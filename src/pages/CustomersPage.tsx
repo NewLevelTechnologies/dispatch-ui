@@ -64,7 +64,7 @@ export default function CustomersPage() {
 
   return (
     <AppLayout>
-      <div className="p-8">
+      <div className="p-3">
         <div className="flex items-center justify-between">
           <div>
             <Heading>Customers</Heading>
@@ -76,13 +76,13 @@ export default function CustomersPage() {
         </div>
 
         {isLoading && (
-          <div className="mt-8 text-center">
+          <div className="mt-3 text-center">
             <p className="text-zinc-600 dark:text-zinc-400">Loading customers...</p>
           </div>
         )}
 
         {error && (
-          <div className="mt-8 rounded-lg bg-red-50 p-4 ring-1 ring-red-200 dark:bg-red-950/10 dark:ring-red-900/20">
+          <div className="mt-3 rounded-lg bg-red-50 p-4 ring-1 ring-red-200 dark:bg-red-950/10 dark:ring-red-900/20">
             <p className="text-sm text-red-800 dark:text-red-400">
               Error loading customers: {(error as Error).message}
             </p>
@@ -90,7 +90,7 @@ export default function CustomersPage() {
         )}
 
         {customers && customers.length === 0 && (
-          <div className="mt-8 text-center">
+          <div className="mt-3 text-center">
             <p className="text-zinc-600 dark:text-zinc-400">No customers found</p>
             <Button className="mt-4" onClick={handleAdd}>
               Add your first customer
@@ -99,8 +99,8 @@ export default function CustomersPage() {
         )}
 
         {customers && customers.length > 0 && (
-          <div className="mt-8">
-            <Table className="[--gutter:theme(spacing.6)] lg:[--gutter:theme(spacing.10)]">
+          <div className="mt-3">
+            <Table className="[--gutter:theme(spacing.2)] lg:[--gutter:theme(spacing.3)]">
               <TableHead>
                 <TableRow>
                   <TableHeader>Name</TableHeader>
