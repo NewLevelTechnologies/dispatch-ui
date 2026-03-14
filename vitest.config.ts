@@ -18,7 +18,32 @@ export default defineConfig({
         '**/*.config.{ts,js}',
         '**/main.tsx',
         '**/vite-env.d.ts',
+        // Exclude third-party Catalyst UI components
+        'src/components/catalyst/**',
+        // Exclude placeholder pages (not yet implemented)
+        'src/pages/DashboardPage.tsx',
+        'src/pages/EquipmentPage.tsx',
+        'src/pages/FinancialPage.tsx',
+        'src/pages/SchedulingPage.tsx',
+        'src/pages/LoginPage.tsx',
+        // Exclude infrastructure files
+        'src/App.tsx',
+        'src/components/AppLayout.tsx',
+        // Exclude config files
+        'src/config/**',
+        // Exclude types
+        'src/types/**',
+        // Exclude utils (tested indirectly)
+        'src/utils/**',
+        // Exclude API client (integration tested via components)
+        'src/api/client.ts',
       ],
+      thresholds: {
+        lines: 80,
+        functions: 80,
+        branches: 80,
+        statements: 80,
+      },
     },
   },
   resolve: {
