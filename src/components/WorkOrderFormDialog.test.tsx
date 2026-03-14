@@ -61,8 +61,15 @@ describe('WorkOrderFormDialog', () => {
 
       renderWithProviders(<WorkOrderFormDialog isOpen={true} onClose={mockOnClose} />);
 
+      // Wait for customers to load
       await waitFor(() => {
-        expect(apiClient.get).toHaveBeenCalled();
+        expect(apiClient.get).toHaveBeenCalledWith('/customers');
+      });
+
+      // Wait for customer options to load
+      await waitFor(() => {
+        const options = screen.getAllByRole('option');
+        expect(options.length).toBeGreaterThan(1);
       });
 
       // Try to submit without selecting a customer
@@ -82,8 +89,15 @@ describe('WorkOrderFormDialog', () => {
 
       renderWithProviders(<WorkOrderFormDialog isOpen={true} onClose={mockOnClose} />);
 
+      // Wait for customers to load
       await waitFor(() => {
-        expect(apiClient.get).toHaveBeenCalled();
+        expect(apiClient.get).toHaveBeenCalledWith('/customers');
+      });
+
+      // Wait for customer options to load
+      await waitFor(() => {
+        const options = screen.getAllByRole('option');
+        expect(options.length).toBeGreaterThan(1);
       });
 
       // Select customer
@@ -125,8 +139,15 @@ describe('WorkOrderFormDialog', () => {
 
       renderWithProviders(<WorkOrderFormDialog isOpen={true} onClose={mockOnClose} />);
 
+      // Wait for customers to load
       await waitFor(() => {
-        expect(apiClient.get).toHaveBeenCalled();
+        expect(apiClient.get).toHaveBeenCalledWith('/customers');
+      });
+
+      // Wait for customer options to load
+      await waitFor(() => {
+        const options = screen.getAllByRole('option');
+        expect(options.length).toBeGreaterThan(1);
       });
 
       const customerSelect = screen.getByLabelText(/customer/i);
@@ -154,8 +175,15 @@ describe('WorkOrderFormDialog', () => {
 
       renderWithProviders(<WorkOrderFormDialog isOpen={true} onClose={mockOnClose} />);
 
+      // Wait for customers to load
       await waitFor(() => {
-        expect(apiClient.get).toHaveBeenCalled();
+        expect(apiClient.get).toHaveBeenCalledWith('/customers');
+      });
+
+      // Wait for customer options to load
+      await waitFor(() => {
+        const options = screen.getAllByRole('option');
+        expect(options.length).toBeGreaterThan(1);
       });
 
       const customerSelect = screen.getByLabelText(/customer/i);
@@ -180,8 +208,15 @@ describe('WorkOrderFormDialog', () => {
 
       renderWithProviders(<WorkOrderFormDialog isOpen={true} onClose={mockOnClose} />);
 
+      // Wait for customers to load
       await waitFor(() => {
-        expect(apiClient.get).toHaveBeenCalled();
+        expect(apiClient.get).toHaveBeenCalledWith('/customers');
+      });
+
+      // Wait for customer options to load
+      await waitFor(() => {
+        const options = screen.getAllByRole('option');
+        expect(options.length).toBeGreaterThan(1);
       });
 
       const customerSelect = screen.getByLabelText(/customer/i);
