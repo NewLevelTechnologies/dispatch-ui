@@ -1,0 +1,85 @@
+name: Setup Repository Labels
+
+on:
+  workflow_dispatch:
+
+permissions:
+  issues: write
+
+jobs:
+  setup-labels:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create/Update Labels
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const labels = [
+              // Type labels
+              { name: 'feature', color: '0e8a16', description: 'New feature or enhancement' },
+              { name: 'bug', color: 'd73a4a', description: 'Something isn\'t working' },
+              { name: 'hotfix', color: 'b60205', description: 'Critical fix for production' },
+              { name: 'chore', color: 'fef2c0', description: 'Maintenance tasks' },
+              { name: 'documentation', color: '0075ca', description: 'Documentation updates' },
+              { name: 'test', color: 'bfe5bf', description: 'Test updates' },
+              { name: 'refactoring', color: 'fbca04', description: 'Code refactoring' },
+
+              // Frontend-specific labels
+              { name: 'components', color: 'c5def5', description: 'React component changes' },
+              { name: 'pages', color: 'c5def5', description: 'Page-level changes' },
+              { name: 'api', color: 'c5def5', description: 'API integration changes' },
+              { name: 'utils', color: 'c5def5', description: 'Utility/helper function changes' },
+              { name: 'styling', color: 'e99695', description: 'CSS/styling changes' },
+              { name: 'dependencies', color: 'fbca04', description: 'Package dependency updates' },
+
+              // Infrastructure labels
+              { name: 'ci-cd', color: '0e8a16', description: 'CI/CD pipeline changes' },
+
+              // Size labels
+              { name: 'size/XS', color: 'c2e0c6', description: 'Extra small PR (<50 changes)' },
+              { name: 'size/S', color: 'c2e0c6', description: 'Small PR (50-200 changes)' },
+              { name: 'size/M', color: 'fbca04', description: 'Medium PR (200-500 changes)' },
+              { name: 'size/L', color: 'ee9900', description: 'Large PR (500-1000 changes)' },
+              { name: 'size/XL', color: 'd73a4a', description: 'Extra large PR (>1000 changes)' },
+
+              // Status labels
+              { name: 'needs-review', color: 'fbca04', description: 'Awaiting code review' },
+              { name: 'needs-testing', color: 'fbca04', description: 'Needs manual testing' },
+              { name: 'work-in-progress', color: 'd4c5f9', description: 'Work in progress' },
+              { name: 'ready-to-merge', color: '0e8a16', description: 'Ready to be merged' },
+              { name: 'blocked', color: 'd73a4a', description: 'Blocked by another issue' },
+
+              // Priority labels
+              { name: 'priority/critical', color: 'b60205', description: 'Critical priority' },
+              { name: 'priority/high', color: 'd93f0b', description: 'High priority' },
+              { name: 'priority/medium', color: 'fbca04', description: 'Medium priority' },
+              { name: 'priority/low', color: '0e8a16', description: 'Low priority' }
+            ];
+
+            for (const label of labels) {
+              try {
+                await github.rest.issues.createLabel({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  name: label.name,
+                  color: label.color,
+                  description: label.description
+                });
+                console.log(`✅ Created label: ${label.name}`);
+              } catch (error) {
+                if (error.status === 422) {
+                  await github.rest.issues.updateLabel({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    name: label.name,
+                    color: label.color,
+                    description: label.description
+                  });
+                  console.log(`🔄 Updated label: ${label.name}`);
+                } else {
+                  console.error(`❌ Error with label ${label.name}:`, error.message);
+                }
+              }
+            }
+
+            console.log('✨ Label setup complete!');

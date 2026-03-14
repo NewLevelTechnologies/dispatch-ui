@@ -1,0 +1,171 @@
+name: PR Auto Labeler
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  label:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Label based on branch name
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const prNumber = context.payload.pull_request.number;
+            const branchName = context.payload.pull_request.head.ref;
+            const labels = [];
+
+            // Branch-based labels
+            if (branchName.startsWith('feature/')) {
+              labels.push('feature');
+            } else if (branchName.startsWith('fix/') || branchName.startsWith('bugfix/')) {
+              labels.push('bug');
+            } else if (branchName.startsWith('hotfix/')) {
+              labels.push('hotfix');
+            } else if (branchName.startsWith('chore/')) {
+              labels.push('chore');
+            } else if (branchName.startsWith('docs/')) {
+              labels.push('documentation');
+            } else if (branchName.startsWith('test/')) {
+              labels.push('test');
+            } else if (branchName.startsWith('refactor/')) {
+              labels.push('refactoring');
+            }
+
+            // Add labels if any were determined
+            if (labels.length > 0) {
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: prNumber,
+                labels: labels
+              });
+              console.log(`Added labels: ${labels.join(', ')}`);
+            }
+
+      - name: Label based on changed files
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const prNumber = context.payload.pull_request.number;
+
+            // Get list of changed files
+            const { data: files } = await github.rest.pulls.listFiles({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: prNumber
+            });
+
+            const labels = new Set();
+
+            for (const file of files) {
+              const path = file.filename;
+
+              // Component-specific labels
+              if (path.includes('src/components/')) {
+                labels.add('components');
+              }
+              if (path.includes('src/pages/')) {
+                labels.add('pages');
+              }
+              if (path.includes('src/api/')) {
+                labels.add('api');
+              }
+              if (path.includes('src/utils/') || path.includes('src/lib/')) {
+                labels.add('utils');
+              }
+
+              // Type-specific labels
+              if (path.includes('test') || path.includes('spec')) {
+                labels.add('test');
+              }
+              if (path.endsWith('.css') || path.endsWith('.scss') || path.includes('styles')) {
+                labels.add('styling');
+              }
+              if (path.endsWith('.md')) {
+                labels.add('documentation');
+              }
+              if (path.includes('.github/workflows/')) {
+                labels.add('ci-cd');
+              }
+              if (path.includes('package.json') || path.includes('package-lock.json')) {
+                labels.add('dependencies');
+              }
+            }
+
+            if (labels.size > 0) {
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: prNumber,
+                labels: Array.from(labels)
+              });
+              console.log(`Added labels: ${Array.from(labels).join(', ')}`);
+            }
+
+      - name: Label based on PR size
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const prNumber = context.payload.pull_request.number;
+
+            // Get PR details including changes
+            const { data: pr } = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: prNumber
+            });
+
+            const additions = pr.additions;
+            const deletions = pr.deletions;
+            const totalChanges = additions + deletions;
+
+            let sizeLabel = '';
+
+            if (totalChanges < 50) {
+              sizeLabel = 'size/XS';
+            } else if (totalChanges < 200) {
+              sizeLabel = 'size/S';
+            } else if (totalChanges < 500) {
+              sizeLabel = 'size/M';
+            } else if (totalChanges < 1000) {
+              sizeLabel = 'size/L';
+            } else {
+              sizeLabel = 'size/XL';
+            }
+
+            // Remove old size labels
+            const { data: currentLabels } = await github.rest.issues.listLabelsOnIssue({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prNumber
+            });
+
+            for (const label of currentLabels) {
+              if (label.name.startsWith('size/')) {
+                await github.rest.issues.removeLabel({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: prNumber,
+                  name: label.name
+                });
+              }
+            }
+
+            // Add new size label
+            await github.rest.issues.addLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prNumber,
+              labels: [sizeLabel]
+            });
+
+            console.log(`Added size label: ${sizeLabel} (${totalChanges} changes)`);
