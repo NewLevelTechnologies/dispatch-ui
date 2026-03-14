@@ -734,6 +734,260 @@ npm run lint
 
 ## Testing
 
+### Test Framework
+
+The project uses **Vitest** + **React Testing Library** for automated testing.
+
+**Key dependencies**:
+- `vitest` - Test runner (Vite-native, fast)
+- `@testing-library/react` - React component testing utilities
+- `@testing-library/user-event` - User interaction simulation
+- `@testing-library/jest-dom` - DOM matchers
+- `jsdom` - DOM implementation for Node
+
+### Running Tests
+
+```bash
+# Run all tests (watch mode)
+npm test
+
+# Run tests once (CI mode)
+npm test -- --run
+
+# Run with UI
+npm run test:ui
+
+# Run with coverage
+npm run test:coverage
+```
+
+### Test File Patterns
+
+Test files are co-located with source files:
+- `src/pages/CustomersPage.test.tsx` - Page component tests
+- `src/components/CustomerFormDialog.test.tsx` - Dialog component tests
+
+**Naming**: Use `.test.tsx` suffix (not `.spec.tsx`)
+
+### Test Utilities
+
+**Custom render function** (`src/test/utils.tsx`):
+```typescript
+import { renderWithProviders } from '../test/utils';
+
+// Automatically wraps components with React Query and Router providers
+renderWithProviders(<MyComponent />);
+```
+
+**Mock API calls**:
+```typescript
+import { vi } from 'vitest';
+import apiClient from '../api/client';
+
+vi.mock('../api/client');
+
+// In test:
+vi.mocked(apiClient.get).mockResolvedValue({ data: mockData });
+```
+
+### Example: Testing a Page Component
+
+**File**: `src/pages/CustomersPage.test.tsx`
+
+```typescript
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { screen, waitFor } from '@testing-library/react';
+import { renderWithProviders, userEvent } from '../test/utils';
+import CustomersPage from './CustomersPage';
+import apiClient from '../api/client';
+
+vi.mock('../api/client');
+
+const mockCustomers = [
+  {
+    id: '1',
+    name: 'John Doe',
+    email: 'john@example.com',
+    phone: '555-1234',
+  },
+];
+
+describe('CustomersPage', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('displays customers in a table', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({ data: mockCustomers });
+
+    renderWithProviders(<CustomersPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('John Doe')).toBeInTheDocument();
+    });
+
+    expect(screen.getByText('john@example.com')).toBeInTheDocument();
+  });
+
+  it('opens create dialog when add button is clicked', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({ data: [] });
+    const user = userEvent.setup();
+
+    renderWithProviders(<CustomersPage />);
+
+    const addButton = screen.getByRole('button', { name: /add customer/i });
+    await user.click(addButton);
+
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+  });
+});
+```
+
+### Example: Testing a Form Dialog
+
+**File**: `src/components/CustomerFormDialog.test.tsx`
+
+```typescript
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { screen, waitFor } from '@testing-library/react';
+import { renderWithProviders, userEvent } from '../test/utils';
+import CustomerFormDialog from './CustomerFormDialog';
+import apiClient from '../api/client';
+
+vi.mock('../api/client');
+
+describe('CustomerFormDialog', () => {
+  const mockOnClose = vi.fn();
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('submits form with valid data', async () => {
+    const user = userEvent.setup();
+    vi.mocked(apiClient.post).mockResolvedValue({ data: { id: '1' } });
+
+    renderWithProviders(
+      <CustomerFormDialog isOpen={true} onClose={mockOnClose} />
+    );
+
+    await user.type(screen.getByLabelText(/name/i), 'John Doe');
+    await user.type(screen.getByLabelText(/email/i), 'john@example.com');
+
+    const submitButton = screen.getByRole('button', { name: /create/i });
+    await user.click(submitButton);
+
+    await waitFor(() => {
+      expect(apiClient.post).toHaveBeenCalledWith('/customers', {
+        name: 'John Doe',
+        email: 'john@example.com',
+        phone: '',
+        address: '',
+        city: '',
+        state: '',
+        zipCode: '',
+      });
+    });
+
+    expect(mockOnClose).toHaveBeenCalled();
+  });
+});
+```
+
+### Testing Best Practices
+
+**1. Mock API calls at the module level**:
+```typescript
+vi.mock('../api/client');
+```
+
+**2. Clear mocks between tests**:
+```typescript
+beforeEach(() => {
+  vi.clearAllMocks();
+});
+```
+
+**3. Use `waitFor` for async operations**:
+```typescript
+await waitFor(() => {
+  expect(screen.getByText('Data')).toBeInTheDocument();
+});
+```
+
+**4. Simulate user interactions with `userEvent`**:
+```typescript
+const user = userEvent.setup();
+await user.click(button);
+await user.type(input, 'text');
+```
+
+**5. Use accessible queries**:
+```typescript
+// ✅ Good - accessible
+screen.getByRole('button', { name: /submit/i })
+screen.getByLabelText(/email/i)
+
+// ❌ Avoid - brittle
+screen.getByClassName('submit-btn')
+screen.getByTestId('email-input')
+```
+
+**6. Test user-facing behavior, not implementation**:
+```typescript
+// ✅ Good - tests what user sees
+expect(screen.getByText('John Doe')).toBeInTheDocument();
+
+// ❌ Avoid - tests implementation details
+expect(component.state.customers).toHaveLength(1);
+```
+
+### What to Test
+
+**For Page components**:
+- [ ] Renders title and action buttons
+- [ ] Displays loading state
+- [ ] Displays error state
+- [ ] Displays empty state
+- [ ] Displays data in table
+- [ ] Opens create dialog on button click
+- [ ] Opens edit dialog from dropdown
+- [ ] Delete confirmation works
+
+**For Form Dialog components**:
+- [ ] Renders in create mode (empty form)
+- [ ] Renders in edit mode (pre-filled form)
+- [ ] Validates required fields
+- [ ] Submits create with correct data
+- [ ] Submits update with correct data
+- [ ] Displays saving state
+- [ ] Closes on cancel
+- [ ] Closes on successful submit
+- [ ] Resets form when reopened
+
+### Test Configuration
+
+**Vitest config** (`vitest.config.ts`):
+```typescript
+import { defineConfig } from 'vitest/config';
+import react from '@vitejs/plugin-react';
+
+export default defineConfig({
+  plugins: [react()],
+  test: {
+    globals: true,
+    environment: 'jsdom',
+    setupFiles: './src/test/setup.ts',
+  },
+});
+```
+
+**Test setup** (`src/test/setup.ts`):
+- Extends matchers with `@testing-library/jest-dom`
+- Mocks AWS Amplify authentication
+- Mocks `window.matchMedia`
+- Cleans up after each test
+
 ### Manual Testing Checklist
 
 For each entity page:
@@ -838,9 +1092,12 @@ aws cloudfront create-invalidation \
 | `src/api/client.ts` | Axios instance with JWT interceptor |
 | `src/components/AppLayout.tsx` | Main layout with navigation |
 | `src/config/amplify.ts` | AWS Amplify/Cognito configuration |
+| `src/test/setup.ts` | Test environment configuration and mocks |
+| `src/test/utils.tsx` | Custom render with providers |
 | `.github/workflows/deploy.yml` | Deployment to S3/CloudFront |
-| `.github/workflows/pr-checks.yml` | PR validation (lint + build) |
+| `.github/workflows/pr-checks.yml` | PR validation (lint + test + build) |
 | `vite.config.ts` | Vite build configuration |
+| `vitest.config.ts` | Vitest test configuration |
 | `package.json` | Dependencies and scripts |
 
 ---
