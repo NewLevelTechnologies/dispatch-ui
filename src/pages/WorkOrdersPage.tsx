@@ -110,13 +110,13 @@ export default function WorkOrdersPage() {
       </div>
 
         {isLoading && (
-          <div className="mt-3 text-center">
+          <div className="mt-8 text-center">
             <p className="text-zinc-600 dark:text-zinc-400">Loading work orders...</p>
           </div>
         )}
 
         {error && (
-          <div className="mt-3 rounded-lg bg-red-50 p-4 ring-1 ring-red-200 dark:bg-red-950/10 dark:ring-red-900/20">
+          <div className="mt-8 rounded-lg bg-red-50 p-4 ring-1 ring-red-200 dark:bg-red-950/10 dark:ring-red-900/20">
             <p className="text-sm text-red-800 dark:text-red-400">
               Error loading work orders: {(error as Error).message}
             </p>
@@ -124,7 +124,7 @@ export default function WorkOrdersPage() {
         )}
 
         {workOrders && workOrders.length === 0 && (
-          <div className="mt-3 text-center">
+          <div className="mt-8 text-center">
             <p className="text-zinc-600 dark:text-zinc-400">No work orders found</p>
             <Button className="mt-4" onClick={handleAdd}>
               Create your first work order
@@ -133,7 +133,7 @@ export default function WorkOrdersPage() {
         )}
 
         {workOrders && workOrders.length > 0 && (
-          <div className="mt-3">
+          <div className="mt-8">
             <Table className="[--gutter:theme(spacing.2)] lg:[--gutter:theme(spacing.3)]">
               <TableHead>
                 <TableRow>
