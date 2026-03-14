@@ -1,0 +1,61 @@
+name: PR Checks
+
+on:
+  pull_request:
+    branches:
+      - dev
+      - qa
+      - main
+
+env:
+  NODE_VERSION: '20'
+
+jobs:
+  test:
+    name: Lint & Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run linter
+        run: npm run lint
+
+      - name: Build
+        run: npm run build
+        env:
+          # Use example values for build validation
+          VITE_COGNITO_USER_POOL_ID: us-east-1_EXAMPLE
+          VITE_COGNITO_CLIENT_ID: example_client_id
+          VITE_COGNITO_DOMAIN: example.auth.us-east-1.amazoncognito.com
+          VITE_API_BASE_URL: https://api.example.com
+          VITE_ENV: development
+
+      - name: Check build size
+        run: |
+          BUILD_SIZE=$(du -sh dist/ | cut -f1)
+          echo "📦 Build size: $BUILD_SIZE"
+
+          # Warn if build is larger than 5MB
+          BUILD_SIZE_KB=$(du -sk dist/ | cut -f1)
+          if [ $BUILD_SIZE_KB -gt 5120 ]; then
+            echo "⚠️ Warning: Build size exceeds 5MB"
+          else
+            echo "✅ Build size is acceptable"
+          fi
+
+      - name: Summary
+        run: |
+          echo "✅ All checks passed!"
+          echo "- Lint: Passed"
+          echo "- Build: Success"
