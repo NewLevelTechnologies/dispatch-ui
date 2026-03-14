@@ -56,8 +56,8 @@ export default function PaymentsPage() {
     try {
       setLoading(true);
       const [paymentsData, invoicesData, customersData] = await Promise.all([
-        paymentsApi.getAll(),
-        invoicesApi.getAll(),
+        paymentsApi.getAll().catch(() => []),
+        invoicesApi.getAll().catch(() => []),
         fetch('/api/v1/customers').then(res => res.json()).catch(() => []),
       ]);
       setPayments(paymentsData);
@@ -65,6 +65,9 @@ export default function PaymentsPage() {
       setCustomers(customersData);
     } catch (error) {
       console.error('Error loading data:', error);
+      setPayments([]);
+      setInvoices([]);
+      setCustomers([]);
     } finally {
       setLoading(false);
     }

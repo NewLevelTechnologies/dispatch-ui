@@ -58,13 +58,15 @@ export default function QuotesPage() {
     try {
       setLoading(true);
       const [quotesData, customersData] = await Promise.all([
-        quotesApi.getAll(),
+        quotesApi.getAll().catch(() => []),
         fetch('/api/v1/customers').then(res => res.json()).catch(() => []),
       ]);
       setQuotes(quotesData);
       setCustomers(customersData);
     } catch (error) {
       console.error('Error loading data:', error);
+      setQuotes([]);
+      setCustomers([]);
     } finally {
       setLoading(false);
     }

@@ -66,7 +66,7 @@ export default function InvoicesPage() {
     try {
       setLoading(true);
       const [invoicesData, customersData, workOrdersData] = await Promise.all([
-        invoicesApi.getAll(),
+        invoicesApi.getAll().catch(() => []),
         fetch('/api/v1/customers').then(res => res.json()).catch(() => []),
         fetch('/api/v1/work-orders').then(res => res.json()).catch(() => []),
       ]);
@@ -75,6 +75,9 @@ export default function InvoicesPage() {
       setWorkOrders(workOrdersData);
     } catch (error) {
       console.error('Error loading data:', error);
+      setInvoices([]);
+      setCustomers([]);
+      setWorkOrders([]);
     } finally {
       setLoading(false);
     }
