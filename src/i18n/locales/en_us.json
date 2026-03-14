@@ -1,67 +1,87 @@
 {
-  "entities": {
-    "customer": "Customer",
-    "customers": "Customers",
-    "workOrder": "Work Order",
-    "workOrders": "Work Orders",
-    "equipment": "Equipment",
-    "dashboard": "Dashboard",
-    "financial": "Financial",
-    "scheduling": "Scheduling",
-    "revenue": "Revenue"
-  },
   "app": {
-    "name": "Dispatch",
-    "loading": "Loading..."
+    "loading": "Loading...",
+    "name": "Dispatch"
   },
   "common": {
-    "signOut": "Sign out",
-    "cancel": "Cancel",
-    "create": "Create",
-    "update": "Update",
-    "edit": "Edit",
-    "delete": "Delete",
-    "saving": "Saving...",
-    "add": "Add",
-    "moreOptions": "More options",
-    "active": "Active",
     "actions": {
       "add": "Add {{entity}}",
       "addFirst": "Add your first {{entity, lowercase}}",
       "create": "Create {{entity}}",
       "createFirst": "Create your first {{entity, lowercase}}",
-      "edit": "Edit {{entity}}",
-      "loading": "Loading {{entities, lowercase}}...",
-      "errorLoading": "Error loading {{entities, lowercase}}",
-      "notFound": "No {{entities, lowercase}} found",
       "deleteConfirm": "Are you sure you want to delete {{name}}?",
-      "deleteConfirmGeneric": "Are you sure you want to delete this {{entity, lowercase}}?"
+      "deleteConfirmGeneric": "Are you sure you want to delete this {{entity, lowercase}}?",
+      "edit": "Edit {{entity}}",
+      "errorLoading": "Error loading {{entities, lowercase}}",
+      "loading": "Loading {{entities, lowercase}}...",
+      "notFound": "No {{entities, lowercase}} found"
     },
+    "active": "Active",
+    "add": "Add",
+    "cancel": "Cancel",
+    "create": "Create",
+    "delete": "Delete",
+    "edit": "Edit",
     "form": {
-      "titleCreate": "{{action}} {{entity}}",
-      "titleEdit": "{{action}} {{entity}}",
-      "descriptionCreate": "Create a new {{entity, lowercase}} record.",
-      "descriptionEdit": "Update {{entity, lowercase}} information.",
-      "name": "Name",
-      "email": "Email",
-      "phone": "Phone",
       "address": "Address",
       "city": "City",
+      "description": "Description",
+      "descriptionCreate": "Create a new {{entity, lowercase}} record.",
+      "descriptionEdit": "Update {{entity, lowercase}} information.",
+      "email": "Email",
+      "errorCreate": "Failed to create {{entity, lowercase}}",
+      "errorUpdate": "Failed to update {{entity, lowercase}}",
+      "name": "Name",
+      "notes": "Notes",
+      "phone": "Phone",
       "state": "State",
       "stateHelper": "CA",
-      "zipCode": "Zip Code",
-      "description": "Description",
-      "notes": "Notes",
       "status": "Status",
-      "errorCreate": "Failed to create {{entity, lowercase}}",
-      "errorUpdate": "Failed to update {{entity, lowercase}}"
-    }
+      "titleCreate": "{{action}} {{entity}}",
+      "titleEdit": "{{action}} {{entity}}",
+      "zipCode": "Zip Code"
+    },
+    "moreOptions": "More options",
+    "saving": "Saving...",
+    "signOut": "Sign out",
+    "update": "Update"
   },
   "customers": {
     "description": "Manage your customer database",
     "table": {
       "location": "Location"
     }
+  },
+  "dashboard": {
+    "stats": {
+      "activeWorkOrders": "Active work orders",
+      "thisMonth": "This month",
+      "totalCustomers": "Total customers"
+    },
+    "welcome": "Welcome to Dispatch"
+  },
+  "entities": {
+    "customer": "Customer",
+    "customers": "Customers",
+    "dashboard": "Dashboard",
+    "equipment": "Equipment",
+    "financial": "Financial",
+    "revenue": "Revenue",
+    "scheduling": "Scheduling",
+    "workOrder": "Work Order",
+    "workOrders": "Work Orders"
+  },
+  "equipment": {
+    "comingSoon": "Coming soon...",
+    "description": "Track equipment and inventory"
+  },
+  "financial": {
+    "comingSoon": "Coming soon...",
+    "description": "Manage invoices, quotes, and payments"
+  },
+  "scheduling": {
+    "comingSoon": "Coming soon...",
+    "description": "Manage dispatches and technician schedules"
   },
   "workOrders": {
     "description": "Manage work orders and service requests",
@@ -71,36 +91,16 @@
       "scheduledDate": "Scheduled Date"
     },
     "status": {
-      "pending": "Pending",
-      "scheduled": "Scheduled",
-      "inProgress": "In Progress",
+      "cancelled": "Cancelled",
       "completed": "Completed",
-      "cancelled": "Cancelled"
+      "inProgress": "In Progress",
+      "pending": "Pending",
+      "scheduled": "Scheduled"
     },
     "table": {
+      "amount": "Amount",
       "id": "ID",
-      "scheduled": "Scheduled",
-      "amount": "Amount"
+      "scheduled": "Scheduled"
     }
-  },
-  "dashboard": {
-    "welcome": "Welcome to Dispatch",
-    "stats": {
-      "totalCustomers": "Total customers",
-      "activeWorkOrders": "Active work orders",
-      "thisMonth": "This month"
-    }
-  },
-  "equipment": {
-    "description": "Track equipment and inventory",
-    "comingSoon": "Coming soon..."
-  },
-  "financial": {
-    "description": "Manage invoices, quotes, and payments",
-    "comingSoon": "Coming soon..."
-  },
-  "scheduling": {
-    "description": "Manage dispatches and technician schedules",
-    "comingSoon": "Coming soon..."
   }
 }
