@@ -137,4 +137,81 @@ describe('CustomersPage', () => {
     const dashElements = screen.getAllByText('-');
     expect(dashElements.length).toBeGreaterThan(0);
   });
+
+  it('opens edit dialog when edit button is clicked', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({ data: mockCustomers });
+    const user = userEvent.setup();
+
+    renderWithProviders(<CustomersPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('John Doe')).toBeInTheDocument();
+    });
+
+    // Click the dropdown button
+    const dropdownButtons = screen.getAllByRole('button', { name: /more options/i });
+    await user.click(dropdownButtons[0]);
+
+    // Click edit option
+    const editButton = screen.getByRole('menuitem', { name: /edit/i });
+    await user.click(editButton);
+
+    // Dialog should open with Edit Customer title
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    expect(screen.getAllByText('Edit Customer').length).toBeGreaterThan(0);
+  });
+
+  it('calls delete mutation when delete is confirmed', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({ data: mockCustomers });
+    vi.mocked(apiClient.delete).mockResolvedValue({ data: {} });
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const user = userEvent.setup();
+
+    renderWithProviders(<CustomersPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('John Doe')).toBeInTheDocument();
+    });
+
+    // Click the dropdown button
+    const dropdownButtons = screen.getAllByRole('button', { name: /more options/i });
+    await user.click(dropdownButtons[0]);
+
+    // Click delete option
+    const deleteButton = screen.getByRole('menuitem', { name: /delete/i });
+    await user.click(deleteButton);
+
+    await waitFor(() => {
+      expect(confirmSpy).toHaveBeenCalledWith('Are you sure you want to delete John Doe?');
+      expect(apiClient.delete).toHaveBeenCalledWith('/customers/1');
+    });
+
+    confirmSpy.mockRestore();
+  });
+
+  it('does not delete when deletion is cancelled', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({ data: mockCustomers });
+    vi.mocked(apiClient.delete).mockResolvedValue({ data: {} });
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    const user = userEvent.setup();
+
+    renderWithProviders(<CustomersPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('John Doe')).toBeInTheDocument();
+    });
+
+    // Click the dropdown button
+    const dropdownButtons = screen.getAllByRole('button', { name: /more options/i });
+    await user.click(dropdownButtons[0]);
+
+    // Click delete option
+    const deleteButton = screen.getByRole('menuitem', { name: /delete/i });
+    await user.click(deleteButton);
+
+    expect(confirmSpy).toHaveBeenCalled();
+    expect(apiClient.delete).not.toHaveBeenCalled();
+
+    confirmSpy.mockRestore();
+  });
 });
