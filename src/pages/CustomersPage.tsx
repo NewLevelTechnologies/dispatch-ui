@@ -66,91 +66,89 @@ export default function CustomersPage() {
 
   return (
     <AppLayout>
-      <div className="p-8">
-        <div className="flex items-center justify-between">
-          <div>
-            <Heading>{t('customers.entities')}</Heading>
-            <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
-              {t('customers.description')}
-            </p>
-          </div>
-          <Button onClick={handleAdd}>{t('common.actions.add', { entity: t('customers.entity') })}</Button>
+      <div className="flex items-center justify-between">
+        <div>
+          <Heading>{t('customers.entities')}</Heading>
+          <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
+            {t('customers.description')}
+          </p>
         </div>
-
-        {isLoading && (
-          <div className="mt-8 text-center">
-            <p className="text-zinc-600 dark:text-zinc-400">{t('common.actions.loading', { entities: t('customers.entities') })}</p>
-          </div>
-        )}
-
-        {error && (
-          <div className="mt-8 rounded-lg bg-red-50 p-4 ring-1 ring-red-200 dark:bg-red-950/10 dark:ring-red-900/20">
-            <p className="text-sm text-red-800 dark:text-red-400">
-              {t('common.actions.errorLoading', { entities: t('customers.entities') })}: {(error as Error).message}
-            </p>
-          </div>
-        )}
-
-        {customers && customers.length === 0 && (
-          <div className="mt-8 text-center">
-            <p className="text-zinc-600 dark:text-zinc-400">{t('common.actions.notFound', { entities: t('customers.entities') })}</p>
-            <Button className="mt-4" onClick={handleAdd}>
-              {t('common.actions.addFirst', { entity: t('customers.entity') })}
-            </Button>
-          </div>
-        )}
-
-        {customers && customers.length > 0 && (
-          <div className="mt-8">
-            <Table className="[--gutter:theme(spacing.6)] lg:[--gutter:theme(spacing.10)]">
-              <TableHead>
-                <TableRow>
-                  <TableHeader>{t('common.form.name')}</TableHeader>
-                  <TableHeader>{t('common.form.email')}</TableHeader>
-                  <TableHeader>{t('common.form.phone')}</TableHeader>
-                  <TableHeader>{t('customers.table.location')}</TableHeader>
-                  <TableHeader>{t('common.form.status')}</TableHeader>
-                  <TableHeader></TableHeader>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {customers.map((customer) => (
-                  <TableRow key={customer.id}>
-                    <TableCell className="font-medium">{customer.name}</TableCell>
-                    <TableCell className="text-zinc-500">{customer.email}</TableCell>
-                    <TableCell className="text-zinc-500">{customer.phone || '-'}</TableCell>
-                    <TableCell className="text-zinc-500">
-                      {customer.city && customer.state
-                        ? `${customer.city}, ${customer.state}`
-                        : '-'}
-                    </TableCell>
-                    <TableCell>
-                      <Badge color="lime">{t('common.active')}</Badge>
-                    </TableCell>
-                    <TableCell>
-                      <div className="-mx-3 -my-1.5 sm:-mx-2.5">
-                        <Dropdown>
-                          <DropdownButton plain aria-label={t('common.moreOptions')}>
-                            <EllipsisVerticalIcon className="size-5" />
-                          </DropdownButton>
-                          <DropdownMenu anchor="bottom end">
-                            <DropdownItem onClick={() => handleEdit(customer)}>
-                              <DropdownLabel>{t('common.edit')}</DropdownLabel>
-                            </DropdownItem>
-                            <DropdownItem onClick={() => handleDelete(customer)}>
-                              <DropdownLabel>{t('common.delete')}</DropdownLabel>
-                            </DropdownItem>
-                          </DropdownMenu>
-                        </Dropdown>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        )}
+        <Button onClick={handleAdd}>{t('common.actions.add', { entity: t('customers.entity') })}</Button>
       </div>
+
+      {isLoading && (
+        <div className="mt-8 text-center">
+          <p className="text-zinc-600 dark:text-zinc-400">{t('common.actions.loading', { entities: t('customers.entities') })}</p>
+        </div>
+      )}
+
+      {error && (
+        <div className="mt-8 rounded-lg bg-red-50 p-4 ring-1 ring-red-200 dark:bg-red-950/10 dark:ring-red-900/20">
+          <p className="text-sm text-red-800 dark:text-red-400">
+            {t('common.actions.errorLoading', { entities: t('customers.entities') })}: {(error as Error).message}
+          </p>
+        </div>
+      )}
+
+      {customers && customers.length === 0 && (
+        <div className="mt-8 text-center">
+          <p className="text-zinc-600 dark:text-zinc-400">{t('common.actions.notFound', { entities: t('customers.entities') })}</p>
+          <Button className="mt-4" onClick={handleAdd}>
+            {t('common.actions.addFirst', { entity: t('customers.entity') })}
+          </Button>
+        </div>
+      )}
+
+      {customers && customers.length > 0 && (
+        <div className="mt-8">
+          <Table className="[--gutter:theme(spacing.2)] lg:[--gutter:theme(spacing.3)]">
+            <TableHead>
+              <TableRow>
+                <TableHeader>{t('common.form.name')}</TableHeader>
+                <TableHeader>{t('common.form.email')}</TableHeader>
+                <TableHeader>{t('common.form.phone')}</TableHeader>
+                <TableHeader>{t('customers.table.location')}</TableHeader>
+                <TableHeader>{t('common.form.status')}</TableHeader>
+                <TableHeader></TableHeader>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {customers.map((customer) => (
+                <TableRow key={customer.id}>
+                  <TableCell className="font-medium">{customer.name}</TableCell>
+                  <TableCell className="text-zinc-500">{customer.email}</TableCell>
+                  <TableCell className="text-zinc-500">{customer.phone || '-'}</TableCell>
+                  <TableCell className="text-zinc-500">
+                    {customer.city && customer.state
+                      ? `${customer.city}, ${customer.state}`
+                      : '-'}
+                  </TableCell>
+                  <TableCell>
+                    <Badge color="lime">{t('common.active')}</Badge>
+                  </TableCell>
+                  <TableCell>
+                    <div className="-mx-3 -my-1.5 sm:-mx-2.5">
+                      <Dropdown>
+                        <DropdownButton plain aria-label={t('common.moreOptions')}>
+                          <EllipsisVerticalIcon className="size-5" />
+                        </DropdownButton>
+                        <DropdownMenu anchor="bottom end">
+                          <DropdownItem onClick={() => handleEdit(customer)}>
+                            <DropdownLabel>{t('common.edit')}</DropdownLabel>
+                          </DropdownItem>
+                          <DropdownItem onClick={() => handleDelete(customer)}>
+                            <DropdownLabel>{t('common.delete')}</DropdownLabel>
+                          </DropdownItem>
+                        </DropdownMenu>
+                      </Dropdown>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      )}
 
       <CustomerFormDialog
         isOpen={isDialogOpen}

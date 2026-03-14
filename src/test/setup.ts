@@ -149,3 +149,13 @@ vi.mock('react-i18next', () => {
     },
   };
 });
+
+// Mock ThemeContext
+vi.mock('../contexts/ThemeContext', () => ({
+  useTheme: vi.fn(() => ({
+    theme: 'light',
+    setTheme: vi.fn(),
+    resolvedTheme: 'light',
+  })),
+  ThemeProvider: ({ children }: { children: React.ReactNode }) => children,
+}));
