@@ -8,6 +8,11 @@ import EquipmentPage from './pages/EquipmentPage';
 import FinancialPage from './pages/FinancialPage';
 import SchedulingPage from './pages/SchedulingPage';
 
+// ProtectedRoute component - defined outside of App to avoid recreation on every render
+const ProtectedRoute = ({ element, isAuthenticated }: { element: React.ReactElement; isAuthenticated: boolean }) => {
+  return isAuthenticated ? element : <Navigate to="/login" replace />;
+};
+
 function App() {
   const { authStatus } = useAuthenticator((context) => [context.authStatus]);
 
@@ -20,9 +25,7 @@ function App() {
     );
   }
 
-  const ProtectedRoute = ({ element }: { element: React.ReactElement }) => {
-    return authStatus === 'authenticated' ? element : <Navigate to="/login" replace />;
-  };
+  const isAuthenticated = authStatus === 'authenticated';
 
   return (
     <Routes>
@@ -36,12 +39,12 @@ function App() {
           )
         }
       />
-      <Route path="/dashboard" element={<ProtectedRoute element={<DashboardPage />} />} />
-      <Route path="/customers" element={<ProtectedRoute element={<CustomersPage />} />} />
-      <Route path="/work-orders" element={<ProtectedRoute element={<WorkOrdersPage />} />} />
-      <Route path="/equipment" element={<ProtectedRoute element={<EquipmentPage />} />} />
-      <Route path="/financial" element={<ProtectedRoute element={<FinancialPage />} />} />
-      <Route path="/scheduling" element={<ProtectedRoute element={<SchedulingPage />} />} />
+      <Route path="/dashboard" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<DashboardPage />} />} />
+      <Route path="/customers" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<CustomersPage />} />} />
+      <Route path="/work-orders" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<WorkOrdersPage />} />} />
+      <Route path="/equipment" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<EquipmentPage />} />} />
+      <Route path="/financial" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<FinancialPage />} />} />
+      <Route path="/scheduling" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<SchedulingPage />} />} />
       <Route
         path="/"
         element={

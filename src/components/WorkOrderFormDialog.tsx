@@ -56,8 +56,8 @@ export default function WorkOrderFormDialog({ isOpen, onClose, workOrder }: Work
 
     // Intentionally setting form state based on props in useEffect
     // This is the recommended pattern for initializing controlled forms
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (workOrder) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setFormData({
         customerId: workOrder.customerId,
         status: workOrder.status,
@@ -66,6 +66,7 @@ export default function WorkOrderFormDialog({ isOpen, onClose, workOrder }: Work
         notes: workOrder.notes || '',
       });
     } else {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setFormData({
         customerId: '',
         status: 'PENDING',

@@ -42,10 +42,11 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
 
     // Intentionally setting form state based on props in useEffect
     // This is the recommended pattern for initializing controlled forms
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (customer) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setFormData(customer);
     } else {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setFormData({
         name: '',
         email: '',
