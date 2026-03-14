@@ -56,7 +56,6 @@ describe('WorkOrderFormDialog', () => {
     it('validates required customer field', async () => {
       vi.mocked(apiClient.get).mockResolvedValue({ data: mockCustomers });
       vi.mocked(apiClient.post).mockResolvedValue({ data: { id: '1' } });
-      const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
       const user = userEvent.setup();
 
       renderWithProviders(<WorkOrderFormDialog isOpen={true} onClose={mockOnClose} />);
@@ -76,10 +75,8 @@ describe('WorkOrderFormDialog', () => {
       const submitButton = screen.getByRole('button', { name: /create/i });
       await user.click(submitButton);
 
-      expect(alertSpy).toHaveBeenCalledWith('Please select a customer');
+      // HTML5 required attribute prevents form submission, so API should not be called
       expect(apiClient.post).not.toHaveBeenCalled();
-
-      alertSpy.mockRestore();
     });
 
     it('submits form with valid data', async () => {
