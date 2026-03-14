@@ -51,11 +51,11 @@ export default function WorkOrderFormDialog({ isOpen, onClose, workOrder }: Work
     enabled: isOpen,
   });
 
+  // Intentionally setting form state based on props in useEffect
+  // This is the recommended pattern for initializing controlled forms
   useEffect(() => {
     if (!isOpen) return;
 
-    // Intentionally setting form state based on props in useEffect
-    // This is the recommended pattern for initializing controlled forms
     if (workOrder) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setFormData({

@@ -1,5 +1,5 @@
-import { ReactElement } from 'react';
-import { render, RenderOptions } from '@testing-library/react';
+import type { ReactElement } from 'react';
+import { render, type RenderOptions } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { BrowserRouter } from 'react-router-dom';
 
@@ -41,5 +41,6 @@ export function renderWithProviders(
 }
 
 // Re-export everything from testing-library
+// eslint-disable-next-line react-refresh/only-export-components
 export * from '@testing-library/react';
 export { default as userEvent } from '@testing-library/user-event';
