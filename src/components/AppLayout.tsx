@@ -90,7 +90,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </Navbar>
       }
     >
-      {children}
+      <div className="p-3">
+        {children}
+      </div>
     </SidebarLayout>
   );
 }

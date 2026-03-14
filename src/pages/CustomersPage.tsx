@@ -64,16 +64,15 @@ export default function CustomersPage() {
 
   return (
     <AppLayout>
-      <div className="p-3">
-        <div className="flex items-center justify-between">
-          <div>
-            <Heading>Customers</Heading>
-            <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
-              Manage your customer database
-            </p>
-          </div>
-          <Button onClick={handleAdd}>Add Customer</Button>
+      <div className="flex items-center justify-between">
+        <div>
+          <Heading>Customers</Heading>
+          <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
+            Manage your customer database
+          </p>
         </div>
+        <Button onClick={handleAdd}>Add Customer</Button>
+      </div>
 
         {isLoading && (
           <div className="mt-3 text-center">
@@ -148,7 +147,6 @@ export default function CustomersPage() {
             </Table>
           </div>
         )}
-      </div>
 
       <CustomerFormDialog
         isOpen={isDialogOpen}

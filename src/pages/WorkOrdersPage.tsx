@@ -99,16 +99,15 @@ export default function WorkOrdersPage() {
 
   return (
     <AppLayout>
-      <div className="p-3">
-        <div className="flex items-center justify-between">
-          <div>
-            <Heading>Work Orders</Heading>
-            <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
-              Manage work orders and service requests
-            </p>
-          </div>
-          <Button onClick={handleAdd}>Create Work Order</Button>
+      <div className="flex items-center justify-between">
+        <div>
+          <Heading>Work Orders</Heading>
+          <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
+            Manage work orders and service requests
+          </p>
         </div>
+        <Button onClick={handleAdd}>Create Work Order</Button>
+      </div>
 
         {isLoading && (
           <div className="mt-3 text-center">
@@ -195,7 +194,6 @@ export default function WorkOrdersPage() {
             </Table>
           </div>
         )}
-      </div>
 
       <WorkOrderFormDialog
         isOpen={isDialogOpen}
