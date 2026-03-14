@@ -52,6 +52,8 @@ export default function WorkOrderFormDialog({ isOpen, onClose, workOrder }: Work
   });
 
   useEffect(() => {
+    if (!isOpen) return;
+
     if (workOrder) {
       setFormData({
         customerId: workOrder.customerId,
@@ -77,8 +79,11 @@ export default function WorkOrderFormDialog({ isOpen, onClose, workOrder }: Work
       queryClient.invalidateQueries({ queryKey: ['work-orders'] });
       onClose();
     },
-    onError: (error: any) => {
-      alert(error.response?.data?.message || 'Failed to create work order');
+    onError: (error: unknown) => {
+      const errorMessage = error instanceof Error && 'response' in error
+        ? ((error as { response?: { data?: { message?: string } } }).response?.data?.message)
+        : undefined;
+      alert(errorMessage || 'Failed to create work order');
     },
   });
 
@@ -94,8 +99,11 @@ export default function WorkOrderFormDialog({ isOpen, onClose, workOrder }: Work
       queryClient.invalidateQueries({ queryKey: ['work-orders'] });
       onClose();
     },
-    onError: (error: any) => {
-      alert(error.response?.data?.message || 'Failed to update work order');
+    onError: (error: unknown) => {
+      const errorMessage = error instanceof Error && 'response' in error
+        ? ((error as { response?: { data?: { message?: string } } }).response?.data?.message)
+        : undefined;
+      alert(errorMessage || 'Failed to update work order');
     },
   });
 

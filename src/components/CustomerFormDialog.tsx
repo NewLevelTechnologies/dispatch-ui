@@ -38,6 +38,8 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
   });
 
   useEffect(() => {
+    if (!isOpen) return;
+
     if (customer) {
       setFormData(customer);
     } else {
