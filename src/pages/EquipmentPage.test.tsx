@@ -120,7 +120,7 @@ describe('EquipmentPage', () => {
     expect(screen.getByRole('dialog')).toBeInTheDocument();
 
     // Fill form and submit to test handleSubmit
-    mockEquipmentCreate.mockResolvedValue({ id: '1', ...mockEquipment[0] });
+    mockEquipmentCreate.mockResolvedValue({ ...mockEquipment[0], id: '3' });
 
     const customerSelect = screen.getByLabelText(/customer/i);
     await user.selectOptions(customerSelect, 'c1');
@@ -166,7 +166,7 @@ describe('EquipmentPage', () => {
 
   it('calls delete when confirmed', async () => {
     mockEquipmentGetAll.mockResolvedValue(mockEquipment);
-    mockEquipmentDelete.mockResolvedValue();
+    mockEquipmentDelete.mockResolvedValue(undefined);
     const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
     const user = userEvent.setup();
 
@@ -228,7 +228,7 @@ describe('EquipmentPage', () => {
 
   it('handles form submission', async () => {
     mockEquipmentGetAll.mockResolvedValue([]);
-    mockEquipmentCreate.mockResolvedValue({ id: '1', ...mockEquipment[0] });
+    mockEquipmentCreate.mockResolvedValue({ ...mockEquipment[0], id: '3' });
     const user = userEvent.setup();
 
     renderWithProviders(<EquipmentPage />);

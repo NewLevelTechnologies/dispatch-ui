@@ -117,7 +117,7 @@ describe('RecurringOrdersPage', () => {
 
   it('opens create dialog when add button is clicked', async () => {
     mockRecurringOrdersGetAll.mockResolvedValue([]);
-    mockRecurringOrdersCreate.mockResolvedValue({ id: '1', ...mockRecurringOrders[0] });
+    mockRecurringOrdersCreate.mockResolvedValue({ ...mockRecurringOrders[0], id: '3' });
     const user = userEvent.setup();
 
     renderWithProviders(<RecurringOrdersPage />);

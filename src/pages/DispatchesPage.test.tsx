@@ -103,7 +103,7 @@ describe('DispatchesPage', () => {
 
   it('opens create dialog when add button is clicked', async () => {
     mockDispatchesGetAll.mockResolvedValue([]);
-    mockDispatchesCreate.mockResolvedValue({ id: '1', ...mockDispatches[0] });
+    mockDispatchesCreate.mockResolvedValue({ ...mockDispatches[0], id: '3' });
     const user = userEvent.setup();
 
     renderWithProviders(<DispatchesPage />);

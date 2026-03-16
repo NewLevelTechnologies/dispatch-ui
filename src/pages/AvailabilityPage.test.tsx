@@ -97,7 +97,7 @@ describe('AvailabilityPage', () => {
 
   it('opens create dialog when add button is clicked', async () => {
     mockAvailabilityGetAll.mockResolvedValue([]);
-    mockAvailabilityCreate.mockResolvedValue({ id: '1', ...mockAvailability[0] });
+    mockAvailabilityCreate.mockResolvedValue({ ...mockAvailability[0], id: '3' });
     const user = userEvent.setup();
 
     renderWithProviders(<AvailabilityPage />);

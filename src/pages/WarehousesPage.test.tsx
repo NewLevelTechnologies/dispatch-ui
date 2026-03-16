@@ -177,7 +177,7 @@ describe('WarehousesPage', () => {
 
   it('handles form submission for create', async () => {
     mockGetAll.mockResolvedValue([]);
-    mockCreate.mockResolvedValue({ id: '1', ...mockWarehouses[0] });
+    mockCreate.mockResolvedValue({ ...mockWarehouses[0], id: '3' });
     const user = userEvent.setup();
 
     renderWithProviders(<WarehousesPage />);

@@ -121,7 +121,7 @@ describe('PartsInventoryPage', () => {
 
   it('opens create dialog when add button is clicked', async () => {
     mockPartsGetAll.mockResolvedValue([]);
-    mockPartsCreate.mockResolvedValue({ id: '1', ...mockParts[0] });
+    mockPartsCreate.mockResolvedValue({ ...mockParts[0], id: '3' });
     const user = userEvent.setup();
 
     renderWithProviders(<PartsInventoryPage />);
