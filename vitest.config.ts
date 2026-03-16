@@ -47,6 +47,10 @@ export default defineConfig({
         'src/utils/**',
         // Exclude API clients (integration tested via components)
         'src/api/client.ts',
+        'src/api/index.ts',
+        'src/api/customerApi.ts',
+        'src/api/workOrderApi.ts',
+        'src/api/userApi.ts',
         'src/api/financialApi.ts',
         'src/api/equipmentApi.ts',
         'src/api/schedulingApi.ts',
