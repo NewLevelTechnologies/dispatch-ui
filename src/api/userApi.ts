@@ -24,14 +24,16 @@ export interface CreateUserRequest {
   firstName: string;
   lastName: string;
   email: string;
-  roleId: string;
+  roleIds: string[];
+  phoneNumber?: string | null;
   sendInvite?: boolean;
 }
 
 export interface UpdateUserRequest {
   firstName: string;
   lastName: string;
-  roleId: string;
+  roleIds: string[];
+  phoneNumber?: string | null;
 }
 
 export interface UpdateUserEnabledRequest {
