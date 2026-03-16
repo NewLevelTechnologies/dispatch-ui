@@ -25,6 +25,7 @@
     "create": "Create",
     "delete": "Delete",
     "edit": "Edit",
+    "inactive": "Inactive",
     "form": {
       "address": "Address",
       "city": "City",
@@ -37,6 +38,7 @@
       "name": "Name",
       "notes": "Notes",
       "phone": "Phone",
+      "select": "Select...",
       "state": "State",
       "stateHelper": "CA",
       "status": "Status",
@@ -84,8 +86,48 @@
     "workOrders": "Work Orders"
   },
   "equipment": {
-    "comingSoon": "Coming soon...",
-    "description": "Track equipment and inventory"
+    "description": "Manage customer equipment, parts inventory, and warehouses",
+    "entities": {
+      "part": "Part",
+      "parts": "Parts",
+      "warehouse": "Warehouse",
+      "warehouses": "Warehouses"
+    },
+    "form": {
+      "customer": "Customer",
+      "equipmentType": "Equipment Type",
+      "locationBin": "Bin Location",
+      "location": "Location",
+      "manager": "Manager Name",
+      "modelNumber": "Model Number",
+      "partName": "Part Name",
+      "partNumber": "Part Number",
+      "quantityOnHand": "Quantity On Hand",
+      "reorderPoint": "Reorder Point",
+      "reorderQuantity": "Reorder Quantity",
+      "serialNumber": "Serial Number",
+      "unitCost": "Unit Cost",
+      "warehouse": "Warehouse"
+    },
+    "table": {
+      "customer": "Customer",
+      "equipmentType": "Equipment Type",
+      "location": "Location",
+      "manager": "Manager",
+      "modelNumber": "Model",
+      "partName": "Part Name",
+      "partNumber": "Part Number",
+      "quantity": "Quantity",
+      "reorderPoint": "Reorder Point",
+      "serialNumber": "Serial Number",
+      "unitCost": "Unit Cost",
+      "warehouse": "Warehouse"
+    },
+    "tabs": {
+      "equipment": "Equipment",
+      "partsInventory": "Parts Inventory",
+      "warehouses": "Warehouses"
+    }
   },
   "financial": {
     "comingSoon": "Coming soon...",
@@ -195,8 +237,60 @@
     }
   },
   "scheduling": {
-    "comingSoon": "Coming soon...",
-    "description": "Manage dispatches and technician schedules"
+    "description": "Manage dispatches, availability, and recurring orders",
+    "entities": {
+      "availability": "Availability",
+      "availabilityRecord": "Availability Record",
+      "dispatch": "Dispatch",
+      "dispatches": "Dispatches",
+      "recurringOrder": "Recurring Order",
+      "recurringOrders": "Recurring Orders"
+    },
+    "form": {
+      "assignedUser": "Assigned User",
+      "customer": "Customer",
+      "date": "Date",
+      "descriptionPlaceholder": "Regular maintenance service",
+      "durationPlaceholder": "Minutes",
+      "endTime": "End Time",
+      "equipment": "Equipment",
+      "estimatedDuration": "Estimated Duration (minutes)",
+      "frequency": "Frequency",
+      "nextScheduledDate": "Next Scheduled Date",
+      "reason": "Reason",
+      "reasonPlaceholder": "e.g., Vacation, Training, Meeting",
+      "scheduledDate": "Scheduled Date",
+      "startTime": "Start Time",
+      "user": "User",
+      "workOrder": "Work Order"
+    },
+    "frequency": {
+      "annually": "Annually",
+      "monthly": "Monthly",
+      "quarterly": "Quarterly",
+      "weekly": "Weekly"
+    },
+    "status": {
+      "available": "Available",
+      "busy": "Busy",
+      "tentative": "Tentative",
+      "unavailable": "Unavailable"
+    },
+    "table": {
+      "assignedUser": "Assigned User",
+      "customer": "Customer",
+      "date": "Date",
+      "endTime": "End Time",
+      "equipment": "Equipment",
+      "estimatedDuration": "Duration",
+      "frequency": "Frequency",
+      "nextScheduled": "Next Scheduled",
+      "reason": "Reason",
+      "scheduledDate": "Scheduled",
+      "startTime": "Start Time",
+      "user": "User",
+      "workOrder": "Work Order"
+    }
   },
   "workOrders": {
     "description": "Manage work orders and service requests",

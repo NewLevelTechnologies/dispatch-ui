@@ -14,6 +14,10 @@ import {
   DocumentTextIcon,
   DocumentChartBarIcon,
   CreditCardIcon,
+  CubeIcon,
+  BuildingStorefrontIcon,
+  ClockIcon,
+  ArrowPathIcon,
 } from '@heroicons/react/24/outline';
 import { Sidebar, SidebarBody, SidebarFooter, SidebarHeader, SidebarItem, SidebarSection } from './catalyst/sidebar';
 import { SidebarLayout } from './catalyst/sidebar-layout';
@@ -32,7 +36,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     { name: t('entities.dashboard'), href: '/dashboard', icon: HomeIcon },
     { name: t('entities.customers'), href: '/customers', icon: UserGroupIcon },
     { name: t('entities.workOrders'), href: '/work-orders', icon: ClipboardDocumentListIcon },
+  ];
+
+  const equipmentNavigation = [
     { name: t('entities.equipment'), href: '/equipment', icon: WrenchScrewdriverIcon },
+    { name: t('equipment.entities.parts'), href: '/parts-inventory', icon: CubeIcon },
+    { name: t('equipment.entities.warehouses'), href: '/warehouses', icon: BuildingStorefrontIcon },
   ];
 
   const financialNavigation = [
@@ -42,7 +51,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   ];
 
   const schedulingNavigation = [
-    { name: t('entities.scheduling'), href: '/scheduling', icon: CalendarIcon },
+    { name: t('scheduling.entities.dispatches'), href: '/dispatches', icon: CalendarIcon },
+    { name: t('scheduling.entities.availability'), href: '/availability', icon: ClockIcon },
+    { name: t('scheduling.entities.recurringOrders'), href: '/recurring-orders', icon: ArrowPathIcon },
   ];
 
   return (
@@ -76,6 +87,23 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
             <SidebarSection className="max-lg:hidden">
               <div className="flex items-center gap-3 px-2 py-1">
+                <WrenchScrewdriverIcon className="h-5 w-5 text-zinc-500" />
+                <span className="text-sm/6 font-medium text-zinc-500 dark:text-zinc-400">{t('entities.equipment')}</span>
+              </div>
+              {equipmentNavigation.map((item) => (
+                <SidebarItem
+                  key={item.name}
+                  href={item.href}
+                  current={location.pathname === item.href}
+                >
+                  <item.icon className="h-5 w-5" />
+                  <span>{item.name}</span>
+                </SidebarItem>
+              ))}
+            </SidebarSection>
+
+            <SidebarSection className="max-lg:hidden">
+              <div className="flex items-center gap-3 px-2 py-1">
                 <CurrencyDollarIcon className="h-5 w-5 text-zinc-500" />
                 <span className="text-sm/6 font-medium text-zinc-500 dark:text-zinc-400">{t('entities.financial')}</span>
               </div>
@@ -92,6 +120,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             </SidebarSection>
 
             <SidebarSection className="max-lg:hidden">
+              <div className="flex items-center gap-3 px-2 py-1">
+                <CalendarIcon className="h-5 w-5 text-zinc-500" />
+                <span className="text-sm/6 font-medium text-zinc-500 dark:text-zinc-400">{t('entities.scheduling')}</span>
+              </div>
               {schedulingNavigation.map((item) => (
                 <SidebarItem
                   key={item.name}
