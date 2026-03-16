@@ -1,0 +1,64 @@
+- generic [ref=e5]:
+  - navigation [ref=e7]:
+    - generic [ref=e9]:
+      - generic [ref=e11]: D
+      - generic [ref=e12]: Dispatch
+    - generic [ref=e13]:
+      - generic [ref=e14]:
+        - link "Dashboard" [ref=e17] [cursor=pointer]:
+          - /url: /dashboard
+          - img [ref=e18]
+          - generic [ref=e20]: Dashboard
+        - link "Customers" [ref=e22] [cursor=pointer]:
+          - /url: /customers
+          - img [ref=e23]
+          - generic [ref=e25]: Customers
+        - link "Work Orders" [ref=e27] [cursor=pointer]:
+          - /url: /work-orders
+          - img [ref=e28]
+          - generic [ref=e30]: Work Orders
+        - link "Equipment" [ref=e32] [cursor=pointer]:
+          - /url: /equipment
+          - img [ref=e33]
+          - generic [ref=e35]: Equipment
+      - generic [ref=e36]:
+        - generic [ref=e37]:
+          - img [ref=e38]
+          - generic [ref=e40]: Financial
+        - link "Invoices" [ref=e42] [cursor=pointer]:
+          - /url: /invoices
+          - img [ref=e43]
+          - generic [ref=e45]: Invoices
+        - link "Quotes" [ref=e47] [cursor=pointer]:
+          - /url: /quotes
+          - img [ref=e48]
+          - generic [ref=e50]: Quotes
+        - link "Payments" [ref=e52] [cursor=pointer]:
+          - /url: /payments
+          - img [ref=e53]
+          - generic [ref=e55]: Payments
+      - link "Scheduling" [ref=e58] [cursor=pointer]:
+        - /url: /scheduling
+        - img [ref=e59]
+        - generic [ref=e61]: Scheduling
+    - button "tenant1@test.com" [ref=e64]:
+      - img [ref=e66]:
+        - generic [ref=e67]: T
+      - generic [ref=e68]: tenant1@test.com
+  - main [ref=e69]:
+    - generic [ref=e72]:
+      - heading "Dashboard" [level=1] [ref=e73]
+      - paragraph [ref=e74]: Welcome to Dispatch
+      - generic [ref=e75]:
+        - generic [ref=e76]:
+          - heading "Customers" [level=3] [ref=e77]
+          - paragraph [ref=e78]: "--"
+          - paragraph [ref=e79]: Total customers
+        - generic [ref=e80]:
+          - heading "Work Orders" [level=3] [ref=e81]
+          - paragraph [ref=e82]: "--"
+          - paragraph [ref=e83]: Active work orders
+        - generic [ref=e84]:
+          - heading "Revenue" [level=3] [ref=e85]
+          - paragraph [ref=e86]: "--"
+          - paragraph [ref=e87]: This month
