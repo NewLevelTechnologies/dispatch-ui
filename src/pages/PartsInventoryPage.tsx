@@ -134,7 +134,7 @@ export default function PartsInventoryPage() {
         <div>
           <Heading>{t('equipment.entities.parts')}</Heading>
           <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
-            Manage parts inventory across warehouses
+            {t('equipment.descriptionParts')}
           </p>
         </div>
         <Button onClick={handleAdd}>
@@ -186,7 +186,7 @@ export default function PartsInventoryPage() {
                   <TableCell>
                     {item.quantityOnHand}
                     {item.needsReorder && (
-                      <Badge color="rose" className="ml-2">Low Stock</Badge>
+                      <Badge color="rose" className="ml-2">{t('equipment.lowStock')}</Badge>
                     )}
                   </TableCell>
                   <TableCell>{item.reorderPoint}</TableCell>

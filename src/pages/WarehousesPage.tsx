@@ -129,7 +129,7 @@ export default function WarehousesPage() {
         <div>
           <Heading>{t('equipment.entities.warehouses')}</Heading>
           <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
-            Manage warehouse locations and inventory storage
+            {t('equipment.descriptionWarehouses')}
           </p>
         </div>
         <Button onClick={handleAdd}>

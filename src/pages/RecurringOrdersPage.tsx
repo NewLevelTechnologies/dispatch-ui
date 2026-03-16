@@ -185,7 +185,7 @@ export default function RecurringOrdersPage() {
         <div>
           <Heading>{t('scheduling.entities.recurringOrders')}</Heading>
           <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
-            Manage recurring maintenance schedules
+            {t('scheduling.descriptionRecurringOrders')}
           </p>
         </div>
         <Button onClick={handleAdd}>

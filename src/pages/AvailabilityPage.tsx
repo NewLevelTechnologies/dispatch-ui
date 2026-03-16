@@ -164,7 +164,7 @@ export default function AvailabilityPage() {
         <div>
           <Heading>{t('scheduling.entities.availability')}</Heading>
           <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
-            Manage user availability schedules
+            {t('scheduling.descriptionAvailability')}
           </p>
         </div>
         <Button onClick={handleAdd}>

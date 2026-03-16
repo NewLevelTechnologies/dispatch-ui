@@ -160,7 +160,7 @@ export default function DispatchesPage() {
         <div>
           <Heading>{t('scheduling.entities.dispatches')}</Heading>
           <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
-            Schedule and manage work order dispatches
+            {t('scheduling.descriptionDispatches')}
           </p>
         </div>
         <Button onClick={handleAdd}>

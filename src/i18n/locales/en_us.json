@@ -97,6 +97,10 @@
   },
   "equipment": {
     "description": "Manage customer equipment, parts inventory, and warehouses",
+    "descriptionEquipment": "Manage customer equipment, parts inventory, and warehouses",
+    "descriptionParts": "Manage parts inventory across warehouses",
+    "descriptionWarehouses": "Manage warehouse locations and inventory storage",
+    "lowStock": "Low Stock",
     "entities": {
       "part": "Part",
       "parts": "Parts",
@@ -248,6 +252,9 @@
   },
   "scheduling": {
     "description": "Manage dispatches, availability, and recurring orders",
+    "descriptionDispatches": "Schedule and manage work order dispatches",
+    "descriptionAvailability": "Manage user availability schedules",
+    "descriptionRecurringOrders": "Manage recurring maintenance schedules",
     "entities": {
       "availability": "Availability",
       "availabilityRecord": "Availability Record",
