@@ -5,13 +5,16 @@ import DispatchesPage from './DispatchesPage';
 import apiClient from '../api/client';
 
 const mockDispatchesGetAll = vi.fn();
+const mockDispatchesCreate = vi.fn();
+const mockDispatchesUpdate = vi.fn();
+const mockDispatchesDelete = vi.fn();
 
 vi.mock('../api/schedulingApi', () => ({
   dispatchesApi: {
     getAll: (...args: unknown[]) => mockDispatchesGetAll(...args),
-    create: vi.fn(),
-    update: vi.fn(),
-    delete: vi.fn(),
+    create: (...args: unknown[]) => mockDispatchesCreate(...args),
+    update: (...args: unknown[]) => mockDispatchesUpdate(...args),
+    delete: (...args: unknown[]) => mockDispatchesDelete(...args),
   },
 }));
 vi.mock('../api/client');
@@ -100,6 +103,7 @@ describe('DispatchesPage', () => {
 
   it('opens create dialog when add button is clicked', async () => {
     mockDispatchesGetAll.mockResolvedValue([]);
+    mockDispatchesCreate.mockResolvedValue({ id: '1', ...mockDispatches[0] });
     const user = userEvent.setup();
 
     renderWithProviders(<DispatchesPage />);
@@ -111,11 +115,28 @@ describe('DispatchesPage', () => {
     const addButton = screen.getByRole('button', { name: /add dispatch/i });
     await user.click(addButton);
 
-    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByRole('dialog')).toBeInTheDocument();
+    });
+
+    // Fill form and submit to test handleSubmit
+    const workOrderSelect = screen.getByLabelText(/work order/i);
+    await user.selectOptions(workOrderSelect, 'wo1');
+
+    const assignedUserInput = screen.getByLabelText(/assigned user/i);
+    await user.type(assignedUserInput, 'user1');
+
+    const submitButton = screen.getByRole('button', { name: /create/i });
+    await user.click(submitButton);
+
+    await waitFor(() => {
+      expect(mockDispatchesCreate).toHaveBeenCalled();
+    });
   });
 
   it('opens edit dialog when edit is clicked', async () => {
     mockDispatchesGetAll.mockResolvedValue(mockDispatches);
+    mockDispatchesUpdate.mockResolvedValue({ ...mockDispatches[0], status: 'IN_PROGRESS' });
     const user = userEvent.setup();
 
     renderWithProviders(<DispatchesPage />);
@@ -131,5 +152,69 @@ describe('DispatchesPage', () => {
     await user.click(editButton);
 
     expect(screen.getByRole('dialog')).toBeInTheDocument();
+
+    // Submit form to test handleSubmit for update
+    const submitButton = screen.getByRole('button', { name: /update/i });
+    await user.click(submitButton);
+
+    await waitFor(() => {
+      expect(mockDispatchesUpdate).toHaveBeenCalled();
+    });
+  });
+
+  it('displays status badges', async () => {
+    const dispatchesWithStatuses = [
+      { ...mockDispatches[0], status: 'SCHEDULED' },
+      { ...mockDispatches[1], status: 'COMPLETED' },
+      { id: '3', workOrderId: 'wo3', assignedUserId: 'user3', scheduledDate: '2024-03-22T10:00:00Z', estimatedDuration: 90, status: 'IN_PROGRESS' },
+      { id: '4', workOrderId: 'wo4', assignedUserId: 'user4', scheduledDate: '2024-03-23T10:00:00Z', estimatedDuration: 60, status: 'CANCELLED' },
+    ];
+    mockDispatchesGetAll.mockResolvedValue(dispatchesWithStatuses);
+
+    renderWithProviders(<DispatchesPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('wo1')).toBeInTheDocument();
+    });
+
+    // Status badges should be rendered
+    expect(screen.getAllByText('SCHEDULED').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('COMPLETED').length).toBeGreaterThan(0);
+  });
+
+  it('formats date and duration correctly', async () => {
+    mockDispatchesGetAll.mockResolvedValue(mockDispatches);
+
+    renderWithProviders(<DispatchesPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('wo1')).toBeInTheDocument();
+    });
+
+    // Duration should be formatted with "min" suffix
+    expect(screen.getByText('120 min')).toBeInTheDocument();
+    expect(screen.getByText('60 min')).toBeInTheDocument();
+  });
+
+  it('handles delete confirmation', async () => {
+    mockDispatchesGetAll.mockResolvedValue(mockDispatches);
+    mockDispatchesDelete.mockResolvedValue(undefined);
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const user = userEvent.setup();
+
+    renderWithProviders(<DispatchesPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('wo1')).toBeInTheDocument();
+    });
+
+    const dropdownButtons = screen.getAllByRole('button', { name: /more options/i });
+    await user.click(dropdownButtons[0]);
+
+    const deleteButton = screen.getByRole('menuitem', { name: /delete/i });
+    await user.click(deleteButton);
+
+    expect(confirmSpy).toHaveBeenCalled();
+    confirmSpy.mockRestore();
   });
 });

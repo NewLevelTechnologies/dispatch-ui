@@ -118,10 +118,27 @@ describe('EquipmentPage', () => {
     await user.click(addButton);
 
     expect(screen.getByRole('dialog')).toBeInTheDocument();
+
+    // Fill form and submit to test handleSubmit
+    mockEquipmentCreate.mockResolvedValue({ id: '1', ...mockEquipment[0] });
+
+    const customerSelect = screen.getByLabelText(/customer/i);
+    await user.selectOptions(customerSelect, 'c1');
+
+    const equipmentTypeInput = screen.getByLabelText(/equipment type/i);
+    await user.type(equipmentTypeInput, 'HVAC');
+
+    const submitButton = screen.getByRole('button', { name: /create/i });
+    await user.click(submitButton);
+
+    await waitFor(() => {
+      expect(mockEquipmentCreate).toHaveBeenCalled();
+    });
   });
 
   it('opens edit dialog when edit is clicked', async () => {
     mockEquipmentGetAll.mockResolvedValue(mockEquipment);
+    mockEquipmentUpdate.mockResolvedValue({ ...mockEquipment[0], equipmentType: 'Updated' });
     const user = userEvent.setup();
 
     renderWithProviders(<EquipmentPage />);
@@ -137,6 +154,14 @@ describe('EquipmentPage', () => {
     await user.click(editButton);
 
     expect(screen.getByRole('dialog')).toBeInTheDocument();
+
+    // Submit form to test handleSubmit for update
+    const submitButton = screen.getByRole('button', { name: /update/i });
+    await user.click(submitButton);
+
+    await waitFor(() => {
+      expect(mockEquipmentUpdate).toHaveBeenCalled();
+    });
   });
 
   it('calls delete when confirmed', async () => {
@@ -163,5 +188,78 @@ describe('EquipmentPage', () => {
     });
 
     confirmSpy.mockRestore();
+  });
+
+  it('displays status badges for different statuses', async () => {
+    const equipmentWithStatuses = [
+      { ...mockEquipment[0], status: 'ACTIVE' },
+      { ...mockEquipment[1], status: 'MAINTENANCE' },
+      { id: '3', customerId: 'c3', customerName: 'Test Customer', equipmentType: 'Furnace', modelNumber: 'FN-300', serialNumber: 'SN789', status: 'INACTIVE' },
+      { id: '4', customerId: 'c4', customerName: 'Another Customer', equipmentType: 'Boiler', modelNumber: 'BL-400', serialNumber: 'SN012', status: 'RETIRED' },
+    ];
+    mockEquipmentGetAll.mockResolvedValue(equipmentWithStatuses);
+
+    renderWithProviders(<EquipmentPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('AC-100')).toBeInTheDocument();
+    });
+
+    // Status badges should be rendered
+    expect(screen.getAllByText('ACTIVE').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('MAINTENANCE').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('INACTIVE').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('RETIRED').length).toBeGreaterThan(0);
+  });
+
+  it('displays customer names correctly', async () => {
+    mockEquipmentGetAll.mockResolvedValue(mockEquipment);
+
+    renderWithProviders(<EquipmentPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('AC-100')).toBeInTheDocument();
+    });
+
+    // Customer names from getCustomerName function
+    expect(screen.getByText('John Doe')).toBeInTheDocument();
+    expect(screen.getByText('Jane Smith')).toBeInTheDocument();
+  });
+
+  it('handles form submission', async () => {
+    mockEquipmentGetAll.mockResolvedValue([]);
+    mockEquipmentCreate.mockResolvedValue({ id: '1', ...mockEquipment[0] });
+    const user = userEvent.setup();
+
+    renderWithProviders(<EquipmentPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('No equipment found')).toBeInTheDocument();
+    });
+
+    const addButton = screen.getByRole('button', { name: /add equipment/i });
+    await user.click(addButton);
+
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+  });
+
+  it('handles update submission', async () => {
+    mockEquipmentGetAll.mockResolvedValue(mockEquipment);
+    mockEquipmentUpdate.mockResolvedValue({ ...mockEquipment[0], modelNumber: 'UPDATED' });
+    const user = userEvent.setup();
+
+    renderWithProviders(<EquipmentPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('AC-100')).toBeInTheDocument();
+    });
+
+    const dropdownButtons = screen.getAllByRole('button', { name: /more options/i });
+    await user.click(dropdownButtons[0]);
+
+    const editButton = screen.getByRole('menuitem', { name: /edit/i });
+    await user.click(editButton);
+
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
   });
 });

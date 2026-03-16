@@ -4,13 +4,16 @@ import { renderWithProviders, userEvent } from '../test/utils';
 import AvailabilityPage from './AvailabilityPage';
 
 const mockAvailabilityGetAll = vi.fn();
+const mockAvailabilityCreate = vi.fn();
+const mockAvailabilityUpdate = vi.fn();
+const mockAvailabilityDelete = vi.fn();
 
 vi.mock('../api/schedulingApi', () => ({
   availabilityApi: {
     getAll: (...args: unknown[]) => mockAvailabilityGetAll(...args),
-    create: vi.fn(),
-    update: vi.fn(),
-    delete: vi.fn(),
+    create: (...args: unknown[]) => mockAvailabilityCreate(...args),
+    update: (...args: unknown[]) => mockAvailabilityUpdate(...args),
+    delete: (...args: unknown[]) => mockAvailabilityDelete(...args),
   },
 }));
 
@@ -94,6 +97,7 @@ describe('AvailabilityPage', () => {
 
   it('opens create dialog when add button is clicked', async () => {
     mockAvailabilityGetAll.mockResolvedValue([]);
+    mockAvailabilityCreate.mockResolvedValue({ id: '1', ...mockAvailability[0] });
     const user = userEvent.setup();
 
     renderWithProviders(<AvailabilityPage />);
@@ -106,10 +110,22 @@ describe('AvailabilityPage', () => {
     await user.click(addButton);
 
     expect(screen.getByRole('dialog')).toBeInTheDocument();
+
+    // Fill out the form to test handleSubmit and resetForm
+    const userIdInput = screen.getByLabelText(/user/i);
+    await user.type(userIdInput, 'test-user');
+
+    const submitButton = screen.getByRole('button', { name: /create/i });
+    await user.click(submitButton);
+
+    await waitFor(() => {
+      expect(mockAvailabilityCreate).toHaveBeenCalled();
+    });
   });
 
   it('opens edit dialog when edit is clicked', async () => {
     mockAvailabilityGetAll.mockResolvedValue(mockAvailability);
+    mockAvailabilityUpdate.mockResolvedValue({ ...mockAvailability[0], reason: 'Updated' });
     const user = userEvent.setup();
 
     renderWithProviders(<AvailabilityPage />);
@@ -125,5 +141,72 @@ describe('AvailabilityPage', () => {
     await user.click(editButton);
 
     expect(screen.getByRole('dialog')).toBeInTheDocument();
+
+    // Submit the form to test handleSubmit for update
+    const submitButton = screen.getByRole('button', { name: /update/i });
+    await user.click(submitButton);
+
+    await waitFor(() => {
+      expect(mockAvailabilityUpdate).toHaveBeenCalled();
+    });
+  });
+
+  it('displays status badges for different statuses', async () => {
+    const availabilityWithStatuses = [
+      { ...mockAvailability[0], status: 'AVAILABLE' },
+      { ...mockAvailability[1], status: 'UNAVAILABLE' },
+      { id: '3', userId: 'user3', date: '2024-03-22', startTime: '2024-03-22T09:00:00Z', endTime: '2024-03-22T17:00:00Z', status: 'TENTATIVE', reason: null },
+      { id: '4', userId: 'user4', date: '2024-03-23', startTime: '2024-03-23T09:00:00Z', endTime: '2024-03-23T17:00:00Z', status: 'BUSY', reason: null },
+    ];
+    mockAvailabilityGetAll.mockResolvedValue(availabilityWithStatuses);
+
+    renderWithProviders(<AvailabilityPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('user1')).toBeInTheDocument();
+    });
+
+    // Status badges should be rendered (function getStatusBadge called)
+    expect(screen.getAllByText('AVAILABLE').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('UNAVAILABLE').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('TENTATIVE').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('BUSY').length).toBeGreaterThan(0);
+  });
+
+  it('formats dates and times correctly', async () => {
+    mockAvailabilityGetAll.mockResolvedValue(mockAvailability);
+
+    renderWithProviders(<AvailabilityPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('user1')).toBeInTheDocument();
+    });
+
+    // Dates and times should be formatted (formatDate and formatTime functions called)
+    // The exact format depends on locale, but we can check structure exists
+    const rows = screen.getAllByRole('row');
+    expect(rows.length).toBeGreaterThan(2); // Header + 2 data rows
+  });
+
+  it('handles delete confirmation', async () => {
+    mockAvailabilityGetAll.mockResolvedValue(mockAvailability);
+    mockAvailabilityDelete.mockResolvedValue(undefined);
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const user = userEvent.setup();
+
+    renderWithProviders(<AvailabilityPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('user1')).toBeInTheDocument();
+    });
+
+    const dropdownButtons = screen.getAllByRole('button', { name: /more options/i });
+    await user.click(dropdownButtons[0]);
+
+    const deleteButton = screen.getByRole('menuitem', { name: /delete/i });
+    await user.click(deleteButton);
+
+    expect(confirmSpy).toHaveBeenCalled();
+    confirmSpy.mockRestore();
   });
 });

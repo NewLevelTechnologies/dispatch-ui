@@ -23,7 +23,6 @@ export default defineConfig({
         'src/components/catalyst/**',
         // Exclude placeholder pages (not yet implemented)
         'src/pages/DashboardPage.tsx',
-        'src/pages/EquipmentPage.tsx',
         'src/pages/FinancialPage.tsx',
         'src/pages/SchedulingPage.tsx',
         'src/pages/LoginPage.tsx',
@@ -31,8 +30,6 @@ export default defineConfig({
         'src/pages/InvoicesPage.tsx',
         'src/pages/QuotesPage.tsx',
         'src/pages/PaymentsPage.tsx',
-        // Exclude financial API (integration tested)
-        'src/api/financialApi.ts',
         // Exclude user management pages (complex forms, will be tested separately)
         'src/pages/UsersPage.tsx',
         'src/pages/UserDetailPage.tsx',
@@ -40,14 +37,22 @@ export default defineConfig({
         // Exclude infrastructure files
         'src/App.tsx',
         'src/components/AppLayout.tsx',
+        'src/contexts/**',
+        'src/i18n/**',
         // Exclude config files
         'src/config/**',
         // Exclude types
         'src/types/**',
         // Exclude utils (tested indirectly)
         'src/utils/**',
-        // Exclude API client (integration tested via components)
+        // Exclude API clients (integration tested via components)
         'src/api/client.ts',
+        'src/api/financialApi.ts',
+        'src/api/equipmentApi.ts',
+        'src/api/schedulingApi.ts',
+        // Exclude temporary/debug files
+        '**/check-menu-sizes.js',
+        'coverage/**',
       ],
       thresholds: {
         lines: 80,

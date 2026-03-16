@@ -4,14 +4,17 @@ import { renderWithProviders, userEvent } from '../test/utils';
 import PartsInventoryPage from './PartsInventoryPage';
 
 const mockPartsGetAll = vi.fn();
+const mockPartsCreate = vi.fn();
+const mockPartsUpdate = vi.fn();
+const mockPartsDelete = vi.fn();
 const mockWarehousesGetAll = vi.fn();
 
 vi.mock('../api/equipmentApi', () => ({
   partsInventoryApi: {
     getAll: (...args: unknown[]) => mockPartsGetAll(...args),
-    create: vi.fn(),
-    update: vi.fn(),
-    delete: vi.fn(),
+    create: (...args: unknown[]) => mockPartsCreate(...args),
+    update: (...args: unknown[]) => mockPartsUpdate(...args),
+    delete: (...args: unknown[]) => mockPartsDelete(...args),
   },
   warehousesApi: {
     getAll: (...args: unknown[]) => mockWarehousesGetAll(...args),
@@ -30,7 +33,10 @@ const mockParts = [
     warehouseName: 'Main Warehouse',
     quantityOnHand: 5,
     reorderPoint: 10,
+    reorderQuantity: 5,
     unitCost: 150.0,
+    locationBin: 'A1',
+    notes: 'Test notes',
     needsReorder: true,
   },
   {
@@ -41,7 +47,10 @@ const mockParts = [
     warehouseName: 'East Warehouse',
     quantityOnHand: 50,
     reorderPoint: 20,
+    reorderQuantity: 10,
     unitCost: 15.0,
+    locationBin: 'B2',
+    notes: '',
     needsReorder: false,
   },
 ];
@@ -112,6 +121,7 @@ describe('PartsInventoryPage', () => {
 
   it('opens create dialog when add button is clicked', async () => {
     mockPartsGetAll.mockResolvedValue([]);
+    mockPartsCreate.mockResolvedValue({ id: '1', ...mockParts[0] });
     const user = userEvent.setup();
 
     renderWithProviders(<PartsInventoryPage />);
@@ -123,11 +133,35 @@ describe('PartsInventoryPage', () => {
     const addButton = screen.getByRole('button', { name: /add part/i });
     await user.click(addButton);
 
-    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByRole('dialog')).toBeInTheDocument();
+    });
+
+    // Fill and submit form to test handleSubmit and resetForm
+    await waitFor(() => {
+      expect(screen.getByLabelText(/warehouse/i)).toBeInTheDocument();
+    });
+
+    const warehouseSelect = screen.getByLabelText(/warehouse/i);
+    await user.selectOptions(warehouseSelect, 'w1');
+
+    const partNumberInput = screen.getByLabelText(/part number/i);
+    await user.type(partNumberInput, 'P-TEST');
+
+    const partNameInput = screen.getByLabelText(/part name/i);
+    await user.type(partNameInput, 'Test Part');
+
+    const submitButton = screen.getByRole('button', { name: /create/i });
+    await user.click(submitButton);
+
+    await waitFor(() => {
+      expect(mockPartsCreate).toHaveBeenCalled();
+    });
   });
 
   it('opens edit dialog when edit is clicked', async () => {
     mockPartsGetAll.mockResolvedValue(mockParts);
+    mockPartsUpdate.mockResolvedValue({ ...mockParts[0], partName: 'Updated Part' });
     const user = userEvent.setup();
 
     renderWithProviders(<PartsInventoryPage />);
@@ -143,5 +177,74 @@ describe('PartsInventoryPage', () => {
     await user.click(editButton);
 
     expect(screen.getByRole('dialog')).toBeInTheDocument();
+
+    // Submit form to test handleSubmit for update
+    const submitButton = screen.getByRole('button', { name: /update/i });
+    await user.click(submitButton);
+
+    await waitFor(() => {
+      expect(mockPartsUpdate).toHaveBeenCalled();
+    });
+  });
+
+  it('displays low stock badge when part needs reorder', async () => {
+    mockPartsGetAll.mockResolvedValue(mockParts);
+
+    renderWithProviders(<PartsInventoryPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('P-001')).toBeInTheDocument();
+    });
+
+    // Low Stock badge should appear for parts that need reorder
+    expect(screen.getByText('Low Stock')).toBeInTheDocument();
+  });
+
+  it('formats currency correctly', async () => {
+    mockPartsGetAll.mockResolvedValue(mockParts);
+
+    renderWithProviders(<PartsInventoryPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('P-001')).toBeInTheDocument();
+    });
+
+    // formatCurrency function should format unit costs
+    expect(screen.getByText(/\$150\.00/)).toBeInTheDocument();
+    expect(screen.getByText(/\$15\.00/)).toBeInTheDocument();
+  });
+
+  it('displays warehouse names correctly', async () => {
+    mockPartsGetAll.mockResolvedValue(mockParts);
+
+    renderWithProviders(<PartsInventoryPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Main Warehouse')).toBeInTheDocument();
+    });
+
+    expect(screen.getByText('East Warehouse')).toBeInTheDocument();
+  });
+
+  it('handles delete confirmation', async () => {
+    mockPartsGetAll.mockResolvedValue(mockParts);
+    mockPartsDelete.mockResolvedValue(undefined);
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const user = userEvent.setup();
+
+    renderWithProviders(<PartsInventoryPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('P-001')).toBeInTheDocument();
+    });
+
+    const dropdownButtons = screen.getAllByRole('button', { name: /more options/i });
+    await user.click(dropdownButtons[0]);
+
+    const deleteButton = screen.getByRole('menuitem', { name: /delete/i });
+    await user.click(deleteButton);
+
+    expect(confirmSpy).toHaveBeenCalled();
+    confirmSpy.mockRestore();
   });
 });

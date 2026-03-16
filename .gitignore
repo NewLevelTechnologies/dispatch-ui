@@ -27,3 +27,8 @@ dist-ssr
 .env
 .env.local
 .env.*.local
+
+# Temporary debug files
+check-menu-sizes.js
+menu-*.png
+menu-*.md

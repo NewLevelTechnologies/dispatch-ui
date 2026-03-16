@@ -137,4 +137,97 @@ describe('WarehousesPage', () => {
 
     expect(screen.getByRole('dialog')).toBeInTheDocument();
   });
+
+  it('displays all warehouse information in table', async () => {
+    mockGetAll.mockResolvedValue(mockWarehouses);
+
+    renderWithProviders(<WarehousesPage />);
+
+    await waitFor(() => {
+      expect(screen.queryByText('Loading warehouses...')).not.toBeInTheDocument();
+    });
+
+    // Check that warehouse names are displayed
+    expect(screen.getByText('Main Warehouse')).toBeInTheDocument();
+    expect(screen.getByText('East Warehouse')).toBeInTheDocument();
+  });
+
+  it('handles delete confirmation', async () => {
+    mockGetAll.mockResolvedValue(mockWarehouses);
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    mockDelete.mockResolvedValue(undefined);
+    const user = userEvent.setup();
+
+    renderWithProviders(<WarehousesPage />);
+
+    await waitFor(() => {
+      expect(screen.queryByText('Loading warehouses...')).not.toBeInTheDocument();
+    });
+
+    const dropdownButtons = screen.getAllByRole('button', { name: /more options/i });
+    await user.click(dropdownButtons[0]);
+
+    const deleteButton = screen.getByRole('menuitem', { name: /delete/i });
+    await user.click(deleteButton);
+
+    expect(confirmSpy).toHaveBeenCalled();
+    expect(mockDelete).toHaveBeenCalledWith('1');
+    confirmSpy.mockRestore();
+  });
+
+  it('handles form submission for create', async () => {
+    mockGetAll.mockResolvedValue([]);
+    mockCreate.mockResolvedValue({ id: '1', ...mockWarehouses[0] });
+    const user = userEvent.setup();
+
+    renderWithProviders(<WarehousesPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('No warehouses found')).toBeInTheDocument();
+    });
+
+    const addButton = screen.getByRole('button', { name: /add warehouse/i });
+    await user.click(addButton);
+
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+
+    // Fill and submit form
+    const nameInput = screen.getByLabelText(/^name \*$/i);
+    await user.type(nameInput, 'Test Warehouse');
+
+    const submitButton = screen.getByRole('button', { name: /create/i });
+    await user.click(submitButton);
+
+    await waitFor(() => {
+      expect(mockCreate).toHaveBeenCalled();
+    });
+  });
+
+  it('handles form submission for update', async () => {
+    mockGetAll.mockResolvedValue(mockWarehouses);
+    mockUpdate.mockResolvedValue({ ...mockWarehouses[0], name: 'Updated Warehouse' });
+    const user = userEvent.setup();
+
+    renderWithProviders(<WarehousesPage />);
+
+    await waitFor(() => {
+      expect(screen.queryByText('Loading warehouses...')).not.toBeInTheDocument();
+    });
+
+    const dropdownButtons = screen.getAllByRole('button', { name: /more options/i });
+    await user.click(dropdownButtons[0]);
+
+    const editButton = screen.getByRole('menuitem', { name: /edit/i });
+    await user.click(editButton);
+
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+
+    // Submit form
+    const submitButton = screen.getByRole('button', { name: /update/i });
+    await user.click(submitButton);
+
+    await waitFor(() => {
+      expect(mockUpdate).toHaveBeenCalled();
+    });
+  });
 });
