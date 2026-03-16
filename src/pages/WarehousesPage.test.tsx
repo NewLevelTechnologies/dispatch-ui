@@ -75,9 +75,9 @@ describe('WarehousesPage', () => {
 
     await waitFor(() => {
       expect(screen.getByText('Main Warehouse')).toBeInTheDocument();
+      expect(screen.getByText('John Manager')).toBeInTheDocument();
     });
 
-    expect(screen.getByText('John Manager')).toBeInTheDocument();
     expect(screen.getByText('555-1234')).toBeInTheDocument();
     expect(screen.getByText('East Warehouse')).toBeInTheDocument();
   });
