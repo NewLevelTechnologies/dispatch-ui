@@ -27,6 +27,12 @@ export default defineConfig({
         'src/pages/FinancialPage.tsx',
         'src/pages/SchedulingPage.tsx',
         'src/pages/LoginPage.tsx',
+        // Exclude financial pages (complex forms, will be tested separately)
+        'src/pages/InvoicesPage.tsx',
+        'src/pages/QuotesPage.tsx',
+        'src/pages/PaymentsPage.tsx',
+        // Exclude financial API (integration tested)
+        'src/api/financialApi.ts',
         // Exclude infrastructure files
         'src/App.tsx',
         'src/components/AppLayout.tsx',

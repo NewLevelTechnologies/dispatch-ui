@@ -51,10 +51,12 @@
       "zipCode": "Zip Code"
     },
     "moreOptions": "More options",
+    "none": "None",
     "saving": "Saving...",
     "signOut": "Sign out",
     "theme": "Theme",
-    "update": "Update"
+    "update": "Update",
+    "updateStatus": "Update {{entity, lowercase}} status"
   },
   "customers": {
     "description": "Manage your customer database",
@@ -76,6 +78,12 @@
     "dashboard": "Dashboard",
     "equipment": "Equipment",
     "financial": "Financial",
+    "invoice": "Invoice",
+    "invoices": "Invoices",
+    "payment": "Payment",
+    "payments": "Payments",
+    "quote": "Quote",
+    "quotes": "Quotes",
     "revenue": "Revenue",
     "role": "Role",
     "roles": "Roles",
@@ -92,6 +100,109 @@
   "financial": {
     "comingSoon": "Coming soon...",
     "description": "Manage invoices, quotes, and payments"
+  },
+  "invoices": {
+    "description": "Manage customer invoices and billing",
+    "form": {
+      "addLineItem": "Add Line Item",
+      "balanceDue": "Balance Due",
+      "customer": "Customer",
+      "description": "Description",
+      "dueDate": "Due Date",
+      "invoiceDate": "Invoice Date",
+      "invoiceNumber": "Invoice Number",
+      "lineItems": "Line Items",
+      "quantity": "Quantity",
+      "removeLineItem": "Remove",
+      "subtotal": "Subtotal",
+      "taxAmount": "Tax Amount",
+      "taxRate": "Tax Rate (%)",
+      "totalAmount": "Total Amount",
+      "unitPrice": "Unit Price",
+      "workOrder": "Work Order (Optional)"
+    },
+    "status": {
+      "cancelled": "Cancelled",
+      "draft": "Draft",
+      "overdue": "Overdue",
+      "paid": "Paid",
+      "sent": "Sent",
+      "void": "Void"
+    },
+    "table": {
+      "balanceDue": "Balance Due",
+      "customer": "Customer",
+      "dueDate": "Due Date",
+      "invoiceDate": "Invoice Date",
+      "invoiceNumber": "Invoice Number",
+      "status": "Status",
+      "totalAmount": "Total"
+    }
+  },
+  "payments": {
+    "description": "Track customer payments and transactions",
+    "form": {
+      "amount": "Amount",
+      "balance": "Balance",
+      "invoice": "Invoice",
+      "invoiceBalance": "Invoice balance",
+      "paymentDate": "Payment Date",
+      "paymentMethod": "Payment Method",
+      "paymentNumber": "Payment Number",
+      "referenceNumber": "Reference Number"
+    },
+    "methods": {
+      "ach": "ACH",
+      "cash": "Cash",
+      "check": "Check",
+      "creditCard": "Credit Card",
+      "debitCard": "Debit Card",
+      "other": "Other",
+      "wireTransfer": "Wire Transfer"
+    },
+    "table": {
+      "amount": "Amount",
+      "customer": "Customer",
+      "invoice": "Invoice",
+      "method": "Method",
+      "paymentDate": "Date",
+      "paymentNumber": "Payment #",
+      "reference": "Reference"
+    }
+  },
+  "quotes": {
+    "description": "Create and manage customer quotes",
+    "form": {
+      "addLineItem": "Add Line Item",
+      "customer": "Customer",
+      "description": "Description",
+      "expirationDate": "Expiration Date",
+      "lineItems": "Line Items",
+      "quantity": "Quantity",
+      "quoteDate": "Quote Date",
+      "quoteNumber": "Quote Number",
+      "removeLineItem": "Remove",
+      "subtotal": "Subtotal",
+      "taxAmount": "Tax Amount",
+      "taxRate": "Tax Rate (%)",
+      "totalAmount": "Total Amount",
+      "unitPrice": "Unit Price"
+    },
+    "status": {
+      "accepted": "Accepted",
+      "declined": "Declined",
+      "draft": "Draft",
+      "expired": "Expired",
+      "sent": "Sent"
+    },
+    "table": {
+      "customer": "Customer",
+      "expirationDate": "Expires",
+      "quoteDate": "Quote Date",
+      "quoteNumber": "Quote #",
+      "status": "Status",
+      "totalAmount": "Total"
+    }
   },
   "scheduling": {
     "comingSoon": "Coming soon...",

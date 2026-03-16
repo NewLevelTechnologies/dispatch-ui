@@ -12,6 +12,9 @@ import {
   SunIcon,
   MoonIcon,
   ComputerDesktopIcon,
+  DocumentTextIcon,
+  DocumentChartBarIcon,
+  CreditCardIcon,
 } from '@heroicons/react/24/outline';
 import { Sidebar, SidebarBody, SidebarFooter, SidebarHeader, SidebarItem, SidebarSection } from './catalyst/sidebar';
 import { SidebarLayout } from './catalyst/sidebar-layout';
@@ -26,12 +29,20 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { t } = useTranslation();
   const { theme, setTheme } = useTheme();
 
-  const navigation = [
+  const mainNavigation = [
     { name: t('entities.dashboard'), href: '/dashboard', icon: HomeIcon },
     { name: t('entities.customers'), href: '/customers', icon: UserGroupIcon },
     { name: t('entities.workOrders'), href: '/work-orders', icon: ClipboardDocumentListIcon },
     { name: t('entities.equipment'), href: '/equipment', icon: WrenchScrewdriverIcon },
-    { name: t('entities.financial'), href: '/financial', icon: CurrencyDollarIcon },
+  ];
+
+  const financialNavigation = [
+    { name: t('entities.invoices'), href: '/invoices', icon: DocumentTextIcon },
+    { name: t('entities.quotes'), href: '/quotes', icon: DocumentChartBarIcon },
+    { name: t('entities.payments'), href: '/payments', icon: CreditCardIcon },
+  ];
+
+  const schedulingNavigation = [
     { name: t('entities.scheduling'), href: '/scheduling', icon: CalendarIcon },
     // TODO: Add capability check - only show if user has VIEW_USERS capability
     { name: t('entities.users'), href: '/users', icon: ShieldCheckIcon },
@@ -54,7 +65,37 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
           <SidebarBody>
             <SidebarSection>
-              {navigation.map((item) => (
+              {mainNavigation.map((item) => (
+                <SidebarItem
+                  key={item.name}
+                  href={item.href}
+                  current={location.pathname === item.href}
+                >
+                  <item.icon className="h-5 w-5" />
+                  <span>{item.name}</span>
+                </SidebarItem>
+              ))}
+            </SidebarSection>
+
+            <SidebarSection className="max-lg:hidden">
+              <div className="flex items-center gap-2 px-2 py-1">
+                <CurrencyDollarIcon className="h-4 w-4 text-zinc-500" />
+                <span className="text-sm font-medium text-zinc-500">{t('entities.financial')}</span>
+              </div>
+              {financialNavigation.map((item) => (
+                <SidebarItem
+                  key={item.name}
+                  href={item.href}
+                  current={location.pathname === item.href}
+                >
+                  <item.icon className="h-5 w-5" />
+                  <span>{item.name}</span>
+                </SidebarItem>
+              ))}
+            </SidebarSection>
+
+            <SidebarSection className="max-lg:hidden">
+              {schedulingNavigation.map((item) => (
                 <SidebarItem
                   key={item.name}
                   href={item.href}
