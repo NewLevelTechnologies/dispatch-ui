@@ -65,7 +65,14 @@ export default function UserFormDialog({ isOpen, onClose, user, roles }: UserFor
 
   const createMutation = useMutation({
     mutationFn: (data: { firstName: string; lastName: string; email: string; roleId: string; sendInvite?: boolean }) =>
-      userApi.create(data),
+      userApi.create({
+        firstName: data.firstName,
+        lastName: data.lastName,
+        email: data.email,
+        roleIds: [data.roleId],
+        phoneNumber: null,
+        sendInvite: data.sendInvite,
+      }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users'] });
       onClose();
@@ -83,7 +90,8 @@ export default function UserFormDialog({ isOpen, onClose, user, roles }: UserFor
       userApi.update(user!.id!, {
         firstName: data.firstName,
         lastName: data.lastName,
-        roleId: data.roleId,
+        roleIds: [data.roleId],
+        phoneNumber: null,
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users'] });
