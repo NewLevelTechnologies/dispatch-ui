@@ -122,9 +122,14 @@ export default function InvoicesPage() {
         lineItems: formData.lineItems,
       };
       await createMutation.mutateAsync(request);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error creating invoice:', error);
-      alert(error.response?.data?.message || t('common.form.errorCreate', { entity: t('entities.invoice') }));
+      const message = error && typeof error === 'object' && 'response' in error &&
+        error.response && typeof error.response === 'object' && 'data' in error.response &&
+        error.response.data && typeof error.response.data === 'object' && 'message' in error.response.data
+        ? String(error.response.data.message)
+        : t('common.form.errorCreate', { entity: t('entities.invoice') });
+      alert(message);
     } finally {
       setSubmitting(false);
     }
@@ -136,9 +141,14 @@ export default function InvoicesPage() {
     try {
       setSubmitting(true);
       await updateStatusMutation.mutateAsync({ id: selectedInvoice.id, status: newStatus });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error updating status:', error);
-      alert(error.response?.data?.message || 'Failed to update invoice status');
+      const message = error && typeof error === 'object' && 'response' in error &&
+        error.response && typeof error.response === 'object' && 'data' in error.response &&
+        error.response.data && typeof error.response.data === 'object' && 'message' in error.response.data
+        ? String(error.response.data.message)
+        : 'Failed to update invoice status';
+      alert(message);
     } finally {
       setSubmitting(false);
     }
@@ -314,7 +324,7 @@ export default function InvoicesPage() {
                   value={formData.workOrderId}
                   onChange={(e) => setFormData({ ...formData, workOrderId: e.target.value })}
                 >
-                  <option value="">None</option>
+                  <option value="">{t('common.none')}</option>
                   {workOrders.map((wo) => (
                     <option key={wo.id} value={wo.id}>
                       {wo.description || wo.id}
@@ -420,7 +430,7 @@ export default function InvoicesPage() {
       {/* Update Status Dialog */}
       <Dialog open={isStatusOpen} onClose={setIsStatusOpen}>
         <DialogTitle>{t('common.actions.edit', { entity: t('entities.invoice') })}</DialogTitle>
-        <DialogDescription>Update invoice status</DialogDescription>
+        <DialogDescription>{t('common.updateStatus', { entity: t('entities.invoice') })}</DialogDescription>
         <DialogBody>
           <Field>
             <Label>{t('common.form.status')}</Label>

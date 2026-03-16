@@ -45,10 +45,12 @@
       "zipCode": "Zip Code"
     },
     "moreOptions": "More options",
+    "none": "None",
     "saving": "Saving...",
     "signOut": "Sign out",
     "theme": "Theme",
-    "update": "Update"
+    "update": "Update",
+    "updateStatus": "Update {{entity, lowercase}} status"
   },
   "customers": {
     "description": "Manage your customer database",
@@ -131,7 +133,9 @@
     "description": "Track customer payments and transactions",
     "form": {
       "amount": "Amount",
+      "balance": "Balance",
       "invoice": "Invoice",
+      "invoiceBalance": "Invoice balance",
       "paymentDate": "Payment Date",
       "paymentMethod": "Payment Method",
       "paymentNumber": "Payment Number",

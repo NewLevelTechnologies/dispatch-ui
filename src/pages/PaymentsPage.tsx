@@ -100,9 +100,14 @@ export default function PaymentsPage() {
         notes: formData.notes || undefined,
       };
       await createMutation.mutateAsync(request);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error creating payment:', error);
-      alert(error.response?.data?.message || t('common.form.errorCreate', { entity: t('entities.payment') }));
+      const message = error && typeof error === 'object' && 'response' in error &&
+        error.response && typeof error.response === 'object' && 'data' in error.response &&
+        error.response.data && typeof error.response.data === 'object' && 'message' in error.response.data
+        ? String(error.response.data.message)
+        : t('common.form.errorCreate', { entity: t('entities.payment') });
+      alert(message);
     } finally {
       setSubmitting(false);
     }
@@ -243,7 +248,7 @@ export default function PaymentsPage() {
                   <option value="">Select invoice...</option>
                   {(Array.isArray(invoices) ? invoices.filter(inv => inv.balanceDue > 0) : []).map((invoice) => (
                     <option key={invoice.id} value={invoice.id}>
-                      {invoice.invoiceNumber} - {getCustomerName(invoice.customerId)} - Balance: {formatCurrency(invoice.balanceDue)}
+                      {invoice.invoiceNumber} - {getCustomerName(invoice.customerId)} - {t('payments.form.balance')}: {formatCurrency(invoice.balanceDue)}
                     </option>
                   ))}
                 </Select>
@@ -270,7 +275,7 @@ export default function PaymentsPage() {
                 />
                 {formData.invoiceId && (
                   <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-                    Invoice balance: {formatCurrency(getInvoiceBalance(formData.invoiceId))}
+                    {t('payments.form.invoiceBalance')}: {formatCurrency(getInvoiceBalance(formData.invoiceId))}
                   </p>
                 )}
               </Field>

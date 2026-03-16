@@ -106,9 +106,14 @@ export default function QuotesPage() {
         lineItems: formData.lineItems,
       };
       await createMutation.mutateAsync(request);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error creating quote:', error);
-      alert(error.response?.data?.message || t('common.form.errorCreate', { entity: t('entities.quote') }));
+      const message = error && typeof error === 'object' && 'response' in error &&
+        error.response && typeof error.response === 'object' && 'data' in error.response &&
+        error.response.data && typeof error.response.data === 'object' && 'message' in error.response.data
+        ? String(error.response.data.message)
+        : t('common.form.errorCreate', { entity: t('entities.quote') });
+      alert(message);
     } finally {
       setSubmitting(false);
     }
@@ -120,9 +125,14 @@ export default function QuotesPage() {
     try {
       setSubmitting(true);
       await updateStatusMutation.mutateAsync({ id: selectedQuote.id, status: newStatus });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error updating status:', error);
-      alert(error.response?.data?.message || 'Failed to update quote status');
+      const message = error && typeof error === 'object' && 'response' in error &&
+        error.response && typeof error.response === 'object' && 'data' in error.response &&
+        error.response.data && typeof error.response.data === 'object' && 'message' in error.response.data
+        ? String(error.response.data.message)
+        : 'Failed to update quote status';
+      alert(message);
     } finally {
       setSubmitting(false);
     }
@@ -384,7 +394,7 @@ export default function QuotesPage() {
       {/* Update Status Dialog */}
       <Dialog open={isStatusOpen} onClose={setIsStatusOpen}>
         <DialogTitle>{t('common.actions.edit', { entity: t('entities.quote') })}</DialogTitle>
-        <DialogDescription>Update quote status</DialogDescription>
+        <DialogDescription>{t('common.updateStatus', { entity: t('entities.quote') })}</DialogDescription>
         <DialogBody>
           <Field>
             <Label>{t('common.form.status')}</Label>
