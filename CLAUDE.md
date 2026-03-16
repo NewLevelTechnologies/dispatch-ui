@@ -112,7 +112,14 @@ dispatch-ui/
 │   ├── App.css               # Global styles
 │   ├── index.css             # Tailwind imports
 │   ├── api/
-│   │   └── client.ts         # Axios instance with JWT auth
+│   │   ├── client.ts         # Shared Axios instance with JWT auth
+│   │   ├── index.ts          # Central barrel export for all APIs
+│   │   ├── customerApi.ts    # Customer service API
+│   │   ├── workOrderApi.ts   # Work Order service API
+│   │   ├── userApi.ts        # User management API
+│   │   ├── equipmentApi.ts   # Equipment, Parts, Warehouses APIs
+│   │   ├── financialApi.ts   # Invoices, Quotes, Payments APIs
+│   │   └── schedulingApi.ts  # Dispatches, Availability, Recurring Orders APIs
 │   ├── components/
 │   │   ├── AppLayout.tsx     # Main layout with sidebar navigation
 │   │   ├── *FormDialog.tsx   # Dialog components for create/edit
@@ -124,9 +131,9 @@ dispatch-ui/
 │   │   ├── DashboardPage.tsx # Dashboard
 │   │   ├── CustomersPage.tsx # Customer management
 │   │   ├── WorkOrdersPage.tsx # Work order management
-│   │   ├── EquipmentPage.tsx  # Equipment (placeholder)
-│   │   ├── FinancialPage.tsx  # Financial (placeholder)
-│   │   └── SchedulingPage.tsx # Scheduling (placeholder)
+│   │   ├── EquipmentPage.tsx  # Equipment management
+│   │   ├── InvoicesPage.tsx   # Financial - Invoices
+│   │   └── DispatchesPage.tsx # Scheduling - Dispatches
 │   ├── types/
 │   │   └── index.ts          # TypeScript type definitions
 │   └── utils/
@@ -142,6 +149,157 @@ dispatch-ui/
 
 ---
 
+## API Architecture
+
+### Overview
+
+The application uses **dedicated API service classes** for all backend communication. This architecture provides:
+
+- **Single source of truth**: Shared `apiClient` handles authentication and configuration
+- **Type safety**: TypeScript interfaces for all requests and responses
+- **Consistency**: Standard CRUD patterns across all services
+- **Maintainability**: Easy to update authentication, error handling, or base URLs
+- **Testability**: Simple to mock in tests
+
+### API Service Structure
+
+Each domain has its own API service file:
+
+- **`customerApi.ts`** - Customer CRUD operations
+- **`workOrderApi.ts`** - Work Order CRUD operations
+- **`userApi.ts`** - User management operations
+- **`equipmentApi.ts`** - Equipment, Parts Inventory, and Warehouses
+- **`financialApi.ts`** - Invoices, Quotes, and Payments
+- **`schedulingApi.ts`** - Dispatches, Availability, and Recurring Orders
+
+### Central Barrel Export
+
+All APIs are exported from `src/api/index.ts`:
+
+```typescript
+// Single import for everything you need
+import { customerApi, workOrderApi, type Customer, type WorkOrder } from '../api';
+```
+
+### Creating a New API Service
+
+When adding a new domain (e.g., "Inventory"), create `src/api/inventoryApi.ts`:
+
+```typescript
+// Inventory API Client
+import apiClient from './client';
+
+export interface InventoryItem {
+  id: string;
+  name: string;
+  quantity: number;
+  // ... other fields
+}
+
+export interface CreateInventoryItemRequest {
+  name: string;
+  quantity: number;
+  // ... other fields
+}
+
+export interface UpdateInventoryItemRequest {
+  name?: string;
+  quantity?: number;
+  // ... other fields
+}
+
+export const inventoryApi = {
+  getAll: async (): Promise<InventoryItem[]> => {
+    const response = await apiClient.get<InventoryItem[]>('/inventory');
+    return response.data;
+  },
+
+  getById: async (id: string): Promise<InventoryItem> => {
+    const response = await apiClient.get<InventoryItem>(`/inventory/${id}`);
+    return response.data;
+  },
+
+  create: async (request: CreateInventoryItemRequest): Promise<InventoryItem> => {
+    const response = await apiClient.post<InventoryItem>('/inventory', request);
+    return response.data;
+  },
+
+  update: async (id: string, request: UpdateInventoryItemRequest): Promise<InventoryItem> => {
+    const response = await apiClient.put<InventoryItem>(`/inventory/${id}`, request);
+    return response.data;
+  },
+
+  delete: async (id: string): Promise<void> => {
+    await apiClient.delete(`/inventory/${id}`);
+  },
+};
+
+export default inventoryApi;
+```
+
+### Adding to Barrel Export
+
+Update `src/api/index.ts`:
+
+```typescript
+// Add to exports
+export {
+  inventoryApi,
+  type InventoryItem,
+  type CreateInventoryItemRequest,
+  type UpdateInventoryItemRequest
+} from './inventoryApi';
+```
+
+### Using API Services in Components
+
+**Import the API service**:
+```typescript
+import { customerApi, type Customer } from '../api';
+```
+
+**Use with React Query**:
+```typescript
+// Fetch data
+const { data: customers } = useQuery({
+  queryKey: ['customers'],
+  queryFn: () => customerApi.getAll(),
+});
+
+// Create
+const createMutation = useMutation({
+  mutationFn: (data: Customer) => customerApi.create(data),
+  onSuccess: () => {
+    queryClient.invalidateQueries({ queryKey: ['customers'] });
+  },
+});
+
+// Update
+const updateMutation = useMutation({
+  mutationFn: (data: Customer) => customerApi.update(customer.id, data),
+  onSuccess: () => {
+    queryClient.invalidateQueries({ queryKey: ['customers'] });
+  },
+});
+
+// Delete
+const deleteMutation = useMutation({
+  mutationFn: (id: string) => customerApi.delete(id),
+  onSuccess: () => {
+    queryClient.invalidateQueries({ queryKey: ['customers'] });
+  },
+});
+```
+
+**Benefits of this pattern**:
+- ✅ No need to import `apiClient` directly in components
+- ✅ TypeScript autocomplete for all API methods
+- ✅ Consistent error handling across the app
+- ✅ Easy to add custom methods (e.g., `getByCustomer()`, `search()`)
+- ✅ Simple to mock in tests: `vi.mock('../api')`
+
+---
+
 ## Adding a New Entity Page
 
 Follow this pattern for consistency. Example: Adding "Equipment" page.
@@ -154,8 +312,9 @@ Follow this pattern for consistency. Example: Adding "Equipment" page.
 ```typescript
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { EllipsisVerticalIcon } from '@heroicons/react/24/outline';
-import apiClient from '../api/client';
+import { equipmentApi, type Equipment } from '../api';
 import AppLayout from '../components/AppLayout';
 import EquipmentFormDialog from '../components/EquipmentFormDialog';
 import { Heading } from '../components/catalyst/heading';
@@ -164,29 +323,21 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '.
 import { Badge } from '../components/catalyst/badge';
 import { Dropdown, DropdownButton, DropdownItem, DropdownLabel, DropdownMenu } from '../components/catalyst/dropdown';
 
-interface Equipment {
-  id: string;
-  name: string;
-  // Add other fields...
-}
-
 export default function EquipmentPage() {
   const queryClient = useQueryClient();
+  const { t } = useTranslation();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedEquipment, setSelectedEquipment] = useState<Equipment | null>(null);
 
   // Fetch data with React Query
   const { data: equipment, isLoading, error } = useQuery({
     queryKey: ['equipment'],
-    queryFn: async () => {
-      const response = await apiClient.get<Equipment[]>('/equipment');
-      return response.data;
-    },
+    queryFn: () => equipmentApi.getAll(),
   });
 
   // Delete mutation
   const deleteMutation = useMutation({
-    mutationFn: (id: string) => apiClient.delete(`/equipment/${id}`),
+    mutationFn: (id: string) => equipmentApi.delete(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['equipment'] });
     },
@@ -317,17 +468,12 @@ export default function EquipmentPage() {
 ```typescript
 import { useState, useEffect } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import apiClient from '../api/client';
+import { useTranslation } from 'react-i18next';
+import { equipmentApi, type Equipment } from '../api';
 import { Dialog, DialogActions, DialogBody, DialogDescription, DialogTitle } from './catalyst/dialog';
 import { Button } from './catalyst/button';
 import { Field, FieldGroup, Fieldset, Label } from './catalyst/fieldset';
 import { Input } from './catalyst/input';
-
-interface Equipment {
-  id?: string;
-  name: string;
-  // Add other fields...
-}
 
 interface EquipmentFormDialogProps {
   isOpen: boolean;
@@ -337,10 +483,12 @@ interface EquipmentFormDialogProps {
 
 export default function EquipmentFormDialog({ isOpen, onClose, equipment }: EquipmentFormDialogProps) {
   const queryClient = useQueryClient();
+  const { t } = useTranslation();
   const isEdit = !!equipment?.id;
 
   const [formData, setFormData] = useState<Equipment>({
-    name: '',
+    customerId: '',
+    equipmentType: '',
     // Initialize other fields...
   });
 
@@ -356,7 +504,8 @@ export default function EquipmentFormDialog({ isOpen, onClose, equipment }: Equi
     } else {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setFormData({
-        name: '',
+        customerId: '',
+        equipmentType: '',
         // Reset other fields...
       });
     }
@@ -364,7 +513,7 @@ export default function EquipmentFormDialog({ isOpen, onClose, equipment }: Equi
 
   // Create mutation
   const createMutation = useMutation({
-    mutationFn: (data: Equipment) => apiClient.post('/equipment', data),
+    mutationFn: (data: Equipment) => equipmentApi.create(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['equipment'] });
       onClose();
@@ -373,14 +522,13 @@ export default function EquipmentFormDialog({ isOpen, onClose, equipment }: Equi
       const errorMessage = error instanceof Error && 'response' in error
         ? ((error as { response?: { data?: { message?: string } } }).response?.data?.message)
         : undefined;
-      alert(errorMessage || 'Failed to create equipment');
+      alert(errorMessage || t('common.form.errorCreate', { entity: t('entities.equipment') }));
     },
   });
 
   // Update mutation
   const updateMutation = useMutation({
-    mutationFn: (data: Equipment) =>
-      apiClient.put(`/equipment/${equipment?.id}`, data),
+    mutationFn: (data: Equipment) => equipmentApi.update(equipment!.id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['equipment'] });
       onClose();
@@ -389,7 +537,7 @@ export default function EquipmentFormDialog({ isOpen, onClose, equipment }: Equi
       const errorMessage = error instanceof Error && 'response' in error
         ? ((error as { response?: { data?: { message?: string } } }).response?.data?.message)
         : undefined;
-      alert(errorMessage || 'Failed to update equipment');
+      alert(errorMessage || t('common.form.errorUpdate', { entity: t('entities.equipment') }));
     },
   });
 
@@ -837,23 +985,25 @@ When adding a new feature:
 
 ### React Query Patterns
 
+**Import API service**:
+```typescript
+import { customerApi, type Customer } from '../api';
+```
+
 **Fetching data**:
 ```typescript
 const { data, isLoading, error } = useQuery({
-  queryKey: ['entity-name'],
-  queryFn: async () => {
-    const response = await apiClient.get<Type[]>('/endpoint');
-    return response.data;
-  },
+  queryKey: ['customers'],
+  queryFn: () => customerApi.getAll(),
 });
 ```
 
-**Creating/updating/deleting**:
+**Creating**:
 ```typescript
-const mutation = useMutation({
-  mutationFn: (data: Type) => apiClient.post('/endpoint', data),
+const createMutation = useMutation({
+  mutationFn: (data: Customer) => customerApi.create(data),
   onSuccess: () => {
-    queryClient.invalidateQueries({ queryKey: ['entity-name'] });
+    queryClient.invalidateQueries({ queryKey: ['customers'] });
     onClose();
   },
   onError: (error: unknown) => {
@@ -861,7 +1011,34 @@ const mutation = useMutation({
     const errorMessage = error instanceof Error && 'response' in error
       ? ((error as { response?: { data?: { message?: string } } }).response?.data?.message)
       : undefined;
-    alert(errorMessage || 'Operation failed');
+    alert(errorMessage || t('common.form.errorCreate', { entity: t('entities.customer') }));
+  },
+});
+```
+
+**Updating**:
+```typescript
+const updateMutation = useMutation({
+  mutationFn: (data: Customer) => customerApi.update(customer.id, data),
+  onSuccess: () => {
+    queryClient.invalidateQueries({ queryKey: ['customers'] });
+    onClose();
+  },
+  onError: (error: unknown) => {
+    const errorMessage = error instanceof Error && 'response' in error
+      ? ((error as { response?: { data?: { message?: string } } }).response?.data?.message)
+      : undefined;
+    alert(errorMessage || t('common.form.errorUpdate', { entity: t('entities.customer') }));
+  },
+});
+```
+
+**Deleting**:
+```typescript
+const deleteMutation = useMutation({
+  mutationFn: (id: string) => customerApi.delete(id),
+  onSuccess: () => {
+    queryClient.invalidateQueries({ queryKey: ['customers'] });
   },
 });
 ```
@@ -1451,7 +1628,14 @@ aws cloudfront create-invalidation \
 |------|---------|
 | `src/main.tsx` | Entry point, sets up Amplify + React Query |
 | `src/App.tsx` | Routes and authentication logic |
-| `src/api/client.ts` | Axios instance with JWT interceptor |
+| `src/api/client.ts` | Shared Axios instance with JWT interceptor |
+| `src/api/index.ts` | Central barrel export for all API services |
+| `src/api/customerApi.ts` | Customer service API methods |
+| `src/api/workOrderApi.ts` | Work Order service API methods |
+| `src/api/userApi.ts` | User management API methods |
+| `src/api/equipmentApi.ts` | Equipment, Parts, Warehouses APIs |
+| `src/api/financialApi.ts` | Invoices, Quotes, Payments APIs |
+| `src/api/schedulingApi.ts` | Dispatches, Availability, Recurring Orders APIs |
 | `src/components/AppLayout.tsx` | Main layout with navigation |
 | `src/config/amplify.ts` | AWS Amplify/Cognito configuration |
 | `src/test/setup.ts` | Test environment configuration and mocks |
@@ -1468,18 +1652,23 @@ aws cloudfront create-invalidation \
 
 This frontend uses a **modern, simple architecture**:
 - ✅ Single page + dialog pattern (no separate Create/Detail routes)
+- ✅ Dedicated API service classes (type-safe, maintainable)
 - ✅ React Query for data management (caching, refetching, mutations)
 - ✅ Catalyst UI for consistent components
 - ✅ TypeScript for type safety
 - ✅ Vite for fast builds
 - ✅ AWS Amplify for authentication
+- ✅ i18n support with react-i18next
 
 **When adding new features**:
-1. Follow the Entity Page + Form Dialog pattern
-2. Use React Query for data fetching
-3. Use Catalyst UI components
-4. Handle loading, error, and empty states
-5. Add proper TypeScript types
-6. Test manually before creating PR
+1. Create API service class in `src/api/` with TypeScript interfaces
+2. Export from `src/api/index.ts` barrel file
+3. Follow the Entity Page + Form Dialog pattern
+4. Use the API service with React Query
+5. Use Catalyst UI components
+6. Add i18n translations to `src/i18n/locales/en_us.json`
+7. Handle loading, error, and empty states
+8. Add proper TypeScript types throughout
+9. Write tests before creating PR
 
-**Remember**: The pattern is consistent across all pages. Look at CustomersPage and WorkOrdersPage as reference examples.
+**Remember**: The pattern is consistent across all pages. Look at CustomersPage, WorkOrdersPage, and their corresponding API services as reference examples.
