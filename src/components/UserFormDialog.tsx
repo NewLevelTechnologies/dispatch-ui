@@ -78,7 +78,7 @@ export default function UserFormDialog({ isOpen, onClose, user, roles }: UserFor
   }, [user, isOpen]);
 
   const createMutation = useMutation({
-    mutationFn: (data: User & { sendInvite?: boolean }) =>
+    mutationFn: (data: { firstName: string; lastName: string; email: string; roleId: string; sendInvite?: boolean }) =>
       apiClient.post('/users', data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users'] });
@@ -93,7 +93,7 @@ export default function UserFormDialog({ isOpen, onClose, user, roles }: UserFor
   });
 
   const updateMutation = useMutation({
-    mutationFn: (data: User) =>
+    mutationFn: (data: { firstName: string; lastName: string; email: string; roleId: string }) =>
       apiClient.put(`/users/${user?.id}`, {
         firstName: data.firstName,
         lastName: data.lastName,
@@ -126,7 +126,7 @@ export default function UserFormDialog({ isOpen, onClose, user, roles }: UserFor
     }
   };
 
-  const handleChange = (field: keyof User, value: string) => {
+  const handleChange = (field: 'firstName' | 'lastName' | 'email' | 'roleId', value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
