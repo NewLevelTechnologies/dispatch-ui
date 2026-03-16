@@ -25,6 +25,7 @@
     "cancel": "Cancel",
     "create": "Create",
     "delete": "Delete",
+    "deleting": "Deleting...",
     "edit": "Edit",
     "disabled": "Disabled",
     "enabled": "Enabled",
@@ -311,6 +312,7 @@
   },
   "users": {
     "actions": {
+      "deleteWarning": "This action cannot be undone. All user data and history will be permanently removed.",
       "disableConfirm": "Are you sure you want to disable {{name}}? They will no longer be able to log in.",
       "enableConfirm": "Are you sure you want to enable {{name}}?"
     },
