@@ -1,37 +1,5 @@
 // Equipment API Client
-import axios from 'axios';
-import { fetchAuthSession } from 'aws-amplify/auth';
-
-// Create axios instance with base configuration
-const api = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || 'https://dev.api.dispatch.newleveltech.net/api/v1',
-  timeout: 30000,
-  headers: {
-    'Content-Type': 'application/json',
-  },
-});
-
-// Add JWT token to all requests
-api.interceptors.request.use(
-  async (config) => {
-    try {
-      const session = await fetchAuthSession();
-      const token = session.tokens?.idToken?.toString();
-
-      if (token) {
-        config.headers.Authorization = `Bearer ${token}`;
-      }
-
-      return config;
-    } catch (error) {
-      console.error('Error fetching auth session:', error);
-      return Promise.reject(error);
-    }
-  },
-  (error) => {
-    return Promise.reject(error);
-  }
-);
+import apiClient from './client';
 
 // ========== EQUIPMENT ==========
 
@@ -90,27 +58,27 @@ export interface UpdateEquipmentRequest {
 export const equipmentApi = {
   getAll: async (customerId?: string): Promise<Equipment[]> => {
     const params = customerId ? { customerId } : {};
-    const response = await api.get<Equipment[]>('/equipment', { params });
+    const response = await apiClient.get<Equipment[]>('/equipment', { params });
     return response.data;
   },
 
   getById: async (id: string): Promise<Equipment> => {
-    const response = await api.get<Equipment>(`/equipment/${id}`);
+    const response = await apiClient.get<Equipment>(`/equipment/${id}`);
     return response.data;
   },
 
   create: async (request: CreateEquipmentRequest): Promise<Equipment> => {
-    const response = await api.post<Equipment>('/equipment', request);
+    const response = await apiClient.post<Equipment>('/equipment', request);
     return response.data;
   },
 
   update: async (id: string, request: UpdateEquipmentRequest): Promise<Equipment> => {
-    const response = await api.put<Equipment>(`/equipment/${id}`, request);
+    const response = await apiClient.put<Equipment>(`/equipment/${id}`, request);
     return response.data;
   },
 
   delete: async (id: string): Promise<void> => {
-    await api.delete(`/equipment/${id}`);
+    await apiClient.delete(`/equipment/${id}`);
   },
 };
 
@@ -169,27 +137,27 @@ export const partsInventoryApi = {
     const params: Record<string, string | boolean> = {};
     if (warehouseId) params.warehouseId = warehouseId;
     if (needsReorder !== undefined) params.needsReorder = needsReorder;
-    const response = await api.get<PartsInventory[]>('/equipment/parts-inventory', { params });
+    const response = await apiClient.get<PartsInventory[]>('/equipment/parts-inventory', { params });
     return response.data;
   },
 
   getById: async (id: string): Promise<PartsInventory> => {
-    const response = await api.get<PartsInventory>(`/equipment/parts-inventory/${id}`);
+    const response = await apiClient.get<PartsInventory>(`/equipment/parts-inventory/${id}`);
     return response.data;
   },
 
   create: async (request: CreatePartsInventoryRequest): Promise<PartsInventory> => {
-    const response = await api.post<PartsInventory>('/equipment/parts-inventory', request);
+    const response = await apiClient.post<PartsInventory>('/equipment/parts-inventory', request);
     return response.data;
   },
 
   update: async (id: string, request: UpdatePartsInventoryRequest): Promise<PartsInventory> => {
-    const response = await api.put<PartsInventory>(`/equipment/parts-inventory/${id}`, request);
+    const response = await apiClient.put<PartsInventory>(`/equipment/parts-inventory/${id}`, request);
     return response.data;
   },
 
   adjustQuantity: async (id: string, adjustment: number): Promise<PartsInventory> => {
-    const response = await api.post<PartsInventory>(
+    const response = await apiClient.post<PartsInventory>(
       `/equipment/parts-inventory/${id}/adjust-quantity`,
       { adjustment }
     );
@@ -197,7 +165,7 @@ export const partsInventoryApi = {
   },
 
   delete: async (id: string): Promise<void> => {
-    await api.delete(`/equipment/parts-inventory/${id}`);
+    await apiClient.delete(`/equipment/parts-inventory/${id}`);
   },
 };
 
@@ -248,27 +216,27 @@ export interface UpdateWarehouseRequest {
 
 export const warehousesApi = {
   getAll: async (): Promise<Warehouse[]> => {
-    const response = await api.get<Warehouse[]>('/equipment/warehouses');
+    const response = await apiClient.get<Warehouse[]>('/equipment/warehouses');
     return response.data;
   },
 
   getById: async (id: string): Promise<Warehouse> => {
-    const response = await api.get<Warehouse>(`/equipment/warehouses/${id}`);
+    const response = await apiClient.get<Warehouse>(`/equipment/warehouses/${id}`);
     return response.data;
   },
 
   create: async (request: CreateWarehouseRequest): Promise<Warehouse> => {
-    const response = await api.post<Warehouse>('/equipment/warehouses', request);
+    const response = await apiClient.post<Warehouse>('/equipment/warehouses', request);
     return response.data;
   },
 
   update: async (id: string, request: UpdateWarehouseRequest): Promise<Warehouse> => {
-    const response = await api.put<Warehouse>(`/equipment/warehouses/${id}`, request);
+    const response = await apiClient.put<Warehouse>(`/equipment/warehouses/${id}`, request);
     return response.data;
   },
 
   delete: async (id: string): Promise<void> => {
-    await api.delete(`/equipment/warehouses/${id}`);
+    await apiClient.delete(`/equipment/warehouses/${id}`);
   },
 };
 

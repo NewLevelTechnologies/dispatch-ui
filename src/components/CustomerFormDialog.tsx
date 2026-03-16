@@ -1,22 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import apiClient from '../api/client';
+import { customerApi, type Customer } from '../api';
 import { Dialog, DialogActions, DialogBody, DialogDescription, DialogTitle } from './catalyst/dialog';
 import { Button } from './catalyst/button';
 import { Field, FieldGroup, Fieldset, Label } from './catalyst/fieldset';
 import { Input } from './catalyst/input';
-
-interface Customer {
-  id?: string;
-  name: string;
-  email: string;
-  phone?: string;
-  address?: string;
-  city?: string;
-  state?: string;
-  zipCode?: string;
-}
 
 interface CustomerFormDialogProps {
   isOpen: boolean;
@@ -48,7 +37,7 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setFormData(customer);
     } else {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
+       
       setFormData({
         name: '',
         email: '',
@@ -62,7 +51,7 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
   }, [customer, isOpen]);
 
   const createMutation = useMutation({
-    mutationFn: (data: Customer) => apiClient.post('/customers', data),
+    mutationFn: (data: Customer) => customerApi.create(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['customers'] });
       onClose();
@@ -70,7 +59,7 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
   });
 
   const updateMutation = useMutation({
-    mutationFn: (data: Customer) => apiClient.put(`/customers/${customer?.id}`, data),
+    mutationFn: (data: Customer) => customerApi.update(customer!.id!, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['customers'] });
       onClose();

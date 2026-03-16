@@ -306,7 +306,7 @@ describe('WorkOrderFormDialog', () => {
 
     it('submits updated data', async () => {
       vi.mocked(apiClient.get).mockResolvedValue({ data: mockCustomers });
-      vi.mocked(apiClient.patch).mockResolvedValue({ data: existingWorkOrder });
+      vi.mocked(apiClient.put).mockResolvedValue({ data: existingWorkOrder });
       const user = userEvent.setup();
 
       renderWithProviders(
@@ -330,7 +330,7 @@ describe('WorkOrderFormDialog', () => {
       await user.click(submitButton);
 
       await waitFor(() => {
-        expect(apiClient.patch).toHaveBeenCalledWith('/work-orders/1', {
+        expect(apiClient.put).toHaveBeenCalledWith('/work-orders/1', {
           status: 'IN_PROGRESS',
           scheduledDate: '2024-03-15',
           description: 'Fixed the leak',
@@ -347,7 +347,7 @@ describe('WorkOrderFormDialog', () => {
       Object.assign(error, {
         response: { data: { message: 'Work order not found' } },
       });
-      vi.mocked(apiClient.patch).mockRejectedValue(error);
+      vi.mocked(apiClient.put).mockRejectedValue(error);
       const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
       const user = userEvent.setup();
 
@@ -372,7 +372,7 @@ describe('WorkOrderFormDialog', () => {
 
     it('handles update error with default message', async () => {
       vi.mocked(apiClient.get).mockResolvedValue({ data: mockCustomers });
-      vi.mocked(apiClient.patch).mockRejectedValue(new Error('Network error'));
+      vi.mocked(apiClient.put).mockRejectedValue(new Error('Network error'));
       const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
       const user = userEvent.setup();
 

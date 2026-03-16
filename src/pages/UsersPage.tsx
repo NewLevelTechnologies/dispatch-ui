@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tantml:react-query';
 import { useTranslation } from 'react-i18next';
 import { EllipsisVerticalIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
-import apiClient from '../api/client';
+import { userApi } from '../api';
 import AppLayout from '../components/AppLayout';
 import UserFormDialog from '../components/UserFormDialog';
 import { Heading } from '../components/catalyst/heading';
@@ -12,25 +12,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '.
 import { Badge } from '../components/catalyst/badge';
 import { Dropdown, DropdownButton, DropdownItem, DropdownLabel, DropdownMenu } from '../components/catalyst/dropdown';
 import { Input } from '../components/catalyst/input';
-
-interface User {
-  id: string;
-  tenantId: string;
-  cognitoSub: string;
-  email: string;
-  firstName: string;
-  lastName: string;
-  enabled: boolean;
-  roles?: Role[];
-  capabilities?: string[];
-  createdAt: string;
-  updatedAt: string;
-}
-
-interface Role {
-  id: string;
-  name: string;
-}
 
 export default function UsersPage() {
   const navigate = useNavigate();
@@ -44,29 +25,23 @@ export default function UsersPage() {
 
   const { data: users, isLoading, error } = useQuery({
     queryKey: ['users'],
-    queryFn: async () => {
-      const response = await apiClient.get<User[]>('/users');
-      return response.data;
-    },
+    queryFn: () => userApi.getAll(),
   });
 
   const { data: roles } = useQuery({
     queryKey: ['roles'],
-    queryFn: async () => {
-      const response = await apiClient.get<Role[]>('/users/roles');
-      return response.data;
-    },
+    queryFn: () => userApi.getRoles(),
   });
 
   const disableMutation = useMutation({
-    mutationFn: (id: string) => apiClient.put(`/users/${id}`, { enabled: false }),
+    mutationFn: (id: string) => userApi.disable(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users'] });
     },
   });
 
   const enableMutation = useMutation({
-    mutationFn: (id: string) => apiClient.put(`/users/${id}`, { enabled: true }),
+    mutationFn: (id: string) => userApi.enable(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users'] });
     },

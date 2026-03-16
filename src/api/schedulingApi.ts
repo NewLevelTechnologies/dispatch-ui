@@ -1,37 +1,5 @@
 // Scheduling API Client
-import axios from 'axios';
-import { fetchAuthSession } from 'aws-amplify/auth';
-
-// Create axios instance with base configuration
-const api = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || 'https://dev.api.dispatch.newleveltech.net/api/v1',
-  timeout: 30000,
-  headers: {
-    'Content-Type': 'application/json',
-  },
-});
-
-// Add JWT token to all requests
-api.interceptors.request.use(
-  async (config) => {
-    try {
-      const session = await fetchAuthSession();
-      const token = session.tokens?.idToken?.toString();
-
-      if (token) {
-        config.headers.Authorization = `Bearer ${token}`;
-      }
-
-      return config;
-    } catch (error) {
-      console.error('Error fetching auth session:', error);
-      return Promise.reject(error);
-    }
-  },
-  (error) => {
-    return Promise.reject(error);
-  }
-);
+import apiClient from './client';
 
 // ========== DISPATCHES ==========
 
@@ -72,27 +40,27 @@ export const dispatchesApi = {
     startDate?: string;
     endDate?: string;
   }): Promise<Dispatch[]> => {
-    const response = await api.get<Dispatch[]>('/scheduling/dispatches', { params });
+    const response = await apiClient.get<Dispatch[]>('/scheduling/dispatches', { params });
     return response.data;
   },
 
   getById: async (id: string): Promise<Dispatch> => {
-    const response = await api.get<Dispatch>(`/scheduling/dispatches/${id}`);
+    const response = await apiClient.get<Dispatch>(`/scheduling/dispatches/${id}`);
     return response.data;
   },
 
   create: async (request: CreateDispatchRequest): Promise<Dispatch> => {
-    const response = await api.post<Dispatch>('/scheduling/dispatches', request);
+    const response = await apiClient.post<Dispatch>('/scheduling/dispatches', request);
     return response.data;
   },
 
   update: async (id: string, request: UpdateDispatchRequest): Promise<Dispatch> => {
-    const response = await api.put<Dispatch>(`/scheduling/dispatches/${id}`, request);
+    const response = await apiClient.put<Dispatch>(`/scheduling/dispatches/${id}`, request);
     return response.data;
   },
 
   delete: async (id: string): Promise<void> => {
-    await api.delete(`/scheduling/dispatches/${id}`);
+    await apiClient.delete(`/scheduling/dispatches/${id}`);
   },
 };
 
@@ -138,27 +106,27 @@ export const availabilityApi = {
     startDate?: string;
     endDate?: string;
   }): Promise<Availability[]> => {
-    const response = await api.get<Availability[]>('/scheduling/availability', { params });
+    const response = await apiClient.get<Availability[]>('/scheduling/availability', { params });
     return response.data;
   },
 
   getById: async (id: string): Promise<Availability> => {
-    const response = await api.get<Availability>(`/scheduling/availability/${id}`);
+    const response = await apiClient.get<Availability>(`/scheduling/availability/${id}`);
     return response.data;
   },
 
   create: async (request: CreateAvailabilityRequest): Promise<Availability> => {
-    const response = await api.post<Availability>('/scheduling/availability', request);
+    const response = await apiClient.post<Availability>('/scheduling/availability', request);
     return response.data;
   },
 
   update: async (id: string, request: UpdateAvailabilityRequest): Promise<Availability> => {
-    const response = await api.put<Availability>(`/scheduling/availability/${id}`, request);
+    const response = await apiClient.put<Availability>(`/scheduling/availability/${id}`, request);
     return response.data;
   },
 
   delete: async (id: string): Promise<void> => {
-    await api.delete(`/scheduling/availability/${id}`);
+    await apiClient.delete(`/scheduling/availability/${id}`);
   },
 };
 
@@ -202,27 +170,27 @@ export const recurringOrdersApi = {
     status?: string;
     dueBefore?: string;
   }): Promise<RecurringOrder[]> => {
-    const response = await api.get<RecurringOrder[]>('/scheduling/recurring-orders', { params });
+    const response = await apiClient.get<RecurringOrder[]>('/scheduling/recurring-orders', { params });
     return response.data;
   },
 
   getById: async (id: string): Promise<RecurringOrder> => {
-    const response = await api.get<RecurringOrder>(`/scheduling/recurring-orders/${id}`);
+    const response = await apiClient.get<RecurringOrder>(`/scheduling/recurring-orders/${id}`);
     return response.data;
   },
 
   create: async (request: CreateRecurringOrderRequest): Promise<RecurringOrder> => {
-    const response = await api.post<RecurringOrder>('/scheduling/recurring-orders', request);
+    const response = await apiClient.post<RecurringOrder>('/scheduling/recurring-orders', request);
     return response.data;
   },
 
   update: async (id: string, request: UpdateRecurringOrderRequest): Promise<RecurringOrder> => {
-    const response = await api.put<RecurringOrder>(`/scheduling/recurring-orders/${id}`, request);
+    const response = await apiClient.put<RecurringOrder>(`/scheduling/recurring-orders/${id}`, request);
     return response.data;
   },
 
   delete: async (id: string): Promise<void> => {
-    await api.delete(`/scheduling/recurring-orders/${id}`);
+    await apiClient.delete(`/scheduling/recurring-orders/${id}`);
   },
 };
 
