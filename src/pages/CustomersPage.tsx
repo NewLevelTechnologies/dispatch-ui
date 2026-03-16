@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { EllipsisVerticalIcon } from '@heroicons/react/24/outline';
-import apiClient from '../api/client';
+import { customerApi, type Customer } from '../api';
 import AppLayout from '../components/AppLayout';
 import CustomerFormDialog from '../components/CustomerFormDialog';
 import { Heading } from '../components/catalyst/heading';
@@ -10,17 +10,6 @@ import { Button } from '../components/catalyst/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/catalyst/table';
 import { Badge } from '../components/catalyst/badge';
 import { Dropdown, DropdownButton, DropdownItem, DropdownLabel, DropdownMenu } from '../components/catalyst/dropdown';
-
-interface Customer {
-  id: string;
-  name: string;
-  email: string;
-  phone?: string;
-  address?: string;
-  city?: string;
-  state?: string;
-  zipCode?: string;
-}
 
 export default function CustomersPage() {
   const queryClient = useQueryClient();
@@ -30,14 +19,11 @@ export default function CustomersPage() {
 
   const { data: customers, isLoading, error } = useQuery({
     queryKey: ['customers'],
-    queryFn: async () => {
-      const response = await apiClient.get<Customer[]>('/customers');
-      return response.data;
-    },
+    queryFn: () => customerApi.getAll(),
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id: string) => apiClient.delete(`/customers/${id}`),
+    mutationFn: (id: string) => customerApi.delete(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['customers'] });
     },

@@ -1,28 +1,13 @@
 import { useState, useEffect } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import apiClient from '../api/client';
+import { customerApi, workOrderApi, type WorkOrder } from '../api';
 import { Dialog, DialogActions, DialogBody, DialogDescription, DialogTitle } from './catalyst/dialog';
 import { Button } from './catalyst/button';
 import { Field, FieldGroup, Fieldset, Label } from './catalyst/fieldset';
 import { Input } from './catalyst/input';
 import { Textarea } from './catalyst/textarea';
 import { Select } from './catalyst/select';
-
-interface WorkOrder {
-  id?: string;
-  customerId: string;
-  status?: 'PENDING' | 'SCHEDULED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
-  scheduledDate?: string;
-  description?: string;
-  notes?: string;
-}
-
-interface Customer {
-  id: string;
-  name: string;
-  email: string;
-}
 
 interface WorkOrderFormDialogProps {
   isOpen: boolean;
@@ -35,7 +20,7 @@ export default function WorkOrderFormDialog({ isOpen, onClose, workOrder }: Work
   const { t } = useTranslation();
   const isEdit = !!workOrder?.id;
 
-  const [formData, setFormData] = useState<WorkOrder>({
+  const [formData, setFormData] = useState<Omit<WorkOrder, 'id' | 'createdAt' | 'updatedAt'>>({
     customerId: '',
     status: 'PENDING',
     scheduledDate: '',
@@ -46,10 +31,7 @@ export default function WorkOrderFormDialog({ isOpen, onClose, workOrder }: Work
   // Fetch customers for dropdown
   const { data: customers } = useQuery({
     queryKey: ['customers'],
-    queryFn: async () => {
-      const response = await apiClient.get<Customer[]>('/customers');
-      return response.data;
-    },
+    queryFn: () => customerApi.getAll(),
     enabled: isOpen,
   });
 
@@ -68,7 +50,7 @@ export default function WorkOrderFormDialog({ isOpen, onClose, workOrder }: Work
         notes: workOrder.notes || '',
       });
     } else {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
+       
       setFormData({
         customerId: '',
         status: 'PENDING',
@@ -80,7 +62,7 @@ export default function WorkOrderFormDialog({ isOpen, onClose, workOrder }: Work
   }, [workOrder, isOpen]);
 
   const createMutation = useMutation({
-    mutationFn: (data: WorkOrder) => apiClient.post('/work-orders', data),
+    mutationFn: (data: Omit<WorkOrder, 'id' | 'createdAt' | 'updatedAt'>) => workOrderApi.create(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['work-orders'] });
       onClose();
@@ -94,10 +76,10 @@ export default function WorkOrderFormDialog({ isOpen, onClose, workOrder }: Work
   });
 
   const updateMutation = useMutation({
-    mutationFn: (data: WorkOrder) =>
-      apiClient.patch(`/work-orders/${workOrder?.id}`, {
+    mutationFn: (data: Omit<WorkOrder, 'id' | 'createdAt' | 'updatedAt'>) =>
+      workOrderApi.update(workOrder!.id!, {
         status: data.status,
-        scheduledDate: data.scheduledDate || null,
+        scheduledDate: data.scheduledDate || undefined,
         description: data.description,
         notes: data.notes,
       }),

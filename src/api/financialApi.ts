@@ -1,37 +1,5 @@
 // Financial API Client
-import axios from 'axios';
-import { fetchAuthSession } from 'aws-amplify/auth';
-
-// Create axios instance with base configuration
-const api = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || 'https://dev.api.dispatch.newleveltech.net/api/v1',
-  timeout: 30000,
-  headers: {
-    'Content-Type': 'application/json',
-  },
-});
-
-// Add JWT token to all requests
-api.interceptors.request.use(
-  async (config) => {
-    try {
-      const session = await fetchAuthSession();
-      const token = session.tokens?.idToken?.toString();
-
-      if (token) {
-        config.headers.Authorization = `Bearer ${token}`;
-      }
-
-      return config;
-    } catch (error) {
-      console.error('Error fetching auth session:', error);
-      return Promise.reject(error);
-    }
-  },
-  (error) => {
-    return Promise.reject(error);
-  }
-);
+import apiClient from './client';
 
 // ========== INVOICES ==========
 
@@ -96,27 +64,27 @@ export interface UpdateInvoiceStatusRequest {
 
 export const invoicesApi = {
   getAll: async (): Promise<Invoice[]> => {
-    const response = await api.get<Invoice[]>('/financial/invoices');
+    const response = await apiClient.get<Invoice[]>('/financial/invoices');
     return response.data;
   },
 
   getById: async (id: string): Promise<Invoice> => {
-    const response = await api.get<Invoice>(`/financial/invoices/${id}`);
+    const response = await apiClient.get<Invoice>(`/financial/invoices/${id}`);
     return response.data;
   },
 
   getByCustomer: async (customerId: string): Promise<Invoice[]> => {
-    const response = await api.get<Invoice[]>(`/financial/invoices/customer/${customerId}`);
+    const response = await apiClient.get<Invoice[]>(`/financial/invoices/customer/${customerId}`);
     return response.data;
   },
 
   create: async (request: CreateInvoiceRequest): Promise<Invoice> => {
-    const response = await api.post<Invoice>('/financial/invoices', request);
+    const response = await apiClient.post<Invoice>('/financial/invoices', request);
     return response.data;
   },
 
   updateStatus: async (id: string, request: UpdateInvoiceStatusRequest): Promise<Invoice> => {
-    const response = await api.patch<Invoice>(`/financial/invoices/${id}/status`, request);
+    const response = await apiClient.patch<Invoice>(`/financial/invoices/${id}/status`, request);
     return response.data;
   },
 };
@@ -179,27 +147,27 @@ export interface UpdateQuoteStatusRequest {
 
 export const quotesApi = {
   getAll: async (): Promise<Quote[]> => {
-    const response = await api.get<Quote[]>('/financial/quotes');
+    const response = await apiClient.get<Quote[]>('/financial/quotes');
     return response.data;
   },
 
   getById: async (id: string): Promise<Quote> => {
-    const response = await api.get<Quote>(`/financial/quotes/${id}`);
+    const response = await apiClient.get<Quote>(`/financial/quotes/${id}`);
     return response.data;
   },
 
   getByCustomer: async (customerId: string): Promise<Quote[]> => {
-    const response = await api.get<Quote[]>(`/financial/quotes/customer/${customerId}`);
+    const response = await apiClient.get<Quote[]>(`/financial/quotes/customer/${customerId}`);
     return response.data;
   },
 
   create: async (request: CreateQuoteRequest): Promise<Quote> => {
-    const response = await api.post<Quote>('/financial/quotes', request);
+    const response = await apiClient.post<Quote>('/financial/quotes', request);
     return response.data;
   },
 
   updateStatus: async (id: string, request: UpdateQuoteStatusRequest): Promise<Quote> => {
-    const response = await api.patch<Quote>(`/financial/quotes/${id}/status`, request);
+    const response = await apiClient.patch<Quote>(`/financial/quotes/${id}/status`, request);
     return response.data;
   },
 };
@@ -243,22 +211,22 @@ export interface CreatePaymentRequest {
 
 export const paymentsApi = {
   getAll: async (): Promise<Payment[]> => {
-    const response = await api.get<Payment[]>('/financial/payments');
+    const response = await apiClient.get<Payment[]>('/financial/payments');
     return response.data;
   },
 
   getById: async (id: string): Promise<Payment> => {
-    const response = await api.get<Payment>(`/financial/payments/${id}`);
+    const response = await apiClient.get<Payment>(`/financial/payments/${id}`);
     return response.data;
   },
 
   getByInvoice: async (invoiceId: string): Promise<Payment[]> => {
-    const response = await api.get<Payment[]>(`/financial/payments/invoice/${invoiceId}`);
+    const response = await apiClient.get<Payment[]>(`/financial/payments/invoice/${invoiceId}`);
     return response.data;
   },
 
   create: async (request: CreatePaymentRequest): Promise<Payment> => {
-    const response = await api.post<Payment>('/financial/payments', request);
+    const response = await apiClient.post<Payment>('/financial/payments', request);
     return response.data;
   },
 };

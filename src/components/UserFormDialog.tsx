@@ -1,27 +1,13 @@
 import { useState, useEffect } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import apiClient from '../api/client';
+import { userApi, type User, type Role } from '../api';
 import { Dialog, DialogActions, DialogBody, DialogDescription, DialogTitle } from './catalyst/dialog';
 import { Button } from './catalyst/button';
 import { Field, FieldGroup, Fieldset, Label } from './catalyst/fieldset';
 import { Input } from './catalyst/input';
 import { Select } from './catalyst/select';
 import { Checkbox, CheckboxField } from './catalyst/checkbox';
-
-interface User {
-  id?: string;
-  firstName: string;
-  lastName: string;
-  email: string;
-  roles?: Role[];
-  enabled?: boolean;
-}
-
-interface Role {
-  id: string;
-  name: string;
-}
 
 interface UserFormDialogProps {
   isOpen: boolean;
@@ -62,24 +48,24 @@ export default function UserFormDialog({ isOpen, onClose, user, roles }: UserFor
         email: user.email,
         roleId: user.roles?.[0]?.id || '',
       });
-      // eslint-disable-next-line react-hooks/set-state-in-effect
+       
       setSendInvite(false); // Don't send invite on edit
     } else {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
+       
       setFormData({
         firstName: '',
         lastName: '',
         email: '',
         roleId: '',
       });
-      // eslint-disable-next-line react-hooks/set-state-in-effect
+       
       setSendInvite(true); // Send invite by default on create
     }
   }, [user, isOpen]);
 
   const createMutation = useMutation({
     mutationFn: (data: { firstName: string; lastName: string; email: string; roleId: string; sendInvite?: boolean }) =>
-      apiClient.post('/users', data),
+      userApi.create(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users'] });
       onClose();
@@ -94,7 +80,7 @@ export default function UserFormDialog({ isOpen, onClose, user, roles }: UserFor
 
   const updateMutation = useMutation({
     mutationFn: (data: { firstName: string; lastName: string; email: string; roleId: string }) =>
-      apiClient.put(`/users/${user?.id}`, {
+      userApi.update(user!.id!, {
         firstName: data.firstName,
         lastName: data.lastName,
         roleId: data.roleId,

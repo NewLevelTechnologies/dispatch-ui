@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { ArrowLeftIcon } from '@heroicons/react/24/outline';
-import apiClient from '../api/client';
+import { userApi } from '../api';
 import AppLayout from '../components/AppLayout';
 import UserFormDialog from '../components/UserFormDialog';
 import { Heading, Subheading } from '../components/catalyst/heading';
@@ -11,25 +11,6 @@ import { Button } from '../components/catalyst/button';
 import { Badge } from '../components/catalyst/badge';
 import { DescriptionList, DescriptionTerm, DescriptionDetails } from '../components/catalyst/description-list';
 import { Divider } from '../components/catalyst/divider';
-
-interface User {
-  id: string;
-  tenantId: string;
-  cognitoSub: string;
-  email: string;
-  firstName: string;
-  lastName: string;
-  enabled: boolean;
-  roles?: Role[];
-  capabilities?: string[];
-  createdAt: string;
-  updatedAt: string;
-}
-
-interface Role {
-  id: string;
-  name: string;
-}
 
 export default function UserDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -41,22 +22,16 @@ export default function UserDetailPage() {
 
   const { data: user, isLoading, error } = useQuery({
     queryKey: ['users', id],
-    queryFn: async () => {
-      const response = await apiClient.get<User>(`/users/${id}`);
-      return response.data;
-    },
+    queryFn: () => userApi.getById(id!),
   });
 
   const { data: roles } = useQuery({
     queryKey: ['roles'],
-    queryFn: async () => {
-      const response = await apiClient.get<Role[]>('/users/roles');
-      return response.data;
-    },
+    queryFn: () => userApi.getRoles(),
   });
 
   const disableMutation = useMutation({
-    mutationFn: () => apiClient.put(`/users/${id}`, { enabled: false }),
+    mutationFn: () => userApi.disable(id!),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users', id] });
       queryClient.invalidateQueries({ queryKey: ['users'] });
@@ -64,7 +39,7 @@ export default function UserDetailPage() {
   });
 
   const enableMutation = useMutation({
-    mutationFn: () => apiClient.put(`/users/${id}`, { enabled: true }),
+    mutationFn: () => userApi.enable(id!),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users', id] });
       queryClient.invalidateQueries({ queryKey: ['users'] });

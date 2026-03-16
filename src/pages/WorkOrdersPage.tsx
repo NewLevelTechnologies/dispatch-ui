@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { EllipsisVerticalIcon } from '@heroicons/react/24/outline';
-import apiClient from '../api/client';
+import { workOrderApi, type WorkOrder } from '../api';
 import AppLayout from '../components/AppLayout';
 import WorkOrderFormDialog from '../components/WorkOrderFormDialog';
 import { Heading } from '../components/catalyst/heading';
@@ -10,19 +10,6 @@ import { Button } from '../components/catalyst/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/catalyst/table';
 import { Badge } from '../components/catalyst/badge';
 import { Dropdown, DropdownButton, DropdownItem, DropdownLabel, DropdownMenu } from '../components/catalyst/dropdown';
-
-interface WorkOrder {
-  id: string;
-  customerId: string;
-  status: 'PENDING' | 'SCHEDULED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
-  scheduledDate?: string;
-  completedDate?: string;
-  description?: string;
-  notes?: string;
-  totalAmount?: number;
-  createdAt: string;
-  updatedAt: string;
-}
 
 const STATUS_COLORS = {
   PENDING: 'amber',
@@ -48,14 +35,11 @@ export default function WorkOrdersPage() {
 
   const { data: workOrders, isLoading, error } = useQuery({
     queryKey: ['work-orders'],
-    queryFn: async () => {
-      const response = await apiClient.get<WorkOrder[]>('/work-orders');
-      return response.data;
-    },
+    queryFn: () => workOrderApi.getAll(),
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id: string) => apiClient.delete(`/work-orders/${id}`),
+    mutationFn: (id: string) => workOrderApi.delete(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['work-orders'] });
     },
