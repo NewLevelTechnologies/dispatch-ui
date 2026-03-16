@@ -18,7 +18,7 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
   const { t } = useTranslation();
   const isEdit = !!customer?.id;
 
-  const [formData, setFormData] = useState<Customer>({
+  const [formData, setFormData] = useState<Omit<Customer, 'id'>>({
     name: '',
     email: '',
     phone: '',
@@ -51,7 +51,7 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
   }, [customer, isOpen]);
 
   const createMutation = useMutation({
-    mutationFn: (data: Customer) => customerApi.create(data),
+    mutationFn: (data: Omit<Customer, 'id'>) => customerApi.create(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['customers'] });
       onClose();
@@ -59,7 +59,7 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
   });
 
   const updateMutation = useMutation({
-    mutationFn: (data: Customer) => customerApi.update(customer!.id!, data),
+    mutationFn: (data: Omit<Customer, 'id'>) => customerApi.update(customer!.id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['customers'] });
       onClose();

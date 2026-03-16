@@ -239,6 +239,8 @@ describe('WorkOrderFormDialog', () => {
       scheduledDate: '2024-03-15',
       description: 'Fix leaking pipe',
       notes: 'Customer prefers morning',
+      createdAt: '2024-03-10T10:00:00Z',
+      updatedAt: '2024-03-10T10:00:00Z',
     };
 
     it('renders edit dialog with populated form', async () => {

@@ -20,7 +20,7 @@ export default function WorkOrderFormDialog({ isOpen, onClose, workOrder }: Work
   const { t } = useTranslation();
   const isEdit = !!workOrder?.id;
 
-  const [formData, setFormData] = useState<WorkOrder>({
+  const [formData, setFormData] = useState<Omit<WorkOrder, 'id' | 'createdAt' | 'updatedAt'>>({
     customerId: '',
     status: 'PENDING',
     scheduledDate: '',
@@ -62,7 +62,7 @@ export default function WorkOrderFormDialog({ isOpen, onClose, workOrder }: Work
   }, [workOrder, isOpen]);
 
   const createMutation = useMutation({
-    mutationFn: (data: WorkOrder) => workOrderApi.create(data),
+    mutationFn: (data: Omit<WorkOrder, 'id' | 'createdAt' | 'updatedAt'>) => workOrderApi.create(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['work-orders'] });
       onClose();
@@ -76,10 +76,10 @@ export default function WorkOrderFormDialog({ isOpen, onClose, workOrder }: Work
   });
 
   const updateMutation = useMutation({
-    mutationFn: (data: WorkOrder) =>
+    mutationFn: (data: Omit<WorkOrder, 'id' | 'createdAt' | 'updatedAt'>) =>
       workOrderApi.update(workOrder!.id!, {
         status: data.status,
-        scheduledDate: data.scheduledDate || null,
+        scheduledDate: data.scheduledDate || undefined,
         description: data.description,
         notes: data.notes,
       }),
