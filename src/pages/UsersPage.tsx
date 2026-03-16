@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { EllipsisVerticalIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
@@ -20,8 +21,8 @@ interface User {
   firstName: string;
   lastName: string;
   enabled: boolean;
-  roleId?: string;
-  roleName?: string;
+  roles?: Role[];
+  capabilities?: string[];
   createdAt: string;
   updatedAt: string;
 }
@@ -32,11 +33,14 @@ interface Role {
 }
 
 export default function UsersPage() {
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { t } = useTranslation();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [roleFilter, setRoleFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
 
   const { data: users, isLoading, error } = useQuery({
     queryKey: ['users'],
@@ -49,7 +53,7 @@ export default function UsersPage() {
   const { data: roles } = useQuery({
     queryKey: ['roles'],
     queryFn: async () => {
-      const response = await apiClient.get<Role[]>('/roles');
+      const response = await apiClient.get<Role[]>('/users/roles');
       return response.data;
     },
   });
@@ -97,16 +101,38 @@ export default function UsersPage() {
     setSelectedUser(null);
   };
 
-  // Filter users based on search query
+  // Filter users based on search query, role, and status
   const filteredUsers = users?.filter((user) => {
+    // Search filter
     const query = searchQuery.toLowerCase();
-    return (
+    const roleNames = user.roles?.map(r => r.name.toLowerCase()).join(' ') || '';
+    const matchesSearch = !query || (
       user.firstName.toLowerCase().includes(query) ||
       user.lastName.toLowerCase().includes(query) ||
       user.email.toLowerCase().includes(query) ||
-      user.roleName?.toLowerCase().includes(query)
+      roleNames.includes(query)
     );
+
+    // Role filter
+    const matchesRole = !roleFilter || user.roles?.some(r => r.id === roleFilter);
+
+    // Status filter
+    const matchesStatus = !statusFilter || (
+      (statusFilter === 'enabled' && user.enabled) ||
+      (statusFilter === 'disabled' && !user.enabled)
+    );
+
+    return matchesSearch && matchesRole && matchesStatus;
   });
+
+  // Clear all filters
+  const clearFilters = () => {
+    setRoleFilter('');
+    setStatusFilter('');
+  };
+
+  // Check if any filters are active
+  const hasActiveFilters = roleFilter || statusFilter;
 
   // Format date helper
   const formatDate = (dateString: string) => {
@@ -129,10 +155,11 @@ export default function UsersPage() {
         <Button onClick={handleAdd}>{t('common.actions.add', { entity: t('entities.user') })}</Button>
       </div>
 
-      {/* Search Bar */}
+      {/* Search Bar and Filters */}
       {users && users.length > 0 && (
-        <div className="mt-6">
-          <div className="relative">
+        <div className="mt-6 flex flex-wrap gap-4 items-center">
+          {/* Search */}
+          <div className="relative flex-1 min-w-[300px]">
             <MagnifyingGlassIcon className="pointer-events-none absolute left-3 top-1/2 size-5 -translate-y-1/2 text-zinc-500" />
             <Input
               type="search"
@@ -141,6 +168,51 @@ export default function UsersPage() {
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-10"
             />
+          </div>
+
+          {/* Filters */}
+          <div className="flex gap-2 items-center flex-shrink-0">
+            {/* Role Filter */}
+            <Dropdown>
+              <DropdownButton outline>
+                {t('users.filter.role')}: {roleFilter ? roles?.find(r => r.id === roleFilter)?.name : t('users.filter.allRoles')}
+              </DropdownButton>
+              <DropdownMenu>
+                <DropdownItem onClick={() => setRoleFilter('')}>
+                  <DropdownLabel>{t('users.filter.allRoles')}</DropdownLabel>
+                </DropdownItem>
+                {roles?.map(role => (
+                  <DropdownItem key={role.id} onClick={() => setRoleFilter(role.id)}>
+                    <DropdownLabel>{role.name}</DropdownLabel>
+                  </DropdownItem>
+                ))}
+              </DropdownMenu>
+            </Dropdown>
+
+            {/* Status Filter */}
+            <Dropdown>
+              <DropdownButton outline>
+                {t('users.filter.status')}: {statusFilter ? t(`users.filter.${statusFilter}`) : t('users.filter.all')}
+              </DropdownButton>
+              <DropdownMenu>
+                <DropdownItem onClick={() => setStatusFilter('')}>
+                  <DropdownLabel>{t('users.filter.all')}</DropdownLabel>
+                </DropdownItem>
+                <DropdownItem onClick={() => setStatusFilter('enabled')}>
+                  <DropdownLabel>{t('users.filter.enabled')}</DropdownLabel>
+                </DropdownItem>
+                <DropdownItem onClick={() => setStatusFilter('disabled')}>
+                  <DropdownLabel>{t('users.filter.disabled')}</DropdownLabel>
+                </DropdownItem>
+              </DropdownMenu>
+            </Dropdown>
+
+            {/* Clear Filters */}
+            {hasActiveFilters && (
+              <Button plain onClick={clearFilters}>
+                {t('users.filter.clearFilters')}
+              </Button>
+            )}
           </div>
         </div>
       )}
@@ -183,13 +255,32 @@ export default function UsersPage() {
             </TableHead>
             <TableBody>
               {filteredUsers.map((user) => (
-                <TableRow key={user.id}>
+                <TableRow
+                  key={user.id}
+                  href={`/users/${user.id}`}
+                  onClick={(e: React.MouseEvent) => {
+                    // Only navigate if not clicking dropdown or its children
+                    const target = e.target as HTMLElement;
+                    if (!target.closest('[role="menu"]') && !target.closest('button[aria-label]')) {
+                      navigate(`/users/${user.id}`);
+                    }
+                  }}
+                  className="cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-900/50"
+                >
                   <TableCell className="font-medium">
                     {user.firstName} {user.lastName}
                   </TableCell>
                   <TableCell className="text-zinc-500">{user.email}</TableCell>
                   <TableCell className="text-zinc-500">
-                    <Badge color="sky">{user.roleName || '-'}</Badge>
+                    {user.roles && user.roles.length > 0 ? (
+                      <div className="flex flex-wrap gap-1">
+                        {user.roles.map(role => (
+                          <Badge key={role.id} color="sky">{role.name}</Badge>
+                        ))}
+                      </div>
+                    ) : (
+                      <span className="text-zinc-500">-</span>
+                    )}
                   </TableCell>
                   <TableCell>
                     {user.enabled ? (
@@ -200,7 +291,7 @@ export default function UsersPage() {
                   </TableCell>
                   <TableCell className="text-zinc-500">{formatDate(user.updatedAt)}</TableCell>
                   <TableCell>
-                    <div className="-mx-3 -my-1.5 sm:-mx-2.5">
+                    <div className="-mx-3 -my-1.5 sm:-mx-2.5" onClick={(e) => e.stopPropagation()}>
                       <Dropdown>
                         <DropdownButton plain aria-label={t('common.moreOptions')}>
                           <EllipsisVerticalIcon className="size-5" />

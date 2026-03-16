@@ -10,6 +10,7 @@
     "actions": {
       "add": "Add {{entity}}",
       "addFirst": "Add your first {{entity, lowercase}}",
+      "back": "Back",
       "create": "Create {{entity}}",
       "createFirst": "Create your first {{entity, lowercase}}",
       "deleteConfirm": "Are you sure you want to delete {{name}}?",
@@ -102,6 +103,33 @@
       "enableConfirm": "Are you sure you want to enable {{name}}?"
     },
     "description": "Manage user accounts and permissions",
+    "detail": {
+      "activityComingSoon": "Activity history coming soon",
+      "activityHelper": "Will show login history, actions performed, etc.",
+      "auditComingSoon": "Audit trail coming soon",
+      "auditHelper": "Will show permission changes, profile updates, etc.",
+      "basicInfo": "Basic Information",
+      "capabilities": "Capabilities",
+      "cognitoSub": "Cognito Sub",
+      "created": "Created",
+      "lastUpdated": "Last Updated",
+      "noCapabilities": "No capabilities assigned",
+      "recentActivity": "Recent Activity",
+      "rolePermissions": "Role & Permissions",
+      "showLess": "Show less",
+      "showMore": "Show {{count}} more...",
+      "systemInfo": "System Information",
+      "userId": "User ID"
+    },
+    "filter": {
+      "all": "All",
+      "allRoles": "All roles",
+      "clearFilters": "Clear filters",
+      "disabled": "Disabled",
+      "enabled": "Enabled",
+      "role": "Role",
+      "status": "Status"
+    },
     "form": {
       "rolePlaceholder": "Select a role...",
       "roleRequired": "Please select a role",
@@ -117,6 +145,7 @@
     },
     "table": {
       "actions": "Actions",
+      "auditLog": "Audit Log",
       "disable": "Disable",
       "enable": "Enable",
       "lastUpdated": "Last Updated"

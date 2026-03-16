@@ -14,7 +14,7 @@ interface User {
   firstName: string;
   lastName: string;
   email: string;
-  roleId: string;
+  roles?: Role[];
   enabled?: boolean;
 }
 
@@ -35,7 +35,12 @@ export default function UserFormDialog({ isOpen, onClose, user, roles }: UserFor
   const { t } = useTranslation();
   const isEdit = !!user?.id;
 
-  const [formData, setFormData] = useState<User>({
+  const [formData, setFormData] = useState<{
+    firstName: string;
+    lastName: string;
+    email: string;
+    roleId: string;
+  }>({
     firstName: '',
     lastName: '',
     email: '',
@@ -55,7 +60,7 @@ export default function UserFormDialog({ isOpen, onClose, user, roles }: UserFor
         firstName: user.firstName,
         lastName: user.lastName,
         email: user.email,
-        roleId: user.roleId,
+        roleId: user.roles?.[0]?.id || '',
       });
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setSendInvite(false); // Don't send invite on edit
