@@ -29,11 +29,14 @@ export interface CreateUserRequest {
   sendInvite?: boolean;
 }
 
-export interface UpdateUserRequest {
+export interface UpdateUserProfileRequest {
   firstName: string;
   lastName: string;
-  roleIds: string[];
   phoneNumber?: string | null;
+}
+
+export interface UpdateUserRolesRequest {
+  roleIds: string[];
 }
 
 export interface UpdateUserEnabledRequest {
@@ -61,8 +64,13 @@ export const userApi = {
     return response.data;
   },
 
-  update: async (id: string, request: UpdateUserRequest): Promise<User> => {
+  updateProfile: async (id: string, request: UpdateUserProfileRequest): Promise<User> => {
     const response = await apiClient.put<User>(`/users/${id}`, request);
+    return response.data;
+  },
+
+  updateRoles: async (id: string, request: UpdateUserRolesRequest): Promise<User> => {
+    const response = await apiClient.put<User>(`/users/${id}/roles`, request);
     return response.data;
   },
 

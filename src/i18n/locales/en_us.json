@@ -343,8 +343,9 @@
       "status": "Status"
     },
     "form": {
+      "adminRoleInfo": "Admin role includes all permissions. Other roles are not needed.",
       "rolePlaceholder": "Select a role...",
-      "roleRequired": "Please select a role",
+      "roleRequired": "Please select at least one role",
       "sendInvite": "Send invitation email"
     },
     "search": {

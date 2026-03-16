@@ -6,8 +6,8 @@ import { Dialog, DialogActions, DialogBody, DialogDescription, DialogTitle } fro
 import { Button } from './catalyst/button';
 import { Field, FieldGroup, Fieldset, Label } from './catalyst/fieldset';
 import { Input } from './catalyst/input';
-import { Select } from './catalyst/select';
 import { Checkbox, CheckboxField } from './catalyst/checkbox';
+import { Text } from './catalyst/text';
 
 interface UserFormDialogProps {
   isOpen: boolean;
@@ -25,12 +25,12 @@ export default function UserFormDialog({ isOpen, onClose, user, roles }: UserFor
     firstName: string;
     lastName: string;
     email: string;
-    roleId: string;
+    roleIds: string[];
   }>({
     firstName: '',
     lastName: '',
     email: '',
-    roleId: '',
+    roleIds: [],
   });
 
   const [sendInvite, setSendInvite] = useState(true);
@@ -46,30 +46,30 @@ export default function UserFormDialog({ isOpen, onClose, user, roles }: UserFor
         firstName: user.firstName,
         lastName: user.lastName,
         email: user.email,
-        roleId: user.roles?.[0]?.id || '',
+        roleIds: user.roles?.map((role) => role.id) || [],
       });
-       
+
       setSendInvite(false); // Don't send invite on edit
     } else {
-       
+
       setFormData({
         firstName: '',
         lastName: '',
         email: '',
-        roleId: '',
+        roleIds: [],
       });
-       
+
       setSendInvite(true); // Send invite by default on create
     }
   }, [user, isOpen]);
 
   const createMutation = useMutation({
-    mutationFn: (data: { firstName: string; lastName: string; email: string; roleId: string; sendInvite?: boolean }) =>
+    mutationFn: (data: { firstName: string; lastName: string; email: string; roleIds: string[]; sendInvite?: boolean }) =>
       userApi.create({
         firstName: data.firstName,
         lastName: data.lastName,
         email: data.email,
-        roleIds: [data.roleId],
+        roleIds: data.roleIds,
         phoneNumber: null,
         sendInvite: data.sendInvite,
       }),
@@ -85,18 +85,13 @@ export default function UserFormDialog({ isOpen, onClose, user, roles }: UserFor
     },
   });
 
-  const updateMutation = useMutation({
-    mutationFn: (data: { firstName: string; lastName: string; email: string; roleId: string }) =>
-      userApi.update(user!.id!, {
+  const updateProfileMutation = useMutation({
+    mutationFn: (data: { firstName: string; lastName: string }) =>
+      userApi.updateProfile(user!.id!, {
         firstName: data.firstName,
         lastName: data.lastName,
-        roleIds: [data.roleId],
         phoneNumber: null,
       }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['users'] });
-      onClose();
-    },
     onError: (error: unknown) => {
       const errorMessage = error instanceof Error && 'response' in error
         ? ((error as { response?: { data?: { message?: string } } }).response?.data?.message)
@@ -105,24 +100,66 @@ export default function UserFormDialog({ isOpen, onClose, user, roles }: UserFor
     },
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const updateRolesMutation = useMutation({
+    mutationFn: (roleIds: string[]) =>
+      userApi.updateRoles(user!.id!, { roleIds }),
+    onError: (error: unknown) => {
+      const errorMessage = error instanceof Error && 'response' in error
+        ? ((error as { response?: { data?: { message?: string } } }).response?.data?.message)
+        : undefined;
+      alert(errorMessage || 'Failed to update user roles');
+    },
+  });
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formData.roleId) {
+    if (formData.roleIds.length === 0) {
       alert(t('users.form.roleRequired'));
       return;
     }
 
     if (isEdit) {
-      updateMutation.mutate(formData);
+      try {
+        // Update profile first
+        await updateProfileMutation.mutateAsync({
+          firstName: formData.firstName,
+          lastName: formData.lastName,
+        });
+
+        // Then update roles
+        await updateRolesMutation.mutateAsync(formData.roleIds);
+
+        // Refresh and close on success
+        queryClient.invalidateQueries({ queryKey: ['users'] });
+        queryClient.invalidateQueries({ queryKey: ['users', user!.id] });
+        onClose();
+      } catch {
+        // Errors already handled by mutation onError callbacks
+      }
     } else {
       createMutation.mutate({ ...formData, sendInvite });
     }
   };
 
-  const handleChange = (field: 'firstName' | 'lastName' | 'email' | 'roleId', value: string) => {
+  const handleChange = (field: 'firstName' | 'lastName' | 'email', value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
+
+  const handleRoleToggle = (roleId: string, checked: boolean) => {
+    setFormData((prev) => ({
+      ...prev,
+      roleIds: checked
+        ? [...prev.roleIds, roleId]
+        : prev.roleIds.filter((id) => id !== roleId),
+    }));
+  };
+
+  // Check if admin role is selected
+  const adminRole = roles.find((role) =>
+    role.name.toLowerCase().includes('admin')
+  );
+  const hasAdminRole = adminRole && formData.roleIds.includes(adminRole.id);
 
   return (
     <Dialog open={isOpen} onClose={onClose}>
@@ -175,19 +212,33 @@ export default function UserFormDialog({ isOpen, onClose, user, roles }: UserFor
 
               <Field>
                 <Label>{t('common.form.role')} *</Label>
-                <Select
-                  name="roleId"
-                  value={formData.roleId}
-                  onChange={(e) => handleChange('roleId', e.target.value)}
-                  required
-                >
-                  <option value="">{t('users.form.rolePlaceholder')}</option>
-                  {roles.map((role) => (
-                    <option key={role.id} value={role.id}>
-                      {role.name}
-                    </option>
-                  ))}
-                </Select>
+                {hasAdminRole && (
+                  <div className="mt-2 rounded-md bg-blue-50 px-3 py-2 ring-1 ring-blue-200 dark:bg-blue-950/10 dark:ring-blue-900/20">
+                    <Text className="text-sm text-blue-800 dark:text-blue-400">
+                      {t('users.form.adminRoleInfo')}
+                    </Text>
+                  </div>
+                )}
+                <div className="mt-3 space-y-2">
+                  {roles.map((role) => {
+                    const isAdmin = role.name.toLowerCase().includes('admin');
+                    const isDisabled = hasAdminRole && !isAdmin;
+
+                    return (
+                      <CheckboxField key={role.id}>
+                        <Checkbox
+                          name={`role-${role.id}`}
+                          checked={formData.roleIds.includes(role.id)}
+                          onChange={(checked) => handleRoleToggle(role.id, checked)}
+                          disabled={isDisabled}
+                        />
+                        <Label className={isDisabled ? 'text-zinc-400 dark:text-zinc-600' : ''}>
+                          {role.name}
+                        </Label>
+                      </CheckboxField>
+                    );
+                  })}
+                </div>
               </Field>
 
               {!isEdit && (
@@ -211,9 +262,9 @@ export default function UserFormDialog({ isOpen, onClose, user, roles }: UserFor
         <Button
           type="submit"
           form="user-form"
-          disabled={createMutation.isPending || updateMutation.isPending}
+          disabled={createMutation.isPending || updateProfileMutation.isPending || updateRolesMutation.isPending}
         >
-          {createMutation.isPending || updateMutation.isPending
+          {createMutation.isPending || updateProfileMutation.isPending || updateRolesMutation.isPending
             ? t('common.saving')
             : t(isEdit ? 'common.update' : 'common.create')}
         </Button>
