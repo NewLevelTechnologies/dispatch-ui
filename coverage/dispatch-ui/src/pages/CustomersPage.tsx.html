@@ -3,15 +3,15 @@
 <html lang="en">
 
 <head>
-    <title>Code coverage report for pages/CustomersPage.tsx</title>
+    <title>Code coverage report for dispatch-ui/src/pages/CustomersPage.tsx</title>
     <meta charset="utf-8" />
-    <link rel="stylesheet" href="../prettify.css" />
-    <link rel="stylesheet" href="../base.css" />
-    <link rel="shortcut icon" type="image/x-icon" href="../favicon.png" />
+    <link rel="stylesheet" href="../../../prettify.css" />
+    <link rel="stylesheet" href="../../../base.css" />
+    <link rel="shortcut icon" type="image/x-icon" href="../../../favicon.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <style type='text/css'>
         .coverage-summary .sorter {
-            background-image: url(../sort-arrow-sprite.png);
+            background-image: url(../../../sort-arrow-sprite.png);
         }
     </style>
 </head>
@@ -19,13 +19,13 @@
 <body>
 <div class='wrapper'>
     <div class='pad1'>
-        <h1><a href="../index.html">All files</a> / <a href="index.html">pages</a> CustomersPage.tsx</h1>
+        <h1><a href="../../../index.html">All files</a> / <a href="index.html">dispatch-ui/src/pages</a> CustomersPage.tsx</h1>
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">97.67% </span>
+                <span class="strong">97.7% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>126/129</span>
+                <span class='fraction'>128/131</span>
             </div>
         
             
@@ -44,9 +44,9 @@
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">97.67% </span>
+                <span class="strong">97.7% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>126/129</span>
+                <span class='fraction'>128/131</span>
             </div>
         
             
@@ -234,6 +234,7 @@
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -246,6 +247,7 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">23x</span>
 <span class="cline-any cline-yes">23x</span>
 <span class="cline-any cline-yes">23x</span>
 <span class="cline-any cline-yes">23x</span>
@@ -294,7 +296,6 @@
 <span class="cline-any cline-yes">23x</span>
 <span class="cline-any cline-yes">23x</span>
 <span class="cline-any cline-yes">23x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">23x</span>
 <span class="cline-any cline-yes">23x</span>
 <span class="cline-any cline-yes">23x</span>
@@ -318,7 +319,7 @@
 <span class="cline-any cline-yes">3x</span>
 <span class="cline-any cline-yes">3x</span>
 <span class="cline-any cline-yes">3x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">3x</span>
 <span class="cline-any cline-yes">3x</span>
 <span class="cline-any cline-yes">3x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -373,7 +374,6 @@
 <span class="cline-any cline-yes">8x</span>
 <span class="cline-any cline-yes">8x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">23x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">23x</span>
 <span class="cline-any cline-yes">23x</span>
@@ -385,6 +385,7 @@
 <span class="cline-any cline-yes">23x</span>
 <span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { EllipsisVerticalIcon } from '@heroicons/react/24/outline';
 import apiClient from '../api/client';
 import AppLayout from '../components/AppLayout';
@@ -408,6 +409,7 @@ interface Customer {
 &nbsp;
 export default function CustomersPage() {
   const queryClient = useQueryClient();
+  const { t } = useTranslation();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState&lt;Customer | null&gt;(null);
 &nbsp;
@@ -437,7 +439,7 @@ export default function CustomersPage() {
   };
 &nbsp;
   const handleDelete = (customer: Customer) =&gt; {
-    if (window.confirm(`Are you sure you want to delete ${customer.name}?`)) {
+    if (window.confirm(t('common.actions.deleteConfirm', { name: customer.name }))) {
       deleteMutation.mutate(customer.id);
     }
   };
@@ -449,91 +451,89 @@ export default function CustomersPage() {
 &nbsp;
   return (
     &lt;AppLayout&gt;
-      &lt;div className="p-8"&gt;
-        &lt;div className="flex items-center justify-between"&gt;
-          &lt;div&gt;
-            &lt;Heading&gt;Customers&lt;/Heading&gt;
-            &lt;p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400"&gt;
-              Manage your customer database
-            &lt;/p&gt;
-          &lt;/div&gt;
-          &lt;Button onClick={handleAdd}&gt;Add Customer&lt;/Button&gt;
+      &lt;div className="flex items-center justify-between"&gt;
+        &lt;div&gt;
+          &lt;Heading&gt;{t('entities.customers')}&lt;/Heading&gt;
+          &lt;p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400"&gt;
+            {t('customers.description')}
+          &lt;/p&gt;
         &lt;/div&gt;
-&nbsp;
-        {isLoading &amp;&amp; (
-          &lt;div className="mt-8 text-center"&gt;
-            &lt;p className="text-zinc-600 dark:text-zinc-400"&gt;Loading customers...&lt;/p&gt;
-          &lt;/div&gt;
-        )}
-&nbsp;
-        {error &amp;&amp; (
-          &lt;div className="mt-8 rounded-lg bg-red-50 p-4 ring-1 ring-red-200 dark:bg-red-950/10 dark:ring-red-900/20"&gt;
-            &lt;p className="text-sm text-red-800 dark:text-red-400"&gt;
-              Error loading customers: {(error as Error).message}
-            &lt;/p&gt;
-          &lt;/div&gt;
-        )}
-&nbsp;
-        {customers &amp;&amp; customers.length === 0 &amp;&amp; (
-          &lt;div className="mt-8 text-center"&gt;
-            &lt;p className="text-zinc-600 dark:text-zinc-400"&gt;No customers found&lt;/p&gt;
-            &lt;Button className="mt-4" onClick={handleAdd}&gt;
-              Add your first customer
-            &lt;/Button&gt;
-          &lt;/div&gt;
-        )}
-&nbsp;
-        {customers &amp;&amp; customers.length &gt; 0 &amp;&amp; (
-          &lt;div className="mt-8"&gt;
-            &lt;Table className="[--gutter:theme(spacing.6)] lg:[--gutter:theme(spacing.10)]"&gt;
-              &lt;TableHead&gt;
-                &lt;TableRow&gt;
-                  &lt;TableHeader&gt;Name&lt;/TableHeader&gt;
-                  &lt;TableHeader&gt;Email&lt;/TableHeader&gt;
-                  &lt;TableHeader&gt;Phone&lt;/TableHeader&gt;
-                  &lt;TableHeader&gt;Location&lt;/TableHeader&gt;
-                  &lt;TableHeader&gt;Status&lt;/TableHeader&gt;
-                  &lt;TableHeader&gt;&lt;/TableHeader&gt;
-                &lt;/TableRow&gt;
-              &lt;/TableHead&gt;
-              &lt;TableBody&gt;
-                {customers.map((customer) =&gt; (
-                  &lt;TableRow key={customer.id}&gt;
-                    &lt;TableCell className="font-medium"&gt;{customer.name}&lt;/TableCell&gt;
-                    &lt;TableCell className="text-zinc-500"&gt;{customer.email}&lt;/TableCell&gt;
-                    &lt;TableCell className="text-zinc-500"&gt;{customer.<span class="branch-0 cbranch-no" title="branch not covered" >phone || '-'}&lt;</span>/TableCell&gt;
-                    &lt;TableCell className="text-zinc-500"&gt;
-                      {customer.city &amp;&amp; customer.state
-                        ? `${customer.city}, ${customer.state}`
-                        : '-'}
-                    &lt;/TableCell&gt;
-                    &lt;TableCell&gt;
-                      &lt;Badge color="lime"&gt;Active&lt;/Badge&gt;
-                    &lt;/TableCell&gt;
-                    &lt;TableCell&gt;
-                      &lt;div className="-mx-3 -my-1.5 sm:-mx-2.5"&gt;
-                        &lt;Dropdown&gt;
-                          &lt;DropdownButton plain aria-label="More options"&gt;
-                            &lt;EllipsisVerticalIcon className="size-5" /&gt;
-                          &lt;/DropdownButton&gt;
-                          &lt;DropdownMenu anchor="bottom end"&gt;
-                            &lt;DropdownItem onClick={() =&gt; handleEdit(customer)}&gt;
-                              &lt;DropdownLabel&gt;Edit&lt;/DropdownLabel&gt;
-                            &lt;/DropdownItem&gt;
-                            &lt;DropdownItem onClick={() =&gt; handleDelete(customer)}&gt;
-                              &lt;DropdownLabel&gt;Delete&lt;/DropdownLabel&gt;
-                            &lt;/DropdownItem&gt;
-                          &lt;/DropdownMenu&gt;
-                        &lt;/Dropdown&gt;
-                      &lt;/div&gt;
-                    &lt;/TableCell&gt;
-                  &lt;/TableRow&gt;
-                ))}
-              &lt;/TableBody&gt;
-            &lt;/Table&gt;
-          &lt;/div&gt;
-        )}
+        &lt;Button onClick={handleAdd}&gt;{t('common.actions.add', { entity: t('entities.customer') })}&lt;/Button&gt;
       &lt;/div&gt;
+&nbsp;
+      {isLoading &amp;&amp; (
+        &lt;div className="mt-8 text-center"&gt;
+          &lt;p className="text-zinc-600 dark:text-zinc-400"&gt;{t('common.actions.loading', { entities: t('entities.customers') })}&lt;/p&gt;
+        &lt;/div&gt;
+      )}
+&nbsp;
+      {error &amp;&amp; (
+        &lt;div className="mt-8 rounded-lg bg-red-50 p-4 ring-1 ring-red-200 dark:bg-red-950/10 dark:ring-red-900/20"&gt;
+          &lt;p className="text-sm text-red-800 dark:text-red-400"&gt;
+            {t('common.actions.errorLoading', { entities: t('entities.customers') })}: {(error as Error).message}
+          &lt;/p&gt;
+        &lt;/div&gt;
+      )}
+&nbsp;
+      {customers &amp;&amp; customers.length === 0 &amp;&amp; (
+        &lt;div className="mt-8 text-center"&gt;
+          &lt;p className="text-zinc-600 dark:text-zinc-400"&gt;{t('common.actions.notFound', { entities: t('entities.customers') })}&lt;/p&gt;
+          &lt;Button className="mt-4" onClick={handleAdd}&gt;
+            {t('common.actions.addFirst', { entity: t('entities.customer') })}
+          &lt;/Button&gt;
+        &lt;/div&gt;
+      )}
+&nbsp;
+      {customers &amp;&amp; customers.length &gt; 0 &amp;&amp; (
+        &lt;div className="mt-8"&gt;
+          &lt;Table className="[--gutter:theme(spacing.2)] lg:[--gutter:theme(spacing.3)]"&gt;
+            &lt;TableHead&gt;
+              &lt;TableRow&gt;
+                &lt;TableHeader&gt;{t('common.form.name')}&lt;/TableHeader&gt;
+                &lt;TableHeader&gt;{t('common.form.email')}&lt;/TableHeader&gt;
+                &lt;TableHeader&gt;{t('common.form.phone')}&lt;/TableHeader&gt;
+                &lt;TableHeader&gt;{t('customers.table.location')}&lt;/TableHeader&gt;
+                &lt;TableHeader&gt;{t('common.form.status')}&lt;/TableHeader&gt;
+                &lt;TableHeader&gt;&lt;/TableHeader&gt;
+              &lt;/TableRow&gt;
+            &lt;/TableHead&gt;
+            &lt;TableBody&gt;
+              {customers.map((customer) =&gt; (
+                &lt;TableRow key={customer.id}&gt;
+                  &lt;TableCell className="font-medium"&gt;{customer.name}&lt;/TableCell&gt;
+                  &lt;TableCell className="text-zinc-500"&gt;{customer.email}&lt;/TableCell&gt;
+                  &lt;TableCell className="text-zinc-500"&gt;{customer.<span class="branch-0 cbranch-no" title="branch not covered" >phone || '-'}&lt;</span>/TableCell&gt;
+                  &lt;TableCell className="text-zinc-500"&gt;
+                    {customer.city &amp;&amp; customer.state
+                      ? `${customer.city}, ${customer.state}`
+                      : '-'}
+                  &lt;/TableCell&gt;
+                  &lt;TableCell&gt;
+                    &lt;Badge color="lime"&gt;{t('common.active')}&lt;/Badge&gt;
+                  &lt;/TableCell&gt;
+                  &lt;TableCell&gt;
+                    &lt;div className="-mx-3 -my-1.5 sm:-mx-2.5"&gt;
+                      &lt;Dropdown&gt;
+                        &lt;DropdownButton plain aria-label={t('common.moreOptions')}&gt;
+                          &lt;EllipsisVerticalIcon className="size-5" /&gt;
+                        &lt;/DropdownButton&gt;
+                        &lt;DropdownMenu anchor="bottom end"&gt;
+                          &lt;DropdownItem onClick={() =&gt; handleEdit(customer)}&gt;
+                            &lt;DropdownLabel&gt;{t('common.edit')}&lt;/DropdownLabel&gt;
+                          &lt;/DropdownItem&gt;
+                          &lt;DropdownItem onClick={() =&gt; handleDelete(customer)}&gt;
+                            &lt;DropdownLabel&gt;{t('common.delete')}&lt;/DropdownLabel&gt;
+                          &lt;/DropdownItem&gt;
+                        &lt;/DropdownMenu&gt;
+                      &lt;/Dropdown&gt;
+                    &lt;/div&gt;
+                  &lt;/TableCell&gt;
+                &lt;/TableRow&gt;
+              ))}
+            &lt;/TableBody&gt;
+          &lt;/Table&gt;
+        &lt;/div&gt;
+      )}
 &nbsp;
       &lt;CustomerFormDialog
         isOpen={isDialogOpen}
@@ -550,16 +550,16 @@ export default function CustomersPage() {
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-03-14T02:35:47.147Z
+                at 2026-03-16T03:24:03.595Z
             </div>
-        <script src="../prettify.js"></script>
+        <script src="../../../prettify.js"></script>
         <script>
             window.onload = function () {
                 prettyPrint();
             };
         </script>
-        <script src="../sorter.js"></script>
-        <script src="../block-navigation.js"></script>
+        <script src="../../../sorter.js"></script>
+        <script src="../../../block-navigation.js"></script>
     </body>
 </html>
     

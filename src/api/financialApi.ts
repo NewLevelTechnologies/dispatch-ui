@@ -2,11 +2,10 @@
 import axios from 'axios';
 import { fetchAuthSession } from 'aws-amplify/auth';
 
-const API_URL = '/api/v1';
-
-// Create axios instance
+// Create axios instance with base configuration
 const api = axios.create({
-  baseURL: API_URL,
+  baseURL: import.meta.env.VITE_API_BASE_URL || 'https://dev.api.dispatch.newleveltech.net/api/v1',
+  timeout: 30000,
   headers: {
     'Content-Type': 'application/json',
   },

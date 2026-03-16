@@ -3,15 +3,15 @@
 <html lang="en">
 
 <head>
-    <title>Code coverage report for pages/WorkOrdersPage.tsx</title>
+    <title>Code coverage report for dispatch-ui/src/pages/WorkOrdersPage.tsx</title>
     <meta charset="utf-8" />
-    <link rel="stylesheet" href="../prettify.css" />
-    <link rel="stylesheet" href="../base.css" />
-    <link rel="shortcut icon" type="image/x-icon" href="../favicon.png" />
+    <link rel="stylesheet" href="../../../prettify.css" />
+    <link rel="stylesheet" href="../../../base.css" />
+    <link rel="shortcut icon" type="image/x-icon" href="../../../favicon.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <style type='text/css'>
         .coverage-summary .sorter {
-            background-image: url(../sort-arrow-sprite.png);
+            background-image: url(../../../sort-arrow-sprite.png);
         }
     </style>
 </head>
@@ -19,13 +19,13 @@
 <body>
 <div class='wrapper'>
     <div class='pad1'>
-        <h1><a href="../index.html">All files</a> / <a href="index.html">pages</a> WorkOrdersPage.tsx</h1>
+        <h1><a href="../../../index.html">All files</a> / <a href="index.html">dispatch-ui/src/pages</a> WorkOrdersPage.tsx</h1>
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">97.64% </span>
+                <span class="strong">97.67% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>166/170</span>
+                <span class='fraction'>168/172</span>
             </div>
         
             
@@ -44,9 +44,9 @@
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">97.64% </span>
+                <span class="strong">97.67% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>166/170</span>
+                <span class='fraction'>168/172</span>
             </div>
         
             
@@ -281,6 +281,7 @@
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -311,6 +312,7 @@
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">31x</span>
 <span class="cline-any cline-yes">31x</span>
 <span class="cline-any cline-yes">31x</span>
 <span class="cline-any cline-yes">31x</span>
@@ -376,7 +378,6 @@
 <span class="cline-any cline-yes">31x</span>
 <span class="cline-any cline-yes">31x</span>
 <span class="cline-any cline-yes">31x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">31x</span>
 <span class="cline-any cline-yes">31x</span>
 <span class="cline-any cline-yes">31x</span>
@@ -400,7 +401,7 @@
 <span class="cline-any cline-yes">3x</span>
 <span class="cline-any cline-yes">3x</span>
 <span class="cline-any cline-yes">3x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">3x</span>
 <span class="cline-any cline-yes">3x</span>
 <span class="cline-any cline-yes">3x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -467,7 +468,6 @@
 <span class="cline-any cline-yes">12x</span>
 <span class="cline-any cline-yes">12x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">31x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">31x</span>
 <span class="cline-any cline-yes">31x</span>
@@ -479,6 +479,7 @@
 <span class="cline-any cline-yes">31x</span>
 <span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { EllipsisVerticalIcon } from '@heroicons/react/24/outline';
 import apiClient from '../api/client';
 import AppLayout from '../components/AppLayout';
@@ -510,16 +511,17 @@ const STATUS_COLORS = {
   CANCELLED: 'zinc',
 } as const;
 &nbsp;
-const STATUS_LABELS = {
-  PENDING: 'Pending',
-  SCHEDULED: 'Scheduled',
-  IN_PROGRESS: 'In Progress',
-  COMPLETED: 'Completed',
-  CANCELLED: 'Cancelled',
+const STATUS_TRANSLATION_KEYS: Record&lt;string, string&gt; = {
+  PENDING: 'pending',
+  SCHEDULED: 'scheduled',
+  IN_PROGRESS: 'inProgress',
+  COMPLETED: 'completed',
+  CANCELLED: 'cancelled',
 };
 &nbsp;
 export default function WorkOrdersPage() {
   const queryClient = useQueryClient();
+  const { t } = useTranslation();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedWorkOrder, setSelectedWorkOrder] = useState&lt;WorkOrder | null&gt;(null);
 &nbsp;
@@ -549,7 +551,7 @@ export default function WorkOrdersPage() {
   };
 &nbsp;
   const handleDelete = (workOrder: WorkOrder) =&gt; {
-    if (window.confirm('Are you sure you want to delete this work order?')) {
+    if (window.confirm(t('common.actions.deleteConfirmGeneric', { entity: t('entities.workOrder') }))) {
       deleteMutation.mutate(workOrder.id);
     }
   };
@@ -578,103 +580,101 @@ export default function WorkOrdersPage() {
 &nbsp;
   return (
     &lt;AppLayout&gt;
-      &lt;div className="p-8"&gt;
-        &lt;div className="flex items-center justify-between"&gt;
-          &lt;div&gt;
-            &lt;Heading&gt;Work Orders&lt;/Heading&gt;
-            &lt;p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400"&gt;
-              Manage work orders and service requests
-            &lt;/p&gt;
-          &lt;/div&gt;
-          &lt;Button onClick={handleAdd}&gt;Create Work Order&lt;/Button&gt;
+      &lt;div className="flex items-center justify-between"&gt;
+        &lt;div&gt;
+          &lt;Heading&gt;{t('entities.workOrders')}&lt;/Heading&gt;
+          &lt;p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400"&gt;
+            {t('workOrders.description')}
+          &lt;/p&gt;
         &lt;/div&gt;
-&nbsp;
-        {isLoading &amp;&amp; (
-          &lt;div className="mt-8 text-center"&gt;
-            &lt;p className="text-zinc-600 dark:text-zinc-400"&gt;Loading work orders...&lt;/p&gt;
-          &lt;/div&gt;
-        )}
-&nbsp;
-        {error &amp;&amp; (
-          &lt;div className="mt-8 rounded-lg bg-red-50 p-4 ring-1 ring-red-200 dark:bg-red-950/10 dark:ring-red-900/20"&gt;
-            &lt;p className="text-sm text-red-800 dark:text-red-400"&gt;
-              Error loading work orders: {(error as Error).message}
-            &lt;/p&gt;
-          &lt;/div&gt;
-        )}
-&nbsp;
-        {workOrders &amp;&amp; workOrders.length === 0 &amp;&amp; (
-          &lt;div className="mt-8 text-center"&gt;
-            &lt;p className="text-zinc-600 dark:text-zinc-400"&gt;No work orders found&lt;/p&gt;
-            &lt;Button className="mt-4" onClick={handleAdd}&gt;
-              Create your first work order
-            &lt;/Button&gt;
-          &lt;/div&gt;
-        )}
-&nbsp;
-        {workOrders &amp;&amp; workOrders.length &gt; 0 &amp;&amp; (
-          &lt;div className="mt-8"&gt;
-            &lt;Table className="[--gutter:theme(spacing.6)] lg:[--gutter:theme(spacing.10)]"&gt;
-              &lt;TableHead&gt;
-                &lt;TableRow&gt;
-                  &lt;TableHeader&gt;ID&lt;/TableHeader&gt;
-                  &lt;TableHeader&gt;Customer&lt;/TableHeader&gt;
-                  &lt;TableHeader&gt;Status&lt;/TableHeader&gt;
-                  &lt;TableHeader&gt;Scheduled&lt;/TableHeader&gt;
-                  &lt;TableHeader&gt;Amount&lt;/TableHeader&gt;
-                  &lt;TableHeader&gt;Description&lt;/TableHeader&gt;
-                  &lt;TableHeader&gt;&lt;/TableHeader&gt;
-                &lt;/TableRow&gt;
-              &lt;/TableHead&gt;
-              &lt;TableBody&gt;
-                {workOrders.map((workOrder) =&gt; (
-                  &lt;TableRow key={workOrder.id}&gt;
-                    &lt;TableCell className="font-mono text-sm text-zinc-500"&gt;
-                      {workOrder.id.substring(0, 8)}...
-                    &lt;/TableCell&gt;
-                    &lt;TableCell className="font-medium"&gt;
-                      {workOrder.customerId.substring(0, 8)}...
-                    &lt;/TableCell&gt;
-                    &lt;TableCell&gt;
-                      &lt;Badge color={STATUS_COLORS[workOrder.status]}&gt;
-                        {STATUS_LABELS[workOrder.status]}
-                      &lt;/Badge&gt;
-                    &lt;/TableCell&gt;
-                    &lt;TableCell className="text-zinc-500"&gt;
-                      {formatDate(workOrder.scheduledDate)}
-                    &lt;/TableCell&gt;
-                    &lt;TableCell className="text-zinc-500"&gt;
-                      {formatCurrency(workOrder.totalAmount)}
-                    &lt;/TableCell&gt;
-                    &lt;TableCell className="text-zinc-500"&gt;
-                      {workOrder.description
-                        ? workOrder.description.substring(0, 50) + (workOrder.description.length &gt; <span class="branch-0 cbranch-no" title="branch not covered" >50 ? '...' : <span class="branch-0 cbranch-no" title="branch not covered" >'</span>')</span>
-<span class="cstat-no" title="statement not covered" >                        : '-'}</span>
-                    &lt;/TableCell&gt;
-                    &lt;TableCell&gt;
-                      &lt;div className="-mx-3 -my-1.5 sm:-mx-2.5"&gt;
-                        &lt;Dropdown&gt;
-                          &lt;DropdownButton plain aria-label="More options"&gt;
-                            &lt;EllipsisVerticalIcon className="size-5" /&gt;
-                          &lt;/DropdownButton&gt;
-                          &lt;DropdownMenu anchor="bottom end"&gt;
-                            &lt;DropdownItem onClick={() =&gt; handleEdit(workOrder)}&gt;
-                              &lt;DropdownLabel&gt;Edit&lt;/DropdownLabel&gt;
-                            &lt;/DropdownItem&gt;
-                            &lt;DropdownItem onClick={() =&gt; handleDelete(workOrder)}&gt;
-                              &lt;DropdownLabel&gt;Delete&lt;/DropdownLabel&gt;
-                            &lt;/DropdownItem&gt;
-                          &lt;/DropdownMenu&gt;
-                        &lt;/Dropdown&gt;
-                      &lt;/div&gt;
-                    &lt;/TableCell&gt;
-                  &lt;/TableRow&gt;
-                ))}
-              &lt;/TableBody&gt;
-            &lt;/Table&gt;
-          &lt;/div&gt;
-        )}
+        &lt;Button onClick={handleAdd}&gt;{t('common.actions.create', { entity: t('entities.workOrder') })}&lt;/Button&gt;
       &lt;/div&gt;
+&nbsp;
+      {isLoading &amp;&amp; (
+        &lt;div className="mt-8 text-center"&gt;
+          &lt;p className="text-zinc-600 dark:text-zinc-400"&gt;{t('common.actions.loading', { entities: t('entities.workOrders') })}&lt;/p&gt;
+        &lt;/div&gt;
+      )}
+&nbsp;
+      {error &amp;&amp; (
+        &lt;div className="mt-8 rounded-lg bg-red-50 p-4 ring-1 ring-red-200 dark:bg-red-950/10 dark:ring-red-900/20"&gt;
+          &lt;p className="text-sm text-red-800 dark:text-red-400"&gt;
+            {t('common.actions.errorLoading', { entities: t('entities.workOrders') })}: {(error as Error).message}
+          &lt;/p&gt;
+        &lt;/div&gt;
+      )}
+&nbsp;
+      {workOrders &amp;&amp; workOrders.length === 0 &amp;&amp; (
+        &lt;div className="mt-8 text-center"&gt;
+          &lt;p className="text-zinc-600 dark:text-zinc-400"&gt;{t('common.actions.notFound', { entities: t('entities.workOrders') })}&lt;/p&gt;
+          &lt;Button className="mt-4" onClick={handleAdd}&gt;
+            {t('common.actions.createFirst', { entity: t('entities.workOrder') })}
+          &lt;/Button&gt;
+        &lt;/div&gt;
+      )}
+&nbsp;
+      {workOrders &amp;&amp; workOrders.length &gt; 0 &amp;&amp; (
+        &lt;div className="mt-8"&gt;
+          &lt;Table className="[--gutter:theme(spacing.2)] lg:[--gutter:theme(spacing.3)]"&gt;
+            &lt;TableHead&gt;
+              &lt;TableRow&gt;
+                &lt;TableHeader&gt;{t('workOrders.table.id')}&lt;/TableHeader&gt;
+                &lt;TableHeader&gt;{t('entities.customer')}&lt;/TableHeader&gt;
+                &lt;TableHeader&gt;{t('common.form.status')}&lt;/TableHeader&gt;
+                &lt;TableHeader&gt;{t('workOrders.table.scheduled')}&lt;/TableHeader&gt;
+                &lt;TableHeader&gt;{t('workOrders.table.amount')}&lt;/TableHeader&gt;
+                &lt;TableHeader&gt;{t('common.form.description')}&lt;/TableHeader&gt;
+                &lt;TableHeader&gt;&lt;/TableHeader&gt;
+              &lt;/TableRow&gt;
+            &lt;/TableHead&gt;
+            &lt;TableBody&gt;
+              {workOrders.map((workOrder) =&gt; (
+                &lt;TableRow key={workOrder.id}&gt;
+                  &lt;TableCell className="font-mono text-sm text-zinc-500"&gt;
+                    {workOrder.id.substring(0, 8)}...
+                  &lt;/TableCell&gt;
+                  &lt;TableCell className="font-medium"&gt;
+                    {workOrder.customerId.substring(0, 8)}...
+                  &lt;/TableCell&gt;
+                  &lt;TableCell&gt;
+                    &lt;Badge color={STATUS_COLORS[workOrder.status]}&gt;
+                      {t(`workOrders.status.${STATUS_TRANSLATION_KEYS[workOrder.status]}`)}
+                    &lt;/Badge&gt;
+                  &lt;/TableCell&gt;
+                  &lt;TableCell className="text-zinc-500"&gt;
+                    {formatDate(workOrder.scheduledDate)}
+                  &lt;/TableCell&gt;
+                  &lt;TableCell className="text-zinc-500"&gt;
+                    {formatCurrency(workOrder.totalAmount)}
+                  &lt;/TableCell&gt;
+                  &lt;TableCell className="text-zinc-500"&gt;
+                    {workOrder.description
+                      ? workOrder.description.substring(0, 50) + (workOrder.description.length &gt; <span class="branch-0 cbranch-no" title="branch not covered" >50 ? '...' : <span class="branch-0 cbranch-no" title="branch not covered" >'</span>')</span>
+<span class="cstat-no" title="statement not covered" >                      : '-'}</span>
+                  &lt;/TableCell&gt;
+                  &lt;TableCell&gt;
+                    &lt;div className="-mx-3 -my-1.5 sm:-mx-2.5"&gt;
+                      &lt;Dropdown&gt;
+                        &lt;DropdownButton plain aria-label={t('common.moreOptions')}&gt;
+                          &lt;EllipsisVerticalIcon className="size-5" /&gt;
+                        &lt;/DropdownButton&gt;
+                        &lt;DropdownMenu anchor="bottom end"&gt;
+                          &lt;DropdownItem onClick={() =&gt; handleEdit(workOrder)}&gt;
+                            &lt;DropdownLabel&gt;{t('common.edit')}&lt;/DropdownLabel&gt;
+                          &lt;/DropdownItem&gt;
+                          &lt;DropdownItem onClick={() =&gt; handleDelete(workOrder)}&gt;
+                            &lt;DropdownLabel&gt;{t('common.delete')}&lt;/DropdownLabel&gt;
+                          &lt;/DropdownItem&gt;
+                        &lt;/DropdownMenu&gt;
+                      &lt;/Dropdown&gt;
+                    &lt;/div&gt;
+                  &lt;/TableCell&gt;
+                &lt;/TableRow&gt;
+              ))}
+            &lt;/TableBody&gt;
+          &lt;/Table&gt;
+        &lt;/div&gt;
+      )}
 &nbsp;
       &lt;WorkOrderFormDialog
         isOpen={isDialogOpen}
@@ -691,16 +691,16 @@ export default function WorkOrdersPage() {
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-03-14T02:35:47.147Z
+                at 2026-03-16T03:24:03.595Z
             </div>
-        <script src="../prettify.js"></script>
+        <script src="../../../prettify.js"></script>
         <script>
             window.onload = function () {
                 prettyPrint();
             };
         </script>
-        <script src="../sorter.js"></script>
-        <script src="../block-navigation.js"></script>
+        <script src="../../../sorter.js"></script>
+        <script src="../../../block-navigation.js"></script>
     </body>
 </html>
     
