@@ -1,17 +1,18 @@
+import { useTranslation } from 'react-i18next';
 import AppLayout from '../components/AppLayout';
 import { Heading } from '../components/catalyst/heading';
 
 export default function SchedulingPage() {
+  const { t } = useTranslation();
+
   return (
     <AppLayout>
-      <div className="p-8">
-        <Heading>Scheduling</Heading>
-        <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
-          Manage dispatches and technician schedules
-        </p>
-        <div className="mt-8">
-          <p className="text-zinc-500">Coming soon...</p>
-        </div>
+      <Heading>{t('entities.scheduling')}</Heading>
+      <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
+        {t('scheduling.description')}
+      </p>
+      <div className="mt-8">
+        <p className="text-zinc-500">{t('scheduling.comingSoon')}</p>
       </div>
     </AppLayout>
   );

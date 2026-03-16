@@ -12,7 +12,7 @@ Amplify.configure({
           scopes: ['openid', 'email', 'profile'],
           redirectSignIn: [window.location.origin],
           redirectSignOut: [window.location.origin],
-          responseType: 'code' as 'code',
+          responseType: 'code' as const,
         },
         email: true,
       },

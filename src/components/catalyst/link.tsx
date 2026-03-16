@@ -12,7 +12,7 @@ export const Link = forwardRef(function Link(
 ) {
   return (
     <Headless.DataInteractive>
-      <RouterLink to={props.href} {...props} ref={ref as any} />
+      <RouterLink to={props.href} {...props} ref={ref as React.Ref<HTMLAnchorElement>} />
     </Headless.DataInteractive>
   )
 })

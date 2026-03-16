@@ -31,6 +31,12 @@ jobs:
       - name: Run linter
         run: npm run lint
 
+      - name: Run tests
+        run: npm test
+
+      - name: Check code coverage
+        run: npm run test:coverage -- --run
+
       - name: Build
         run: npm run build
         env:
@@ -58,4 +64,6 @@ jobs:
         run: |
           echo "✅ All checks passed!"
           echo "- Lint: Passed"
+          echo "- Tests: Passed"
+          echo "- Coverage: ≥80%"
           echo "- Build: Success"

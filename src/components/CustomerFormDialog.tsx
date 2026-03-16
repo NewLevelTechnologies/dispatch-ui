@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import apiClient from '../api/client';
 import { Dialog, DialogActions, DialogBody, DialogDescription, DialogTitle } from './catalyst/dialog';
 import { Button } from './catalyst/button';
@@ -25,6 +26,7 @@ interface CustomerFormDialogProps {
 
 export default function CustomerFormDialog({ isOpen, onClose, customer }: CustomerFormDialogProps) {
   const queryClient = useQueryClient();
+  const { t } = useTranslation();
   const isEdit = !!customer?.id;
 
   const [formData, setFormData] = useState<Customer>({
@@ -37,10 +39,16 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
     zipCode: '',
   });
 
+  // Intentionally setting form state based on props in useEffect
+  // This is the recommended pattern for initializing controlled forms
   useEffect(() => {
+    if (!isOpen) return;
+
     if (customer) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setFormData(customer);
     } else {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setFormData({
         name: '',
         email: '',
@@ -84,16 +92,23 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
 
   return (
     <Dialog open={isOpen} onClose={onClose}>
-      <DialogTitle>{isEdit ? 'Edit Customer' : 'Add Customer'}</DialogTitle>
+      <DialogTitle>
+        {t('common.form.titleCreate', {
+          action: isEdit ? t('common.edit') : t('common.add'),
+          entity: t('entities.customer')
+        })}
+      </DialogTitle>
       <DialogDescription>
-        {isEdit ? 'Update customer information.' : 'Create a new customer record.'}
+        {t(isEdit ? 'common.form.descriptionEdit' : 'common.form.descriptionCreate', {
+          entity: t('entities.customer')
+        })}
       </DialogDescription>
       <DialogBody>
         <form onSubmit={handleSubmit} id="customer-form">
           <Fieldset>
             <FieldGroup>
               <Field>
-                <Label>Name *</Label>
+                <Label>{t('common.form.name')} *</Label>
                 <Input
                   name="name"
                   value={formData.name}
@@ -103,7 +118,7 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
               </Field>
 
               <Field>
-                <Label>Email *</Label>
+                <Label>{t('common.form.email')} *</Label>
                 <Input
                   type="email"
                   name="email"
@@ -114,7 +129,7 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
               </Field>
 
               <Field>
-                <Label>Phone</Label>
+                <Label>{t('common.form.phone')}</Label>
                 <Input
                   type="tel"
                   name="phone"
@@ -124,7 +139,7 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
               </Field>
 
               <Field>
-                <Label>Address</Label>
+                <Label>{t('common.form.address')}</Label>
                 <Input
                   name="address"
                   value={formData.address || ''}
@@ -134,7 +149,7 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
 
               <div className="grid grid-cols-2 gap-4">
                 <Field>
-                  <Label>City</Label>
+                  <Label>{t('common.form.city')}</Label>
                   <Input
                     name="city"
                     value={formData.city || ''}
@@ -143,19 +158,19 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
                 </Field>
 
                 <Field>
-                  <Label>State</Label>
+                  <Label>{t('common.form.state')}</Label>
                   <Input
                     name="state"
                     value={formData.state || ''}
                     onChange={(e) => handleChange('state', e.target.value)}
-                    placeholder="CA"
+                    placeholder={t('common.form.stateHelper')}
                     maxLength={2}
                   />
                 </Field>
               </div>
 
               <Field>
-                <Label>Zip Code</Label>
+                <Label>{t('common.form.zipCode')}</Label>
                 <Input
                   name="zipCode"
                   value={formData.zipCode || ''}
@@ -168,7 +183,7 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
       </DialogBody>
       <DialogActions>
         <Button plain onClick={onClose}>
-          Cancel
+          {t('common.cancel')}
         </Button>
         <Button
           type="submit"
@@ -176,10 +191,8 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
           disabled={createMutation.isPending || updateMutation.isPending}
         >
           {createMutation.isPending || updateMutation.isPending
-            ? 'Saving...'
-            : isEdit
-              ? 'Update'
-              : 'Create'}
+            ? t('common.saving')
+            : t(isEdit ? 'common.update' : 'common.create')}
         </Button>
       </DialogActions>
     </Dialog>

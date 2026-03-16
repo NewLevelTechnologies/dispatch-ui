@@ -1,0 +1,221 @@
+{
+  "app": {
+    "loading": "Loading...",
+    "name": "Dispatch"
+  },
+  "auth": {
+    "signInPrompt": "Sign in to your account"
+  },
+  "common": {
+    "actions": {
+      "add": "Add {{entity}}",
+      "addFirst": "Add your first {{entity, lowercase}}",
+      "create": "Create {{entity}}",
+      "createFirst": "Create your first {{entity, lowercase}}",
+      "deleteConfirm": "Are you sure you want to delete {{name}}?",
+      "deleteConfirmGeneric": "Are you sure you want to delete this {{entity, lowercase}}?",
+      "edit": "Edit {{entity}}",
+      "errorLoading": "Error loading {{entities, lowercase}}",
+      "loading": "Loading {{entities, lowercase}}...",
+      "notFound": "No {{entities, lowercase}} found"
+    },
+    "active": "Active",
+    "add": "Add",
+    "cancel": "Cancel",
+    "create": "Create",
+    "delete": "Delete",
+    "edit": "Edit",
+    "form": {
+      "address": "Address",
+      "city": "City",
+      "description": "Description",
+      "descriptionCreate": "Create a new {{entity, lowercase}} record.",
+      "descriptionEdit": "Update {{entity, lowercase}} information.",
+      "email": "Email",
+      "errorCreate": "Failed to create {{entity, lowercase}}",
+      "errorUpdate": "Failed to update {{entity, lowercase}}",
+      "name": "Name",
+      "notes": "Notes",
+      "phone": "Phone",
+      "state": "State",
+      "stateHelper": "CA",
+      "status": "Status",
+      "titleCreate": "{{action}} {{entity}}",
+      "titleEdit": "{{action}} {{entity}}",
+      "zipCode": "Zip Code"
+    },
+    "moreOptions": "More options",
+    "none": "None",
+    "saving": "Saving...",
+    "signOut": "Sign out",
+    "theme": "Theme",
+    "update": "Update",
+    "updateStatus": "Update {{entity, lowercase}} status"
+  },
+  "customers": {
+    "description": "Manage your customer database",
+    "table": {
+      "location": "Location"
+    }
+  },
+  "dashboard": {
+    "stats": {
+      "activeWorkOrders": "Active work orders",
+      "thisMonth": "This month",
+      "totalCustomers": "Total customers"
+    },
+    "welcome": "Welcome to Dispatch"
+  },
+  "entities": {
+    "customer": "Customer",
+    "customers": "Customers",
+    "dashboard": "Dashboard",
+    "equipment": "Equipment",
+    "financial": "Financial",
+    "invoice": "Invoice",
+    "invoices": "Invoices",
+    "payment": "Payment",
+    "payments": "Payments",
+    "quote": "Quote",
+    "quotes": "Quotes",
+    "revenue": "Revenue",
+    "scheduling": "Scheduling",
+    "workOrder": "Work Order",
+    "workOrders": "Work Orders"
+  },
+  "equipment": {
+    "comingSoon": "Coming soon...",
+    "description": "Track equipment and inventory"
+  },
+  "financial": {
+    "comingSoon": "Coming soon...",
+    "description": "Manage invoices, quotes, and payments"
+  },
+  "invoices": {
+    "description": "Manage customer invoices and billing",
+    "form": {
+      "addLineItem": "Add Line Item",
+      "balanceDue": "Balance Due",
+      "customer": "Customer",
+      "description": "Description",
+      "dueDate": "Due Date",
+      "invoiceDate": "Invoice Date",
+      "invoiceNumber": "Invoice Number",
+      "lineItems": "Line Items",
+      "quantity": "Quantity",
+      "removeLineItem": "Remove",
+      "subtotal": "Subtotal",
+      "taxAmount": "Tax Amount",
+      "taxRate": "Tax Rate (%)",
+      "totalAmount": "Total Amount",
+      "unitPrice": "Unit Price",
+      "workOrder": "Work Order (Optional)"
+    },
+    "status": {
+      "cancelled": "Cancelled",
+      "draft": "Draft",
+      "overdue": "Overdue",
+      "paid": "Paid",
+      "sent": "Sent",
+      "void": "Void"
+    },
+    "table": {
+      "balanceDue": "Balance Due",
+      "customer": "Customer",
+      "dueDate": "Due Date",
+      "invoiceDate": "Invoice Date",
+      "invoiceNumber": "Invoice Number",
+      "status": "Status",
+      "totalAmount": "Total"
+    }
+  },
+  "payments": {
+    "description": "Track customer payments and transactions",
+    "form": {
+      "amount": "Amount",
+      "balance": "Balance",
+      "invoice": "Invoice",
+      "invoiceBalance": "Invoice balance",
+      "paymentDate": "Payment Date",
+      "paymentMethod": "Payment Method",
+      "paymentNumber": "Payment Number",
+      "referenceNumber": "Reference Number"
+    },
+    "methods": {
+      "ach": "ACH",
+      "cash": "Cash",
+      "check": "Check",
+      "creditCard": "Credit Card",
+      "debitCard": "Debit Card",
+      "other": "Other",
+      "wireTransfer": "Wire Transfer"
+    },
+    "table": {
+      "amount": "Amount",
+      "customer": "Customer",
+      "invoice": "Invoice",
+      "method": "Method",
+      "paymentDate": "Date",
+      "paymentNumber": "Payment #",
+      "reference": "Reference"
+    }
+  },
+  "quotes": {
+    "description": "Create and manage customer quotes",
+    "form": {
+      "addLineItem": "Add Line Item",
+      "customer": "Customer",
+      "description": "Description",
+      "expirationDate": "Expiration Date",
+      "lineItems": "Line Items",
+      "quantity": "Quantity",
+      "quoteDate": "Quote Date",
+      "quoteNumber": "Quote Number",
+      "removeLineItem": "Remove",
+      "subtotal": "Subtotal",
+      "taxAmount": "Tax Amount",
+      "taxRate": "Tax Rate (%)",
+      "totalAmount": "Total Amount",
+      "unitPrice": "Unit Price"
+    },
+    "status": {
+      "accepted": "Accepted",
+      "declined": "Declined",
+      "draft": "Draft",
+      "expired": "Expired",
+      "sent": "Sent"
+    },
+    "table": {
+      "customer": "Customer",
+      "expirationDate": "Expires",
+      "quoteDate": "Quote Date",
+      "quoteNumber": "Quote #",
+      "status": "Status",
+      "totalAmount": "Total"
+    }
+  },
+  "scheduling": {
+    "comingSoon": "Coming soon...",
+    "description": "Manage dispatches and technician schedules"
+  },
+  "workOrders": {
+    "description": "Manage work orders and service requests",
+    "form": {
+      "customerPlaceholder": "Select a customer...",
+      "customerRequired": "Please select a customer",
+      "scheduledDate": "Scheduled Date"
+    },
+    "status": {
+      "cancelled": "Cancelled",
+      "completed": "Completed",
+      "inProgress": "In Progress",
+      "pending": "Pending",
+      "scheduled": "Scheduled"
+    },
+    "table": {
+      "amount": "Amount",
+      "id": "ID",
+      "scheduled": "Scheduled"
+    }
+  }
+}
