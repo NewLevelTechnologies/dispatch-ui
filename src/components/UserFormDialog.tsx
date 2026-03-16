@@ -85,18 +85,13 @@ export default function UserFormDialog({ isOpen, onClose, user, roles }: UserFor
     },
   });
 
-  const updateMutation = useMutation({
-    mutationFn: (data: { firstName: string; lastName: string; email: string; roleIds: string[] }) =>
-      userApi.update(user!.id!, {
+  const updateProfileMutation = useMutation({
+    mutationFn: (data: { firstName: string; lastName: string }) =>
+      userApi.updateProfile(user!.id!, {
         firstName: data.firstName,
         lastName: data.lastName,
-        roleIds: data.roleIds,
         phoneNumber: null,
       }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['users'] });
-      onClose();
-    },
     onError: (error: unknown) => {
       const errorMessage = error instanceof Error && 'response' in error
         ? ((error as { response?: { data?: { message?: string } } }).response?.data?.message)
@@ -105,7 +100,18 @@ export default function UserFormDialog({ isOpen, onClose, user, roles }: UserFor
     },
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const updateRolesMutation = useMutation({
+    mutationFn: (roleIds: string[]) =>
+      userApi.updateRoles(user!.id!, { roleIds }),
+    onError: (error: unknown) => {
+      const errorMessage = error instanceof Error && 'response' in error
+        ? ((error as { response?: { data?: { message?: string } } }).response?.data?.message)
+        : undefined;
+      alert(errorMessage || 'Failed to update user roles');
+    },
+  });
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (formData.roleIds.length === 0) {
@@ -114,7 +120,23 @@ export default function UserFormDialog({ isOpen, onClose, user, roles }: UserFor
     }
 
     if (isEdit) {
-      updateMutation.mutate(formData);
+      try {
+        // Update profile first
+        await updateProfileMutation.mutateAsync({
+          firstName: formData.firstName,
+          lastName: formData.lastName,
+        });
+
+        // Then update roles
+        await updateRolesMutation.mutateAsync(formData.roleIds);
+
+        // Refresh and close on success
+        queryClient.invalidateQueries({ queryKey: ['users'] });
+        queryClient.invalidateQueries({ queryKey: ['users', user!.id] });
+        onClose();
+      } catch {
+        // Errors already handled by mutation onError callbacks
+      }
     } else {
       createMutation.mutate({ ...formData, sendInvite });
     }
@@ -240,9 +262,9 @@ export default function UserFormDialog({ isOpen, onClose, user, roles }: UserFor
         <Button
           type="submit"
           form="user-form"
-          disabled={createMutation.isPending || updateMutation.isPending}
+          disabled={createMutation.isPending || updateProfileMutation.isPending || updateRolesMutation.isPending}
         >
-          {createMutation.isPending || updateMutation.isPending
+          {createMutation.isPending || updateProfileMutation.isPending || updateRolesMutation.isPending
             ? t('common.saving')
             : t(isEdit ? 'common.update' : 'common.create')}
         </Button>

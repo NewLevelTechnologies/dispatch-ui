@@ -10,7 +10,8 @@ export {
   type User,
   type Role,
   type CreateUserRequest,
-  type UpdateUserRequest,
+  type UpdateUserProfileRequest,
+  type UpdateUserRolesRequest,
   type UpdateUserEnabledRequest
 } from './userApi';
 
