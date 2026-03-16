@@ -12,6 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '.
 import { Badge } from '../components/catalyst/badge';
 import { Dropdown, DropdownButton, DropdownItem, DropdownLabel, DropdownMenu } from '../components/catalyst/dropdown';
 import { Input } from '../components/catalyst/input';
+import { Alert, AlertActions, AlertDescription, AlertTitle } from '../components/catalyst/alert';
 
 export default function UsersPage() {
   const navigate = useNavigate();
@@ -22,6 +23,8 @@ export default function UsersPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [roleFilter, setRoleFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+  const [isDeleteAlertOpen, setIsDeleteAlertOpen] = useState(false);
+  const [userToDelete, setUserToDelete] = useState<User | null>(null);
 
   const { data: users, isLoading, error } = useQuery({
     queryKey: ['users'],
@@ -47,6 +50,15 @@ export default function UsersPage() {
     },
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => userApi.delete(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+      setIsDeleteAlertOpen(false);
+      setUserToDelete(null);
+    },
+  });
+
   const handleAdd = () => {
     setSelectedUser(null);
     setIsDialogOpen(true);
@@ -68,6 +80,17 @@ export default function UsersPage() {
     const message = t('users.actions.enableConfirm', { name: `${user.firstName} ${user.lastName}` });
     if (window.confirm(message)) {
       enableMutation.mutate(user.id);
+    }
+  };
+
+  const handleDelete = (user: User) => {
+    setUserToDelete(user);
+    setIsDeleteAlertOpen(true);
+  };
+
+  const confirmDelete = () => {
+    if (userToDelete) {
+      deleteMutation.mutate(userToDelete.id);
     }
   };
 
@@ -284,6 +307,9 @@ export default function UsersPage() {
                               <DropdownLabel>{t('users.table.enable')}</DropdownLabel>
                             </DropdownItem>
                           )}
+                          <DropdownItem onClick={() => handleDelete(user)}>
+                            <DropdownLabel>{t('common.delete')}</DropdownLabel>
+                          </DropdownItem>
                         </DropdownMenu>
                       </Dropdown>
                     </div>
@@ -309,6 +335,21 @@ export default function UsersPage() {
         user={selectedUser}
         roles={roles || []}
       />
+
+      <Alert open={isDeleteAlertOpen} onClose={() => setIsDeleteAlertOpen(false)}>
+        <AlertTitle>{t('common.actions.deleteConfirm', { name: userToDelete ? `${userToDelete.firstName} ${userToDelete.lastName}` : '' })}</AlertTitle>
+        <AlertDescription>
+          {t('users.actions.deleteWarning')}
+        </AlertDescription>
+        <AlertActions>
+          <Button plain onClick={() => setIsDeleteAlertOpen(false)}>
+            {t('common.cancel')}
+          </Button>
+          <Button color="red" onClick={confirmDelete} disabled={deleteMutation.isPending}>
+            {deleteMutation.isPending ? t('common.deleting') : t('common.delete')}
+          </Button>
+        </AlertActions>
+      </Alert>
     </AppLayout>
   );
 }

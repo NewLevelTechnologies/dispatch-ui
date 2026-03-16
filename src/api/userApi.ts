@@ -83,6 +83,10 @@ export const userApi = {
     const response = await apiClient.put<User>(`/users/${id}`, { enabled: false });
     return response.data;
   },
+
+  delete: async (id: string): Promise<void> => {
+    await apiClient.delete(`/users/${id}`);
+  },
 };
 
 export default userApi;
