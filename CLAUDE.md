@@ -76,6 +76,60 @@ VITE_ENV=development
 
 ---
 
+## Branching Strategy
+
+### Default Branch
+
+**The default branch is `dev`** - all PRs should target this branch unless explicitly instructed otherwise.
+
+### Branch Workflow
+
+```
+dev (default) ──→ qa ──→ main (production)
+```
+
+**Key branches**:
+- `dev` - Default branch, integration environment
+- `qa` - Quality assurance testing
+- `main` - Production releases
+- `master` - **⚠️ DO NOT USE** - Legacy branch, not part of current workflow
+
+### Creating Pull Requests
+
+**Always create PRs targeting `dev`**:
+
+```bash
+# Create a PR (automatically targets dev)
+gh pr create --title "Your PR title" --body "Description"
+
+# If you need to specify the base branch explicitly
+gh pr create --base dev --title "Your PR title" --body "Description"
+```
+
+**IMPORTANT**: Do not create PRs targeting `master`. The default branch is `dev`.
+
+### Feature Branch Naming
+
+Use descriptive branch names with prefixes:
+
+- `feat/` - New features (e.g., `feat/user-authentication`)
+- `fix/` - Bug fixes (e.g., `fix/login-validation`)
+- `refactor/` - Code refactoring (e.g., `refactor/api-layer`)
+- `test/` - Test additions/improvements (e.g., `test/customer-page`)
+- `docs/` - Documentation updates (e.g., `docs/api-guide`)
+- `ci/` - CI/CD changes (e.g., `ci/add-coverage-check`)
+
+### Pull Request Process
+
+1. Create feature branch from `dev`
+2. Develop and test locally
+3. Create PR targeting `dev`
+4. Ensure PR checks pass (lint, tests, build)
+5. Request review
+6. Merge to `dev` after approval
+
+---
+
 ## Architecture Pattern
 
 ### Modern Single-Page + Dialog Pattern
