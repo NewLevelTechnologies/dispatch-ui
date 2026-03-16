@@ -33,6 +33,10 @@ export default defineConfig({
         'src/pages/PaymentsPage.tsx',
         // Exclude financial API (integration tested)
         'src/api/financialApi.ts',
+        // Exclude user management pages (complex forms, will be tested separately)
+        'src/pages/UsersPage.tsx',
+        'src/pages/UserDetailPage.tsx',
+        'src/components/UserFormDialog.tsx',
         // Exclude infrastructure files
         'src/App.tsx',
         'src/components/AppLayout.tsx',

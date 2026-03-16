@@ -10,6 +10,7 @@
     "actions": {
       "add": "Add {{entity}}",
       "addFirst": "Add your first {{entity, lowercase}}",
+      "back": "Back",
       "create": "Create {{entity}}",
       "createFirst": "Create your first {{entity, lowercase}}",
       "deleteConfirm": "Are you sure you want to delete {{name}}?",
@@ -25,6 +26,8 @@
     "create": "Create",
     "delete": "Delete",
     "edit": "Edit",
+    "disabled": "Disabled",
+    "enabled": "Enabled",
     "form": {
       "address": "Address",
       "city": "City",
@@ -34,9 +37,12 @@
       "email": "Email",
       "errorCreate": "Failed to create {{entity, lowercase}}",
       "errorUpdate": "Failed to update {{entity, lowercase}}",
+      "firstName": "First Name",
+      "lastName": "Last Name",
       "name": "Name",
       "notes": "Notes",
       "phone": "Phone",
+      "role": "Role",
       "state": "State",
       "stateHelper": "CA",
       "status": "Status",
@@ -79,7 +85,11 @@
     "quote": "Quote",
     "quotes": "Quotes",
     "revenue": "Revenue",
+    "role": "Role",
+    "roles": "Roles",
     "scheduling": "Scheduling",
+    "user": "User",
+    "users": "Users",
     "workOrder": "Work Order",
     "workOrders": "Work Orders"
   },
@@ -197,6 +207,60 @@
   "scheduling": {
     "comingSoon": "Coming soon...",
     "description": "Manage dispatches and technician schedules"
+  },
+  "users": {
+    "actions": {
+      "disableConfirm": "Are you sure you want to disable {{name}}? They will no longer be able to log in.",
+      "enableConfirm": "Are you sure you want to enable {{name}}?"
+    },
+    "description": "Manage user accounts and permissions",
+    "detail": {
+      "activityComingSoon": "Activity history coming soon",
+      "activityHelper": "Will show login history, actions performed, etc.",
+      "auditComingSoon": "Audit trail coming soon",
+      "auditHelper": "Will show permission changes, profile updates, etc.",
+      "basicInfo": "Basic Information",
+      "capabilities": "Capabilities",
+      "cognitoSub": "Cognito Sub",
+      "created": "Created",
+      "lastUpdated": "Last Updated",
+      "noCapabilities": "No capabilities assigned",
+      "recentActivity": "Recent Activity",
+      "rolePermissions": "Role & Permissions",
+      "showLess": "Show less",
+      "showMore": "Show {{count}} more...",
+      "systemInfo": "System Information",
+      "userId": "User ID"
+    },
+    "filter": {
+      "all": "All",
+      "allRoles": "All roles",
+      "clearFilters": "Clear filters",
+      "disabled": "Disabled",
+      "enabled": "Enabled",
+      "role": "Role",
+      "status": "Status"
+    },
+    "form": {
+      "rolePlaceholder": "Select a role...",
+      "roleRequired": "Please select a role",
+      "sendInvite": "Send invitation email"
+    },
+    "search": {
+      "noMatch": "No users match \"{{query}}\"",
+      "placeholder": "Search by name, email, or role..."
+    },
+    "status": {
+      "disabled": "Disabled",
+      "enabled": "Enabled"
+    },
+    "table": {
+      "actions": "Actions",
+      "auditLog": "Audit Log",
+      "disable": "Disable",
+      "enable": "Enable",
+      "lastUpdated": "Last Updated"
+    }
   },
   "workOrders": {
     "description": "Manage work orders and service requests",
