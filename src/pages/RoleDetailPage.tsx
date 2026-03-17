@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useQuery, useMutation, useQueryClient } from '@tantml:react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { ArrowLeftIcon } from '@heroicons/react/24/outline';
 import { userApi } from '../api';
@@ -132,7 +132,7 @@ export default function RoleDetailPage() {
         <div className="grid gap-8 lg:grid-cols-2">
           {/* Basic Information */}
           <div>
-            <Subheading>Role Information</Subheading>
+            <Subheading>{t('roles.detail.roleInfo')}</Subheading>
             <DescriptionList className="mt-4">
               <DescriptionTerm>{t('common.form.name')}</DescriptionTerm>
               <DescriptionDetails>{role.name}</DescriptionDetails>
@@ -142,28 +142,28 @@ export default function RoleDetailPage() {
                 {role.description || <span className="text-zinc-500">-</span>}
               </DescriptionDetails>
 
-              <DescriptionTerm>Total Capabilities</DescriptionTerm>
+              <DescriptionTerm>{t('roles.detail.totalCapabilities')}</DescriptionTerm>
               <DescriptionDetails>
-                {role.capabilities?.length || 0} capabilities
+                {role.capabilities?.length || 0} {t('capabilities.totalCount')}
               </DescriptionDetails>
             </DescriptionList>
           </div>
 
           {/* System Information */}
           <div>
-            <Subheading>System Information</Subheading>
+            <Subheading>{t('roles.detail.systemInfo')}</Subheading>
             <DescriptionList className="mt-4">
-              <DescriptionTerm>Role ID</DescriptionTerm>
+              <DescriptionTerm>{t('roles.detail.roleId')}</DescriptionTerm>
               <DescriptionDetails>
                 <code className="text-xs text-zinc-600 dark:text-zinc-400">
                   {role.id}
                 </code>
               </DescriptionDetails>
 
-              <DescriptionTerm>Created</DescriptionTerm>
+              <DescriptionTerm>{t('roles.detail.created')}</DescriptionTerm>
               <DescriptionDetails>{formatDate(role.createdAt)}</DescriptionDetails>
 
-              <DescriptionTerm>Last Updated</DescriptionTerm>
+              <DescriptionTerm>{t('roles.detail.lastUpdated')}</DescriptionTerm>
               <DescriptionDetails>{formatDate(role.updatedAt)}</DescriptionDetails>
             </DescriptionList>
           </div>
@@ -171,9 +171,9 @@ export default function RoleDetailPage() {
 
         {/* Capabilities Section - Full Width */}
         <div className="mt-8">
-          <Subheading>Capabilities</Subheading>
+          <Subheading>{t('capabilities.label')}</Subheading>
           <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
-            Users assigned this role will have the following capabilities
+            {t('capabilities.rolesWillHave')}
           </p>
           <div className="mt-4">
             <CapabilitiesDisplay
@@ -195,7 +195,7 @@ export default function RoleDetailPage() {
           {t('common.actions.deleteConfirm', { name: role.name })}
         </AlertTitle>
         <AlertDescription>
-          This action cannot be undone. Users assigned this role will lose associated capabilities.
+          {t('roles.actions.deleteWarning')}
         </AlertDescription>
         <AlertActions>
           <Button plain onClick={() => setIsDeleteAlertOpen(false)}>

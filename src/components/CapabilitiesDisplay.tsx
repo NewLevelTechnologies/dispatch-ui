@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { ChevronDownIcon, ChevronRightIcon } from '@heroicons/react/24/outline';
-import { userApi, type Capability, type CapabilityGroup } from '../api';
+import { userApi, type CapabilityGroup } from '../api';
 import { Badge } from './catalyst/badge';
 import { Checkbox, CheckboxField } from './catalyst/checkbox';
 import { Label } from './catalyst/fieldset';
@@ -25,6 +26,7 @@ export default function CapabilitiesDisplay({
   onCapabilityToggle,
   editMode = false,
 }: CapabilitiesDisplayProps) {
+  const { t } = useTranslation();
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
 
   const { data: capabilitiesData, isLoading, error } = useQuery({
@@ -57,7 +59,9 @@ export default function CapabilitiesDisplay({
   if (isLoading) {
     return (
       <div className="rounded-lg bg-zinc-50 p-4 text-center dark:bg-zinc-900">
-        <p className="text-sm text-zinc-600 dark:text-zinc-400">Loading capabilities...</p>
+        <p className="text-sm text-zinc-600 dark:text-zinc-400">
+          {t('common.actions.loading', { entities: t('capabilities.label').toLowerCase() })}
+        </p>
       </div>
     );
   }
@@ -66,7 +70,7 @@ export default function CapabilitiesDisplay({
     return (
       <div className="rounded-lg bg-red-50 p-4 ring-1 ring-red-200 dark:bg-red-950/10 dark:ring-red-900/20">
         <p className="text-sm text-red-800 dark:text-red-400">
-          Error loading capabilities: {error instanceof Error ? error.message : 'Unknown error'}
+          {t('capabilities.errorLoading')}: {error instanceof Error ? error.message : t('capabilities.unknownError')}
         </p>
       </div>
     );
@@ -88,7 +92,7 @@ export default function CapabilitiesDisplay({
   if (!editMode && displayGroups.length === 0) {
     return (
       <div className="rounded-lg bg-zinc-50 p-4 text-center dark:bg-zinc-900">
-        <p className="text-sm text-zinc-600 dark:text-zinc-400">No capabilities assigned</p>
+        <p className="text-sm text-zinc-600 dark:text-zinc-400">{t('capabilities.noCapabilities')}</p>
       </div>
     );
   }
@@ -100,7 +104,7 @@ export default function CapabilitiesDisplay({
       ).length;
       return `${selected}/${group.capabilities.length}`;
     }
-    return `${group.capabilities.length}`;
+    return String(group.capabilities.length);
   };
 
   return (
@@ -109,10 +113,10 @@ export default function CapabilitiesDisplay({
       {displayGroups.length > 3 && (
         <div className="mb-4 flex gap-2">
           <Button plain onClick={expandAll} className="text-sm">
-            Expand All
+            {t('capabilities.expandAll')}
           </Button>
           <Button plain onClick={collapseAll} className="text-sm">
-            Collapse All
+            {t('capabilities.collapseAll')}
           </Button>
         </div>
       )}
@@ -142,7 +146,7 @@ export default function CapabilitiesDisplay({
                     {group.displayName}
                   </div>
                   <div className="text-xs text-zinc-500">
-                    {getGroupStats(group)} capabilities
+                    {getGroupStats(group)} {t('capabilities.totalCount')}
                   </div>
                 </div>
               </div>

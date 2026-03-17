@@ -30,11 +30,11 @@ export default function RoleFormDialog({ isOpen, onClose, role }: RoleFormDialog
     capabilities: [],
   });
 
-  // Intentionally setting form state based on props in useEffect
-  // This is the recommended pattern for initializing controlled forms
   useEffect(() => {
     if (!isOpen) return;
 
+    // Intentionally setting form state based on props in useEffect
+    // This is the recommended pattern for initializing controlled forms
     if (role) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setFormData({
@@ -43,7 +43,7 @@ export default function RoleFormDialog({ isOpen, onClose, role }: RoleFormDialog
         capabilities: role.capabilities || [],
       });
     } else {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
+       
       setFormData({
         name: '',
         description: '',
@@ -162,13 +162,13 @@ export default function RoleFormDialog({ isOpen, onClose, role }: RoleFormDialog
 
           <div className="mt-6">
             <div className="mb-4">
-              <Label>Capabilities *</Label>
+              <Label>{t('capabilities.label')} *</Label>
               <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-                Select the capabilities this role should have. Users assigned this role will inherit these permissions.
+                {t('capabilities.description')}
               </p>
               {formData.capabilities.length > 0 && (
                 <p className="mt-2 text-sm font-medium text-zinc-900 dark:text-zinc-100">
-                  {formData.capabilities.length} capability(ies) selected
+                  {formData.capabilities.length} {t('capabilities.selected')}
                 </p>
               )}
             </div>

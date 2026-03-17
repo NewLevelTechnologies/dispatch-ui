@@ -83,7 +83,7 @@ export default function RolesPage() {
         <div>
           <Heading>{t('entities.roles')}</Heading>
           <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
-            Manage roles and their capabilities
+            {t('roles.description')}
           </p>
         </div>
         <Button onClick={handleAdd}>
@@ -126,8 +126,8 @@ export default function RolesPage() {
               <TableRow>
                 <TableHeader>{t('common.form.name')}</TableHeader>
                 <TableHeader>{t('common.form.description')}</TableHeader>
-                <TableHeader>Capabilities</TableHeader>
-                <TableHeader>Last Updated</TableHeader>
+                <TableHeader>{t('roles.table.capabilities')}</TableHeader>
+                <TableHeader>{t('roles.table.lastUpdated')}</TableHeader>
                 <TableHeader></TableHeader>
               </TableRow>
             </TableHead>
@@ -150,7 +150,7 @@ export default function RolesPage() {
                   </TableCell>
                   <TableCell>
                     {role.capabilities && role.capabilities.length > 0 ? (
-                      <Badge color="purple">{role.capabilities.length} capabilities</Badge>
+                      <Badge color="purple">{role.capabilities.length} {t('capabilities.totalCount')}</Badge>
                     ) : (
                       <span className="text-zinc-500">-</span>
                     )}
@@ -193,7 +193,7 @@ export default function RolesPage() {
           {t('common.actions.deleteConfirm', { name: roleToDelete?.name || '' })}
         </AlertTitle>
         <AlertDescription>
-          This action cannot be undone. Users assigned this role will lose associated capabilities.
+          {t('roles.actions.deleteWarning')}
         </AlertDescription>
         <AlertActions>
           <Button plain onClick={() => setIsDeleteAlertOpen(false)}>
