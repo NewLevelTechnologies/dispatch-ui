@@ -6,7 +6,7 @@ import { ArrowLeftIcon } from '@heroicons/react/24/outline';
 import { userApi } from '../api';
 import AppLayout from '../components/AppLayout';
 import RoleFormDialog from '../components/RoleFormDialog';
-import CapabilitiesDisplay from '../components/CapabilitiesDisplay';
+import CapabilitiesSection from '../components/CapabilitiesSection';
 import { Heading, Subheading } from '../components/catalyst/heading';
 import { Button } from '../components/catalyst/button';
 import { DescriptionList, DescriptionTerm, DescriptionDetails } from '../components/catalyst/description-list';
@@ -171,16 +171,7 @@ export default function RoleDetailPage() {
 
         {/* Capabilities Section - Full Width */}
         <div className="mt-8">
-          <Subheading>{t('capabilities.label')}</Subheading>
-          <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
-            {t('capabilities.rolesWillHave')}
-          </p>
-          <div className="mt-4">
-            <CapabilitiesDisplay
-              userCapabilities={role.capabilities || []}
-              editMode={false}
-            />
-          </div>
+          <CapabilitiesSection capabilities={role.capabilities || []} />
         </div>
       </div>
 

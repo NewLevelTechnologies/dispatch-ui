@@ -5,8 +5,7 @@ import { ChevronDownIcon, ChevronRightIcon } from '@heroicons/react/24/outline';
 import { userApi, type CapabilityGroup } from '../api';
 import { Badge } from './catalyst/badge';
 import { Checkbox, CheckboxField } from './catalyst/checkbox';
-import { Label } from './catalyst/fieldset';
-import { Text } from './catalyst/text';
+import { Label, Description } from './catalyst/fieldset';
 import { Button } from './catalyst/button';
 
 interface CapabilitiesDisplayProps {
@@ -167,12 +166,8 @@ export default function CapabilitiesDisplay({
                             onCapabilityToggle?.(capability.name, checked)
                           }
                         />
-                        <div className="flex-1">
-                          <Label className="font-medium">{capability.displayName}</Label>
-                          <Text className="text-sm text-zinc-600 dark:text-zinc-400">
-                            {capability.description}
-                          </Text>
-                        </div>
+                        <Label>{capability.displayName}</Label>
+                        <Description>{capability.description}</Description>
                       </CheckboxField>
                     ))}
                   </div>

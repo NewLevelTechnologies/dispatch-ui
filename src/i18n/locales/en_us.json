@@ -29,7 +29,9 @@
     "edit": "Edit",
     "disabled": "Disabled",
     "enabled": "Enabled",
+    "hide": "Hide",
     "inactive": "Inactive",
+    "show": "Show",
     "form": {
       "address": "Address",
       "city": "City",
@@ -218,6 +220,7 @@
     }
   },
   "capabilities": {
+    "clearGroup": "Clear group",
     "collapseAll": "Collapse All",
     "description": "Select the capabilities this role should have. Users assigned this role will inherit these permissions.",
     "errorLoading": "Error loading capabilities",
@@ -225,7 +228,8 @@
     "label": "Capabilities",
     "noCapabilities": "No capabilities assigned",
     "rolesWillHave": "Users assigned this role will have the following capabilities",
-    "selected": "capability(ies) selected",
+    "selected": "selected",
+    "selectedLower": "selected",
     "totalCount": "capabilities",
     "unknownError": "Unknown error"
   },
@@ -268,6 +272,10 @@
       "deleteWarning": "This action cannot be undone. Users assigned this role will lose associated capabilities."
     },
     "description": "Manage roles and their capabilities",
+    "form": {
+      "descriptionCreate": "Create a new role by defining its name, description, and capabilities.",
+      "descriptionEdit": "Update role name, description, and capabilities."
+    },
     "detail": {
       "created": "Created",
       "lastUpdated": "Last Updated",

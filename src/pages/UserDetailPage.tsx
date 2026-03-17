@@ -6,7 +6,7 @@ import { ArrowLeftIcon } from '@heroicons/react/24/outline';
 import { userApi } from '../api';
 import AppLayout from '../components/AppLayout';
 import UserFormDialog from '../components/UserFormDialog';
-import CapabilitiesDisplay from '../components/CapabilitiesDisplay';
+import CapabilitiesSection from '../components/CapabilitiesSection';
 import { Heading, Subheading } from '../components/catalyst/heading';
 import { Button } from '../components/catalyst/button';
 import { Badge } from '../components/catalyst/badge';
@@ -198,19 +198,7 @@ export default function UserDetailPage() {
           </div>
         </div>
 
-        {/* Capabilities Section - Full Width */}
-        <div className="mt-8">
-          <Subheading>{t('users.detail.capabilities')}</Subheading>
-          <div className="mt-4">
-            <CapabilitiesDisplay
-              userCapabilities={user.capabilities || []}
-              editMode={false}
-            />
-          </div>
-        </div>
-
         <div className="grid gap-8 lg:grid-cols-2">
-
           {/* System Information */}
           <div>
             <Subheading>{t('users.detail.systemInfo')}</Subheading>
@@ -249,6 +237,12 @@ export default function UserDetailPage() {
               </p>
             </div>
           </div>
+        </div>
+
+        {/* Capabilities Section - Collapsible, below main content */}
+        <Divider className="my-8" />
+        <div>
+          <CapabilitiesSection capabilities={user.capabilities || []} />
         </div>
 
         {/* Future sections placeholder */}

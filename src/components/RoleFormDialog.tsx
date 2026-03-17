@@ -7,7 +7,7 @@ import { Button } from './catalyst/button';
 import { Field, FieldGroup, Fieldset, Label } from './catalyst/fieldset';
 import { Input } from './catalyst/input';
 import { Textarea } from './catalyst/textarea';
-import CapabilitiesDisplay from './CapabilitiesDisplay';
+import CapabilitySelector from './CapabilitySelector';
 
 interface RoleFormDialogProps {
   isOpen: boolean;
@@ -43,7 +43,6 @@ export default function RoleFormDialog({ isOpen, onClose, role }: RoleFormDialog
         capabilities: role.capabilities || [],
       });
     } else {
-       
       setFormData({
         name: '',
         description: '',
@@ -120,7 +119,7 @@ export default function RoleFormDialog({ isOpen, onClose, role }: RoleFormDialog
   };
 
   return (
-    <Dialog open={isOpen} onClose={onClose} size="5xl">
+    <Dialog open={isOpen} onClose={onClose} size="3xl">
       <DialogTitle>
         {t('common.form.titleCreate', {
           action: isEdit ? t('common.edit') : t('common.add'),
@@ -129,8 +128,8 @@ export default function RoleFormDialog({ isOpen, onClose, role }: RoleFormDialog
       </DialogTitle>
       <DialogDescription>
         {isEdit
-          ? 'Update role name, description, and capabilities.'
-          : 'Create a new role by defining its name, description, and capabilities.'}
+          ? t('roles.form.descriptionEdit')
+          : t('roles.form.descriptionCreate')}
       </DialogDescription>
       <DialogBody>
         <form onSubmit={handleSubmit} id="role-form">
@@ -161,23 +160,19 @@ export default function RoleFormDialog({ isOpen, onClose, role }: RoleFormDialog
           </Fieldset>
 
           <div className="mt-6">
-            <div className="mb-4">
-              <Label>{t('capabilities.label')} *</Label>
-              <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-                {t('capabilities.description')}
-              </p>
-              {formData.capabilities.length > 0 && (
-                <p className="mt-2 text-sm font-medium text-zinc-900 dark:text-zinc-100">
-                  {formData.capabilities.length} {t('capabilities.selected')}
-                </p>
-              )}
+            <div className="text-sm font-medium text-zinc-950 dark:text-white">
+              {t('capabilities.label')} *
             </div>
+            <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
+              {t('capabilities.description')}
+            </p>
 
-            <CapabilitiesDisplay
-              selectedCapabilities={formData.capabilities}
-              onCapabilityToggle={handleCapabilityToggle}
-              editMode={true}
-            />
+            <div className="mt-4">
+              <CapabilitySelector
+                selectedCapabilities={formData.capabilities}
+                onCapabilityToggle={handleCapabilityToggle}
+              />
+            </div>
           </div>
         </form>
       </DialogBody>

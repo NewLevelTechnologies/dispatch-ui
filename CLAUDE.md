@@ -1037,6 +1037,61 @@ When adding a new feature:
 
 ## Key Patterns & Conventions
 
+### ⚠️ CRITICAL: Always Use Catalyst UI Components
+
+**THIS IS NON-NEGOTIABLE**: The project uses **Tailwind Catalyst UI** as the design system. ALL UI components MUST use Catalyst components correctly.
+
+**Rules**:
+- ✅ **ALWAYS** reference Catalyst component documentation in `src/components/catalyst/`
+- ✅ **ALWAYS** use proper Catalyst component structure (Field, Label, Description, etc.)
+- ✅ **ALWAYS** check existing components for correct usage patterns
+- ❌ **NEVER** create custom HTML/Tailwind implementations that duplicate Catalyst functionality
+- ❌ **NEVER** use components outside their required context (e.g., Label needs Field parent)
+- ❌ **NEVER** wrap Catalyst components in unnecessary divs that break their structure
+
+**Common Catalyst Components**:
+- **Forms**: `Field`, `FieldGroup`, `Fieldset`, `Label`, `Description`, `Input`, `Textarea`, `Select`
+- **Checkboxes**: `CheckboxField`, `Checkbox` (Label and Description as direct children)
+- **Buttons**: `Button` (with `plain` prop for text-style buttons)
+- **Dialogs**: `Dialog`, `DialogTitle`, `DialogDescription`, `DialogBody`, `DialogActions`
+- **Tables**: `Table`, `TableHead`, `TableBody`, `TableRow`, `TableHeader`, `TableCell`
+- **Badges**: `Badge` (with color prop: lime, zinc, sky, blue, amber, rose, purple, etc.)
+- **Dropdowns**: `Dropdown`, `DropdownButton`, `DropdownMenu`, `DropdownItem`
+- **Layout**: `Heading`, `Subheading`, `Divider`, `Text`
+
+**Example - CheckboxField Correct Usage**:
+```typescript
+// ✅ CORRECT - Direct children, proper Catalyst components
+<CheckboxField>
+  <Checkbox
+    name="fieldName"
+    checked={isChecked}
+    onChange={(checked) => handleChange(checked)}
+  />
+  <Label>Field Name</Label>
+  <Description>Optional description text</Description>
+</CheckboxField>
+
+// ❌ WRONG - Wrapped in div, using wrong components
+<CheckboxField>
+  <Checkbox ... />
+  <div>
+    <Label>Field Name</Label>
+    <Text>Description</Text>  {/* Should be Description, not Text */}
+  </div>
+</CheckboxField>
+```
+
+**When in doubt**:
+1. Check `src/components/catalyst/` for the component implementation
+2. Search the codebase for existing usage examples
+3. Follow the exact structure shown in Catalyst documentation
+
+**All Catalyst component files are available at**:
+- `src/components/catalyst/*.tsx`
+
+---
+
 ### React Query Patterns
 
 **Import API service**:
