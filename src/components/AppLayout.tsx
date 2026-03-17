@@ -9,6 +9,7 @@ import {
   CurrencyDollarIcon,
   CalendarIcon,
   ShieldCheckIcon,
+  KeyIcon,
   SunIcon,
   MoonIcon,
   ComputerDesktopIcon,
@@ -60,6 +61,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const adminNavigation = [
     // TODO: Add capability check - only show if user has VIEW_USERS capability
     { name: t('entities.users'), href: '/users', icon: ShieldCheckIcon },
+    // TODO: Add capability check - only show if user has VIEW_ROLES capability
+    { name: t('entities.roles'), href: '/roles', icon: KeyIcon },
   ];
 
   return (

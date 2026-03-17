@@ -18,6 +18,26 @@ export interface User {
 export interface Role {
   id: string;
   name: string;
+  description?: string;
+  capabilities?: string[];
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface Capability {
+  name: string;
+  displayName: string;
+  description: string;
+}
+
+export interface CapabilityGroup {
+  featureArea: string;
+  displayName: string;
+  capabilities: Capability[];
+}
+
+export interface GroupedCapabilitiesResponse {
+  groups: CapabilityGroup[];
 }
 
 export interface CreateUserRequest {
@@ -43,6 +63,18 @@ export interface UpdateUserEnabledRequest {
   enabled: boolean;
 }
 
+export interface CreateRoleRequest {
+  name: string;
+  description?: string;
+  capabilities: string[];
+}
+
+export interface UpdateRoleRequest {
+  name?: string;
+  description?: string;
+  capabilities?: string[];
+}
+
 export const userApi = {
   getAll: async (): Promise<User[]> => {
     const response = await apiClient.get<User[]>('/users');
@@ -56,6 +88,11 @@ export const userApi = {
 
   getRoles: async (): Promise<Role[]> => {
     const response = await apiClient.get<Role[]>('/users/roles');
+    return response.data;
+  },
+
+  getGroupedCapabilities: async (): Promise<GroupedCapabilitiesResponse> => {
+    const response = await apiClient.get<GroupedCapabilitiesResponse>('/users/capabilities/grouped');
     return response.data;
   },
 
@@ -86,6 +123,26 @@ export const userApi = {
 
   delete: async (id: string): Promise<void> => {
     await apiClient.delete(`/users/${id}`);
+  },
+
+  // Role management methods
+  getRoleById: async (id: string): Promise<Role> => {
+    const response = await apiClient.get<Role>(`/users/roles/${id}`);
+    return response.data;
+  },
+
+  createRole: async (request: CreateRoleRequest): Promise<Role> => {
+    const response = await apiClient.post<Role>('/users/roles', request);
+    return response.data;
+  },
+
+  updateRole: async (id: string, request: UpdateRoleRequest): Promise<Role> => {
+    const response = await apiClient.put<Role>(`/users/roles/${id}`, request);
+    return response.data;
+  },
+
+  deleteRole: async (id: string): Promise<void> => {
+    await apiClient.delete(`/users/roles/${id}`);
   },
 };
 

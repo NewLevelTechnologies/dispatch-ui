@@ -6,6 +6,7 @@ import { ArrowLeftIcon } from '@heroicons/react/24/outline';
 import { userApi } from '../api';
 import AppLayout from '../components/AppLayout';
 import UserFormDialog from '../components/UserFormDialog';
+import CapabilitiesDisplay from '../components/CapabilitiesDisplay';
 import { Heading, Subheading } from '../components/catalyst/heading';
 import { Button } from '../components/catalyst/button';
 import { Badge } from '../components/catalyst/badge';
@@ -18,7 +19,6 @@ export default function UserDetailPage() {
   const queryClient = useQueryClient();
   const { t } = useTranslation();
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-  const [showAllCapabilities, setShowAllCapabilities] = useState(false);
 
   const { data: user, isLoading, error } = useQuery({
     queryKey: ['users', id],
@@ -194,35 +194,22 @@ export default function UserDetailPage() {
                 )}
               </DescriptionDetails>
 
-              <DescriptionTerm>{t('users.detail.capabilities')}</DescriptionTerm>
-              <DescriptionDetails>
-                {user.capabilities && user.capabilities.length > 0 ? (
-                  <div className="space-y-2">
-                    <div className="flex flex-wrap gap-2">
-                      {(showAllCapabilities ? user.capabilities : user.capabilities.slice(0, 10)).map((capability) => (
-                        <Badge key={capability} color="purple">
-                          {capability}
-                        </Badge>
-                      ))}
-                    </div>
-                    {user.capabilities.length > 10 && (
-                      <Button
-                        plain
-                        onClick={() => setShowAllCapabilities(!showAllCapabilities)}
-                        className="text-sm"
-                      >
-                        {showAllCapabilities
-                          ? t('users.detail.showLess')
-                          : t('users.detail.showMore', { count: user.capabilities.length - 10 })}
-                      </Button>
-                    )}
-                  </div>
-                ) : (
-                  <span className="text-zinc-500">{t('users.detail.noCapabilities')}</span>
-                )}
-              </DescriptionDetails>
             </DescriptionList>
           </div>
+        </div>
+
+        {/* Capabilities Section - Full Width */}
+        <div className="mt-8">
+          <Subheading>{t('users.detail.capabilities')}</Subheading>
+          <div className="mt-4">
+            <CapabilitiesDisplay
+              userCapabilities={user.capabilities || []}
+              editMode={false}
+            />
+          </div>
+        </div>
+
+        <div className="grid gap-8 lg:grid-cols-2">
 
           {/* System Information */}
           <div>

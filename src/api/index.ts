@@ -9,10 +9,15 @@ export {
   userApi,
   type User,
   type Role,
+  type Capability,
+  type CapabilityGroup,
+  type GroupedCapabilitiesResponse,
   type CreateUserRequest,
   type UpdateUserProfileRequest,
   type UpdateUserRolesRequest,
-  type UpdateUserEnabledRequest
+  type UpdateUserEnabledRequest,
+  type CreateRoleRequest,
+  type UpdateRoleRequest
 } from './userApi';
 
 // Work Order API
