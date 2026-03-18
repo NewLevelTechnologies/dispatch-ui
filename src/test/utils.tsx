@@ -22,8 +22,9 @@ interface CustomRenderOptions extends Omit<RenderOptions, 'wrapper'> {
   queryClient?: QueryClient;
   routes?: RouteObject[];
   initialPath?: string;
-  // Backward compatibility
+  // Backward compatibility (not currently used but kept for test compatibility)
   initialEntries?: string[];
+  path?: string;
 }
 
 export function renderWithProviders(
@@ -33,6 +34,8 @@ export function renderWithProviders(
     routes,
     initialPath = '/',
     initialEntries,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    path: _path, // Not used, kept for backward compatibility
     ...renderOptions
   }: CustomRenderOptions = {}
 ) {
