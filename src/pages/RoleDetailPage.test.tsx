@@ -108,8 +108,10 @@ describe('RoleDetailPage', () => {
       expect(screen.getByRole('heading', { name: 'Field Technician' })).toBeInTheDocument();
     });
 
-    expect(screen.getByText('Handles field work and customer visits')).toBeInTheDocument();
-    expect(screen.getByText('Field Technician')).toBeInTheDocument();
+    // Description appears in multiple places (header and description list)
+    const descriptions = screen.getAllByText('Handles field work and customer visits');
+    expect(descriptions.length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Field Technician').length).toBeGreaterThan(0);
     expect(screen.getByText(/3.*capabilities/i)).toBeInTheDocument();
     expect(screen.getByText('role-123')).toBeInTheDocument();
   });
@@ -141,8 +143,9 @@ describe('RoleDetailPage', () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByText(/jan 1, 2024.*10:30 am/i)).toBeInTheDocument();
-      expect(screen.getByText(/jan 15, 2024.*02:45 pm/i)).toBeInTheDocument();
+      // Check dates are formatted with month, day, year, and time (timezone may vary)
+      expect(screen.getByText(/jan 1, 2024,.*[ap]m/i)).toBeInTheDocument();
+      expect(screen.getByText(/jan 15, 2024,.*[ap]m/i)).toBeInTheDocument();
     });
   });
 
@@ -269,14 +272,14 @@ describe('RoleDetailPage', () => {
     const deleteButton = screen.getByRole('button', { name: /^delete$/i });
     await user.click(deleteButton);
 
-    // Confirm delete
+    // Wait for alert dialog to appear
     await waitFor(() => {
-      const confirmButtons = screen.getAllByRole('button', { name: /^delete$/i });
-      expect(confirmButtons.length).toBeGreaterThan(1);
+      expect(screen.getByText(/delete field technician/i)).toBeInTheDocument();
     });
 
-    const confirmButtons = screen.getAllByRole('button', { name: /^delete$/i });
-    const confirmButton = confirmButtons[confirmButtons.length - 1];
+    // Find the confirm button within the alert dialog (last Delete button)
+    const allDeleteButtons = screen.getAllByRole('button', { name: /^delete$/i });
+    const confirmButton = allDeleteButtons[allDeleteButtons.length - 1];
     await user.click(confirmButton);
 
     await waitFor(() => {
@@ -311,7 +314,9 @@ describe('RoleDetailPage', () => {
     await user.click(cancelButton);
 
     expect(apiClient.delete).not.toHaveBeenCalled();
-    expect(screen.queryByText(/delete field technician/i)).not.toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.queryByText(/delete field technician/i)).not.toBeInTheDocument();
+    });
   });
 
   it('displays deleting state during deletion', async () => {
@@ -334,14 +339,14 @@ describe('RoleDetailPage', () => {
     const deleteButton = screen.getByRole('button', { name: /^delete$/i });
     await user.click(deleteButton);
 
-    // Confirm delete
+    // Wait for alert dialog to appear
     await waitFor(() => {
-      const confirmButtons = screen.getAllByRole('button', { name: /^delete$/i });
-      expect(confirmButtons.length).toBeGreaterThan(1);
+      expect(screen.getByText(/delete field technician/i)).toBeInTheDocument();
     });
 
-    const confirmButtons = screen.getAllByRole('button', { name: /^delete$/i });
-    const confirmButton = confirmButtons[confirmButtons.length - 1];
+    // Find the confirm button within the alert dialog (last Delete button)
+    const allDeleteButtons = screen.getAllByRole('button', { name: /^delete$/i });
+    const confirmButton = allDeleteButtons[allDeleteButtons.length - 1];
     await user.click(confirmButton);
 
     await waitFor(() => {
@@ -351,9 +356,10 @@ describe('RoleDetailPage', () => {
 
   it('displays error message when deletion fails', async () => {
     vi.mocked(apiClient.get).mockResolvedValue({ data: mockRole });
-    vi.mocked(apiClient.delete).mockRejectedValue({
-      response: { data: { message: 'Cannot delete role in use' } },
-    });
+    const error = new Error('Cannot delete role in use');
+    // @ts-expect-error - Adding response property to Error for test
+    error.response = { data: { message: 'Cannot delete role in use' } };
+    vi.mocked(apiClient.delete).mockRejectedValue(error);
     const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
     const user = userEvent.setup();
 
@@ -370,14 +376,14 @@ describe('RoleDetailPage', () => {
     const deleteButton = screen.getByRole('button', { name: /^delete$/i });
     await user.click(deleteButton);
 
-    // Confirm delete
+    // Wait for alert dialog to appear
     await waitFor(() => {
-      const confirmButtons = screen.getAllByRole('button', { name: /^delete$/i });
-      expect(confirmButtons.length).toBeGreaterThan(1);
+      expect(screen.getByText(/delete field technician/i)).toBeInTheDocument();
     });
 
-    const confirmButtons = screen.getAllByRole('button', { name: /^delete$/i });
-    const confirmButton = confirmButtons[confirmButtons.length - 1];
+    // Find the confirm button within the alert dialog (last Delete button)
+    const allDeleteButtons = screen.getAllByRole('button', { name: /^delete$/i });
+    const confirmButton = allDeleteButtons[allDeleteButtons.length - 1];
     await user.click(confirmButton);
 
     await waitFor(() => {

@@ -430,9 +430,10 @@ describe('RolesPage', () => {
 
   it('displays error message when delete fails', async () => {
     vi.mocked(apiClient.get).mockResolvedValue({ data: mockRoles });
-    vi.mocked(apiClient.delete).mockRejectedValue({
-      response: { data: { message: 'Cannot delete role in use' } },
-    });
+    const error = new Error('Cannot delete role in use');
+    // @ts-expect-error - Adding response property to Error for test
+    error.response = { data: { message: 'Cannot delete role in use' } };
+    vi.mocked(apiClient.delete).mockRejectedValue(error);
     const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
     const user = userEvent.setup();
 
@@ -493,6 +494,8 @@ describe('RolesPage', () => {
     const cancelButton = screen.getByRole('button', { name: /cancel/i });
     await user.click(cancelButton);
 
-    expect(screen.queryByText(/delete field technician/i)).not.toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.queryByText(/delete field technician/i)).not.toBeInTheDocument();
+    });
   });
 });

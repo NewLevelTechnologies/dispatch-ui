@@ -1,7 +1,7 @@
 import type { ReactElement } from 'react';
 import { render, type RenderOptions } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { BrowserRouter } from 'react-router-dom';
+import { createMemoryRouter, RouterProvider, type RouteObject } from 'react-router-dom';
 
 // Create a custom render function that includes providers
 function createTestQueryClient() {
@@ -20,23 +20,63 @@ function createTestQueryClient() {
 
 interface CustomRenderOptions extends Omit<RenderOptions, 'wrapper'> {
   queryClient?: QueryClient;
+  routes?: RouteObject[];
+  initialPath?: string;
+  // Backward compatibility
+  initialEntries?: string[];
+  path?: string;
 }
 
 export function renderWithProviders(
   ui: ReactElement,
-  { queryClient = createTestQueryClient(), ...renderOptions }: CustomRenderOptions = {}
+  {
+    queryClient = createTestQueryClient(),
+    routes,
+    initialPath = '/',
+    initialEntries,
+    path,
+    ...renderOptions
+  }: CustomRenderOptions = {}
 ) {
+  // Support both new (initialPath) and old (initialEntries) parameter styles
+  const routerInitialEntries = initialEntries || [initialPath];
+
+  // Create a memory router with custom routes or default route structure
+  const defaultRoutes: RouteObject[] = [
+    {
+      path: '/',
+      element: ui,
+    },
+    {
+      path: '/roles',
+      element: <div>Roles List</div>,
+    },
+    {
+      path: '/roles/:id',
+      element: ui, // Render the component being tested for detail routes
+    },
+    {
+      path: '*',
+      element: ui,
+    },
+  ];
+
+  const router = createMemoryRouter(routes || defaultRoutes, {
+    initialEntries: routerInitialEntries,
+  });
+
   function Wrapper({ children }: { children: React.ReactNode }) {
     return (
       <QueryClientProvider client={queryClient}>
-        <BrowserRouter>{children}</BrowserRouter>
+        {children}
       </QueryClientProvider>
     );
   }
 
   return {
-    ...render(ui, { wrapper: Wrapper, ...renderOptions }),
+    ...render(<RouterProvider router={router} />, { wrapper: Wrapper, ...renderOptions }),
     queryClient,
+    router,
   };
 }
 

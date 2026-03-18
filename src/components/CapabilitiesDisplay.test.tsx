@@ -572,8 +572,9 @@ describe('CapabilitiesDisplay', () => {
       await waitFor(() => {
         // Customers: 2/3 selected
         expect(screen.getByText(/2\/3.*capabilities/i)).toBeInTheDocument();
-        // Work Orders: 0/2 selected
-        expect(screen.getByText(/0\/2.*capabilities/i)).toBeInTheDocument();
+        // Work Orders and Users: both have 0/2 selected
+        const zeroCapabilities = screen.getAllByText(/0\/2.*capabilities/i);
+        expect(zeroCapabilities.length).toBe(2);
       });
     });
 
