@@ -24,7 +24,6 @@ interface CustomRenderOptions extends Omit<RenderOptions, 'wrapper'> {
   initialPath?: string;
   // Backward compatibility
   initialEntries?: string[];
-  path?: string;
 }
 
 export function renderWithProviders(
@@ -34,7 +33,6 @@ export function renderWithProviders(
     routes,
     initialPath = '/',
     initialEntries,
-    path,
     ...renderOptions
   }: CustomRenderOptions = {}
 ) {
@@ -49,6 +47,7 @@ export function renderWithProviders(
     },
     {
       path: '/roles',
+      // eslint-disable-next-line i18next/no-literal-string
       element: <div>Roles List</div>,
     },
     {
