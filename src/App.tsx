@@ -16,6 +16,8 @@ import RecurringOrdersPage from './pages/RecurringOrdersPage';
 import SchedulingPage from './pages/SchedulingPage';
 import UsersPage from './pages/UsersPage';
 import UserDetailPage from './pages/UserDetailPage';
+import RolesPage from './pages/RolesPage';
+import RoleDetailPage from './pages/RoleDetailPage';
 
 // ProtectedRoute component - defined outside of App to avoid recreation on every render
 const ProtectedRoute = ({ element, isAuthenticated }: { element: React.ReactElement; isAuthenticated: boolean }) => {
@@ -63,6 +65,8 @@ function App() {
       <Route path="/scheduling" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<SchedulingPage />} />} />
       <Route path="/users" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<UsersPage />} />} />
       <Route path="/users/:id" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<UserDetailPage />} />} />
+      <Route path="/roles" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<RolesPage />} />} />
+      <Route path="/roles/:id" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<RoleDetailPage />} />} />
       <Route
         path="/"
         element={
