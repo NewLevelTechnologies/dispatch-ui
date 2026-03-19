@@ -2,8 +2,8 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { EllipsisVerticalIcon, ShieldCheckIcon } from '@heroicons/react/24/outline';
-import { userApi, type Role } from '../api';
+import { EllipsisVerticalIcon, ShieldCheckIcon, ArrowPathIcon } from '@heroicons/react/24/outline';
+import { userApi, type Role, type RestoreAllDefaultsResponse } from '../api';
 import AppLayout from '../components/AppLayout';
 import RoleFormDialog from '../components/RoleFormDialog';
 import { Heading } from '../components/catalyst/heading';
@@ -21,6 +21,7 @@ export default function RolesPage() {
   const [selectedRole, setSelectedRole] = useState<Role | null>(null);
   const [isDeleteAlertOpen, setIsDeleteAlertOpen] = useState(false);
   const [roleToDelete, setRoleToDelete] = useState<Role | null>(null);
+  const [isRestoreAllAlertOpen, setIsRestoreAllAlertOpen] = useState(false);
 
   const { data: roles, isLoading, error } = useQuery({
     queryKey: ['roles'],
@@ -39,6 +40,45 @@ export default function RolesPage() {
         ? ((error as { response?: { data?: { message?: string } } }).response?.data?.message)
         : undefined;
       alert(errorMessage || 'Failed to delete role');
+    },
+  });
+
+  const restoreAllMutation = useMutation({
+    mutationFn: () => userApi.restoreAllDefaults(),
+    onSuccess: (result: RestoreAllDefaultsResponse) => {
+      queryClient.invalidateQueries({ queryKey: ['roles'] });
+      setIsRestoreAllAlertOpen(false);
+
+      const restoredCount = result.restoredRoles.length;
+      const recreatedCount = result.recreatedRoles.length;
+      const preservedCount = result.preservedCustomRoles.length;
+
+      const messages: string[] = [];
+      if (restoredCount > 0) {
+        messages.push(t('roles.restoreAllSummary.rolesReset', { count: restoredCount }));
+      }
+      if (recreatedCount > 0) {
+        messages.push(t('roles.restoreAllSummary.rolesRecreated', { count: recreatedCount }));
+      }
+      if (preservedCount > 0) {
+        messages.push(t('roles.restoreAllSummary.customRolesPreserved', { count: preservedCount }));
+      }
+
+      const summary = [
+        t('roles.actions.restoreAllDefaultsSuccess'),
+        '',
+        ...messages,
+        '',
+        t('roles.restoreAllSummary.userAssignmentsPreserved')
+      ].join('\n');
+
+      alert(summary);
+    },
+    onError: (error: unknown) => {
+      const errorMessage = error instanceof Error && 'response' in error
+        ? ((error as { response?: { data?: { message?: string } } }).response?.data?.message)
+        : undefined;
+      alert(errorMessage || t('roles.actions.errorRestoreAll'));
     },
   });
 
@@ -61,6 +101,14 @@ export default function RolesPage() {
     if (roleToDelete) {
       deleteMutation.mutate(roleToDelete.id);
     }
+  };
+
+  const handleRestoreAllDefaults = () => {
+    setIsRestoreAllAlertOpen(true);
+  };
+
+  const confirmRestoreAll = () => {
+    restoreAllMutation.mutate();
   };
 
   const handleCloseDialog = () => {
@@ -86,10 +134,16 @@ export default function RolesPage() {
             {t('roles.description')}
           </p>
         </div>
-        <Button onClick={handleAdd}>
-          <ShieldCheckIcon className="size-4" />
-          {t('common.actions.add', { entity: t('entities.role') })}
-        </Button>
+        <div className="flex gap-2">
+          <Button plain onClick={handleRestoreAllDefaults}>
+            <ArrowPathIcon className="size-4" />
+            {t('roles.actions.restoreAllDefaults')}
+          </Button>
+          <Button onClick={handleAdd}>
+            <ShieldCheckIcon className="size-4" />
+            {t('common.actions.add', { entity: t('entities.role') })}
+          </Button>
+        </div>
       </div>
 
       {isLoading && (
@@ -208,6 +262,29 @@ export default function RolesPage() {
           </Button>
           <Button color="red" onClick={confirmDelete} disabled={deleteMutation.isPending}>
             {deleteMutation.isPending ? t('common.deleting') : t('common.delete')}
+          </Button>
+        </AlertActions>
+      </Alert>
+
+      <Alert open={isRestoreAllAlertOpen} onClose={() => setIsRestoreAllAlertOpen(false)}>
+        <AlertTitle>
+          {t('roles.actions.restoreAllDefaultsConfirm')}
+        </AlertTitle>
+        <AlertDescription>
+          {t('roles.actions.restoreAllDefaultsDescription', {
+            count: 6
+          })}
+          {' '}
+          {t('roles.actions.restoreAllDefaultsDetails')}
+          {' '}
+          {t('roles.actions.restoreAllDefaultsWarning')}
+        </AlertDescription>
+        <AlertActions>
+          <Button plain onClick={() => setIsRestoreAllAlertOpen(false)}>
+            {t('common.cancel')}
+          </Button>
+          <Button onClick={confirmRestoreAll} disabled={restoreAllMutation.isPending}>
+            {restoreAllMutation.isPending ? t('common.restoring') : t('roles.actions.restoreAllDefaults')}
           </Button>
         </AlertActions>
       </Alert>

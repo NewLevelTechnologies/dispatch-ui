@@ -276,7 +276,14 @@
       "cloneDescription": "Create a copy of \"{{name}}\" with all its capabilities.",
       "deleteWarning": "This action cannot be undone. Users assigned this role will lose associated capabilities.",
       "errorClone": "Failed to clone role",
+      "errorRestoreAll": "Failed to restore default roles",
       "restore": "Restore",
+      "restoreAllDefaults": "Restore All Defaults",
+      "restoreAllDefaultsConfirm": "Restore All Default Roles?",
+      "restoreAllDefaultsDescription": "This will reset all {{count}} default system roles to their original state.",
+      "restoreAllDefaultsDetails": "What will happen: Modified system roles will be reset (names and capabilities). Deleted system roles will be recreated. Custom roles you've created will be preserved. User assignments will be preserved.",
+      "restoreAllDefaultsSuccess": "Default roles restored successfully",
+      "restoreAllDefaultsWarning": "⚠️ Any changes you've made to default roles will be lost",
       "restoreDefaults": "Restore Defaults",
       "restoreDefaultsConfirm": "Restore \"{{name}}\" to default capabilities?",
       "restoreDefaultsWarning": "This will reset all capabilities to the system template defaults. Custom changes will be lost."
@@ -298,6 +305,15 @@
     "table": {
       "capabilities": "Capabilities",
       "lastUpdated": "Last Updated"
+    },
+    "restoreAllSummary": {
+      "customRolesPreserved": "{{count}} custom role preserved",
+      "customRolesPreserved_other": "{{count}} custom roles preserved",
+      "rolesRecreated": "{{count}} role recreated",
+      "rolesRecreated_other": "{{count}} roles recreated",
+      "rolesReset": "{{count}} role reset to defaults",
+      "rolesReset_other": "{{count}} roles reset to defaults",
+      "userAssignmentsPreserved": "All user assignments have been preserved."
     }
   },
   "scheduling": {
