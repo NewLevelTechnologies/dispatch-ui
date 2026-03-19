@@ -30,10 +30,6 @@ export default defineConfig({
         'src/pages/InvoicesPage.tsx',
         'src/pages/QuotesPage.tsx',
         'src/pages/PaymentsPage.tsx',
-        // Exclude user management pages (complex forms, will be tested separately)
-        'src/pages/UsersPage.tsx',
-        'src/pages/UserDetailPage.tsx',
-        'src/components/UserFormDialog.tsx',
         // Exclude infrastructure files
         'src/App.tsx',
         'src/components/AppLayout.tsx',

@@ -27,12 +27,17 @@ import { Navbar, NavbarItem, NavbarSection, NavbarSpacer } from './catalyst/navb
 import { Dropdown, DropdownButton, DropdownItem, DropdownLabel, DropdownMenu } from './catalyst/dropdown';
 import { Avatar } from './catalyst/avatar';
 import { useTheme } from '../contexts/ThemeContext';
+import { useHasAnyCapability } from '../hooks/useCurrentUser';
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, signOut } = useAuthenticator((context) => [context.user]);
   const location = useLocation();
   const { t } = useTranslation();
   const { theme, setTheme } = useTheme();
+
+  // Permission checks for navigation visibility
+  const canViewUsers = useHasAnyCapability('VIEW_USERS');
+  const canViewRoles = useHasAnyCapability('VIEW_ROLES');
 
   const mainNavigation = [
     { name: t('entities.dashboard'), href: '/dashboard', icon: HomeIcon },
@@ -59,10 +64,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   ];
 
   const adminNavigation = [
-    // TODO: Add capability check - only show if user has VIEW_USERS capability
-    { name: t('entities.users'), href: '/users', icon: ShieldCheckIcon },
-    // TODO: Add capability check - only show if user has VIEW_ROLES capability
-    { name: t('entities.roles'), href: '/roles', icon: KeyIcon },
+    ...(canViewUsers ? [{ name: t('entities.users'), href: '/users', icon: ShieldCheckIcon }] : []),
+    ...(canViewRoles ? [{ name: t('entities.roles'), href: '/roles', icon: KeyIcon }] : []),
   ];
 
   return (
@@ -145,18 +148,20 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               ))}
             </SidebarSection>
 
-            <SidebarSection className="max-lg:hidden">
-              {adminNavigation.map((item) => (
-                <SidebarItem
-                  key={item.name}
-                  href={item.href}
-                  current={location.pathname === item.href}
-                >
-                  <item.icon className="h-5 w-5" />
-                  <span>{item.name}</span>
-                </SidebarItem>
-              ))}
-            </SidebarSection>
+            {adminNavigation.length > 0 && (
+              <SidebarSection className="max-lg:hidden">
+                {adminNavigation.map((item) => (
+                  <SidebarItem
+                    key={item.name}
+                    href={item.href}
+                    current={location.pathname === item.href}
+                  >
+                    <item.icon className="h-5 w-5" />
+                    <span>{item.name}</span>
+                  </SidebarItem>
+                ))}
+              </SidebarSection>
+            )}
           </SidebarBody>
 
           <SidebarFooter>

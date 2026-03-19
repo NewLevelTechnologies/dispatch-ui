@@ -88,6 +88,11 @@ export interface RestoreAllDefaultsResponse {
 }
 
 export const userApi = {
+  getCurrentUser: async (): Promise<User> => {
+    const response = await apiClient.get<User>('/users/me');
+    return response.data;
+  },
+
   getAll: async (): Promise<User[]> => {
     const response = await apiClient.get<User[]>('/users');
     return response.data;
