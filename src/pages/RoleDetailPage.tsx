@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { ArrowLeftIcon } from '@heroicons/react/24/outline';
 import { userApi } from '../api';
+import { useHasCapability } from '../hooks/useCurrentUser';
 import AppLayout from '../components/AppLayout';
 import RoleFormDialog from '../components/RoleFormDialog';
 import CloneRoleDialog from '../components/CloneRoleDialog';
@@ -23,6 +24,11 @@ export default function RoleDetailPage() {
   const [isCloneDialogOpen, setIsCloneDialogOpen] = useState(false);
   const [isDeleteAlertOpen, setIsDeleteAlertOpen] = useState(false);
   const [isRestoreAlertOpen, setIsRestoreAlertOpen] = useState(false);
+
+  // Permission checks
+  const canCreateRoles = useHasCapability('CREATE_ROLES');
+  const canEditRoles = useHasCapability('EDIT_ROLES');
+  const canDeleteRoles = useHasCapability('DELETE_ROLES');
 
   const { data: role, isLoading, error } = useQuery({
     queryKey: ['roles', id],
@@ -150,26 +156,30 @@ export default function RoleDetailPage() {
               {role.description || 'No description provided'}
             </p>
           </div>
-          <div className="flex gap-2">
-            {!role.isProtected && (
-              <Button color="zinc" onClick={handleEdit}>
-                {t('common.edit')}
-              </Button>
-            )}
-            <Button color="zinc" onClick={handleClone}>
-              {t('roles.actions.clone')}
-            </Button>
-            {role.isSystemRole && (
-              <Button color="zinc" onClick={handleRestoreDefaults}>
-                {t('roles.actions.restoreDefaults')}
-              </Button>
-            )}
-            {!role.isProtected && (
-              <Button color="red" onClick={handleDelete}>
-                {t('common.delete')}
-              </Button>
-            )}
-          </div>
+          {(canEditRoles || canCreateRoles || canDeleteRoles) && (
+            <div className="flex gap-2">
+              {canEditRoles && !role.isProtected && (
+                <Button color="zinc" onClick={handleEdit}>
+                  {t('common.edit')}
+                </Button>
+              )}
+              {canCreateRoles && (
+                <Button color="zinc" onClick={handleClone}>
+                  {t('roles.actions.clone')}
+                </Button>
+              )}
+              {canEditRoles && role.isSystemRole && (
+                <Button color="zinc" onClick={handleRestoreDefaults}>
+                  {t('roles.actions.restoreDefaults')}
+                </Button>
+              )}
+              {canDeleteRoles && !role.isProtected && (
+                <Button color="red" onClick={handleDelete}>
+                  {t('common.delete')}
+                </Button>
+              )}
+            </div>
+          )}
         </div>
 
         <Divider className="my-8" />

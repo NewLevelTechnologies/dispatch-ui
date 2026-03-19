@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { EllipsisVerticalIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import { userApi, type User } from '../api';
+import { useHasCapability } from '../hooks/useCurrentUser';
 import AppLayout from '../components/AppLayout';
 import UserFormDialog from '../components/UserFormDialog';
 import { Heading } from '../components/catalyst/heading';
@@ -25,6 +26,11 @@ export default function UsersPage() {
   const [statusFilter, setStatusFilter] = useState('');
   const [isDeleteAlertOpen, setIsDeleteAlertOpen] = useState(false);
   const [userToDelete, setUserToDelete] = useState<User | null>(null);
+
+  // Permission checks
+  const canInviteUsers = useHasCapability('INVITE_USERS');
+  const canEditUsers = useHasCapability('EDIT_USERS');
+  const canDeleteUsers = useHasCapability('DELETE_USERS');
 
   const { data: users, isLoading, error } = useQuery({
     queryKey: ['users'],
@@ -150,7 +156,9 @@ export default function UsersPage() {
             {t('users.description')}
           </p>
         </div>
-        <Button onClick={handleAdd}>{t('common.actions.add', { entity: t('entities.user') })}</Button>
+        {canInviteUsers && (
+          <Button onClick={handleAdd}>{t('common.actions.add', { entity: t('entities.user') })}</Button>
+        )}
       </div>
 
       {/* Search Bar and Filters */}
@@ -232,9 +240,11 @@ export default function UsersPage() {
       {users && users.length === 0 && (
         <div className="mt-8 text-center">
           <p className="text-zinc-600 dark:text-zinc-400">{t('common.actions.notFound', { entities: t('entities.users') })}</p>
-          <Button className="mt-4" onClick={handleAdd}>
-            {t('common.actions.addFirst', { entity: t('entities.user') })}
-          </Button>
+          {canInviteUsers && (
+            <Button className="mt-4" onClick={handleAdd}>
+              {t('common.actions.addFirst', { entity: t('entities.user') })}
+            </Button>
+          )}
         </div>
       )}
 
@@ -289,30 +299,38 @@ export default function UsersPage() {
                   </TableCell>
                   <TableCell className="text-zinc-500">{formatDate(user.updatedAt)}</TableCell>
                   <TableCell>
-                    <div className="-mx-3 -my-1.5 sm:-mx-2.5" onClick={(e) => e.stopPropagation()}>
-                      <Dropdown>
-                        <DropdownButton plain aria-label={t('common.moreOptions')}>
-                          <EllipsisVerticalIcon className="size-5" />
-                        </DropdownButton>
-                        <DropdownMenu anchor="bottom end">
-                          <DropdownItem onClick={() => handleEdit(user)}>
-                            <DropdownLabel>{t('common.edit')}</DropdownLabel>
-                          </DropdownItem>
-                          {user.enabled ? (
-                            <DropdownItem onClick={() => handleDisable(user)}>
-                              <DropdownLabel>{t('users.table.disable')}</DropdownLabel>
-                            </DropdownItem>
-                          ) : (
-                            <DropdownItem onClick={() => handleEnable(user)}>
-                              <DropdownLabel>{t('users.table.enable')}</DropdownLabel>
-                            </DropdownItem>
-                          )}
-                          <DropdownItem onClick={() => handleDelete(user)}>
-                            <DropdownLabel>{t('common.delete')}</DropdownLabel>
-                          </DropdownItem>
-                        </DropdownMenu>
-                      </Dropdown>
-                    </div>
+                    {(canEditUsers || canDeleteUsers) && (
+                      <div className="-mx-3 -my-1.5 sm:-mx-2.5" onClick={(e) => e.stopPropagation()}>
+                        <Dropdown>
+                          <DropdownButton plain aria-label={t('common.moreOptions')}>
+                            <EllipsisVerticalIcon className="size-5" />
+                          </DropdownButton>
+                          <DropdownMenu anchor="bottom end">
+                            {canEditUsers && (
+                              <>
+                                <DropdownItem onClick={() => handleEdit(user)}>
+                                  <DropdownLabel>{t('common.edit')}</DropdownLabel>
+                                </DropdownItem>
+                                {user.enabled ? (
+                                  <DropdownItem onClick={() => handleDisable(user)}>
+                                    <DropdownLabel>{t('users.table.disable')}</DropdownLabel>
+                                  </DropdownItem>
+                                ) : (
+                                  <DropdownItem onClick={() => handleEnable(user)}>
+                                    <DropdownLabel>{t('users.table.enable')}</DropdownLabel>
+                                  </DropdownItem>
+                                )}
+                              </>
+                            )}
+                            {canDeleteUsers && (
+                              <DropdownItem onClick={() => handleDelete(user)}>
+                                <DropdownLabel>{t('common.delete')}</DropdownLabel>
+                              </DropdownItem>
+                            )}
+                          </DropdownMenu>
+                        </Dropdown>
+                      </div>
+                    )}
                   </TableCell>
                 </TableRow>
               ))}

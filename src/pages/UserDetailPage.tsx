@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { ArrowLeftIcon } from '@heroicons/react/24/outline';
 import { userApi } from '../api';
+import { useHasCapability } from '../hooks/useCurrentUser';
 import AppLayout from '../components/AppLayout';
 import UserFormDialog from '../components/UserFormDialog';
 import CapabilitiesSection from '../components/CapabilitiesSection';
@@ -19,6 +20,9 @@ export default function UserDetailPage() {
   const queryClient = useQueryClient();
   const { t } = useTranslation();
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+
+  // Permission checks
+  const canEditUsers = useHasCapability('EDIT_USERS');
 
   const { data: user, isLoading, error } = useQuery({
     queryKey: ['users', id],
@@ -133,20 +137,22 @@ export default function UserDetailPage() {
               {user.email}
             </p>
           </div>
-          <div className="flex gap-2">
-            <Button color="zinc" onClick={handleEdit}>
-              {t('common.edit')}
-            </Button>
-            {user.enabled ? (
-              <Button color="zinc" onClick={handleDisable}>
-                {t('users.table.disable')}
+          {canEditUsers && (
+            <div className="flex gap-2">
+              <Button color="zinc" onClick={handleEdit}>
+                {t('common.edit')}
               </Button>
-            ) : (
-              <Button onClick={handleEnable}>
-                {t('users.table.enable')}
-              </Button>
-            )}
-          </div>
+              {user.enabled ? (
+                <Button color="zinc" onClick={handleDisable}>
+                  {t('users.table.disable')}
+                </Button>
+              ) : (
+                <Button onClick={handleEnable}>
+                  {t('users.table.enable')}
+                </Button>
+              )}
+            </div>
+          )}
         </div>
 
         <Divider className="my-8" />

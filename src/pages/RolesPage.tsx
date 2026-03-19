@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { EllipsisVerticalIcon, ShieldCheckIcon, ArrowPathIcon } from '@heroicons/react/24/outline';
 import { userApi, type Role, type RestoreAllDefaultsResponse } from '../api';
+import { useHasCapability } from '../hooks/useCurrentUser';
 import AppLayout from '../components/AppLayout';
 import RoleFormDialog from '../components/RoleFormDialog';
 import { Heading } from '../components/catalyst/heading';
@@ -22,6 +23,11 @@ export default function RolesPage() {
   const [isDeleteAlertOpen, setIsDeleteAlertOpen] = useState(false);
   const [roleToDelete, setRoleToDelete] = useState<Role | null>(null);
   const [isRestoreAllAlertOpen, setIsRestoreAllAlertOpen] = useState(false);
+
+  // Permission checks
+  const canCreateRoles = useHasCapability('CREATE_ROLES');
+  const canEditRoles = useHasCapability('EDIT_ROLES');
+  const canDeleteRoles = useHasCapability('DELETE_ROLES');
 
   const { data: roles, isLoading, error } = useQuery({
     queryKey: ['roles'],
@@ -134,16 +140,22 @@ export default function RolesPage() {
             {t('roles.description')}
           </p>
         </div>
-        <div className="flex gap-2">
-          <Button plain onClick={handleRestoreAllDefaults}>
-            <ArrowPathIcon className="size-4" />
-            {t('roles.actions.restoreAllDefaults')}
-          </Button>
-          <Button onClick={handleAdd}>
-            <ShieldCheckIcon className="size-4" />
-            {t('common.actions.add', { entity: t('entities.role') })}
-          </Button>
-        </div>
+        {(canCreateRoles || canEditRoles) && (
+          <div className="flex gap-2">
+            {canEditRoles && (
+              <Button plain onClick={handleRestoreAllDefaults}>
+                <ArrowPathIcon className="size-4" />
+                {t('roles.actions.restoreAllDefaults')}
+              </Button>
+            )}
+            {canCreateRoles && (
+              <Button onClick={handleAdd}>
+                <ShieldCheckIcon className="size-4" />
+                {t('common.actions.add', { entity: t('entities.role') })}
+              </Button>
+            )}
+          </div>
+        )}
       </div>
 
       {isLoading && (
@@ -167,9 +179,11 @@ export default function RolesPage() {
           <p className="text-zinc-600 dark:text-zinc-400">
             {t('common.actions.notFound', { entities: t('entities.roles') })}
           </p>
-          <Button className="mt-4" onClick={handleAdd}>
-            {t('common.actions.addFirst', { entity: t('entities.role') })}
-          </Button>
+          {canCreateRoles && (
+            <Button className="mt-4" onClick={handleAdd}>
+              {t('common.actions.addFirst', { entity: t('entities.role') })}
+            </Button>
+          )}
         </div>
       )}
 
@@ -219,7 +233,7 @@ export default function RolesPage() {
                           <EllipsisVerticalIcon className="size-5" />
                         </DropdownButton>
                         <DropdownMenu anchor="bottom end">
-                          {!role.isProtected && (
+                          {canEditRoles && !role.isProtected && (
                             <DropdownItem onClick={() => handleEdit(role)}>
                               <DropdownLabel>{t('common.edit')}</DropdownLabel>
                             </DropdownItem>
@@ -227,7 +241,7 @@ export default function RolesPage() {
                           <DropdownItem onClick={() => navigate(`/roles/${role.id}`)}>
                             <DropdownLabel>{t('common.view')}</DropdownLabel>
                           </DropdownItem>
-                          {!role.isProtected && (
+                          {canDeleteRoles && !role.isProtected && (
                             <DropdownItem onClick={() => handleDelete(role)}>
                               <DropdownLabel>{t('common.delete')}</DropdownLabel>
                             </DropdownItem>

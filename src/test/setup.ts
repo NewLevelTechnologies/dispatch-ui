@@ -327,3 +327,68 @@ vi.mock('../contexts/ThemeContext', () => ({
   })),
   ThemeProvider: ({ children }: { children: React.ReactNode }) => children,
 }));
+
+// Mock useCurrentUser hook
+vi.mock('../hooks/useCurrentUser', () => ({
+  useCurrentUser: vi.fn(() => ({
+    data: {
+      id: 'test-user-id',
+      email: 'test@example.com',
+      firstName: 'Test',
+      lastName: 'User',
+      enabled: true,
+      capabilities: [
+        'VIEW_USERS',
+        'INVITE_USERS',
+        'EDIT_USERS',
+        'DELETE_USERS',
+        'VIEW_ROLES',
+        'CREATE_ROLES',
+        'EDIT_ROLES',
+        'DELETE_ROLES',
+      ],
+      roles: [],
+    },
+    isLoading: false,
+    error: null,
+  })),
+  useHasCapability: vi.fn((capability: string) => {
+    const capabilities = [
+      'VIEW_USERS',
+      'INVITE_USERS',
+      'EDIT_USERS',
+      'DELETE_USERS',
+      'VIEW_ROLES',
+      'CREATE_ROLES',
+      'EDIT_ROLES',
+      'DELETE_ROLES',
+    ];
+    return capabilities.includes(capability);
+  }),
+  useHasAnyCapability: vi.fn((...capabilities: string[]) => {
+    const mockCapabilities = [
+      'VIEW_USERS',
+      'INVITE_USERS',
+      'EDIT_USERS',
+      'DELETE_USERS',
+      'VIEW_ROLES',
+      'CREATE_ROLES',
+      'EDIT_ROLES',
+      'DELETE_ROLES',
+    ];
+    return capabilities.some(cap => mockCapabilities.includes(cap));
+  }),
+  useHasAllCapabilities: vi.fn((...capabilities: string[]) => {
+    const mockCapabilities = [
+      'VIEW_USERS',
+      'INVITE_USERS',
+      'EDIT_USERS',
+      'DELETE_USERS',
+      'VIEW_ROLES',
+      'CREATE_ROLES',
+      'EDIT_ROLES',
+      'DELETE_ROLES',
+    ];
+    return capabilities.every(cap => mockCapabilities.includes(cap));
+  }),
+}));
