@@ -81,6 +81,12 @@ export interface UpdateRoleCapabilitiesRequest {
   capabilities: string[];
 }
 
+export interface RestoreAllDefaultsResponse {
+  restoredRoles: Role[];
+  recreatedRoles: Role[];
+  preservedCustomRoles: Role[];
+}
+
 export const userApi = {
   getAll: async (): Promise<User[]> => {
     const response = await apiClient.get<User[]>('/users');
@@ -163,6 +169,11 @@ export const userApi = {
 
   restoreRoleDefaults: async (id: string): Promise<Role> => {
     const response = await apiClient.post<Role>(`/users/roles/${id}/restore-defaults`);
+    return response.data;
+  },
+
+  restoreAllDefaults: async (): Promise<RestoreAllDefaultsResponse> => {
+    const response = await apiClient.post<RestoreAllDefaultsResponse>('/users/roles/restore-all-defaults');
     return response.data;
   },
 };

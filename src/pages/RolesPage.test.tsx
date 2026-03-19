@@ -579,4 +579,257 @@ describe('RolesPage', () => {
     expect(screen.getByRole('menuitem', { name: /edit/i })).toBeInTheDocument();
     expect(screen.getByRole('menuitem', { name: /delete/i })).toBeInTheDocument();
   });
+
+  describe('Restore All Defaults', () => {
+    it('renders the restore all defaults button', () => {
+      vi.mocked(apiClient.get).mockResolvedValue({ data: [] });
+
+      renderWithProviders(<RolesPage />);
+
+      expect(screen.getByRole('button', { name: /restore all defaults/i })).toBeInTheDocument();
+    });
+
+    it('opens confirmation dialog when restore all defaults button is clicked', async () => {
+      vi.mocked(apiClient.get).mockResolvedValue({ data: mockRoles });
+      const user = userEvent.setup();
+
+      renderWithProviders(<RolesPage />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Field Technician')).toBeInTheDocument();
+      });
+
+      const restoreButton = screen.getByRole('button', { name: /restore all defaults/i });
+      await user.click(restoreButton);
+
+      await waitFor(() => {
+        expect(screen.getByText('Restore All Default Roles?')).toBeInTheDocument();
+      });
+
+      expect(screen.getByText(/reset all.*default system roles/i)).toBeInTheDocument();
+      expect(screen.getByText(/modified system roles will be reset/i)).toBeInTheDocument();
+      expect(screen.getByText(/deleted system roles will be recreated/i)).toBeInTheDocument();
+      expect(screen.getByText(/custom roles.*will be preserved/i)).toBeInTheDocument();
+    });
+
+    it('closes confirmation dialog when cancel button is clicked', async () => {
+      vi.mocked(apiClient.get).mockResolvedValue({ data: mockRoles });
+      const user = userEvent.setup();
+
+      renderWithProviders(<RolesPage />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Field Technician')).toBeInTheDocument();
+      });
+
+      const restoreButton = screen.getByRole('button', { name: /restore all defaults/i });
+      await user.click(restoreButton);
+
+      await waitFor(() => {
+        expect(screen.getByText('Restore All Default Roles?')).toBeInTheDocument();
+      });
+
+      const cancelButton = screen.getAllByRole('button', { name: /cancel/i })[0];
+      await user.click(cancelButton);
+
+      await waitFor(() => {
+        expect(screen.queryByText('Restore All Default Roles?')).not.toBeInTheDocument();
+      });
+    });
+
+    it('calls restore all defaults API when confirmed', async () => {
+      vi.mocked(apiClient.get).mockResolvedValue({ data: mockRoles });
+      const mockRestoreResponse = {
+        restoredRoles: [mockRoles[0]],
+        recreatedRoles: [],
+        preservedCustomRoles: [mockRoles[1]],
+      };
+      vi.mocked(apiClient.post).mockResolvedValue({ data: mockRestoreResponse });
+      const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
+      const user = userEvent.setup();
+
+      renderWithProviders(<RolesPage />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Field Technician')).toBeInTheDocument();
+      });
+
+      const restoreButtons = screen.getAllByRole('button', { name: /restore all defaults/i });
+      await user.click(restoreButtons[0]);
+
+      await waitFor(() => {
+        expect(screen.getByText('Restore All Default Roles?')).toBeInTheDocument();
+      });
+
+      const confirmButtons = screen.getAllByRole('button', { name: /restore all defaults/i });
+      const confirmButton = confirmButtons[confirmButtons.length - 1];
+      await user.click(confirmButton);
+
+      await waitFor(() => {
+        expect(apiClient.post).toHaveBeenCalledWith('/users/roles/restore-all-defaults');
+      });
+
+      alertSpy.mockRestore();
+    });
+
+    it('displays success message with summary after successful restore', async () => {
+      vi.mocked(apiClient.get).mockResolvedValue({ data: mockRoles });
+      const mockRestoreResponse = {
+        restoredRoles: [mockRoles[0], mockRoles[2]],
+        recreatedRoles: [{ ...mockRoles[0], id: '4', name: 'Dispatcher' }],
+        preservedCustomRoles: [mockRoles[1]],
+      };
+      vi.mocked(apiClient.post).mockResolvedValue({ data: mockRestoreResponse });
+      const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
+      const user = userEvent.setup();
+
+      renderWithProviders(<RolesPage />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Field Technician')).toBeInTheDocument();
+      });
+
+      const restoreButtons = screen.getAllByRole('button', { name: /restore all defaults/i });
+      await user.click(restoreButtons[0]);
+
+      await waitFor(() => {
+        expect(screen.getByText('Restore All Default Roles?')).toBeInTheDocument();
+      });
+
+      const confirmButtons = screen.getAllByRole('button', { name: /restore all defaults/i });
+      const confirmButton = confirmButtons[confirmButtons.length - 1];
+      await user.click(confirmButton);
+
+      await waitFor(() => {
+        expect(alertSpy).toHaveBeenCalled();
+      });
+
+      const alertMessage = alertSpy.mock.calls[0][0] as string;
+      expect(alertMessage).toContain('Default roles restored successfully');
+      expect(alertMessage).toContain('2 role reset to defaults');
+      expect(alertMessage).toContain('1 role recreated');
+      expect(alertMessage).toContain('1 custom role preserved');
+      expect(alertMessage).toContain('All user assignments have been preserved');
+
+      alertSpy.mockRestore();
+    });
+
+    it('displays error message when restore fails', async () => {
+      vi.mocked(apiClient.get).mockResolvedValue({ data: mockRoles });
+      const error = new Error('Restore failed');
+      // @ts-expect-error - Adding response property to Error for test
+      error.response = { data: { message: 'Insufficient permissions' } };
+      vi.mocked(apiClient.post).mockRejectedValue(error);
+      const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
+      const user = userEvent.setup();
+
+      renderWithProviders(<RolesPage />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Field Technician')).toBeInTheDocument();
+      });
+
+      const restoreButtons = screen.getAllByRole('button', { name: /restore all defaults/i });
+      await user.click(restoreButtons[0]);
+
+      await waitFor(() => {
+        expect(screen.getByText('Restore All Default Roles?')).toBeInTheDocument();
+      });
+
+      const confirmButtons = screen.getAllByRole('button', { name: /restore all defaults/i });
+      const confirmButton = confirmButtons[confirmButtons.length - 1];
+      await user.click(confirmButton);
+
+      await waitFor(() => {
+        expect(alertSpy).toHaveBeenCalledWith('Insufficient permissions');
+      });
+
+      alertSpy.mockRestore();
+    });
+
+    it('displays restoring state during restore operation', async () => {
+      vi.mocked(apiClient.get).mockResolvedValue({ data: mockRoles });
+      vi.mocked(apiClient.post).mockImplementation(
+        () => new Promise(() => {}) // Never resolves
+      );
+      const user = userEvent.setup();
+
+      renderWithProviders(<RolesPage />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Field Technician')).toBeInTheDocument();
+      });
+
+      const restoreButtons = screen.getAllByRole('button', { name: /restore all defaults/i });
+      await user.click(restoreButtons[0]);
+
+      await waitFor(() => {
+        expect(screen.getByText('Restore All Default Roles?')).toBeInTheDocument();
+      });
+
+      const confirmButtons = screen.getAllByRole('button', { name: /restore all defaults/i });
+      const confirmButton = confirmButtons[confirmButtons.length - 1];
+      await user.click(confirmButton);
+
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: /restoring/i })).toBeInTheDocument();
+      });
+
+      expect(screen.getByRole('button', { name: /restoring/i })).toBeDisabled();
+    });
+
+    it('closes confirmation dialog after successful restore', async () => {
+      vi.mocked(apiClient.get).mockResolvedValue({ data: mockRoles });
+      const mockRestoreResponse = {
+        restoredRoles: [mockRoles[0]],
+        recreatedRoles: [],
+        preservedCustomRoles: [mockRoles[1]],
+      };
+      vi.mocked(apiClient.post).mockResolvedValue({ data: mockRestoreResponse });
+      vi.spyOn(window, 'alert').mockImplementation(() => {});
+      const user = userEvent.setup();
+
+      renderWithProviders(<RolesPage />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Field Technician')).toBeInTheDocument();
+      });
+
+      const restoreButtons = screen.getAllByRole('button', { name: /restore all defaults/i });
+      await user.click(restoreButtons[0]);
+
+      await waitFor(() => {
+        expect(screen.getByText('Restore All Default Roles?')).toBeInTheDocument();
+      });
+
+      const confirmButtons = screen.getAllByRole('button', { name: /restore all defaults/i });
+      const confirmButton = confirmButtons[confirmButtons.length - 1];
+      await user.click(confirmButton);
+
+      await waitFor(() => {
+        expect(screen.queryByText('Restore All Default Roles?')).not.toBeInTheDocument();
+      });
+    });
+
+    it('shows system role count in confirmation dialog', async () => {
+      vi.mocked(apiClient.get).mockResolvedValue({ data: mockRoles });
+      const user = userEvent.setup();
+
+      renderWithProviders(<RolesPage />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Field Technician')).toBeInTheDocument();
+      });
+
+      const restoreButton = screen.getByRole('button', { name: /restore all defaults/i });
+      await user.click(restoreButton);
+
+      await waitFor(() => {
+        expect(screen.getByText('Restore All Default Roles?')).toBeInTheDocument();
+      });
+
+      // Should show count of system roles (2 in mockRoles)
+      expect(screen.getByText(/reset all 2 default system roles/i)).toBeInTheDocument();
+    });
+  });
 });

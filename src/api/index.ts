@@ -17,7 +17,8 @@ export {
   type UpdateUserRolesRequest,
   type UpdateUserEnabledRequest,
   type CreateRoleRequest,
-  type UpdateRoleRequest
+  type UpdateRoleRequest,
+  type RestoreAllDefaultsResponse
 } from './userApi';
 
 // Work Order API
