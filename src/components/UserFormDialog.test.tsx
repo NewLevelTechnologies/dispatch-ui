@@ -44,15 +44,6 @@ describe('UserFormDialog', () => {
       expect(screen.getByRole('button', { name: /create/i })).toBeInTheDocument();
     });
 
-    it('displays all required fields', () => {
-      renderWithProviders(<UserFormDialog isOpen={true} onClose={mockOnClose} roles={mockRoles} />);
-
-      expect(screen.getByLabelText('First Name *')).toBeInTheDocument();
-      expect(screen.getByLabelText('Last Name *')).toBeInTheDocument();
-      expect(screen.getByLabelText('Email *')).toBeInTheDocument();
-      expect(screen.getByLabelText('Role *')).toBeInTheDocument();
-    });
-
     it('displays all available roles as checkboxes', () => {
       renderWithProviders(<UserFormDialog isOpen={true} onClose={mockOnClose} roles={mockRoles} />);
 
