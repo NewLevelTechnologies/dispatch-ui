@@ -20,6 +20,8 @@ export interface Role {
   name: string;
   description?: string;
   capabilities?: string[];
+  isProtected?: boolean;
+  isSystemRole?: boolean;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -70,9 +72,12 @@ export interface CreateRoleRequest {
 }
 
 export interface UpdateRoleRequest {
-  name?: string;
+  name: string;
   description?: string;
-  capabilities?: string[];
+}
+
+export interface UpdateRoleCapabilitiesRequest {
+  capabilities: string[];
 }
 
 export const userApi = {
@@ -141,8 +146,23 @@ export const userApi = {
     return response.data;
   },
 
+  updateRoleCapabilities: async (id: string, request: UpdateRoleCapabilitiesRequest): Promise<Role> => {
+    const response = await apiClient.put<Role>(`/users/roles/${id}/capabilities`, request);
+    return response.data;
+  },
+
   deleteRole: async (id: string): Promise<void> => {
     await apiClient.delete(`/users/roles/${id}`);
+  },
+
+  cloneRole: async (id: string, request: { name: string; description?: string }): Promise<Role> => {
+    const response = await apiClient.post<Role>(`/users/roles/${id}/clone`, request);
+    return response.data;
+  },
+
+  restoreRoleDefaults: async (id: string): Promise<Role> => {
+    const response = await apiClient.post<Role>(`/users/roles/${id}/restore-defaults`);
+    return response.data;
   },
 };
 

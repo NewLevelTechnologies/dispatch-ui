@@ -7,12 +7,24 @@ import apiClient from '../api/client';
 // Mock the API client
 vi.mock('../api/client');
 
+// Mock react-router-dom navigate
+const mockNavigate = vi.fn();
+vi.mock('react-router-dom', async () => {
+  const actual = await vi.importActual('react-router-dom');
+  return {
+    ...actual,
+    useNavigate: () => mockNavigate,
+  };
+});
+
 const mockRoles = [
   {
     id: '1',
     name: 'Field Technician',
     description: 'Handles field work and customer visits',
     capabilities: ['customers:read', 'work_orders:read', 'work_orders:write'],
+    isProtected: false,
+    isSystemRole: true,
     createdAt: '2024-01-01T00:00:00Z',
     updatedAt: '2024-01-15T10:30:00Z',
   },
@@ -21,8 +33,20 @@ const mockRoles = [
     name: 'Office Manager',
     description: 'Manages office operations',
     capabilities: ['customers:read', 'customers:write', 'users:read'],
+    isProtected: false,
+    isSystemRole: false,
     createdAt: '2024-01-02T00:00:00Z',
     updatedAt: '2024-01-20T14:20:00Z',
+  },
+  {
+    id: '3',
+    name: 'Admin',
+    description: 'Full system access',
+    capabilities: ['*:*'],
+    isProtected: true,
+    isSystemRole: true,
+    createdAt: '2024-01-01T00:00:00Z',
+    updatedAt: '2024-01-01T00:00:00Z',
   },
 ];
 
@@ -41,6 +65,7 @@ const mockCapabilitiesData = {
 describe('RolesPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockNavigate.mockClear();
   });
 
   it('renders the page title and add button', () => {
@@ -57,7 +82,7 @@ describe('RolesPage', () => {
 
     renderWithProviders(<RolesPage />);
 
-    expect(screen.getByText(/define roles with specific permissions/i)).toBeInTheDocument();
+    expect(screen.getByText(/manage roles and their capabilities/i)).toBeInTheDocument();
   });
 
   it('displays loading state while fetching roles', () => {
@@ -194,7 +219,7 @@ describe('RolesPage', () => {
     const user = userEvent.setup();
     vi.mocked(apiClient.get).mockResolvedValue({ data: mockRoles });
 
-    const { router } = renderWithProviders(<RolesPage />);
+    renderWithProviders(<RolesPage />);
 
     await waitFor(() => {
       expect(screen.getByText('Field Technician')).toBeInTheDocument();
@@ -203,9 +228,7 @@ describe('RolesPage', () => {
     const nameCell = screen.getByText('Field Technician');
     await user.click(nameCell);
 
-    await waitFor(() => {
-      expect(router.state.location.pathname).toBe('/roles/1');
-    });
+    expect(mockNavigate).toHaveBeenCalledWith('/roles/1');
   });
 
   it('opens edit dialog when edit button is clicked', async () => {
@@ -280,7 +303,7 @@ describe('RolesPage', () => {
     // Delete alert should open
     await waitFor(() => {
       expect(screen.getByText(/delete field technician/i)).toBeInTheDocument();
-      expect(screen.getByText(/users currently assigned to this role will lose these permissions/i)).toBeInTheDocument();
+      expect(screen.getByText(/users assigned this role will lose associated capabilities/i)).toBeInTheDocument();
     });
   });
 
@@ -497,5 +520,63 @@ describe('RolesPage', () => {
     await waitFor(() => {
       expect(screen.queryByText(/delete field technician/i)).not.toBeInTheDocument();
     });
+  });
+
+  it('hides edit button for protected roles', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({ data: mockRoles });
+    const user = userEvent.setup();
+
+    renderWithProviders(<RolesPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Admin')).toBeInTheDocument();
+    });
+
+    // Click the dropdown button for Admin role (third role)
+    const dropdownButtons = screen.getAllByRole('button', { name: /more options/i });
+    await user.click(dropdownButtons[2]);
+
+    // Edit button should not be present
+    expect(screen.queryByRole('menuitem', { name: /^edit$/i })).not.toBeInTheDocument();
+
+    // View button should be present
+    expect(screen.getByRole('menuitem', { name: /view/i })).toBeInTheDocument();
+  });
+
+  it('hides delete button for protected roles', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({ data: mockRoles });
+    const user = userEvent.setup();
+
+    renderWithProviders(<RolesPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Admin')).toBeInTheDocument();
+    });
+
+    // Click the dropdown button for Admin role (third role)
+    const dropdownButtons = screen.getAllByRole('button', { name: /more options/i });
+    await user.click(dropdownButtons[2]);
+
+    // Delete button should not be present
+    expect(screen.queryByRole('menuitem', { name: /delete/i })).not.toBeInTheDocument();
+  });
+
+  it('shows edit and delete buttons for non-protected roles', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({ data: mockRoles });
+    const user = userEvent.setup();
+
+    renderWithProviders(<RolesPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Field Technician')).toBeInTheDocument();
+    });
+
+    // Click the dropdown button for Field Technician (non-protected)
+    const dropdownButtons = screen.getAllByRole('button', { name: /more options/i });
+    await user.click(dropdownButtons[0]);
+
+    // Both edit and delete should be present
+    expect(screen.getByRole('menuitem', { name: /edit/i })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: /delete/i })).toBeInTheDocument();
   });
 });

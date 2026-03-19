@@ -7,13 +7,47 @@ import apiClient from '../api/client';
 // Mock the API client
 vi.mock('../api/client');
 
+// Mock react-router-dom navigate
+const mockNavigate = vi.fn();
+vi.mock('react-router-dom', async () => {
+  const actual = await vi.importActual('react-router-dom');
+  return {
+    ...actual,
+    useNavigate: () => mockNavigate,
+  };
+});
+
 const mockRole = {
   id: 'role-123',
   name: 'Field Technician',
   description: 'Handles field work and customer visits',
   capabilities: ['customers:read', 'work_orders:read', 'work_orders:write'],
+  isProtected: false,
+  isSystemRole: true,
   createdAt: '2024-01-01T10:30:00Z',
   updatedAt: '2024-01-15T14:45:00Z',
+};
+
+const mockProtectedRole = {
+  id: 'role-456',
+  name: 'Admin',
+  description: 'Full system access',
+  capabilities: ['*:*'],
+  isProtected: true,
+  isSystemRole: true,
+  createdAt: '2024-01-01T00:00:00Z',
+  updatedAt: '2024-01-01T00:00:00Z',
+};
+
+const mockCustomRole = {
+  id: 'role-789',
+  name: 'Custom Role',
+  description: 'A custom role',
+  capabilities: ['customers:read'],
+  isProtected: false,
+  isSystemRole: false,
+  createdAt: '2024-01-01T00:00:00Z',
+  updatedAt: '2024-01-01T00:00:00Z',
 };
 
 const mockCapabilitiesData = {
@@ -31,6 +65,7 @@ const mockCapabilitiesData = {
 describe('RoleDetailPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockNavigate.mockClear();
   });
 
   it('displays loading state while fetching role', () => {
@@ -79,7 +114,7 @@ describe('RoleDetailPage', () => {
     vi.mocked(apiClient.get).mockRejectedValue(new Error('Not found'));
     const user = userEvent.setup();
 
-    const { router } = renderWithProviders(<RoleDetailPage />, {
+    renderWithProviders(<RoleDetailPage />, {
       initialEntries: ['/roles/role-123'],
       path: '/roles/:id',
     });
@@ -91,9 +126,7 @@ describe('RoleDetailPage', () => {
     const backButton = screen.getByRole('button', { name: /back/i });
     await user.click(backButton);
 
-    await waitFor(() => {
-      expect(router.state.location.pathname).toBe('/roles');
-    });
+    expect(mockNavigate).toHaveBeenCalledWith('/roles');
   });
 
   it('renders role details with all information', async () => {
@@ -169,7 +202,7 @@ describe('RoleDetailPage', () => {
     vi.mocked(apiClient.get).mockResolvedValue({ data: mockRole });
     const user = userEvent.setup();
 
-    const { router } = renderWithProviders(<RoleDetailPage />, {
+    renderWithProviders(<RoleDetailPage />, {
       initialEntries: ['/roles/role-123'],
       path: '/roles/:id',
     });
@@ -181,9 +214,7 @@ describe('RoleDetailPage', () => {
     const backButtons = screen.getAllByRole('button', { name: /back/i });
     await user.click(backButtons[0]);
 
-    await waitFor(() => {
-      expect(router.state.location.pathname).toBe('/roles');
-    });
+    expect(mockNavigate).toHaveBeenCalledWith('/roles');
   });
 
   it('renders edit and delete buttons', async () => {
@@ -250,7 +281,7 @@ describe('RoleDetailPage', () => {
 
     await waitFor(() => {
       expect(screen.getByText(/delete field technician/i)).toBeInTheDocument();
-      expect(screen.getByText(/users currently assigned to this role will lose these permissions/i)).toBeInTheDocument();
+      expect(screen.getByText(/users assigned this role will lose associated capabilities/i)).toBeInTheDocument();
     });
   });
 
@@ -259,7 +290,7 @@ describe('RoleDetailPage', () => {
     vi.mocked(apiClient.delete).mockResolvedValue({ data: {} });
     const user = userEvent.setup();
 
-    const { router } = renderWithProviders(<RoleDetailPage />, {
+    renderWithProviders(<RoleDetailPage />, {
       initialEntries: ['/roles/role-123'],
       path: '/roles/:id',
     });
@@ -284,7 +315,7 @@ describe('RoleDetailPage', () => {
 
     await waitFor(() => {
       expect(apiClient.delete).toHaveBeenCalledWith('/users/roles/role-123');
-      expect(router.state.location.pathname).toBe('/roles');
+      expect(mockNavigate).toHaveBeenCalledWith('/roles');
     });
   });
 
@@ -575,5 +606,274 @@ describe('RoleDetailPage', () => {
     await waitFor(() => {
       expect(apiClient.get).toHaveBeenCalledWith('/users/roles/role-123');
     });
+  });
+
+  // Protected role tests
+  it('hides edit button for protected roles', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({ data: mockProtectedRole });
+
+    renderWithProviders(<RoleDetailPage />, {
+      initialEntries: ['/roles/role-456'],
+      path: '/roles/:id',
+    });
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Admin' })).toBeInTheDocument();
+    });
+
+    expect(screen.queryByRole('button', { name: /^edit$/i })).not.toBeInTheDocument();
+  });
+
+  it('hides delete button for protected roles', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({ data: mockProtectedRole });
+
+    renderWithProviders(<RoleDetailPage />, {
+      initialEntries: ['/roles/role-456'],
+      path: '/roles/:id',
+    });
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Admin' })).toBeInTheDocument();
+    });
+
+    expect(screen.queryByRole('button', { name: /^delete$/i })).not.toBeInTheDocument();
+  });
+
+  it('shows clone button for all roles', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({ data: mockRole });
+
+    renderWithProviders(<RoleDetailPage />, {
+      initialEntries: ['/roles/role-123'],
+      path: '/roles/:id',
+    });
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Field Technician' })).toBeInTheDocument();
+    });
+
+    expect(screen.getByRole('button', { name: /clone role/i })).toBeInTheDocument();
+  });
+
+  it('shows clone button for protected roles', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({ data: mockProtectedRole });
+
+    renderWithProviders(<RoleDetailPage />, {
+      initialEntries: ['/roles/role-456'],
+      path: '/roles/:id',
+    });
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Admin' })).toBeInTheDocument();
+    });
+
+    expect(screen.getByRole('button', { name: /clone role/i })).toBeInTheDocument();
+  });
+
+  it('shows restore defaults button for system roles', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({ data: mockRole });
+
+    renderWithProviders(<RoleDetailPage />, {
+      initialEntries: ['/roles/role-123'],
+      path: '/roles/:id',
+    });
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Field Technician' })).toBeInTheDocument();
+    });
+
+    expect(screen.getByRole('button', { name: /restore defaults/i })).toBeInTheDocument();
+  });
+
+  it('hides restore defaults button for custom roles', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({ data: mockCustomRole });
+
+    renderWithProviders(<RoleDetailPage />, {
+      initialEntries: ['/roles/role-789'],
+      path: '/roles/:id',
+    });
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Custom Role' })).toBeInTheDocument();
+    });
+
+    expect(screen.queryByRole('button', { name: /restore defaults/i })).not.toBeInTheDocument();
+  });
+
+  it('opens clone dialog when clone button is clicked', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({ data: mockRole });
+    const user = userEvent.setup();
+
+    renderWithProviders(<RoleDetailPage />, {
+      initialEntries: ['/roles/role-123'],
+      path: '/roles/:id',
+    });
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Field Technician' })).toBeInTheDocument();
+    });
+
+    const cloneButton = screen.getByRole('button', { name: /clone role/i });
+    await user.click(cloneButton);
+
+    await waitFor(() => {
+      expect(screen.getByRole('dialog')).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: 'Clone Role' })).toBeInTheDocument();
+    });
+  });
+
+  it('opens restore defaults confirmation when restore button is clicked', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({ data: mockRole });
+    const user = userEvent.setup();
+
+    renderWithProviders(<RoleDetailPage />, {
+      initialEntries: ['/roles/role-123'],
+      path: '/roles/:id',
+    });
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Field Technician' })).toBeInTheDocument();
+    });
+
+    const restoreButton = screen.getByRole('button', { name: /restore defaults/i });
+    await user.click(restoreButton);
+
+    await waitFor(() => {
+      expect(screen.getByText(/restore "field technician" to default capabilities/i)).toBeInTheDocument();
+      expect(screen.getByText(/this will reset all capabilities to the system template defaults/i)).toBeInTheDocument();
+    });
+  });
+
+  it('calls restore defaults API when confirmed', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({ data: mockRole });
+    vi.mocked(apiClient.post).mockResolvedValue({ data: mockRole });
+    const user = userEvent.setup();
+
+    renderWithProviders(<RoleDetailPage />, {
+      initialEntries: ['/roles/role-123'],
+      path: '/roles/:id',
+    });
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Field Technician' })).toBeInTheDocument();
+    });
+
+    // Open restore confirmation
+    const restoreButton = screen.getByRole('button', { name: /restore defaults/i });
+    await user.click(restoreButton);
+
+    // Confirm restore
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /^restore$/i })).toBeInTheDocument();
+    });
+
+    const confirmButton = screen.getByRole('button', { name: /^restore$/i });
+    await user.click(confirmButton);
+
+    await waitFor(() => {
+      expect(apiClient.post).toHaveBeenCalledWith('/users/roles/role-123/restore-defaults');
+    });
+  });
+
+  it('cancels restore defaults when cancel is clicked', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({ data: mockRole });
+    const user = userEvent.setup();
+
+    renderWithProviders(<RoleDetailPage />, {
+      initialEntries: ['/roles/role-123'],
+      path: '/roles/:id',
+    });
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Field Technician' })).toBeInTheDocument();
+    });
+
+    // Open restore confirmation
+    const restoreButton = screen.getByRole('button', { name: /restore defaults/i });
+    await user.click(restoreButton);
+
+    // Cancel
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /cancel/i })).toBeInTheDocument();
+    });
+
+    const cancelButton = screen.getByRole('button', { name: /cancel/i });
+    await user.click(cancelButton);
+
+    expect(apiClient.post).not.toHaveBeenCalled();
+    await waitFor(() => {
+      expect(screen.queryByText(/restore "field technician"/i)).not.toBeInTheDocument();
+    });
+  });
+
+  it('displays restoring state during restore operation', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({ data: mockRole });
+    vi.mocked(apiClient.post).mockImplementation(
+      () => new Promise(() => {}) // Never resolves
+    );
+    const user = userEvent.setup();
+
+    renderWithProviders(<RoleDetailPage />, {
+      initialEntries: ['/roles/role-123'],
+      path: '/roles/:id',
+    });
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Field Technician' })).toBeInTheDocument();
+    });
+
+    // Open restore confirmation
+    const restoreButton = screen.getByRole('button', { name: /restore defaults/i });
+    await user.click(restoreButton);
+
+    // Confirm restore
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /^restore$/i })).toBeInTheDocument();
+    });
+
+    const confirmButton = screen.getByRole('button', { name: /^restore$/i });
+    await user.click(confirmButton);
+
+    await waitFor(() => {
+      expect(screen.getByText('Restoring...')).toBeInTheDocument();
+    });
+
+    expect(confirmButton).toBeDisabled();
+  });
+
+  it('displays error message when restore defaults fails', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({ data: mockRole });
+    const error = new Error('Failed to restore');
+    // @ts-expect-error - Adding response property to Error for test
+    error.response = { data: { message: 'Failed to restore' } };
+    vi.mocked(apiClient.post).mockRejectedValue(error);
+    const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
+    const user = userEvent.setup();
+
+    renderWithProviders(<RoleDetailPage />, {
+      initialEntries: ['/roles/role-123'],
+      path: '/roles/:id',
+    });
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Field Technician' })).toBeInTheDocument();
+    });
+
+    // Open restore confirmation
+    const restoreButton = screen.getByRole('button', { name: /restore defaults/i });
+    await user.click(restoreButton);
+
+    // Confirm restore
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /^restore$/i })).toBeInTheDocument();
+    });
+
+    const confirmButton = screen.getByRole('button', { name: /^restore$/i });
+    await user.click(confirmButton);
+
+    await waitFor(() => {
+      expect(alertSpy).toHaveBeenCalledWith('Failed to restore');
+    });
+
+    alertSpy.mockRestore();
   });
 });

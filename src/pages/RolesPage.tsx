@@ -165,12 +165,19 @@ export default function RolesPage() {
                           <EllipsisVerticalIcon className="size-5" />
                         </DropdownButton>
                         <DropdownMenu anchor="bottom end">
-                          <DropdownItem onClick={() => handleEdit(role)}>
-                            <DropdownLabel>{t('common.edit')}</DropdownLabel>
+                          {!role.isProtected && (
+                            <DropdownItem onClick={() => handleEdit(role)}>
+                              <DropdownLabel>{t('common.edit')}</DropdownLabel>
+                            </DropdownItem>
+                          )}
+                          <DropdownItem onClick={() => navigate(`/roles/${role.id}`)}>
+                            <DropdownLabel>{t('common.view')}</DropdownLabel>
                           </DropdownItem>
-                          <DropdownItem onClick={() => handleDelete(role)}>
-                            <DropdownLabel>{t('common.delete')}</DropdownLabel>
-                          </DropdownItem>
+                          {!role.isProtected && (
+                            <DropdownItem onClick={() => handleDelete(role)}>
+                              <DropdownLabel>{t('common.delete')}</DropdownLabel>
+                            </DropdownItem>
+                          )}
                         </DropdownMenu>
                       </Dropdown>
                     </div>
