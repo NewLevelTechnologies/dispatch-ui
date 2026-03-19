@@ -17,46 +17,6 @@ vi.mock('react-router-dom', async () => {
   };
 });
 
-const mockRoles = [
-  {
-    id: 'role-1',
-    name: 'Admin',
-    description: 'Administrator role',
-    capabilities: ['*:*'],
-  },
-  {
-    id: 'role-2',
-    name: 'Technician',
-    description: 'Field technician role',
-    capabilities: ['customers:read', 'work_orders:read'],
-  },
-];
-
-const mockUser = {
-  id: 'user-123',
-  tenantId: 'tenant-1',
-  cognitoSub: 'cognito-abc123',
-  email: 'john.doe@example.com',
-  firstName: 'John',
-  lastName: 'Doe',
-  enabled: true,
-  roles: [mockRoles[0]],
-  capabilities: ['*:*'],
-  createdAt: '2024-01-01T10:30:00Z',
-  updatedAt: '2024-01-15T14:45:00Z',
-};
-
-const mockDisabledUser = {
-  ...mockUser,
-  id: 'user-456',
-  firstName: 'Jane',
-  lastName: 'Smith',
-  email: 'jane.smith@example.com',
-  enabled: false,
-  roles: [mockRoles[1]],
-  capabilities: ['customers:read', 'work_orders:read'],
-};
-
 describe('UserDetailPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
