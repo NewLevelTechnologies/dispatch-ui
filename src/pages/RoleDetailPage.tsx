@@ -206,6 +206,17 @@ export default function RoleDetailPage() {
                 </code>
               </DescriptionDetails>
 
+              {role.systemRoleCode && (
+                <>
+                  <DescriptionTerm>{t('roles.detail.templateCode')}</DescriptionTerm>
+                  <DescriptionDetails>
+                    <code className="text-xs font-semibold text-purple-600 dark:text-purple-400">
+                      {role.systemRoleCode}
+                    </code>
+                  </DescriptionDetails>
+                </>
+              )}
+
               <DescriptionTerm>{t('roles.detail.created')}</DescriptionTerm>
               <DescriptionDetails>{formatDate(role.createdAt)}</DescriptionDetails>
 

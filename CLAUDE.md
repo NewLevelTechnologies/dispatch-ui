@@ -163,8 +163,6 @@ dispatch-ui/
 ├── src/
 │   ├── main.tsx              # Entry point with Amplify + React Query setup
 │   ├── App.tsx               # Routes and authentication
-│   ├── App.css               # Global styles
-│   ├── index.css             # Tailwind imports
 │   ├── api/
 │   │   ├── client.ts         # Shared Axios instance with JWT auth
 │   │   ├── index.ts          # Central barrel export for all APIs
@@ -182,23 +180,17 @@ dispatch-ui/
 │   │   └── amplify.ts        # AWS Amplify configuration
 │   ├── pages/
 │   │   ├── LoginPage.tsx     # Login with Cognito
-│   │   ├── DashboardPage.tsx # Dashboard
 │   │   ├── CustomersPage.tsx # Customer management
-│   │   ├── WorkOrdersPage.tsx # Work order management
-│   │   ├── EquipmentPage.tsx  # Equipment management
-│   │   ├── InvoicesPage.tsx   # Financial - Invoices
-│   │   └── DispatchesPage.tsx # Scheduling - Dispatches
-│   ├── types/
-│   │   └── index.ts          # TypeScript type definitions
-│   └── utils/
-│       └── index.ts          # Utility functions
-├── public/                   # Static assets
-├── .env                      # Environment variables (local)
-├── .env.example              # Environment template
-├── package.json              # Dependencies
+│   │   └── ...               # Other entity pages
+│   ├── test/
+│   │   ├── setup.ts          # Test configuration and mocks
+│   │   └── utils.tsx         # Custom render with providers
+│   └── types/
+│       └── index.ts          # TypeScript type definitions
+├── .github/workflows/        # CI/CD pipelines
+├── package.json              # Dependencies and scripts
 ├── vite.config.ts            # Vite configuration
-├── tsconfig.json             # TypeScript configuration
-└── tailwind.config.ts        # Tailwind CSS configuration (if exists)
+└── vitest.config.ts          # Vitest test configuration
 ```
 
 ---
@@ -207,7 +199,7 @@ dispatch-ui/
 
 ### Overview
 
-The application uses **dedicated API service classes** for all backend communication. This architecture provides:
+The application uses **dedicated API service classes** for all backend communication:
 
 - **Single source of truth**: Shared `apiClient` handles authentication and configuration
 - **Type safety**: TypeScript interfaces for all requests and responses
@@ -237,85 +229,47 @@ import { customerApi, workOrderApi, type Customer, type WorkOrder } from '../api
 
 ### Creating a New API Service
 
-When adding a new domain (e.g., "Inventory"), create `src/api/inventoryApi.ts`:
+**Pattern structure** (see `src/api/customerApi.ts` for full example):
 
 ```typescript
-// Inventory API Client
+// src/api/inventoryApi.ts
 import apiClient from './client';
 
 export interface InventoryItem {
   id: string;
   name: string;
   quantity: number;
-  // ... other fields
 }
 
-export interface CreateInventoryItemRequest {
-  name: string;
-  quantity: number;
-  // ... other fields
-}
-
-export interface UpdateInventoryItemRequest {
-  name?: string;
-  quantity?: number;
-  // ... other fields
-}
+export interface CreateInventoryItemRequest { /* ... */ }
+export interface UpdateInventoryItemRequest { /* ... */ }
 
 export const inventoryApi = {
   getAll: async (): Promise<InventoryItem[]> => {
     const response = await apiClient.get<InventoryItem[]>('/inventory');
     return response.data;
   },
-
-  getById: async (id: string): Promise<InventoryItem> => {
-    const response = await apiClient.get<InventoryItem>(`/inventory/${id}`);
-    return response.data;
-  },
-
-  create: async (request: CreateInventoryItemRequest): Promise<InventoryItem> => {
-    const response = await apiClient.post<InventoryItem>('/inventory', request);
-    return response.data;
-  },
-
-  update: async (id: string, request: UpdateInventoryItemRequest): Promise<InventoryItem> => {
-    const response = await apiClient.put<InventoryItem>(`/inventory/${id}`, request);
-    return response.data;
-  },
-
-  delete: async (id: string): Promise<void> => {
-    await apiClient.delete(`/inventory/${id}`);
-  },
+  getById: async (id: string): Promise<InventoryItem> => { /* ... */ },
+  create: async (request: CreateInventoryItemRequest): Promise<InventoryItem> => { /* ... */ },
+  update: async (id: string, request: UpdateInventoryItemRequest): Promise<InventoryItem> => { /* ... */ },
+  delete: async (id: string): Promise<void> => { /* ... */ },
 };
 
 export default inventoryApi;
 ```
 
-### Adding to Barrel Export
-
-Update `src/api/index.ts`:
-
+**Then export from** `src/api/index.ts`:
 ```typescript
-// Add to exports
-export {
-  inventoryApi,
-  type InventoryItem,
-  type CreateInventoryItemRequest,
-  type UpdateInventoryItemRequest
-} from './inventoryApi';
+export { inventoryApi, type InventoryItem, type CreateInventoryItemRequest, type UpdateInventoryItemRequest } from './inventoryApi';
 ```
 
-### Using API Services in Components
+### Using API Services with React Query
 
-**Import the API service**:
 ```typescript
 import { customerApi, type Customer } from '../api';
-```
 
-**Use with React Query**:
-```typescript
 // Fetch data
-const { data: customers } = useQuery({
+const { data, isLoading, error } = useQuery({
   queryKey: ['customers'],
   queryFn: () => customerApi.getAll(),
 });
@@ -356,298 +310,121 @@ const deleteMutation = useMutation({
 
 ## Adding a New Entity Page
 
-Follow this pattern for consistency. Example: Adding "Equipment" page.
+Follow this pattern for consistency. **See `CustomersPage.tsx` and `CustomerFormDialog.tsx` as reference examples.**
 
 ### Step 1: Create Entity Page
 
-**File**: `src/pages/EquipmentPage.tsx`
+**File**: `src/pages/EntityPage.tsx`
 
-**Template**:
+**Key structure**:
 ```typescript
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { EllipsisVerticalIcon } from '@heroicons/react/24/outline';
-import { equipmentApi, type Equipment } from '../api';
+import { entityApi, type Entity } from '../api';
 import AppLayout from '../components/AppLayout';
-import EquipmentFormDialog from '../components/EquipmentFormDialog';
-import { Heading } from '../components/catalyst/heading';
-import { Button } from '../components/catalyst/button';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/catalyst/table';
-import { Badge } from '../components/catalyst/badge';
-import { Dropdown, DropdownButton, DropdownItem, DropdownLabel, DropdownMenu } from '../components/catalyst/dropdown';
+import EntityFormDialog from '../components/EntityFormDialog';
+import { Heading, Button, Table, Badge, Dropdown } from '../components/catalyst/*';
 
-export default function EquipmentPage() {
+export default function EntityPage() {
   const queryClient = useQueryClient();
   const { t } = useTranslation();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [selectedEquipment, setSelectedEquipment] = useState<Equipment | null>(null);
+  const [selectedEntity, setSelectedEntity] = useState<Entity | null>(null);
 
   // Fetch data with React Query
-  const { data: equipment, isLoading, error } = useQuery({
-    queryKey: ['equipment'],
-    queryFn: () => equipmentApi.getAll(),
+  const { data: entities, isLoading, error } = useQuery({
+    queryKey: ['entities'],
+    queryFn: () => entityApi.getAll(),
   });
 
   // Delete mutation
   const deleteMutation = useMutation({
-    mutationFn: (id: string) => equipmentApi.delete(id),
+    mutationFn: (id: string) => entityApi.delete(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['equipment'] });
+      queryClient.invalidateQueries({ queryKey: ['entities'] });
     },
   });
 
-  const handleAdd = () => {
-    setSelectedEquipment(null);
-    setIsDialogOpen(true);
-  };
-
-  const handleEdit = (item: Equipment) => {
-    setSelectedEquipment(item);
-    setIsDialogOpen(true);
-  };
-
-  const handleDelete = (item: Equipment) => {
-    if (window.confirm(`Are you sure you want to delete ${item.name}?`)) {
-      deleteMutation.mutate(item.id);
-    }
-  };
-
-  const handleCloseDialog = () => {
-    setIsDialogOpen(false);
-    setSelectedEquipment(null);
-  };
+  // Handlers: handleAdd(), handleEdit(item), handleDelete(item), handleCloseDialog()
 
   return (
     <AppLayout>
       <div className="p-8">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <Heading>Equipment</Heading>
-            <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
-              Manage your equipment inventory
-            </p>
-          </div>
-          <Button onClick={handleAdd}>Add Equipment</Button>
-        </div>
-
-        {/* Loading State */}
-        {isLoading && (
-          <div className="mt-8 text-center">
-            <p className="text-zinc-600 dark:text-zinc-400">Loading equipment...</p>
-          </div>
-        )}
-
-        {/* Error State */}
-        {error && (
-          <div className="mt-8 rounded-lg bg-red-50 p-4 ring-1 ring-red-200 dark:bg-red-950/10 dark:ring-red-900/20">
-            <p className="text-sm text-red-800 dark:text-red-400">
-              Error loading equipment: {(error as Error).message}
-            </p>
-          </div>
-        )}
-
-        {/* Empty State */}
-        {equipment && equipment.length === 0 && (
-          <div className="mt-8 text-center">
-            <p className="text-zinc-600 dark:text-zinc-400">No equipment found</p>
-            <Button className="mt-4" onClick={handleAdd}>
-              Add your first equipment
-            </Button>
-          </div>
-        )}
-
-        {/* Table */}
-        {equipment && equipment.length > 0 && (
-          <div className="mt-8">
-            <Table className="[--gutter:theme(spacing.6)] lg:[--gutter:theme(spacing.10)]">
-              <TableHead>
-                <TableRow>
-                  <TableHeader>Name</TableHeader>
-                  {/* Add other column headers */}
-                  <TableHeader>Status</TableHeader>
-                  <TableHeader></TableHeader>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {equipment.map((item) => (
-                  <TableRow key={item.id}>
-                    <TableCell className="font-medium">{item.name}</TableCell>
-                    {/* Add other columns */}
-                    <TableCell>
-                      <Badge color="lime">Active</Badge>
-                    </TableCell>
-                    <TableCell>
-                      <div className="-mx-3 -my-1.5 sm:-mx-2.5">
-                        <Dropdown>
-                          <DropdownButton plain aria-label="More options">
-                            <EllipsisVerticalIcon className="size-5" />
-                          </DropdownButton>
-                          <DropdownMenu anchor="bottom end">
-                            <DropdownItem onClick={() => handleEdit(item)}>
-                              <DropdownLabel>Edit</DropdownLabel>
-                            </DropdownItem>
-                            <DropdownItem onClick={() => handleDelete(item)}>
-                              <DropdownLabel>Delete</DropdownLabel>
-                            </DropdownItem>
-                          </DropdownMenu>
-                        </Dropdown>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        )}
+        {/* Header with title and Add button */}
+        {/* Loading state */}
+        {/* Error state */}
+        {/* Empty state */}
+        {/* Table with data and actions */}
       </div>
-
-      {/* Form Dialog */}
-      <EquipmentFormDialog
-        isOpen={isDialogOpen}
-        onClose={handleCloseDialog}
-        equipment={selectedEquipment}
-      />
+      <EntityFormDialog isOpen={isDialogOpen} onClose={handleCloseDialog} entity={selectedEntity} />
     </AppLayout>
   );
 }
 ```
 
+**See `src/pages/CustomersPage.tsx` for complete implementation.**
+
 ### Step 2: Create Form Dialog
 
-**File**: `src/components/EquipmentFormDialog.tsx`
+**File**: `src/components/EntityFormDialog.tsx`
 
-**Template**:
+**Key structure**:
 ```typescript
 import { useState, useEffect } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { equipmentApi, type Equipment } from '../api';
+import { entityApi, type Entity } from '../api';
 import { Dialog, DialogActions, DialogBody, DialogDescription, DialogTitle } from './catalyst/dialog';
-import { Button } from './catalyst/button';
-import { Field, FieldGroup, Fieldset, Label } from './catalyst/fieldset';
-import { Input } from './catalyst/input';
+import { Button, Field, FieldGroup, Fieldset, Label, Input } from './catalyst/*';
 
-interface EquipmentFormDialogProps {
-  isOpen: boolean;
-  onClose: () => void;
-  equipment?: Equipment | null;
-}
-
-export default function EquipmentFormDialog({ isOpen, onClose, equipment }: EquipmentFormDialogProps) {
+export default function EntityFormDialog({ isOpen, onClose, entity }) {
   const queryClient = useQueryClient();
   const { t } = useTranslation();
-  const isEdit = !!equipment?.id;
+  const isEdit = !!entity?.id;
+  const [formData, setFormData] = useState<Entity>({ /* defaults */ });
 
-  const [formData, setFormData] = useState<Equipment>({
-    customerId: '',
-    equipmentType: '',
-    // Initialize other fields...
-  });
-
-  // Reset form when dialog opens/closes or equipment changes
+  // Reset form when dialog opens
   useEffect(() => {
     if (!isOpen) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setFormData(entity || { /* defaults */ });
+  }, [entity, isOpen]);
 
-    // Intentionally setting form state based on props in useEffect
-    // This is the recommended pattern for initializing controlled forms
-    if (equipment) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setFormData(equipment);
-    } else {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setFormData({
-        customerId: '',
-        equipmentType: '',
-        // Reset other fields...
-      });
-    }
-  }, [equipment, isOpen]);
-
-  // Create mutation
+  // Create and update mutations with proper error handling
   const createMutation = useMutation({
-    mutationFn: (data: Equipment) => equipmentApi.create(data),
+    mutationFn: (data: Entity) => entityApi.create(data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['equipment'] });
+      queryClient.invalidateQueries({ queryKey: ['entities'] });
       onClose();
     },
     onError: (error: unknown) => {
       const errorMessage = error instanceof Error && 'response' in error
         ? ((error as { response?: { data?: { message?: string } } }).response?.data?.message)
         : undefined;
-      alert(errorMessage || t('common.form.errorCreate', { entity: t('entities.equipment') }));
+      alert(errorMessage || t('common.form.errorCreate', { entity: t('entities.entity') }));
     },
   });
 
-  // Update mutation
-  const updateMutation = useMutation({
-    mutationFn: (data: Equipment) => equipmentApi.update(equipment!.id, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['equipment'] });
-      onClose();
-    },
-    onError: (error: unknown) => {
-      const errorMessage = error instanceof Error && 'response' in error
-        ? ((error as { response?: { data?: { message?: string } } }).response?.data?.message)
-        : undefined;
-      alert(errorMessage || t('common.form.errorUpdate', { entity: t('entities.equipment') }));
-    },
-  });
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (isEdit) {
-      updateMutation.mutate(formData);
-    } else {
-      createMutation.mutate(formData);
-    }
-  };
-
-  const handleChange = (field: keyof Equipment, value: string) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
-  };
+  // Similar updateMutation pattern
 
   return (
     <Dialog open={isOpen} onClose={onClose}>
-      <DialogTitle>{isEdit ? 'Edit Equipment' : 'Add Equipment'}</DialogTitle>
-      <DialogDescription>
-        {isEdit ? 'Update equipment information.' : 'Create a new equipment record.'}
-      </DialogDescription>
+      <DialogTitle>{/* Use i18n */}</DialogTitle>
+      <DialogDescription>{/* Use i18n */}</DialogDescription>
       <DialogBody>
-        <form onSubmit={handleSubmit} id="equipment-form">
+        <form onSubmit={handleSubmit} id="entity-form">
           <Fieldset>
             <FieldGroup>
-              {/* Name Field */}
-              <Field>
-                <Label>Name *</Label>
-                <Input
-                  name="name"
-                  value={formData.name}
-                  onChange={(e) => handleChange('name', e.target.value)}
-                  required
-                />
-              </Field>
-
-              {/* Add other fields following the same pattern */}
+              {/* Fields using Field, Label, Input pattern */}
             </FieldGroup>
           </Fieldset>
         </form>
       </DialogBody>
       <DialogActions>
-        <Button plain onClick={onClose}>
-          Cancel
-        </Button>
-        <Button
-          type="submit"
-          form="equipment-form"
-          disabled={createMutation.isPending || updateMutation.isPending}
-        >
-          {createMutation.isPending || updateMutation.isPending
-            ? 'Saving...'
-            : isEdit
-              ? 'Update'
-              : 'Create'}
+        <Button plain onClick={onClose}>{t('common.cancel')}</Button>
+        <Button type="submit" form="entity-form" disabled={/* pending */}>
+          {/* Show saving state */}
         </Button>
       </DialogActions>
     </Dialog>
@@ -655,18 +432,17 @@ export default function EquipmentFormDialog({ isOpen, onClose, equipment }: Equi
 }
 ```
 
+**See `src/components/CustomerFormDialog.tsx` for complete implementation.**
+
 ### Step 3: Add Route
 
 **File**: `src/App.tsx`
 
-Add import:
 ```typescript
-import EquipmentPage from './pages/EquipmentPage';
-```
+import EntityPage from './pages/EntityPage';
 
-Add route:
-```typescript
-<Route path="/equipment" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<EquipmentPage />} />} />
+// Add route:
+<Route path="/entities" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<EntityPage />} />} />
 ```
 
 **Note**: Navigation link already exists in AppLayout.tsx
@@ -773,15 +549,13 @@ export default function MyComponent() {
 }
 ```
 
-**Simple translation**:
+**Examples**:
 ```typescript
+// Simple translation
 <Heading>{t('entities.customers')}</Heading>
 <Button>{t('common.cancel')}</Button>
-```
 
-**With variable interpolation**:
-```typescript
-// Single variable
+// With variable interpolation
 <Button onClick={handleAdd}>
   {t('common.actions.add', { entity: t('entities.customer') })}
 </Button>
@@ -796,10 +570,8 @@ if (window.confirm(t('common.actions.deleteConfirm', { name: customer.name }))) 
   deleteMutation.mutate(customer.id);
 }
 // Output: "Are you sure you want to delete John Doe?"
-```
 
-**Form titles and descriptions**:
-```typescript
+// Form titles and descriptions
 <DialogTitle>
   {t('common.form.titleCreate', {
     action: isEdit ? t('common.edit') : t('common.create'),
@@ -808,14 +580,6 @@ if (window.confirm(t('common.actions.deleteConfirm', { name: customer.name }))) 
 </DialogTitle>
 // Create mode: "Create Customer"
 // Edit mode: "Edit Customer"
-
-<DialogDescription>
-  {t(isEdit ? 'common.form.descriptionEdit' : 'common.form.descriptionCreate', {
-    entity: t('entities.customer')
-  })}
-</DialogDescription>
-// Create: "Create a new customer record."
-// Edit: "Update customer information."
 ```
 
 ### Adding a New Entity
@@ -854,24 +618,7 @@ When adding a new entity (e.g., "Invoice"), follow these steps:
 }
 ```
 
-**3. Use in components**:
-```typescript
-// Page title
-<Heading>{t('entities.invoices')}</Heading>
-
-// Buttons
-<Button onClick={handleAdd}>
-  {t('common.actions.add', { entity: t('entities.invoice') })}
-</Button>
-
-// Loading state
-<p>{t('common.actions.loading', { entities: t('entities.invoices') })}</p>
-
-// Table headers
-<TableHeader>{t('invoices.table.invoiceNumber')}</TableHeader>
-```
-
-**4. Add to test mock** (`src/test/setup.ts`):
+**3. Add to test mock** (`src/test/setup.ts`):
 ```typescript
 const translations = {
   'entities.invoice': 'Invoice',
@@ -890,136 +637,6 @@ const translations = {
 - Prevents duplicate keys
 - Better for diffs in version control
 - Professional standard
-
-**Example**:
-```json
-{
-  "common": {
-    "active": "Active",      // ← Alphabetical
-    "add": "Add",
-    "cancel": "Cancel",
-    "create": "Create",
-    "delete": "Delete",
-    "edit": "Edit"
-  }
-}
-```
-
-### Testing with i18n
-
-**Test setup** (`src/test/setup.ts`):
-- Mocks `react-i18next` with actual English translations
-- Supports `{{param}}` and `{{param, lowercase}}` interpolation
-- All translations alphabetically sorted
-
-**In tests**, translations work automatically:
-```typescript
-import { screen } from '@testing-library/react';
-import { renderWithProviders } from '../test/utils';
-
-it('displays customer title', () => {
-  renderWithProviders(<CustomersPage />);
-  expect(screen.getByText('Customers')).toBeInTheDocument();
-});
-```
-
-**Adding new translations to test mock**:
-```typescript
-// In src/test/setup.ts
-const translations = {
-  'entities.invoice': 'Invoice',
-  'entities.invoices': 'Invoices',
-  // ... keep alphabetically sorted
-};
-```
-
-### Complete Pattern Example
-
-**Page component**:
-```typescript
-import { useTranslation } from 'react-i18next';
-
-export default function InvoicesPage() {
-  const { t } = useTranslation();
-
-  return (
-    <AppLayout>
-      <div className="flex items-center justify-between">
-        <div>
-          <Heading>{t('entities.invoices')}</Heading>
-          <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
-            {t('invoices.description')}
-          </p>
-        </div>
-        <Button onClick={handleAdd}>
-          {t('common.actions.add', { entity: t('entities.invoice') })}
-        </Button>
-      </div>
-
-      {isLoading && (
-        <div className="mt-8 text-center">
-          <p>{t('common.actions.loading', { entities: t('entities.invoices') })}</p>
-        </div>
-      )}
-
-      {error && (
-        <p>{t('common.actions.errorLoading', { entities: t('entities.invoices') })}: {error.message}</p>
-      )}
-
-      {invoices?.length === 0 && (
-        <div className="mt-8 text-center">
-          <p>{t('common.actions.notFound', { entities: t('entities.invoices') })}</p>
-          <Button onClick={handleAdd}>
-            {t('common.actions.addFirst', { entity: t('entities.invoice') })}
-          </Button>
-        </div>
-      )}
-    </AppLayout>
-  );
-}
-```
-
-**Form dialog component**:
-```typescript
-import { useTranslation } from 'react-i18next';
-
-export default function InvoiceFormDialog({ isOpen, onClose, invoice }) {
-  const { t } = useTranslation();
-  const isEdit = !!invoice?.id;
-
-  return (
-    <Dialog open={isOpen} onClose={onClose}>
-      <DialogTitle>
-        {t('common.form.titleCreate', {
-          action: isEdit ? t('common.edit') : t('common.create'),
-          entity: t('entities.invoice')
-        })}
-      </DialogTitle>
-      <DialogDescription>
-        {t(isEdit ? 'common.form.descriptionEdit' : 'common.form.descriptionCreate', {
-          entity: t('entities.invoice')
-        })}
-      </DialogDescription>
-      <DialogBody>
-        <form>
-          <Field>
-            <Label>{t('invoices.table.invoiceNumber')}</Label>
-            <Input {...props} />
-          </Field>
-        </form>
-      </DialogBody>
-      <DialogActions>
-        <Button plain onClick={onClose}>
-          {t('common.cancel')}
-        </Button>
-        <Button type="submit">
-          {isPending ? t('common.saving') : t(isEdit ? 'common.update' : 'common.create')}
-        </Button>
-      </DialogActions>
-    </Dialog>
-  );
-}
-```
 
 ### i18n Checklist for New Features
 
@@ -1087,27 +704,11 @@ When adding a new feature:
 2. Search the codebase for existing usage examples
 3. Follow the exact structure shown in Catalyst documentation
 
-**All Catalyst component files are available at**:
-- `src/components/catalyst/*.tsx`
-
 ---
 
-### React Query Patterns
+### React Query Error Handling Pattern
 
-**Import API service**:
-```typescript
-import { customerApi, type Customer } from '../api';
-```
-
-**Fetching data**:
-```typescript
-const { data, isLoading, error } = useQuery({
-  queryKey: ['customers'],
-  queryFn: () => customerApi.getAll(),
-});
-```
-
-**Creating**:
+**Proper error handling with type guards**:
 ```typescript
 const createMutation = useMutation({
   mutationFn: (data: Customer) => customerApi.create(data),
@@ -1125,34 +726,7 @@ const createMutation = useMutation({
 });
 ```
 
-**Updating**:
-```typescript
-const updateMutation = useMutation({
-  mutationFn: (data: Customer) => customerApi.update(customer.id, data),
-  onSuccess: () => {
-    queryClient.invalidateQueries({ queryKey: ['customers'] });
-    onClose();
-  },
-  onError: (error: unknown) => {
-    const errorMessage = error instanceof Error && 'response' in error
-      ? ((error as { response?: { data?: { message?: string } } }).response?.data?.message)
-      : undefined;
-    alert(errorMessage || t('common.form.errorUpdate', { entity: t('entities.customer') }));
-  },
-});
-```
-
-**Deleting**:
-```typescript
-const deleteMutation = useMutation({
-  mutationFn: (id: string) => customerApi.delete(id),
-  onSuccess: () => {
-    queryClient.invalidateQueries({ queryKey: ['customers'] });
-  },
-});
-```
-
-### Catalyst UI Components
+### Catalyst UI Quick Reference
 
 **Badge colors**:
 ```typescript
@@ -1162,39 +736,6 @@ const deleteMutation = useMutation({
 <Badge color="blue">In Progress</Badge> // Blue
 <Badge color="amber">Pending</Badge>    // Yellow/Orange
 <Badge color="rose">Error</Badge>       // Red
-```
-
-**Table**:
-```typescript
-<Table className="[--gutter:theme(spacing.6)] lg:[--gutter:theme(spacing.10)]">
-  <TableHead>
-    <TableRow>
-      <TableHeader>Column</TableHeader>
-    </TableRow>
-  </TableHead>
-  <TableBody>
-    {data.map((item) => (
-      <TableRow key={item.id}>
-        <TableCell>Value</TableCell>
-      </TableRow>
-    ))}
-  </TableBody>
-</Table>
-```
-
-**Dialog**:
-```typescript
-<Dialog open={isOpen} onClose={onClose}>
-  <DialogTitle>Title</DialogTitle>
-  <DialogDescription>Description</DialogDescription>
-  <DialogBody>
-    <form id="form-id">...</form>
-  </DialogBody>
-  <DialogActions>
-    <Button plain onClick={onClose}>Cancel</Button>
-    <Button type="submit" form="form-id">Submit</Button>
-  </DialogActions>
-</Dialog>
 ```
 
 **Form fields**:
@@ -1216,40 +757,7 @@ const deleteMutation = useMutation({
 
 ### Authentication Pattern
 
-**API Client** (`src/api/client.ts`):
-```typescript
-import axios from 'axios';
-import { fetchAuthSession } from 'aws-amplify/auth';
-
-const apiClient = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL,
-  headers: {
-    'Content-Type': 'application/json',
-  },
-});
-
-// Add JWT token to all requests
-apiClient.interceptors.request.use(
-  async (config) => {
-    try {
-      const session = await fetchAuthSession();
-      const token = session.tokens?.idToken?.toString();
-
-      if (token) {
-        config.headers.Authorization = `Bearer ${token}`;
-      }
-
-      return config;
-    } catch (error) {
-      console.error('Error fetching auth session:', error);
-      return Promise.reject(error);
-    }
-  },
-  (error) => Promise.reject(error)
-);
-
-export default apiClient;
-```
+**API Client** (`src/api/client.ts`) automatically adds JWT tokens to all requests via Axios interceptor using AWS Amplify `fetchAuthSession()`.
 
 ### Form Initialization Pattern
 
@@ -1452,12 +960,7 @@ import apiClient from '../api/client';
 vi.mock('../api/client');
 
 const mockCustomers = [
-  {
-    id: '1',
-    name: 'John Doe',
-    email: 'john@example.com',
-    phone: '555-1234',
-  },
+  { id: '1', name: 'John Doe', email: 'john@example.com', phone: '555-1234' },
 ];
 
 describe('CustomersPage', () => {
@@ -1467,128 +970,31 @@ describe('CustomersPage', () => {
 
   it('displays customers in a table', async () => {
     vi.mocked(apiClient.get).mockResolvedValue({ data: mockCustomers });
-
     renderWithProviders(<CustomersPage />);
-
     await waitFor(() => {
       expect(screen.getByText('John Doe')).toBeInTheDocument();
     });
-
-    expect(screen.getByText('john@example.com')).toBeInTheDocument();
   });
 
   it('opens create dialog when add button is clicked', async () => {
     vi.mocked(apiClient.get).mockResolvedValue({ data: [] });
     const user = userEvent.setup();
-
     renderWithProviders(<CustomersPage />);
-
     const addButton = screen.getByRole('button', { name: /add customer/i });
     await user.click(addButton);
-
     expect(screen.getByRole('dialog')).toBeInTheDocument();
-  });
-});
-```
-
-### Example: Testing a Form Dialog
-
-**File**: `src/components/CustomerFormDialog.test.tsx`
-
-```typescript
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { screen, waitFor } from '@testing-library/react';
-import { renderWithProviders, userEvent } from '../test/utils';
-import CustomerFormDialog from './CustomerFormDialog';
-import apiClient from '../api/client';
-
-vi.mock('../api/client');
-
-describe('CustomerFormDialog', () => {
-  const mockOnClose = vi.fn();
-
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  it('submits form with valid data', async () => {
-    const user = userEvent.setup();
-    vi.mocked(apiClient.post).mockResolvedValue({ data: { id: '1' } });
-
-    renderWithProviders(
-      <CustomerFormDialog isOpen={true} onClose={mockOnClose} />
-    );
-
-    await user.type(screen.getByLabelText(/name/i), 'John Doe');
-    await user.type(screen.getByLabelText(/email/i), 'john@example.com');
-
-    const submitButton = screen.getByRole('button', { name: /create/i });
-    await user.click(submitButton);
-
-    await waitFor(() => {
-      expect(apiClient.post).toHaveBeenCalledWith('/customers', {
-        name: 'John Doe',
-        email: 'john@example.com',
-        phone: '',
-        address: '',
-        city: '',
-        state: '',
-        zipCode: '',
-      });
-    });
-
-    expect(mockOnClose).toHaveBeenCalled();
   });
 });
 ```
 
 ### Testing Best Practices
 
-**1. Mock API calls at the module level**:
-```typescript
-vi.mock('../api/client');
-```
-
-**2. Clear mocks between tests**:
-```typescript
-beforeEach(() => {
-  vi.clearAllMocks();
-});
-```
-
-**3. Use `waitFor` for async operations**:
-```typescript
-await waitFor(() => {
-  expect(screen.getByText('Data')).toBeInTheDocument();
-});
-```
-
-**4. Simulate user interactions with `userEvent`**:
-```typescript
-const user = userEvent.setup();
-await user.click(button);
-await user.type(input, 'text');
-```
-
-**5. Use accessible queries**:
-```typescript
-// ✅ Good - accessible
-screen.getByRole('button', { name: /submit/i })
-screen.getByLabelText(/email/i)
-
-// ❌ Avoid - brittle
-screen.getByClassName('submit-btn')
-screen.getByTestId('email-input')
-```
-
-**6. Test user-facing behavior, not implementation**:
-```typescript
-// ✅ Good - tests what user sees
-expect(screen.getByText('John Doe')).toBeInTheDocument();
-
-// ❌ Avoid - tests implementation details
-expect(component.state.customers).toHaveLength(1);
-```
+1. **Mock API calls at the module level**: `vi.mock('../api/client')`
+2. **Clear mocks between tests**: `beforeEach(() => { vi.clearAllMocks(); })`
+3. **Use `waitFor` for async operations**: `await waitFor(() => { expect(...).toBeInTheDocument(); })`
+4. **Simulate user interactions with `userEvent`**: `await user.click(button)`
+5. **Use accessible queries**: `screen.getByRole('button', { name: /submit/i })`
+6. **Test user-facing behavior, not implementation**: Test what user sees, not internal state
 
 ### What to Test
 
@@ -1739,12 +1145,7 @@ aws cloudfront create-invalidation \
 | `src/App.tsx` | Routes and authentication logic |
 | `src/api/client.ts` | Shared Axios instance with JWT interceptor |
 | `src/api/index.ts` | Central barrel export for all API services |
-| `src/api/customerApi.ts` | Customer service API methods |
-| `src/api/workOrderApi.ts` | Work Order service API methods |
-| `src/api/userApi.ts` | User management API methods |
-| `src/api/equipmentApi.ts` | Equipment, Parts, Warehouses APIs |
-| `src/api/financialApi.ts` | Invoices, Quotes, Payments APIs |
-| `src/api/schedulingApi.ts` | Dispatches, Availability, Recurring Orders APIs |
+| `src/api/*Api.ts` | API service methods for each domain |
 | `src/components/AppLayout.tsx` | Main layout with navigation |
 | `src/config/amplify.ts` | AWS Amplify/Cognito configuration |
 | `src/test/setup.ts` | Test environment configuration and mocks |
@@ -1772,7 +1173,7 @@ This frontend uses a **modern, simple architecture**:
 **When adding new features**:
 1. Create API service class in `src/api/` with TypeScript interfaces
 2. Export from `src/api/index.ts` barrel file
-3. Follow the Entity Page + Form Dialog pattern
+3. Follow the Entity Page + Form Dialog pattern (see CustomersPage.tsx as reference)
 4. Use the API service with React Query
 5. Use Catalyst UI components
 6. Add i18n translations to `src/i18n/locales/en_us.json`

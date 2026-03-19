@@ -22,6 +22,7 @@ export interface Role {
   capabilities?: string[];
   isProtected?: boolean;
   isSystemRole?: boolean;
+  systemRoleCode?: string;
   createdAt?: string;
   updatedAt?: string;
 }
