@@ -292,6 +292,7 @@
       "roleId": "Role ID",
       "roleInfo": "Role Information",
       "systemInfo": "System Information",
+      "templateCode": "Template Code",
       "totalCapabilities": "Total Capabilities"
     },
     "table": {

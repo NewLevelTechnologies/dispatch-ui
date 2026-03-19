@@ -261,6 +261,7 @@ vi.mock('react-i18next', () => {
     'roles.detail.roleId': 'Role ID',
     'roles.detail.roleInfo': 'Role Information',
     'roles.detail.systemInfo': 'System Information',
+    'roles.detail.templateCode': 'Template Code',
     'roles.detail.totalCapabilities': 'Total Capabilities',
     'roles.form.descriptionCreate': 'Create a new role by defining its name, description, and capabilities.',
     'roles.form.descriptionEdit': 'Update role name, description, and capabilities.',
