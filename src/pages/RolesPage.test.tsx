@@ -828,8 +828,8 @@ describe('RolesPage', () => {
         expect(screen.getByText('Restore All Default Roles?')).toBeInTheDocument();
       });
 
-      // Should show count of system roles (2 in mockRoles)
-      expect(screen.getByText(/reset all 2 default system roles/i)).toBeInTheDocument();
+      // Should always show 6 (the number in templates, not current count)
+      expect(screen.getByText(/reset all 6 default system roles/i)).toBeInTheDocument();
     });
   });
 });

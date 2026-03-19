@@ -272,7 +272,7 @@ export default function RolesPage() {
         </AlertTitle>
         <AlertDescription>
           {t('roles.actions.restoreAllDefaultsDescription', {
-            count: roles?.filter(r => r.isSystemRole).length || 6
+            count: 6
           })}
           {' '}
           What will happen: Modified system roles will be reset (names and capabilities). Deleted system roles will be recreated. Custom roles you've created will be preserved. User assignments will be preserved.
