@@ -6,6 +6,7 @@ import { ArrowLeftIcon } from '@heroicons/react/24/outline';
 import { userApi } from '../api';
 import AppLayout from '../components/AppLayout';
 import RoleFormDialog from '../components/RoleFormDialog';
+import CloneRoleDialog from '../components/CloneRoleDialog';
 import CapabilitiesSection from '../components/CapabilitiesSection';
 import { Heading, Subheading } from '../components/catalyst/heading';
 import { Button } from '../components/catalyst/button';
@@ -19,7 +20,9 @@ export default function RoleDetailPage() {
   const queryClient = useQueryClient();
   const { t } = useTranslation();
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isCloneDialogOpen, setIsCloneDialogOpen] = useState(false);
   const [isDeleteAlertOpen, setIsDeleteAlertOpen] = useState(false);
+  const [isRestoreAlertOpen, setIsRestoreAlertOpen] = useState(false);
 
   const { data: role, isLoading, error } = useQuery({
     queryKey: ['roles', id],
@@ -40,8 +43,31 @@ export default function RoleDetailPage() {
     },
   });
 
+  const restoreDefaultsMutation = useMutation({
+    mutationFn: () => userApi.restoreRoleDefaults(id!),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['roles'] });
+      queryClient.invalidateQueries({ queryKey: ['roles', id] });
+      setIsRestoreAlertOpen(false);
+    },
+    onError: (error: unknown) => {
+      const errorMessage = error instanceof Error && 'response' in error
+        ? ((error as { response?: { data?: { message?: string } } }).response?.data?.message)
+        : undefined;
+      alert(errorMessage || 'Failed to restore role defaults');
+    },
+  });
+
   const handleEdit = () => {
     setIsEditDialogOpen(true);
+  };
+
+  const handleClone = () => {
+    setIsCloneDialogOpen(true);
+  };
+
+  const handleRestoreDefaults = () => {
+    setIsRestoreAlertOpen(true);
   };
 
   const handleDelete = () => {
@@ -52,8 +78,16 @@ export default function RoleDetailPage() {
     deleteMutation.mutate();
   };
 
+  const confirmRestoreDefaults = () => {
+    restoreDefaultsMutation.mutate();
+  };
+
   const handleCloseDialog = () => {
     setIsEditDialogOpen(false);
+  };
+
+  const handleCloseCloneDialog = () => {
+    setIsCloneDialogOpen(false);
   };
 
   const formatDate = (dateString?: string) => {
@@ -117,12 +151,24 @@ export default function RoleDetailPage() {
             </p>
           </div>
           <div className="flex gap-2">
-            <Button color="zinc" onClick={handleEdit}>
-              {t('common.edit')}
+            {!role.isProtected && (
+              <Button color="zinc" onClick={handleEdit}>
+                {t('common.edit')}
+              </Button>
+            )}
+            <Button color="zinc" onClick={handleClone}>
+              {t('roles.actions.clone')}
             </Button>
-            <Button color="red" onClick={handleDelete}>
-              {t('common.delete')}
-            </Button>
+            {role.isSystemRole && (
+              <Button color="zinc" onClick={handleRestoreDefaults}>
+                {t('roles.actions.restoreDefaults')}
+              </Button>
+            )}
+            {!role.isProtected && (
+              <Button color="red" onClick={handleDelete}>
+                {t('common.delete')}
+              </Button>
+            )}
           </div>
         </div>
 
@@ -181,6 +227,12 @@ export default function RoleDetailPage() {
         role={role}
       />
 
+      <CloneRoleDialog
+        isOpen={isCloneDialogOpen}
+        onClose={handleCloseCloneDialog}
+        role={role}
+      />
+
       <Alert open={isDeleteAlertOpen} onClose={() => setIsDeleteAlertOpen(false)}>
         <AlertTitle>
           {t('common.actions.deleteConfirm', { name: role.name })}
@@ -194,6 +246,23 @@ export default function RoleDetailPage() {
           </Button>
           <Button color="red" onClick={confirmDelete} disabled={deleteMutation.isPending}>
             {deleteMutation.isPending ? t('common.deleting') : t('common.delete')}
+          </Button>
+        </AlertActions>
+      </Alert>
+
+      <Alert open={isRestoreAlertOpen} onClose={() => setIsRestoreAlertOpen(false)}>
+        <AlertTitle>
+          {t('roles.actions.restoreDefaultsConfirm', { name: role.name })}
+        </AlertTitle>
+        <AlertDescription>
+          {t('roles.actions.restoreDefaultsWarning')}
+        </AlertDescription>
+        <AlertActions>
+          <Button plain onClick={() => setIsRestoreAlertOpen(false)}>
+            {t('common.cancel')}
+          </Button>
+          <Button onClick={confirmRestoreDefaults} disabled={restoreDefaultsMutation.isPending}>
+            {restoreDefaultsMutation.isPending ? t('common.restoring') : t('roles.actions.restore')}
           </Button>
         </AlertActions>
       </Alert>

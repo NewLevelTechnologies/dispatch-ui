@@ -175,10 +175,80 @@ describe('RoleFormDialog', () => {
       await user.click(submitButton);
 
       await waitFor(() => {
+        // Only metadata endpoint called since name changed but capabilities didn't
         expect(apiClient.put).toHaveBeenCalledWith('/users/roles/1', {
           name: 'Senior Technician',
           description: 'Handles field work',
-          capabilities: ['customers:read'],
+        });
+      });
+
+      // Capabilities endpoint NOT called since capabilities didn't change
+      expect(apiClient.put).toHaveBeenCalledTimes(1);
+
+      expect(mockOnClose).toHaveBeenCalled();
+    });
+
+    it('only calls capabilities endpoint when only capabilities change', async () => {
+      const user = userEvent.setup();
+      vi.mocked(apiClient.put).mockResolvedValue({ data: existingRole });
+
+      renderWithProviders(<RoleFormDialog isOpen={true} onClose={mockOnClose} role={existingRole} />);
+
+      await waitFor(() => {
+        expect(screen.getByRole('checkbox', { name: /view customers/i })).toBeInTheDocument();
+      });
+
+      // Add a new capability (Edit Customers)
+      const editCheckbox = screen.getByRole('checkbox', { name: /edit customers/i });
+      await user.click(editCheckbox);
+
+      const submitButton = screen.getByRole('button', { name: /update/i });
+      await user.click(submitButton);
+
+      await waitFor(() => {
+        // Only capabilities endpoint called since only capabilities changed
+        expect(apiClient.put).toHaveBeenCalledWith('/users/roles/1/capabilities', {
+          capabilities: expect.arrayContaining(['customers:read', 'customers:write']),
+        });
+      });
+
+      // Metadata endpoint NOT called since name/description didn't change
+      expect(apiClient.put).toHaveBeenCalledTimes(1);
+
+      expect(mockOnClose).toHaveBeenCalled();
+    });
+
+    it('calls both endpoints when both metadata and capabilities change', async () => {
+      const user = userEvent.setup();
+      vi.mocked(apiClient.put).mockResolvedValue({ data: existingRole });
+
+      renderWithProviders(<RoleFormDialog isOpen={true} onClose={mockOnClose} role={existingRole} />);
+
+      // Update name
+      const nameInput = screen.getByDisplayValue('Field Technician');
+      await user.clear(nameInput);
+      await user.type(nameInput, 'Senior Technician');
+
+      await waitFor(() => {
+        expect(screen.getByRole('checkbox', { name: /view customers/i })).toBeInTheDocument();
+      });
+
+      // Add a new capability
+      const editCheckbox = screen.getByRole('checkbox', { name: /edit customers/i });
+      await user.click(editCheckbox);
+
+      const submitButton = screen.getByRole('button', { name: /update/i });
+      await user.click(submitButton);
+
+      await waitFor(() => {
+        // Both endpoints called
+        expect(apiClient.put).toHaveBeenCalledWith('/users/roles/1', {
+          name: 'Senior Technician',
+          description: 'Handles field work',
+        });
+
+        expect(apiClient.put).toHaveBeenCalledWith('/users/roles/1/capabilities', {
+          capabilities: expect.arrayContaining(['customers:read', 'customers:write']),
         });
       });
 

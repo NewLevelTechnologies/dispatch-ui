@@ -71,12 +71,38 @@ export default function RoleFormDialog({ isOpen, onClose, role }: RoleFormDialog
   });
 
   const updateMutation = useMutation({
-    mutationFn: (data: { name: string; description?: string; capabilities: string[] }) =>
-      userApi.updateRole(role!.id, {
-        name: data.name,
-        description: data.description,
-        capabilities: data.capabilities,
-      }),
+    mutationFn: async (data: { name: string; description?: string; capabilities: string[] }) => {
+      const originalRole = role!;
+
+      // Check if metadata changed (name or description)
+      const metadataChanged =
+        data.name !== originalRole.name ||
+        (data.description || '') !== (originalRole.description || '');
+
+      // Check if capabilities changed
+      const capabilitiesChanged =
+        JSON.stringify([...(data.capabilities || [])].sort()) !==
+        JSON.stringify([...(originalRole.capabilities || [])].sort());
+
+      let updatedRole = originalRole;
+
+      // Only call metadata endpoint if name or description changed
+      if (metadataChanged) {
+        await userApi.updateRole(originalRole.id, {
+          name: data.name,
+          description: data.description,
+        });
+      }
+
+      // Only call capabilities endpoint if capabilities changed
+      if (capabilitiesChanged) {
+        updatedRole = await userApi.updateRoleCapabilities(originalRole.id, {
+          capabilities: data.capabilities,
+        });
+      }
+
+      return updatedRole;
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['roles'] });
       queryClient.invalidateQueries({ queryKey: ['roles', role!.id] });

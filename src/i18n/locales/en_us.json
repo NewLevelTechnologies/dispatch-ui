@@ -23,6 +23,7 @@
     "active": "Active",
     "add": "Add",
     "cancel": "Cancel",
+    "cloning": "Cloning...",
     "create": "Create",
     "delete": "Delete",
     "deleting": "Deleting...",
@@ -31,7 +32,9 @@
     "enabled": "Enabled",
     "hide": "Hide",
     "inactive": "Inactive",
+    "restoring": "Restoring...",
     "show": "Show",
+    "view": "View",
     "form": {
       "address": "Address",
       "city": "City",
@@ -269,7 +272,14 @@
   },
   "roles": {
     "actions": {
-      "deleteWarning": "This action cannot be undone. Users assigned this role will lose associated capabilities."
+      "clone": "Clone Role",
+      "cloneDescription": "Create a copy of \"{{name}}\" with all its capabilities.",
+      "deleteWarning": "This action cannot be undone. Users assigned this role will lose associated capabilities.",
+      "errorClone": "Failed to clone role",
+      "restore": "Restore",
+      "restoreDefaults": "Restore Defaults",
+      "restoreDefaultsConfirm": "Restore \"{{name}}\" to default capabilities?",
+      "restoreDefaultsWarning": "This will reset all capabilities to the system template defaults. Custom changes will be lost."
     },
     "description": "Manage roles and their capabilities",
     "form": {
