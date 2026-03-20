@@ -117,90 +117,10 @@ Dispatch UI is the frontend for the Dispatch management platform, built with **V
 - Test with realistic data volumes (100+ rows, long names, multiple phone numbers)
 - Ask: "Can a CSR complete this task in 30 seconds or less?"
 
----
-
-## CSR-Optimized UI Patterns (Established Patterns)
-
-### Dense List Page Pattern
-
-All entity list pages follow this consistent pattern for maximum data density:
-
-```typescript
-// 1. Add search state and imports
-import { useState, useMemo } from 'react';
-import { MagnifyingGlassIcon } from '@heroicons/react/24/outline';
-import { Input, InputGroup } from '../components/catalyst/input';
-
-const [searchQuery, setSearchQuery] = useState('');
-
-// 2. Filter with useMemo
-const filteredItems = useMemo(() => {
-  if (!items) return [];
-  if (!searchQuery.trim()) return items;
-  const query = searchQuery.toLowerCase();
-  return items.filter(item => /* search logic */);
-}, [items, searchQuery]);
-
-// 3. Search bar with row count (mt-2, not mt-8)
-<div className="mt-2 flex items-center gap-4">
-  <InputGroup className="flex-1 max-w-md">
-    <MagnifyingGlassIcon data-slot="icon" />
-    <Input
-      type="text"
-      placeholder={t('common.search')}
-      value={searchQuery}
-      onChange={(e) => setSearchQuery(e.target.value)}
-    />
-  </InputGroup>
-  {items && items.length > 0 && (
-    <div className="text-sm text-zinc-600 dark:text-zinc-400">
-      {filteredItems.length === items.length
-        ? `${items.length} ${items.length === 1 ? 'item' : 'items'}`
-        : `${filteredItems.length} of ${items.length}`}
-    </div>
-  )}
-</div>
-
-// 4. Dense table (mt-4, not mt-8)
-<div className="mt-4">
-  <Table dense className="[--gutter:theme(spacing.1)] text-sm">
-    {/* table content */}
-  </Table>
-</div>
-
-// 5. Compact empty states
-<div className="mt-4 rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700 p-4">
-  <p className="text-sm text-zinc-600 dark:text-zinc-400">
-    {searchQuery ? t('common.actions.noMatchSearch') : t('common.actions.notFound')}
-  </p>
-</div>
-```
-
-### Spacing Conventions (CSR Density)
-
-**List Pages:**
-- Top spacing: `mt-4` (not mt-8)
-- Search bar: `mt-2`
-- Gap between elements: `gap-4` or `gap-2` for tight sections
-
-**Detail Pages:**
-- Section spacing: `my-4` (not my-8)
-- Content grids: `gap-4` (not gap-8)
-- Top spacing: `mt-4` (not mt-8 or mt-6)
-
-**Result:** ~60% whitespace reduction, 25-30 rows visible per screen vs 10-15 previously.
-
-### CSR Quick Checklist
-
-When adding/updating entity pages:
-- [ ] Use `dense` prop on all Tables
-- [ ] Add `className="[--gutter:theme(spacing.1)] text-sm"` to Tables
-- [ ] Use InputGroup + MagnifyingGlassIcon for search
-- [ ] Add row count indicator (X items / X of Y)
-- [ ] Use `mt-4` for main content spacing (not mt-8)
-- [ ] Use `mt-2` for search bars
-- [ ] Compact empty/loading states (no centering, no large icons)
-- [ ] Test with 50+ rows to verify density
+**CSR-Optimized UI Patterns:**
+- All entity pages follow established patterns for maximum density
+- See **[CSR_PATTERNS.md](./CSR_PATTERNS.md)** for detailed implementation patterns
+- Quick checklist: dense tables (`dense` prop + `[--gutter:theme(spacing.1)] text-sm`), InputGroup search, mt-4/mt-2 spacing, row counts
 
 ---
 
@@ -942,28 +862,6 @@ const createMutation = useMutation({
 
 **API Client** (`src/api/client.ts`) automatically adds JWT tokens to all requests via Axios interceptor using AWS Amplify `fetchAuthSession()`.
 
-### Form Initialization Pattern
-
-Use this pattern for form dialogs:
-
-```typescript
-useEffect(() => {
-  if (!isOpen) return;
-
-  // Intentionally setting form state based on props in useEffect
-  // This is the recommended pattern for initializing controlled forms
-  if (entity) {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setFormData(entity);
-  } else {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setFormData({ /* default values */ });
-  }
-}, [entity, isOpen]);
-```
-
-**Why**: This is the correct React pattern for initializing controlled forms from props.
-
 ---
 
 ## Common Utilities
@@ -1314,30 +1212,9 @@ aws cloudfront create-invalidation \
 
 - **Backend API**: See dispatch-api CLAUDE.md
 - **Infrastructure**: See dispatch-infra CLAUDE.md
-- **Catalyst UI Docs**: https://catalyst.tailwindui.com
-- **React Query Docs**: https://tanstack.com/query/latest
-- **Vite Docs**: https://vitejs.dev
-
----
-
-## Key Files Reference
-
-| File | Purpose |
-|------|---------|
-| `src/main.tsx` | Entry point, sets up Amplify + React Query |
-| `src/App.tsx` | Routes and authentication logic |
-| `src/api/client.ts` | Shared Axios instance with JWT interceptor |
-| `src/api/index.ts` | Central barrel export for all API services |
-| `src/api/*Api.ts` | API service methods for each domain |
-| `src/components/AppLayout.tsx` | Main layout with navigation |
-| `src/config/amplify.ts` | AWS Amplify/Cognito configuration |
-| `src/test/setup.ts` | Test environment configuration and mocks |
-| `src/test/utils.tsx` | Custom render with providers |
-| `.github/workflows/deploy.yml` | Deployment to S3/CloudFront |
-| `.github/workflows/pr-checks.yml` | PR validation (lint + test + build) |
-| `vite.config.ts` | Vite build configuration |
-| `vitest.config.ts` | Vitest test configuration |
-| `package.json` | Dependencies and scripts |
+- **CSR UI Patterns**: See [CSR_PATTERNS.md](./CSR_PATTERNS.md)
+- **Catalyst UI**: https://catalyst.tailwindui.com
+- **React Query**: https://tanstack.com/query/latest
 
 ---
 
