@@ -141,18 +141,18 @@ export default function CustomersPage() {
             <TableBody>
               {filteredCustomers.map((customer) => (
                 <TableRow key={customer.id}>
-                  <TableCell className="font-medium">{customer.name}</TableCell>
-                  <TableCell className="text-zinc-500">{customer.email}</TableCell>
-                  <TableCell className="text-zinc-500">{customer.phone || '-'}</TableCell>
-                  <TableCell className="text-zinc-500">
+                  <TableCell className="py-2 font-medium">{customer.name}</TableCell>
+                  <TableCell className="py-2 text-zinc-500">{customer.email}</TableCell>
+                  <TableCell className="py-2 text-zinc-500">{customer.phone || '-'}</TableCell>
+                  <TableCell className="py-2 text-zinc-500">
                     {customer.city && customer.state
                       ? `${customer.city}, ${customer.state}`
                       : '-'}
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="py-2">
                     <Badge color="lime">{t('common.active')}</Badge>
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="py-2">
                     <div className="-mx-3 -my-1.5 sm:-mx-2.5">
                       <Dropdown>
                         <DropdownButton plain aria-label={t('common.moreOptions')}>
