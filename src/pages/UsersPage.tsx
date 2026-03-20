@@ -163,7 +163,7 @@ export default function UsersPage() {
 
       {/* Search Bar and Filters */}
       {users && users.length > 0 && (
-        <div className="mt-6 flex flex-wrap gap-4 items-center">
+        <div className="mt-3 flex flex-wrap gap-4 items-center">
           {/* Search */}
           <div className="relative flex-1 min-w-[300px]">
             <MagnifyingGlassIcon className="pointer-events-none absolute left-3 top-1/2 size-5 -translate-y-1/2 text-zinc-500" />
@@ -224,13 +224,13 @@ export default function UsersPage() {
       )}
 
       {isLoading && (
-        <div className="mt-8 text-center">
+        <div className="mt-4 text-center">
           <p className="text-zinc-600 dark:text-zinc-400">{t('common.actions.loading', { entities: t('entities.users') })}</p>
         </div>
       )}
 
       {error && (
-        <div className="mt-8 rounded-lg bg-red-50 p-4 ring-1 ring-red-200 dark:bg-red-950/10 dark:ring-red-900/20">
+        <div className="mt-4 rounded-lg bg-red-50 p-4 ring-1 ring-red-200 dark:bg-red-950/10 dark:ring-red-900/20">
           <p className="text-sm text-red-800 dark:text-red-400">
             {t('common.actions.errorLoading', { entities: t('entities.users') })}: {(error as Error).message}
           </p>
@@ -238,7 +238,7 @@ export default function UsersPage() {
       )}
 
       {users && users.length === 0 && (
-        <div className="mt-8 text-center">
+        <div className="mt-4 text-center">
           <p className="text-zinc-600 dark:text-zinc-400">{t('common.actions.notFound', { entities: t('entities.users') })}</p>
           {canInviteUsers && (
             <Button className="mt-4" onClick={handleAdd}>
@@ -249,8 +249,8 @@ export default function UsersPage() {
       )}
 
       {filteredUsers && filteredUsers.length > 0 && (
-        <div className="mt-8">
-          <Table className="[--gutter:theme(spacing.2)] lg:[--gutter:theme(spacing.3)]">
+        <div className="mt-4">
+          <Table dense className="[--gutter:theme(spacing.1)] text-sm">
             <TableHead>
               <TableRow>
                 <TableHeader>{t('common.form.name')}</TableHeader>
@@ -338,7 +338,7 @@ export default function UsersPage() {
           </Table>
 
           {filteredUsers.length === 0 && searchQuery && (
-            <div className="mt-8 text-center">
+            <div className="mt-4 text-center">
               <p className="text-zinc-600 dark:text-zinc-400">
                 {t('users.search.noMatch', { query: searchQuery })}
               </p>
