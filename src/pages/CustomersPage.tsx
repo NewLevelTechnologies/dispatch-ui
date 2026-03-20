@@ -30,7 +30,7 @@ export default function CustomersPage() {
     if (!searchQuery.trim()) return customers;
 
     const query = searchQuery.toLowerCase();
-    return customers.filter(
+    const filtered = customers.filter(
       (customer) =>
         customer.name.toLowerCase().includes(query) ||
         customer.email.toLowerCase().includes(query) ||
@@ -38,6 +38,8 @@ export default function CustomersPage() {
         customer.city?.toLowerCase().includes(query) ||
         customer.state?.toLowerCase().includes(query)
     );
+    console.log('Search query:', searchQuery, '| Total:', customers.length, '| Filtered:', filtered.length);
+    return filtered;
   }, [customers, searchQuery]);
 
   const deleteMutation = useMutation({
@@ -127,32 +129,32 @@ export default function CustomersPage() {
 
       {filteredCustomers.length > 0 && (
         <div className="mt-4">
-          <Table className="[--gutter:theme(spacing.1)] text-sm">
+          <Table dense className="[--gutter:theme(spacing.1)] text-sm">
             <TableHead>
               <TableRow>
-                <TableHeader>{t('common.form.name')}</TableHeader>
-                <TableHeader>{t('common.form.email')}</TableHeader>
-                <TableHeader>{t('common.form.phone')}</TableHeader>
-                <TableHeader>{t('customers.table.location')}</TableHeader>
-                <TableHeader>{t('common.form.status')}</TableHeader>
-                <TableHeader></TableHeader>
+                <TableHeader className="py-1.5">{t('common.form.name')}</TableHeader>
+                <TableHeader className="py-1.5">{t('common.form.email')}</TableHeader>
+                <TableHeader className="py-1.5">{t('common.form.phone')}</TableHeader>
+                <TableHeader className="py-1.5">{t('customers.table.location')}</TableHeader>
+                <TableHeader className="py-1.5">{t('common.form.status')}</TableHeader>
+                <TableHeader className="py-1.5"></TableHeader>
               </TableRow>
             </TableHead>
             <TableBody>
               {filteredCustomers.map((customer) => (
                 <TableRow key={customer.id}>
-                  <TableCell className="py-2 font-medium">{customer.name}</TableCell>
-                  <TableCell className="py-2 text-zinc-500">{customer.email}</TableCell>
-                  <TableCell className="py-2 text-zinc-500">{customer.phone || '-'}</TableCell>
-                  <TableCell className="py-2 text-zinc-500">
+                  <TableCell className="py-1.5 font-medium">{customer.name}</TableCell>
+                  <TableCell className="py-1.5 text-zinc-500">{customer.email}</TableCell>
+                  <TableCell className="py-1.5 text-zinc-500">{customer.phone || '-'}</TableCell>
+                  <TableCell className="py-1.5 text-zinc-500">
                     {customer.city && customer.state
                       ? `${customer.city}, ${customer.state}`
                       : '-'}
                   </TableCell>
-                  <TableCell className="py-2">
+                  <TableCell className="py-1.5">
                     <Badge color="lime">{t('common.active')}</Badge>
                   </TableCell>
-                  <TableCell className="py-2">
+                  <TableCell className="py-1.5">
                     <div className="-mx-3 -my-1.5 sm:-mx-2.5">
                       <Dropdown>
                         <DropdownButton plain aria-label={t('common.moreOptions')}>
