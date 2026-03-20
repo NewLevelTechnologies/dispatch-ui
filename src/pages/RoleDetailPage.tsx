@@ -182,10 +182,10 @@ export default function RoleDetailPage() {
           )}
         </div>
 
-        <Divider className="my-8" />
+        <Divider className="my-4" />
 
         {/* Content Grid */}
-        <div className="grid gap-8 lg:grid-cols-2">
+        <div className="grid gap-4 lg:grid-cols-2">
           {/* Basic Information */}
           <div>
             <Subheading>{t('roles.detail.roleInfo')}</Subheading>
@@ -237,7 +237,7 @@ export default function RoleDetailPage() {
         </div>
 
         {/* Capabilities Section - Full Width */}
-        <div className="mt-8">
+        <div className="mt-4">
           <CapabilitiesSection capabilities={role.capabilities || []} />
         </div>
       </div>
