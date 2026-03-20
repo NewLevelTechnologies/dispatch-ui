@@ -1,14 +1,15 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { EllipsisVerticalIcon, ShieldCheckIcon, ArrowPathIcon } from '@heroicons/react/24/outline';
+import { EllipsisVerticalIcon, ShieldCheckIcon, ArrowPathIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import { userApi, type Role, type RestoreAllDefaultsResponse } from '../api';
 import { useHasCapability } from '../hooks/useCurrentUser';
 import AppLayout from '../components/AppLayout';
 import RoleFormDialog from '../components/RoleFormDialog';
 import { Heading } from '../components/catalyst/heading';
 import { Button } from '../components/catalyst/button';
+import { Input, InputGroup } from '../components/catalyst/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/catalyst/table';
 import { Badge } from '../components/catalyst/badge';
 import { Dropdown, DropdownButton, DropdownItem, DropdownLabel, DropdownMenu } from '../components/catalyst/dropdown';
@@ -23,6 +24,7 @@ export default function RolesPage() {
   const [isDeleteAlertOpen, setIsDeleteAlertOpen] = useState(false);
   const [roleToDelete, setRoleToDelete] = useState<Role | null>(null);
   const [isRestoreAllAlertOpen, setIsRestoreAllAlertOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
 
   // Permission checks
   const canCreateRoles = useHasCapability('CREATE_ROLES');
@@ -131,6 +133,19 @@ export default function RolesPage() {
     });
   };
 
+  // Filter roles based on search query
+  const filteredRoles = useMemo(() => {
+    if (!roles) return [];
+    if (!searchQuery.trim()) return roles;
+
+    const query = searchQuery.toLowerCase();
+    return roles.filter(
+      (role) =>
+        role.name.toLowerCase().includes(query) ||
+        role.description?.toLowerCase().includes(query)
+    );
+  }, [roles, searchQuery]);
+
   return (
     <AppLayout>
       <div className="flex items-center justify-between">
@@ -158,8 +173,28 @@ export default function RolesPage() {
         )}
       </div>
 
+      {/* Quick Search Bar */}
+      <div className="mt-2 flex items-center gap-4">
+        <InputGroup className="flex-1 max-w-md">
+          <MagnifyingGlassIcon data-slot="icon" />
+          <Input
+            type="text"
+            placeholder={t('common.search')}
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+        </InputGroup>
+        {roles && roles.length > 0 && (
+          <div className="text-sm text-zinc-600 dark:text-zinc-400">
+            {filteredRoles.length === roles.length
+              ? `${roles.length} ${roles.length === 1 ? t('entities.role').toLowerCase() : t('entities.roles').toLowerCase()}`
+              : `${filteredRoles.length} of ${roles.length}`}
+          </div>
+        )}
+      </div>
+
       {isLoading && (
-        <div className="mt-8 text-center">
+        <div className="mt-4 text-center">
           <p className="text-zinc-600 dark:text-zinc-400">
             {t('common.actions.loading', { entities: t('entities.roles') })}
           </p>
@@ -167,7 +202,7 @@ export default function RolesPage() {
       )}
 
       {error && (
-        <div className="mt-8 rounded-lg bg-red-50 p-4 ring-1 ring-red-200 dark:bg-red-950/10 dark:ring-red-900/20">
+        <div className="mt-4 rounded-lg bg-red-50 p-4 ring-1 ring-red-200 dark:bg-red-950/10 dark:ring-red-900/20">
           <p className="text-sm text-red-800 dark:text-red-400">
             {t('common.actions.errorLoading', { entities: t('entities.roles') })}: {(error as Error).message}
           </p>
@@ -175,7 +210,7 @@ export default function RolesPage() {
       )}
 
       {roles && roles.length === 0 && (
-        <div className="mt-8 text-center">
+        <div className="mt-4 text-center">
           <p className="text-zinc-600 dark:text-zinc-400">
             {t('common.actions.notFound', { entities: t('entities.roles') })}
           </p>
@@ -187,9 +222,17 @@ export default function RolesPage() {
         </div>
       )}
 
-      {roles && roles.length > 0 && (
-        <div className="mt-8">
-          <Table className="[--gutter:theme(spacing.6)] lg:[--gutter:theme(spacing.10)]">
+      {roles && roles.length > 0 && filteredRoles.length === 0 && (
+        <div className="mt-4 rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700 p-4">
+          <p className="text-sm text-zinc-600 dark:text-zinc-400">
+            {t('common.actions.noMatchSearch', { entities: t('entities.roles') })}
+          </p>
+        </div>
+      )}
+
+      {roles && roles.length > 0 && filteredRoles.length > 0 && (
+        <div className="mt-4">
+          <Table dense className="[--gutter:theme(spacing.1)] text-sm">
             <TableHead>
               <TableRow>
                 <TableHeader>{t('common.form.name')}</TableHeader>
@@ -200,7 +243,7 @@ export default function RolesPage() {
               </TableRow>
             </TableHead>
             <TableBody>
-              {roles.map((role) => (
+              {filteredRoles.map((role) => (
                 <TableRow
                   key={role.id}
                   href={`/roles/${role.id}`}
