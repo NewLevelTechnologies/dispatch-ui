@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { EllipsisVerticalIcon, CalendarIcon } from '@heroicons/react/24/outline';
+import { EllipsisVerticalIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import apiClient from '../api/client';
 import AppLayout from '../components/AppLayout';
 import { Heading } from '../components/catalyst/heading';
@@ -11,7 +11,7 @@ import { Badge } from '../components/catalyst/badge';
 import { Dropdown, DropdownButton, DropdownItem, DropdownLabel, DropdownMenu } from '../components/catalyst/dropdown';
 import { Dialog, DialogActions, DialogBody, DialogDescription, DialogTitle } from '../components/catalyst/dialog';
 import { Field, FieldGroup, Fieldset, Label } from '../components/catalyst/fieldset';
-import { Input } from '../components/catalyst/input';
+import { Input, InputGroup } from '../components/catalyst/input';
 import { Select } from '../components/catalyst/select';
 import { Textarea } from '../components/catalyst/textarea';
 import {
@@ -31,6 +31,7 @@ export default function DispatchesPage() {
   const { t } = useTranslation();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedDispatch, setSelectedDispatch] = useState<Dispatch | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
   const [formData, setFormData] = useState<CreateDispatchRequest>({
     workOrderId: '',
     assignedUserId: '',
@@ -53,8 +54,44 @@ export default function DispatchesPage() {
   });
 
   // Ensure all data is always an array
-  const safeDispatches = Array.isArray(dispatches) ? dispatches : [];
-  const safeWorkOrders = Array.isArray(workOrders) ? workOrders : [];
+  const safeDispatches = useMemo(() => Array.isArray(dispatches) ? dispatches : [], [dispatches]);
+  const safeWorkOrders = useMemo(() => Array.isArray(workOrders) ? workOrders : [], [workOrders]);
+
+  const formatDateTime = (dateString: string) => {
+    return new Date(dateString).toLocaleString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  };
+
+  const getWorkOrderDescription = (workOrderId: string) => {
+    const workOrder = safeWorkOrders.find((wo) => wo.id === workOrderId);
+    return workOrder?.description || workOrderId;
+  };
+
+  // Filter dispatches based on search query
+  const filteredDispatches = useMemo(() => {
+    if (safeDispatches.length === 0) return [];
+    if (!searchQuery.trim()) return safeDispatches;
+
+    const query = searchQuery.toLowerCase();
+    return safeDispatches.filter(
+      (dispatch) => {
+        const workOrderDesc = safeWorkOrders.find((wo) => wo.id === dispatch.workOrderId)?.description || dispatch.workOrderId;
+        return (
+          dispatch.id.toLowerCase().includes(query) ||
+          dispatch.workOrderId.toLowerCase().includes(query) ||
+          dispatch.assignedUserId.toLowerCase().includes(query) ||
+          dispatch.status.toLowerCase().includes(query) ||
+          dispatch.notes?.toLowerCase().includes(query) ||
+          workOrderDesc.toLowerCase().includes(query)
+        );
+      }
+    );
+  }, [safeDispatches, safeWorkOrders, searchQuery]);
 
   const createMutation = useMutation({
     mutationFn: (request: CreateDispatchRequest) => dispatchesApi.create(request),
@@ -139,59 +176,64 @@ export default function DispatchesPage() {
     return <Badge color={colors[status] || 'zinc'}>{status}</Badge>;
   };
 
-  const getWorkOrderDescription = (workOrderId: string) => {
-    const workOrder = safeWorkOrders.find((wo) => wo.id === workOrderId);
-    return workOrder?.description || workOrderId;
-  };
-
-  const formatDateTime = (dateString: string) => {
-    return new Date(dateString).toLocaleString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  };
-
   return (
     <AppLayout>
-      <div className="flex items-end justify-between gap-4">
-        <div>
-          <Heading>{t('scheduling.entities.dispatches')}</Heading>
-          <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
-            {t('scheduling.descriptionDispatches')}
-          </p>
-        </div>
+      <div className="flex items-center justify-between gap-4">
+        <Heading>{t('scheduling.entities.dispatches')}</Heading>
         <Button onClick={handleAdd}>
           {t('common.actions.add', { entity: t('scheduling.entities.dispatch') })}
         </Button>
       </div>
 
-      <div className="mt-8">
-        {error && (
-          <div className="rounded-lg bg-red-50 p-4 ring-1 ring-red-200 dark:bg-red-950/10 dark:ring-red-900/20 mb-4">
-            <p className="text-sm text-red-800 dark:text-red-400">
-              {t('common.actions.errorLoading', { entities: t('scheduling.entities.dispatches') })}: {(error as Error).message}
-            </p>
+      {/* Quick Search Bar */}
+      <div className="mt-2 flex items-center gap-4">
+        <InputGroup className="flex-1 max-w-md">
+          <MagnifyingGlassIcon data-slot="icon" />
+          <Input
+            type="text"
+            placeholder={t('common.search')}
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+        </InputGroup>
+        {safeDispatches.length > 0 && (
+          <div className="text-sm text-zinc-600 dark:text-zinc-400">
+            {filteredDispatches.length === safeDispatches.length
+              ? `${safeDispatches.length} ${safeDispatches.length === 1 ? t('scheduling.entities.dispatch').toLowerCase() : t('scheduling.entities.dispatches').toLowerCase()}`
+              : `${filteredDispatches.length} of ${safeDispatches.length}`}
           </div>
         )}
+      </div>
 
-        {isLoading ? (
-          <div className="flex flex-col items-center justify-center py-12">
-            <p className="text-sm text-zinc-600 dark:text-zinc-400">
-              {t('common.actions.loading', { entities: t('scheduling.entities.dispatches') })}
-            </p>
-          </div>
-        ) : safeDispatches.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-12">
-            <CalendarIcon className="h-12 w-12 text-zinc-400" />
-            <p className="mt-4 text-sm text-zinc-600 dark:text-zinc-400">
-              {t('common.actions.notFound', { entities: t('scheduling.entities.dispatches') })}
-            </p>
-          </div>
-        ) : (
-          <Table>
+      {error && (
+        <div className="mt-4 rounded-lg bg-red-50 p-3 ring-1 ring-red-200 dark:bg-red-950/10 dark:ring-red-900/20">
+          <p className="text-sm text-red-800 dark:text-red-400">
+            {t('common.actions.errorLoading', { entities: t('scheduling.entities.dispatches') })}: {(error as Error).message}
+          </p>
+        </div>
+      )}
+
+      {isLoading ? (
+        <div className="mt-4 text-center">
+          <p className="text-sm text-zinc-600 dark:text-zinc-400">
+            {t('common.actions.loading', { entities: t('scheduling.entities.dispatches') })}
+          </p>
+        </div>
+      ) : safeDispatches.length === 0 ? (
+        <div className="mt-4 rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700 p-4">
+          <p className="text-sm text-zinc-600 dark:text-zinc-400">
+            {t('common.actions.notFound', { entities: t('scheduling.entities.dispatches') })}
+          </p>
+        </div>
+      ) : filteredDispatches.length === 0 ? (
+        <div className="mt-4 rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700 p-4">
+          <p className="text-sm text-zinc-600 dark:text-zinc-400">
+            {t('common.actions.noMatchSearch', { entities: t('scheduling.entities.dispatches') })}
+          </p>
+        </div>
+      ) : (
+        <div className="mt-4">
+          <Table dense className="[--gutter:theme(spacing.1)] text-sm">
             <TableHead>
               <TableRow>
                 <TableHeader>{t('scheduling.table.workOrder')}</TableHeader>
@@ -203,7 +245,7 @@ export default function DispatchesPage() {
               </TableRow>
             </TableHead>
             <TableBody>
-              {safeDispatches.map((item) => (
+              {filteredDispatches.map((item) => (
                 <TableRow key={item.id}>
                   <TableCell className="font-medium">
                     {getWorkOrderDescription(item.workOrderId)}
@@ -235,8 +277,8 @@ export default function DispatchesPage() {
               ))}
             </TableBody>
           </Table>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Dialog */}
       <Dialog open={isDialogOpen} onClose={setIsDialogOpen}>
