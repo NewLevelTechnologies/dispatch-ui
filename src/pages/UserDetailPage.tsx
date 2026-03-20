@@ -155,10 +155,10 @@ export default function UserDetailPage() {
           )}
         </div>
 
-        <Divider className="my-8" />
+        <Divider className="my-4" />
 
         {/* Content Grid */}
-        <div className="grid gap-8 lg:grid-cols-2">
+        <div className="grid gap-4 lg:grid-cols-2">
           {/* Basic Information */}
           <div>
             <Subheading>{t('users.detail.basicInfo')}</Subheading>
@@ -204,7 +204,7 @@ export default function UserDetailPage() {
           </div>
         </div>
 
-        <div className="grid gap-8 lg:grid-cols-2">
+        <div className="grid gap-4 lg:grid-cols-2">
           {/* System Information */}
           <div>
             <Subheading>{t('users.detail.systemInfo')}</Subheading>
@@ -246,15 +246,15 @@ export default function UserDetailPage() {
         </div>
 
         {/* Capabilities Section - Collapsible, below main content */}
-        <Divider className="my-8" />
+        <Divider className="my-4" />
         <div>
           <CapabilitiesSection capabilities={user.capabilities || []} />
         </div>
 
         {/* Future sections placeholder */}
-        <Divider className="my-8" />
+        <Divider className="my-4" />
 
-        <div className="grid gap-8">
+        <div className="grid gap-4">
           <div>
             <Subheading>{t('users.table.auditLog')}</Subheading>
             <div className="mt-4 rounded-lg bg-zinc-50 p-6 text-center dark:bg-zinc-900">
