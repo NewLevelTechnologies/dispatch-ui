@@ -235,7 +235,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </Navbar>
       }
     >
-      <div className="p-3">
+      <div className="p-2">
         {children}
       </div>
     </SidebarLayout>

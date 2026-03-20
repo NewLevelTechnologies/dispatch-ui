@@ -18,6 +18,7 @@
       "edit": "Edit {{entity}}",
       "errorLoading": "Error loading {{entities, lowercase}}",
       "loading": "Loading {{entities, lowercase}}...",
+      "noMatchSearch": "No {{entities, lowercase}} match your search.",
       "notFound": "No {{entities, lowercase}} found"
     },
     "active": "Active",
@@ -33,6 +34,7 @@
     "hide": "Hide",
     "inactive": "Inactive",
     "restoring": "Restoring...",
+    "search": "Search...",
     "show": "Show",
     "view": "View",
     "form": {
