@@ -30,7 +30,7 @@ export default function CustomersPage() {
     if (!searchQuery.trim()) return customers;
 
     const query = searchQuery.toLowerCase();
-    const filtered = customers.filter(
+    return customers.filter(
       (customer) =>
         customer.name.toLowerCase().includes(query) ||
         customer.email.toLowerCase().includes(query) ||
@@ -38,8 +38,6 @@ export default function CustomersPage() {
         customer.city?.toLowerCase().includes(query) ||
         customer.state?.toLowerCase().includes(query)
     );
-    console.log('Search query:', searchQuery, '| Total:', customers.length, '| Filtered:', filtered.length);
-    return filtered;
   }, [customers, searchQuery]);
 
   const deleteMutation = useMutation({
@@ -85,10 +83,7 @@ export default function CustomersPage() {
             type="text"
             placeholder={t('common.search')}
             value={searchQuery}
-            onChange={(e) => {
-              console.log('Input onChange fired:', e.target.value);
-              setSearchQuery(e.target.value);
-            }}
+            onChange={(e) => setSearchQuery(e.target.value)}
           />
         </InputGroup>
         {customers && (
