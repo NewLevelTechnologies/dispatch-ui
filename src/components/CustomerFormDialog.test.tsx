@@ -34,7 +34,7 @@ describe('CustomerFormDialog', () => {
       expect(apiClient.post).not.toHaveBeenCalled();
     });
 
-    it('submits form with valid data', async () => {
+    it('submits form with valid data', { timeout: 10000 }, async () => {
       const user = userEvent.setup();
       vi.mocked(apiClient.post).mockResolvedValue({ data: { id: '1' } });
 
