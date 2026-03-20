@@ -21,6 +21,102 @@ Dispatch UI is the frontend for the Dispatch management platform, built with **V
 
 **Live URL**: https://dev.dispatch.newleveltech.net
 
+## End Users & Context
+
+**IMPORTANT**: This is an **internal business tool**, not a customer-facing application.
+
+**End Users (who uses the software):**
+- **Customer Service Reps (CSRs)** - Take incoming calls, create/update customer records, schedule work orders
+- **Dispatchers** - Assign technicians, manage schedules, track service calls
+- **Field Technicians** - View assigned work orders, update job status (mobile)
+- **Office Managers** - Generate reports, manage invoices, track payments
+
+**Customers (NOT end users):**
+- Homeowners (90% of service calls)
+- Business owners (restaurants, offices, retail)
+- Property managers (landlords with rental properties)
+
+**Critical UI/UX Implications:**
+
+1. **Data Density Over Simplicity**
+   - ✅ CSRs are trained users who work in this system all day
+   - ✅ Prefer dense, information-rich screens over minimal designs
+   - ✅ Minimize scrolling - CSRs want everything visible at once
+   - ✅ Use tables, grids, and compact layouts (not cards with lots of whitespace)
+   - ❌ Don't over-simplify or hide information "to reduce clutter"
+   - ❌ Don't make CSRs click through multiple screens for common tasks
+
+2. **Efficiency Over Aesthetics**
+   - ✅ Fast data entry is more important than beautiful animations
+   - ✅ Keyboard shortcuts and tab navigation are critical
+   - ✅ Bulk actions and batch operations are valuable
+   - ✅ Quick search/filter at the top of every list
+   - ❌ Don't add unnecessary animations that slow down workflows
+   - ❌ Don't prioritize visual polish over speed
+
+3. **Desktop-First Design**
+   - ✅ CSRs work on large monitors (1920x1080 or larger)
+   - ✅ Use the screen real estate - show more columns, more rows
+   - ✅ Multi-column layouts are good (sidebar + main content + details panel)
+   - ✅ Tables can have 8-10+ columns if the data is relevant
+   - ❌ Don't constrain layouts to narrow containers
+   - ❌ Don't hide columns in responsive dropdowns on desktop
+
+4. **Industry Terminology is Expected**
+   - ✅ Use domain language: "PO", "Net 30", "service location", "dispatch"
+   - ✅ CSRs understand technical and business terms
+   - ❌ Don't over-explain or add tooltips for standard industry concepts
+
+5. **Context Switching is Expensive**
+   - ✅ Show related information on the same screen (customer + locations + recent work orders)
+   - ✅ Use dialogs/modals for quick edits (keeps context)
+   - ✅ Inline editing where possible
+   - ❌ Don't make CSRs navigate between multiple pages for related data
+
+**Example: Good CSR UI Design**
+```
+┌─────────────────────────────────────────────────────────────────┐
+│ Customers  [🔍 Quick search...]  [+ Add Customer]              │
+├─────────────────────────────────────────────────────────────────┤
+│ ┌───────────────────────────────────────────────────────────┐  │
+│ │ Name         │ Phone      │ Email           │ Locations  │  │
+│ │─────────────────────────────────────────────────────────────│
+│ │ Bob Smith    │ 555-1234   │ bob@email.com   │ 1          │  │
+│ │ Joe's Pizza  │ 555-5678   │ joe@pizza.com   │ 3          │  │
+│ │ Jane Doe     │ 555-9999   │ jane@email.com  │ 2          │  │
+│ │ [25 more rows visible without scrolling]                  │  │
+│ └───────────────────────────────────────────────────────────┘  │
+│                                               Showing 1-30 of 127│
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**Example: Bad CSR UI Design (Too Much Whitespace)**
+```
+┌────────────────────────┐
+│                        │
+│   Customers            │
+│                        │
+│   ┌──────────────────┐ │
+│   │  Bob Smith       │ │  ← Only 3 customers visible
+│   │  555-1234        │ │  ← CSR has to scroll constantly
+│   └──────────────────┘ │
+│                        │
+│   ┌──────────────────┐ │
+│   │  Joe's Pizza     │ │
+│   │  555-5678        │ │
+│   └──────────────────┘ │
+│                        │
+└────────────────────────┘
+```
+
+**When Building Features:**
+- Show more data per screen
+- Reduce padding and margins (within accessibility limits)
+- Use compact Catalyst components (tables over cards)
+- Add keyboard shortcuts for common actions
+- Test with realistic data volumes (100+ rows, long names, multiple phone numbers)
+- Ask: "Can a CSR complete this task in 30 seconds or less?"
+
 ## Technology Stack
 
 - **Build Tool**: Vite 6.4.1
