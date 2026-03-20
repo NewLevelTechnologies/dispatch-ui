@@ -163,9 +163,9 @@ export default function UsersPage() {
 
       {/* Search Bar and Filters */}
       {users && users.length > 0 && (
-        <div className="mt-3 flex flex-wrap gap-4 items-center">
+        <div className="mt-2 flex flex-wrap gap-2 items-center">
           {/* Search */}
-          <div className="relative flex-1 min-w-[300px]">
+          <div className="relative flex-1 min-w-[250px]">
             <MagnifyingGlassIcon className="pointer-events-none absolute left-3 top-1/2 size-5 -translate-y-1/2 text-zinc-500" />
             <Input
               type="search"
