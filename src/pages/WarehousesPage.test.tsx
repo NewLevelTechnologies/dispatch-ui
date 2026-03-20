@@ -230,4 +230,53 @@ describe('WarehousesPage', () => {
       expect(mockUpdate).toHaveBeenCalled();
     });
   });
+
+  it('filters warehouses by search query', async () => {
+    mockGetAll.mockResolvedValue(mockWarehouses);
+    const user = userEvent.setup();
+
+    renderWithProviders(<WarehousesPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Main Warehouse')).toBeInTheDocument();
+      expect(screen.getByText('East Warehouse')).toBeInTheDocument();
+    });
+
+    // Type in search box
+    const searchInput = screen.getByPlaceholderText(/search/i);
+    await user.type(searchInput, 'Main');
+
+    // Only Main Warehouse should be visible
+    await waitFor(() => {
+      expect(screen.getByText('Main Warehouse')).toBeInTheDocument();
+      expect(screen.queryByText('East Warehouse')).not.toBeInTheDocument();
+    });
+  });
+
+  it('shows all warehouses when search is cleared', async () => {
+    mockGetAll.mockResolvedValue(mockWarehouses);
+    const user = userEvent.setup();
+
+    renderWithProviders(<WarehousesPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Main Warehouse')).toBeInTheDocument();
+    });
+
+    const searchInput = screen.getByPlaceholderText(/search/i);
+    await user.type(searchInput, 'Main');
+
+    await waitFor(() => {
+      expect(screen.queryByText('East Warehouse')).not.toBeInTheDocument();
+    });
+
+    // Clear search
+    await user.clear(searchInput);
+
+    // Both should be visible again
+    await waitFor(() => {
+      expect(screen.getByText('Main Warehouse')).toBeInTheDocument();
+      expect(screen.getByText('East Warehouse')).toBeInTheDocument();
+    });
+  });
 });

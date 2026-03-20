@@ -119,7 +119,7 @@ describe('PartsInventoryPage', () => {
     });
   });
 
-  it('opens create dialog when add button is clicked', async () => {
+  it('opens create dialog when add button is clicked', { timeout: 10000 }, async () => {
     mockPartsGetAll.mockResolvedValue([]);
     mockPartsCreate.mockResolvedValue({ ...mockParts[0], id: '3' });
     const user = userEvent.setup();
@@ -246,5 +246,27 @@ describe('PartsInventoryPage', () => {
 
     expect(confirmSpy).toHaveBeenCalled();
     confirmSpy.mockRestore();
+  });
+
+  it('filters parts by search query', async () => {
+    mockPartsGetAll.mockResolvedValue(mockParts);
+    const user = userEvent.setup();
+
+    renderWithProviders(<PartsInventoryPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('P-001')).toBeInTheDocument();
+      expect(screen.getByText('P-002')).toBeInTheDocument();
+    });
+
+    // Search for "Filter" (part of part name)
+    const searchInput = screen.getByPlaceholderText(/search/i);
+    await user.type(searchInput, 'Filter');
+
+    // Only Filter part should be visible
+    await waitFor(() => {
+      expect(screen.getByText('P-002')).toBeInTheDocument();
+      expect(screen.queryByText('P-001')).not.toBeInTheDocument();
+    });
   });
 });

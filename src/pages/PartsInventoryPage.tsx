@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { EllipsisVerticalIcon, WrenchScrewdriverIcon } from '@heroicons/react/24/outline';
+import { EllipsisVerticalIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import AppLayout from '../components/AppLayout';
 import { Heading } from '../components/catalyst/heading';
 import { Button } from '../components/catalyst/button';
@@ -10,7 +10,7 @@ import { Badge } from '../components/catalyst/badge';
 import { Dropdown, DropdownButton, DropdownItem, DropdownLabel, DropdownMenu } from '../components/catalyst/dropdown';
 import { Dialog, DialogActions, DialogBody, DialogDescription, DialogTitle } from '../components/catalyst/dialog';
 import { Field, FieldGroup, Fieldset, Label } from '../components/catalyst/fieldset';
-import { Input } from '../components/catalyst/input';
+import { Input, InputGroup } from '../components/catalyst/input';
 import { Select } from '../components/catalyst/select';
 import { Textarea } from '../components/catalyst/textarea';
 import {
@@ -26,6 +26,7 @@ export default function PartsInventoryPage() {
   const { t } = useTranslation();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedPart, setSelectedPart] = useState<PartsInventory | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
   const [formData, setFormData] = useState<CreatePartsInventoryRequest>({
     warehouseId: '',
     partNumber: '',
@@ -46,8 +47,28 @@ export default function PartsInventoryPage() {
   });
 
   // Ensure all data is always an array
-  const safePartsInventory = Array.isArray(partsInventory) ? partsInventory : [];
-  const safeWarehouses = Array.isArray(warehouses) ? warehouses : [];
+  const safePartsInventory = useMemo(() => Array.isArray(partsInventory) ? partsInventory : [], [partsInventory]);
+  const safeWarehouses = useMemo(() => Array.isArray(warehouses) ? warehouses : [], [warehouses]);
+
+  const formatCurrency = (amount?: number) => {
+    if (amount === undefined) return '-';
+    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
+  };
+
+  // Filter parts based on search query
+  const filteredParts = useMemo(() => {
+    if (safePartsInventory.length === 0) return [];
+    if (!searchQuery.trim()) return safePartsInventory;
+
+    const query = searchQuery.toLowerCase();
+    return safePartsInventory.filter(
+      (part) =>
+        part.partNumber.toLowerCase().includes(query) ||
+        part.partName.toLowerCase().includes(query) ||
+        part.warehouseId.toLowerCase().includes(query) ||
+        part.warehouseName?.toLowerCase().includes(query)
+    );
+  }, [safePartsInventory, searchQuery]);
 
   const createMutation = useMutation({
     mutationFn: (request: CreatePartsInventoryRequest) => partsInventoryApi.create(request),
@@ -123,49 +144,64 @@ export default function PartsInventoryPage() {
     });
   };
 
-  const formatCurrency = (amount?: number) => {
-    if (amount === undefined) return '-';
-    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
-  };
-
   return (
     <AppLayout>
-      <div className="flex items-end justify-between gap-4">
-        <div>
-          <Heading>{t('equipment.entities.parts')}</Heading>
-          <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
-            {t('equipment.descriptionParts')}
-          </p>
-        </div>
+      <div className="flex items-center justify-between gap-4">
+        <Heading>{t('equipment.entities.parts')}</Heading>
         <Button onClick={handleAdd}>
           {t('common.actions.add', { entity: t('equipment.entities.part') })}
         </Button>
       </div>
 
-      <div className="mt-8">
-        {error && (
-          <div className="rounded-lg bg-red-50 p-4 ring-1 ring-red-200 dark:bg-red-950/10 dark:ring-red-900/20 mb-4">
-            <p className="text-sm text-red-800 dark:text-red-400">
-              {t('common.actions.errorLoading', { entities: t('equipment.entities.parts') })}: {(error as Error).message}
-            </p>
+      {/* Quick Search Bar */}
+      <div className="mt-2 flex items-center gap-4">
+        <InputGroup className="flex-1 max-w-md">
+          <MagnifyingGlassIcon data-slot="icon" />
+          <Input
+            type="text"
+            placeholder={t('common.search')}
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+        </InputGroup>
+        {safePartsInventory.length > 0 && (
+          <div className="text-sm text-zinc-600 dark:text-zinc-400">
+            {filteredParts.length === safePartsInventory.length
+              ? `${safePartsInventory.length} ${safePartsInventory.length === 1 ? t('equipment.entities.part').toLowerCase() : t('equipment.entities.parts').toLowerCase()}`
+              : `${filteredParts.length} of ${safePartsInventory.length}`}
           </div>
         )}
+      </div>
 
-        {isLoading ? (
-          <div className="flex flex-col items-center justify-center py-12">
-            <p className="text-sm text-zinc-600 dark:text-zinc-400">
-              {t('common.actions.loading', { entities: t('equipment.entities.parts') })}
-            </p>
-          </div>
-        ) : safePartsInventory.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-12">
-            <WrenchScrewdriverIcon className="h-12 w-12 text-zinc-400" />
-            <p className="mt-4 text-sm text-zinc-600 dark:text-zinc-400">
-              {t('common.actions.notFound', { entities: t('equipment.entities.parts') })}
-            </p>
-          </div>
-        ) : (
-          <Table>
+      {error && (
+        <div className="mt-4 rounded-lg bg-red-50 p-3 ring-1 ring-red-200 dark:bg-red-950/10 dark:ring-red-900/20">
+          <p className="text-sm text-red-800 dark:text-red-400">
+            {t('common.actions.errorLoading', { entities: t('equipment.entities.parts') })}: {(error as Error).message}
+          </p>
+        </div>
+      )}
+
+      {isLoading ? (
+        <div className="mt-4 text-center">
+          <p className="text-sm text-zinc-600 dark:text-zinc-400">
+            {t('common.actions.loading', { entities: t('equipment.entities.parts') })}
+          </p>
+        </div>
+      ) : safePartsInventory.length === 0 ? (
+        <div className="mt-4 rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700 p-4">
+          <p className="text-sm text-zinc-600 dark:text-zinc-400">
+            {t('common.actions.notFound', { entities: t('equipment.entities.parts') })}
+          </p>
+        </div>
+      ) : filteredParts.length === 0 ? (
+        <div className="mt-4 rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700 p-4">
+          <p className="text-sm text-zinc-600 dark:text-zinc-400">
+            {t('common.actions.noMatchSearch', { entities: t('equipment.entities.parts') })}
+          </p>
+        </div>
+      ) : (
+        <div className="mt-4">
+          <Table dense className="[--gutter:theme(spacing.1)] text-sm">
             <TableHead>
               <TableRow>
                 <TableHeader>{t('equipment.table.partNumber')}</TableHeader>
@@ -178,7 +214,7 @@ export default function PartsInventoryPage() {
               </TableRow>
             </TableHead>
             <TableBody>
-              {safePartsInventory.map((item) => (
+              {filteredParts.map((item) => (
                 <TableRow key={item.id}>
                   <TableCell className="font-medium">{item.partNumber}</TableCell>
                   <TableCell>{item.partName}</TableCell>
@@ -212,8 +248,8 @@ export default function PartsInventoryPage() {
               ))}
             </TableBody>
           </Table>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Dialog */}
       <Dialog open={isDialogOpen} onClose={setIsDialogOpen}>

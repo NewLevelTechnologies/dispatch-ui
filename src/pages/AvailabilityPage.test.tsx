@@ -209,4 +209,26 @@ describe('AvailabilityPage', () => {
     expect(confirmSpy).toHaveBeenCalled();
     confirmSpy.mockRestore();
   });
+
+  it('filters availability by search query', async () => {
+    mockAvailabilityGetAll.mockResolvedValue(mockAvailability);
+    const user = userEvent.setup();
+
+    renderWithProviders(<AvailabilityPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('user1')).toBeInTheDocument();
+      expect(screen.getByText('user2')).toBeInTheDocument();
+    });
+
+    // Search for "user1"
+    const searchInput = screen.getByPlaceholderText(/search/i);
+    await user.type(searchInput, 'user1');
+
+    // Only user1 should be visible
+    await waitFor(() => {
+      expect(screen.getByText('user1')).toBeInTheDocument();
+      expect(screen.queryByText('user2')).not.toBeInTheDocument();
+    });
+  });
 });

@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { EllipsisVerticalIcon } from '@heroicons/react/24/outline';
+import { EllipsisVerticalIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import { workOrderApi, type WorkOrder } from '../api';
 import AppLayout from '../components/AppLayout';
 import WorkOrderFormDialog from '../components/WorkOrderFormDialog';
@@ -10,6 +10,7 @@ import { Button } from '../components/catalyst/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/catalyst/table';
 import { Badge } from '../components/catalyst/badge';
 import { Dropdown, DropdownButton, DropdownItem, DropdownLabel, DropdownMenu } from '../components/catalyst/dropdown';
+import { Input, InputGroup } from '../components/catalyst/input';
 
 const STATUS_COLORS = {
   PENDING: 'amber',
@@ -32,11 +33,44 @@ export default function WorkOrdersPage() {
   const { t } = useTranslation();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedWorkOrder, setSelectedWorkOrder] = useState<WorkOrder | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
 
   const { data: workOrders, isLoading, error } = useQuery({
     queryKey: ['work-orders'],
     queryFn: () => workOrderApi.getAll(),
   });
+
+  const formatCurrency = (amount?: number) => {
+    if (!amount) return '-';
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+    }).format(amount);
+  };
+
+  const formatDate = (dateString?: string) => {
+    if (!dateString) return '-';
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+    });
+  };
+
+  // Filter work orders based on search query
+  const filteredWorkOrders = useMemo(() => {
+    if (!workOrders) return [];
+    if (!searchQuery.trim()) return workOrders;
+
+    const query = searchQuery.toLowerCase();
+    return workOrders.filter(
+      (workOrder) =>
+        workOrder.id.toLowerCase().includes(query) ||
+        workOrder.customerId.toLowerCase().includes(query) ||
+        workOrder.status.toLowerCase().includes(query) ||
+        workOrder.description?.toLowerCase().includes(query)
+    );
+  }, [workOrders, searchQuery]);
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => workOrderApi.delete(id),
@@ -66,43 +100,41 @@ export default function WorkOrdersPage() {
     setSelectedWorkOrder(null);
   };
 
-  const formatCurrency = (amount?: number) => {
-    if (!amount) return '-';
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-    }).format(amount);
-  };
-
-  const formatDate = (dateString?: string) => {
-    if (!dateString) return '-';
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-    });
-  };
-
   return (
     <AppLayout>
-      <div className="flex items-center justify-between">
-        <div>
-          <Heading>{t('entities.workOrders')}</Heading>
-          <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
-            {t('workOrders.description')}
-          </p>
-        </div>
+      <div className="flex items-center justify-between gap-4">
+        <Heading>{t('entities.workOrders')}</Heading>
         <Button onClick={handleAdd}>{t('common.actions.create', { entity: t('entities.workOrder') })}</Button>
       </div>
 
+      {/* Quick Search Bar */}
+      <div className="mt-2 flex items-center gap-4">
+        <InputGroup className="flex-1 max-w-md">
+          <MagnifyingGlassIcon data-slot="icon" />
+          <Input
+            type="text"
+            placeholder={t('common.search')}
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+        </InputGroup>
+        {workOrders && (
+          <div className="text-sm text-zinc-600 dark:text-zinc-400">
+            {filteredWorkOrders.length === workOrders.length
+              ? `${workOrders.length} ${workOrders.length === 1 ? t('entities.workOrder').toLowerCase() : t('entities.workOrders').toLowerCase()}`
+              : `${filteredWorkOrders.length} of ${workOrders.length}`}
+          </div>
+        )}
+      </div>
+
       {isLoading && (
-        <div className="mt-8 text-center">
-          <p className="text-zinc-600 dark:text-zinc-400">{t('common.actions.loading', { entities: t('entities.workOrders') })}</p>
+        <div className="mt-4 text-center">
+          <p className="text-sm text-zinc-600 dark:text-zinc-400">{t('common.actions.loading', { entities: t('entities.workOrders') })}</p>
         </div>
       )}
 
       {error && (
-        <div className="mt-8 rounded-lg bg-red-50 p-4 ring-1 ring-red-200 dark:bg-red-950/10 dark:ring-red-900/20">
+        <div className="mt-4 rounded-lg bg-red-50 p-3 ring-1 ring-red-200 dark:bg-red-950/10 dark:ring-red-900/20">
           <p className="text-sm text-red-800 dark:text-red-400">
             {t('common.actions.errorLoading', { entities: t('entities.workOrders') })}: {(error as Error).message}
           </p>
@@ -110,17 +142,23 @@ export default function WorkOrdersPage() {
       )}
 
       {workOrders && workOrders.length === 0 && (
-        <div className="mt-8 text-center">
-          <p className="text-zinc-600 dark:text-zinc-400">{t('common.actions.notFound', { entities: t('entities.workOrders') })}</p>
-          <Button className="mt-4" onClick={handleAdd}>
+        <div className="mt-4 rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700 p-4">
+          <p className="text-sm text-zinc-600 dark:text-zinc-400">{t('common.actions.notFound', { entities: t('entities.workOrders') })}</p>
+          <Button className="mt-2" onClick={handleAdd}>
             {t('common.actions.createFirst', { entity: t('entities.workOrder') })}
           </Button>
         </div>
       )}
 
-      {workOrders && workOrders.length > 0 && (
-        <div className="mt-8">
-          <Table className="[--gutter:theme(spacing.2)] lg:[--gutter:theme(spacing.3)]">
+      {filteredWorkOrders.length === 0 && workOrders && workOrders.length > 0 && (
+        <div className="mt-4 rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700 p-4">
+          <p className="text-sm text-zinc-600 dark:text-zinc-400">{t('common.actions.noMatchSearch', { entities: t('entities.workOrders') })}</p>
+        </div>
+      )}
+
+      {filteredWorkOrders.length > 0 && (
+        <div className="mt-4">
+          <Table dense className="[--gutter:theme(spacing.1)] text-sm">
             <TableHead>
               <TableRow>
                 <TableHeader>{t('workOrders.table.id')}</TableHeader>
@@ -133,7 +171,7 @@ export default function WorkOrdersPage() {
               </TableRow>
             </TableHead>
             <TableBody>
-              {workOrders.map((workOrder) => (
+              {filteredWorkOrders.map((workOrder) => (
                 <TableRow key={workOrder.id}>
                   <TableCell className="font-mono text-sm text-zinc-500">
                     {workOrder.id.substring(0, 8)}...

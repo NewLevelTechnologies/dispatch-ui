@@ -1,12 +1,11 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { DocumentChartBarIcon } from '@heroicons/react/24/outline';
+import { MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import AppLayout from '../components/AppLayout';
 import { Heading } from '../components/catalyst/heading';
 import { Button } from '../components/catalyst/button';
-import { Divider } from '../components/catalyst/divider';
-import { Input } from '../components/catalyst/input';
+import { Input, InputGroup } from '../components/catalyst/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/catalyst/table';
 import { Badge } from '../components/catalyst/badge';
 import { Dialog, DialogActions, DialogBody, DialogDescription, DialogTitle } from '../components/catalyst/dialog';
@@ -211,30 +210,39 @@ export default function QuotesPage() {
         </Button>
       </div>
 
-      <div className="mt-8">
-        <Input
-          type="text"
-          placeholder="Search quotes..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-        />
+      {/* Quick Search Bar */}
+      <div className="mt-2 flex items-center gap-4">
+        <InputGroup className="flex-1 max-w-md">
+          <MagnifyingGlassIcon data-slot="icon" />
+          <Input
+            type="text"
+            placeholder={t('common.search')}
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </InputGroup>
+        {quotes && quotes.length > 0 && (
+          <div className="text-sm text-zinc-600 dark:text-zinc-400">
+            {filteredQuotes.length === quotes.length
+              ? `${quotes.length} ${quotes.length === 1 ? t('entities.quote').toLowerCase() : t('entities.quotes').toLowerCase()}`
+              : `${filteredQuotes.length} of ${quotes.length}`}
+          </div>
+        )}
       </div>
 
-      <Divider className="my-10" />
-
       {quotesLoading ? (
-        <div className="flex flex-col items-center justify-center py-12">
+        <div className="mt-4 text-center">
           <p className="text-sm text-zinc-600 dark:text-zinc-400">{t('common.actions.loading', { entities: t('entities.quotes') })}</p>
         </div>
       ) : filteredQuotes.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-12">
-          <DocumentChartBarIcon className="h-12 w-12 text-zinc-400" />
-          <p className="mt-4 text-sm text-zinc-600 dark:text-zinc-400">
-            {searchTerm ? t('common.actions.notFound', { entities: t('entities.quotes') }) : t('common.actions.addFirst', { entity: t('entities.quote') })}
+        <div className="mt-4 rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700 p-4">
+          <p className="text-sm text-zinc-600 dark:text-zinc-400">
+            {searchTerm ? t('common.actions.noMatchSearch', { entities: t('entities.quotes') }) : t('common.actions.notFound', { entities: t('entities.quotes') })}
           </p>
         </div>
       ) : (
-        <Table>
+        <div className="mt-4">
+          <Table dense className="[--gutter:theme(spacing.1)] text-sm">
           <TableHead>
             <TableRow>
               <TableHeader>{t('quotes.table.quoteNumber')}</TableHeader>
@@ -271,6 +279,7 @@ export default function QuotesPage() {
             ))}
           </TableBody>
         </Table>
+        </div>
       )}
 
       {/* Create Quote Dialog */}
