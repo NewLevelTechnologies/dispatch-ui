@@ -10,7 +10,7 @@ import { Button } from '../components/catalyst/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/catalyst/table';
 import { Badge } from '../components/catalyst/badge';
 import { Dropdown, DropdownButton, DropdownItem, DropdownLabel, DropdownMenu } from '../components/catalyst/dropdown';
-import { Input } from '../components/catalyst/input';
+import { Input, InputGroup } from '../components/catalyst/input';
 
 export default function CustomersPage() {
   const queryClient = useQueryClient();
@@ -79,16 +79,18 @@ export default function CustomersPage() {
 
       {/* Quick Search Bar */}
       <div className="mt-2 flex items-center gap-4">
-        <div className="relative flex-1 max-w-md">
-          <MagnifyingGlassIcon className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-zinc-400" />
+        <InputGroup className="flex-1 max-w-md">
+          <MagnifyingGlassIcon data-slot="icon" />
           <Input
             type="text"
             placeholder={t('common.search')}
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10"
+            onChange={(e) => {
+              console.log('Input onChange fired:', e.target.value);
+              setSearchQuery(e.target.value);
+            }}
           />
-        </div>
+        </InputGroup>
         {customers && (
           <div className="text-sm text-zinc-600 dark:text-zinc-400">
             {filteredCustomers.length === customers.length
