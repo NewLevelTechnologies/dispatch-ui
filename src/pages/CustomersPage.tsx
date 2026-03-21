@@ -35,8 +35,14 @@ export default function CustomersPage() {
         customer.name.toLowerCase().includes(query) ||
         customer.email.toLowerCase().includes(query) ||
         customer.phone?.toLowerCase().includes(query) ||
-        customer.city?.toLowerCase().includes(query) ||
-        customer.state?.toLowerCase().includes(query)
+        customer.billingAddress.city.toLowerCase().includes(query) ||
+        customer.billingAddress.state.toLowerCase().includes(query) ||
+        customer.serviceLocations.some(
+          (loc) =>
+            loc.address.city.toLowerCase().includes(query) ||
+            loc.address.state.toLowerCase().includes(query) ||
+            loc.locationName?.toLowerCase().includes(query)
+        )
     );
   }, [customers, searchQuery]);
 
@@ -132,44 +138,59 @@ export default function CustomersPage() {
                 <TableHeader>{t('common.form.name')}</TableHeader>
                 <TableHeader>{t('common.form.email')}</TableHeader>
                 <TableHeader>{t('common.form.phone')}</TableHeader>
-                <TableHeader>{t('customers.table.location')}</TableHeader>
+                <TableHeader>{t('customers.table.locations')}</TableHeader>
                 <TableHeader>{t('common.form.status')}</TableHeader>
                 <TableHeader></TableHeader>
               </TableRow>
             </TableHead>
             <TableBody>
-              {filteredCustomers.map((customer) => (
-                <TableRow key={customer.id}>
-                  <TableCell className="font-medium">{customer.name}</TableCell>
-                  <TableCell className="text-zinc-500">{customer.email}</TableCell>
-                  <TableCell className="text-zinc-500">{customer.phone || '-'}</TableCell>
-                  <TableCell className="text-zinc-500">
-                    {customer.city && customer.state
-                      ? `${customer.city}, ${customer.state}`
-                      : '-'}
-                  </TableCell>
-                  <TableCell>
-                    <Badge color="lime">{t('common.active')}</Badge>
-                  </TableCell>
-                  <TableCell>
-                    <div className="-mx-3 -my-1.5 sm:-mx-2.5">
-                      <Dropdown>
-                        <DropdownButton plain aria-label={t('common.moreOptions')}>
-                          <EllipsisVerticalIcon className="size-5" />
-                        </DropdownButton>
-                        <DropdownMenu anchor="bottom end">
-                          <DropdownItem onClick={() => handleEdit(customer)}>
-                            <DropdownLabel>{t('common.edit')}</DropdownLabel>
-                          </DropdownItem>
-                          <DropdownItem onClick={() => handleDelete(customer)}>
-                            <DropdownLabel>{t('common.delete')}</DropdownLabel>
-                          </DropdownItem>
-                        </DropdownMenu>
-                      </Dropdown>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
+              {filteredCustomers.map((customer) => {
+                const activeLocations = customer.serviceLocations.filter(loc => loc.status === 'ACTIVE');
+                const primaryLocation = activeLocations[0];
+                return (
+                  <TableRow key={customer.id}>
+                    <TableCell className="font-medium">{customer.name}</TableCell>
+                    <TableCell className="text-zinc-500">{customer.email}</TableCell>
+                    <TableCell className="text-zinc-500">{customer.phone || '-'}</TableCell>
+                    <TableCell className="text-zinc-500">
+                      {primaryLocation ? (
+                        <>
+                          {primaryLocation.address.city}, {primaryLocation.address.state}
+                          {activeLocations.length > 1 && (
+                            <span className="ml-1 text-xs text-zinc-400">
+                              {t('customers.table.moreLocations', { count: activeLocations.length - 1 })}
+                            </span>
+                          )}
+                        </>
+                      ) : (
+                        '-'
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <Badge color={customer.status === 'ACTIVE' ? 'lime' : 'zinc'}>
+                        {customer.status === 'ACTIVE' ? t('common.active') : t('common.inactive')}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <div className="-mx-3 -my-1.5 sm:-mx-2.5">
+                        <Dropdown>
+                          <DropdownButton plain aria-label={t('common.moreOptions')}>
+                            <EllipsisVerticalIcon className="size-5" />
+                          </DropdownButton>
+                          <DropdownMenu anchor="bottom end">
+                            <DropdownItem onClick={() => handleEdit(customer)}>
+                              <DropdownLabel>{t('common.edit')}</DropdownLabel>
+                            </DropdownItem>
+                            <DropdownItem onClick={() => handleDelete(customer)}>
+                              <DropdownLabel>{t('common.delete')}</DropdownLabel>
+                            </DropdownItem>
+                          </DropdownMenu>
+                        </Dropdown>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
         </div>

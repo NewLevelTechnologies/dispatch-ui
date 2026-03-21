@@ -38,8 +38,13 @@
     "show": "Show",
     "view": "View",
     "form": {
+      "accessInstructions": "Access Instructions",
       "address": "Address",
+      "addressLine2": "Address Line 2",
+      "billingAddress": "Billing Address",
+      "billingAddressSameAsService": "Send invoice to same address",
       "city": "City",
+      "contractPricingTier": "Contract Pricing Tier",
       "description": "Description",
       "descriptionCreate": "Create a new {{entity, lowercase}} record.",
       "descriptionEdit": "Update {{entity, lowercase}} information.",
@@ -48,14 +53,24 @@
       "errorUpdate": "Failed to update {{entity, lowercase}}",
       "firstName": "First Name",
       "lastName": "Last Name",
+      "locationName": "Location Name",
       "name": "Name",
       "notes": "Notes",
+      "paymentTermsDays": "Payment Terms (Days)",
       "phone": "Phone",
+      "requiresPurchaseOrder": "Requires Purchase Order",
       "role": "Role",
       "select": "Select...",
+      "serviceAddress": "Service Address",
+      "siteContactEmail": "Site Contact Email",
+      "siteContactName": "Site Contact Name",
+      "siteContactPhone": "Site Contact Phone",
       "state": "State",
       "stateHelper": "CA",
       "status": "Status",
+      "streetAddress": "Street Address",
+      "taxExempt": "Tax Exempt",
+      "taxExemptCertificate": "Tax Exempt Certificate",
       "titleCreate": "{{action}} {{entity}}",
       "titleEdit": "{{action}} {{entity}}",
       "zipCode": "Zip Code"
@@ -70,8 +85,22 @@
   },
   "customers": {
     "description": "Manage your customer database",
+    "displayMode": {
+      "simple": "Simple",
+      "standard": "Standard"
+    },
+    "form": {
+      "billingAddressHelp": "Check this if invoices should be sent to the service address",
+      "billingAddressSection": "Billing Address",
+      "businessDetails": "Business Details",
+      "locationNameHelp": "Optional - useful for businesses with multiple locations",
+      "paymentTermsHelp": "0 = Due on receipt",
+      "serviceLocationSection": "Service Location"
+    },
     "table": {
-      "location": "Location"
+      "location": "Location",
+      "locations": "Locations",
+      "moreLocations": "+{{count}} more"
     }
   },
   "dashboard": {
@@ -98,6 +127,8 @@
     "role": "Role",
     "roles": "Roles",
     "scheduling": "Scheduling",
+    "serviceLocation": "Service Location",
+    "serviceLocations": "Service Locations",
     "user": "User",
     "users": "Users",
     "workOrder": "Work Order",

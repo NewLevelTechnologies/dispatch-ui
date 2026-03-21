@@ -3,30 +3,131 @@ import { screen, waitFor } from '@testing-library/react';
 import { renderWithProviders, userEvent } from '../test/utils';
 import CustomersPage from './CustomersPage';
 import apiClient from '../api/client';
+import type { Customer } from '../api';
 
 // Mock the API client
 vi.mock('../api/client');
 
-const mockCustomers = [
+const mockCustomers: Customer[] = [
   {
     id: '1',
     name: 'John Doe',
     email: 'john@example.com',
     phone: '555-1234',
-    address: '123 Main St',
-    city: 'Boston',
-    state: 'MA',
-    zipCode: '02101',
+    billingAddress: {
+      streetAddress: '123 Main St',
+      streetAddressLine2: null,
+      city: 'Boston',
+      state: 'MA',
+      zipCode: '02101',
+      country: 'US',
+      validated: true,
+      validatedAt: '2024-01-01T00:00:00Z',
+      dpvConfirmation: 'Y',
+      isBusiness: false,
+    },
+    serviceLocations: [
+      {
+        id: 'loc-1',
+        customerId: '1',
+        locationName: null,
+        address: {
+          streetAddress: '123 Main St',
+          streetAddressLine2: null,
+          city: 'Boston',
+          state: 'MA',
+          zipCode: '02101',
+          country: 'US',
+          validated: true,
+          validatedAt: '2024-01-01T00:00:00Z',
+          dpvConfirmation: 'Y',
+          isBusiness: false,
+        },
+        previousLocationId: null,
+        successionDate: null,
+        successionType: null,
+        siteContactName: null,
+        siteContactPhone: null,
+        siteContactEmail: null,
+        accessInstructions: null,
+        notes: null,
+        status: 'ACTIVE',
+        createdAt: '2024-01-01T00:00:00Z',
+        updatedAt: '2024-01-01T00:00:00Z',
+        version: 0,
+      },
+    ],
+    paymentTermsDays: 0,
+    requiresPurchaseOrder: false,
+    contractPricingTier: null,
+    taxExempt: false,
+    taxExemptCertificate: null,
+    notes: null,
+    status: 'ACTIVE',
+    displayMode: 'SIMPLE',
+    createdAt: '2024-01-01T00:00:00Z',
+    updatedAt: '2024-01-01T00:00:00Z',
+    version: 0,
   },
   {
     id: '2',
     name: 'Jane Smith',
     email: 'jane@example.com',
     phone: '555-5678',
-    address: '456 Oak Ave',
-    city: 'Cambridge',
-    state: 'MA',
-    zipCode: '02139',
+    billingAddress: {
+      streetAddress: '456 Oak Ave',
+      streetAddressLine2: null,
+      city: 'Cambridge',
+      state: 'MA',
+      zipCode: '02139',
+      country: 'US',
+      validated: true,
+      validatedAt: '2024-01-01T00:00:00Z',
+      dpvConfirmation: 'Y',
+      isBusiness: false,
+    },
+    serviceLocations: [
+      {
+        id: 'loc-2',
+        customerId: '2',
+        locationName: null,
+        address: {
+          streetAddress: '456 Oak Ave',
+          streetAddressLine2: null,
+          city: 'Cambridge',
+          state: 'MA',
+          zipCode: '02139',
+          country: 'US',
+          validated: true,
+          validatedAt: '2024-01-01T00:00:00Z',
+          dpvConfirmation: 'Y',
+          isBusiness: false,
+        },
+        previousLocationId: null,
+        successionDate: null,
+        successionType: null,
+        siteContactName: null,
+        siteContactPhone: null,
+        siteContactEmail: null,
+        accessInstructions: null,
+        notes: null,
+        status: 'ACTIVE',
+        createdAt: '2024-01-01T00:00:00Z',
+        updatedAt: '2024-01-01T00:00:00Z',
+        version: 0,
+      },
+    ],
+    paymentTermsDays: 0,
+    requiresPurchaseOrder: false,
+    contractPricingTier: null,
+    taxExempt: false,
+    taxExemptCertificate: null,
+    notes: null,
+    status: 'ACTIVE',
+    displayMode: 'SIMPLE',
+    createdAt: '2024-01-01T00:00:00Z',
+    updatedAt: '2024-01-01T00:00:00Z',
+    version: 0,
   },
 ];
 
@@ -118,11 +219,10 @@ describe('CustomersPage', () => {
     expect(screen.getByText('Cambridge, MA')).toBeInTheDocument();
   });
 
-  it('displays dash when location fields are missing', async () => {
-    const customerWithoutLocation = {
+  it('displays dash when no service locations exist', async () => {
+    const customerWithoutLocation: Customer = {
       ...mockCustomers[0],
-      city: undefined,
-      state: undefined,
+      serviceLocations: [],
     };
 
     vi.mocked(apiClient.get).mockResolvedValue({ data: [customerWithoutLocation] });
