@@ -4,7 +4,6 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { EllipsisVerticalIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import { customerApi, type ServiceLocation, type Customer } from '../api';
-import { useHasCapability } from '../hooks/useCurrentUser';
 import AppLayout from '../components/AppLayout';
 import ServiceLocationFormDialog from '../components/ServiceLocationFormDialog';
 import { Heading } from '../components/catalyst/heading';
@@ -28,11 +27,6 @@ export default function ServiceLocationsPage() {
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
-
-  // Permission checks
-  const canAddServiceLocations = useHasCapability('ADD_SERVICE_LOCATIONS');
-  const canEditServiceLocations = useHasCapability('EDIT_SERVICE_LOCATIONS');
-  const canCloseServiceLocations = useHasCapability('CLOSE_SERVICE_LOCATIONS');
 
   // Fetch all customers (which includes their service locations)
   const { data: customers, isLoading, error } = useQuery({
@@ -116,9 +110,7 @@ export default function ServiceLocationsPage() {
     <AppLayout>
       <div className="flex items-center justify-between gap-4">
         <Heading>{t('entities.serviceLocations')}</Heading>
-        {canAddServiceLocations && (
-          <Button onClick={handleAdd}>{t('common.actions.add', { entity: t('entities.serviceLocation') })}</Button>
-        )}
+        <Button onClick={handleAdd}>{t('common.actions.add', { entity: t('entities.serviceLocation') })}</Button>
       </div>
 
       {/* Search and Filters */}
@@ -188,11 +180,9 @@ export default function ServiceLocationsPage() {
       {allLocations.length === 0 && !isLoading && (
         <div className="mt-4 rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700 p-4">
           <p className="text-sm text-zinc-600 dark:text-zinc-400">{t('common.actions.notFound', { entities: t('entities.serviceLocations') })}</p>
-          {canAddServiceLocations && (
-            <Button className="mt-2" onClick={handleAdd}>
-              {t('common.actions.addFirst', { entity: t('entities.serviceLocation') })}
-            </Button>
-          )}
+          <Button className="mt-2" onClick={handleAdd}>
+            {t('common.actions.addFirst', { entity: t('entities.serviceLocation') })}
+          </Button>
         </div>
       )}
 
@@ -271,30 +261,26 @@ export default function ServiceLocationsPage() {
                       </Badge>
                     </TableCell>
                     <TableCell>
-                      {(canEditServiceLocations || canCloseServiceLocations) && (
-                        <div className="-mx-3 -my-1.5 sm:-mx-2.5">
-                          <Dropdown>
-                            <DropdownButton plain aria-label={t('common.moreOptions')}>
-                              <EllipsisVerticalIcon className="size-5" />
-                            </DropdownButton>
-                            <DropdownMenu anchor="bottom end">
-                              <DropdownItem onClick={() => navigate(`/service-locations/${location.id}`)}>
-                                <DropdownLabel>{t('common.view')}</DropdownLabel>
+                      <div className="-mx-3 -my-1.5 sm:-mx-2.5">
+                        <Dropdown>
+                          <DropdownButton plain aria-label={t('common.moreOptions')}>
+                            <EllipsisVerticalIcon className="size-5" />
+                          </DropdownButton>
+                          <DropdownMenu anchor="bottom end">
+                            <DropdownItem onClick={() => navigate(`/service-locations/${location.id}`)}>
+                              <DropdownLabel>{t('common.view')}</DropdownLabel>
+                            </DropdownItem>
+                            <DropdownItem onClick={() => handleEdit(location)}>
+                              <DropdownLabel>{t('common.edit')}</DropdownLabel>
+                            </DropdownItem>
+                            {location.status !== 'CLOSED' && (
+                              <DropdownItem onClick={() => handleClose(location)}>
+                                <DropdownLabel>{t('serviceLocations.actions.close')}</DropdownLabel>
                               </DropdownItem>
-                              {canEditServiceLocations && (
-                                <DropdownItem onClick={() => handleEdit(location)}>
-                                  <DropdownLabel>{t('common.edit')}</DropdownLabel>
-                                </DropdownItem>
-                              )}
-                              {location.status !== 'CLOSED' && canCloseServiceLocations && (
-                                <DropdownItem onClick={() => handleClose(location)}>
-                                  <DropdownLabel>{t('serviceLocations.actions.close')}</DropdownLabel>
-                                </DropdownItem>
-                              )}
-                            </DropdownMenu>
-                          </Dropdown>
-                        </div>
-                      )}
+                            )}
+                          </DropdownMenu>
+                        </Dropdown>
+                      </div>
                     </TableCell>
                   </TableRow>
                 );

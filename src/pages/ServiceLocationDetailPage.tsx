@@ -3,7 +3,6 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { customerApi } from '../api';
-import { useHasCapability } from '../hooks/useCurrentUser';
 import AppLayout from '../components/AppLayout';
 import ServiceLocationFormDialog from '../components/ServiceLocationFormDialog';
 import { Heading, Subheading } from '../components/catalyst/heading';
@@ -18,9 +17,6 @@ export default function ServiceLocationDetailPage() {
   const navigate = useNavigate();
   const { t } = useTranslation();
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-
-  // Permission checks
-  const canEditServiceLocations = useHasCapability('EDIT_SERVICE_LOCATIONS');
 
   // Fetch all customers to find the service location
   const { data: customers, isLoading, error } = useQuery({
@@ -125,12 +121,10 @@ export default function ServiceLocationDetailPage() {
                 </a>
               </Text>
             </div>
-            {canEditServiceLocations && (
-              <Button color="zinc" onClick={() => setIsEditDialogOpen(true)}>
-                <PencilIcon className="size-4" />
-                {t('common.edit')}
-              </Button>
-            )}
+            <Button color="zinc" onClick={() => setIsEditDialogOpen(true)}>
+              <PencilIcon className="size-4" />
+              {t('common.edit')}
+            </Button>
           </div>
 
           {/* Main Content - 2 Column Layout */}
@@ -209,7 +203,6 @@ export default function ServiceLocationDetailPage() {
               <div className="rounded-lg border border-zinc-200 p-3 dark:border-zinc-800">
                 <div className="flex items-center justify-between">
                   <Subheading>{t('serviceLocations.detail.equipment')}</Subheading>
-                  {/* TODO: Add equipment permission check when equipment management is implemented */}
                   <Button plain>
                     <PlusIcon className="size-4" />
                     {t('serviceLocations.detail.addEquipment')}
@@ -224,7 +217,6 @@ export default function ServiceLocationDetailPage() {
               <div className="rounded-lg border border-zinc-200 p-3 dark:border-zinc-800">
                 <div className="flex items-center justify-between">
                   <Subheading>{t('serviceLocations.detail.recentWorkOrders')}</Subheading>
-                  {/* TODO: Add work order permission check when work order management is implemented */}
                   <Button plain>
                     <PlusIcon className="size-4" />
                     {t('serviceLocations.detail.newWorkOrder')}
