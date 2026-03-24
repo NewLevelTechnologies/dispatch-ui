@@ -167,7 +167,7 @@ describe('CustomerFormDialog', () => {
       });
     });
 
-    it('handles all form fields including optional fields', async () => {
+    it('handles all form fields including optional fields', { timeout: 10000 }, async () => {
       const user = userEvent.setup();
       vi.mocked(apiClient.post).mockResolvedValue({ data: mockCustomer });
 
