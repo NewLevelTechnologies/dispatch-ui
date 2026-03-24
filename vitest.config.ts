@@ -41,8 +41,6 @@ export default defineConfig({
         'src/types/**',
         // Exclude utils (tested indirectly)
         'src/utils/**',
-        // Exclude hooks with external dependencies (testing separately)
-        'src/hooks/useCurrentUser.ts',
         // Exclude API clients (integration tested via components)
         'src/api/client.ts',
         'src/api/index.ts',
