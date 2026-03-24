@@ -213,8 +213,8 @@ export default function UserFormDialog({ isOpen, onClose, user, roles }: UserFor
               <Field>
                 <Label>{t('common.form.role')} *</Label>
                 {hasAdminRole && (
-                  <div className="mt-2 rounded-md bg-blue-50 px-3 py-2 ring-1 ring-blue-200 dark:bg-blue-950/10 dark:ring-blue-900/20">
-                    <Text className="text-sm text-blue-800 dark:text-blue-400">
+                  <div className="mt-2 rounded-md bg-primary-50 px-3 py-2 ring-1 ring-primary-200 dark:bg-primary-950/10 dark:ring-primary-900/20">
+                    <Text className="text-sm text-primary-800 dark:text-primary-400">
                       {t('users.form.adminRoleInfo')}
                     </Text>
                   </div>
