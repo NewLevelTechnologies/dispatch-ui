@@ -2,7 +2,20 @@
 export { default as apiClient } from './client';
 
 // Customer API
-export { customerApi, type Customer, type CreateCustomerRequest, type UpdateCustomerRequest } from './customerApi';
+export {
+  customerApi,
+  type Customer,
+  type Address,
+  type ServiceLocation,
+  type CustomerDisplayMode,
+  type CustomerStatus,
+  type CreateCustomerRequest,
+  type CreateServiceLocationRequest,
+  type UpdateCustomerRequest,
+  type UpdateBillingAddressRequest,
+  type UpdateServiceLocationRequest,
+  type UpdateServiceLocationAddressRequest,
+} from './customerApi';
 
 // User API
 export {
