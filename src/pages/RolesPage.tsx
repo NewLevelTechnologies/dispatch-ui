@@ -261,9 +261,16 @@ export default function RolesPage() {
                   </TableCell>
                   <TableCell>
                     {role.capabilities && role.capabilities.length > 0 ? (
-                      <span className="inline-flex items-center rounded-md px-2 py-1 text-xs font-medium bg-primary-100 text-primary-700 dark:bg-primary-950/50 dark:text-primary-400">
+                      <Badge
+                        color="purple"
+                        style={{
+                          backgroundColor: 'var(--color-primary-100)',
+                          color: 'var(--color-primary-700)',
+                        }}
+                        className="dark:!bg-primary-950/50 dark:!text-primary-400"
+                      >
                         {role.capabilities.length} {t('capabilities.totalCount')}
-                      </span>
+                      </Badge>
                     ) : (
                       <span className="text-zinc-500">-</span>
                     )}

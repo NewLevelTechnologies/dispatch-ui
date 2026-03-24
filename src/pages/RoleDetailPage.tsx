@@ -220,7 +220,10 @@ export default function RoleDetailPage() {
                 <>
                   <DescriptionTerm>{t('roles.detail.templateCode')}</DescriptionTerm>
                   <DescriptionDetails>
-                    <code className="text-xs font-semibold text-primary-600 dark:text-primary-400">
+                    <code
+                      className="text-xs font-semibold"
+                      style={{ color: 'var(--color-primary-600)' }}
+                    >
                       {role.systemRoleCode}
                     </code>
                   </DescriptionDetails>

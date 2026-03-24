@@ -62,9 +62,16 @@ export default function CapabilitiesSection({ capabilities = [] }: CapabilitiesS
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Subheading>{t('capabilities.label')}</Subheading>
-          <span className="inline-flex items-center rounded-md px-2 py-1 text-xs font-medium bg-primary-100 text-primary-700 dark:bg-primary-950/50 dark:text-primary-400">
+          <Badge
+            color="purple"
+            style={{
+              backgroundColor: 'var(--color-primary-100)',
+              color: 'var(--color-primary-700)',
+            }}
+            className="dark:!bg-primary-950/50 dark:!text-primary-400"
+          >
             {totalCount}
-          </span>
+          </Badge>
         </div>
         <Button plain onClick={() => setIsExpanded(!isExpanded)}>
           {isExpanded ? (
@@ -108,13 +115,18 @@ export default function CapabilitiesSection({ capabilities = [] }: CapabilitiesS
                   ?.capabilities
                   .filter(cap => capabilities.includes(cap.name))
                   .map(cap => (
-                    <span
+                    <Badge
                       key={cap.name}
-                      className="inline-flex items-center rounded-md px-2 py-1 text-xs font-medium cursor-help bg-primary-100 text-primary-700 dark:bg-primary-950/50 dark:text-primary-400"
+                      color="purple"
+                      style={{
+                        backgroundColor: 'var(--color-primary-100)',
+                        color: 'var(--color-primary-700)',
+                      }}
+                      className="cursor-help text-xs dark:!bg-primary-950/50 dark:!text-primary-400"
                       title={cap.description}
                     >
                       {cap.displayName}
-                    </span>
+                    </Badge>
                   ))}
               </div>
             </div>
