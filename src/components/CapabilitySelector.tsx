@@ -84,18 +84,28 @@ export default function CapabilitySelector({
                 className={`
                   whitespace-nowrap border-b-2 px-1 py-3 text-sm font-medium transition-colors
                   ${isActive
-                    ? 'border-indigo-600 text-indigo-600 dark:border-indigo-500 dark:text-indigo-400'
+                    ? ''
                     : 'border-transparent text-zinc-500 hover:border-zinc-300 hover:text-zinc-700 dark:text-zinc-400 dark:hover:border-zinc-700 dark:hover:text-zinc-300'
                   }
                 `}
+                style={isActive ? {
+                  borderColor: 'var(--color-primary-600)',
+                  color: 'var(--color-primary-600)',
+                } : undefined}
               >
                 <span>{group.displayName}</span>
                 {selectedCount > 0 && (
-                  <span className={`ml-2 inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
-                    isActive
-                      ? 'bg-indigo-100 text-indigo-600 dark:bg-indigo-950 dark:text-indigo-400'
-                      : 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400'
-                  }`}>
+                  <span
+                    className={`ml-2 inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
+                      isActive
+                        ? ''
+                        : 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400'
+                    }`}
+                    style={isActive ? {
+                      backgroundColor: 'var(--color-primary-100)',
+                      color: 'var(--color-primary-600)',
+                    } : undefined}
+                  >
                     {selectedCount}
                   </span>
                 )}

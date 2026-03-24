@@ -17,7 +17,7 @@ export default function DashboardPage() {
           <h3 className="text-base font-medium text-zinc-900 dark:text-white">
             {t('entities.customers')}
           </h3>
-          <p className="mt-2 text-3xl font-semibold text-indigo-600 dark:text-indigo-400">
+          <p className="mt-2 text-3xl font-semibold" style={{ color: 'var(--color-primary-600)' }}>
             --
           </p>
           <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
@@ -29,7 +29,7 @@ export default function DashboardPage() {
           <h3 className="text-base font-medium text-zinc-900 dark:text-white">
             {t('entities.workOrders')}
           </h3>
-          <p className="mt-2 text-3xl font-semibold text-indigo-600 dark:text-indigo-400">
+          <p className="mt-2 text-3xl font-semibold" style={{ color: 'var(--color-primary-600)' }}>
             --
           </p>
           <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
@@ -41,7 +41,7 @@ export default function DashboardPage() {
           <h3 className="text-base font-medium text-zinc-900 dark:text-white">
             {t('entities.revenue')}
           </h3>
-          <p className="mt-2 text-3xl font-semibold text-indigo-600 dark:text-indigo-400">
+          <p className="mt-2 text-3xl font-semibold" style={{ color: 'var(--color-primary-600)' }}>
             --
           </p>
           <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
