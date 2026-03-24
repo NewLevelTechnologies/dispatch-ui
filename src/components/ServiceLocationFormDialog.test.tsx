@@ -147,7 +147,7 @@ describe('ServiceLocationFormDialog', () => {
     await user.click(screen.getByRole('button', { name: /create/i }));
 
     await waitFor(() => {
-      expect(screen.getByText(/saving/i)).toBeInTheDocument();
+      expect(screen.getByText('Saving...')).toBeInTheDocument();
     });
   });
 

@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { customerApi } from '../api';
 import { Dialog, DialogActions, DialogBody, DialogDescription, DialogTitle } from './catalyst/dialog';
 import { Button } from './catalyst/button';
-import { Field, FieldGroup, Fieldset, Label } from './catalyst/fieldset';
+import { Field, Label } from './catalyst/fieldset';
 import { Input } from './catalyst/input';
 
 interface ServiceLocationFormDialogProps {
@@ -46,6 +46,7 @@ export default function ServiceLocationFormDialog({ isOpen, onClose, customerId 
   // Reset form when dialog opens
   useEffect(() => {
     if (isOpen) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setFormData({
         locationName: '',
         streetAddress: '',
@@ -102,15 +103,15 @@ export default function ServiceLocationFormDialog({ isOpen, onClose, customerId 
 
   return (
     <Dialog open={isOpen} onClose={onClose} size="3xl">
-      <DialogTitle>Add Service Location</DialogTitle>
+      <DialogTitle>{t('customers.detail.addServiceLocation')}</DialogTitle>
       <DialogDescription>
-        Add a new service location for this customer.
+        {t('customers.detail.addServiceLocationDescription')}
       </DialogDescription>
       <DialogBody>
         <form onSubmit={handleSubmit} id="service-location-form" className="space-y-3">
           {/* Location Name */}
           <Field>
-            <Label className="text-xs">Location Name *</Label>
+            <Label className="text-xs">{t('common.form.locationName')} *</Label>
             <Input
               name="locationName"
               value={formData.locationName}
@@ -178,7 +179,7 @@ export default function ServiceLocationFormDialog({ isOpen, onClose, customerId 
           {/* Site Contact (all on one row) */}
           <div className="grid grid-cols-3 gap-2">
             <Field>
-              <Label className="text-xs">Site Contact Name</Label>
+              <Label className="text-xs">{t('common.form.siteContactName')}</Label>
               <Input
                 name="siteContactName"
                 value={formData.siteContactName}
@@ -186,7 +187,7 @@ export default function ServiceLocationFormDialog({ isOpen, onClose, customerId 
               />
             </Field>
             <Field>
-              <Label className="text-xs">Site Contact Phone</Label>
+              <Label className="text-xs">{t('common.form.siteContactPhone')}</Label>
               <Input
                 type="tel"
                 name="siteContactPhone"
@@ -195,7 +196,7 @@ export default function ServiceLocationFormDialog({ isOpen, onClose, customerId 
               />
             </Field>
             <Field>
-              <Label className="text-xs">Site Contact Email</Label>
+              <Label className="text-xs">{t('common.form.siteContactEmail')}</Label>
               <Input
                 type="email"
                 name="siteContactEmail"
@@ -207,7 +208,7 @@ export default function ServiceLocationFormDialog({ isOpen, onClose, customerId 
 
           {/* Access Instructions */}
           <Field>
-            <Label className="text-xs">Access Instructions</Label>
+            <Label className="text-xs">{t('common.form.accessInstructions')}</Label>
             <Input
               name="accessInstructions"
               value={formData.accessInstructions}

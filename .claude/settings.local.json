@@ -1,0 +1,39 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run lint)",
+      "Bash(npm run build)",
+      "Bash(ls -la src/components/Capability*.tsx)",
+      "Bash(npm test -- src/components/CustomerFormDialog.test.tsx --run 2>&1 | tail -80)",
+      "Bash(npm test -- --run --reporter=verbose 2>&1 | grep -A 20 \"Unhandled\" | head -30)",
+      "Bash(npm test -- src/components/CapabilitiesSection.test.tsx --run 2>&1 | tail -40)",
+      "Bash(npm test -- src/components/CapabilitiesSection.test.tsx --run 2>&1 | tail -50)",
+      "Bash(npm test -- src/components/CapabilitiesSection.test.tsx --run 2>&1 | tail -60)",
+      "Bash(npm test -- src/components/CapabilitiesSection.test.tsx --run 2>&1 | tail -80)",
+      "Bash(npm test -- --run 2>&1 | tail -100)",
+      "Bash(git stash pop)",
+      "Bash(npm test -- src/components/CapabilitiesSection.test.tsx --run 2>&1 | grep -E \"\\(PASS|FAIL|Test Files|tests|✓|✗\\)\" | head -30)",
+      "Bash(npm test -- src/components/CapabilitiesSection.test.tsx --run 2>&1 | tail -100)",
+      "Bash(npm test -- src/components/CapabilitiesSection.test.tsx --run 2>&1 | grep -E \"\\(PASS|FAIL|Error|Test Files|tests\\)\" | head -20)",
+      "Bash(gh pr list --state all --limit 5 --json number,title,state,statusCheckRollup --jq '.[] | \"\\\\\\(.number\\) - \\\\\\(.title\\) - \\\\\\(.state\\) - Checks: \\\\\\(.statusCheckRollup // \"N/A\"\\)\"')",
+      "Bash(git stash && npm test -- --run src/pages/CustomersPage.test.tsx 2>&1 | head -50)",
+      "Bash(npm test -- --run 2>&1 | tail -80)",
+      "Bash(npm test -- --run 2>&1 | grep -A 5 \"Test Files\")",
+      "Bash(git stash && git checkout dev && npm test -- --run src/pages/CustomersPage.test.tsx 2>&1 | tail -30 && git checkout feat/capabilities-management && git stash pop)",
+      "Bash(rm -rf node_modules/.vite && npm test -- --run src/pages/CustomersPage.test.tsx 2>&1 | tail -30)",
+      "Bash(ls -la src/components/*.test.tsx src/pages/*Role*.test.tsx 2>&1)",
+      "Bash(npm test -- --run)",
+      "Bash(npm test -- --run RoleDetailPage 2>&1 | grep -A 20 \"formats dates correctly\")",
+      "Bash(git checkout:*)",
+      "Bash(git pull:*)",
+      "Bash(npm test:*)",
+      "Bash(ls:*)",
+      "Bash(git add:*)",
+      "Bash(git push:*)",
+      "Bash(git stash:*)",
+      "Bash(git commit:*)",
+      "Bash(npm run:*)",
+      "Bash(tee /tmp/test-coverage.txt)"
+    ]
+  }
+}

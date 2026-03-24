@@ -5,7 +5,7 @@ import { customerApi, type Customer, type CreateCustomerRequest, type UpdateCust
 import { Dialog, DialogActions, DialogBody, DialogDescription, DialogTitle } from './catalyst/dialog';
 import { Button } from './catalyst/button';
 import { Checkbox, CheckboxField } from './catalyst/checkbox';
-import { Description, Field, FieldGroup, Fieldset, Label } from './catalyst/fieldset';
+import { Field, Label } from './catalyst/fieldset';
 import { Input } from './catalyst/input';
 import { Textarea } from './catalyst/textarea';
 import { Radio, RadioField, RadioGroup } from './catalyst/radio';
@@ -78,7 +78,6 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
   const [showSiteContact, setShowSiteContact] = useState(false);
   const [showAccessInstructions, setShowAccessInstructions] = useState(false);
   const [showBusinessTerms, setShowBusinessTerms] = useState(false);
-  const [showBillingAddress, setShowBillingAddress] = useState(false);
 
   const [createFormData, setCreateFormData] = useState<CreateFormData>({
     name: '',
@@ -140,15 +139,13 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
     // Reset collapsible sections
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setShowSiteContact(false);
-    // eslint-disable-next-line react-hooks/set-state-in-effect
+     
     setShowAccessInstructions(false);
-    // eslint-disable-next-line react-hooks/set-state-in-effect
+     
     setShowBusinessTerms(false);
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setShowBillingAddress(false);
 
     if (customer) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
+       
       setEditFormData({
         name: customer.name,
         email: customer.email,
@@ -322,7 +319,7 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
           <form onSubmit={handleCreateSubmit} id="customer-form" className="space-y-4">
             {/* PRIMARY SECTION: Where do you need service? */}
             <div>
-              <Subheading className="mb-3 text-base font-semibold">Where do you need service?</Subheading>
+              <Subheading className="mb-3 text-base font-semibold">{t('customers.form.serviceLocationPrompt')}</Subheading>
               <div className="space-y-2">
                 {/* Row 1: Name, Phone, Email */}
                 <div className="grid grid-cols-12 gap-2">
@@ -455,18 +452,18 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
                     setCreateFormData((prev) => ({ ...prev, billingAddressSameAsService: checked }))
                   }
                 />
-                <Label className="font-medium">Send invoice to same address</Label>
+                <Label className="font-medium">{t('common.form.billingAddressSameAsService')}</Label>
               </CheckboxField>
             </div>
 
             {/* CONDITIONAL: Billing Address (if different) */}
             {!createFormData.billingAddressSameAsService && (
               <div className="border-t border-zinc-200 pt-3 dark:border-zinc-800">
-                <Subheading className="mb-3 text-sm font-semibold">Invoice Recipient</Subheading>
+                <Subheading className="mb-3 text-sm font-semibold">{t('customers.form.billingInvoiceRecipient')}</Subheading>
                 <div className="space-y-2">
                   {/* Billing Name */}
                   <Field>
-                    <Label className="text-xs">Company/Name *</Label>
+                    <Label className="text-xs">{t('customers.form.companyName')}</Label>
                     <Input
                       name="billingName"
                       value={createFormData.name}
@@ -571,12 +568,12 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
                   <svg className={`h-4 w-4 transition-transform ${showSiteContact ? 'rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                   </svg>
-                  Site Contact (optional)
+                  {t('customers.detail.siteContact')}
                 </button>
                 {showSiteContact && (
                   <div className="mt-2 grid grid-cols-3 gap-2 pl-6">
                     <Field>
-                      <Label className="text-xs">Name</Label>
+                      <Label className="text-xs">{t('common.form.name')}</Label>
                       <Input
                         name="siteContactName"
                         value={createFormData.siteContactName}
@@ -584,7 +581,7 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
                       />
                     </Field>
                     <Field>
-                      <Label className="text-xs">Phone</Label>
+                      <Label className="text-xs">{t('common.form.phone')}</Label>
                       <Input
                         type="tel"
                         name="siteContactPhone"
@@ -593,7 +590,7 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
                       />
                     </Field>
                     <Field>
-                      <Label className="text-xs">Email</Label>
+                      <Label className="text-xs">{t('common.form.email')}</Label>
                       <Input
                         type="email"
                         name="siteContactEmail"
@@ -615,7 +612,7 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
                   <svg className={`h-4 w-4 transition-transform ${showAccessInstructions ? 'rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                   </svg>
-                  Access Instructions (optional)
+                  {t('customers.form.accessInstructionsOptional')}
                 </button>
                 {showAccessInstructions && (
                   <div className="mt-2 pl-6">
@@ -639,14 +636,14 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
                   <svg className={`h-4 w-4 transition-transform ${showBusinessTerms ? 'rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                   </svg>
-                  Business Terms (optional)
+                  {t('customers.detail.businessTermsOptional')}
                 </button>
                 {showBusinessTerms && (
                   <div className="mt-2 space-y-2 pl-6">
                     {/* Payment Terms + Contract Tier */}
                     <div className="grid grid-cols-2 gap-2">
                       <Field>
-                        <Label className="text-xs">Payment Terms (Days)</Label>
+                        <Label className="text-xs">{t('customers.detail.paymentTerms')}</Label>
                         <Input
                           type="number"
                           name="paymentTermsDays"
@@ -659,7 +656,7 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
                         />
                       </Field>
                       <Field>
-                        <Label className="text-xs">Contract Tier</Label>
+                        <Label className="text-xs">{t('customers.detail.contractTier')}</Label>
                         <Input
                           name="contractPricingTier"
                           value={createFormData.contractPricingTier}
@@ -677,7 +674,7 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
                           checked={createFormData.requiresPurchaseOrder}
                           onChange={(checked) => setCreateFormData((prev) => ({ ...prev, requiresPurchaseOrder: checked }))}
                         />
-                        <Label className="text-xs">Requires PO</Label>
+                        <Label className="text-xs">{t('common.form.requiresPurchaseOrder')}</Label>
                       </CheckboxField>
 
                       <CheckboxField className="flex-none">
@@ -686,12 +683,12 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
                           checked={createFormData.taxExempt}
                           onChange={(checked) => setCreateFormData((prev) => ({ ...prev, taxExempt: checked }))}
                         />
-                        <Label className="text-xs">Tax Exempt</Label>
+                        <Label className="text-xs">{t('common.form.taxExempt')}</Label>
                       </CheckboxField>
 
                       {createFormData.taxExempt && (
                         <Field className="flex-1">
-                          <Label className="text-xs">Tax Cert #</Label>
+                          <Label className="text-xs">{t('customers.detail.taxCert')}</Label>
                           <Input
                             name="taxExemptCertificate"
                             value={createFormData.taxExemptCertificate}
@@ -706,7 +703,7 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
 
                     {/* Notes */}
                     <Field>
-                      <Label className="text-xs">Notes</Label>
+                      <Label className="text-xs">{t('common.form.notes')}</Label>
                       <Textarea
                         name="notes"
                         value={createFormData.notes}
@@ -756,7 +753,7 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
 
             {/* BILLING ADDRESS - Always Visible */}
             <div className="space-y-2 border-t border-zinc-200 pt-3 dark:border-zinc-800">
-              <Subheading className="text-sm font-semibold">Billing Address</Subheading>
+              <Subheading className="text-sm font-semibold">{t('common.form.billingAddress')}</Subheading>
               {/* Street + Apt */}
               <div className="grid grid-cols-4 gap-2">
                 <Field className="col-span-3">
@@ -851,14 +848,14 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
                   <svg className={`h-4 w-4 transition-transform ${showBusinessTerms ? 'rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                   </svg>
-                  Business Terms
+                  {t('customers.detail.businessTerms')}
                 </button>
                 {showBusinessTerms && (
                   <div className="mt-2 space-y-2 pl-6">
                     {/* Payment Terms + Contract Tier */}
                     <div className="grid grid-cols-2 gap-2">
                       <Field>
-                        <Label className="text-xs">Payment Terms (Days)</Label>
+                        <Label className="text-xs">{t('customers.detail.paymentTerms')}</Label>
                         <Input
                           type="number"
                           name="paymentTermsDays"
@@ -871,7 +868,7 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
                         />
                       </Field>
                       <Field>
-                        <Label className="text-xs">Contract Tier</Label>
+                        <Label className="text-xs">{t('customers.detail.contractTier')}</Label>
                         <Input
                           name="contractPricingTier"
                           value={editFormData.contractPricingTier}
@@ -889,7 +886,7 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
                           checked={editFormData.requiresPurchaseOrder}
                           onChange={(checked) => setEditFormData((prev) => ({ ...prev, requiresPurchaseOrder: checked }))}
                         />
-                        <Label className="text-xs">Requires PO</Label>
+                        <Label className="text-xs">{t('common.form.requiresPurchaseOrder')}</Label>
                       </CheckboxField>
 
                       <CheckboxField className="flex-none">
@@ -898,12 +895,12 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
                           checked={editFormData.taxExempt}
                           onChange={(checked) => setEditFormData((prev) => ({ ...prev, taxExempt: checked }))}
                         />
-                        <Label className="text-xs">Tax Exempt</Label>
+                        <Label className="text-xs">{t('common.form.taxExempt')}</Label>
                       </CheckboxField>
 
                       {editFormData.taxExempt && (
                         <Field className="flex-1">
-                          <Label className="text-xs">Tax Cert #</Label>
+                          <Label className="text-xs">{t('customers.detail.taxCert')}</Label>
                           <Input
                             name="taxExemptCertificate"
                             value={editFormData.taxExemptCertificate}
@@ -918,7 +915,7 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
 
                     {/* Notes */}
                     <Field>
-                      <Label className="text-xs">Notes</Label>
+                      <Label className="text-xs">{t('common.form.notes')}</Label>
                       <Textarea
                         name="notes"
                         value={editFormData.notes}

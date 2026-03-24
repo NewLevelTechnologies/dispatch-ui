@@ -85,22 +85,66 @@
   },
   "customers": {
     "description": "Manage your customer database",
+    "detail": {
+      "addEquipment": "Add Equipment",
+      "addLocation": "Add Location",
+      "addServiceLocation": "Add Service Location",
+      "addServiceLocationDescription": "Add a new service location for this customer.",
+      "balance": "Balance",
+      "backToCustomers": "Back to Customers",
+      "billingAddressLabel": "Billing Address",
+      "businessTerms": "Business Terms",
+      "businessTermsOptional": "Business Terms (optional)",
+      "contractTier": "Contract Tier",
+      "equipment": "Equipment",
+      "equipmentCount": "Equipment: {{count}}",
+      "errorLoading": "Error loading customer",
+      "lastService": "Last Service",
+      "lastServiceNever": "Last service: Never",
+      "netTerms": "Net-{{days}}",
+      "never": "Never",
+      "noEquipment": "No equipment recorded yet",
+      "noPhone": "No phone",
+      "noWorkOrders": "No work orders yet",
+      "openWorkOrders": "Open Work Orders",
+      "paymentTerms": "Payment Terms (Days)",
+      "recentWorkOrders": "Recent Work Orders",
+      "requiresPo": "Requires PO",
+      "serviceLocationsCount": "Service Locations ({{count}})",
+      "siteContact": "Site Contact (optional)",
+      "taxCert": "Tax Cert #",
+      "taxExemptBadge": "Tax Exempt",
+      "viewDetails": "View Details →"
+    },
     "displayMode": {
       "simple": "Simple",
       "standard": "Standard"
     },
     "form": {
+      "accessInstructionsOptional": "Access Instructions (optional)",
       "billingAddressHelp": "Check this if invoices should be sent to the service address",
       "billingAddressSection": "Billing Address",
+      "billingInvoiceRecipient": "Invoice Recipient",
       "businessDetails": "Business Details",
+      "companyName": "Company/Name *",
       "locationNameHelp": "Optional - useful for businesses with multiple locations",
+      "newWorkOrder": "New Work Order",
       "paymentTermsHelp": "0 = Due on receipt",
+      "serviceLocationPrompt": "Where do you need service?",
       "serviceLocationSection": "Service Location"
     },
     "table": {
+      "billingAddress": "Billing Address",
       "location": "Location",
+      "locationName": "Location Name",
+      "locationAddress": "Address",
+      "locationContact": "Contact",
       "locations": "Locations",
-      "moreLocations": "+{{count}} more"
+      "locationsCount": "{{count}} locations",
+      "moreLocations": "+{{count}} more",
+      "none": "None",
+      "terms": "Terms",
+      "type": "Type"
     }
   },
   "dashboard": {

@@ -139,13 +139,13 @@ export default function CustomersPage() {
           <Table dense className="[--gutter:theme(spacing.1)] text-sm">
             <TableHead>
               <TableRow>
-                <TableHeader>Type</TableHeader>
+                <TableHeader>{t('customers.table.type')}</TableHeader>
                 <TableHeader>{t('common.form.name')}</TableHeader>
                 <TableHeader>{t('common.form.phone')}</TableHeader>
                 <TableHeader>{t('common.form.email')}</TableHeader>
-                <TableHeader>Billing Address</TableHeader>
+                <TableHeader>{t('customers.table.billingAddress')}</TableHeader>
                 <TableHeader>{t('customers.table.locations')}</TableHeader>
-                <TableHeader>Terms</TableHeader>
+                <TableHeader>{t('customers.table.terms')}</TableHeader>
                 <TableHeader>{t('common.form.status')}</TableHeader>
                 <TableHeader></TableHeader>
               </TableRow>
@@ -213,10 +213,10 @@ export default function CustomersPage() {
                         </div>
                       ) : activeLocations.length > 1 ? (
                         <div className="text-xs">
-                          {activeLocations.length} locations
+                          {t('customers.table.locationsCount', { count: activeLocations.length })}
                         </div>
                       ) : (
-                        <div className="text-xs text-zinc-400">None</div>
+                        <div className="text-xs text-zinc-400">{t('customers.table.none')}</div>
                       )}
                     </TableCell>
                     <TableCell>
