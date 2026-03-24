@@ -20,6 +20,7 @@ import {
   BuildingStorefrontIcon,
   ClockIcon,
   ArrowPathIcon,
+  MapPinIcon,
 } from '@heroicons/react/24/outline';
 import { Sidebar, SidebarBody, SidebarFooter, SidebarHeader, SidebarItem, SidebarSection } from './catalyst/sidebar';
 import { SidebarLayout } from './catalyst/sidebar-layout';
@@ -42,6 +43,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const mainNavigation = [
     { name: t('entities.dashboard'), href: '/dashboard', icon: HomeIcon },
     { name: t('entities.customers'), href: '/customers', icon: UserGroupIcon },
+    { name: t('entities.serviceLocations'), href: '/service-locations', icon: MapPinIcon },
     { name: t('entities.workOrders'), href: '/work-orders', icon: ClipboardDocumentListIcon },
   ];
 

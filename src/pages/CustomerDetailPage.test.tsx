@@ -154,7 +154,7 @@ describe('CustomerDetailPage', () => {
     await user.click(addButton);
 
     await waitFor(() => {
-      expect(screen.getByText('Add Service Location')).toBeInTheDocument();
+      expect(screen.getByText('Create Service Location')).toBeInTheDocument();
     });
   });
 
@@ -358,14 +358,14 @@ describe('CustomerDetailPage', () => {
     await user.click(addButton);
 
     await waitFor(() => {
-      expect(screen.getByText('Add Service Location')).toBeInTheDocument();
+      expect(screen.getByText('Create Service Location')).toBeInTheDocument();
     });
 
     const cancelButton = screen.getByRole('button', { name: /cancel/i });
     await user.click(cancelButton);
 
     await waitFor(() => {
-      expect(screen.queryByText('Add Service Location')).not.toBeInTheDocument();
+      expect(screen.queryByText('Create Service Location')).not.toBeInTheDocument();
     });
   });
 

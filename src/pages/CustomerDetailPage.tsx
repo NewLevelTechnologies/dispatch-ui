@@ -284,7 +284,7 @@ export default function CustomerDetailPage() {
                     </TableHead>
                     <TableBody>
                       {filteredLocations.map((location) => (
-                        <TableRow key={location.id} className="cursor-pointer">
+                        <TableRow key={location.id} href={`/service-locations/${location.id}`} className="cursor-pointer">
                           <TableCell className="font-medium">
                             {location.locationName || 'Unnamed Location'}
                           </TableCell>
@@ -372,7 +372,11 @@ export default function CustomerDetailPage() {
                       </Text>
                     </div>
 
-                    <Button plain className="mt-2 w-full text-xs">
+                    <Button
+                      plain
+                      className="mt-2 w-full text-xs"
+                      onClick={() => navigate(`/service-locations/${location.id}`)}
+                    >
                       {t('customers.detail.viewDetails')}
                     </Button>
                   </div>

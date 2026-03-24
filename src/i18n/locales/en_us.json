@@ -178,6 +178,58 @@
     "workOrder": "Work Order",
     "workOrders": "Work Orders"
   },
+  "serviceLocations": {
+    "actions": {
+      "close": "Close Location",
+      "closeConfirm": "Are you sure you want to close {{name}}? This location will no longer be available for new work orders."
+    },
+    "description": "Manage service locations across all customers",
+    "detail": {
+      "addEquipment": "Add Equipment",
+      "address": "Address",
+      "backToList": "Back to Service Locations",
+      "belongsTo": "Belongs to",
+      "businessLocation": "Business",
+      "created": "Created",
+      "equipment": "Equipment",
+      "errorLoading": "Error loading service location",
+      "lastService": "Last Service",
+      "lastUpdated": "Last Updated",
+      "loading": "Loading service location...",
+      "locationId": "Location ID",
+      "never": "Never",
+      "newWorkOrder": "New Work Order",
+      "noEquipment": "No equipment recorded yet",
+      "noWorkOrders": "No work orders yet",
+      "openWorkOrders": "Open Work Orders",
+      "quickStats": "Quick Stats",
+      "recentWorkOrders": "Recent Work Orders",
+      "siteContact": "Site Contact",
+      "systemInfo": "System Information",
+      "totalEquipment": "Total Equipment",
+      "totalRevenue": "Total Revenue",
+      "unnamedLocation": "Unnamed Location",
+      "uspsValidated": "USPS Validated"
+    },
+    "filter": {
+      "allStatuses": "All statuses"
+    },
+    "status": {
+      "active": "Active",
+      "closed": "Closed",
+      "inactive": "Inactive"
+    },
+    "table": {
+      "address": "Address",
+      "contact": "Contact",
+      "customer": "Customer",
+      "equipment": "Equipment",
+      "lastService": "Last Service",
+      "locationName": "Location Name",
+      "neverServiced": "Never",
+      "type": "Type"
+    }
+  },
   "equipment": {
     "description": "Manage customer equipment, parts inventory, and warehouses",
     "descriptionEquipment": "Manage customer equipment, parts inventory, and warehouses",
