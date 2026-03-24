@@ -202,7 +202,7 @@ describe('CustomerFormDialog', () => {
       await user.click(screen.getByRole('button', { name: /business terms/i }));
       await user.type(screen.getByLabelText(/payment terms/i), '30');
       await user.type(screen.getByLabelText(/contract tier/i), 'GOLD');
-      await user.click(screen.getByRole('checkbox', { name: /requires po/i }));
+      await user.click(screen.getByRole('checkbox', { name: /requires purchase order/i }));
       await user.click(screen.getByRole('checkbox', { name: /tax exempt/i }));
       await user.type(screen.getByLabelText(/tax cert/i), 'TAX-12345');
       await user.type(screen.getByLabelText(/notes/i), 'VIP customer');
@@ -317,7 +317,7 @@ describe('CustomerFormDialog', () => {
 
       await user.type(screen.getByLabelText(/payment terms/i), '60');
       await user.type(screen.getByLabelText(/contract tier/i), 'PLATINUM');
-      await user.click(screen.getByRole('checkbox', { name: /requires po/i }));
+      await user.click(screen.getByRole('checkbox', { name: /requires purchase order/i }));
       await user.click(screen.getByRole('checkbox', { name: /tax exempt/i }));
       await user.type(screen.getByLabelText(/tax cert/i), 'TAX-99999');
       await user.type(screen.getByLabelText(/notes/i), 'Updated notes');
