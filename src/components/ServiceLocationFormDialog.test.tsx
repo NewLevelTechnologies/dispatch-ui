@@ -19,7 +19,7 @@ describe('ServiceLocationFormDialog', () => {
       <ServiceLocationFormDialog isOpen={true} onClose={mockOnClose} customerId={mockCustomerId} />
     );
 
-    expect(screen.getByText('Add Service Location')).toBeInTheDocument();
+    expect(screen.getByText('Create Service Location')).toBeInTheDocument();
     expect(screen.getByLabelText(/location name/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/street address/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/city/i)).toBeInTheDocument();

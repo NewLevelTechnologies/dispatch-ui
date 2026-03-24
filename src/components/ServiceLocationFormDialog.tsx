@@ -1,16 +1,18 @@
 import { useState, useEffect } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { customerApi } from '../api';
+import { customerApi, type ServiceLocation } from '../api';
 import { Dialog, DialogActions, DialogBody, DialogDescription, DialogTitle } from './catalyst/dialog';
 import { Button } from './catalyst/button';
 import { Field, Label } from './catalyst/fieldset';
 import { Input } from './catalyst/input';
+import { Textarea } from './catalyst/textarea';
 
 interface ServiceLocationFormDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  customerId: string;
+  serviceLocation?: ServiceLocation | null;
+  customerId?: string | null;
 }
 
 interface FormData {
@@ -24,11 +26,14 @@ interface FormData {
   siteContactPhone: string;
   siteContactEmail: string;
   accessInstructions: string;
+  notes: string;
 }
 
-export default function ServiceLocationFormDialog({ isOpen, onClose, customerId }: ServiceLocationFormDialogProps) {
+export default function ServiceLocationFormDialog({ isOpen, onClose, serviceLocation, customerId }: ServiceLocationFormDialogProps) {
   const queryClient = useQueryClient();
   const { t } = useTranslation();
+  const isEdit = !!serviceLocation;
+  const effectiveCustomerId = serviceLocation?.customerId || customerId || '';
 
   const [formData, setFormData] = useState<FormData>({
     locationName: '',
@@ -41,26 +46,43 @@ export default function ServiceLocationFormDialog({ isOpen, onClose, customerId 
     siteContactPhone: '',
     siteContactEmail: '',
     accessInstructions: '',
+    notes: '',
   });
 
-  // Reset form when dialog opens
+  // Reset form when dialog opens or service location changes
   useEffect(() => {
-    if (isOpen) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setFormData({
-        locationName: '',
-        streetAddress: '',
-        streetAddressLine2: '',
-        city: '',
-        state: '',
-        zipCode: '',
-        siteContactName: '',
-        siteContactPhone: '',
-        siteContactEmail: '',
-        accessInstructions: '',
-      });
-    }
-  }, [isOpen]);
+    if (!isOpen) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setFormData(
+      serviceLocation
+        ? {
+            locationName: serviceLocation.locationName || '',
+            streetAddress: serviceLocation.address.streetAddress,
+            streetAddressLine2: serviceLocation.address.streetAddressLine2 || '',
+            city: serviceLocation.address.city,
+            state: serviceLocation.address.state,
+            zipCode: serviceLocation.address.zipCode,
+            siteContactName: serviceLocation.siteContactName || '',
+            siteContactPhone: serviceLocation.siteContactPhone || '',
+            siteContactEmail: serviceLocation.siteContactEmail || '',
+            accessInstructions: serviceLocation.accessInstructions || '',
+            notes: serviceLocation.notes || '',
+          }
+        : {
+            locationName: '',
+            streetAddress: '',
+            streetAddressLine2: '',
+            city: '',
+            state: '',
+            zipCode: '',
+            siteContactName: '',
+            siteContactPhone: '',
+            siteContactEmail: '',
+            accessInstructions: '',
+            notes: '',
+          }
+    );
+  }, [isOpen, serviceLocation]);
 
   const createMutation = useMutation({
     mutationFn: async (data: FormData) => {
@@ -77,14 +99,13 @@ export default function ServiceLocationFormDialog({ isOpen, onClose, customerId 
         siteContactPhone: data.siteContactPhone || null,
         siteContactEmail: data.siteContactEmail || null,
         accessInstructions: data.accessInstructions || null,
-        notes: null,
+        notes: data.notes || null,
       };
 
-      // Using the API endpoint from the guide: POST /customers/{customerId}/service-locations
-      return customerApi.addServiceLocation(customerId, request);
+      return customerApi.addServiceLocation(effectiveCustomerId, request);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['customers', customerId] });
+      queryClient.invalidateQueries({ queryKey: ['customers', effectiveCustomerId] });
       queryClient.invalidateQueries({ queryKey: ['customers'] });
       onClose();
     },
@@ -92,20 +113,81 @@ export default function ServiceLocationFormDialog({ isOpen, onClose, customerId 
       const errorMessage = error instanceof Error && 'response' in error
         ? ((error as { response?: { data?: { message?: string } } }).response?.data?.message)
         : undefined;
-      alert(errorMessage || 'Failed to add service location');
+      alert(errorMessage || t('common.form.errorCreate', { entity: t('entities.serviceLocation') }));
+    },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: async (data: FormData) => {
+      if (!serviceLocation) throw new Error('No service location to update');
+
+      // Update basic fields (not address)
+      const updateRequest = {
+        locationName: data.locationName || null,
+        siteContactName: data.siteContactName || null,
+        siteContactPhone: data.siteContactPhone || null,
+        siteContactEmail: data.siteContactEmail || null,
+        accessInstructions: data.accessInstructions || null,
+        notes: data.notes || null,
+      };
+
+      await customerApi.updateServiceLocation(effectiveCustomerId, serviceLocation.id, updateRequest);
+
+      // Check if address changed, if so update it separately
+      const addressChanged =
+        data.streetAddress !== serviceLocation.address.streetAddress ||
+        data.streetAddressLine2 !== (serviceLocation.address.streetAddressLine2 || '') ||
+        data.city !== serviceLocation.address.city ||
+        data.state !== serviceLocation.address.state ||
+        data.zipCode !== serviceLocation.address.zipCode;
+
+      if (addressChanged) {
+        const addressRequest = {
+          streetAddress: data.streetAddress,
+          streetAddressLine2: data.streetAddressLine2 || null,
+          city: data.city,
+          state: data.state,
+          zipCode: data.zipCode,
+        };
+        await customerApi.updateServiceLocationAddress(effectiveCustomerId, serviceLocation.id, addressRequest);
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['customers', effectiveCustomerId] });
+      queryClient.invalidateQueries({ queryKey: ['customers'] });
+      onClose();
+    },
+    onError: (error: unknown) => {
+      const errorMessage = error instanceof Error && 'response' in error
+        ? ((error as { response?: { data?: { message?: string } } }).response?.data?.message)
+        : undefined;
+      alert(errorMessage || t('common.form.errorUpdate', { entity: t('entities.serviceLocation') }));
     },
   });
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    createMutation.mutate(formData);
+    if (isEdit) {
+      updateMutation.mutate(formData);
+    } else {
+      createMutation.mutate(formData);
+    }
   };
+
+  const isPending = createMutation.isPending || updateMutation.isPending;
 
   return (
     <Dialog open={isOpen} onClose={onClose} size="3xl">
-      <DialogTitle>{t('customers.detail.addServiceLocation')}</DialogTitle>
+      <DialogTitle>
+        {t('common.form.titleCreate', {
+          action: isEdit ? t('common.edit') : t('common.create'),
+          entity: t('entities.serviceLocation'),
+        })}
+      </DialogTitle>
       <DialogDescription>
-        {t('customers.detail.addServiceLocationDescription')}
+        {isEdit
+          ? t('common.form.descriptionEdit', { entity: t('entities.serviceLocation') })
+          : t('common.form.descriptionCreate', { entity: t('entities.serviceLocation') })}
       </DialogDescription>
       <DialogBody>
         <form onSubmit={handleSubmit} id="service-location-form" className="space-y-3">
@@ -216,6 +298,17 @@ export default function ServiceLocationFormDialog({ isOpen, onClose, customerId 
               placeholder="e.g., Use back entrance, gate code 1234"
             />
           </Field>
+
+          {/* Notes */}
+          <Field>
+            <Label className="text-xs">{t('common.form.notes')}</Label>
+            <Textarea
+              name="notes"
+              value={formData.notes}
+              onChange={(e) => setFormData((prev) => ({ ...prev, notes: e.target.value }))}
+              rows={2}
+            />
+          </Field>
         </form>
       </DialogBody>
       <DialogActions>
@@ -225,9 +318,9 @@ export default function ServiceLocationFormDialog({ isOpen, onClose, customerId 
         <Button
           type="submit"
           form="service-location-form"
-          disabled={createMutation.isPending}
+          disabled={isPending}
         >
-          {createMutation.isPending ? t('common.saving') : t('common.create')}
+          {isPending ? t('common.saving') : isEdit ? t('common.update') : t('common.create')}
         </Button>
       </DialogActions>
     </Dialog>
