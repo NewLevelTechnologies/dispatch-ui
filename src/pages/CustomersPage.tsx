@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { EllipsisVerticalIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import { customerApi, type Customer } from '../api';
+import { useHasCapability } from '../hooks/useCurrentUser';
 import AppLayout from '../components/AppLayout';
 import CustomerFormDialog from '../components/CustomerFormDialog';
 import { Heading } from '../components/catalyst/heading';
@@ -20,6 +21,11 @@ export default function CustomersPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Permission checks
+  const canAddCustomers = useHasCapability('ADD_CUSTOMERS');
+  const canEditCustomers = useHasCapability('EDIT_CUSTOMERS');
+  const canArchiveCustomers = useHasCapability('ARCHIVE_CUSTOMERS');
 
   const { data: customers, isLoading, error } = useQuery({
     queryKey: ['customers'],
@@ -82,7 +88,9 @@ export default function CustomersPage() {
     <AppLayout>
       <div className="flex items-center justify-between gap-4">
         <Heading>{t('entities.customers')}</Heading>
-        <Button onClick={handleAdd}>{t('common.actions.add', { entity: t('entities.customer') })}</Button>
+        {canAddCustomers && (
+          <Button onClick={handleAdd}>{t('common.actions.add', { entity: t('entities.customer') })}</Button>
+        )}
       </div>
 
       {/* Quick Search Bar */}
@@ -122,9 +130,11 @@ export default function CustomersPage() {
       {customers && customers.length === 0 && (
         <div className="mt-4 rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700 p-4">
           <p className="text-sm text-zinc-600 dark:text-zinc-400">{t('common.actions.notFound', { entities: t('entities.customers') })}</p>
-          <Button className="mt-2" onClick={handleAdd}>
-            {t('common.actions.addFirst', { entity: t('entities.customer') })}
-          </Button>
+          {canAddCustomers && (
+            <Button className="mt-2" onClick={handleAdd}>
+              {t('common.actions.addFirst', { entity: t('entities.customer') })}
+            </Button>
+          )}
         </div>
       )}
 
@@ -238,24 +248,30 @@ export default function CustomersPage() {
                       </Badge>
                     </TableCell>
                     <TableCell>
-                      <div className="-mx-3 -my-1.5 sm:-mx-2.5">
-                        <Dropdown>
-                          <DropdownButton plain aria-label={t('common.moreOptions')}>
-                            <EllipsisVerticalIcon className="size-5" />
-                          </DropdownButton>
-                          <DropdownMenu anchor="bottom end">
-                            <DropdownItem onClick={() => navigate(`/customers/${customer.id}`)}>
-                              <DropdownLabel>{t('common.view')}</DropdownLabel>
-                            </DropdownItem>
-                            <DropdownItem onClick={() => handleEdit(customer)}>
-                              <DropdownLabel>{t('common.edit')}</DropdownLabel>
-                            </DropdownItem>
-                            <DropdownItem onClick={() => handleDelete(customer)}>
-                              <DropdownLabel>{t('common.delete')}</DropdownLabel>
-                            </DropdownItem>
-                          </DropdownMenu>
-                        </Dropdown>
-                      </div>
+                      {(canEditCustomers || canArchiveCustomers) && (
+                        <div className="-mx-3 -my-1.5 sm:-mx-2.5">
+                          <Dropdown>
+                            <DropdownButton plain aria-label={t('common.moreOptions')}>
+                              <EllipsisVerticalIcon className="size-5" />
+                            </DropdownButton>
+                            <DropdownMenu anchor="bottom end">
+                              <DropdownItem onClick={() => navigate(`/customers/${customer.id}`)}>
+                                <DropdownLabel>{t('common.view')}</DropdownLabel>
+                              </DropdownItem>
+                              {canEditCustomers && (
+                                <DropdownItem onClick={() => handleEdit(customer)}>
+                                  <DropdownLabel>{t('common.edit')}</DropdownLabel>
+                                </DropdownItem>
+                              )}
+                              {canArchiveCustomers && (
+                                <DropdownItem onClick={() => handleDelete(customer)}>
+                                  <DropdownLabel>{t('common.delete')}</DropdownLabel>
+                                </DropdownItem>
+                              )}
+                            </DropdownMenu>
+                          </Dropdown>
+                        </div>
+                      )}
                     </TableCell>
                   </TableRow>
                 );
