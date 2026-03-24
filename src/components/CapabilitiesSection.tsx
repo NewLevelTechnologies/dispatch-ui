@@ -62,7 +62,9 @@ export default function CapabilitiesSection({ capabilities = [] }: CapabilitiesS
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Subheading>{t('capabilities.label')}</Subheading>
-          <Badge color="purple">{totalCount}</Badge>
+          <span className="inline-flex items-center rounded-md px-2 py-1 text-xs font-medium bg-primary-100 text-primary-700 dark:bg-primary-950/50 dark:text-primary-400">
+            {totalCount}
+          </span>
         </div>
         <Button plain onClick={() => setIsExpanded(!isExpanded)}>
           {isExpanded ? (
@@ -106,14 +108,13 @@ export default function CapabilitiesSection({ capabilities = [] }: CapabilitiesS
                   ?.capabilities
                   .filter(cap => capabilities.includes(cap.name))
                   .map(cap => (
-                    <Badge
+                    <span
                       key={cap.name}
-                      color="purple"
-                      className="cursor-help text-xs"
+                      className="inline-flex items-center rounded-md px-2 py-1 text-xs font-medium cursor-help bg-primary-100 text-primary-700 dark:bg-primary-950/50 dark:text-primary-400"
                       title={cap.description}
                     >
                       {cap.displayName}
-                    </Badge>
+                    </span>
                   ))}
               </div>
             </div>
