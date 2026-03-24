@@ -8,6 +8,7 @@ import { Checkbox, CheckboxField } from './catalyst/checkbox';
 import { Description, Field, FieldGroup, Fieldset, Label } from './catalyst/fieldset';
 import { Input } from './catalyst/input';
 import { Textarea } from './catalyst/textarea';
+import { Radio, RadioField, RadioGroup } from './catalyst/radio';
 import { Subheading } from './catalyst/heading';
 
 interface CustomerFormDialogProps {
@@ -52,6 +53,13 @@ interface EditFormData {
   name: string;
   email: string;
   phone: string;
+  billingAddress: {
+    streetAddress: string;
+    streetAddressLine2: string;
+    city: string;
+    state: string;
+    zipCode: string;
+  };
   paymentTermsDays: number;
   requiresPurchaseOrder: boolean;
   contractPricingTier: string;
@@ -65,6 +73,12 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
   const queryClient = useQueryClient();
   const { t } = useTranslation();
   const isEdit = !!customer?.id;
+
+  // Collapsible sections state
+  const [showSiteContact, setShowSiteContact] = useState(false);
+  const [showAccessInstructions, setShowAccessInstructions] = useState(false);
+  const [showBusinessTerms, setShowBusinessTerms] = useState(false);
+  const [showBillingAddress, setShowBillingAddress] = useState(false);
 
   const [createFormData, setCreateFormData] = useState<CreateFormData>({
     name: '',
@@ -102,6 +116,13 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
     name: '',
     email: '',
     phone: '',
+    billingAddress: {
+      streetAddress: '',
+      streetAddressLine2: '',
+      city: '',
+      state: '',
+      zipCode: '',
+    },
     paymentTermsDays: 0,
     requiresPurchaseOrder: false,
     contractPricingTier: '',
@@ -116,12 +137,29 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
   useEffect(() => {
     if (!isOpen) return;
 
+    // Reset collapsible sections
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setShowSiteContact(false);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setShowAccessInstructions(false);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setShowBusinessTerms(false);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setShowBillingAddress(false);
+
     if (customer) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setEditFormData({
         name: customer.name,
         email: customer.email,
         phone: customer.phone || '',
+        billingAddress: {
+          streetAddress: customer.billingAddress.streetAddress,
+          streetAddressLine2: customer.billingAddress.streetAddressLine2 || '',
+          city: customer.billingAddress.city,
+          state: customer.billingAddress.state,
+          zipCode: customer.billingAddress.zipCode,
+        },
         paymentTermsDays: customer.paymentTermsDays,
         requiresPurchaseOrder: customer.requiresPurchaseOrder,
         contractPricingTier: customer.contractPricingTier || '',
@@ -180,7 +218,15 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
   });
 
   const updateMutation = useMutation({
-    mutationFn: (data: UpdateCustomerRequest) => customerApi.update(customer!.id, data),
+    mutationFn: async ({ customerRequest, billingAddressRequest }: {
+      customerRequest: UpdateCustomerRequest;
+      billingAddressRequest?: { billingAddress: typeof editFormData.billingAddress }
+    }) => {
+      await customerApi.update(customer!.id, customerRequest);
+      if (billingAddressRequest) {
+        await customerApi.updateBillingAddress(customer!.id, billingAddressRequest);
+      }
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['customers'] });
       onClose();
@@ -205,7 +251,8 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
         : createFormData.billingAddress,
       serviceLocations: [
         {
-          locationName: createFormData.locationName || null,
+          // Location name is the same as customer name (homeowner) or business name
+          locationName: createFormData.locationName || createFormData.name,
           address: createFormData.serviceAddress,
           siteContactName: createFormData.siteContactName || null,
           siteContactPhone: createFormData.siteContactPhone || null,
@@ -229,7 +276,7 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
   const handleEditSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    const request: UpdateCustomerRequest = {
+    const customerRequest: UpdateCustomerRequest = {
       name: editFormData.name,
       email: editFormData.email,
       phone: editFormData.phone || null,
@@ -242,7 +289,19 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
       status: editFormData.status,
     };
 
-    updateMutation.mutate(request);
+    // Check if billing address changed
+    const billingAddressChanged = customer && (
+      editFormData.billingAddress.streetAddress !== customer.billingAddress.streetAddress ||
+      (editFormData.billingAddress.streetAddressLine2 || '') !== (customer.billingAddress.streetAddressLine2 || '') ||
+      editFormData.billingAddress.city !== customer.billingAddress.city ||
+      editFormData.billingAddress.state !== customer.billingAddress.state ||
+      editFormData.billingAddress.zipCode !== customer.billingAddress.zipCode
+    );
+
+    updateMutation.mutate({
+      customerRequest,
+      billingAddressRequest: billingAddressChanged ? { billingAddress: editFormData.billingAddress } : undefined
+    });
   };
 
   return (
@@ -260,22 +319,40 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
       </DialogDescription>
       <DialogBody>
         {!isEdit ? (
-          <form onSubmit={handleCreateSubmit} id="customer-form">
-            <Fieldset>
-              <FieldGroup>
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <Field>
-                    <Label>{t('common.form.name')} *</Label>
+          <form onSubmit={handleCreateSubmit} id="customer-form" className="space-y-4">
+            {/* PRIMARY SECTION: Where do you need service? */}
+            <div>
+              <Subheading className="mb-3 text-base font-semibold">Where do you need service?</Subheading>
+              <div className="space-y-2">
+                {/* Row 1: Name, Phone, Email */}
+                <div className="grid grid-cols-12 gap-2">
+                  <Field className="col-span-5">
+                    <Label className="text-xs">{t('common.form.name')} *</Label>
                     <Input
                       name="name"
                       value={createFormData.name}
-                      onChange={(e) => setCreateFormData((prev) => ({ ...prev, name: e.target.value }))}
+                      onChange={(e) => {
+                        const name = e.target.value;
+                        setCreateFormData((prev) => ({
+                          ...prev,
+                          name,
+                          locationName: prev.locationName === '' || prev.locationName === prev.name ? name : prev.locationName
+                        }));
+                      }}
                       required
                     />
                   </Field>
-
-                  <Field>
-                    <Label>{t('common.form.email')} *</Label>
+                  <Field className="col-span-4">
+                    <Label className="text-xs">{t('common.form.phone')}</Label>
+                    <Input
+                      type="tel"
+                      name="phone"
+                      value={createFormData.phone}
+                      onChange={(e) => setCreateFormData((prev) => ({ ...prev, phone: e.target.value }))}
+                    />
+                  </Field>
+                  <Field className="col-span-3">
+                    <Label className="text-xs">{t('common.form.email')} *</Label>
                     <Input
                       type="email"
                       name="email"
@@ -286,65 +363,42 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
                   </Field>
                 </div>
 
-                <Field>
-                  <Label>{t('common.form.phone')}</Label>
-                  <Input
-                    type="tel"
-                    name="phone"
-                    value={createFormData.phone}
-                    onChange={(e) => setCreateFormData((prev) => ({ ...prev, phone: e.target.value }))}
-                  />
-                </Field>
-              </FieldGroup>
-            </Fieldset>
-
-            <Fieldset className="mt-6">
-              <Subheading>{t('customers.form.serviceLocationSection')}</Subheading>
-              <FieldGroup>
-                <Field>
-                  <Label>{t('common.form.locationName')}</Label>
-                  <Description>{t('customers.form.locationNameHelp')}</Description>
-                  <Input
-                    name="locationName"
-                    value={createFormData.locationName}
-                    onChange={(e) => setCreateFormData((prev) => ({ ...prev, locationName: e.target.value }))}
-                    placeholder="e.g., Downtown Location, Main Office"
-                  />
-                </Field>
-
-                <Field>
-                  <Label>{t('common.form.streetAddress')} *</Label>
-                  <Input
-                    name="serviceStreetAddress"
-                    value={createFormData.serviceAddress.streetAddress}
-                    onChange={(e) =>
-                      setCreateFormData((prev) => ({
-                        ...prev,
-                        serviceAddress: { ...prev.serviceAddress, streetAddress: e.target.value },
-                      }))
-                    }
-                    required
-                  />
-                </Field>
-
-                <Field>
-                  <Label>{t('common.form.addressLine2')}</Label>
-                  <Input
-                    name="serviceStreetAddressLine2"
-                    value={createFormData.serviceAddress.streetAddressLine2}
-                    onChange={(e) =>
-                      setCreateFormData((prev) => ({
-                        ...prev,
-                        serviceAddress: { ...prev.serviceAddress, streetAddressLine2: e.target.value },
-                      }))
-                    }
-                    placeholder="Apt, Suite, Unit, etc."
-                  />
-                </Field>
-
-                <div className="grid grid-cols-6 gap-4">
+                {/* Row 2: Street + Apt */}
+                <div className="grid grid-cols-4 gap-2">
                   <Field className="col-span-3">
-                    <Label>{t('common.form.city')} *</Label>
+                    <Label className="text-xs">{t('common.form.streetAddress')} *</Label>
+                    <Input
+                      name="serviceStreetAddress"
+                      value={createFormData.serviceAddress.streetAddress}
+                      onChange={(e) =>
+                        setCreateFormData((prev) => ({
+                          ...prev,
+                          serviceAddress: { ...prev.serviceAddress, streetAddress: e.target.value },
+                        }))
+                      }
+                      required
+                    />
+                  </Field>
+                  <Field className="col-span-1">
+                    <Label className="text-xs">{t('common.form.addressLine2')}</Label>
+                    <Input
+                      name="serviceStreetAddressLine2"
+                      value={createFormData.serviceAddress.streetAddressLine2}
+                      onChange={(e) =>
+                        setCreateFormData((prev) => ({
+                          ...prev,
+                          serviceAddress: { ...prev.serviceAddress, streetAddressLine2: e.target.value },
+                        }))
+                      }
+                      placeholder="Apt"
+                    />
+                  </Field>
+                </div>
+
+                {/* Row 3: City/State/Zip */}
+                <div className="grid grid-cols-12 gap-2">
+                  <Field className="col-span-6">
+                    <Label className="text-xs">{t('common.form.city')} *</Label>
                     <Input
                       name="serviceCity"
                       value={createFormData.serviceAddress.city}
@@ -357,9 +411,8 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
                       required
                     />
                   </Field>
-
-                  <Field className="col-span-1">
-                    <Label>{t('common.form.state')} *</Label>
+                  <Field className="col-span-2">
+                    <Label className="text-xs">{t('common.form.state')} *</Label>
                     <Input
                       name="serviceState"
                       value={createFormData.serviceAddress.state}
@@ -369,14 +422,13 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
                           serviceAddress: { ...prev.serviceAddress, state: e.target.value.toUpperCase() },
                         }))
                       }
-                      placeholder={t('common.form.stateHelper')}
+                      placeholder="CA"
                       maxLength={2}
                       required
                     />
                   </Field>
-
-                  <Field className="col-span-2">
-                    <Label>{t('common.form.zipCode')} *</Label>
+                  <Field className="col-span-4">
+                    <Label className="text-xs">{t('common.form.zipCode')} *</Label>
                     <Input
                       name="serviceZipCode"
                       value={createFormData.serviceAddress.zipCode}
@@ -390,52 +442,11 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
                     />
                   </Field>
                 </div>
+              </div>
+            </div>
 
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                  <Field>
-                    <Label>{t('common.form.siteContactName')}</Label>
-                    <Input
-                      name="siteContactName"
-                      value={createFormData.siteContactName}
-                      onChange={(e) => setCreateFormData((prev) => ({ ...prev, siteContactName: e.target.value }))}
-                    />
-                  </Field>
-
-                  <Field>
-                    <Label>{t('common.form.siteContactPhone')}</Label>
-                    <Input
-                      type="tel"
-                      name="siteContactPhone"
-                      value={createFormData.siteContactPhone}
-                      onChange={(e) => setCreateFormData((prev) => ({ ...prev, siteContactPhone: e.target.value }))}
-                    />
-                  </Field>
-
-                  <Field>
-                    <Label>{t('common.form.siteContactEmail')}</Label>
-                    <Input
-                      type="email"
-                      name="siteContactEmail"
-                      value={createFormData.siteContactEmail}
-                      onChange={(e) => setCreateFormData((prev) => ({ ...prev, siteContactEmail: e.target.value }))}
-                    />
-                  </Field>
-                </div>
-
-                <Field>
-                  <Label>{t('common.form.accessInstructions')}</Label>
-                  <Textarea
-                    name="accessInstructions"
-                    value={createFormData.accessInstructions}
-                    onChange={(e) => setCreateFormData((prev) => ({ ...prev, accessInstructions: e.target.value }))}
-                    placeholder="e.g., Use back entrance, gate code 1234"
-                    rows={2}
-                  />
-                </Field>
-              </FieldGroup>
-            </Fieldset>
-
-            <div className="mt-6">
+            {/* BILLING CHECKBOX */}
+            <div className="border-t border-zinc-200 pt-3 dark:border-zinc-800">
               <CheckboxField>
                 <Checkbox
                   name="billingAddressSameAsService"
@@ -444,48 +455,63 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
                     setCreateFormData((prev) => ({ ...prev, billingAddressSameAsService: checked }))
                   }
                 />
-                <Label>{t('common.form.billingAddressSameAsService')}</Label>
-                <Description>{t('customers.form.billingAddressHelp')}</Description>
+                <Label className="font-medium">Send invoice to same address</Label>
               </CheckboxField>
             </div>
 
+            {/* CONDITIONAL: Billing Address (if different) */}
             {!createFormData.billingAddressSameAsService && (
-              <Fieldset className="mt-6">
-                <Subheading>{t('customers.form.billingAddressSection')}</Subheading>
-                <FieldGroup>
+              <div className="border-t border-zinc-200 pt-3 dark:border-zinc-800">
+                <Subheading className="mb-3 text-sm font-semibold">Invoice Recipient</Subheading>
+                <div className="space-y-2">
+                  {/* Billing Name */}
                   <Field>
-                    <Label>{t('common.form.streetAddress')} *</Label>
+                    <Label className="text-xs">Company/Name *</Label>
                     <Input
-                      name="billingStreetAddress"
-                      value={createFormData.billingAddress.streetAddress}
-                      onChange={(e) =>
-                        setCreateFormData((prev) => ({
-                          ...prev,
-                          billingAddress: { ...prev.billingAddress, streetAddress: e.target.value },
-                        }))
-                      }
+                      name="billingName"
+                      value={createFormData.name}
+                      onChange={(e) => setCreateFormData((prev) => ({ ...prev, name: e.target.value }))}
+                      placeholder="e.g., Burger King Corporate"
                       required
                     />
                   </Field>
 
-                  <Field>
-                    <Label>{t('common.form.addressLine2')}</Label>
-                    <Input
-                      name="billingStreetAddressLine2"
-                      value={createFormData.billingAddress.streetAddressLine2}
-                      onChange={(e) =>
-                        setCreateFormData((prev) => ({
-                          ...prev,
-                          billingAddress: { ...prev.billingAddress, streetAddressLine2: e.target.value },
-                        }))
-                      }
-                      placeholder="Apt, Suite, Unit, etc."
-                    />
-                  </Field>
-
-                  <div className="grid grid-cols-6 gap-4">
+                  {/* Street + Apt */}
+                  <div className="grid grid-cols-4 gap-2">
                     <Field className="col-span-3">
-                      <Label>{t('common.form.city')} *</Label>
+                      <Label className="text-xs">{t('common.form.streetAddress')} *</Label>
+                      <Input
+                        name="billingStreetAddress"
+                        value={createFormData.billingAddress.streetAddress}
+                        onChange={(e) =>
+                          setCreateFormData((prev) => ({
+                            ...prev,
+                            billingAddress: { ...prev.billingAddress, streetAddress: e.target.value },
+                          }))
+                        }
+                        required
+                      />
+                    </Field>
+                    <Field className="col-span-1">
+                      <Label className="text-xs">{t('common.form.addressLine2')}</Label>
+                      <Input
+                        name="billingStreetAddressLine2"
+                        value={createFormData.billingAddress.streetAddressLine2}
+                        onChange={(e) =>
+                          setCreateFormData((prev) => ({
+                            ...prev,
+                            billingAddress: { ...prev.billingAddress, streetAddressLine2: e.target.value },
+                          }))
+                        }
+                        placeholder="Apt"
+                      />
+                    </Field>
+                  </div>
+
+                  {/* City/State/Zip */}
+                  <div className="grid grid-cols-12 gap-2">
+                    <Field className="col-span-6">
+                      <Label className="text-xs">{t('common.form.city')} *</Label>
                       <Input
                         name="billingCity"
                         value={createFormData.billingAddress.city}
@@ -498,9 +524,8 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
                         required
                       />
                     </Field>
-
-                    <Field className="col-span-1">
-                      <Label>{t('common.form.state')} *</Label>
+                    <Field className="col-span-2">
+                      <Label className="text-xs">{t('common.form.state')} *</Label>
                       <Input
                         name="billingState"
                         value={createFormData.billingAddress.state}
@@ -510,14 +535,13 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
                             billingAddress: { ...prev.billingAddress, state: e.target.value.toUpperCase() },
                           }))
                         }
-                        placeholder={t('common.form.stateHelper')}
+                        placeholder="CA"
                         maxLength={2}
                         required
                       />
                     </Field>
-
-                    <Field className="col-span-2">
-                      <Label>{t('common.form.zipCode')} *</Label>
+                    <Field className="col-span-4">
+                      <Label className="text-xs">{t('common.form.zipCode')} *</Label>
                       <Input
                         name="billingZipCode"
                         value={createFormData.billingAddress.zipCode}
@@ -531,220 +555,401 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
                       />
                     </Field>
                   </div>
-                </FieldGroup>
-              </Fieldset>
+                </div>
+              </div>
             )}
 
-            <Fieldset className="mt-6">
-              <Subheading>{t('customers.form.businessDetails')}</Subheading>
-              <FieldGroup>
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <Field>
-                    <Label>{t('common.form.paymentTermsDays')}</Label>
-                    <Description>{t('customers.form.paymentTermsHelp')}</Description>
-                    <Input
-                      type="number"
-                      name="paymentTermsDays"
-                      value={createFormData.paymentTermsDays}
-                      onChange={(e) =>
-                        setCreateFormData((prev) => ({ ...prev, paymentTermsDays: parseInt(e.target.value) || 0 }))
-                      }
-                      min="0"
-                    />
-                  </Field>
-
-                  <Field>
-                    <Label>{t('common.form.contractPricingTier')}</Label>
-                    <Input
-                      name="contractPricingTier"
-                      value={createFormData.contractPricingTier}
-                      onChange={(e) => setCreateFormData((prev) => ({ ...prev, contractPricingTier: e.target.value }))}
-                      placeholder="e.g., GOLD, SILVER"
-                    />
-                  </Field>
-                </div>
-
-                <div className="flex gap-6">
-                  <CheckboxField>
-                    <Checkbox
-                      name="requiresPurchaseOrder"
-                      checked={createFormData.requiresPurchaseOrder}
-                      onChange={(checked) => setCreateFormData((prev) => ({ ...prev, requiresPurchaseOrder: checked }))}
-                    />
-                    <Label>{t('common.form.requiresPurchaseOrder')}</Label>
-                  </CheckboxField>
-
-                  <CheckboxField>
-                    <Checkbox
-                      name="taxExempt"
-                      checked={createFormData.taxExempt}
-                      onChange={(checked) => setCreateFormData((prev) => ({ ...prev, taxExempt: checked }))}
-                    />
-                    <Label>{t('common.form.taxExempt')}</Label>
-                  </CheckboxField>
-                </div>
-
-                {createFormData.taxExempt && (
-                  <Field>
-                    <Label>{t('common.form.taxExemptCertificate')}</Label>
-                    <Input
-                      name="taxExemptCertificate"
-                      value={createFormData.taxExemptCertificate}
-                      onChange={(e) =>
-                        setCreateFormData((prev) => ({ ...prev, taxExemptCertificate: e.target.value }))
-                      }
-                    />
-                  </Field>
+            {/* OPTIONAL SECTIONS - Collapsible */}
+            <div className="space-y-2 border-t border-zinc-200 pt-3 dark:border-zinc-800">
+              {/* Site Contact - Collapsible */}
+              <div>
+                <button
+                  type="button"
+                  onClick={() => setShowSiteContact(!showSiteContact)}
+                  className="flex w-full items-center gap-2 text-sm font-medium text-zinc-700 hover:text-zinc-900 dark:text-zinc-300 dark:hover:text-zinc-100"
+                >
+                  <svg className={`h-4 w-4 transition-transform ${showSiteContact ? 'rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                  Site Contact (optional)
+                </button>
+                {showSiteContact && (
+                  <div className="mt-2 grid grid-cols-3 gap-2 pl-6">
+                    <Field>
+                      <Label className="text-xs">Name</Label>
+                      <Input
+                        name="siteContactName"
+                        value={createFormData.siteContactName}
+                        onChange={(e) => setCreateFormData((prev) => ({ ...prev, siteContactName: e.target.value }))}
+                      />
+                    </Field>
+                    <Field>
+                      <Label className="text-xs">Phone</Label>
+                      <Input
+                        type="tel"
+                        name="siteContactPhone"
+                        value={createFormData.siteContactPhone}
+                        onChange={(e) => setCreateFormData((prev) => ({ ...prev, siteContactPhone: e.target.value }))}
+                      />
+                    </Field>
+                    <Field>
+                      <Label className="text-xs">Email</Label>
+                      <Input
+                        type="email"
+                        name="siteContactEmail"
+                        value={createFormData.siteContactEmail}
+                        onChange={(e) => setCreateFormData((prev) => ({ ...prev, siteContactEmail: e.target.value }))}
+                      />
+                    </Field>
+                  </div>
                 )}
+              </div>
 
-                <Field>
-                  <Label>{t('common.form.notes')}</Label>
-                  <Textarea
-                    name="notes"
-                    value={createFormData.notes}
-                    onChange={(e) => setCreateFormData((prev) => ({ ...prev, notes: e.target.value }))}
-                    rows={3}
-                  />
-                </Field>
-              </FieldGroup>
-            </Fieldset>
+              {/* Access Instructions - Collapsible */}
+              <div>
+                <button
+                  type="button"
+                  onClick={() => setShowAccessInstructions(!showAccessInstructions)}
+                  className="flex w-full items-center gap-2 text-sm font-medium text-zinc-700 hover:text-zinc-900 dark:text-zinc-300 dark:hover:text-zinc-100"
+                >
+                  <svg className={`h-4 w-4 transition-transform ${showAccessInstructions ? 'rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                  Access Instructions (optional)
+                </button>
+                {showAccessInstructions && (
+                  <div className="mt-2 pl-6">
+                    <Input
+                      name="accessInstructions"
+                      value={createFormData.accessInstructions}
+                      onChange={(e) => setCreateFormData((prev) => ({ ...prev, accessInstructions: e.target.value }))}
+                      placeholder="e.g., Use back entrance, gate code 1234"
+                    />
+                  </div>
+                )}
+              </div>
+
+              {/* Business Terms - Collapsible */}
+              <div>
+                <button
+                  type="button"
+                  onClick={() => setShowBusinessTerms(!showBusinessTerms)}
+                  className="flex w-full items-center gap-2 text-sm font-medium text-zinc-700 hover:text-zinc-900 dark:text-zinc-300 dark:hover:text-zinc-100"
+                >
+                  <svg className={`h-4 w-4 transition-transform ${showBusinessTerms ? 'rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                  Business Terms (optional)
+                </button>
+                {showBusinessTerms && (
+                  <div className="mt-2 space-y-2 pl-6">
+                    {/* Payment Terms + Contract Tier */}
+                    <div className="grid grid-cols-2 gap-2">
+                      <Field>
+                        <Label className="text-xs">Payment Terms (Days)</Label>
+                        <Input
+                          type="number"
+                          name="paymentTermsDays"
+                          value={createFormData.paymentTermsDays}
+                          onChange={(e) =>
+                            setCreateFormData((prev) => ({ ...prev, paymentTermsDays: parseInt(e.target.value) || 0 }))
+                          }
+                          min="0"
+                          placeholder="0 = Due on receipt"
+                        />
+                      </Field>
+                      <Field>
+                        <Label className="text-xs">Contract Tier</Label>
+                        <Input
+                          name="contractPricingTier"
+                          value={createFormData.contractPricingTier}
+                          onChange={(e) => setCreateFormData((prev) => ({ ...prev, contractPricingTier: e.target.value }))}
+                          placeholder="e.g., GOLD"
+                        />
+                      </Field>
+                    </div>
+
+                    {/* Checkboxes + Tax Cert */}
+                    <div className="flex items-end gap-2">
+                      <CheckboxField className="flex-none">
+                        <Checkbox
+                          name="requiresPurchaseOrder"
+                          checked={createFormData.requiresPurchaseOrder}
+                          onChange={(checked) => setCreateFormData((prev) => ({ ...prev, requiresPurchaseOrder: checked }))}
+                        />
+                        <Label className="text-xs">Requires PO</Label>
+                      </CheckboxField>
+
+                      <CheckboxField className="flex-none">
+                        <Checkbox
+                          name="taxExempt"
+                          checked={createFormData.taxExempt}
+                          onChange={(checked) => setCreateFormData((prev) => ({ ...prev, taxExempt: checked }))}
+                        />
+                        <Label className="text-xs">Tax Exempt</Label>
+                      </CheckboxField>
+
+                      {createFormData.taxExempt && (
+                        <Field className="flex-1">
+                          <Label className="text-xs">Tax Cert #</Label>
+                          <Input
+                            name="taxExemptCertificate"
+                            value={createFormData.taxExemptCertificate}
+                            onChange={(e) =>
+                              setCreateFormData((prev) => ({ ...prev, taxExemptCertificate: e.target.value }))
+                            }
+                            placeholder="Certificate #"
+                          />
+                        </Field>
+                      )}
+                    </div>
+
+                    {/* Notes */}
+                    <Field>
+                      <Label className="text-xs">Notes</Label>
+                      <Textarea
+                        name="notes"
+                        value={createFormData.notes}
+                        onChange={(e) => setCreateFormData((prev) => ({ ...prev, notes: e.target.value }))}
+                        rows={2}
+                        placeholder="Any special notes..."
+                      />
+                    </Field>
+                  </div>
+                )}
+              </div>
+            </div>
           </form>
         ) : (
-          <form onSubmit={handleEditSubmit} id="customer-form">
-            <Fieldset>
-              <FieldGroup>
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <Field>
-                    <Label>{t('common.form.name')} *</Label>
-                    <Input
-                      name="name"
-                      value={editFormData.name}
-                      onChange={(e) => setEditFormData((prev) => ({ ...prev, name: e.target.value }))}
-                      required
-                    />
-                  </Field>
+          <form onSubmit={handleEditSubmit} id="customer-form" className="space-y-4">
+            {/* PRIMARY SECTION */}
+            <div className="grid grid-cols-12 gap-2">
+              <Field className="col-span-5">
+                <Label className="text-xs">{t('common.form.name')} *</Label>
+                <Input
+                  name="name"
+                  value={editFormData.name}
+                  onChange={(e) => setEditFormData((prev) => ({ ...prev, name: e.target.value }))}
+                  required
+                />
+              </Field>
+              <Field className="col-span-4">
+                <Label className="text-xs">{t('common.form.phone')}</Label>
+                <Input
+                  type="tel"
+                  name="phone"
+                  value={editFormData.phone}
+                  onChange={(e) => setEditFormData((prev) => ({ ...prev, phone: e.target.value }))}
+                />
+              </Field>
+              <Field className="col-span-3">
+                <Label className="text-xs">{t('common.form.email')} *</Label>
+                <Input
+                  type="email"
+                  name="email"
+                  value={editFormData.email}
+                  onChange={(e) => setEditFormData((prev) => ({ ...prev, email: e.target.value }))}
+                  required
+                />
+              </Field>
+            </div>
 
-                  <Field>
-                    <Label>{t('common.form.email')} *</Label>
-                    <Input
-                      type="email"
-                      name="email"
-                      value={editFormData.email}
-                      onChange={(e) => setEditFormData((prev) => ({ ...prev, email: e.target.value }))}
-                      required
-                    />
-                  </Field>
-                </div>
-
-                <Field>
-                  <Label>{t('common.form.phone')}</Label>
+            {/* BILLING ADDRESS - Always Visible */}
+            <div className="space-y-2 border-t border-zinc-200 pt-3 dark:border-zinc-800">
+              <Subheading className="text-sm font-semibold">Billing Address</Subheading>
+              {/* Street + Apt */}
+              <div className="grid grid-cols-4 gap-2">
+                <Field className="col-span-3">
+                  <Label className="text-xs">{t('common.form.streetAddress')} *</Label>
                   <Input
-                    type="tel"
-                    name="phone"
-                    value={editFormData.phone}
-                    onChange={(e) => setEditFormData((prev) => ({ ...prev, phone: e.target.value }))}
+                    name="billingStreetAddress"
+                    value={editFormData.billingAddress.streetAddress}
+                    onChange={(e) =>
+                      setEditFormData((prev) => ({
+                        ...prev,
+                        billingAddress: { ...prev.billingAddress, streetAddress: e.target.value },
+                      }))
+                    }
+                    required
                   />
                 </Field>
-              </FieldGroup>
-            </Fieldset>
-
-            <Fieldset className="mt-6">
-              <Subheading>{t('customers.form.businessDetails')}</Subheading>
-              <FieldGroup>
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <Field>
-                    <Label>{t('common.form.paymentTermsDays')}</Label>
-                    <Description>{t('customers.form.paymentTermsHelp')}</Description>
-                    <Input
-                      type="number"
-                      name="paymentTermsDays"
-                      value={editFormData.paymentTermsDays}
-                      onChange={(e) =>
-                        setEditFormData((prev) => ({ ...prev, paymentTermsDays: parseInt(e.target.value) || 0 }))
-                      }
-                      min="0"
-                    />
-                  </Field>
-
-                  <Field>
-                    <Label>{t('common.form.contractPricingTier')}</Label>
-                    <Input
-                      name="contractPricingTier"
-                      value={editFormData.contractPricingTier}
-                      onChange={(e) => setEditFormData((prev) => ({ ...prev, contractPricingTier: e.target.value }))}
-                      placeholder="e.g., GOLD, SILVER"
-                    />
-                  </Field>
-                </div>
-
-                <div className="flex gap-6">
-                  <CheckboxField>
-                    <Checkbox
-                      name="requiresPurchaseOrder"
-                      checked={editFormData.requiresPurchaseOrder}
-                      onChange={(checked) => setEditFormData((prev) => ({ ...prev, requiresPurchaseOrder: checked }))}
-                    />
-                    <Label>{t('common.form.requiresPurchaseOrder')}</Label>
-                  </CheckboxField>
-
-                  <CheckboxField>
-                    <Checkbox
-                      name="taxExempt"
-                      checked={editFormData.taxExempt}
-                      onChange={(checked) => setEditFormData((prev) => ({ ...prev, taxExempt: checked }))}
-                    />
-                    <Label>{t('common.form.taxExempt')}</Label>
-                  </CheckboxField>
-                </div>
-
-                {editFormData.taxExempt && (
-                  <Field>
-                    <Label>{t('common.form.taxExemptCertificate')}</Label>
-                    <Input
-                      name="taxExemptCertificate"
-                      value={editFormData.taxExemptCertificate}
-                      onChange={(e) => setEditFormData((prev) => ({ ...prev, taxExemptCertificate: e.target.value }))}
-                    />
-                  </Field>
-                )}
-
-                <Field>
-                  <Label>{t('common.form.notes')}</Label>
-                  <Textarea
-                    name="notes"
-                    value={editFormData.notes}
-                    onChange={(e) => setEditFormData((prev) => ({ ...prev, notes: e.target.value }))}
-                    rows={3}
+                <Field className="col-span-1">
+                  <Label className="text-xs">{t('common.form.addressLine2')}</Label>
+                  <Input
+                    name="billingStreetAddressLine2"
+                    value={editFormData.billingAddress.streetAddressLine2}
+                    onChange={(e) =>
+                      setEditFormData((prev) => ({
+                        ...prev,
+                        billingAddress: { ...prev.billingAddress, streetAddressLine2: e.target.value },
+                      }))
+                    }
+                    placeholder="Apt"
                   />
                 </Field>
+              </div>
 
-                <Field>
-                  <Label>{t('common.form.status')}</Label>
-                  <div className="flex gap-4 mt-2">
-                    <label className="flex items-center gap-2">
-                      <input
-                        type="radio"
-                        name="status"
-                        value="ACTIVE"
-                        checked={editFormData.status === 'ACTIVE'}
-                        onChange={() => setEditFormData((prev) => ({ ...prev, status: 'ACTIVE' }))}
+              {/* City/State/Zip */}
+              <div className="grid grid-cols-12 gap-2">
+                <Field className="col-span-6">
+                  <Label className="text-xs">{t('common.form.city')} *</Label>
+                  <Input
+                    name="billingCity"
+                    value={editFormData.billingAddress.city}
+                    onChange={(e) =>
+                      setEditFormData((prev) => ({
+                        ...prev,
+                        billingAddress: { ...prev.billingAddress, city: e.target.value },
+                      }))
+                    }
+                    required
+                  />
+                </Field>
+                <Field className="col-span-2">
+                  <Label className="text-xs">{t('common.form.state')} *</Label>
+                  <Input
+                    name="billingState"
+                    value={editFormData.billingAddress.state}
+                    onChange={(e) =>
+                      setEditFormData((prev) => ({
+                        ...prev,
+                        billingAddress: { ...prev.billingAddress, state: e.target.value.toUpperCase() },
+                      }))
+                    }
+                    placeholder="CA"
+                    maxLength={2}
+                    required
+                  />
+                </Field>
+                <Field className="col-span-4">
+                  <Label className="text-xs">{t('common.form.zipCode')} *</Label>
+                  <Input
+                    name="billingZipCode"
+                    value={editFormData.billingAddress.zipCode}
+                    onChange={(e) =>
+                      setEditFormData((prev) => ({
+                        ...prev,
+                        billingAddress: { ...prev.billingAddress, zipCode: e.target.value },
+                      }))
+                    }
+                    required
+                  />
+                </Field>
+              </div>
+            </div>
+
+            {/* OPTIONAL SECTIONS - Collapsible */}
+            <div className="space-y-2 border-t border-zinc-200 pt-3 dark:border-zinc-800">
+
+              {/* Business Terms - Collapsible */}
+              <div>
+                <button
+                  type="button"
+                  onClick={() => setShowBusinessTerms(!showBusinessTerms)}
+                  className="flex w-full items-center gap-2 text-sm font-medium text-zinc-700 hover:text-zinc-900 dark:text-zinc-300 dark:hover:text-zinc-100"
+                >
+                  <svg className={`h-4 w-4 transition-transform ${showBusinessTerms ? 'rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                  Business Terms
+                </button>
+                {showBusinessTerms && (
+                  <div className="mt-2 space-y-2 pl-6">
+                    {/* Payment Terms + Contract Tier */}
+                    <div className="grid grid-cols-2 gap-2">
+                      <Field>
+                        <Label className="text-xs">Payment Terms (Days)</Label>
+                        <Input
+                          type="number"
+                          name="paymentTermsDays"
+                          value={editFormData.paymentTermsDays}
+                          onChange={(e) =>
+                            setEditFormData((prev) => ({ ...prev, paymentTermsDays: parseInt(e.target.value) || 0 }))
+                          }
+                          min="0"
+                          placeholder="0 = Due on receipt"
+                        />
+                      </Field>
+                      <Field>
+                        <Label className="text-xs">Contract Tier</Label>
+                        <Input
+                          name="contractPricingTier"
+                          value={editFormData.contractPricingTier}
+                          onChange={(e) => setEditFormData((prev) => ({ ...prev, contractPricingTier: e.target.value }))}
+                          placeholder="e.g., GOLD"
+                        />
+                      </Field>
+                    </div>
+
+                    {/* Checkboxes + Tax Cert */}
+                    <div className="flex items-end gap-2">
+                      <CheckboxField className="flex-none">
+                        <Checkbox
+                          name="requiresPurchaseOrder"
+                          checked={editFormData.requiresPurchaseOrder}
+                          onChange={(checked) => setEditFormData((prev) => ({ ...prev, requiresPurchaseOrder: checked }))}
+                        />
+                        <Label className="text-xs">Requires PO</Label>
+                      </CheckboxField>
+
+                      <CheckboxField className="flex-none">
+                        <Checkbox
+                          name="taxExempt"
+                          checked={editFormData.taxExempt}
+                          onChange={(checked) => setEditFormData((prev) => ({ ...prev, taxExempt: checked }))}
+                        />
+                        <Label className="text-xs">Tax Exempt</Label>
+                      </CheckboxField>
+
+                      {editFormData.taxExempt && (
+                        <Field className="flex-1">
+                          <Label className="text-xs">Tax Cert #</Label>
+                          <Input
+                            name="taxExemptCertificate"
+                            value={editFormData.taxExemptCertificate}
+                            onChange={(e) =>
+                              setEditFormData((prev) => ({ ...prev, taxExemptCertificate: e.target.value }))
+                            }
+                            placeholder="Certificate #"
+                          />
+                        </Field>
+                      )}
+                    </div>
+
+                    {/* Notes */}
+                    <Field>
+                      <Label className="text-xs">Notes</Label>
+                      <Textarea
+                        name="notes"
+                        value={editFormData.notes}
+                        onChange={(e) => setEditFormData((prev) => ({ ...prev, notes: e.target.value }))}
+                        rows={2}
+                        placeholder="Any special notes..."
                       />
-                      <span>{t('common.active')}</span>
-                    </label>
-                    <label className="flex items-center gap-2">
-                      <input
-                        type="radio"
-                        name="status"
-                        value="INACTIVE"
-                        checked={editFormData.status === 'INACTIVE'}
-                        onChange={() => setEditFormData((prev) => ({ ...prev, status: 'INACTIVE' }))}
-                      />
-                      <span>{t('common.inactive')}</span>
-                    </label>
+                    </Field>
+
+                    {/* Status */}
+                    <Field>
+                      <Label className="text-xs">{t('common.form.status')}</Label>
+                      <RadioGroup
+                        value={editFormData.status}
+                        onChange={(value) => setEditFormData((prev) => ({ ...prev, status: value as 'ACTIVE' | 'INACTIVE' }))}
+                        className="mt-1 flex gap-4"
+                      >
+                        <RadioField>
+                          <Radio value="ACTIVE" />
+                          <Label className="text-sm">{t('common.active')}</Label>
+                        </RadioField>
+                        <RadioField>
+                          <Radio value="INACTIVE" />
+                          <Label className="text-sm">{t('common.inactive')}</Label>
+                        </RadioField>
+                      </RadioGroup>
+                    </Field>
                   </div>
-                </Field>
-              </FieldGroup>
-            </Fieldset>
+                )}
+              </div>
+            </div>
           </form>
         )}
       </DialogBody>

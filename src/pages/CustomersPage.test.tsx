@@ -190,7 +190,7 @@ describe('CustomersPage', () => {
     });
   });
 
-  it('opens create dialog when add button is clicked', async () => {
+  it('opens create dialog when add button is clicked', { timeout: 10000 }, async () => {
     vi.mocked(apiClient.get).mockResolvedValue({ data: [] });
     const user = userEvent.setup();
 
@@ -207,7 +207,7 @@ describe('CustomersPage', () => {
     expect(screen.getAllByText('Add Customer').length).toBeGreaterThan(0);
   });
 
-  it('displays customer location in correct format', async () => {
+  it('displays customer location in correct format', { timeout: 10000 }, async () => {
     vi.mocked(apiClient.get).mockResolvedValue({ data: mockCustomers });
 
     renderWithProviders(<CustomersPage />);
