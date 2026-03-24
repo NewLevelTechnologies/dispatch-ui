@@ -1,3 +1,96 @@
 @import "tailwindcss";
 
 @variant dark (&:where(.dark, .dark *));
+
+/* Color scheme variants */
+@variant theme-indigo (&:where(.theme-indigo, .theme-indigo *));
+@variant theme-blue (&:where(.theme-blue, .theme-blue *));
+@variant theme-purple (&:where(.theme-purple, .theme-purple *));
+@variant theme-emerald (&:where(.theme-emerald, .theme-emerald *));
+@variant theme-amber (&:where(.theme-amber, .theme-amber *));
+@variant theme-rose (&:where(.theme-rose, .theme-rose *));
+
+/* Apply color scheme custom properties */
+:root {
+  --color-primary-50: var(--color-indigo-50);
+  --color-primary-100: var(--color-indigo-100);
+  --color-primary-200: var(--color-indigo-200);
+  --color-primary-300: var(--color-indigo-300);
+  --color-primary-400: var(--color-indigo-400);
+  --color-primary-500: var(--color-indigo-500);
+  --color-primary-600: var(--color-indigo-600);
+  --color-primary-700: var(--color-indigo-700);
+  --color-primary-800: var(--color-indigo-800);
+  --color-primary-900: var(--color-indigo-900);
+  --color-primary-950: var(--color-indigo-950);
+}
+
+.theme-blue {
+  --color-primary-50: var(--color-blue-50);
+  --color-primary-100: var(--color-blue-100);
+  --color-primary-200: var(--color-blue-200);
+  --color-primary-300: var(--color-blue-300);
+  --color-primary-400: var(--color-blue-400);
+  --color-primary-500: var(--color-blue-500);
+  --color-primary-600: var(--color-blue-600);
+  --color-primary-700: var(--color-blue-700);
+  --color-primary-800: var(--color-blue-800);
+  --color-primary-900: var(--color-blue-900);
+  --color-primary-950: var(--color-blue-950);
+}
+
+.theme-purple {
+  --color-primary-50: var(--color-purple-50);
+  --color-primary-100: var(--color-purple-100);
+  --color-primary-200: var(--color-purple-200);
+  --color-primary-300: var(--color-purple-300);
+  --color-primary-400: var(--color-purple-400);
+  --color-primary-500: var(--color-purple-500);
+  --color-primary-600: var(--color-purple-600);
+  --color-primary-700: var(--color-purple-700);
+  --color-primary-800: var(--color-purple-800);
+  --color-primary-900: var(--color-purple-900);
+  --color-primary-950: var(--color-purple-950);
+}
+
+.theme-emerald {
+  --color-primary-50: var(--color-emerald-50);
+  --color-primary-100: var(--color-emerald-100);
+  --color-primary-200: var(--color-emerald-200);
+  --color-primary-300: var(--color-emerald-300);
+  --color-primary-400: var(--color-emerald-400);
+  --color-primary-500: var(--color-emerald-500);
+  --color-primary-600: var(--color-emerald-600);
+  --color-primary-700: var(--color-emerald-700);
+  --color-primary-800: var(--color-emerald-800);
+  --color-primary-900: var(--color-emerald-900);
+  --color-primary-950: var(--color-emerald-950);
+}
+
+.theme-amber {
+  --color-primary-50: var(--color-amber-50);
+  --color-primary-100: var(--color-amber-100);
+  --color-primary-200: var(--color-amber-200);
+  --color-primary-300: var(--color-amber-300);
+  --color-primary-400: var(--color-amber-400);
+  --color-primary-500: var(--color-amber-500);
+  --color-primary-600: var(--color-amber-600);
+  --color-primary-700: var(--color-amber-700);
+  --color-primary-800: var(--color-amber-800);
+  --color-primary-900: var(--color-amber-900);
+  --color-primary-950: var(--color-amber-950);
+}
+
+.theme-rose {
+  --color-primary-50: var(--color-rose-50);
+  --color-primary-100: var(--color-rose-100);
+  --color-primary-200: var(--color-rose-200);
+  --color-primary-300: var(--color-rose-300);
+  --color-primary-400: var(--color-rose-400);
+  --color-primary-500: var(--color-rose-500);
+  --color-primary-600: var(--color-rose-600);
+  --color-primary-700: var(--color-rose-700);
+  --color-primary-800: var(--color-rose-800);
+  --color-primary-900: var(--color-rose-900);
+  --color-primary-950: var(--color-rose-950);
+}
