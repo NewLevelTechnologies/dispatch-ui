@@ -11,7 +11,8 @@
 @variant theme-rose (&:where(.theme-rose, .theme-rose *));
 
 /* Apply color scheme custom properties */
-:root {
+:root,
+.theme-indigo {
   --color-primary-50: var(--color-indigo-50);
   --color-primary-100: var(--color-indigo-100);
   --color-primary-200: var(--color-indigo-200);
@@ -143,3 +144,17 @@
 .ring-primary-800 { --tw-ring-color: var(--color-primary-800); }
 .ring-primary-900 { --tw-ring-color: var(--color-primary-900); }
 .ring-primary-950 { --tw-ring-color: var(--color-primary-950); }
+
+/* Focus outline colors - override Catalyst's blue-500 defaults */
+.outline-primary-500 { outline-color: var(--color-primary-500); }
+
+[data-focus]:has(.outline-blue-500),
+*[data-focus].outline-blue-500,
+.focus-within\:after\:ring-blue-500:focus-within::after,
+.data-focus\:outline-blue-500[data-focus] {
+  outline-color: var(--color-primary-500) !important;
+}
+
+.sm\:focus-within\:after\:ring-blue-500:focus-within::after {
+  --tw-ring-color: var(--color-primary-500) !important;
+}
