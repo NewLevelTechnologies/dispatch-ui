@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { customerApi } from '../api';
+import { useHasCapability } from '../hooks/useCurrentUser';
 import AppLayout from '../components/AppLayout';
 import ServiceLocationFormDialog from '../components/ServiceLocationFormDialog';
 import CustomerFormDialog from '../components/CustomerFormDialog';
@@ -21,6 +22,10 @@ export default function CustomerDetailPage() {
   const [isAddLocationDialogOpen, setIsAddLocationDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [locationSearchQuery, setLocationSearchQuery] = useState('');
+
+  // Permission checks
+  const canEditCustomers = useHasCapability('EDIT_CUSTOMERS');
+  const canAddServiceLocations = useHasCapability('ADD_SERVICE_LOCATIONS');
 
   const { data: customer, isLoading, error } = useQuery({
     queryKey: ['customers', id],
@@ -118,14 +123,18 @@ export default function CustomerDetailPage() {
                 </Text>
               </div>
               <div className="flex gap-2">
-                <Button plain onClick={() => setIsAddLocationDialogOpen(true)}>
-                  <PlusIcon className="size-4" />
-                  {t('customers.detail.addLocation')}
-                </Button>
-                <Button color="zinc" onClick={() => setIsEditDialogOpen(true)}>
-                  <PencilIcon className="size-4" />
-                  {t('common.edit')}
-                </Button>
+                {canAddServiceLocations && (
+                  <Button plain onClick={() => setIsAddLocationDialogOpen(true)}>
+                    <PlusIcon className="size-4" />
+                    {t('customers.detail.addLocation')}
+                  </Button>
+                )}
+                {canEditCustomers && (
+                  <Button color="zinc" onClick={() => setIsEditDialogOpen(true)}>
+                    <PencilIcon className="size-4" />
+                    {t('common.edit')}
+                  </Button>
+                )}
               </div>
             </div>
 
@@ -153,6 +162,7 @@ export default function CustomerDetailPage() {
             <div className="mt-4">
               <div className="flex items-center justify-between">
                 <Subheading>{t('customers.detail.equipment')}</Subheading>
+                {/* TODO: Add equipment permission check when equipment management is implemented */}
                 <Button plain>
                   <PlusIcon className="size-4" />
                   {t('customers.detail.addEquipment')}
@@ -167,6 +177,7 @@ export default function CustomerDetailPage() {
             <div className="mt-4">
               <div className="flex items-center justify-between">
                 <Subheading>{t('customers.detail.recentWorkOrders')}</Subheading>
+                {/* TODO: Add work order permission check when work order management is implemented */}
                 <Button plain>
                   <PlusIcon className="size-4" />
                   {t('customers.form.newWorkOrder')}
@@ -229,17 +240,19 @@ export default function CustomerDetailPage() {
                   </Text>
                 </div>
               </div>
-              <Button color="zinc" onClick={() => setIsEditDialogOpen(true)}>
-                <PencilIcon className="size-4" />
-                {t('common.edit')}
-              </Button>
+              {canEditCustomers && (
+                <Button color="zinc" onClick={() => setIsEditDialogOpen(true)}>
+                  <PencilIcon className="size-4" />
+                  {t('common.edit')}
+                </Button>
+              )}
             </div>
 
             {/* Service Locations */}
             <div className="mt-4">
               <div className="flex items-center justify-between">
                 <Subheading>{t('customers.detail.serviceLocationsCount', { count: customer.serviceLocations.length })}</Subheading>
-                {useTableLayout && (
+                {useTableLayout && canAddServiceLocations && (
                   <Button plain onClick={() => setIsAddLocationDialogOpen(true)}>
                     <PlusIcon className="size-4" />
                     {t('customers.detail.addLocation')}
@@ -383,18 +396,20 @@ export default function CustomerDetailPage() {
                 ))}
 
                   {/* Add Location Card */}
-                  <button
-                    type="button"
-                    onClick={() => setIsAddLocationDialogOpen(true)}
-                    className="flex min-h-[160px] items-center justify-center rounded-lg border-2 border-dashed border-zinc-300 p-3 hover:border-zinc-400 hover:bg-zinc-50 dark:border-zinc-700 dark:hover:border-zinc-600 dark:hover:bg-zinc-900"
-                  >
-                    <div className="text-center">
-                      <PlusIcon className="mx-auto size-8 text-zinc-400" />
-                      <Strong className="mt-2 block text-sm">
-                        {t('customers.detail.addServiceLocation')}
-                      </Strong>
-                    </div>
-                  </button>
+                  {canAddServiceLocations && (
+                    <button
+                      type="button"
+                      onClick={() => setIsAddLocationDialogOpen(true)}
+                      className="flex min-h-[160px] items-center justify-center rounded-lg border-2 border-dashed border-zinc-300 p-3 hover:border-zinc-400 hover:bg-zinc-50 dark:border-zinc-700 dark:hover:border-zinc-600 dark:hover:bg-zinc-900"
+                    >
+                      <div className="text-center">
+                        <PlusIcon className="mx-auto size-8 text-zinc-400" />
+                        <Strong className="mt-2 block text-sm">
+                          {t('customers.detail.addServiceLocation')}
+                        </Strong>
+                      </div>
+                    </button>
+                  )}
                 </div>
               )}
             </div>

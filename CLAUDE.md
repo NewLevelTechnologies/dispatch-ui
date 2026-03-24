@@ -181,6 +181,47 @@ VITE_ENV=development
 
 ## Branching Strategy
 
+### ⚠️ CRITICAL: NEVER PUSH DIRECTLY TO DEV ⚠️
+
+**ABSOLUTELY REQUIRED WORKFLOW:**
+
+1. **ALWAYS create a feature branch FIRST** before making any commits
+2. **NEVER commit directly to `dev`**
+3. **NEVER push directly to `dev`**
+4. **ALWAYS create a pull request** from your feature branch
+
+**Correct workflow:**
+```bash
+# 1. Create feature branch from dev
+git checkout dev
+git pull origin dev
+git checkout -b feat/your-feature-name
+
+# 2. Make changes and commit to feature branch
+git add <files>
+git commit -m "Your commit message"
+
+# 3. Push feature branch
+git push -u origin feat/your-feature-name
+
+# 4. Create PR via GitHub or gh CLI
+gh pr create --base dev --title "Your PR title"
+```
+
+**❌ NEVER DO THIS:**
+```bash
+# WRONG - Do not commit to dev directly
+git checkout dev
+git commit -m "something"
+git push origin dev  # ❌ NEVER DO THIS
+```
+
+**Why this matters:**
+- `dev` is a protected branch that requires PR reviews
+- Direct pushes bypass code review and CI checks
+- Breaking this rule requires manual cleanup and wastes time
+- All changes MUST go through the PR process
+
 ### Default Branch
 
 **The default branch is `dev`** - all PRs should target this branch unless explicitly instructed otherwise.
@@ -192,7 +233,7 @@ dev (default) ──→ qa ──→ main (production)
 ```
 
 **Key branches**:
-- `dev` - Default branch, integration environment
+- `dev` - Default branch, integration environment (protected - no direct pushes)
 - `qa` - Quality assurance testing
 - `main` - Production releases
 - `master` - **⚠️ DO NOT USE** - Legacy branch, not part of current workflow
@@ -224,12 +265,36 @@ Use descriptive branch names with prefixes:
 
 ### Pull Request Process
 
-1. Create feature branch from `dev`
-2. Develop and test locally
-3. Create PR targeting `dev`
-4. Ensure PR checks pass (lint, tests, build)
-5. Request review
-6. Merge to `dev` after approval
+**MANDATORY STEPS - NO EXCEPTIONS:**
+
+1. **Create feature branch from `dev` BEFORE making any changes**
+   ```bash
+   git checkout dev
+   git pull origin dev
+   git checkout -b feat/your-feature-name
+   ```
+
+2. **Develop and test locally on your feature branch**
+   - Make commits to your feature branch only
+   - NEVER switch back to dev to commit
+
+3. **Push feature branch to remote**
+   ```bash
+   git push -u origin feat/your-feature-name
+   ```
+
+4. **Create PR targeting `dev`**
+   ```bash
+   gh pr create --base dev --title "Your PR title" --body "Description"
+   ```
+
+5. **Ensure PR checks pass** (lint, tests, build)
+
+6. **Request review**
+
+7. **Merge to `dev` after approval** (via GitHub UI, not command line)
+
+**NEVER commit or push directly to dev. ALWAYS use feature branches and PRs.**
 
 ---
 
