@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, fireEvent } from '@testing-library/react';
 import { renderWithProviders, userEvent } from '../test/utils';
 import ServiceLocationFormDialog from './ServiceLocationFormDialog';
 import apiClient from '../api/client';
@@ -36,7 +36,8 @@ describe('ServiceLocationFormDialog', () => {
     await user.type(screen.getByLabelText(/location name/i), 'Main Office');
     await user.type(screen.getByLabelText(/street address/i), '123 Main St');
     await user.type(screen.getByLabelText(/city/i), 'Boston');
-    await user.type(screen.getByLabelText(/state/i), 'MA');
+    // State is a select dropdown, not a text input
+    await user.selectOptions(screen.getByLabelText(/state/i), 'MA');
     await user.type(screen.getByLabelText(/zip code/i), '02101');
 
     await user.click(screen.getByRole('button', { name: /create/i }));
@@ -91,16 +92,18 @@ describe('ServiceLocationFormDialog', () => {
     await user.type(screen.getByLabelText(/location name/i), 'Branch Office');
     await user.type(screen.getByLabelText(/street address/i), '456 Oak Ave');
     await user.type(screen.getByLabelText(/city/i), 'Cambridge');
-    await user.type(screen.getByLabelText(/state/i), 'MA');
+    // State is a select dropdown, not a text input
+    await user.selectOptions(screen.getByLabelText(/state/i), 'MA');
     await user.type(screen.getByLabelText(/zip code/i), '02139');
 
-    const phoneInputs = screen.getAllByLabelText(/phone/i);
-    await user.type(phoneInputs[phoneInputs.length - 1], '555-5678');
-
-    const emailInputs = screen.getAllByLabelText(/email/i);
-    await user.type(emailInputs[emailInputs.length - 1], 'contact@example.com');
-
     await user.type(screen.getByLabelText(/site contact name/i), 'Jane Manager');
+
+    // For PatternFormat phone field, use fireEvent with formatted value
+    const phoneInput = screen.getByLabelText(/site contact phone/i);
+    fireEvent.change(phoneInput, { target: { value: '(555) 567-8901' } });
+
+    const emailInput = screen.getByLabelText(/site contact email/i);
+    await user.type(emailInput, 'contact@example.com');
 
     await user.click(screen.getByRole('button', { name: /create/i }));
 
@@ -109,7 +112,7 @@ describe('ServiceLocationFormDialog', () => {
         `/customers/${mockCustomerId}/service-locations`,
         expect.objectContaining({
           siteContactName: 'Jane Manager',
-          siteContactPhone: '555-5678',
+          siteContactPhone: '(555) 567-8901',
           siteContactEmail: 'contact@example.com',
         })
       );
@@ -141,7 +144,8 @@ describe('ServiceLocationFormDialog', () => {
     await user.type(screen.getByLabelText(/location name/i), 'Office');
     await user.type(screen.getByLabelText(/street address/i), '789 Elm St');
     await user.type(screen.getByLabelText(/city/i), 'Newton');
-    await user.type(screen.getByLabelText(/state/i), 'MA');
+    // State is a select dropdown, not a text input
+    await user.selectOptions(screen.getByLabelText(/state/i), 'MA');
     await user.type(screen.getByLabelText(/zip code/i), '02458');
 
     await user.click(screen.getByRole('button', { name: /create/i }));
@@ -162,7 +166,8 @@ describe('ServiceLocationFormDialog', () => {
     await user.type(screen.getByLabelText(/location name/i), 'Test');
     await user.type(screen.getByLabelText(/street address/i), '123 Main');
     await user.type(screen.getByLabelText(/city/i), 'Boston');
-    await user.type(screen.getByLabelText(/state/i), 'ma');
+    // State is a select dropdown with uppercase values
+    await user.selectOptions(screen.getByLabelText(/state/i), 'MA');
     await user.type(screen.getByLabelText(/zip code/i), '02101');
 
     await user.click(screen.getByRole('button', { name: /create/i }));
@@ -190,7 +195,8 @@ describe('ServiceLocationFormDialog', () => {
     await user.type(screen.getByLabelText(/location name/i), 'Main');
     await user.type(screen.getByLabelText(/street address/i), '123 St');
     await user.type(screen.getByLabelText(/city/i), 'Boston');
-    await user.type(screen.getByLabelText(/state/i), 'MA');
+    // State is a select dropdown, not a text input
+    await user.selectOptions(screen.getByLabelText(/state/i), 'MA');
     await user.type(screen.getByLabelText(/zip code/i), '02101');
     await user.type(screen.getByLabelText(/access instructions/i), 'Use back door');
 
@@ -218,7 +224,8 @@ describe('ServiceLocationFormDialog', () => {
     await user.type(screen.getByLabelText(/location name/i), 'Test');
     await user.type(screen.getByLabelText(/street address/i), '123 Main');
     await user.type(screen.getByLabelText(/city/i), 'Boston');
-    await user.type(screen.getByLabelText(/state/i), 'MA');
+    // State is a select dropdown, not a text input
+    await user.selectOptions(screen.getByLabelText(/state/i), 'MA');
     await user.type(screen.getByLabelText(/zip code/i), '02101');
 
     await user.click(screen.getByRole('button', { name: /create/i }));

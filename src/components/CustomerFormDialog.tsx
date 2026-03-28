@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
+import { PatternFormat } from 'react-number-format';
 import { customerApi, type Customer, type CreateCustomerRequest, type UpdateCustomerRequest } from '../api';
 import { Dialog, DialogActions, DialogBody, DialogDescription, DialogTitle } from './catalyst/dialog';
 import { Button } from './catalyst/button';
@@ -343,11 +344,13 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
                   </Field>
                   <Field className="col-span-4">
                     <Label className="text-xs">{t('common.form.phone')}</Label>
-                    <Input
-                      type="tel"
+                    <PatternFormat
+                      format="(###) ###-####"
+                      mask="_"
+                      customInput={Input}
                       name="phone"
                       value={createFormData.phone}
-                      onChange={(e) => setCreateFormData((prev) => ({ ...prev, phone: e.target.value }))}
+                      onValueChange={(values) => setCreateFormData((prev) => ({ ...prev, phone: values.formattedValue }))}
                     />
                   </Field>
                   <Field className="col-span-3">
@@ -594,11 +597,13 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
                     </Field>
                     <Field>
                       <Label className="text-xs">{t('common.form.phone')}</Label>
-                      <Input
-                        type="tel"
+                      <PatternFormat
+                        format="(###) ###-####"
+                        mask="_"
+                        customInput={Input}
                         name="siteContactPhone"
                         value={createFormData.siteContactPhone}
-                        onChange={(e) => setCreateFormData((prev) => ({ ...prev, siteContactPhone: e.target.value }))}
+                        onValueChange={(values) => setCreateFormData((prev) => ({ ...prev, siteContactPhone: values.formattedValue }))}
                       />
                     </Field>
                     <Field>
@@ -744,11 +749,13 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
               </Field>
               <Field className="col-span-4">
                 <Label className="text-xs">{t('common.form.phone')}</Label>
-                <Input
-                  type="tel"
+                <PatternFormat
+                  format="(###) ###-####"
+                  mask="_"
+                  customInput={Input}
                   name="phone"
                   value={editFormData.phone}
-                  onChange={(e) => setEditFormData((prev) => ({ ...prev, phone: e.target.value }))}
+                  onValueChange={(values) => setEditFormData((prev) => ({ ...prev, phone: values.formattedValue }))}
                 />
               </Field>
               <Field className="col-span-3">

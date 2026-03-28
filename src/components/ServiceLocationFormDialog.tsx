@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
+import { PatternFormat } from 'react-number-format';
 import { customerApi, type ServiceLocation } from '../api';
 import { Dialog, DialogActions, DialogBody, DialogDescription, DialogTitle } from './catalyst/dialog';
 import { Button } from './catalyst/button';
@@ -277,11 +278,13 @@ export default function ServiceLocationFormDialog({ isOpen, onClose, serviceLoca
             </Field>
             <Field>
               <Label className="text-xs">{t('common.form.siteContactPhone')}</Label>
-              <Input
-                type="tel"
+              <PatternFormat
+                format="(###) ###-####"
+                mask="_"
+                customInput={Input}
                 name="siteContactPhone"
                 value={formData.siteContactPhone}
-                onChange={(e) => setFormData((prev) => ({ ...prev, siteContactPhone: e.target.value }))}
+                onValueChange={(values) => setFormData((prev) => ({ ...prev, siteContactPhone: values.formattedValue }))}
               />
             </Field>
             <Field>
