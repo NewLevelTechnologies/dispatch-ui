@@ -174,21 +174,21 @@ export default function TenantSettingsPage() {
               <div className="grid grid-cols-2 gap-4">
                 <Field>
                   <Label>{t('tenantSettings.form.companyNameShort')}</Label>
-                  <Description>{t('tenantSettings.form.companyNameShortHelper')}</Description>
                   <Input
                     name="companyNameShort"
                     value={formData.companyNameShort || ''}
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange('companyNameShort', e.target.value)}
+                    placeholder="Acme"
                   />
                 </Field>
 
                 <Field>
                   <Label>{t('tenantSettings.form.companySlogan')}</Label>
-                  <Description>{t('tenantSettings.form.companySloganHelper')}</Description>
                   <Input
                     name="companySlogan"
                     value={formData.companySlogan || ''}
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange('companySlogan', e.target.value)}
+                    placeholder="Your tagline here"
                   />
                 </Field>
               </div>
@@ -203,22 +203,21 @@ export default function TenantSettingsPage() {
             <FieldGroup className="mt-4">
               <Field>
                 <Label>{t('tenantSettings.form.logo')}</Label>
-                <Description>{t('tenantSettings.form.logoHelper')}</Description>
                 {(logoPreview || settings?.logoThumbnailUrl) && (
-                  <div className="mt-2 mb-4">
+                  <div className="mt-3 mb-4">
                     <img
                       src={logoPreview || settings?.logoThumbnailUrl || ''}
                       alt="Company logo"
-                      className="h-32 w-32 object-contain rounded border border-zinc-200 dark:border-zinc-700"
+                      className="h-32 w-32 object-contain rounded border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800"
                     />
                   </div>
                 )}
-                <div className="flex gap-2 items-center">
+                <div className="flex gap-3 items-center">
                   <input
                     type="file"
                     accept="image/png,image/jpeg"
                     onChange={handleLogoChange}
-                    className="text-sm"
+                    className="text-sm text-zinc-900 dark:text-zinc-100 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-medium file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 dark:file:bg-indigo-900/20 dark:file:text-indigo-400 dark:hover:file:bg-indigo-900/30"
                   />
                   {logoFile && (
                     <Button
@@ -230,12 +229,12 @@ export default function TenantSettingsPage() {
                     </Button>
                   )}
                 </div>
+                <Description>{t('tenantSettings.form.logoHelper')}</Description>
               </Field>
 
               <div className="grid grid-cols-2 gap-4">
                 <Field>
                   <Label>{t('tenantSettings.form.primaryColor')} *</Label>
-                  <Description>{t('tenantSettings.form.primaryColorHelper')}</Description>
                   <Input
                     name="primaryColor"
                     type="color"
@@ -247,7 +246,6 @@ export default function TenantSettingsPage() {
 
                 <Field>
                   <Label>{t('tenantSettings.form.secondaryColor')} *</Label>
-                  <Description>{t('tenantSettings.form.secondaryColorHelper')}</Description>
                   <Input
                     name="secondaryColor"
                     type="color"
@@ -287,12 +285,12 @@ export default function TenantSettingsPage() {
 
                 <Field>
                   <Label>{t('tenantSettings.form.state')}</Label>
-                  <Description>{t('tenantSettings.form.stateHelper')}</Description>
                   <Input
                     name="state"
                     value={formData.state || ''}
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange('state', e.target.value)}
                     maxLength={2}
+                    placeholder="CA"
                   />
                 </Field>
 
@@ -349,7 +347,6 @@ export default function TenantSettingsPage() {
               <div className="grid grid-cols-2 gap-4">
                 <Field>
                   <Label>{t('tenantSettings.form.timezone')} *</Label>
-                  <Description>{t('tenantSettings.form.timezoneHelper')}</Description>
                   <Input
                     name="timezone"
                     value={formData.timezone || ''}
@@ -357,11 +354,11 @@ export default function TenantSettingsPage() {
                     placeholder="America/New_York"
                     required
                   />
+                  <Description>{t('tenantSettings.form.timezoneHelper')}</Description>
                 </Field>
 
                 <Field>
                   <Label>{t('tenantSettings.form.defaultTaxRate')}</Label>
-                  <Description>{t('tenantSettings.form.defaultTaxRateHelper')}</Description>
                   <Input
                     name="defaultTaxRate"
                     type="number"
@@ -370,18 +367,20 @@ export default function TenantSettingsPage() {
                     max="1"
                     value={formData.defaultTaxRate || ''}
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange('defaultTaxRate', parseFloat(e.target.value))}
+                    placeholder="0.0825"
                   />
+                  <Description>{t('tenantSettings.form.defaultTaxRateHelper')}</Description>
                 </Field>
               </div>
 
               <Field>
                 <Label>{t('tenantSettings.form.invoiceTerms')}</Label>
-                <Description>{t('tenantSettings.form.invoiceTermsHelper')}</Description>
                 <Textarea
                   name="invoiceTerms"
                   value={formData.invoiceTerms || ''}
                   onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => handleChange('invoiceTerms', e.target.value)}
                   rows={2}
+                  placeholder="Net 30"
                 />
               </Field>
             </FieldGroup>
