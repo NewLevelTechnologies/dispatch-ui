@@ -13,15 +13,7 @@ import { Select } from '../components/catalyst/select';
 import { Textarea } from '../components/catalyst/textarea';
 import { CheckboxField, Checkbox } from '../components/catalyst/checkbox';
 import { Divider } from '../components/catalyst/divider';
-
-// US States
-const US_STATES = [
-  'AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'FL', 'GA',
-  'HI', 'ID', 'IL', 'IN', 'IA', 'KS', 'KY', 'LA', 'ME', 'MD',
-  'MA', 'MI', 'MN', 'MS', 'MO', 'MT', 'NE', 'NV', 'NH', 'NJ',
-  'NM', 'NY', 'NC', 'ND', 'OH', 'OK', 'OR', 'PA', 'RI', 'SC',
-  'SD', 'TN', 'TX', 'UT', 'VT', 'VA', 'WA', 'WV', 'WI', 'WY'
-];
+import { US_STATES } from '../constants/states';
 
 export default function TenantSettingsPage() {
   const queryClient = useQueryClient();

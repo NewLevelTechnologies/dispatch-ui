@@ -6,7 +6,9 @@ import { Dialog, DialogActions, DialogBody, DialogDescription, DialogTitle } fro
 import { Button } from './catalyst/button';
 import { Field, Label } from './catalyst/fieldset';
 import { Input } from './catalyst/input';
+import { Select } from './catalyst/select';
 import { Textarea } from './catalyst/textarea';
+import { US_STATES } from '../constants/states';
 
 interface ServiceLocationFormDialogProps {
   isOpen: boolean;
@@ -238,14 +240,19 @@ export default function ServiceLocationFormDialog({ isOpen, onClose, serviceLoca
             </Field>
             <Field className="col-span-2">
               <Label className="text-xs">{t('common.form.state')} *</Label>
-              <Input
+              <Select
                 name="state"
                 value={formData.state}
-                onChange={(e) => setFormData((prev) => ({ ...prev, state: e.target.value.toUpperCase() }))}
-                placeholder="CA"
-                maxLength={2}
+                onChange={(e) => setFormData((prev) => ({ ...prev, state: e.target.value }))}
                 required
-              />
+              >
+                <option value="">{t('common.form.select')}</option>
+                {US_STATES.map((state) => (
+                  <option key={state} value={state}>
+                    {state}
+                  </option>
+                ))}
+              </Select>
             </Field>
             <Field className="col-span-4">
               <Label className="text-xs">{t('common.form.zipCode')} *</Label>
