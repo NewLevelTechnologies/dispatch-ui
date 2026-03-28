@@ -554,6 +554,7 @@
       "invalidFileType": "Only PNG and JPEG files are supported",
       "loadingSettings": "Loading settings...",
       "logoUploadedSuccess": "Logo uploaded successfully",
+      "noLogo": "No logo uploaded",
       "settingsUpdatedSuccess": "Settings updated successfully"
     }
   },

@@ -4,8 +4,8 @@ import { useTranslation } from 'react-i18next';
 import { tenantSettingsApi, type UpdateTenantSettingsRequest } from '../api';
 import { useHasCapability } from '../hooks/useCurrentUser';
 import AppLayout from '../components/AppLayout';
-import { Heading } from '../components/catalyst/heading';
-import { Subheading } from '../components/catalyst/heading';
+import { Heading, Subheading } from '../components/catalyst/heading';
+import { Text } from '../components/catalyst/text';
 import { Button } from '../components/catalyst/button';
 import { Field, FieldGroup, Fieldset, Label, Description } from '../components/catalyst/fieldset';
 import { Input } from '../components/catalyst/input';
@@ -17,6 +17,7 @@ export default function TenantSettingsPage() {
   const queryClient = useQueryClient();
   const { t } = useTranslation();
   const canEdit = useHasCapability('EDIT_SETTINGS');
+  const [isEditing, setIsEditing] = useState(false);
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -62,7 +63,7 @@ export default function TenantSettingsPage() {
     mutationFn: (data: UpdateTenantSettingsRequest) => tenantSettingsApi.updateSettings(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tenant-settings'] });
-      alert(t('tenantSettings.messages.settingsUpdatedSuccess'));
+      setIsEditing(false);
     },
     onError: (error: unknown) => {
       const errorMessage = error instanceof Error && 'response' in error
@@ -83,7 +84,6 @@ export default function TenantSettingsPage() {
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
-      alert(t('tenantSettings.messages.logoUploadedSuccess'));
     },
     onError: (error: unknown) => {
       const errorMessage = error instanceof Error && 'response' in error
@@ -153,13 +153,199 @@ export default function TenantSettingsPage() {
     );
   }
 
+  // View mode - display settings
+  if (!isEditing) {
+    return (
+      <AppLayout>
+        <div className="p-8 max-w-7xl">
+          <div className="flex items-start justify-between mb-6">
+            <div>
+              <Heading>{t('entities.tenantSettings')}</Heading>
+              <Text className="mt-1">{t('tenantSettings.description')}</Text>
+            </div>
+            {canEdit && (
+              <Button onClick={() => setIsEditing(true)}>{t('common.edit')}</Button>
+            )}
+          </div>
+
+          <Divider className="my-4" />
+
+          <div className="grid grid-cols-2 gap-x-12 gap-y-6">
+            {/* Company Information */}
+            <div>
+              <Subheading className="mb-3">{t('tenantSettings.sections.companyInfo')}</Subheading>
+              <dl className="space-y-2">
+                <div>
+                  <dt className="text-sm font-medium text-zinc-500 dark:text-zinc-400">{t('tenantSettings.form.companyName')}</dt>
+                  <dd className="mt-0.5 text-sm text-zinc-900 dark:text-white">{settings?.companyName || '-'}</dd>
+                </div>
+                {settings?.companyNameShort && (
+                  <div>
+                    <dt className="text-sm font-medium text-zinc-500 dark:text-zinc-400">{t('tenantSettings.form.companyNameShort')}</dt>
+                    <dd className="mt-0.5 text-sm text-zinc-900 dark:text-white">{settings.companyNameShort}</dd>
+                  </div>
+                )}
+                {settings?.companySlogan && (
+                  <div>
+                    <dt className="text-sm font-medium text-zinc-500 dark:text-zinc-400">{t('tenantSettings.form.companySlogan')}</dt>
+                    <dd className="mt-0.5 text-sm text-zinc-900 dark:text-white">{settings.companySlogan}</dd>
+                  </div>
+                )}
+              </dl>
+            </div>
+
+            {/* Branding & Logo */}
+            <div>
+              <Subheading className="mb-3">{t('tenantSettings.sections.branding')}</Subheading>
+              <dl className="space-y-3">
+                {settings?.logoThumbnailUrl && (
+                  <div>
+                    <dt className="text-sm font-medium text-zinc-500 dark:text-zinc-400 mb-2">{t('tenantSettings.form.logo')}</dt>
+                    <dd>
+                      <img
+                        src={settings.logoThumbnailUrl}
+                        alt="Company logo"
+                        className="h-20 w-20 object-contain rounded border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800"
+                      />
+                    </dd>
+                  </div>
+                )}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <dt className="text-sm font-medium text-zinc-500 dark:text-zinc-400">{t('tenantSettings.form.primaryColor')}</dt>
+                    <dd className="mt-0.5 flex items-center gap-2">
+                      <div className="h-5 w-5 rounded border border-zinc-200 dark:border-zinc-700" style={{ backgroundColor: settings?.primaryColor }} />
+                      <span className="text-sm text-zinc-900 dark:text-white">{settings?.primaryColor || '-'}</span>
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-sm font-medium text-zinc-500 dark:text-zinc-400">{t('tenantSettings.form.secondaryColor')}</dt>
+                    <dd className="mt-0.5 flex items-center gap-2">
+                      <div className="h-5 w-5 rounded border border-zinc-200 dark:border-zinc-700" style={{ backgroundColor: settings?.secondaryColor }} />
+                      <span className="text-sm text-zinc-900 dark:text-white">{settings?.secondaryColor || '-'}</span>
+                    </dd>
+                  </div>
+                </div>
+              </dl>
+            </div>
+
+            {/* Contact Information */}
+            <div>
+              <Subheading className="mb-3">{t('tenantSettings.sections.contactInfo')}</Subheading>
+              <dl className="space-y-2">
+                {settings?.streetAddress && (
+                  <div>
+                    <dt className="text-sm font-medium text-zinc-500 dark:text-zinc-400">{t('tenantSettings.form.streetAddress')}</dt>
+                    <dd className="mt-0.5 text-sm text-zinc-900 dark:text-white">{settings.streetAddress}</dd>
+                  </div>
+                )}
+                <div className="grid grid-cols-3 gap-3">
+                  {settings?.city && (
+                    <div>
+                      <dt className="text-sm font-medium text-zinc-500 dark:text-zinc-400">{t('tenantSettings.form.city')}</dt>
+                      <dd className="mt-0.5 text-sm text-zinc-900 dark:text-white">{settings.city}</dd>
+                    </div>
+                  )}
+                  {settings?.state && (
+                    <div>
+                      <dt className="text-sm font-medium text-zinc-500 dark:text-zinc-400">{t('tenantSettings.form.state')}</dt>
+                      <dd className="mt-0.5 text-sm text-zinc-900 dark:text-white">{settings.state}</dd>
+                    </div>
+                  )}
+                  {settings?.zipCode && (
+                    <div>
+                      <dt className="text-sm font-medium text-zinc-500 dark:text-zinc-400">{t('tenantSettings.form.zipCode')}</dt>
+                      <dd className="mt-0.5 text-sm text-zinc-900 dark:text-white">{settings.zipCode}</dd>
+                    </div>
+                  )}
+                </div>
+                <div className="grid grid-cols-3 gap-3">
+                  {settings?.phone && (
+                    <div>
+                      <dt className="text-sm font-medium text-zinc-500 dark:text-zinc-400">{t('tenantSettings.form.phone')}</dt>
+                      <dd className="mt-0.5 text-sm text-zinc-900 dark:text-white">{settings.phone}</dd>
+                    </div>
+                  )}
+                  {settings?.fax && (
+                    <div>
+                      <dt className="text-sm font-medium text-zinc-500 dark:text-zinc-400">{t('tenantSettings.form.fax')}</dt>
+                      <dd className="mt-0.5 text-sm text-zinc-900 dark:text-white">{settings.fax}</dd>
+                    </div>
+                  )}
+                  {settings?.email && (
+                    <div>
+                      <dt className="text-sm font-medium text-zinc-500 dark:text-zinc-400">{t('tenantSettings.form.email')}</dt>
+                      <dd className="mt-0.5 text-sm text-zinc-900 dark:text-white">{settings.email}</dd>
+                    </div>
+                  )}
+                </div>
+              </dl>
+            </div>
+
+            {/* Business Settings */}
+            <div>
+              <Subheading className="mb-3">{t('tenantSettings.sections.businessSettings')}</Subheading>
+              <dl className="space-y-2">
+                <div>
+                  <dt className="text-sm font-medium text-zinc-500 dark:text-zinc-400">{t('tenantSettings.form.timezone')}</dt>
+                  <dd className="mt-0.5 text-sm text-zinc-900 dark:text-white">{settings?.timezone || '-'}</dd>
+                </div>
+                <div>
+                  <dt className="text-sm font-medium text-zinc-500 dark:text-zinc-400">{t('tenantSettings.form.defaultTaxRate')}</dt>
+                  <dd className="mt-0.5 text-sm text-zinc-900 dark:text-white">
+                    {settings?.defaultTaxRate ? `${(settings.defaultTaxRate * 100).toFixed(2)}%` : '-'}
+                  </dd>
+                </div>
+                {settings?.invoiceTerms && (
+                  <div>
+                    <dt className="text-sm font-medium text-zinc-500 dark:text-zinc-400">{t('tenantSettings.form.invoiceTerms')}</dt>
+                    <dd className="mt-0.5 text-sm text-zinc-900 dark:text-white">{settings.invoiceTerms}</dd>
+                  </div>
+                )}
+              </dl>
+            </div>
+
+            {/* Feature Flags */}
+            <div className="col-span-2">
+              <Subheading className="mb-3">{t('tenantSettings.sections.featureFlags')}</Subheading>
+              <div className="flex gap-4">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-zinc-900 dark:text-white">{t('tenantSettings.form.enableOnlineBooking')}</span>
+                  <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${settings?.enableOnlineBooking ? 'bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400' : 'bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-400'}`}>
+                    {settings?.enableOnlineBooking ? t('common.enabled') : t('common.disabled')}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-zinc-900 dark:text-white">{t('tenantSettings.form.enableSmsNotifications')}</span>
+                  <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${settings?.enableSmsNotifications ? 'bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400' : 'bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-400'}`}>
+                    {settings?.enableSmsNotifications ? t('common.enabled') : t('common.disabled')}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-zinc-900 dark:text-white">{t('tenantSettings.form.enableEmailNotifications')}</span>
+                  <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${settings?.enableEmailNotifications ? 'bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400' : 'bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-400'}`}>
+                    {settings?.enableEmailNotifications ? t('common.enabled') : t('common.disabled')}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </AppLayout>
+    );
+  }
+  // Edit mode - form for editing settings
   return (
     <AppLayout>
       <div className="p-8 max-w-4xl">
-        <Heading>{t('entities.tenantSettings')}</Heading>
-        <p className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">
-          {t('tenantSettings.description')}
-        </p>
+        <div className="flex items-start justify-between">
+          <div>
+            <Heading>{t('entities.tenantSettings')}</Heading>
+            <Text className="mt-2">
+              {t('tenantSettings.description')}
+            </Text>
+          </div>
+        </div>
 
         <Divider className="my-8" />
 
@@ -175,7 +361,7 @@ export default function TenantSettingsPage() {
                   value={formData.companyName || ''}
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange('companyName', e.target.value)}
                   required
-                  disabled={!canEdit}
+                  
                 />
               </Field>
 
@@ -187,7 +373,7 @@ export default function TenantSettingsPage() {
                     value={formData.companyNameShort || ''}
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange('companyNameShort', e.target.value)}
                     placeholder="Acme"
-                    disabled={!canEdit}
+                    
                   />
                 </Field>
 
@@ -198,7 +384,7 @@ export default function TenantSettingsPage() {
                     value={formData.companySlogan || ''}
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange('companySlogan', e.target.value)}
                     placeholder="Your tagline here"
-                    disabled={!canEdit}
+                    
                   />
                 </Field>
               </div>
@@ -222,29 +408,25 @@ export default function TenantSettingsPage() {
                     />
                   </div>
                 )}
-                {canEdit && (
-                  <>
-                    <div className="flex gap-3 items-center">
-                      <input
-                        ref={fileInputRef}
-                        type="file"
-                        accept="image/png,image/jpeg"
-                        onChange={handleLogoChange}
-                        className="text-sm text-zinc-900 dark:text-zinc-100 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-medium file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 dark:file:bg-indigo-900/20 dark:file:text-indigo-400 dark:hover:file:bg-indigo-900/30"
-                      />
-                      {logoFile && (
-                        <Button
-                          type="button"
-                          onClick={handleLogoUpload}
-                          disabled={uploadLogoMutation.isPending}
-                        >
-                          {uploadLogoMutation.isPending ? t('common.saving') : t('tenantSettings.form.uploadLogo')}
-                        </Button>
-                      )}
-                    </div>
-                    <Description>{t('tenantSettings.form.logoHelper')}</Description>
-                  </>
-                )}
+                <div className="flex gap-3 items-center">
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/png,image/jpeg"
+                    onChange={handleLogoChange}
+                    className="text-sm text-zinc-900 dark:text-zinc-100 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-medium file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 dark:file:bg-indigo-900/20 dark:file:text-indigo-400 dark:hover:file:bg-indigo-900/30"
+                  />
+                  {logoFile && (
+                    <Button
+                      type="button"
+                      onClick={handleLogoUpload}
+                      disabled={uploadLogoMutation.isPending}
+                    >
+                      {uploadLogoMutation.isPending ? t('common.saving') : t('tenantSettings.form.uploadLogo')}
+                    </Button>
+                  )}
+                </div>
+                <Description>{t('tenantSettings.form.logoHelper')}</Description>
               </Field>
 
               <div className="grid grid-cols-2 gap-4">
@@ -256,7 +438,7 @@ export default function TenantSettingsPage() {
                     value={formData.primaryColor || '#1976d2'}
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange('primaryColor', e.target.value)}
                     required
-                    disabled={!canEdit}
+                    
                   />
                 </Field>
 
@@ -268,7 +450,7 @@ export default function TenantSettingsPage() {
                     value={formData.secondaryColor || '#dc004e'}
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange('secondaryColor', e.target.value)}
                     required
-                    disabled={!canEdit}
+                    
                   />
                 </Field>
               </div>
@@ -287,7 +469,7 @@ export default function TenantSettingsPage() {
                   name="streetAddress"
                   value={formData.streetAddress || ''}
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange('streetAddress', e.target.value)}
-                  disabled={!canEdit}
+                  
                 />
               </Field>
 
@@ -298,7 +480,7 @@ export default function TenantSettingsPage() {
                     name="city"
                     value={formData.city || ''}
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange('city', e.target.value)}
-                    disabled={!canEdit}
+                    
                   />
                 </Field>
 
@@ -310,7 +492,7 @@ export default function TenantSettingsPage() {
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange('state', e.target.value)}
                     maxLength={2}
                     placeholder="CA"
-                    disabled={!canEdit}
+                    
                   />
                 </Field>
 
@@ -320,7 +502,7 @@ export default function TenantSettingsPage() {
                     name="zipCode"
                     value={formData.zipCode || ''}
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange('zipCode', e.target.value)}
-                    disabled={!canEdit}
+                    
                   />
                 </Field>
               </div>
@@ -333,7 +515,7 @@ export default function TenantSettingsPage() {
                     type="tel"
                     value={formData.phone || ''}
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange('phone', e.target.value)}
-                    disabled={!canEdit}
+                    
                   />
                 </Field>
 
@@ -344,7 +526,7 @@ export default function TenantSettingsPage() {
                     type="tel"
                     value={formData.fax || ''}
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange('fax', e.target.value)}
-                    disabled={!canEdit}
+                    
                   />
                 </Field>
 
@@ -355,7 +537,7 @@ export default function TenantSettingsPage() {
                     type="email"
                     value={formData.email || ''}
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange('email', e.target.value)}
-                    disabled={!canEdit}
+                    
                   />
                 </Field>
               </div>
@@ -377,7 +559,7 @@ export default function TenantSettingsPage() {
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange('timezone', e.target.value)}
                     placeholder="America/New_York"
                     required
-                    disabled={!canEdit}
+                    
                   />
                   <Description>{t('tenantSettings.form.timezoneHelper')}</Description>
                 </Field>
@@ -393,7 +575,7 @@ export default function TenantSettingsPage() {
                     value={formData.defaultTaxRate || ''}
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange('defaultTaxRate', parseFloat(e.target.value))}
                     placeholder="0.0825"
-                    disabled={!canEdit}
+                    
                   />
                   <Description>{t('tenantSettings.form.defaultTaxRateHelper')}</Description>
                 </Field>
@@ -407,7 +589,7 @@ export default function TenantSettingsPage() {
                   onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => handleChange('invoiceTerms', e.target.value)}
                   rows={2}
                   placeholder="Net 30"
-                  disabled={!canEdit}
+                  
                 />
               </Field>
             </FieldGroup>
@@ -424,7 +606,7 @@ export default function TenantSettingsPage() {
                   name="enableOnlineBooking"
                   checked={formData.enableOnlineBooking || false}
                   onChange={(checked) => handleChange('enableOnlineBooking', checked)}
-                  disabled={!canEdit}
+                  
                 />
                 <Label>{t('tenantSettings.form.enableOnlineBooking')}</Label>
               </CheckboxField>
@@ -434,7 +616,7 @@ export default function TenantSettingsPage() {
                   name="enableSmsNotifications"
                   checked={formData.enableSmsNotifications || false}
                   onChange={(checked) => handleChange('enableSmsNotifications', checked)}
-                  disabled={!canEdit}
+                  
                 />
                 <Label>{t('tenantSettings.form.enableSmsNotifications')}</Label>
               </CheckboxField>
@@ -444,23 +626,23 @@ export default function TenantSettingsPage() {
                   name="enableEmailNotifications"
                   checked={formData.enableEmailNotifications || false}
                   onChange={(checked) => handleChange('enableEmailNotifications', checked)}
-                  disabled={!canEdit}
+                  
                 />
                 <Label>{t('tenantSettings.form.enableEmailNotifications')}</Label>
               </CheckboxField>
             </FieldGroup>
           </Fieldset>
 
-          {canEdit && (
-            <>
-              <Divider className="my-8" />
-              <div className="flex justify-end gap-4">
-                <Button type="submit" disabled={updateMutation.isPending}>
-                  {updateMutation.isPending ? t('common.saving') : t('common.update')}
-                </Button>
-              </div>
-            </>
-          )}
+          <Divider className="my-8" />
+
+          <div className="flex justify-end gap-3">
+            <Button plain onClick={() => setIsEditing(false)}>
+              {t('common.cancel')}
+            </Button>
+            <Button type="submit" disabled={updateMutation.isPending}>
+              {updateMutation.isPending ? t('common.saving') : t('common.update')}
+            </Button>
+          </div>
         </form>
       </div>
     </AppLayout>
