@@ -9,9 +9,19 @@ import { Text } from '../components/catalyst/text';
 import { Button } from '../components/catalyst/button';
 import { Field, FieldGroup, Label, Description } from '../components/catalyst/fieldset';
 import { Input } from '../components/catalyst/input';
+import { Select } from '../components/catalyst/select';
 import { Textarea } from '../components/catalyst/textarea';
 import { CheckboxField, Checkbox } from '../components/catalyst/checkbox';
 import { Divider } from '../components/catalyst/divider';
+
+// US States
+const US_STATES = [
+  'AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'FL', 'GA',
+  'HI', 'ID', 'IL', 'IN', 'IA', 'KS', 'KY', 'LA', 'ME', 'MD',
+  'MA', 'MI', 'MN', 'MS', 'MO', 'MT', 'NE', 'NV', 'NH', 'NJ',
+  'NM', 'NY', 'NC', 'ND', 'OH', 'OK', 'OR', 'PA', 'RI', 'SC',
+  'SD', 'TN', 'TX', 'UT', 'VT', 'VA', 'WA', 'WV', 'WI', 'WY'
+];
 
 export default function TenantSettingsPage() {
   const queryClient = useQueryClient();
@@ -239,46 +249,38 @@ export default function TenantSettingsPage() {
                     <dd className="mt-0.5 text-sm text-zinc-900 dark:text-white">{settings.streetAddress}</dd>
                   </div>
                 )}
-                <div className="grid grid-cols-3 gap-3">
-                  {settings?.city && (
-                    <div>
-                      <dt className="text-sm font-medium text-zinc-500 dark:text-zinc-400">{t('tenantSettings.form.city')}</dt>
-                      <dd className="mt-0.5 text-sm text-zinc-900 dark:text-white">{settings.city}</dd>
-                    </div>
-                  )}
-                  {settings?.state && (
-                    <div>
-                      <dt className="text-sm font-medium text-zinc-500 dark:text-zinc-400">{t('tenantSettings.form.state')}</dt>
-                      <dd className="mt-0.5 text-sm text-zinc-900 dark:text-white">{settings.state}</dd>
-                    </div>
-                  )}
-                  {settings?.zipCode && (
-                    <div>
-                      <dt className="text-sm font-medium text-zinc-500 dark:text-zinc-400">{t('tenantSettings.form.zipCode')}</dt>
-                      <dd className="mt-0.5 text-sm text-zinc-900 dark:text-white">{settings.zipCode}</dd>
-                    </div>
-                  )}
-                </div>
-                <div className="grid grid-cols-3 gap-3">
-                  {settings?.phone && (
-                    <div>
-                      <dt className="text-sm font-medium text-zinc-500 dark:text-zinc-400">{t('tenantSettings.form.phone')}</dt>
-                      <dd className="mt-0.5 text-sm text-zinc-900 dark:text-white">{settings.phone}</dd>
-                    </div>
-                  )}
-                  {settings?.fax && (
-                    <div>
-                      <dt className="text-sm font-medium text-zinc-500 dark:text-zinc-400">{t('tenantSettings.form.fax')}</dt>
-                      <dd className="mt-0.5 text-sm text-zinc-900 dark:text-white">{settings.fax}</dd>
-                    </div>
-                  )}
-                  {settings?.email && (
-                    <div>
-                      <dt className="text-sm font-medium text-zinc-500 dark:text-zinc-400">{t('tenantSettings.form.email')}</dt>
-                      <dd className="mt-0.5 text-sm text-zinc-900 dark:text-white">{settings.email}</dd>
-                    </div>
-                  )}
-                </div>
+                {(settings?.city || settings?.state || settings?.zipCode) && (
+                  <div>
+                    <dt className="text-sm font-medium text-zinc-500 dark:text-zinc-400">
+                      {t('tenantSettings.form.city')} / {t('tenantSettings.form.state')} / {t('tenantSettings.form.zipCode')}
+                    </dt>
+                    <dd className="mt-0.5 text-sm text-zinc-900 dark:text-white">
+                      {[settings.city, settings.state, settings.zipCode].filter(Boolean).join(', ')}
+                    </dd>
+                  </div>
+                )}
+                {(settings?.phone || settings?.email) && (
+                  <div className="grid grid-cols-2 gap-3">
+                    {settings?.phone && (
+                      <div>
+                        <dt className="text-sm font-medium text-zinc-500 dark:text-zinc-400">{t('tenantSettings.form.phone')}</dt>
+                        <dd className="mt-0.5 text-sm text-zinc-900 dark:text-white">{settings.phone}</dd>
+                      </div>
+                    )}
+                    {settings?.email && (
+                      <div>
+                        <dt className="text-sm font-medium text-zinc-500 dark:text-zinc-400">{t('tenantSettings.form.email')}</dt>
+                        <dd className="mt-0.5 text-sm text-zinc-900 dark:text-white">{settings.email}</dd>
+                      </div>
+                    )}
+                  </div>
+                )}
+                {settings?.fax && (
+                  <div>
+                    <dt className="text-sm font-medium text-zinc-500 dark:text-zinc-400">{t('tenantSettings.form.fax')}</dt>
+                    <dd className="mt-0.5 text-sm text-zinc-900 dark:text-white">{settings.fax}</dd>
+                  </div>
+                )}
               </dl>
             </div>
 
@@ -466,13 +468,18 @@ export default function TenantSettingsPage() {
                   </Field>
                   <Field>
                     <Label>{t('tenantSettings.form.state')}</Label>
-                    <Input
+                    <Select
                       name="state"
                       value={formData.state || ''}
-                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange('state', e.target.value)}
-                      maxLength={2}
-                      placeholder="CA"
-                    />
+                      onChange={(e: React.ChangeEvent<HTMLSelectElement>) => handleChange('state', e.target.value)}
+                    >
+                      <option value="">{t('common.form.select')}</option>
+                      {US_STATES.map((state) => (
+                        <option key={state} value={state}>
+                          {state}
+                        </option>
+                      ))}
+                    </Select>
                   </Field>
                   <Field>
                     <Label>{t('tenantSettings.form.zipCode')}</Label>

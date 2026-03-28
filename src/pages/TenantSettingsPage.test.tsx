@@ -64,9 +64,8 @@ describe('TenantSettingsPage', () => {
     expect(screen.getByText('Acme')).toBeInTheDocument();
     expect(screen.getByText('Your Comfort is Our Priority')).toBeInTheDocument();
     expect(screen.getByText('123 Main Street')).toBeInTheDocument();
-    expect(screen.getByText('Springfield')).toBeInTheDocument();
-    expect(screen.getByText('IL')).toBeInTheDocument();
-    expect(screen.getByText('62701')).toBeInTheDocument();
+    // City, state, zip are now combined on one line
+    expect(screen.getByText('Springfield, IL, 62701')).toBeInTheDocument();
     expect(screen.getByText('555-123-4567')).toBeInTheDocument();
     expect(screen.getByText('info@acmehvac.com')).toBeInTheDocument();
     expect(screen.getByText('America/Chicago')).toBeInTheDocument();
