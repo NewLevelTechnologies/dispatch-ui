@@ -173,6 +173,8 @@
     "scheduling": "Scheduling",
     "serviceLocation": "Service Location",
     "serviceLocations": "Service Locations",
+    "settings": "Settings",
+    "tenantSettings": "Tenant Settings",
     "user": "User",
     "users": "Users",
     "workOrder": "Work Order",
@@ -502,6 +504,58 @@
       "startTime": "Start Time",
       "user": "User",
       "workOrder": "Work Order"
+    }
+  },
+  "tenantSettings": {
+    "description": "Manage company branding, contact information, and business settings",
+    "sections": {
+      "branding": "Branding & Logo",
+      "businessSettings": "Business Settings",
+      "companyInfo": "Company Information",
+      "contactInfo": "Contact Information",
+      "featureFlags": "Feature Flags"
+    },
+    "form": {
+      "city": "City",
+      "companyName": "Company Name",
+      "companyNameShort": "Short Name",
+      "companyNameShortHelper": "Optional - used in tight spaces",
+      "companySlogan": "Company Slogan",
+      "companySloganHelper": "Optional - tagline or motto",
+      "defaultTaxRate": "Default Tax Rate",
+      "defaultTaxRateHelper": "Decimal (e.g., 0.0825 = 8.25%)",
+      "email": "Email",
+      "enableEmailNotifications": "Enable Email Notifications",
+      "enableOnlineBooking": "Enable Online Booking",
+      "enableSmsNotifications": "Enable SMS Notifications",
+      "fax": "Fax",
+      "invoiceTerms": "Invoice Terms",
+      "invoiceTermsHelper": "e.g., Net 30, Due on receipt",
+      "logo": "Company Logo",
+      "logoHelper": "Max 5MB. Square images work best.",
+      "phone": "Phone",
+      "primaryColor": "Primary Color",
+      "primaryColorHelper": "Main brand color (hex code)",
+      "secondaryColor": "Secondary Color",
+      "secondaryColorHelper": "Accent color (hex code)",
+      "state": "State",
+      "stateHelper": "Two-letter code (e.g., CA)",
+      "streetAddress": "Street Address",
+      "timezone": "Timezone",
+      "timezoneHelper": "For dates and scheduling",
+      "uploadLogo": "Upload Logo",
+      "zipCode": "Zip Code"
+    },
+    "messages": {
+      "errorLoadingSettings": "Error loading tenant settings",
+      "errorUpdateSettings": "Failed to update settings",
+      "errorUploadLogo": "Failed to upload logo",
+      "fileSizeTooLarge": "File size must be less than 5MB",
+      "invalidFileType": "Only PNG and JPEG files are supported",
+      "loadingSettings": "Loading settings...",
+      "logoUploadedSuccess": "Logo uploaded successfully",
+      "noLogo": "No logo uploaded",
+      "settingsUpdatedSuccess": "Settings updated successfully"
     }
   },
   "users": {
