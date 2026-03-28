@@ -15,6 +15,7 @@ import { CheckboxField, Checkbox } from '../components/catalyst/checkbox';
 import { Divider } from '../components/catalyst/divider';
 import { US_STATES } from '../constants/states';
 import { US_TIMEZONES } from '../constants/timezones';
+import { PhoneIcon, EnvelopeIcon } from '@heroicons/react/24/outline';
 
 export default function TenantSettingsPage() {
   const queryClient = useQueryClient();
@@ -184,12 +185,30 @@ export default function TenantSettingsPage() {
                     {[settings.city, [settings.state, settings.zipCode].filter(Boolean).join(' ')].filter(Boolean).join(', ')}
                   </div>
                 )}
-                {settings?.phone && <div>{settings.phone}</div>}
-                {settings?.email && <div>{settings.email}</div>}
+                {settings?.phone && (
+                  <div className="flex items-center gap-2">
+                    <PhoneIcon className="h-4 w-4 text-zinc-400" />
+                    <span>{settings.phone}</span>
+                  </div>
+                )}
+                {settings?.email && (
+                  <div className="flex items-center gap-2">
+                    <EnvelopeIcon className="h-4 w-4 text-zinc-400" />
+                    <span>{settings.email}</span>
+                  </div>
+                )}
                 {(settings?.companyNameShort || settings?.companySlogan) && (
                   <div className="pt-2 space-y-0.5 text-xs text-zinc-500 dark:text-zinc-400">
-                    {settings?.companyNameShort && <div>Short: {settings.companyNameShort}</div>}
-                    {settings?.companySlogan && <div>Slogan: {settings.companySlogan}</div>}
+                    {settings?.companyNameShort && (
+                      <div>
+                        {t('tenantSettings.form.companyNameShort')}: {settings.companyNameShort}
+                      </div>
+                    )}
+                    {settings?.companySlogan && (
+                      <div>
+                        {t('tenantSettings.form.companySlogan')}: {settings.companySlogan}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
