@@ -217,6 +217,54 @@ describe('TenantSettingsPage', () => {
     expect(global.alert).toHaveBeenCalledWith('File size must be less than 5MB');
   });
 
+  it('uploads logo successfully', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({ data: mockSettings });
+    vi.mocked(apiClient.post).mockResolvedValue({
+      data: {
+        message: 'Logo uploaded successfully',
+        urls: {
+          original: 'https://example.com/logo.png',
+          large: 'https://example.com/logo-large.png',
+          medium: 'https://example.com/logo-medium.png',
+          small: 'https://example.com/logo-small.png',
+          thumbnail: 'https://example.com/logo-thumbnail.png',
+        }
+      }
+    });
+    const user = userEvent.setup();
+    renderWithProviders(<TenantSettingsPage />);
+
+    // Wait for view mode and click Edit
+    await waitFor(() => {
+      expect(screen.getByText('Acme HVAC Services')).toBeInTheDocument();
+    });
+
+    const editButton = screen.getByRole('button', { name: /edit/i });
+    await user.click(editButton);
+
+    // Now in edit mode, upload a valid file
+    await waitFor(() => {
+      expect(screen.getByDisplayValue('Acme HVAC Services')).toBeInTheDocument();
+    });
+
+    const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+    const validFile = new File(['logo content'], 'logo.png', { type: 'image/png' });
+
+    await user.upload(fileInput, validFile);
+
+    // Click upload button
+    const uploadButton = screen.getByRole('button', { name: /upload logo/i });
+    await user.click(uploadButton);
+
+    await waitFor(() => {
+      expect(apiClient.post).toHaveBeenCalledWith(
+        '/tenant-settings/logo',
+        expect.any(FormData),
+        { headers: { 'Content-Type': 'multipart/form-data' } }
+      );
+    });
+  });
+
   it('has file input with correct accept attribute in edit mode', async () => {
     vi.mocked(apiClient.get).mockResolvedValue({ data: mockSettings });
     const user = userEvent.setup();
