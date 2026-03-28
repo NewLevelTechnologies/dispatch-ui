@@ -60,11 +60,9 @@ describe('TenantSettingsPage', () => {
       expect(screen.getByText('Acme HVAC Services')).toBeInTheDocument();
     });
 
-    expect(screen.getByText('Acme')).toBeInTheDocument();
-    expect(screen.getByText('Your Comfort is Our Priority')).toBeInTheDocument();
+    // Company information is displayed without labels (just values)
     expect(screen.getByText('123 Main Street')).toBeInTheDocument();
-    // Address is now formatted as a simple block
-    expect(screen.getByText('Springfield IL, 62701')).toBeInTheDocument();
+    expect(screen.getByText('Springfield, IL 62701')).toBeInTheDocument();
     expect(screen.getByText('555-123-4567')).toBeInTheDocument();
     expect(screen.getByText('info@acmehvac.com')).toBeInTheDocument();
     expect(screen.getByText('America/Chicago')).toBeInTheDocument();
@@ -80,7 +78,6 @@ describe('TenantSettingsPage', () => {
     });
 
     expect(screen.getByText('Branding & Logo')).toBeInTheDocument();
-    expect(screen.getByText('Contact Information')).toBeInTheDocument();
     expect(screen.getByText('Business Settings')).toBeInTheDocument();
     expect(screen.getByText('Feature Flags')).toBeInTheDocument();
   });

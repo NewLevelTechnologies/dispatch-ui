@@ -178,19 +178,44 @@ export default function TenantSettingsPage() {
               <Subheading className="mb-3">{t('tenantSettings.sections.companyInfo')}</Subheading>
               <dl className="space-y-2">
                 <div>
-                  <dt className="text-sm font-medium text-zinc-500 dark:text-zinc-400">{t('tenantSettings.form.companyName')}</dt>
-                  <dd className="mt-0.5 text-sm text-zinc-900 dark:text-white">{settings?.companyName || '-'}</dd>
+                  <dt className="sr-only">{t('tenantSettings.form.companyName')}</dt>
+                  <dd className="text-base font-semibold text-zinc-900 dark:text-white">{settings?.companyName || '-'}</dd>
                 </div>
                 {settings?.companyNameShort && (
                   <div>
-                    <dt className="text-sm font-medium text-zinc-500 dark:text-zinc-400">{t('tenantSettings.form.companyNameShort')}</dt>
-                    <dd className="mt-0.5 text-sm text-zinc-900 dark:text-white">{settings.companyNameShort}</dd>
+                    <dt className="sr-only">{t('tenantSettings.form.companyNameShort')}</dt>
+                    <dd className="text-sm text-zinc-600 dark:text-zinc-400">{settings.companyNameShort}</dd>
                   </div>
                 )}
                 {settings?.companySlogan && (
                   <div>
-                    <dt className="text-sm font-medium text-zinc-500 dark:text-zinc-400">{t('tenantSettings.form.companySlogan')}</dt>
-                    <dd className="mt-0.5 text-sm text-zinc-900 dark:text-white">{settings.companySlogan}</dd>
+                    <dt className="sr-only">{t('tenantSettings.form.companySlogan')}</dt>
+                    <dd className="text-sm italic text-zinc-600 dark:text-zinc-400">{settings.companySlogan}</dd>
+                  </div>
+                )}
+                {(settings?.streetAddress || settings?.city || settings?.state || settings?.zipCode) && (
+                  <div className="pt-2">
+                    <dt className="sr-only">{t('tenantSettings.form.address')}</dt>
+                    <dd className="text-sm text-zinc-900 dark:text-white">
+                      {settings.streetAddress && <div>{settings.streetAddress}</div>}
+                      {(settings.city || settings.state || settings.zipCode) && (
+                        <div>
+                          {[settings.city, [settings.state, settings.zipCode].filter(Boolean).join(' ')].filter(Boolean).join(', ')}
+                        </div>
+                      )}
+                    </dd>
+                  </div>
+                )}
+                {settings?.phone && (
+                  <div>
+                    <dt className="sr-only">{t('tenantSettings.form.phone')}</dt>
+                    <dd className="text-sm text-zinc-900 dark:text-white">{settings.phone}</dd>
+                  </div>
+                )}
+                {settings?.email && (
+                  <div>
+                    <dt className="sr-only">{t('tenantSettings.form.email')}</dt>
+                    <dd className="text-sm text-zinc-900 dark:text-white">{settings.email}</dd>
                   </div>
                 )}
               </dl>
@@ -227,40 +252,6 @@ export default function TenantSettingsPage() {
                       <span className="text-sm text-zinc-900 dark:text-white">{settings?.secondaryColor || '-'}</span>
                     </dd>
                   </div>
-                </div>
-              </dl>
-            </div>
-
-            {/* Contact Information */}
-            <div>
-              <Subheading className="mb-3">{t('tenantSettings.sections.contactInfo')}</Subheading>
-              <dl className="space-y-2">
-                {(settings?.streetAddress || settings?.city || settings?.state || settings?.zipCode) && (
-                  <div>
-                    <dt className="text-sm font-medium text-zinc-500 dark:text-zinc-400">{t('tenantSettings.form.address')}</dt>
-                    <dd className="mt-0.5 text-sm text-zinc-900 dark:text-white">
-                      {settings.streetAddress && <div>{settings.streetAddress}</div>}
-                      {(settings.city || settings.state || settings.zipCode) && (
-                        <div>
-                          {[settings.city, [settings.state, settings.zipCode].filter(Boolean).join(', ')].filter(Boolean).join(' ')}
-                        </div>
-                      )}
-                    </dd>
-                  </div>
-                )}
-                <div className="grid grid-cols-2 gap-3">
-                  {settings?.phone && (
-                    <div>
-                      <dt className="text-sm font-medium text-zinc-500 dark:text-zinc-400">{t('tenantSettings.form.phone')}</dt>
-                      <dd className="mt-0.5 text-sm text-zinc-900 dark:text-white">{settings.phone}</dd>
-                    </div>
-                  )}
-                  {settings?.email && (
-                    <div>
-                      <dt className="text-sm font-medium text-zinc-500 dark:text-zinc-400">{t('tenantSettings.form.email')}</dt>
-                      <dd className="mt-0.5 text-sm text-zinc-900 dark:text-white">{settings.email}</dd>
-                    </div>
-                  )}
                 </div>
               </dl>
             </div>
@@ -363,73 +354,6 @@ export default function TenantSettingsPage() {
                     placeholder="Your tagline here"
                   />
                 </Field>
-              </FieldGroup>
-            </div>
-
-            {/* Branding & Logo - Right */}
-            <div>
-              <Subheading className="mb-3">{t('tenantSettings.sections.branding')}</Subheading>
-              <FieldGroup className="space-y-3">
-                <Field>
-                  <Label>{t('tenantSettings.form.logo')}</Label>
-                  {(logoPreview || settings?.logoThumbnailUrl) && (
-                    <div className="mb-2">
-                      <img
-                        src={logoPreview || settings?.logoThumbnailUrl || ''}
-                        alt="Company logo"
-                        className="h-20 w-20 object-contain rounded border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800"
-                      />
-                    </div>
-                  )}
-                  <div className="flex gap-2 items-center">
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      accept="image/png,image/jpeg"
-                      onChange={handleLogoChange}
-                      className="text-sm text-zinc-900 dark:text-zinc-100 file:mr-3 file:py-1.5 file:px-3 file:rounded file:border-0 file:text-sm file:font-medium file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 dark:file:bg-indigo-900/20 dark:file:text-indigo-400 dark:hover:file:bg-indigo-900/30"
-                    />
-                    {logoFile && (
-                      <Button
-                        type="button"
-                        onClick={handleLogoUpload}
-                        disabled={uploadLogoMutation.isPending}
-                      >
-                        {uploadLogoMutation.isPending ? t('common.saving') : t('tenantSettings.form.uploadLogo')}
-                      </Button>
-                    )}
-                  </div>
-                  <Description>{t('tenantSettings.form.logoHelper')}</Description>
-                </Field>
-                <div className="grid grid-cols-2 gap-3">
-                  <Field>
-                    <Label>{t('tenantSettings.form.primaryColor')} *</Label>
-                    <Input
-                      name="primaryColor"
-                      type="color"
-                      value={formData.primaryColor || '#1976d2'}
-                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange('primaryColor', e.target.value)}
-                      required
-                    />
-                  </Field>
-                  <Field>
-                    <Label>{t('tenantSettings.form.secondaryColor')} *</Label>
-                    <Input
-                      name="secondaryColor"
-                      type="color"
-                      value={formData.secondaryColor || '#dc004e'}
-                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange('secondaryColor', e.target.value)}
-                      required
-                    />
-                  </Field>
-                </div>
-              </FieldGroup>
-            </div>
-
-            {/* Contact Information - Left */}
-            <div>
-              <Subheading className="mb-3">{t('tenantSettings.sections.contactInfo')}</Subheading>
-              <FieldGroup className="space-y-3">
                 <Field>
                   <Label>{t('tenantSettings.form.streetAddress')}</Label>
                   <Input
@@ -488,6 +412,66 @@ export default function TenantSettingsPage() {
                       type="email"
                       value={formData.email || ''}
                       onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange('email', e.target.value)}
+                    />
+                  </Field>
+                </div>
+              </FieldGroup>
+            </div>
+
+            {/* Branding & Logo - Right */}
+            <div>
+              <Subheading className="mb-3">{t('tenantSettings.sections.branding')}</Subheading>
+              <FieldGroup className="space-y-3">
+                <Field>
+                  <Label>{t('tenantSettings.form.logo')}</Label>
+                  {(logoPreview || settings?.logoThumbnailUrl) && (
+                    <div className="mb-2">
+                      <img
+                        src={logoPreview || settings?.logoThumbnailUrl || ''}
+                        alt="Company logo"
+                        className="h-20 w-20 object-contain rounded border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800"
+                      />
+                    </div>
+                  )}
+                  <div className="flex gap-2 items-center">
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/png,image/jpeg"
+                      onChange={handleLogoChange}
+                      className="text-sm text-zinc-900 dark:text-zinc-100 file:mr-3 file:py-1.5 file:px-3 file:rounded file:border-0 file:text-sm file:font-medium file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 dark:file:bg-indigo-900/20 dark:file:text-indigo-400 dark:hover:file:bg-indigo-900/30"
+                    />
+                    {logoFile && (
+                      <Button
+                        type="button"
+                        onClick={handleLogoUpload}
+                        disabled={uploadLogoMutation.isPending}
+                      >
+                        {uploadLogoMutation.isPending ? t('common.saving') : t('tenantSettings.form.uploadLogo')}
+                      </Button>
+                    )}
+                  </div>
+                  <Description>{t('tenantSettings.form.logoHelper')}</Description>
+                </Field>
+                <div className="grid grid-cols-2 gap-3">
+                  <Field>
+                    <Label>{t('tenantSettings.form.primaryColor')} *</Label>
+                    <Input
+                      name="primaryColor"
+                      type="color"
+                      value={formData.primaryColor || '#1976d2'}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange('primaryColor', e.target.value)}
+                      required
+                    />
+                  </Field>
+                  <Field>
+                    <Label>{t('tenantSettings.form.secondaryColor')} *</Label>
+                    <Input
+                      name="secondaryColor"
+                      type="color"
+                      value={formData.secondaryColor || '#dc004e'}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange('secondaryColor', e.target.value)}
+                      required
                     />
                   </Field>
                 </div>
