@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { tenantSettingsApi, type UpdateTenantSettingsRequest } from '../api';
@@ -17,6 +17,7 @@ export default function TenantSettingsPage() {
   const { t } = useTranslation();
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Fetch settings
   const { data: settings, isLoading, error } = useQuery({
@@ -76,6 +77,10 @@ export default function TenantSettingsPage() {
       queryClient.invalidateQueries({ queryKey: ['tenant-settings'] });
       setLogoFile(null);
       setLogoPreview(null);
+      // Clear the file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
       alert(t('tenantSettings.messages.logoUploadedSuccess'));
     },
     onError: (error: unknown) => {
@@ -214,6 +219,7 @@ export default function TenantSettingsPage() {
                 )}
                 <div className="flex gap-3 items-center">
                   <input
+                    ref={fileInputRef}
                     type="file"
                     accept="image/png,image/jpeg"
                     onChange={handleLogoChange}
