@@ -48,7 +48,6 @@ export default function TenantSettingsPage() {
         state: settings.state,
         zipCode: settings.zipCode,
         phone: settings.phone,
-        fax: settings.fax,
         email: settings.email,
         timezone: settings.timezone,
         defaultTaxRate: settings.defaultTaxRate,
@@ -267,12 +266,6 @@ export default function TenantSettingsPage() {
                     )}
                   </div>
                 )}
-                {settings?.fax && (
-                  <div>
-                    <dt className="text-sm font-medium text-zinc-500 dark:text-zinc-400">{t('tenantSettings.form.fax')}</dt>
-                    <dd className="mt-0.5 text-sm text-zinc-900 dark:text-white">{settings.fax}</dd>
-                  </div>
-                )}
               </dl>
             </div>
 
@@ -482,7 +475,7 @@ export default function TenantSettingsPage() {
                     />
                   </Field>
                 </div>
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-2 gap-3">
                   <Field>
                     <Label>{t('tenantSettings.form.phone')}</Label>
                     <Input
@@ -490,15 +483,6 @@ export default function TenantSettingsPage() {
                       type="tel"
                       value={formData.phone || ''}
                       onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange('phone', e.target.value)}
-                    />
-                  </Field>
-                  <Field>
-                    <Label>{t('tenantSettings.form.fax')}</Label>
-                    <Input
-                      name="fax"
-                      type="tel"
-                      value={formData.fax || ''}
-                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange('fax', e.target.value)}
                     />
                   </Field>
                   <Field>

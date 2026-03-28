@@ -23,7 +23,6 @@ const mockSettings = {
   state: 'IL',
   zipCode: '62701',
   phone: '555-123-4567',
-  fax: '555-123-4568',
   email: 'info@acmehvac.com',
   timezone: 'America/Chicago',
   defaultTaxRate: 0.0825,
