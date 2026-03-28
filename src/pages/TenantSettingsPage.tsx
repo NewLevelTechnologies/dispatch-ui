@@ -508,8 +508,8 @@ export default function TenantSettingsPage() {
                   >
                     <option value="">{t('common.form.select')}</option>
                     {US_TIMEZONES.map((tz) => (
-                      <option key={tz} value={tz}>
-                        {tz.replace(/_/g, ' ')}
+                      <option key={tz.value} value={tz.value}>
+                        {tz.label}
                       </option>
                     ))}
                   </Select>
