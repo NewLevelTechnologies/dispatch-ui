@@ -53,6 +53,9 @@ global.ResizeObserver = class ResizeObserver {
   disconnect() {}
 };
 
+// Mock window.alert
+global.alert = vi.fn();
+
 // Mock react-i18next with actual translations
 vi.mock('react-i18next', () => {
   const translations = {
@@ -202,6 +205,8 @@ vi.mock('react-i18next', () => {
     'entities.scheduling': 'Scheduling',
     'entities.serviceLocation': 'Service Location',
     'entities.serviceLocations': 'Service Locations',
+    'entities.settings': 'Settings',
+    'entities.tenantSettings': 'Tenant Settings',
     'entities.user': 'User',
     'entities.users': 'Users',
     'entities.workOrder': 'Work Order',
@@ -401,6 +406,49 @@ vi.mock('react-i18next', () => {
     'workOrders.table.amount': 'Amount',
     'workOrders.table.id': 'ID',
     'workOrders.table.scheduled': 'Scheduled',
+    'tenantSettings.description': 'Manage company branding, contact information, and business settings',
+    'tenantSettings.sections.branding': 'Branding & Logo',
+    'tenantSettings.sections.businessSettings': 'Business Settings',
+    'tenantSettings.sections.companyInfo': 'Company Information',
+    'tenantSettings.sections.contactInfo': 'Contact Information',
+    'tenantSettings.sections.featureFlags': 'Feature Flags',
+    'tenantSettings.form.city': 'City',
+    'tenantSettings.form.companyName': 'Company Name',
+    'tenantSettings.form.companyNameShort': 'Short Name',
+    'tenantSettings.form.companyNameShortHelper': 'Optional - used in tight spaces',
+    'tenantSettings.form.companySlogan': 'Company Slogan',
+    'tenantSettings.form.companySloganHelper': 'Optional - tagline or motto',
+    'tenantSettings.form.defaultTaxRate': 'Default Tax Rate',
+    'tenantSettings.form.defaultTaxRateHelper': 'Enter as decimal (e.g., 0.0825 for 8.25%)',
+    'tenantSettings.form.email': 'Email',
+    'tenantSettings.form.enableEmailNotifications': 'Enable Email Notifications',
+    'tenantSettings.form.enableOnlineBooking': 'Enable Online Booking',
+    'tenantSettings.form.enableSmsNotifications': 'Enable SMS Notifications',
+    'tenantSettings.form.fax': 'Fax',
+    'tenantSettings.form.invoiceTerms': 'Invoice Terms',
+    'tenantSettings.form.invoiceTermsHelper': 'e.g., Net 30, Due on receipt',
+    'tenantSettings.form.logo': 'Company Logo',
+    'tenantSettings.form.logoHelper': 'Square images (1:1 ratio) work best. Max 5MB. PNG or JPEG only.',
+    'tenantSettings.form.phone': 'Phone',
+    'tenantSettings.form.primaryColor': 'Primary Color',
+    'tenantSettings.form.primaryColorHelper': 'Main brand color (hex code)',
+    'tenantSettings.form.secondaryColor': 'Secondary Color',
+    'tenantSettings.form.secondaryColorHelper': 'Accent color (hex code)',
+    'tenantSettings.form.state': 'State',
+    'tenantSettings.form.stateHelper': 'Two-letter code (e.g., CA)',
+    'tenantSettings.form.streetAddress': 'Street Address',
+    'tenantSettings.form.timezone': 'Timezone',
+    'tenantSettings.form.timezoneHelper': 'Used for displaying dates and scheduling',
+    'tenantSettings.form.uploadLogo': 'Upload Logo',
+    'tenantSettings.form.zipCode': 'Zip Code',
+    'tenantSettings.messages.errorLoadingSettings': 'Error loading tenant settings',
+    'tenantSettings.messages.errorUpdateSettings': 'Failed to update settings',
+    'tenantSettings.messages.errorUploadLogo': 'Failed to upload logo',
+    'tenantSettings.messages.fileSizeTooLarge': 'File size must be less than 5MB',
+    'tenantSettings.messages.invalidFileType': 'Only PNG and JPEG files are supported',
+    'tenantSettings.messages.loadingSettings': 'Loading settings...',
+    'tenantSettings.messages.logoUploadedSuccess': 'Logo uploaded successfully',
+    'tenantSettings.messages.settingsUpdatedSuccess': 'Settings updated successfully',
   };
 
   return {
@@ -465,6 +513,8 @@ vi.mock('../hooks/useCurrentUser', () => ({
         'ADD_SERVICE_LOCATIONS',
         'EDIT_SERVICE_LOCATIONS',
         'CLOSE_SERVICE_LOCATIONS',
+        'VIEW_SETTINGS',
+        'EDIT_SETTINGS',
       ],
       roles: [],
     },
@@ -489,6 +539,8 @@ vi.mock('../hooks/useCurrentUser', () => ({
       'ADD_SERVICE_LOCATIONS',
       'EDIT_SERVICE_LOCATIONS',
       'CLOSE_SERVICE_LOCATIONS',
+      'VIEW_SETTINGS',
+      'EDIT_SETTINGS',
     ];
     return capabilities.includes(capability);
   }),
@@ -510,6 +562,8 @@ vi.mock('../hooks/useCurrentUser', () => ({
       'ADD_SERVICE_LOCATIONS',
       'EDIT_SERVICE_LOCATIONS',
       'CLOSE_SERVICE_LOCATIONS',
+      'VIEW_SETTINGS',
+      'EDIT_SETTINGS',
     ];
     return capabilities.some(cap => mockCapabilities.includes(cap));
   }),
@@ -531,6 +585,8 @@ vi.mock('../hooks/useCurrentUser', () => ({
       'ADD_SERVICE_LOCATIONS',
       'EDIT_SERVICE_LOCATIONS',
       'CLOSE_SERVICE_LOCATIONS',
+      'VIEW_SETTINGS',
+      'EDIT_SETTINGS',
     ];
     return capabilities.every(cap => mockCapabilities.includes(cap));
   }),
