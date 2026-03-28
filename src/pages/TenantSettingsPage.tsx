@@ -7,7 +7,7 @@ import AppLayout from '../components/AppLayout';
 import { Heading, Subheading } from '../components/catalyst/heading';
 import { Text } from '../components/catalyst/text';
 import { Button } from '../components/catalyst/button';
-import { Field, FieldGroup, Fieldset, Label, Description } from '../components/catalyst/fieldset';
+import { Field, FieldGroup, Label, Description } from '../components/catalyst/fieldset';
 import { Input } from '../components/catalyst/input';
 import { Textarea } from '../components/catalyst/textarea';
 import { CheckboxField, Checkbox } from '../components/catalyst/checkbox';
@@ -337,35 +337,31 @@ export default function TenantSettingsPage() {
   // Edit mode - form for editing settings
   return (
     <AppLayout>
-      <div className="p-8 max-w-4xl">
-        <div className="flex items-start justify-between">
+      <div className="p-8 max-w-7xl">
+        <div className="flex items-start justify-between mb-6">
           <div>
             <Heading>{t('entities.tenantSettings')}</Heading>
-            <Text className="mt-2">
-              {t('tenantSettings.description')}
-            </Text>
+            <Text className="mt-1">{t('tenantSettings.description')}</Text>
           </div>
         </div>
 
-        <Divider className="my-8" />
+        <Divider className="my-4" />
 
         <form onSubmit={handleSubmit}>
-          {/* Company Information */}
-          <Fieldset className="mb-8">
-            <Subheading>{t('tenantSettings.sections.companyInfo')}</Subheading>
-            <FieldGroup className="mt-4">
-              <Field>
-                <Label>{t('tenantSettings.form.companyName')} *</Label>
-                <Input
-                  name="companyName"
-                  value={formData.companyName || ''}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange('companyName', e.target.value)}
-                  required
-                  
-                />
-              </Field>
-
-              <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 gap-x-12 gap-y-6">
+            {/* Company Information - Left */}
+            <div>
+              <Subheading className="mb-3">{t('tenantSettings.sections.companyInfo')}</Subheading>
+              <FieldGroup className="space-y-3">
+                <Field>
+                  <Label>{t('tenantSettings.form.companyName')} *</Label>
+                  <Input
+                    name="companyName"
+                    value={formData.companyName || ''}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange('companyName', e.target.value)}
+                    required
+                  />
+                </Field>
                 <Field>
                   <Label>{t('tenantSettings.form.companyNameShort')}</Label>
                   <Input
@@ -373,10 +369,8 @@ export default function TenantSettingsPage() {
                     value={formData.companyNameShort || ''}
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange('companyNameShort', e.target.value)}
                     placeholder="Acme"
-                    
                   />
                 </Field>
-
                 <Field>
                   <Label>{t('tenantSettings.form.companySlogan')}</Label>
                   <Input
@@ -384,173 +378,147 @@ export default function TenantSettingsPage() {
                     value={formData.companySlogan || ''}
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange('companySlogan', e.target.value)}
                     placeholder="Your tagline here"
-                    
                   />
                 </Field>
-              </div>
-            </FieldGroup>
-          </Fieldset>
+              </FieldGroup>
+            </div>
 
-          <Divider className="my-8" />
-
-          {/* Branding & Logo */}
-          <Fieldset className="mb-8">
-            <Subheading>{t('tenantSettings.sections.branding')}</Subheading>
-            <FieldGroup className="mt-4">
-              <Field>
-                <Label>{t('tenantSettings.form.logo')}</Label>
-                {(logoPreview || settings?.logoThumbnailUrl) && (
-                  <div className="mt-3 mb-4">
-                    <img
-                      src={logoPreview || settings?.logoThumbnailUrl || ''}
-                      alt="Company logo"
-                      className="h-32 w-32 object-contain rounded border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800"
-                    />
-                  </div>
-                )}
-                <div className="flex gap-3 items-center">
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/png,image/jpeg"
-                    onChange={handleLogoChange}
-                    className="text-sm text-zinc-900 dark:text-zinc-100 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-medium file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 dark:file:bg-indigo-900/20 dark:file:text-indigo-400 dark:hover:file:bg-indigo-900/30"
-                  />
-                  {logoFile && (
-                    <Button
-                      type="button"
-                      onClick={handleLogoUpload}
-                      disabled={uploadLogoMutation.isPending}
-                    >
-                      {uploadLogoMutation.isPending ? t('common.saving') : t('tenantSettings.form.uploadLogo')}
-                    </Button>
+            {/* Branding & Logo - Right */}
+            <div>
+              <Subheading className="mb-3">{t('tenantSettings.sections.branding')}</Subheading>
+              <FieldGroup className="space-y-3">
+                <Field>
+                  <Label>{t('tenantSettings.form.logo')}</Label>
+                  {(logoPreview || settings?.logoThumbnailUrl) && (
+                    <div className="mb-2">
+                      <img
+                        src={logoPreview || settings?.logoThumbnailUrl || ''}
+                        alt="Company logo"
+                        className="h-20 w-20 object-contain rounded border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800"
+                      />
+                    </div>
                   )}
+                  <div className="flex gap-2 items-center">
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/png,image/jpeg"
+                      onChange={handleLogoChange}
+                      className="text-sm text-zinc-900 dark:text-zinc-100 file:mr-3 file:py-1.5 file:px-3 file:rounded file:border-0 file:text-sm file:font-medium file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 dark:file:bg-indigo-900/20 dark:file:text-indigo-400 dark:hover:file:bg-indigo-900/30"
+                    />
+                    {logoFile && (
+                      <Button
+                        type="button"
+                        onClick={handleLogoUpload}
+                        disabled={uploadLogoMutation.isPending}
+                      >
+                        {uploadLogoMutation.isPending ? t('common.saving') : t('tenantSettings.form.uploadLogo')}
+                      </Button>
+                    )}
+                  </div>
+                  <Description>{t('tenantSettings.form.logoHelper')}</Description>
+                </Field>
+                <div className="grid grid-cols-2 gap-3">
+                  <Field>
+                    <Label>{t('tenantSettings.form.primaryColor')} *</Label>
+                    <Input
+                      name="primaryColor"
+                      type="color"
+                      value={formData.primaryColor || '#1976d2'}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange('primaryColor', e.target.value)}
+                      required
+                    />
+                  </Field>
+                  <Field>
+                    <Label>{t('tenantSettings.form.secondaryColor')} *</Label>
+                    <Input
+                      name="secondaryColor"
+                      type="color"
+                      value={formData.secondaryColor || '#dc004e'}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange('secondaryColor', e.target.value)}
+                      required
+                    />
+                  </Field>
                 </div>
-                <Description>{t('tenantSettings.form.logoHelper')}</Description>
-              </Field>
+              </FieldGroup>
+            </div>
 
-              <div className="grid grid-cols-2 gap-4">
+            {/* Contact Information - Left */}
+            <div>
+              <Subheading className="mb-3">{t('tenantSettings.sections.contactInfo')}</Subheading>
+              <FieldGroup className="space-y-3">
                 <Field>
-                  <Label>{t('tenantSettings.form.primaryColor')} *</Label>
+                  <Label>{t('tenantSettings.form.streetAddress')}</Label>
                   <Input
-                    name="primaryColor"
-                    type="color"
-                    value={formData.primaryColor || '#1976d2'}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange('primaryColor', e.target.value)}
-                    required
-                    
+                    name="streetAddress"
+                    value={formData.streetAddress || ''}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange('streetAddress', e.target.value)}
                   />
                 </Field>
+                <div className="grid grid-cols-3 gap-3">
+                  <Field>
+                    <Label>{t('tenantSettings.form.city')}</Label>
+                    <Input
+                      name="city"
+                      value={formData.city || ''}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange('city', e.target.value)}
+                    />
+                  </Field>
+                  <Field>
+                    <Label>{t('tenantSettings.form.state')}</Label>
+                    <Input
+                      name="state"
+                      value={formData.state || ''}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange('state', e.target.value)}
+                      maxLength={2}
+                      placeholder="CA"
+                    />
+                  </Field>
+                  <Field>
+                    <Label>{t('tenantSettings.form.zipCode')}</Label>
+                    <Input
+                      name="zipCode"
+                      value={formData.zipCode || ''}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange('zipCode', e.target.value)}
+                    />
+                  </Field>
+                </div>
+                <div className="grid grid-cols-3 gap-3">
+                  <Field>
+                    <Label>{t('tenantSettings.form.phone')}</Label>
+                    <Input
+                      name="phone"
+                      type="tel"
+                      value={formData.phone || ''}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange('phone', e.target.value)}
+                    />
+                  </Field>
+                  <Field>
+                    <Label>{t('tenantSettings.form.fax')}</Label>
+                    <Input
+                      name="fax"
+                      type="tel"
+                      value={formData.fax || ''}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange('fax', e.target.value)}
+                    />
+                  </Field>
+                  <Field>
+                    <Label>{t('tenantSettings.form.email')}</Label>
+                    <Input
+                      name="email"
+                      type="email"
+                      value={formData.email || ''}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange('email', e.target.value)}
+                    />
+                  </Field>
+                </div>
+              </FieldGroup>
+            </div>
 
-                <Field>
-                  <Label>{t('tenantSettings.form.secondaryColor')} *</Label>
-                  <Input
-                    name="secondaryColor"
-                    type="color"
-                    value={formData.secondaryColor || '#dc004e'}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange('secondaryColor', e.target.value)}
-                    required
-                    
-                  />
-                </Field>
-              </div>
-            </FieldGroup>
-          </Fieldset>
-
-          <Divider className="my-8" />
-
-          {/* Contact Information */}
-          <Fieldset className="mb-8">
-            <Subheading>{t('tenantSettings.sections.contactInfo')}</Subheading>
-            <FieldGroup className="mt-4">
-              <Field>
-                <Label>{t('tenantSettings.form.streetAddress')}</Label>
-                <Input
-                  name="streetAddress"
-                  value={formData.streetAddress || ''}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange('streetAddress', e.target.value)}
-                  
-                />
-              </Field>
-
-              <div className="grid grid-cols-3 gap-4">
-                <Field>
-                  <Label>{t('tenantSettings.form.city')}</Label>
-                  <Input
-                    name="city"
-                    value={formData.city || ''}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange('city', e.target.value)}
-                    
-                  />
-                </Field>
-
-                <Field>
-                  <Label>{t('tenantSettings.form.state')}</Label>
-                  <Input
-                    name="state"
-                    value={formData.state || ''}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange('state', e.target.value)}
-                    maxLength={2}
-                    placeholder="CA"
-                    
-                  />
-                </Field>
-
-                <Field>
-                  <Label>{t('tenantSettings.form.zipCode')}</Label>
-                  <Input
-                    name="zipCode"
-                    value={formData.zipCode || ''}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange('zipCode', e.target.value)}
-                    
-                  />
-                </Field>
-              </div>
-
-              <div className="grid grid-cols-3 gap-4">
-                <Field>
-                  <Label>{t('tenantSettings.form.phone')}</Label>
-                  <Input
-                    name="phone"
-                    type="tel"
-                    value={formData.phone || ''}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange('phone', e.target.value)}
-                    
-                  />
-                </Field>
-
-                <Field>
-                  <Label>{t('tenantSettings.form.fax')}</Label>
-                  <Input
-                    name="fax"
-                    type="tel"
-                    value={formData.fax || ''}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange('fax', e.target.value)}
-                    
-                  />
-                </Field>
-
-                <Field>
-                  <Label>{t('tenantSettings.form.email')}</Label>
-                  <Input
-                    name="email"
-                    type="email"
-                    value={formData.email || ''}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange('email', e.target.value)}
-                    
-                  />
-                </Field>
-              </div>
-            </FieldGroup>
-          </Fieldset>
-
-          <Divider className="my-8" />
-
-          {/* Business Settings */}
-          <Fieldset className="mb-8">
-            <Subheading>{t('tenantSettings.sections.businessSettings')}</Subheading>
-            <FieldGroup className="mt-4">
-              <div className="grid grid-cols-2 gap-4">
+            {/* Business Settings - Right */}
+            <div>
+              <Subheading className="mb-3">{t('tenantSettings.sections.businessSettings')}</Subheading>
+              <FieldGroup className="space-y-3">
                 <Field>
                   <Label>{t('tenantSettings.form.timezone')} *</Label>
                   <Input
@@ -559,11 +527,9 @@ export default function TenantSettingsPage() {
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange('timezone', e.target.value)}
                     placeholder="America/New_York"
                     required
-                    
                   />
                   <Description>{t('tenantSettings.form.timezoneHelper')}</Description>
                 </Field>
-
                 <Field>
                   <Label>{t('tenantSettings.form.defaultTaxRate')}</Label>
                   <Input
@@ -575,65 +541,55 @@ export default function TenantSettingsPage() {
                     value={formData.defaultTaxRate || ''}
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange('defaultTaxRate', parseFloat(e.target.value))}
                     placeholder="0.0825"
-                    
                   />
                   <Description>{t('tenantSettings.form.defaultTaxRateHelper')}</Description>
                 </Field>
-              </div>
+                <Field>
+                  <Label>{t('tenantSettings.form.invoiceTerms')}</Label>
+                  <Textarea
+                    name="invoiceTerms"
+                    value={formData.invoiceTerms || ''}
+                    onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => handleChange('invoiceTerms', e.target.value)}
+                    rows={2}
+                    placeholder="Net 30"
+                  />
+                </Field>
+              </FieldGroup>
+            </div>
 
-              <Field>
-                <Label>{t('tenantSettings.form.invoiceTerms')}</Label>
-                <Textarea
-                  name="invoiceTerms"
-                  value={formData.invoiceTerms || ''}
-                  onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => handleChange('invoiceTerms', e.target.value)}
-                  rows={2}
-                  placeholder="Net 30"
-                  
-                />
-              </Field>
-            </FieldGroup>
-          </Fieldset>
+            {/* Feature Flags - Full Width */}
+            <div className="col-span-2">
+              <Subheading className="mb-3">{t('tenantSettings.sections.featureFlags')}</Subheading>
+              <FieldGroup className="space-y-2">
+                <CheckboxField>
+                  <Checkbox
+                    name="enableOnlineBooking"
+                    checked={formData.enableOnlineBooking || false}
+                    onChange={(checked) => handleChange('enableOnlineBooking', checked)}
+                  />
+                  <Label>{t('tenantSettings.form.enableOnlineBooking')}</Label>
+                </CheckboxField>
+                <CheckboxField>
+                  <Checkbox
+                    name="enableSmsNotifications"
+                    checked={formData.enableSmsNotifications || false}
+                    onChange={(checked) => handleChange('enableSmsNotifications', checked)}
+                  />
+                  <Label>{t('tenantSettings.form.enableSmsNotifications')}</Label>
+                </CheckboxField>
+                <CheckboxField>
+                  <Checkbox
+                    name="enableEmailNotifications"
+                    checked={formData.enableEmailNotifications || false}
+                    onChange={(checked) => handleChange('enableEmailNotifications', checked)}
+                  />
+                  <Label>{t('tenantSettings.form.enableEmailNotifications')}</Label>
+                </CheckboxField>
+              </FieldGroup>
+            </div>
+          </div>
 
-          <Divider className="my-8" />
-
-          {/* Feature Flags */}
-          <Fieldset className="mb-8">
-            <Subheading>{t('tenantSettings.sections.featureFlags')}</Subheading>
-            <FieldGroup className="mt-4">
-              <CheckboxField>
-                <Checkbox
-                  name="enableOnlineBooking"
-                  checked={formData.enableOnlineBooking || false}
-                  onChange={(checked) => handleChange('enableOnlineBooking', checked)}
-                  
-                />
-                <Label>{t('tenantSettings.form.enableOnlineBooking')}</Label>
-              </CheckboxField>
-
-              <CheckboxField>
-                <Checkbox
-                  name="enableSmsNotifications"
-                  checked={formData.enableSmsNotifications || false}
-                  onChange={(checked) => handleChange('enableSmsNotifications', checked)}
-                  
-                />
-                <Label>{t('tenantSettings.form.enableSmsNotifications')}</Label>
-              </CheckboxField>
-
-              <CheckboxField>
-                <Checkbox
-                  name="enableEmailNotifications"
-                  checked={formData.enableEmailNotifications || false}
-                  onChange={(checked) => handleChange('enableEmailNotifications', checked)}
-                  
-                />
-                <Label>{t('tenantSettings.form.enableEmailNotifications')}</Label>
-              </CheckboxField>
-            </FieldGroup>
-          </Fieldset>
-
-          <Divider className="my-8" />
+          <Divider className="my-6" />
 
           <div className="flex justify-end gap-3">
             <Button plain onClick={() => setIsEditing(false)}>

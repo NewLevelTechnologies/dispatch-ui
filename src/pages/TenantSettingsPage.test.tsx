@@ -53,24 +53,24 @@ describe('TenantSettingsPage', () => {
     });
   });
 
-  it('displays settings form with data', async () => {
+  it('displays settings data in view mode', async () => {
     vi.mocked(apiClient.get).mockResolvedValue({ data: mockSettings });
     renderWithProviders(<TenantSettingsPage />);
 
     await waitFor(() => {
-      expect(screen.getByDisplayValue('Acme HVAC Services')).toBeInTheDocument();
+      expect(screen.getByText('Acme HVAC Services')).toBeInTheDocument();
     });
 
-    expect(screen.getByDisplayValue('Acme')).toBeInTheDocument();
-    expect(screen.getByDisplayValue('Your Comfort is Our Priority')).toBeInTheDocument();
-    expect(screen.getByDisplayValue('123 Main Street')).toBeInTheDocument();
-    expect(screen.getByDisplayValue('Springfield')).toBeInTheDocument();
-    expect(screen.getByDisplayValue('IL')).toBeInTheDocument();
-    expect(screen.getByDisplayValue('62701')).toBeInTheDocument();
-    expect(screen.getByDisplayValue('555-123-4567')).toBeInTheDocument();
-    expect(screen.getByDisplayValue('info@acmehvac.com')).toBeInTheDocument();
-    expect(screen.getByDisplayValue('America/Chicago')).toBeInTheDocument();
-    expect(screen.getByDisplayValue('Net 30')).toBeInTheDocument();
+    expect(screen.getByText('Acme')).toBeInTheDocument();
+    expect(screen.getByText('Your Comfort is Our Priority')).toBeInTheDocument();
+    expect(screen.getByText('123 Main Street')).toBeInTheDocument();
+    expect(screen.getByText('Springfield')).toBeInTheDocument();
+    expect(screen.getByText('IL')).toBeInTheDocument();
+    expect(screen.getByText('62701')).toBeInTheDocument();
+    expect(screen.getByText('555-123-4567')).toBeInTheDocument();
+    expect(screen.getByText('info@acmehvac.com')).toBeInTheDocument();
+    expect(screen.getByText('America/Chicago')).toBeInTheDocument();
+    expect(screen.getByText('Net 30')).toBeInTheDocument();
   });
 
   it('displays all section headings', async () => {
@@ -87,27 +87,35 @@ describe('TenantSettingsPage', () => {
     expect(screen.getByText('Feature Flags')).toBeInTheDocument();
   });
 
-  it('displays feature flag checkboxes in correct state', async () => {
+  it('displays feature flags in view mode', async () => {
     vi.mocked(apiClient.get).mockResolvedValue({ data: mockSettings });
     renderWithProviders(<TenantSettingsPage />);
 
     await waitFor(() => {
-      const onlineBookingCheckbox = screen.getByRole('checkbox', { name: /enable online booking/i });
-      expect(onlineBookingCheckbox).toBeChecked();
+      expect(screen.getByText('Enable Online Booking')).toBeInTheDocument();
     });
 
-    const smsCheckbox = screen.getByRole('checkbox', { name: /enable sms notifications/i });
-    expect(smsCheckbox).toBeChecked();
-
-    const emailCheckbox = screen.getByRole('checkbox', { name: /enable email notifications/i });
-    expect(emailCheckbox).toBeChecked();
+    expect(screen.getByText('Enable SMS Notifications')).toBeInTheDocument();
+    expect(screen.getByText('Enable Email Notifications')).toBeInTheDocument();
+    // Check that all three show "Enabled" status
+    const enabledBadges = screen.getAllByText('Enabled');
+    expect(enabledBadges).toHaveLength(3);
   });
 
-  it('updates form field when user types', async () => {
+  it('updates form field when user types in edit mode', async () => {
     vi.mocked(apiClient.get).mockResolvedValue({ data: mockSettings });
     const user = userEvent.setup();
     renderWithProviders(<TenantSettingsPage />);
 
+    // Wait for view mode to load and click Edit button
+    await waitFor(() => {
+      expect(screen.getByText('Acme HVAC Services')).toBeInTheDocument();
+    });
+
+    const editButton = screen.getByRole('button', { name: /edit/i });
+    await user.click(editButton);
+
+    // Now in edit mode, find and update the input
     await waitFor(() => {
       expect(screen.getByDisplayValue('Acme HVAC Services')).toBeInTheDocument();
     });
@@ -125,6 +133,15 @@ describe('TenantSettingsPage', () => {
     const user = userEvent.setup();
     renderWithProviders(<TenantSettingsPage />);
 
+    // Wait for view mode and click Edit
+    await waitFor(() => {
+      expect(screen.getByText('Acme HVAC Services')).toBeInTheDocument();
+    });
+
+    const editButton = screen.getByRole('button', { name: /edit/i });
+    await user.click(editButton);
+
+    // Update form field
     await waitFor(() => {
       expect(screen.getByDisplayValue('Acme HVAC Services')).toBeInTheDocument();
     });
@@ -146,11 +163,20 @@ describe('TenantSettingsPage', () => {
     });
   });
 
-  it('toggles feature flag checkbox', async () => {
+  it('toggles feature flag checkbox in edit mode', async () => {
     vi.mocked(apiClient.get).mockResolvedValue({ data: mockSettings });
     const user = userEvent.setup();
     renderWithProviders(<TenantSettingsPage />);
 
+    // Wait for view mode and click Edit
+    await waitFor(() => {
+      expect(screen.getByText('Acme HVAC Services')).toBeInTheDocument();
+    });
+
+    const editButton = screen.getByRole('button', { name: /edit/i });
+    await user.click(editButton);
+
+    // Now in edit mode, toggle checkbox
     await waitFor(() => {
       expect(screen.getByRole('checkbox', { name: /enable online booking/i })).toBeChecked();
     });
@@ -161,11 +187,20 @@ describe('TenantSettingsPage', () => {
     expect(onlineBookingCheckbox).not.toBeChecked();
   });
 
-  it('validates logo file size', async () => {
+  it('validates logo file size in edit mode', async () => {
     vi.mocked(apiClient.get).mockResolvedValue({ data: mockSettings });
     const user = userEvent.setup();
     renderWithProviders(<TenantSettingsPage />);
 
+    // Wait for view mode and click Edit
+    await waitFor(() => {
+      expect(screen.getByText('Acme HVAC Services')).toBeInTheDocument();
+    });
+
+    const editButton = screen.getByRole('button', { name: /edit/i });
+    await user.click(editButton);
+
+    // Now in edit mode, find file input
     await waitFor(() => {
       expect(screen.getByDisplayValue('Acme HVAC Services')).toBeInTheDocument();
     });
@@ -182,10 +217,20 @@ describe('TenantSettingsPage', () => {
     expect(global.alert).toHaveBeenCalledWith('File size must be less than 5MB');
   });
 
-  it('has file input with correct accept attribute', async () => {
+  it('has file input with correct accept attribute in edit mode', async () => {
     vi.mocked(apiClient.get).mockResolvedValue({ data: mockSettings });
+    const user = userEvent.setup();
     renderWithProviders(<TenantSettingsPage />);
 
+    // Wait for view mode and click Edit
+    await waitFor(() => {
+      expect(screen.getByText('Acme HVAC Services')).toBeInTheDocument();
+    });
+
+    const editButton = screen.getByRole('button', { name: /edit/i });
+    await user.click(editButton);
+
+    // Now in edit mode, verify file input
     await waitFor(() => {
       expect(screen.getByDisplayValue('Acme HVAC Services')).toBeInTheDocument();
     });
@@ -196,10 +241,20 @@ describe('TenantSettingsPage', () => {
     expect(fileInput.accept).toBe('image/png,image/jpeg');
   });
 
-  it('displays save button in correct state', async () => {
+  it('displays save button in edit mode', async () => {
     vi.mocked(apiClient.get).mockResolvedValue({ data: mockSettings });
+    const user = userEvent.setup();
     renderWithProviders(<TenantSettingsPage />);
 
+    // Wait for view mode and click Edit
+    await waitFor(() => {
+      expect(screen.getByText('Acme HVAC Services')).toBeInTheDocument();
+    });
+
+    const editButton = screen.getByRole('button', { name: /edit/i });
+    await user.click(editButton);
+
+    // Now in edit mode, check for Update button
     await waitFor(() => {
       expect(screen.getByRole('button', { name: /update/i })).toBeInTheDocument();
     });
