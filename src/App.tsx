@@ -21,6 +21,7 @@ import UsersPage from './pages/UsersPage';
 import UserDetailPage from './pages/UserDetailPage';
 import RolesPage from './pages/RolesPage';
 import RoleDetailPage from './pages/RoleDetailPage';
+import TenantSettingsPage from './pages/TenantSettingsPage';
 
 // ProtectedRoute component - defined outside of App to avoid recreation on every render
 const ProtectedRoute = ({ element, isAuthenticated }: { element: React.ReactElement; isAuthenticated: boolean }) => {
@@ -73,6 +74,7 @@ function App() {
       <Route path="/users/:id" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<UserDetailPage />} />} />
       <Route path="/roles" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<RolesPage />} />} />
       <Route path="/roles/:id" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<RoleDetailPage />} />} />
+      <Route path="/settings" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<TenantSettingsPage />} />} />
       <Route
         path="/"
         element={

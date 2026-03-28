@@ -99,3 +99,12 @@ export {
   type CreateRecurringOrderRequest,
   type UpdateRecurringOrderRequest,
 } from './schedulingApi';
+
+// Tenant Settings API
+export {
+  tenantSettingsApi,
+  type TenantSettings,
+  type UpdateTenantSettingsRequest,
+  type LogoUrls,
+  type UploadLogoResponse,
+} from './tenantSettingsApi';
