@@ -235,38 +235,33 @@ export default function TenantSettingsPage() {
             <div>
               <Subheading className="mb-3">{t('tenantSettings.sections.contactInfo')}</Subheading>
               <dl className="space-y-2">
-                {settings?.streetAddress && (
+                {(settings?.streetAddress || settings?.city || settings?.state || settings?.zipCode) && (
                   <div>
-                    <dt className="text-sm font-medium text-zinc-500 dark:text-zinc-400">{t('tenantSettings.form.streetAddress')}</dt>
-                    <dd className="mt-0.5 text-sm text-zinc-900 dark:text-white">{settings.streetAddress}</dd>
-                  </div>
-                )}
-                {(settings?.city || settings?.state || settings?.zipCode) && (
-                  <div>
-                    <dt className="text-sm font-medium text-zinc-500 dark:text-zinc-400">
-                      {t('tenantSettings.form.city')} / {t('tenantSettings.form.state')} / {t('tenantSettings.form.zipCode')}
-                    </dt>
+                    <dt className="text-sm font-medium text-zinc-500 dark:text-zinc-400">{t('tenantSettings.form.address')}</dt>
                     <dd className="mt-0.5 text-sm text-zinc-900 dark:text-white">
-                      {[settings.city, settings.state, settings.zipCode].filter(Boolean).join(', ')}
+                      {settings.streetAddress && <div>{settings.streetAddress}</div>}
+                      {(settings.city || settings.state || settings.zipCode) && (
+                        <div>
+                          {[settings.city, [settings.state, settings.zipCode].filter(Boolean).join(', ')].filter(Boolean).join(' ')}
+                        </div>
+                      )}
                     </dd>
                   </div>
                 )}
-                {(settings?.phone || settings?.email) && (
-                  <div className="grid grid-cols-2 gap-3">
-                    {settings?.phone && (
-                      <div>
-                        <dt className="text-sm font-medium text-zinc-500 dark:text-zinc-400">{t('tenantSettings.form.phone')}</dt>
-                        <dd className="mt-0.5 text-sm text-zinc-900 dark:text-white">{settings.phone}</dd>
-                      </div>
-                    )}
-                    {settings?.email && (
-                      <div>
-                        <dt className="text-sm font-medium text-zinc-500 dark:text-zinc-400">{t('tenantSettings.form.email')}</dt>
-                        <dd className="mt-0.5 text-sm text-zinc-900 dark:text-white">{settings.email}</dd>
-                      </div>
-                    )}
-                  </div>
-                )}
+                <div className="grid grid-cols-2 gap-3">
+                  {settings?.phone && (
+                    <div>
+                      <dt className="text-sm font-medium text-zinc-500 dark:text-zinc-400">{t('tenantSettings.form.phone')}</dt>
+                      <dd className="mt-0.5 text-sm text-zinc-900 dark:text-white">{settings.phone}</dd>
+                    </div>
+                  )}
+                  {settings?.email && (
+                    <div>
+                      <dt className="text-sm font-medium text-zinc-500 dark:text-zinc-400">{t('tenantSettings.form.email')}</dt>
+                      <dd className="mt-0.5 text-sm text-zinc-900 dark:text-white">{settings.email}</dd>
+                    </div>
+                  )}
+                </div>
               </dl>
             </div>
 

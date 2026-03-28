@@ -412,6 +412,7 @@ vi.mock('react-i18next', () => {
     'tenantSettings.sections.companyInfo': 'Company Information',
     'tenantSettings.sections.contactInfo': 'Contact Information',
     'tenantSettings.sections.featureFlags': 'Feature Flags',
+    'tenantSettings.form.address': 'Address',
     'tenantSettings.form.city': 'City',
     'tenantSettings.form.companyName': 'Company Name',
     'tenantSettings.form.companyNameShort': 'Short Name',

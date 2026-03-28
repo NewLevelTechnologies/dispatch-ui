@@ -516,6 +516,7 @@
       "featureFlags": "Feature Flags"
     },
     "form": {
+      "address": "Address",
       "city": "City",
       "companyName": "Company Name",
       "companyNameShort": "Short Name",
