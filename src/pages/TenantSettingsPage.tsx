@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { tenantSettingsApi, type UpdateTenantSettingsRequest } from '../api';
+import { useHasCapability } from '../hooks/useCurrentUser';
 import AppLayout from '../components/AppLayout';
 import { Heading } from '../components/catalyst/heading';
 import { Subheading } from '../components/catalyst/heading';
@@ -15,6 +16,7 @@ import { Divider } from '../components/catalyst/divider';
 export default function TenantSettingsPage() {
   const queryClient = useQueryClient();
   const { t } = useTranslation();
+  const canEdit = useHasCapability('EDIT_SETTINGS');
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -173,6 +175,7 @@ export default function TenantSettingsPage() {
                   value={formData.companyName || ''}
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange('companyName', e.target.value)}
                   required
+                  disabled={!canEdit}
                 />
               </Field>
 
@@ -184,6 +187,7 @@ export default function TenantSettingsPage() {
                     value={formData.companyNameShort || ''}
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange('companyNameShort', e.target.value)}
                     placeholder="Acme"
+                    disabled={!canEdit}
                   />
                 </Field>
 
@@ -194,6 +198,7 @@ export default function TenantSettingsPage() {
                     value={formData.companySlogan || ''}
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange('companySlogan', e.target.value)}
                     placeholder="Your tagline here"
+                    disabled={!canEdit}
                   />
                 </Field>
               </div>
@@ -217,25 +222,29 @@ export default function TenantSettingsPage() {
                     />
                   </div>
                 )}
-                <div className="flex gap-3 items-center">
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/png,image/jpeg"
-                    onChange={handleLogoChange}
-                    className="text-sm text-zinc-900 dark:text-zinc-100 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-medium file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 dark:file:bg-indigo-900/20 dark:file:text-indigo-400 dark:hover:file:bg-indigo-900/30"
-                  />
-                  {logoFile && (
-                    <Button
-                      type="button"
-                      onClick={handleLogoUpload}
-                      disabled={uploadLogoMutation.isPending}
-                    >
-                      {uploadLogoMutation.isPending ? t('common.saving') : t('tenantSettings.form.uploadLogo')}
-                    </Button>
-                  )}
-                </div>
-                <Description>{t('tenantSettings.form.logoHelper')}</Description>
+                {canEdit && (
+                  <>
+                    <div className="flex gap-3 items-center">
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="image/png,image/jpeg"
+                        onChange={handleLogoChange}
+                        className="text-sm text-zinc-900 dark:text-zinc-100 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-medium file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 dark:file:bg-indigo-900/20 dark:file:text-indigo-400 dark:hover:file:bg-indigo-900/30"
+                      />
+                      {logoFile && (
+                        <Button
+                          type="button"
+                          onClick={handleLogoUpload}
+                          disabled={uploadLogoMutation.isPending}
+                        >
+                          {uploadLogoMutation.isPending ? t('common.saving') : t('tenantSettings.form.uploadLogo')}
+                        </Button>
+                      )}
+                    </div>
+                    <Description>{t('tenantSettings.form.logoHelper')}</Description>
+                  </>
+                )}
               </Field>
 
               <div className="grid grid-cols-2 gap-4">
@@ -247,6 +256,7 @@ export default function TenantSettingsPage() {
                     value={formData.primaryColor || '#1976d2'}
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange('primaryColor', e.target.value)}
                     required
+                    disabled={!canEdit}
                   />
                 </Field>
 
@@ -258,6 +268,7 @@ export default function TenantSettingsPage() {
                     value={formData.secondaryColor || '#dc004e'}
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange('secondaryColor', e.target.value)}
                     required
+                    disabled={!canEdit}
                   />
                 </Field>
               </div>
@@ -276,6 +287,7 @@ export default function TenantSettingsPage() {
                   name="streetAddress"
                   value={formData.streetAddress || ''}
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange('streetAddress', e.target.value)}
+                  disabled={!canEdit}
                 />
               </Field>
 
@@ -286,6 +298,7 @@ export default function TenantSettingsPage() {
                     name="city"
                     value={formData.city || ''}
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange('city', e.target.value)}
+                    disabled={!canEdit}
                   />
                 </Field>
 
@@ -297,6 +310,7 @@ export default function TenantSettingsPage() {
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange('state', e.target.value)}
                     maxLength={2}
                     placeholder="CA"
+                    disabled={!canEdit}
                   />
                 </Field>
 
@@ -306,6 +320,7 @@ export default function TenantSettingsPage() {
                     name="zipCode"
                     value={formData.zipCode || ''}
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange('zipCode', e.target.value)}
+                    disabled={!canEdit}
                   />
                 </Field>
               </div>
@@ -318,6 +333,7 @@ export default function TenantSettingsPage() {
                     type="tel"
                     value={formData.phone || ''}
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange('phone', e.target.value)}
+                    disabled={!canEdit}
                   />
                 </Field>
 
@@ -328,6 +344,7 @@ export default function TenantSettingsPage() {
                     type="tel"
                     value={formData.fax || ''}
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange('fax', e.target.value)}
+                    disabled={!canEdit}
                   />
                 </Field>
 
@@ -338,6 +355,7 @@ export default function TenantSettingsPage() {
                     type="email"
                     value={formData.email || ''}
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange('email', e.target.value)}
+                    disabled={!canEdit}
                   />
                 </Field>
               </div>
@@ -359,6 +377,7 @@ export default function TenantSettingsPage() {
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange('timezone', e.target.value)}
                     placeholder="America/New_York"
                     required
+                    disabled={!canEdit}
                   />
                   <Description>{t('tenantSettings.form.timezoneHelper')}</Description>
                 </Field>
@@ -374,6 +393,7 @@ export default function TenantSettingsPage() {
                     value={formData.defaultTaxRate || ''}
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange('defaultTaxRate', parseFloat(e.target.value))}
                     placeholder="0.0825"
+                    disabled={!canEdit}
                   />
                   <Description>{t('tenantSettings.form.defaultTaxRateHelper')}</Description>
                 </Field>
@@ -387,6 +407,7 @@ export default function TenantSettingsPage() {
                   onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => handleChange('invoiceTerms', e.target.value)}
                   rows={2}
                   placeholder="Net 30"
+                  disabled={!canEdit}
                 />
               </Field>
             </FieldGroup>
@@ -403,6 +424,7 @@ export default function TenantSettingsPage() {
                   name="enableOnlineBooking"
                   checked={formData.enableOnlineBooking || false}
                   onChange={(checked) => handleChange('enableOnlineBooking', checked)}
+                  disabled={!canEdit}
                 />
                 <Label>{t('tenantSettings.form.enableOnlineBooking')}</Label>
               </CheckboxField>
@@ -412,6 +434,7 @@ export default function TenantSettingsPage() {
                   name="enableSmsNotifications"
                   checked={formData.enableSmsNotifications || false}
                   onChange={(checked) => handleChange('enableSmsNotifications', checked)}
+                  disabled={!canEdit}
                 />
                 <Label>{t('tenantSettings.form.enableSmsNotifications')}</Label>
               </CheckboxField>
@@ -421,19 +444,23 @@ export default function TenantSettingsPage() {
                   name="enableEmailNotifications"
                   checked={formData.enableEmailNotifications || false}
                   onChange={(checked) => handleChange('enableEmailNotifications', checked)}
+                  disabled={!canEdit}
                 />
                 <Label>{t('tenantSettings.form.enableEmailNotifications')}</Label>
               </CheckboxField>
             </FieldGroup>
           </Fieldset>
 
-          <Divider className="my-8" />
-
-          <div className="flex justify-end gap-4">
-            <Button type="submit" disabled={updateMutation.isPending}>
-              {updateMutation.isPending ? t('common.saving') : t('common.update')}
-            </Button>
-          </div>
+          {canEdit && (
+            <>
+              <Divider className="my-8" />
+              <div className="flex justify-end gap-4">
+                <Button type="submit" disabled={updateMutation.isPending}>
+                  {updateMutation.isPending ? t('common.saving') : t('common.update')}
+                </Button>
+              </div>
+            </>
+          )}
         </form>
       </div>
     </AppLayout>
