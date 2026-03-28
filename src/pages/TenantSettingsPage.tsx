@@ -273,9 +273,9 @@ export default function TenantSettingsPage() {
             </div>
 
             {/* Feature Flags */}
-            <div className="col-span-2">
+            <div>
               <Subheading className="mb-3">{t('tenantSettings.sections.featureFlags')}</Subheading>
-              <div className="flex gap-4">
+              <div className="space-y-2">
                 <div className="flex items-center gap-2">
                   <span className="text-sm text-zinc-900 dark:text-white">{t('tenantSettings.form.enableOnlineBooking')}</span>
                   <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${settings?.enableOnlineBooking ? 'bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400' : 'bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-400'}`}>
@@ -471,7 +471,7 @@ export default function TenantSettingsPage() {
               </FieldGroup>
             </div>
 
-            {/* Business Settings - Right */}
+            {/* Business Settings - Left */}
             <div>
               <Subheading className="mb-3">{t('tenantSettings.sections.businessSettings')}</Subheading>
               <FieldGroup className="space-y-3">
@@ -519,8 +519,8 @@ export default function TenantSettingsPage() {
               </FieldGroup>
             </div>
 
-            {/* Feature Flags - Full Width */}
-            <div className="col-span-2">
+            {/* Feature Flags - Right */}
+            <div>
               <Subheading className="mb-3">{t('tenantSettings.sections.featureFlags')}</Subheading>
               <FieldGroup className="space-y-2">
                 <CheckboxField>
