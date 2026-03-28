@@ -137,57 +137,60 @@ export default function ServiceLocationDetailPage() {
           <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-3">
             {/* Left Column - Primary Info */}
             <div className="lg:col-span-2 space-y-4">
-              {/* Address Section */}
-              <div className="rounded-lg border border-zinc-200 p-3 dark:border-zinc-800">
-                <Subheading>{t('serviceLocations.detail.address')}</Subheading>
-                <div className="mt-2 space-y-1">
-                  <Text className="font-medium">{location.address.streetAddress}</Text>
-                  {location.address.streetAddressLine2 && (
-                    <Text>{location.address.streetAddressLine2}</Text>
-                  )}
-                  <Text>
-                    {location.address.city}, {location.address.state} {location.address.zipCode}
-                  </Text>
-                  {location.address.validated && (
-                    <div className="mt-2 flex items-center gap-2">
-                      <Badge color="lime" className="text-xs">
-                        {t('serviceLocations.detail.uspsValidated')}
-                      </Badge>
-                      {location.address.isBusiness && (
-                        <Badge color="sky" className="text-xs">
-                          {t('serviceLocations.detail.businessLocation')}
-                        </Badge>
-                      )}
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Site Contact Section */}
-              {(location.siteContactName || location.siteContactPhone || location.siteContactEmail) && (
+              {/* Address and Site Contact - Side by Side */}
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                {/* Address Section */}
                 <div className="rounded-lg border border-zinc-200 p-3 dark:border-zinc-800">
-                  <Subheading>{t('serviceLocations.detail.siteContact')}</Subheading>
+                  <Subheading>{t('serviceLocations.detail.address')}</Subheading>
                   <div className="mt-2 space-y-1">
-                    {location.siteContactName && (
-                      <Text className="font-medium">{location.siteContactName}</Text>
+                    <Text className="font-medium">{location.address.streetAddress}</Text>
+                    {location.address.streetAddressLine2 && (
+                      <Text>{location.address.streetAddressLine2}</Text>
                     )}
-                    {location.siteContactPhone && (
-                      <Text>
-                        <a href={`tel:${location.siteContactPhone}`} className="hover:underline">
-                          {location.siteContactPhone}
-                        </a>
-                      </Text>
-                    )}
-                    {location.siteContactEmail && (
-                      <Text>
-                        <a href={`mailto:${location.siteContactEmail}`} className="hover:underline">
-                          {location.siteContactEmail}
-                        </a>
-                      </Text>
+                    <Text>
+                      {location.address.city}, {location.address.state} {location.address.zipCode}
+                    </Text>
+                    {location.address.validated && (
+                      <div className="mt-2 flex items-center gap-2">
+                        <Badge color="lime" className="text-xs">
+                          {t('serviceLocations.detail.uspsValidated')}
+                        </Badge>
+                        {location.address.isBusiness && (
+                          <Badge color="sky" className="text-xs">
+                            {t('serviceLocations.detail.businessLocation')}
+                          </Badge>
+                        )}
+                      </div>
                     )}
                   </div>
                 </div>
-              )}
+
+                {/* Site Contact Section */}
+                {(location.siteContactName || location.siteContactPhone || location.siteContactEmail) && (
+                  <div className="rounded-lg border border-zinc-200 p-3 dark:border-zinc-800">
+                    <Subheading>{t('serviceLocations.detail.siteContact')}</Subheading>
+                    <div className="mt-2 space-y-1">
+                      {location.siteContactName && (
+                        <Text className="font-medium">{location.siteContactName}</Text>
+                      )}
+                      {location.siteContactPhone && (
+                        <Text>
+                          <a href={`tel:${location.siteContactPhone}`} className="hover:underline">
+                            {location.siteContactPhone}
+                          </a>
+                        </Text>
+                      )}
+                      {location.siteContactEmail && (
+                        <Text>
+                          <a href={`mailto:${location.siteContactEmail}`} className="hover:underline">
+                            {location.siteContactEmail}
+                          </a>
+                        </Text>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
 
               {/* Access Instructions */}
               {location.accessInstructions && (

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, fireEvent } from '@testing-library/react';
 import { renderWithProviders, userEvent } from '../test/utils';
 import CustomerFormDialog from './CustomerFormDialog';
 import apiClient from '../api/client';
@@ -15,7 +15,7 @@ describe('CustomerFormDialog', () => {
     id: '1',
     name: 'John Doe',
     email: 'john@example.com',
-    phone: '555-1234',
+    phone: '(555) 123-4567',
     billingAddress: {
       streetAddress: '123 Main St',
       streetAddressLine2: null,
@@ -107,12 +107,16 @@ describe('CustomerFormDialog', () => {
       // Fill in all required fields
       await user.type(screen.getByLabelText(/^name \*/i), 'John Doe');
       await user.type(screen.getByLabelText(/^email \*/i), 'john@example.com');
-      await user.type(screen.getByLabelText(/^phone/i), '555-1234');
+
+      // For PatternFormat phone field, use fireEvent with formatted value
+      const phoneInput = screen.getByLabelText(/^phone/i);
+      fireEvent.change(phoneInput, { target: { value: '(555) 123-4567' } });
 
       // Service address fields (required)
       await user.type(screen.getByLabelText(/^street address \*/i), '123 Main St');
       await user.type(screen.getByLabelText(/^city \*/i), 'Boston');
-      await user.type(screen.getByLabelText(/^state \*/i), 'MA');
+      // State is a select dropdown, not a text input
+      await user.selectOptions(screen.getByLabelText(/^state \*/i), 'MA');
       await user.type(screen.getByLabelText(/^zip code \*/i), '02101');
 
       const submitButton = screen.getByRole('button', { name: /create/i });
@@ -175,14 +179,19 @@ describe('CustomerFormDialog', () => {
 
       // Fill required fields
       await user.type(screen.getByLabelText(/^name \*/i), 'John Doe');
-      await user.type(screen.getByLabelText(/^phone/i), '555-1234');
+
+      // For PatternFormat phone field, use fireEvent with formatted value
+      const phoneInput = screen.getByLabelText(/^phone/i);
+      fireEvent.change(phoneInput, { target: { value: '(555) 123-4567' } });
+
       await user.type(screen.getByLabelText(/^email \*/i), 'john@example.com');
 
       // Fill service location address
       await user.type(screen.getByLabelText(/^street address \*/i), '123 Main St');
       await user.type(screen.getByLabelText(/address line 2/i), 'Suite 100');
       await user.type(screen.getByLabelText(/^city \*/i), 'Boston');
-      await user.type(screen.getByLabelText(/^state \*/i), 'MA');
+      // State is a select dropdown, not a text input
+      await user.selectOptions(screen.getByLabelText(/^state \*/i), 'MA');
       await user.type(screen.getByLabelText(/^zip code \*/i), '02101');
 
       // Expand and fill optional sections
@@ -190,7 +199,8 @@ describe('CustomerFormDialog', () => {
       await user.click(screen.getByRole('button', { name: /site contact/i }));
       await user.type(screen.getByLabelText(/^name$/i), 'Jane Manager');
       const phoneInputs = screen.getAllByLabelText(/^phone$/i);
-      await user.type(phoneInputs[phoneInputs.length - 1], '555-5678');
+      const sitePhoneInput = phoneInputs[phoneInputs.length - 1];
+      fireEvent.change(sitePhoneInput, { target: { value: '(555) 567-8901' } });
       const emailInputs = screen.getAllByLabelText(/^email$/i);
       await user.type(emailInputs[emailInputs.length - 1], 'jane@example.com');
 
@@ -214,7 +224,7 @@ describe('CustomerFormDialog', () => {
         expect(apiClient.post).toHaveBeenCalledWith('/customers', expect.objectContaining({
           name: 'John Doe',
           email: 'john@example.com',
-          phone: '555-1234',
+          phone: '(555) 123-4567',
           paymentTermsDays: 30,
           requiresPurchaseOrder: true,
           taxExempt: true,
@@ -244,7 +254,7 @@ describe('CustomerFormDialog', () => {
 
       expect(screen.getByDisplayValue('John Doe')).toBeInTheDocument();
       expect(screen.getByDisplayValue('john@example.com')).toBeInTheDocument();
-      expect(screen.getByDisplayValue('555-1234')).toBeInTheDocument();
+      expect(screen.getByDisplayValue('(555) 123-4567')).toBeInTheDocument();
     });
 
     it('submits updated data', { timeout: 10000 }, async () => {
@@ -267,7 +277,7 @@ describe('CustomerFormDialog', () => {
         expect(apiClient.put).toHaveBeenCalledWith('/customers/1', expect.objectContaining({
           name: 'Jane Doe',
           email: 'john@example.com',
-          phone: '555-1234',
+          phone: '(555) 123-4567',
         }));
       });
 

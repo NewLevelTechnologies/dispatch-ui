@@ -1,12 +1,15 @@
 import { useState, useEffect } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
+import { PatternFormat } from 'react-number-format';
 import { customerApi, type ServiceLocation } from '../api';
 import { Dialog, DialogActions, DialogBody, DialogDescription, DialogTitle } from './catalyst/dialog';
 import { Button } from './catalyst/button';
 import { Field, Label } from './catalyst/fieldset';
 import { Input } from './catalyst/input';
+import { Select } from './catalyst/select';
 import { Textarea } from './catalyst/textarea';
+import { US_STATES } from '../constants/states';
 
 interface ServiceLocationFormDialogProps {
   isOpen: boolean;
@@ -238,14 +241,19 @@ export default function ServiceLocationFormDialog({ isOpen, onClose, serviceLoca
             </Field>
             <Field className="col-span-2">
               <Label className="text-xs">{t('common.form.state')} *</Label>
-              <Input
+              <Select
                 name="state"
                 value={formData.state}
-                onChange={(e) => setFormData((prev) => ({ ...prev, state: e.target.value.toUpperCase() }))}
-                placeholder="CA"
-                maxLength={2}
+                onChange={(e) => setFormData((prev) => ({ ...prev, state: e.target.value }))}
                 required
-              />
+              >
+                <option value="">{t('common.form.select')}</option>
+                {US_STATES.map((state) => (
+                  <option key={state} value={state}>
+                    {state}
+                  </option>
+                ))}
+              </Select>
             </Field>
             <Field className="col-span-4">
               <Label className="text-xs">{t('common.form.zipCode')} *</Label>
@@ -270,11 +278,13 @@ export default function ServiceLocationFormDialog({ isOpen, onClose, serviceLoca
             </Field>
             <Field>
               <Label className="text-xs">{t('common.form.siteContactPhone')}</Label>
-              <Input
-                type="tel"
+              <PatternFormat
+                format="(###) ###-####"
+                mask="_"
+                customInput={Input}
                 name="siteContactPhone"
                 value={formData.siteContactPhone}
-                onChange={(e) => setFormData((prev) => ({ ...prev, siteContactPhone: e.target.value }))}
+                onValueChange={(values) => setFormData((prev) => ({ ...prev, siteContactPhone: values.formattedValue }))}
               />
             </Field>
             <Field>

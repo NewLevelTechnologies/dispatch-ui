@@ -1,14 +1,17 @@
 import { useState, useEffect } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
+import { PatternFormat } from 'react-number-format';
 import { customerApi, type Customer, type CreateCustomerRequest, type UpdateCustomerRequest } from '../api';
 import { Dialog, DialogActions, DialogBody, DialogDescription, DialogTitle } from './catalyst/dialog';
 import { Button } from './catalyst/button';
 import { Checkbox, CheckboxField } from './catalyst/checkbox';
 import { Field, Label } from './catalyst/fieldset';
 import { Input } from './catalyst/input';
+import { Select } from './catalyst/select';
 import { Textarea } from './catalyst/textarea';
 import { Radio, RadioField, RadioGroup } from './catalyst/radio';
+import { US_STATES } from '../constants/states';
 import { Subheading } from './catalyst/heading';
 
 interface CustomerFormDialogProps {
@@ -341,11 +344,13 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
                   </Field>
                   <Field className="col-span-4">
                     <Label className="text-xs">{t('common.form.phone')}</Label>
-                    <Input
-                      type="tel"
+                    <PatternFormat
+                      format="(###) ###-####"
+                      mask="_"
+                      customInput={Input}
                       name="phone"
                       value={createFormData.phone}
-                      onChange={(e) => setCreateFormData((prev) => ({ ...prev, phone: e.target.value }))}
+                      onValueChange={(values) => setCreateFormData((prev) => ({ ...prev, phone: values.formattedValue }))}
                     />
                   </Field>
                   <Field className="col-span-3">
@@ -410,19 +415,24 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
                   </Field>
                   <Field className="col-span-2">
                     <Label className="text-xs">{t('common.form.state')} *</Label>
-                    <Input
+                    <Select
                       name="serviceState"
                       value={createFormData.serviceAddress.state}
                       onChange={(e) =>
                         setCreateFormData((prev) => ({
                           ...prev,
-                          serviceAddress: { ...prev.serviceAddress, state: e.target.value.toUpperCase() },
+                          serviceAddress: { ...prev.serviceAddress, state: e.target.value },
                         }))
                       }
-                      placeholder="CA"
-                      maxLength={2}
                       required
-                    />
+                    >
+                      <option value="">{t('common.form.select')}</option>
+                      {US_STATES.map((state) => (
+                        <option key={state} value={state}>
+                          {state}
+                        </option>
+                      ))}
+                    </Select>
                   </Field>
                   <Field className="col-span-4">
                     <Label className="text-xs">{t('common.form.zipCode')} *</Label>
@@ -523,19 +533,24 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
                     </Field>
                     <Field className="col-span-2">
                       <Label className="text-xs">{t('common.form.state')} *</Label>
-                      <Input
+                      <Select
                         name="billingState"
                         value={createFormData.billingAddress.state}
                         onChange={(e) =>
                           setCreateFormData((prev) => ({
                             ...prev,
-                            billingAddress: { ...prev.billingAddress, state: e.target.value.toUpperCase() },
+                            billingAddress: { ...prev.billingAddress, state: e.target.value },
                           }))
                         }
-                        placeholder="CA"
-                        maxLength={2}
                         required
-                      />
+                      >
+                        <option value="">{t('common.form.select')}</option>
+                        {US_STATES.map((state) => (
+                          <option key={state} value={state}>
+                            {state}
+                          </option>
+                        ))}
+                      </Select>
                     </Field>
                     <Field className="col-span-4">
                       <Label className="text-xs">{t('common.form.zipCode')} *</Label>
@@ -582,11 +597,13 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
                     </Field>
                     <Field>
                       <Label className="text-xs">{t('common.form.phone')}</Label>
-                      <Input
-                        type="tel"
+                      <PatternFormat
+                        format="(###) ###-####"
+                        mask="_"
+                        customInput={Input}
                         name="siteContactPhone"
                         value={createFormData.siteContactPhone}
-                        onChange={(e) => setCreateFormData((prev) => ({ ...prev, siteContactPhone: e.target.value }))}
+                        onValueChange={(values) => setCreateFormData((prev) => ({ ...prev, siteContactPhone: values.formattedValue }))}
                       />
                     </Field>
                     <Field>
@@ -732,11 +749,13 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
               </Field>
               <Field className="col-span-4">
                 <Label className="text-xs">{t('common.form.phone')}</Label>
-                <Input
-                  type="tel"
+                <PatternFormat
+                  format="(###) ###-####"
+                  mask="_"
+                  customInput={Input}
                   name="phone"
                   value={editFormData.phone}
-                  onChange={(e) => setEditFormData((prev) => ({ ...prev, phone: e.target.value }))}
+                  onValueChange={(values) => setEditFormData((prev) => ({ ...prev, phone: values.formattedValue }))}
                 />
               </Field>
               <Field className="col-span-3">
@@ -804,19 +823,24 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
                 </Field>
                 <Field className="col-span-2">
                   <Label className="text-xs">{t('common.form.state')} *</Label>
-                  <Input
+                  <Select
                     name="billingState"
                     value={editFormData.billingAddress.state}
                     onChange={(e) =>
                       setEditFormData((prev) => ({
                         ...prev,
-                        billingAddress: { ...prev.billingAddress, state: e.target.value.toUpperCase() },
+                        billingAddress: { ...prev.billingAddress, state: e.target.value },
                       }))
                     }
-                    placeholder="CA"
-                    maxLength={2}
                     required
-                  />
+                  >
+                    <option value="">{t('common.form.select')}</option>
+                    {US_STATES.map((state) => (
+                      <option key={state} value={state}>
+                        {state}
+                      </option>
+                    ))}
+                  </Select>
                 </Field>
                 <Field className="col-span-4">
                   <Label className="text-xs">{t('common.form.zipCode')} *</Label>

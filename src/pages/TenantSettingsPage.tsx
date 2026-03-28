@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
+import { PatternFormat } from 'react-number-format';
 import { tenantSettingsApi, type UpdateTenantSettingsRequest } from '../api';
 import { useHasCapability } from '../hooks/useCurrentUser';
 import AppLayout from '../components/AppLayout';
@@ -9,9 +10,12 @@ import { Text } from '../components/catalyst/text';
 import { Button } from '../components/catalyst/button';
 import { Field, FieldGroup, Label, Description } from '../components/catalyst/fieldset';
 import { Input } from '../components/catalyst/input';
-import { Textarea } from '../components/catalyst/textarea';
-import { CheckboxField, Checkbox } from '../components/catalyst/checkbox';
+import { Select } from '../components/catalyst/select';
+import { CheckboxField, Checkbox, CheckboxGroup } from '../components/catalyst/checkbox';
 import { Divider } from '../components/catalyst/divider';
+import { US_STATES } from '../constants/states';
+import { US_TIMEZONES } from '../constants/timezones';
+import { PhoneIcon, EnvelopeIcon } from '@heroicons/react/24/outline';
 
 export default function TenantSettingsPage() {
   const queryClient = useQueryClient();
@@ -46,7 +50,6 @@ export default function TenantSettingsPage() {
         state: settings.state,
         zipCode: settings.zipCode,
         phone: settings.phone,
-        fax: settings.fax,
         email: settings.email,
         timezone: settings.timezone,
         defaultTaxRate: settings.defaultTaxRate,
@@ -174,24 +177,45 @@ export default function TenantSettingsPage() {
             {/* Company Information */}
             <div>
               <Subheading className="mb-3">{t('tenantSettings.sections.companyInfo')}</Subheading>
-              <dl className="space-y-2">
-                <div>
-                  <dt className="text-sm font-medium text-zinc-500 dark:text-zinc-400">{t('tenantSettings.form.companyName')}</dt>
-                  <dd className="mt-0.5 text-sm text-zinc-900 dark:text-white">{settings?.companyName || '-'}</dd>
-                </div>
-                {settings?.companyNameShort && (
+              <div className="space-y-1 text-sm text-zinc-900 dark:text-white">
+                <div className="text-base font-semibold">{settings?.companyName || '-'}</div>
+                {settings?.streetAddress && <div>{settings.streetAddress}</div>}
+                {(settings?.city || settings?.state || settings?.zipCode) && (
                   <div>
-                    <dt className="text-sm font-medium text-zinc-500 dark:text-zinc-400">{t('tenantSettings.form.companyNameShort')}</dt>
-                    <dd className="mt-0.5 text-sm text-zinc-900 dark:text-white">{settings.companyNameShort}</dd>
+                    {[settings.city, [settings.state, settings.zipCode].filter(Boolean).join(' ')].filter(Boolean).join(', ')}
                   </div>
                 )}
-                {settings?.companySlogan && (
-                  <div>
-                    <dt className="text-sm font-medium text-zinc-500 dark:text-zinc-400">{t('tenantSettings.form.companySlogan')}</dt>
-                    <dd className="mt-0.5 text-sm text-zinc-900 dark:text-white">{settings.companySlogan}</dd>
+                {settings?.phone && (
+                  <div className="flex items-center gap-2">
+                    <PhoneIcon className="h-4 w-4 text-zinc-400" />
+                    <a href={`tel:${settings.phone}`} className="hover:underline">
+                      {settings.phone}
+                    </a>
                   </div>
                 )}
-              </dl>
+                {settings?.email && (
+                  <div className="flex items-center gap-2">
+                    <EnvelopeIcon className="h-4 w-4 text-zinc-400" />
+                    <a href={`mailto:${settings.email}`} className="hover:underline">
+                      {settings.email}
+                    </a>
+                  </div>
+                )}
+                {(settings?.companyNameShort || settings?.companySlogan) && (
+                  <div className="pt-2 space-y-0.5 text-xs text-zinc-500 dark:text-zinc-400">
+                    {settings?.companyNameShort && (
+                      <div>
+                        {t('tenantSettings.form.companyNameShort')}: {settings.companyNameShort}
+                      </div>
+                    )}
+                    {settings?.companySlogan && (
+                      <div>
+                        {t('tenantSettings.form.companySlogan')}: {settings.companySlogan}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Branding & Logo */}
@@ -229,59 +253,6 @@ export default function TenantSettingsPage() {
               </dl>
             </div>
 
-            {/* Contact Information */}
-            <div>
-              <Subheading className="mb-3">{t('tenantSettings.sections.contactInfo')}</Subheading>
-              <dl className="space-y-2">
-                {settings?.streetAddress && (
-                  <div>
-                    <dt className="text-sm font-medium text-zinc-500 dark:text-zinc-400">{t('tenantSettings.form.streetAddress')}</dt>
-                    <dd className="mt-0.5 text-sm text-zinc-900 dark:text-white">{settings.streetAddress}</dd>
-                  </div>
-                )}
-                <div className="grid grid-cols-3 gap-3">
-                  {settings?.city && (
-                    <div>
-                      <dt className="text-sm font-medium text-zinc-500 dark:text-zinc-400">{t('tenantSettings.form.city')}</dt>
-                      <dd className="mt-0.5 text-sm text-zinc-900 dark:text-white">{settings.city}</dd>
-                    </div>
-                  )}
-                  {settings?.state && (
-                    <div>
-                      <dt className="text-sm font-medium text-zinc-500 dark:text-zinc-400">{t('tenantSettings.form.state')}</dt>
-                      <dd className="mt-0.5 text-sm text-zinc-900 dark:text-white">{settings.state}</dd>
-                    </div>
-                  )}
-                  {settings?.zipCode && (
-                    <div>
-                      <dt className="text-sm font-medium text-zinc-500 dark:text-zinc-400">{t('tenantSettings.form.zipCode')}</dt>
-                      <dd className="mt-0.5 text-sm text-zinc-900 dark:text-white">{settings.zipCode}</dd>
-                    </div>
-                  )}
-                </div>
-                <div className="grid grid-cols-3 gap-3">
-                  {settings?.phone && (
-                    <div>
-                      <dt className="text-sm font-medium text-zinc-500 dark:text-zinc-400">{t('tenantSettings.form.phone')}</dt>
-                      <dd className="mt-0.5 text-sm text-zinc-900 dark:text-white">{settings.phone}</dd>
-                    </div>
-                  )}
-                  {settings?.fax && (
-                    <div>
-                      <dt className="text-sm font-medium text-zinc-500 dark:text-zinc-400">{t('tenantSettings.form.fax')}</dt>
-                      <dd className="mt-0.5 text-sm text-zinc-900 dark:text-white">{settings.fax}</dd>
-                    </div>
-                  )}
-                  {settings?.email && (
-                    <div>
-                      <dt className="text-sm font-medium text-zinc-500 dark:text-zinc-400">{t('tenantSettings.form.email')}</dt>
-                      <dd className="mt-0.5 text-sm text-zinc-900 dark:text-white">{settings.email}</dd>
-                    </div>
-                  )}
-                </div>
-              </dl>
-            </div>
-
             {/* Business Settings */}
             <div>
               <Subheading className="mb-3">{t('tenantSettings.sections.businessSettings')}</Subheading>
@@ -306,9 +277,9 @@ export default function TenantSettingsPage() {
             </div>
 
             {/* Feature Flags */}
-            <div className="col-span-2">
+            <div>
               <Subheading className="mb-3">{t('tenantSettings.sections.featureFlags')}</Subheading>
-              <div className="flex gap-4">
+              <div className="space-y-2">
                 <div className="flex items-center gap-2">
                   <span className="text-sm text-zinc-900 dark:text-white">{t('tenantSettings.form.enableOnlineBooking')}</span>
                   <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${settings?.enableOnlineBooking ? 'bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400' : 'bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-400'}`}>
@@ -363,91 +334,6 @@ export default function TenantSettingsPage() {
                   />
                 </Field>
                 <Field>
-                  <Label>{t('tenantSettings.form.companyNameShort')}</Label>
-                  <Input
-                    name="companyNameShort"
-                    value={formData.companyNameShort || ''}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange('companyNameShort', e.target.value)}
-                    placeholder="Acme"
-                  />
-                </Field>
-                <Field>
-                  <Label>{t('tenantSettings.form.companySlogan')}</Label>
-                  <Input
-                    name="companySlogan"
-                    value={formData.companySlogan || ''}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange('companySlogan', e.target.value)}
-                    placeholder="Your tagline here"
-                  />
-                </Field>
-              </FieldGroup>
-            </div>
-
-            {/* Branding & Logo - Right */}
-            <div>
-              <Subheading className="mb-3">{t('tenantSettings.sections.branding')}</Subheading>
-              <FieldGroup className="space-y-3">
-                <Field>
-                  <Label>{t('tenantSettings.form.logo')}</Label>
-                  {(logoPreview || settings?.logoThumbnailUrl) && (
-                    <div className="mb-2">
-                      <img
-                        src={logoPreview || settings?.logoThumbnailUrl || ''}
-                        alt="Company logo"
-                        className="h-20 w-20 object-contain rounded border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800"
-                      />
-                    </div>
-                  )}
-                  <div className="flex gap-2 items-center">
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      accept="image/png,image/jpeg"
-                      onChange={handleLogoChange}
-                      className="text-sm text-zinc-900 dark:text-zinc-100 file:mr-3 file:py-1.5 file:px-3 file:rounded file:border-0 file:text-sm file:font-medium file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 dark:file:bg-indigo-900/20 dark:file:text-indigo-400 dark:hover:file:bg-indigo-900/30"
-                    />
-                    {logoFile && (
-                      <Button
-                        type="button"
-                        onClick={handleLogoUpload}
-                        disabled={uploadLogoMutation.isPending}
-                      >
-                        {uploadLogoMutation.isPending ? t('common.saving') : t('tenantSettings.form.uploadLogo')}
-                      </Button>
-                    )}
-                  </div>
-                  <Description>{t('tenantSettings.form.logoHelper')}</Description>
-                </Field>
-                <div className="grid grid-cols-2 gap-3">
-                  <Field>
-                    <Label>{t('tenantSettings.form.primaryColor')} *</Label>
-                    <Input
-                      name="primaryColor"
-                      type="color"
-                      value={formData.primaryColor || '#1976d2'}
-                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange('primaryColor', e.target.value)}
-                      required
-                    />
-                  </Field>
-                  <Field>
-                    <Label>{t('tenantSettings.form.secondaryColor')} *</Label>
-                    <Input
-                      name="secondaryColor"
-                      type="color"
-                      value={formData.secondaryColor || '#dc004e'}
-                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange('secondaryColor', e.target.value)}
-                      required
-                    />
-                  </Field>
-                </div>
-              </FieldGroup>
-            </div>
-
-            {/* Contact Information - Left */}
-            <div>
-              <Subheading className="mb-3">{t('tenantSettings.sections.contactInfo')}</Subheading>
-              <FieldGroup className="space-y-3">
-                <Field>
                   <Label>{t('tenantSettings.form.streetAddress')}</Label>
                   <Input
                     name="streetAddress"
@@ -455,8 +341,8 @@ export default function TenantSettingsPage() {
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange('streetAddress', e.target.value)}
                   />
                 </Field>
-                <div className="grid grid-cols-3 gap-3">
-                  <Field>
+                <div className="grid grid-cols-6 gap-3">
+                  <Field className="col-span-3">
                     <Label>{t('tenantSettings.form.city')}</Label>
                     <Input
                       name="city"
@@ -464,17 +350,22 @@ export default function TenantSettingsPage() {
                       onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange('city', e.target.value)}
                     />
                   </Field>
-                  <Field>
+                  <Field className="col-span-1">
                     <Label>{t('tenantSettings.form.state')}</Label>
-                    <Input
+                    <Select
                       name="state"
                       value={formData.state || ''}
-                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange('state', e.target.value)}
-                      maxLength={2}
-                      placeholder="CA"
-                    />
+                      onChange={(e: React.ChangeEvent<HTMLSelectElement>) => handleChange('state', e.target.value)}
+                    >
+                      <option value="">{t('common.form.select')}</option>
+                      {US_STATES.map((state) => (
+                        <option key={state} value={state}>
+                          {state}
+                        </option>
+                      ))}
+                    </Select>
                   </Field>
-                  <Field>
+                  <Field className="col-span-2">
                     <Label>{t('tenantSettings.form.zipCode')}</Label>
                     <Input
                       name="zipCode"
@@ -483,23 +374,16 @@ export default function TenantSettingsPage() {
                     />
                   </Field>
                 </div>
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-2 gap-3">
                   <Field>
                     <Label>{t('tenantSettings.form.phone')}</Label>
-                    <Input
+                    <PatternFormat
+                      format="(###) ###-####"
+                      mask="_"
+                      customInput={Input}
                       name="phone"
-                      type="tel"
                       value={formData.phone || ''}
-                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange('phone', e.target.value)}
-                    />
-                  </Field>
-                  <Field>
-                    <Label>{t('tenantSettings.form.fax')}</Label>
-                    <Input
-                      name="fax"
-                      type="tel"
-                      value={formData.fax || ''}
-                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange('fax', e.target.value)}
+                      onValueChange={(values) => handleChange('phone', values.formattedValue)}
                     />
                   </Field>
                   <Field>
@@ -512,84 +396,174 @@ export default function TenantSettingsPage() {
                     />
                   </Field>
                 </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <Field>
+                    <Label>{t('tenantSettings.form.companyNameShort')}</Label>
+                    <Input
+                      name="companyNameShort"
+                      value={formData.companyNameShort || ''}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange('companyNameShort', e.target.value)}
+                      placeholder="Acme"
+                    />
+                  </Field>
+                  <Field>
+                    <Label>{t('tenantSettings.form.companySlogan')}</Label>
+                    <Input
+                      name="companySlogan"
+                      value={formData.companySlogan || ''}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange('companySlogan', e.target.value)}
+                      placeholder="Your tagline here"
+                    />
+                  </Field>
+                </div>
               </FieldGroup>
             </div>
 
-            {/* Business Settings - Right */}
-            <div>
-              <Subheading className="mb-3">{t('tenantSettings.sections.businessSettings')}</Subheading>
-              <FieldGroup className="space-y-3">
-                <Field>
-                  <Label>{t('tenantSettings.form.timezone')} *</Label>
-                  <Input
-                    name="timezone"
-                    value={formData.timezone || ''}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange('timezone', e.target.value)}
-                    placeholder="America/New_York"
-                    required
-                  />
-                  <Description>{t('tenantSettings.form.timezoneHelper')}</Description>
-                </Field>
-                <Field>
-                  <Label>{t('tenantSettings.form.defaultTaxRate')}</Label>
-                  <Input
-                    name="defaultTaxRate"
-                    type="number"
-                    step="0.0001"
-                    min="0"
-                    max="1"
-                    value={formData.defaultTaxRate || ''}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange('defaultTaxRate', parseFloat(e.target.value))}
-                    placeholder="0.0825"
-                  />
-                  <Description>{t('tenantSettings.form.defaultTaxRateHelper')}</Description>
-                </Field>
-                <Field>
-                  <Label>{t('tenantSettings.form.invoiceTerms')}</Label>
-                  <Textarea
-                    name="invoiceTerms"
-                    value={formData.invoiceTerms || ''}
-                    onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => handleChange('invoiceTerms', e.target.value)}
-                    rows={2}
-                    placeholder="Net 30"
-                  />
-                </Field>
-              </FieldGroup>
-            </div>
+            {/* Branding, Business Settings, and Feature Flags - Right */}
+            <div className="space-y-6">
+              {/* Branding & Logo */}
+              <div>
+                <Subheading className="mb-3">{t('tenantSettings.sections.branding')}</Subheading>
+                <FieldGroup className="space-y-3">
+                  <Field>
+                    <Label>{t('tenantSettings.form.logo')}</Label>
+                    {(logoPreview || settings?.logoThumbnailUrl) && (
+                      <div className="mb-2">
+                        <img
+                          src={logoPreview || settings?.logoThumbnailUrl || ''}
+                          alt="Company logo"
+                          className="h-20 w-20 object-contain rounded border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800"
+                        />
+                      </div>
+                    )}
+                    <div className="flex gap-2 items-center">
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="image/png,image/jpeg"
+                        onChange={handleLogoChange}
+                        className="text-sm text-zinc-900 dark:text-zinc-100 file:mr-3 file:py-1.5 file:px-3 file:rounded file:border-0 file:text-sm file:font-medium file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 dark:file:bg-indigo-900/20 dark:file:text-indigo-400 dark:hover:file:bg-indigo-900/30"
+                      />
+                      {logoFile && (
+                        <Button
+                          type="button"
+                          onClick={handleLogoUpload}
+                          disabled={uploadLogoMutation.isPending}
+                        >
+                          {uploadLogoMutation.isPending ? t('common.saving') : t('tenantSettings.form.uploadLogo')}
+                        </Button>
+                      )}
+                    </div>
+                    <Description>{t('tenantSettings.form.logoHelper')}</Description>
+                  </Field>
+                  <div className="grid grid-cols-2 gap-3">
+                    <Field>
+                      <Label>{t('tenantSettings.form.primaryColor')} *</Label>
+                      <Input
+                        name="primaryColor"
+                        type="color"
+                        value={formData.primaryColor || '#1976d2'}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange('primaryColor', e.target.value)}
+                        required
+                      />
+                    </Field>
+                    <Field>
+                      <Label>{t('tenantSettings.form.secondaryColor')} *</Label>
+                      <Input
+                        name="secondaryColor"
+                        type="color"
+                        value={formData.secondaryColor || '#dc004e'}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange('secondaryColor', e.target.value)}
+                        required
+                      />
+                    </Field>
+                  </div>
+                </FieldGroup>
+              </div>
 
-            {/* Feature Flags - Full Width */}
-            <div className="col-span-2">
-              <Subheading className="mb-3">{t('tenantSettings.sections.featureFlags')}</Subheading>
-              <FieldGroup className="space-y-2">
-                <CheckboxField>
-                  <Checkbox
-                    name="enableOnlineBooking"
-                    checked={formData.enableOnlineBooking || false}
-                    onChange={(checked) => handleChange('enableOnlineBooking', checked)}
-                  />
-                  <Label>{t('tenantSettings.form.enableOnlineBooking')}</Label>
-                </CheckboxField>
-                <CheckboxField>
-                  <Checkbox
-                    name="enableSmsNotifications"
-                    checked={formData.enableSmsNotifications || false}
-                    onChange={(checked) => handleChange('enableSmsNotifications', checked)}
-                  />
-                  <Label>{t('tenantSettings.form.enableSmsNotifications')}</Label>
-                </CheckboxField>
-                <CheckboxField>
-                  <Checkbox
-                    name="enableEmailNotifications"
-                    checked={formData.enableEmailNotifications || false}
-                    onChange={(checked) => handleChange('enableEmailNotifications', checked)}
-                  />
-                  <Label>{t('tenantSettings.form.enableEmailNotifications')}</Label>
-                </CheckboxField>
-              </FieldGroup>
+              {/* Business Settings */}
+              <div>
+                <Subheading className="mb-3">{t('tenantSettings.sections.businessSettings')}</Subheading>
+                <FieldGroup className="space-y-3">
+                  <div className="grid grid-cols-3 gap-3">
+                    <Field className="col-span-2">
+                      <Label>{t('tenantSettings.form.timezone')} *</Label>
+                      <Select
+                        name="timezone"
+                        value={formData.timezone || ''}
+                        onChange={(e: React.ChangeEvent<HTMLSelectElement>) => handleChange('timezone', e.target.value)}
+                        required
+                      >
+                        <option value="">{t('common.form.select')}</option>
+                        {US_TIMEZONES.map((tz) => (
+                          <option key={tz.value} value={tz.value}>
+                            {tz.label}
+                          </option>
+                        ))}
+                      </Select>
+                      <Description>{t('tenantSettings.form.timezoneHelper')}</Description>
+                    </Field>
+                    <Field>
+                      <Label>{t('tenantSettings.form.defaultTaxRate')}</Label>
+                      <Input
+                        name="defaultTaxRate"
+                        type="number"
+                        step="0.0001"
+                        min="0"
+                        max="1"
+                        value={formData.defaultTaxRate || ''}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange('defaultTaxRate', parseFloat(e.target.value))}
+                        placeholder="0.0825"
+                      />
+                      <Description>{t('tenantSettings.form.defaultTaxRateHelper')}</Description>
+                    </Field>
+                  </div>
+                  <Field>
+                    <Label>{t('tenantSettings.form.invoiceTerms')}</Label>
+                    <Input
+                      name="invoiceTerms"
+                      value={formData.invoiceTerms || ''}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange('invoiceTerms', e.target.value)}
+                      placeholder="Net 30"
+                    />
+                  </Field>
+                </FieldGroup>
+              </div>
+
+              {/* Feature Flags */}
+              <div>
+                <Subheading className="mb-3">{t('tenantSettings.sections.featureFlags')}</Subheading>
+                <CheckboxGroup>
+                  <CheckboxField>
+                    <Checkbox
+                      name="enableOnlineBooking"
+                      checked={formData.enableOnlineBooking || false}
+                      onChange={(checked) => handleChange('enableOnlineBooking', checked)}
+                    />
+                    <Label>{t('tenantSettings.form.enableOnlineBooking')}</Label>
+                  </CheckboxField>
+                  <CheckboxField>
+                    <Checkbox
+                      name="enableSmsNotifications"
+                      checked={formData.enableSmsNotifications || false}
+                      onChange={(checked) => handleChange('enableSmsNotifications', checked)}
+                    />
+                    <Label>{t('tenantSettings.form.enableSmsNotifications')}</Label>
+                  </CheckboxField>
+                  <CheckboxField>
+                    <Checkbox
+                      name="enableEmailNotifications"
+                      checked={formData.enableEmailNotifications || false}
+                      onChange={(checked) => handleChange('enableEmailNotifications', checked)}
+                    />
+                    <Label>{t('tenantSettings.form.enableEmailNotifications')}</Label>
+                  </CheckboxField>
+                </CheckboxGroup>
+              </div>
             </div>
           </div>
 
-          <Divider className="my-6" />
+          <Divider className="my-4" />
 
           <div className="flex justify-end gap-3">
             <Button plain onClick={() => setIsEditing(false)}>

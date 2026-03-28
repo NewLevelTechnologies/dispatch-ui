@@ -18,7 +18,6 @@ export interface TenantSettings {
   state?: string | null;
   zipCode?: string | null;
   phone?: string | null;
-  fax?: string | null;
   email?: string | null;
   timezone: string;
   defaultTaxRate?: number | null;
@@ -40,7 +39,6 @@ export interface UpdateTenantSettingsRequest {
   state?: string | null;
   zipCode?: string | null;
   phone?: string | null;
-  fax?: string | null;
   email?: string | null;
   timezone?: string;
   defaultTaxRate?: number | null;

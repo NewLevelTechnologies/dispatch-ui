@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { EllipsisVerticalIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
+import { EllipsisVerticalIcon, MagnifyingGlassIcon, HomeIcon, BuildingOfficeIcon } from '@heroicons/react/24/outline';
 import { customerApi, type Customer } from '../api';
 import { useHasCapability } from '../hooks/useCurrentUser';
 import AppLayout from '../components/AppLayout';
@@ -180,9 +180,11 @@ export default function CustomersPage() {
                 return (
                   <TableRow key={customer.id} href={`/customers/${customer.id}`} className="cursor-pointer">
                     <TableCell>
-                      <span title={customer.displayMode === 'SIMPLE' ? 'Homeowner' : 'Business'}>
-                        {customer.displayMode === 'SIMPLE' ? '🏠' : '🏢'}
-                      </span>
+                      {customer.displayMode === 'SIMPLE' ? (
+                        <HomeIcon className="h-4 w-4 text-zinc-400" title="Homeowner" />
+                      ) : (
+                        <BuildingOfficeIcon className="h-4 w-4 text-zinc-400" title="Business" />
+                      )}
                     </TableCell>
                     <TableCell className="font-medium">{customer.name}</TableCell>
                     <TableCell className="text-zinc-500">

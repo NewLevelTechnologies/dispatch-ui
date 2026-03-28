@@ -13,7 +13,19 @@ import { Button } from '../components/catalyst/button';
 import { Badge } from '../components/catalyst/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/catalyst/table';
 import { Input, InputGroup } from '../components/catalyst/input';
-import { ArrowLeftIcon, PencilIcon, PlusIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
+import {
+  ArrowLeftIcon,
+  PencilIcon,
+  PlusIcon,
+  MagnifyingGlassIcon,
+  BuildingOfficeIcon,
+  PhoneIcon,
+  EnvelopeIcon,
+  CreditCardIcon,
+  MapPinIcon,
+  UserIcon,
+  KeyIcon
+} from '@heroicons/react/24/outline';
 
 export default function CustomerDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -103,21 +115,24 @@ export default function CustomerDetailPage() {
             <div className="flex items-start justify-between">
               <div>
                 <Heading className="text-2xl">{customer.name}</Heading>
-                {/* eslint-disable i18next/no-literal-string */}
-                <Text className="mt-1">
-                  📞 {customer.phone ? (
+                <Text className="mt-1 flex items-center gap-1">
+                  <PhoneIcon className="inline h-4 w-4 text-zinc-400" />
+                  {customer.phone ? (
                     <a href={`tel:${customer.phone}`} className="hover:underline">
                       {customer.phone}
                     </a>
                   ) : (
                     t('customers.detail.noPhone')
-                  )} • 📧 <a href={`mailto:${customer.email}`} className="hover:underline">
+                  )}
+                  <span className="mx-1">•</span>
+                  <EnvelopeIcon className="inline h-4 w-4 text-zinc-400" />
+                  <a href={`mailto:${customer.email}`} className="hover:underline">
                     {customer.email}
                   </a>
                 </Text>
-                {/* eslint-enable i18next/no-literal-string */}
-                <Text className="mt-1">
-                  📍 {primaryLocation.address.streetAddress}
+                <Text className="mt-1 flex items-center gap-1">
+                  <MapPinIcon className="inline h-4 w-4 text-zinc-400" />
+                  {primaryLocation.address.streetAddress}
                   {primaryLocation.address.streetAddressLine2 && `, ${primaryLocation.address.streetAddressLine2}`}
                   , {primaryLocation.address.city}, {primaryLocation.address.state} {primaryLocation.address.zipCode}
                 </Text>
@@ -204,8 +219,9 @@ export default function CustomerDetailPage() {
             {/* Header - Business */}
             <div className="flex items-start justify-between">
               <div>
-                <Heading className="text-2xl">
-                  🏢 {customer.name}
+                <Heading className="text-2xl flex items-center gap-2">
+                  <BuildingOfficeIcon className="h-6 w-6 text-zinc-400" />
+                  {customer.name}
                 </Heading>
                 <div className="mt-1 flex flex-wrap items-center gap-2">
                   {customer.paymentTermsDays > 0 && (
@@ -222,21 +238,24 @@ export default function CustomerDetailPage() {
                   )}
                 </div>
                 <div className="mt-2">
-                  {/* eslint-disable i18next/no-literal-string */}
-                  <Text>
-                    📞 {customer.phone ? (
+                  <Text className="flex items-center gap-1">
+                    <PhoneIcon className="inline h-4 w-4 text-zinc-400" />
+                    {customer.phone ? (
                       <a href={`tel:${customer.phone}`} className="hover:underline">
                         {customer.phone}
                       </a>
                     ) : (
                       t('customers.detail.noPhone')
-                    )} • 📧 <a href={`mailto:${customer.email}`} className="hover:underline">
+                    )}
+                    <span className="mx-1">•</span>
+                    <EnvelopeIcon className="inline h-4 w-4 text-zinc-400" />
+                    <a href={`mailto:${customer.email}`} className="hover:underline">
                       {customer.email}
                     </a>
                   </Text>
-                  {/* eslint-enable i18next/no-literal-string */}
-                  <Text className="mt-1">
-                    💳 {t('customers.detail.billingAddressLabel')}: {customer.billingAddress.streetAddress}, {customer.billingAddress.city}, {customer.billingAddress.state} {customer.billingAddress.zipCode}
+                  <Text className="mt-1 flex items-center gap-1">
+                    <CreditCardIcon className="inline h-4 w-4 text-zinc-400" />
+                    {t('customers.detail.billingAddressLabel')}: {customer.billingAddress.streetAddress}, {customer.billingAddress.city}, {customer.billingAddress.state} {customer.billingAddress.zipCode}
                   </Text>
                 </div>
               </div>
@@ -343,8 +362,9 @@ export default function CustomerDetailPage() {
                         <Strong className="text-sm">
                           {location.locationName || 'Unnamed Location'}
                         </Strong>
-                        <Text className="mt-1 text-xs">
-                          📍 {location.address.streetAddress}
+                        <Text className="mt-1 text-xs flex items-center gap-1">
+                          <MapPinIcon className="inline h-3 w-3 text-zinc-400" />
+                          {location.address.streetAddress}
                           {location.address.streetAddressLine2 && `, ${location.address.streetAddressLine2}`}
                         </Text>
                         <Text className="text-xs">
@@ -352,24 +372,36 @@ export default function CustomerDetailPage() {
                         </Text>
 
                         {(location.siteContactName || location.siteContactPhone || location.siteContactEmail) && (
-                          <Text className="mt-2 text-xs">
-                            {location.siteContactName && <>👤 {location.siteContactName}</>}
+                          <div className="mt-2 space-y-0.5">
+                            {location.siteContactName && (
+                              <Text className="text-xs flex items-center gap-1">
+                                <UserIcon className="inline h-3 w-3 text-zinc-400 flex-shrink-0" />
+                                {location.siteContactName}
+                              </Text>
+                            )}
                             {location.siteContactPhone && (
-                              <>{location.siteContactName && ' • '}<a href={`tel:${location.siteContactPhone}`} className="hover:underline">
-                                {location.siteContactPhone}
-                              </a></>
+                              <Text className="text-xs flex items-center gap-1">
+                                <PhoneIcon className="inline h-3 w-3 text-zinc-400 flex-shrink-0" />
+                                <a href={`tel:${location.siteContactPhone}`} className="hover:underline">
+                                  {location.siteContactPhone}
+                                </a>
+                              </Text>
                             )}
                             {location.siteContactEmail && (
-                              <>{(location.siteContactName || location.siteContactPhone) && ' • '}<a href={`mailto:${location.siteContactEmail}`} className="hover:underline">
-                                {location.siteContactEmail}
-                              </a></>
+                              <Text className="text-xs flex items-center gap-1">
+                                <EnvelopeIcon className="inline h-3 w-3 text-zinc-400 flex-shrink-0" />
+                                <a href={`mailto:${location.siteContactEmail}`} className="hover:underline">
+                                  {location.siteContactEmail}
+                                </a>
+                              </Text>
                             )}
-                          </Text>
+                          </div>
                         )}
 
                         {location.accessInstructions && (
-                          <Text className="mt-2 text-xs">
-                            🔑 {location.accessInstructions}
+                          <Text className="mt-2 text-xs flex items-center gap-1">
+                            <KeyIcon className="inline h-3 w-3 text-zinc-400 flex-shrink-0" />
+                            {location.accessInstructions}
                           </Text>
                         )}
                       </div>

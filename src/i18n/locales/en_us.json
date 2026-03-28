@@ -516,6 +516,7 @@
       "featureFlags": "Feature Flags"
     },
     "form": {
+      "address": "Address",
       "city": "City",
       "companyName": "Company Name",
       "companyNameShort": "Short Name",
@@ -523,7 +524,7 @@
       "companySlogan": "Company Slogan",
       "companySloganHelper": "Optional - tagline or motto",
       "defaultTaxRate": "Default Tax Rate",
-      "defaultTaxRateHelper": "Decimal (e.g., 0.0825 = 8.25%)",
+      "defaultTaxRateHelper": "e.g., 0.0825 = 8.25%",
       "email": "Email",
       "enableEmailNotifications": "Enable Email Notifications",
       "enableOnlineBooking": "Enable Online Booking",
