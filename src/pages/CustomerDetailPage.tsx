@@ -23,7 +23,8 @@ import {
   EnvelopeIcon,
   CreditCardIcon,
   MapPinIcon,
-  UserIcon
+  UserIcon,
+  KeyIcon
 } from '@heroicons/react/24/outline';
 
 export default function CustomerDetailPage() {
@@ -371,29 +372,36 @@ export default function CustomerDetailPage() {
                         </Text>
 
                         {(location.siteContactName || location.siteContactPhone || location.siteContactEmail) && (
-                          <Text className="mt-2 text-xs flex items-center gap-1">
+                          <div className="mt-2 space-y-0.5">
                             {location.siteContactName && (
-                              <>
-                                <UserIcon className="inline h-3 w-3 text-zinc-400" />
+                              <Text className="text-xs flex items-center gap-1">
+                                <UserIcon className="inline h-3 w-3 text-zinc-400 flex-shrink-0" />
                                 {location.siteContactName}
-                              </>
+                              </Text>
                             )}
                             {location.siteContactPhone && (
-                              <>{location.siteContactName && ' • '}<a href={`tel:${location.siteContactPhone}`} className="hover:underline">
-                                {location.siteContactPhone}
-                              </a></>
+                              <Text className="text-xs flex items-center gap-1">
+                                <PhoneIcon className="inline h-3 w-3 text-zinc-400 flex-shrink-0" />
+                                <a href={`tel:${location.siteContactPhone}`} className="hover:underline">
+                                  {location.siteContactPhone}
+                                </a>
+                              </Text>
                             )}
                             {location.siteContactEmail && (
-                              <>{(location.siteContactName || location.siteContactPhone) && ' • '}<a href={`mailto:${location.siteContactEmail}`} className="hover:underline">
-                                {location.siteContactEmail}
-                              </a></>
+                              <Text className="text-xs flex items-center gap-1">
+                                <EnvelopeIcon className="inline h-3 w-3 text-zinc-400 flex-shrink-0" />
+                                <a href={`mailto:${location.siteContactEmail}`} className="hover:underline">
+                                  {location.siteContactEmail}
+                                </a>
+                              </Text>
                             )}
-                          </Text>
+                          </div>
                         )}
 
                         {location.accessInstructions && (
-                          <Text className="mt-2 text-xs">
-                            🔑 {location.accessInstructions}
+                          <Text className="mt-2 text-xs flex items-center gap-1">
+                            <KeyIcon className="inline h-3 w-3 text-zinc-400 flex-shrink-0" />
+                            {location.accessInstructions}
                           </Text>
                         )}
                       </div>
