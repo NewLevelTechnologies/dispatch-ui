@@ -186,6 +186,12 @@ export default function TenantSettingsPage() {
                 )}
                 {settings?.phone && <div>{settings.phone}</div>}
                 {settings?.email && <div>{settings.email}</div>}
+                {(settings?.companyNameShort || settings?.companySlogan) && (
+                  <div className="pt-2 space-y-0.5 text-xs text-zinc-500 dark:text-zinc-400">
+                    {settings?.companyNameShort && <div>Short: {settings.companyNameShort}</div>}
+                    {settings?.companySlogan && <div>Slogan: {settings.companySlogan}</div>}
+                  </div>
+                )}
               </div>
             </div>
 
