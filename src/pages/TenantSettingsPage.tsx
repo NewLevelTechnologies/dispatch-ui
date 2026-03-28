@@ -14,6 +14,7 @@ import { Textarea } from '../components/catalyst/textarea';
 import { CheckboxField, Checkbox } from '../components/catalyst/checkbox';
 import { Divider } from '../components/catalyst/divider';
 import { US_STATES } from '../constants/states';
+import { US_TIMEZONES } from '../constants/timezones';
 
 export default function TenantSettingsPage() {
   const queryClient = useQueryClient();
@@ -504,13 +505,19 @@ export default function TenantSettingsPage() {
               <FieldGroup className="space-y-3">
                 <Field>
                   <Label>{t('tenantSettings.form.timezone')} *</Label>
-                  <Input
+                  <Select
                     name="timezone"
                     value={formData.timezone || ''}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange('timezone', e.target.value)}
-                    placeholder="America/New_York"
+                    onChange={(e: React.ChangeEvent<HTMLSelectElement>) => handleChange('timezone', e.target.value)}
                     required
-                  />
+                  >
+                    <option value="">{t('common.form.select')}</option>
+                    {US_TIMEZONES.map((tz) => (
+                      <option key={tz} value={tz}>
+                        {tz.replace(/_/g, ' ')}
+                      </option>
+                    ))}
+                  </Select>
                   <Description>{t('tenantSettings.form.timezoneHelper')}</Description>
                 </Field>
                 <Field>
