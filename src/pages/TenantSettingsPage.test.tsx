@@ -60,7 +60,8 @@ describe('TenantSettingsPage', () => {
       expect(screen.getByText('Acme HVAC Services')).toBeInTheDocument();
     });
 
-    // Company information is displayed without labels (just values)
+    // Company information is compact: name, address, phone, email only
+    expect(screen.getByText('Acme HVAC Services')).toBeInTheDocument();
     expect(screen.getByText('123 Main Street')).toBeInTheDocument();
     expect(screen.getByText('Springfield, IL 62701')).toBeInTheDocument();
     expect(screen.getByText('555-123-4567')).toBeInTheDocument();

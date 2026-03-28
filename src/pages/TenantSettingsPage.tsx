@@ -176,49 +176,17 @@ export default function TenantSettingsPage() {
             {/* Company Information */}
             <div>
               <Subheading className="mb-3">{t('tenantSettings.sections.companyInfo')}</Subheading>
-              <dl className="space-y-2">
-                <div>
-                  <dt className="sr-only">{t('tenantSettings.form.companyName')}</dt>
-                  <dd className="text-base font-semibold text-zinc-900 dark:text-white">{settings?.companyName || '-'}</dd>
-                </div>
-                {settings?.companyNameShort && (
+              <div className="space-y-1 text-sm text-zinc-900 dark:text-white">
+                <div className="text-base font-semibold">{settings?.companyName || '-'}</div>
+                {settings?.streetAddress && <div>{settings.streetAddress}</div>}
+                {(settings?.city || settings?.state || settings?.zipCode) && (
                   <div>
-                    <dt className="sr-only">{t('tenantSettings.form.companyNameShort')}</dt>
-                    <dd className="text-sm text-zinc-600 dark:text-zinc-400">{settings.companyNameShort}</dd>
+                    {[settings.city, [settings.state, settings.zipCode].filter(Boolean).join(' ')].filter(Boolean).join(', ')}
                   </div>
                 )}
-                {settings?.companySlogan && (
-                  <div>
-                    <dt className="sr-only">{t('tenantSettings.form.companySlogan')}</dt>
-                    <dd className="text-sm italic text-zinc-600 dark:text-zinc-400">{settings.companySlogan}</dd>
-                  </div>
-                )}
-                {(settings?.streetAddress || settings?.city || settings?.state || settings?.zipCode) && (
-                  <div className="pt-2">
-                    <dt className="sr-only">{t('tenantSettings.form.address')}</dt>
-                    <dd className="text-sm text-zinc-900 dark:text-white">
-                      {settings.streetAddress && <div>{settings.streetAddress}</div>}
-                      {(settings.city || settings.state || settings.zipCode) && (
-                        <div>
-                          {[settings.city, [settings.state, settings.zipCode].filter(Boolean).join(' ')].filter(Boolean).join(', ')}
-                        </div>
-                      )}
-                    </dd>
-                  </div>
-                )}
-                {settings?.phone && (
-                  <div>
-                    <dt className="sr-only">{t('tenantSettings.form.phone')}</dt>
-                    <dd className="text-sm text-zinc-900 dark:text-white">{settings.phone}</dd>
-                  </div>
-                )}
-                {settings?.email && (
-                  <div>
-                    <dt className="sr-only">{t('tenantSettings.form.email')}</dt>
-                    <dd className="text-sm text-zinc-900 dark:text-white">{settings.email}</dd>
-                  </div>
-                )}
-              </dl>
+                {settings?.phone && <div>{settings.phone}</div>}
+                {settings?.email && <div>{settings.email}</div>}
+              </div>
             </div>
 
             {/* Branding & Logo */}
