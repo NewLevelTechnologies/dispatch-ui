@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { EllipsisVerticalIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import { customerApi, type ServiceLocation, type Customer } from '../api';
+import { useGlossary } from '../contexts/GlossaryContext';
 import { useHasCapability } from '../hooks/useCurrentUser';
 import AppLayout from '../components/AppLayout';
 import ServiceLocationFormDialog from '../components/ServiceLocationFormDialog';
@@ -23,6 +24,7 @@ export default function ServiceLocationsPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { t } = useTranslation();
+  const { getName } = useGlossary();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedLocation, setSelectedLocation] = useState<ServiceLocation | null>(null);
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
@@ -115,9 +117,9 @@ export default function ServiceLocationsPage() {
   return (
     <AppLayout>
       <div className="flex items-center justify-between gap-4">
-        <Heading>{t('entities.serviceLocations')}</Heading>
+        <Heading>{getName('service_location', true)}</Heading>
         {canAddServiceLocations && (
-          <Button onClick={handleAdd}>{t('common.actions.add', { entity: t('entities.serviceLocation') })}</Button>
+          <Button onClick={handleAdd}>{t('common.actions.add', { entity: getName('service_location') })}</Button>
         )}
       </div>
 
@@ -165,7 +167,7 @@ export default function ServiceLocationsPage() {
         {allLocations.length > 0 && (
           <div className="text-sm text-zinc-600 dark:text-zinc-400">
             {filteredLocations.length === allLocations.length
-              ? `${allLocations.length} ${allLocations.length === 1 ? t('entities.serviceLocation').toLowerCase() : t('entities.serviceLocations').toLowerCase()}`
+              ? `${allLocations.length} ${allLocations.length === 1 ? getName('service_location').toLowerCase() : getName('service_location', true).toLowerCase()}`
               : `${filteredLocations.length} of ${allLocations.length}`}
           </div>
         )}
@@ -173,24 +175,24 @@ export default function ServiceLocationsPage() {
 
       {isLoading && (
         <div className="mt-4 text-center">
-          <p className="text-sm text-zinc-600 dark:text-zinc-400">{t('common.actions.loading', { entities: t('entities.serviceLocations') })}</p>
+          <p className="text-sm text-zinc-600 dark:text-zinc-400">{t('common.actions.loading', { entities: getName('service_location', true) })}</p>
         </div>
       )}
 
       {error && (
         <div className="mt-4 rounded-lg bg-red-50 p-3 ring-1 ring-red-200 dark:bg-red-950/10 dark:ring-red-900/20">
           <p className="text-sm text-red-800 dark:text-red-400">
-            {t('common.actions.errorLoading', { entities: t('entities.serviceLocations') })}: {(error as Error).message}
+            {t('common.actions.errorLoading', { entities: getName('service_location', true) })}: {(error as Error).message}
           </p>
         </div>
       )}
 
       {allLocations.length === 0 && !isLoading && (
         <div className="mt-4 rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700 p-4">
-          <p className="text-sm text-zinc-600 dark:text-zinc-400">{t('common.actions.notFound', { entities: t('entities.serviceLocations') })}</p>
+          <p className="text-sm text-zinc-600 dark:text-zinc-400">{t('common.actions.notFound', { entities: getName('service_location', true) })}</p>
           {canAddServiceLocations && (
             <Button className="mt-2" onClick={handleAdd}>
-              {t('common.actions.addFirst', { entity: t('entities.serviceLocation') })}
+              {t('common.actions.addFirst', { entity: getName('service_location') })}
             </Button>
           )}
         </div>
@@ -198,7 +200,7 @@ export default function ServiceLocationsPage() {
 
       {filteredLocations.length === 0 && allLocations.length > 0 && (
         <div className="mt-4 rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700 p-4">
-          <p className="text-sm text-zinc-600 dark:text-zinc-400">{t('common.actions.noMatchSearch', { entities: t('entities.serviceLocations') })}</p>
+          <p className="text-sm text-zinc-600 dark:text-zinc-400">{t('common.actions.noMatchSearch', { entities: getName('service_location', true) })}</p>
         </div>
       )}
 

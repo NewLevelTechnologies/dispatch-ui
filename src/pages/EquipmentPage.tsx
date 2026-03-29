@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { EllipsisVerticalIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import apiClient from '../api/client';
+import { useGlossary } from '../contexts/GlossaryContext';
 import AppLayout from '../components/AppLayout';
 import { Heading } from '../components/catalyst/heading';
 import { Button } from '../components/catalyst/button';
@@ -30,6 +31,7 @@ interface Customer {
 export default function EquipmentPage() {
   const queryClient = useQueryClient();
   const { t } = useTranslation();
+  const { getName } = useGlossary();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedEquipment, setSelectedEquipment] = useState<Equipment | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -161,9 +163,9 @@ export default function EquipmentPage() {
   return (
     <AppLayout>
       <div className="flex items-center justify-between gap-4">
-        <Heading>{t('entities.equipment')}</Heading>
+        <Heading>{getName('equipment', true)}</Heading>
         <Button onClick={handleAdd}>
-          {t('common.actions.add', { entity: t('entities.equipment') })}
+          {t('common.actions.add', { entity: getName('equipment') })}
         </Button>
       </div>
 
@@ -181,7 +183,7 @@ export default function EquipmentPage() {
         {safeEquipment.length > 0 && (
           <div className="text-sm text-zinc-600 dark:text-zinc-400">
             {filteredEquipment.length === safeEquipment.length
-              ? `${safeEquipment.length} ${safeEquipment.length === 1 ? t('entities.equipment').toLowerCase() : t('entities.equipment').toLowerCase()}`
+              ? `${safeEquipment.length} ${safeEquipment.length === 1 ? getName('equipment').toLowerCase() : getName('equipment', true).toLowerCase()}`
               : `${filteredEquipment.length} of ${safeEquipment.length}`}
           </div>
         )}
@@ -190,7 +192,7 @@ export default function EquipmentPage() {
       {error && (
         <div className="mt-4 rounded-lg bg-red-50 p-3 ring-1 ring-red-200 dark:bg-red-950/10 dark:ring-red-900/20">
           <p className="text-sm text-red-800 dark:text-red-400">
-            {t('common.actions.errorLoading', { entities: t('entities.equipment') })}: {(error as Error).message}
+            {t('common.actions.errorLoading', { entities: getName('equipment', true) })}: {(error as Error).message}
           </p>
         </div>
       )}
@@ -198,19 +200,19 @@ export default function EquipmentPage() {
       {isLoading ? (
         <div className="mt-4 text-center">
           <p className="text-sm text-zinc-600 dark:text-zinc-400">
-            {t('common.actions.loading', { entities: t('entities.equipment') })}
+            {t('common.actions.loading', { entities: getName('equipment', true) })}
           </p>
         </div>
       ) : safeEquipment.length === 0 ? (
         <div className="mt-4 rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700 p-4">
           <p className="text-sm text-zinc-600 dark:text-zinc-400">
-            {t('common.actions.notFound', { entities: t('entities.equipment') })}
+            {t('common.actions.notFound', { entities: getName('equipment', true) })}
           </p>
         </div>
       ) : filteredEquipment.length === 0 ? (
         <div className="mt-4 rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700 p-4">
           <p className="text-sm text-zinc-600 dark:text-zinc-400">
-            {t('common.actions.noMatchSearch', { entities: t('entities.equipment') })}
+            {t('common.actions.noMatchSearch', { entities: getName('equipment', true) })}
           </p>
         </div>
       ) : (
@@ -264,13 +266,13 @@ export default function EquipmentPage() {
       <Dialog open={isDialogOpen} onClose={setIsDialogOpen}>
         <DialogTitle>
           {selectedEquipment
-            ? t('common.actions.edit', { entity: t('entities.equipment') })
-            : t('common.actions.add', { entity: t('entities.equipment') })}
+            ? t('common.actions.edit', { entity: getName('equipment') })
+            : t('common.actions.add', { entity: getName('equipment') })}
         </DialogTitle>
         <DialogDescription>
           {selectedEquipment
-            ? t('common.form.descriptionEdit', { entity: t('entities.equipment') })
-            : t('common.form.descriptionCreate', { entity: t('entities.equipment') })}
+            ? t('common.form.descriptionEdit', { entity: getName('equipment') })
+            : t('common.form.descriptionCreate', { entity: getName('equipment') })}
         </DialogDescription>
         <form onSubmit={handleSubmit}>
           <DialogBody>
