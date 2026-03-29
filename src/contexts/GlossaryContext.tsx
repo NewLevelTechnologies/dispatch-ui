@@ -22,16 +22,17 @@ import type { Glossary, GlossaryEntry } from '../api';
  */
 export const GLOSSARY_DEFAULTS: Record<string, GlossaryEntry> = {
   customer: { singular: 'Customer', plural: 'Customers' },
-  service_location: { singular: 'Service Location', plural: 'Service Locations' },
-  work_order: { singular: 'Work Order', plural: 'Work Orders' },
-  technician: { singular: 'Technician', plural: 'Technicians' },
+  dispatch: { singular: 'Dispatch', plural: 'Dispatches' },
   equipment: { singular: 'Equipment', plural: 'Equipment' },
   invoice: { singular: 'Invoice', plural: 'Invoices' },
-  quote: { singular: 'Quote', plural: 'Quotes' },
-  work_item: { singular: 'Work Item', plural: 'Work Items' },
   payment: { singular: 'Payment', plural: 'Payments' },
-  schedule: { singular: 'Schedule', plural: 'Schedules' },
+  quote: { singular: 'Quote', plural: 'Quotes' },
   route: { singular: 'Route', plural: 'Routes' },
+  schedule: { singular: 'Schedule', plural: 'Schedules' },
+  service_location: { singular: 'Service Location', plural: 'Service Locations' },
+  technician: { singular: 'Technician', plural: 'Technicians' },
+  work_item: { singular: 'Work Item', plural: 'Work Items' },
+  work_order: { singular: 'Work Order', plural: 'Work Orders' },
 };
 
 interface GlossaryContextType {
