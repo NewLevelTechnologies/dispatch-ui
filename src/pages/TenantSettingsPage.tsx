@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { PatternFormat } from 'react-number-format';
+import { Tab } from '@headlessui/react';
 import { tenantSettingsApi, glossaryApi, type UpdateTenantSettingsRequest, type Glossary } from '../api';
 import { useHasCapability } from '../hooks/useCurrentUser';
 import { useGlossary } from '../contexts/GlossaryContext';
@@ -213,7 +214,31 @@ export default function TenantSettingsPage() {
             )}
           </div>
 
-          <Divider className="my-4" />
+          <Tab.Group>
+            <Tab.List className="flex gap-4 border-b border-zinc-200 dark:border-zinc-800 mt-6">
+              <Tab className={({ selected }) =>
+                `pb-3 px-1 text-sm font-medium outline-none transition-colors ${
+                  selected
+                    ? 'text-zinc-900 dark:text-white border-b-2 border-zinc-900 dark:border-white -mb-px'
+                    : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-300'
+                }`
+              }>
+                {t('tenantSettings.tabs.general')}
+              </Tab>
+              <Tab className={({ selected }) =>
+                `pb-3 px-1 text-sm font-medium outline-none transition-colors ${
+                  selected
+                    ? 'text-zinc-900 dark:text-white border-b-2 border-zinc-900 dark:border-white -mb-px'
+                    : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-300'
+                }`
+              }>
+                {t('tenantSettings.tabs.terminology')}
+              </Tab>
+            </Tab.List>
+
+            <Tab.Panels className="mt-6">
+              {/* General Tab */}
+              <Tab.Panel>
 
           <div className="grid grid-cols-2 gap-x-12 gap-y-6">
             {/* Company Information */}
@@ -344,34 +369,40 @@ export default function TenantSettingsPage() {
             </div>
           </div>
 
-          {/* Terminology/Glossary - Full width section */}
-          {settings?.glossary && Object.keys(settings.glossary).length > 0 && (
-            <>
-              <Divider className="my-6" />
-              <div>
-                <Subheading className="mb-3">{t('tenantSettings.sections.terminology')}</Subheading>
-                <Text className="text-sm text-zinc-600 dark:text-zinc-400 mb-3">
-                  {t('tenantSettings.glossary.customizedCount', { count: Object.keys(settings.glossary).length })}
-                </Text>
-                <div className="space-y-1 text-sm">
-                  {Object.entries(settings.glossary).map(([code, entry]) => (
-                    <div key={code} className="flex items-center gap-2">
-                      <span className="text-zinc-500 dark:text-zinc-400 capitalize">
-                        {code.replace(/_/g, ' ')}:
-                      </span>
-                      <span className="text-zinc-900 dark:text-white font-medium">
-                        {entry.singular}
-                      </span>
-                      <span className="text-zinc-400 dark:text-zinc-600">/</span>
-                      <span className="text-zinc-900 dark:text-white font-medium">
-                        {entry.plural}
-                      </span>
+              </Tab.Panel>
+
+              {/* Terminology Tab */}
+              <Tab.Panel>
+                {settings?.glossary && Object.keys(settings.glossary).length > 0 ? (
+                  <div>
+                    <Text className="text-sm text-zinc-600 dark:text-zinc-400 mb-4">
+                      {t('tenantSettings.glossary.customizedCount', { count: Object.keys(settings.glossary).length })}
+                    </Text>
+                    <div className="space-y-1 text-sm">
+                      {Object.entries(settings.glossary).map(([code, entry]) => (
+                        <div key={code} className="flex items-center gap-2">
+                          <span className="text-zinc-500 dark:text-zinc-400 capitalize">
+                            {code.replace(/_/g, ' ')}:
+                          </span>
+                          <span className="text-zinc-900 dark:text-white font-medium">
+                            {entry.singular}
+                          </span>
+                          <span className="text-zinc-400 dark:text-zinc-600">/</span>
+                          <span className="text-zinc-900 dark:text-white font-medium">
+                            {entry.plural}
+                          </span>
+                        </div>
+                      ))}
                     </div>
-                  ))}
-                </div>
-              </div>
-            </>
-          )}
+                  </div>
+                ) : (
+                  <Text className="text-sm text-zinc-500 dark:text-zinc-400">
+                    {t('tenantSettings.glossary.emptyState')}
+                  </Text>
+                )}
+              </Tab.Panel>
+            </Tab.Panels>
+          </Tab.Group>
         </div>
       </AppLayout>
     );
@@ -387,9 +418,32 @@ export default function TenantSettingsPage() {
           </div>
         </div>
 
-        <Divider className="my-4" />
-
         <form onSubmit={handleSubmit}>
+          <Tab.Group>
+            <Tab.List className="flex gap-4 border-b border-zinc-200 dark:border-zinc-800 mt-6">
+              <Tab className={({ selected }) =>
+                `pb-3 px-1 text-sm font-medium outline-none transition-colors ${
+                  selected
+                    ? 'text-zinc-900 dark:text-white border-b-2 border-zinc-900 dark:border-white -mb-px'
+                    : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-300'
+                }`
+              }>
+                {t('tenantSettings.tabs.general')}
+              </Tab>
+              <Tab className={({ selected }) =>
+                `pb-3 px-1 text-sm font-medium outline-none transition-colors ${
+                  selected
+                    ? 'text-zinc-900 dark:text-white border-b-2 border-zinc-900 dark:border-white -mb-px'
+                    : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-300'
+                }`
+              }>
+                {t('tenantSettings.tabs.terminology')}
+              </Tab>
+            </Tab.List>
+
+            <Tab.Panels className="mt-6">
+              {/* General Tab */}
+              <Tab.Panel>
           <div className="grid grid-cols-2 gap-x-12 gap-y-6">
             {/* Company Information - Left */}
             <div>
@@ -634,81 +688,85 @@ export default function TenantSettingsPage() {
             </div>
           </div>
 
-          {/* Terminology/Glossary - Full width section */}
-          {availableEntities && availableEntities.length > 0 && (
-            <>
-              <Divider className="my-4" />
-              <div>
-                <Subheading>{t('tenantSettings.sections.terminology')}</Subheading>
-                <Text className="text-sm text-zinc-600 dark:text-zinc-400 mt-1 mb-3">
+              </Tab.Panel>
+
+              {/* Terminology Tab */}
+              <Tab.Panel>
+                <Text className="text-sm text-zinc-600 dark:text-zinc-400 mb-4">
                   {t('tenantSettings.glossary.description')}
                 </Text>
-                <Table dense className="[--gutter:theme(spacing.1)] text-sm">
-                  <TableHead>
-                    <TableRow>
-                      <TableHeader>{t('tenantSettings.glossary.entity')}</TableHeader>
-                      <TableHeader>{t('tenantSettings.glossary.singularForm')}</TableHeader>
-                      <TableHeader>{t('tenantSettings.glossary.pluralForm')}</TableHeader>
-                      <TableHeader className="w-16"></TableHeader>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {availableEntities.map((entity) => {
-                      const customization = glossaryCustomizations[entity.code];
-                      const isCustomized = customization?.singular || customization?.plural;
-                      return (
-                        <TableRow key={entity.code}>
-                          <TableCell className="font-medium">
-                            <div className="capitalize">{entity.code.replace(/_/g, ' ')}</div>
-                            <div className="text-xs text-zinc-500 dark:text-zinc-400 font-normal mt-0.5">
-                              {entity.description}
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <Input
-                              name={`glossary-${entity.code}-singular`}
-                              value={customization?.singular || ''}
-                              onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                                handleGlossaryChange(entity.code, 'singular', e.target.value)
-                              }
-                              placeholder={entity.defaultSingular}
-                              className="h-8 text-sm"
-                            />
-                          </TableCell>
-                          <TableCell>
-                            <Input
-                              name={`glossary-${entity.code}-plural`}
-                              value={customization?.plural || ''}
-                              onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                                handleGlossaryChange(entity.code, 'plural', e.target.value)
-                              }
-                              placeholder={entity.defaultPlural}
-                              className="h-8 text-sm"
-                            />
-                          </TableCell>
-                          <TableCell>
-                            {isCustomized && (
-                              <Button
-                                type="button"
-                                plain
-                                onClick={() => handleGlossaryReset(entity.code)}
-                                className="text-xs"
-                                title={t('tenantSettings.glossary.resetToDefault')}
-                              >
-                                <ArrowPathIcon className="h-4 w-4" />
-                              </Button>
-                            )}
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
-              </div>
-            </>
-          )}
+                {availableEntities && availableEntities.length > 0 ? (
+                  <Table dense className="[--gutter:theme(spacing.1)] text-sm">
+                    <TableHead>
+                      <TableRow>
+                        <TableHeader>{t('tenantSettings.glossary.entity')}</TableHeader>
+                        <TableHeader>{t('tenantSettings.glossary.singularForm')}</TableHeader>
+                        <TableHeader>{t('tenantSettings.glossary.pluralForm')}</TableHeader>
+                        <TableHeader className="w-16"></TableHeader>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {availableEntities.map((entity) => {
+                        const customization = glossaryCustomizations[entity.code];
+                        const isCustomized = customization?.singular || customization?.plural;
+                        return (
+                          <TableRow key={entity.code}>
+                            <TableCell className="font-medium">
+                              <div className="capitalize">{entity.code.replace(/_/g, ' ')}</div>
+                              <div className="text-xs text-zinc-500 dark:text-zinc-400 font-normal mt-0.5">
+                                {entity.description}
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <Input
+                                name={`glossary-${entity.code}-singular`}
+                                value={customization?.singular || ''}
+                                onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                                  handleGlossaryChange(entity.code, 'singular', e.target.value)
+                                }
+                                placeholder={entity.defaultSingular}
+                                className="h-8 text-sm"
+                              />
+                            </TableCell>
+                            <TableCell>
+                              <Input
+                                name={`glossary-${entity.code}-plural`}
+                                value={customization?.plural || ''}
+                                onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                                  handleGlossaryChange(entity.code, 'plural', e.target.value)
+                                }
+                                placeholder={entity.defaultPlural}
+                                className="h-8 text-sm"
+                              />
+                            </TableCell>
+                            <TableCell>
+                              {isCustomized && (
+                                <Button
+                                  type="button"
+                                  plain
+                                  onClick={() => handleGlossaryReset(entity.code)}
+                                  className="text-xs"
+                                  title={t('tenantSettings.glossary.resetToDefault')}
+                                >
+                                  <ArrowPathIcon className="h-4 w-4" />
+                                </Button>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                ) : (
+                  <Text className="text-sm text-zinc-500 dark:text-zinc-400">
+                    {t('tenantSettings.glossary.loadingEntities')}
+                  </Text>
+                )}
+              </Tab.Panel>
+            </Tab.Panels>
+          </Tab.Group>
 
-          <Divider className="my-4" />
+          <Divider className="my-6" />
 
           <div className="flex justify-end gap-3">
             <Button plain onClick={() => setIsEditing(false)}>

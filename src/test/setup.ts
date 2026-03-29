@@ -445,7 +445,9 @@ vi.mock('react-i18next', () => {
     'tenantSettings.glossary.customizedCount': 'Customized entity names: {{count}} override',
     'tenantSettings.glossary.customizedCount_other': 'Customized entity names: {{count}} overrides',
     'tenantSettings.glossary.description': 'Customize how entity names appear throughout the application. Leave blank to use defaults.',
+    'tenantSettings.glossary.emptyState': 'No custom terminology configured. Using default entity names.',
     'tenantSettings.glossary.entity': 'Entity',
+    'tenantSettings.glossary.loadingEntities': 'Loading entity types...',
     'tenantSettings.glossary.pluralForm': 'Plural Form',
     'tenantSettings.glossary.resetToDefault': 'Reset to default',
     'tenantSettings.glossary.singularForm': 'Singular Form',
@@ -458,6 +460,8 @@ vi.mock('react-i18next', () => {
     'tenantSettings.messages.logoUploadedSuccess': 'Logo uploaded successfully',
     'tenantSettings.messages.settingsUpdatedSuccess': 'Settings updated successfully',
     'tenantSettings.sections.terminology': 'Terminology',
+    'tenantSettings.tabs.general': 'General',
+    'tenantSettings.tabs.terminology': 'Terminology',
   };
 
   return {

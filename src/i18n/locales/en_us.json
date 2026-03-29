@@ -516,6 +516,10 @@
       "featureFlags": "Feature Flags",
       "terminology": "Terminology"
     },
+    "tabs": {
+      "general": "General",
+      "terminology": "Terminology"
+    },
     "form": {
       "address": "Address",
       "city": "City",
@@ -553,6 +557,8 @@
       "customizedCount_other": "Customized entity names: {{count}} overrides",
       "description": "Customize how entity names appear throughout the application. Leave blank to use defaults.",
       "entity": "Entity",
+      "emptyState": "No custom terminology configured. Using default entity names.",
+      "loadingEntities": "Loading entity types...",
       "pluralForm": "Plural Form",
       "resetToDefault": "Reset to default",
       "singularForm": "Singular Form"
