@@ -57,13 +57,15 @@ export const GlossaryProvider: React.FC<GlossaryProviderProps> = ({
   // Deep merge to handle partial overrides (e.g., only singular customized)
   const [glossary, setGlossary] = useState<Record<string, GlossaryEntry>>(() => {
     const merged = { ...GLOSSARY_DEFAULTS };
-    Object.keys(initialGlossary).forEach(entityCode => {
-      const override = initialGlossary[entityCode];
-      merged[entityCode] = {
-        singular: override?.singular || GLOSSARY_DEFAULTS[entityCode]?.singular || entityCode,
-        plural: override?.plural || GLOSSARY_DEFAULTS[entityCode]?.plural || entityCode + 's',
-      };
-    });
+    if (initialGlossary) {
+      Object.keys(initialGlossary).forEach(entityCode => {
+        const override = initialGlossary[entityCode];
+        merged[entityCode] = {
+          singular: override?.singular || GLOSSARY_DEFAULTS[entityCode]?.singular || entityCode,
+          plural: override?.plural || GLOSSARY_DEFAULTS[entityCode]?.plural || entityCode + 's',
+        };
+      });
+    }
     return merged;
   });
 
@@ -72,13 +74,15 @@ export const GlossaryProvider: React.FC<GlossaryProviderProps> = ({
    */
   const updateGlossary = (newOverrides: Glossary) => {
     const merged = { ...GLOSSARY_DEFAULTS };
-    Object.keys(newOverrides).forEach(entityCode => {
-      const override = newOverrides[entityCode];
-      merged[entityCode] = {
-        singular: override?.singular || GLOSSARY_DEFAULTS[entityCode]?.singular || entityCode,
-        plural: override?.plural || GLOSSARY_DEFAULTS[entityCode]?.plural || entityCode + 's',
-      };
-    });
+    if (newOverrides) {
+      Object.keys(newOverrides).forEach(entityCode => {
+        const override = newOverrides[entityCode];
+        merged[entityCode] = {
+          singular: override?.singular || GLOSSARY_DEFAULTS[entityCode]?.singular || entityCode,
+          plural: override?.plural || GLOSSARY_DEFAULTS[entityCode]?.plural || entityCode + 's',
+        };
+      });
+    }
     setGlossary(merged);
   };
 
