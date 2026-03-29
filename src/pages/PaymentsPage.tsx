@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { MagnifyingGlassIcon } from '@heroicons/react/24/outline';
+import { useGlossary } from '../contexts/GlossaryContext';
 import AppLayout from '../components/AppLayout';
 import { Heading } from '../components/catalyst/heading';
 import { Button } from '../components/catalyst/button';
@@ -24,6 +25,7 @@ interface Customer {
 export default function PaymentsPage() {
   const queryClient = useQueryClient();
   const { t } = useTranslation();
+  const { getName } = useGlossary();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -105,7 +107,7 @@ export default function PaymentsPage() {
         error.response && typeof error.response === 'object' && 'data' in error.response &&
         error.response.data && typeof error.response.data === 'object' && 'message' in error.response.data
         ? String(error.response.data.message)
-        : t('common.form.errorCreate', { entity: t('entities.payment') });
+        : t('common.form.errorCreate', { entity: getName('payment') });
       alert(message);
     } finally {
       setSubmitting(false);
@@ -163,11 +165,11 @@ export default function PaymentsPage() {
     <AppLayout>
       <div className="flex items-end justify-between gap-4">
         <div>
-          <Heading>{t('entities.payments')}</Heading>
+          <Heading>{getName('payment', true)}</Heading>
           <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">{t('payments.description')}</p>
         </div>
         <Button onClick={() => setIsCreateOpen(true)}>
-          {t('common.actions.create', { entity: t('entities.payment') })}
+          {t('common.actions.create', { entity: getName('payment') })}
         </Button>
       </div>
 
@@ -185,7 +187,7 @@ export default function PaymentsPage() {
         {payments && payments.length > 0 && (
           <div className="text-sm text-zinc-600 dark:text-zinc-400">
             {filteredPayments.length === payments.length
-              ? `${payments.length} ${payments.length === 1 ? t('entities.payment').toLowerCase() : t('entities.payments').toLowerCase()}`
+              ? `${payments.length} ${payments.length === 1 ? getName('payment').toLowerCase() : getName('payment', true).toLowerCase()}`
               : `${filteredPayments.length} of ${payments.length}`}
           </div>
         )}
@@ -193,12 +195,12 @@ export default function PaymentsPage() {
 
       {paymentsLoading ? (
         <div className="mt-4 text-center">
-          <p className="text-sm text-zinc-600 dark:text-zinc-400">{t('common.actions.loading', { entities: t('entities.payments') })}</p>
+          <p className="text-sm text-zinc-600 dark:text-zinc-400">{t('common.actions.loading', { entities: getName('payment', true) })}</p>
         </div>
       ) : filteredPayments.length === 0 ? (
         <div className="mt-4 rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700 p-4">
           <p className="text-sm text-zinc-600 dark:text-zinc-400">
-            {searchTerm ? t('common.actions.noMatchSearch', { entities: t('entities.payments') }) : t('common.actions.notFound', { entities: t('entities.payments') })}
+            {searchTerm ? t('common.actions.noMatchSearch', { entities: getName('payment', true) }) : t('common.actions.notFound', { entities: getName('payment', true) })}
           </p>
         </div>
       ) : (
@@ -234,8 +236,8 @@ export default function PaymentsPage() {
 
       {/* Create Payment Dialog */}
       <Dialog open={isCreateOpen} onClose={setIsCreateOpen}>
-        <DialogTitle>{t('common.actions.create', { entity: t('entities.payment') })}</DialogTitle>
-        <DialogDescription>{t('common.form.descriptionCreate', { entity: t('entities.payment') })}</DialogDescription>
+        <DialogTitle>{t('common.actions.create', { entity: getName('payment') })}</DialogTitle>
+        <DialogDescription>{t('common.form.descriptionCreate', { entity: getName('payment') })}</DialogDescription>
         <form onSubmit={handleSubmit}>
           <DialogBody>
             <div className="space-y-4">
