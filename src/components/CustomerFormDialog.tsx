@@ -3,6 +3,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { PatternFormat } from 'react-number-format';
 import { customerApi, type Customer, type CreateCustomerRequest, type UpdateCustomerRequest } from '../api';
+import { useGlossary } from '../contexts/GlossaryContext';
 import { Dialog, DialogActions, DialogBody, DialogDescription, DialogTitle } from './catalyst/dialog';
 import { Button } from './catalyst/button';
 import { Checkbox, CheckboxField } from './catalyst/checkbox';
@@ -75,6 +76,7 @@ interface EditFormData {
 export default function CustomerFormDialog({ isOpen, onClose, customer }: CustomerFormDialogProps) {
   const queryClient = useQueryClient();
   const { t } = useTranslation();
+  const { getName } = useGlossary();
   const isEdit = !!customer?.id;
 
   // Collapsible sections state
@@ -213,7 +215,7 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
       const errorMessage = error instanceof Error && 'response' in error
         ? ((error as { response?: { data?: { message?: string } } }).response?.data?.message)
         : undefined;
-      alert(errorMessage || t('common.form.errorCreate', { entity: t('entities.customer') }));
+      alert(errorMessage || t('common.form.errorCreate', { entity: getName('customer') }));
     },
   });
 
@@ -235,7 +237,7 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
       const errorMessage = error instanceof Error && 'response' in error
         ? ((error as { response?: { data?: { message?: string } } }).response?.data?.message)
         : undefined;
-      alert(errorMessage || t('common.form.errorUpdate', { entity: t('entities.customer') }));
+      alert(errorMessage || t('common.form.errorUpdate', { entity: getName('customer') }));
     },
   });
 
@@ -309,12 +311,12 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
       <DialogTitle>
         {t('common.form.titleCreate', {
           action: isEdit ? t('common.edit') : t('common.add'),
-          entity: t('entities.customer')
+          entity: getName('customer')
         })}
       </DialogTitle>
       <DialogDescription>
         {t(isEdit ? 'common.form.descriptionEdit' : 'common.form.descriptionCreate', {
-          entity: t('entities.customer')
+          entity: getName('customer')
         })}
       </DialogDescription>
       <DialogBody>
