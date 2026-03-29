@@ -513,7 +513,8 @@
       "businessSettings": "Business Settings",
       "companyInfo": "Company Information",
       "contactInfo": "Contact Information",
-      "featureFlags": "Feature Flags"
+      "featureFlags": "Feature Flags",
+      "terminology": "Terminology"
     },
     "form": {
       "address": "Address",
@@ -546,6 +547,15 @@
       "timezoneHelper": "For dates and scheduling",
       "uploadLogo": "Upload Logo",
       "zipCode": "Zip Code"
+    },
+    "glossary": {
+      "customizedCount": "Customized entity names: {{count}} override",
+      "customizedCount_other": "Customized entity names: {{count}} overrides",
+      "description": "Customize how entity names appear throughout the application. Leave blank to use defaults.",
+      "entity": "Entity",
+      "pluralForm": "Plural Form",
+      "resetToDefault": "Reset to default",
+      "singularForm": "Singular Form"
     },
     "messages": {
       "errorLoadingSettings": "Error loading tenant settings",

@@ -2,8 +2,9 @@ import { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { PatternFormat } from 'react-number-format';
-import { tenantSettingsApi, type UpdateTenantSettingsRequest } from '../api';
+import { tenantSettingsApi, glossaryApi, type UpdateTenantSettingsRequest, type Glossary } from '../api';
 import { useHasCapability } from '../hooks/useCurrentUser';
+import { useGlossary } from '../contexts/GlossaryContext';
 import AppLayout from '../components/AppLayout';
 import { Heading, Subheading } from '../components/catalyst/heading';
 import { Text } from '../components/catalyst/text';
@@ -13,23 +14,32 @@ import { Input } from '../components/catalyst/input';
 import { Select } from '../components/catalyst/select';
 import { CheckboxField, Checkbox, CheckboxGroup } from '../components/catalyst/checkbox';
 import { Divider } from '../components/catalyst/divider';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/catalyst/table';
 import { US_STATES } from '../constants/states';
 import { US_TIMEZONES } from '../constants/timezones';
-import { PhoneIcon, EnvelopeIcon } from '@heroicons/react/24/outline';
+import { PhoneIcon, EnvelopeIcon, ArrowPathIcon } from '@heroicons/react/24/outline';
 
 export default function TenantSettingsPage() {
   const queryClient = useQueryClient();
   const { t } = useTranslation();
+  const { updateGlossary } = useGlossary();
   const canEdit = useHasCapability('EDIT_SETTINGS');
   const [isEditing, setIsEditing] = useState(false);
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [glossaryCustomizations, setGlossaryCustomizations] = useState<Glossary>({});
 
   // Fetch settings
   const { data: settings, isLoading, error } = useQuery({
     queryKey: ['tenant-settings'],
     queryFn: () => tenantSettingsApi.getSettings(),
+  });
+
+  // Fetch available entities (for glossary UI)
+  const { data: availableEntities } = useQuery({
+    queryKey: ['glossary', 'available'],
+    queryFn: () => glossaryApi.getAvailableEntities(),
   });
 
   // Initialize form data
@@ -58,14 +68,19 @@ export default function TenantSettingsPage() {
         enableSmsNotifications: settings.enableSmsNotifications,
         enableEmailNotifications: settings.enableEmailNotifications,
       });
+      setGlossaryCustomizations(settings.glossary || {});
     }
   }, [settings]);
 
   // Update settings mutation
   const updateMutation = useMutation({
     mutationFn: (data: UpdateTenantSettingsRequest) => tenantSettingsApi.updateSettings(data),
-    onSuccess: () => {
+    onSuccess: (updatedSettings) => {
       queryClient.invalidateQueries({ queryKey: ['tenant-settings'] });
+      // Update glossary context immediately
+      if (updatedSettings.glossary) {
+        updateGlossary(updatedSettings.glossary);
+      }
       setIsEditing(false);
     },
     onError: (error: unknown) => {
@@ -100,9 +115,36 @@ export default function TenantSettingsPage() {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
+  const handleGlossaryChange = (entityCode: string, field: 'singular' | 'plural', value: string) => {
+    setGlossaryCustomizations((prev) => ({
+      ...prev,
+      [entityCode]: {
+        singular: field === 'singular' ? value : (prev[entityCode]?.singular || ''),
+        plural: field === 'plural' ? value : (prev[entityCode]?.plural || ''),
+      },
+    }));
+  };
+
+  const handleGlossaryReset = (entityCode: string) => {
+    setGlossaryCustomizations((prev) => {
+      const updated = { ...prev };
+      delete updated[entityCode];
+      return updated;
+    });
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    updateMutation.mutate(formData);
+    // Only include non-empty glossary customizations
+    const cleanedGlossary = Object.fromEntries(
+      Object.entries(glossaryCustomizations).filter(
+        ([, value]) => value.singular?.trim() || value.plural?.trim()
+      )
+    );
+    updateMutation.mutate({
+      ...formData,
+      glossary: cleanedGlossary,
+    });
   };
 
   const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -301,6 +343,35 @@ export default function TenantSettingsPage() {
               </div>
             </div>
           </div>
+
+          {/* Terminology/Glossary - Full width section */}
+          {settings?.glossary && Object.keys(settings.glossary).length > 0 && (
+            <>
+              <Divider className="my-6" />
+              <div>
+                <Subheading className="mb-3">{t('tenantSettings.sections.terminology')}</Subheading>
+                <Text className="text-sm text-zinc-600 dark:text-zinc-400 mb-3">
+                  {t('tenantSettings.glossary.customizedCount', { count: Object.keys(settings.glossary).length })}
+                </Text>
+                <div className="space-y-1 text-sm">
+                  {Object.entries(settings.glossary).map(([code, entry]) => (
+                    <div key={code} className="flex items-center gap-2">
+                      <span className="text-zinc-500 dark:text-zinc-400 capitalize">
+                        {code.replace(/_/g, ' ')}:
+                      </span>
+                      <span className="text-zinc-900 dark:text-white font-medium">
+                        {entry.singular}
+                      </span>
+                      <span className="text-zinc-400 dark:text-zinc-600">/</span>
+                      <span className="text-zinc-900 dark:text-white font-medium">
+                        {entry.plural}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
         </div>
       </AppLayout>
     );
@@ -562,6 +633,80 @@ export default function TenantSettingsPage() {
               </div>
             </div>
           </div>
+
+          {/* Terminology/Glossary - Full width section */}
+          {availableEntities && availableEntities.length > 0 && (
+            <>
+              <Divider className="my-4" />
+              <div>
+                <Subheading>{t('tenantSettings.sections.terminology')}</Subheading>
+                <Text className="text-sm text-zinc-600 dark:text-zinc-400 mt-1 mb-3">
+                  {t('tenantSettings.glossary.description')}
+                </Text>
+                <Table dense className="[--gutter:theme(spacing.1)] text-sm">
+                  <TableHead>
+                    <TableRow>
+                      <TableHeader>{t('tenantSettings.glossary.entity')}</TableHeader>
+                      <TableHeader>{t('tenantSettings.glossary.singularForm')}</TableHeader>
+                      <TableHeader>{t('tenantSettings.glossary.pluralForm')}</TableHeader>
+                      <TableHeader className="w-16"></TableHeader>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {availableEntities.map((entity) => {
+                      const customization = glossaryCustomizations[entity.code];
+                      const isCustomized = customization?.singular || customization?.plural;
+                      return (
+                        <TableRow key={entity.code}>
+                          <TableCell className="font-medium">
+                            <div className="capitalize">{entity.code.replace(/_/g, ' ')}</div>
+                            <div className="text-xs text-zinc-500 dark:text-zinc-400 font-normal mt-0.5">
+                              {entity.description}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <Input
+                              name={`glossary-${entity.code}-singular`}
+                              value={customization?.singular || ''}
+                              onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                                handleGlossaryChange(entity.code, 'singular', e.target.value)
+                              }
+                              placeholder={entity.defaultSingular}
+                              className="h-8 text-sm"
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <Input
+                              name={`glossary-${entity.code}-plural`}
+                              value={customization?.plural || ''}
+                              onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                                handleGlossaryChange(entity.code, 'plural', e.target.value)
+                              }
+                              placeholder={entity.defaultPlural}
+                              className="h-8 text-sm"
+                            />
+                          </TableCell>
+                          <TableCell>
+                            {isCustomized && (
+                              <Button
+                                type="button"
+                                plain
+                                onClick={() => handleGlossaryReset(entity.code)}
+                                className="text-xs"
+                                title={t('tenantSettings.glossary.resetToDefault')}
+                              >
+                                <ArrowPathIcon className="h-4 w-4" />
+                              </Button>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+            </>
+          )}
 
           <Divider className="my-4" />
 

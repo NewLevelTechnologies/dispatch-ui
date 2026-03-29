@@ -442,6 +442,13 @@ vi.mock('react-i18next', () => {
     'tenantSettings.form.timezoneHelper': 'Used for displaying dates and scheduling',
     'tenantSettings.form.uploadLogo': 'Upload Logo',
     'tenantSettings.form.zipCode': 'Zip Code',
+    'tenantSettings.glossary.customizedCount': 'Customized entity names: {{count}} override',
+    'tenantSettings.glossary.customizedCount_other': 'Customized entity names: {{count}} overrides',
+    'tenantSettings.glossary.description': 'Customize how entity names appear throughout the application. Leave blank to use defaults.',
+    'tenantSettings.glossary.entity': 'Entity',
+    'tenantSettings.glossary.pluralForm': 'Plural Form',
+    'tenantSettings.glossary.resetToDefault': 'Reset to default',
+    'tenantSettings.glossary.singularForm': 'Singular Form',
     'tenantSettings.messages.errorLoadingSettings': 'Error loading tenant settings',
     'tenantSettings.messages.errorUpdateSettings': 'Failed to update settings',
     'tenantSettings.messages.errorUploadLogo': 'Failed to upload logo',
@@ -450,6 +457,7 @@ vi.mock('react-i18next', () => {
     'tenantSettings.messages.loadingSettings': 'Loading settings...',
     'tenantSettings.messages.logoUploadedSuccess': 'Logo uploaded successfully',
     'tenantSettings.messages.settingsUpdatedSuccess': 'Settings updated successfully',
+    'tenantSettings.sections.terminology': 'Terminology',
   };
 
   return {
