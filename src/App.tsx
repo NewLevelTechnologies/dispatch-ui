@@ -1,6 +1,7 @@
+import { useEffect } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuthenticator } from '@aws-amplify/ui-react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { tenantSettingsApi } from './api';
 import { GlossaryProvider } from './contexts/GlossaryContext';
 import LoginPage from './pages/LoginPage';
@@ -33,6 +34,14 @@ const ProtectedRoute = ({ element, isAuthenticated }: { element: React.ReactElem
 
 function App() {
   const { authStatus } = useAuthenticator((context) => [context.authStatus]);
+  const queryClient = useQueryClient();
+
+  // Clear React Query cache on logout to prevent showing old tenant's data
+  useEffect(() => {
+    if (authStatus === 'unauthenticated') {
+      queryClient.clear();
+    }
+  }, [authStatus, queryClient]);
 
   // Load tenant settings (includes glossary)
   const { data: tenantSettings, isLoading: settingsLoading, error: settingsError } = useQuery({
