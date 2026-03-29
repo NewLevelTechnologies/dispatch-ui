@@ -378,22 +378,30 @@ export default function TenantSettingsPage() {
                     <Text className="text-sm text-zinc-600 dark:text-zinc-400 mb-4">
                       {t('tenantSettings.glossary.customizedCount', { count: Object.keys(settings.glossary).length })}
                     </Text>
-                    <div className="space-y-1 text-sm">
-                      {Object.entries(settings.glossary).map(([code, entry]) => (
-                        <div key={code} className="flex items-center gap-2">
-                          <span className="text-zinc-500 dark:text-zinc-400 capitalize">
-                            {code.replace(/_/g, ' ')}:
-                          </span>
-                          <span className="text-zinc-900 dark:text-white font-medium">
-                            {entry.singular}
-                          </span>
-                          <span className="text-zinc-400 dark:text-zinc-600">/</span>
-                          <span className="text-zinc-900 dark:text-white font-medium">
-                            {entry.plural}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
+                    <Table dense className="[--gutter:theme(spacing.1)] text-sm">
+                      <TableHead>
+                        <TableRow>
+                          <TableHeader>{t('tenantSettings.glossary.entity')}</TableHeader>
+                          <TableHeader>{t('tenantSettings.glossary.singularForm')}</TableHeader>
+                          <TableHeader>{t('tenantSettings.glossary.pluralForm')}</TableHeader>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {Object.entries(settings.glossary).map(([code, entry]) => (
+                          <TableRow key={code}>
+                            <TableCell className="font-medium capitalize">
+                              {code.replace(/_/g, ' ')}
+                            </TableCell>
+                            <TableCell>
+                              {entry.singular}
+                            </TableCell>
+                            <TableCell>
+                              {entry.plural}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
                   </div>
                 ) : (
                   <Text className="text-sm text-zinc-500 dark:text-zinc-400">
