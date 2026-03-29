@@ -488,6 +488,24 @@ vi.mock('../contexts/ThemeContext', () => ({
   ThemeProvider: ({ children }: { children: React.ReactNode }) => children,
 }));
 
+// Mock GlossaryContext
+vi.mock('../contexts/GlossaryContext', async () => {
+  // Re-import inside mock for proper module resolution
+  const { GLOSSARY_DEFAULTS } = await import('../contexts/GlossaryContext');
+
+  return {
+    useGlossary: vi.fn(() => ({
+      getName: (code: string, plural = false) => {
+        const entry = GLOSSARY_DEFAULTS[code];
+        return entry ? (plural ? entry.plural : entry.singular) : code;
+      },
+      updateGlossary: vi.fn(),
+    })),
+    GlossaryProvider: ({ children }: { children: React.ReactNode }) => children,
+    GLOSSARY_DEFAULTS, // Re-export for other tests if needed
+  };
+});
+
 // Mock useCurrentUser hook
 vi.mock('../hooks/useCurrentUser', () => ({
   useCurrentUser: vi.fn(() => ({

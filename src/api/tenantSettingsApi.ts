@@ -1,6 +1,15 @@
 // Tenant Settings API Client
 import apiClient from './client';
 
+export interface GlossaryEntry {
+  singular: string;
+  plural: string;
+}
+
+export interface Glossary {
+  [entityCode: string]: GlossaryEntry;
+}
+
 export interface TenantSettings {
   tenantId: string;
   companyName: string;
@@ -25,6 +34,7 @@ export interface TenantSettings {
   enableOnlineBooking: boolean;
   enableSmsNotifications: boolean;
   enableEmailNotifications: boolean;
+  glossary?: Glossary; // Glossary is part of tenant settings
   updatedAt: string;
 }
 
@@ -46,6 +56,7 @@ export interface UpdateTenantSettingsRequest {
   enableOnlineBooking?: boolean;
   enableSmsNotifications?: boolean;
   enableEmailNotifications?: boolean;
+  glossary?: Glossary; // Glossary can be updated
 }
 
 export interface LogoUrls {
