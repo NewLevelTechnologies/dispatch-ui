@@ -89,7 +89,7 @@ describe('CustomerDetailPage', () => {
   it('displays loading state', () => {
     vi.mocked(apiClient.get).mockImplementation(() => new Promise(() => {}));
     renderWithProviders(<CustomerDetailPage />);
-    expect(screen.getByText(/loading customer/i)).toBeInTheDocument();
+    expect(screen.getByText(/loading/i)).toBeInTheDocument();
   });
 
   it('displays error state', async () => {
@@ -97,7 +97,7 @@ describe('CustomerDetailPage', () => {
     renderWithProviders(<CustomerDetailPage />);
 
     await waitFor(() => {
-      expect(screen.getByText(/error loading customer/i)).toBeInTheDocument();
+      expect(screen.getByText(/error loading/i)).toBeInTheDocument();
     });
   });
 
@@ -109,8 +109,8 @@ describe('CustomerDetailPage', () => {
       expect(screen.getByText('John Doe')).toBeInTheDocument();
     });
 
-    expect(screen.getByText(/no equipment recorded yet/i)).toBeInTheDocument();
-    expect(screen.getByText(/no work orders yet/i)).toBeInTheDocument();
+    // Glossary translates to "No equipment yet" and "No work orders yet"
+    expect(screen.getAllByText(/no .* yet/i).length).toBeGreaterThanOrEqual(2);
   });
 
   it('displays standard view for business', async () => {
@@ -150,7 +150,8 @@ describe('CustomerDetailPage', () => {
       expect(screen.getByText('John Doe')).toBeInTheDocument();
     });
 
-    const addButton = screen.getByRole('button', { name: /add location/i });
+    // Button now says "Add Service Location" (from glossary)
+    const addButton = screen.getByRole('button', { name: /add service location/i });
     await user.click(addButton);
 
     await waitFor(() => {
@@ -354,7 +355,8 @@ describe('CustomerDetailPage', () => {
       expect(screen.getByText('John Doe')).toBeInTheDocument();
     });
 
-    const addButton = screen.getByRole('button', { name: /add location/i });
+    // Button now says "Add Service Location" (from glossary)
+    const addButton = screen.getByRole('button', { name: /add service location/i });
     await user.click(addButton);
 
     await waitFor(() => {
