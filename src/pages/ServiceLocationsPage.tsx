@@ -209,7 +209,7 @@ export default function ServiceLocationsPage() {
           <Table dense className="[--gutter:theme(spacing.1)] text-sm">
             <TableHead>
               <TableRow>
-                <TableHeader>{t('serviceLocations.table.locationName')}</TableHeader>
+                <TableHeader>{t('common.form.name')}</TableHeader>
                 <TableHeader>{t('serviceLocations.table.address')}</TableHeader>
                 <TableHeader>{t('serviceLocations.table.contact')}</TableHeader>
                 <TableHeader>{t('serviceLocations.table.lastService')}</TableHeader>

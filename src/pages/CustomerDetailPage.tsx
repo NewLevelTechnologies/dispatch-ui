@@ -310,7 +310,7 @@ export default function CustomerDetailPage() {
                   <Table dense className="[--gutter:theme(spacing.1)] text-sm">
                     <TableHead>
                       <TableRow>
-                        <TableHeader>{t('customers.table.locationName')}</TableHeader>
+                        <TableHeader>{t('common.form.name')}</TableHeader>
                         <TableHeader>{t('customers.table.locationAddress')}</TableHeader>
                         <TableHeader>{t('customers.table.locationContact')}</TableHeader>
                         <TableHeader>{t('common.form.status')}</TableHeader>
