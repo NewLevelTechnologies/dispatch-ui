@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { MagnifyingGlassIcon } from '@heroicons/react/24/outline';
+import { useGlossary } from '../contexts/GlossaryContext';
 import AppLayout from '../components/AppLayout';
 import { Heading } from '../components/catalyst/heading';
 import { Button } from '../components/catalyst/button';
@@ -29,6 +30,7 @@ interface WorkOrder {
 export default function InvoicesPage() {
   const queryClient = useQueryClient();
   const { t } = useTranslation();
+  const { getName } = useGlossary();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isStatusOpen, setIsStatusOpen] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
@@ -127,7 +129,7 @@ export default function InvoicesPage() {
         error.response && typeof error.response === 'object' && 'data' in error.response &&
         error.response.data && typeof error.response.data === 'object' && 'message' in error.response.data
         ? String(error.response.data.message)
-        : t('common.form.errorCreate', { entity: t('entities.invoice') });
+        : t('common.form.errorCreate', { entity: getName('invoice') });
       alert(message);
     } finally {
       setSubmitting(false);
@@ -220,11 +222,11 @@ export default function InvoicesPage() {
     <AppLayout>
       <div className="flex items-end justify-between gap-4">
         <div>
-          <Heading>{t('entities.invoices')}</Heading>
+          <Heading>{getName('invoice', true)}</Heading>
           <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">{t('invoices.description')}</p>
         </div>
         <Button onClick={() => setIsCreateOpen(true)}>
-          {t('common.actions.create', { entity: t('entities.invoice') })}
+          {t('common.actions.create', { entity: getName('invoice') })}
         </Button>
       </div>
 
@@ -242,7 +244,7 @@ export default function InvoicesPage() {
         {invoices && invoices.length > 0 && (
           <div className="text-sm text-zinc-600 dark:text-zinc-400">
             {filteredInvoices.length === invoices.length
-              ? `${invoices.length} ${invoices.length === 1 ? t('entities.invoice').toLowerCase() : t('entities.invoices').toLowerCase()}`
+              ? `${invoices.length} ${invoices.length === 1 ? getName('invoice').toLowerCase() : getName('invoice', true).toLowerCase()}`
               : `${filteredInvoices.length} of ${invoices.length}`}
           </div>
         )}
@@ -250,12 +252,12 @@ export default function InvoicesPage() {
 
       {invoicesLoading ? (
         <div className="mt-4 text-center">
-          <p className="text-sm text-zinc-600 dark:text-zinc-400">{t('common.actions.loading', { entities: t('entities.invoices') })}</p>
+          <p className="text-sm text-zinc-600 dark:text-zinc-400">{t('common.actions.loading', { entities: getName('invoice', true) })}</p>
         </div>
       ) : filteredInvoices.length === 0 ? (
         <div className="mt-4 rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700 p-4">
           <p className="text-sm text-zinc-600 dark:text-zinc-400">
-            {searchTerm ? t('common.actions.noMatchSearch', { entities: t('entities.invoices') }) : t('common.actions.notFound', { entities: t('entities.invoices') })}
+            {searchTerm ? t('common.actions.noMatchSearch', { entities: getName('invoice', true) }) : t('common.actions.notFound', { entities: getName('invoice', true) })}
           </p>
         </div>
       ) : (
@@ -304,8 +306,8 @@ export default function InvoicesPage() {
 
       {/* Create Invoice Dialog */}
       <Dialog open={isCreateOpen} onClose={setIsCreateOpen}>
-        <DialogTitle>{t('common.actions.create', { entity: t('entities.invoice') })}</DialogTitle>
-        <DialogDescription>{t('common.form.descriptionCreate', { entity: t('entities.invoice') })}</DialogDescription>
+        <DialogTitle>{t('common.actions.create', { entity: getName('invoice') })}</DialogTitle>
+        <DialogDescription>{t('common.form.descriptionCreate', { entity: getName('invoice') })}</DialogDescription>
         <form onSubmit={handleSubmit}>
           <DialogBody>
             <div className="space-y-4">
@@ -438,8 +440,8 @@ export default function InvoicesPage() {
 
       {/* Update Status Dialog */}
       <Dialog open={isStatusOpen} onClose={setIsStatusOpen}>
-        <DialogTitle>{t('common.actions.edit', { entity: t('entities.invoice') })}</DialogTitle>
-        <DialogDescription>{t('common.updateStatus', { entity: t('entities.invoice') })}</DialogDescription>
+        <DialogTitle>{t('common.actions.edit', { entity: getName('invoice') })}</DialogTitle>
+        <DialogDescription>{t('common.updateStatus', { entity: getName('invoice') })}</DialogDescription>
         <DialogBody>
           <Field>
             <Label>{t('common.form.status')}</Label>

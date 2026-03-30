@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
+import { PatternFormat } from 'react-number-format';
 import { EllipsisVerticalIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import AppLayout from '../components/AppLayout';
 import { Heading } from '../components/catalyst/heading';
@@ -318,11 +319,13 @@ export default function WarehousesPage() {
 
                 <Field>
                   <Label>{t('common.form.phone')}</Label>
-                  <Input
-                    type="tel"
+                  <PatternFormat
+                    format="(###) ###-####"
+                    mask="_"
+                    customInput={Input}
                     name="phone"
                     value={formData.phone}
-                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                    onValueChange={(values) => setFormData({ ...formData, phone: values.formattedValue })}
                   />
                 </Field>
               </FieldGroup>

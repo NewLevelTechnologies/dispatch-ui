@@ -1,5 +1,9 @@
+import { useEffect } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuthenticator } from '@aws-amplify/ui-react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { tenantSettingsApi } from './api';
+import { GlossaryProvider } from './contexts/GlossaryContext';
 import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
 import CustomersPage from './pages/CustomersPage';
@@ -30,9 +34,31 @@ const ProtectedRoute = ({ element, isAuthenticated }: { element: React.ReactElem
 
 function App() {
   const { authStatus } = useAuthenticator((context) => [context.authStatus]);
+  const queryClient = useQueryClient();
 
-  // Show loading while checking auth status
-  if (authStatus === 'configuring') {
+  // Clear React Query cache on logout to prevent showing old tenant's data
+  useEffect(() => {
+    if (authStatus === 'unauthenticated') {
+      queryClient.clear();
+    }
+  }, [authStatus, queryClient]);
+
+  // Load tenant settings (includes glossary)
+  const { data: tenantSettings, isLoading: settingsLoading, error: settingsError } = useQuery({
+    queryKey: ['tenant-settings'],
+    queryFn: () => tenantSettingsApi.getSettings(),
+    enabled: authStatus === 'authenticated',
+    staleTime: 30 * 60 * 1000, // 30 minutes - settings change rarely, but should propagate reasonably fast
+    retry: 2, // Retry failed requests twice before giving up
+  });
+
+  // Log error but continue with defaults (GlossaryProvider will fall back to GLOSSARY_DEFAULTS)
+  if (settingsError) {
+    console.error('Failed to load tenant settings:', settingsError);
+  }
+
+  // Show loading while checking auth OR loading settings
+  if (authStatus === 'configuring' || (authStatus === 'authenticated' && settingsLoading)) {
     return (
       <div className="flex h-screen items-center justify-center">
         <div className="text-lg">Loading...</div>
@@ -43,7 +69,8 @@ function App() {
   const isAuthenticated = authStatus === 'authenticated';
 
   return (
-    <Routes>
+    <GlossaryProvider glossary={tenantSettings?.glossary}>
+      <Routes>
       <Route
         path="/login"
         element={
@@ -85,7 +112,8 @@ function App() {
           )
         }
       />
-    </Routes>
+      </Routes>
+    </GlossaryProvider>
   );
 }
 

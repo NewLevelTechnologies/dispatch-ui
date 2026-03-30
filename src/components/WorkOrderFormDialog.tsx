@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { customerApi, workOrderApi, type WorkOrder } from '../api';
+import { useGlossary } from '../contexts/GlossaryContext';
 import { Dialog, DialogActions, DialogBody, DialogDescription, DialogTitle } from './catalyst/dialog';
 import { Button } from './catalyst/button';
 import { Field, FieldGroup, Fieldset, Label } from './catalyst/fieldset';
@@ -18,6 +19,7 @@ interface WorkOrderFormDialogProps {
 export default function WorkOrderFormDialog({ isOpen, onClose, workOrder }: WorkOrderFormDialogProps) {
   const queryClient = useQueryClient();
   const { t } = useTranslation();
+  const { getName } = useGlossary();
   const isEdit = !!workOrder?.id;
 
   const [formData, setFormData] = useState<Omit<WorkOrder, 'id' | 'createdAt' | 'updatedAt'>>({
@@ -71,7 +73,7 @@ export default function WorkOrderFormDialog({ isOpen, onClose, workOrder }: Work
       const errorMessage = error instanceof Error && 'response' in error
         ? ((error as { response?: { data?: { message?: string } } }).response?.data?.message)
         : undefined;
-      alert(errorMessage || t('common.form.errorCreate', { entity: t('entities.workOrder') }));
+      alert(errorMessage || t('common.form.errorCreate', { entity: getName('work_order') }));
     },
   });
 
@@ -91,7 +93,7 @@ export default function WorkOrderFormDialog({ isOpen, onClose, workOrder }: Work
       const errorMessage = error instanceof Error && 'response' in error
         ? ((error as { response?: { data?: { message?: string } } }).response?.data?.message)
         : undefined;
-      alert(errorMessage || t('common.form.errorUpdate', { entity: t('entities.workOrder') }));
+      alert(errorMessage || t('common.form.errorUpdate', { entity: getName('work_order') }));
     },
   });
 
@@ -119,12 +121,12 @@ export default function WorkOrderFormDialog({ isOpen, onClose, workOrder }: Work
       <DialogTitle>
         {t('common.form.titleCreate', {
           action: isEdit ? t('common.edit') : t('common.create'),
-          entity: t('entities.workOrder')
+          entity: getName('work_order')
         })}
       </DialogTitle>
       <DialogDescription>
         {t(isEdit ? 'common.form.descriptionEdit' : 'common.form.descriptionCreate', {
-          entity: t('entities.workOrder')
+          entity: getName('work_order')
         })}
       </DialogDescription>
       <DialogBody>
@@ -132,7 +134,7 @@ export default function WorkOrderFormDialog({ isOpen, onClose, workOrder }: Work
           <Fieldset>
             <FieldGroup>
               <Field>
-                <Label>{t('entities.customer')} *</Label>
+                <Label>{getName('customer')} *</Label>
                 <Select
                   name="customerId"
                   value={formData.customerId}

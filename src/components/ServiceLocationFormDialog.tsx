@@ -3,6 +3,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { PatternFormat } from 'react-number-format';
 import { customerApi, type ServiceLocation } from '../api';
+import { useGlossary } from '../contexts/GlossaryContext';
 import { Dialog, DialogActions, DialogBody, DialogDescription, DialogTitle } from './catalyst/dialog';
 import { Button } from './catalyst/button';
 import { Field, Label } from './catalyst/fieldset';
@@ -35,6 +36,7 @@ interface FormData {
 export default function ServiceLocationFormDialog({ isOpen, onClose, serviceLocation, customerId }: ServiceLocationFormDialogProps) {
   const queryClient = useQueryClient();
   const { t } = useTranslation();
+  const { getName } = useGlossary();
   const isEdit = !!serviceLocation;
   const effectiveCustomerId = serviceLocation?.customerId || customerId || '';
 
@@ -116,7 +118,7 @@ export default function ServiceLocationFormDialog({ isOpen, onClose, serviceLoca
       const errorMessage = error instanceof Error && 'response' in error
         ? ((error as { response?: { data?: { message?: string } } }).response?.data?.message)
         : undefined;
-      alert(errorMessage || t('common.form.errorCreate', { entity: t('entities.serviceLocation') }));
+      alert(errorMessage || t('common.form.errorCreate', { entity: getName('service_location') }));
     },
   });
 
@@ -164,7 +166,7 @@ export default function ServiceLocationFormDialog({ isOpen, onClose, serviceLoca
       const errorMessage = error instanceof Error && 'response' in error
         ? ((error as { response?: { data?: { message?: string } } }).response?.data?.message)
         : undefined;
-      alert(errorMessage || t('common.form.errorUpdate', { entity: t('entities.serviceLocation') }));
+      alert(errorMessage || t('common.form.errorUpdate', { entity: getName('service_location') }));
     },
   });
 
@@ -184,13 +186,13 @@ export default function ServiceLocationFormDialog({ isOpen, onClose, serviceLoca
       <DialogTitle>
         {t('common.form.titleCreate', {
           action: isEdit ? t('common.edit') : t('common.create'),
-          entity: t('entities.serviceLocation'),
+          entity: getName('service_location'),
         })}
       </DialogTitle>
       <DialogDescription>
         {isEdit
-          ? t('common.form.descriptionEdit', { entity: t('entities.serviceLocation') })
-          : t('common.form.descriptionCreate', { entity: t('entities.serviceLocation') })}
+          ? t('common.form.descriptionEdit', { entity: getName('service_location') })
+          : t('common.form.descriptionCreate', { entity: getName('service_location') })}
       </DialogDescription>
       <DialogBody>
         <form onSubmit={handleSubmit} id="service-location-form" className="space-y-3">

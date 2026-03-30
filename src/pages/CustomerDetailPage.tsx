@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { customerApi } from '../api';
+import { useGlossary } from '../contexts/GlossaryContext';
 import { useHasCapability } from '../hooks/useCurrentUser';
 import AppLayout from '../components/AppLayout';
 import ServiceLocationFormDialog from '../components/ServiceLocationFormDialog';
@@ -31,6 +32,7 @@ export default function CustomerDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { t } = useTranslation();
+  const { getName } = useGlossary();
   const [isAddLocationDialogOpen, setIsAddLocationDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [locationSearchQuery, setLocationSearchQuery] = useState('');
@@ -66,7 +68,7 @@ export default function CustomerDetailPage() {
     return (
       <AppLayout>
         <div className="p-8 text-center">
-          <Text>Loading customer...</Text>
+          <Text>{t('common.actions.loadingEntity', { entity: getName('customer') })}</Text>
         </div>
       </AppLayout>
     );
@@ -78,13 +80,13 @@ export default function CustomerDetailPage() {
         <div className="p-8">
           <div className="rounded-lg bg-red-50 p-4 ring-1 ring-red-200 dark:bg-red-950/10 dark:ring-red-900/20">
             <Text className="text-red-800 dark:text-red-400">
-              {t('customers.detail.errorLoading')}
+              {t('common.actions.errorLoadingEntity', { entity: getName('customer') })}
               {error && `: ${(error as Error).message}`}
             </Text>
           </div>
           <Button className="mt-4" onClick={() => navigate('/customers')}>
             <ArrowLeftIcon className="size-4" />
-            {t('customers.detail.backToCustomers')}
+            {t('common.actions.backTo', { entities: getName('customer', true) })}
           </Button>
         </div>
       </AppLayout>
@@ -141,7 +143,7 @@ export default function CustomerDetailPage() {
                 {canAddServiceLocations && (
                   <Button plain onClick={() => setIsAddLocationDialogOpen(true)}>
                     <PlusIcon className="size-4" />
-                    {t('customers.detail.addLocation')}
+                    {t('common.actions.add', { entity: getName('service_location') })}
                   </Button>
                 )}
                 {canEditCustomers && (
@@ -164,7 +166,7 @@ export default function CustomerDetailPage() {
                 <Strong className="mt-1 block text-sm">{t('customers.detail.never')}</Strong>
               </div>
               <div>
-                <Text className="text-xs">{t('customers.detail.openWorkOrders')}</Text>
+                <Text className="text-xs">{t('common.actions.open', { entities: getName('work_order', true) })}</Text>
                 <Strong className="mt-1 block text-sm">0</Strong>
               </div>
               <div>
@@ -176,30 +178,30 @@ export default function CustomerDetailPage() {
             {/* Equipment Section */}
             <div className="mt-4">
               <div className="flex items-center justify-between">
-                <Subheading>{t('customers.detail.equipment')}</Subheading>
+                <Subheading>{getName('equipment')}</Subheading>
                 {/* TODO: Add equipment permission check when equipment management is implemented */}
                 <Button plain>
                   <PlusIcon className="size-4" />
-                  {t('customers.detail.addEquipment')}
+                  {t('common.actions.add', { entity: getName('equipment') })}
                 </Button>
               </div>
               <div className="mt-2 rounded-lg border border-zinc-200 p-4 text-center dark:border-zinc-800">
-                <Text>{t('customers.detail.noEquipment')}</Text>
+                <Text>{t('common.actions.noEntitiesYet', { entities: getName('equipment', true) })}</Text>
               </div>
             </div>
 
             {/* Recent Work Orders */}
             <div className="mt-4">
               <div className="flex items-center justify-between">
-                <Subheading>{t('customers.detail.recentWorkOrders')}</Subheading>
+                <Subheading>{t('common.recentEntities', { entities: getName('work_order', true) })}</Subheading>
                 {/* TODO: Add work order permission check when work order management is implemented */}
                 <Button plain>
                   <PlusIcon className="size-4" />
-                  {t('customers.form.newWorkOrder')}
+                  {t('common.actions.new', { entity: getName('work_order') })}
                 </Button>
               </div>
               <div className="mt-2 rounded-lg border border-zinc-200 p-4 text-center dark:border-zinc-800">
-                <Text>{t('customers.detail.noWorkOrders')}</Text>
+                <Text>{t('common.actions.noEntitiesYet', { entities: getName('work_order', true) })}</Text>
               </div>
             </div>
 
@@ -270,11 +272,11 @@ export default function CustomerDetailPage() {
             {/* Service Locations */}
             <div className="mt-4">
               <div className="flex items-center justify-between">
-                <Subheading>{t('customers.detail.serviceLocationsCount', { count: customer.serviceLocations.length })}</Subheading>
+                <Subheading>{t('common.entitiesCount', { entities: getName('service_location', true), count: customer.serviceLocations.length })}</Subheading>
                 {useTableLayout && canAddServiceLocations && (
                   <Button plain onClick={() => setIsAddLocationDialogOpen(true)}>
                     <PlusIcon className="size-4" />
-                    {t('customers.detail.addLocation')}
+                    {t('common.actions.add', { entity: getName('service_location') })}
                   </Button>
                 )}
               </div>
@@ -308,7 +310,7 @@ export default function CustomerDetailPage() {
                   <Table dense className="[--gutter:theme(spacing.1)] text-sm">
                     <TableHead>
                       <TableRow>
-                        <TableHeader>{t('customers.table.locationName')}</TableHeader>
+                        <TableHeader>{t('common.form.name')}</TableHeader>
                         <TableHeader>{t('customers.table.locationAddress')}</TableHeader>
                         <TableHeader>{t('customers.table.locationContact')}</TableHeader>
                         <TableHeader>{t('common.form.status')}</TableHeader>
@@ -412,7 +414,8 @@ export default function CustomerDetailPage() {
 
                     <div className="mt-3 border-t border-zinc-100 pt-2 dark:border-zinc-800">
                       <Text className="flex items-center justify-between text-xs">
-                        <span>{t('customers.detail.equipmentCount', { count: 0 })}</span>
+                        {/* eslint-disable-next-line i18next/no-literal-string */}
+                        <span>{getName('equipment')}: 0</span>
                         <span>{t('customers.detail.lastServiceNever')}</span>
                       </Text>
                     </div>
@@ -437,7 +440,7 @@ export default function CustomerDetailPage() {
                       <div className="text-center">
                         <PlusIcon className="mx-auto size-8 text-zinc-400" />
                         <Strong className="mt-2 block text-sm">
-                          {t('customers.detail.addServiceLocation')}
+                          {t('common.actions.add', { entity: getName('service_location') })}
                         </Strong>
                       </div>
                     </button>

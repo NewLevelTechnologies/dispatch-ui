@@ -33,7 +33,9 @@
       "Bash(git stash:*)",
       "Bash(git commit:*)",
       "Bash(npm run:*)",
-      "Bash(tee /tmp/test-coverage.txt)"
+      "Bash(tee /tmp/test-coverage.txt)",
+      "WebFetch(domain:www.npmjs.com)",
+      "WebFetch(domain:github.com)"
     ]
   }
 }

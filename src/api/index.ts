@@ -107,4 +107,9 @@ export {
   type UpdateTenantSettingsRequest,
   type LogoUrls,
   type UploadLogoResponse,
+  type Glossary,
+  type GlossaryEntry,
 } from './tenantSettingsApi';
+
+// Glossary API
+export { glossaryApi, type EntityInfo } from './glossaryApi';

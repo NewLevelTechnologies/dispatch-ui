@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { customerApi } from '../api';
+import { useGlossary } from '../contexts/GlossaryContext';
 import { useHasCapability } from '../hooks/useCurrentUser';
 import AppLayout from '../components/AppLayout';
 import ServiceLocationFormDialog from '../components/ServiceLocationFormDialog';
@@ -17,6 +18,7 @@ export default function ServiceLocationDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { t } = useTranslation();
+  const { getName } = useGlossary();
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
 
   // Permission checks
@@ -45,7 +47,7 @@ export default function ServiceLocationDetailPage() {
     return (
       <AppLayout>
         <div className="p-8 text-center">
-          <Text>{t('serviceLocations.detail.loading')}</Text>
+          <Text>{t('common.actions.loadingEntity', { entity: getName('service_location') })}</Text>
         </div>
       </AppLayout>
     );
@@ -57,13 +59,13 @@ export default function ServiceLocationDetailPage() {
         <div className="p-8">
           <div className="rounded-lg bg-red-50 p-4 ring-1 ring-red-200 dark:bg-red-950/10 dark:ring-red-900/20">
             <Text className="text-red-800 dark:text-red-400">
-              {t('serviceLocations.detail.errorLoading')}
+              {t('common.actions.errorLoadingEntity', { entity: getName('service_location') })}
               {error && `: ${(error as Error).message}`}
             </Text>
           </div>
           <Button className="mt-4" onClick={() => navigate('/service-locations')}>
             <ArrowLeftIcon className="size-4" />
-            {t('serviceLocations.detail.backToList')}
+            {t('common.actions.backTo', { entities: getName('service_location', true) })}
           </Button>
         </div>
       </AppLayout>
@@ -211,30 +213,30 @@ export default function ServiceLocationDetailPage() {
               {/* Equipment Section */}
               <div className="rounded-lg border border-zinc-200 p-3 dark:border-zinc-800">
                 <div className="flex items-center justify-between">
-                  <Subheading>{t('serviceLocations.detail.equipment')}</Subheading>
+                  <Subheading>{getName('equipment')}</Subheading>
                   {/* TODO: Add equipment permission check when equipment management is implemented */}
                   <Button plain>
                     <PlusIcon className="size-4" />
-                    {t('serviceLocations.detail.addEquipment')}
+                    {t('common.actions.add', { entity: getName('equipment') })}
                   </Button>
                 </div>
                 <div className="mt-2 rounded-lg bg-zinc-50 p-3 text-center dark:bg-zinc-900">
-                  <Text className="text-sm">{t('serviceLocations.detail.noEquipment')}</Text>
+                  <Text className="text-sm">{t('common.actions.noEntitiesYet', { entities: getName('equipment', true) })}</Text>
                 </div>
               </div>
 
               {/* Recent Work Orders */}
               <div className="rounded-lg border border-zinc-200 p-3 dark:border-zinc-800">
                 <div className="flex items-center justify-between">
-                  <Subheading>{t('serviceLocations.detail.recentWorkOrders')}</Subheading>
+                  <Subheading>{t('common.recentEntities', { entities: getName('work_order', true) })}</Subheading>
                   {/* TODO: Add work order permission check when work order management is implemented */}
                   <Button plain>
                     <PlusIcon className="size-4" />
-                    {t('serviceLocations.detail.newWorkOrder')}
+                    {t('common.actions.new', { entity: getName('work_order') })}
                   </Button>
                 </div>
                 <div className="mt-2 rounded-lg bg-zinc-50 p-3 text-center dark:bg-zinc-900">
-                  <Text className="text-sm">{t('serviceLocations.detail.noWorkOrders')}</Text>
+                  <Text className="text-sm">{t('common.actions.noEntitiesYet', { entities: getName('work_order', true) })}</Text>
                 </div>
               </div>
             </div>
@@ -251,7 +253,7 @@ export default function ServiceLocationDetailPage() {
                   </div>
                   <Divider />
                   <div>
-                    <Text className="text-xs">{t('serviceLocations.detail.openWorkOrders')}</Text>
+                    <Text className="text-xs">{t('common.actions.open', { entities: getName('work_order', true) })}</Text>
                     <Strong className="mt-1 block text-lg">0</Strong>
                   </div>
                   <Divider />

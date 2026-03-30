@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { EllipsisVerticalIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import apiClient from '../api/client';
+import { useGlossary } from '../contexts/GlossaryContext';
 import AppLayout from '../components/AppLayout';
 import { Heading } from '../components/catalyst/heading';
 import { Button } from '../components/catalyst/button';
@@ -29,6 +30,7 @@ interface WorkOrder {
 export default function DispatchesPage() {
   const queryClient = useQueryClient();
   const { t } = useTranslation();
+  const { getName } = useGlossary();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedDispatch, setSelectedDispatch] = useState<Dispatch | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -179,9 +181,9 @@ export default function DispatchesPage() {
   return (
     <AppLayout>
       <div className="flex items-center justify-between gap-4">
-        <Heading>{t('scheduling.entities.dispatches')}</Heading>
+        <Heading>{getName('dispatch', true)}</Heading>
         <Button onClick={handleAdd}>
-          {t('common.actions.add', { entity: t('scheduling.entities.dispatch') })}
+          {t('common.actions.add', { entity: getName('dispatch') })}
         </Button>
       </div>
 
@@ -199,7 +201,7 @@ export default function DispatchesPage() {
         {safeDispatches.length > 0 && (
           <div className="text-sm text-zinc-600 dark:text-zinc-400">
             {filteredDispatches.length === safeDispatches.length
-              ? `${safeDispatches.length} ${safeDispatches.length === 1 ? t('scheduling.entities.dispatch').toLowerCase() : t('scheduling.entities.dispatches').toLowerCase()}`
+              ? `${safeDispatches.length} ${safeDispatches.length === 1 ? getName('dispatch').toLowerCase() : getName('dispatch', true).toLowerCase()}`
               : `${filteredDispatches.length} of ${safeDispatches.length}`}
           </div>
         )}
@@ -208,7 +210,7 @@ export default function DispatchesPage() {
       {error && (
         <div className="mt-4 rounded-lg bg-red-50 p-3 ring-1 ring-red-200 dark:bg-red-950/10 dark:ring-red-900/20">
           <p className="text-sm text-red-800 dark:text-red-400">
-            {t('common.actions.errorLoading', { entities: t('scheduling.entities.dispatches') })}: {(error as Error).message}
+            {t('common.actions.errorLoading', { entities: getName('dispatch', true) })}: {(error as Error).message}
           </p>
         </div>
       )}
@@ -216,19 +218,19 @@ export default function DispatchesPage() {
       {isLoading ? (
         <div className="mt-4 text-center">
           <p className="text-sm text-zinc-600 dark:text-zinc-400">
-            {t('common.actions.loading', { entities: t('scheduling.entities.dispatches') })}
+            {t('common.actions.loading', { entities: getName('dispatch', true) })}
           </p>
         </div>
       ) : safeDispatches.length === 0 ? (
         <div className="mt-4 rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700 p-4">
           <p className="text-sm text-zinc-600 dark:text-zinc-400">
-            {t('common.actions.notFound', { entities: t('scheduling.entities.dispatches') })}
+            {t('common.actions.notFound', { entities: getName('dispatch', true) })}
           </p>
         </div>
       ) : filteredDispatches.length === 0 ? (
         <div className="mt-4 rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700 p-4">
           <p className="text-sm text-zinc-600 dark:text-zinc-400">
-            {t('common.actions.noMatchSearch', { entities: t('scheduling.entities.dispatches') })}
+            {t('common.actions.noMatchSearch', { entities: getName('dispatch', true) })}
           </p>
         </div>
       ) : (
@@ -284,13 +286,13 @@ export default function DispatchesPage() {
       <Dialog open={isDialogOpen} onClose={setIsDialogOpen}>
         <DialogTitle>
           {selectedDispatch
-            ? t('common.actions.edit', { entity: t('scheduling.entities.dispatch') })
-            : t('common.actions.add', { entity: t('scheduling.entities.dispatch') })}
+            ? t('common.actions.edit', { entity: getName('dispatch') })
+            : t('common.actions.add', { entity: getName('dispatch') })}
         </DialogTitle>
         <DialogDescription>
           {selectedDispatch
-            ? t('common.form.descriptionEdit', { entity: t('scheduling.entities.dispatch') })
-            : t('common.form.descriptionCreate', { entity: t('scheduling.entities.dispatch') })}
+            ? t('common.form.descriptionEdit', { entity: getName('dispatch') })
+            : t('common.form.descriptionCreate', { entity: getName('dispatch') })}
         </DialogDescription>
         <form onSubmit={handleSubmit}>
           <DialogBody>

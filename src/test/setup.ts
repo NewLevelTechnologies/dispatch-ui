@@ -65,15 +65,21 @@ vi.mock('react-i18next', () => {
     'common.actions.add': 'Add {{entity}}',
     'common.actions.addFirst': 'Add your first {{entity, lowercase}}',
     'common.actions.back': 'Back',
+    'common.actions.backTo': 'Back to {{entities}}',
     'common.actions.create': 'Create {{entity}}',
     'common.actions.createFirst': 'Create your first {{entity, lowercase}}',
     'common.actions.deleteConfirm': 'Are you sure you want to delete {{name}}?',
     'common.actions.deleteConfirmGeneric': 'Are you sure you want to delete this {{entity, lowercase}}?',
     'common.actions.edit': 'Edit {{entity}}',
     'common.actions.errorLoading': 'Error loading {{entities, lowercase}}',
+    'common.actions.errorLoadingEntity': 'Error loading {{entity, lowercase}}',
     'common.actions.loading': 'Loading {{entities, lowercase}}...',
+    'common.actions.loadingEntity': 'Loading {{entity, lowercase}}...',
+    'common.actions.new': 'New {{entity}}',
+    'common.actions.noEntitiesYet': 'No {{entities, lowercase}} yet',
     'common.actions.noMatchSearch': 'No {{entities, lowercase}} match your search.',
     'common.actions.notFound': 'No {{entities, lowercase}} found',
+    'common.actions.open': 'Open {{entities}}',
     'common.active': 'Active',
     'common.add': 'Add',
     'common.cancel': 'Cancel',
@@ -84,7 +90,9 @@ vi.mock('react-i18next', () => {
     'common.disabled': 'Disabled',
     'common.edit': 'Edit',
     'common.enabled': 'Enabled',
+    'common.entitiesCount': '{{entities}} ({{count}})',
     'common.hide': 'Hide',
+    'common.recentEntities': 'Recent {{entities}}',
     'common.restoring': 'Restoring...',
     'common.search': 'Search...',
     'common.show': 'Show',
@@ -442,6 +450,15 @@ vi.mock('react-i18next', () => {
     'tenantSettings.form.timezoneHelper': 'Used for displaying dates and scheduling',
     'tenantSettings.form.uploadLogo': 'Upload Logo',
     'tenantSettings.form.zipCode': 'Zip Code',
+    'tenantSettings.glossary.customizedCount': 'Customized entity names: {{count}} override',
+    'tenantSettings.glossary.customizedCount_other': 'Customized entity names: {{count}} overrides',
+    'tenantSettings.glossary.description': 'Customize how entity names appear throughout the application. Leave blank to use defaults.',
+    'tenantSettings.glossary.emptyState': 'No custom terminology configured. Using default entity names.',
+    'tenantSettings.glossary.entity': 'Entity',
+    'tenantSettings.glossary.loadingEntities': 'Loading entity types...',
+    'tenantSettings.glossary.pluralForm': 'Plural Form',
+    'tenantSettings.glossary.resetToDefault': 'Reset to default',
+    'tenantSettings.glossary.singularForm': 'Singular Form',
     'tenantSettings.messages.errorLoadingSettings': 'Error loading tenant settings',
     'tenantSettings.messages.errorUpdateSettings': 'Failed to update settings',
     'tenantSettings.messages.errorUploadLogo': 'Failed to upload logo',
@@ -450,6 +467,9 @@ vi.mock('react-i18next', () => {
     'tenantSettings.messages.loadingSettings': 'Loading settings...',
     'tenantSettings.messages.logoUploadedSuccess': 'Logo uploaded successfully',
     'tenantSettings.messages.settingsUpdatedSuccess': 'Settings updated successfully',
+    'tenantSettings.sections.terminology': 'Terminology',
+    'tenantSettings.tabs.general': 'General',
+    'tenantSettings.tabs.terminology': 'Terminology',
   };
 
   return {
@@ -487,6 +507,24 @@ vi.mock('../contexts/ThemeContext', () => ({
   })),
   ThemeProvider: ({ children }: { children: React.ReactNode }) => children,
 }));
+
+// Mock GlossaryContext
+vi.mock('../contexts/GlossaryContext', async () => {
+  // Re-import inside mock for proper module resolution
+  const { GLOSSARY_DEFAULTS } = await import('../contexts/GlossaryContext');
+
+  return {
+    useGlossary: vi.fn(() => ({
+      getName: (code: string, plural = false) => {
+        const entry = GLOSSARY_DEFAULTS[code];
+        return entry ? (plural ? entry.plural : entry.singular) : code;
+      },
+      updateGlossary: vi.fn(),
+    })),
+    GlossaryProvider: ({ children }: { children: React.ReactNode }) => children,
+    GLOSSARY_DEFAULTS, // Re-export for other tests if needed
+  };
+});
 
 // Mock useCurrentUser hook
 vi.mock('../hooks/useCurrentUser', () => ({

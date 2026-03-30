@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { EllipsisVerticalIcon, MagnifyingGlassIcon, HomeIcon, BuildingOfficeIcon } from '@heroicons/react/24/outline';
 import { customerApi, type Customer } from '../api';
+import { useGlossary } from '../contexts/GlossaryContext';
 import { useHasCapability } from '../hooks/useCurrentUser';
 import AppLayout from '../components/AppLayout';
 import CustomerFormDialog from '../components/CustomerFormDialog';
@@ -18,6 +19,7 @@ export default function CustomersPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { t } = useTranslation();
+  const { getName } = useGlossary();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -87,9 +89,9 @@ export default function CustomersPage() {
   return (
     <AppLayout>
       <div className="flex items-center justify-between gap-4">
-        <Heading>{t('entities.customers')}</Heading>
+        <Heading>{getName('customer', true)}</Heading>
         {canAddCustomers && (
-          <Button onClick={handleAdd}>{t('common.actions.add', { entity: t('entities.customer') })}</Button>
+          <Button onClick={handleAdd}>{t('common.actions.add', { entity: getName('customer') })}</Button>
         )}
       </div>
 
@@ -107,7 +109,7 @@ export default function CustomersPage() {
         {customers && (
           <div className="text-sm text-zinc-600 dark:text-zinc-400">
             {filteredCustomers.length === customers.length
-              ? `${customers.length} ${customers.length === 1 ? t('entities.customer').toLowerCase() : t('entities.customers').toLowerCase()}`
+              ? `${customers.length} ${customers.length === 1 ? getName('customer').toLowerCase() : getName('customer', true).toLowerCase()}`
               : `${filteredCustomers.length} of ${customers.length}`}
           </div>
         )}
@@ -115,24 +117,24 @@ export default function CustomersPage() {
 
       {isLoading && (
         <div className="mt-4 text-center">
-          <p className="text-sm text-zinc-600 dark:text-zinc-400">{t('common.actions.loading', { entities: t('entities.customers') })}</p>
+          <p className="text-sm text-zinc-600 dark:text-zinc-400">{t('common.actions.loading', { entities: getName('customer', true) })}</p>
         </div>
       )}
 
       {error && (
         <div className="mt-4 rounded-lg bg-red-50 p-3 ring-1 ring-red-200 dark:bg-red-950/10 dark:ring-red-900/20">
           <p className="text-sm text-red-800 dark:text-red-400">
-            {t('common.actions.errorLoading', { entities: t('entities.customers') })}: {(error as Error).message}
+            {t('common.actions.errorLoading', { entities: getName('customer', true) })}: {(error as Error).message}
           </p>
         </div>
       )}
 
       {customers && customers.length === 0 && (
         <div className="mt-4 rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700 p-4">
-          <p className="text-sm text-zinc-600 dark:text-zinc-400">{t('common.actions.notFound', { entities: t('entities.customers') })}</p>
+          <p className="text-sm text-zinc-600 dark:text-zinc-400">{t('common.actions.notFound', { entities: getName('customer', true) })}</p>
           {canAddCustomers && (
             <Button className="mt-2" onClick={handleAdd}>
-              {t('common.actions.addFirst', { entity: t('entities.customer') })}
+              {t('common.actions.addFirst', { entity: getName('customer') })}
             </Button>
           )}
         </div>
@@ -140,7 +142,7 @@ export default function CustomersPage() {
 
       {filteredCustomers.length === 0 && customers && customers.length > 0 && (
         <div className="mt-4 rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700 p-4">
-          <p className="text-sm text-zinc-600 dark:text-zinc-400">{t('common.actions.noMatchSearch', { entities: t('entities.customers') })}</p>
+          <p className="text-sm text-zinc-600 dark:text-zinc-400">{t('common.actions.noMatchSearch', { entities: getName('customer', true) })}</p>
         </div>
       )}
 
