@@ -476,6 +476,100 @@ const deleteMutation = useMutation({
 
 ---
 
+## Glossary Integration
+
+**CRITICAL**: All entity names flow through the glossary system for tenant customization.
+
+Tenants can customize entity names (e.g., "Work Orders" → "Jobs", "Service Locations" → "Properties"). Every page and component that displays entity names MUST use the glossary.
+
+### Core Pattern
+
+```typescript
+import { useGlossary } from '../contexts/GlossaryContext';
+
+export default function MyPage() {
+  const { t } = useTranslation();
+  const { getName } = useGlossary(); // Always add this
+
+  return (
+    <AppLayout>
+      {/* Use getName() for all entity references */}
+      <Heading>{getName('customer', true)}</Heading>
+
+      <Button>
+        {t('common.actions.add', { entity: getName('customer') })}
+      </Button>
+
+      <Text>
+        {t('common.actions.notFound', { entities: getName('customer', true) })}
+      </Text>
+    </AppLayout>
+  );
+}
+```
+
+### Quick Rules
+
+**✅ DO use `getName()` for:**
+- Page titles: `getName('customer', true)` → "Customers" or "Clients"
+- Buttons: `t('common.actions.add', { entity: getName('customer') })` → "Add Customer" or "Add Client"
+- Loading/error/empty states with parameterized `common.*` keys
+- Dialog titles and descriptions
+- Section headings that reference entities
+
+**❌ DON'T use `getName()` for:**
+- Generic form fields: "Name", "Email", "Phone" (use `common.form.*`)
+- Non-entity text: "Save", "Cancel", "Search"
+- Technical terms that aren't tenant-facing
+
+### Entity Codes
+
+Use these exact codes:
+- `customer`, `work_order`, `service_location`, `equipment`
+- `invoice`, `quote`, `payment`, `dispatch`
+- `user`, `role`
+
+**Plural**: Always pass `true` as second parameter for plural forms:
+- `getName('customer')` → "Customer"
+- `getName('customer', true)` → "Customers"
+
+### Parameterized i18n Keys
+
+Use these common keys that accept entity names:
+
+```typescript
+// Actions
+t('common.actions.add', { entity: getName('customer') })
+t('common.actions.backTo', { entities: getName('customer', true) })
+t('common.actions.loading', { entities: getName('customer', true) })
+t('common.actions.errorLoadingEntity', { entity: getName('customer') })
+t('common.actions.notFound', { entities: getName('customer', true) })
+t('common.actions.noEntitiesYet', { entities: getName('customer', true) })
+
+// Counts
+t('common.entitiesCount', { entities: getName('service_location', true), count: 5 })
+t('common.recentEntities', { entities: getName('work_order', true) })
+
+// Forms
+t('common.form.titleCreate', { action: t('common.create'), entity: getName('customer') })
+t('common.form.descriptionCreate', { entity: getName('customer') })
+t('common.form.errorCreate', { entity: getName('customer') })
+```
+
+### Complete Guide
+
+See **[GLOSSARY_INTEGRATION.md](./GLOSSARY_INTEGRATION.md)** for:
+- Complete pattern reference with examples
+- When to use vs not use glossary
+- Full list of parameterized translation keys
+- Testing patterns
+- Migration checklist
+- Common pitfalls
+
+**IMPORTANT**: When creating or modifying pages/forms, always reference GLOSSARY_INTEGRATION.md to ensure proper glossary usage.
+
+---
+
 ## Adding a New Entity Page
 
 Follow this pattern for consistency. **See `CustomersPage.tsx` and `CustomerFormDialog.tsx` as reference examples.**
@@ -489,6 +583,7 @@ Follow this pattern for consistency. **See `CustomersPage.tsx` and `CustomerForm
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
+import { useGlossary } from '../contexts/GlossaryContext'; // ALWAYS add this
 import { entityApi, type Entity } from '../api';
 import AppLayout from '../components/AppLayout';
 import EntityFormDialog from '../components/EntityFormDialog';
@@ -497,6 +592,7 @@ import { Heading, Button, Table, Badge, Dropdown } from '../components/catalyst/
 export default function EntityPage() {
   const queryClient = useQueryClient();
   const { t } = useTranslation();
+  const { getName } = useGlossary(); // ALWAYS add this
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedEntity, setSelectedEntity] = useState<Entity | null>(null);
 
@@ -542,6 +638,7 @@ export default function EntityPage() {
 import { useState, useEffect } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
+import { useGlossary } from '../contexts/GlossaryContext'; // ALWAYS add this
 import { entityApi, type Entity } from '../api';
 import { Dialog, DialogActions, DialogBody, DialogDescription, DialogTitle } from './catalyst/dialog';
 import { Button, Field, FieldGroup, Fieldset, Label, Input } from './catalyst/*';
@@ -549,6 +646,7 @@ import { Button, Field, FieldGroup, Fieldset, Label, Input } from './catalyst/*'
 export default function EntityFormDialog({ isOpen, onClose, entity }) {
   const queryClient = useQueryClient();
   const { t } = useTranslation();
+  const { getName } = useGlossary(); // ALWAYS add this
   const isEdit = !!entity?.id;
   const [formData, setFormData] = useState<Entity>({ /* defaults */ });
 
@@ -570,7 +668,8 @@ export default function EntityFormDialog({ isOpen, onClose, entity }) {
       const errorMessage = error instanceof Error && 'response' in error
         ? ((error as { response?: { data?: { message?: string } } }).response?.data?.message)
         : undefined;
-      alert(errorMessage || t('common.form.errorCreate', { entity: t('entities.entity') }));
+      // Use getName() for entity reference in error message
+      alert(errorMessage || t('common.form.errorCreate', { entity: getName('entity') }));
     },
   });
 
@@ -578,13 +677,23 @@ export default function EntityFormDialog({ isOpen, onClose, entity }) {
 
   return (
     <Dialog open={isOpen} onClose={onClose}>
-      <DialogTitle>{/* Use i18n */}</DialogTitle>
-      <DialogDescription>{/* Use i18n */}</DialogDescription>
+      <DialogTitle>
+        {t('common.form.titleCreate', {
+          action: isEdit ? t('common.edit') : t('common.create'),
+          entity: getName('entity')
+        })}
+      </DialogTitle>
+      <DialogDescription>
+        {isEdit
+          ? t('common.form.descriptionEdit', { entity: getName('entity') })
+          : t('common.form.descriptionCreate', { entity: getName('entity') })}
+      </DialogDescription>
       <DialogBody>
         <form onSubmit={handleSubmit} id="entity-form">
           <Fieldset>
             <FieldGroup>
               {/* Fields using Field, Label, Input pattern */}
+              {/* Use t('common.form.*') for generic fields (Name, Email, etc.) */}
             </FieldGroup>
           </Fieldset>
         </form>
@@ -1278,6 +1387,7 @@ aws cloudfront create-invalidation \
 - **Backend API**: See dispatch-api CLAUDE.md
 - **Infrastructure**: See dispatch-infra CLAUDE.md
 - **CSR UI Patterns**: See [CSR_PATTERNS.md](./CSR_PATTERNS.md)
+- **Glossary Integration**: See [GLOSSARY_INTEGRATION.md](./GLOSSARY_INTEGRATION.md)
 - **Catalyst UI**: https://catalyst.tailwindui.com
 - **React Query**: https://tanstack.com/query/latest
 
@@ -1289,21 +1399,25 @@ This frontend uses a **modern, simple architecture**:
 - ✅ Single page + dialog pattern (no separate Create/Detail routes)
 - ✅ Dedicated API service classes (type-safe, maintainable)
 - ✅ React Query for data management (caching, refetching, mutations)
+- ✅ Glossary system for tenant-customizable entity names
 - ✅ Catalyst UI for consistent components
 - ✅ TypeScript for type safety
 - ✅ Vite for fast builds
 - ✅ AWS Amplify for authentication
-- ✅ i18n support with react-i18next
+- ✅ i18n support with react-i18next and parameterized keys
 
 **When adding new features**:
-1. Create API service class in `src/api/` with TypeScript interfaces
-2. Export from `src/api/index.ts` barrel file
-3. Follow the Entity Page + Form Dialog pattern (see CustomersPage.tsx as reference)
-4. Use the API service with React Query
-5. Use Catalyst UI components
-6. Add i18n translations to `src/i18n/locales/en_us.json`
-7. Handle loading, error, and empty states
-8. Add proper TypeScript types throughout
-9. Write tests before creating PR
+1. **CRITICAL**: Import `useGlossary` and use `getName()` for all entity names (see GLOSSARY_INTEGRATION.md)
+2. Create API service class in `src/api/` with TypeScript interfaces
+3. Export from `src/api/index.ts` barrel file
+4. Follow the Entity Page + Form Dialog pattern (see CustomersPage.tsx as reference)
+5. Use the API service with React Query
+6. Use Catalyst UI components
+7. Use parameterized `common.*` i18n keys with `getName()` for entity references
+8. Add i18n translations to `src/i18n/locales/en_us.json` (only if new keys needed)
+9. Handle loading, error, and empty states with glossary
+10. Add proper TypeScript types throughout
+11. Write tests with flexible matchers (not exact entity names)
+12. Run lint and tests before creating PR
 
-**Remember**: The pattern is consistent across all pages. Look at CustomersPage, WorkOrdersPage, and their corresponding API services as reference examples.
+**Remember**: The pattern is consistent across all pages. Look at CustomersPage, WorkOrdersPage, and their corresponding API services as reference examples. **Always check GLOSSARY_INTEGRATION.md** for proper glossary usage patterns.
