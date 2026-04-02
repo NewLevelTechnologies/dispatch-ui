@@ -20,7 +20,6 @@ export interface AdditionalContact {
   id: string;
   name: string;
   phone?: string | null;
-  mobilePhone?: string | null;
   email?: string | null;
   notes?: string | null;
   displayOrder: number;

@@ -5,7 +5,6 @@ import type { AdditionalContact } from './customerApi';
 export interface CreateAdditionalContactRequest {
   name: string;
   phone?: string | null;
-  mobilePhone?: string | null;
   email?: string | null;
   notes?: string | null;
   displayOrder?: number;
@@ -14,7 +13,6 @@ export interface CreateAdditionalContactRequest {
 export interface UpdateAdditionalContactRequest {
   name: string;
   phone?: string | null;
-  mobilePhone?: string | null;
   email?: string | null;
   notes?: string | null;
   displayOrder?: number;

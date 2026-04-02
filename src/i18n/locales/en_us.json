@@ -88,6 +88,7 @@
     },
     "moreOptions": "More options",
     "none": "None",
+    "save": "Save",
     "saving": "Saving...",
     "signOut": "Sign out",
     "theme": "Theme",
@@ -106,8 +107,6 @@
     "form": {
       "descriptionCreate": "Add an additional contact for this record.",
       "descriptionEdit": "Update contact information.",
-      "mobilePhone": "Mobile Phone",
-      "officePhone": "Office Phone",
       "titleCreate": "Add Contact",
       "titleEdit": "Edit Contact"
     },

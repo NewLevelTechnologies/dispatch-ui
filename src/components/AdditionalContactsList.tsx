@@ -6,7 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '.
 import { Button } from './catalyst/button';
 import { Text } from './catalyst/text';
 import { Subheading } from './catalyst/heading';
-import { PencilIcon, TrashIcon, PlusIcon, PhoneIcon, DevicePhoneMobileIcon } from '@heroicons/react/24/outline';
+import { PencilIcon, TrashIcon, PlusIcon, PhoneIcon } from '@heroicons/react/24/outline';
 import AdditionalContactFormDialog from './AdditionalContactFormDialog';
 import ConfirmDialog from './ConfirmDialog';
 import { formatPhone } from '../utils/formatPhone';
@@ -124,14 +124,6 @@ export default function AdditionalContactsList({
                           </a>
                         </div>
                       )}
-                      {contact.mobilePhone && (
-                        <div className="flex items-center gap-1 text-xs">
-                          <DevicePhoneMobileIcon className="h-3 w-3 text-zinc-400 flex-shrink-0" />
-                          <a href={`tel:${contact.mobilePhone}`} className="hover:underline">
-                            {formatPhone(contact.mobilePhone)}
-                          </a>
-                        </div>
-                      )}
                       {contact.email && (
                         <div className="text-xs">
                           <a href={`mailto:${contact.email}`} className="hover:underline">
@@ -139,7 +131,7 @@ export default function AdditionalContactsList({
                           </a>
                         </div>
                       )}
-                      {!contact.phone && !contact.mobilePhone && !contact.email && (
+                      {!contact.phone && !contact.email && (
                         <Text className="text-xs">-</Text>
                       )}
                     </div>

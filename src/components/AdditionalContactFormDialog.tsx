@@ -33,7 +33,6 @@ export default function AdditionalContactFormDialog({
   const [formData, setFormData] = useState<CreateAdditionalContactRequest>({
     name: '',
     phone: null,
-    mobilePhone: null,
     email: null,
     notes: null,
   });
@@ -45,14 +44,12 @@ export default function AdditionalContactFormDialog({
     ? {
         name: contact.name,
         phone: contact.phone || null,
-        mobilePhone: contact.mobilePhone || null,
         email: contact.email || null,
         notes: contact.notes || null,
       }
     : {
         name: '',
         phone: null,
-        mobilePhone: null,
         email: null,
         notes: null,
       };
@@ -172,22 +169,12 @@ export default function AdditionalContactFormDialog({
               </Field>
 
               <Field>
-                <Label>{t('contacts.form.officePhone')}</Label>
+                <Label>{t('common.form.phone')}</Label>
                 <Input
                   name="phone"
                   type="tel"
                   value={formData.phone || ''}
                   onChange={(e) => handleChange('phone', e.target.value)}
-                />
-              </Field>
-
-              <Field>
-                <Label>{t('contacts.form.mobilePhone')}</Label>
-                <Input
-                  name="mobilePhone"
-                  type="tel"
-                  value={formData.mobilePhone || ''}
-                  onChange={(e) => handleChange('mobilePhone', e.target.value)}
                 />
               </Field>
 
