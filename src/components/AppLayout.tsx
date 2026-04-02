@@ -86,10 +86,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         <Sidebar>
           <SidebarHeader>
             {isCollapsed ? (
-              <div className="flex flex-col items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-indigo-600">
-                  <span className="text-base font-bold text-white">D</span>
-                </div>
+              <div className="flex items-center justify-center">
                 <button
                   onClick={toggleSidebar}
                   className="flex h-8 w-8 items-center justify-center rounded-lg hover:bg-zinc-950/5 dark:hover:bg-white/5 transition-colors"
@@ -128,10 +125,17 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                   href={item.href}
                   current={location.pathname === item.href}
                   title={isCollapsed ? item.name : undefined}
-                  className={isCollapsed ? 'justify-center' : ''}
                 >
-                  <item.icon className="h-5 w-5" />
-                  {!isCollapsed && <span>{item.name}</span>}
+                  {isCollapsed ? (
+                    <div className="flex w-full items-center justify-center">
+                      <item.icon className="h-5 w-5" />
+                    </div>
+                  ) : (
+                    <>
+                      <item.icon className="h-5 w-5" />
+                      <span>{item.name}</span>
+                    </>
+                  )}
                 </SidebarItem>
               ))}
             </SidebarSection>
@@ -164,9 +168,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                       href={item.href}
                       current={location.pathname === item.href}
                       title={item.name}
-                      className="justify-center"
                     >
-                      <item.icon className="h-5 w-5" />
+                      <div className="flex w-full items-center justify-center">
+                        <item.icon className="h-5 w-5" />
+                      </div>
                     </SidebarItem>
                   ))}
                 </SidebarSection>
@@ -201,9 +206,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                       href={item.href}
                       current={location.pathname === item.href}
                       title={item.name}
-                      className="justify-center"
                     >
-                      <item.icon className="h-5 w-5" />
+                      <div className="flex w-full items-center justify-center">
+                        <item.icon className="h-5 w-5" />
+                      </div>
                     </SidebarItem>
                   ))}
                 </SidebarSection>
@@ -238,9 +244,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                       href={item.href}
                       current={location.pathname === item.href}
                       title={item.name}
-                      className="justify-center"
                     >
-                      <item.icon className="h-5 w-5" />
+                      <div className="flex w-full items-center justify-center">
+                        <item.icon className="h-5 w-5" />
+                      </div>
                     </SidebarItem>
                   ))}
                 </SidebarSection>
@@ -257,10 +264,17 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                       href={item.href}
                       current={location.pathname === item.href}
                       title={isCollapsed ? item.name : undefined}
-                      className={isCollapsed ? 'justify-center' : ''}
                     >
-                      <item.icon className="h-5 w-5" />
-                      {!isCollapsed && <span>{item.name}</span>}
+                      {isCollapsed ? (
+                        <div className="flex w-full items-center justify-center">
+                          <item.icon className="h-5 w-5" />
+                        </div>
+                      ) : (
+                        <>
+                          <item.icon className="h-5 w-5" />
+                          <span>{item.name}</span>
+                        </>
+                      )}
                     </SidebarItem>
                   ))}
                 </SidebarSection>
@@ -273,14 +287,25 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               <DropdownButton
                 as={SidebarItem}
                 title={isCollapsed ? user?.signInDetails?.loginId : undefined}
-                className={isCollapsed ? 'justify-center' : ''}
               >
-                <Avatar
-                  slot="icon"
-                  initials={user?.signInDetails?.loginId?.charAt(0).toUpperCase() || 'U'}
-                  className="size-6"
-                />
-                {!isCollapsed && <span className="truncate">{user?.signInDetails?.loginId}</span>}
+                {isCollapsed ? (
+                  <div className="flex w-full items-center justify-center">
+                    <Avatar
+                      slot="icon"
+                      initials={user?.signInDetails?.loginId?.charAt(0).toUpperCase() || 'U'}
+                      className="size-6"
+                    />
+                  </div>
+                ) : (
+                  <>
+                    <Avatar
+                      slot="icon"
+                      initials={user?.signInDetails?.loginId?.charAt(0).toUpperCase() || 'U'}
+                      className="size-6"
+                    />
+                    <span className="truncate">{user?.signInDetails?.loginId}</span>
+                  </>
+                )}
               </DropdownButton>
               <DropdownMenu className="min-w-64" anchor="top start">
                 <div className="px-3 py-2">
