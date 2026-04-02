@@ -78,10 +78,10 @@ export default function NotificationPreferencesDialog({
       if (pref.id) {
         return notificationApi.updatePreference(pref.id, { optIn });
       } else {
-        // Create new preference
+        // Create new preference - use customerId/contactId from props, not from pref
         return notificationApi.createPreference({
-          customerId: pref.customerId,
-          contactId: pref.contactId,
+          customerId, // Use the prop, not pref.customerId
+          contactId: contactId ?? null, // Use the contactId from props (null for primary customer)
           notificationTypeId: pref.notificationTypeId,
           optIn,
         });
