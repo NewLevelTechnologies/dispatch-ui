@@ -85,29 +85,39 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       sidebar={
         <Sidebar>
           <SidebarHeader>
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-3 min-w-0">
-                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-600 flex-shrink-0">
-                  <span className="text-sm font-bold text-white">D</span>
+            {isCollapsed ? (
+              <div className="flex flex-col items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-indigo-600">
+                  <span className="text-base font-bold text-white">D</span>
                 </div>
-                {!isCollapsed && (
+                <button
+                  onClick={toggleSidebar}
+                  className="flex h-8 w-8 items-center justify-center rounded-lg hover:bg-zinc-950/5 dark:hover:bg-white/5 transition-colors"
+                  aria-label="Expand sidebar"
+                  title="Expand sidebar"
+                >
+                  <Bars3Icon className="h-5 w-5 text-zinc-500 dark:text-zinc-400" />
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-600 flex-shrink-0">
+                    <span className="text-sm font-bold text-white">D</span>
+                  </div>
                   <div className="text-base font-semibold text-zinc-900 dark:text-white truncate">
                     {t('app.name')}
                   </div>
-                )}
-              </div>
-              <button
-                onClick={toggleSidebar}
-                className="flex h-8 w-8 items-center justify-center rounded-lg hover:bg-zinc-950/5 dark:hover:bg-white/5 transition-colors flex-shrink-0"
-                aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-              >
-                {isCollapsed ? (
-                  <Bars3Icon className="h-5 w-5 text-zinc-500 dark:text-zinc-400" />
-                ) : (
+                </div>
+                <button
+                  onClick={toggleSidebar}
+                  className="flex h-8 w-8 items-center justify-center rounded-lg hover:bg-zinc-950/5 dark:hover:bg-white/5 transition-colors flex-shrink-0"
+                  aria-label="Collapse sidebar"
+                >
                   <ChevronDoubleLeftIcon className="h-5 w-5 text-zinc-500 dark:text-zinc-400" />
-                )}
-              </button>
-            </div>
+                </button>
+              </div>
+            )}
           </SidebarHeader>
 
           <SidebarBody>
@@ -118,6 +128,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                   href={item.href}
                   current={location.pathname === item.href}
                   title={isCollapsed ? item.name : undefined}
+                  className={isCollapsed ? 'justify-center' : ''}
                 >
                   <item.icon className="h-5 w-5" />
                   {!isCollapsed && <span>{item.name}</span>}
@@ -144,18 +155,22 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               </SidebarSection>
             )}
             {isCollapsed && (
-              <SidebarSection className="max-lg:hidden">
-                {equipmentNavigation.map((item) => (
-                  <SidebarItem
-                    key={item.name}
-                    href={item.href}
-                    current={location.pathname === item.href}
-                    title={item.name}
-                  >
-                    <item.icon className="h-5 w-5" />
-                  </SidebarItem>
-                ))}
-              </SidebarSection>
+              <>
+                <div className="mx-auto my-2 h-px w-8 bg-zinc-200 dark:bg-zinc-800" />
+                <SidebarSection className="max-lg:hidden">
+                  {equipmentNavigation.map((item) => (
+                    <SidebarItem
+                      key={item.name}
+                      href={item.href}
+                      current={location.pathname === item.href}
+                      title={item.name}
+                      className="justify-center"
+                    >
+                      <item.icon className="h-5 w-5" />
+                    </SidebarItem>
+                  ))}
+                </SidebarSection>
+              </>
             )}
 
             {!isCollapsed && (
@@ -177,18 +192,22 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               </SidebarSection>
             )}
             {isCollapsed && (
-              <SidebarSection className="max-lg:hidden">
-                {financialNavigation.map((item) => (
-                  <SidebarItem
-                    key={item.name}
-                    href={item.href}
-                    current={location.pathname === item.href}
-                    title={item.name}
-                  >
-                    <item.icon className="h-5 w-5" />
-                  </SidebarItem>
-                ))}
-              </SidebarSection>
+              <>
+                <div className="mx-auto my-2 h-px w-8 bg-zinc-200 dark:bg-zinc-800" />
+                <SidebarSection className="max-lg:hidden">
+                  {financialNavigation.map((item) => (
+                    <SidebarItem
+                      key={item.name}
+                      href={item.href}
+                      current={location.pathname === item.href}
+                      title={item.name}
+                      className="justify-center"
+                    >
+                      <item.icon className="h-5 w-5" />
+                    </SidebarItem>
+                  ))}
+                </SidebarSection>
+              </>
             )}
 
             {!isCollapsed && (
@@ -210,40 +229,52 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               </SidebarSection>
             )}
             {isCollapsed && (
-              <SidebarSection className="max-lg:hidden">
-                {schedulingNavigation.map((item) => (
-                  <SidebarItem
-                    key={item.name}
-                    href={item.href}
-                    current={location.pathname === item.href}
-                    title={item.name}
-                  >
-                    <item.icon className="h-5 w-5" />
-                  </SidebarItem>
-                ))}
-              </SidebarSection>
+              <>
+                <div className="mx-auto my-2 h-px w-8 bg-zinc-200 dark:bg-zinc-800" />
+                <SidebarSection className="max-lg:hidden">
+                  {schedulingNavigation.map((item) => (
+                    <SidebarItem
+                      key={item.name}
+                      href={item.href}
+                      current={location.pathname === item.href}
+                      title={item.name}
+                      className="justify-center"
+                    >
+                      <item.icon className="h-5 w-5" />
+                    </SidebarItem>
+                  ))}
+                </SidebarSection>
+              </>
             )}
 
             {adminNavigation.length > 0 && (
-              <SidebarSection className="max-lg:hidden">
-                {adminNavigation.map((item) => (
-                  <SidebarItem
-                    key={item.name}
-                    href={item.href}
-                    current={location.pathname === item.href}
-                    title={isCollapsed ? item.name : undefined}
-                  >
-                    <item.icon className="h-5 w-5" />
-                    {!isCollapsed && <span>{item.name}</span>}
-                  </SidebarItem>
-                ))}
-              </SidebarSection>
+              <>
+                {isCollapsed && <div className="mx-auto my-2 h-px w-8 bg-zinc-200 dark:bg-zinc-800" />}
+                <SidebarSection className="max-lg:hidden">
+                  {adminNavigation.map((item) => (
+                    <SidebarItem
+                      key={item.name}
+                      href={item.href}
+                      current={location.pathname === item.href}
+                      title={isCollapsed ? item.name : undefined}
+                      className={isCollapsed ? 'justify-center' : ''}
+                    >
+                      <item.icon className="h-5 w-5" />
+                      {!isCollapsed && <span>{item.name}</span>}
+                    </SidebarItem>
+                  ))}
+                </SidebarSection>
+              </>
             )}
           </SidebarBody>
 
           <SidebarFooter>
             <Dropdown>
-              <DropdownButton as={SidebarItem} title={isCollapsed ? user?.signInDetails?.loginId : undefined}>
+              <DropdownButton
+                as={SidebarItem}
+                title={isCollapsed ? user?.signInDetails?.loginId : undefined}
+                className={isCollapsed ? 'justify-center' : ''}
+              >
                 <Avatar
                   slot="icon"
                   initials={user?.signInDetails?.loginId?.charAt(0).toUpperCase() || 'U'}

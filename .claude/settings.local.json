@@ -35,7 +35,8 @@
       "Bash(npm run:*)",
       "Bash(tee /tmp/test-coverage.txt)",
       "WebFetch(domain:www.npmjs.com)",
-      "WebFetch(domain:github.com)"
+      "WebFetch(domain:github.com)",
+      "Bash(grep -r \"customer\\\\.phone\\\\|location\\\\.siteContactPhone\\\\|\\\\.phone\" /Users/paulwilcox/Documents/dispatch-ui/src/pages/*.tsx)"
     ]
   }
 }
