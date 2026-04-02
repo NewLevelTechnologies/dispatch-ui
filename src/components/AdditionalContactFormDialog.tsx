@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
+import { PatternFormat } from 'react-number-format';
 import { contactApi, type AdditionalContact, type CreateAdditionalContactRequest } from '../api';
 import { Dialog, DialogActions, DialogBody, DialogDescription, DialogTitle } from './catalyst/dialog';
 import { Button } from './catalyst/button';
@@ -170,11 +171,13 @@ export default function AdditionalContactFormDialog({
 
               <Field>
                 <Label>{t('common.form.phone')}</Label>
-                <Input
+                <PatternFormat
+                  format="(###) ###-####"
+                  mask="_"
+                  customInput={Input}
                   name="phone"
-                  type="tel"
                   value={formData.phone || ''}
-                  onChange={(e) => handleChange('phone', e.target.value)}
+                  onValueChange={(values) => handleChange('phone', values.value)}
                 />
               </Field>
 
