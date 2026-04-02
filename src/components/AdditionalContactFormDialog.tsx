@@ -8,8 +8,9 @@ import { Button } from './catalyst/button';
 import { Field, FieldGroup, Fieldset, Label } from './catalyst/fieldset';
 import { Input } from './catalyst/input';
 import { Textarea } from './catalyst/textarea';
-import { CheckboxField, Checkbox } from './catalyst/checkbox';
+import { Checkbox } from './catalyst/checkbox';
 import { Text, Strong } from './catalyst/text';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './catalyst/table';
 import { validateEmail } from '../utils/validation';
 
 interface AdditionalContactFormDialogProps {
@@ -311,37 +312,68 @@ export default function AdditionalContactFormDialog({
 
           {/* Notification Preferences Section */}
           {notificationTypes.length > 0 && (
-            <div className="mt-6 border-t border-zinc-200 pt-6 dark:border-zinc-800">
-              <Strong className="text-base">{t('notifications.preferences.title')}</Strong>
-              <Text className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+            <div className="mt-4 border-t border-zinc-200 pt-4 dark:border-zinc-800">
+              <Strong className="text-sm">{t('notifications.preferences.title')}</Strong>
+              <Text className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
                 {t('notifications.preferences.formDescription')}
               </Text>
-              <div className="mt-4 space-y-4">
-                {notificationTypes.map((notificationType) => (
-                  <div key={notificationType.id}>
-                    <Text className="text-sm font-medium">{notificationType.name}</Text>
-                    <div className="ml-4 mt-2 space-y-2">
-                      {notificationType.channels.map((pref) => (
-                        <CheckboxField key={pref.id}>
-                          <Checkbox
-                            checked={isPreferenceChecked(pref.notificationTypeId, pref.channel)}
-                            onChange={(checked) =>
-                              handlePreferenceToggle(pref.notificationTypeId, pref.channel, checked)
-                            }
-                            disabled={isSubmitting}
-                          />
-                          <Label>
-                            {pref.channel === 'EMAIL'
-                              ? t('notifications.preferences.channelEmail')
-                              : pref.channel === 'SMS'
-                                ? t('notifications.preferences.channelSms')
-                                : t('notifications.preferences.channelPush')}
-                          </Label>
-                        </CheckboxField>
-                      ))}
-                    </div>
-                  </div>
-                ))}
+              <div className="mt-3">
+                <Table dense className="[--gutter:theme(spacing.1)] text-xs">
+                  <TableHead>
+                    <TableRow>
+                      <TableHeader>{t('notifications.preferences.notificationType')}</TableHeader>
+                      <TableHeader className="w-16 text-center">{t('notifications.preferences.channelEmail')}</TableHeader>
+                      <TableHeader className="w-16 text-center">{t('notifications.preferences.channelSms')}</TableHeader>
+                      <TableHeader className="w-16 text-center">{t('notifications.preferences.channelPush')}</TableHeader>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {notificationTypes.map((notificationType) => {
+                      const emailPref = notificationType.channels.find((p) => p.channel === 'EMAIL');
+                      const smsPref = notificationType.channels.find((p) => p.channel === 'SMS');
+                      const pushPref = notificationType.channels.find((p) => p.channel === 'PUSH');
+
+                      return (
+                        <TableRow key={notificationType.id}>
+                          <TableCell className="font-medium">{notificationType.name}</TableCell>
+                          <TableCell className="text-center">
+                            {emailPref && (
+                              <Checkbox
+                                checked={isPreferenceChecked(emailPref.notificationTypeId, emailPref.channel)}
+                                onChange={(checked) =>
+                                  handlePreferenceToggle(emailPref.notificationTypeId, emailPref.channel, checked)
+                                }
+                                disabled={isSubmitting}
+                              />
+                            )}
+                          </TableCell>
+                          <TableCell className="text-center">
+                            {smsPref && (
+                              <Checkbox
+                                checked={isPreferenceChecked(smsPref.notificationTypeId, smsPref.channel)}
+                                onChange={(checked) =>
+                                  handlePreferenceToggle(smsPref.notificationTypeId, smsPref.channel, checked)
+                                }
+                                disabled={isSubmitting}
+                              />
+                            )}
+                          </TableCell>
+                          <TableCell className="text-center">
+                            {pushPref && (
+                              <Checkbox
+                                checked={isPreferenceChecked(pushPref.notificationTypeId, pushPref.channel)}
+                                onChange={(checked) =>
+                                  handlePreferenceToggle(pushPref.notificationTypeId, pushPref.channel, checked)
+                                }
+                                disabled={isSubmitting}
+                              />
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
               </div>
             </div>
           )}

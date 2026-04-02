@@ -10,8 +10,8 @@ import {
 import { Dialog, DialogActions, DialogBody, DialogDescription, DialogTitle } from './catalyst/dialog';
 import { Button } from './catalyst/button';
 import { Text } from './catalyst/text';
-import { CheckboxField, Checkbox } from './catalyst/checkbox';
-import { Label } from './catalyst/fieldset';
+import { Checkbox } from './catalyst/checkbox';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './catalyst/table';
 
 interface NotificationPreferencesDialogProps {
   isOpen: boolean;
@@ -134,7 +134,7 @@ export default function NotificationPreferencesDialog({
   const notificationTypes = Object.values(groupedPreferences);
 
   return (
-    <Dialog open={isOpen} onClose={onClose} size="2xl">
+    <Dialog open={isOpen} onClose={onClose} size="lg">
       <DialogTitle>{t('notifications.preferences.title')}</DialogTitle>
       <DialogDescription>
         {t('notifications.preferences.description', { name: contactName })}
@@ -164,31 +164,56 @@ export default function NotificationPreferencesDialog({
         )}
 
         {!isLoading && !error && notificationTypes.length > 0 && (
-          <div className="space-y-6">
-            {notificationTypes.map((notificationType) => (
-              <div key={notificationType.id} className="space-y-3">
-                <Text className="font-semibold">{notificationType.name}</Text>
-                <div className="ml-4 space-y-2">
-                  {notificationType.channels.map((pref) => (
-                    <CheckboxField key={pref.id}>
-                      <Checkbox
-                        checked={isChecked(pref.notificationTypeId, pref.channel)}
-                        onChange={(checked) => handleToggle(pref, checked)}
-                        disabled={updateMutation.isPending}
-                      />
-                      <Label>
-                        {pref.channel === NotificationChannel.EMAIL
-                          ? t('notifications.preferences.channelEmail')
-                          : pref.channel === NotificationChannel.SMS
-                            ? t('notifications.preferences.channelSms')
-                            : t('notifications.preferences.channelPush')}
-                      </Label>
-                    </CheckboxField>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
+          <Table dense className="[--gutter:theme(spacing.1)] text-sm">
+            <TableHead>
+              <TableRow>
+                <TableHeader>{t('notifications.preferences.notificationType')}</TableHeader>
+                <TableHeader className="text-center">{t('notifications.preferences.channelEmail')}</TableHeader>
+                <TableHeader className="text-center">{t('notifications.preferences.channelSms')}</TableHeader>
+                <TableHeader className="text-center">{t('notifications.preferences.channelPush')}</TableHeader>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {notificationTypes.map((notificationType) => {
+                const emailPref = notificationType.channels.find((p) => p.channel === NotificationChannel.EMAIL);
+                const smsPref = notificationType.channels.find((p) => p.channel === NotificationChannel.SMS);
+                const pushPref = notificationType.channels.find((p) => p.channel === NotificationChannel.PUSH);
+
+                return (
+                  <TableRow key={notificationType.id}>
+                    <TableCell className="font-medium">{notificationType.name}</TableCell>
+                    <TableCell className="text-center">
+                      {emailPref && (
+                        <Checkbox
+                          checked={isChecked(emailPref.notificationTypeId, emailPref.channel)}
+                          onChange={(checked) => handleToggle(emailPref, checked)}
+                          disabled={updateMutation.isPending}
+                        />
+                      )}
+                    </TableCell>
+                    <TableCell className="text-center">
+                      {smsPref && (
+                        <Checkbox
+                          checked={isChecked(smsPref.notificationTypeId, smsPref.channel)}
+                          onChange={(checked) => handleToggle(smsPref, checked)}
+                          disabled={updateMutation.isPending}
+                        />
+                      )}
+                    </TableCell>
+                    <TableCell className="text-center">
+                      {pushPref && (
+                        <Checkbox
+                          checked={isChecked(pushPref.notificationTypeId, pushPref.channel)}
+                          onChange={(checked) => handleToggle(pushPref, checked)}
+                          disabled={updateMutation.isPending}
+                        />
+                      )}
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
         )}
       </DialogBody>
 

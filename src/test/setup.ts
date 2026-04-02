@@ -278,6 +278,7 @@ vi.mock('react-i18next', () => {
     'notifications.preferences.formDescription': 'Choose which notifications this contact should receive',
     'notifications.preferences.manage': 'Manage Notifications',
     'notifications.preferences.noPreferences': 'No notification preferences available',
+    'notifications.preferences.notificationType': 'Notification Type',
     'notifications.preferences.title': 'Notification Preferences',
     'payments.description': 'Track customer payments and transactions',
     'quotes.description': 'Create and manage customer quotes',

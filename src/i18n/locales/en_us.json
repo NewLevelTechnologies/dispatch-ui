@@ -370,6 +370,7 @@
       "formDescription": "Choose which notifications this contact should receive",
       "manage": "Manage Notifications",
       "noPreferences": "No notification preferences available",
+      "notificationType": "Notification Type",
       "title": "Notification Preferences"
     }
   },
