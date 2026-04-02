@@ -6,7 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '.
 import { Button } from './catalyst/button';
 import { Text } from './catalyst/text';
 import { Subheading } from './catalyst/heading';
-import { PencilIcon, TrashIcon, PlusIcon, PhoneIcon } from '@heroicons/react/24/outline';
+import { PencilIcon, TrashIcon, PlusIcon, PhoneIcon, EnvelopeIcon } from '@heroicons/react/24/outline';
 import AdditionalContactFormDialog from './AdditionalContactFormDialog';
 import ConfirmDialog from './ConfirmDialog';
 import { formatPhone } from '../utils/formatPhone';
@@ -125,7 +125,8 @@ export default function AdditionalContactsList({
                         </div>
                       )}
                       {contact.email && (
-                        <div className="text-xs">
+                        <div className="flex items-center gap-1 text-xs">
+                          <EnvelopeIcon className="h-3 w-3 text-zinc-400 flex-shrink-0" />
                           <a href={`mailto:${contact.email}`} className="hover:underline">
                             {contact.email}
                           </a>
