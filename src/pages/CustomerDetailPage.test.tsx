@@ -24,6 +24,7 @@ const mockSimpleCustomer: Customer = {
     dpvConfirmation: 'Y',
     isBusiness: false,
   },
+  additionalContacts: [],
   serviceLocations: [
     {
       id: 'loc-1',
@@ -47,6 +48,7 @@ const mockSimpleCustomer: Customer = {
       siteContactName: null,
       siteContactPhone: null,
       siteContactEmail: null,
+      additionalContacts: [],
       accessInstructions: null,
       notes: null,
       status: 'ACTIVE',

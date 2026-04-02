@@ -7,6 +7,7 @@ import { useGlossary } from '../contexts/GlossaryContext';
 import { useHasCapability } from '../hooks/useCurrentUser';
 import AppLayout from '../components/AppLayout';
 import ServiceLocationFormDialog from '../components/ServiceLocationFormDialog';
+import AdditionalContactsList from '../components/AdditionalContactsList';
 import { formatPhone } from '../utils/formatPhone';
 import { Heading, Subheading } from '../components/catalyst/heading';
 import { Text, Strong } from '../components/catalyst/text';
@@ -81,6 +82,16 @@ export default function ServiceLocationDetailPage() {
       hour: '2-digit',
       minute: '2-digit',
     });
+  };
+
+  // Determine if we should show additional contacts section
+  const shouldShowAdditionalContacts = (): boolean => {
+    return !!(
+      location.additionalContacts.length > 0 ||
+      location.siteContactName ||
+      location.siteContactPhone ||
+      location.siteContactEmail
+    );
   };
 
   return (
@@ -194,6 +205,20 @@ export default function ServiceLocationDetailPage() {
                   </div>
                 )}
               </div>
+
+              {/* Additional Contacts */}
+              {shouldShowAdditionalContacts() && (
+                <div className="rounded-lg border border-zinc-200 p-3 dark:border-zinc-800">
+                  <AdditionalContactsList
+                    contacts={location.additionalContacts}
+                    parentId={location.id}
+                    parentType="serviceLocation"
+                    queryKey={['customers']}
+                    canEdit={canEditServiceLocations}
+                    showAddButton={shouldShowAdditionalContacts()}
+                  />
+                </div>
+              )}
 
               {/* Access Instructions */}
               {location.accessInstructions && (

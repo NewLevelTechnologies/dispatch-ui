@@ -26,6 +26,7 @@ const mockCustomers: Customer[] = [
       dpvConfirmation: 'Y',
       isBusiness: false,
     },
+    additionalContacts: [],
     serviceLocations: [
       {
         id: 'loc-1',
@@ -49,6 +50,7 @@ const mockCustomers: Customer[] = [
         siteContactName: null,
         siteContactPhone: null,
         siteContactEmail: null,
+        additionalContacts: [],
         accessInstructions: null,
         notes: null,
         status: 'ACTIVE',
@@ -86,6 +88,7 @@ const mockCustomers: Customer[] = [
       dpvConfirmation: 'Y',
       isBusiness: false,
     },
+    additionalContacts: [],
     serviceLocations: [
       {
         id: 'loc-2',
@@ -109,6 +112,7 @@ const mockCustomers: Customer[] = [
         siteContactName: null,
         siteContactPhone: null,
         siteContactEmail: null,
+        additionalContacts: [],
         accessInstructions: null,
         notes: null,
         status: 'ACTIVE',

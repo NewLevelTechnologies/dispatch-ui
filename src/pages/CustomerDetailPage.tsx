@@ -8,6 +8,7 @@ import { useHasCapability } from '../hooks/useCurrentUser';
 import AppLayout from '../components/AppLayout';
 import ServiceLocationFormDialog from '../components/ServiceLocationFormDialog';
 import CustomerFormDialog from '../components/CustomerFormDialog';
+import AdditionalContactsList from '../components/AdditionalContactsList';
 import { formatPhone } from '../utils/formatPhone';
 import { Heading, Subheading } from '../components/catalyst/heading';
 import { Text, Strong } from '../components/catalyst/text';
@@ -100,6 +101,16 @@ export default function CustomerDetailPage() {
   // Adaptive layout: cards for ≤5 locations, table for >5
   const useTableLayout = customer.serviceLocations.length > 5;
 
+  // Determine if we should show additional contacts section
+  const shouldShowAdditionalContacts = () => {
+    if (isSimple) {
+      // For SIMPLE mode: show if contacts exist OR customer has primary contact info
+      return customer.additionalContacts.length > 0 || customer.email || customer.phone;
+    }
+    // For STANDARD mode: always show
+    return true;
+  };
+
   return (
     <AppLayout>
       <div className="p-4">
@@ -175,6 +186,20 @@ export default function CustomerDetailPage() {
                 <Strong className="mt-1 block text-sm">$0.00</Strong>
               </div>
             </div>
+
+            {/* Additional Contacts */}
+            {shouldShowAdditionalContacts() && (
+              <div className="mt-4">
+                <AdditionalContactsList
+                  contacts={customer.additionalContacts}
+                  parentId={customer.id}
+                  parentType="customer"
+                  queryKey={['customers', id!]}
+                  canEdit={canEditCustomers}
+                  showAddButton={customer.additionalContacts.length > 0 || !!customer.email || !!customer.phone}
+                />
+              </div>
+            )}
 
             {/* Equipment Section */}
             <div className="mt-4">
@@ -449,6 +474,20 @@ export default function CustomerDetailPage() {
                 </div>
               )}
             </div>
+
+            {/* Additional Contacts */}
+            {shouldShowAdditionalContacts() && (
+              <div className="mt-4">
+                <AdditionalContactsList
+                  contacts={customer.additionalContacts}
+                  parentId={customer.id}
+                  parentType="customer"
+                  queryKey={['customers', id!]}
+                  canEdit={canEditCustomers}
+                  showAddButton={true}
+                />
+              </div>
+            )}
 
             {/* Notes */}
             {customer.notes && (
