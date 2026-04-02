@@ -452,7 +452,7 @@ export default function TenantSettingsPage() {
             <Tab.Panels className="mt-6">
               {/* General Tab */}
               <Tab.Panel>
-          <div className="mx-auto max-w-6xl grid grid-cols-2 gap-x-12 gap-y-6">
+          <div className="grid grid-cols-2 gap-x-12 gap-y-6">
             {/* Company Information - Left */}
             <div>
               <Subheading className="mb-3">{t('tenantSettings.sections.companyInfo')}</Subheading>
