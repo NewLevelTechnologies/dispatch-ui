@@ -28,6 +28,7 @@ describe('CustomerFormDialog', () => {
       dpvConfirmation: 'Y',
       isBusiness: false,
     },
+    additionalContacts: [],
     serviceLocations: [
       {
         id: 'loc-1',
@@ -51,6 +52,7 @@ describe('CustomerFormDialog', () => {
         siteContactName: null,
         siteContactPhone: null,
         siteContactEmail: null,
+        additionalContacts: [],
         accessInstructions: null,
         notes: null,
         status: 'ACTIVE',

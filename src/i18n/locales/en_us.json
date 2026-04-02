@@ -25,7 +25,8 @@
       "noEntitiesYet": "No {{entities, lowercase}} yet",
       "noMatchSearch": "No {{entities, lowercase}} match your search.",
       "notFound": "No {{entities, lowercase}} found",
-      "open": "Open {{entities}}"
+      "open": "Open {{entities}}",
+      "title": "Actions"
     },
     "active": "Active",
     "add": "Add",
@@ -58,7 +59,9 @@
       "descriptionEdit": "Update {{entity, lowercase}} information.",
       "email": "Email",
       "errorCreate": "Failed to create {{entity, lowercase}}",
+      "errorDelete": "Failed to delete {{entity, lowercase}}",
       "errorUpdate": "Failed to update {{entity, lowercase}}",
+      "invalidEmail": "Invalid email address",
       "firstName": "First Name",
       "lastName": "Last Name",
       "locationName": "Location Name",
@@ -67,6 +70,7 @@
       "paymentTermsDays": "Payment Terms (Days)",
       "phone": "Phone",
       "requiresPurchaseOrder": "Requires Purchase Order",
+      "required": "{{field}} is required",
       "role": "Role",
       "select": "Select...",
       "serviceAddress": "Service Address",
@@ -85,11 +89,33 @@
     },
     "moreOptions": "More options",
     "none": "None",
+    "save": "Save",
     "saving": "Saving...",
     "signOut": "Sign out",
     "theme": "Theme",
     "update": "Update",
     "updateStatus": "Update {{entity, lowercase}} status"
+  },
+  "contacts": {
+    "actions": {
+      "add": "Add Additional Contact"
+    },
+    "delete": {
+      "message": "Are you sure you want to delete {{name}}?",
+      "title": "Delete Contact"
+    },
+    "entity": "contact",
+    "form": {
+      "descriptionCreate": "Add an additional contact for this record.",
+      "descriptionEdit": "Update contact information.",
+      "titleCreate": "Add Contact",
+      "titleEdit": "Edit Contact"
+    },
+    "noContacts": "No additional contacts yet",
+    "table": {
+      "contact": "Contact"
+    },
+    "title": "Additional Contacts"
   },
   "customers": {
     "description": "Manage your customer database",

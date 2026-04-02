@@ -8,6 +8,7 @@ import { useHasCapability } from '../hooks/useCurrentUser';
 import AppLayout from '../components/AppLayout';
 import ServiceLocationFormDialog from '../components/ServiceLocationFormDialog';
 import CustomerFormDialog from '../components/CustomerFormDialog';
+import AdditionalContactsList from '../components/AdditionalContactsList';
 import { formatPhone } from '../utils/formatPhone';
 import { Heading, Subheading } from '../components/catalyst/heading';
 import { Text, Strong } from '../components/catalyst/text';
@@ -97,8 +98,19 @@ export default function CustomerDetailPage() {
   const isSimple = customer.displayMode === 'SIMPLE';
   const primaryLocation = customer.serviceLocations[0];
 
-  // Adaptive layout: cards for ≤5 locations, table for >5
-  const useTableLayout = customer.serviceLocations.length > 5;
+  // For STANDARD mode: always use table (more CSR-friendly, easier to scan)
+  // For SIMPLE mode: cards are fine (only 1 location typically)
+  const useTableLayout = !isSimple || customer.serviceLocations.length > 5;
+
+  // Determine if we should show additional contacts section
+  const shouldShowAdditionalContacts = () => {
+    if (isSimple) {
+      // For SIMPLE mode: show if contacts exist OR customer has primary contact info
+      return customer.additionalContacts.length > 0 || customer.email || customer.phone;
+    }
+    // For STANDARD mode: always show
+    return true;
+  };
 
   return (
     <AppLayout>
@@ -156,29 +168,46 @@ export default function CustomerDetailPage() {
               </div>
             </div>
 
-            {/* Quick Stats Bar */}
-            <div className="mt-4 grid grid-cols-4 gap-4 rounded-lg bg-zinc-50 p-3 dark:bg-zinc-900">
-              <div>
-                <Text className="text-xs">{t('common.form.status')}</Text>
-                <Badge color="lime" className="mt-1">{t('common.active')}</Badge>
+            {/* Quick Stats Bar - Compact for homeowner */}
+            <div className="mt-3 flex items-center gap-4 rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-2 dark:border-zinc-800 dark:bg-zinc-900/50">
+              <div className="flex items-center gap-2">
+                <Text className="text-xs text-zinc-500 dark:text-zinc-400">{t('common.form.status')}:</Text>
+                <Badge color="lime">{t('common.active')}</Badge>
               </div>
-              <div>
-                <Text className="text-xs">{t('customers.detail.lastService')}</Text>
-                <Strong className="mt-1 block text-sm">{t('customers.detail.never')}</Strong>
+              <div className="h-4 w-px bg-zinc-200 dark:bg-zinc-700" />
+              <div className="flex items-center gap-2">
+                <Text className="text-xs text-zinc-500 dark:text-zinc-400">{t('customers.detail.lastService')}:</Text>
+                <Text className="text-xs font-medium">{t('customers.detail.never')}</Text>
               </div>
-              <div>
-                <Text className="text-xs">{t('common.actions.open', { entities: getName('work_order', true) })}</Text>
-                <Strong className="mt-1 block text-sm">0</Strong>
+              <div className="h-4 w-px bg-zinc-200 dark:bg-zinc-700" />
+              <div className="flex items-center gap-2">
+                <Text className="text-xs text-zinc-500 dark:text-zinc-400">{t('common.actions.open', { entities: getName('work_order', true) })}:</Text>
+                <Text className="text-xs font-medium">0</Text>
               </div>
-              <div>
-                <Text className="text-xs">{t('customers.detail.balance')}</Text>
-                <Strong className="mt-1 block text-sm">$0.00</Strong>
+              <div className="h-4 w-px bg-zinc-200 dark:bg-zinc-700" />
+              <div className="flex items-center gap-2">
+                <Text className="text-xs text-zinc-500 dark:text-zinc-400">{t('customers.detail.balance')}:</Text>
+                <Text className="text-xs font-medium">$0.00</Text>
               </div>
             </div>
 
+            {/* Additional Contacts */}
+            {shouldShowAdditionalContacts() && (
+              <div className="mt-3">
+                <AdditionalContactsList
+                  contacts={customer.additionalContacts}
+                  parentId={customer.id}
+                  parentType="customer"
+                  queryKey={['customers', id!]}
+                  canEdit={canEditCustomers}
+                  showAddButton={true}
+                />
+              </div>
+            )}
+
             {/* Equipment Section */}
-            <div className="mt-4">
-              <div className="flex items-center justify-between">
+            <div className="mt-3">
+              <div className="flex items-center justify-between mb-2">
                 <Subheading>{getName('equipment')}</Subheading>
                 {/* TODO: Add equipment permission check when equipment management is implemented */}
                 <Button plain>
@@ -186,14 +215,14 @@ export default function CustomerDetailPage() {
                   {t('common.actions.add', { entity: getName('equipment') })}
                 </Button>
               </div>
-              <div className="mt-2 rounded-lg border border-zinc-200 p-4 text-center dark:border-zinc-800">
-                <Text>{t('common.actions.noEntitiesYet', { entities: getName('equipment', true) })}</Text>
+              <div className="rounded-lg border border-zinc-200 p-3 dark:border-zinc-800">
+                <Text className="text-sm text-zinc-500 dark:text-zinc-400">{t('common.actions.noEntitiesYet', { entities: getName('equipment', true) })}</Text>
               </div>
             </div>
 
             {/* Recent Work Orders */}
-            <div className="mt-4">
-              <div className="flex items-center justify-between">
+            <div className="mt-3">
+              <div className="flex items-center justify-between mb-2">
                 <Subheading>{t('common.recentEntities', { entities: getName('work_order', true) })}</Subheading>
                 {/* TODO: Add work order permission check when work order management is implemented */}
                 <Button plain>
@@ -201,17 +230,19 @@ export default function CustomerDetailPage() {
                   {t('common.actions.new', { entity: getName('work_order') })}
                 </Button>
               </div>
-              <div className="mt-2 rounded-lg border border-zinc-200 p-4 text-center dark:border-zinc-800">
-                <Text>{t('common.actions.noEntitiesYet', { entities: getName('work_order', true) })}</Text>
+              <div className="rounded-lg border border-zinc-200 p-3 dark:border-zinc-800">
+                <Text className="text-sm text-zinc-500 dark:text-zinc-400">{t('common.actions.noEntitiesYet', { entities: getName('work_order', true) })}</Text>
               </div>
             </div>
 
             {/* Notes */}
             {customer.notes && (
-              <div className="mt-4">
-                <Subheading>{t('common.form.notes')}</Subheading>
-                <div className="mt-2 rounded-lg border border-zinc-200 p-3 dark:border-zinc-800">
-                  <Text>{customer.notes}</Text>
+              <div className="mt-3">
+                <div className="mb-2">
+                  <Subheading>{t('common.form.notes')}</Subheading>
+                </div>
+                <div className="rounded-lg border border-zinc-200 p-3 dark:border-zinc-800">
+                  <Text className="text-sm">{customer.notes}</Text>
                 </div>
               </div>
             )}
@@ -270,19 +301,41 @@ export default function CustomerDetailPage() {
               )}
             </div>
 
-            {/* Service Locations */}
-            <div className="mt-4">
-              <div className="flex items-center justify-between">
-                <Subheading>{t('common.entitiesCount', { entities: getName('service_location', true), count: customer.serviceLocations.length })}</Subheading>
+            {/* Quick Stats Bar */}
+            <div className="mt-4 flex items-center divide-x divide-zinc-200 rounded-lg border border-zinc-200 bg-zinc-50 dark:divide-zinc-700 dark:border-zinc-800 dark:bg-zinc-900/50">
+              <div className="flex-1 px-4 py-3">
+                <Text className="text-xs font-medium text-zinc-500 dark:text-zinc-400">{getName('service_location', true)}</Text>
+                <Strong className="mt-1 block text-2xl">{customer.serviceLocations.length}</Strong>
+              </div>
+              <div className="flex-1 px-4 py-3">
+                <Text className="text-xs font-medium text-zinc-500 dark:text-zinc-400">{t('common.actions.open', { entities: getName('work_order', true) })}</Text>
+                <Strong className="mt-1 block text-2xl">0</Strong>
+              </div>
+              <div className="flex-1 px-4 py-3">
+                <Text className="text-xs font-medium text-zinc-500 dark:text-zinc-400">{t('customers.detail.balance')}</Text>
+                <Strong className="mt-1 block text-2xl">$0.00</Strong>
+              </div>
+              <div className="flex-1 px-4 py-3">
+                <Text className="text-xs font-medium text-zinc-500 dark:text-zinc-400">{t('customers.detail.lastService')}</Text>
+                <Strong className="mt-1 block text-base">{t('customers.detail.never')}</Strong>
+              </div>
+            </div>
+
+            {/* Two-column layout: Locations (left) + Contacts/Notes (right) */}
+            <div className="mt-4 grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Left column - Service Locations (2/3 width) */}
+              <div className="lg:col-span-2">
+                <div className="flex items-center justify-between mb-2">
+                  <Subheading>{t('common.entitiesCount', { entities: getName('service_location', true), count: customer.serviceLocations.length })}</Subheading>
                 {useTableLayout && canAddServiceLocations && (
-                  <Button plain onClick={() => setIsAddLocationDialogOpen(true)}>
+                  <Button plain onClick={() => setIsAddLocationDialogOpen(true)} className="text-sm">
                     <PlusIcon className="size-4" />
                     {t('common.actions.add', { entity: getName('service_location') })}
                   </Button>
                 )}
               </div>
 
-              {useTableLayout && (
+              {useTableLayout && customer.serviceLocations.length >= 5 && (
                 <div className="mt-2 flex items-center gap-4">
                   <InputGroup className="flex-1 max-w-md">
                     <MagnifyingGlassIcon data-slot="icon" />
@@ -323,23 +376,25 @@ export default function CustomerDetailPage() {
                           <TableCell className="font-medium">
                             {location.locationName || 'Unnamed Location'}
                           </TableCell>
-                          <TableCell>
-                            <Text className="text-xs">
+                          <TableCell className="text-zinc-500">
+                            <div className="text-xs">
                               {location.address.streetAddress}
-                              {location.address.streetAddressLine2 && `, ${location.address.streetAddressLine2}`}
-                            </Text>
-                            <Text className="text-xs">
+                              {location.address.streetAddressLine2 && ` ${location.address.streetAddressLine2}`}
+                            </div>
+                            <div className="text-xs text-zinc-400">
                               {location.address.city}, {location.address.state} {location.address.zipCode}
-                            </Text>
+                            </div>
                           </TableCell>
-                          <TableCell>
+                          <TableCell className="text-zinc-500">
                             {location.siteContactName ? (
-                              <Text className="text-xs">
-                                {location.siteContactName}
-                                {location.siteContactPhone && ` • ${formatPhone(location.siteContactPhone)}`}
-                              </Text>
+                              <>
+                                <div className="text-xs">{location.siteContactName}</div>
+                                {location.siteContactPhone && (
+                                  <div className="text-xs">{formatPhone(location.siteContactPhone)}</div>
+                                )}
+                              </>
                             ) : (
-                              <Text className="text-xs">-</Text>
+                              <span className="text-xs text-zinc-400">-</span>
                             )}
                           </TableCell>
                           <TableCell>
@@ -448,17 +503,35 @@ export default function CustomerDetailPage() {
                   )}
                 </div>
               )}
-            </div>
-
-            {/* Notes */}
-            {customer.notes && (
-              <div className="mt-4">
-                <Subheading>{t('common.form.notes')}</Subheading>
-                <div className="mt-2 rounded-lg border border-zinc-200 p-3 dark:border-zinc-800">
-                  <Text>{customer.notes}</Text>
-                </div>
               </div>
-            )}
+
+              {/* Right column - Contacts & Notes (1/3 width) */}
+              <div className="space-y-4">
+                {/* Additional Contacts */}
+                {shouldShowAdditionalContacts() && (
+                  <div>
+                    <AdditionalContactsList
+                      contacts={customer.additionalContacts}
+                      parentId={customer.id}
+                      parentType="customer"
+                      queryKey={['customers', id!]}
+                      canEdit={canEditCustomers}
+                      showAddButton={true}
+                    />
+                  </div>
+                )}
+
+                {/* Notes */}
+                {customer.notes && (
+                  <div>
+                    <Subheading>{t('common.form.notes')}</Subheading>
+                    <div className="mt-2 rounded-lg border border-zinc-200 p-3 dark:border-zinc-800">
+                      <Text>{customer.notes}</Text>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         )}
       </div>

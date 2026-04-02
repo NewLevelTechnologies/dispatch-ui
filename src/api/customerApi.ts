@@ -16,6 +16,17 @@ export interface Address {
   isBusiness?: boolean;
 }
 
+export interface AdditionalContact {
+  id: string;
+  name: string;
+  phone?: string | null;
+  email?: string | null;
+  notes?: string | null;
+  displayOrder: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface ServiceLocation {
   id: string;
   customerId: string;
@@ -27,6 +38,7 @@ export interface ServiceLocation {
   siteContactName?: string | null;
   siteContactPhone?: string | null;
   siteContactEmail?: string | null;
+  additionalContacts: AdditionalContact[];
   accessInstructions?: string | null;
   notes?: string | null;
   status: 'ACTIVE' | 'INACTIVE' | 'CLOSED';
@@ -44,6 +56,7 @@ export interface Customer {
   email: string;
   phone?: string | null;
   billingAddress: Address;
+  additionalContacts: AdditionalContact[];
   serviceLocations: ServiceLocation[];
   paymentTermsDays: number;
   requiresPurchaseOrder: boolean;

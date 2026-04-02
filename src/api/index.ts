@@ -7,6 +7,7 @@ export {
   type Customer,
   type Address,
   type ServiceLocation,
+  type AdditionalContact,
   type CustomerDisplayMode,
   type CustomerStatus,
   type CreateCustomerRequest,
@@ -16,6 +17,13 @@ export {
   type UpdateServiceLocationRequest,
   type UpdateServiceLocationAddressRequest,
 } from './customerApi';
+
+// Contact API
+export {
+  contactApi,
+  type CreateAdditionalContactRequest,
+  type UpdateAdditionalContactRequest,
+} from './contactApi';
 
 // User API
 export {

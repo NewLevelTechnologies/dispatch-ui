@@ -29,6 +29,7 @@ const mockCustomer = {
       siteContactName: 'John Doe',
       siteContactPhone: '5551234567',
       siteContactEmail: 'john@example.com',
+      additionalContacts: [],
       accessInstructions: 'Use side entrance',
       notes: 'Important client',
       createdAt: '2024-01-01T00:00:00Z',
@@ -252,5 +253,97 @@ describe('ServiceLocationDetailPage', () => {
     expect(screen.queryByText('Site Contact')).not.toBeInTheDocument();
     expect(screen.queryByText('Access Instructions')).not.toBeInTheDocument();
     expect(screen.queryByText('Notes')).not.toBeInTheDocument();
+  });
+
+  it('displays additional contacts when present', async () => {
+    const customerWithContacts = {
+      ...mockCustomer,
+      serviceLocations: [
+        {
+          ...mockCustomer.serviceLocations[0],
+          additionalContacts: [
+            {
+              id: 'contact-1',
+              name: 'Jane Manager',
+              phone: '5559876543',
+              email: 'jane@example.com',
+              notes: 'Facilities manager',
+              displayOrder: 0,
+              createdAt: '2024-01-01T00:00:00Z',
+              updatedAt: '2024-01-01T00:00:00Z',
+            },
+          ],
+        },
+      ],
+    };
+
+    vi.mocked(apiClient.get).mockResolvedValue({ data: [customerWithContacts] });
+
+    renderDetailPage();
+
+    await waitFor(() => {
+      expect(screen.getByText('Jane Manager')).toBeInTheDocument();
+    });
+
+    expect(screen.getByText(/\(555\) 987-6543/i)).toBeInTheDocument();
+    expect(screen.getByText('jane@example.com')).toBeInTheDocument();
+    expect(screen.getByText('Facilities manager')).toBeInTheDocument();
+  });
+
+  it('shows additional contacts section when user can edit', async () => {
+    const minimalCustomer = {
+      ...mockCustomer,
+      serviceLocations: [
+        {
+          ...mockCustomer.serviceLocations[0],
+          siteContactName: '',
+          siteContactPhone: '',
+          siteContactEmail: '',
+          additionalContacts: [],
+        },
+      ],
+    };
+
+    vi.mocked(apiClient.get).mockResolvedValue({ data: [minimalCustomer] });
+
+    renderDetailPage();
+
+    await waitFor(() => {
+      expect(screen.getByText('Main Office')).toBeInTheDocument();
+    });
+
+    // Should show add button when user has permission
+    expect(screen.getByRole('button', { name: /add additional contact/i })).toBeInTheDocument();
+  });
+
+  it('shows additional contacts section when site contact exists', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({ data: [mockCustomer] });
+
+    renderDetailPage();
+
+    await waitFor(() => {
+      expect(screen.getByText('Main Office')).toBeInTheDocument();
+    });
+
+    // Should show section because siteContactName exists
+    expect(screen.getByRole('button', { name: /add additional contact/i })).toBeInTheDocument();
+  });
+
+  it('opens add contact dialog when button is clicked', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({ data: [mockCustomer] });
+    const user = userEvent.setup();
+
+    renderDetailPage();
+
+    await waitFor(() => {
+      expect(screen.getByText('Main Office')).toBeInTheDocument();
+    });
+
+    const addButton = screen.getByRole('button', { name: /add additional contact/i });
+    await user.click(addButton);
+
+    await waitFor(() => {
+      expect(screen.getByText(/create additional contact/i)).toBeInTheDocument();
+    });
   });
 });
