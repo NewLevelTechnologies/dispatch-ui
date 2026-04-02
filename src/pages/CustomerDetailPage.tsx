@@ -98,8 +98,9 @@ export default function CustomerDetailPage() {
   const isSimple = customer.displayMode === 'SIMPLE';
   const primaryLocation = customer.serviceLocations[0];
 
-  // Adaptive layout: cards for ≤5 locations, table for >5
-  const useTableLayout = customer.serviceLocations.length > 5;
+  // For STANDARD mode: always use table (more CSR-friendly, easier to scan)
+  // For SIMPLE mode: cards are fine (only 1 location typically)
+  const useTableLayout = !isSimple || customer.serviceLocations.length > 5;
 
   // Determine if we should show additional contacts section
   const shouldShowAdditionalContacts = () => {
@@ -293,6 +294,26 @@ export default function CustomerDetailPage() {
                   {t('common.edit')}
                 </Button>
               )}
+            </div>
+
+            {/* Quick Stats Bar */}
+            <div className="mt-4 grid grid-cols-4 gap-3 rounded-lg bg-zinc-50 p-3 dark:bg-zinc-900">
+              <div>
+                <Text className="text-xs text-zinc-500">{getName('service_location', true)}</Text>
+                <Strong className="mt-0.5 block text-lg">{customer.serviceLocations.length}</Strong>
+              </div>
+              <div>
+                <Text className="text-xs text-zinc-500">{t('common.actions.open', { entities: getName('work_order', true) })}</Text>
+                <Strong className="mt-0.5 block text-lg">0</Strong>
+              </div>
+              <div>
+                <Text className="text-xs text-zinc-500">{t('customers.detail.balance')}</Text>
+                <Strong className="mt-0.5 block text-lg">$0.00</Strong>
+              </div>
+              <div>
+                <Text className="text-xs text-zinc-500">{t('customers.detail.lastService')}</Text>
+                <Strong className="mt-0.5 block text-sm">{t('customers.detail.never')}</Strong>
+              </div>
             </div>
 
             {/* Two-column layout: Locations (left) + Contacts/Notes (right) */}
