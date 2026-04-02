@@ -26,6 +26,7 @@ export default function TenantSettingsPage() {
   const { updateGlossary } = useGlossary();
   const canEdit = useHasCapability('EDIT_SETTINGS');
   const [isEditing, setIsEditing] = useState(false);
+  const [selectedTab, setSelectedTab] = useState(0); // 0 = General, 1 = Terminology
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -214,7 +215,7 @@ export default function TenantSettingsPage() {
             )}
           </div>
 
-          <Tab.Group>
+          <Tab.Group selectedIndex={selectedTab} onChange={setSelectedTab}>
             <Tab.List className="flex gap-4 border-b border-zinc-200 dark:border-zinc-800 mt-6">
               <Tab className={({ selected }) =>
                 `pb-3 px-1 text-sm font-medium outline-none transition-colors ${
@@ -427,7 +428,7 @@ export default function TenantSettingsPage() {
         </div>
 
         <form onSubmit={handleSubmit}>
-          <Tab.Group>
+          <Tab.Group selectedIndex={selectedTab} onChange={setSelectedTab}>
             <Tab.List className="flex gap-4 border-b border-zinc-200 dark:border-zinc-800 mt-6">
               <Tab className={({ selected }) =>
                 `pb-3 px-1 text-sm font-medium outline-none transition-colors ${
