@@ -297,22 +297,22 @@ export default function CustomerDetailPage() {
             </div>
 
             {/* Quick Stats Bar */}
-            <div className="mt-4 grid grid-cols-4 gap-3 rounded-lg bg-zinc-50 p-3 dark:bg-zinc-900">
-              <div>
-                <Text className="text-xs text-zinc-500">{getName('service_location', true)}</Text>
-                <Strong className="mt-0.5 block text-lg">{customer.serviceLocations.length}</Strong>
+            <div className="mt-4 flex items-center divide-x divide-zinc-200 rounded-lg bg-zinc-50 dark:divide-zinc-800 dark:bg-zinc-900">
+              <div className="flex-1 px-4 py-3">
+                <Text className="text-xs font-medium text-zinc-500 dark:text-zinc-400">{getName('service_location', true)}</Text>
+                <Strong className="mt-1 block text-2xl">{customer.serviceLocations.length}</Strong>
               </div>
-              <div>
-                <Text className="text-xs text-zinc-500">{t('common.actions.open', { entities: getName('work_order', true) })}</Text>
-                <Strong className="mt-0.5 block text-lg">0</Strong>
+              <div className="flex-1 px-4 py-3">
+                <Text className="text-xs font-medium text-zinc-500 dark:text-zinc-400">{t('common.actions.open', { entities: getName('work_order', true) })}</Text>
+                <Strong className="mt-1 block text-2xl">0</Strong>
               </div>
-              <div>
-                <Text className="text-xs text-zinc-500">{t('customers.detail.balance')}</Text>
-                <Strong className="mt-0.5 block text-lg">$0.00</Strong>
+              <div className="flex-1 px-4 py-3">
+                <Text className="text-xs font-medium text-zinc-500 dark:text-zinc-400">{t('customers.detail.balance')}</Text>
+                <Strong className="mt-1 block text-2xl">$0.00</Strong>
               </div>
-              <div>
-                <Text className="text-xs text-zinc-500">{t('customers.detail.lastService')}</Text>
-                <Strong className="mt-0.5 block text-sm">{t('customers.detail.never')}</Strong>
+              <div className="flex-1 px-4 py-3">
+                <Text className="text-xs font-medium text-zinc-500 dark:text-zinc-400">{t('customers.detail.lastService')}</Text>
+                <Strong className="mt-1 block text-base">{t('customers.detail.never')}</Strong>
               </div>
             </div>
 
@@ -330,7 +330,7 @@ export default function CustomerDetailPage() {
                 )}
               </div>
 
-              {useTableLayout && (
+              {useTableLayout && customer.serviceLocations.length >= 5 && (
                 <div className="mt-2 flex items-center gap-4">
                   <InputGroup className="flex-1 max-w-md">
                     <MagnifyingGlassIcon data-slot="icon" />
