@@ -371,23 +371,25 @@ export default function CustomerDetailPage() {
                           <TableCell className="font-medium">
                             {location.locationName || 'Unnamed Location'}
                           </TableCell>
-                          <TableCell>
-                            <Text className="text-xs">
+                          <TableCell className="text-zinc-500">
+                            <div className="text-xs">
                               {location.address.streetAddress}
-                              {location.address.streetAddressLine2 && `, ${location.address.streetAddressLine2}`}
-                            </Text>
-                            <Text className="text-xs">
+                              {location.address.streetAddressLine2 && ` ${location.address.streetAddressLine2}`}
+                            </div>
+                            <div className="text-xs text-zinc-400">
                               {location.address.city}, {location.address.state} {location.address.zipCode}
-                            </Text>
+                            </div>
                           </TableCell>
-                          <TableCell>
+                          <TableCell className="text-zinc-500">
                             {location.siteContactName ? (
-                              <Text className="text-xs">
-                                {location.siteContactName}
-                                {location.siteContactPhone && ` • ${formatPhone(location.siteContactPhone)}`}
-                              </Text>
+                              <>
+                                <div className="text-xs">{location.siteContactName}</div>
+                                {location.siteContactPhone && (
+                                  <div className="text-xs">{formatPhone(location.siteContactPhone)}</div>
+                                )}
+                              </>
                             ) : (
-                              <Text className="text-xs">-</Text>
+                              <span className="text-xs text-zinc-400">-</span>
                             )}
                           </TableCell>
                           <TableCell>
