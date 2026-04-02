@@ -85,7 +85,7 @@ export default function AdditionalContactsList({
 
   return (
     <div>
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between mb-2">
         <Subheading>{t('contacts.title')}</Subheading>
         {canEdit && showAddButton && (
           <Button plain onClick={handleAdd}>

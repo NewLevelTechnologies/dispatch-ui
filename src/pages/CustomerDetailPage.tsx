@@ -317,10 +317,10 @@ export default function CustomerDetailPage() {
             </div>
 
             {/* Two-column layout: Locations (left) + Contacts/Notes (right) */}
-            <div className="mt-4 grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <div className="mt-4 grid grid-cols-1 lg:grid-cols-3 gap-6">
               {/* Left column - Service Locations (2/3 width) */}
               <div className="lg:col-span-2">
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between mb-2">
                   <Subheading>{t('common.entitiesCount', { entities: getName('service_location', true), count: customer.serviceLocations.length })}</Subheading>
                 {useTableLayout && canAddServiceLocations && (
                   <Button plain onClick={() => setIsAddLocationDialogOpen(true)}>
