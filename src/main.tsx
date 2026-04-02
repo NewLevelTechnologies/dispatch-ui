@@ -9,6 +9,7 @@ import './config/amplify';
 import './i18n/config';
 import App from './App';
 import { ThemeProvider } from './contexts/ThemeContext';
+import { SidebarProvider } from './contexts/SidebarContext';
 
 // Create a React Query client
 const queryClient = new QueryClient({
@@ -24,13 +25,15 @@ const queryClient = new QueryClient({
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <ThemeProvider>
-      <QueryClientProvider client={queryClient}>
-        <Authenticator.Provider>
-          <BrowserRouter>
-            <App />
-          </BrowserRouter>
-        </Authenticator.Provider>
-      </QueryClientProvider>
+      <SidebarProvider>
+        <QueryClientProvider client={queryClient}>
+          <Authenticator.Provider>
+            <BrowserRouter>
+              <App />
+            </BrowserRouter>
+          </Authenticator.Provider>
+        </QueryClientProvider>
+      </SidebarProvider>
     </ThemeProvider>
   </StrictMode>
 );

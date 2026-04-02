@@ -2,6 +2,7 @@ import { useAuthenticator } from '@aws-amplify/ui-react';
 import { useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useGlossary } from '../contexts/GlossaryContext';
+import { useSidebar } from '../contexts/SidebarContext';
 import {
   HomeIcon,
   UserGroupIcon,
@@ -23,6 +24,8 @@ import {
   ClockIcon,
   ArrowPathIcon,
   MapPinIcon,
+  Bars3Icon,
+  ChevronDoubleLeftIcon,
 } from '@heroicons/react/24/outline';
 import { Sidebar, SidebarBody, SidebarFooter, SidebarHeader, SidebarItem, SidebarSection } from './catalyst/sidebar';
 import { SidebarLayout } from './catalyst/sidebar-layout';
@@ -38,6 +41,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { t } = useTranslation();
   const { getName } = useGlossary();
   const { theme, setTheme } = useTheme();
+  const { isCollapsed, toggleSidebar } = useSidebar();
 
   // Permission checks for navigation visibility
   const canViewUsers = useHasAnyCapability('VIEW_USERS');
@@ -77,16 +81,32 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <SidebarLayout
+      isCollapsed={isCollapsed}
       sidebar={
         <Sidebar>
           <SidebarHeader>
-            <div className="flex items-center gap-3">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-600">
-                <span className="text-sm font-bold text-white">D</span>
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-600 flex-shrink-0">
+                  <span className="text-sm font-bold text-white">D</span>
+                </div>
+                {!isCollapsed && (
+                  <div className="text-base font-semibold text-zinc-900 dark:text-white truncate">
+                    {t('app.name')}
+                  </div>
+                )}
               </div>
-              <div className="text-base font-semibold text-zinc-900 dark:text-white">
-                {t('app.name')}
-              </div>
+              <button
+                onClick={toggleSidebar}
+                className="flex h-8 w-8 items-center justify-center rounded-lg hover:bg-zinc-950/5 dark:hover:bg-white/5 transition-colors flex-shrink-0"
+                aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+              >
+                {isCollapsed ? (
+                  <Bars3Icon className="h-5 w-5 text-zinc-500 dark:text-zinc-400" />
+                ) : (
+                  <ChevronDoubleLeftIcon className="h-5 w-5 text-zinc-500 dark:text-zinc-400" />
+                )}
+              </button>
             </div>
           </SidebarHeader>
 
@@ -97,67 +117,21 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                   key={item.name}
                   href={item.href}
                   current={location.pathname === item.href}
+                  title={isCollapsed ? item.name : undefined}
                 >
                   <item.icon className="h-5 w-5" />
-                  <span>{item.name}</span>
+                  {!isCollapsed && <span>{item.name}</span>}
                 </SidebarItem>
               ))}
             </SidebarSection>
 
-            <SidebarSection className="max-lg:hidden">
-              <div className="flex items-center gap-3 px-2 py-1">
-                <WrenchScrewdriverIcon className="h-5 w-5 text-zinc-500" />
-                <span className="text-sm/6 font-medium text-zinc-500 dark:text-zinc-400">{getName('equipment', true)}</span>
-              </div>
-              {equipmentNavigation.map((item) => (
-                <SidebarItem
-                  key={item.name}
-                  href={item.href}
-                  current={location.pathname === item.href}
-                >
-                  <item.icon className="h-5 w-5" />
-                  <span>{item.name}</span>
-                </SidebarItem>
-              ))}
-            </SidebarSection>
-
-            <SidebarSection className="max-lg:hidden">
-              <div className="flex items-center gap-3 px-2 py-1">
-                <CurrencyDollarIcon className="h-5 w-5 text-zinc-500" />
-                <span className="text-sm/6 font-medium text-zinc-500 dark:text-zinc-400">{t('entities.financial')}</span>
-              </div>
-              {financialNavigation.map((item) => (
-                <SidebarItem
-                  key={item.name}
-                  href={item.href}
-                  current={location.pathname === item.href}
-                >
-                  <item.icon className="h-5 w-5" />
-                  <span>{item.name}</span>
-                </SidebarItem>
-              ))}
-            </SidebarSection>
-
-            <SidebarSection className="max-lg:hidden">
-              <div className="flex items-center gap-3 px-2 py-1">
-                <CalendarIcon className="h-5 w-5 text-zinc-500" />
-                <span className="text-sm/6 font-medium text-zinc-500 dark:text-zinc-400">{t('entities.scheduling')}</span>
-              </div>
-              {schedulingNavigation.map((item) => (
-                <SidebarItem
-                  key={item.name}
-                  href={item.href}
-                  current={location.pathname === item.href}
-                >
-                  <item.icon className="h-5 w-5" />
-                  <span>{item.name}</span>
-                </SidebarItem>
-              ))}
-            </SidebarSection>
-
-            {adminNavigation.length > 0 && (
+            {!isCollapsed && (
               <SidebarSection className="max-lg:hidden">
-                {adminNavigation.map((item) => (
+                <div className="flex items-center gap-3 px-2 py-1">
+                  <WrenchScrewdriverIcon className="h-5 w-5 text-zinc-500" />
+                  <span className="text-sm/6 font-medium text-zinc-500 dark:text-zinc-400">{getName('equipment', true)}</span>
+                </div>
+                {equipmentNavigation.map((item) => (
                   <SidebarItem
                     key={item.name}
                     href={item.href}
@@ -169,17 +143,113 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 ))}
               </SidebarSection>
             )}
+            {isCollapsed && (
+              <SidebarSection className="max-lg:hidden">
+                {equipmentNavigation.map((item) => (
+                  <SidebarItem
+                    key={item.name}
+                    href={item.href}
+                    current={location.pathname === item.href}
+                    title={item.name}
+                  >
+                    <item.icon className="h-5 w-5" />
+                  </SidebarItem>
+                ))}
+              </SidebarSection>
+            )}
+
+            {!isCollapsed && (
+              <SidebarSection className="max-lg:hidden">
+                <div className="flex items-center gap-3 px-2 py-1">
+                  <CurrencyDollarIcon className="h-5 w-5 text-zinc-500" />
+                  <span className="text-sm/6 font-medium text-zinc-500 dark:text-zinc-400">{t('entities.financial')}</span>
+                </div>
+                {financialNavigation.map((item) => (
+                  <SidebarItem
+                    key={item.name}
+                    href={item.href}
+                    current={location.pathname === item.href}
+                  >
+                    <item.icon className="h-5 w-5" />
+                    <span>{item.name}</span>
+                  </SidebarItem>
+                ))}
+              </SidebarSection>
+            )}
+            {isCollapsed && (
+              <SidebarSection className="max-lg:hidden">
+                {financialNavigation.map((item) => (
+                  <SidebarItem
+                    key={item.name}
+                    href={item.href}
+                    current={location.pathname === item.href}
+                    title={item.name}
+                  >
+                    <item.icon className="h-5 w-5" />
+                  </SidebarItem>
+                ))}
+              </SidebarSection>
+            )}
+
+            {!isCollapsed && (
+              <SidebarSection className="max-lg:hidden">
+                <div className="flex items-center gap-3 px-2 py-1">
+                  <CalendarIcon className="h-5 w-5 text-zinc-500" />
+                  <span className="text-sm/6 font-medium text-zinc-500 dark:text-zinc-400">{t('entities.scheduling')}</span>
+                </div>
+                {schedulingNavigation.map((item) => (
+                  <SidebarItem
+                    key={item.name}
+                    href={item.href}
+                    current={location.pathname === item.href}
+                  >
+                    <item.icon className="h-5 w-5" />
+                    <span>{item.name}</span>
+                  </SidebarItem>
+                ))}
+              </SidebarSection>
+            )}
+            {isCollapsed && (
+              <SidebarSection className="max-lg:hidden">
+                {schedulingNavigation.map((item) => (
+                  <SidebarItem
+                    key={item.name}
+                    href={item.href}
+                    current={location.pathname === item.href}
+                    title={item.name}
+                  >
+                    <item.icon className="h-5 w-5" />
+                  </SidebarItem>
+                ))}
+              </SidebarSection>
+            )}
+
+            {adminNavigation.length > 0 && (
+              <SidebarSection className="max-lg:hidden">
+                {adminNavigation.map((item) => (
+                  <SidebarItem
+                    key={item.name}
+                    href={item.href}
+                    current={location.pathname === item.href}
+                    title={isCollapsed ? item.name : undefined}
+                  >
+                    <item.icon className="h-5 w-5" />
+                    {!isCollapsed && <span>{item.name}</span>}
+                  </SidebarItem>
+                ))}
+              </SidebarSection>
+            )}
           </SidebarBody>
 
           <SidebarFooter>
             <Dropdown>
-              <DropdownButton as={SidebarItem}>
+              <DropdownButton as={SidebarItem} title={isCollapsed ? user?.signInDetails?.loginId : undefined}>
                 <Avatar
                   slot="icon"
                   initials={user?.signInDetails?.loginId?.charAt(0).toUpperCase() || 'U'}
                   className="size-6"
                 />
-                <span className="truncate">{user?.signInDetails?.loginId}</span>
+                {!isCollapsed && <span className="truncate">{user?.signInDetails?.loginId}</span>}
               </DropdownButton>
               <DropdownMenu className="min-w-64" anchor="top start">
                 <div className="px-3 py-2">
