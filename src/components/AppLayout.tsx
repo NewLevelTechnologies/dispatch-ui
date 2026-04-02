@@ -104,7 +104,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               ))}
             </SidebarSection>
 
-            <SidebarSection className="max-lg:hidden">
+            <SidebarSection>
               <div className="flex items-center gap-3 px-2 py-1">
                 <WrenchScrewdriverIcon className="h-5 w-5 text-zinc-500" />
                 <span className="text-sm/6 font-medium text-zinc-500 dark:text-zinc-400">{getName('equipment', true)}</span>
@@ -121,7 +121,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               ))}
             </SidebarSection>
 
-            <SidebarSection className="max-lg:hidden">
+            <SidebarSection>
               <div className="flex items-center gap-3 px-2 py-1">
                 <CurrencyDollarIcon className="h-5 w-5 text-zinc-500" />
                 <span className="text-sm/6 font-medium text-zinc-500 dark:text-zinc-400">{t('entities.financial')}</span>
@@ -138,7 +138,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               ))}
             </SidebarSection>
 
-            <SidebarSection className="max-lg:hidden">
+            <SidebarSection>
               <div className="flex items-center gap-3 px-2 py-1">
                 <CalendarIcon className="h-5 w-5 text-zinc-500" />
                 <span className="text-sm/6 font-medium text-zinc-500 dark:text-zinc-400">{t('entities.scheduling')}</span>
@@ -156,7 +156,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             </SidebarSection>
 
             {adminNavigation.length > 0 && (
-              <SidebarSection className="max-lg:hidden">
+              <SidebarSection>
                 {adminNavigation.map((item) => (
                   <SidebarItem
                     key={item.name}
