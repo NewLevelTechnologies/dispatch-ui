@@ -297,7 +297,7 @@ export default function CustomerDetailPage() {
             </div>
 
             {/* Quick Stats Bar */}
-            <div className="mt-4 flex items-center divide-x divide-zinc-200 rounded-lg bg-zinc-50 dark:divide-zinc-800 dark:bg-zinc-900">
+            <div className="mt-4 flex items-center divide-x divide-zinc-200 rounded-lg border border-zinc-200 bg-zinc-50 dark:divide-zinc-700 dark:border-zinc-800 dark:bg-zinc-900/50">
               <div className="flex-1 px-4 py-3">
                 <Text className="text-xs font-medium text-zinc-500 dark:text-zinc-400">{getName('service_location', true)}</Text>
                 <Strong className="mt-1 block text-2xl">{customer.serviceLocations.length}</Strong>
