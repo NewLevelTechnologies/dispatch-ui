@@ -21,6 +21,8 @@ const mockContact: AdditionalContact = {
 describe('AdditionalContactFormDialog', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Mock notification preferences API to return empty array by default
+    vi.mocked(apiClient.get).mockResolvedValue({ data: [] });
   });
 
   it('renders in create mode when no contact provided', () => {
@@ -30,6 +32,7 @@ describe('AdditionalContactFormDialog', () => {
         onClose={() => {}}
         parentId="parent-1"
         parentType="customer"
+        customerId="customer-1"
         queryKey={['customers', 'parent-1']}
       />
     );
@@ -44,6 +47,7 @@ describe('AdditionalContactFormDialog', () => {
         onClose={() => {}}
         parentId="parent-1"
         parentType="customer"
+        customerId="customer-1"
         contact={mockContact}
         queryKey={['customers', 'parent-1']}
       />
@@ -63,6 +67,7 @@ describe('AdditionalContactFormDialog', () => {
         onClose={() => {}}
         parentId="parent-1"
         parentType="customer"
+        customerId="customer-1"
         queryKey={['customers', 'parent-1']}
       />
     );
@@ -84,6 +89,7 @@ describe('AdditionalContactFormDialog', () => {
         onClose={() => {}}
         parentId="parent-1"
         parentType="customer"
+        customerId="customer-1"
         queryKey={['customers', 'parent-1']}
       />
     );
@@ -114,6 +120,7 @@ describe('AdditionalContactFormDialog', () => {
         onClose={onClose}
         parentId="parent-1"
         parentType="customer"
+        customerId="customer-1"
         queryKey={['customers', 'parent-1']}
       />
     );
@@ -157,6 +164,7 @@ describe('AdditionalContactFormDialog', () => {
         onClose={onClose}
         parentId="parent-1"
         parentType="customer"
+        customerId="customer-1"
         contact={mockContact}
         queryKey={['customers', 'parent-1']}
       />
@@ -191,6 +199,7 @@ describe('AdditionalContactFormDialog', () => {
         onClose={() => {}}
         parentId="loc-1"
         parentType="serviceLocation"
+        customerId="customer-1"
         queryKey={['customers']}
       />
     );
@@ -217,6 +226,7 @@ describe('AdditionalContactFormDialog', () => {
         onClose={() => {}}
         parentId="parent-1"
         parentType="customer"
+        customerId="customer-1"
         queryKey={['customers', 'parent-1']}
       />
     );
@@ -239,6 +249,7 @@ describe('AdditionalContactFormDialog', () => {
         onClose={onClose}
         parentId="parent-1"
         parentType="customer"
+        customerId="customer-1"
         queryKey={['customers', 'parent-1']}
       />
     );
@@ -256,6 +267,7 @@ describe('AdditionalContactFormDialog', () => {
         onClose={() => {}}
         parentId="parent-1"
         parentType="customer"
+        customerId="customer-1"
         queryKey={['customers', 'parent-1']}
       />
     );
@@ -270,6 +282,7 @@ describe('AdditionalContactFormDialog', () => {
         onClose={() => {}}
         parentId="parent-1"
         parentType="customer"
+        customerId="customer-1"
         queryKey={['customers', 'parent-1']}
       />
     );
@@ -280,6 +293,7 @@ describe('AdditionalContactFormDialog', () => {
         onClose={() => {}}
         parentId="parent-1"
         parentType="customer"
+        customerId="customer-1"
         queryKey={['customers', 'parent-1']}
       />
     );
@@ -299,6 +313,7 @@ describe('AdditionalContactFormDialog', () => {
         onClose={() => {}}
         parentId="parent-1"
         parentType="customer"
+        customerId="customer-1"
         queryKey={['customers', 'parent-1']}
       />
     );
@@ -325,6 +340,7 @@ describe('AdditionalContactFormDialog', () => {
         onClose={() => {}}
         parentId="parent-1"
         parentType="customer"
+        customerId="customer-1"
         queryKey={['customers', 'parent-1']}
       />
     );
@@ -352,6 +368,7 @@ describe('AdditionalContactFormDialog', () => {
         onClose={() => {}}
         parentId="parent-1"
         parentType="customer"
+        customerId="customer-1"
         queryKey={['customers', 'parent-1']}
       />
     );

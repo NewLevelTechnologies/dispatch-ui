@@ -185,6 +185,7 @@ export default function AdditionalContactsList({
         onClose={handleCloseFormDialog}
         parentId={parentId}
         parentType={parentType}
+        customerId={customerId}
         contact={selectedContact}
         queryKey={queryKey}
       />

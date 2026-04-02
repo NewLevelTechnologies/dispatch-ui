@@ -367,6 +367,7 @@
       "description": "Manage notification preferences for {{name}}",
       "errorLoad": "Failed to load notification preferences",
       "errorUpdate": "Failed to update notification preference",
+      "formDescription": "Choose which notifications this contact should receive",
       "manage": "Manage Notifications",
       "noPreferences": "No notification preferences available",
       "title": "Notification Preferences"

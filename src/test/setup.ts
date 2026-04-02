@@ -275,6 +275,7 @@ vi.mock('react-i18next', () => {
     'notifications.preferences.description': 'Manage notification preferences for {{name}}',
     'notifications.preferences.errorLoad': 'Failed to load notification preferences',
     'notifications.preferences.errorUpdate': 'Failed to update notification preference',
+    'notifications.preferences.formDescription': 'Choose which notifications this contact should receive',
     'notifications.preferences.manage': 'Manage Notifications',
     'notifications.preferences.noPreferences': 'No notification preferences available',
     'notifications.preferences.title': 'Notification Preferences',
