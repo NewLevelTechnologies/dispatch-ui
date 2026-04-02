@@ -25,7 +25,8 @@
       "noEntitiesYet": "No {{entities, lowercase}} yet",
       "noMatchSearch": "No {{entities, lowercase}} match your search.",
       "notFound": "No {{entities, lowercase}} found",
-      "open": "Open {{entities}}"
+      "open": "Open {{entities}}",
+      "title": "Actions"
     },
     "active": "Active",
     "add": "Add",
