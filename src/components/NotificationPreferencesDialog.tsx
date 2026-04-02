@@ -134,7 +134,7 @@ export default function NotificationPreferencesDialog({
   const notificationTypes = Object.values(groupedPreferences);
 
   return (
-    <Dialog open={isOpen} onClose={onClose} size="lg">
+    <Dialog open={isOpen} onClose={onClose} size="2xl">
       <DialogTitle>{t('notifications.preferences.title')}</DialogTitle>
       <DialogDescription>
         {t('notifications.preferences.description', { name: contactName })}

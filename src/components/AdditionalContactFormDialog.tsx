@@ -251,7 +251,7 @@ export default function AdditionalContactFormDialog({
   const isSubmitting = createMutation.isPending || updateMutation.isPending;
 
   return (
-    <Dialog open={isOpen} onClose={onClose}>
+    <Dialog open={isOpen} onClose={onClose} size="2xl">
       <DialogTitle>
         {isEdit ? t('contacts.form.titleEdit') : t('contacts.form.titleCreate')}
       </DialogTitle>
@@ -261,52 +261,54 @@ export default function AdditionalContactFormDialog({
       <form onSubmit={handleSubmit}>
         <DialogBody className="space-y-4">
           <Fieldset>
-            <FieldGroup className="space-y-3">
-              <Field>
-                <Label>{t('common.form.name')} *</Label>
-                <Input
-                  name="name"
-                  value={formData.name}
-                  onChange={(e) => handleChange('name', e.target.value)}
-                  required
-                  invalid={!!errors.name}
-                />
-                {errors.name && <div className="text-xs text-red-600 mt-1">{errors.name}</div>}
-              </Field>
+            <FieldGroup>
+              <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+                <Field>
+                  <Label>{t('common.form.name')} *</Label>
+                  <Input
+                    name="name"
+                    value={formData.name}
+                    onChange={(e) => handleChange('name', e.target.value)}
+                    required
+                    invalid={!!errors.name}
+                  />
+                  {errors.name && <div className="text-xs text-red-600 mt-1">{errors.name}</div>}
+                </Field>
 
-              <Field>
-                <Label>{t('common.form.phone')}</Label>
-                <PatternFormat
-                  format="(###) ###-####"
-                  mask="_"
-                  customInput={Input}
-                  name="phone"
-                  value={formData.phone || ''}
-                  onValueChange={(values) => handleChange('phone', values.value)}
-                />
-              </Field>
+                <Field>
+                  <Label>{t('common.form.phone')}</Label>
+                  <PatternFormat
+                    format="(###) ###-####"
+                    mask="_"
+                    customInput={Input}
+                    name="phone"
+                    value={formData.phone || ''}
+                    onValueChange={(values) => handleChange('phone', values.value)}
+                  />
+                </Field>
 
-              <Field>
-                <Label>{t('common.form.email')}</Label>
-                <Input
-                  name="email"
-                  type="email"
-                  value={formData.email || ''}
-                  onChange={(e) => handleChange('email', e.target.value)}
-                  invalid={!!errors.email}
-                />
-                {errors.email && <div className="text-xs text-red-600 mt-1">{errors.email}</div>}
-              </Field>
+                <Field>
+                  <Label>{t('common.form.email')}</Label>
+                  <Input
+                    name="email"
+                    type="email"
+                    value={formData.email || ''}
+                    onChange={(e) => handleChange('email', e.target.value)}
+                    invalid={!!errors.email}
+                  />
+                  {errors.email && <div className="text-xs text-red-600 mt-1">{errors.email}</div>}
+                </Field>
 
-              <Field>
-                <Label>{t('common.form.notes')}</Label>
-                <Textarea
-                  name="notes"
-                  value={formData.notes || ''}
-                  onChange={(e) => handleChange('notes', e.target.value)}
-                  rows={2}
-                />
-              </Field>
+                <Field>
+                  <Label>{t('common.form.notes')}</Label>
+                  <Textarea
+                    name="notes"
+                    value={formData.notes || ''}
+                    onChange={(e) => handleChange('notes', e.target.value)}
+                    rows={1}
+                  />
+                </Field>
+              </div>
             </FieldGroup>
           </Fieldset>
 
