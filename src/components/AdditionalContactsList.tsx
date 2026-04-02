@@ -97,7 +97,7 @@ export default function AdditionalContactsList({
 
       {contacts.length === 0 ? (
         <div className="mt-2">
-          <Text className="text-sm text-zinc-500">{t('contacts.noContacts')}</Text>
+          <Text className="text-sm text-zinc-500 dark:text-zinc-400">{t('contacts.noContacts')}</Text>
         </div>
       ) : (
         <div className="mt-2">

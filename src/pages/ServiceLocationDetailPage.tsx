@@ -84,13 +84,14 @@ export default function ServiceLocationDetailPage() {
     });
   };
 
-  // Determine if we should show additional contacts section
+  // Show additional contacts section if there are contacts, site contact info, or user can add
   const shouldShowAdditionalContacts = (): boolean => {
     return !!(
       location.additionalContacts.length > 0 ||
       location.siteContactName ||
       location.siteContactPhone ||
-      location.siteContactEmail
+      location.siteContactEmail ||
+      canEditServiceLocations
     );
   };
 
@@ -215,7 +216,7 @@ export default function ServiceLocationDetailPage() {
                     parentType="serviceLocation"
                     queryKey={['customers']}
                     canEdit={canEditServiceLocations}
-                    showAddButton={shouldShowAdditionalContacts()}
+                    showAddButton={true}
                   />
                 </div>
               )}
@@ -246,8 +247,8 @@ export default function ServiceLocationDetailPage() {
                     {t('common.actions.add', { entity: getName('equipment') })}
                   </Button>
                 </div>
-                <div className="mt-2 rounded-lg bg-zinc-50 p-3 text-center dark:bg-zinc-900">
-                  <Text className="text-sm">{t('common.actions.noEntitiesYet', { entities: getName('equipment', true) })}</Text>
+                <div className="mt-2 rounded-lg bg-zinc-50 p-3 dark:bg-zinc-900">
+                  <Text className="text-sm text-zinc-500 dark:text-zinc-400">{t('common.actions.noEntitiesYet', { entities: getName('equipment', true) })}</Text>
                 </div>
               </div>
 
@@ -261,8 +262,8 @@ export default function ServiceLocationDetailPage() {
                     {t('common.actions.new', { entity: getName('work_order') })}
                   </Button>
                 </div>
-                <div className="mt-2 rounded-lg bg-zinc-50 p-3 text-center dark:bg-zinc-900">
-                  <Text className="text-sm">{t('common.actions.noEntitiesYet', { entities: getName('work_order', true) })}</Text>
+                <div className="mt-2 rounded-lg bg-zinc-50 p-3 dark:bg-zinc-900">
+                  <Text className="text-sm text-zinc-500 dark:text-zinc-400">{t('common.actions.noEntitiesYet', { entities: getName('work_order', true) })}</Text>
                 </div>
               </div>
             </div>

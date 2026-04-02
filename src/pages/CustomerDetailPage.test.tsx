@@ -209,7 +209,7 @@ describe('CustomerDetailPage', () => {
     });
   });
 
-  it('uses card layout for customers with few locations', async () => {
+  it('uses table layout for standard customers regardless of location count', async () => {
     vi.mocked(apiClient.get).mockResolvedValue({ data: mockStandardCustomer });
     renderWithProviders(<CustomerDetailPage />);
 
@@ -217,9 +217,8 @@ describe('CustomerDetailPage', () => {
       expect(screen.getByText(/service locations \(2\)/i)).toBeInTheDocument();
     });
 
-    // Should show cards not table
-    expect(screen.queryByRole('table')).not.toBeInTheDocument();
-    expect(screen.getAllByText(/view details/i).length).toBe(2);
+    // Standard customers always use table layout (more CSR-friendly)
+    expect(screen.getByRole('table')).toBeInTheDocument();
   });
 
   it('displays payment terms badges for standard customers', async () => {
@@ -291,25 +290,6 @@ describe('CustomerDetailPage', () => {
     });
 
     expect(screen.getByText(/\(555\) 999-9999/i)).toBeInTheDocument();
-  });
-
-  it('displays location with access instructions', async () => {
-    const customerWithInstructions: Customer = {
-      ...mockStandardCustomer,
-      serviceLocations: [
-        {
-          ...mockSimpleCustomer.serviceLocations[0],
-          accessInstructions: 'Use back entrance, gate code 1234',
-        },
-      ],
-    };
-
-    vi.mocked(apiClient.get).mockResolvedValue({ data: customerWithInstructions });
-    renderWithProviders(<CustomerDetailPage />);
-
-    await waitFor(() => {
-      expect(screen.getByText(/use back entrance/i)).toBeInTheDocument();
-    });
   });
 
   it('displays customer without phone number', async () => {
@@ -503,5 +483,98 @@ describe('CustomerDetailPage', () => {
     await waitFor(() => {
       expect(screen.queryByText(/of 10/i)).not.toBeInTheDocument();
     });
+  });
+
+  it('displays additional contacts section', async () => {
+    const customerWithContacts: Customer = {
+      ...mockSimpleCustomer,
+      additionalContacts: [
+        {
+          id: 'contact-1',
+          name: 'Jane Smith',
+          phone: '5551234567',
+          email: 'jane@example.com',
+          notes: 'Primary contact',
+          displayOrder: 0,
+          createdAt: '2024-01-01T00:00:00Z',
+          updatedAt: '2024-01-01T00:00:00Z',
+        },
+      ],
+    };
+
+    vi.mocked(apiClient.get).mockResolvedValue({ data: customerWithContacts });
+    renderWithProviders(<CustomerDetailPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Jane Smith')).toBeInTheDocument();
+    });
+
+    expect(screen.getAllByText(/\(555\) 123-4567/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText('jane@example.com').length).toBeGreaterThan(0);
+    expect(screen.getByText('Primary contact')).toBeInTheDocument();
+  });
+
+  it('shows add additional contact button for simple customers', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({ data: mockSimpleCustomer });
+    renderWithProviders(<CustomerDetailPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('John Doe')).toBeInTheDocument();
+    });
+
+    expect(screen.getByRole('button', { name: /add additional contact/i })).toBeInTheDocument();
+  });
+
+  it('shows add additional contact button for standard customers', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({ data: mockStandardCustomer });
+    renderWithProviders(<CustomerDetailPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/john doe/i)).toBeInTheDocument();
+    });
+
+    expect(screen.getByRole('button', { name: /add additional contact/i })).toBeInTheDocument();
+  });
+
+  it('opens add contact dialog when button is clicked', async () => {
+    const user = userEvent.setup();
+    vi.mocked(apiClient.get).mockResolvedValue({ data: mockSimpleCustomer });
+    renderWithProviders(<CustomerDetailPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('John Doe')).toBeInTheDocument();
+    });
+
+    const addButton = screen.getByRole('button', { name: /add additional contact/i });
+    await user.click(addButton);
+
+    await waitFor(() => {
+      expect(screen.getByText(/create additional contact/i)).toBeInTheDocument();
+    });
+  });
+
+  it('displays compact stats bar for simple customers', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({ data: mockSimpleCustomer });
+    renderWithProviders(<CustomerDetailPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('John Doe')).toBeInTheDocument();
+    });
+
+    // Simple view should have inline stats with "Status:"
+    expect(screen.getByText(/status:/i)).toBeInTheDocument();
+    expect(screen.getByText(/last service:/i)).toBeInTheDocument();
+  });
+
+  it('displays large numbers for standard customers', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({ data: mockStandardCustomer });
+    renderWithProviders(<CustomerDetailPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/john doe/i)).toBeInTheDocument();
+    });
+
+    // Standard view should not have inline style with colons
+    expect(screen.queryByText(/status:/i)).not.toBeInTheDocument();
   });
 });

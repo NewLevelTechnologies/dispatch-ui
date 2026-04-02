@@ -168,43 +168,46 @@ export default function CustomerDetailPage() {
               </div>
             </div>
 
-            {/* Quick Stats Bar */}
-            <div className="mt-4 grid grid-cols-4 gap-4 rounded-lg bg-zinc-50 p-3 dark:bg-zinc-900">
-              <div>
-                <Text className="text-xs">{t('common.form.status')}</Text>
-                <Badge color="lime" className="mt-1">{t('common.active')}</Badge>
+            {/* Quick Stats Bar - Compact for homeowner */}
+            <div className="mt-3 flex items-center gap-4 rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-2 dark:border-zinc-800 dark:bg-zinc-900/50">
+              <div className="flex items-center gap-2">
+                <Text className="text-xs text-zinc-500 dark:text-zinc-400">{t('common.form.status')}:</Text>
+                <Badge color="lime">{t('common.active')}</Badge>
               </div>
-              <div>
-                <Text className="text-xs">{t('customers.detail.lastService')}</Text>
-                <Strong className="mt-1 block text-sm">{t('customers.detail.never')}</Strong>
+              <div className="h-4 w-px bg-zinc-200 dark:bg-zinc-700" />
+              <div className="flex items-center gap-2">
+                <Text className="text-xs text-zinc-500 dark:text-zinc-400">{t('customers.detail.lastService')}:</Text>
+                <Text className="text-xs font-medium">{t('customers.detail.never')}</Text>
               </div>
-              <div>
-                <Text className="text-xs">{t('common.actions.open', { entities: getName('work_order', true) })}</Text>
-                <Strong className="mt-1 block text-sm">0</Strong>
+              <div className="h-4 w-px bg-zinc-200 dark:bg-zinc-700" />
+              <div className="flex items-center gap-2">
+                <Text className="text-xs text-zinc-500 dark:text-zinc-400">{t('common.actions.open', { entities: getName('work_order', true) })}:</Text>
+                <Text className="text-xs font-medium">0</Text>
               </div>
-              <div>
-                <Text className="text-xs">{t('customers.detail.balance')}</Text>
-                <Strong className="mt-1 block text-sm">$0.00</Strong>
+              <div className="h-4 w-px bg-zinc-200 dark:bg-zinc-700" />
+              <div className="flex items-center gap-2">
+                <Text className="text-xs text-zinc-500 dark:text-zinc-400">{t('customers.detail.balance')}:</Text>
+                <Text className="text-xs font-medium">$0.00</Text>
               </div>
             </div>
 
             {/* Additional Contacts */}
             {shouldShowAdditionalContacts() && (
-              <div className="mt-4">
+              <div className="mt-3">
                 <AdditionalContactsList
                   contacts={customer.additionalContacts}
                   parentId={customer.id}
                   parentType="customer"
                   queryKey={['customers', id!]}
                   canEdit={canEditCustomers}
-                  showAddButton={customer.additionalContacts.length > 0 || !!customer.email || !!customer.phone}
+                  showAddButton={true}
                 />
               </div>
             )}
 
             {/* Equipment Section */}
-            <div className="mt-4">
-              <div className="flex items-center justify-between">
+            <div className="mt-3">
+              <div className="flex items-center justify-between mb-2">
                 <Subheading>{getName('equipment')}</Subheading>
                 {/* TODO: Add equipment permission check when equipment management is implemented */}
                 <Button plain>
@@ -212,14 +215,14 @@ export default function CustomerDetailPage() {
                   {t('common.actions.add', { entity: getName('equipment') })}
                 </Button>
               </div>
-              <div className="mt-2 rounded-lg border border-zinc-200 p-4 text-center dark:border-zinc-800">
-                <Text>{t('common.actions.noEntitiesYet', { entities: getName('equipment', true) })}</Text>
+              <div className="rounded-lg border border-zinc-200 p-3 dark:border-zinc-800">
+                <Text className="text-sm text-zinc-500 dark:text-zinc-400">{t('common.actions.noEntitiesYet', { entities: getName('equipment', true) })}</Text>
               </div>
             </div>
 
             {/* Recent Work Orders */}
-            <div className="mt-4">
-              <div className="flex items-center justify-between">
+            <div className="mt-3">
+              <div className="flex items-center justify-between mb-2">
                 <Subheading>{t('common.recentEntities', { entities: getName('work_order', true) })}</Subheading>
                 {/* TODO: Add work order permission check when work order management is implemented */}
                 <Button plain>
@@ -227,17 +230,19 @@ export default function CustomerDetailPage() {
                   {t('common.actions.new', { entity: getName('work_order') })}
                 </Button>
               </div>
-              <div className="mt-2 rounded-lg border border-zinc-200 p-4 text-center dark:border-zinc-800">
-                <Text>{t('common.actions.noEntitiesYet', { entities: getName('work_order', true) })}</Text>
+              <div className="rounded-lg border border-zinc-200 p-3 dark:border-zinc-800">
+                <Text className="text-sm text-zinc-500 dark:text-zinc-400">{t('common.actions.noEntitiesYet', { entities: getName('work_order', true) })}</Text>
               </div>
             </div>
 
             {/* Notes */}
             {customer.notes && (
-              <div className="mt-4">
-                <Subheading>{t('common.form.notes')}</Subheading>
-                <div className="mt-2 rounded-lg border border-zinc-200 p-3 dark:border-zinc-800">
-                  <Text>{customer.notes}</Text>
+              <div className="mt-3">
+                <div className="mb-2">
+                  <Subheading>{t('common.form.notes')}</Subheading>
+                </div>
+                <div className="rounded-lg border border-zinc-200 p-3 dark:border-zinc-800">
+                  <Text className="text-sm">{customer.notes}</Text>
                 </div>
               </div>
             )}
