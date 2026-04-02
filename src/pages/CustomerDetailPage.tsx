@@ -323,7 +323,7 @@ export default function CustomerDetailPage() {
                 <div className="flex items-center justify-between mb-2">
                   <Subheading>{t('common.entitiesCount', { entities: getName('service_location', true), count: customer.serviceLocations.length })}</Subheading>
                 {useTableLayout && canAddServiceLocations && (
-                  <Button plain onClick={() => setIsAddLocationDialogOpen(true)}>
+                  <Button plain onClick={() => setIsAddLocationDialogOpen(true)} className="text-sm">
                     <PlusIcon className="size-4" />
                     {t('common.actions.add', { entity: getName('service_location') })}
                   </Button>
