@@ -295,10 +295,12 @@ export default function CustomerDetailPage() {
               )}
             </div>
 
-            {/* Service Locations */}
-            <div className="mt-4">
-              <div className="flex items-center justify-between">
-                <Subheading>{t('common.entitiesCount', { entities: getName('service_location', true), count: customer.serviceLocations.length })}</Subheading>
+            {/* Two-column layout: Locations (left) + Contacts/Notes (right) */}
+            <div className="mt-4 grid grid-cols-1 lg:grid-cols-3 gap-4">
+              {/* Left column - Service Locations (2/3 width) */}
+              <div className="lg:col-span-2">
+                <div className="flex items-center justify-between">
+                  <Subheading>{t('common.entitiesCount', { entities: getName('service_location', true), count: customer.serviceLocations.length })}</Subheading>
                 {useTableLayout && canAddServiceLocations && (
                   <Button plain onClick={() => setIsAddLocationDialogOpen(true)}>
                     <PlusIcon className="size-4" />
@@ -473,31 +475,35 @@ export default function CustomerDetailPage() {
                   )}
                 </div>
               )}
+              </div>
+
+              {/* Right column - Contacts & Notes (1/3 width) */}
+              <div className="space-y-4">
+                {/* Additional Contacts */}
+                {shouldShowAdditionalContacts() && (
+                  <div>
+                    <AdditionalContactsList
+                      contacts={customer.additionalContacts}
+                      parentId={customer.id}
+                      parentType="customer"
+                      queryKey={['customers', id!]}
+                      canEdit={canEditCustomers}
+                      showAddButton={true}
+                    />
+                  </div>
+                )}
+
+                {/* Notes */}
+                {customer.notes && (
+                  <div>
+                    <Subheading>{t('common.form.notes')}</Subheading>
+                    <div className="mt-2 rounded-lg border border-zinc-200 p-3 dark:border-zinc-800">
+                      <Text>{customer.notes}</Text>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
-
-            {/* Additional Contacts */}
-            {shouldShowAdditionalContacts() && (
-              <div className="mt-4">
-                <AdditionalContactsList
-                  contacts={customer.additionalContacts}
-                  parentId={customer.id}
-                  parentType="customer"
-                  queryKey={['customers', id!]}
-                  canEdit={canEditCustomers}
-                  showAddButton={true}
-                />
-              </div>
-            )}
-
-            {/* Notes */}
-            {customer.notes && (
-              <div className="mt-4">
-                <Subheading>{t('common.form.notes')}</Subheading>
-                <div className="mt-2 rounded-lg border border-zinc-200 p-3 dark:border-zinc-800">
-                  <Text>{customer.notes}</Text>
-                </div>
-              </div>
-            )}
           </div>
         )}
       </div>
