@@ -141,7 +141,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             </SidebarSection>
 
             {!isCollapsed && (
-              <SidebarSection className="max-lg:hidden">
+              <SidebarSection className="">
                 <div className="flex items-center gap-3 px-2 py-1">
                   <WrenchScrewdriverIcon className="h-5 w-5 text-zinc-500" />
                   <span className="text-sm/6 font-medium text-zinc-500 dark:text-zinc-400">{getName('equipment', true)}</span>
@@ -161,7 +161,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             {isCollapsed && (
               <>
                 <div className="mx-auto my-2 h-px w-8 bg-zinc-200 dark:bg-zinc-800" />
-                <SidebarSection className="max-lg:hidden">
+                <SidebarSection className="">
                   {equipmentNavigation.map((item) => (
                     <SidebarItem
                       key={item.name}
@@ -179,7 +179,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             )}
 
             {!isCollapsed && (
-              <SidebarSection className="max-lg:hidden">
+              <SidebarSection className="">
                 <div className="flex items-center gap-3 px-2 py-1">
                   <CurrencyDollarIcon className="h-5 w-5 text-zinc-500" />
                   <span className="text-sm/6 font-medium text-zinc-500 dark:text-zinc-400">{t('entities.financial')}</span>
@@ -199,7 +199,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             {isCollapsed && (
               <>
                 <div className="mx-auto my-2 h-px w-8 bg-zinc-200 dark:bg-zinc-800" />
-                <SidebarSection className="max-lg:hidden">
+                <SidebarSection className="">
                   {financialNavigation.map((item) => (
                     <SidebarItem
                       key={item.name}
@@ -217,7 +217,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             )}
 
             {!isCollapsed && (
-              <SidebarSection className="max-lg:hidden">
+              <SidebarSection className="">
                 <div className="flex items-center gap-3 px-2 py-1">
                   <CalendarIcon className="h-5 w-5 text-zinc-500" />
                   <span className="text-sm/6 font-medium text-zinc-500 dark:text-zinc-400">{t('entities.scheduling')}</span>
@@ -237,7 +237,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             {isCollapsed && (
               <>
                 <div className="mx-auto my-2 h-px w-8 bg-zinc-200 dark:bg-zinc-800" />
-                <SidebarSection className="max-lg:hidden">
+                <SidebarSection className="">
                   {schedulingNavigation.map((item) => (
                     <SidebarItem
                       key={item.name}
@@ -257,7 +257,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             {adminNavigation.length > 0 && (
               <>
                 {isCollapsed && <div className="mx-auto my-2 h-px w-8 bg-zinc-200 dark:bg-zinc-800" />}
-                <SidebarSection className="max-lg:hidden">
+                <SidebarSection className="">
                   {adminNavigation.map((item) => (
                     <SidebarItem
                       key={item.name}
