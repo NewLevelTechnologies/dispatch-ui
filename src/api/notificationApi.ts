@@ -1,5 +1,5 @@
 // Notification Service API Client
-import notificationClient from './notificationClient';
+import apiClient from './client';
 
 // Notification Status
 export const NotificationStatus = {
@@ -128,20 +128,20 @@ export const notificationApi = {
     if (params.size !== undefined) queryParams.append('size', params.size.toString());
     if (params.sort) queryParams.append('sort', params.sort);
 
-    const response = await notificationClient.get<PageableResponse<NotificationLogDto>>(
+    const response = await apiClient.get<PageableResponse<NotificationLogDto>>(
       `/notification-logs?${queryParams.toString()}`
     );
     return response.data;
   },
 
   getNotificationLog: async (id: string): Promise<NotificationLogDto> => {
-    const response = await notificationClient.get<NotificationLogDto>(`/notification-logs/${id}`);
+    const response = await apiClient.get<NotificationLogDto>(`/notification-logs/${id}`);
     return response.data;
   },
 
   // Notification Preferences
   getCustomerPreferences: async (customerId: string): Promise<NotificationPreferenceDto[]> => {
-    const response = await notificationClient.get<NotificationPreferenceDto[]>(
+    const response = await apiClient.get<NotificationPreferenceDto[]>(
       `/notification-preferences/customers/${customerId}`
     );
     return response.data;
@@ -151,7 +151,7 @@ export const notificationApi = {
     customerId: string,
     contactId: string
   ): Promise<NotificationPreferenceDto[]> => {
-    const response = await notificationClient.get<NotificationPreferenceDto[]>(
+    const response = await apiClient.get<NotificationPreferenceDto[]>(
       `/notification-preferences/customers/${customerId}/contacts/${contactId}`
     );
     return response.data;
@@ -160,7 +160,7 @@ export const notificationApi = {
   createPreference: async (
     request: CreateNotificationPreferenceRequest
   ): Promise<NotificationPreferenceDto> => {
-    const response = await notificationClient.post<NotificationPreferenceDto>(
+    const response = await apiClient.post<NotificationPreferenceDto>(
       '/notification-preferences',
       request
     );
@@ -171,7 +171,7 @@ export const notificationApi = {
     id: string,
     request: UpdateNotificationPreferenceRequest
   ): Promise<NotificationPreferenceDto> => {
-    const response = await notificationClient.put<NotificationPreferenceDto>(
+    const response = await apiClient.put<NotificationPreferenceDto>(
       `/notification-preferences/${id}`,
       request
     );
@@ -179,7 +179,7 @@ export const notificationApi = {
   },
 
   deletePreference: async (id: string): Promise<void> => {
-    await notificationClient.delete(`/notification-preferences/${id}`);
+    await apiClient.delete(`/notification-preferences/${id}`);
   },
 };
 
