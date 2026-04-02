@@ -259,9 +259,9 @@ export default function AdditionalContactFormDialog({
         {isEdit ? t('contacts.form.descriptionEdit') : t('contacts.form.descriptionCreate')}
       </DialogDescription>
       <form onSubmit={handleSubmit}>
-        <DialogBody>
+        <DialogBody className="space-y-4">
           <Fieldset>
-            <FieldGroup>
+            <FieldGroup className="space-y-3">
               <Field>
                 <Label>{t('common.form.name')} *</Label>
                 <Input
@@ -304,7 +304,7 @@ export default function AdditionalContactFormDialog({
                   name="notes"
                   value={formData.notes || ''}
                   onChange={(e) => handleChange('notes', e.target.value)}
-                  rows={3}
+                  rows={2}
                 />
               </Field>
             </FieldGroup>
@@ -312,12 +312,12 @@ export default function AdditionalContactFormDialog({
 
           {/* Notification Preferences Section */}
           {notificationTypes.length > 0 && (
-            <div className="mt-4 border-t border-zinc-200 pt-4 dark:border-zinc-800">
+            <div className="border-t border-zinc-200 pt-3 dark:border-zinc-800">
               <Strong className="text-sm">{t('notifications.preferences.title')}</Strong>
-              <Text className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+              <Text className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
                 {t('notifications.preferences.formDescription')}
               </Text>
-              <div className="mt-3">
+              <div className="mt-2">
                 <Table dense className="[--gutter:theme(spacing.1)] text-xs">
                   <TableHead>
                     <TableRow>
