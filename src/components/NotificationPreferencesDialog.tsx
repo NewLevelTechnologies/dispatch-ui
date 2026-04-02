@@ -68,13 +68,24 @@ export default function NotificationPreferencesDialog({
   // Update preference mutation
   const updateMutation = useMutation({
     mutationFn: async ({
-      preferenceId,
+      pref,
       optIn,
     }: {
-      preferenceId: string;
+      pref: NotificationPreferenceDto;
       optIn: boolean;
     }) => {
-      return notificationApi.updatePreference(preferenceId, { optIn });
+      // If preference has an ID, update it. Otherwise, create it.
+      if (pref.id) {
+        return notificationApi.updatePreference(pref.id, { optIn });
+      } else {
+        // Create new preference
+        return notificationApi.createPreference({
+          customerId: pref.customerId,
+          contactId: pref.contactId,
+          notificationTypeId: pref.notificationTypeId,
+          optIn,
+        });
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey });
@@ -94,7 +105,7 @@ export default function NotificationPreferencesDialog({
     setLocalPreferences((prev) => new Map(prev).set(key, newValue));
 
     // Update on server
-    updateMutation.mutate({ preferenceId: pref.id, optIn: newValue });
+    updateMutation.mutate({ pref, optIn: newValue });
   };
 
   const getPreferenceKey = (typeId: string, channel: NotificationChannel) => {

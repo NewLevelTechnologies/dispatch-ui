@@ -133,18 +133,22 @@ export default function AdditionalContactFormDialog({
         ? await contactApi.createCustomerContact(parentId, data)
         : await contactApi.createServiceLocationContact(parentId, data);
 
-      // Then update preferences if any are set
-      const preferencesToUpdate = preferences.filter((pref) => {
+      // Then CREATE preferences for the new contact if any are toggled ON
+      const preferencesToCreate = preferences.filter((pref) => {
         const key = `${pref.notificationTypeId}-${pref.channel}`;
-        return preferencesState.has(key);
+        const optIn = preferencesState.get(key) ?? false;
+        return optIn; // Only create if opted in
       });
 
-      if (preferencesToUpdate.length > 0) {
+      if (preferencesToCreate.length > 0) {
         await Promise.all(
-          preferencesToUpdate.map((pref) => {
-            const key = `${pref.notificationTypeId}-${pref.channel}`;
-            const optIn = preferencesState.get(key) ?? false;
-            return notificationApi.updatePreference(pref.id, { optIn });
+          preferencesToCreate.map((pref) => {
+            return notificationApi.createPreference({
+              customerId,
+              contactId: newContact.id,
+              notificationTypeId: pref.notificationTypeId,
+              optIn: true,
+            });
           })
         );
       }
@@ -173,18 +177,30 @@ export default function AdditionalContactFormDialog({
         ? await contactApi.updateCustomerContact(parentId, contact.id, data)
         : await contactApi.updateServiceLocationContact(parentId, contact.id, data);
 
-      // Then update preferences if any changed
-      const preferencesToUpdate = preferences.filter((pref) => {
+      // Then update/create preferences if any changed
+      const preferencesToSave = preferences.filter((pref) => {
         const key = `${pref.notificationTypeId}-${pref.channel}`;
         return preferencesState.has(key) && preferencesState.get(key) !== pref.optIn;
       });
 
-      if (preferencesToUpdate.length > 0) {
+      if (preferencesToSave.length > 0) {
         await Promise.all(
-          preferencesToUpdate.map((pref) => {
+          preferencesToSave.map((pref) => {
             const key = `${pref.notificationTypeId}-${pref.channel}`;
             const optIn = preferencesState.get(key) ?? false;
-            return notificationApi.updatePreference(pref.id, { optIn });
+
+            // If preference has an ID, update it. Otherwise, create it.
+            if (pref.id) {
+              return notificationApi.updatePreference(pref.id, { optIn });
+            } else {
+              // Create new preference
+              return notificationApi.createPreference({
+                customerId,
+                contactId: contact.id,
+                notificationTypeId: pref.notificationTypeId,
+                optIn,
+              });
+            }
           })
         );
       }

@@ -44,7 +44,7 @@ export interface NotificationLogDto {
 }
 
 export interface NotificationPreferenceDto {
-  id: string;
+  id?: string | null; // ID is null if preference doesn't exist yet (merged from backend)
   customerId: string;
   contactId?: string | null;
   notificationTypeId: string;
@@ -52,8 +52,8 @@ export interface NotificationPreferenceDto {
   notificationTypeName: string;
   channel: NotificationChannel;
   optIn: boolean;
-  createdAt: string;
-  updatedAt: string;
+  createdAt?: string; // Optional if preference doesn't exist yet
+  updatedAt?: string; // Optional if preference doesn't exist yet
 }
 
 export interface CreateNotificationPreferenceRequest {
