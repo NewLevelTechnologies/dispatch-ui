@@ -86,7 +86,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         <Sidebar>
           <SidebarHeader>
             {isCollapsed ? (
-              <div className="flex items-center justify-center">
+              <div className="flex items-center justify-center max-lg:hidden">
                 <button
                   onClick={toggleSidebar}
                   className="flex h-8 w-8 items-center justify-center rounded-lg hover:bg-zinc-950/5 dark:hover:bg-white/5 transition-colors"
@@ -108,7 +108,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 </div>
                 <button
                   onClick={toggleSidebar}
-                  className="flex h-8 w-8 items-center justify-center rounded-lg hover:bg-zinc-950/5 dark:hover:bg-white/5 transition-colors flex-shrink-0"
+                  className="flex h-8 w-8 items-center justify-center rounded-lg hover:bg-zinc-950/5 dark:hover:bg-white/5 transition-colors flex-shrink-0 max-lg:hidden"
                   aria-label="Collapse sidebar"
                 >
                   <ChevronDoubleLeftIcon className="h-5 w-5 text-zinc-500 dark:text-zinc-400" />
@@ -127,10 +127,19 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                   title={isCollapsed ? item.name : undefined}
                 >
                   {isCollapsed ? (
-                    <div className="flex w-full items-center justify-center">
-                      <item.icon className="h-5 w-5" />
-                    </div>
+                    <>
+                      {/* Desktop collapsed: centered icon only */}
+                      <div className="hidden lg:flex w-full items-center justify-center">
+                        <item.icon className="h-5 w-5" />
+                      </div>
+                      {/* Mobile: always show icon + text */}
+                      <div className="flex lg:hidden items-center gap-3">
+                        <item.icon className="h-5 w-5" />
+                        <span>{item.name}</span>
+                      </div>
+                    </>
                   ) : (
+                    /* Desktop expanded and mobile: icon + text */
                     <>
                       <item.icon className="h-5 w-5" />
                       <span>{item.name}</span>
@@ -160,7 +169,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             )}
             {isCollapsed && (
               <>
-                <div className="mx-auto my-2 h-px w-8 bg-zinc-200 dark:bg-zinc-800" />
+                <div className="mx-auto my-2 h-px w-8 bg-zinc-200 dark:bg-zinc-800 max-lg:hidden" />
                 <SidebarSection className="">
                   {equipmentNavigation.map((item) => (
                     <SidebarItem
@@ -169,8 +178,14 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                       current={location.pathname === item.href}
                       title={item.name}
                     >
-                      <div className="flex w-full items-center justify-center">
+                      {/* Desktop collapsed: centered icon only */}
+                      <div className="hidden lg:flex w-full items-center justify-center">
                         <item.icon className="h-5 w-5" />
+                      </div>
+                      {/* Mobile: always show icon + text */}
+                      <div className="flex lg:hidden items-center gap-3">
+                        <item.icon className="h-5 w-5" />
+                        <span>{item.name}</span>
                       </div>
                     </SidebarItem>
                   ))}
@@ -198,7 +213,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             )}
             {isCollapsed && (
               <>
-                <div className="mx-auto my-2 h-px w-8 bg-zinc-200 dark:bg-zinc-800" />
+                <div className="mx-auto my-2 h-px w-8 bg-zinc-200 dark:bg-zinc-800 max-lg:hidden" />
                 <SidebarSection className="">
                   {financialNavigation.map((item) => (
                     <SidebarItem
@@ -207,8 +222,14 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                       current={location.pathname === item.href}
                       title={item.name}
                     >
-                      <div className="flex w-full items-center justify-center">
+                      {/* Desktop collapsed: centered icon only */}
+                      <div className="hidden lg:flex w-full items-center justify-center">
                         <item.icon className="h-5 w-5" />
+                      </div>
+                      {/* Mobile: always show icon + text */}
+                      <div className="flex lg:hidden items-center gap-3">
+                        <item.icon className="h-5 w-5" />
+                        <span>{item.name}</span>
                       </div>
                     </SidebarItem>
                   ))}
@@ -236,7 +257,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             )}
             {isCollapsed && (
               <>
-                <div className="mx-auto my-2 h-px w-8 bg-zinc-200 dark:bg-zinc-800" />
+                <div className="mx-auto my-2 h-px w-8 bg-zinc-200 dark:bg-zinc-800 max-lg:hidden" />
                 <SidebarSection className="">
                   {schedulingNavigation.map((item) => (
                     <SidebarItem
@@ -245,8 +266,14 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                       current={location.pathname === item.href}
                       title={item.name}
                     >
-                      <div className="flex w-full items-center justify-center">
+                      {/* Desktop collapsed: centered icon only */}
+                      <div className="hidden lg:flex w-full items-center justify-center">
                         <item.icon className="h-5 w-5" />
+                      </div>
+                      {/* Mobile: always show icon + text */}
+                      <div className="flex lg:hidden items-center gap-3">
+                        <item.icon className="h-5 w-5" />
+                        <span>{item.name}</span>
                       </div>
                     </SidebarItem>
                   ))}
@@ -256,7 +283,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
             {adminNavigation.length > 0 && (
               <>
-                {isCollapsed && <div className="mx-auto my-2 h-px w-8 bg-zinc-200 dark:bg-zinc-800" />}
+                {isCollapsed && <div className="mx-auto my-2 h-px w-8 bg-zinc-200 dark:bg-zinc-800 max-lg:hidden" />}
                 <SidebarSection className="">
                   {adminNavigation.map((item) => (
                     <SidebarItem
@@ -266,9 +293,17 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                       title={isCollapsed ? item.name : undefined}
                     >
                       {isCollapsed ? (
-                        <div className="flex w-full items-center justify-center">
-                          <item.icon className="h-5 w-5" />
-                        </div>
+                        <>
+                          {/* Desktop collapsed: centered icon only */}
+                          <div className="hidden lg:flex w-full items-center justify-center">
+                            <item.icon className="h-5 w-5" />
+                          </div>
+                          {/* Mobile: always show icon + text */}
+                          <div className="flex lg:hidden items-center gap-3">
+                            <item.icon className="h-5 w-5" />
+                            <span>{item.name}</span>
+                          </div>
+                        </>
                       ) : (
                         <>
                           <item.icon className="h-5 w-5" />
@@ -289,13 +324,25 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 title={isCollapsed ? user?.signInDetails?.loginId : undefined}
               >
                 {isCollapsed ? (
-                  <div className="flex w-full items-center justify-center">
-                    <Avatar
-                      slot="icon"
-                      initials={user?.signInDetails?.loginId?.charAt(0).toUpperCase() || 'U'}
-                      className="size-6"
-                    />
-                  </div>
+                  <>
+                    {/* Desktop collapsed: centered avatar only */}
+                    <div className="hidden lg:flex w-full items-center justify-center">
+                      <Avatar
+                        slot="icon"
+                        initials={user?.signInDetails?.loginId?.charAt(0).toUpperCase() || 'U'}
+                        className="size-6"
+                      />
+                    </div>
+                    {/* Mobile: always show avatar + text */}
+                    <div className="flex lg:hidden items-center gap-3">
+                      <Avatar
+                        slot="icon"
+                        initials={user?.signInDetails?.loginId?.charAt(0).toUpperCase() || 'U'}
+                        className="size-6"
+                      />
+                      <span className="truncate">{user?.signInDetails?.loginId}</span>
+                    </div>
+                  </>
                 ) : (
                   <>
                     <Avatar
