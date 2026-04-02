@@ -45,6 +45,7 @@ export default function AdditionalContactFormDialog({
 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [preferencesState, setPreferencesState] = useState<Map<string, boolean>>(new Map());
+  const [showPreferences, setShowPreferences] = useState(false);
 
   // Fetch notification preferences for editing existing contact
   const { data: preferences = [] } = useQuery({
@@ -90,6 +91,9 @@ export default function AdditionalContactFormDialog({
       setErrors({});
       if (!isEdit) {
         setPreferencesState(new Map());
+        setShowPreferences(false); // Collapsed by default for new contacts
+      } else {
+        setShowPreferences(true); // Expanded by default when editing
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -315,12 +319,29 @@ export default function AdditionalContactFormDialog({
           {/* Notification Preferences Section */}
           {notificationTypes.length > 0 && (
             <div className="border-t border-zinc-200 pt-3 dark:border-zinc-800">
-              <Strong className="text-sm">{t('notifications.preferences.title')}</Strong>
-              <Text className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
-                {t('notifications.preferences.formDescription')}
-              </Text>
-              <div className="mt-2">
-                <Table dense className="[--gutter:theme(spacing.1)] text-xs">
+              <button
+                type="button"
+                onClick={() => setShowPreferences(!showPreferences)}
+                className="flex w-full items-center justify-between text-left"
+              >
+                <div className="flex-1">
+                  <Strong className="text-sm">{t('notifications.preferences.title')}</Strong>
+                  <Text className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
+                    {t('notifications.preferences.formDescription')}
+                  </Text>
+                </div>
+                <svg
+                  className={`h-5 w-5 text-zinc-500 transition-transform ${showPreferences ? 'rotate-180' : ''}`}
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+              {showPreferences && (
+                <div className="mt-2">
+                  <Table dense className="[--gutter:theme(spacing.1)] text-xs">
                   <TableHead>
                     <TableRow>
                       <TableHeader>{t('notifications.preferences.notificationType')}</TableHeader>
@@ -376,7 +397,8 @@ export default function AdditionalContactFormDialog({
                     })}
                   </TableBody>
                 </Table>
-              </div>
+                </div>
+              )}
             </div>
           )}
         </DialogBody>
