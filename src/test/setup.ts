@@ -270,7 +270,7 @@ vi.mock('react-i18next', () => {
     'invoices.description': 'Manage customer invoices and billing',
     'notifications.description': 'View notification history and manage preferences',
     'notifications.preferences.channelEmail': 'Email',
-    'notifications.preferences.channelPush': 'Push Notification',
+    'notifications.preferences.channelPush': 'Push',
     'notifications.preferences.channelSms': 'SMS',
     'notifications.preferences.description': 'Manage notification preferences for {{name}}',
     'notifications.preferences.errorLoad': 'Failed to load notification preferences',
