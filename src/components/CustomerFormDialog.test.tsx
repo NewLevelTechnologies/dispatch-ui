@@ -15,7 +15,7 @@ describe('CustomerFormDialog', () => {
     id: '1',
     name: 'John Doe',
     email: 'john@example.com',
-    phone: '(555) 123-4567',
+    phone: '5551234567',
     billingAddress: {
       streetAddress: '123 Main St',
       streetAddressLine2: null,
@@ -224,7 +224,7 @@ describe('CustomerFormDialog', () => {
         expect(apiClient.post).toHaveBeenCalledWith('/customers', expect.objectContaining({
           name: 'John Doe',
           email: 'john@example.com',
-          phone: '(555) 123-4567',
+          phone: '5551234567',
           paymentTermsDays: 30,
           requiresPurchaseOrder: true,
           taxExempt: true,
@@ -277,7 +277,7 @@ describe('CustomerFormDialog', () => {
         expect(apiClient.put).toHaveBeenCalledWith('/customers/1', expect.objectContaining({
           name: 'Jane Doe',
           email: 'john@example.com',
-          phone: '(555) 123-4567',
+          phone: '5551234567',
         }));
       });
 

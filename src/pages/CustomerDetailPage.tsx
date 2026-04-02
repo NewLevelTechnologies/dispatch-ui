@@ -8,6 +8,7 @@ import { useHasCapability } from '../hooks/useCurrentUser';
 import AppLayout from '../components/AppLayout';
 import ServiceLocationFormDialog from '../components/ServiceLocationFormDialog';
 import CustomerFormDialog from '../components/CustomerFormDialog';
+import { formatPhone } from '../utils/formatPhone';
 import { Heading, Subheading } from '../components/catalyst/heading';
 import { Text, Strong } from '../components/catalyst/text';
 import { Button } from '../components/catalyst/button';
@@ -112,7 +113,7 @@ export default function CustomerDetailPage() {
 
         {isSimple ? (
           /* SIMPLE VIEW - Homeowner */
-          <div className="max-w-4xl">
+          <div>
             {/* Header - Compact */}
             <div className="flex items-start justify-between">
               <div>
@@ -121,7 +122,7 @@ export default function CustomerDetailPage() {
                   <PhoneIcon className="inline h-4 w-4 text-zinc-400" />
                   {customer.phone ? (
                     <a href={`tel:${customer.phone}`} className="hover:underline">
-                      {customer.phone}
+                      {formatPhone(customer.phone)}
                     </a>
                   ) : (
                     t('customers.detail.noPhone')
@@ -217,7 +218,7 @@ export default function CustomerDetailPage() {
           </div>
         ) : (
           /* STANDARD VIEW - Business/Landlord */
-          <div className="max-w-6xl">
+          <div>
             {/* Header - Business */}
             <div className="flex items-start justify-between">
               <div>
@@ -244,7 +245,7 @@ export default function CustomerDetailPage() {
                     <PhoneIcon className="inline h-4 w-4 text-zinc-400" />
                     {customer.phone ? (
                       <a href={`tel:${customer.phone}`} className="hover:underline">
-                        {customer.phone}
+                        {formatPhone(customer.phone)}
                       </a>
                     ) : (
                       t('customers.detail.noPhone')
@@ -335,7 +336,7 @@ export default function CustomerDetailPage() {
                             {location.siteContactName ? (
                               <Text className="text-xs">
                                 {location.siteContactName}
-                                {location.siteContactPhone && ` • ${location.siteContactPhone}`}
+                                {location.siteContactPhone && ` • ${formatPhone(location.siteContactPhone)}`}
                               </Text>
                             ) : (
                               <Text className="text-xs">-</Text>
@@ -385,7 +386,7 @@ export default function CustomerDetailPage() {
                               <Text className="text-xs flex items-center gap-1">
                                 <PhoneIcon className="inline h-3 w-3 text-zinc-400 flex-shrink-0" />
                                 <a href={`tel:${location.siteContactPhone}`} className="hover:underline">
-                                  {location.siteContactPhone}
+                                  {formatPhone(location.siteContactPhone)}
                                 </a>
                               </Text>
                             )}

@@ -27,7 +27,7 @@ const mockCustomers = [
         },
         status: 'ACTIVE' as const,
         siteContactName: 'John Doe',
-        siteContactPhone: '555-1234',
+        siteContactPhone: '5551234567',
         siteContactEmail: 'john@example.com',
         accessInstructions: '',
         notes: '',

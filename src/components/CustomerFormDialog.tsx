@@ -352,7 +352,7 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
                       customInput={Input}
                       name="phone"
                       value={createFormData.phone}
-                      onValueChange={(values) => setCreateFormData((prev) => ({ ...prev, phone: values.formattedValue }))}
+                      onValueChange={(values) => setCreateFormData((prev) => ({ ...prev, phone: values.value }))}
                     />
                   </Field>
                   <Field className="col-span-3">
@@ -605,7 +605,7 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
                         customInput={Input}
                         name="siteContactPhone"
                         value={createFormData.siteContactPhone}
-                        onValueChange={(values) => setCreateFormData((prev) => ({ ...prev, siteContactPhone: values.formattedValue }))}
+                        onValueChange={(values) => setCreateFormData((prev) => ({ ...prev, siteContactPhone: values.value }))}
                       />
                     </Field>
                     <Field>
@@ -757,7 +757,7 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
                   customInput={Input}
                   name="phone"
                   value={editFormData.phone}
-                  onValueChange={(values) => setEditFormData((prev) => ({ ...prev, phone: values.formattedValue }))}
+                  onValueChange={(values) => setEditFormData((prev) => ({ ...prev, phone: values.value }))}
                 />
               </Field>
               <Field className="col-span-3">

@@ -7,6 +7,7 @@ import { useGlossary } from '../contexts/GlossaryContext';
 import { useHasCapability } from '../hooks/useCurrentUser';
 import AppLayout from '../components/AppLayout';
 import ServiceLocationFormDialog from '../components/ServiceLocationFormDialog';
+import { formatPhone } from '../utils/formatPhone';
 import { Heading, Subheading } from '../components/catalyst/heading';
 import { Text, Strong } from '../components/catalyst/text';
 import { Button } from '../components/catalyst/button';
@@ -93,7 +94,7 @@ export default function ServiceLocationDetailPage() {
           </Button>
         </div>
 
-        <div className="max-w-6xl">
+        <div>
           {/* Header */}
           <div className="flex items-start justify-between">
             <div className="flex-1">
@@ -178,7 +179,7 @@ export default function ServiceLocationDetailPage() {
                       {location.siteContactPhone && (
                         <Text>
                           <a href={`tel:${location.siteContactPhone}`} className="hover:underline">
-                            {location.siteContactPhone}
+                            {formatPhone(location.siteContactPhone)}
                           </a>
                         </Text>
                       )}
