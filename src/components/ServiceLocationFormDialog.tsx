@@ -286,7 +286,7 @@ export default function ServiceLocationFormDialog({ isOpen, onClose, serviceLoca
                 customInput={Input}
                 name="siteContactPhone"
                 value={formData.siteContactPhone}
-                onValueChange={(values) => setFormData((prev) => ({ ...prev, siteContactPhone: values.formattedValue }))}
+                onValueChange={(values) => setFormData((prev) => ({ ...prev, siteContactPhone: values.value }))}
               />
             </Field>
             <Field>

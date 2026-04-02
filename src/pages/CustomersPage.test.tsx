@@ -13,7 +13,7 @@ const mockCustomers: Customer[] = [
     id: '1',
     name: 'John Doe',
     email: 'john@example.com',
-    phone: '555-1234',
+    phone: '5551234567',
     billingAddress: {
       streetAddress: '123 Main St',
       streetAddressLine2: null,
@@ -73,7 +73,7 @@ const mockCustomers: Customer[] = [
     id: '2',
     name: 'Jane Smith',
     email: 'jane@example.com',
-    phone: '555-5678',
+    phone: '5555678901',
     billingAddress: {
       streetAddress: '456 Oak Ave',
       streetAddressLine2: null,
@@ -165,7 +165,7 @@ describe('CustomersPage', () => {
     });
 
     expect(screen.getByText('john@example.com')).toBeInTheDocument();
-    expect(screen.getByText('555-1234')).toBeInTheDocument();
+    expect(screen.getByText('(555) 123-4567')).toBeInTheDocument();
     expect(screen.getByText('Jane Smith')).toBeInTheDocument();
     expect(screen.getByText('jane@example.com')).toBeInTheDocument();
   });

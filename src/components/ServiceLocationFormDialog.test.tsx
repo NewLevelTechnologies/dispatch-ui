@@ -112,7 +112,7 @@ describe('ServiceLocationFormDialog', () => {
         `/customers/${mockCustomerId}/service-locations`,
         expect.objectContaining({
           siteContactName: 'Jane Manager',
-          siteContactPhone: '(555) 567-8901',
+          siteContactPhone: '5555678901',
           siteContactEmail: 'contact@example.com',
         })
       );

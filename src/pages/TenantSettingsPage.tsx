@@ -203,7 +203,7 @@ export default function TenantSettingsPage() {
   if (!isEditing) {
     return (
       <AppLayout>
-        <div className="p-8 max-w-7xl">
+        <div className="p-8">
           <div className="flex items-start justify-between mb-6">
             <div>
               <Heading>{t('entities.tenantSettings')}</Heading>
@@ -418,7 +418,7 @@ export default function TenantSettingsPage() {
   // Edit mode - form for editing settings
   return (
     <AppLayout>
-      <div className="p-8 max-w-7xl">
+      <div className="p-8">
         <div className="flex items-start justify-between mb-6">
           <div>
             <Heading>{t('entities.tenantSettings')}</Heading>

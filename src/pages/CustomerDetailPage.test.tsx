@@ -11,7 +11,7 @@ const mockSimpleCustomer: Customer = {
   id: '1',
   name: 'John Doe',
   email: 'john@example.com',
-  phone: '555-1234',
+  phone: '5551234567',
   billingAddress: {
     streetAddress: '123 Main St',
     streetAddressLine2: null,
@@ -261,8 +261,8 @@ describe('CustomerDetailPage', () => {
       expect(screen.getByText('John Doe')).toBeInTheDocument();
     });
 
-    const phoneLink = screen.getByRole('link', { name: /555-1234/i });
-    expect(phoneLink).toHaveAttribute('href', 'tel:555-1234');
+    const phoneLink = screen.getByRole('link', { name: /\(555\) 123-4567/i });
+    expect(phoneLink).toHaveAttribute('href', 'tel:5551234567');
 
     const emailLink = screen.getByRole('link', { name: /john@example.com/i });
     expect(emailLink).toHaveAttribute('href', 'mailto:john@example.com');
@@ -275,7 +275,7 @@ describe('CustomerDetailPage', () => {
         {
           ...mockSimpleCustomer.serviceLocations[0],
           siteContactName: 'Jane Manager',
-          siteContactPhone: '555-9999',
+          siteContactPhone: '5559999999',
           siteContactEmail: 'jane@example.com',
         },
       ],
@@ -288,7 +288,7 @@ describe('CustomerDetailPage', () => {
       expect(screen.getByText(/jane manager/i)).toBeInTheDocument();
     });
 
-    expect(screen.getByText(/555-9999/i)).toBeInTheDocument();
+    expect(screen.getByText(/\(555\) 999-9999/i)).toBeInTheDocument();
   });
 
   it('displays location with access instructions', async () => {

@@ -119,7 +119,7 @@ export default function UserDetailPage() {
 
   return (
     <AppLayout>
-      <div className="max-w-5xl">
+      <div>
         {/* Header */}
         <div className="mb-4">
           <Button plain onClick={() => navigate('/users')}>

@@ -8,6 +8,7 @@ import { useGlossary } from '../contexts/GlossaryContext';
 import { useHasCapability } from '../hooks/useCurrentUser';
 import AppLayout from '../components/AppLayout';
 import CustomerFormDialog from '../components/CustomerFormDialog';
+import { formatPhone } from '../utils/formatPhone';
 import { Heading } from '../components/catalyst/heading';
 import { Button } from '../components/catalyst/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/catalyst/table';
@@ -196,7 +197,7 @@ export default function CustomersPage() {
                           onClick={(e) => e.stopPropagation()}
                           className="relative z-10 hover:underline"
                         >
-                          {customer.phone}
+                          {formatPhone(customer.phone)}
                         </a>
                       ) : (
                         '-'

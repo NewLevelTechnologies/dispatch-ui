@@ -27,7 +27,7 @@ const mockCustomer = {
       },
       status: 'ACTIVE' as const,
       siteContactName: 'John Doe',
-      siteContactPhone: '555-1234',
+      siteContactPhone: '5551234567',
       siteContactEmail: 'john@example.com',
       accessInstructions: 'Use side entrance',
       notes: 'Important client',
@@ -144,8 +144,8 @@ describe('ServiceLocationDetailPage', () => {
       expect(screen.getByText('John Doe')).toBeInTheDocument();
     });
 
-    const phoneLink = screen.getByText('555-1234');
-    expect(phoneLink).toHaveAttribute('href', 'tel:555-1234');
+    const phoneLink = screen.getByText('(555) 123-4567');
+    expect(phoneLink).toHaveAttribute('href', 'tel:5551234567');
 
     const emailLink = screen.getByText('john@example.com');
     expect(emailLink).toHaveAttribute('href', 'mailto:john@example.com');
