@@ -214,6 +214,7 @@ export default function ServiceLocationDetailPage() {
                     contacts={location.additionalContacts}
                     parentId={location.id}
                     parentType="serviceLocation"
+                    customerId={customer.id}
                     queryKey={['customers']}
                     canEdit={canEditServiceLocations}
                     showAddButton={true}

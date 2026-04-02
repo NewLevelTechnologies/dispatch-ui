@@ -198,6 +198,7 @@ export default function CustomerDetailPage() {
                   contacts={customer.additionalContacts}
                   parentId={customer.id}
                   parentType="customer"
+                  customerId={customer.id}
                   queryKey={['customers', id!]}
                   canEdit={canEditCustomers}
                   showAddButton={true}
@@ -514,6 +515,7 @@ export default function CustomerDetailPage() {
                       contacts={customer.additionalContacts}
                       parentId={customer.id}
                       parentType="customer"
+                      customerId={customer.id}
                       queryKey={['customers', id!]}
                       canEdit={canEditCustomers}
                       showAddButton={true}
