@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { customerApi } from '../api';
+import { customerApi, notificationApi } from '../api';
 import { useGlossary } from '../contexts/GlossaryContext';
 import { useHasCapability } from '../hooks/useCurrentUser';
 import AppLayout from '../components/AppLayout';
@@ -50,6 +50,16 @@ export default function CustomerDetailPage() {
     queryKey: ['customers', id],
     queryFn: () => customerApi.getById(id!),
   });
+
+  // Fetch notification preferences to show opt-in count
+  const { data: preferences = [] } = useQuery({
+    queryKey: ['notification-preferences', 'customer', id],
+    queryFn: () => notificationApi.getCustomerPreferences(id!),
+    enabled: !!id && !!customer, // Only fetch when customer is loaded
+  });
+
+  // Count opted-in preferences
+  const notificationOptInCount = preferences.filter((pref) => pref.optIn).length;
 
   // Filter service locations based on search query - MUST be before early returns
   // eslint-disable-next-line react-hooks/preserve-manual-memoization
@@ -150,10 +160,13 @@ export default function CustomerDetailPage() {
                   <button
                     type="button"
                     onClick={() => setIsNotificationDialogOpen(true)}
-                    className="ml-1 inline-flex text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300"
+                    className="ml-1 inline-flex items-center gap-0.5 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300"
                     title={t('notifications.preferences.manage')}
                   >
                     <BellIcon className="h-4 w-4" />
+                    {notificationOptInCount > 0 && (
+                      <span className="text-[10px] font-medium">{notificationOptInCount}</span>
+                    )}
                   </button>
                 </Text>
                 <Text className="mt-1 flex items-center gap-1">
@@ -301,10 +314,13 @@ export default function CustomerDetailPage() {
                     <button
                       type="button"
                       onClick={() => setIsNotificationDialogOpen(true)}
-                      className="ml-1 inline-flex text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300"
+                      className="ml-1 inline-flex items-center gap-0.5 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300"
                       title={t('notifications.preferences.manage')}
                     >
                       <BellIcon className="h-4 w-4" />
+                      {notificationOptInCount > 0 && (
+                        <span className="text-[10px] font-medium">{notificationOptInCount}</span>
+                      )}
                     </button>
                   </Text>
                   <Text className="mt-1 flex items-center gap-1">
