@@ -9,6 +9,7 @@ import AppLayout from '../components/AppLayout';
 import ServiceLocationFormDialog from '../components/ServiceLocationFormDialog';
 import CustomerFormDialog from '../components/CustomerFormDialog';
 import AdditionalContactsList from '../components/AdditionalContactsList';
+import NotificationPreferencesDialog from '../components/NotificationPreferencesDialog';
 import { formatPhone } from '../utils/formatPhone';
 import { Heading, Subheading } from '../components/catalyst/heading';
 import { Text, Strong } from '../components/catalyst/text';
@@ -27,7 +28,8 @@ import {
   CreditCardIcon,
   MapPinIcon,
   UserIcon,
-  KeyIcon
+  KeyIcon,
+  BellIcon
 } from '@heroicons/react/24/outline';
 
 export default function CustomerDetailPage() {
@@ -37,6 +39,7 @@ export default function CustomerDetailPage() {
   const { getName } = useGlossary();
   const [isAddLocationDialogOpen, setIsAddLocationDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isNotificationDialogOpen, setIsNotificationDialogOpen] = useState(false);
   const [locationSearchQuery, setLocationSearchQuery] = useState('');
 
   // Permission checks
@@ -159,6 +162,9 @@ export default function CustomerDetailPage() {
                     {t('common.actions.add', { entity: getName('service_location') })}
                   </Button>
                 )}
+                <Button plain onClick={() => setIsNotificationDialogOpen(true)} title={t('notifications.preferences.manage')}>
+                  <BellIcon className="size-4" />
+                </Button>
                 {canEditCustomers && (
                   <Button color="zinc" onClick={() => setIsEditDialogOpen(true)}>
                     <PencilIcon className="size-4" />
@@ -294,12 +300,17 @@ export default function CustomerDetailPage() {
                   </Text>
                 </div>
               </div>
-              {canEditCustomers && (
-                <Button color="zinc" onClick={() => setIsEditDialogOpen(true)}>
-                  <PencilIcon className="size-4" />
-                  {t('common.edit')}
+              <div className="flex gap-2">
+                <Button plain onClick={() => setIsNotificationDialogOpen(true)} title={t('notifications.preferences.manage')}>
+                  <BellIcon className="size-4" />
                 </Button>
-              )}
+                {canEditCustomers && (
+                  <Button color="zinc" onClick={() => setIsEditDialogOpen(true)}>
+                    <PencilIcon className="size-4" />
+                    {t('common.edit')}
+                  </Button>
+                )}
+              </div>
             </div>
 
             {/* Quick Stats Bar */}
@@ -547,6 +558,12 @@ export default function CustomerDetailPage() {
         isOpen={isEditDialogOpen}
         onClose={() => setIsEditDialogOpen(false)}
         customer={customer}
+      />
+      <NotificationPreferencesDialog
+        isOpen={isNotificationDialogOpen}
+        onClose={() => setIsNotificationDialogOpen(false)}
+        customerId={customer.id}
+        contactName={customer.name}
       />
     </AppLayout>
   );
