@@ -111,8 +111,9 @@ describe('CustomerDetailPage', () => {
       expect(screen.getByText('John Doe')).toBeInTheDocument();
     });
 
-    // Glossary translates to "No equipment yet" and "No work orders yet"
-    expect(screen.getAllByText(/no .* yet/i).length).toBeGreaterThanOrEqual(2);
+    // Check that tabs are present
+    expect(screen.getByRole('button', { name: /overview/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /work order/i })).toBeInTheDocument();
   });
 
   it('displays standard view for business', async () => {

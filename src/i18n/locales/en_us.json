@@ -181,6 +181,11 @@
       "none": "None",
       "terms": "Terms",
       "type": "Type"
+    },
+    "tabs": {
+      "activity": "Activity",
+      "financial": "Financial",
+      "overview": "Overview"
     }
   },
   "dashboard": {
@@ -266,6 +271,10 @@
       "locationName": "Location Name",
       "neverServiced": "Never",
       "type": "Type"
+    },
+    "tabs": {
+      "activity": "Activity",
+      "overview": "Overview"
     }
   },
   "equipment": {
@@ -360,6 +369,37 @@
   },
   "notifications": {
     "description": "View notification history and manage preferences",
+    "logs": {
+      "errorLoad": "Failed to load notification logs",
+      "filters": {
+        "allChannels": "All Channels",
+        "allStatuses": "All Statuses"
+      },
+      "loading": "Loading notification logs...",
+      "noLogs": "No notification logs found",
+      "pagination": {
+        "next": "Next",
+        "page": "Page {{current}} of {{total}}",
+        "previous": "Previous",
+        "showing": "Showing {{start}}-{{end}} of {{total}}"
+      },
+      "status": {
+        "bounced": "Bounced",
+        "delivered": "Delivered",
+        "failed": "Failed",
+        "pending": "Pending",
+        "sent": "Sent"
+      },
+      "table": {
+        "channel": "Channel",
+        "delivered": "Delivered",
+        "recipient": "Recipient",
+        "sent": "Sent",
+        "status": "Status",
+        "type": "Type"
+      },
+      "title": "Notification History"
+    },
     "preferences": {
       "channelEmail": "Email",
       "channelPush": "Push",
