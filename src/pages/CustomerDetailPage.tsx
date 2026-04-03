@@ -147,6 +147,14 @@ export default function CustomerDetailPage() {
                   <a href={`mailto:${customer.email}`} className="hover:underline">
                     {customer.email}
                   </a>
+                  <button
+                    type="button"
+                    onClick={() => setIsNotificationDialogOpen(true)}
+                    className="ml-1 inline-flex text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300"
+                    title={t('notifications.preferences.manage')}
+                  >
+                    <BellIcon className="h-4 w-4" />
+                  </button>
                 </Text>
                 <Text className="mt-1 flex items-center gap-1">
                   <MapPinIcon className="inline h-4 w-4 text-zinc-400" />
@@ -162,9 +170,6 @@ export default function CustomerDetailPage() {
                     {t('common.actions.add', { entity: getName('service_location') })}
                   </Button>
                 )}
-                <Button plain onClick={() => setIsNotificationDialogOpen(true)} title={t('notifications.preferences.manage')}>
-                  <BellIcon className="size-4" />
-                </Button>
                 {canEditCustomers && (
                   <Button color="zinc" onClick={() => setIsEditDialogOpen(true)}>
                     <PencilIcon className="size-4" />
@@ -293,6 +298,14 @@ export default function CustomerDetailPage() {
                     <a href={`mailto:${customer.email}`} className="hover:underline">
                       {customer.email}
                     </a>
+                    <button
+                      type="button"
+                      onClick={() => setIsNotificationDialogOpen(true)}
+                      className="ml-1 inline-flex text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300"
+                      title={t('notifications.preferences.manage')}
+                    >
+                      <BellIcon className="h-4 w-4" />
+                    </button>
                   </Text>
                   <Text className="mt-1 flex items-center gap-1">
                     <CreditCardIcon className="inline h-4 w-4 text-zinc-400" />
@@ -300,17 +313,12 @@ export default function CustomerDetailPage() {
                   </Text>
                 </div>
               </div>
-              <div className="flex gap-2">
-                <Button plain onClick={() => setIsNotificationDialogOpen(true)} title={t('notifications.preferences.manage')}>
-                  <BellIcon className="size-4" />
+              {canEditCustomers && (
+                <Button color="zinc" onClick={() => setIsEditDialogOpen(true)}>
+                  <PencilIcon className="size-4" />
+                  {t('common.edit')}
                 </Button>
-                {canEditCustomers && (
-                  <Button color="zinc" onClick={() => setIsEditDialogOpen(true)}>
-                    <PencilIcon className="size-4" />
-                    {t('common.edit')}
-                  </Button>
-                )}
-              </div>
+              )}
             </div>
 
             {/* Quick Stats Bar */}
