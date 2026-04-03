@@ -121,3 +121,16 @@ export {
 
 // Glossary API
 export { glossaryApi, type EntityInfo } from './glossaryApi';
+
+// Notification API
+export {
+  notificationApi,
+  NotificationStatus,
+  NotificationChannel,
+  type NotificationLogDto,
+  type NotificationPreferenceDto,
+  type CreateNotificationPreferenceRequest,
+  type UpdateNotificationPreferenceRequest,
+  type NotificationLogsQueryParams,
+  type PageableResponse,
+} from './notificationApi';

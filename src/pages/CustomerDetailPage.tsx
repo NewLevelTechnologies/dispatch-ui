@@ -2,13 +2,14 @@ import { useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { customerApi } from '../api';
+import { customerApi, notificationApi } from '../api';
 import { useGlossary } from '../contexts/GlossaryContext';
 import { useHasCapability } from '../hooks/useCurrentUser';
 import AppLayout from '../components/AppLayout';
 import ServiceLocationFormDialog from '../components/ServiceLocationFormDialog';
 import CustomerFormDialog from '../components/CustomerFormDialog';
 import AdditionalContactsList from '../components/AdditionalContactsList';
+import NotificationPreferencesDialog from '../components/NotificationPreferencesDialog';
 import { formatPhone } from '../utils/formatPhone';
 import { Heading, Subheading } from '../components/catalyst/heading';
 import { Text, Strong } from '../components/catalyst/text';
@@ -27,7 +28,8 @@ import {
   CreditCardIcon,
   MapPinIcon,
   UserIcon,
-  KeyIcon
+  KeyIcon,
+  BellIcon
 } from '@heroicons/react/24/outline';
 
 export default function CustomerDetailPage() {
@@ -37,6 +39,7 @@ export default function CustomerDetailPage() {
   const { getName } = useGlossary();
   const [isAddLocationDialogOpen, setIsAddLocationDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isNotificationDialogOpen, setIsNotificationDialogOpen] = useState(false);
   const [locationSearchQuery, setLocationSearchQuery] = useState('');
 
   // Permission checks
@@ -47,6 +50,16 @@ export default function CustomerDetailPage() {
     queryKey: ['customers', id],
     queryFn: () => customerApi.getById(id!),
   });
+
+  // Fetch notification preferences to show opt-in count
+  const { data: preferences = [] } = useQuery({
+    queryKey: ['notification-preferences', 'customer', id],
+    queryFn: () => notificationApi.getCustomerPreferences(id!),
+    enabled: !!id && !!customer, // Only fetch when customer is loaded
+  });
+
+  // Count opted-in preferences
+  const notificationOptInCount = preferences.filter((pref) => pref.optIn).length;
 
   // Filter service locations based on search query - MUST be before early returns
   // eslint-disable-next-line react-hooks/preserve-manual-memoization
@@ -144,6 +157,17 @@ export default function CustomerDetailPage() {
                   <a href={`mailto:${customer.email}`} className="hover:underline">
                     {customer.email}
                   </a>
+                  <button
+                    type="button"
+                    onClick={() => setIsNotificationDialogOpen(true)}
+                    className="ml-1 inline-flex items-center gap-0.5 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300"
+                    title={t('notifications.preferences.manage')}
+                  >
+                    <BellIcon className="h-4 w-4" />
+                    {notificationOptInCount > 0 && (
+                      <span className="text-[10px] font-medium">{notificationOptInCount}</span>
+                    )}
+                  </button>
                 </Text>
                 <Text className="mt-1 flex items-center gap-1">
                   <MapPinIcon className="inline h-4 w-4 text-zinc-400" />
@@ -198,6 +222,7 @@ export default function CustomerDetailPage() {
                   contacts={customer.additionalContacts}
                   parentId={customer.id}
                   parentType="customer"
+                  customerId={customer.id}
                   queryKey={['customers', id!]}
                   canEdit={canEditCustomers}
                   showAddButton={true}
@@ -286,6 +311,17 @@ export default function CustomerDetailPage() {
                     <a href={`mailto:${customer.email}`} className="hover:underline">
                       {customer.email}
                     </a>
+                    <button
+                      type="button"
+                      onClick={() => setIsNotificationDialogOpen(true)}
+                      className="ml-1 inline-flex items-center gap-0.5 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300"
+                      title={t('notifications.preferences.manage')}
+                    >
+                      <BellIcon className="h-4 w-4" />
+                      {notificationOptInCount > 0 && (
+                        <span className="text-[10px] font-medium">{notificationOptInCount}</span>
+                      )}
+                    </button>
                   </Text>
                   <Text className="mt-1 flex items-center gap-1">
                     <CreditCardIcon className="inline h-4 w-4 text-zinc-400" />
@@ -514,6 +550,7 @@ export default function CustomerDetailPage() {
                       contacts={customer.additionalContacts}
                       parentId={customer.id}
                       parentType="customer"
+                      customerId={customer.id}
                       queryKey={['customers', id!]}
                       canEdit={canEditCustomers}
                       showAddButton={true}
@@ -545,6 +582,12 @@ export default function CustomerDetailPage() {
         isOpen={isEditDialogOpen}
         onClose={() => setIsEditDialogOpen(false)}
         customer={customer}
+      />
+      <NotificationPreferencesDialog
+        isOpen={isNotificationDialogOpen}
+        onClose={() => setIsNotificationDialogOpen(false)}
+        customerId={customer.id}
+        contactName={customer.name}
       />
     </AppLayout>
   );

@@ -6,8 +6,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '.
 import { Button } from './catalyst/button';
 import { Text } from './catalyst/text';
 import { Subheading } from './catalyst/heading';
-import { PencilIcon, TrashIcon, PlusIcon, PhoneIcon, EnvelopeIcon } from '@heroicons/react/24/outline';
+import { PencilIcon, TrashIcon, PlusIcon, PhoneIcon, EnvelopeIcon, BellIcon } from '@heroicons/react/24/outline';
 import AdditionalContactFormDialog from './AdditionalContactFormDialog';
+import NotificationPreferencesDialog from './NotificationPreferencesDialog';
 import ConfirmDialog from './ConfirmDialog';
 import { formatPhone } from '../utils/formatPhone';
 
@@ -15,6 +16,7 @@ interface AdditionalContactsListProps {
   contacts: AdditionalContact[];
   parentId: string;
   parentType: 'customer' | 'serviceLocation';
+  customerId: string; // Always required for notification preferences
   queryKey: string[];
   canEdit?: boolean;
   showAddButton?: boolean;
@@ -24,6 +26,7 @@ export default function AdditionalContactsList({
   contacts,
   parentId,
   parentType,
+  customerId,
   queryKey,
   canEdit = true,
   showAddButton = true,
@@ -33,6 +36,7 @@ export default function AdditionalContactsList({
   const [isFormDialogOpen, setIsFormDialogOpen] = useState(false);
   const [selectedContact, setSelectedContact] = useState<AdditionalContact | null>(null);
   const [contactToDelete, setContactToDelete] = useState<AdditionalContact | null>(null);
+  const [notificationContact, setNotificationContact] = useState<AdditionalContact | null>(null);
 
   const deleteMutation = useMutation({
     mutationFn: (contactId: string) => {
@@ -73,6 +77,10 @@ export default function AdditionalContactsList({
     setContactToDelete(contact);
   };
 
+  const handleManageNotifications = (contact: AdditionalContact) => {
+    setNotificationContact(contact);
+  };
+
   const confirmDelete = () => {
     if (contactToDelete) {
       deleteMutation.mutate(contactToDelete.id);
@@ -107,7 +115,7 @@ export default function AdditionalContactsList({
                 <TableHeader>{t('common.form.name')}</TableHeader>
                 <TableHeader>{t('contacts.table.contact')}</TableHeader>
                 <TableHeader>{t('common.form.notes')}</TableHeader>
-                {canEdit && <TableHeader className="w-32 text-right">{t('common.actions.title')}</TableHeader>}
+                {canEdit && <TableHeader className="w-40 text-right">{t('common.actions.title')}</TableHeader>}
               </TableRow>
             </TableHead>
             <TableBody>
@@ -149,6 +157,13 @@ export default function AdditionalContactsList({
                   {canEdit && (
                     <TableCell>
                       <div className="flex gap-2 justify-end">
+                        <Button
+                          plain
+                          onClick={() => handleManageNotifications(contact)}
+                          title={t('notifications.preferences.manage')}
+                        >
+                          <BellIcon className="size-4" />
+                        </Button>
                         <Button plain onClick={() => handleEdit(contact)} title={t('common.edit')}>
                           <PencilIcon className="size-4" />
                         </Button>
@@ -170,6 +185,7 @@ export default function AdditionalContactsList({
         onClose={handleCloseFormDialog}
         parentId={parentId}
         parentType={parentType}
+        customerId={customerId}
         contact={selectedContact}
         queryKey={queryKey}
       />
@@ -182,6 +198,14 @@ export default function AdditionalContactsList({
         message={t('contacts.delete.message', { name: contactToDelete?.name || '' })}
         confirmLabel={t('common.delete')}
         isDestructive
+      />
+
+      <NotificationPreferencesDialog
+        isOpen={!!notificationContact}
+        onClose={() => setNotificationContact(null)}
+        customerId={customerId}
+        contact={notificationContact}
+        contactName={notificationContact?.name || ''}
       />
     </div>
   );

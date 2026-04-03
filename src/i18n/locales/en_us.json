@@ -31,6 +31,7 @@
     "active": "Active",
     "add": "Add",
     "cancel": "Cancel",
+    "close": "Close",
     "cloning": "Cloning...",
     "create": "Create",
     "delete": "Delete",
@@ -41,6 +42,7 @@
     "entitiesCount": "{{entities}} ({{count}})",
     "hide": "Hide",
     "inactive": "Inactive",
+    "loading": "Loading...",
     "recentEntities": "Recent {{entities}}",
     "restoring": "Restoring...",
     "search": "Search...",
@@ -354,6 +356,22 @@
       "invoiceNumber": "Invoice Number",
       "status": "Status",
       "totalAmount": "Total"
+    }
+  },
+  "notifications": {
+    "description": "View notification history and manage preferences",
+    "preferences": {
+      "channelEmail": "Email",
+      "channelPush": "Push",
+      "channelSms": "SMS",
+      "description": "Manage notification preferences for {{name}}",
+      "errorLoad": "Failed to load notification preferences",
+      "errorUpdate": "Failed to update notification preference",
+      "formDescription": "Choose which notifications this contact should receive",
+      "manage": "Manage Notifications",
+      "noPreferences": "No notification preferences available",
+      "notificationType": "Notification Type",
+      "title": "Notification Preferences"
     }
   },
   "payments": {

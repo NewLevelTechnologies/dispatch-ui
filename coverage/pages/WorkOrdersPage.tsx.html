@@ -23,9 +23,9 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">91.95% </span>
+                <span class="strong">92.03% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>183/199</span>
+                <span class='fraction'>185/201</span>
             </div>
         
             
@@ -44,9 +44,9 @@
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">91.95% </span>
+                <span class="strong">92.03% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>183/199</span>
+                <span class='fraction'>185/201</span>
             </div>
         
             
@@ -292,20 +292,15 @@
 <a name='L227'></a><a href='#L227'>227</a>
 <a name='L228'></a><a href='#L228'>228</a>
 <a name='L229'></a><a href='#L229'>229</a>
-<a name='L230'></a><a href='#L230'>230</a></td><td class="line-coverage quiet"><span class="cline-any cline-yes">1x</span>
+<a name='L230'></a><a href='#L230'>230</a>
+<a name='L231'></a><a href='#L231'>231</a>
+<a name='L232'></a><a href='#L232'>232</a></td><td class="line-coverage quiet"><span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
@@ -322,6 +317,15 @@
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">31x</span>
 <span class="cline-any cline-yes">31x</span>
 <span class="cline-any cline-yes">31x</span>
 <span class="cline-any cline-yes">31x</span>
@@ -526,6 +530,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { EllipsisVerticalIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import { workOrderApi, type WorkOrder } from '../api';
+import { useGlossary } from '../contexts/GlossaryContext';
 import AppLayout from '../components/AppLayout';
 import WorkOrderFormDialog from '../components/WorkOrderFormDialog';
 import { Heading } from '../components/catalyst/heading';
@@ -554,6 +559,7 @@ const STATUS_TRANSLATION_KEYS: Record&lt;string, string&gt; = {
 export default function WorkOrdersPage() {
   const queryClient = useQueryClient();
   const { t } = useTranslation();
+  const { getName } = useGlossary();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedWorkOrder, setSelectedWorkOrder] = useState&lt;WorkOrder | null&gt;(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -613,7 +619,7 @@ export default function WorkOrdersPage() {
   };
 &nbsp;
   const handleDelete = (workOrder: WorkOrder) =&gt; {
-    if (window.confirm(t('common.actions.deleteConfirmGeneric', { entity: t('entities.workOrder') }))) {
+    if (window.confirm(t('common.actions.deleteConfirmGeneric', { entity: getName('work_order') }))) {
       deleteMutation.mutate(workOrder.id);
     }
   };
@@ -626,8 +632,8 @@ export default function WorkOrdersPage() {
   return (
     &lt;AppLayout&gt;
       &lt;div className="flex items-center justify-between gap-4"&gt;
-        &lt;Heading&gt;{t('entities.workOrders')}&lt;/Heading&gt;
-        &lt;Button onClick={handleAdd}&gt;{t('common.actions.create', { entity: t('entities.workOrder') })}&lt;/Button&gt;
+        &lt;Heading&gt;{getName('work_order', true)}&lt;/Heading&gt;
+        &lt;Button onClick={handleAdd}&gt;{t('common.actions.create', { entity: getName('work_order') })}&lt;/Button&gt;
       &lt;/div&gt;
 &nbsp;
       {/* Quick Search Bar */}
@@ -644,7 +650,7 @@ export default function WorkOrdersPage() {
         {workOrders &amp;&amp; (
           &lt;div className="text-sm text-zinc-600 dark:text-zinc-400"&gt;
             {filteredWorkOrders.length === workOrders.length
-              ? `${workOrders.length} ${workOrders.length === 1 ? t('entities.workOrder').toLowerCase() : t('entities.workOrders').toLowerCase()<span class="branch-0 cbranch-no" title="branch not covered" >}`</span>
+              ? `${workOrders.length} ${workOrders.length === 1 ? getName('work_order').toLowerCase() : getName('work_order', true).toLowerCase()<span class="branch-0 cbranch-no" title="branch not covered" >}`</span>
 <span class="cstat-no" title="statement not covered" >              : `${filteredWorkOrders.length} of ${workOrders.length}`}</span>
           &lt;/div&gt;
         )}
@@ -652,30 +658,30 @@ export default function WorkOrdersPage() {
 &nbsp;
       {isLoading &amp;&amp; (
         &lt;div className="mt-4 text-center"&gt;
-          &lt;p className="text-sm text-zinc-600 dark:text-zinc-400"&gt;{t('common.actions.loading', { entities: t('entities.workOrders') })}&lt;/p&gt;
+          &lt;p className="text-sm text-zinc-600 dark:text-zinc-400"&gt;{t('common.actions.loading', { entities: getName('work_order', true) })}&lt;/p&gt;
         &lt;/div&gt;
       )}
 &nbsp;
       {error &amp;&amp; (
         &lt;div className="mt-4 rounded-lg bg-red-50 p-3 ring-1 ring-red-200 dark:bg-red-950/10 dark:ring-red-900/20"&gt;
           &lt;p className="text-sm text-red-800 dark:text-red-400"&gt;
-            {t('common.actions.errorLoading', { entities: t('entities.workOrders') })}: {(error as Error).message}
+            {t('common.actions.errorLoading', { entities: getName('work_order', true) })}: {(error as Error).message}
           &lt;/p&gt;
         &lt;/div&gt;
       )}
 &nbsp;
       {workOrders &amp;&amp; workOrders.length === 0 &amp;&amp; (
         &lt;div className="mt-4 rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700 p-4"&gt;
-          &lt;p className="text-sm text-zinc-600 dark:text-zinc-400"&gt;{t('common.actions.notFound', { entities: t('entities.workOrders') })}&lt;/p&gt;
+          &lt;p className="text-sm text-zinc-600 dark:text-zinc-400"&gt;{t('common.actions.notFound', { entities: getName('work_order', true) })}&lt;/p&gt;
           &lt;Button className="mt-2" onClick={handleAdd}&gt;
-            {t('common.actions.createFirst', { entity: t('entities.workOrder') })}
+            {t('common.actions.createFirst', { entity: getName('work_order') })}
           &lt;/Button&gt;
         &lt;/div&gt;
       )}
 &nbsp;
       {filteredWorkOrders.length === 0 &amp;&amp; workOrders &amp;&amp; workOrders.length &gt; <span class="branch-0 cbranch-no" title="branch not covered" >0 &amp;&amp; (</span>
 <span class="cstat-no" title="statement not covered" >        &lt;div className="mt-4 rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700 p-4"&gt;</span>
-<span class="cstat-no" title="statement not covered" >          &lt;p className="text-sm text-zinc-600 dark:text-zinc-400"&gt;{t('common.actions.noMatchSearch', { entities: t('entities.workOrders') })}&lt;/p&gt;</span>
+<span class="cstat-no" title="statement not covered" >          &lt;p className="text-sm text-zinc-600 dark:text-zinc-400"&gt;{t('common.actions.noMatchSearch', { entities: getName('work_order', true) })}&lt;/p&gt;</span>
 <span class="cstat-no" title="statement not covered" >        &lt;/div&gt;</span>
       )}
 &nbsp;
@@ -757,7 +763,7 @@ export default function WorkOrdersPage() {
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-03-28T17:02:18.817Z
+                at 2026-04-03T01:50:32.711Z
             </div>
         <script src="../prettify.js"></script>
         <script>

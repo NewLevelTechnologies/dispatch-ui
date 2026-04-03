@@ -21,6 +21,8 @@ const mockContact: AdditionalContact = {
 describe('AdditionalContactFormDialog', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Mock notification preferences API to return empty array by default
+    vi.mocked(apiClient.get).mockResolvedValue({ data: [] });
   });
 
   it('renders in create mode when no contact provided', () => {
@@ -30,6 +32,7 @@ describe('AdditionalContactFormDialog', () => {
         onClose={() => {}}
         parentId="parent-1"
         parentType="customer"
+        customerId="customer-1"
         queryKey={['customers', 'parent-1']}
       />
     );
@@ -44,6 +47,7 @@ describe('AdditionalContactFormDialog', () => {
         onClose={() => {}}
         parentId="parent-1"
         parentType="customer"
+        customerId="customer-1"
         contact={mockContact}
         queryKey={['customers', 'parent-1']}
       />
@@ -63,6 +67,7 @@ describe('AdditionalContactFormDialog', () => {
         onClose={() => {}}
         parentId="parent-1"
         parentType="customer"
+        customerId="customer-1"
         queryKey={['customers', 'parent-1']}
       />
     );
@@ -84,6 +89,7 @@ describe('AdditionalContactFormDialog', () => {
         onClose={() => {}}
         parentId="parent-1"
         parentType="customer"
+        customerId="customer-1"
         queryKey={['customers', 'parent-1']}
       />
     );
@@ -114,6 +120,7 @@ describe('AdditionalContactFormDialog', () => {
         onClose={onClose}
         parentId="parent-1"
         parentType="customer"
+        customerId="customer-1"
         queryKey={['customers', 'parent-1']}
       />
     );
@@ -157,6 +164,7 @@ describe('AdditionalContactFormDialog', () => {
         onClose={onClose}
         parentId="parent-1"
         parentType="customer"
+        customerId="customer-1"
         contact={mockContact}
         queryKey={['customers', 'parent-1']}
       />
@@ -191,6 +199,7 @@ describe('AdditionalContactFormDialog', () => {
         onClose={() => {}}
         parentId="loc-1"
         parentType="serviceLocation"
+        customerId="customer-1"
         queryKey={['customers']}
       />
     );
@@ -217,6 +226,7 @@ describe('AdditionalContactFormDialog', () => {
         onClose={() => {}}
         parentId="parent-1"
         parentType="customer"
+        customerId="customer-1"
         queryKey={['customers', 'parent-1']}
       />
     );
@@ -239,6 +249,7 @@ describe('AdditionalContactFormDialog', () => {
         onClose={onClose}
         parentId="parent-1"
         parentType="customer"
+        customerId="customer-1"
         queryKey={['customers', 'parent-1']}
       />
     );
@@ -256,6 +267,7 @@ describe('AdditionalContactFormDialog', () => {
         onClose={() => {}}
         parentId="parent-1"
         parentType="customer"
+        customerId="customer-1"
         queryKey={['customers', 'parent-1']}
       />
     );
@@ -270,6 +282,7 @@ describe('AdditionalContactFormDialog', () => {
         onClose={() => {}}
         parentId="parent-1"
         parentType="customer"
+        customerId="customer-1"
         queryKey={['customers', 'parent-1']}
       />
     );
@@ -280,6 +293,7 @@ describe('AdditionalContactFormDialog', () => {
         onClose={() => {}}
         parentId="parent-1"
         parentType="customer"
+        customerId="customer-1"
         queryKey={['customers', 'parent-1']}
       />
     );
@@ -299,6 +313,7 @@ describe('AdditionalContactFormDialog', () => {
         onClose={() => {}}
         parentId="parent-1"
         parentType="customer"
+        customerId="customer-1"
         queryKey={['customers', 'parent-1']}
       />
     );
@@ -325,6 +340,7 @@ describe('AdditionalContactFormDialog', () => {
         onClose={() => {}}
         parentId="parent-1"
         parentType="customer"
+        customerId="customer-1"
         queryKey={['customers', 'parent-1']}
       />
     );
@@ -352,6 +368,7 @@ describe('AdditionalContactFormDialog', () => {
         onClose={() => {}}
         parentId="parent-1"
         parentType="customer"
+        customerId="customer-1"
         queryKey={['customers', 'parent-1']}
       />
     );
@@ -372,6 +389,320 @@ describe('AdditionalContactFormDialog', () => {
           notes: null,
         })
       );
+    });
+  });
+
+  describe('Notification Preferences', () => {
+    const mockPreferences = [
+      {
+        id: 'pref-1',
+        customerId: 'customer-1',
+        contactId: 'contact-1',
+        notificationTypeId: 'type-1',
+        notificationTypeKey: 'work_order_scheduled',
+        notificationTypeName: 'Work Order Scheduled',
+        channel: 'EMAIL' as const,
+        optIn: true,
+      },
+      {
+        id: 'pref-2',
+        customerId: 'customer-1',
+        contactId: 'contact-1',
+        notificationTypeId: 'type-1',
+        notificationTypeKey: 'work_order_scheduled',
+        notificationTypeName: 'Work Order Scheduled',
+        channel: 'SMS' as const,
+        optIn: false,
+      },
+    ];
+
+    it('does not show notification preferences in create mode', () => {
+      vi.mocked(apiClient.get).mockResolvedValue({ data: [] });
+
+      renderWithProviders(
+        <AdditionalContactFormDialog
+          isOpen={true}
+          onClose={() => {}}
+          parentId="parent-1"
+          parentType="customer"
+          customerId="customer-1"
+          queryKey={['customers', 'parent-1']}
+        />
+      );
+
+      expect(screen.queryByText('Notification Preferences')).not.toBeInTheDocument();
+    });
+
+    it('shows notification preferences section in edit mode', async () => {
+      vi.mocked(apiClient.get).mockResolvedValue({ data: mockPreferences });
+
+      renderWithProviders(
+        <AdditionalContactFormDialog
+          isOpen={true}
+          onClose={() => {}}
+          parentId="parent-1"
+          parentType="customer"
+          customerId="customer-1"
+          contact={mockContact}
+          queryKey={['customers', 'parent-1']}
+        />
+      );
+
+      await waitFor(() => {
+        expect(screen.getByText('Notification Preferences')).toBeInTheDocument();
+      });
+    });
+
+    it('fetches contact preferences when editing', async () => {
+      vi.mocked(apiClient.get).mockResolvedValue({ data: mockPreferences });
+
+      renderWithProviders(
+        <AdditionalContactFormDialog
+          isOpen={true}
+          onClose={() => {}}
+          parentId="parent-1"
+          parentType="customer"
+          customerId="customer-1"
+          contact={mockContact}
+          queryKey={['customers', 'parent-1']}
+        />
+      );
+
+      await waitFor(() => {
+        expect(apiClient.get).toHaveBeenCalledWith(
+          '/notification-preferences/customers/customer-1/contacts/contact-1'
+        );
+      });
+    });
+
+    it('displays notification preferences in table when expanded', async () => {
+      vi.mocked(apiClient.get).mockResolvedValue({ data: mockPreferences });
+
+      renderWithProviders(
+        <AdditionalContactFormDialog
+          isOpen={true}
+          onClose={() => {}}
+          parentId="parent-1"
+          parentType="customer"
+          customerId="customer-1"
+          contact={mockContact}
+          queryKey={['customers', 'parent-1']}
+        />
+      );
+
+      await waitFor(() => {
+        expect(screen.getByText('Work Order Scheduled')).toBeInTheDocument();
+      });
+    });
+
+    it('collapses and expands notification preferences section', async () => {
+      const user = userEvent.setup();
+      vi.mocked(apiClient.get).mockResolvedValue({ data: mockPreferences });
+
+      renderWithProviders(
+        <AdditionalContactFormDialog
+          isOpen={true}
+          onClose={() => {}}
+          parentId="parent-1"
+          parentType="customer"
+          customerId="customer-1"
+          contact={mockContact}
+          queryKey={['customers', 'parent-1']}
+        />
+      );
+
+      // Wait for preferences to load and be visible (expanded by default in edit mode)
+      await waitFor(() => {
+        expect(screen.getByText('Work Order Scheduled')).toBeInTheDocument();
+      });
+
+      // Click to collapse
+      const toggleButton = screen.getByRole('button', { name: /notification preferences/i });
+      await user.click(toggleButton);
+
+      // Table should be hidden
+      await waitFor(() => {
+        expect(screen.queryByText('Work Order Scheduled')).not.toBeInTheDocument();
+      });
+
+      // Click to expand
+      await user.click(toggleButton);
+
+      // Table should be visible again
+      await waitFor(() => {
+        expect(screen.getByText('Work Order Scheduled')).toBeInTheDocument();
+      });
+    });
+
+    it('toggles notification preference checkbox', async () => {
+      const user = userEvent.setup();
+      vi.mocked(apiClient.get).mockResolvedValue({ data: mockPreferences });
+      vi.mocked(apiClient.put).mockResolvedValue({ data: mockContact });
+
+      renderWithProviders(
+        <AdditionalContactFormDialog
+          isOpen={true}
+          onClose={() => {}}
+          parentId="parent-1"
+          parentType="customer"
+          customerId="customer-1"
+          contact={mockContact}
+          queryKey={['customers', 'parent-1']}
+        />
+      );
+
+      await waitFor(() => {
+        expect(screen.getByText('Work Order Scheduled')).toBeInTheDocument();
+      });
+
+      const checkboxes = screen.getAllByRole('checkbox');
+      const emailCheckbox = checkboxes[0]; // First checkbox (EMAIL)
+
+      await user.click(emailCheckbox);
+
+      // Should just update local state, not call API yet (preferences saved on form submit)
+      expect(apiClient.put).not.toHaveBeenCalledWith(
+        expect.stringContaining('/notification-preferences/'),
+        expect.anything()
+      );
+    });
+
+    it('updates preferences when form is submitted', async () => {
+      const user = userEvent.setup();
+      vi.mocked(apiClient.get).mockResolvedValue({ data: mockPreferences });
+      vi.mocked(apiClient.put).mockResolvedValue({ data: mockContact });
+
+      renderWithProviders(
+        <AdditionalContactFormDialog
+          isOpen={true}
+          onClose={() => {}}
+          parentId="parent-1"
+          parentType="customer"
+          customerId="customer-1"
+          contact={mockContact}
+          queryKey={['customers', 'parent-1']}
+        />
+      );
+
+      await waitFor(() => {
+        expect(screen.getByText('Work Order Scheduled')).toBeInTheDocument();
+      });
+
+      // Toggle the SMS preference (currently false, toggle to true)
+      const checkboxes = screen.getAllByRole('checkbox');
+      const smsCheckbox = checkboxes[1]; // Second checkbox (SMS)
+
+      await user.click(smsCheckbox);
+
+      // Submit the form
+      const submitButton = screen.getByRole('button', { name: /save/i });
+      await user.click(submitButton);
+
+      // Should update contact AND preference
+      await waitFor(() => {
+        expect(apiClient.put).toHaveBeenCalledWith(
+          '/customers/parent-1/contacts/contact-1',
+          expect.any(Object)
+        );
+        expect(apiClient.put).toHaveBeenCalledWith(
+          '/notification-preferences/pref-2',
+          { optIn: true }
+        );
+      });
+    });
+
+    it('creates new preference when toggling uncreated preference', async () => {
+      const user = userEvent.setup();
+
+      const preferencesWithNull = [
+        {
+          id: null, // No preference created yet
+          customerId: 'customer-1',
+          contactId: 'contact-1',
+          notificationTypeId: 'type-1',
+          notificationTypeKey: 'work_order_scheduled',
+          notificationTypeName: 'Work Order Scheduled',
+          channel: 'PUSH' as const,
+          optIn: false,
+        },
+      ];
+
+      vi.mocked(apiClient.get).mockResolvedValue({ data: preferencesWithNull });
+      vi.mocked(apiClient.put).mockResolvedValue({ data: mockContact });
+      vi.mocked(apiClient.post).mockResolvedValue({ data: {} });
+
+      renderWithProviders(
+        <AdditionalContactFormDialog
+          isOpen={true}
+          onClose={() => {}}
+          parentId="parent-1"
+          parentType="customer"
+          customerId="customer-1"
+          contact={mockContact}
+          queryKey={['customers', 'parent-1']}
+        />
+      );
+
+      await waitFor(() => {
+        expect(screen.getByText('Work Order Scheduled')).toBeInTheDocument();
+      });
+
+      // Toggle the PUSH preference (currently false/null, toggle to true)
+      const checkbox = screen.getByRole('checkbox');
+      await user.click(checkbox);
+
+      // Submit the form
+      const submitButton = screen.getByRole('button', { name: /save/i });
+      await user.click(submitButton);
+
+      // Should create new preference
+      await waitFor(() => {
+        expect(apiClient.post).toHaveBeenCalledWith(
+          '/notification-preferences',
+          expect.objectContaining({
+            customerId: 'customer-1',
+            contactId: 'contact-1',
+            notificationTypeId: 'type-1',
+            optIn: true,
+          })
+        );
+      });
+    });
+
+    it('handles no preference changes on submit', async () => {
+      const user = userEvent.setup();
+      vi.mocked(apiClient.get).mockResolvedValue({ data: mockPreferences });
+      vi.mocked(apiClient.put).mockResolvedValue({ data: mockContact });
+
+      renderWithProviders(
+        <AdditionalContactFormDialog
+          isOpen={true}
+          onClose={() => {}}
+          parentId="parent-1"
+          parentType="customer"
+          customerId="customer-1"
+          contact={mockContact}
+          queryKey={['customers', 'parent-1']}
+        />
+      );
+
+      await waitFor(() => {
+        expect(screen.getByText('Work Order Scheduled')).toBeInTheDocument();
+      });
+
+      // Don't toggle any preferences, just submit
+      const submitButton = screen.getByRole('button', { name: /save/i });
+      await user.click(submitButton);
+
+      // Should only update contact, not preferences
+      await waitFor(() => {
+        expect(apiClient.put).toHaveBeenCalledWith(
+          '/customers/parent-1/contacts/contact-1',
+          expect.any(Object)
+        );
+        // Should not call preference API if no changes
+        expect(apiClient.put).toHaveBeenCalledTimes(1);
+      });
     });
   });
 });
