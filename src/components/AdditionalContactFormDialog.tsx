@@ -47,14 +47,16 @@ export default function AdditionalContactFormDialog({
   const [preferencesState, setPreferencesState] = useState<Map<string, boolean>>(new Map());
   const [showPreferences, setShowPreferences] = useState(false);
 
-  // Fetch notification preferences for editing existing contact
+  // Fetch notification preferences
+  // For NEW contacts: fetch customer preferences as template (all types, unchecked by default)
+  // For EXISTING contacts: fetch contact's actual preferences
   const { data: preferences = [] } = useQuery({
     queryKey: ['notification-preferences', 'contact', customerId, contact?.id],
     queryFn: () =>
       contact?.id
         ? notificationApi.getContactPreferences(customerId, contact.id)
-        : notificationApi.getCustomerPreferences(customerId),
-    enabled: isOpen && isEdit,
+        : notificationApi.getCustomerPreferences(customerId), // Use customer prefs as template
+    enabled: isOpen, // Always enabled when dialog is open
   });
 
   // Initialize form data from contact prop or empty form
@@ -78,11 +80,14 @@ export default function AdditionalContactFormDialog({
       const prefMap = new Map<string, boolean>();
       preferences.forEach((pref) => {
         const key = `${pref.notificationTypeId}-${pref.channel}`;
-        prefMap.set(key, pref.optIn);
+        // For NEW contacts: start with all unchecked (don't inherit customer prefs)
+        // For EXISTING contacts: use their actual opt-in values
+        const optIn = isEdit ? pref.optIn : false;
+        prefMap.set(key, optIn);
       });
       setPreferencesState(prefMap);
     }
-  }, [preferences]);
+  }, [preferences, isEdit]);
 
   // Reset form when dialog opens/closes or contact changes
   useEffect(() => {
