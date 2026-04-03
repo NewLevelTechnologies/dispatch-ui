@@ -140,10 +140,10 @@ export default function CustomerDetailPage() {
           /* SIMPLE VIEW - Homeowner */
           <div>
             {/* Header - Compact */}
-            <div className="flex items-start justify-between">
-              <div>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div className="flex-1 min-w-0">
                 <Heading className="text-2xl">{customer.name}</Heading>
-                <Text className="mt-1 flex items-center gap-1">
+                <Text className="mt-1 flex flex-wrap items-center gap-1">
                   <PhoneIcon className="inline h-4 w-4 text-zinc-400" />
                   {customer.phone ? (
                     <a href={`tel:${customer.phone}`} className="hover:underline">
@@ -169,18 +169,21 @@ export default function CustomerDetailPage() {
                     )}
                   </button>
                 </Text>
-                <Text className="mt-1 flex items-center gap-1">
-                  <MapPinIcon className="inline h-4 w-4 text-zinc-400" />
-                  {primaryLocation.address.streetAddress}
-                  {primaryLocation.address.streetAddressLine2 && `, ${primaryLocation.address.streetAddressLine2}`}
-                  , {primaryLocation.address.city}, {primaryLocation.address.state} {primaryLocation.address.zipCode}
+                <Text className="mt-1 flex items-start gap-1">
+                  <MapPinIcon className="inline h-4 w-4 text-zinc-400 flex-shrink-0 mt-0.5" />
+                  <span className="break-words">
+                    {primaryLocation.address.streetAddress}
+                    {primaryLocation.address.streetAddressLine2 && `, ${primaryLocation.address.streetAddressLine2}`}
+                    , {primaryLocation.address.city}, {primaryLocation.address.state} {primaryLocation.address.zipCode}
+                  </span>
                 </Text>
               </div>
-              <div className="flex gap-2">
+              <div className="flex gap-2 sm:flex-shrink-0">
                 {canAddServiceLocations && (
                   <Button plain onClick={() => setIsAddLocationDialogOpen(true)}>
                     <PlusIcon className="size-4" />
-                    {t('common.actions.add', { entity: getName('service_location') })}
+                    <span className="hidden sm:inline">{t('common.actions.add', { entity: getName('service_location') })}</span>
+                    <span className="sm:hidden">{t('common.actions.add', { entity: '' }).trim()}</span>
                   </Button>
                 )}
                 {canEditCustomers && (
@@ -193,22 +196,22 @@ export default function CustomerDetailPage() {
             </div>
 
             {/* Quick Stats Bar - Compact for homeowner */}
-            <div className="mt-3 flex items-center gap-4 rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-2 dark:border-zinc-800 dark:bg-zinc-900/50">
+            <div className="mt-3 grid grid-cols-2 gap-3 rounded-lg border border-zinc-200 bg-zinc-50 p-3 dark:border-zinc-800 dark:bg-zinc-900/50 sm:flex sm:items-center sm:gap-4 sm:px-4 sm:py-2">
               <div className="flex items-center gap-2">
                 <Text className="text-xs text-zinc-500 dark:text-zinc-400">{t('common.form.status')}:</Text>
                 <Badge color="lime">{t('common.active')}</Badge>
               </div>
-              <div className="h-4 w-px bg-zinc-200 dark:bg-zinc-700" />
+              <div className="hidden h-4 w-px bg-zinc-200 dark:bg-zinc-700 sm:block" />
               <div className="flex items-center gap-2">
                 <Text className="text-xs text-zinc-500 dark:text-zinc-400">{t('customers.detail.lastService')}:</Text>
                 <Text className="text-xs font-medium">{t('customers.detail.never')}</Text>
               </div>
-              <div className="h-4 w-px bg-zinc-200 dark:bg-zinc-700" />
+              <div className="hidden h-4 w-px bg-zinc-200 dark:bg-zinc-700 sm:block" />
               <div className="flex items-center gap-2">
                 <Text className="text-xs text-zinc-500 dark:text-zinc-400">{t('common.actions.open', { entities: getName('work_order', true) })}:</Text>
                 <Text className="text-xs font-medium">0</Text>
               </div>
-              <div className="h-4 w-px bg-zinc-200 dark:bg-zinc-700" />
+              <div className="hidden h-4 w-px bg-zinc-200 dark:bg-zinc-700 sm:block" />
               <div className="flex items-center gap-2">
                 <Text className="text-xs text-zinc-500 dark:text-zinc-400">{t('customers.detail.balance')}:</Text>
                 <Text className="text-xs font-medium">$0.00</Text>
@@ -276,8 +279,8 @@ export default function CustomerDetailPage() {
           /* STANDARD VIEW - Business/Landlord */
           <div>
             {/* Header - Business */}
-            <div className="flex items-start justify-between">
-              <div>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div className="flex-1 min-w-0">
                 <Heading className="text-2xl flex items-center gap-2">
                   <BuildingOfficeIcon className="h-6 w-6 text-zinc-400" />
                   {customer.name}
@@ -297,7 +300,7 @@ export default function CustomerDetailPage() {
                   )}
                 </div>
                 <div className="mt-2">
-                  <Text className="flex items-center gap-1">
+                  <Text className="flex flex-wrap items-center gap-1">
                     <PhoneIcon className="inline h-4 w-4 text-zinc-400" />
                     {customer.phone ? (
                       <a href={`tel:${customer.phone}`} className="hover:underline">
@@ -323,35 +326,37 @@ export default function CustomerDetailPage() {
                       )}
                     </button>
                   </Text>
-                  <Text className="mt-1 flex items-center gap-1">
-                    <CreditCardIcon className="inline h-4 w-4 text-zinc-400" />
-                    {t('customers.detail.billingAddressLabel')}: {customer.billingAddress.streetAddress}, {customer.billingAddress.city}, {customer.billingAddress.state} {customer.billingAddress.zipCode}
+                  <Text className="mt-1 flex items-start gap-1">
+                    <CreditCardIcon className="inline h-4 w-4 text-zinc-400 flex-shrink-0 mt-0.5" />
+                    <span className="break-words">
+                      {t('customers.detail.billingAddressLabel')}: {customer.billingAddress.streetAddress}, {customer.billingAddress.city}, {customer.billingAddress.state} {customer.billingAddress.zipCode}
+                    </span>
                   </Text>
                 </div>
               </div>
               {canEditCustomers && (
-                <Button color="zinc" onClick={() => setIsEditDialogOpen(true)}>
+                <Button color="zinc" onClick={() => setIsEditDialogOpen(true)} className="sm:flex-shrink-0">
                   <PencilIcon className="size-4" />
                   {t('common.edit')}
                 </Button>
               )}
             </div>
 
-            {/* Quick Stats Bar */}
-            <div className="mt-4 flex items-center divide-x divide-zinc-200 rounded-lg border border-zinc-200 bg-zinc-50 dark:divide-zinc-700 dark:border-zinc-800 dark:bg-zinc-900/50">
-              <div className="flex-1 px-4 py-3">
+            {/* Quick Stats Bar - Responsive Grid */}
+            <div className="mt-4 grid grid-cols-2 gap-px rounded-lg border border-zinc-200 bg-zinc-200 overflow-hidden dark:border-zinc-700 dark:bg-zinc-700 lg:grid-cols-4">
+              <div className="bg-zinc-50 px-4 py-3 dark:bg-zinc-900/50">
                 <Text className="text-xs font-medium text-zinc-500 dark:text-zinc-400">{getName('service_location', true)}</Text>
                 <Strong className="mt-1 block text-2xl">{customer.serviceLocations.length}</Strong>
               </div>
-              <div className="flex-1 px-4 py-3">
+              <div className="bg-zinc-50 px-4 py-3 dark:bg-zinc-900/50">
                 <Text className="text-xs font-medium text-zinc-500 dark:text-zinc-400">{t('common.actions.open', { entities: getName('work_order', true) })}</Text>
                 <Strong className="mt-1 block text-2xl">0</Strong>
               </div>
-              <div className="flex-1 px-4 py-3">
+              <div className="bg-zinc-50 px-4 py-3 dark:bg-zinc-900/50">
                 <Text className="text-xs font-medium text-zinc-500 dark:text-zinc-400">{t('customers.detail.balance')}</Text>
                 <Strong className="mt-1 block text-2xl">$0.00</Strong>
               </div>
-              <div className="flex-1 px-4 py-3">
+              <div className="bg-zinc-50 px-4 py-3 dark:bg-zinc-900/50">
                 <Text className="text-xs font-medium text-zinc-500 dark:text-zinc-400">{t('customers.detail.lastService')}</Text>
                 <Strong className="mt-1 block text-base">{t('customers.detail.never')}</Strong>
               </div>
@@ -361,10 +366,10 @@ export default function CustomerDetailPage() {
             <div className="mt-4 grid grid-cols-1 lg:grid-cols-3 gap-6">
               {/* Left column - Service Locations (2/3 width) */}
               <div className="lg:col-span-2">
-                <div className="flex items-center justify-between mb-2">
+                <div className="flex flex-col gap-2 mb-2 sm:flex-row sm:items-center sm:justify-between">
                   <Subheading>{t('common.entitiesCount', { entities: getName('service_location', true), count: customer.serviceLocations.length })}</Subheading>
                 {useTableLayout && canAddServiceLocations && (
-                  <Button plain onClick={() => setIsAddLocationDialogOpen(true)} className="text-sm">
+                  <Button plain onClick={() => setIsAddLocationDialogOpen(true)} className="text-sm sm:flex-shrink-0">
                     <PlusIcon className="size-4" />
                     {t('common.actions.add', { entity: getName('service_location') })}
                   </Button>
