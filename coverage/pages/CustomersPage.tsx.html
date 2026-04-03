@@ -23,16 +23,16 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">83.33% </span>
+                <span class="strong">83.13% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>205/246</span>
+                <span class='fraction'>207/249</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">64.28% </span>
+                <span class="strong">65.85% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>27/42</span>
+                <span class='fraction'>27/41</span>
             </div>
         
             
@@ -44,9 +44,9 @@
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">83.33% </span>
+                <span class="strong">83.13% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>205/246</span>
+                <span class='fraction'>207/249</span>
             </div>
         
             
@@ -354,7 +354,14 @@
 <a name='L289'></a><a href='#L289'>289</a>
 <a name='L290'></a><a href='#L290'>290</a>
 <a name='L291'></a><a href='#L291'>291</a>
-<a name='L292'></a><a href='#L292'>292</a></td><td class="line-coverage quiet"><span class="cline-any cline-yes">1x</span>
+<a name='L292'></a><a href='#L292'>292</a>
+<a name='L293'></a><a href='#L293'>293</a>
+<a name='L294'></a><a href='#L294'>294</a>
+<a name='L295'></a><a href='#L295'>295</a>
+<a name='L296'></a><a href='#L296'>296</a>
+<a name='L297'></a><a href='#L297'>297</a></td><td class="line-coverage quiet"><span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
@@ -370,6 +377,7 @@
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">23x</span>
 <span class="cline-any cline-yes">23x</span>
 <span class="cline-any cline-yes">23x</span>
 <span class="cline-any cline-yes">23x</span>
@@ -538,7 +546,9 @@
 <span class="cline-any cline-yes">15x</span>
 <span class="cline-any cline-yes">15x</span>
 <span class="cline-any cline-yes">15x</span>
-<span class="cline-any cline-yes">15x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">15x</span>
 <span class="cline-any cline-yes">15x</span>
 <span class="cline-any cline-yes">15x</span>
@@ -649,11 +659,13 @@
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { EllipsisVerticalIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
+import { EllipsisVerticalIcon, MagnifyingGlassIcon, HomeIcon, BuildingOfficeIcon } from '@heroicons/react/24/outline';
 import { customerApi, type Customer } from '../api';
+import { useGlossary } from '../contexts/GlossaryContext';
 import { useHasCapability } from '../hooks/useCurrentUser';
 import AppLayout from '../components/AppLayout';
 import CustomerFormDialog from '../components/CustomerFormDialog';
+import { formatPhone } from '../utils/formatPhone';
 import { Heading } from '../components/catalyst/heading';
 import { Button } from '../components/catalyst/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/catalyst/table';
@@ -665,6 +677,7 @@ export default function CustomersPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { t } = useTranslation();
+  const { getName } = useGlossary();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState&lt;Customer | null&gt;(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -734,9 +747,9 @@ export default function CustomersPage() {
   return (
     &lt;AppLayout&gt;
       &lt;div className="flex items-center justify-between gap-4"&gt;
-        &lt;Heading&gt;{t('entities.customers')}&lt;/Heading&gt;
+        &lt;Heading&gt;{getName('customer', true)}&lt;/Heading&gt;
         {canAddCustomers &amp;&amp; (
-          &lt;Button onClick={handleAdd}&gt;{t('common.actions.add', { entity: t('entities.customer') })}&lt;/Button&gt;
+          &lt;Button onClick={handleAdd}&gt;{t('common.actions.add', { entity: getName('customer') })}&lt;/Button&gt;
         )}
       &lt;/div&gt;
 &nbsp;
@@ -754,7 +767,7 @@ export default function CustomersPage() {
         {customers &amp;&amp; (
           &lt;div className="text-sm text-zinc-600 dark:text-zinc-400"&gt;
             {filteredCustomers.length === customers.length
-              ? `${customers.length} ${customers.length === 1 ? t('entities.customer').toLowerCase() : t('entities.customers').toLowerCase()<span class="branch-0 cbranch-no" title="branch not covered" >}`</span>
+              ? `${customers.length} ${customers.length === 1 ? getName('customer').toLowerCase() : getName('customer', true).toLowerCase()<span class="branch-0 cbranch-no" title="branch not covered" >}`</span>
 <span class="cstat-no" title="statement not covered" >              : `${filteredCustomers.length} of ${customers.length}`}</span>
           &lt;/div&gt;
         )}
@@ -762,24 +775,24 @@ export default function CustomersPage() {
 &nbsp;
       {isLoading &amp;&amp; (
         &lt;div className="mt-4 text-center"&gt;
-          &lt;p className="text-sm text-zinc-600 dark:text-zinc-400"&gt;{t('common.actions.loading', { entities: t('entities.customers') })}&lt;/p&gt;
+          &lt;p className="text-sm text-zinc-600 dark:text-zinc-400"&gt;{t('common.actions.loading', { entities: getName('customer', true) })}&lt;/p&gt;
         &lt;/div&gt;
       )}
 &nbsp;
       {error &amp;&amp; (
         &lt;div className="mt-4 rounded-lg bg-red-50 p-3 ring-1 ring-red-200 dark:bg-red-950/10 dark:ring-red-900/20"&gt;
           &lt;p className="text-sm text-red-800 dark:text-red-400"&gt;
-            {t('common.actions.errorLoading', { entities: t('entities.customers') })}: {(error as Error).message}
+            {t('common.actions.errorLoading', { entities: getName('customer', true) })}: {(error as Error).message}
           &lt;/p&gt;
         &lt;/div&gt;
       )}
 &nbsp;
       {customers &amp;&amp; customers.length === 0 &amp;&amp; (
         &lt;div className="mt-4 rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700 p-4"&gt;
-          &lt;p className="text-sm text-zinc-600 dark:text-zinc-400"&gt;{t('common.actions.notFound', { entities: t('entities.customers') })}&lt;/p&gt;
+          &lt;p className="text-sm text-zinc-600 dark:text-zinc-400"&gt;{t('common.actions.notFound', { entities: getName('customer', true) })}&lt;/p&gt;
           {canAddCustomers &amp;&amp; (
             &lt;Button className="mt-2" onClick={handleAdd}&gt;
-              {t('common.actions.addFirst', { entity: t('entities.customer') })}
+              {t('common.actions.addFirst', { entity: getName('customer') })}
             &lt;/Button&gt;
           )}
         &lt;/div&gt;
@@ -787,7 +800,7 @@ export default function CustomersPage() {
 &nbsp;
       {filteredCustomers.length === 0 &amp;&amp; customers &amp;&amp; customers.length &gt; <span class="branch-0 cbranch-no" title="branch not covered" >0 &amp;&amp; (</span>
 <span class="cstat-no" title="statement not covered" >        &lt;div className="mt-4 rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700 p-4"&gt;</span>
-<span class="cstat-no" title="statement not covered" >          &lt;p className="text-sm text-zinc-600 dark:text-zinc-400"&gt;{t('common.actions.noMatchSearch', { entities: t('entities.customers') })}&lt;/p&gt;</span>
+<span class="cstat-no" title="statement not covered" >          &lt;p className="text-sm text-zinc-600 dark:text-zinc-400"&gt;{t('common.actions.noMatchSearch', { entities: getName('customer', true) })}&lt;/p&gt;</span>
 <span class="cstat-no" title="statement not covered" >        &lt;/div&gt;</span>
       )}
 &nbsp;
@@ -827,9 +840,11 @@ export default function CustomersPage() {
                 return (
                   &lt;TableRow key={customer.id} href={`/customers/${customer.id}`} className="cursor-pointer"&gt;
                     &lt;TableCell&gt;
-                      &lt;span title={customer.displayMode === 'SIMPLE' ? <span class="branch-0 cbranch-no" title="branch not covered" >'Homeowner' : 'Business'}&gt;</span>
-                        {customer.displayMode === 'SIMPLE' ? <span class="branch-0 cbranch-no" title="branch not covered" >'🏠' : '🏢'}</span>
-                      &lt;/span&gt;
+                      {customer.displayMode === 'SIMPLE' ? (
+                        &lt;HomeIcon className="h-4 w-4 text-zinc-400" title="Homeowner" <span class="branch-0 cbranch-no" title="branch not covered" >/&gt;</span>
+                      ) : (
+<span class="cstat-no" title="statement not covered" >                        &lt;BuildingOfficeIcon className="h-4 w-4 text-zinc-400" title="Business" /&gt;</span>
+                      )}
                     &lt;/TableCell&gt;
                     &lt;TableCell className="font-medium"&gt;{customer.name}&lt;/TableCell&gt;
                     &lt;TableCell className="text-zinc-500"&gt;
@@ -839,7 +854,7 @@ export default function CustomersPage() {
                           onClick={<span class="fstat-no" title="function not covered" >(e) =&gt; e.stopPropagation()}</span>
                           className="relative z-10 hover:underline"
                         &gt;
-                          {customer.phone}
+                          {formatPhone(customer.phone)}
 <span class="branch-0 cbranch-no" title="branch not covered" >                        &lt;/a&gt;</span>
                       ) : (
 <span class="cstat-no" title="statement not covered" >                        '-'</span>
@@ -943,7 +958,7 @@ export default function CustomersPage() {
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-03-28T17:02:18.817Z
+                at 2026-04-03T01:50:32.711Z
             </div>
         <script src="../prettify.js"></script>
         <script>

@@ -23,9 +23,9 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">93.03% </span>
+                <span class="strong">93.07% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>307/330</span>
+                <span class='fraction'>309/332</span>
             </div>
         
             
@@ -44,9 +44,9 @@
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">93.03% </span>
+                <span class="strong">93.07% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>307/330</span>
+                <span class='fraction'>309/332</span>
             </div>
         
             
@@ -441,7 +441,10 @@
 <a name='L376'></a><a href='#L376'>376</a>
 <a name='L377'></a><a href='#L377'>377</a>
 <a name='L378'></a><a href='#L378'>378</a>
-<a name='L379'></a><a href='#L379'>379</a></td><td class="line-coverage quiet"><span class="cline-any cline-yes">1x</span>
+<a name='L379'></a><a href='#L379'>379</a>
+<a name='L380'></a><a href='#L380'>380</a>
+<a name='L381'></a><a href='#L381'>381</a></td><td class="line-coverage quiet"><span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
@@ -469,6 +472,7 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">29x</span>
 <span class="cline-any cline-yes">29x</span>
 <span class="cline-any cline-yes">29x</span>
 <span class="cline-any cline-yes">29x</span>
@@ -824,6 +828,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { EllipsisVerticalIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import apiClient from '../api/client';
+import { useGlossary } from '../contexts/GlossaryContext';
 import AppLayout from '../components/AppLayout';
 import { Heading } from '../components/catalyst/heading';
 import { Button } from '../components/catalyst/button';
@@ -850,6 +855,7 @@ interface WorkOrder {
 export default function DispatchesPage() {
   const queryClient = useQueryClient();
   const { t } = useTranslation();
+  const { getName } = useGlossary();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedDispatch, setSelectedDispatch] = useState&lt;Dispatch | null&gt;(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -1000,9 +1006,9 @@ export default function DispatchesPage() {
   return (
     &lt;AppLayout&gt;
       &lt;div className="flex items-center justify-between gap-4"&gt;
-        &lt;Heading&gt;{t('scheduling.entities.dispatches')}&lt;/Heading&gt;
+        &lt;Heading&gt;{getName('dispatch', true)}&lt;/Heading&gt;
         &lt;Button onClick={handleAdd}&gt;
-          {t('common.actions.add', { entity: t('scheduling.entities.dispatch') })}
+          {t('common.actions.add', { entity: getName('dispatch') })}
         &lt;/Button&gt;
       &lt;/div&gt;
 &nbsp;
@@ -1020,7 +1026,7 @@ export default function DispatchesPage() {
         {safeDispatches.length &gt; 0 &amp;&amp; (
           &lt;div className="text-sm text-zinc-600 dark:text-zinc-400"&gt;
             {filteredDispatches.length === safeDispatches.length
-              ? `${safeDispatches.length} ${safeDispatches.length === <span class="branch-0 cbranch-no" title="branch not covered" >1 ? t('scheduling.entities.dispatch').toLowerCase() : t</span>('scheduling.entities.dispatches').toLowerCase()<span class="branch-0 cbranch-no" title="branch not covered" >}`</span>
+              ? `${safeDispatches.length} ${safeDispatches.length === <span class="branch-0 cbranch-no" title="branch not covered" >1 ? getName('dispatch').toLowerCase() : g</span>etName('dispatch', true).toLowerCase()<span class="branch-0 cbranch-no" title="branch not covered" >}`</span>
 <span class="cstat-no" title="statement not covered" >              : `${filteredDispatches.length} of ${safeDispatches.length}`}</span>
           &lt;/div&gt;
         )}
@@ -1029,7 +1035,7 @@ export default function DispatchesPage() {
       {error &amp;&amp; (
         &lt;div className="mt-4 rounded-lg bg-red-50 p-3 ring-1 ring-red-200 dark:bg-red-950/10 dark:ring-red-900/20"&gt;
           &lt;p className="text-sm text-red-800 dark:text-red-400"&gt;
-            {t('common.actions.errorLoading', { entities: t('scheduling.entities.dispatches') })}: {(error as Error).message}
+            {t('common.actions.errorLoading', { entities: getName('dispatch', true) })}: {(error as Error).message}
           &lt;/p&gt;
         &lt;/div&gt;
       )}
@@ -1037,19 +1043,19 @@ export default function DispatchesPage() {
       {isLoading ? (
         &lt;div className="mt-4 text-center"&gt;
           &lt;p className="text-sm text-zinc-600 dark:text-zinc-400"&gt;
-            {t('common.actions.loading', { entities: t('scheduling.entities.dispatches') })}
+            {t('common.actions.loading', { entities: getName('dispatch', true) })}
           &lt;/p&gt;
         &lt;/div&gt;
       ) : safeDispatches.length === 0 ? (
         &lt;div className="mt-4 rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700 p-4"&gt;
           &lt;p className="text-sm text-zinc-600 dark:text-zinc-400"&gt;
-            {t('common.actions.notFound', { entities: t('scheduling.entities.dispatches') })}
+            {t('common.actions.notFound', { entities: getName('dispatch', true) })}
           &lt;/p&gt;
         &lt;/div&gt;
       ) : filteredDispatches.length === <span class="branch-0 cbranch-no" title="branch not covered" >0 ? (</span>
 <span class="cstat-no" title="statement not covered" >        &lt;div className="mt-4 rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700 p-4"&gt;</span>
 <span class="cstat-no" title="statement not covered" >          &lt;p className="text-sm text-zinc-600 dark:text-zinc-400"&gt;</span>
-<span class="cstat-no" title="statement not covered" >            {t('common.actions.noMatchSearch', { entities: t('scheduling.entities.dispatches') })}</span>
+<span class="cstat-no" title="statement not covered" >            {t('common.actions.noMatchSearch', { entities: getName('dispatch', true) })}</span>
 <span class="cstat-no" title="statement not covered" >          &lt;/p&gt;</span>
 <span class="cstat-no" title="statement not covered" >        &lt;/div&gt;</span>
       ) : (
@@ -1105,13 +1111,13 @@ export default function DispatchesPage() {
       &lt;Dialog open={isDialogOpen} onClose={setIsDialogOpen}&gt;
         &lt;DialogTitle&gt;
           {selectedDispatch
-            ? t('common.actions.edit', { entity: t('scheduling.entities.dispatch') })
-            : t('common.actions.add', { entity: t('scheduling.entities.dispatch') })}
+            ? t('common.actions.edit', { entity: getName('dispatch') })
+            : t('common.actions.add', { entity: getName('dispatch') })}
         &lt;/DialogTitle&gt;
         &lt;DialogDescription&gt;
           {selectedDispatch
-            ? t('common.form.descriptionEdit', { entity: t('scheduling.entities.dispatch') })
-            : t('common.form.descriptionCreate', { entity: t('scheduling.entities.dispatch') })}
+            ? t('common.form.descriptionEdit', { entity: getName('dispatch') })
+            : t('common.form.descriptionCreate', { entity: getName('dispatch') })}
         &lt;/DialogDescription&gt;
         &lt;form onSubmit={handleSubmit}&gt;
           &lt;DialogBody&gt;
@@ -1204,7 +1210,7 @@ export default function DispatchesPage() {
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-03-28T17:02:18.817Z
+                at 2026-04-03T01:50:32.711Z
             </div>
         <script src="../prettify.js"></script>
         <script>

@@ -23,9 +23,9 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">96.89% </span>
+                <span class="strong">96.93% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>250/258</span>
+                <span class='fraction'>253/261</span>
             </div>
         
             
@@ -44,9 +44,9 @@
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">96.89% </span>
+                <span class="strong">96.93% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>250/258</span>
+                <span class='fraction'>253/261</span>
             </div>
         
             
@@ -378,7 +378,12 @@
 <a name='L313'></a><a href='#L313'>313</a>
 <a name='L314'></a><a href='#L314'>314</a>
 <a name='L315'></a><a href='#L315'>315</a>
-<a name='L316'></a><a href='#L316'>316</a></td><td class="line-coverage quiet"><span class="cline-any cline-yes">1x</span>
+<a name='L316'></a><a href='#L316'>316</a>
+<a name='L317'></a><a href='#L317'>317</a>
+<a name='L318'></a><a href='#L318'>318</a>
+<a name='L319'></a><a href='#L319'>319</a></td><td class="line-coverage quiet"><span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
@@ -399,6 +404,7 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">33x</span>
 <span class="cline-any cline-yes">33x</span>
 <span class="cline-any cline-yes">33x</span>
 <span class="cline-any cline-yes">33x</span>
@@ -699,9 +705,11 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { EllipsisVerticalIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import { customerApi, type ServiceLocation, type Customer } from '../api';
+import { useGlossary } from '../contexts/GlossaryContext';
 import { useHasCapability } from '../hooks/useCurrentUser';
 import AppLayout from '../components/AppLayout';
 import ServiceLocationFormDialog from '../components/ServiceLocationFormDialog';
+import { formatPhone } from '../utils/formatPhone';
 import { Heading } from '../components/catalyst/heading';
 import { Button } from '../components/catalyst/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/catalyst/table';
@@ -718,6 +726,7 @@ export default function ServiceLocationsPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { t } = useTranslation();
+  const { getName } = useGlossary();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedLocation, setSelectedLocation] = useState&lt;ServiceLocation | null&gt;(null);
   const [selectedCustomerId, setSelectedCustomerId] = useState&lt;string | null&gt;(null);
@@ -810,9 +819,9 @@ export default function ServiceLocationsPage() {
   return (
     &lt;AppLayout&gt;
       &lt;div className="flex items-center justify-between gap-4"&gt;
-        &lt;Heading&gt;{t('entities.serviceLocations')}&lt;/Heading&gt;
+        &lt;Heading&gt;{getName('service_location', true)}&lt;/Heading&gt;
         {canAddServiceLocations &amp;&amp; (
-          &lt;Button onClick={handleAdd}&gt;{t('common.actions.add', { entity: t('entities.serviceLocation') })}&lt;/Button&gt;
+          &lt;Button onClick={handleAdd}&gt;{t('common.actions.add', { entity: getName('service_location') })}&lt;/Button&gt;
         )}
       &lt;/div&gt;
 &nbsp;
@@ -860,7 +869,7 @@ export default function ServiceLocationsPage() {
         {allLocations.length &gt; 0 &amp;&amp; (
           &lt;div className="text-sm text-zinc-600 dark:text-zinc-400"&gt;
             {filteredLocations.length === allLocations.length
-              ? `${allLocations.length} ${allLocations.length === <span class="branch-0 cbranch-no" title="branch not covered" >1 ? t('entities.serviceLocation').toLowerCase() : t</span>('entities.serviceLocations').toLowerCase()}`
+              ? `${allLocations.length} ${allLocations.length === <span class="branch-0 cbranch-no" title="branch not covered" >1 ? getName('service_location').toLowerCase() : g</span>etName('service_location', true).toLowerCase()}`
               : `${filteredLocations.length} of ${allLocations.length}`}
           &lt;/div&gt;
         )}
@@ -868,24 +877,24 @@ export default function ServiceLocationsPage() {
 &nbsp;
       {isLoading &amp;&amp; (
         &lt;div className="mt-4 text-center"&gt;
-          &lt;p className="text-sm text-zinc-600 dark:text-zinc-400"&gt;{t('common.actions.loading', { entities: t('entities.serviceLocations') })}&lt;/p&gt;
+          &lt;p className="text-sm text-zinc-600 dark:text-zinc-400"&gt;{t('common.actions.loading', { entities: getName('service_location', true) })}&lt;/p&gt;
         &lt;/div&gt;
       )}
 &nbsp;
       {error &amp;&amp; (
         &lt;div className="mt-4 rounded-lg bg-red-50 p-3 ring-1 ring-red-200 dark:bg-red-950/10 dark:ring-red-900/20"&gt;
           &lt;p className="text-sm text-red-800 dark:text-red-400"&gt;
-            {t('common.actions.errorLoading', { entities: t('entities.serviceLocations') })}: {(error as Error).message}
+            {t('common.actions.errorLoading', { entities: getName('service_location', true) })}: {(error as Error).message}
           &lt;/p&gt;
         &lt;/div&gt;
       )}
 &nbsp;
       {allLocations.length === 0 &amp;&amp; !isLoading &amp;&amp; (
         &lt;div className="mt-4 rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700 p-4"&gt;
-          &lt;p className="text-sm text-zinc-600 dark:text-zinc-400"&gt;{t('common.actions.notFound', { entities: t('entities.serviceLocations') })}&lt;/p&gt;
+          &lt;p className="text-sm text-zinc-600 dark:text-zinc-400"&gt;{t('common.actions.notFound', { entities: getName('service_location', true) })}&lt;/p&gt;
           {canAddServiceLocations &amp;&amp; (
             &lt;Button className="mt-2" onClick={handleAdd}&gt;
-              {t('common.actions.addFirst', { entity: t('entities.serviceLocation') })}
+              {t('common.actions.addFirst', { entity: getName('service_location') })}
             &lt;/Button&gt;
           )}
         &lt;/div&gt;
@@ -893,7 +902,7 @@ export default function ServiceLocationsPage() {
 &nbsp;
       {filteredLocations.length === 0 &amp;&amp; allLocations.length &gt; <span class="branch-0 cbranch-no" title="branch not covered" >0 &amp;&amp; (</span>
 <span class="cstat-no" title="statement not covered" >        &lt;div className="mt-4 rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700 p-4"&gt;</span>
-<span class="cstat-no" title="statement not covered" >          &lt;p className="text-sm text-zinc-600 dark:text-zinc-400"&gt;{t('common.actions.noMatchSearch', { entities: t('entities.serviceLocations') })}&lt;/p&gt;</span>
+<span class="cstat-no" title="statement not covered" >          &lt;p className="text-sm text-zinc-600 dark:text-zinc-400"&gt;{t('common.actions.noMatchSearch', { entities: getName('service_location', true) })}&lt;/p&gt;</span>
 <span class="cstat-no" title="statement not covered" >        &lt;/div&gt;</span>
       )}
 &nbsp;
@@ -902,7 +911,7 @@ export default function ServiceLocationsPage() {
           &lt;Table dense className="[--gutter:theme(spacing.1)] text-sm"&gt;
             &lt;TableHead&gt;
               &lt;TableRow&gt;
-                &lt;TableHeader&gt;{t('serviceLocations.table.locationName')}&lt;/TableHeader&gt;
+                &lt;TableHeader&gt;{t('common.form.name')}&lt;/TableHeader&gt;
                 &lt;TableHeader&gt;{t('serviceLocations.table.address')}&lt;/TableHeader&gt;
                 &lt;TableHeader&gt;{t('serviceLocations.table.contact')}&lt;/TableHeader&gt;
                 &lt;TableHeader&gt;{t('serviceLocations.table.lastService')}&lt;/TableHeader&gt;
@@ -939,7 +948,7 @@ export default function ServiceLocationsPage() {
                                 onClick={<span class="fstat-no" title="function not covered" >(e) =&gt; e.stopPropagation()}</span>
                                 className="relative z-10 hover:underline"
                               &gt;
-                                {location.siteContactPhone}
+                                {formatPhone(location.siteContactPhone)}
                               &lt;/a&gt;
                             &lt;/div&gt;
                           )}
@@ -1015,7 +1024,7 @@ export default function ServiceLocationsPage() {
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-03-28T17:02:18.817Z
+                at 2026-04-03T01:50:32.711Z
             </div>
         <script src="../prettify.js"></script>
         <script>

@@ -23,9 +23,9 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">94.53% </span>
+                <span class="strong">94.56% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>294/311</span>
+                <span class='fraction'>296/313</span>
             </div>
         
             
@@ -44,9 +44,9 @@
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">94.53% </span>
+                <span class="strong">94.56% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>294/311</span>
+                <span class='fraction'>296/313</span>
             </div>
         
             
@@ -420,7 +420,10 @@
 <a name='L355'></a><a href='#L355'>355</a>
 <a name='L356'></a><a href='#L356'>356</a>
 <a name='L357'></a><a href='#L357'>357</a>
-<a name='L358'></a><a href='#L358'>358</a></td><td class="line-coverage quiet"><span class="cline-any cline-yes">1x</span>
+<a name='L358'></a><a href='#L358'>358</a>
+<a name='L359'></a><a href='#L359'>359</a>
+<a name='L360'></a><a href='#L360'>360</a></td><td class="line-coverage quiet"><span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
@@ -449,6 +452,7 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">34x</span>
 <span class="cline-any cline-yes">34x</span>
 <span class="cline-any cline-yes">34x</span>
 <span class="cline-any cline-yes">34x</span>
@@ -782,6 +786,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { EllipsisVerticalIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import apiClient from '../api/client';
+import { useGlossary } from '../contexts/GlossaryContext';
 import AppLayout from '../components/AppLayout';
 import { Heading } from '../components/catalyst/heading';
 import { Button } from '../components/catalyst/button';
@@ -809,6 +814,7 @@ interface Customer {
 export default function EquipmentPage() {
   const queryClient = useQueryClient();
   const { t } = useTranslation();
+  const { getName } = useGlossary();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedEquipment, setSelectedEquipment] = useState&lt;Equipment | null&gt;(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -940,9 +946,9 @@ export default function EquipmentPage() {
   return (
     &lt;AppLayout&gt;
       &lt;div className="flex items-center justify-between gap-4"&gt;
-        &lt;Heading&gt;{t('entities.equipment')}&lt;/Heading&gt;
+        &lt;Heading&gt;{getName('equipment', true)}&lt;/Heading&gt;
         &lt;Button onClick={handleAdd}&gt;
-          {t('common.actions.add', { entity: t('entities.equipment') })}
+          {t('common.actions.add', { entity: getName('equipment') })}
         &lt;/Button&gt;
       &lt;/div&gt;
 &nbsp;
@@ -960,7 +966,7 @@ export default function EquipmentPage() {
         {safeEquipment.length &gt; 0 &amp;&amp; (
           &lt;div className="text-sm text-zinc-600 dark:text-zinc-400"&gt;
             {filteredEquipment.length === safeEquipment.length
-              ? `${safeEquipment.length} ${safeEquipment.length === <span class="branch-0 cbranch-no" title="branch not covered" >1 ? t('entities.equipment').toLowerCase() : t</span>('entities.equipment').toLowerCase()<span class="branch-0 cbranch-no" title="branch not covered" >}`</span>
+              ? `${safeEquipment.length} ${safeEquipment.length === <span class="branch-0 cbranch-no" title="branch not covered" >1 ? getName('equipment').toLowerCase() : g</span>etName('equipment', true).toLowerCase()<span class="branch-0 cbranch-no" title="branch not covered" >}`</span>
 <span class="cstat-no" title="statement not covered" >              : `${filteredEquipment.length} of ${safeEquipment.length}`}</span>
           &lt;/div&gt;
         )}
@@ -969,7 +975,7 @@ export default function EquipmentPage() {
       {error &amp;&amp; (
         &lt;div className="mt-4 rounded-lg bg-red-50 p-3 ring-1 ring-red-200 dark:bg-red-950/10 dark:ring-red-900/20"&gt;
           &lt;p className="text-sm text-red-800 dark:text-red-400"&gt;
-            {t('common.actions.errorLoading', { entities: t('entities.equipment') })}: {(error as Error).message}
+            {t('common.actions.errorLoading', { entities: getName('equipment', true) })}: {(error as Error).message}
           &lt;/p&gt;
         &lt;/div&gt;
       )}
@@ -977,19 +983,19 @@ export default function EquipmentPage() {
       {isLoading ? (
         &lt;div className="mt-4 text-center"&gt;
           &lt;p className="text-sm text-zinc-600 dark:text-zinc-400"&gt;
-            {t('common.actions.loading', { entities: t('entities.equipment') })}
+            {t('common.actions.loading', { entities: getName('equipment', true) })}
           &lt;/p&gt;
         &lt;/div&gt;
       ) : safeEquipment.length === 0 ? (
         &lt;div className="mt-4 rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700 p-4"&gt;
           &lt;p className="text-sm text-zinc-600 dark:text-zinc-400"&gt;
-            {t('common.actions.notFound', { entities: t('entities.equipment') })}
+            {t('common.actions.notFound', { entities: getName('equipment', true) })}
           &lt;/p&gt;
         &lt;/div&gt;
       ) : filteredEquipment.length === <span class="branch-0 cbranch-no" title="branch not covered" >0 ? (</span>
 <span class="cstat-no" title="statement not covered" >        &lt;div className="mt-4 rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700 p-4"&gt;</span>
 <span class="cstat-no" title="statement not covered" >          &lt;p className="text-sm text-zinc-600 dark:text-zinc-400"&gt;</span>
-<span class="cstat-no" title="statement not covered" >            {t('common.actions.noMatchSearch', { entities: t('entities.equipment') })}</span>
+<span class="cstat-no" title="statement not covered" >            {t('common.actions.noMatchSearch', { entities: getName('equipment', true) })}</span>
 <span class="cstat-no" title="statement not covered" >          &lt;/p&gt;</span>
 <span class="cstat-no" title="statement not covered" >        &lt;/div&gt;</span>
       ) : (
@@ -1043,13 +1049,13 @@ export default function EquipmentPage() {
       &lt;Dialog open={isDialogOpen} onClose={setIsDialogOpen}&gt;
         &lt;DialogTitle&gt;
           {selectedEquipment
-            ? t('common.actions.edit', { entity: t('entities.equipment') })
-            : t('common.actions.add', { entity: t('entities.equipment') })}
+            ? t('common.actions.edit', { entity: getName('equipment') })
+            : t('common.actions.add', { entity: getName('equipment') })}
         &lt;/DialogTitle&gt;
         &lt;DialogDescription&gt;
           {selectedEquipment
-            ? t('common.form.descriptionEdit', { entity: t('entities.equipment') })
-            : t('common.form.descriptionCreate', { entity: t('entities.equipment') })}
+            ? t('common.form.descriptionEdit', { entity: getName('equipment') })
+            : t('common.form.descriptionCreate', { entity: getName('equipment') })}
         &lt;/DialogDescription&gt;
         &lt;form onSubmit={handleSubmit}&gt;
           &lt;DialogBody&gt;
@@ -1141,7 +1147,7 @@ export default function EquipmentPage() {
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-03-28T17:02:18.817Z
+                at 2026-04-03T01:50:32.711Z
             </div>
         <script src="../prettify.js"></script>
         <script>

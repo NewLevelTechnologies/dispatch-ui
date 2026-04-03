@@ -236,6 +236,9 @@ describe('NotificationPreferencesDialog', () => {
       phone: '555-1234',
       email: 'jane@test.com',
       notes: null,
+      displayOrder: 0,
+      createdAt: '2024-01-01T00:00:00Z',
+      updatedAt: '2024-01-01T00:00:00Z',
     };
 
     renderWithProviders(
