@@ -47,16 +47,11 @@ export default function AdditionalContactFormDialog({
   const [preferencesState, setPreferencesState] = useState<Map<string, boolean>>(new Map());
   const [showPreferences, setShowPreferences] = useState(false);
 
-  // Fetch notification preferences
-  // For NEW contacts: fetch customer preferences as template (all types, unchecked by default)
-  // For EXISTING contacts: fetch contact's actual preferences
+  // Fetch notification preferences (only for existing contacts to avoid race condition)
   const { data: preferences = [] } = useQuery({
     queryKey: ['notification-preferences', 'contact', customerId, contact?.id],
-    queryFn: () =>
-      contact?.id
-        ? notificationApi.getContactPreferences(customerId, contact.id)
-        : notificationApi.getCustomerPreferences(customerId), // Use customer prefs as template
-    enabled: isOpen, // Always enabled when dialog is open
+    queryFn: () => notificationApi.getContactPreferences(customerId, contact!.id),
+    enabled: isOpen && isEdit, // Only fetch for existing contacts
   });
 
   // Initialize form data from contact prop or empty form
@@ -80,26 +75,18 @@ export default function AdditionalContactFormDialog({
       const prefMap = new Map<string, boolean>();
       preferences.forEach((pref) => {
         const key = `${pref.notificationTypeId}-${pref.channel}`;
-        // For NEW contacts: start with all unchecked (don't inherit customer prefs)
-        // For EXISTING contacts: use their actual opt-in values
-        const optIn = isEdit ? pref.optIn : false;
-        prefMap.set(key, optIn);
+        prefMap.set(key, pref.optIn);
       });
       setPreferencesState(prefMap);
     }
-  }, [preferences, isEdit]);
+  }, [preferences]);
 
   // Reset form when dialog opens/closes or contact changes
   useEffect(() => {
     if (isOpen) {
       setFormData(initialFormData);
       setErrors({});
-      if (!isEdit) {
-        setPreferencesState(new Map());
-        setShowPreferences(false); // Collapsed by default for new contacts
-      } else {
-        setShowPreferences(true); // Expanded by default when editing
-      }
+      setShowPreferences(isEdit); // Show preferences only for existing contacts
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, contact?.id]);
@@ -133,32 +120,10 @@ export default function AdditionalContactFormDialog({
 
   const createMutation = useMutation({
     mutationFn: async (data: CreateAdditionalContactRequest) => {
-      // Create contact first
-      const newContact = parentType === 'customer'
+      // Create contact only - preferences can be set via bell icon after creation
+      return parentType === 'customer'
         ? await contactApi.createCustomerContact(parentId, data)
         : await contactApi.createServiceLocationContact(parentId, data);
-
-      // Then CREATE preferences for the new contact if any are toggled ON
-      const preferencesToCreate = preferences.filter((pref) => {
-        const key = `${pref.notificationTypeId}-${pref.channel}`;
-        const optIn = preferencesState.get(key) ?? false;
-        return optIn; // Only create if opted in
-      });
-
-      if (preferencesToCreate.length > 0) {
-        await Promise.all(
-          preferencesToCreate.map((pref) => {
-            return notificationApi.createPreference({
-              customerId,
-              contactId: newContact.id,
-              notificationTypeId: pref.notificationTypeId,
-              optIn: true,
-            });
-          })
-        );
-      }
-
-      return newContact;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey });
@@ -337,8 +302,8 @@ export default function AdditionalContactFormDialog({
             </FieldGroup>
           </Fieldset>
 
-          {/* Notification Preferences Section */}
-          {notificationTypes.length > 0 && (
+          {/* Notification Preferences Section - Only show for existing contacts */}
+          {isEdit && notificationTypes.length > 0 && (
             <div className="border-t border-zinc-200 pt-3 dark:border-zinc-800">
               <button
                 type="button"
