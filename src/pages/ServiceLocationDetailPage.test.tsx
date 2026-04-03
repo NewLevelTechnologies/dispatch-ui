@@ -331,4 +331,77 @@ describe('ServiceLocationDetailPage', () => {
       expect(screen.getByText(/create additional contact/i)).toBeInTheDocument();
     });
   });
+
+  it('displays all tabs', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({ data: [mockCustomer] });
+
+    renderDetailPage();
+
+    await waitFor(() => {
+      expect(screen.getByText('Main Office')).toBeInTheDocument();
+    });
+
+    // Check that all tabs are present
+    expect(screen.getByRole('button', { name: /overview/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /work order/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /equipment/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /activity/i })).toBeInTheDocument();
+  });
+
+  it('switches to work orders tab', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({ data: [mockCustomer] });
+    const user = userEvent.setup();
+
+    renderDetailPage();
+
+    await waitFor(() => {
+      expect(screen.getByText('Main Office')).toBeInTheDocument();
+    });
+
+    // Click on Work Orders tab
+    const workOrdersTab = screen.getByRole('button', { name: /work order/i });
+    await user.click(workOrdersTab);
+
+    await waitFor(() => {
+      expect(workOrdersTab).toHaveAttribute('aria-current', 'page');
+    });
+  });
+
+  it('switches to equipment tab', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({ data: [mockCustomer] });
+    const user = userEvent.setup();
+
+    renderDetailPage();
+
+    await waitFor(() => {
+      expect(screen.getByText('Main Office')).toBeInTheDocument();
+    });
+
+    // Click on Equipment tab
+    const equipmentTab = screen.getByRole('button', { name: /equipment/i });
+    await user.click(equipmentTab);
+
+    await waitFor(() => {
+      expect(equipmentTab).toHaveAttribute('aria-current', 'page');
+    });
+  });
+
+  it('switches to activity tab', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({ data: [mockCustomer] });
+    const user = userEvent.setup();
+
+    renderDetailPage();
+
+    await waitFor(() => {
+      expect(screen.getByText('Main Office')).toBeInTheDocument();
+    });
+
+    // Click on Activity tab
+    const activityTab = screen.getByRole('button', { name: /activity/i });
+    await user.click(activityTab);
+
+    await waitFor(() => {
+      expect(activityTab).toHaveAttribute('aria-current', 'page');
+    });
+  });
 });

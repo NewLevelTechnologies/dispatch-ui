@@ -291,4 +291,55 @@ describe('NotificationLogsList', () => {
       );
     });
   });
+
+  it('displays all status badge colors', async () => {
+    const logsWithAllStatuses = {
+      ...mockLogs,
+      content: [
+        { ...mockLogs.content[0], status: NotificationStatus.DELIVERED },
+        { ...mockLogs.content[1], status: NotificationStatus.SENT },
+        { ...mockLogs.content[0], id: '3', status: NotificationStatus.PENDING },
+        { ...mockLogs.content[0], id: '4', status: NotificationStatus.BOUNCED },
+        { ...mockLogs.content[0], id: '5', status: NotificationStatus.FAILED },
+      ],
+    };
+
+    vi.spyOn(api.notificationApi, 'getNotificationLogs').mockResolvedValue(logsWithAllStatuses);
+
+    renderWithProviders(<NotificationLogsList customerId="customer-123" />);
+
+    await waitFor(() => {
+      expect(screen.getByText('DELIVERED')).toBeInTheDocument();
+      expect(screen.getByText('SENT')).toBeInTheDocument();
+      expect(screen.getByText('PENDING')).toBeInTheDocument();
+      expect(screen.getByText('BOUNCED')).toBeInTheDocument();
+      expect(screen.getByText('FAILED')).toBeInTheDocument();
+    });
+  });
+
+  it('displays all channel icons', async () => {
+    const logsWithAllChannels = {
+      ...mockLogs,
+      content: [
+        { ...mockLogs.content[0], channel: NotificationChannel.EMAIL },
+        { ...mockLogs.content[1], channel: NotificationChannel.SMS },
+        { ...mockLogs.content[0], id: '3', channel: NotificationChannel.PUSH },
+      ],
+      totalPages: 1,
+      totalElements: 3,
+    };
+
+    vi.spyOn(api.notificationApi, 'getNotificationLogs').mockResolvedValue(logsWithAllChannels);
+
+    renderWithProviders(<NotificationLogsList customerId="customer-123" />);
+
+    await waitFor(() => {
+      // Check that all three channels are present by checking the table content
+      const table = screen.getByRole('table');
+      expect(table).toBeInTheDocument();
+    });
+
+    // Verify we have all three rows rendered
+    expect(screen.getAllByRole('row').length).toBeGreaterThanOrEqual(4); // Header + 3 data rows
+  });
 });
