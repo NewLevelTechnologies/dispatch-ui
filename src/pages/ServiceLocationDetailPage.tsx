@@ -8,6 +8,8 @@ import { useHasCapability } from '../hooks/useCurrentUser';
 import AppLayout from '../components/AppLayout';
 import ServiceLocationFormDialog from '../components/ServiceLocationFormDialog';
 import AdditionalContactsList from '../components/AdditionalContactsList';
+import NotificationLogsList from '../components/NotificationLogsList';
+import TabNavigation from '../components/TabNavigation';
 import { formatPhone } from '../utils/formatPhone';
 import { Heading, Subheading } from '../components/catalyst/heading';
 import { Text, Strong } from '../components/catalyst/text';
@@ -16,11 +18,14 @@ import { Badge } from '../components/catalyst/badge';
 import { ArrowLeftIcon, PencilIcon, PlusIcon } from '@heroicons/react/24/outline';
 import { Divider } from '../components/catalyst/divider';
 
+type TabId = 'overview' | 'work-orders' | 'equipment' | 'activity';
+
 export default function ServiceLocationDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { t } = useTranslation();
   const { getName } = useGlossary();
+  const [activeTab, setActiveTab] = useState<TabId>('overview');
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
 
   // Permission checks
@@ -74,16 +79,6 @@ export default function ServiceLocationDetailPage() {
     );
   }
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  };
-
   // Show additional contacts section if there are contacts, site contact info, or user can add
   const shouldShowAdditionalContacts = (): boolean => {
     return !!(
@@ -94,6 +89,14 @@ export default function ServiceLocationDetailPage() {
       canEditServiceLocations
     );
   };
+
+  // Tab configuration
+  const tabs = [
+    { id: 'overview', label: t('serviceLocations.tabs.overview'), count: undefined },
+    { id: 'work-orders', label: getName('work_order', true), count: 0 }, // TODO: actual count
+    { id: 'equipment', label: getName('equipment'), count: undefined },
+    { id: 'activity', label: t('serviceLocations.tabs.activity'), count: undefined },
+  ];
 
   return (
     <AppLayout>
@@ -148,8 +151,19 @@ export default function ServiceLocationDetailPage() {
             )}
           </div>
 
-          {/* Main Content - 2 Column Layout */}
-          <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-3">
+          {/* Tabs */}
+          <div className="mt-4">
+            <TabNavigation
+              tabs={tabs}
+              activeTab={activeTab}
+              onTabChange={(tabId) => setActiveTab(tabId as TabId)}
+            />
+          </div>
+
+          {/* Tab Content */}
+          <div className="mt-4">
+            {activeTab === 'overview' && (
+              <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
             {/* Left Column - Primary Info */}
             <div className="lg:col-span-2 space-y-4">
               {/* Address and Site Contact - Side by Side */}
@@ -237,39 +251,9 @@ export default function ServiceLocationDetailPage() {
                   <Text className="mt-2">{location.notes}</Text>
                 </div>
               )}
-
-              {/* Equipment Section */}
-              <div className="rounded-lg border border-zinc-200 p-3 dark:border-zinc-800">
-                <div className="flex items-center justify-between">
-                  <Subheading>{getName('equipment')}</Subheading>
-                  {/* TODO: Add equipment permission check when equipment management is implemented */}
-                  <Button plain>
-                    <PlusIcon className="size-4" />
-                    {t('common.actions.add', { entity: getName('equipment') })}
-                  </Button>
-                </div>
-                <div className="mt-2 rounded-lg bg-zinc-50 p-3 dark:bg-zinc-900">
-                  <Text className="text-sm text-zinc-500 dark:text-zinc-400">{t('common.actions.noEntitiesYet', { entities: getName('equipment', true) })}</Text>
-                </div>
-              </div>
-
-              {/* Recent Work Orders */}
-              <div className="rounded-lg border border-zinc-200 p-3 dark:border-zinc-800">
-                <div className="flex items-center justify-between">
-                  <Subheading>{t('common.recentEntities', { entities: getName('work_order', true) })}</Subheading>
-                  {/* TODO: Add work order permission check when work order management is implemented */}
-                  <Button plain>
-                    <PlusIcon className="size-4" />
-                    {t('common.actions.new', { entity: getName('work_order') })}
-                  </Button>
-                </div>
-                <div className="mt-2 rounded-lg bg-zinc-50 p-3 dark:bg-zinc-900">
-                  <Text className="text-sm text-zinc-500 dark:text-zinc-400">{t('common.actions.noEntitiesYet', { entities: getName('work_order', true) })}</Text>
-                </div>
-              </div>
             </div>
 
-            {/* Right Column - Stats and Metadata */}
+            {/* Right Column - Quick Stats */}
             <div className="space-y-4">
               {/* Quick Stats */}
               <div className="rounded-lg border border-zinc-200 p-3 dark:border-zinc-800">
@@ -296,28 +280,54 @@ export default function ServiceLocationDetailPage() {
                   </div>
                 </div>
               </div>
+            </div>
+              </div>
+            )}
 
-              {/* System Metadata */}
-              <div className="rounded-lg border border-zinc-200 p-3 dark:border-zinc-800">
-                <Subheading>{t('serviceLocations.detail.systemInfo')}</Subheading>
-                <div className="mt-2 space-y-2">
-                  <div>
-                    <Text className="text-xs text-zinc-500">{t('serviceLocations.detail.locationId')}</Text>
-                    <Text className="text-xs font-mono">{location.id.substring(0, 8)}...</Text>
-                  </div>
-                  <Divider />
-                  <div>
-                    <Text className="text-xs text-zinc-500">{t('serviceLocations.detail.created')}</Text>
-                    <Text className="text-xs">{formatDate(location.createdAt)}</Text>
-                  </div>
-                  <Divider />
-                  <div>
-                    <Text className="text-xs text-zinc-500">{t('serviceLocations.detail.lastUpdated')}</Text>
-                    <Text className="text-xs">{formatDate(location.updatedAt)}</Text>
-                  </div>
+            {activeTab === 'work-orders' && (
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <Subheading>{t('common.recentEntities', { entities: getName('work_order', true) })}</Subheading>
+                  {/* TODO: Add work order permission check when work order management is implemented */}
+                  <Button plain>
+                    <PlusIcon className="size-4" />
+                    {t('common.actions.new', { entity: getName('work_order') })}
+                  </Button>
+                </div>
+                <div className="rounded-lg border border-zinc-200 p-8 text-center dark:border-zinc-800">
+                  <Text className="text-zinc-500 dark:text-zinc-400">
+                    {t('common.actions.noEntitiesYet', { entities: getName('work_order', true) })}
+                  </Text>
                 </div>
               </div>
-            </div>
+            )}
+
+            {activeTab === 'equipment' && (
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <Subheading>{getName('equipment')}</Subheading>
+                  {/* TODO: Add equipment permission check when equipment management is implemented */}
+                  <Button plain>
+                    <PlusIcon className="size-4" />
+                    {t('common.actions.add', { entity: getName('equipment') })}
+                  </Button>
+                </div>
+                <div className="rounded-lg border border-zinc-200 p-8 text-center dark:border-zinc-800">
+                  <Text className="text-zinc-500 dark:text-zinc-400">
+                    {t('common.actions.noEntitiesYet', { entities: getName('equipment', true) })}
+                  </Text>
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'activity' && (
+              <div className="rounded-lg border border-zinc-200 p-3 dark:border-zinc-800">
+                <NotificationLogsList
+                  entityType="SERVICE_LOCATION"
+                  entityId={location.id}
+                />
+              </div>
+            )}
           </div>
         </div>
       </div>

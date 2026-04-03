@@ -34,7 +34,7 @@ export interface NotificationLogDto {
   status: NotificationStatus;
   entityType: string;
   entityId: string;
-  subject: string;
+  subject?: string; // Optional - SMS notifications don't have subjects
   createdAt: string;
   sentAt?: string;
   deliveredAt?: string;

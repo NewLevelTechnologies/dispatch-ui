@@ -10,6 +10,8 @@ import ServiceLocationFormDialog from '../components/ServiceLocationFormDialog';
 import CustomerFormDialog from '../components/CustomerFormDialog';
 import AdditionalContactsList from '../components/AdditionalContactsList';
 import NotificationPreferencesDialog from '../components/NotificationPreferencesDialog';
+import NotificationLogsList from '../components/NotificationLogsList';
+import TabNavigation from '../components/TabNavigation';
 import { formatPhone } from '../utils/formatPhone';
 import { Heading, Subheading } from '../components/catalyst/heading';
 import { Text, Strong } from '../components/catalyst/text';
@@ -32,11 +34,14 @@ import {
   BellIcon
 } from '@heroicons/react/24/outline';
 
+type TabId = 'overview' | 'work-orders' | 'financial' | 'equipment' | 'activity';
+
 export default function CustomerDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { t } = useTranslation();
   const { getName } = useGlossary();
+  const [activeTab, setActiveTab] = useState<TabId>('overview');
   const [isAddLocationDialogOpen, setIsAddLocationDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isNotificationDialogOpen, setIsNotificationDialogOpen] = useState(false);
@@ -124,6 +129,15 @@ export default function CustomerDetailPage() {
     // For STANDARD mode: always show
     return true;
   };
+
+  // Tab configuration
+  const tabs = [
+    { id: 'overview', label: t('customers.tabs.overview'), count: undefined },
+    { id: 'work-orders', label: getName('work_order', true), count: 0 }, // TODO: actual count
+    { id: 'financial', label: t('customers.tabs.financial'), count: undefined },
+    { id: 'equipment', label: getName('equipment'), count: undefined },
+    { id: 'activity', label: t('customers.tabs.activity'), count: undefined },
+  ];
 
   return (
     <AppLayout>
@@ -218,62 +232,96 @@ export default function CustomerDetailPage() {
               </div>
             </div>
 
-            {/* Additional Contacts */}
-            {shouldShowAdditionalContacts() && (
-              <div className="mt-3">
-                <AdditionalContactsList
-                  contacts={customer.additionalContacts}
-                  parentId={customer.id}
-                  parentType="customer"
-                  customerId={customer.id}
-                  queryKey={['customers', id!]}
-                  canEdit={canEditCustomers}
-                  showAddButton={true}
-                />
-              </div>
-            )}
-
-            {/* Equipment Section */}
-            <div className="mt-3">
-              <div className="flex items-center justify-between mb-2">
-                <Subheading>{getName('equipment')}</Subheading>
-                {/* TODO: Add equipment permission check when equipment management is implemented */}
-                <Button plain>
-                  <PlusIcon className="size-4" />
-                  {t('common.actions.add', { entity: getName('equipment') })}
-                </Button>
-              </div>
-              <div className="rounded-lg border border-zinc-200 p-3 dark:border-zinc-800">
-                <Text className="text-sm text-zinc-500 dark:text-zinc-400">{t('common.actions.noEntitiesYet', { entities: getName('equipment', true) })}</Text>
-              </div>
+            {/* Tabs */}
+            <div className="mt-4">
+              <TabNavigation
+                tabs={tabs}
+                activeTab={activeTab}
+                onTabChange={(tabId) => setActiveTab(tabId as TabId)}
+              />
             </div>
 
-            {/* Recent Work Orders */}
-            <div className="mt-3">
-              <div className="flex items-center justify-between mb-2">
-                <Subheading>{t('common.recentEntities', { entities: getName('work_order', true) })}</Subheading>
-                {/* TODO: Add work order permission check when work order management is implemented */}
-                <Button plain>
-                  <PlusIcon className="size-4" />
-                  {t('common.actions.new', { entity: getName('work_order') })}
-                </Button>
-              </div>
-              <div className="rounded-lg border border-zinc-200 p-3 dark:border-zinc-800">
-                <Text className="text-sm text-zinc-500 dark:text-zinc-400">{t('common.actions.noEntitiesYet', { entities: getName('work_order', true) })}</Text>
-              </div>
-            </div>
+            {/* Tab Content */}
+            <div className="mt-4">
+              {activeTab === 'overview' && (
+                <>
+                  {/* Additional Contacts */}
+                  {shouldShowAdditionalContacts() && (
+                    <div className="mt-3">
+                      <AdditionalContactsList
+                        contacts={customer.additionalContacts}
+                        parentId={customer.id}
+                        parentType="customer"
+                        customerId={customer.id}
+                        queryKey={['customers', id!]}
+                        canEdit={canEditCustomers}
+                        showAddButton={true}
+                      />
+                    </div>
+                  )}
 
-            {/* Notes */}
-            {customer.notes && (
-              <div className="mt-3">
-                <div className="mb-2">
-                  <Subheading>{t('common.form.notes')}</Subheading>
+                  {/* Notes */}
+                  {customer.notes && (
+                    <div className="mt-3">
+                      <div className="mb-2">
+                        <Subheading>{t('common.form.notes')}</Subheading>
+                      </div>
+                      <div className="rounded-lg border border-zinc-200 p-3 dark:border-zinc-800">
+                        <Text className="text-sm">{customer.notes}</Text>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+
+              {activeTab === 'work-orders' && (
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <Subheading>{t('common.recentEntities', { entities: getName('work_order', true) })}</Subheading>
+                    {/* TODO: Add work order permission check when equipment management is implemented */}
+                    <Button plain>
+                      <PlusIcon className="size-4" />
+                      {t('common.actions.new', { entity: getName('work_order') })}
+                    </Button>
+                  </div>
+                  <div className="rounded-lg border border-zinc-200 p-8 text-center dark:border-zinc-800">
+                    <Text className="text-zinc-500 dark:text-zinc-400">
+                      {t('common.actions.noEntitiesYet', { entities: getName('work_order', true) })}
+                    </Text>
+                  </div>
                 </div>
+              )}
+
+              {activeTab === 'financial' && (
+                <div className="rounded-lg border border-zinc-200 p-8 text-center dark:border-zinc-800">
+                  <Text className="text-zinc-500 dark:text-zinc-400">Coming soon...</Text>
+                </div>
+              )}
+
+              {activeTab === 'equipment' && (
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <Subheading>{getName('equipment')}</Subheading>
+                    {/* TODO: Add equipment permission check when equipment management is implemented */}
+                    <Button plain>
+                      <PlusIcon className="size-4" />
+                      {t('common.actions.add', { entity: getName('equipment') })}
+                    </Button>
+                  </div>
+                  <div className="rounded-lg border border-zinc-200 p-8 text-center dark:border-zinc-800">
+                    <Text className="text-zinc-500 dark:text-zinc-400">
+                      {t('common.actions.noEntitiesYet', { entities: getName('equipment', true) })}
+                    </Text>
+                  </div>
+                </div>
+              )}
+
+              {activeTab === 'activity' && (
                 <div className="rounded-lg border border-zinc-200 p-3 dark:border-zinc-800">
-                  <Text className="text-sm">{customer.notes}</Text>
+                  <NotificationLogsList customerId={customer.id} />
                 </div>
-              </div>
-            )}
+              )}
+            </div>
           </div>
         ) : (
           /* STANDARD VIEW - Business/Landlord */
@@ -362,8 +410,21 @@ export default function CustomerDetailPage() {
               </div>
             </div>
 
-            {/* Two-column layout: Locations (left) + Contacts/Notes (right) */}
-            <div className="mt-4 grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Tabs */}
+            <div className="mt-4">
+              <TabNavigation
+                tabs={tabs}
+                activeTab={activeTab}
+                onTabChange={(tabId) => setActiveTab(tabId as TabId)}
+              />
+            </div>
+
+            {/* Tab Content */}
+            <div className="mt-4">
+              {activeTab === 'overview' && (
+                <>
+                  {/* Two-column layout: Locations (left) + Contacts/Notes (right) */}
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               {/* Left column - Service Locations (2/3 width) */}
               <div className="lg:col-span-2">
                 <div className="flex flex-col gap-2 mb-2 sm:flex-row sm:items-center sm:justify-between">
@@ -574,8 +635,39 @@ export default function CustomerDetailPage() {
                 )}
               </div>
             </div>
+          </>
+        )}
+
+        {activeTab === 'work-orders' && (
+          <div className="rounded-lg border border-zinc-200 p-8 text-center dark:border-zinc-800">
+            <Text className="text-zinc-500 dark:text-zinc-400">
+              {t('common.actions.noEntitiesYet', { entities: getName('work_order', true) })}
+            </Text>
           </div>
         )}
+
+        {activeTab === 'financial' && (
+          <div className="rounded-lg border border-zinc-200 p-8 text-center dark:border-zinc-800">
+            <Text className="text-zinc-500 dark:text-zinc-400">Coming soon...</Text>
+          </div>
+        )}
+
+        {activeTab === 'equipment' && (
+          <div className="rounded-lg border border-zinc-200 p-8 text-center dark:border-zinc-800">
+            <Text className="text-zinc-500 dark:text-zinc-400">
+              {t('common.actions.noEntitiesYet', { entities: getName('equipment', true) })}
+            </Text>
+          </div>
+        )}
+
+        {activeTab === 'activity' && (
+          <div className="rounded-lg border border-zinc-200 p-3 dark:border-zinc-800">
+            <NotificationLogsList customerId={customer.id} />
+          </div>
+        )}
+      </div>
+    </div>
+  )}
       </div>
 
       <ServiceLocationFormDialog

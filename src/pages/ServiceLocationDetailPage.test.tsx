@@ -172,21 +172,6 @@ describe('ServiceLocationDetailPage', () => {
     });
   });
 
-  it('displays system metadata', async () => {
-    vi.mocked(apiClient.get).mockResolvedValue({ data: [mockCustomer] });
-
-    renderDetailPage();
-
-    await waitFor(() => {
-      // Check system info section exists
-      expect(screen.getByText('System Information')).toBeInTheDocument();
-    });
-
-    // Check for formatted dates (Created and Last Updated)
-    const dates = screen.getAllByText(/Jan \d+, 2024/);
-    expect(dates.length).toBeGreaterThan(0);
-  });
-
   it('opens edit dialog when edit button is clicked', async () => {
     vi.mocked(apiClient.get).mockResolvedValue({ data: [mockCustomer] });
     const user = userEvent.setup();
