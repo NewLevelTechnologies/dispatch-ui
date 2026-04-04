@@ -116,29 +116,27 @@ export default function NotificationTemplatesPage() {
                 <TableHeader>Subject</TableHeader>
                 <TableHeader>Status</TableHeader>
                 <TableHeader>Version</TableHeader>
-                <TableHeader className="text-right">Actions</TableHeader>
+                <TableHeader></TableHeader>
               </TableRow>
             </TableHead>
             <TableBody>
               {templates.map((template) => (
                 <TableRow key={template.id}>
                   <TableCell className="font-medium">{template.displayName}</TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      {template.channel === 'EMAIL' ? (
-                        <>
-                          <EnvelopeIcon className="h-4 w-4 text-zinc-500" />
-                          <span>Email</span>
-                        </>
-                      ) : (
-                        <>
-                          <DevicePhoneMobileIcon className="h-4 w-4 text-zinc-500" />
-                          <span>SMS</span>
-                        </>
-                      )}
-                    </div>
+                  <TableCell className="text-zinc-500">
+                    {template.channel === 'EMAIL' ? (
+                      <>
+                        <EnvelopeIcon className="inline h-4 w-4 mr-1.5" />
+                        Email
+                      </>
+                    ) : (
+                      <>
+                        <DevicePhoneMobileIcon className="inline h-4 w-4 mr-1.5" />
+                        SMS
+                      </>
+                    )}
                   </TableCell>
-                  <TableCell className="max-w-md truncate">{template.subject || '-'}</TableCell>
+                  <TableCell className="max-w-md truncate text-zinc-500">{template.subject || '-'}</TableCell>
                   <TableCell>
                     {template.isSystemTemplate ? (
                       <Badge color="zinc">System Default</Badge>
@@ -146,9 +144,9 @@ export default function NotificationTemplatesPage() {
                       <Badge color="blue">Customized</Badge>
                     )}
                   </TableCell>
-                  <TableCell>v{template.version}</TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex items-center justify-end gap-2">
+                  <TableCell className="text-zinc-500">v{template.version}</TableCell>
+                  <TableCell>
+                    <div className="-mx-3 -my-1.5 sm:-mx-2.5 flex items-center justify-end gap-2">
                       {canEdit && (
                         <Button plain onClick={() => handleCustomize(template)}>
                           {template.isSystemTemplate ? 'Customize' : 'Edit'}
