@@ -134,3 +134,20 @@ export {
   type NotificationLogsQueryParams,
   type PageableResponse,
 } from './notificationApi';
+
+// Notification Template API
+export {
+  notificationTemplateApi,
+  type NotificationTemplate,
+  type NotificationTemplateListItem,
+  type NotificationTemplateVariable,
+  type CreateNotificationTemplateRequest,
+  type UpdateNotificationTemplateRequest,
+  type TemplatePreviewRequest,
+  type TemplatePreviewResponse,
+  type ValidateTemplateRequest,
+  type ValidateTemplateResponse,
+  type ValidationWarning,
+  type TemplateVersion,
+  type TemplateVersionHistoryResponse,
+} from './notificationTemplateApi';
