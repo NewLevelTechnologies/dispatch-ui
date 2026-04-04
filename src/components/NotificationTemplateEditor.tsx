@@ -1,6 +1,6 @@
 /* eslint-disable i18next/no-literal-string */
 /* eslint-disable react-hooks/set-state-in-effect */
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ChevronDownIcon, ChevronUpIcon } from '@heroicons/react/24/outline';
 import {
@@ -34,6 +34,7 @@ export default function NotificationTemplateEditor({
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState(0);
   const [isVariablesPanelOpen, setIsVariablesPanelOpen] = useState(false);
+  const previewRef = useRef<HTMLDivElement>(null);
 
   // Form state
   const [subject, setSubject] = useState(template.subject || '');
@@ -42,6 +43,7 @@ export default function NotificationTemplateEditor({
 
   // Preview state
   const [previewData, setPreviewData] = useState<Record<string, string>>({});
+  const [isGeneratingPreview, setIsGeneratingPreview] = useState(false);
   const [previewResult, setPreviewResult] = useState<{
     subject: string;
     bodyPlainText: string;
@@ -113,13 +115,21 @@ export default function NotificationTemplateEditor({
   };
 
   const handlePreview = async () => {
+    setIsGeneratingPreview(true);
     try {
       const request: TemplatePreviewRequest = { templateData: previewData };
       const result = await notificationTemplateApi.preview(template.id, request);
       setPreviewResult(result);
+
+      // Auto-scroll to preview after a brief delay to allow rendering
+      setTimeout(() => {
+        previewRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 100);
     } catch (err) {
       console.error('Failed to preview template:', err);
       alert('Failed to generate preview');
+    } finally {
+      setIsGeneratingPreview(false);
     }
   };
 
@@ -285,12 +295,14 @@ export default function NotificationTemplateEditor({
                     </FieldGroup>
                   </Fieldset>
                   <div className="mt-4">
-                    <Button onClick={handlePreview}>Generate Preview</Button>
+                    <Button onClick={handlePreview} disabled={isGeneratingPreview}>
+                      {isGeneratingPreview ? 'Generating...' : 'Generate Preview'}
+                    </Button>
                   </div>
                 </div>
 
                 {previewResult && (
-                  <div>
+                  <div ref={previewRef}>
                     <Divider className="my-6" />
 
                     <Subheading>Preview</Subheading>
