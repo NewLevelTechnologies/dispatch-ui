@@ -31,7 +31,7 @@ export default function NotificationTemplateEditor({
 }: NotificationTemplateEditorProps) {
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState(0);
-  const [isVariablesPanelOpen, setIsVariablesPanelOpen] = useState(true);
+  const [isVariablesPanelOpen, setIsVariablesPanelOpen] = useState(false);
 
   // Form state
   const [subject, setSubject] = useState(template.subject || '');
@@ -177,33 +177,45 @@ export default function NotificationTemplateEditor({
                       placeholder="Enter subject line with {{variables}}"
                     />
                   </Field>
-
-                  <Field>
-                    <Label>Body Template (Plain Text)</Label>
-                    <Textarea
-                      name="bodyTemplate"
-                      value={bodyTemplate}
-                      onChange={(e) => setBodyTemplate(e.target.value)}
-                      rows={8}
-                      placeholder="Enter plain text template with {{variables}}"
-                    />
-                  </Field>
-
-                  {template.channel === 'EMAIL' && (
-                    <Field>
-                      <Label>HTML Body Template (Optional)</Label>
-                      <Textarea
-                        name="htmlBodyTemplate"
-                        value={htmlBodyTemplate}
-                        onChange={(e) => setHtmlBodyTemplate(e.target.value)}
-                        rows={12}
-                        placeholder="<html>&#10;  <body>&#10;    <p>Hello {{customer_name}},</p>&#10;  </body>&#10;</html>"
-                        className="font-mono text-xs"
-                      />
-                    </Field>
-                  )}
                 </FieldGroup>
               </Fieldset>
+
+              {/* Body Template Tabs */}
+              <div className="mt-4">
+                <TabGroup>
+                  <TabList>
+                    <Tab>Plain Text</Tab>
+                    {template.channel === 'EMAIL' && <Tab>HTML</Tab>}
+                  </TabList>
+                  <TabPanels>
+                    <TabPanel>
+                      <Field>
+                        <Textarea
+                          name="bodyTemplate"
+                          value={bodyTemplate}
+                          onChange={(e) => setBodyTemplate(e.target.value)}
+                          rows={10}
+                          placeholder="Enter plain text template with {{variables}}"
+                        />
+                      </Field>
+                    </TabPanel>
+                    {template.channel === 'EMAIL' && (
+                      <TabPanel>
+                        <Field>
+                          <Textarea
+                            name="htmlBodyTemplate"
+                            value={htmlBodyTemplate}
+                            onChange={(e) => setHtmlBodyTemplate(e.target.value)}
+                            rows={10}
+                            placeholder="<html>&#10;  <body>&#10;    <p>Hello {{customer_name}},</p>&#10;  </body>&#10;</html>"
+                            className="font-mono text-xs"
+                          />
+                        </Field>
+                      </TabPanel>
+                    )}
+                  </TabPanels>
+                </TabGroup>
+              </div>
 
               {/* Variables Reference Panel */}
               {template.availableVariables && template.availableVariables.length > 0 && (
