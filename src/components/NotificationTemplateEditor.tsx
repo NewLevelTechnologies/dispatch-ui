@@ -193,7 +193,7 @@ export default function NotificationTemplateEditor({
               </Fieldset>
 
               {/* Body Template Tabs */}
-              <div className="mt-4">
+              <div className="mt-2">
                 <TabGroup>
                   <TabList>
                     <Tab>Plain Text</Tab>
@@ -231,7 +231,7 @@ export default function NotificationTemplateEditor({
 
               {/* Variables Reference Panel */}
               {template.availableVariables && template.availableVariables.length > 0 && (
-                <div className="mt-6 rounded-lg border border-zinc-950/10 dark:border-white/10">
+                <div className="mt-4 rounded-lg border border-zinc-950/10 dark:border-white/10">
                   <button
                     type="button"
                     onClick={() => setIsVariablesPanelOpen(!isVariablesPanelOpen)}
@@ -245,8 +245,8 @@ export default function NotificationTemplateEditor({
                     )}
                   </button>
                   {isVariablesPanelOpen && (
-                    <div className="max-h-48 overflow-y-auto border-t border-zinc-950/10 px-4 py-3 dark:border-white/10">
-                      <div className="space-y-3">
+                    <div className="max-h-48 overflow-y-auto border-t border-zinc-950/10 px-4 py-2 dark:border-white/10">
+                      <div className="space-y-2">
                         {template.availableVariables.map((variable) => (
                           <div key={variable.name} className="text-sm">
                             <div className="flex items-center gap-2">
@@ -272,11 +272,11 @@ export default function NotificationTemplateEditor({
 
             {/* Preview Tab */}
             <TabPanel>
-              <div className="space-y-6">
+              <div className="space-y-4">
                 <div>
-                  <Text className="mb-4 font-medium">Sample Data</Text>
+                  <Text className="mb-2 font-medium text-sm">Sample Data</Text>
                   <Fieldset>
-                    <FieldGroup className="grid grid-cols-1 gap-x-4 gap-y-4 sm:grid-cols-2">
+                    <FieldGroup className="grid grid-cols-1 gap-x-4 gap-y-2 sm:grid-cols-2">
                       {template.availableVariables?.map((variable) => (
                         <Field key={variable.name}>
                           <Label>
@@ -294,7 +294,7 @@ export default function NotificationTemplateEditor({
                       ))}
                     </FieldGroup>
                   </Fieldset>
-                  <div className="mt-4">
+                  <div className="mt-2">
                     <Button onClick={handlePreview} disabled={isGeneratingPreview}>
                       {isGeneratingPreview ? 'Generating...' : 'Generate Preview'}
                     </Button>
@@ -303,18 +303,18 @@ export default function NotificationTemplateEditor({
 
                 {previewResult && (
                   <div ref={previewRef}>
-                    <Divider className="my-6" />
+                    <Divider className="my-4" />
 
                     <Subheading>Preview</Subheading>
 
                     {/* Subject */}
-                    <div className="mt-4">
+                    <div className="mt-2">
                       <Text className="text-sm/6 font-medium">Subject</Text>
                       <Text className="mt-1">{previewResult.subject}</Text>
                     </div>
 
                     {/* Body Preview Tabs */}
-                    <div className="mt-6">
+                    <div className="mt-4">
                       <TabGroup>
                         <TabList>
                           <Tab>Plain Text</Tab>
@@ -339,7 +339,7 @@ export default function NotificationTemplateEditor({
 
                     {/* Warnings and Errors */}
                     {(previewResult.missingVariables.length > 0 || previewResult.warnings.length > 0) && (
-                      <div className="mt-6 space-y-4">
+                      <div className="mt-4 space-y-2">
                         {previewResult.missingVariables.length > 0 && (
                           <div className="rounded-lg border border-amber-500/20 bg-amber-50 p-4 dark:bg-amber-950/20">
                             <Text className="mb-2 font-medium text-amber-800 dark:text-amber-200">
