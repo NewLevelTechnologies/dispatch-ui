@@ -315,20 +315,20 @@ export default function NotificationTemplateEditor({
                     )}
                   </button>
                   {isVariablesPanelOpen && (
-                    <div className="max-h-48 overflow-y-auto border-t border-zinc-950/10 px-4 py-2 dark:border-white/10">
-                      <div className="space-y-2">
+                    <div className="max-h-48 overflow-y-auto border-t border-zinc-950/10 px-4 py-2 dark:border-white/10 dark:bg-zinc-800/50">
+                      <div className="space-y-3">
                         {template.availableVariables.map((variable) => (
                           <div key={variable.name} className="text-sm">
                             <div className="flex items-center gap-2">
-                              <code className="rounded bg-zinc-100 px-1.5 py-0.5 font-mono text-xs dark:bg-zinc-800">
+                              <code className="rounded bg-zinc-100 px-1.5 py-0.5 font-mono text-xs text-zinc-900 dark:bg-zinc-700 dark:text-zinc-100">
                                 {`{{${variable.name}}}`}
                               </code>
                               {variable.required && <Badge color="amber">Required</Badge>}
                             </div>
-                            <Text className="mt-1 text-xs text-zinc-600 dark:text-zinc-400">
+                            <Text className="mt-1 text-xs text-zinc-600 dark:text-zinc-300">
                               {variable.description}
                             </Text>
-                            <Text className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-500">
+                            <Text className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
                               Example: {variable.exampleValue}
                             </Text>
                           </div>
