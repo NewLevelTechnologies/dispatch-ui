@@ -75,7 +75,16 @@ export default function NotificationTemplateEditor({
       initialPreviewData[variable.name] = variable.exampleValue;
     });
     setPreviewData(initialPreviewData);
+    setPreviewResult(null); // Reset preview when template changes
   }, [template]);
+
+  // Auto-generate preview when switching to Preview tab (index 1)
+  useEffect(() => {
+    if (activeTab === 1 && !previewResult && Object.keys(previewData).length > 0) {
+      handlePreview();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab]);
 
   const updateMutation = useMutation({
     mutationFn: (request: UpdateNotificationTemplateRequest) =>
@@ -335,7 +344,12 @@ export default function NotificationTemplateEditor({
             <TabPanel>
               <div className="space-y-4">
                 <div>
-                  <Text className="mb-2 font-medium text-sm">Sample Data</Text>
+                  <div className="mb-2 flex items-center justify-between">
+                    <Text className="font-medium text-sm">Sample Data</Text>
+                    <Button onClick={handlePreview} disabled={isGeneratingPreview}>
+                      {isGeneratingPreview ? 'Regenerating...' : 'Regenerate Preview'}
+                    </Button>
+                  </div>
                   <Fieldset>
                     <FieldGroup className="grid grid-cols-1 gap-x-4 sm:grid-cols-2">
                       {template.availableVariables?.map((variable) => (
@@ -355,11 +369,6 @@ export default function NotificationTemplateEditor({
                       ))}
                     </FieldGroup>
                   </Fieldset>
-                  <div className="mt-4">
-                    <Button onClick={handlePreview} disabled={isGeneratingPreview}>
-                      {isGeneratingPreview ? 'Generating...' : 'Generate Preview'}
-                    </Button>
-                  </div>
                 </div>
 
                 {previewResult && (
