@@ -216,25 +216,47 @@ export default function NotificationTemplateEditor({
                     </TabPanel>
                     {template.channel === 'EMAIL' && (
                       <TabPanel>
-                        <div className="rounded-lg border border-zinc-950/10 overflow-hidden dark:border-white/10">
-                          <Suspense fallback={<div className="p-4 text-sm text-zinc-500">Loading editor...</div>}>
-                            <Editor
-                              height="300px"
-                              defaultLanguage="html"
-                              value={htmlBodyTemplate}
-                              onChange={(value) => setHtmlBodyTemplate(value || '')}
-                              theme="vs-dark"
-                              options={{
-                                minimap: { enabled: false },
-                                fontSize: 13,
-                                lineNumbers: 'on',
-                                scrollBeyondLastLine: false,
-                                wordWrap: 'on',
-                                tabSize: 2,
-                                automaticLayout: true,
-                              }}
-                            />
-                          </Suspense>
+                        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                          {/* Monaco Editor */}
+                          <div>
+                            <Text className="mb-2 text-xs font-medium text-zinc-500 dark:text-zinc-400">
+                              HTML Code
+                            </Text>
+                            <div className="rounded-lg border border-zinc-950/10 overflow-hidden dark:border-white/10">
+                              <Suspense fallback={<div className="p-4 text-sm text-zinc-500">Loading editor...</div>}>
+                                <Editor
+                                  height="300px"
+                                  defaultLanguage="html"
+                                  value={htmlBodyTemplate}
+                                  onChange={(value) => setHtmlBodyTemplate(value || '')}
+                                  theme="vs-dark"
+                                  options={{
+                                    minimap: { enabled: false },
+                                    fontSize: 13,
+                                    lineNumbers: 'on',
+                                    scrollBeyondLastLine: false,
+                                    wordWrap: 'on',
+                                    tabSize: 2,
+                                    automaticLayout: true,
+                                  }}
+                                />
+                              </Suspense>
+                            </div>
+                          </div>
+
+                          {/* Live Preview */}
+                          <div>
+                            <Text className="mb-2 text-xs font-medium text-zinc-500 dark:text-zinc-400">
+                              Live Preview
+                            </Text>
+                            <div className="rounded-lg border border-zinc-950/10 overflow-auto bg-white p-4 dark:border-white/10 dark:bg-white" style={{ height: '300px' }}>
+                              {htmlBodyTemplate ? (
+                                <div dangerouslySetInnerHTML={{ __html: htmlBodyTemplate }} />
+                              ) : (
+                                <Text className="text-zinc-400">HTML preview will appear here as you type...</Text>
+                              )}
+                            </div>
+                          </div>
                         </div>
                       </TabPanel>
                     )}
