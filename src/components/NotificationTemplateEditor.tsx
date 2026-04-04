@@ -252,7 +252,7 @@ export default function NotificationTemplateEditor({
                 <div>
                   <Text className="mb-4 font-medium">Sample Data</Text>
                   <Fieldset>
-                    <FieldGroup>
+                    <FieldGroup className="grid grid-cols-1 gap-x-4 gap-y-4 sm:grid-cols-2">
                       {template.availableVariables?.map((variable) => (
                         <Field key={variable.name}>
                           <Label>
