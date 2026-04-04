@@ -17,6 +17,8 @@ import { Input } from './catalyst/input';
 import { Textarea } from './catalyst/textarea';
 import { Text } from './catalyst/text';
 import { Badge } from './catalyst/badge';
+import { Subheading } from './catalyst/heading';
+import { Divider } from './catalyst/divider';
 
 interface NotificationTemplateEditorProps {
   template: NotificationTemplate;
@@ -288,26 +290,41 @@ export default function NotificationTemplateEditor({
                 </div>
 
                 {previewResult && (
-                  <div className="space-y-4">
-                    <div className="rounded-lg border border-zinc-950/10 p-4 dark:border-white/10">
-                      <Text className="mb-2 font-medium">Subject:</Text>
-                      <Text>{previewResult.subject}</Text>
-                    </div>
+                  <div>
+                    <Divider className="my-6" />
 
-                    <div className="rounded-lg border border-zinc-950/10 p-4 dark:border-white/10">
-                      <Text className="mb-2 font-medium">Plain Text Body:</Text>
-                      <pre className="whitespace-pre-wrap text-sm">{previewResult.bodyPlainText}</pre>
-                    </div>
+                    <Subheading>Preview</Subheading>
 
-                    {previewResult.bodyHtml && (
-                      <div className="rounded-lg border border-zinc-950/10 p-4 dark:border-white/10">
-                        <Text className="mb-2 font-medium">HTML Preview:</Text>
-                        <div
-                          className="rounded border border-zinc-200 p-4 dark:border-zinc-700"
-                          dangerouslySetInnerHTML={{ __html: previewResult.bodyHtml }}
-                        />
+                    <div className="mt-4 space-y-4">
+                      {/* Subject */}
+                      <div>
+                        <Text className="text-sm/6 font-medium">Subject</Text>
+                        <Text className="mt-1">{previewResult.subject}</Text>
                       </div>
-                    )}
+
+                      <Divider />
+
+                      {/* Plain Text Body */}
+                      <div>
+                        <Text className="text-sm/6 font-medium">Plain Text Body</Text>
+                        <div className="mt-2 rounded-lg bg-white p-4 ring-1 ring-zinc-950/10 dark:bg-zinc-900 dark:ring-white/10">
+                          <Text className="whitespace-pre-wrap">{previewResult.bodyPlainText}</Text>
+                        </div>
+                      </div>
+
+                      {/* HTML Preview */}
+                      {previewResult.bodyHtml && (
+                        <>
+                          <Divider />
+                          <div>
+                            <Text className="text-sm/6 font-medium">HTML Preview</Text>
+                            <div className="mt-2 rounded-lg bg-white p-4 ring-1 ring-zinc-950/10 dark:bg-white dark:ring-zinc-950/10">
+                              <div dangerouslySetInnerHTML={{ __html: previewResult.bodyHtml }} />
+                            </div>
+                          </div>
+                        </>
+                      )}
+                    </div>
 
                     {previewResult.missingVariables.length > 0 && (
                       <div className="rounded-lg border border-amber-500/20 bg-amber-50 p-4 dark:bg-amber-950/20">
