@@ -295,58 +295,62 @@ export default function NotificationTemplateEditor({
 
                     <Subheading>Preview</Subheading>
 
-                    <div className="mt-4 space-y-4">
-                      {/* Subject */}
-                      <div>
-                        <Text className="text-sm/6 font-medium">Subject</Text>
-                        <Text className="mt-1">{previewResult.subject}</Text>
-                      </div>
-
-                      <Divider />
-
-                      {/* Plain Text Body */}
-                      <div>
-                        <Text className="text-sm/6 font-medium">Plain Text Body</Text>
-                        <div className="mt-2 rounded-lg bg-white p-4 ring-1 ring-zinc-950/10 dark:bg-zinc-900 dark:ring-white/10">
-                          <Text className="whitespace-pre-wrap">{previewResult.bodyPlainText}</Text>
-                        </div>
-                      </div>
-
-                      {/* HTML Preview */}
-                      {previewResult.bodyHtml && (
-                        <>
-                          <Divider />
-                          <div>
-                            <Text className="text-sm/6 font-medium">HTML Preview</Text>
-                            <div className="mt-2 rounded-lg bg-white p-4 ring-1 ring-zinc-950/10 dark:bg-white dark:ring-zinc-950/10">
-                              <div dangerouslySetInnerHTML={{ __html: previewResult.bodyHtml }} />
-                            </div>
-                          </div>
-                        </>
-                      )}
+                    {/* Subject */}
+                    <div className="mt-4">
+                      <Text className="text-sm/6 font-medium">Subject</Text>
+                      <Text className="mt-1">{previewResult.subject}</Text>
                     </div>
 
-                    {previewResult.missingVariables.length > 0 && (
-                      <div className="rounded-lg border border-amber-500/20 bg-amber-50 p-4 dark:bg-amber-950/20">
-                        <Text className="mb-2 font-medium text-amber-800 dark:text-amber-200">
-                          Missing Variables:
-                        </Text>
-                        <ul className="list-disc pl-5 text-sm text-amber-700 dark:text-amber-300">
-                          {previewResult.missingVariables.map((variable) => (
-                            <li key={variable}>{variable}</li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
+                    {/* Body Preview Tabs */}
+                    <div className="mt-6">
+                      <TabGroup>
+                        <TabList>
+                          <Tab>Plain Text</Tab>
+                          {previewResult.bodyHtml && <Tab>HTML</Tab>}
+                        </TabList>
+                        <TabPanels>
+                          <TabPanel>
+                            <div className="rounded-lg bg-white p-4 ring-1 ring-zinc-950/10 dark:bg-zinc-900 dark:ring-white/10">
+                              <Text className="whitespace-pre-wrap">{previewResult.bodyPlainText}</Text>
+                            </div>
+                          </TabPanel>
+                          {previewResult.bodyHtml && (
+                            <TabPanel>
+                              <div className="rounded-lg bg-white p-4 ring-1 ring-zinc-950/10 dark:bg-white dark:ring-zinc-950/10">
+                                <div dangerouslySetInnerHTML={{ __html: previewResult.bodyHtml }} />
+                              </div>
+                            </TabPanel>
+                          )}
+                        </TabPanels>
+                      </TabGroup>
+                    </div>
 
-                    {previewResult.warnings.length > 0 && (
-                      <div className="rounded-lg border border-amber-500/20 bg-amber-50 p-4 dark:bg-amber-950/20">
-                        <Text className="mb-2 font-medium text-amber-800 dark:text-amber-200">Warnings:</Text>
-                        <ul className="list-disc pl-5 text-sm text-amber-700 dark:text-amber-300">
-                          {previewResult.warnings.map((warning, idx) => (
-                            <li key={idx}>{warning}</li>
-                          ))}
-                        </ul>
+                    {/* Warnings and Errors */}
+                    {(previewResult.missingVariables.length > 0 || previewResult.warnings.length > 0) && (
+                      <div className="mt-6 space-y-4">
+                        {previewResult.missingVariables.length > 0 && (
+                          <div className="rounded-lg border border-amber-500/20 bg-amber-50 p-4 dark:bg-amber-950/20">
+                            <Text className="mb-2 font-medium text-amber-800 dark:text-amber-200">
+                              Missing Variables:
+                            </Text>
+                            <ul className="list-disc pl-5 text-sm text-amber-700 dark:text-amber-300">
+                              {previewResult.missingVariables.map((variable) => (
+                                <li key={variable}>{variable}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+
+                        {previewResult.warnings.length > 0 && (
+                          <div className="rounded-lg border border-amber-500/20 bg-amber-50 p-4 dark:bg-amber-950/20">
+                            <Text className="mb-2 font-medium text-amber-800 dark:text-amber-200">Warnings:</Text>
+                            <ul className="list-disc pl-5 text-sm text-amber-700 dark:text-amber-300">
+                              {previewResult.warnings.map((warning, idx) => (
+                                <li key={idx}>{warning}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
