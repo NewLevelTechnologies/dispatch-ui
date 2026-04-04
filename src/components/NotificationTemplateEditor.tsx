@@ -153,8 +153,8 @@ export default function NotificationTemplateEditor({
         </SlideOverDescription>
       </SlideOverHeader>
 
-      <TabGroup selectedIndex={activeTab} onChange={setActiveTab}>
-        <div className="border-b border-zinc-950/10 px-6 dark:border-white/10">
+      <TabGroup selectedIndex={activeTab} onChange={setActiveTab} className="flex flex-1 flex-col overflow-hidden">
+        <div className="flex-shrink-0 border-b border-zinc-950/10 px-6 dark:border-white/10">
           <TabList>
             <Tab>Edit</Tab>
             <Tab>Preview</Tab>
@@ -233,7 +233,7 @@ export default function NotificationTemplateEditor({
                     )}
                   </button>
                   {isVariablesPanelOpen && (
-                    <div className="max-h-60 overflow-y-auto border-t border-zinc-950/10 px-4 py-3 dark:border-white/10">
+                    <div className="max-h-48 overflow-y-auto border-t border-zinc-950/10 px-4 py-3 dark:border-white/10">
                       <div className="space-y-3">
                         {template.availableVariables.map((variable) => (
                           <div key={variable.name} className="text-sm">
