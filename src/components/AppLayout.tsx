@@ -23,7 +23,6 @@ import {
   ClockIcon,
   ArrowPathIcon,
   MapPinIcon,
-  BellAlertIcon,
 } from '@heroicons/react/24/outline';
 import { Sidebar, SidebarBody, SidebarFooter, SidebarHeader, SidebarItem, SidebarSection } from './catalyst/sidebar';
 import { SidebarLayout } from './catalyst/sidebar-layout';
@@ -74,7 +73,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     ...(canViewUsers ? [{ name: t('entities.users'), href: '/users', icon: ShieldCheckIcon }] : []),
     ...(canViewRoles ? [{ name: t('entities.roles'), href: '/roles', icon: KeyIcon }] : []),
     ...(canViewSettings ? [{ name: t('entities.settings'), href: '/settings', icon: Cog6ToothIcon }] : []),
-    ...(canViewSettings ? [{ name: 'Notification Templates', href: '/notification-templates', icon: BellAlertIcon }] : []),
   ];
 
   return (

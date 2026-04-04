@@ -77,9 +77,9 @@ describe('TabNavigation', () => {
     const activeTab = screen.getByRole('button', { name: /activity/i });
     const inactiveTab = screen.getByRole('button', { name: /overview/i });
 
-    // Active tab should have blue color classes
-    expect(activeTab.className).toContain('border-blue-500');
-    expect(activeTab.className).toContain('text-blue-600');
+    // Active tab should have zinc-950 color classes (Catalyst style)
+    expect(activeTab.className).toContain('border-zinc-950');
+    expect(activeTab.className).toContain('text-zinc-950');
 
     // Inactive tab should have transparent border
     expect(inactiveTab.className).toContain('border-transparent');
@@ -93,9 +93,9 @@ describe('TabNavigation', () => {
     const workOrdersTab = screen.getByRole('button', { name: /work orders/i });
     const equipmentTab = screen.getByRole('button', { name: /equipment/i });
 
-    // Active tab badge should have blue background
+    // Active tab badge should have zinc-950/10 background (Catalyst style)
     const activeBadge = workOrdersTab.querySelector('span');
-    expect(activeBadge?.className).toContain('bg-blue-100');
+    expect(activeBadge?.className).toContain('bg-zinc-950/10');
 
     // Inactive tab badge should have zinc background
     const inactiveBadge = equipmentTab.querySelector('span');
