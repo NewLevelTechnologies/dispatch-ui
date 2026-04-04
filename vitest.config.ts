@@ -50,6 +50,11 @@ export default defineConfig({
         'src/api/financialApi.ts',
         'src/api/equipmentApi.ts',
         'src/api/schedulingApi.ts',
+        'src/api/notificationApi.ts',
+        'src/api/notificationTemplateApi.ts',
+        'src/api/contactApi.ts',
+        'src/api/tenantSettingsApi.ts',
+        'src/api/glossaryApi.ts',
         // Exclude temporary/debug files
         '**/check-menu-sizes.js',
         'coverage/**',

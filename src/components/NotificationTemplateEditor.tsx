@@ -1,5 +1,4 @@
 /* eslint-disable i18next/no-literal-string */
-/* eslint-disable react-hooks/set-state-in-effect */
 import { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ChevronDownIcon, ChevronUpIcon } from '@heroicons/react/24/outline';
