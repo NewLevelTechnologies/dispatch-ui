@@ -1,6 +1,6 @@
 /* eslint-disable i18next/no-literal-string */
 /* eslint-disable react-hooks/set-state-in-effect */
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ChevronDownIcon, ChevronUpIcon } from '@heroicons/react/24/outline';
 import {
@@ -19,6 +19,9 @@ import { Text } from './catalyst/text';
 import { Badge } from './catalyst/badge';
 import { Subheading } from './catalyst/heading';
 import { Divider } from './catalyst/divider';
+
+// Lazy-load Monaco Editor (only loads when editing HTML)
+const Editor = lazy(() => import('@monaco-editor/react'));
 
 interface NotificationTemplateEditorProps {
   template: NotificationTemplate;
@@ -213,16 +216,26 @@ export default function NotificationTemplateEditor({
                     </TabPanel>
                     {template.channel === 'EMAIL' && (
                       <TabPanel>
-                        <Field>
-                          <Textarea
-                            name="htmlBodyTemplate"
-                            value={htmlBodyTemplate}
-                            onChange={(e) => setHtmlBodyTemplate(e.target.value)}
-                            rows={8}
-                            placeholder="<html>&#10;  <body>&#10;    <p>Hello {{customer_name}},</p>&#10;  </body>&#10;</html>"
-                            className="font-mono text-xs"
-                          />
-                        </Field>
+                        <div className="rounded-lg border border-zinc-950/10 overflow-hidden dark:border-white/10">
+                          <Suspense fallback={<div className="p-4 text-sm text-zinc-500">Loading editor...</div>}>
+                            <Editor
+                              height="300px"
+                              defaultLanguage="html"
+                              value={htmlBodyTemplate}
+                              onChange={(value) => setHtmlBodyTemplate(value || '')}
+                              theme="vs-dark"
+                              options={{
+                                minimap: { enabled: false },
+                                fontSize: 13,
+                                lineNumbers: 'on',
+                                scrollBeyondLastLine: false,
+                                wordWrap: 'on',
+                                tabSize: 2,
+                                automaticLayout: true,
+                              }}
+                            />
+                          </Suspense>
+                        </div>
                       </TabPanel>
                     )}
                   </TabPanels>
