@@ -276,7 +276,7 @@ export default function NotificationTemplateEditor({
                 <div>
                   <Text className="mb-2 font-medium text-sm">Sample Data</Text>
                   <Fieldset>
-                    <FieldGroup className="grid grid-cols-1 gap-x-4 gap-y-2 sm:grid-cols-2">
+                    <FieldGroup className="!space-y-0 grid grid-cols-1 gap-x-4 gap-y-1 sm:grid-cols-2">
                       {template.availableVariables?.map((variable) => (
                         <Field key={variable.name}>
                           <Label>
@@ -294,7 +294,7 @@ export default function NotificationTemplateEditor({
                       ))}
                     </FieldGroup>
                   </Fieldset>
-                  <div className="mt-2">
+                  <div className="mt-4">
                     <Button onClick={handlePreview} disabled={isGeneratingPreview}>
                       {isGeneratingPreview ? 'Generating...' : 'Generate Preview'}
                     </Button>
