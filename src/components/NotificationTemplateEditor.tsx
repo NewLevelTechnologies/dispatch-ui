@@ -194,7 +194,7 @@ export default function NotificationTemplateEditor({
                           name="bodyTemplate"
                           value={bodyTemplate}
                           onChange={(e) => setBodyTemplate(e.target.value)}
-                          rows={10}
+                          rows={8}
                           placeholder="Enter plain text template with {{variables}}"
                         />
                       </Field>
@@ -206,7 +206,7 @@ export default function NotificationTemplateEditor({
                             name="htmlBodyTemplate"
                             value={htmlBodyTemplate}
                             onChange={(e) => setHtmlBodyTemplate(e.target.value)}
-                            rows={10}
+                            rows={8}
                             placeholder="<html>&#10;  <body>&#10;    <p>Hello {{customer_name}},</p>&#10;  </body>&#10;</html>"
                             className="font-mono text-xs"
                           />
@@ -233,7 +233,7 @@ export default function NotificationTemplateEditor({
                     )}
                   </button>
                   {isVariablesPanelOpen && (
-                    <div className="border-t border-zinc-950/10 px-4 py-3 dark:border-white/10">
+                    <div className="max-h-60 overflow-y-auto border-t border-zinc-950/10 px-4 py-3 dark:border-white/10">
                       <div className="space-y-3">
                         {template.availableVariables.map((variable) => (
                           <div key={variable.name} className="text-sm">
