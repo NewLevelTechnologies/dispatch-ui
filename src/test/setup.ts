@@ -53,6 +53,9 @@ global.ResizeObserver = class ResizeObserver {
   disconnect() {}
 };
 
+// Mock scrollIntoView for jsdom
+Element.prototype.scrollIntoView = vi.fn();
+
 // Mock window.alert
 global.alert = vi.fn();
 
