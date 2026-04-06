@@ -162,18 +162,15 @@ export default function UserDetailPage() {
           {/* Basic Information */}
           <div>
             <Subheading>{t('users.detail.basicInfo')}</Subheading>
-            <DescriptionList className="mt-4">
-              <DescriptionTerm>{t('common.form.firstName')}</DescriptionTerm>
-              <DescriptionDetails>{user.firstName}</DescriptionDetails>
+            <DescriptionList className="mt-4 text-sm">
+              <DescriptionTerm className="!py-1.5">{t('common.form.name')}</DescriptionTerm>
+              <DescriptionDetails className="!py-1.5">{user.firstName} {user.lastName}</DescriptionDetails>
 
-              <DescriptionTerm>{t('common.form.lastName')}</DescriptionTerm>
-              <DescriptionDetails>{user.lastName}</DescriptionDetails>
+              <DescriptionTerm className="!py-1.5">{t('common.form.email')}</DescriptionTerm>
+              <DescriptionDetails className="!py-1.5">{user.email}</DescriptionDetails>
 
-              <DescriptionTerm>{t('common.form.email')}</DescriptionTerm>
-              <DescriptionDetails>{user.email}</DescriptionDetails>
-
-              <DescriptionTerm>{t('common.form.status')}</DescriptionTerm>
-              <DescriptionDetails>
+              <DescriptionTerm className="!py-1.5">{t('common.form.status')}</DescriptionTerm>
+              <DescriptionDetails className="!py-1.5">
                 {user.enabled ? (
                   <Badge color="lime">{t('common.enabled')}</Badge>
                 ) : (
@@ -186,9 +183,9 @@ export default function UserDetailPage() {
           {/* Role & Permissions */}
           <div>
             <Subheading>{t('users.detail.rolePermissions')}</Subheading>
-            <DescriptionList className="mt-4">
-              <DescriptionTerm>{t('common.form.role')}</DescriptionTerm>
-              <DescriptionDetails>
+            <DescriptionList className="mt-4 text-sm">
+              <DescriptionTerm className="!py-1.5">{t('common.form.role')}</DescriptionTerm>
+              <DescriptionDetails className="!py-1.5">
                 {user.roles && user.roles.length > 0 ? (
                   <div className="flex flex-wrap gap-2">
                     {user.roles.map(role => (
@@ -204,30 +201,30 @@ export default function UserDetailPage() {
           </div>
         </div>
 
-        <div className="grid gap-4 lg:grid-cols-2">
+        <div className="grid gap-4 lg:grid-cols-2 mt-8">
           {/* System Information */}
           <div>
             <Subheading>{t('users.detail.systemInfo')}</Subheading>
-            <DescriptionList className="mt-4">
-              <DescriptionTerm>{t('users.detail.userId')}</DescriptionTerm>
-              <DescriptionDetails>
+            <DescriptionList className="mt-4 text-sm">
+              <DescriptionTerm className="!py-1.5">{t('users.detail.userId')}</DescriptionTerm>
+              <DescriptionDetails className="!py-1.5">
                 <code className="text-xs text-zinc-600 dark:text-zinc-400">
                   {user.id}
                 </code>
               </DescriptionDetails>
 
-              <DescriptionTerm>{t('users.detail.cognitoSub')}</DescriptionTerm>
-              <DescriptionDetails>
+              <DescriptionTerm className="!py-1.5">{t('users.detail.cognitoSub')}</DescriptionTerm>
+              <DescriptionDetails className="!py-1.5">
                 <code className="text-xs text-zinc-600 dark:text-zinc-400">
                   {user.cognitoSub}
                 </code>
               </DescriptionDetails>
 
-              <DescriptionTerm>{t('users.detail.created')}</DescriptionTerm>
-              <DescriptionDetails>{formatDate(user.createdAt)}</DescriptionDetails>
+              <DescriptionTerm className="!py-1.5">{t('users.detail.created')}</DescriptionTerm>
+              <DescriptionDetails className="!py-1.5">{formatDate(user.createdAt)}</DescriptionDetails>
 
-              <DescriptionTerm>{t('users.detail.lastUpdated')}</DescriptionTerm>
-              <DescriptionDetails>{formatDate(user.updatedAt)}</DescriptionDetails>
+              <DescriptionTerm className="!py-1.5">{t('users.detail.lastUpdated')}</DescriptionTerm>
+              <DescriptionDetails className="!py-1.5">{formatDate(user.updatedAt)}</DescriptionDetails>
             </DescriptionList>
           </div>
 

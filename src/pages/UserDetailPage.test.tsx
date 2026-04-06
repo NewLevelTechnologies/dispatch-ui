@@ -131,7 +131,7 @@ describe('UserDetailPage', () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByText('John Doe')).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: 'John Doe' })).toBeInTheDocument();
     });
 
     // Email appears twice (header and details), so use getAllByText
@@ -153,7 +153,7 @@ describe('UserDetailPage', () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByText('John Doe')).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: 'John Doe' })).toBeInTheDocument();
     });
 
     const editButton = screen.getByRole('button', { name: /^edit$/i });
@@ -183,7 +183,7 @@ describe('UserDetailPage', () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByText('John Doe')).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: 'John Doe' })).toBeInTheDocument();
     });
 
     const disableButton = screen.getByRole('button', { name: /disable/i });
@@ -216,7 +216,7 @@ describe('UserDetailPage', () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByText('John Doe')).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: 'John Doe' })).toBeInTheDocument();
     });
 
     const disableButton = screen.getByRole('button', { name: /disable/i });
@@ -252,7 +252,7 @@ describe('UserDetailPage', () => {
 
     // Wait for page to load
     await waitFor(() => {
-      expect(screen.getByText('John Doe')).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: 'John Doe' })).toBeInTheDocument();
     });
 
     // Verify disabled badge is showing
@@ -292,7 +292,7 @@ describe('UserDetailPage', () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByText('John Doe')).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: 'John Doe' })).toBeInTheDocument();
     });
 
     const backButton = screen.getAllByRole('button', { name: /back/i })[0];
@@ -314,7 +314,7 @@ describe('UserDetailPage', () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByText('John Doe')).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: 'John Doe' })).toBeInTheDocument();
     });
 
     // Open dialog
@@ -345,7 +345,7 @@ describe('UserDetailPage', () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByText('John Doe')).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: 'John Doe' })).toBeInTheDocument();
     });
 
     // Check all sections are rendered
