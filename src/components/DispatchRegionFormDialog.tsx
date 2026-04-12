@@ -162,23 +162,22 @@ export default function DispatchRegionFormDialog({ isOpen, onClose, region }: Di
                 </Field>
               </div>
 
-              {/* Toggle for optional fields */}
-              <div>
-                <Button
-                  type="button"
-                  plain
-                  onClick={() => setShowOptionalFields(!showOptionalFields)}
-                  className="text-xs"
-                >
-                  {showOptionalFields ? t('common.hide') : t('common.show')} {t('common.form.optional')} ({t('common.form.optionalCount', { count: 5 })})
-                </Button>
-              </div>
-
               {/* Optional fields - collapsible */}
-              {showOptionalFields && (
-                <>
-                  {/* State + Sort Order */}
-                  <div className="grid grid-cols-2 gap-2">
+              <div className="border-t border-zinc-200 pt-2 dark:border-zinc-800">
+                <button
+                  type="button"
+                  onClick={() => setShowOptionalFields(!showOptionalFields)}
+                  className="flex w-full items-center gap-2 text-sm font-medium text-zinc-700 hover:text-zinc-900 dark:text-zinc-300 dark:hover:text-zinc-100"
+                >
+                  <svg className={`h-4 w-4 transition-transform ${showOptionalFields ? 'rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                  {t('common.form.optional')} (5)
+                </button>
+                {showOptionalFields && (
+                  <div className="mt-2 space-y-2 pl-6">
+                    {/* State + Sort Order */}
+                    <div className="grid grid-cols-2 gap-2">
                     <Field>
                       <Label className="text-xs">{t('dispatchRegions.form.state')}</Label>
                       <Select
@@ -228,7 +227,7 @@ export default function DispatchRegionFormDialog({ isOpen, onClose, region }: Di
                         placeholder="Optional"
                       />
                     </Field>
-                  </div>
+                    </div>
 
                     {/* Description */}
                     <Field>
