@@ -1,13 +1,13 @@
 import { useState, useEffect } from 'react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { PatternFormat } from 'react-number-format';
-import { customerApi, type Customer, type CreateCustomerRequest, type UpdateCustomerRequest } from '../api';
+import { customerApi, dispatchRegionApi, type Customer, type CreateCustomerRequest, type UpdateCustomerRequest } from '../api';
 import { useGlossary } from '../contexts/GlossaryContext';
 import { Dialog, DialogActions, DialogBody, DialogDescription, DialogTitle } from './catalyst/dialog';
 import { Button } from './catalyst/button';
 import { Checkbox, CheckboxField } from './catalyst/checkbox';
-import { Field, Label } from './catalyst/fieldset';
+import { Field, Label, Description } from './catalyst/fieldset';
 import { Input } from './catalyst/input';
 import { Select } from './catalyst/select';
 import { Textarea } from './catalyst/textarea';
@@ -22,6 +22,7 @@ interface CustomerFormDialogProps {
 }
 
 interface CreateFormData {
+  dispatchRegionId: string;
   name: string;
   email: string;
   phone: string;
@@ -84,7 +85,22 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
   const [showAccessInstructions, setShowAccessInstructions] = useState(false);
   const [showBusinessTerms, setShowBusinessTerms] = useState(false);
 
+  // Fetch default dispatch region (for single-region tenants)
+  const { data: defaultRegion } = useQuery({
+    queryKey: ['dispatch-regions', 'default'],
+    queryFn: () => dispatchRegionApi.getDefault(),
+    enabled: isOpen && !isEdit,
+  });
+
+  // Fetch all active dispatch regions
+  const { data: activeRegions } = useQuery({
+    queryKey: ['dispatch-regions', 'active'],
+    queryFn: () => dispatchRegionApi.getAll(false),
+    enabled: isOpen && !isEdit,
+  });
+
   const [createFormData, setCreateFormData] = useState<CreateFormData>({
+    dispatchRegionId: '',
     name: '',
     email: '',
     phone: '',
@@ -172,6 +188,7 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
       });
     } else {
       setCreateFormData({
+        dispatchRegionId: defaultRegion?.id || '',
         name: '',
         email: '',
         phone: '',
@@ -203,7 +220,7 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
         taxExemptCertificate: '',
       });
     }
-  }, [customer, isOpen]);
+  }, [customer, isOpen, defaultRegion]);
 
   const createMutation = useMutation({
     mutationFn: (data: CreateCustomerRequest) => customerApi.create(data),
@@ -253,6 +270,7 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
         : createFormData.billingAddress,
       serviceLocations: [
         {
+          dispatchRegionId: createFormData.dispatchRegionId,
           // Location name is the same as customer name (homeowner) or business name
           locationName: createFormData.locationName || createFormData.name,
           address: createFormData.serviceAddress,
@@ -366,6 +384,29 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
                     />
                   </Field>
                 </div>
+
+                {/* Dispatch Region */}
+                {activeRegions && activeRegions.length > 0 && (
+                  <Field>
+                    <Label className="text-xs">{getName('dispatch')} {t('entities.region')} *</Label>
+                    <Select
+                      name="dispatchRegionId"
+                      value={createFormData.dispatchRegionId}
+                      onChange={(e) => setCreateFormData((prev) => ({ ...prev, dispatchRegionId: e.target.value }))}
+                      required
+                    >
+                      <option value="">{t('dispatchRegions.form.selectRegion')}</option>
+                      {activeRegions.map((region) => (
+                        <option key={region.id} value={region.id}>
+                          {region.name} ({region.abbreviation})
+                        </option>
+                      ))}
+                    </Select>
+                    {defaultRegion && (
+                      <Description>{t('dispatchRegions.form.autoSelected')}</Description>
+                    )}
+                  </Field>
+                )}
 
                 {/* Row 2: Street + Apt */}
                 <div className="grid grid-cols-4 gap-2">

@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { PatternFormat } from 'react-number-format';
-import { customerApi, type ServiceLocation } from '../api';
+import { customerApi, dispatchRegionApi, type ServiceLocation } from '../api';
 import { useGlossary } from '../contexts/GlossaryContext';
 import { Dialog, DialogActions, DialogBody, DialogDescription, DialogTitle } from './catalyst/dialog';
 import { Button } from './catalyst/button';
-import { Field, Label } from './catalyst/fieldset';
+import { Field, Label, Description } from './catalyst/fieldset';
 import { Input } from './catalyst/input';
 import { Select } from './catalyst/select';
 import { Textarea } from './catalyst/textarea';
@@ -20,6 +20,7 @@ interface ServiceLocationFormDialogProps {
 }
 
 interface FormData {
+  dispatchRegionId: string;
   locationName: string;
   streetAddress: string;
   streetAddressLine2: string;
@@ -41,6 +42,7 @@ export default function ServiceLocationFormDialog({ isOpen, onClose, serviceLoca
   const effectiveCustomerId = serviceLocation?.customerId || customerId || '';
 
   const [formData, setFormData] = useState<FormData>({
+    dispatchRegionId: '',
     locationName: '',
     streetAddress: '',
     streetAddressLine2: '',
@@ -54,6 +56,20 @@ export default function ServiceLocationFormDialog({ isOpen, onClose, serviceLoca
     notes: '',
   });
 
+  // Fetch default dispatch region (for single-region tenants)
+  const { data: defaultRegion } = useQuery({
+    queryKey: ['dispatch-regions', 'default'],
+    queryFn: () => dispatchRegionApi.getDefault(),
+    enabled: isOpen && !isEdit,
+  });
+
+  // Fetch all active dispatch regions
+  const { data: activeRegions } = useQuery({
+    queryKey: ['dispatch-regions', 'active'],
+    queryFn: () => dispatchRegionApi.getAll(false),
+    enabled: isOpen,
+  });
+
   // Reset form when dialog opens or service location changes
   useEffect(() => {
     if (!isOpen) return;
@@ -61,6 +77,7 @@ export default function ServiceLocationFormDialog({ isOpen, onClose, serviceLoca
     setFormData(
       serviceLocation
         ? {
+            dispatchRegionId: serviceLocation.dispatchRegionId,
             locationName: serviceLocation.locationName || '',
             streetAddress: serviceLocation.address.streetAddress,
             streetAddressLine2: serviceLocation.address.streetAddressLine2 || '',
@@ -74,6 +91,7 @@ export default function ServiceLocationFormDialog({ isOpen, onClose, serviceLoca
             notes: serviceLocation.notes || '',
           }
         : {
+            dispatchRegionId: defaultRegion?.id || '',
             locationName: '',
             streetAddress: '',
             streetAddressLine2: '',
@@ -87,11 +105,12 @@ export default function ServiceLocationFormDialog({ isOpen, onClose, serviceLoca
             notes: '',
           }
     );
-  }, [isOpen, serviceLocation]);
+  }, [isOpen, serviceLocation, defaultRegion]);
 
   const createMutation = useMutation({
     mutationFn: async (data: FormData) => {
       const request = {
+        dispatchRegionId: data.dispatchRegionId,
         locationName: data.locationName || null,
         address: {
           streetAddress: data.streetAddress,
@@ -128,6 +147,7 @@ export default function ServiceLocationFormDialog({ isOpen, onClose, serviceLoca
 
       // Update basic fields (not address)
       const updateRequest = {
+        dispatchRegionId: data.dispatchRegionId !== serviceLocation.dispatchRegionId ? data.dispatchRegionId : undefined,
         locationName: data.locationName || null,
         siteContactName: data.siteContactName || null,
         siteContactPhone: data.siteContactPhone || null,
@@ -196,6 +216,29 @@ export default function ServiceLocationFormDialog({ isOpen, onClose, serviceLoca
       </DialogDescription>
       <DialogBody>
         <form onSubmit={handleSubmit} id="service-location-form" className="space-y-3">
+          {/* Dispatch Region */}
+          {activeRegions && activeRegions.length > 0 && (
+            <Field>
+              <Label className="text-xs">{getName('dispatch')} {t('entities.region')} *</Label>
+              <Select
+                name="dispatchRegionId"
+                value={formData.dispatchRegionId}
+                onChange={(e) => setFormData((prev) => ({ ...prev, dispatchRegionId: e.target.value }))}
+                required
+              >
+                <option value="">{t('dispatchRegions.form.selectRegion')}</option>
+                {activeRegions.map((region) => (
+                  <option key={region.id} value={region.id}>
+                    {region.name} ({region.abbreviation})
+                  </option>
+                ))}
+              </Select>
+              {defaultRegion && !isEdit && (
+                <Description>{t('dispatchRegions.form.autoSelected')}</Description>
+              )}
+            </Field>
+          )}
+
           {/* Location Name */}
           <Field>
             <Label className="text-xs">{t('common.form.locationName')} *</Label>
