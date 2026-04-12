@@ -252,7 +252,7 @@ export default function ServiceLocationFormDialog({ isOpen, onClose, serviceLoca
 
           {/* City/State/Zip + Dispatch Region */}
           <div className="grid grid-cols-12 gap-2">
-            <Field className="col-span-4">
+            <Field className="col-span-5">
               <Label className="text-xs">{t('common.form.city')} *</Label>
               <Input
                 name="city"
@@ -261,7 +261,7 @@ export default function ServiceLocationFormDialog({ isOpen, onClose, serviceLoca
                 required
               />
             </Field>
-            <Field className="col-span-2">
+            <Field className="col-span-1">
               <Label className="text-xs">{t('common.form.state')} *</Label>
               <Select
                 name="state"
