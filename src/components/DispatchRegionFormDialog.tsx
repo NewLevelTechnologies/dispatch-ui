@@ -230,19 +230,20 @@ export default function DispatchRegionFormDialog({ isOpen, onClose, region }: Di
                     </Field>
                   </div>
 
-                  {/* Description */}
-                  <Field>
-                    <Label className="text-xs">{t('dispatchRegions.form.description')}</Label>
-                    <Textarea
-                      name="description"
-                      value={formData.description || ''}
-                      onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => handleChange('description', e.target.value)}
-                      rows={2}
-                      placeholder="Optional"
-                    />
-                  </Field>
-                </>
-              )}
+                    {/* Description */}
+                    <Field>
+                      <Label className="text-xs">{t('dispatchRegions.form.description')}</Label>
+                      <Textarea
+                        name="description"
+                        value={formData.description || ''}
+                        onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => handleChange('description', e.target.value)}
+                        rows={2}
+                        placeholder="Optional"
+                      />
+                    </Field>
+                  </div>
+                )}
+              </div>
             </FieldGroup>
           </Fieldset>
         </DialogBody>
