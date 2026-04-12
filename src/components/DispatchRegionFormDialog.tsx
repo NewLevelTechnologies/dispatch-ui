@@ -133,10 +133,11 @@ export default function DispatchRegionFormDialog({ isOpen, onClose, region }: Di
       <form onSubmit={handleSubmit}>
         <DialogBody>
           <Fieldset>
-            <FieldGroup>
+            <FieldGroup className="space-y-2">
+              {/* Row 1: Name + Abbreviation */}
               <div className="grid grid-cols-3 gap-2">
                 <Field className="col-span-2">
-                  <Label>{t('dispatchRegions.form.name')} *</Label>
+                  <Label className="text-xs">{t('dispatchRegions.form.name')} *</Label>
                   <Input
                     name="name"
                     value={formData.name}
@@ -147,8 +148,8 @@ export default function DispatchRegionFormDialog({ isOpen, onClose, region }: Di
                     placeholder="Atlanta Region"
                   />
                 </Field>
-                <Field className="col-span-1">
-                  <Label>{t('dispatchRegions.form.abbreviation')} *</Label>
+                <Field>
+                  <Label className="text-xs">{t('dispatchRegions.form.abbreviation')} *</Label>
                   <Input
                     name="abbreviation"
                     value={formData.abbreviation}
@@ -159,6 +160,71 @@ export default function DispatchRegionFormDialog({ isOpen, onClose, region }: Di
                   />
                 </Field>
               </div>
+
+              {/* Row 2: State + Sort Order */}
+              <div className="grid grid-cols-2 gap-2">
+                <Field>
+                  <Label className="text-xs">{t('dispatchRegions.form.state')}</Label>
+                  <Select
+                    name="state"
+                    value={formData.state || ''}
+                    onChange={(e: React.ChangeEvent<HTMLSelectElement>) => handleChange('state', e.target.value)}
+                  >
+                    <option value="">{t('common.form.select')}</option>
+                    {US_STATES.map((state) => (
+                      <option key={state} value={state}>
+                        {state}
+                      </option>
+                    ))}
+                  </Select>
+                </Field>
+                <Field>
+                  <Label className="text-xs">{t('dispatchRegions.form.sortOrder')}</Label>
+                  <Input
+                    name="sortOrder"
+                    type="number"
+                    value={formData.sortOrder ?? 0}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange('sortOrder', parseInt(e.target.value) || 0)}
+                  />
+                </Field>
+              </div>
+
+              {/* Row 3: Tab Display Name + Logo URL */}
+              <div className="grid grid-cols-2 gap-2">
+                <Field>
+                  <Label className="text-xs">{t('dispatchRegions.form.tabDisplayName')}</Label>
+                  <Input
+                    name="tabDisplayName"
+                    value={formData.tabDisplayName || ''}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange('tabDisplayName', e.target.value)}
+                    maxLength={50}
+                    placeholder="Optional"
+                  />
+                </Field>
+                <Field>
+                  <Label className="text-xs">{t('dispatchRegions.form.logoUrl')}</Label>
+                  <Input
+                    name="logoUrl"
+                    type="url"
+                    value={formData.logoUrl || ''}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange('logoUrl', e.target.value)}
+                    maxLength={500}
+                    placeholder="Optional"
+                  />
+                </Field>
+              </div>
+
+              {/* Row 4: Description */}
+              <Field>
+                <Label className="text-xs">{t('dispatchRegions.form.description')}</Label>
+                <Textarea
+                  name="description"
+                  value={formData.description || ''}
+                  onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => handleChange('description', e.target.value)}
+                  rows={2}
+                  placeholder="Optional"
+                />
+              </Field>
             </FieldGroup>
           </Fieldset>
         </DialogBody>
