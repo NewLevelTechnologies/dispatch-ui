@@ -419,7 +419,7 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
 
                 {/* Row 3: City/State/Zip + Dispatch Region */}
                 <div className="grid grid-cols-12 gap-2">
-                  <Field className="col-span-5">
+                  <Field className="col-span-4">
                     <Label className="text-xs">{t('common.form.city')} *</Label>
                     <Input
                       name="serviceCity"
@@ -469,7 +469,7 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
                     />
                   </Field>
                   {activeRegions && activeRegions.length > 0 && (
-                    <Field className="col-span-3">
+                    <Field className="col-span-4">
                       <Label className="text-xs">{getName('dispatch')} {t('entities.region')} *</Label>
                       <Select
                         name="dispatchRegionId"
