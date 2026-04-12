@@ -417,9 +417,9 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
                   </Field>
                 </div>
 
-                {/* Row 3: City/State/Zip + Dispatch Region */}
+                {/* Row 3: City/State/Zip */}
                 <div className="grid grid-cols-12 gap-2">
-                  <Field className="col-span-3">
+                  <Field className="col-span-6">
                     <Label className="text-xs">{t('common.form.city')} *</Label>
                     <Input
                       name="serviceCity"
@@ -433,7 +433,7 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
                       required
                     />
                   </Field>
-                  <Field className="col-span-1">
+                  <Field className="col-span-2">
                     <Label className="text-xs">{t('common.form.state')} *</Label>
                     <Select
                       name="serviceState"
@@ -454,7 +454,7 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
                       ))}
                     </Select>
                   </Field>
-                  <Field className="col-span-2">
+                  <Field className="col-span-4">
                     <Label className="text-xs">{t('common.form.zipCode')} *</Label>
                     <Input
                       name="serviceZipCode"
@@ -468,25 +468,27 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
                       required
                     />
                   </Field>
-                  {activeRegions && activeRegions.length > 0 && (
-                    <Field className="col-span-6">
-                      <Label className="text-xs">{getName('dispatch')} {t('entities.region')} *</Label>
-                      <Select
-                        name="dispatchRegionId"
-                        value={createFormData.dispatchRegionId}
-                        onChange={(e) => setCreateFormData((prev) => ({ ...prev, dispatchRegionId: e.target.value }))}
-                        required
-                      >
-                        <option value="">{t('dispatchRegions.form.selectRegion')}</option>
-                        {activeRegions.map((region) => (
-                          <option key={region.id} value={region.id}>
-                            {region.name} ({region.abbreviation})
-                          </option>
-                        ))}
-                      </Select>
-                    </Field>
-                  )}
                 </div>
+
+                {/* Dispatch Region */}
+                {activeRegions && activeRegions.length > 0 && (
+                  <Field>
+                    <Label className="text-xs">{getName('dispatch')} {t('entities.region')} *</Label>
+                    <Select
+                      name="dispatchRegionId"
+                      value={createFormData.dispatchRegionId}
+                      onChange={(e) => setCreateFormData((prev) => ({ ...prev, dispatchRegionId: e.target.value }))}
+                      required
+                    >
+                      <option value="">{t('dispatchRegions.form.selectRegion')}</option>
+                      {activeRegions.map((region) => (
+                        <option key={region.id} value={region.id}>
+                          {region.name} ({region.abbreviation})
+                        </option>
+                      ))}
+                    </Select>
+                  </Field>
+                )}
               </div>
             </div>
 
