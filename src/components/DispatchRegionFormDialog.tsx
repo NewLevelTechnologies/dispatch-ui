@@ -134,8 +134,8 @@ export default function DispatchRegionFormDialog({ isOpen, onClose, region }: Di
         <DialogBody>
           <Fieldset>
             <FieldGroup>
-              <div className="grid grid-cols-2 gap-4">
-                <Field>
+              <div className="grid grid-cols-3 gap-2">
+                <Field className="col-span-2">
                   <Label>{t('dispatchRegions.form.name')} *</Label>
                   <Input
                     name="name"
@@ -144,10 +144,10 @@ export default function DispatchRegionFormDialog({ isOpen, onClose, region }: Di
                     maxLength={100}
                     required
                     autoFocus
+                    placeholder="Atlanta Region"
                   />
-                  <Description>{t('dispatchRegions.form.nameHelper')}</Description>
                 </Field>
-                <Field>
+                <Field className="col-span-1">
                   <Label>{t('dispatchRegions.form.abbreviation')} *</Label>
                   <Input
                     name="abbreviation"
@@ -155,71 +155,10 @@ export default function DispatchRegionFormDialog({ isOpen, onClose, region }: Di
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange('abbreviation', e.target.value.toUpperCase())}
                     maxLength={20}
                     required
+                    placeholder="ATL"
                   />
-                  <Description>{t('dispatchRegions.form.abbreviationHelper')}</Description>
                 </Field>
               </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <Field>
-                  <Label>{t('dispatchRegions.form.state')}</Label>
-                  <Select
-                    name="state"
-                    value={formData.state || ''}
-                    onChange={(e: React.ChangeEvent<HTMLSelectElement>) => handleChange('state', e.target.value)}
-                  >
-                    <option value="">{t('common.form.select')}</option>
-                    {US_STATES.map((state) => (
-                      <option key={state} value={state}>
-                        {state}
-                      </option>
-                    ))}
-                  </Select>
-                </Field>
-                <Field>
-                  <Label>{t('dispatchRegions.form.sortOrder')}</Label>
-                  <Input
-                    name="sortOrder"
-                    type="number"
-                    value={formData.sortOrder ?? 0}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange('sortOrder', parseInt(e.target.value) || 0)}
-                  />
-                  <Description>{t('dispatchRegions.form.sortOrderHelper')}</Description>
-                </Field>
-              </div>
-
-              <Field>
-                <Label>{t('dispatchRegions.form.tabDisplayName')}</Label>
-                <Input
-                  name="tabDisplayName"
-                  value={formData.tabDisplayName || ''}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange('tabDisplayName', e.target.value)}
-                  maxLength={50}
-                />
-                <Description>{t('dispatchRegions.form.tabDisplayNameHelper')}</Description>
-              </Field>
-
-              <Field>
-                <Label>{t('dispatchRegions.form.description')}</Label>
-                <Textarea
-                  name="description"
-                  value={formData.description || ''}
-                  onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => handleChange('description', e.target.value)}
-                  rows={2}
-                />
-              </Field>
-
-              <Field>
-                <Label>{t('dispatchRegions.form.logoUrl')}</Label>
-                <Input
-                  name="logoUrl"
-                  type="url"
-                  value={formData.logoUrl || ''}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange('logoUrl', e.target.value)}
-                  maxLength={500}
-                />
-                <Description>{t('dispatchRegions.form.logoUrlHelper')}</Description>
-              </Field>
             </FieldGroup>
           </Fieldset>
         </DialogBody>
