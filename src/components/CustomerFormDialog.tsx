@@ -7,7 +7,7 @@ import { useGlossary } from '../contexts/GlossaryContext';
 import { Dialog, DialogActions, DialogBody, DialogDescription, DialogTitle } from './catalyst/dialog';
 import { Button } from './catalyst/button';
 import { Checkbox, CheckboxField } from './catalyst/checkbox';
-import { Field, Label, Description } from './catalyst/fieldset';
+import { Field, Label } from './catalyst/fieldset';
 import { Input } from './catalyst/input';
 import { Select } from './catalyst/select';
 import { Textarea } from './catalyst/textarea';
@@ -385,29 +385,6 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
                   </Field>
                 </div>
 
-                {/* Dispatch Region */}
-                {activeRegions && activeRegions.length > 0 && (
-                  <Field>
-                    <Label className="text-xs">{getName('dispatch')} {t('entities.region')} *</Label>
-                    <Select
-                      name="dispatchRegionId"
-                      value={createFormData.dispatchRegionId}
-                      onChange={(e) => setCreateFormData((prev) => ({ ...prev, dispatchRegionId: e.target.value }))}
-                      required
-                    >
-                      <option value="">{t('dispatchRegions.form.selectRegion')}</option>
-                      {activeRegions.map((region) => (
-                        <option key={region.id} value={region.id}>
-                          {region.name} ({region.abbreviation})
-                        </option>
-                      ))}
-                    </Select>
-                    {defaultRegion && (
-                      <Description>{t('dispatchRegions.form.autoSelected')}</Description>
-                    )}
-                  </Field>
-                )}
-
                 {/* Row 2: Street + Apt */}
                 <div className="grid grid-cols-4 gap-2">
                   <Field className="col-span-3">
@@ -440,9 +417,9 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
                   </Field>
                 </div>
 
-                {/* Row 3: City/State/Zip */}
+                {/* Row 3: City/State/Zip + Dispatch Region */}
                 <div className="grid grid-cols-12 gap-2">
-                  <Field className="col-span-6">
+                  <Field className="col-span-5">
                     <Label className="text-xs">{t('common.form.city')} *</Label>
                     <Input
                       name="serviceCity"
@@ -477,7 +454,7 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
                       ))}
                     </Select>
                   </Field>
-                  <Field className="col-span-4">
+                  <Field className="col-span-2">
                     <Label className="text-xs">{t('common.form.zipCode')} *</Label>
                     <Input
                       name="serviceZipCode"
@@ -491,6 +468,24 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
                       required
                     />
                   </Field>
+                  {activeRegions && activeRegions.length > 0 && (
+                    <Field className="col-span-3">
+                      <Label className="text-xs">{getName('dispatch')} {t('entities.region')} *</Label>
+                      <Select
+                        name="dispatchRegionId"
+                        value={createFormData.dispatchRegionId}
+                        onChange={(e) => setCreateFormData((prev) => ({ ...prev, dispatchRegionId: e.target.value }))}
+                        required
+                      >
+                        <option value="">{t('dispatchRegions.form.selectRegion')}</option>
+                        {activeRegions.map((region) => (
+                          <option key={region.id} value={region.id}>
+                            {region.name} ({region.abbreviation})
+                          </option>
+                        ))}
+                      </Select>
+                    </Field>
+                  )}
                 </div>
               </div>
             </div>

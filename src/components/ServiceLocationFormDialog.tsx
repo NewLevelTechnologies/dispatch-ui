@@ -6,7 +6,7 @@ import { customerApi, dispatchRegionApi, type ServiceLocation } from '../api';
 import { useGlossary } from '../contexts/GlossaryContext';
 import { Dialog, DialogActions, DialogBody, DialogDescription, DialogTitle } from './catalyst/dialog';
 import { Button } from './catalyst/button';
-import { Field, Label, Description } from './catalyst/fieldset';
+import { Field, Label } from './catalyst/fieldset';
 import { Input } from './catalyst/input';
 import { Select } from './catalyst/select';
 import { Textarea } from './catalyst/textarea';
@@ -216,29 +216,6 @@ export default function ServiceLocationFormDialog({ isOpen, onClose, serviceLoca
       </DialogDescription>
       <DialogBody>
         <form onSubmit={handleSubmit} id="service-location-form" className="space-y-3">
-          {/* Dispatch Region */}
-          {activeRegions && activeRegions.length > 0 && (
-            <Field>
-              <Label className="text-xs">{getName('dispatch')} {t('entities.region')} *</Label>
-              <Select
-                name="dispatchRegionId"
-                value={formData.dispatchRegionId}
-                onChange={(e) => setFormData((prev) => ({ ...prev, dispatchRegionId: e.target.value }))}
-                required
-              >
-                <option value="">{t('dispatchRegions.form.selectRegion')}</option>
-                {activeRegions.map((region) => (
-                  <option key={region.id} value={region.id}>
-                    {region.name} ({region.abbreviation})
-                  </option>
-                ))}
-              </Select>
-              {defaultRegion && !isEdit && (
-                <Description>{t('dispatchRegions.form.autoSelected')}</Description>
-              )}
-            </Field>
-          )}
-
           {/* Location Name */}
           <Field>
             <Label className="text-xs">{t('common.form.locationName')} *</Label>
@@ -273,9 +250,9 @@ export default function ServiceLocationFormDialog({ isOpen, onClose, serviceLoca
             </Field>
           </div>
 
-          {/* City/State/Zip */}
+          {/* City/State/Zip + Dispatch Region */}
           <div className="grid grid-cols-12 gap-2">
-            <Field className="col-span-6">
+            <Field className="col-span-5">
               <Label className="text-xs">{t('common.form.city')} *</Label>
               <Input
                 name="city"
@@ -300,7 +277,7 @@ export default function ServiceLocationFormDialog({ isOpen, onClose, serviceLoca
                 ))}
               </Select>
             </Field>
-            <Field className="col-span-4">
+            <Field className="col-span-2">
               <Label className="text-xs">{t('common.form.zipCode')} *</Label>
               <Input
                 name="zipCode"
@@ -309,6 +286,24 @@ export default function ServiceLocationFormDialog({ isOpen, onClose, serviceLoca
                 required
               />
             </Field>
+            {activeRegions && activeRegions.length > 0 && (
+              <Field className="col-span-3">
+                <Label className="text-xs">{getName('dispatch')} {t('entities.region')} *</Label>
+                <Select
+                  name="dispatchRegionId"
+                  value={formData.dispatchRegionId}
+                  onChange={(e) => setFormData((prev) => ({ ...prev, dispatchRegionId: e.target.value }))}
+                  required
+                >
+                  <option value="">{t('dispatchRegions.form.selectRegion')}</option>
+                  {activeRegions.map((region) => (
+                    <option key={region.id} value={region.id}>
+                      {region.name} ({region.abbreviation})
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+            )}
           </div>
 
           {/* Site Contact (all on one row) */}

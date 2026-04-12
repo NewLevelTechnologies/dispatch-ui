@@ -29,7 +29,7 @@ import { PhoneIcon, EnvelopeIcon, ArrowPathIcon, DevicePhoneMobileIcon } from '@
 export default function TenantSettingsPage() {
   const queryClient = useQueryClient();
   const { t } = useTranslation();
-  const { updateGlossary } = useGlossary();
+  const { getName, updateGlossary } = useGlossary();
   const canView = useHasCapability('VIEW_SETTINGS');
   const canEdit = useHasCapability('EDIT_SETTINGS');
   const [isEditing, setIsEditing] = useState(false);
