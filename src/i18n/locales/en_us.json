@@ -69,6 +69,8 @@
       "locationName": "Location Name",
       "name": "Name",
       "notes": "Notes",
+      "optional": "optional",
+      "optionalCount": "{{count}} optional",
       "paymentTermsDays": "Payment Terms (Days)",
       "phone": "Phone",
       "requiresPurchaseOrder": "Requires Purchase Order",
