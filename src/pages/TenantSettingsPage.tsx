@@ -342,7 +342,7 @@ export default function TenantSettingsPage() {
           </div>
 
           <Tab.Group selectedIndex={selectedTab} onChange={setSelectedTab}>
-            <Tab.List className="flex gap-4 border-b border-zinc-200 dark:border-zinc-800 mt-6">
+            <Tab.List className="flex flex-wrap gap-4 border-b border-zinc-200 dark:border-zinc-800 mt-6">
               <Tab className={({ selected }) =>
                 `pb-3 px-1 text-sm font-medium outline-none transition-colors ${
                   selected
@@ -770,7 +770,7 @@ export default function TenantSettingsPage() {
 
         <form onSubmit={handleSubmit}>
           <Tab.Group selectedIndex={selectedTab} onChange={setSelectedTab}>
-            <Tab.List className="flex gap-4 border-b border-zinc-200 dark:border-zinc-800 mt-6">
+            <Tab.List className="flex flex-wrap gap-4 border-b border-zinc-200 dark:border-zinc-800 mt-6">
               <Tab className={({ selected }) =>
                 `pb-3 px-1 text-sm font-medium outline-none transition-colors ${
                   selected
