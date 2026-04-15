@@ -3,6 +3,7 @@ import { screen, waitFor } from '@testing-library/react';
 import { renderWithProviders, userEvent } from '../test/utils';
 import UserFormDialog from './UserFormDialog';
 import apiClient from '../api/client';
+import type { User } from '../api';
 
 // Mock the API client
 vi.mock('../api/client');
@@ -597,13 +598,18 @@ describe('UserFormDialog', () => {
     });
 
     it('pre-selects dispatch regions in edit mode', async () => {
-      const existingUser = {
+      const existingUser: User = {
         id: 'user-123',
+        tenantId: 'tenant-1',
+        cognitoSub: 'cognito-123',
         firstName: 'John',
         lastName: 'Doe',
         email: 'john@example.com',
+        enabled: true,
         roles: [mockRoles[1]],
         dispatchRegionIds: ['region-1', 'region-2'],
+        createdAt: '2024-01-01T00:00:00Z',
+        updatedAt: '2024-01-01T00:00:00Z',
       };
 
       renderWithProviders(
@@ -620,13 +626,18 @@ describe('UserFormDialog', () => {
 
     it('updates dispatch regions in edit mode', async () => {
       const user = userEvent.setup();
-      const existingUser = {
+      const existingUser: User = {
         id: 'user-123',
+        tenantId: 'tenant-1',
+        cognitoSub: 'cognito-123',
         firstName: 'John',
         lastName: 'Doe',
         email: 'john@example.com',
+        enabled: true,
         roles: [mockRoles[1]],
         dispatchRegionIds: ['region-1'],
+        createdAt: '2024-01-01T00:00:00Z',
+        updatedAt: '2024-01-01T00:00:00Z',
       };
 
       vi.mocked(apiClient.put).mockResolvedValue({ data: existingUser });
