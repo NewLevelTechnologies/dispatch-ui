@@ -33,6 +33,7 @@ describe('CustomerFormDialog', () => {
       {
         id: 'loc-1',
         customerId: '1',
+        dispatchRegionId: 'region-1',
         locationName: null,
         address: {
           streetAddress: '123 Main St',

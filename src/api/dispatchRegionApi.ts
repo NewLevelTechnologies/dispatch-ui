@@ -7,7 +7,6 @@ export interface DispatchRegion {
   abbreviation: string;
   description?: string;
   state?: string;
-  logoUrl?: string;
   tabDisplayName?: string;
   isActive: boolean;
   sortOrder: number;
@@ -21,7 +20,6 @@ export interface CreateDispatchRegionRequest {
   abbreviation: string;
   description?: string;
   state?: string;
-  logoUrl?: string;
   tabDisplayName?: string;
   sortOrder?: number;
 }
@@ -31,9 +29,9 @@ export interface UpdateDispatchRegionRequest {
   abbreviation?: string;
   description?: string;
   state?: string;
-  logoUrl?: string;
   tabDisplayName?: string;
   sortOrder?: number;
+  isActive?: boolean;
 }
 
 // API Service
@@ -44,7 +42,7 @@ export const dispatchRegionApi = {
    */
   getAll: async (includeInactive = false): Promise<DispatchRegion[]> => {
     const response = await apiClient.get<DispatchRegion[]>(
-      `/dispatch-regions${includeInactive ? '?includeInactive=true' : ''}`
+      `/tenant/dispatch-regions${includeInactive ? '?includeInactive=true' : ''}`
     );
     return response.data;
   },
@@ -54,7 +52,7 @@ export const dispatchRegionApi = {
    * Returns null if multiple active regions exist
    */
   getDefault: async (): Promise<DispatchRegion | null> => {
-    const response = await apiClient.get<DispatchRegion | null>('/dispatch-regions/default');
+    const response = await apiClient.get<DispatchRegion | null>('/tenant/dispatch-regions/default');
     return response.data;
   },
 
@@ -62,7 +60,7 @@ export const dispatchRegionApi = {
    * Get a specific dispatch region by ID
    */
   getById: async (id: string): Promise<DispatchRegion> => {
-    const response = await apiClient.get<DispatchRegion>(`/dispatch-regions/${id}`);
+    const response = await apiClient.get<DispatchRegion>(`/tenant/dispatch-regions/${id}`);
     return response.data;
   },
 
@@ -70,7 +68,7 @@ export const dispatchRegionApi = {
    * Create a new dispatch region
    */
   create: async (request: CreateDispatchRegionRequest): Promise<DispatchRegion> => {
-    const response = await apiClient.post<DispatchRegion>('/dispatch-regions', request);
+    const response = await apiClient.post<DispatchRegion>('/tenant/dispatch-regions', request);
     return response.data;
   },
 
@@ -78,7 +76,7 @@ export const dispatchRegionApi = {
    * Update an existing dispatch region
    */
   update: async (id: string, request: UpdateDispatchRegionRequest): Promise<DispatchRegion> => {
-    const response = await apiClient.put<DispatchRegion>(`/dispatch-regions/${id}`, request);
+    const response = await apiClient.put<DispatchRegion>(`/tenant/dispatch-regions/${id}`, request);
     return response.data;
   },
 
@@ -86,14 +84,14 @@ export const dispatchRegionApi = {
    * Soft delete (deactivate) a dispatch region
    */
   delete: async (id: string): Promise<void> => {
-    await apiClient.delete(`/dispatch-regions/${id}`);
+    await apiClient.delete(`/tenant/dispatch-regions/${id}`);
   },
 
   /**
    * Reactivate a previously deactivated dispatch region
    */
   reactivate: async (id: string): Promise<DispatchRegion> => {
-    const response = await apiClient.post<DispatchRegion>(`/dispatch-regions/${id}/reactivate`);
+    const response = await apiClient.post<DispatchRegion>(`/tenant/dispatch-regions/${id}/reactivate`);
     return response.data;
   },
 };

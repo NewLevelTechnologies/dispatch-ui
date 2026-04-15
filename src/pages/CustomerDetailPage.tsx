@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { customerApi, notificationApi } from '../api';
+import { customerApi, notificationApi, dispatchRegionApi } from '../api';
 import { useGlossary } from '../contexts/GlossaryContext';
 import { useHasCapability } from '../hooks/useCurrentUser';
 import AppLayout from '../components/AppLayout';
@@ -65,6 +65,14 @@ export default function CustomerDetailPage() {
 
   // Count opted-in preferences
   const notificationOptInCount = preferences.filter((pref) => pref.optIn).length;
+
+  // Fetch dispatch region for SIMPLE mode (primary location only)
+  const primaryLocationRegionId = customer?.displayMode === 'SIMPLE' ? customer.serviceLocations[0]?.dispatchRegionId : undefined;
+  const { data: dispatchRegion } = useQuery({
+    queryKey: ['dispatch-regions', primaryLocationRegionId],
+    queryFn: () => dispatchRegionApi.getById(primaryLocationRegionId!),
+    enabled: !!primaryLocationRegionId,
+  });
 
   // Filter service locations based on search query - MUST be before early returns
   // eslint-disable-next-line react-hooks/preserve-manual-memoization
@@ -214,6 +222,11 @@ export default function CustomerDetailPage() {
               <div className="flex items-center gap-2">
                 <Text className="text-xs text-zinc-500 dark:text-zinc-400">{t('common.form.status')}:</Text>
                 <Badge color="lime">{t('common.active')}</Badge>
+              </div>
+              <div className="hidden h-4 w-px bg-zinc-200 dark:bg-zinc-700 sm:block" />
+              <div className="flex items-center gap-2">
+                <Text className="text-xs text-zinc-500 dark:text-zinc-400">{t('entities.region')}:</Text>
+                <Text className="text-xs font-medium">{dispatchRegion?.name || '-'}</Text>
               </div>
               <div className="hidden h-4 w-px bg-zinc-200 dark:bg-zinc-700 sm:block" />
               <div className="flex items-center gap-2">

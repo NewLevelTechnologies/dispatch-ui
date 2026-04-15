@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { ArrowLeftIcon } from '@heroicons/react/24/outline';
-import { userApi } from '../api';
+import { userApi, dispatchRegionApi } from '../api';
 import { useHasCapability } from '../hooks/useCurrentUser';
 import AppLayout from '../components/AppLayout';
 import UserFormDialog from '../components/UserFormDialog';
@@ -32,6 +32,11 @@ export default function UserDetailPage() {
   const { data: roles } = useQuery({
     queryKey: ['roles'],
     queryFn: () => userApi.getRoles(),
+  });
+
+  const { data: allRegions } = useQuery({
+    queryKey: ['dispatch-regions'],
+    queryFn: () => dispatchRegionApi.getAll(true),
   });
 
   const disableMutation = useMutation({
@@ -197,6 +202,21 @@ export default function UserDetailPage() {
                 )}
               </DescriptionDetails>
 
+              <DescriptionTerm className="!py-1.5">{t('users.form.assignedRegions')}</DescriptionTerm>
+              <DescriptionDetails className="!py-1.5">
+                {user.dispatchRegionIds && user.dispatchRegionIds.length > 0 && allRegions ? (
+                  <div className="flex flex-wrap gap-2">
+                    {user.dispatchRegionIds.map(regionId => {
+                      const region = allRegions.find(r => r.id === regionId);
+                      return region ? (
+                        <Badge key={region.id} color="purple">{region.name}</Badge>
+                      ) : null;
+                    })}
+                  </div>
+                ) : (
+                  <span className="text-zinc-500">{t('users.detail.noRegionsAssigned')}</span>
+                )}
+              </DescriptionDetails>
             </DescriptionList>
           </div>
         </div>

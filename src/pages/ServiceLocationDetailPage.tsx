@@ -188,7 +188,7 @@ export default function ServiceLocationDetailPage() {
                     </Text>
                     {dispatchRegion && (
                       <Text className="text-sm text-zinc-600 dark:text-zinc-400">
-                        {getName('dispatch')} {t('entities.region')}: <Strong>{dispatchRegion.name}</Strong>
+                        {t('entities.region')}: <Strong>{dispatchRegion.name}</Strong>
                       </Text>
                     )}
                     {location.address.validated && (

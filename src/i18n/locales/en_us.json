@@ -728,6 +728,7 @@
       "created": "Created",
       "lastUpdated": "Last Updated",
       "noCapabilities": "No capabilities assigned",
+      "noRegionsAssigned": "No regions assigned",
       "recentActivity": "Recent Activity",
       "rolePermissions": "Role & Permissions",
       "showLess": "Show less",
@@ -746,6 +747,7 @@
     },
     "form": {
       "adminRoleInfo": "Admin role includes all permissions. Other roles are not needed.",
+      "assignedRegions": "Assigned Regions",
       "rolePlaceholder": "Select a role...",
       "roleRequired": "Please select at least one role",
       "sendInvite": "Send invitation email"

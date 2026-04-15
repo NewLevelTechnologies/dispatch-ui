@@ -85,19 +85,18 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
   const [showAccessInstructions, setShowAccessInstructions] = useState(false);
   const [showBusinessTerms, setShowBusinessTerms] = useState(false);
 
-  // Fetch default dispatch region (for single-region tenants)
-  const { data: defaultRegion } = useQuery({
-    queryKey: ['dispatch-regions', 'default'],
-    queryFn: () => dispatchRegionApi.getDefault(),
-    enabled: isOpen && !isEdit,
-  });
-
   // Fetch all active dispatch regions
   const { data: activeRegions } = useQuery({
     queryKey: ['dispatch-regions', 'active'],
     queryFn: () => dispatchRegionApi.getAll(false),
     enabled: isOpen && !isEdit,
   });
+
+  // Determine if we should show the dropdown (only if 2+ regions)
+  const showRegionDropdown = activeRegions && activeRegions.length > 1;
+
+  // Auto-select the single region if there's only one
+  const defaultRegionId = activeRegions?.length === 1 ? activeRegions[0].id : '';
 
   const [createFormData, setCreateFormData] = useState<CreateFormData>({
     dispatchRegionId: '',
@@ -188,7 +187,7 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
       });
     } else {
       setCreateFormData({
-        dispatchRegionId: defaultRegion?.id || '',
+        dispatchRegionId: defaultRegionId,
         name: '',
         email: '',
         phone: '',
@@ -220,7 +219,7 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
         taxExemptCertificate: '',
       });
     }
-  }, [customer, isOpen, defaultRegion]);
+  }, [customer, isOpen, defaultRegionId]);
 
   const createMutation = useMutation({
     mutationFn: (data: CreateCustomerRequest) => customerApi.create(data),
@@ -470,8 +469,8 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
                   </Field>
                 </div>
 
-                {/* Dispatch Region */}
-                {activeRegions && activeRegions.length > 0 && (
+                {/* Dispatch Region - Only show dropdown if 2+ regions */}
+                {showRegionDropdown && (
                   <Field>
                     <Label className="text-xs">{getName('dispatch')} {t('entities.region')} *</Label>
                     <Select

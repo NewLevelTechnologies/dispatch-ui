@@ -5,7 +5,7 @@ import { useGlossary } from '../contexts/GlossaryContext';
 import { dispatchRegionApi, type DispatchRegion, type CreateDispatchRegionRequest, type UpdateDispatchRegionRequest } from '../api';
 import { Dialog, DialogActions, DialogBody, DialogDescription, DialogTitle } from './catalyst/dialog';
 import { Button } from './catalyst/button';
-import { Field, FieldGroup, Fieldset, Label, Description } from './catalyst/fieldset';
+import { Field, FieldGroup, Fieldset, Label } from './catalyst/fieldset';
 import { Input } from './catalyst/input';
 import { Textarea } from './catalyst/textarea';
 import { Select } from './catalyst/select';
@@ -29,7 +29,6 @@ export default function DispatchRegionFormDialog({ isOpen, onClose, region }: Di
     abbreviation: '',
     description: '',
     state: '',
-    logoUrl: '',
     tabDisplayName: '',
     sortOrder: 0,
   });
@@ -45,7 +44,6 @@ export default function DispatchRegionFormDialog({ isOpen, onClose, region }: Di
           abbreviation: region.abbreviation,
           description: region.description || '',
           state: region.state || '',
-          logoUrl: region.logoUrl || '',
           tabDisplayName: region.tabDisplayName || '',
           sortOrder: region.sortOrder,
         }
@@ -54,7 +52,6 @@ export default function DispatchRegionFormDialog({ isOpen, onClose, region }: Di
           abbreviation: '',
           description: '',
           state: '',
-          logoUrl: '',
           tabDisplayName: '',
           sortOrder: 0,
         };
@@ -71,9 +68,19 @@ export default function DispatchRegionFormDialog({ isOpen, onClose, region }: Di
       onClose();
     },
     onError: (error: unknown) => {
-      const errorMessage = error instanceof Error && 'response' in error
-        ? ((error as { response?: { data?: { message?: string } } }).response?.data?.message)
-        : undefined;
+      let errorMessage: string | undefined;
+
+      if (error instanceof Error && 'response' in error) {
+        const axiosError = error as { response?: { data?: unknown } };
+        const data = axiosError.response?.data;
+
+        if (typeof data === 'string') {
+          errorMessage = data;
+        } else if (data && typeof data === 'object') {
+          errorMessage = (data as { message?: string }).message || (data as { error?: string }).error;
+        }
+      }
+
       alert(errorMessage || t('common.form.errorCreate', { entity: `${getName('dispatch')} ${t('entities.region')}` }));
     },
   });
@@ -89,35 +96,43 @@ export default function DispatchRegionFormDialog({ isOpen, onClose, region }: Di
       onClose();
     },
     onError: (error: unknown) => {
-      const errorMessage = error instanceof Error && 'response' in error
-        ? ((error as { response?: { data?: { message?: string } } }).response?.data?.message)
-        : undefined;
+      let errorMessage: string | undefined;
+
+      if (error instanceof Error && 'response' in error) {
+        const axiosError = error as { response?: { data?: unknown } };
+        const data = axiosError.response?.data;
+
+        if (typeof data === 'string') {
+          errorMessage = data;
+        } else if (data && typeof data === 'object') {
+          errorMessage = (data as { message?: string }).message || (data as { error?: string }).error;
+        }
+      }
+
       alert(errorMessage || t('common.form.errorUpdate', { entity: `${getName('dispatch')} ${t('entities.region')}` }));
     },
   });
 
-  const handleChange = (field: keyof typeof formData, value: string | number) => {
+  const handleChange = (field: keyof typeof formData, value: string | number | boolean) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Clean up empty optional fields
-    const cleanedData = {
+    const data = {
       name: formData.name,
       abbreviation: formData.abbreviation,
-      ...(formData.description?.trim() && { description: formData.description.trim() }),
-      ...(formData.state?.trim() && { state: formData.state.trim() }),
-      ...(formData.logoUrl?.trim() && { logoUrl: formData.logoUrl.trim() }),
-      ...(formData.tabDisplayName?.trim() && { tabDisplayName: formData.tabDisplayName.trim() }),
+      description: formData.description?.trim() || '',
+      state: formData.state?.trim() || '',
+      tabDisplayName: formData.tabDisplayName?.trim() || '',
       sortOrder: formData.sortOrder ?? 0,
     };
 
     if (isEdit) {
-      updateMutation.mutate(cleanedData);
+      updateMutation.mutate(data);
     } else {
-      createMutation.mutate(cleanedData as CreateDispatchRegionRequest);
+      createMutation.mutate(data as CreateDispatchRegionRequest);
     }
   };
 
@@ -172,77 +187,64 @@ export default function DispatchRegionFormDialog({ isOpen, onClose, region }: Di
                   <svg className={`h-4 w-4 transition-transform ${showOptionalFields ? 'rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                   </svg>
-                  {t('common.form.optional')} (5)
+                  {t('common.form.optional')} (4)
                 </button>
                 {showOptionalFields && (
                   <div className="mt-2 space-y-2 pl-6">
                     {/* State + Sort Order */}
                     <div className="grid grid-cols-2 gap-2">
-                    <Field>
-                      <Label className="text-xs">{t('dispatchRegions.form.state')}</Label>
-                      <Select
-                        name="state"
-                        value={formData.state || ''}
-                        onChange={(e: React.ChangeEvent<HTMLSelectElement>) => handleChange('state', e.target.value)}
-                      >
-                        <option value="">{t('common.form.select')}</option>
-                        {US_STATES.map((state) => (
-                          <option key={state} value={state}>
-                            {state}
-                          </option>
-                        ))}
-                      </Select>
-                    </Field>
-                    <Field>
-                      <Label className="text-xs">{t('dispatchRegions.form.sortOrder')}</Label>
-                      <Input
-                        name="sortOrder"
-                        type="number"
-                        value={formData.sortOrder ?? 0}
-                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange('sortOrder', parseInt(e.target.value) || 0)}
-                      />
-                    </Field>
-                  </div>
-
-                  {/* Tab Display Name + Logo URL */}
-                  <div className="grid grid-cols-2 gap-2">
-                    <Field>
-                      <Label className="text-xs">{t('dispatchRegions.form.tabDisplayName')}</Label>
-                      <Input
-                        name="tabDisplayName"
-                        value={formData.tabDisplayName || ''}
-                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange('tabDisplayName', e.target.value)}
-                        maxLength={50}
-                        placeholder="Optional"
-                      />
-                    </Field>
-                    <Field>
-                      <Label className="text-xs">{t('dispatchRegions.form.logoUrl')}</Label>
-                      <Input
-                        name="logoUrl"
-                        type="url"
-                        value={formData.logoUrl || ''}
-                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange('logoUrl', e.target.value)}
-                        maxLength={500}
-                        placeholder="Optional"
-                      />
-                    </Field>
+                      <Field>
+                        <Label className="text-xs">{t('dispatchRegions.form.state')}</Label>
+                        <Select
+                          name="state"
+                          value={formData.state || ''}
+                          onChange={(e: React.ChangeEvent<HTMLSelectElement>) => handleChange('state', e.target.value)}
+                        >
+                          <option value="">{t('common.form.select')}</option>
+                          {US_STATES.map((state) => (
+                            <option key={state} value={state}>
+                              {state}
+                            </option>
+                          ))}
+                        </Select>
+                      </Field>
+                      <Field>
+                        <Label className="text-xs">{t('dispatchRegions.form.sortOrder')}</Label>
+                        <Input
+                          name="sortOrder"
+                          type="number"
+                          value={formData.sortOrder ?? 0}
+                          onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange('sortOrder', parseInt(e.target.value) || 0)}
+                        />
+                      </Field>
                     </div>
 
-                    {/* Description */}
-                    <Field>
-                      <Label className="text-xs">{t('dispatchRegions.form.description')}</Label>
-                      <Textarea
-                        name="description"
-                        value={formData.description || ''}
-                        onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => handleChange('description', e.target.value)}
-                        rows={2}
-                        placeholder="Optional"
-                      />
-                    </Field>
-                  </div>
-                )}
-              </div>
+                  {/* Tab Display Name */}
+                  <Field>
+                    <Label className="text-xs">{t('dispatchRegions.form.tabDisplayName')}</Label>
+                    <Input
+                      name="tabDisplayName"
+                      value={formData.tabDisplayName || ''}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange('tabDisplayName', e.target.value)}
+                      maxLength={50}
+                      placeholder="Optional"
+                    />
+                  </Field>
+
+                  {/* Description */}
+                  <Field>
+                    <Label className="text-xs">{t('dispatchRegions.form.description')}</Label>
+                    <Textarea
+                      name="description"
+                      value={formData.description || ''}
+                      onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => handleChange('description', e.target.value)}
+                      rows={2}
+                      placeholder="Optional"
+                    />
+                  </Field>
+                </div>
+              )}
+            </div>
             </FieldGroup>
           </Fieldset>
         </DialogBody>
