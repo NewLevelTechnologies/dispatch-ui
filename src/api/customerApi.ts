@@ -30,6 +30,7 @@ export interface AdditionalContact {
 export interface ServiceLocation {
   id: string;
   customerId: string;
+  dispatchRegionId: string;
   locationName?: string | null;
   address: Address;
   previousLocationId?: string | null;
@@ -72,6 +73,7 @@ export interface Customer {
 }
 
 export interface CreateServiceLocationRequest {
+  dispatchRegionId: string;
   locationName?: string | null;
   address: {
     streetAddress: string;
@@ -132,6 +134,7 @@ export interface UpdateBillingAddressRequest {
 }
 
 export interface UpdateServiceLocationRequest {
+  dispatchRegionId?: string;
   locationName?: string | null;
   siteContactName?: string | null;
   siteContactPhone?: string | null;

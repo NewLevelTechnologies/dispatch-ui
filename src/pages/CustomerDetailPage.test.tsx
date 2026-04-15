@@ -29,6 +29,7 @@ const mockSimpleCustomer: Customer = {
     {
       id: 'loc-1',
       customerId: '1',
+      dispatchRegionId: 'region-1',
       locationName: 'Home',
       address: {
         streetAddress: '123 Main St',

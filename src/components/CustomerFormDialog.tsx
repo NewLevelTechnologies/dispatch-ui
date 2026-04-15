@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { PatternFormat } from 'react-number-format';
-import { customerApi, type Customer, type CreateCustomerRequest, type UpdateCustomerRequest } from '../api';
+import { customerApi, dispatchRegionApi, type Customer, type CreateCustomerRequest, type UpdateCustomerRequest } from '../api';
 import { useGlossary } from '../contexts/GlossaryContext';
 import { Dialog, DialogActions, DialogBody, DialogDescription, DialogTitle } from './catalyst/dialog';
 import { Button } from './catalyst/button';
@@ -22,6 +22,7 @@ interface CustomerFormDialogProps {
 }
 
 interface CreateFormData {
+  dispatchRegionId: string;
   name: string;
   email: string;
   phone: string;
@@ -84,7 +85,21 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
   const [showAccessInstructions, setShowAccessInstructions] = useState(false);
   const [showBusinessTerms, setShowBusinessTerms] = useState(false);
 
+  // Fetch all active dispatch regions
+  const { data: activeRegions } = useQuery({
+    queryKey: ['dispatch-regions', 'active'],
+    queryFn: () => dispatchRegionApi.getAll(false),
+    enabled: isOpen && !isEdit,
+  });
+
+  // Determine if we should show the dropdown (only if 2+ regions)
+  const showRegionDropdown = activeRegions && activeRegions.length > 1;
+
+  // Auto-select the single region if there's only one
+  const defaultRegionId = activeRegions?.length === 1 ? activeRegions[0].id : '';
+
   const [createFormData, setCreateFormData] = useState<CreateFormData>({
+    dispatchRegionId: '',
     name: '',
     email: '',
     phone: '',
@@ -172,6 +187,7 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
       });
     } else {
       setCreateFormData({
+        dispatchRegionId: defaultRegionId,
         name: '',
         email: '',
         phone: '',
@@ -203,7 +219,7 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
         taxExemptCertificate: '',
       });
     }
-  }, [customer, isOpen]);
+  }, [customer, isOpen, defaultRegionId]);
 
   const createMutation = useMutation({
     mutationFn: (data: CreateCustomerRequest) => customerApi.create(data),
@@ -253,6 +269,7 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
         : createFormData.billingAddress,
       serviceLocations: [
         {
+          dispatchRegionId: createFormData.dispatchRegionId,
           // Location name is the same as customer name (homeowner) or business name
           locationName: createFormData.locationName || createFormData.name,
           address: createFormData.serviceAddress,
@@ -451,6 +468,26 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
                     />
                   </Field>
                 </div>
+
+                {/* Dispatch Region - Only show dropdown if 2+ regions */}
+                {showRegionDropdown && (
+                  <Field>
+                    <Label className="text-xs">{getName('dispatch')} {t('entities.region')} *</Label>
+                    <Select
+                      name="dispatchRegionId"
+                      value={createFormData.dispatchRegionId}
+                      onChange={(e) => setCreateFormData((prev) => ({ ...prev, dispatchRegionId: e.target.value }))}
+                      required
+                    >
+                      <option value="">{t('dispatchRegions.form.selectRegion')}</option>
+                      {activeRegions.map((region) => (
+                        <option key={region.id} value={region.id}>
+                          {region.name} ({region.abbreviation})
+                        </option>
+                      ))}
+                    </Select>
+                  </Field>
+                )}
               </div>
             </div>
 

@@ -151,3 +151,11 @@ export {
   type TemplateVersion,
   type TemplateVersionHistoryResponse,
 } from './notificationTemplateApi';
+
+// Dispatch Region API
+export {
+  dispatchRegionApi,
+  type DispatchRegion,
+  type CreateDispatchRegionRequest,
+  type UpdateDispatchRegionRequest,
+} from './dispatchRegionApi';

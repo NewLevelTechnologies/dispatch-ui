@@ -31,6 +31,7 @@ const mockCustomers: Customer[] = [
       {
         id: 'loc-1',
         customerId: '1',
+        dispatchRegionId: 'region-1',
         locationName: null,
         address: {
           streetAddress: '123 Main St',
@@ -93,6 +94,7 @@ const mockCustomers: Customer[] = [
       {
         id: 'loc-2',
         customerId: '2',
+        dispatchRegionId: 'region-1',
         locationName: null,
         address: {
           streetAddress: '456 Oak Ave',
@@ -317,5 +319,21 @@ describe('CustomersPage', () => {
     expect(apiClient.delete).not.toHaveBeenCalled();
 
     confirmSpy.mockRestore();
+  });
+
+  it('updates search query when typing in search input', async () => {
+    const user = userEvent.setup();
+    vi.mocked(apiClient.get).mockResolvedValue({ data: mockCustomers });
+
+    renderWithProviders(<CustomersPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('John Doe')).toBeInTheDocument();
+    });
+
+    const searchInput = screen.getByPlaceholderText(/search/i);
+    await user.type(searchInput, 'test');
+
+    expect(searchInput).toHaveValue('test');
   });
 });

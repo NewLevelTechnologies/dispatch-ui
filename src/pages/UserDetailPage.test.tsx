@@ -45,6 +45,7 @@ describe('UserDetailPage', () => {
       { id: 'role-1', name: 'Admin', description: 'Administrator role' },
     ],
     capabilities: ['VIEW_USERS', 'EDIT_USERS', 'DELETE_USERS'],
+    dispatchRegionIds: ['region-1', 'region-2'],
     createdAt: '2024-01-01T10:00:00Z',
     updatedAt: '2024-01-15T14:30:00Z',
   };
@@ -52,6 +53,11 @@ describe('UserDetailPage', () => {
   const mockRoles = [
     { id: 'role-1', name: 'Admin', description: 'Administrator role' },
     { id: 'role-2', name: 'User', description: 'Standard user role' },
+  ];
+
+  const mockDispatchRegions = [
+    { id: 'region-1', name: 'North Region', abbreviation: 'NORTH', isActive: true, sortOrder: 0, createdAt: '2024-01-01T10:00:00Z', updatedAt: '2024-01-01T10:00:00Z', version: 0 },
+    { id: 'region-2', name: 'South Region', abbreviation: 'SOUTH', isActive: true, sortOrder: 1, createdAt: '2024-01-01T10:00:00Z', updatedAt: '2024-01-01T10:00:00Z', version: 0 },
   ];
 
   beforeEach(() => {
@@ -123,7 +129,8 @@ describe('UserDetailPage', () => {
   it('displays user details when loaded successfully', async () => {
     vi.mocked(apiClient.get)
       .mockResolvedValueOnce({ data: mockUser }) // First call for user
-      .mockResolvedValueOnce({ data: mockRoles }); // Second call for roles
+      .mockResolvedValueOnce({ data: mockRoles }) // Second call for roles
+      .mockResolvedValueOnce({ data: mockDispatchRegions }); // Third call for dispatch regions
 
     renderWithProviders(<UserDetailPage />, {
       initialEntries: ['/users/user-123'],
@@ -143,7 +150,8 @@ describe('UserDetailPage', () => {
   it('opens edit dialog when edit button is clicked', async () => {
     vi.mocked(apiClient.get)
       .mockResolvedValueOnce({ data: mockUser })
-      .mockResolvedValueOnce({ data: mockRoles });
+      .mockResolvedValueOnce({ data: mockRoles })
+      .mockResolvedValueOnce({ data: mockDispatchRegions });
 
     const user = userEvent.setup();
 
@@ -168,7 +176,8 @@ describe('UserDetailPage', () => {
   it.skip('disables user when disable button is clicked with confirmation', async () => {
     vi.mocked(apiClient.get)
       .mockResolvedValueOnce({ data: mockUser })
-      .mockResolvedValueOnce({ data: mockRoles });
+      .mockResolvedValueOnce({ data: mockRoles })
+      .mockResolvedValueOnce({ data: mockDispatchRegions });
 
     vi.mocked(apiClient.post).mockResolvedValue({ data: { ...mockUser, enabled: false } });
 
@@ -200,10 +209,11 @@ describe('UserDetailPage', () => {
     confirmSpy.mockRestore();
   });
 
-  it.skip('does not disable user when confirmation is cancelled', async () => {
+  it('does not disable user when confirmation is cancelled', async () => {
     vi.mocked(apiClient.get)
       .mockResolvedValueOnce({ data: mockUser })
-      .mockResolvedValueOnce({ data: mockRoles });
+      .mockResolvedValueOnce({ data: mockRoles })
+      .mockResolvedValueOnce({ data: mockDispatchRegions });
 
     // Mock window.confirm to return false
     const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
@@ -239,7 +249,8 @@ describe('UserDetailPage', () => {
 
     vi.mocked(apiClient.get)
       .mockResolvedValueOnce({ data: disabledUser })
-      .mockResolvedValueOnce({ data: mockRoles });
+      .mockResolvedValueOnce({ data: mockRoles })
+      .mockResolvedValueOnce({ data: mockDispatchRegions });
 
     const postSpy = vi.mocked(apiClient.post).mockResolvedValue({ data: { ...disabledUser, enabled: true } });
 
@@ -282,7 +293,8 @@ describe('UserDetailPage', () => {
   it('navigates back when back button is clicked from success state', async () => {
     vi.mocked(apiClient.get)
       .mockResolvedValueOnce({ data: mockUser })
-      .mockResolvedValueOnce({ data: mockRoles });
+      .mockResolvedValueOnce({ data: mockRoles })
+      .mockResolvedValueOnce({ data: mockDispatchRegions });
 
     const user = userEvent.setup();
 
@@ -304,7 +316,8 @@ describe('UserDetailPage', () => {
   it('closes edit dialog when cancel is clicked', async () => {
     vi.mocked(apiClient.get)
       .mockResolvedValueOnce({ data: mockUser })
-      .mockResolvedValueOnce({ data: mockRoles });
+      .mockResolvedValueOnce({ data: mockRoles })
+      .mockResolvedValueOnce({ data: mockDispatchRegions });
 
     const user = userEvent.setup();
 
@@ -337,7 +350,8 @@ describe('UserDetailPage', () => {
   it('displays all user information sections', async () => {
     vi.mocked(apiClient.get)
       .mockResolvedValueOnce({ data: mockUser })
-      .mockResolvedValueOnce({ data: mockRoles });
+      .mockResolvedValueOnce({ data: mockRoles })
+      .mockResolvedValueOnce({ data: mockDispatchRegions });
 
     renderWithProviders(<UserDetailPage />, {
       initialEntries: ['/users/user-123'],
@@ -358,5 +372,113 @@ describe('UserDetailPage', () => {
     // Check user ID and cognitoSub are displayed
     expect(screen.getByText('user-123')).toBeInTheDocument();
     expect(screen.getByText('cognito-sub-123')).toBeInTheDocument();
+  });
+
+  it('displays dispatch regions when user has assigned regions', async () => {
+    vi.mocked(apiClient.get)
+      .mockResolvedValueOnce({ data: mockUser })
+      .mockResolvedValueOnce({ data: mockRoles })
+      .mockResolvedValueOnce({ data: mockDispatchRegions });
+
+    renderWithProviders(<UserDetailPage />, {
+      initialEntries: ['/users/user-123'],
+      path: '/users/:id',
+    });
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'John Doe' })).toBeInTheDocument();
+    });
+
+    // Check dispatch regions are displayed
+    await waitFor(() => {
+      expect(screen.getByText('North Region')).toBeInTheDocument();
+      expect(screen.getByText('South Region')).toBeInTheDocument();
+    });
+  });
+
+  it('displays "No regions assigned" when user has no dispatch regions', async () => {
+    const userWithoutRegions = { ...mockUser, dispatchRegionIds: [] };
+    vi.mocked(apiClient.get)
+      .mockResolvedValueOnce({ data: userWithoutRegions })
+      .mockResolvedValueOnce({ data: mockRoles })
+      .mockResolvedValueOnce({ data: mockDispatchRegions });
+
+    renderWithProviders(<UserDetailPage />, {
+      initialEntries: ['/users/user-123'],
+      path: '/users/:id',
+    });
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'John Doe' })).toBeInTheDocument();
+    });
+
+    // Check "No regions assigned" message is displayed
+    await waitFor(() => {
+      expect(screen.getByText('No regions assigned')).toBeInTheDocument();
+    });
+  });
+
+  it('displays "No regions assigned" when dispatchRegionIds is undefined', async () => {
+    const userWithoutRegions = { ...mockUser, dispatchRegionIds: undefined };
+    vi.mocked(apiClient.get)
+      .mockResolvedValueOnce({ data: userWithoutRegions })
+      .mockResolvedValueOnce({ data: mockRoles })
+      .mockResolvedValueOnce({ data: mockDispatchRegions });
+
+    renderWithProviders(<UserDetailPage />, {
+      initialEntries: ['/users/user-123'],
+      path: '/users/:id',
+    });
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'John Doe' })).toBeInTheDocument();
+    });
+
+    // Check "No regions assigned" message is displayed
+    await waitFor(() => {
+      expect(screen.getByText('No regions assigned')).toBeInTheDocument();
+    });
+  });
+
+  it('displays system information with dates', async () => {
+    vi.mocked(apiClient.get)
+      .mockResolvedValueOnce({ data: mockUser })
+      .mockResolvedValueOnce({ data: mockRoles })
+      .mockResolvedValueOnce({ data: mockDispatchRegions });
+
+    renderWithProviders(<UserDetailPage />, {
+      initialEntries: ['/users/user-123'],
+      path: '/users/:id',
+    });
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'John Doe' })).toBeInTheDocument();
+    });
+
+    // Check system information fields are displayed
+    expect(screen.getByText('System Information')).toBeInTheDocument();
+    expect(screen.getByText('Created')).toBeInTheDocument();
+    expect(screen.getByText('Last Updated')).toBeInTheDocument();
+  });
+
+  it('shows dispatch regions section in role & permissions', async () => {
+    vi.mocked(apiClient.get)
+      .mockResolvedValueOnce({ data: mockUser })
+      .mockResolvedValueOnce({ data: mockRoles })
+      .mockResolvedValueOnce({ data: mockDispatchRegions });
+
+    renderWithProviders(<UserDetailPage />, {
+      initialEntries: ['/users/user-123'],
+      path: '/users/:id',
+    });
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'John Doe' })).toBeInTheDocument();
+    });
+
+    // Check the "Assigned Regions" label is displayed
+    await waitFor(() => {
+      expect(screen.getByText('Assigned Regions')).toBeInTheDocument();
+    });
   });
 });

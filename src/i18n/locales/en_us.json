@@ -69,6 +69,8 @@
       "locationName": "Location Name",
       "name": "Name",
       "notes": "Notes",
+      "optional": "optional",
+      "optionalCount": "{{count}} optional",
       "paymentTermsDays": "Payment Terms (Days)",
       "phone": "Phone",
       "requiresPurchaseOrder": "Requires Purchase Order",
@@ -200,6 +202,8 @@
     "customer": "Customer",
     "customers": "Customers",
     "dashboard": "Dashboard",
+    "dispatch": "Dispatch",
+    "dispatches": "Dispatches",
     "equipment": "Equipment",
     "financial": "Financial",
     "invoice": "Invoice",
@@ -208,6 +212,8 @@
     "payments": "Payments",
     "quote": "Quote",
     "quotes": "Quotes",
+    "region": "Region",
+    "regions": "Regions",
     "revenue": "Revenue",
     "role": "Role",
     "roles": "Roles",
@@ -220,6 +226,43 @@
     "users": "Users",
     "workOrder": "Work Order",
     "workOrders": "Work Orders"
+  },
+  "dispatchRegions": {
+    "actions": {
+      "deactivate": "Deactivate",
+      "deactivateConfirm": "Are you sure you want to deactivate \"{{name}}\"? It will be hidden from active lists but preserved in history.",
+      "reactivate": "Reactivate"
+    },
+    "description": "Manage geographic regions for organizing service locations and technicians on dispatch boards.",
+    "empty": "No dispatch regions found. Create your first region to get started.",
+    "form": {
+      "abbreviation": "Abbreviation",
+      "abbreviationHelper": "Short code (e.g., \"ATL\")",
+      "autoSelected": "Auto-selected: only one active region",
+      "description": "Description",
+      "descriptionCreate": "Create a new dispatch region for organizing service locations and technicians.",
+      "descriptionEdit": "Update the dispatch region details.",
+      "logoUrl": "Logo URL",
+      "logoUrlHelper": "Optional URL to region-specific logo image",
+      "name": "Name",
+      "nameHelper": "Full region name (e.g., \"Atlanta Region\")",
+      "selectRegion": "Select region",
+      "sortOrder": "Sort Order",
+      "sortOrderHelper": "Lower numbers appear first",
+      "state": "State",
+      "tabDisplayName": "Tab Display Name",
+      "tabDisplayNameHelper": "Optional name for dispatch board tabs",
+      "titleCreate": "Create Dispatch Region",
+      "titleEdit": "Edit Dispatch Region"
+    },
+    "loading": "Loading dispatch regions...",
+    "table": {
+      "abbreviation": "Abbreviation",
+      "name": "Name",
+      "sortOrder": "Sort Order",
+      "state": "State",
+      "status": "Status"
+    }
   },
   "serviceLocations": {
     "actions": {
@@ -685,6 +728,7 @@
       "created": "Created",
       "lastUpdated": "Last Updated",
       "noCapabilities": "No capabilities assigned",
+      "noRegionsAssigned": "No regions assigned",
       "recentActivity": "Recent Activity",
       "rolePermissions": "Role & Permissions",
       "showLess": "Show less",
@@ -703,6 +747,7 @@
     },
     "form": {
       "adminRoleInfo": "Admin role includes all permissions. Other roles are not needed.",
+      "assignedRegions": "Assigned Regions",
       "rolePlaceholder": "Select a role...",
       "roleRequired": "Please select at least one role",
       "sendInvite": "Send invitation email"

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { customerApi } from '../api';
+import { customerApi, dispatchRegionApi } from '../api';
 import { useGlossary } from '../contexts/GlossaryContext';
 import { useHasCapability } from '../hooks/useCurrentUser';
 import AppLayout from '../components/AppLayout';
@@ -37,6 +37,12 @@ export default function ServiceLocationDetailPage() {
     queryFn: () => customerApi.getAll(),
   });
 
+  // Fetch dispatch regions to display region name
+  const { data: dispatchRegions } = useQuery({
+    queryKey: ['dispatch-regions', 'active'],
+    queryFn: () => dispatchRegionApi.getAll(false),
+  });
+
   // Find the service location and its customer
   const locationData = customers
     ?.flatMap((customer) =>
@@ -49,6 +55,7 @@ export default function ServiceLocationDetailPage() {
 
   const location = locationData?.location;
   const customer = locationData?.customer;
+  const dispatchRegion = dispatchRegions?.find(r => r.id === location?.dispatchRegionId);
 
   if (isLoading) {
     return (
@@ -179,6 +186,11 @@ export default function ServiceLocationDetailPage() {
                     <Text>
                       {location.address.city}, {location.address.state} {location.address.zipCode}
                     </Text>
+                    {dispatchRegion && (
+                      <Text className="text-sm text-zinc-600 dark:text-zinc-400">
+                        {t('entities.region')}: <Strong>{dispatchRegion.name}</Strong>
+                      </Text>
+                    )}
                     {location.address.validated && (
                       <div className="mt-2 flex items-center gap-2">
                         <Badge color="lime" className="text-xs">
