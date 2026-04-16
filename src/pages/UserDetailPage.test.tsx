@@ -474,4 +474,64 @@ describe('UserDetailPage', () => {
       expect(screen.getByText('Assigned Regions')).toBeInTheDocument();
     });
   });
+
+  it('does not call disable when confirmation is cancelled', async () => {
+    const user = userEvent.setup();
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    vi.mocked(apiClient.get)
+      .mockResolvedValueOnce({ data: mockUser })
+      .mockResolvedValueOnce({ data: mockRoles })
+      .mockResolvedValueOnce({ data: mockDispatchRegions });
+
+    renderWithProviders(<UserDetailPage />, {
+      initialEntries: ['/users/user-123'],
+      path: '/users/:id',
+    });
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'John Doe' })).toBeInTheDocument();
+    });
+
+    const disableButton = screen.getByRole('button', { name: /disable/i });
+    await user.click(disableButton);
+
+    expect(confirmSpy).toHaveBeenCalled();
+    // Should not have called the API since confirmation was cancelled
+    expect(apiClient.put).not.toHaveBeenCalled();
+
+    confirmSpy.mockRestore();
+  });
+
+  it('closes edit dialog when cancel is clicked', async () => {
+    const user = userEvent.setup();
+    vi.mocked(apiClient.get)
+      .mockResolvedValueOnce({ data: mockUser })
+      .mockResolvedValueOnce({ data: mockRoles })
+      .mockResolvedValueOnce({ data: mockDispatchRegions });
+
+    renderWithProviders(<UserDetailPage />, {
+      initialEntries: ['/users/user-123'],
+      path: '/users/:id',
+    });
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'John Doe' })).toBeInTheDocument();
+    });
+
+    // Open edit dialog
+    const editButton = screen.getByRole('button', { name: /edit/i });
+    await user.click(editButton);
+
+    await waitFor(() => {
+      expect(screen.getByRole('dialog')).toBeInTheDocument();
+    });
+
+    // Cancel
+    const cancelButton = screen.getByRole('button', { name: /cancel/i });
+    await user.click(cancelButton);
+
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    });
+  });
 });
