@@ -244,7 +244,14 @@ export default function UserDetailPage() {
 
           {/* Right Column: Recent Activity (Audit Log) */}
           <div>
-            <Subheading>{t('users.detail.recentActivity')}</Subheading>
+            <div className="flex items-center justify-between">
+              <Subheading>{t('users.detail.recentActivity')}</Subheading>
+              {auditLog && auditLog.length > 0 && (
+                <Text className="text-xs text-zinc-500">
+                  {auditLog.length} {auditLog.length === 1 ? 'entry' : 'entries'}
+                </Text>
+              )}
+            </div>
             <div className="mt-2">
               {isAuditLoading ? (
                 <div className="rounded-lg bg-zinc-50 p-4 text-center dark:bg-zinc-900">
@@ -259,38 +266,42 @@ export default function UserDetailPage() {
                   </Text>
                 </div>
               ) : (
-                <Table dense className="[--gutter:theme(spacing.2)] text-sm">
-                  <TableHead>
-                    <TableRow>
-                      <TableHeader>{t('users.detail.auditEvent')}</TableHeader>
-                      <TableHeader>{t('users.detail.auditEntity')}</TableHeader>
-                      <TableHeader>{t('users.detail.auditChanges')}</TableHeader>
-                      <TableHeader>{t('users.detail.auditWhen')}</TableHeader>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {auditLog.slice(0, 20).map((entry) => (
-                      <TableRow key={entry.id}>
-                        <TableCell>
-                          <Badge color={getEventBadgeColor(entry.eventType)}>
-                            {entry.eventType}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-xs">
-                          {entry.entityType}
-                        </TableCell>
-                        <TableCell className="max-w-md">
-                          <div className="space-y-0.5">
-                            {formatChanges(entry.changes)}
-                          </div>
-                        </TableCell>
-                        <TableCell className="whitespace-nowrap text-xs text-zinc-500">
-                          {formatTimestamp(entry.timestamp)}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                <div className="overflow-hidden rounded-lg border border-zinc-950/10 dark:border-white/10">
+                  <div className="max-h-[600px] overflow-y-auto">
+                    <Table dense className="[--gutter:theme(spacing.2)] text-sm">
+                      <TableHead className="sticky top-0 z-10 bg-zinc-950/[2.5%] dark:bg-white/[2.5%]">
+                        <TableRow>
+                          <TableHeader>{t('users.detail.auditEvent')}</TableHeader>
+                          <TableHeader>{t('users.detail.auditEntity')}</TableHeader>
+                          <TableHeader>{t('users.detail.auditChanges')}</TableHeader>
+                          <TableHeader>{t('users.detail.auditWhen')}</TableHeader>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {auditLog.map((entry) => (
+                          <TableRow key={entry.id}>
+                            <TableCell>
+                              <Badge color={getEventBadgeColor(entry.eventType)}>
+                                {entry.eventType}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-xs">
+                              {entry.entityType}
+                            </TableCell>
+                            <TableCell className="max-w-md">
+                              <div className="space-y-0.5">
+                                {formatChanges(entry.changes)}
+                              </div>
+                            </TableCell>
+                            <TableCell className="whitespace-nowrap text-xs text-zinc-500">
+                              {formatTimestamp(entry.timestamp)}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </div>
               )}
             </div>
           </div>
