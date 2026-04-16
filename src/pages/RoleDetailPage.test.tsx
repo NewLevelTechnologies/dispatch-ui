@@ -66,6 +66,14 @@ describe('RoleDetailPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockNavigate.mockClear();
+
+    // Default mock for capabilities API (used by CapabilitiesSection)
+    vi.mocked(apiClient.get).mockImplementation((url) => {
+      if (url === '/users/capabilities/grouped') {
+        return Promise.resolve({ data: mockCapabilitiesData });
+      }
+      return Promise.reject(new Error(`Unmocked URL: ${url}`));
+    });
   });
 
   it('displays loading state while fetching role', () => {
@@ -130,7 +138,15 @@ describe('RoleDetailPage', () => {
   });
 
   it('renders role details with all information', async () => {
-    vi.mocked(apiClient.get).mockResolvedValue({ data: mockRole });
+    vi.mocked(apiClient.get).mockImplementation((url) => {
+      if (url === '/users/roles/role-123') {
+        return Promise.resolve({ data: mockRole });
+      }
+      if (url === '/users/capabilities/grouped') {
+        return Promise.resolve({ data: mockCapabilitiesData });
+      }
+      return Promise.reject(new Error('Unknown URL'));
+    });
 
     renderWithProviders(<RoleDetailPage />, {
       initialEntries: ['/roles/role-123'],
@@ -155,7 +171,15 @@ describe('RoleDetailPage', () => {
       description: undefined,
     };
 
-    vi.mocked(apiClient.get).mockResolvedValue({ data: roleWithoutDescription });
+    vi.mocked(apiClient.get).mockImplementation((url) => {
+      if (url === '/users/roles/role-123') {
+        return Promise.resolve({ data: roleWithoutDescription });
+      }
+      if (url === '/users/capabilities/grouped') {
+        return Promise.resolve({ data: mockCapabilitiesData });
+      }
+      return Promise.reject(new Error('Unknown URL'));
+    });
 
     renderWithProviders(<RoleDetailPage />, {
       initialEntries: ['/roles/role-123'],
@@ -168,7 +192,15 @@ describe('RoleDetailPage', () => {
   });
 
   it('formats dates correctly', async () => {
-    vi.mocked(apiClient.get).mockResolvedValue({ data: mockRole });
+    vi.mocked(apiClient.get).mockImplementation((url) => {
+      if (url === '/users/roles/role-123') {
+        return Promise.resolve({ data: mockRole });
+      }
+      if (url === '/users/capabilities/grouped') {
+        return Promise.resolve({ data: mockCapabilitiesData });
+      }
+      return Promise.reject(new Error('Unknown URL'));
+    });
 
     renderWithProviders(<RoleDetailPage />, {
       initialEntries: ['/roles/role-123'],
@@ -183,7 +215,15 @@ describe('RoleDetailPage', () => {
   });
 
   it('renders back button in header', async () => {
-    vi.mocked(apiClient.get).mockResolvedValue({ data: mockRole });
+    vi.mocked(apiClient.get).mockImplementation((url) => {
+      if (url === '/users/roles/role-123') {
+        return Promise.resolve({ data: mockRole });
+      }
+      if (url === '/users/capabilities/grouped') {
+        return Promise.resolve({ data: mockCapabilitiesData });
+      }
+      return Promise.reject(new Error('Unknown URL'));
+    });
 
     renderWithProviders(<RoleDetailPage />, {
       initialEntries: ['/roles/role-123'],
@@ -199,7 +239,15 @@ describe('RoleDetailPage', () => {
   });
 
   it('navigates back when header back button is clicked', async () => {
-    vi.mocked(apiClient.get).mockResolvedValue({ data: mockRole });
+    vi.mocked(apiClient.get).mockImplementation((url) => {
+      if (url === '/users/roles/role-123') {
+        return Promise.resolve({ data: mockRole });
+      }
+      if (url === '/users/capabilities/grouped') {
+        return Promise.resolve({ data: mockCapabilitiesData });
+      }
+      return Promise.reject(new Error('Unknown URL'));
+    });
     const user = userEvent.setup();
 
     renderWithProviders(<RoleDetailPage />, {
@@ -218,7 +266,15 @@ describe('RoleDetailPage', () => {
   });
 
   it('renders edit and delete buttons', async () => {
-    vi.mocked(apiClient.get).mockResolvedValue({ data: mockRole });
+    vi.mocked(apiClient.get).mockImplementation((url) => {
+      if (url === '/users/roles/role-123') {
+        return Promise.resolve({ data: mockRole });
+      }
+      if (url === '/users/capabilities/grouped') {
+        return Promise.resolve({ data: mockCapabilitiesData });
+      }
+      return Promise.reject(new Error('Unknown URL'));
+    });
 
     renderWithProviders(<RoleDetailPage />, {
       initialEntries: ['/roles/role-123'],
@@ -264,7 +320,15 @@ describe('RoleDetailPage', () => {
   });
 
   it('opens delete confirmation when delete button is clicked', async () => {
-    vi.mocked(apiClient.get).mockResolvedValue({ data: mockRole });
+    vi.mocked(apiClient.get).mockImplementation((url) => {
+      if (url === '/users/roles/role-123') {
+        return Promise.resolve({ data: mockRole });
+      }
+      if (url === '/users/capabilities/grouped') {
+        return Promise.resolve({ data: mockCapabilitiesData });
+      }
+      return Promise.reject(new Error('Unknown URL'));
+    });
     const user = userEvent.setup();
 
     renderWithProviders(<RoleDetailPage />, {
@@ -286,7 +350,15 @@ describe('RoleDetailPage', () => {
   });
 
   it('deletes role and navigates back on successful deletion', async () => {
-    vi.mocked(apiClient.get).mockResolvedValue({ data: mockRole });
+    vi.mocked(apiClient.get).mockImplementation((url) => {
+      if (url === '/users/roles/role-123') {
+        return Promise.resolve({ data: mockRole });
+      }
+      if (url === '/users/capabilities/grouped') {
+        return Promise.resolve({ data: mockCapabilitiesData });
+      }
+      return Promise.reject(new Error('Unknown URL'));
+    });
     vi.mocked(apiClient.delete).mockResolvedValue({ data: {} });
     const user = userEvent.setup();
 
@@ -320,7 +392,15 @@ describe('RoleDetailPage', () => {
   });
 
   it('cancels deletion when cancel button is clicked', async () => {
-    vi.mocked(apiClient.get).mockResolvedValue({ data: mockRole });
+    vi.mocked(apiClient.get).mockImplementation((url) => {
+      if (url === '/users/roles/role-123') {
+        return Promise.resolve({ data: mockRole });
+      }
+      if (url === '/users/capabilities/grouped') {
+        return Promise.resolve({ data: mockCapabilitiesData });
+      }
+      return Promise.reject(new Error('Unknown URL'));
+    });
     const user = userEvent.setup();
 
     renderWithProviders(<RoleDetailPage />, {
@@ -351,7 +431,15 @@ describe('RoleDetailPage', () => {
   });
 
   it('displays deleting state during deletion', async () => {
-    vi.mocked(apiClient.get).mockResolvedValue({ data: mockRole });
+    vi.mocked(apiClient.get).mockImplementation((url) => {
+      if (url === '/users/roles/role-123') {
+        return Promise.resolve({ data: mockRole });
+      }
+      if (url === '/users/capabilities/grouped') {
+        return Promise.resolve({ data: mockCapabilitiesData });
+      }
+      return Promise.reject(new Error('Unknown URL'));
+    });
     vi.mocked(apiClient.delete).mockImplementation(
       () => new Promise(() => {}) // Never resolves
     );
@@ -386,7 +474,15 @@ describe('RoleDetailPage', () => {
   });
 
   it('displays error message when deletion fails', async () => {
-    vi.mocked(apiClient.get).mockResolvedValue({ data: mockRole });
+    vi.mocked(apiClient.get).mockImplementation((url) => {
+      if (url === '/users/roles/role-123') {
+        return Promise.resolve({ data: mockRole });
+      }
+      if (url === '/users/capabilities/grouped') {
+        return Promise.resolve({ data: mockCapabilitiesData });
+      }
+      return Promise.reject(new Error('Unknown URL'));
+    });
     const error = new Error('Cannot delete role in use');
     // @ts-expect-error - Adding response property to Error for test
     error.response = { data: { message: 'Cannot delete role in use' } };
@@ -425,7 +521,15 @@ describe('RoleDetailPage', () => {
   });
 
   it('renders role information section', async () => {
-    vi.mocked(apiClient.get).mockResolvedValue({ data: mockRole });
+    vi.mocked(apiClient.get).mockImplementation((url) => {
+      if (url === '/users/roles/role-123') {
+        return Promise.resolve({ data: mockRole });
+      }
+      if (url === '/users/capabilities/grouped') {
+        return Promise.resolve({ data: mockCapabilitiesData });
+      }
+      return Promise.reject(new Error('Unknown URL'));
+    });
 
     renderWithProviders(<RoleDetailPage />, {
       initialEntries: ['/roles/role-123'],
@@ -442,7 +546,15 @@ describe('RoleDetailPage', () => {
   });
 
   it('renders system information section', async () => {
-    vi.mocked(apiClient.get).mockResolvedValue({ data: mockRole });
+    vi.mocked(apiClient.get).mockImplementation((url) => {
+      if (url === '/users/roles/role-123') {
+        return Promise.resolve({ data: mockRole });
+      }
+      if (url === '/users/capabilities/grouped') {
+        return Promise.resolve({ data: mockCapabilitiesData });
+      }
+      return Promise.reject(new Error('Unknown URL'));
+    });
 
     renderWithProviders(<RoleDetailPage />, {
       initialEntries: ['/roles/role-123'],
@@ -459,7 +571,15 @@ describe('RoleDetailPage', () => {
   });
 
   it('displays role ID as code', async () => {
-    vi.mocked(apiClient.get).mockResolvedValue({ data: mockRole });
+    vi.mocked(apiClient.get).mockImplementation((url) => {
+      if (url === '/users/roles/role-123') {
+        return Promise.resolve({ data: mockRole });
+      }
+      if (url === '/users/capabilities/grouped') {
+        return Promise.resolve({ data: mockCapabilitiesData });
+      }
+      return Promise.reject(new Error('Unknown URL'));
+    });
 
     renderWithProviders(<RoleDetailPage />, {
       initialEntries: ['/roles/role-123'],
@@ -478,7 +598,15 @@ describe('RoleDetailPage', () => {
       description: undefined,
     };
 
-    vi.mocked(apiClient.get).mockResolvedValue({ data: roleWithoutDescription });
+    vi.mocked(apiClient.get).mockImplementation((url) => {
+      if (url === '/users/roles/role-123') {
+        return Promise.resolve({ data: roleWithoutDescription });
+      }
+      if (url === '/users/capabilities/grouped') {
+        return Promise.resolve({ data: mockCapabilitiesData });
+      }
+      return Promise.reject(new Error('Unknown URL'));
+    });
 
     renderWithProviders(<RoleDetailPage />, {
       initialEntries: ['/roles/role-123'],
@@ -501,7 +629,15 @@ describe('RoleDetailPage', () => {
       capabilities: undefined,
     };
 
-    vi.mocked(apiClient.get).mockResolvedValue({ data: roleWithoutCapabilities });
+    vi.mocked(apiClient.get).mockImplementation((url) => {
+      if (url === '/users/roles/role-123') {
+        return Promise.resolve({ data: roleWithoutCapabilities });
+      }
+      if (url === '/users/capabilities/grouped') {
+        return Promise.resolve({ data: mockCapabilitiesData });
+      }
+      return Promise.reject(new Error('Unknown URL'));
+    });
 
     renderWithProviders(<RoleDetailPage />, {
       initialEntries: ['/roles/role-123'],
@@ -514,7 +650,15 @@ describe('RoleDetailPage', () => {
   });
 
   it('renders CapabilitiesSection component', async () => {
-    vi.mocked(apiClient.get).mockResolvedValue({ data: mockRole });
+    vi.mocked(apiClient.get).mockImplementation((url) => {
+      if (url === '/users/roles/role-123') {
+        return Promise.resolve({ data: mockRole });
+      }
+      if (url === '/users/capabilities/grouped') {
+        return Promise.resolve({ data: mockCapabilitiesData });
+      }
+      return Promise.reject(new Error('Unknown URL'));
+    });
 
     renderWithProviders(<RoleDetailPage />, {
       initialEntries: ['/roles/role-123'],
@@ -580,7 +724,15 @@ describe('RoleDetailPage', () => {
       description: undefined,
     };
 
-    vi.mocked(apiClient.get).mockResolvedValue({ data: roleWithoutDetailedDescription });
+    vi.mocked(apiClient.get).mockImplementation((url) => {
+      if (url === '/users/roles/role-123') {
+        return Promise.resolve({ data: roleWithoutDetailedDescription });
+      }
+      if (url === '/users/capabilities/grouped') {
+        return Promise.resolve({ data: mockCapabilitiesData });
+      }
+      return Promise.reject(new Error('Unknown URL'));
+    });
 
     renderWithProviders(<RoleDetailPage />, {
       initialEntries: ['/roles/role-123'],
@@ -596,7 +748,15 @@ describe('RoleDetailPage', () => {
   });
 
   it('uses correct query key for role fetch', async () => {
-    vi.mocked(apiClient.get).mockResolvedValue({ data: mockRole });
+    vi.mocked(apiClient.get).mockImplementation((url) => {
+      if (url === '/users/roles/role-123') {
+        return Promise.resolve({ data: mockRole });
+      }
+      if (url === '/users/capabilities/grouped') {
+        return Promise.resolve({ data: mockCapabilitiesData });
+      }
+      return Promise.reject(new Error('Unknown URL'));
+    });
 
     renderWithProviders(<RoleDetailPage />, {
       initialEntries: ['/roles/role-123'],
@@ -610,7 +770,15 @@ describe('RoleDetailPage', () => {
 
   // Protected role tests
   it('hides edit button for protected roles', async () => {
-    vi.mocked(apiClient.get).mockResolvedValue({ data: mockProtectedRole });
+    vi.mocked(apiClient.get).mockImplementation((url) => {
+      if (url === '/users/roles/role-456') {
+        return Promise.resolve({ data: mockProtectedRole });
+      }
+      if (url === '/users/capabilities/grouped') {
+        return Promise.resolve({ data: mockCapabilitiesData });
+      }
+      return Promise.reject(new Error('Unknown URL'));
+    });
 
     renderWithProviders(<RoleDetailPage />, {
       initialEntries: ['/roles/role-456'],
@@ -625,7 +793,15 @@ describe('RoleDetailPage', () => {
   });
 
   it('hides delete button for protected roles', async () => {
-    vi.mocked(apiClient.get).mockResolvedValue({ data: mockProtectedRole });
+    vi.mocked(apiClient.get).mockImplementation((url) => {
+      if (url === '/users/roles/role-456') {
+        return Promise.resolve({ data: mockProtectedRole });
+      }
+      if (url === '/users/capabilities/grouped') {
+        return Promise.resolve({ data: mockCapabilitiesData });
+      }
+      return Promise.reject(new Error('Unknown URL'));
+    });
 
     renderWithProviders(<RoleDetailPage />, {
       initialEntries: ['/roles/role-456'],
@@ -640,7 +816,15 @@ describe('RoleDetailPage', () => {
   });
 
   it('shows clone button for all roles', async () => {
-    vi.mocked(apiClient.get).mockResolvedValue({ data: mockRole });
+    vi.mocked(apiClient.get).mockImplementation((url) => {
+      if (url === '/users/roles/role-123') {
+        return Promise.resolve({ data: mockRole });
+      }
+      if (url === '/users/capabilities/grouped') {
+        return Promise.resolve({ data: mockCapabilitiesData });
+      }
+      return Promise.reject(new Error('Unknown URL'));
+    });
 
     renderWithProviders(<RoleDetailPage />, {
       initialEntries: ['/roles/role-123'],
@@ -655,7 +839,15 @@ describe('RoleDetailPage', () => {
   });
 
   it('shows clone button for protected roles', async () => {
-    vi.mocked(apiClient.get).mockResolvedValue({ data: mockProtectedRole });
+    vi.mocked(apiClient.get).mockImplementation((url) => {
+      if (url === '/users/roles/role-456') {
+        return Promise.resolve({ data: mockProtectedRole });
+      }
+      if (url === '/users/capabilities/grouped') {
+        return Promise.resolve({ data: mockCapabilitiesData });
+      }
+      return Promise.reject(new Error('Unknown URL'));
+    });
 
     renderWithProviders(<RoleDetailPage />, {
       initialEntries: ['/roles/role-456'],
@@ -670,7 +862,15 @@ describe('RoleDetailPage', () => {
   });
 
   it('shows restore defaults button for system roles', async () => {
-    vi.mocked(apiClient.get).mockResolvedValue({ data: mockRole });
+    vi.mocked(apiClient.get).mockImplementation((url) => {
+      if (url === '/users/roles/role-123') {
+        return Promise.resolve({ data: mockRole });
+      }
+      if (url === '/users/capabilities/grouped') {
+        return Promise.resolve({ data: mockCapabilitiesData });
+      }
+      return Promise.reject(new Error('Unknown URL'));
+    });
 
     renderWithProviders(<RoleDetailPage />, {
       initialEntries: ['/roles/role-123'],
@@ -685,7 +885,15 @@ describe('RoleDetailPage', () => {
   });
 
   it('hides restore defaults button for custom roles', async () => {
-    vi.mocked(apiClient.get).mockResolvedValue({ data: mockCustomRole });
+    vi.mocked(apiClient.get).mockImplementation((url) => {
+      if (url === '/users/roles/role-789') {
+        return Promise.resolve({ data: mockCustomRole });
+      }
+      if (url === '/users/capabilities/grouped') {
+        return Promise.resolve({ data: mockCapabilitiesData });
+      }
+      return Promise.reject(new Error('Unknown URL'));
+    });
 
     renderWithProviders(<RoleDetailPage />, {
       initialEntries: ['/roles/role-789'],
@@ -700,7 +908,15 @@ describe('RoleDetailPage', () => {
   });
 
   it('opens clone dialog when clone button is clicked', async () => {
-    vi.mocked(apiClient.get).mockResolvedValue({ data: mockRole });
+    vi.mocked(apiClient.get).mockImplementation((url) => {
+      if (url === '/users/roles/role-123') {
+        return Promise.resolve({ data: mockRole });
+      }
+      if (url === '/users/capabilities/grouped') {
+        return Promise.resolve({ data: mockCapabilitiesData });
+      }
+      return Promise.reject(new Error('Unknown URL'));
+    });
     const user = userEvent.setup();
 
     renderWithProviders(<RoleDetailPage />, {
@@ -722,7 +938,15 @@ describe('RoleDetailPage', () => {
   });
 
   it('opens restore defaults confirmation when restore button is clicked', async () => {
-    vi.mocked(apiClient.get).mockResolvedValue({ data: mockRole });
+    vi.mocked(apiClient.get).mockImplementation((url) => {
+      if (url === '/users/roles/role-123') {
+        return Promise.resolve({ data: mockRole });
+      }
+      if (url === '/users/capabilities/grouped') {
+        return Promise.resolve({ data: mockCapabilitiesData });
+      }
+      return Promise.reject(new Error('Unknown URL'));
+    });
     const user = userEvent.setup();
 
     renderWithProviders(<RoleDetailPage />, {
@@ -744,7 +968,15 @@ describe('RoleDetailPage', () => {
   });
 
   it('calls restore defaults API when confirmed', async () => {
-    vi.mocked(apiClient.get).mockResolvedValue({ data: mockRole });
+    vi.mocked(apiClient.get).mockImplementation((url) => {
+      if (url === '/users/roles/role-123') {
+        return Promise.resolve({ data: mockRole });
+      }
+      if (url === '/users/capabilities/grouped') {
+        return Promise.resolve({ data: mockCapabilitiesData });
+      }
+      return Promise.reject(new Error('Unknown URL'));
+    });
     vi.mocked(apiClient.post).mockResolvedValue({ data: mockRole });
     const user = userEvent.setup();
 
@@ -775,7 +1007,15 @@ describe('RoleDetailPage', () => {
   });
 
   it('cancels restore defaults when cancel is clicked', async () => {
-    vi.mocked(apiClient.get).mockResolvedValue({ data: mockRole });
+    vi.mocked(apiClient.get).mockImplementation((url) => {
+      if (url === '/users/roles/role-123') {
+        return Promise.resolve({ data: mockRole });
+      }
+      if (url === '/users/capabilities/grouped') {
+        return Promise.resolve({ data: mockCapabilitiesData });
+      }
+      return Promise.reject(new Error('Unknown URL'));
+    });
     const user = userEvent.setup();
 
     renderWithProviders(<RoleDetailPage />, {
@@ -806,7 +1046,15 @@ describe('RoleDetailPage', () => {
   });
 
   it('displays restoring state during restore operation', async () => {
-    vi.mocked(apiClient.get).mockResolvedValue({ data: mockRole });
+    vi.mocked(apiClient.get).mockImplementation((url) => {
+      if (url === '/users/roles/role-123') {
+        return Promise.resolve({ data: mockRole });
+      }
+      if (url === '/users/capabilities/grouped') {
+        return Promise.resolve({ data: mockCapabilitiesData });
+      }
+      return Promise.reject(new Error('Unknown URL'));
+    });
     vi.mocked(apiClient.post).mockImplementation(
       () => new Promise(() => {}) // Never resolves
     );
@@ -841,7 +1089,15 @@ describe('RoleDetailPage', () => {
   });
 
   it('displays error message when restore defaults fails', async () => {
-    vi.mocked(apiClient.get).mockResolvedValue({ data: mockRole });
+    vi.mocked(apiClient.get).mockImplementation((url) => {
+      if (url === '/users/roles/role-123') {
+        return Promise.resolve({ data: mockRole });
+      }
+      if (url === '/users/capabilities/grouped') {
+        return Promise.resolve({ data: mockCapabilitiesData });
+      }
+      return Promise.reject(new Error('Unknown URL'));
+    });
     const error = new Error('Failed to restore');
     // @ts-expect-error - Adding response property to Error for test
     error.response = { data: { message: 'Failed to restore' } };
