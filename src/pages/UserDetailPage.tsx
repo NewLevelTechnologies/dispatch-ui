@@ -196,70 +196,70 @@ export default function UserDetailPage() {
         <Divider className="my-4" />
 
         {/* Dense Two-Column Layout */}
-        <div className="grid gap-6 lg:grid-cols-[1fr,1.5fr]">
-          {/* Left Column: Role & Permissions + Capabilities */}
-          <div className="space-y-4">
-            {/* Role & Permissions - Compact */}
-            <div>
-              <Subheading>{t('users.detail.rolePermissions')}</Subheading>
-              <DescriptionList className="mt-2 text-sm">
-                <DescriptionTerm className="!py-0.5">{t('common.form.status')}</DescriptionTerm>
-                <DescriptionDetails className="!py-0.5">
-                  {user.enabled ? (
-                    <Badge color="lime">{t('common.enabled')}</Badge>
-                  ) : (
-                    <Badge color="zinc">{t('common.disabled')}</Badge>
-                  )}
-                </DescriptionDetails>
+        <div className="grid gap-6 lg:grid-cols-2">
+          {/* Left Column: Role & Permissions */}
+          <div>
+            <Subheading>{t('users.detail.rolePermissions')}</Subheading>
+            <DescriptionList className="mt-2 text-sm">
+              <DescriptionTerm className="!py-0.5">{t('common.form.status')}</DescriptionTerm>
+              <DescriptionDetails className="!py-0.5">
+                {user.enabled ? (
+                  <Badge color="lime">{t('common.enabled')}</Badge>
+                ) : (
+                  <Badge color="zinc">{t('common.disabled')}</Badge>
+                )}
+              </DescriptionDetails>
 
-                <DescriptionTerm className="!py-0.5">{t('common.form.role')}</DescriptionTerm>
-                <DescriptionDetails className="!py-0.5">
-                  {user.roles && user.roles.length > 0 ? (
-                    <div className="flex flex-wrap gap-1.5">
-                      {user.roles.map(role => (
-                        <Badge key={role.id} color="sky">{role.name}</Badge>
-                      ))}
-                    </div>
-                  ) : (
-                    <span className="text-zinc-500">-</span>
-                  )}
-                </DescriptionDetails>
+              <DescriptionTerm className="!py-0.5">{t('common.form.role')}</DescriptionTerm>
+              <DescriptionDetails className="!py-0.5">
+                {user.roles && user.roles.length > 0 ? (
+                  <div className="flex flex-wrap gap-1.5">
+                    {user.roles.map(role => (
+                      <Badge key={role.id} color="sky">{role.name}</Badge>
+                    ))}
+                  </div>
+                ) : (
+                  <span className="text-zinc-500">-</span>
+                )}
+              </DescriptionDetails>
 
-                <DescriptionTerm className="!py-0.5">{t('users.form.assignedRegions')}</DescriptionTerm>
-                <DescriptionDetails className="!py-0.5">
-                  {user.dispatchRegionIds && user.dispatchRegionIds.length > 0 && allRegions ? (
-                    <div className="flex flex-wrap gap-1.5">
-                      {user.dispatchRegionIds.map(regionId => {
-                        const region = allRegions.find(r => r.id === regionId);
-                        return region ? (
-                          <Badge key={region.id} color="purple">{region.name}</Badge>
-                        ) : null;
-                      })}
-                    </div>
-                  ) : (
-                    <span className="text-zinc-500">{t('users.detail.noRegionsAssigned')}</span>
-                  )}
-                </DescriptionDetails>
-              </DescriptionList>
-            </div>
-
-            {/* Capabilities - Related to roles/permissions */}
-            <div>
-              <CapabilitiesSection capabilities={user.capabilities || []} />
-            </div>
+              <DescriptionTerm className="!py-0.5">{t('users.form.assignedRegions')}</DescriptionTerm>
+              <DescriptionDetails className="!py-0.5">
+                {user.dispatchRegionIds && user.dispatchRegionIds.length > 0 && allRegions ? (
+                  <div className="flex flex-wrap gap-1.5">
+                    {user.dispatchRegionIds.map(regionId => {
+                      const region = allRegions.find(r => r.id === regionId);
+                      return region ? (
+                        <Badge key={region.id} color="purple">{region.name}</Badge>
+                      ) : null;
+                    })}
+                  </div>
+                ) : (
+                  <span className="text-zinc-500">{t('users.detail.noRegionsAssigned')}</span>
+                )}
+              </DescriptionDetails>
+            </DescriptionList>
           </div>
 
-          {/* Right Column: Recent Activity (Audit Log) */}
+          {/* Right Column: Capabilities Summary */}
           <div>
-            <div className="flex items-center justify-between">
-              <Subheading>{t('users.detail.recentActivity')}</Subheading>
-              {auditLog && auditLog.length > 0 && (
-                <Text className="text-xs text-zinc-500">
-                  {auditLog.length} {auditLog.length === 1 ? 'entry' : 'entries'}
-                </Text>
-              )}
-            </div>
-            <div className="mt-2">
+            <CapabilitiesSection capabilities={user.capabilities || []} />
+          </div>
+        </div>
+
+        <Divider className="my-4" />
+
+        {/* Recent Activity - Full Width Below */}
+        <div>
+          <div className="flex items-center justify-between">
+            <Subheading>{t('users.detail.recentActivity')}</Subheading>
+            {auditLog && auditLog.length > 0 && (
+              <Text className="text-xs text-zinc-500">
+                {auditLog.length} {auditLog.length === 1 ? 'entry' : 'entries'}
+              </Text>
+            )}
+          </div>
+          <div className="mt-2">
               {isAuditLoading ? (
                 <div className="rounded-lg bg-zinc-50 p-4 text-center dark:bg-zinc-900">
                   <Text className="text-sm text-zinc-600 dark:text-zinc-400">
@@ -310,10 +310,8 @@ export default function UserDetailPage() {
                   </div>
                 </div>
               )}
-            </div>
           </div>
         </div>
-
       </div>
 
       <UserFormDialog
