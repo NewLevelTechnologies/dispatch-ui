@@ -199,27 +199,21 @@ export default function UserDetailPage() {
         <div className="grid gap-6 lg:grid-cols-[1fr,1.5fr]">
           {/* Left Column: User Info */}
           <div className="space-y-4">
-            {/* Basic Information */}
+            {/* Role & Permissions - Compact */}
             <div>
-              <Subheading>{t('users.detail.basicInfo')}</Subheading>
+              <Subheading>{t('users.detail.rolePermissions')}</Subheading>
               <DescriptionList className="mt-2 text-sm">
-                <DescriptionTerm className="!py-1">{t('common.form.status')}</DescriptionTerm>
-                <DescriptionDetails className="!py-1">
+                <DescriptionTerm className="!py-0.5">{t('common.form.status')}</DescriptionTerm>
+                <DescriptionDetails className="!py-0.5">
                   {user.enabled ? (
                     <Badge color="lime">{t('common.enabled')}</Badge>
                   ) : (
                     <Badge color="zinc">{t('common.disabled')}</Badge>
                   )}
                 </DescriptionDetails>
-              </DescriptionList>
-            </div>
 
-            {/* Role & Permissions */}
-            <div>
-              <Subheading>{t('users.detail.rolePermissions')}</Subheading>
-              <DescriptionList className="mt-2 text-sm">
-                <DescriptionTerm className="!py-1">{t('common.form.role')}</DescriptionTerm>
-                <DescriptionDetails className="!py-1">
+                <DescriptionTerm className="!py-0.5">{t('common.form.role')}</DescriptionTerm>
+                <DescriptionDetails className="!py-0.5">
                   {user.roles && user.roles.length > 0 ? (
                     <div className="flex flex-wrap gap-1.5">
                       {user.roles.map(role => (
@@ -231,8 +225,8 @@ export default function UserDetailPage() {
                   )}
                 </DescriptionDetails>
 
-                <DescriptionTerm className="!py-1">{t('users.form.assignedRegions')}</DescriptionTerm>
-                <DescriptionDetails className="!py-1">
+                <DescriptionTerm className="!py-0.5">{t('users.form.assignedRegions')}</DescriptionTerm>
+                <DescriptionDetails className="!py-0.5">
                   {user.dispatchRegionIds && user.dispatchRegionIds.length > 0 && allRegions ? (
                     <div className="flex flex-wrap gap-1.5">
                       {user.dispatchRegionIds.map(regionId => {
@@ -245,6 +239,16 @@ export default function UserDetailPage() {
                   ) : (
                     <span className="text-zinc-500">{t('users.detail.noRegionsAssigned')}</span>
                   )}
+                </DescriptionDetails>
+
+                <DescriptionTerm className="!py-0.5">{t('users.detail.created')}</DescriptionTerm>
+                <DescriptionDetails className="!py-0.5 text-xs text-zinc-500">
+                  {formatTimestamp(user.createdAt)}
+                </DescriptionDetails>
+
+                <DescriptionTerm className="!py-0.5">{t('users.detail.lastUpdated')}</DescriptionTerm>
+                <DescriptionDetails className="!py-0.5 text-xs text-zinc-500">
+                  {formatTimestamp(user.updatedAt)}
                 </DescriptionDetails>
               </DescriptionList>
             </div>
