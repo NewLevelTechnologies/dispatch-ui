@@ -274,7 +274,7 @@ export default function UserDetailPage() {
                 </div>
               ) : (
                 <div className="overflow-hidden rounded-lg border border-zinc-950/10 dark:border-white/10">
-                  <div className="max-h-[600px] overflow-y-auto">
+                  <div className="max-h-[300px] overflow-y-auto">
                     <Table dense className="[--gutter:theme(spacing.2)] text-sm">
                       <TableHead className="sticky top-0 z-10 bg-zinc-950/[2.5%] dark:bg-white/[2.5%]">
                         <TableRow>
