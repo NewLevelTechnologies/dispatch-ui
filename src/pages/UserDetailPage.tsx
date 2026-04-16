@@ -13,6 +13,8 @@ import { Button } from '../components/catalyst/button';
 import { Badge } from '../components/catalyst/badge';
 import { DescriptionList, DescriptionTerm, DescriptionDetails } from '../components/catalyst/description-list';
 import { Divider } from '../components/catalyst/divider';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/catalyst/table';
+import { Text } from '../components/catalyst/text';
 
 export default function UserDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -37,6 +39,12 @@ export default function UserDetailPage() {
   const { data: allRegions } = useQuery({
     queryKey: ['dispatch-regions'],
     queryFn: () => dispatchRegionApi.getAll(true),
+  });
+
+  const { data: auditLog, isLoading: isAuditLoading } = useQuery({
+    queryKey: ['audit-log', id],
+    queryFn: () => userApi.getAuditLog(id!),
+    enabled: !!id,
   });
 
   const disableMutation = useMutation({
@@ -81,14 +89,39 @@ export default function UserDetailPage() {
     setIsEditDialogOpen(false);
   };
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
+  const formatTimestamp = (timestamp: string) => {
+    const date = new Date(timestamp);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    if (diffDays < 7) return `${diffDays}d ago`;
+
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  };
+
+  const formatChanges = (changes: Record<string, string>) => {
+    if (!changes || Object.keys(changes).length === 0) return '-';
+
+    return Object.entries(changes).map(([field, change]) => (
+      <div key={field} className="text-xs">
+        <span className="font-medium">{field}:</span> {change}
+      </div>
+    ));
+  };
+
+  const getEventBadgeColor = (eventType: string): 'sky' | 'amber' | 'rose' | 'lime' => {
+    switch (eventType) {
+      case 'CREATED': return 'lime';
+      case 'UPDATED': return 'sky';
+      case 'DELETED': return 'rose';
+      default: return 'amber';
+    }
   };
 
   if (isLoading) {
@@ -126,7 +159,7 @@ export default function UserDetailPage() {
     <AppLayout>
       <div>
         {/* Header */}
-        <div className="mb-4">
+        <div className="mb-2">
           <Button plain onClick={() => navigate('/users')}>
             <ArrowLeftIcon className="size-4" />
             {t('common.actions.back')}
@@ -138,9 +171,9 @@ export default function UserDetailPage() {
             <Heading>
               {user.firstName} {user.lastName}
             </Heading>
-            <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
+            <Text className="mt-1">
               {user.email}
-            </p>
+            </Text>
           </div>
           {canEditUsers && (
             <div className="flex gap-2">
@@ -162,125 +195,116 @@ export default function UserDetailPage() {
 
         <Divider className="my-4" />
 
-        {/* Content Grid */}
-        <div className="grid gap-4 lg:grid-cols-2">
-          {/* Basic Information */}
-          <div>
-            <Subheading>{t('users.detail.basicInfo')}</Subheading>
-            <DescriptionList className="mt-4 text-sm">
-              <DescriptionTerm className="!py-1.5">{t('common.form.name')}</DescriptionTerm>
-              <DescriptionDetails className="!py-1.5">{user.firstName} {user.lastName}</DescriptionDetails>
+        {/* Dense Two-Column Layout */}
+        <div className="grid gap-6 lg:grid-cols-[1fr,1.5fr]">
+          {/* Left Column: User Info */}
+          <div className="space-y-4">
+            {/* Basic Information */}
+            <div>
+              <Subheading>{t('users.detail.basicInfo')}</Subheading>
+              <DescriptionList className="mt-2 text-sm">
+                <DescriptionTerm className="!py-1">{t('common.form.status')}</DescriptionTerm>
+                <DescriptionDetails className="!py-1">
+                  {user.enabled ? (
+                    <Badge color="lime">{t('common.enabled')}</Badge>
+                  ) : (
+                    <Badge color="zinc">{t('common.disabled')}</Badge>
+                  )}
+                </DescriptionDetails>
+              </DescriptionList>
+            </div>
 
-              <DescriptionTerm className="!py-1.5">{t('common.form.email')}</DescriptionTerm>
-              <DescriptionDetails className="!py-1.5">{user.email}</DescriptionDetails>
+            {/* Role & Permissions */}
+            <div>
+              <Subheading>{t('users.detail.rolePermissions')}</Subheading>
+              <DescriptionList className="mt-2 text-sm">
+                <DescriptionTerm className="!py-1">{t('common.form.role')}</DescriptionTerm>
+                <DescriptionDetails className="!py-1">
+                  {user.roles && user.roles.length > 0 ? (
+                    <div className="flex flex-wrap gap-1.5">
+                      {user.roles.map(role => (
+                        <Badge key={role.id} color="sky">{role.name}</Badge>
+                      ))}
+                    </div>
+                  ) : (
+                    <span className="text-zinc-500">-</span>
+                  )}
+                </DescriptionDetails>
 
-              <DescriptionTerm className="!py-1.5">{t('common.form.status')}</DescriptionTerm>
-              <DescriptionDetails className="!py-1.5">
-                {user.enabled ? (
-                  <Badge color="lime">{t('common.enabled')}</Badge>
-                ) : (
-                  <Badge color="zinc">{t('common.disabled')}</Badge>
-                )}
-              </DescriptionDetails>
-            </DescriptionList>
-          </div>
+                <DescriptionTerm className="!py-1">{t('users.form.assignedRegions')}</DescriptionTerm>
+                <DescriptionDetails className="!py-1">
+                  {user.dispatchRegionIds && user.dispatchRegionIds.length > 0 && allRegions ? (
+                    <div className="flex flex-wrap gap-1.5">
+                      {user.dispatchRegionIds.map(regionId => {
+                        const region = allRegions.find(r => r.id === regionId);
+                        return region ? (
+                          <Badge key={region.id} color="purple">{region.name}</Badge>
+                        ) : null;
+                      })}
+                    </div>
+                  ) : (
+                    <span className="text-zinc-500">{t('users.detail.noRegionsAssigned')}</span>
+                  )}
+                </DescriptionDetails>
+              </DescriptionList>
+            </div>
 
-          {/* Role & Permissions */}
-          <div>
-            <Subheading>{t('users.detail.rolePermissions')}</Subheading>
-            <DescriptionList className="mt-4 text-sm">
-              <DescriptionTerm className="!py-1.5">{t('common.form.role')}</DescriptionTerm>
-              <DescriptionDetails className="!py-1.5">
-                {user.roles && user.roles.length > 0 ? (
-                  <div className="flex flex-wrap gap-2">
-                    {user.roles.map(role => (
-                      <Badge key={role.id} color="sky">{role.name}</Badge>
-                    ))}
-                  </div>
-                ) : (
-                  <span className="text-zinc-500">-</span>
-                )}
-              </DescriptionDetails>
-
-              <DescriptionTerm className="!py-1.5">{t('users.form.assignedRegions')}</DescriptionTerm>
-              <DescriptionDetails className="!py-1.5">
-                {user.dispatchRegionIds && user.dispatchRegionIds.length > 0 && allRegions ? (
-                  <div className="flex flex-wrap gap-2">
-                    {user.dispatchRegionIds.map(regionId => {
-                      const region = allRegions.find(r => r.id === regionId);
-                      return region ? (
-                        <Badge key={region.id} color="purple">{region.name}</Badge>
-                      ) : null;
-                    })}
-                  </div>
-                ) : (
-                  <span className="text-zinc-500">{t('users.detail.noRegionsAssigned')}</span>
-                )}
-              </DescriptionDetails>
-            </DescriptionList>
-          </div>
-        </div>
-
-        <div className="grid gap-4 lg:grid-cols-2 mt-8">
-          {/* System Information */}
-          <div>
-            <Subheading>{t('users.detail.systemInfo')}</Subheading>
-            <DescriptionList className="mt-4 text-sm">
-              <DescriptionTerm className="!py-1.5">{t('users.detail.userId')}</DescriptionTerm>
-              <DescriptionDetails className="!py-1.5">
-                <code className="text-xs text-zinc-600 dark:text-zinc-400">
-                  {user.id}
-                </code>
-              </DescriptionDetails>
-
-              <DescriptionTerm className="!py-1.5">{t('users.detail.cognitoSub')}</DescriptionTerm>
-              <DescriptionDetails className="!py-1.5">
-                <code className="text-xs text-zinc-600 dark:text-zinc-400">
-                  {user.cognitoSub}
-                </code>
-              </DescriptionDetails>
-
-              <DescriptionTerm className="!py-1.5">{t('users.detail.created')}</DescriptionTerm>
-              <DescriptionDetails className="!py-1.5">{formatDate(user.createdAt)}</DescriptionDetails>
-
-              <DescriptionTerm className="!py-1.5">{t('users.detail.lastUpdated')}</DescriptionTerm>
-              <DescriptionDetails className="!py-1.5">{formatDate(user.updatedAt)}</DescriptionDetails>
-            </DescriptionList>
-          </div>
-
-          {/* Activity Section - Placeholder for future */}
-          <div>
-            <Subheading>{t('users.detail.recentActivity')}</Subheading>
-            <div className="mt-4 rounded-lg bg-zinc-50 p-6 text-center dark:bg-zinc-900">
-              <p className="text-sm text-zinc-600 dark:text-zinc-400">
-                {t('users.detail.activityComingSoon')}
-              </p>
-              <p className="mt-2 text-xs text-zinc-500">
-                {t('users.detail.activityHelper')}
-              </p>
+            {/* Capabilities */}
+            <div>
+              <CapabilitiesSection capabilities={user.capabilities || []} />
             </div>
           </div>
-        </div>
 
-        {/* Capabilities Section - Collapsible, below main content */}
-        <Divider className="my-4" />
-        <div>
-          <CapabilitiesSection capabilities={user.capabilities || []} />
-        </div>
-
-        {/* Future sections placeholder */}
-        <Divider className="my-4" />
-
-        <div className="grid gap-4">
+          {/* Right Column: Recent Activity (Audit Log) */}
           <div>
-            <Subheading>{t('users.table.auditLog')}</Subheading>
-            <div className="mt-4 rounded-lg bg-zinc-50 p-6 text-center dark:bg-zinc-900">
-              <p className="text-sm text-zinc-600 dark:text-zinc-400">
-                {t('users.detail.auditComingSoon')}
-              </p>
-              <p className="mt-2 text-xs text-zinc-500">
-                {t('users.detail.auditHelper')}
-              </p>
+            <Subheading>{t('users.detail.recentActivity')}</Subheading>
+            <div className="mt-2">
+              {isAuditLoading ? (
+                <div className="rounded-lg bg-zinc-50 p-4 text-center dark:bg-zinc-900">
+                  <Text className="text-sm text-zinc-600 dark:text-zinc-400">
+                    {t('common.actions.loading', { entities: 'activity' })}
+                  </Text>
+                </div>
+              ) : !auditLog || auditLog.length === 0 ? (
+                <div className="rounded-lg bg-zinc-50 p-4 text-center dark:bg-zinc-900">
+                  <Text className="text-sm text-zinc-600 dark:text-zinc-400">
+                    {t('users.detail.noActivityYet')}
+                  </Text>
+                </div>
+              ) : (
+                <Table dense className="[--gutter:theme(spacing.2)] text-sm">
+                  <TableHead>
+                    <TableRow>
+                      <TableHeader>{t('users.detail.auditEvent')}</TableHeader>
+                      <TableHeader>{t('users.detail.auditEntity')}</TableHeader>
+                      <TableHeader>{t('users.detail.auditChanges')}</TableHeader>
+                      <TableHeader>{t('users.detail.auditWhen')}</TableHeader>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {auditLog.slice(0, 20).map((entry) => (
+                      <TableRow key={entry.id}>
+                        <TableCell>
+                          <Badge color={getEventBadgeColor(entry.eventType)}>
+                            {entry.eventType}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-xs">
+                          {entry.entityType}
+                        </TableCell>
+                        <TableCell className="max-w-md">
+                          <div className="space-y-0.5">
+                            {formatChanges(entry.changes)}
+                          </div>
+                        </TableCell>
+                        <TableCell className="whitespace-nowrap text-xs text-zinc-500">
+                          {formatTimestamp(entry.timestamp)}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
             </div>
           </div>
         </div>

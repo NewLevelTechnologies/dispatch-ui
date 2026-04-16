@@ -93,6 +93,16 @@ export interface RestoreAllDefaultsResponse {
   preservedCustomRoles: Role[];
 }
 
+export interface AuditLogEntry {
+  id: string;
+  entityType: string;
+  entityId: string;
+  eventType: string;
+  userId: string;
+  changes: Record<string, string>;
+  timestamp: string;
+}
+
 export const userApi = {
   getCurrentUser: async (): Promise<User> => {
     const response = await apiClient.get<User>('/users/me');
@@ -190,6 +200,12 @@ export const userApi = {
 
   restoreAllDefaults: async (): Promise<RestoreAllDefaultsResponse> => {
     const response = await apiClient.post<RestoreAllDefaultsResponse>('/users/roles/restore-all-defaults');
+    return response.data;
+  },
+
+  // Audit log
+  getAuditLog: async (userId: string): Promise<AuditLogEntry[]> => {
+    const response = await apiClient.get<AuditLogEntry[]>(`/audit/user/${userId}`);
     return response.data;
   },
 };
