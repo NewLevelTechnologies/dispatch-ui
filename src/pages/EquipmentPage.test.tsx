@@ -262,4 +262,25 @@ describe('EquipmentPage', () => {
 
     expect(screen.getByRole('dialog')).toBeInTheDocument();
   });
+
+  it('filters equipment by search query', async () => {
+    mockEquipmentGetAll.mockResolvedValue(mockEquipment);
+    const user = userEvent.setup();
+
+    renderWithProviders(<EquipmentPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('AC-100')).toBeInTheDocument();
+      expect(screen.getByText('RF-200')).toBeInTheDocument();
+    });
+
+    // Search for "AC"
+    const searchInput = screen.getByPlaceholderText(/search/i);
+    await user.type(searchInput, 'AC');
+
+    await waitFor(() => {
+      expect(screen.getByText('AC-100')).toBeInTheDocument();
+      expect(screen.queryByText('RF-200')).not.toBeInTheDocument();
+    });
+  });
 });
