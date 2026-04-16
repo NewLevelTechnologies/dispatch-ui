@@ -195,7 +195,7 @@ export default function UserFormDialog({ isOpen, onClose, user, roles }: UserFor
   };
 
   // Check if admin role is selected
-  const adminRole = roles.find((role) =>
+  const adminRole = roles?.find((role) =>
     role.name.toLowerCase().includes('admin')
   );
   const hasAdminRole = adminRole && formData.roleIds.includes(adminRole.id);
@@ -266,7 +266,7 @@ export default function UserFormDialog({ isOpen, onClose, user, roles }: UserFor
                 </div>
               )}
               <div className="mt-2 grid grid-cols-3 gap-x-4 gap-y-1">
-                {roles.map((role) => {
+                {roles?.map((role) => {
                   const isAdmin = role.name.toLowerCase().includes('admin');
                   const isDisabled = hasAdminRole && !isAdmin;
 

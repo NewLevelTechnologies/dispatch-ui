@@ -362,16 +362,10 @@ describe('UserDetailPage', () => {
       expect(screen.getByRole('heading', { name: 'John Doe' })).toBeInTheDocument();
     });
 
-    // Check all sections are rendered
-    expect(screen.getByText('Basic Information')).toBeInTheDocument();
+    // Check all sections are rendered (updated for new layout)
     expect(screen.getByText('Role & Permissions')).toBeInTheDocument();
-    expect(screen.getByText('System Information')).toBeInTheDocument();
+    expect(screen.getByText('Capabilities')).toBeInTheDocument();
     expect(screen.getByText('Recent Activity')).toBeInTheDocument();
-    expect(screen.getByText('Audit Log')).toBeInTheDocument();
-
-    // Check user ID and cognitoSub are displayed
-    expect(screen.getByText('user-123')).toBeInTheDocument();
-    expect(screen.getByText('cognito-sub-123')).toBeInTheDocument();
   });
 
   it('displays dispatch regions when user has assigned regions', async () => {
@@ -440,7 +434,7 @@ describe('UserDetailPage', () => {
     });
   });
 
-  it('displays system information with dates', async () => {
+  it('displays capabilities section', async () => {
     vi.mocked(apiClient.get)
       .mockResolvedValueOnce({ data: mockUser })
       .mockResolvedValueOnce({ data: mockRoles })
@@ -455,10 +449,9 @@ describe('UserDetailPage', () => {
       expect(screen.getByRole('heading', { name: 'John Doe' })).toBeInTheDocument();
     });
 
-    // Check system information fields are displayed
-    expect(screen.getByText('System Information')).toBeInTheDocument();
-    expect(screen.getByText('Created')).toBeInTheDocument();
-    expect(screen.getByText('Last Updated')).toBeInTheDocument();
+    // Check capabilities section is displayed with count
+    expect(screen.getByText('Capabilities')).toBeInTheDocument();
+    expect(screen.getByText('3')).toBeInTheDocument(); // 3 capabilities count
   });
 
   it('shows dispatch regions section in role & permissions', async () => {
