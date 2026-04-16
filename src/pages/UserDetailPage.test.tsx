@@ -534,4 +534,5 @@ describe('UserDetailPage', () => {
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     });
   });
+
 });
