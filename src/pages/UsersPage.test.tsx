@@ -633,5 +633,31 @@ describe('UsersPage', () => {
 
       expect(mockNavigate).toHaveBeenCalledWith('/users/user-1');
     });
+
+    it('does not navigate when clicking dropdown button', async () => {
+      const user = userEvent.setup();
+      vi.mocked(apiClient.get).mockImplementation((url) => {
+        if (url === '/users') {
+          return Promise.resolve({ data: mockUsers });
+        }
+        if (url === '/users/roles') {
+          return Promise.resolve({ data: [] });
+        }
+        return Promise.reject(new Error('Unknown URL'));
+      });
+
+      renderWithProviders(<UsersPage />);
+
+      await waitFor(() => {
+        expect(screen.getByText('John Doe')).toBeInTheDocument();
+      });
+
+      const dropdownButtons = screen.getAllByRole('button', { name: '' });
+      if (dropdownButtons.length > 0) {
+        await user.click(dropdownButtons[0]);
+        // Should not navigate
+        expect(mockNavigate).not.toHaveBeenCalled();
+      }
+    });
   });
 });

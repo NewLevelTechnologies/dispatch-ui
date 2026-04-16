@@ -718,6 +718,82 @@ describe('RoleDetailPage', () => {
     });
   });
 
+  it('closes edit dialog when cancel is clicked', async () => {
+    vi.mocked(apiClient.get).mockImplementation((url) => {
+      if (url === '/users/roles/role-123') {
+        return Promise.resolve({ data: mockRole });
+      }
+      if (url === '/users/capabilities/grouped') {
+        return Promise.resolve({ data: mockCapabilitiesData });
+      }
+      return Promise.reject(new Error('Unknown URL'));
+    });
+    const user = userEvent.setup();
+
+    renderWithProviders(<RoleDetailPage />, {
+      initialEntries: ['/roles/role-123'],
+      path: '/roles/:id',
+    });
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Field Technician' })).toBeInTheDocument();
+    });
+
+    // Open edit dialog
+    const editButton = screen.getByRole('button', { name: /^edit$/i });
+    await user.click(editButton);
+
+    await waitFor(() => {
+      expect(screen.getByRole('dialog')).toBeInTheDocument();
+    });
+
+    // Cancel
+    const cancelButton = screen.getByRole('button', { name: /cancel/i });
+    await user.click(cancelButton);
+
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    });
+  });
+
+  it('closes clone dialog when cancel is clicked', async () => {
+    vi.mocked(apiClient.get).mockImplementation((url) => {
+      if (url === '/users/roles/role-123') {
+        return Promise.resolve({ data: mockRole });
+      }
+      if (url === '/users/capabilities/grouped') {
+        return Promise.resolve({ data: mockCapabilitiesData });
+      }
+      return Promise.reject(new Error('Unknown URL'));
+    });
+    const user = userEvent.setup();
+
+    renderWithProviders(<RoleDetailPage />, {
+      initialEntries: ['/roles/role-123'],
+      path: '/roles/:id',
+    });
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Field Technician' })).toBeInTheDocument();
+    });
+
+    // Open clone dialog
+    const cloneButton = screen.getByRole('button', { name: /clone role/i });
+    await user.click(cloneButton);
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Clone Role' })).toBeInTheDocument();
+    });
+
+    // Cancel
+    const cancelButton = screen.getByRole('button', { name: /cancel/i });
+    await user.click(cancelButton);
+
+    await waitFor(() => {
+      expect(screen.queryByRole('heading', { name: 'Clone Role' })).not.toBeInTheDocument();
+    });
+  });
+
   it('displays description from header when no detailed description', async () => {
     const roleWithoutDetailedDescription = {
       ...mockRole,
