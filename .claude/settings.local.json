@@ -35,7 +35,10 @@
       "Bash(npm run:*)",
       "Bash(tee /tmp/test-coverage.txt)",
       "WebFetch(domain:www.npmjs.com)",
-      "WebFetch(domain:github.com)"
+      "WebFetch(domain:github.com)",
+      "Bash(cat)",
+      "Bash(chmod +x /tmp/update_tests.sh)",
+      "Bash(/tmp/update_tests.sh)"
     ]
   }
 }
