@@ -22,6 +22,7 @@ export default function UserDetailPage() {
   const queryClient = useQueryClient();
   const { t } = useTranslation();
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isAuditExpanded, setIsAuditExpanded] = useState(false);
 
   // Permission checks
   const canEditUsers = useHasCapability('EDIT_USERS');
@@ -253,11 +254,18 @@ export default function UserDetailPage() {
         <div>
           <div className="flex items-center justify-between">
             <Subheading>{t('users.detail.recentActivity')}</Subheading>
-            {auditLog && auditLog.length > 0 && (
-              <Text className="text-xs text-zinc-500">
-                {auditLog.length} {auditLog.length === 1 ? 'entry' : 'entries'}
-              </Text>
-            )}
+            <div className="flex items-center gap-3">
+              {auditLog && auditLog.length > 0 && (
+                <>
+                  <Text className="text-xs text-zinc-500">
+                    {auditLog.length} {auditLog.length === 1 ? 'entry' : 'entries'}
+                  </Text>
+                  <Button plain onClick={() => setIsAuditExpanded(!isAuditExpanded)}>
+                    {isAuditExpanded ? t('common.hide') : t('common.showAll')}
+                  </Button>
+                </>
+              )}
+            </div>
           </div>
           <div className="mt-2">
               {isAuditLoading ? (
@@ -274,7 +282,7 @@ export default function UserDetailPage() {
                 </div>
               ) : (
                 <div className="overflow-hidden rounded-lg border border-zinc-950/10 dark:border-white/10">
-                  <div className="max-h-[300px] overflow-y-auto">
+                  <div className={isAuditExpanded ? 'max-h-[600px] overflow-y-auto' : 'max-h-[300px] overflow-y-auto'}>
                     <Table dense className="[--gutter:theme(spacing.2)] text-sm">
                       <TableHead className="sticky top-0 z-10 bg-zinc-950/[2.5%] dark:bg-white/[2.5%]">
                         <TableRow>
