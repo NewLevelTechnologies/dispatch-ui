@@ -23,7 +23,7 @@ export default function CapabilitiesSection({ capabilities = [] }: CapabilitiesS
   const { data: capabilitiesData, isLoading } = useQuery({
     queryKey: ['capabilities', 'grouped'],
     queryFn: () => userApi.getGroupedCapabilities(),
-    enabled: isExpanded, // Only fetch when expanded
+    // Fetch immediately to show collapsed preview
   });
 
   // Count capabilities by feature area
@@ -78,6 +78,37 @@ export default function CapabilitiesSection({ capabilities = [] }: CapabilitiesS
           )}
         </Button>
       </div>
+
+      {/* Collapsed: Show compact summary */}
+      {!isExpanded && stats && stats.length > 0 && (
+        <div className="mt-2 flex flex-wrap gap-2">
+          {stats.slice(0, 5).map((group) => (
+            <div
+              key={group.name}
+              className="inline-flex items-center gap-1.5 rounded-md bg-zinc-100 px-2 py-1 dark:bg-zinc-800"
+            >
+              <span className="text-xs font-medium text-zinc-700 dark:text-zinc-300">
+                {group.name}
+              </span>
+              <Badge color="purple" className="text-xs">
+                {group.count}
+              </Badge>
+            </div>
+          ))}
+          {stats.length > 5 && (
+            <div className="inline-flex items-center rounded-md bg-zinc-100 px-2 py-1 text-xs text-zinc-500 dark:bg-zinc-800">
+              {t('capabilities.moreAreas', { count: stats.length - 5 })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Loading state for collapsed view */}
+      {!isExpanded && isLoading && (
+        <div className="mt-2 text-xs text-zinc-500">
+          Loading summary...
+        </div>
+      )}
 
       {/* Expanded: Show organized list */}
       {isExpanded && (
