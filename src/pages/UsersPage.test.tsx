@@ -608,4 +608,30 @@ describe('UsersPage', () => {
       expect(screen.getByRole('button', { name: /status:.*all/i })).toBeInTheDocument();
     });
   });
+
+  describe('Row navigation', () => {
+    it('navigates to user detail page when user name is clicked', async () => {
+      const user = userEvent.setup();
+      vi.mocked(apiClient.get).mockImplementation((url) => {
+        if (url === '/users') {
+          return Promise.resolve({ data: mockUsers });
+        }
+        if (url === '/users/roles') {
+          return Promise.resolve({ data: [] });
+        }
+        return Promise.reject(new Error('Unknown URL'));
+      });
+
+      renderWithProviders(<UsersPage />);
+
+      await waitFor(() => {
+        expect(screen.getByText('John Doe')).toBeInTheDocument();
+      });
+
+      const nameCell = screen.getByText('John Doe');
+      await user.click(nameCell);
+
+      expect(mockNavigate).toHaveBeenCalledWith('/users/user-1');
+    });
+  });
 });

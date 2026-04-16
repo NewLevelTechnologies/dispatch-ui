@@ -295,6 +295,62 @@ describe('AdditionalContactsList', () => {
     expect(screen.getByText('jane@example.com')).toBeInTheDocument();
   });
 
+  it('opens notification preferences dialog when manage notifications button clicked', async () => {
+    const user = userEvent.setup();
+    vi.mocked(apiClient.get).mockResolvedValue({ data: [] });
+
+    renderWithProviders(
+      <AdditionalContactsList
+        contacts={mockContacts}
+        parentId="parent-1"
+        parentType="customer"
+        customerId="customer-1"
+        queryKey={['customers', 'parent-1']}
+        canEdit={true}
+        showAddButton={true}
+      />
+    );
+
+    const notificationButtons = screen.getAllByTitle(/manage notifications/i);
+    await user.click(notificationButtons[0]);
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: /notification preferences/i })).toBeInTheDocument();
+    });
+  });
+
+  it('cancels delete when cancel button clicked', async () => {
+    const user = userEvent.setup();
+
+    renderWithProviders(
+      <AdditionalContactsList
+        contacts={mockContacts}
+        parentId="parent-1"
+        parentType="customer"
+        customerId="customer-1"
+        queryKey={['customers', 'parent-1']}
+        canEdit={true}
+        showAddButton={true}
+      />
+    );
+
+    const deleteButtons = screen.getAllByTitle(/delete/i);
+    await user.click(deleteButtons[0]);
+
+    await waitFor(() => {
+      expect(screen.getByText(/delete additional contact/i)).toBeInTheDocument();
+    });
+
+    const cancelButton = screen.getByRole('button', { name: /cancel/i });
+    await user.click(cancelButton);
+
+    await waitFor(() => {
+      expect(screen.queryByText(/delete additional contact/i)).not.toBeInTheDocument();
+    });
+
+    expect(apiClient.delete).not.toHaveBeenCalled();
+  });
+
   it('hides action buttons when canEdit is false', () => {
     renderWithProviders(
       <AdditionalContactsList
