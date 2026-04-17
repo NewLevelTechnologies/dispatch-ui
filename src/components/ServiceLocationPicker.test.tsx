@@ -299,4 +299,51 @@ describe('ServiceLocationPicker', () => {
 
     expect(apiClient.get).not.toHaveBeenCalled();
   });
+
+  it('closes dropdown when location is selected', async () => {
+    const user = userEvent.setup();
+    vi.mocked(apiClient.get).mockResolvedValue({ data: mockSearchResults });
+
+    renderWithProviders(
+      <ServiceLocationPicker
+        value={null}
+        onChange={mockOnChange}
+      />
+    );
+
+    const input = screen.getByPlaceholderText('Search by customer, address, or phone...');
+    await user.type(input, 'john');
+
+    await waitFor(() => {
+      expect(screen.getByText("John's House")).toBeInTheDocument();
+    });
+
+    const firstResult = screen.getByText("John's House").closest('button');
+    await user.click(firstResult!);
+
+    // Dropdown should close after selection
+    await waitFor(() => {
+      expect(screen.queryByText("John's House")).not.toBeInTheDocument();
+    });
+  });
+
+  it('handles API errors gracefully', async () => {
+    const user = userEvent.setup();
+    vi.mocked(apiClient.get).mockRejectedValue(new Error('Network error'));
+
+    renderWithProviders(
+      <ServiceLocationPicker
+        value={null}
+        onChange={mockOnChange}
+      />
+    );
+
+    const input = screen.getByPlaceholderText('Search by customer, address, or phone...');
+    await user.type(input, 'test');
+
+    // Should not crash, just show no results
+    await waitFor(() => {
+      expect(screen.getByText('No locations found')).toBeInTheDocument();
+    });
+  });
 });
