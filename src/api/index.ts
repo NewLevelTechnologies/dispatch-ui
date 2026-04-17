@@ -7,6 +7,8 @@ export {
   type Customer,
   type Address,
   type ServiceLocation,
+  type ServiceLocationSearchResult,
+  type ServiceLocationSearchResponse,
   type AdditionalContact,
   type CustomerDisplayMode,
   type CustomerStatus,

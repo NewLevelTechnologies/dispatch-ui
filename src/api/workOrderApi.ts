@@ -14,6 +14,7 @@ export const WorkOrderStatus = {
 export interface WorkOrder {
   id: string;
   customerId: string;
+  serviceLocationId: string;
   status: WorkOrderStatus;
   scheduledDate?: string;
   completedDate?: string;
@@ -26,6 +27,7 @@ export interface WorkOrder {
 
 export interface CreateWorkOrderRequest {
   customerId: string;
+  serviceLocationId: string;
   status?: WorkOrderStatus;
   scheduledDate?: string;
   description?: string;

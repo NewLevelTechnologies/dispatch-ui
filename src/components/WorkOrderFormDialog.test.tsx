@@ -235,6 +235,7 @@ describe('WorkOrderFormDialog', () => {
     const existingWorkOrder = {
       id: '1',
       customerId: 'customer-1',
+      serviceLocationId: 'location-1',
       status: 'SCHEDULED' as const,
       scheduledDate: '2024-03-15',
       description: 'Fix leaking pipe',
