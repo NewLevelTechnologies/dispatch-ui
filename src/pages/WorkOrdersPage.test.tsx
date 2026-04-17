@@ -10,6 +10,7 @@ vi.mock('../api/client');
 const mockWorkOrders = [
   {
     id: 'aaaaaaaa-bbbb-cccc-dddd-111111111111',
+    workOrderNumber: 'WO-00001',
     customerId: 'cccccccc-dddd-eeee-ffff-222222222222',
     serviceLocationId: 'location-1',
     status: 'PENDING' as const,
@@ -40,6 +41,7 @@ const mockWorkOrders = [
   },
   {
     id: 'bbbbbbbb-cccc-dddd-eeee-333333333333',
+    workOrderNumber: 'WO-00002',
     customerId: 'dddddddd-eeee-ffff-0000-444444444444',
     serviceLocationId: 'location-2',
     status: 'IN_PROGRESS' as const,
@@ -101,8 +103,8 @@ describe('WorkOrdersPage', () => {
     });
 
     expect(screen.getByText('Install new HVAC system')).toBeInTheDocument();
-    expect(screen.getByText('#aaaaaaaa')).toBeInTheDocument();
-    expect(screen.getByText('#bbbbbbbb')).toBeInTheDocument();
+    expect(screen.getByText('WO-00001')).toBeInTheDocument();
+    expect(screen.getByText('WO-00002')).toBeInTheDocument();
   });
 
   it('displays status badges with correct styling', async () => {
@@ -166,8 +168,23 @@ describe('WorkOrdersPage', () => {
     expect(screen.getByText('Mar 14, 2024')).toBeInTheDocument();
   });
 
-  it('displays truncated IDs with # prefix', async () => {
+  it('displays work order numbers', async () => {
     vi.mocked(apiClient.get).mockResolvedValue({ data: [mockWorkOrders[0]] });
+
+    renderWithProviders(<WorkOrdersPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('WO-00001')).toBeInTheDocument();
+    });
+  });
+
+  it('falls back to truncated UUID when workOrderNumber is not available', async () => {
+    const workOrderWithoutNumber = {
+      ...mockWorkOrders[0],
+      workOrderNumber: undefined,
+    };
+
+    vi.mocked(apiClient.get).mockResolvedValue({ data: [workOrderWithoutNumber] });
 
     renderWithProviders(<WorkOrdersPage />);
 

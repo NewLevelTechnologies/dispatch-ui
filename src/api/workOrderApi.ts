@@ -13,6 +13,7 @@ export const WorkOrderStatus = {
 
 export interface WorkOrder {
   id: string;
+  workOrderNumber?: string; // e.g., "WO-00001" - display this prominently
   customerId: string;
   serviceLocationId: string;
   status: WorkOrderStatus;
@@ -77,6 +78,13 @@ export const workOrderApi = {
 
   getByCustomer: async (customerId: string): Promise<WorkOrder[]> => {
     const response = await apiClient.get<WorkOrder[]>(`/work-orders/customer/${customerId}`);
+    return response.data;
+  },
+
+  getByNumber: async (workOrderNumber: string): Promise<WorkOrder> => {
+    // Strip "WO-" prefix if user included it
+    const number = workOrderNumber.replace(/^WO-/i, '');
+    const response = await apiClient.get<WorkOrder>(`/work-orders/by-number/WO-${number}`);
     return response.data;
   },
 

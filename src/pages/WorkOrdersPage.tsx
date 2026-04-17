@@ -59,6 +59,7 @@ export default function WorkOrdersPage() {
     const query = searchQuery.toLowerCase();
     return workOrders.filter(
       (workOrder) =>
+        workOrder.workOrderNumber?.toLowerCase().includes(query) ||
         workOrder.id.toLowerCase().includes(query) ||
         workOrder.customerId.toLowerCase().includes(query) ||
         workOrder.status.toLowerCase().includes(query) ||
@@ -167,7 +168,7 @@ export default function WorkOrdersPage() {
               {filteredWorkOrders.map((workOrder) => (
                 <TableRow key={workOrder.id}>
                   <TableCell className="font-mono text-sm text-zinc-500">
-                    #{workOrder.id.substring(0, 8)}
+                    {workOrder.workOrderNumber || `#${workOrder.id.substring(0, 8)}`}
                   </TableCell>
                   <TableCell className="font-medium">
                     <div className="flex flex-col">
