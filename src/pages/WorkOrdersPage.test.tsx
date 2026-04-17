@@ -11,6 +11,7 @@ const mockWorkOrders = [
   {
     id: 'aaaaaaaa-bbbb-cccc-dddd-111111111111',
     customerId: 'cccccccc-dddd-eeee-ffff-222222222222',
+    serviceLocationId: 'location-1',
     status: 'PENDING' as const,
     scheduledDate: '2024-03-15T10:00:00Z',
     description: 'Fix leaking pipe',
@@ -18,10 +19,29 @@ const mockWorkOrders = [
     totalAmount: 150.00,
     createdAt: '2024-03-01T10:00:00Z',
     updatedAt: '2024-03-01T10:00:00Z',
+    customer: {
+      id: 'cccccccc-dddd-eeee-ffff-222222222222',
+      name: 'John Doe',
+      email: 'john@example.com',
+      phone: '5551234567',
+    },
+    serviceLocation: {
+      id: 'location-1',
+      locationName: "John's House",
+      address: {
+        streetAddress: '123 Main St',
+        city: 'Atlanta',
+        state: 'GA',
+        zipCode: '30301',
+      },
+      siteContactName: 'John Doe',
+      siteContactPhone: '5551234567',
+    },
   },
   {
     id: 'bbbbbbbb-cccc-dddd-eeee-333333333333',
     customerId: 'dddddddd-eeee-ffff-0000-444444444444',
+    serviceLocationId: 'location-2',
     status: 'IN_PROGRESS' as const,
     scheduledDate: '2024-03-14T10:00:00Z',
     description: 'Install new HVAC system',
@@ -29,6 +49,21 @@ const mockWorkOrders = [
     totalAmount: 5000.00,
     createdAt: '2024-03-02T11:00:00Z',
     updatedAt: '2024-03-02T11:00:00Z',
+    customer: {
+      id: 'dddddddd-eeee-ffff-0000-444444444444',
+      name: 'Jane Smith',
+      email: 'jane@example.com',
+    },
+    serviceLocation: {
+      id: 'location-2',
+      locationName: null,
+      address: {
+        streetAddress: '456 Oak Ave',
+        city: 'Marietta',
+        state: 'GA',
+        zipCode: '30060',
+      },
+    },
   },
 ];
 
@@ -66,8 +101,8 @@ describe('WorkOrdersPage', () => {
     });
 
     expect(screen.getByText('Install new HVAC system')).toBeInTheDocument();
-    expect(screen.getByText('aaaaaaaa...')).toBeInTheDocument();
-    expect(screen.getByText('bbbbbbbb...')).toBeInTheDocument();
+    expect(screen.getByText('#aaaaaaaa')).toBeInTheDocument();
+    expect(screen.getByText('#bbbbbbbb')).toBeInTheDocument();
   });
 
   it('displays status badges with correct styling', async () => {
@@ -131,15 +166,13 @@ describe('WorkOrdersPage', () => {
     expect(screen.getByText('Mar 14, 2024')).toBeInTheDocument();
   });
 
-  it('displays truncated IDs', async () => {
+  it('displays truncated IDs with # prefix', async () => {
     vi.mocked(apiClient.get).mockResolvedValue({ data: [mockWorkOrders[0]] });
 
     renderWithProviders(<WorkOrdersPage />);
 
     await waitFor(() => {
-      // Both ID and customer ID should be truncated
-      const truncatedTexts = screen.getAllByText('aaaaaaaa...');
-      expect(truncatedTexts.length).toBeGreaterThan(0);
+      expect(screen.getByText('#aaaaaaaa')).toBeInTheDocument();
     });
   });
 
@@ -162,36 +195,23 @@ describe('WorkOrdersPage', () => {
     expect(dashElements.length).toBeGreaterThan(0);
   });
 
-  it('formats currency amounts correctly', async () => {
+  it('displays service location information', async () => {
     vi.mocked(apiClient.get).mockResolvedValue({ data: mockWorkOrders });
 
     renderWithProviders(<WorkOrdersPage />);
 
     await waitFor(() => {
-      expect(screen.getByText('$150.00')).toBeInTheDocument();
+      expect(screen.getByText("John's House")).toBeInTheDocument();
     });
 
-    expect(screen.getByText('$5,000.00')).toBeInTheDocument();
+    // Check for parts of the address (text is split across elements)
+    expect(screen.getByText(/123 Main St/)).toBeInTheDocument();
+    expect(screen.getByText(/Atlanta/)).toBeInTheDocument();
+    expect(screen.getByText('Jane Smith')).toBeInTheDocument();
+    expect(screen.getByText(/456 Oak Ave/)).toBeInTheDocument();
+    expect(screen.getByText(/Marietta/)).toBeInTheDocument();
   });
 
-  it('handles work orders without amounts', async () => {
-    const workOrderWithoutAmount = {
-      ...mockWorkOrders[0],
-      totalAmount: undefined,
-    };
-
-    vi.mocked(apiClient.get).mockResolvedValue({ data: [workOrderWithoutAmount] });
-
-    renderWithProviders(<WorkOrdersPage />);
-
-    await waitFor(() => {
-      expect(screen.getByText('Fix leaking pipe')).toBeInTheDocument();
-    });
-
-    // Should display dash for missing amount
-    const dashElements = screen.getAllByText('-');
-    expect(dashElements.length).toBeGreaterThan(0);
-  });
 
   it('opens edit dialog when edit button is clicked', { timeout: 10000 }, async () => {
     vi.mocked(apiClient.get).mockResolvedValue({ data: mockWorkOrders });
