@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { customerApi, workOrderApi, type WorkOrder } from '../api';
+import { workOrderApi, type WorkOrder, type ServiceLocationSearchResult } from '../api';
 import { useGlossary } from '../contexts/GlossaryContext';
 import { Dialog, DialogActions, DialogBody, DialogDescription, DialogTitle } from './catalyst/dialog';
 import { Button } from './catalyst/button';
@@ -9,6 +9,7 @@ import { Field, FieldGroup, Fieldset, Label } from './catalyst/fieldset';
 import { Input } from './catalyst/input';
 import { Textarea } from './catalyst/textarea';
 import { Select } from './catalyst/select';
+import ServiceLocationPicker from './ServiceLocationPicker';
 
 interface WorkOrderFormDialogProps {
   isOpen: boolean;
@@ -24,43 +25,43 @@ export default function WorkOrderFormDialog({ isOpen, onClose, workOrder }: Work
 
   const [formData, setFormData] = useState<Omit<WorkOrder, 'id' | 'createdAt' | 'updatedAt'>>({
     customerId: '',
+    serviceLocationId: '',
     status: 'PENDING',
     scheduledDate: '',
     description: '',
     notes: '',
   });
 
-  // Fetch customers for dropdown
-  const { data: customers } = useQuery({
-    queryKey: ['customers'],
-    queryFn: () => customerApi.getAll(),
-    enabled: isOpen,
-  });
+  const [selectedLocation, setSelectedLocation] = useState<ServiceLocationSearchResult | null>(null);
 
   // Intentionally setting form state based on props in useEffect
   // This is the recommended pattern for initializing controlled forms
   useEffect(() => {
     if (!isOpen) return;
 
+    /* eslint-disable react-hooks/set-state-in-effect */
     if (workOrder) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setFormData({
         customerId: workOrder.customerId,
+        serviceLocationId: workOrder.serviceLocationId,
         status: workOrder.status,
         scheduledDate: workOrder.scheduledDate || '',
         description: workOrder.description || '',
         notes: workOrder.notes || '',
       });
+      setSelectedLocation(null); // TODO: Load from workOrder if editing
     } else {
-       
       setFormData({
         customerId: '',
+        serviceLocationId: '',
         status: 'PENDING',
         scheduledDate: '',
         description: '',
         notes: '',
       });
+      setSelectedLocation(null);
     }
+    /* eslint-enable react-hooks/set-state-in-effect */
   }, [workOrder, isOpen]);
 
   const createMutation = useMutation({
@@ -97,11 +98,22 @@ export default function WorkOrderFormDialog({ isOpen, onClose, workOrder }: Work
     },
   });
 
+  const handleLocationChange = (location: ServiceLocationSearchResult | null) => {
+    setSelectedLocation(location);
+    if (location) {
+      setFormData((prev) => ({
+        ...prev,
+        customerId: location.customerId,
+        serviceLocationId: location.id,
+      }));
+    }
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formData.customerId) {
-      alert(t('workOrders.form.customerRequired'));
+    if (!formData.serviceLocationId) {
+      alert('Please select a service location');
       return;
     }
 
@@ -133,23 +145,13 @@ export default function WorkOrderFormDialog({ isOpen, onClose, workOrder }: Work
         <form onSubmit={handleSubmit} id="work-order-form">
           <Fieldset>
             <FieldGroup>
-              <Field>
-                <Label>{getName('customer')} *</Label>
-                <Select
-                  name="customerId"
-                  value={formData.customerId}
-                  onChange={(e) => handleChange('customerId', e.target.value)}
-                  required
-                  disabled={isEdit}
-                >
-                  <option value="">{t('workOrders.form.customerPlaceholder')}</option>
-                  {customers?.map((customer) => (
-                    <option key={customer.id} value={customer.id}>
-                      {customer.name} ({customer.email})
-                    </option>
-                  ))}
-                </Select>
-              </Field>
+              <ServiceLocationPicker
+                value={selectedLocation}
+                onChange={handleLocationChange}
+                label={getName('service_location')}
+                required
+                autoFocus
+              />
 
               {isEdit && (
                 <Field>

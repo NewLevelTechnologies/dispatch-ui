@@ -42,14 +42,6 @@ export default function WorkOrdersPage() {
     queryFn: () => workOrderApi.getAll(),
   });
 
-  const formatCurrency = (amount?: number) => {
-    if (!amount) return '-';
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-    }).format(amount);
-  };
-
   const formatDate = (dateString?: string) => {
     if (!dateString) return '-';
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -67,6 +59,7 @@ export default function WorkOrdersPage() {
     const query = searchQuery.toLowerCase();
     return workOrders.filter(
       (workOrder) =>
+        workOrder.workOrderNumber?.toLowerCase().includes(query) ||
         workOrder.id.toLowerCase().includes(query) ||
         workOrder.customerId.toLowerCase().includes(query) ||
         workOrder.status.toLowerCase().includes(query) ||
@@ -164,10 +157,9 @@ export default function WorkOrdersPage() {
             <TableHead>
               <TableRow>
                 <TableHeader>{t('workOrders.table.id')}</TableHeader>
-                <TableHeader>{t('entities.customer')}</TableHeader>
+                <TableHeader>{getName('service_location')}</TableHeader>
                 <TableHeader>{t('common.form.status')}</TableHeader>
                 <TableHeader>{t('workOrders.table.scheduled')}</TableHeader>
-                <TableHeader>{t('workOrders.table.amount')}</TableHeader>
                 <TableHeader>{t('common.form.description')}</TableHeader>
                 <TableHeader></TableHeader>
               </TableRow>
@@ -176,10 +168,18 @@ export default function WorkOrdersPage() {
               {filteredWorkOrders.map((workOrder) => (
                 <TableRow key={workOrder.id}>
                   <TableCell className="font-mono text-sm text-zinc-500">
-                    {workOrder.id.substring(0, 8)}...
+                    {workOrder.workOrderNumber || `#${workOrder.id.substring(0, 8)}`}
                   </TableCell>
                   <TableCell className="font-medium">
-                    {workOrder.customerId.substring(0, 8)}...
+                    <div className="flex flex-col">
+                      <span>
+                        {workOrder.serviceLocation?.locationName || workOrder.customer?.name || '-'}
+                      </span>
+                      <span className="text-sm text-zinc-500">
+                        {workOrder.serviceLocation?.address.streetAddress || ''}{' '}
+                        {workOrder.serviceLocation?.address.city || ''}, {workOrder.serviceLocation?.address.state || ''}
+                      </span>
+                    </div>
                   </TableCell>
                   <TableCell>
                     <Badge color={STATUS_COLORS[workOrder.status]}>
@@ -188,9 +188,6 @@ export default function WorkOrdersPage() {
                   </TableCell>
                   <TableCell className="text-zinc-500">
                     {formatDate(workOrder.scheduledDate)}
-                  </TableCell>
-                  <TableCell className="text-zinc-500">
-                    {formatCurrency(workOrder.totalAmount)}
                   </TableCell>
                   <TableCell className="text-zinc-500">
                     {workOrder.description

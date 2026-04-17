@@ -48,6 +48,30 @@ export interface ServiceLocation {
   version: number;
 }
 
+export interface ServiceLocationSearchResult {
+  id: string;
+  customerId: string;
+  customerName: string;
+  locationName?: string | null;
+  address: {
+    streetAddress: string;
+    city: string;
+    state: string;
+    zipCode: string;
+  };
+  siteContactName?: string | null;
+  siteContactPhone?: string | null;
+  status: 'ACTIVE' | 'INACTIVE' | 'CLOSED';
+}
+
+export interface ServiceLocationSearchResponse {
+  content: ServiceLocationSearchResult[];
+  totalElements: number;
+  totalPages: number;
+  size: number;
+  number: number;
+}
+
 export type CustomerDisplayMode = 'SIMPLE' | 'STANDARD';
 export type CustomerStatus = 'ACTIVE' | 'INACTIVE';
 
@@ -226,6 +250,13 @@ export const customerApi = {
   search: async (name: string): Promise<Customer[]> => {
     const response = await apiClient.get<Customer[]>('/customers/search', {
       params: { name },
+    });
+    return response.data;
+  },
+
+  searchServiceLocations: async (query: string, page = 0, size = 50): Promise<ServiceLocationSearchResponse> => {
+    const response = await apiClient.get<ServiceLocationSearchResponse>('/service-locations/search', {
+      params: { q: query, page, size },
     });
     return response.data;
   },
