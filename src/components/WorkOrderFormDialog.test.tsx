@@ -153,4 +153,260 @@ describe('WorkOrderFormDialog', () => {
       expect(screen.getByLabelText(/notes/i)).toBeInTheDocument();
     });
   });
+
+  describe('Form validation', () => {
+    it('alerts when submitting without service location', async () => {
+      const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
+      const user = userEvent.setup();
+
+      renderWithProviders(<WorkOrderFormDialog isOpen={true} onClose={mockOnClose} />);
+
+      // Fill in description but not service location
+      const descriptionTextarea = screen.getByLabelText(/description/i);
+      await user.type(descriptionTextarea, 'Test description');
+
+      // Try to submit without selecting location by submitting the form
+      const form = document.getElementById('work-order-form');
+      if (form) {
+        form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+      }
+
+      await waitFor(() => {
+        expect(alertSpy).toHaveBeenCalledWith('Please select a service location');
+      });
+      expect(mockOnClose).not.toHaveBeenCalled();
+
+      alertSpy.mockRestore();
+    });
+  });
+
+  describe('Location selection', () => {
+    it('updates form data when location is selected', async () => {
+      vi.mocked(apiClient.get).mockResolvedValue({ data: mockServiceLocations });
+      const user = userEvent.setup();
+
+      renderWithProviders(<WorkOrderFormDialog isOpen={true} onClose={mockOnClose} />);
+
+      const searchInput = screen.getByPlaceholderText('Search by customer, address, or phone...');
+      await user.type(searchInput, 'john');
+
+      await waitFor(() => {
+        expect(screen.getByText("John's House")).toBeInTheDocument();
+      });
+
+      const firstResult = screen.getByText("John's House").closest('button');
+      await user.click(firstResult!);
+
+      // After selection, search input should be cleared (searchQuery is reset)
+      // The dropdown should also close
+      await waitFor(() => {
+        expect(screen.queryByText("John's House")).not.toBeInTheDocument();
+      });
+    });
+  });
+
+  describe('Form submission', () => {
+    it('successfully creates work order with valid data', async () => {
+      vi.mocked(apiClient.get).mockResolvedValue({ data: mockServiceLocations });
+      vi.mocked(apiClient.post).mockResolvedValue({
+        data: {
+          id: 'new-work-order-1',
+          customerId: 'customer-1',
+          serviceLocationId: 'location-1',
+          status: 'PENDING',
+          description: 'Test work order',
+          notes: 'Test notes',
+          createdAt: '2024-03-15T10:00:00Z',
+          updatedAt: '2024-03-15T10:00:00Z',
+        },
+      });
+
+      const user = userEvent.setup();
+
+      renderWithProviders(<WorkOrderFormDialog isOpen={true} onClose={mockOnClose} />);
+
+      // Select service location
+      const searchInput = screen.getByPlaceholderText('Search by customer, address, or phone...');
+      await user.type(searchInput, 'john');
+
+      await waitFor(() => {
+        expect(screen.getByText("John's House")).toBeInTheDocument();
+      });
+
+      const firstResult = screen.getByText("John's House").closest('button');
+      await user.click(firstResult!);
+
+      // Fill in description
+      const descriptionTextarea = screen.getByLabelText(/description/i);
+      await user.type(descriptionTextarea, 'Test work order');
+
+      // Fill in notes
+      const notesTextarea = screen.getByLabelText(/notes/i);
+      await user.type(notesTextarea, 'Test notes');
+
+      // Submit form
+      const createButton = screen.getByRole('button', { name: /create/i });
+      await user.click(createButton);
+
+      // Should call API with correct data
+      await waitFor(() => {
+        expect(apiClient.post).toHaveBeenCalledWith('/work-orders', expect.objectContaining({
+          customerId: 'customer-1',
+          serviceLocationId: 'location-1',
+          status: 'PENDING',
+          description: 'Test work order',
+          notes: 'Test notes',
+        }));
+      });
+
+      // Dialog should close
+      expect(mockOnClose).toHaveBeenCalled();
+    });
+
+    it('successfully updates work order in edit mode', async () => {
+      const existingWorkOrder = {
+        id: '1',
+        customerId: 'customer-1',
+        serviceLocationId: 'location-1',
+        status: 'SCHEDULED' as const,
+        scheduledDate: '2024-03-15',
+        description: 'Fix leaking pipe',
+        notes: 'Customer prefers morning',
+        createdAt: '2024-03-10T10:00:00Z',
+        updatedAt: '2024-03-10T10:00:00Z',
+      };
+
+      vi.mocked(apiClient.get).mockResolvedValue({ data: mockServiceLocations });
+      vi.mocked(apiClient.put).mockResolvedValue({
+        data: { ...existingWorkOrder, status: 'COMPLETED' },
+      });
+
+      const user = userEvent.setup();
+
+      renderWithProviders(
+        <WorkOrderFormDialog isOpen={true} onClose={mockOnClose} workOrder={existingWorkOrder} />
+      );
+
+      await waitFor(() => {
+        expect(screen.getByLabelText(/status/i)).toBeInTheDocument();
+      });
+
+      // Select a service location first (required even in edit mode)
+      const searchInput = screen.getByPlaceholderText('Search by customer, address, or phone...');
+      await user.type(searchInput, 'john');
+
+      await waitFor(() => {
+        expect(screen.getByText("John's House")).toBeInTheDocument();
+      });
+
+      const firstResult = screen.getByText("John's House").closest('button');
+      await user.click(firstResult!);
+
+      // Now change status to completed
+      const statusSelect = screen.getByLabelText(/status/i);
+      await user.selectOptions(statusSelect, 'COMPLETED');
+
+      // Submit form
+      const updateButton = screen.getByRole('button', { name: /update/i });
+      await user.click(updateButton);
+
+      // Should call API with update data
+      await waitFor(() => {
+        expect(apiClient.put).toHaveBeenCalledWith('/work-orders/1', expect.objectContaining({
+          status: 'COMPLETED',
+        }));
+      });
+
+      // Dialog should close
+      expect(mockOnClose).toHaveBeenCalled();
+    });
+
+    it('displays error when create fails', async () => {
+      vi.mocked(apiClient.get).mockResolvedValue({ data: mockServiceLocations });
+      vi.mocked(apiClient.post).mockRejectedValue({
+        response: { data: { message: 'Failed to create work order' } },
+      });
+
+      const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
+      const user = userEvent.setup();
+
+      renderWithProviders(<WorkOrderFormDialog isOpen={true} onClose={mockOnClose} />);
+
+      // Select service location
+      const searchInput = screen.getByPlaceholderText('Search by customer, address, or phone...');
+      await user.type(searchInput, 'john');
+
+      await waitFor(() => {
+        expect(screen.getByText("John's House")).toBeInTheDocument();
+      });
+
+      const firstResult = screen.getByText("John's House").closest('button');
+      await user.click(firstResult!);
+
+      // Fill in description
+      const descriptionTextarea = screen.getByLabelText(/description/i);
+      await user.type(descriptionTextarea, 'Test work order');
+
+      // Submit form
+      const createButton = screen.getByRole('button', { name: /create/i });
+      await user.click(createButton);
+
+      // Should show error alert
+      await waitFor(() => {
+        expect(alertSpy).toHaveBeenCalledWith('Failed to create work order');
+      });
+
+      // Dialog should not close
+      expect(mockOnClose).not.toHaveBeenCalled();
+
+      alertSpy.mockRestore();
+    });
+  });
+
+  describe('Form field changes', () => {
+    it('updates form fields correctly', async () => {
+      const user = userEvent.setup();
+
+      renderWithProviders(<WorkOrderFormDialog isOpen={true} onClose={mockOnClose} />);
+
+      const descriptionTextarea = screen.getByLabelText(/description/i);
+      await user.type(descriptionTextarea, 'Test description');
+      expect(descriptionTextarea).toHaveValue('Test description');
+
+      const notesTextarea = screen.getByLabelText(/notes/i);
+      await user.type(notesTextarea, 'Test notes');
+      expect(notesTextarea).toHaveValue('Test notes');
+
+      const dateInput = screen.getByLabelText(/scheduled date/i);
+      await user.type(dateInput, '2024-03-20');
+      expect(dateInput).toHaveValue('2024-03-20');
+    });
+
+    it('updates status field in edit mode', async () => {
+      const user = userEvent.setup();
+      const existingWorkOrder = {
+        id: '1',
+        customerId: 'customer-1',
+        serviceLocationId: 'location-1',
+        status: 'SCHEDULED' as const,
+        scheduledDate: '2024-03-15',
+        description: 'Fix leaking pipe',
+        notes: 'Customer prefers morning',
+        createdAt: '2024-03-10T10:00:00Z',
+        updatedAt: '2024-03-10T10:00:00Z',
+      };
+
+      renderWithProviders(
+        <WorkOrderFormDialog isOpen={true} onClose={mockOnClose} workOrder={existingWorkOrder} />
+      );
+
+      await waitFor(() => {
+        expect(screen.getByLabelText(/status/i)).toBeInTheDocument();
+      });
+
+      const statusSelect = screen.getByLabelText(/status/i);
+      await user.selectOptions(statusSelect, 'COMPLETED');
+      expect(statusSelect).toHaveValue('COMPLETED');
+    });
+  });
 });

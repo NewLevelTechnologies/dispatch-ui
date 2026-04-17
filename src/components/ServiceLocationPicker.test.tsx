@@ -346,4 +346,172 @@ describe('ServiceLocationPicker', () => {
       expect(screen.getByText('No locations found')).toBeInTheDocument();
     });
   });
+
+  it('calls onChange with formatted location when location name is present', async () => {
+    const user = userEvent.setup();
+    vi.mocked(apiClient.get).mockResolvedValue({ data: mockSearchResults });
+
+    renderWithProviders(
+      <ServiceLocationPicker
+        value={null}
+        onChange={mockOnChange}
+      />
+    );
+
+    const input = screen.getByPlaceholderText('Search by customer, address, or phone...');
+    await user.type(input, 'john');
+
+    await waitFor(() => {
+      expect(screen.getByText("John's House")).toBeInTheDocument();
+    });
+
+    const firstResult = screen.getByText("John's House").closest('button');
+    await user.click(firstResult!);
+
+    // Should call onChange with the selected location
+    expect(mockOnChange).toHaveBeenCalledWith(mockSearchResults.content[0]);
+
+    // Input should be cleared after selection (searchQuery is reset)
+    expect(input).toHaveValue('');
+  });
+
+  it('calls onChange with formatted location when location name is null', async () => {
+    const user = userEvent.setup();
+    vi.mocked(apiClient.get).mockResolvedValue({ data: mockSearchResults });
+
+    renderWithProviders(
+      <ServiceLocationPicker
+        value={null}
+        onChange={mockOnChange}
+      />
+    );
+
+    const input = screen.getByPlaceholderText('Search by customer, address, or phone...');
+    await user.type(input, 'jane');
+
+    await waitFor(() => {
+      expect(screen.getByText('Jane Smith')).toBeInTheDocument();
+    });
+
+    const secondResult = screen.getByText('Jane Smith').closest('button');
+    await user.click(secondResult!);
+
+    // Should call onChange with the selected location
+    expect(mockOnChange).toHaveBeenCalledWith(mockSearchResults.content[1]);
+
+    // Input should be cleared after selection (searchQuery is reset)
+    expect(input).toHaveValue('');
+  });
+
+  it('does not show dropdown when typing only 1 character', async () => {
+    const user = userEvent.setup();
+    vi.mocked(apiClient.get).mockResolvedValue({ data: mockSearchResults });
+
+    renderWithProviders(
+      <ServiceLocationPicker
+        value={null}
+        onChange={mockOnChange}
+      />
+    );
+
+    const input = screen.getByPlaceholderText('Search by customer, address, or phone...');
+    await user.type(input, 'j');
+
+    // Should show minimum character message
+    expect(screen.getByText('Type at least 2 characters to search')).toBeInTheDocument();
+
+    // Should not make API call
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    expect(apiClient.get).not.toHaveBeenCalled();
+
+    // Should not show dropdown results
+    expect(screen.queryByText("John's House")).not.toBeInTheDocument();
+  });
+
+  it('allows user to search again after selecting a value', async () => {
+    const user = userEvent.setup();
+    const selectedLocation = mockSearchResults.content[0];
+
+    renderWithProviders(
+      <ServiceLocationPicker
+        value={selectedLocation}
+        onChange={mockOnChange}
+      />
+    );
+
+    const input = screen.getByPlaceholderText('Search by customer, address, or phone...');
+
+    // Should show formatted value initially
+    expect(input).toHaveValue("John's House - 123 Main St, Atlanta, GA");
+
+    // Focus triggers onFocus handler that clears searchQuery
+    await user.click(input);
+
+    // Type new search - should override the display value
+    await user.type(input, 'test');
+
+    // Input should now show the new search text appended
+    // (Since displayValue is shown when searchQuery is empty, typing adds to it)
+    expect(input.value).toContain('test');
+  });
+
+  it('handles rapid typing with debounce correctly', async () => {
+    const user = userEvent.setup();
+    vi.mocked(apiClient.get).mockResolvedValue({ data: mockSearchResults });
+
+    renderWithProviders(
+      <ServiceLocationPicker
+        value={null}
+        onChange={mockOnChange}
+      />
+    );
+
+    const input = screen.getByPlaceholderText('Search by customer, address, or phone...');
+
+    // Type quickly
+    await user.type(input, 'jo');
+
+    // Should not call API immediately
+    expect(apiClient.get).not.toHaveBeenCalled();
+
+    // Wait for debounce
+    await waitFor(() => {
+      expect(apiClient.get).toHaveBeenCalledWith('/service-locations/search', {
+        params: { q: 'jo', page: 0, size: 50 },
+      });
+    });
+
+    // Should only call API once after debounce delay
+    expect(apiClient.get).toHaveBeenCalledTimes(1);
+  });
+
+  it('updates dropdown visibility when search query changes length', async () => {
+    const user = userEvent.setup();
+    vi.mocked(apiClient.get).mockResolvedValue({ data: mockSearchResults });
+
+    renderWithProviders(
+      <ServiceLocationPicker
+        value={null}
+        onChange={mockOnChange}
+      />
+    );
+
+    const input = screen.getByPlaceholderText('Search by customer, address, or phone...');
+
+    // Type 1 character - no dropdown
+    await user.type(input, 'j');
+    expect(screen.queryByText('Searching...')).not.toBeInTheDocument();
+
+    // Type second character - show dropdown
+    await user.type(input, 'o');
+    await waitFor(() => {
+      expect(screen.getByText("John's House")).toBeInTheDocument();
+    });
+
+    // Clear input - hide dropdown
+    await user.clear(input);
+    await waitFor(() => {
+      expect(screen.queryByText("John's House")).not.toBeInTheDocument();
+    });
+  });
 });
