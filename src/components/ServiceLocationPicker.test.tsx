@@ -452,7 +452,7 @@ describe('ServiceLocationPicker', () => {
 
     // Input should now show the new search text appended
     // (Since displayValue is shown when searchQuery is empty, typing adds to it)
-    expect(input.value).toContain('test');
+    expect((input as HTMLInputElement).value).toContain('test');
   });
 
   it('handles rapid typing with debounce correctly', async () => {
