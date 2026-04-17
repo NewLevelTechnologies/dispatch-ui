@@ -87,14 +87,14 @@ export default function ServiceLocationPicker({
         />
 
         {shouldShowDropdown && (
-          <div className="absolute z-10 mt-1 w-full rounded-lg bg-white shadow-lg ring-1 ring-zinc-950/10 dark:bg-zinc-800 dark:ring-white/10">
+          <div className="absolute z-10 mt-1 w-full rounded-lg bg-white shadow-lg ring-1 ring-zinc-950/10 dark:bg-zinc-900 dark:ring-white/10">
             {isLoading && (
-              <div className="p-3 text-sm text-zinc-500">Searching...</div>
+              <div className="p-3 text-sm text-zinc-600 dark:text-zinc-400">Searching...</div>
             )}
 
             {!isLoading && locations.length === 0 && (
               /* eslint-disable-next-line i18next/no-literal-string */
-              <div className="p-3 text-sm text-zinc-500">No locations found</div>
+              <div className="p-3 text-sm text-zinc-600 dark:text-zinc-400">No locations found</div>
             )}
 
             {!isLoading && locations.length > 0 && (
@@ -104,12 +104,12 @@ export default function ServiceLocationPicker({
                     key={location.id}
                     type="button"
                     onClick={() => handleSelect(location)}
-                    className="w-full rounded-lg px-3 py-2 text-left hover:bg-blue-500 hover:text-white focus:bg-blue-500 focus:text-white focus:outline-hidden"
+                    className="w-full rounded-lg px-3 py-2.5 text-left transition-colors hover:bg-blue-500 hover:text-white focus:bg-blue-500 focus:text-white focus:outline-hidden dark:text-white dark:hover:bg-blue-600"
                   >
-                    <div className="font-medium">
+                    <div className="font-medium text-zinc-950 dark:text-white group-hover:text-white">
                       {location.locationName || location.customerName}
                     </div>
-                    <div className="text-sm opacity-75">
+                    <div className="text-sm text-zinc-600 dark:text-zinc-400 group-hover:text-white">
                       {location.address.streetAddress}, {location.address.city}, {location.address.state} {location.address.zipCode}
                     </div>
                   </button>

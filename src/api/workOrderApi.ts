@@ -23,6 +23,25 @@ export interface WorkOrder {
   totalAmount?: number;
   createdAt: string;
   updatedAt: string;
+  // Enriched response fields from backend
+  customer?: {
+    id: string;
+    name: string;
+    email: string;
+    phone?: string;
+  };
+  serviceLocation?: {
+    id: string;
+    locationName?: string;
+    address: {
+      streetAddress: string;
+      city: string;
+      state: string;
+      zipCode: string;
+    };
+    siteContactName?: string;
+    siteContactPhone?: string;
+  };
 }
 
 export interface CreateWorkOrderRequest {
