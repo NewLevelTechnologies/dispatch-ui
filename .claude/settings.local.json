@@ -38,7 +38,8 @@
       "WebFetch(domain:github.com)",
       "Bash(cat)",
       "Bash(chmod +x /tmp/update_tests.sh)",
-      "Bash(/tmp/update_tests.sh)"
+      "Bash(/tmp/update_tests.sh)",
+      "Bash(git reset *)"
     ]
   }
 }
