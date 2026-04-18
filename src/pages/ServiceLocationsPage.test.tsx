@@ -249,4 +249,369 @@ describe('ServiceLocationsPage', () => {
       expect(screen.getByText('2 service locations')).toBeInTheDocument();
     });
   });
+
+  it('filters locations by inactive status', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({ data: mockCustomers });
+    const user = userEvent.setup();
+
+    renderWithProviders(<ServiceLocationsPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Main Office')).toBeInTheDocument();
+    });
+
+    // Filter to INACTIVE only
+    const inactiveButton = screen.getByRole('button', { name: /^inactive$/i });
+    await user.click(inactiveButton);
+
+    // Only inactive location visible
+    expect(screen.queryByText('Main Office')).not.toBeInTheDocument();
+    expect(screen.getByText('Warehouse')).toBeInTheDocument();
+  });
+
+  it('filters locations by closed status', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({ data: mockCustomers });
+    const user = userEvent.setup();
+
+    renderWithProviders(<ServiceLocationsPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Main Office')).toBeInTheDocument();
+    });
+
+    // Filter to CLOSED only
+    const closedButton = screen.getByRole('button', { name: /^closed$/i });
+    await user.click(closedButton);
+
+    // No locations should be visible (none are closed)
+    expect(screen.queryByText('Main Office')).not.toBeInTheDocument();
+    expect(screen.queryByText('Warehouse')).not.toBeInTheDocument();
+  });
+
+  it('displays filtered count when filter is active', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({ data: mockCustomers });
+    const user = userEvent.setup();
+
+    renderWithProviders(<ServiceLocationsPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('2 service locations')).toBeInTheDocument();
+    });
+
+    // Filter to ACTIVE only
+    const activeButton = screen.getByRole('button', { name: /^active$/i });
+    await user.click(activeButton);
+
+    // Should show filtered count
+    await waitFor(() => {
+      expect(screen.getByText('1 of 2')).toBeInTheDocument();
+    });
+  });
+
+  it('resets filter when "all" button is clicked', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({ data: mockCustomers });
+    const user = userEvent.setup();
+
+    renderWithProviders(<ServiceLocationsPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Main Office')).toBeInTheDocument();
+    });
+
+    // Filter to ACTIVE only
+    const activeButton = screen.getByRole('button', { name: /^active$/i });
+    await user.click(activeButton);
+
+    await waitFor(() => {
+      expect(screen.queryByText('Warehouse')).not.toBeInTheDocument();
+    });
+
+    // Reset filter
+    const allButton = screen.getByRole('button', { name: /all statuses/i });
+    await user.click(allButton);
+
+    // Both locations should be visible again
+    await waitFor(() => {
+      expect(screen.getByText('Main Office')).toBeInTheDocument();
+      expect(screen.getByText('Warehouse')).toBeInTheDocument();
+    });
+  });
+
+  it('displays "add first" button in empty state', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({ data: [] });
+
+    renderWithProviders(<ServiceLocationsPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/no service locations found/i)).toBeInTheDocument();
+    });
+
+    // Should show "add first" button (using regex to match partial text)
+    const addButton = screen.getByRole('button', { name: /add your first/i });
+    expect(addButton).toBeInTheDocument();
+  });
+
+  it('opens dialog when "add first" button is clicked', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({ data: [] });
+    const user = userEvent.setup();
+
+    renderWithProviders(<ServiceLocationsPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/no service locations found/i)).toBeInTheDocument();
+    });
+
+    const addFirstButton = screen.getByRole('button', { name: /add your first/i });
+    await user.click(addFirstButton);
+
+    // Dialog should open
+    await waitFor(() => {
+      expect(screen.getByRole('dialog')).toBeInTheDocument();
+    });
+  });
+
+  it('displays no match message when search returns no results', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({ data: mockCustomers });
+    const user = userEvent.setup();
+
+    renderWithProviders(<ServiceLocationsPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Main Office')).toBeInTheDocument();
+    });
+
+    // Search for something that doesn't exist
+    const searchInput = screen.getByPlaceholderText(/search/i);
+    await user.type(searchInput, 'nonexistent location');
+
+    // Should show no match message
+    await waitFor(() => {
+      expect(screen.getByText(/no .* match/i)).toBeInTheDocument();
+    });
+  });
+
+  it('closes dialog when handleCloseDialog is called', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({ data: mockCustomers });
+    const user = userEvent.setup();
+
+    renderWithProviders(<ServiceLocationsPage />);
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Service Locations' })).toBeInTheDocument();
+    });
+
+    // Open dialog
+    const addButton = screen.getByRole('button', { name: /add service location/i });
+    await user.click(addButton);
+
+    await waitFor(() => {
+      expect(screen.getByRole('dialog')).toBeInTheDocument();
+    });
+
+    // Close dialog
+    const cancelButton = screen.getByRole('button', { name: /cancel/i });
+    await user.click(cancelButton);
+
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    });
+  });
+
+  it('shows view option in dropdown menu', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({ data: mockCustomers });
+    const user = userEvent.setup();
+
+    renderWithProviders(<ServiceLocationsPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Main Office')).toBeInTheDocument();
+    });
+
+    // Click the dropdown menu button
+    const dropdownButtons = screen.getAllByLabelText(/more options/i);
+    await user.click(dropdownButtons[0]);
+
+    // View option should be available
+    const viewButton = screen.getByRole('menuitem', { name: /^view$/i });
+    expect(viewButton).toBeInTheDocument();
+  });
+
+  it('displays phone number as clickable link', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({ data: mockCustomers });
+
+    renderWithProviders(<ServiceLocationsPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Main Office')).toBeInTheDocument();
+    });
+
+    // Phone should be a link
+    const phoneLink = screen.getByRole('link', { name: /\(555\) 123-4567/i });
+    expect(phoneLink).toHaveAttribute('href', 'tel:5551234567');
+  });
+
+  it('displays dash when no contact information available', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({ data: mockCustomers });
+
+    renderWithProviders(<ServiceLocationsPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Warehouse')).toBeInTheDocument();
+    });
+
+    // Warehouse has no contact, should show dash
+    const rows = screen.getAllByRole('row');
+    const warehouseRow = rows.find(row => row.textContent?.includes('Warehouse'));
+    expect(warehouseRow?.textContent).toContain('-');
+  });
+
+  it('displays location with streetAddressLine2', async () => {
+    const customerWithLine2 = {
+      ...mockCustomers[0],
+      serviceLocations: [
+        {
+          ...mockCustomers[0].serviceLocations[0],
+          address: {
+            ...mockCustomers[0].serviceLocations[0].address,
+            streetAddressLine2: 'Suite 200',
+          },
+        },
+      ],
+    };
+
+    vi.mocked(apiClient.get).mockResolvedValue({ data: [customerWithLine2] });
+
+    renderWithProviders(<ServiceLocationsPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/suite 200/i)).toBeInTheDocument();
+    });
+  });
+
+  it('cancels close location when confirm dialog is dismissed', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({ data: mockCustomers });
+
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    const user = userEvent.setup();
+
+    renderWithProviders(<ServiceLocationsPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Main Office')).toBeInTheDocument();
+    });
+
+    // Click the dropdown menu button
+    const dropdownButtons = screen.getAllByLabelText(/more options/i);
+    await user.click(dropdownButtons[0]);
+
+    // Click close option
+    const closeButton = screen.getByRole('menuitem', { name: /close location/i });
+    await user.click(closeButton);
+
+    // Confirm dialog should appear but user cancels
+    expect(confirmSpy).toHaveBeenCalled();
+    expect(apiClient.post).not.toHaveBeenCalled();
+
+    confirmSpy.mockRestore();
+  });
+
+  it('does not show close option for already closed locations', async () => {
+    const closedCustomer = {
+      ...mockCustomers[0],
+      serviceLocations: [
+        {
+          ...mockCustomers[0].serviceLocations[0],
+          status: 'CLOSED' as const,
+        },
+      ],
+    };
+
+    vi.mocked(apiClient.get).mockResolvedValue({ data: [closedCustomer] });
+    const user = userEvent.setup();
+
+    renderWithProviders(<ServiceLocationsPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Main Office')).toBeInTheDocument();
+    });
+
+    // Click the dropdown menu button
+    const dropdownButtons = screen.getAllByLabelText(/more options/i);
+    await user.click(dropdownButtons[0]);
+
+    // Close option should NOT be available
+    expect(screen.queryByRole('menuitem', { name: /close location/i })).not.toBeInTheDocument();
+  });
+
+  it('searches by city', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({ data: mockCustomers });
+    const user = userEvent.setup();
+
+    renderWithProviders(<ServiceLocationsPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Main Office')).toBeInTheDocument();
+    });
+
+    // Search by city
+    const searchInput = screen.getByPlaceholderText(/search/i);
+    await user.type(searchInput, 'springfield');
+
+    // Both locations are in Springfield
+    expect(screen.getByText('Main Office')).toBeInTheDocument();
+    expect(screen.getByText('Warehouse')).toBeInTheDocument();
+  });
+
+  it('searches by customer name', async () => {
+    const multipleCustomers = [
+      ...mockCustomers,
+      {
+        ...mockCustomers[0],
+        id: 'customer-2',
+        name: 'Different Customer',
+        serviceLocations: [
+          {
+            ...mockCustomers[0].serviceLocations[0],
+            id: 'location-3',
+            locationName: 'Remote Office',
+          },
+        ],
+      },
+    ];
+
+    vi.mocked(apiClient.get).mockResolvedValue({ data: multipleCustomers });
+    const user = userEvent.setup();
+
+    renderWithProviders(<ServiceLocationsPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Main Office')).toBeInTheDocument();
+      expect(screen.getByText('Remote Office')).toBeInTheDocument();
+    });
+
+    // Search by customer name
+    const searchInput = screen.getByPlaceholderText(/search/i);
+    await user.type(searchInput, 'different');
+
+    // Only "Different Customer" locations should be visible
+    await waitFor(() => {
+      expect(screen.queryByText('Main Office')).not.toBeInTheDocument();
+      expect(screen.getByText('Remote Office')).toBeInTheDocument();
+    });
+  });
+
+  it('displays singular form for single location count', async () => {
+    const singleLocationCustomer = {
+      ...mockCustomers[0],
+      serviceLocations: [mockCustomers[0].serviceLocations[0]],
+    };
+
+    vi.mocked(apiClient.get).mockResolvedValue({ data: [singleLocationCustomer] });
+
+    renderWithProviders(<ServiceLocationsPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/1 service location$/i)).toBeInTheDocument();
+    });
+  });
 });
