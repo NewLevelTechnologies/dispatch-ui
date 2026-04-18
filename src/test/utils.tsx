@@ -58,6 +58,10 @@ export function renderWithProviders(
       element: ui, // Render the component being tested for detail routes
     },
     {
+      path: '/users/:id',
+      element: ui, // Render the component being tested for user detail routes
+    },
+    {
       path: '*',
       element: ui,
     },
