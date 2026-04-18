@@ -1030,6 +1030,23 @@ vi.mocked(apiClient.get).mockResolvedValue({ data: mockData });
 4. **Simulate user interactions with `userEvent`**: `await user.click(button)`
 5. **Use accessible queries**: `screen.getByRole('button', { name: /submit/i })`
 6. **Test user-facing behavior, not implementation**: Test what user sees, not internal state
+7. **Mock window.confirm for confirmation dialogs**: `vi.spyOn(window, 'confirm').mockReturnValue(true)`
+
+### Testing Headless UI / Catalyst Components
+
+**Headless UI components ARE fully testable** - they use proper ARIA roles making them easier to test:
+
+```typescript
+// Dropdown/Menu: Find button, click to open, find menuitem
+const dropdownButton = allButtons.find(btn => 
+  btn.closest('td') && btn.querySelector('svg')
+);
+await user.click(dropdownButton!);
+const menuItem = await screen.findByRole('menuitem', { name: /edit/i });
+await user.click(menuItem);
+```
+
+**ARIA roles used**: `menu`, `menuitem`, `tab`, `tabpanel`, `dialog` - all standard RTL queries work.
 
 ### What to Test
 

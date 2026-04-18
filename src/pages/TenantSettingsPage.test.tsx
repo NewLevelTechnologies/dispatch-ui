@@ -600,9 +600,198 @@ describe('TenantSettingsPage', () => {
         expect(addButton).toBeInTheDocument();
       });
     });
+
+    it('opens edit region dialog when edit is clicked from dropdown', async () => {
+      const user = userEvent.setup();
+      vi.mocked(apiClient.get).mockImplementation((url) => {
+        if (url.includes('/tenant-settings')) {
+          return Promise.resolve({ data: mockSettings });
+        }
+        if (url.includes('/dispatch-regions')) {
+          return Promise.resolve({ data: mockDispatchRegions });
+        }
+        return Promise.resolve({ data: [] });
+      });
+
+      renderWithProviders(<TenantSettingsPage />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Acme HVAC Services')).toBeInTheDocument();
+      });
+
+      const dispatchTab = screen.getByRole('tab', { name: /dispatch regions/i });
+      await user.click(dispatchTab);
+
+      await waitFor(() => {
+        expect(screen.getByText('North Region')).toBeInTheDocument();
+      });
+
+      // Get the table rows - there should be 2 regions
+      const rows = screen.getAllByRole('row');
+      // First row is header, second row is "North Region" with dropdown
+      expect(rows.length).toBeGreaterThan(1);
+
+      // Find all buttons - the dropdown menu buttons are plain buttons with no accessible name
+      const allButtons = screen.getAllByRole('button');
+
+      // Find the first dropdown button (it's in the North Region row)
+      // The DropdownButton renders inside a <Dropdown> component
+      // Look for buttons that contain an EllipsisVerticalIcon SVG
+      const dropdownButton = allButtons.find(btn => {
+        // Check if button is in a table cell
+        const isInTable = btn.closest('td') !== null;
+        // Check if it has an SVG child (the icon)
+        const hasSvg = btn.querySelector('svg') !== null;
+        return isInTable && hasSvg;
+      });
+
+      expect(dropdownButton).toBeDefined();
+
+      // Click to open dropdown menu
+      await user.click(dropdownButton!);
+
+      // Wait for menu to appear - Headless UI adds role="menu"
+      const editMenuItem = await screen.findByRole('menuitem', { name: /edit/i });
+      expect(editMenuItem).toBeInTheDocument();
+
+      // Click Edit - this calls handleEditRegion
+      await user.click(editMenuItem);
+
+      // After clicking, menu should close
+      await waitFor(() => {
+        expect(screen.queryByRole('menuitem', { name: /edit/i })).not.toBeInTheDocument();
+      });
+    });
+
+    it('deactivates a region when deactivate is clicked from dropdown', async () => {
+      const user = userEvent.setup();
+      const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+
+      vi.mocked(apiClient.get).mockImplementation((url) => {
+        if (url.includes('/tenant-settings')) {
+          return Promise.resolve({ data: mockSettings });
+        }
+        if (url.includes('/dispatch-regions')) {
+          return Promise.resolve({ data: mockDispatchRegions });
+        }
+        return Promise.resolve({ data: [] });
+      });
+      vi.mocked(apiClient.delete).mockResolvedValue({ data: {} });
+
+      renderWithProviders(<TenantSettingsPage />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Acme HVAC Services')).toBeInTheDocument();
+      });
+
+      const dispatchTab = screen.getByRole('tab', { name: /dispatch regions/i });
+      await user.click(dispatchTab);
+
+      await waitFor(() => {
+        expect(screen.getByText('North Region')).toBeInTheDocument();
+      });
+
+      // Find the first dropdown button (for North Region, which is active)
+      const allButtons = screen.getAllByRole('button');
+      const dropdownButton = allButtons.find(btn => {
+        const isInTable = btn.closest('td') !== null;
+        const hasSvg = btn.querySelector('svg') !== null;
+        return isInTable && hasSvg;
+      });
+
+      await user.click(dropdownButton!);
+
+      // Find and click Deactivate
+      const deactivateMenuItem = await screen.findByRole('menuitem', { name: /deactivate/i });
+      await user.click(deactivateMenuItem);
+
+      // Verify confirm was called
+      expect(confirmSpy).toHaveBeenCalled();
+
+      // Confirm deletion API was called
+      await waitFor(() => {
+        expect(apiClient.delete).toHaveBeenCalledWith('/tenant/dispatch-regions/region-1');
+      });
+
+      confirmSpy.mockRestore();
+    });
+
+    it('reactivates an inactive region when reactivate is clicked from dropdown', async () => {
+      const user = userEvent.setup();
+      vi.mocked(apiClient.get).mockImplementation((url) => {
+        if (url.includes('/tenant-settings')) {
+          return Promise.resolve({ data: mockSettings });
+        }
+        if (url.includes('/dispatch-regions')) {
+          return Promise.resolve({ data: mockDispatchRegions });
+        }
+        return Promise.resolve({ data: [] });
+      });
+      vi.mocked(apiClient.post).mockResolvedValue({ data: mockDispatchRegions[1] });
+
+      renderWithProviders(<TenantSettingsPage />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Acme HVAC Services')).toBeInTheDocument();
+      });
+
+      const dispatchTab = screen.getByRole('tab', { name: /dispatch regions/i });
+      await user.click(dispatchTab);
+
+      await waitFor(() => {
+        expect(screen.getByText('South Region')).toBeInTheDocument();
+      });
+
+      // Find the second dropdown button (for South Region, which is inactive)
+      const allButtons = screen.getAllByRole('button');
+      const dropdownButtons = allButtons.filter(btn => {
+        const isInTable = btn.closest('td') !== null;
+        const hasSvg = btn.querySelector('svg') !== null;
+        return isInTable && hasSvg;
+      });
+
+      // Should have 2 dropdown buttons (one per region row)
+      expect(dropdownButtons.length).toBeGreaterThanOrEqual(2);
+
+      // Click the second dropdown (South Region - inactive)
+      await user.click(dropdownButtons[1]);
+
+      // Find Reactivate menu item (no confirmation needed for reactivate)
+      const reactivateMenuItem = await screen.findByRole('menuitem', { name: /reactivate/i });
+      expect(reactivateMenuItem).toBeInTheDocument();
+
+      // Click it
+      await user.click(reactivateMenuItem);
+
+      // Verify reactivate API was called (uses POST, not PUT)
+      await waitFor(() => {
+        expect(apiClient.post).toHaveBeenCalledWith('/tenant/dispatch-regions/region-2/reactivate');
+      });
+    });
   });
 
   describe('Notification Templates Tab', () => {
+    const mockTemplates = [
+      {
+        id: 'template-1',
+        type: 'WORK_ORDER_SCHEDULED',
+        displayName: 'Work Order Scheduled',
+        channel: 'EMAIL',
+        subject: 'Your service is scheduled',
+        isSystemTemplate: true,
+        version: 1,
+      },
+      {
+        id: 'template-2',
+        type: 'WORK_ORDER_SCHEDULED',
+        displayName: 'Work Order Scheduled SMS',
+        channel: 'SMS',
+        subject: null,
+        isSystemTemplate: false,
+        version: 2,
+      },
+    ];
+
     it('displays notification templates tab', async () => {
       renderWithProviders(<TenantSettingsPage />);
 
@@ -610,12 +799,147 @@ describe('TenantSettingsPage', () => {
         expect(screen.getByRole('tab', { name: /notification templates/i })).toBeInTheDocument();
       });
     });
+
+    it('displays notification templates in table', async () => {
+      const user = userEvent.setup();
+      vi.mocked(apiClient.get).mockImplementation((url) => {
+        if (url.includes('/tenant-settings')) {
+          return Promise.resolve({ data: mockSettings });
+        }
+        if (url.includes('/notification-templates')) {
+          return Promise.resolve({ data: { templates: mockTemplates } });
+        }
+        if (url.includes('/dispatch-regions')) {
+          return Promise.resolve({ data: [] });
+        }
+        if (url.includes('/glossary/available')) {
+          return Promise.resolve({ data: [] });
+        }
+        return Promise.resolve({ data: [] });
+      });
+
+      renderWithProviders(<TenantSettingsPage />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Acme HVAC Services')).toBeInTheDocument();
+      });
+
+      const templatesTab = screen.getByRole('tab', { name: /notification templates/i });
+      await user.click(templatesTab);
+
+      await waitFor(() => {
+        expect(screen.getByText('Work Order Scheduled')).toBeInTheDocument();
+      }, { timeout: 10000 });
+
+      expect(screen.getByText('Work Order Scheduled SMS')).toBeInTheDocument();
+      expect(screen.getByText('System Default')).toBeInTheDocument();
+      expect(screen.getByText('Customized')).toBeInTheDocument();
+    });
+
+    it('opens customize editor when customize button is clicked', async () => {
+      const user = userEvent.setup();
+      const fullTemplate = {
+        ...mockTemplates[0],
+        body: 'Email body content',
+        availableVariables: ['customerName', 'scheduledDate'],
+      };
+
+      vi.mocked(apiClient.get).mockImplementation((url) => {
+        if (url.includes('/tenant-settings')) {
+          return Promise.resolve({ data: mockSettings });
+        }
+        if (url.includes('/notification-templates/template-1')) {
+          return Promise.resolve({ data: fullTemplate });
+        }
+        if (url.includes('/notification-templates')) {
+          return Promise.resolve({ data: { templates: mockTemplates } });
+        }
+        if (url.includes('/dispatch-regions')) {
+          return Promise.resolve({ data: [] });
+        }
+        if (url.includes('/glossary/available')) {
+          return Promise.resolve({ data: [] });
+        }
+        return Promise.resolve({ data: [] });
+      });
+
+      renderWithProviders(<TenantSettingsPage />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Acme HVAC Services')).toBeInTheDocument();
+      });
+
+      const templatesTab = screen.getByRole('tab', { name: /notification templates/i });
+      await user.click(templatesTab);
+
+      await waitFor(() => {
+        expect(screen.getByText('Work Order Scheduled')).toBeInTheDocument();
+      });
+
+      // Click Customize button
+      const customizeButtons = screen.getAllByRole('button', { name: /customize/i });
+      await user.click(customizeButtons[0]);
+
+      // Verify API was called to fetch full template
+      await waitFor(() => {
+        expect(apiClient.get).toHaveBeenCalledWith('/notification-templates/template-1');
+      });
+    });
+
+    it('reverts template to default when confirmed', async () => {
+      const user = userEvent.setup();
+      const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+
+      vi.mocked(apiClient.get).mockImplementation((url) => {
+        if (url.includes('/tenant-settings')) {
+          return Promise.resolve({ data: mockSettings });
+        }
+        if (url.includes('/notification-templates')) {
+          return Promise.resolve({ data: { templates: mockTemplates } });
+        }
+        if (url.includes('/dispatch-regions')) {
+          return Promise.resolve({ data: [] });
+        }
+        if (url.includes('/glossary/available')) {
+          return Promise.resolve({ data: [] });
+        }
+        return Promise.resolve({ data: [] });
+      });
+      vi.mocked(apiClient.delete).mockResolvedValue({ data: {} });
+
+      renderWithProviders(<TenantSettingsPage />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Acme HVAC Services')).toBeInTheDocument();
+      });
+
+      const templatesTab = screen.getByRole('tab', { name: /notification templates/i });
+      await user.click(templatesTab);
+
+      await waitFor(() => {
+        expect(screen.getByText('Work Order Scheduled SMS')).toBeInTheDocument();
+      });
+
+      // Click Revert to Default button (only on customized template)
+      const revertButton = screen.getByRole('button', { name: /revert to default/i });
+      await user.click(revertButton);
+
+      // Verify confirm was called
+      expect(confirmSpy).toHaveBeenCalled();
+
+      // Confirm the revert API was called
+      await waitFor(() => {
+        expect(apiClient.delete).toHaveBeenCalledWith('/notification-templates/template-2');
+      });
+
+      confirmSpy.mockRestore();
+    });
   });
 
   describe('Terminology Tab', () => {
     const mockAvailableEntities = [
-      { code: 'customer', singular: 'Customer', plural: 'Customers' },
-      { code: 'work_order', singular: 'Work Order', plural: 'Work Orders' },
+      { code: 'customer', singular: 'Customer', plural: 'Customers', defaultSingular: 'Customer', defaultPlural: 'Customers', description: 'Customer entity' },
+      { code: 'work_order', singular: 'Work Order', plural: 'Work Orders', defaultSingular: 'Work Order', defaultPlural: 'Work Orders', description: 'Work order entity' },
     ];
 
     it('displays terminology tab', async () => {
@@ -746,6 +1070,185 @@ describe('TenantSettingsPage', () => {
       await waitFor(() => {
         // Tab is selected - verified by presence of dispatch regions content
         expect(dispatchTab).toBeInTheDocument();
+      });
+    });
+
+    it('allows editing glossary customizations in edit mode', async () => {
+      const user = userEvent.setup();
+      vi.mocked(apiClient.get).mockImplementation((url) => {
+        if (url.includes('/tenant-settings/glossary/available')) {
+          return Promise.resolve({ data: mockAvailableEntities });
+        }
+        if (url.includes('/tenant-settings')) {
+          return Promise.resolve({ data: mockSettings });
+        }
+        if (url.includes('/notification-templates')) {
+          return Promise.resolve({ data: { templates: [] } });
+        }
+        if (url.includes('/dispatch-regions')) {
+          return Promise.resolve({ data: [] });
+        }
+        return Promise.resolve({ data: [] });
+      });
+
+      renderWithProviders(<TenantSettingsPage />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Acme HVAC Services')).toBeInTheDocument();
+      });
+
+      // Enter edit mode
+      const editButton = screen.getByRole('button', { name: /edit/i });
+      await user.click(editButton);
+
+      // Switch to terminology tab
+      const terminologyTab = screen.getByRole('tab', { name: /terminology/i });
+      await user.click(terminologyTab);
+
+      await waitFor(() => {
+        expect(screen.getByText(/customize how entity names appear/i)).toBeInTheDocument();
+      });
+
+      // Wait for table with entities to load
+      await waitFor(() => {
+        expect(screen.getByPlaceholderText('Customer')).toBeInTheDocument();
+      });
+
+      // Find the singular input for 'customer'
+      const singularInput = screen.getByPlaceholderText('Customer');
+      await user.clear(singularInput);
+      await user.type(singularInput, 'Client');
+
+      // Find the plural input for 'customer'
+      const pluralInput = screen.getByPlaceholderText('Customers');
+      await user.clear(pluralInput);
+      await user.type(pluralInput, 'Clients');
+
+      expect(screen.getByDisplayValue('Client')).toBeInTheDocument();
+      expect(screen.getByDisplayValue('Clients')).toBeInTheDocument();
+    });
+
+    it('resets glossary customization when reset button is clicked', async () => {
+      const user = userEvent.setup();
+      vi.mocked(apiClient.get).mockImplementation((url) => {
+        if (url.includes('/tenant-settings/glossary/available')) {
+          return Promise.resolve({ data: mockAvailableEntities });
+        }
+        if (url.includes('/tenant-settings')) {
+          return Promise.resolve({
+            data: {
+              ...mockSettings,
+              glossary: { customer: { singular: 'Client', plural: 'Clients' } }
+            }
+          });
+        }
+        if (url.includes('/notification-templates')) {
+          return Promise.resolve({ data: { templates: [] } });
+        }
+        if (url.includes('/dispatch-regions')) {
+          return Promise.resolve({ data: [] });
+        }
+        return Promise.resolve({ data: [] });
+      });
+
+      renderWithProviders(<TenantSettingsPage />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Acme HVAC Services')).toBeInTheDocument();
+      });
+
+      // Enter edit mode
+      const editButton = screen.getByRole('button', { name: /edit/i });
+      await user.click(editButton);
+
+      // Switch to terminology tab
+      const terminologyTab = screen.getByRole('tab', { name: /terminology/i });
+      await user.click(terminologyTab);
+
+      await waitFor(() => {
+        expect(screen.getByDisplayValue('Client')).toBeInTheDocument();
+      });
+
+      // Find the reset button (ArrowPathIcon button in the row)
+      const resetButtons = screen.getAllByRole('button');
+      const resetButton = resetButtons.find(btn => {
+        const svg = btn.querySelector('svg');
+        return svg && btn.getAttribute('title') === 'Reset to default';
+      });
+
+      expect(resetButton).toBeDefined();
+      await user.click(resetButton!);
+
+      // After reset, the inputs should be empty (showing placeholders)
+      await waitFor(() => {
+        const singularInput = screen.getByPlaceholderText('Customer') as HTMLInputElement;
+        expect(singularInput.value).toBe('');
+      });
+    });
+
+    it('submits glossary customizations when form is saved', async () => {
+      const user = userEvent.setup();
+      vi.mocked(apiClient.get).mockImplementation((url) => {
+        if (url.includes('/tenant-settings/glossary/available')) {
+          return Promise.resolve({ data: mockAvailableEntities });
+        }
+        if (url.includes('/tenant-settings')) {
+          return Promise.resolve({ data: mockSettings });
+        }
+        if (url.includes('/notification-templates')) {
+          return Promise.resolve({ data: { templates: [] } });
+        }
+        if (url.includes('/dispatch-regions')) {
+          return Promise.resolve({ data: [] });
+        }
+        return Promise.resolve({ data: [] });
+      });
+      vi.mocked(apiClient.put).mockResolvedValue({
+        data: {
+          ...mockSettings,
+          glossary: { customer: { singular: 'Client', plural: 'Clients' } }
+        }
+      });
+
+      renderWithProviders(<TenantSettingsPage />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Acme HVAC Services')).toBeInTheDocument();
+      });
+
+      // Enter edit mode
+      const editButton = screen.getByRole('button', { name: /edit/i });
+      await user.click(editButton);
+
+      // Switch to terminology tab
+      const terminologyTab = screen.getByRole('tab', { name: /terminology/i });
+      await user.click(terminologyTab);
+
+      await waitFor(() => {
+        expect(screen.getByPlaceholderText('Customer')).toBeInTheDocument();
+      });
+
+      // Customize entity names
+      const singularInput = screen.getByPlaceholderText('Customer');
+      await user.type(singularInput, 'Client');
+
+      const pluralInput = screen.getByPlaceholderText('Customers');
+      await user.type(pluralInput, 'Clients');
+
+      // Submit the form
+      const updateButton = screen.getByRole('button', { name: /update/i });
+      await user.click(updateButton);
+
+      // Verify the glossary was included in the request
+      await waitFor(() => {
+        expect(apiClient.put).toHaveBeenCalledWith(
+          '/tenant-settings',
+          expect.objectContaining({
+            glossary: {
+              customer: { singular: 'Client', plural: 'Clients' }
+            }
+          })
+        );
       });
     });
   });
