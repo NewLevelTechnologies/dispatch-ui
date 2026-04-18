@@ -3,6 +3,7 @@ import { screen, waitFor } from '@testing-library/react';
 import { renderWithProviders, userEvent } from '../test/utils';
 import UserDetailPage from './UserDetailPage';
 import apiClient from '../api/client';
+import type { User } from '../api';
 
 // Mock the API client
 vi.mock('../api/client');
@@ -75,7 +76,7 @@ describe('UserDetailPage', () => {
   };
 
   interface MockOptions {
-    user?: typeof mockUser;
+    user?: Partial<User> & Pick<User, 'id'>;
     auditLog?: unknown[] | 'loading';
   }
 
@@ -430,7 +431,11 @@ describe('UserDetailPage', () => {
   });
 
   it('displays "No regions assigned" when dispatchRegionIds is undefined', async () => {
-    const userWithoutRegions = { ...mockUser, dispatchRegionIds: undefined };
+    const userWithoutRegions: User = {
+      ...mockUser,
+      tenantId: 'tenant-123',
+      dispatchRegionIds: undefined,
+    };
     setupStandardMocks({ user: userWithoutRegions });
 
     renderWithProviders(<UserDetailPage />, {
