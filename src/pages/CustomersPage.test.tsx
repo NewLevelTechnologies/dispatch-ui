@@ -336,4 +336,243 @@ describe('CustomersPage', () => {
 
     expect(searchInput).toHaveValue('test');
   });
+
+  it('filters customers by email', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({ data: mockCustomers });
+    const user = userEvent.setup();
+
+    renderWithProviders(<CustomersPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('John Doe')).toBeInTheDocument();
+    });
+
+    const searchInput = screen.getByPlaceholderText(/search/i);
+    await user.type(searchInput, 'jane@');
+
+    await waitFor(() => {
+      expect(screen.getByText('Jane Smith')).toBeInTheDocument();
+      expect(screen.queryByText('John Doe')).not.toBeInTheDocument();
+    });
+  });
+
+  it('filters customers by phone', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({ data: mockCustomers });
+    const user = userEvent.setup();
+
+    renderWithProviders(<CustomersPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('John Doe')).toBeInTheDocument();
+    });
+
+    const searchInput = screen.getByPlaceholderText(/search/i);
+    await user.type(searchInput, '555123');
+
+    await waitFor(() => {
+      expect(screen.getByText('John Doe')).toBeInTheDocument();
+      expect(screen.queryByText('Jane Smith')).not.toBeInTheDocument();
+    });
+  });
+
+  it('filters customers by billing city', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({ data: mockCustomers });
+    const user = userEvent.setup();
+
+    renderWithProviders(<CustomersPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('John Doe')).toBeInTheDocument();
+    });
+
+    const searchInput = screen.getByPlaceholderText(/search/i);
+    await user.type(searchInput, 'Cambridge');
+
+    await waitFor(() => {
+      expect(screen.getByText('Jane Smith')).toBeInTheDocument();
+      expect(screen.queryByText('John Doe')).not.toBeInTheDocument();
+    });
+  });
+
+  it('filters customers by service location name', async () => {
+    const customersWithLocationNames: Customer[] = [
+      {
+        ...mockCustomers[0],
+        serviceLocations: [
+          {
+            ...mockCustomers[0].serviceLocations[0],
+            locationName: 'Downtown Office',
+          },
+        ],
+      },
+      mockCustomers[1],
+    ];
+
+    vi.mocked(apiClient.get).mockResolvedValue({ data: customersWithLocationNames });
+    const user = userEvent.setup();
+
+    renderWithProviders(<CustomersPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('John Doe')).toBeInTheDocument();
+    });
+
+    const searchInput = screen.getByPlaceholderText(/search/i);
+    await user.type(searchInput, 'Downtown');
+
+    await waitFor(() => {
+      expect(screen.getByText('John Doe')).toBeInTheDocument();
+      expect(screen.queryByText('Jane Smith')).not.toBeInTheDocument();
+    });
+  });
+
+  it('displays filtered count when search filters results', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({ data: mockCustomers });
+    const user = userEvent.setup();
+
+    renderWithProviders(<CustomersPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('John Doe')).toBeInTheDocument();
+    });
+
+    const searchInput = screen.getByPlaceholderText(/search/i);
+    await user.type(searchInput, 'John');
+
+    await waitFor(() => {
+      expect(screen.getByText('1 of 2')).toBeInTheDocument();
+    });
+  });
+
+  it('shows no match message when search returns no results', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({ data: mockCustomers });
+    const user = userEvent.setup();
+
+    renderWithProviders(<CustomersPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('John Doe')).toBeInTheDocument();
+    });
+
+    const searchInput = screen.getByPlaceholderText(/search/i);
+    await user.type(searchInput, 'NonExistent');
+
+    await waitFor(() => {
+      expect(screen.getByText(/no customers match your search/i)).toBeInTheDocument();
+    });
+  });
+
+  it('displays payment terms badges', async () => {
+    const customersWithTerms: Customer[] = [
+      {
+        ...mockCustomers[0],
+        paymentTermsDays: 30,
+        requiresPurchaseOrder: true,
+        contractPricingTier: 'Gold',
+      },
+    ];
+
+    vi.mocked(apiClient.get).mockResolvedValue({ data: customersWithTerms });
+
+    renderWithProviders(<CustomersPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Net-30')).toBeInTheDocument();
+      expect(screen.getByText('PO')).toBeInTheDocument();
+      expect(screen.getByText('Gold')).toBeInTheDocument();
+    });
+  });
+
+  it('displays business icon for STANDARD display mode', async () => {
+    const businessCustomer: Customer = {
+      ...mockCustomers[0],
+      displayMode: 'STANDARD',
+    };
+
+    vi.mocked(apiClient.get).mockResolvedValue({ data: [businessCustomer] });
+
+    renderWithProviders(<CustomersPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('John Doe')).toBeInTheDocument();
+    });
+
+    const businessIcon = screen.getByTitle('Business');
+    expect(businessIcon).toBeInTheDocument();
+  });
+
+  it('displays INACTIVE status badge correctly', async () => {
+    const inactiveCustomer: Customer = {
+      ...mockCustomers[0],
+      status: 'INACTIVE',
+    };
+
+    vi.mocked(apiClient.get).mockResolvedValue({ data: [inactiveCustomer] });
+
+    renderWithProviders(<CustomersPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('John Doe')).toBeInTheDocument();
+    });
+
+    expect(screen.getByText(/inactive/i)).toBeInTheDocument();
+  });
+
+  it('displays billing address line 2 when present', async () => {
+    const customerWithLine2: Customer = {
+      ...mockCustomers[0],
+      billingAddress: {
+        ...mockCustomers[0].billingAddress,
+        streetAddressLine2: 'Apt 5B',
+      },
+    };
+
+    vi.mocked(apiClient.get).mockResolvedValue({ data: [customerWithLine2] });
+
+    renderWithProviders(<CustomersPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/123 Main St Apt 5B/)).toBeInTheDocument();
+    });
+  });
+
+  it('displays multiple locations count', async () => {
+    const customerWithMultipleLocations: Customer = {
+      ...mockCustomers[0],
+      serviceLocations: [
+        mockCustomers[0].serviceLocations[0],
+        {
+          ...mockCustomers[0].serviceLocations[0],
+          id: 'loc-2',
+          address: { ...mockCustomers[0].serviceLocations[0].address, city: 'Cambridge' },
+        },
+        {
+          ...mockCustomers[0].serviceLocations[0],
+          id: 'loc-3',
+          address: { ...mockCustomers[0].serviceLocations[0].address, city: 'Somerville' },
+        },
+      ],
+    };
+
+    vi.mocked(apiClient.get).mockResolvedValue({ data: [customerWithMultipleLocations] });
+
+    renderWithProviders(<CustomersPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('3 locations')).toBeInTheDocument();
+    });
+  });
+
+  it('displays phone link with correct href', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({ data: mockCustomers });
+
+    renderWithProviders(<CustomersPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('John Doe')).toBeInTheDocument();
+    });
+
+    const phoneLink = screen.getByText(/\(555\) 123-4567/);
+    expect(phoneLink).toHaveAttribute('href', 'tel:5551234567');
+  });
 });
