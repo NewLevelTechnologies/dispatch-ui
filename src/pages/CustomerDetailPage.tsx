@@ -29,8 +29,6 @@ import {
   EnvelopeIcon,
   CreditCardIcon,
   MapPinIcon,
-  UserIcon,
-  KeyIcon,
   BellIcon
 } from '@heroicons/react/24/outline';
 
@@ -123,10 +121,6 @@ export default function CustomerDetailPage() {
 
   const isSimple = customer.displayMode === 'SIMPLE';
   const primaryLocation = customer.serviceLocations[0];
-
-  // For STANDARD mode: always use table (more CSR-friendly, easier to scan)
-  // For SIMPLE mode: cards are fine (only 1 location typically)
-  const useTableLayout = !isSimple || customer.serviceLocations.length > 5;
 
   // Determine if we should show additional contacts section
   const shouldShowAdditionalContacts = () => {
@@ -442,7 +436,7 @@ export default function CustomerDetailPage() {
               <div className="lg:col-span-2">
                 <div className="flex flex-col gap-2 mb-2 sm:flex-row sm:items-center sm:justify-between">
                   <Subheading>{t('common.entitiesCount', { entities: getName('service_location', true), count: customer.serviceLocations.length })}</Subheading>
-                {useTableLayout && canAddServiceLocations && (
+                {canAddServiceLocations && (
                   <Button plain onClick={() => setIsAddLocationDialogOpen(true)} className="text-sm sm:flex-shrink-0">
                     <PlusIcon className="size-4" />
                     {t('common.actions.add', { entity: getName('service_location') })}
@@ -450,7 +444,7 @@ export default function CustomerDetailPage() {
                 )}
               </div>
 
-              {useTableLayout && customer.serviceLocations.length >= 5 && (
+              {customer.serviceLocations.length >= 5 && (
                 <div className="mt-2 flex items-center gap-4">
                   <InputGroup className="flex-1 max-w-md">
                     <MagnifyingGlassIcon data-slot="icon" />
@@ -473,151 +467,54 @@ export default function CustomerDetailPage() {
                 </div>
               )}
 
-              {useTableLayout ? (
-                /* TABLE LAYOUT for many locations */
-                <div className="mt-2">
-                  <Table dense className="[--gutter:theme(spacing.1)] text-sm">
-                    <TableHead>
-                      <TableRow>
-                        <TableHeader>{t('common.form.name')}</TableHeader>
-                        <TableHeader>{t('customers.table.locationAddress')}</TableHeader>
-                        <TableHeader>{t('customers.table.locationContact')}</TableHeader>
-                        <TableHeader>{t('common.form.status')}</TableHeader>
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {filteredLocations.map((location) => (
-                        <TableRow key={location.id} href={`/service-locations/${location.id}`} className="cursor-pointer">
-                          <TableCell className="font-medium">
-                            {location.locationName || 'Unnamed Location'}
-                          </TableCell>
-                          <TableCell className="text-zinc-500">
-                            <div className="text-xs">
-                              {location.address.streetAddress}
-                              {location.address.streetAddressLine2 && ` ${location.address.streetAddressLine2}`}
-                            </div>
-                            <div className="text-xs text-zinc-400">
-                              {location.address.city}, {location.address.state} {location.address.zipCode}
-                            </div>
-                          </TableCell>
-                          <TableCell className="text-zinc-500">
-                            {location.siteContactName ? (
-                              <>
-                                <div className="text-xs">{location.siteContactName}</div>
-                                {location.siteContactPhone && (
-                                  <div className="text-xs">{formatPhone(location.siteContactPhone)}</div>
-                                )}
-                              </>
-                            ) : (
-                              <span className="text-xs text-zinc-400">-</span>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            <Badge color={location.status === 'ACTIVE' ? 'lime' : 'zinc'} className="text-xs">
-                              {location.status}
-                            </Badge>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              ) : (
-                /* CARD LAYOUT for few locations */
-                <div className="mt-2 grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-                  {customer.serviceLocations.map((location) => (
-                  <div
-                    key={location.id}
-                    className="rounded-lg border border-zinc-200 p-3 hover:border-zinc-300 dark:border-zinc-800 dark:hover:border-zinc-700"
-                  >
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <Strong className="text-sm">
+              {/* TABLE LAYOUT - STANDARD customers always use table */}
+              <div className="mt-2">
+                <Table dense className="[--gutter:theme(spacing.1)] text-sm">
+                  <TableHead>
+                    <TableRow>
+                      <TableHeader>{t('common.form.name')}</TableHeader>
+                      <TableHeader>{t('customers.table.locationAddress')}</TableHeader>
+                      <TableHeader>{t('customers.table.locationContact')}</TableHeader>
+                      <TableHeader>{t('common.form.status')}</TableHeader>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {filteredLocations.map((location) => (
+                      <TableRow key={location.id} href={`/service-locations/${location.id}`} className="cursor-pointer">
+                        <TableCell className="font-medium">
                           {location.locationName || 'Unnamed Location'}
-                        </Strong>
-                        <Text className="mt-1 text-xs flex items-center gap-1">
-                          <MapPinIcon className="inline h-3 w-3 text-zinc-400" />
-                          {location.address.streetAddress}
-                          {location.address.streetAddressLine2 && `, ${location.address.streetAddressLine2}`}
-                        </Text>
-                        <Text className="text-xs">
-                          {location.address.city}, {location.address.state} {location.address.zipCode}
-                        </Text>
-
-                        {(location.siteContactName || location.siteContactPhone || location.siteContactEmail) && (
-                          <div className="mt-2 space-y-0.5">
-                            {location.siteContactName && (
-                              <Text className="text-xs flex items-center gap-1">
-                                <UserIcon className="inline h-3 w-3 text-zinc-400 flex-shrink-0" />
-                                {location.siteContactName}
-                              </Text>
-                            )}
-                            {location.siteContactPhone && (
-                              <Text className="text-xs flex items-center gap-1">
-                                <PhoneIcon className="inline h-3 w-3 text-zinc-400 flex-shrink-0" />
-                                <a href={`tel:${location.siteContactPhone}`} className="hover:underline">
-                                  {formatPhone(location.siteContactPhone)}
-                                </a>
-                              </Text>
-                            )}
-                            {location.siteContactEmail && (
-                              <Text className="text-xs flex items-center gap-1">
-                                <EnvelopeIcon className="inline h-3 w-3 text-zinc-400 flex-shrink-0" />
-                                <a href={`mailto:${location.siteContactEmail}`} className="hover:underline">
-                                  {location.siteContactEmail}
-                                </a>
-                              </Text>
-                            )}
+                        </TableCell>
+                        <TableCell className="text-zinc-500">
+                          <div className="text-xs">
+                            {location.address.streetAddress}
+                            {location.address.streetAddressLine2 && ` ${location.address.streetAddressLine2}`}
                           </div>
-                        )}
-
-                        {location.accessInstructions && (
-                          <Text className="mt-2 text-xs flex items-center gap-1">
-                            <KeyIcon className="inline h-3 w-3 text-zinc-400 flex-shrink-0" />
-                            {location.accessInstructions}
-                          </Text>
-                        )}
-                      </div>
-                      <Badge color={location.status === 'ACTIVE' ? 'lime' : 'zinc'} className="text-xs">
-                        {location.status}
-                      </Badge>
-                    </div>
-
-                    <div className="mt-3 border-t border-zinc-100 pt-2 dark:border-zinc-800">
-                      <Text className="flex items-center justify-between text-xs">
-                        {/* eslint-disable-next-line i18next/no-literal-string */}
-                        <span>{getName('equipment')}: 0</span>
-                        <span>{t('customers.detail.lastServiceNever')}</span>
-                      </Text>
-                    </div>
-
-                    <Button
-                      plain
-                      className="mt-2 w-full text-xs"
-                      onClick={() => navigate(`/service-locations/${location.id}`)}
-                    >
-                      {t('customers.detail.viewDetails')}
-                    </Button>
-                  </div>
-                ))}
-
-                  {/* Add Location Card */}
-                  {canAddServiceLocations && (
-                    <button
-                      type="button"
-                      onClick={() => setIsAddLocationDialogOpen(true)}
-                      className="flex min-h-[160px] items-center justify-center rounded-lg border-2 border-dashed border-zinc-300 p-3 hover:border-zinc-400 hover:bg-zinc-50 dark:border-zinc-700 dark:hover:border-zinc-600 dark:hover:bg-zinc-900"
-                    >
-                      <div className="text-center">
-                        <PlusIcon className="mx-auto size-8 text-zinc-400" />
-                        <Strong className="mt-2 block text-sm">
-                          {t('common.actions.add', { entity: getName('service_location') })}
-                        </Strong>
-                      </div>
-                    </button>
-                  )}
-                </div>
-              )}
+                          <div className="text-xs text-zinc-400">
+                            {location.address.city}, {location.address.state} {location.address.zipCode}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-zinc-500">
+                          {location.siteContactName ? (
+                            <>
+                              <div className="text-xs">{location.siteContactName}</div>
+                              {location.siteContactPhone && (
+                                <div className="text-xs">{formatPhone(location.siteContactPhone)}</div>
+                              )}
+                            </>
+                          ) : (
+                            <span className="text-xs text-zinc-400">-</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <Badge color={location.status === 'ACTIVE' ? 'lime' : 'zinc'} className="text-xs">
+                            {location.status}
+                          </Badge>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
               </div>
 
               {/* Right column - Contacts & Notes (1/3 width) */}

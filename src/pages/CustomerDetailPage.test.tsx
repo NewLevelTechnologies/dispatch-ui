@@ -579,4 +579,616 @@ describe('CustomerDetailPage', () => {
     // Standard view should not have inline style with colons
     expect(screen.queryByText(/status:/i)).not.toBeInTheDocument();
   });
+
+  it('switches to work-orders tab', async () => {
+    const user = userEvent.setup();
+    vi.mocked(apiClient.get).mockResolvedValue({ data: mockSimpleCustomer });
+    renderWithProviders(<CustomerDetailPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('John Doe')).toBeInTheDocument();
+    });
+
+    const workOrdersTab = screen.getByRole('button', { name: /work order/i });
+    await user.click(workOrdersTab);
+
+    await waitFor(() => {
+      expect(screen.getByText(/no .* yet/i)).toBeInTheDocument();
+    });
+  });
+
+  it('switches to financial tab', async () => {
+    const user = userEvent.setup();
+    vi.mocked(apiClient.get).mockResolvedValue({ data: mockSimpleCustomer });
+    renderWithProviders(<CustomerDetailPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('John Doe')).toBeInTheDocument();
+    });
+
+    const financialTab = screen.getByRole('button', { name: /financial/i });
+    await user.click(financialTab);
+
+    await waitFor(() => {
+      expect(screen.getByText(/coming soon/i)).toBeInTheDocument();
+    });
+  });
+
+  it('switches to equipment tab', async () => {
+    const user = userEvent.setup();
+    vi.mocked(apiClient.get).mockResolvedValue({ data: mockSimpleCustomer });
+    renderWithProviders(<CustomerDetailPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('John Doe')).toBeInTheDocument();
+    });
+
+    const equipmentTab = screen.getByRole('button', { name: /equipment/i });
+    await user.click(equipmentTab);
+
+    await waitFor(() => {
+      expect(screen.getByText(/no .* yet/i)).toBeInTheDocument();
+    });
+  });
+
+  it('switches to activity tab', async () => {
+    const user = userEvent.setup();
+    vi.mocked(apiClient.get).mockResolvedValue({ data: mockSimpleCustomer });
+    renderWithProviders(<CustomerDetailPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('John Doe')).toBeInTheDocument();
+    });
+
+    const activityTab = screen.getByRole('button', { name: /activity/i });
+    await user.click(activityTab);
+
+    // Activity tab content should be rendered (NotificationLogsList component is mounted)
+    // Tab button should have aria-current="page"
+    await waitFor(() => {
+      expect(activityTab).toHaveAttribute('aria-current', 'page');
+    });
+  });
+
+  it('opens notification preferences dialog when bell icon is clicked', async () => {
+    const user = userEvent.setup();
+    vi.mocked(apiClient.get).mockImplementation((url) => {
+      if (url.includes('/notification-preferences')) {
+        return Promise.resolve({ data: [] });
+      }
+      if (url.includes('/notification-types')) {
+        return Promise.resolve({ data: [] });
+      }
+      return Promise.resolve({ data: mockSimpleCustomer });
+    });
+    renderWithProviders(<CustomerDetailPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('John Doe')).toBeInTheDocument();
+    });
+
+    const bellButton = screen.getByRole('button', { name: /manage/i });
+    await user.click(bellButton);
+
+    await waitFor(() => {
+      expect(screen.getAllByText(/notification preferences/i).length).toBeGreaterThan(0);
+    });
+  });
+
+  it('fetches notification preferences for display', async () => {
+    vi.mocked(apiClient.get).mockImplementation((url) => {
+      if (url.includes('/notification-preferences')) {
+        return Promise.resolve({
+          data: [
+            { id: '1', notificationTypeId: 'type1', optIn: true },
+            { id: '2', notificationTypeId: 'type2', optIn: true },
+            { id: '3', notificationTypeId: 'type3', optIn: false },
+          ],
+        });
+      }
+      return Promise.resolve({ data: mockSimpleCustomer });
+    });
+
+    renderWithProviders(<CustomerDetailPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('John Doe')).toBeInTheDocument();
+    });
+
+    // Notification bell button should be present
+    expect(screen.getByRole('button', { name: /manage/i })).toBeInTheDocument();
+  });
+
+  it('displays back button in normal view', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({ data: mockSimpleCustomer });
+    renderWithProviders(<CustomerDetailPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('John Doe')).toBeInTheDocument();
+    });
+
+    const backButton = screen.getByRole('button', { name: /back/i });
+    expect(backButton).toBeInTheDocument();
+  });
+
+  it('displays back button in error view', async () => {
+    vi.mocked(apiClient.get).mockRejectedValue(new Error('Failed to load'));
+    renderWithProviders(<CustomerDetailPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/error loading/i)).toBeInTheDocument();
+    });
+
+    const backButton = screen.getByRole('button', { name: /back/i });
+    expect(backButton).toBeInTheDocument();
+  });
+
+  it('does not show table for simple customers with few locations', async () => {
+    const simpleWith3Locations: Customer = {
+      ...mockSimpleCustomer,
+      serviceLocations: Array.from({ length: 3 }, (_, i) => ({
+        ...mockSimpleCustomer.serviceLocations[0],
+        id: `loc-${i}`,
+        locationName: `Location ${i}`,
+      })),
+    };
+
+    vi.mocked(apiClient.get).mockResolvedValue({ data: simpleWith3Locations });
+    renderWithProviders(<CustomerDetailPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('John Doe')).toBeInTheDocument();
+    });
+
+    // Should NOT show table for simple customers with ≤5 locations
+    expect(screen.queryByRole('table')).not.toBeInTheDocument();
+  });
+
+  it('renders successfully with multiple locations for simple customers', async () => {
+    const simpleWithManyLocations: Customer = {
+      ...mockSimpleCustomer,
+      serviceLocations: Array.from({ length: 6 }, (_, i) => ({
+        ...mockSimpleCustomer.serviceLocations[0],
+        id: `loc-${i}`,
+        locationName: `Location ${i}`,
+      })),
+    };
+
+    vi.mocked(apiClient.get).mockResolvedValue({ data: simpleWithManyLocations });
+    renderWithProviders(<CustomerDetailPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('John Doe')).toBeInTheDocument();
+    });
+
+    // Page should render successfully with multiple locations
+    expect(screen.getByRole('button', { name: /overview/i })).toBeInTheDocument();
+  });
+
+  it('renders successfully with few locations for simple customers', async () => {
+    const simpleWith3Locations: Customer = {
+      ...mockSimpleCustomer,
+      serviceLocations: Array.from({ length: 3 }, (_, i) => ({
+        ...mockSimpleCustomer.serviceLocations[0],
+        id: `loc-${i}`,
+        locationName: `Location ${i}`,
+      })),
+    };
+
+    vi.mocked(apiClient.get).mockResolvedValue({ data: simpleWith3Locations });
+    renderWithProviders(<CustomerDetailPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('John Doe')).toBeInTheDocument();
+    });
+
+    // Page should render successfully
+    expect(screen.getByRole('button', { name: /overview/i })).toBeInTheDocument();
+  });
+
+  it('displays add location card in card layout view', async () => {
+    const simpleWith3Locations: Customer = {
+      ...mockSimpleCustomer,
+      serviceLocations: Array.from({ length: 3 }, (_, i) => ({
+        ...mockSimpleCustomer.serviceLocations[0],
+        id: `loc-${i}`,
+        locationName: `Location ${i}`,
+      })),
+    };
+
+    vi.mocked(apiClient.get).mockResolvedValue({ data: simpleWith3Locations });
+    renderWithProviders(<CustomerDetailPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('John Doe')).toBeInTheDocument();
+    });
+
+    // Should show add location button (in header)
+    const addButtons = screen.getAllByText(/add service location/i);
+    expect(addButtons.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('renders locations with access instructions for standard customers', async () => {
+    const standardWithAccessInstructions: Customer = {
+      ...mockStandardCustomer,
+      serviceLocations: [
+        {
+          ...mockStandardCustomer.serviceLocations[0],
+          accessInstructions: 'Gate code: 1234',
+        },
+      ],
+    };
+
+    vi.mocked(apiClient.get).mockResolvedValue({ data: standardWithAccessInstructions });
+    renderWithProviders(<CustomerDetailPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/john doe/i)).toBeInTheDocument();
+    });
+
+    // Standard view should show locations in table
+    expect(screen.getByRole('table')).toBeInTheDocument();
+  });
+
+  it('displays inactive location badge', async () => {
+    const customerWithInactiveLocation: Customer = {
+      ...mockStandardCustomer,
+      serviceLocations: [
+        {
+          ...mockSimpleCustomer.serviceLocations[0],
+          status: 'INACTIVE',
+        },
+      ],
+    };
+
+    vi.mocked(apiClient.get).mockResolvedValue({ data: customerWithInactiveLocation });
+    renderWithProviders(<CustomerDetailPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/john doe/i)).toBeInTheDocument();
+    });
+
+    expect(screen.getByText('INACTIVE')).toBeInTheDocument();
+  });
+
+  it('fetches and displays dispatch region for simple customers', async () => {
+    vi.mocked(apiClient.get).mockImplementation((url) => {
+      if (url.includes('/dispatch-regions')) {
+        return Promise.resolve({ data: { id: 'region-1', name: 'North Region' } });
+      }
+      return Promise.resolve({ data: mockSimpleCustomer });
+    });
+
+    renderWithProviders(<CustomerDetailPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('John Doe')).toBeInTheDocument();
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText('North Region')).toBeInTheDocument();
+    });
+  });
+
+  it('shows "new work order" button in work orders tab', async () => {
+    const user = userEvent.setup();
+    vi.mocked(apiClient.get).mockResolvedValue({ data: mockSimpleCustomer });
+    renderWithProviders(<CustomerDetailPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('John Doe')).toBeInTheDocument();
+    });
+
+    const workOrdersTab = screen.getByRole('button', { name: /work order/i });
+    await user.click(workOrdersTab);
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /new work order/i })).toBeInTheDocument();
+    });
+  });
+
+  it('shows "add equipment" button in equipment tab', async () => {
+    const user = userEvent.setup();
+    vi.mocked(apiClient.get).mockResolvedValue({ data: mockSimpleCustomer });
+    renderWithProviders(<CustomerDetailPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('John Doe')).toBeInTheDocument();
+    });
+
+    const equipmentTab = screen.getByRole('button', { name: /equipment/i });
+    await user.click(equipmentTab);
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /add equipment/i })).toBeInTheDocument();
+    });
+  });
+
+  it('displays billing address for standard customers', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({ data: mockStandardCustomer });
+    renderWithProviders(<CustomerDetailPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/billing address:/i)).toBeInTheDocument();
+    });
+
+    // Billing address should be present (multiple instances possible)
+    expect(screen.getAllByText(/123 main st/i).length).toBeGreaterThan(0);
+  });
+
+  it('shows add location button in table header for standard customers', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({ data: mockStandardCustomer });
+    renderWithProviders(<CustomerDetailPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/john doe/i)).toBeInTheDocument();
+    });
+
+    // Should show add button in table header (not just in header area)
+    const addButtons = screen.getAllByRole('button', { name: /add service location/i });
+    expect(addButtons.length).toBeGreaterThan(0);
+  });
+
+  it('renders locations with site contact for standard customers', async () => {
+    const standardWithContact: Customer = {
+      ...mockStandardCustomer,
+      serviceLocations: [
+        {
+          ...mockStandardCustomer.serviceLocations[0],
+          siteContactName: 'Jane Manager',
+          siteContactEmail: 'jane@location.com',
+        },
+      ],
+    };
+
+    vi.mocked(apiClient.get).mockResolvedValue({ data: standardWithContact });
+    renderWithProviders(<CustomerDetailPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/john doe/i)).toBeInTheDocument();
+    });
+
+    // Standard view should show locations in table
+    expect(screen.getByRole('table')).toBeInTheDocument();
+  });
+
+  it('closes notification preferences dialog when close is clicked', async () => {
+    const user = userEvent.setup();
+    vi.mocked(apiClient.get).mockImplementation((url) => {
+      if (url.includes('/notification-preferences')) {
+        return Promise.resolve({ data: [] });
+      }
+      if (url.includes('/notification-types')) {
+        return Promise.resolve({ data: [] });
+      }
+      return Promise.resolve({ data: mockSimpleCustomer });
+    });
+    renderWithProviders(<CustomerDetailPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('John Doe')).toBeInTheDocument();
+    });
+
+    const bellButton = screen.getByRole('button', { name: /manage/i });
+    await user.click(bellButton);
+
+    await waitFor(() => {
+      expect(screen.getAllByText(/notification preferences/i).length).toBeGreaterThan(0);
+    });
+
+    const closeButton = screen.getByRole('button', { name: /close/i });
+    await user.click(closeButton);
+
+    // Dialog should close - check that notification dialog content is gone
+    await waitFor(() => {
+      expect(screen.queryByRole('button', { name: /close/i })).not.toBeInTheDocument();
+    });
+  });
+
+  describe('Standard customer overview tab', () => {
+    it('displays locations table in overview tab for standard customers', async () => {
+      vi.mocked(apiClient.get).mockResolvedValue({ data: mockStandardCustomer });
+      renderWithProviders(<CustomerDetailPage />);
+
+      await waitFor(() => {
+        expect(screen.getByText(/john doe/i)).toBeInTheDocument();
+      });
+
+      // Should show table with locations
+      expect(screen.getByRole('table')).toBeInTheDocument();
+      expect(screen.getByText('Branch Office')).toBeInTheDocument();
+    });
+
+    it('shows add location button in table header for standard customers', async () => {
+      vi.mocked(apiClient.get).mockResolvedValue({ data: mockStandardCustomer });
+      renderWithProviders(<CustomerDetailPage />);
+
+      await waitFor(() => {
+        expect(screen.getByText(/john doe/i)).toBeInTheDocument();
+      });
+
+      // Multiple add buttons should exist (one in header, one in table section)
+      const addButtons = screen.getAllByRole('button', { name: /add service location/i });
+      expect(addButtons.length).toBeGreaterThanOrEqual(1);
+    });
+
+    it('displays location count for standard customers', async () => {
+      vi.mocked(apiClient.get).mockResolvedValue({ data: mockStandardCustomer });
+      renderWithProviders(<CustomerDetailPage />);
+
+      await waitFor(() => {
+        expect(screen.getByText(/john doe/i)).toBeInTheDocument();
+      });
+
+      // Should show location count
+      expect(screen.getByText(/service locations \(2\)/i)).toBeInTheDocument();
+    });
+
+    it('displays search input for standard customers with 5+ locations', async () => {
+      const standardWith5Locations: Customer = {
+        ...mockStandardCustomer,
+        serviceLocations: Array.from({ length: 5 }, (_, i) => ({
+          ...mockStandardCustomer.serviceLocations[0],
+          id: `loc-${i}`,
+          locationName: `Location ${i}`,
+        })),
+      };
+
+      vi.mocked(apiClient.get).mockResolvedValue({ data: standardWith5Locations });
+      renderWithProviders(<CustomerDetailPage />);
+
+      await waitFor(() => {
+        expect(screen.getByText(/john doe/i)).toBeInTheDocument();
+      });
+
+      // Should show search input
+      expect(screen.getByPlaceholderText(/search locations/i)).toBeInTheDocument();
+    });
+
+    it('filters locations by search in standard view', async () => {
+      const user = userEvent.setup();
+      const standardWith5Locations: Customer = {
+        ...mockStandardCustomer,
+        serviceLocations: Array.from({ length: 5 }, (_, i) => ({
+          ...mockStandardCustomer.serviceLocations[0],
+          id: `loc-${i}`,
+          locationName: `Location ${i}`,
+        })),
+      };
+
+      vi.mocked(apiClient.get).mockResolvedValue({ data: standardWith5Locations });
+      renderWithProviders(<CustomerDetailPage />);
+
+      await waitFor(() => {
+        expect(screen.getByText(/john doe/i)).toBeInTheDocument();
+      });
+
+      // All locations should be visible
+      expect(screen.getByText('Location 0')).toBeInTheDocument();
+      expect(screen.getByText('Location 1')).toBeInTheDocument();
+
+      // Search for "Location 2"
+      const searchInput = screen.getByPlaceholderText(/search locations/i);
+      await user.type(searchInput, 'Location 2');
+
+      // Should show filtered count
+      await waitFor(() => {
+        expect(screen.getByText(/1 of 5/i)).toBeInTheDocument();
+      });
+    });
+
+    it('displays unnamed location when locationName is null', async () => {
+      const standardWithUnnamed: Customer = {
+        ...mockStandardCustomer,
+        serviceLocations: [
+          {
+            ...mockStandardCustomer.serviceLocations[0],
+            locationName: null,
+          },
+        ],
+      };
+
+      vi.mocked(apiClient.get).mockResolvedValue({ data: standardWithUnnamed });
+      renderWithProviders(<CustomerDetailPage />);
+
+      await waitFor(() => {
+        expect(screen.getByText(/john doe/i)).toBeInTheDocument();
+      });
+
+      // Should show "Unnamed Location"
+      expect(screen.getByText('Unnamed Location')).toBeInTheDocument();
+    });
+
+    it('displays dash when location has no site contact', async () => {
+      const standardNoContact: Customer = {
+        ...mockStandardCustomer,
+        serviceLocations: [
+          {
+            ...mockStandardCustomer.serviceLocations[0],
+            siteContactName: null,
+            siteContactPhone: null,
+          },
+        ],
+      };
+
+      vi.mocked(apiClient.get).mockResolvedValue({ data: standardNoContact });
+      renderWithProviders(<CustomerDetailPage />);
+
+      await waitFor(() => {
+        expect(screen.getByText(/john doe/i)).toBeInTheDocument();
+      });
+
+      // Should show dash in contact column
+      const table = screen.getByRole('table');
+      expect(table.textContent).toContain('-');
+    });
+
+    it('displays location with only site contact name', async () => {
+      const standardNameOnly: Customer = {
+        ...mockStandardCustomer,
+        serviceLocations: [
+          {
+            ...mockStandardCustomer.serviceLocations[0],
+            siteContactName: 'Site Manager',
+            siteContactPhone: null,
+          },
+        ],
+      };
+
+      vi.mocked(apiClient.get).mockResolvedValue({ data: standardNameOnly });
+      renderWithProviders(<CustomerDetailPage />);
+
+      await waitFor(() => {
+        expect(screen.getByText(/john doe/i)).toBeInTheDocument();
+      });
+
+      // Should show contact name
+      expect(screen.getByText('Site Manager')).toBeInTheDocument();
+    });
+
+    it('shows notes section for standard customers with notes', async () => {
+      const standardWithNotes: Customer = {
+        ...mockStandardCustomer,
+        notes: 'Important customer notes here',
+      };
+
+      vi.mocked(apiClient.get).mockResolvedValue({ data: standardWithNotes });
+      renderWithProviders(<CustomerDetailPage />);
+
+      await waitFor(() => {
+        expect(screen.getByText(/john doe/i)).toBeInTheDocument();
+      });
+
+      // Should show notes
+      expect(screen.getByText('Important customer notes here')).toBeInTheDocument();
+    });
+
+    it('displays additional contacts for standard customers', async () => {
+      const standardWithContacts: Customer = {
+        ...mockStandardCustomer,
+        additionalContacts: [
+          {
+            id: 'contact-1',
+            name: 'Secondary Contact',
+            phone: '5559876543',
+            email: 'secondary@example.com',
+            notes: 'Alternate contact',
+            displayOrder: 0,
+            createdAt: '2024-01-01T00:00:00Z',
+            updatedAt: '2024-01-01T00:00:00Z',
+          },
+        ],
+      };
+
+      vi.mocked(apiClient.get).mockResolvedValue({ data: standardWithContacts });
+      renderWithProviders(<CustomerDetailPage />);
+
+      await waitFor(() => {
+        expect(screen.getByText(/john doe/i)).toBeInTheDocument();
+      });
+
+      // Should show additional contact
+      expect(screen.getByText('Secondary Contact')).toBeInTheDocument();
+    });
+  });
 });

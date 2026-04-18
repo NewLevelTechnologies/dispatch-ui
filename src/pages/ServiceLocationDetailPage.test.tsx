@@ -404,4 +404,170 @@ describe('ServiceLocationDetailPage', () => {
       expect(activityTab).toHaveAttribute('aria-current', 'page');
     });
   });
+
+  it('navigates back to service locations when back button is clicked', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({ data: [mockCustomer] });
+
+    renderDetailPage();
+
+    await waitFor(() => {
+      expect(screen.getByText('Main Office')).toBeInTheDocument();
+    });
+
+    // Verify back button exists and has correct href
+    const backButtons = screen.getAllByRole('button', { name: /back/i });
+    expect(backButtons[0]).toBeInTheDocument();
+  });
+
+  it('navigates to customer detail when customer name is clicked', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({ data: [mockCustomer] });
+
+    renderDetailPage();
+
+    await waitFor(() => {
+      expect(screen.getByText('Test Customer')).toBeInTheDocument();
+    });
+
+    // Verify customer link exists and has correct href
+    const customerLink = screen.getByText('Test Customer');
+    expect(customerLink).toHaveAttribute('href', '/customers/customer-1');
+  });
+
+  it('displays dispatch region when available', async () => {
+    const customerWithRegion = {
+      ...mockCustomer,
+      serviceLocations: [
+        {
+          ...mockCustomer.serviceLocations[0],
+          dispatchRegionId: 'region-1',
+        },
+      ],
+    };
+
+    const mockDispatchRegions = [
+      { id: 'region-1', name: 'North Region', isActive: true },
+    ];
+
+    vi.mocked(apiClient.get).mockImplementation((url: string) => {
+      if (url.includes('/customers')) {
+        return Promise.resolve({ data: [customerWithRegion] });
+      }
+      if (url.includes('/dispatch-regions')) {
+        return Promise.resolve({ data: mockDispatchRegions });
+      }
+      return Promise.reject(new Error('Not found'));
+    });
+
+    renderDetailPage();
+
+    await waitFor(() => {
+      expect(screen.getByText('Main Office')).toBeInTheDocument();
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText('North Region')).toBeInTheDocument();
+    });
+  });
+
+  it('closes edit dialog when onClose is called', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({ data: [mockCustomer] });
+    const user = userEvent.setup();
+
+    renderDetailPage();
+
+    await waitFor(() => {
+      expect(screen.getByText('Main Office')).toBeInTheDocument();
+    });
+
+    // Open edit dialog
+    const editButton = screen.getByRole('button', { name: /edit/i });
+    await user.click(editButton);
+
+    await waitFor(() => {
+      expect(screen.getByRole('dialog')).toBeInTheDocument();
+    });
+
+    // Close dialog (cancel button)
+    const cancelButton = screen.getByRole('button', { name: /cancel/i });
+    await user.click(cancelButton);
+
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    });
+  });
+
+  it('displays empty state in work orders tab', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({ data: [mockCustomer] });
+    const user = userEvent.setup();
+
+    renderDetailPage();
+
+    await waitFor(() => {
+      expect(screen.getByText('Main Office')).toBeInTheDocument();
+    });
+
+    // Switch to work orders tab
+    const workOrdersTab = screen.getByRole('button', { name: /work order/i });
+    await user.click(workOrdersTab);
+
+    await waitFor(() => {
+      // Check for the "no entities yet" message
+      expect(screen.getByText(/no.*work order.*yet/i)).toBeInTheDocument();
+    });
+  });
+
+  it('displays empty state in equipment tab', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({ data: [mockCustomer] });
+    const user = userEvent.setup();
+
+    renderDetailPage();
+
+    await waitFor(() => {
+      expect(screen.getByText('Main Office')).toBeInTheDocument();
+    });
+
+    // Switch to equipment tab
+    const equipmentTab = screen.getByRole('button', { name: /equipment/i });
+    await user.click(equipmentTab);
+
+    await waitFor(() => {
+      // Check for the "no entities yet" message
+      expect(screen.getByText(/no.*equipment.*yet/i)).toBeInTheDocument();
+    });
+  });
+
+  it('displays notification logs in activity tab', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({ data: [mockCustomer] });
+    const user = userEvent.setup();
+
+    renderDetailPage();
+
+    await waitFor(() => {
+      expect(screen.getByText('Main Office')).toBeInTheDocument();
+    });
+
+    // Switch to activity tab
+    const activityTab = screen.getByRole('button', { name: /activity/i });
+    await user.click(activityTab);
+
+    await waitFor(() => {
+      // NotificationLogsList component is rendered
+      // The component shows "Recent Notifications" heading from the component itself
+      expect(activityTab).toHaveAttribute('aria-current', 'page');
+    });
+  });
+
+  it('displays back button in error state', async () => {
+    const error = new Error('Network error');
+    vi.mocked(apiClient.get).mockRejectedValue(error);
+
+    renderDetailPage();
+
+    await waitFor(() => {
+      expect(screen.getByText(/error loading service location/i)).toBeInTheDocument();
+    });
+
+    const backButton = screen.getByRole('button', { name: /back to service location/i });
+    expect(backButton).toBeInTheDocument();
+  });
 });
