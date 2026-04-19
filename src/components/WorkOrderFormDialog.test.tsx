@@ -535,5 +535,16 @@ describe('WorkOrderFormDialog', () => {
       expect(screen.queryByRole('radio', { name: /existing/i })).not.toBeInTheDocument();
       expect(screen.queryByRole('radio', { name: /new/i })).not.toBeInTheDocument();
     });
+
+    it('updates scheduled date field', async () => {
+      const user = userEvent.setup();
+
+      renderWithProviders(<WorkOrderFormDialog isOpen={true} onClose={mockOnClose} />);
+
+      const dateInput = screen.getByLabelText(/scheduled date/i);
+      await user.type(dateInput, '2024-12-25');
+
+      expect(dateInput).toHaveValue('2024-12-25');
+    });
   });
 });
