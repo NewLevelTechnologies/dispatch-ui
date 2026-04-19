@@ -7,7 +7,7 @@ import { useGlossary } from '../contexts/GlossaryContext';
 import { Dialog, DialogActions, DialogBody, DialogDescription, DialogTitle } from './catalyst/dialog';
 import { Button } from './catalyst/button';
 import { Checkbox, CheckboxField } from './catalyst/checkbox';
-import { Field, FieldGroup, Fieldset, Label } from './catalyst/fieldset';
+import { Field, FieldGroup, Fieldset, Label, Legend } from './catalyst/fieldset';
 import { Input } from './catalyst/input';
 import { Textarea } from './catalyst/textarea';
 import { Select } from './catalyst/select';
@@ -285,8 +285,8 @@ export default function WorkOrderFormDialog({ isOpen, onClose, workOrder }: Work
           {!isEdit && (
             <>
               {/* Radio Toggle: Existing vs New Customer */}
-              <Field>
-                <Label>{getName('customer')}</Label>
+              <Fieldset>
+                <Legend>{getName('customer')}</Legend>
                 <RadioGroup
                   value={customerMode}
                   onChange={(value) => setCustomerMode(value as 'existing' | 'new')}
@@ -294,14 +294,14 @@ export default function WorkOrderFormDialog({ isOpen, onClose, workOrder }: Work
                 >
                   <RadioField>
                     <Radio value="existing" />
-                    <Label className="text-sm">{t('workOrders.form.existingCustomer', { entity: getName('customer') })}</Label>
+                    <Label>{t('workOrders.form.existingCustomer', { entity: getName('customer') })}</Label>
                   </RadioField>
                   <RadioField>
                     <Radio value="new" />
-                    <Label className="text-sm">{t('workOrders.form.newCustomer', { entity: getName('customer') })}</Label>
+                    <Label>{t('workOrders.form.newCustomer', { entity: getName('customer') })}</Label>
                   </RadioField>
                 </RadioGroup>
-              </Field>
+              </Fieldset>
 
               {/* Conditional: Existing Customer - Service Location Picker */}
               {customerMode === 'existing' && (
