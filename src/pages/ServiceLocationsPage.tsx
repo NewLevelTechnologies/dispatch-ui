@@ -37,6 +37,7 @@ export default function ServiceLocationsPage() {
   const canAddServiceLocations = useHasCapability('ADD_SERVICE_LOCATIONS');
   const canEditServiceLocations = useHasCapability('EDIT_SERVICE_LOCATIONS');
   const canCloseServiceLocations = useHasCapability('CLOSE_SERVICE_LOCATIONS');
+  const canDeleteServiceLocations = useHasCapability('DELETE_SERVICE_LOCATIONS');
 
   // Update URL when search/filter changes
   const updateFilters = (updates: { search?: string; status?: string }) => {
@@ -84,6 +85,21 @@ export default function ServiceLocationsPage() {
     },
   });
 
+  const deleteLocationMutation = useMutation({
+    mutationFn: (locationId: string) =>
+      customerApi.deleteServiceLocation(locationId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['service-locations'] });
+      queryClient.invalidateQueries({ queryKey: ['customers'] });
+    },
+    onError: (error: unknown) => {
+      const errorMessage = error instanceof Error && 'response' in error
+        ? ((error as { response?: { data?: { message?: string } } }).response?.data?.message)
+        : undefined;
+      alert(errorMessage || t('common.form.errorDelete', { entity: getName('service_location') }));
+    },
+  });
+
   const handleAdd = () => {
     setSelectedLocation(null);
     setSelectedCustomerId(null);
@@ -101,6 +117,12 @@ export default function ServiceLocationsPage() {
   const handleClose = (locationId: string, locationName: string, streetAddress: string) => {
     if (window.confirm(t('serviceLocations.actions.closeConfirm', { name: locationName || streetAddress }))) {
       closeLocationMutation.mutate(locationId);
+    }
+  };
+
+  const handleDelete = (locationId: string, locationName: string, streetAddress: string) => {
+    if (window.confirm(t('common.actions.deleteConfirm', { name: locationName || streetAddress }))) {
+      deleteLocationMutation.mutate(locationId);
     }
   };
 
@@ -268,7 +290,7 @@ export default function ServiceLocationsPage() {
                       </Badge>
                     </TableCell>
                     <TableCell>
-                      {(canEditServiceLocations || canCloseServiceLocations) && (
+                      {(canEditServiceLocations || canCloseServiceLocations || canDeleteServiceLocations) && (
                         <div className="-mx-3 -my-1.5 sm:-mx-2.5">
                           <Dropdown>
                             <DropdownButton plain aria-label={t('common.moreOptions')}>
@@ -286,6 +308,11 @@ export default function ServiceLocationsPage() {
                               {location.status !== 'CLOSED' && canCloseServiceLocations && (
                                 <DropdownItem onClick={() => handleClose(location.id, location.locationName || '', location.address.streetAddress)}>
                                   <DropdownLabel>{t('serviceLocations.actions.close')}</DropdownLabel>
+                                </DropdownItem>
+                              )}
+                              {canDeleteServiceLocations && (
+                                <DropdownItem onClick={() => handleDelete(location.id, location.locationName || '', location.address.streetAddress)}>
+                                  <DropdownLabel>{t('common.delete')}</DropdownLabel>
                                 </DropdownItem>
                               )}
                             </DropdownMenu>
