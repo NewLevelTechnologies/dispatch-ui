@@ -237,7 +237,7 @@ export default function ServiceLocationDetailPage() {
                     parentId={location.id}
                     parentType="serviceLocation"
                     customerId={customer.id}
-                    queryKey={['customers']}
+                    queryKey={['service-location', id!]}
                     canEdit={canEditServiceLocations}
                     showAddButton={true}
                   />
