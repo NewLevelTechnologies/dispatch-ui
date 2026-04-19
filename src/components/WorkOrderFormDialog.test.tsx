@@ -448,7 +448,6 @@ describe('WorkOrderFormDialog', () => {
     it('shows inline customer form when new customer is selected', async () => {
       // Mock dispatch regions API call
       vi.mocked(apiClient.get).mockResolvedValue({ data: mockDispatchRegions });
-      const user = userEvent.setup();
 
       renderWithProviders(<WorkOrderFormDialog isOpen={true} onClose={mockOnClose} />);
 
@@ -477,7 +476,6 @@ describe('WorkOrderFormDialog', () => {
         }
         return Promise.resolve({ data: mockServiceLocations });
       });
-      const user = userEvent.setup();
 
       renderWithProviders(<WorkOrderFormDialog isOpen={true} onClose={mockOnClose} />);
 
@@ -502,7 +500,6 @@ describe('WorkOrderFormDialog', () => {
         }
         return Promise.resolve({ data: mockServiceLocations });
       });
-      const user = userEvent.setup();
 
       renderWithProviders(<WorkOrderFormDialog isOpen={true} onClose={mockOnClose} />);
 
