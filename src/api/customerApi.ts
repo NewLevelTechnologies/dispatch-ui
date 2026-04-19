@@ -72,6 +72,126 @@ export interface ServiceLocationSearchResponse {
   number: number;
 }
 
+// Paginated response types (Spring Page structure)
+export interface Pageable {
+  pageNumber: number;    // 0-indexed
+  pageSize: number;
+  sort: {
+    sorted: boolean;
+    unsorted: boolean;
+    empty: boolean;
+  };
+  offset: number;
+  paged: boolean;
+  unpaged: boolean;
+}
+
+export interface CustomerListDto {
+  id: string;
+  name: string;
+  email: string;
+  phone?: string | null;
+  billingAddress: {
+    streetAddress: string;
+    city: string;
+    state: string;
+    zipCode: string;
+  };
+  serviceLocationCount: number;
+  paymentTermsDays: number;
+  requiresPurchaseOrder: boolean;
+  contractPricingTier?: string | null;
+  status: CustomerStatus;
+  displayMode: CustomerDisplayMode;
+}
+
+export interface CustomerListResponse {
+  content: CustomerListDto[];
+  pageable: Pageable;
+  totalElements: number;
+  totalPages: number;
+  number: number;        // 0-indexed page number
+  size: number;
+  numberOfElements: number;
+  first: boolean;
+  last: boolean;
+  empty: boolean;
+}
+
+export interface CustomerSearchResult {
+  id: string;
+  name: string;
+  displayMode: CustomerDisplayMode;
+}
+
+export interface CustomerSearchResponse {
+  content: CustomerSearchResult[];
+  pageable: Pageable;
+  totalElements: number;
+  totalPages: number;
+  number: number;
+  size: number;
+  numberOfElements: number;
+  first: boolean;
+  last: boolean;
+  empty: boolean;
+}
+
+export interface ServiceLocationListDto {
+  id: string;
+  customerId: string;
+  customerName: string;
+  customerDisplayMode: CustomerDisplayMode;
+  locationName?: string | null;
+  address: Address;
+  siteContactName?: string | null;
+  siteContactPhone?: string | null;
+  siteContactEmail?: string | null;
+  accessInstructions?: string | null;
+  notes?: string | null;
+  status: 'ACTIVE' | 'INACTIVE' | 'CLOSED';
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ServiceLocationListResponse {
+  content: ServiceLocationListDto[];
+  pageable: Pageable;
+  totalElements: number;
+  totalPages: number;
+  number: number;
+  size: number;
+  numberOfElements: number;
+  first: boolean;
+  last: boolean;
+  empty: boolean;
+}
+
+// Service Location Detail DTO - for detail views
+// Includes everything: full location + customer info + contacts
+export interface ServiceLocationDetailDto {
+  id: string;
+  customerId: string;
+  customerName: string;
+  customerDisplayMode: CustomerDisplayMode;
+  dispatchRegionId: string;
+  locationName?: string | null;
+  address: Address;
+  previousLocationId?: string | null;
+  successionDate?: string | null;
+  successionType?: string | null;
+  siteContactName?: string | null;
+  siteContactPhone?: string | null;
+  siteContactEmail?: string | null;
+  additionalContacts: AdditionalContact[];
+  accessInstructions?: string | null;
+  notes?: string | null;
+  status: 'ACTIVE' | 'INACTIVE' | 'CLOSED';
+  createdAt: string;
+  updatedAt: string;
+  version: number;
+}
+
 export type CustomerDisplayMode = 'SIMPLE' | 'STANDARD';
 export type CustomerStatus = 'ACTIVE' | 'INACTIVE';
 
@@ -177,8 +297,24 @@ export interface UpdateServiceLocationAddressRequest {
 }
 
 export const customerApi = {
-  getAll: async (): Promise<Customer[]> => {
-    const response = await apiClient.get<Customer[]>('/customers');
+  // Paginated list (BREAKING: was getAll returning Customer[])
+  getAllPaginated: async (params?: {
+    page?: number;     // 1-indexed for UI, converted to 0-indexed for API
+    limit?: number;
+    status?: 'ACTIVE' | 'INACTIVE';
+    search?: string;
+    sort?: string;     // e.g., "name,desc"
+  }): Promise<CustomerListResponse> => {
+    const apiParams = {
+      page: params?.page ? params.page - 1 : 0,  // Convert to 0-indexed
+      limit: params?.limit,
+      status: params?.status,
+      search: params?.search,
+      sort: params?.sort,
+    };
+    const response = await apiClient.get<CustomerListResponse>('/customers', {
+      params: apiParams,
+    });
     return response.data;
   },
 
@@ -216,40 +352,45 @@ export const customerApi = {
     return response.data;
   },
 
+  // Service Location standalone endpoints (no customerId needed in path)
   updateServiceLocation: async (
-    customerId: string,
     locationId: string,
     request: UpdateServiceLocationRequest
   ): Promise<ServiceLocation> => {
     const response = await apiClient.put<ServiceLocation>(
-      `/customers/${customerId}/service-locations/${locationId}`,
+      `/service-locations/${locationId}`,
       request
     );
     return response.data;
   },
 
   updateServiceLocationAddress: async (
-    customerId: string,
     locationId: string,
     request: UpdateServiceLocationAddressRequest
   ): Promise<ServiceLocation> => {
     const response = await apiClient.put<ServiceLocation>(
-      `/customers/${customerId}/service-locations/${locationId}/address`,
+      `/service-locations/${locationId}/address`,
       request
     );
     return response.data;
   },
 
-  closeServiceLocation: async (customerId: string, locationId: string): Promise<ServiceLocation> => {
+  closeServiceLocation: async (locationId: string): Promise<ServiceLocation> => {
     const response = await apiClient.post<ServiceLocation>(
-      `/customers/${customerId}/service-locations/${locationId}/close`
+      `/service-locations/${locationId}/close`
     );
     return response.data;
   },
 
-  search: async (name: string): Promise<Customer[]> => {
-    const response = await apiClient.get<Customer[]>('/customers/search', {
-      params: { name },
+  // Paginated search for pickers (BREAKING: was search(name) returning Customer[])
+  search: async (params: {
+    q: string;         // Query string (was "name")
+    page?: number;     // 0-indexed
+    size?: number;
+    sort?: string;
+  }): Promise<CustomerSearchResponse> => {
+    const response = await apiClient.get<CustomerSearchResponse>('/customers/search', {
+      params,
     });
     return response.data;
   },
@@ -258,6 +399,33 @@ export const customerApi = {
     const response = await apiClient.get<ServiceLocationSearchResponse>('/service-locations/search', {
       params: { q: query, page, size },
     });
+    return response.data;
+  },
+
+  // New paginated service locations list
+  getAllServiceLocationsPaginated: async (params?: {
+    page?: number;     // 1-indexed for UI
+    limit?: number;
+    status?: 'ACTIVE' | 'INACTIVE' | 'CLOSED';
+    search?: string;
+    sort?: string;
+  }): Promise<ServiceLocationListResponse> => {
+    const apiParams = {
+      page: params?.page ? params.page - 1 : 0,  // Convert to 0-indexed
+      limit: params?.limit,
+      status: params?.status,
+      search: params?.search,
+      sort: params?.sort,
+    };
+    const response = await apiClient.get<ServiceLocationListResponse>('/service-locations', {
+      params: apiParams,
+    });
+    return response.data;
+  },
+
+  // Get single service location by ID (full details with customer info and contacts)
+  getServiceLocationById: async (id: string): Promise<ServiceLocationDetailDto> => {
+    const response = await apiClient.get<ServiceLocationDetailDto>(`/service-locations/${id}`);
     return response.data;
   },
 };

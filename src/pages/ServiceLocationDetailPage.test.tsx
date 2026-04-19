@@ -4,44 +4,54 @@ import { renderWithProviders, userEvent } from '../test/utils';
 import ServiceLocationDetailPage from './ServiceLocationDetailPage';
 import apiClient from '../api/client';
 import type { RouteObject } from 'react-router-dom';
+import type { ServiceLocationDetailDto } from '../api';
 
 vi.mock('../api/client');
 
-const mockCustomer = {
-  id: 'customer-1',
-  name: 'Test Customer',
-  displayMode: 'STANDARD' as const,
-  serviceLocations: [
-    {
-      id: 'location-1',
-      customerId: 'customer-1',
-      locationName: 'Main Office',
-      address: {
-        streetAddress: '123 Main St',
-        streetAddressLine2: 'Suite 100',
-        city: 'Springfield',
-        state: 'IL',
-        zipCode: '62701',
-        validated: true,
-        isBusiness: true,
-      },
-      status: 'ACTIVE' as const,
-      siteContactName: 'John Doe',
-      siteContactPhone: '5551234567',
-      siteContactEmail: 'john@example.com',
-      additionalContacts: [],
-      accessInstructions: 'Use side entrance',
-      notes: 'Important client',
-      createdAt: '2024-01-01T00:00:00Z',
-      updatedAt: '2024-01-02T10:30:00Z',
-    },
-  ],
+const mockLocation: ServiceLocationDetailDto = {
+  id: 'location-1',
+  customerId: 'customer-1',
+  customerName: 'Test Customer',
+  customerDisplayMode: 'STANDARD' as const,
+  dispatchRegionId: 'region-1',
+  locationName: 'Main Office',
+  address: {
+    streetAddress: '123 Main St',
+    streetAddressLine2: 'Suite 100',
+    city: 'Springfield',
+    state: 'IL',
+    zipCode: '62701',
+    validated: true,
+    isBusiness: true,
+  },
+  status: 'ACTIVE' as const,
+  siteContactName: 'John Doe',
+  siteContactPhone: '5551234567',
+  siteContactEmail: 'john@example.com',
+  additionalContacts: [],
+  accessInstructions: 'Use side entrance',
+  notes: 'Important client',
+  createdAt: '2024-01-01T00:00:00Z',
+  updatedAt: '2024-01-02T10:30:00Z',
+  version: 1,
 };
 
 describe('ServiceLocationDetailPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
+
+  const mockApiResponses = (location: ServiceLocationDetailDto | null = mockLocation, regions: unknown[] = []) => {
+    vi.mocked(apiClient.get).mockImplementation((url) => {
+      if (url.includes('/service-locations/')) {
+        return location ? Promise.resolve({ data: location }) : Promise.reject(new Error('Not found'));
+      }
+      if (url.includes('/dispatch-regions')) {
+        return Promise.resolve({ data: regions });
+      }
+      return Promise.reject(new Error('Unknown endpoint'));
+    });
+  };
 
   const renderDetailPage = (locationId = 'location-1') => {
     const routes: RouteObject[] = [
@@ -77,7 +87,7 @@ describe('ServiceLocationDetailPage', () => {
   });
 
   it('displays error state when location not found', async () => {
-    vi.mocked(apiClient.get).mockResolvedValue({ data: [mockCustomer] });
+    vi.mocked(apiClient.get).mockRejectedValue(new Error('Not found'));
 
     renderDetailPage('non-existent-id');
 
@@ -87,7 +97,7 @@ describe('ServiceLocationDetailPage', () => {
   });
 
   it('displays location name and status', async () => {
-    vi.mocked(apiClient.get).mockResolvedValue({ data: [mockCustomer] });
+    mockApiResponses();
 
     renderDetailPage();
 
@@ -99,7 +109,7 @@ describe('ServiceLocationDetailPage', () => {
   });
 
   it('displays customer name with link', async () => {
-    vi.mocked(apiClient.get).mockResolvedValue({ data: [mockCustomer] });
+    mockApiResponses();
 
     renderDetailPage();
 
@@ -112,7 +122,7 @@ describe('ServiceLocationDetailPage', () => {
   });
 
   it('displays full address', async () => {
-    vi.mocked(apiClient.get).mockResolvedValue({ data: [mockCustomer] });
+    mockApiResponses();
 
     renderDetailPage();
 
@@ -125,7 +135,7 @@ describe('ServiceLocationDetailPage', () => {
   });
 
   it('displays address validation badges', async () => {
-    vi.mocked(apiClient.get).mockResolvedValue({ data: [mockCustomer] });
+    mockApiResponses();
 
     renderDetailPage();
 
@@ -137,7 +147,7 @@ describe('ServiceLocationDetailPage', () => {
   });
 
   it('displays site contact information', async () => {
-    vi.mocked(apiClient.get).mockResolvedValue({ data: [mockCustomer] });
+    mockApiResponses();
 
     renderDetailPage();
 
@@ -153,7 +163,7 @@ describe('ServiceLocationDetailPage', () => {
   });
 
   it('displays access instructions', async () => {
-    vi.mocked(apiClient.get).mockResolvedValue({ data: [mockCustomer] });
+    mockApiResponses();
 
     renderDetailPage();
 
@@ -163,7 +173,7 @@ describe('ServiceLocationDetailPage', () => {
   });
 
   it('displays notes', async () => {
-    vi.mocked(apiClient.get).mockResolvedValue({ data: [mockCustomer] });
+    mockApiResponses();
 
     renderDetailPage();
 
@@ -173,7 +183,7 @@ describe('ServiceLocationDetailPage', () => {
   });
 
   it('opens edit dialog when edit button is clicked', async () => {
-    vi.mocked(apiClient.get).mockResolvedValue({ data: [mockCustomer] });
+    mockApiResponses();
     const user = userEvent.setup();
 
     renderDetailPage();
@@ -192,17 +202,12 @@ describe('ServiceLocationDetailPage', () => {
   });
 
   it('handles unnamed location', async () => {
-    const customerWithUnnamedLocation = {
-      ...mockCustomer,
-      serviceLocations: [
-        {
-          ...mockCustomer.serviceLocations[0],
-          locationName: '',
-        },
-      ],
+    const unnamedLocation = {
+      ...mockLocation,
+      locationName: '',
     };
 
-    vi.mocked(apiClient.get).mockResolvedValue({ data: [customerWithUnnamedLocation] });
+    mockApiResponses(unnamedLocation);
 
     renderDetailPage();
 
@@ -212,21 +217,16 @@ describe('ServiceLocationDetailPage', () => {
   });
 
   it('hides optional sections when data is missing', async () => {
-    const minimalCustomer = {
-      ...mockCustomer,
-      serviceLocations: [
-        {
-          ...mockCustomer.serviceLocations[0],
-          siteContactName: '',
-          siteContactPhone: '',
-          siteContactEmail: '',
-          accessInstructions: '',
-          notes: '',
-        },
-      ],
+    const minimalLocation = {
+      ...mockLocation,
+      siteContactName: '',
+      siteContactPhone: '',
+      siteContactEmail: '',
+      accessInstructions: '',
+      notes: '',
     };
 
-    vi.mocked(apiClient.get).mockResolvedValue({ data: [minimalCustomer] });
+    mockApiResponses(minimalLocation);
 
     renderDetailPage();
 
@@ -241,12 +241,9 @@ describe('ServiceLocationDetailPage', () => {
   });
 
   it('displays additional contacts when present', async () => {
-    const customerWithContacts = {
-      ...mockCustomer,
-      serviceLocations: [
-        {
-          ...mockCustomer.serviceLocations[0],
-          additionalContacts: [
+    const locationWithContacts = {
+      ...mockLocation,
+      additionalContacts: [
             {
               id: 'contact-1',
               name: 'Jane Manager',
@@ -258,11 +255,9 @@ describe('ServiceLocationDetailPage', () => {
               updatedAt: '2024-01-01T00:00:00Z',
             },
           ],
-        },
-      ],
     };
 
-    vi.mocked(apiClient.get).mockResolvedValue({ data: [customerWithContacts] });
+    mockApiResponses(locationWithContacts);
 
     renderDetailPage();
 
@@ -276,20 +271,15 @@ describe('ServiceLocationDetailPage', () => {
   });
 
   it('shows additional contacts section when user can edit', async () => {
-    const minimalCustomer = {
-      ...mockCustomer,
-      serviceLocations: [
-        {
-          ...mockCustomer.serviceLocations[0],
-          siteContactName: '',
-          siteContactPhone: '',
-          siteContactEmail: '',
-          additionalContacts: [],
-        },
-      ],
+    const minimalLocation = {
+      ...mockLocation,
+      siteContactName: '',
+      siteContactPhone: '',
+      siteContactEmail: '',
+      additionalContacts: [],
     };
 
-    vi.mocked(apiClient.get).mockResolvedValue({ data: [minimalCustomer] });
+    mockApiResponses(minimalLocation);
 
     renderDetailPage();
 
@@ -302,7 +292,7 @@ describe('ServiceLocationDetailPage', () => {
   });
 
   it('shows additional contacts section when site contact exists', async () => {
-    vi.mocked(apiClient.get).mockResolvedValue({ data: [mockCustomer] });
+    mockApiResponses();
 
     renderDetailPage();
 
@@ -315,7 +305,7 @@ describe('ServiceLocationDetailPage', () => {
   });
 
   it('opens add contact dialog when button is clicked', async () => {
-    vi.mocked(apiClient.get).mockResolvedValue({ data: [mockCustomer] });
+    mockApiResponses();
     const user = userEvent.setup();
 
     renderDetailPage();
@@ -333,7 +323,7 @@ describe('ServiceLocationDetailPage', () => {
   });
 
   it('displays all tabs', async () => {
-    vi.mocked(apiClient.get).mockResolvedValue({ data: [mockCustomer] });
+    mockApiResponses();
 
     renderDetailPage();
 
@@ -349,7 +339,7 @@ describe('ServiceLocationDetailPage', () => {
   });
 
   it('switches to work orders tab', async () => {
-    vi.mocked(apiClient.get).mockResolvedValue({ data: [mockCustomer] });
+    mockApiResponses();
     const user = userEvent.setup();
 
     renderDetailPage();
@@ -368,7 +358,7 @@ describe('ServiceLocationDetailPage', () => {
   });
 
   it('switches to equipment tab', async () => {
-    vi.mocked(apiClient.get).mockResolvedValue({ data: [mockCustomer] });
+    mockApiResponses();
     const user = userEvent.setup();
 
     renderDetailPage();
@@ -387,7 +377,7 @@ describe('ServiceLocationDetailPage', () => {
   });
 
   it('switches to activity tab', async () => {
-    vi.mocked(apiClient.get).mockResolvedValue({ data: [mockCustomer] });
+    mockApiResponses();
     const user = userEvent.setup();
 
     renderDetailPage();
@@ -406,7 +396,7 @@ describe('ServiceLocationDetailPage', () => {
   });
 
   it('navigates back to service locations when back button is clicked', async () => {
-    vi.mocked(apiClient.get).mockResolvedValue({ data: [mockCustomer] });
+    mockApiResponses();
 
     renderDetailPage();
 
@@ -420,7 +410,7 @@ describe('ServiceLocationDetailPage', () => {
   });
 
   it('navigates to customer detail when customer name is clicked', async () => {
-    vi.mocked(apiClient.get).mockResolvedValue({ data: [mockCustomer] });
+    mockApiResponses();
 
     renderDetailPage();
 
@@ -434,29 +424,16 @@ describe('ServiceLocationDetailPage', () => {
   });
 
   it('displays dispatch region when available', async () => {
-    const customerWithRegion = {
-      ...mockCustomer,
-      serviceLocations: [
-        {
-          ...mockCustomer.serviceLocations[0],
-          dispatchRegionId: 'region-1',
-        },
-      ],
+    const locationWithRegion = {
+      ...mockLocation,
+      dispatchRegionId: 'region-1',
     };
 
     const mockDispatchRegions = [
       { id: 'region-1', name: 'North Region', isActive: true },
     ];
 
-    vi.mocked(apiClient.get).mockImplementation((url: string) => {
-      if (url.includes('/customers')) {
-        return Promise.resolve({ data: [customerWithRegion] });
-      }
-      if (url.includes('/dispatch-regions')) {
-        return Promise.resolve({ data: mockDispatchRegions });
-      }
-      return Promise.reject(new Error('Not found'));
-    });
+    mockApiResponses(locationWithRegion, mockDispatchRegions);
 
     renderDetailPage();
 
@@ -470,7 +447,7 @@ describe('ServiceLocationDetailPage', () => {
   });
 
   it('closes edit dialog when onClose is called', async () => {
-    vi.mocked(apiClient.get).mockResolvedValue({ data: [mockCustomer] });
+    mockApiResponses();
     const user = userEvent.setup();
 
     renderDetailPage();
@@ -497,7 +474,7 @@ describe('ServiceLocationDetailPage', () => {
   });
 
   it('displays empty state in work orders tab', async () => {
-    vi.mocked(apiClient.get).mockResolvedValue({ data: [mockCustomer] });
+    mockApiResponses();
     const user = userEvent.setup();
 
     renderDetailPage();
@@ -517,7 +494,7 @@ describe('ServiceLocationDetailPage', () => {
   });
 
   it('displays empty state in equipment tab', async () => {
-    vi.mocked(apiClient.get).mockResolvedValue({ data: [mockCustomer] });
+    mockApiResponses();
     const user = userEvent.setup();
 
     renderDetailPage();
@@ -537,7 +514,7 @@ describe('ServiceLocationDetailPage', () => {
   });
 
   it('displays notification logs in activity tab', async () => {
-    vi.mocked(apiClient.get).mockResolvedValue({ data: [mockCustomer] });
+    mockApiResponses();
     const user = userEvent.setup();
 
     renderDetailPage();
@@ -572,7 +549,7 @@ describe('ServiceLocationDetailPage', () => {
   });
 
   it('calls navigate when back button is clicked', async () => {
-    vi.mocked(apiClient.get).mockResolvedValue({ data: [mockCustomer] });
+    mockApiResponses();
     const user = userEvent.setup();
 
     renderDetailPage();
@@ -589,7 +566,7 @@ describe('ServiceLocationDetailPage', () => {
   });
 
   it('customer link has correct href', async () => {
-    vi.mocked(apiClient.get).mockResolvedValue({ data: [mockCustomer] });
+    mockApiResponses();
 
     renderDetailPage();
 
@@ -604,7 +581,7 @@ describe('ServiceLocationDetailPage', () => {
   });
 
   it('displays add button in work orders tab', async () => {
-    vi.mocked(apiClient.get).mockResolvedValue({ data: [mockCustomer] });
+    mockApiResponses();
     const user = userEvent.setup();
 
     renderDetailPage();
@@ -623,7 +600,7 @@ describe('ServiceLocationDetailPage', () => {
   });
 
   it('displays add button in equipment tab', async () => {
-    vi.mocked(apiClient.get).mockResolvedValue({ data: [mockCustomer] });
+    mockApiResponses();
     const user = userEvent.setup();
 
     renderDetailPage();
@@ -643,17 +620,12 @@ describe('ServiceLocationDetailPage', () => {
 
 
   it('displays inactive status badge correctly', async () => {
-    const customerWithInactiveLocation = {
-      ...mockCustomer,
-      serviceLocations: [
-        {
-          ...mockCustomer.serviceLocations[0],
-          status: 'INACTIVE' as const,
-        },
-      ],
+    const inactiveLocation = {
+      ...mockLocation,
+      status: 'INACTIVE' as const,
     };
 
-    vi.mocked(apiClient.get).mockResolvedValue({ data: [customerWithInactiveLocation] });
+    mockApiResponses(inactiveLocation);
 
     renderDetailPage();
 

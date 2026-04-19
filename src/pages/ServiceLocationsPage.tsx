@@ -1,9 +1,9 @@
-import { useState, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useDeferredValue } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { EllipsisVerticalIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
-import { customerApi, type ServiceLocation, type Customer } from '../api';
+import { customerApi, type ServiceLocation } from '../api';
 import { useGlossary } from '../contexts/GlossaryContext';
 import { useHasCapability } from '../hooks/useCurrentUser';
 import AppLayout from '../components/AppLayout';
@@ -15,78 +15,71 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '.
 import { Badge } from '../components/catalyst/badge';
 import { Dropdown, DropdownButton, DropdownItem, DropdownLabel, DropdownMenu } from '../components/catalyst/dropdown';
 import { Input, InputGroup } from '../components/catalyst/input';
-
-type ServiceLocationWithCustomer = ServiceLocation & {
-  customerName: string;
-  customerDisplayMode: 'SIMPLE' | 'STANDARD';
-};
+import { Pagination, PaginationGap, PaginationList, PaginationNext, PaginationPage, PaginationPrevious } from '../components/catalyst/pagination';
 
 export default function ServiceLocationsPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { t } = useTranslation();
   const { getName } = useGlossary();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedLocation, setSelectedLocation] = useState<ServiceLocation | null>(null);
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [searchQuery, setSearchQuery] = useState(searchParams.get('search') || '');
+  const deferredSearch = useDeferredValue(searchQuery);
+
+  // Read filters from URL
+  const page = parseInt(searchParams.get('page') || '1', 10);
+  const statusFilter = searchParams.get('status') || 'all';
 
   // Permission checks
   const canAddServiceLocations = useHasCapability('ADD_SERVICE_LOCATIONS');
   const canEditServiceLocations = useHasCapability('EDIT_SERVICE_LOCATIONS');
   const canCloseServiceLocations = useHasCapability('CLOSE_SERVICE_LOCATIONS');
 
-  // Fetch all customers (which includes their service locations)
-  const { data: customers, isLoading, error } = useQuery({
-    queryKey: ['customers'],
-    queryFn: () => customerApi.getAll(),
+  // Update URL when search/filter changes
+  const updateFilters = (updates: { search?: string; status?: string }) => {
+    const newParams = new URLSearchParams(searchParams);
+    if (updates.search !== undefined) {
+      if (updates.search) {
+        newParams.set('search', updates.search);
+      } else {
+        newParams.delete('search');
+      }
+      newParams.set('page', '1');
+    }
+    if (updates.status !== undefined) {
+      if (updates.status === 'all') {
+        newParams.delete('status');
+      } else {
+        newParams.set('status', updates.status);
+      }
+      newParams.set('page', '1');
+    }
+    setSearchParams(newParams);
+  };
+
+  // Fetch paginated service locations
+  const { data, isLoading, error } = useQuery({
+    queryKey: ['service-locations', page, statusFilter, deferredSearch],
+    queryFn: () => customerApi.getAllServiceLocationsPaginated({
+      page,
+      limit: 50,
+      status: statusFilter === 'all' ? undefined : (statusFilter as 'ACTIVE' | 'INACTIVE' | 'CLOSED'),
+      search: deferredSearch || undefined,
+    }),
   });
 
-  // Flatten all service locations with customer info
-  const allLocations = useMemo((): ServiceLocationWithCustomer[] => {
-    if (!customers) return [];
-    return customers.flatMap((customer: Customer) =>
-      customer.serviceLocations.map((location: ServiceLocation): ServiceLocationWithCustomer => ({
-        ...location,
-        customerName: customer.name,
-        customerDisplayMode: customer.displayMode,
-      }))
-    );
-  }, [customers]);
-
-  // Filter locations based on search query and status
-  const filteredLocations = useMemo(() => {
-    let filtered = allLocations;
-
-    // Status filter
-    if (statusFilter !== 'all') {
-      filtered = filtered.filter((loc) => loc.status === statusFilter);
-    }
-
-    // Search filter
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(
-        (location) =>
-          location.locationName?.toLowerCase().includes(query) ||
-          location.address.streetAddress.toLowerCase().includes(query) ||
-          location.address.city.toLowerCase().includes(query) ||
-          location.address.state.toLowerCase().includes(query) ||
-          location.address.zipCode.toLowerCase().includes(query) ||
-          location.siteContactName?.toLowerCase().includes(query) ||
-          location.siteContactPhone?.toLowerCase().includes(query) ||
-          location.customerName.toLowerCase().includes(query)
-      );
-    }
-
-    return filtered;
-  }, [allLocations, searchQuery, statusFilter]);
+  const locations = data?.content || [];
+  const totalLocations = data?.totalElements || 0;
+  const totalPages = data?.totalPages || 0;
 
   const closeLocationMutation = useMutation({
-    mutationFn: ({ customerId, locationId }: { customerId: string; locationId: string }) =>
-      customerApi.closeServiceLocation(customerId, locationId),
+    mutationFn: (locationId: string) =>
+      customerApi.closeServiceLocation(locationId),
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['service-locations'] });
       queryClient.invalidateQueries({ queryKey: ['customers'] });
     },
   });
@@ -97,15 +90,17 @@ export default function ServiceLocationsPage() {
     setIsDialogOpen(true);
   };
 
-  const handleEdit = (location: ServiceLocation) => {
+  const handleEdit = async (locationId: string, customerId: string) => {
+    // Fetch full location details for editing
+    const location = await customerApi.getServiceLocationById(locationId);
     setSelectedLocation(location);
-    setSelectedCustomerId(location.customerId);
+    setSelectedCustomerId(customerId);
     setIsDialogOpen(true);
   };
 
-  const handleClose = (location: ServiceLocation) => {
-    if (window.confirm(t('serviceLocations.actions.closeConfirm', { name: location.locationName || location.address.streetAddress }))) {
-      closeLocationMutation.mutate({ customerId: location.customerId, locationId: location.id });
+  const handleClose = (locationId: string, locationName: string, streetAddress: string) => {
+    if (window.confirm(t('serviceLocations.actions.closeConfirm', { name: locationName || streetAddress }))) {
+      closeLocationMutation.mutate(locationId);
     }
   };
 
@@ -132,44 +127,45 @@ export default function ServiceLocationsPage() {
             type="text"
             placeholder={t('common.search')}
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={(e) => {
+              setSearchQuery(e.target.value);
+              updateFilters({ search: e.target.value });
+            }}
           />
         </InputGroup>
         <div className="flex items-center gap-2">
           <Button
             plain
-            onClick={() => setStatusFilter('all')}
+            onClick={() => updateFilters({ status: 'all' })}
             className={statusFilter === 'all' ? 'font-semibold text-zinc-950 dark:text-white' : ''}
           >
             {t('serviceLocations.filter.allStatuses')}
           </Button>
           <Button
             plain
-            onClick={() => setStatusFilter('ACTIVE')}
+            onClick={() => updateFilters({ status: 'ACTIVE' })}
             className={statusFilter === 'ACTIVE' ? 'font-semibold text-zinc-950 dark:text-white' : ''}
           >
             {t('serviceLocations.status.active')}
           </Button>
           <Button
             plain
-            onClick={() => setStatusFilter('INACTIVE')}
+            onClick={() => updateFilters({ status: 'INACTIVE'  })}
             className={statusFilter === 'INACTIVE' ? 'font-semibold text-zinc-950 dark:text-white' : ''}
           >
             {t('serviceLocations.status.inactive')}
           </Button>
           <Button
             plain
-            onClick={() => setStatusFilter('CLOSED')}
+            onClick={() => updateFilters({ status: 'CLOSED' })}
             className={statusFilter === 'CLOSED' ? 'font-semibold text-zinc-950 dark:text-white' : ''}
           >
             {t('serviceLocations.status.closed')}
           </Button>
         </div>
-        {allLocations.length > 0 && (
+        {totalLocations > 0 && (
           <div className="text-sm text-zinc-600 dark:text-zinc-400">
-            {filteredLocations.length === allLocations.length
-              ? `${allLocations.length} ${allLocations.length === 1 ? getName('service_location').toLowerCase() : getName('service_location', true).toLowerCase()}`
-              : `${filteredLocations.length} of ${allLocations.length}`}
+            {totalLocations} {totalLocations === 1 ? getName('service_location').toLowerCase() : getName('service_location', true).toLowerCase()}
           </div>
         )}
       </div>
@@ -188,10 +184,14 @@ export default function ServiceLocationsPage() {
         </div>
       )}
 
-      {allLocations.length === 0 && !isLoading && (
+      {totalLocations === 0 && !isLoading && (
         <div className="mt-4 rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700 p-4">
-          <p className="text-sm text-zinc-600 dark:text-zinc-400">{t('common.actions.notFound', { entities: getName('service_location', true) })}</p>
-          {canAddServiceLocations && (
+          <p className="text-sm text-zinc-600 dark:text-zinc-400">
+            {deferredSearch || statusFilter !== 'all'
+              ? t('common.actions.noMatchSearch', { entities: getName('service_location', true) })
+              : t('common.actions.notFound', { entities: getName('service_location', true) })}
+          </p>
+          {canAddServiceLocations && !deferredSearch && statusFilter === 'all' && (
             <Button className="mt-2" onClick={handleAdd}>
               {t('common.actions.addFirst', { entity: getName('service_location') })}
             </Button>
@@ -199,13 +199,7 @@ export default function ServiceLocationsPage() {
         </div>
       )}
 
-      {filteredLocations.length === 0 && allLocations.length > 0 && (
-        <div className="mt-4 rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700 p-4">
-          <p className="text-sm text-zinc-600 dark:text-zinc-400">{t('common.actions.noMatchSearch', { entities: getName('service_location', true) })}</p>
-        </div>
-      )}
-
-      {filteredLocations.length > 0 && (
+      {locations.length > 0 && (
         <div className="mt-4">
           <Table dense className="[--gutter:theme(spacing.1)] text-sm">
             <TableHead>
@@ -219,7 +213,7 @@ export default function ServiceLocationsPage() {
               </TableRow>
             </TableHead>
             <TableBody>
-              {filteredLocations.map((location) => {
+              {locations.map((location) => {
                 return (
                   <TableRow key={location.id} href={`/service-locations/${location.id}`} className="cursor-pointer">
                     <TableCell className="font-medium">
@@ -285,12 +279,12 @@ export default function ServiceLocationsPage() {
                                 <DropdownLabel>{t('common.view')}</DropdownLabel>
                               </DropdownItem>
                               {canEditServiceLocations && (
-                                <DropdownItem onClick={() => handleEdit(location)}>
+                                <DropdownItem onClick={() => handleEdit(location.id, location.customerId)}>
                                   <DropdownLabel>{t('common.edit')}</DropdownLabel>
                                 </DropdownItem>
                               )}
                               {location.status !== 'CLOSED' && canCloseServiceLocations && (
-                                <DropdownItem onClick={() => handleClose(location)}>
+                                <DropdownItem onClick={() => handleClose(location.id, location.locationName || '', location.address.streetAddress)}>
                                   <DropdownLabel>{t('serviceLocations.actions.close')}</DropdownLabel>
                                 </DropdownItem>
                               )}
@@ -305,6 +299,43 @@ export default function ServiceLocationsPage() {
             </TableBody>
           </Table>
         </div>
+      )}
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <Pagination className="mt-4">
+          <PaginationPrevious href={page > 1 ? `?${new URLSearchParams({ ...Object.fromEntries(searchParams), page: (page - 1).toString() })}` : undefined} />
+          <PaginationList>
+            {(() => {
+              const pages: (number | 'gap')[] = [];
+              if (totalPages <= 7) {
+                for (let i = 1; i <= totalPages; i++) pages.push(i);
+              } else {
+                pages.push(1);
+                if (page > 3) pages.push('gap');
+                const start = Math.max(2, page - 1);
+                const end = Math.min(totalPages - 1, page + 1);
+                for (let i = start; i <= end; i++) pages.push(i);
+                if (page < totalPages - 2) pages.push('gap');
+                pages.push(totalPages);
+              }
+              return pages.map((p, idx) =>
+                p === 'gap' ? (
+                  <PaginationGap key={`gap-${idx}`} />
+                ) : (
+                  <PaginationPage
+                    key={p}
+                    href={`?${new URLSearchParams({ ...Object.fromEntries(searchParams), page: p.toString() })}`}
+                    current={p === page}
+                  >
+                    {p}
+                  </PaginationPage>
+                )
+              );
+            })()}
+          </PaginationList>
+          <PaginationNext href={page < totalPages ? `?${new URLSearchParams({ ...Object.fromEntries(searchParams), page: (page + 1).toString() })}` : undefined} />
+        </Pagination>
       )}
 
       <ServiceLocationFormDialog

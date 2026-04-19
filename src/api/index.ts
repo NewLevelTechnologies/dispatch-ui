@@ -18,6 +18,14 @@ export {
   type UpdateBillingAddressRequest,
   type UpdateServiceLocationRequest,
   type UpdateServiceLocationAddressRequest,
+  type Pageable,
+  type CustomerListDto,
+  type CustomerListResponse,
+  type CustomerSearchResult,
+  type CustomerSearchResponse,
+  type ServiceLocationListDto,
+  type ServiceLocationListResponse,
+  type ServiceLocationDetailDto,
 } from './customerApi';
 
 // Contact API
