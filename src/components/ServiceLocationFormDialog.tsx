@@ -131,6 +131,10 @@ export default function ServiceLocationFormDialog({ isOpen, onClose, serviceLoca
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['customers', effectiveCustomerId] });
       queryClient.invalidateQueries({ queryKey: ['customers'] });
+      queryClient.invalidateQueries({ queryKey: ['service-locations'] });
+      if (serviceLocation) {
+        queryClient.invalidateQueries({ queryKey: ['service-location', serviceLocation.id] });
+      }
       onClose();
     },
     onError: (error: unknown) => {
@@ -180,6 +184,10 @@ export default function ServiceLocationFormDialog({ isOpen, onClose, serviceLoca
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['customers', effectiveCustomerId] });
       queryClient.invalidateQueries({ queryKey: ['customers'] });
+      queryClient.invalidateQueries({ queryKey: ['service-locations'] });
+      if (serviceLocation) {
+        queryClient.invalidateQueries({ queryKey: ['service-location', serviceLocation.id] });
+      }
       onClose();
     },
     onError: (error: unknown) => {
