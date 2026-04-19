@@ -328,7 +328,7 @@ export default function WorkOrderFormDialog({ isOpen, onClose, workOrder }: Work
 
                   {/* Service Address */}
                   <div className="space-y-2">
-                    <Label className="text-xs font-semibold">{t('common.form.serviceAddress')}</Label>
+                    <Subheading className="text-xs font-semibold">{t('common.form.serviceAddress')}</Subheading>
                     <AddressFields
                       address={serviceAddress}
                       onChange={setServiceAddress}
@@ -369,7 +369,7 @@ export default function WorkOrderFormDialog({ isOpen, onClose, workOrder }: Work
                   {/* Conditional: Different Billing Address */}
                   {!billingAddressSameAsService && (
                     <div className="space-y-2">
-                      <Label className="text-xs font-semibold">{t('common.form.billingAddress')}</Label>
+                      <Subheading className="text-xs font-semibold">{t('common.form.billingAddress')}</Subheading>
                       <AddressFields
                         address={billingAddress}
                         onChange={setBillingAddress}
