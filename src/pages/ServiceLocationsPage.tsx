@@ -37,7 +37,6 @@ export default function ServiceLocationsPage() {
   const canAddServiceLocations = useHasCapability('ADD_SERVICE_LOCATIONS');
   const canEditServiceLocations = useHasCapability('EDIT_SERVICE_LOCATIONS');
   const canCloseServiceLocations = useHasCapability('CLOSE_SERVICE_LOCATIONS');
-  const canDeleteServiceLocations = useHasCapability('DELETE_SERVICE_LOCATIONS');
 
   // Update URL when search/filter changes
   const updateFilters = (updates: { search?: string; status?: string }) => {
@@ -290,7 +289,7 @@ export default function ServiceLocationsPage() {
                       </Badge>
                     </TableCell>
                     <TableCell>
-                      {(canEditServiceLocations || canCloseServiceLocations || canDeleteServiceLocations) && (
+                      {(canEditServiceLocations || canCloseServiceLocations) && (
                         <div className="-mx-3 -my-1.5 sm:-mx-2.5">
                           <Dropdown>
                             <DropdownButton plain aria-label={t('common.moreOptions')}>
@@ -305,15 +304,17 @@ export default function ServiceLocationsPage() {
                                   <DropdownLabel>{t('common.edit')}</DropdownLabel>
                                 </DropdownItem>
                               )}
-                              {location.status !== 'CLOSED' && canCloseServiceLocations && (
-                                <DropdownItem onClick={() => handleClose(location.id, location.locationName || '', location.address.streetAddress)}>
-                                  <DropdownLabel>{t('serviceLocations.actions.close')}</DropdownLabel>
-                                </DropdownItem>
-                              )}
-                              {canDeleteServiceLocations && (
-                                <DropdownItem onClick={() => handleDelete(location.id, location.locationName || '', location.address.streetAddress)}>
-                                  <DropdownLabel>{t('common.delete')}</DropdownLabel>
-                                </DropdownItem>
+                              {canCloseServiceLocations && (
+                                <>
+                                  {location.status !== 'CLOSED' && (
+                                    <DropdownItem onClick={() => handleClose(location.id, location.locationName || '', location.address.streetAddress)}>
+                                      <DropdownLabel>{t('serviceLocations.actions.close')}</DropdownLabel>
+                                    </DropdownItem>
+                                  )}
+                                  <DropdownItem onClick={() => handleDelete(location.id, location.locationName || '', location.address.streetAddress)}>
+                                    <DropdownLabel>{t('common.delete')}</DropdownLabel>
+                                  </DropdownItem>
+                                </>
                               )}
                             </DropdownMenu>
                           </Dropdown>
