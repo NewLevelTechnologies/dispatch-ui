@@ -31,6 +31,7 @@ export default function WorkOrderFormDialog({ isOpen, onClose, workOrder }: Work
 
   // Customer mode: existing or new
   const [customerMode, setCustomerMode] = useState<'existing' | 'new'>('existing');
+  const [isCreatingCustomer, setIsCreatingCustomer] = useState(false);
 
   // Work order form data
   const [formData, setFormData] = useState<Omit<WorkOrder, 'id' | 'createdAt' | 'updatedAt'>>({
@@ -121,6 +122,7 @@ export default function WorkOrderFormDialog({ isOpen, onClose, workOrder }: Work
     } else {
       // Create mode - reset everything
       setCustomerMode('existing');
+      setIsCreatingCustomer(false);
       setFormData({
         customerId: '',
         serviceLocationId: '',
@@ -155,9 +157,11 @@ export default function WorkOrderFormDialog({ isOpen, onClose, workOrder }: Work
     mutationFn: (data: Omit<WorkOrder, 'id' | 'createdAt' | 'updatedAt'>) => workOrderApi.create(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['work-orders'] });
+      setIsCreatingCustomer(false);
       onClose();
     },
     onError: (error: unknown) => {
+      setIsCreatingCustomer(false);
       const errorMessage = error instanceof Error && 'response' in error
         ? ((error as { response?: { data?: { message?: string } } }).response?.data?.message)
         : undefined;
@@ -213,6 +217,7 @@ export default function WorkOrderFormDialog({ isOpen, onClose, workOrder }: Work
       createMutation.mutate(formData);
     } else {
       // New customer mode - create customer first, then work order
+      setIsCreatingCustomer(true);
       try {
         const customerRequest: CreateCustomerRequest = {
           name: newCustomer.name,
@@ -255,6 +260,7 @@ export default function WorkOrderFormDialog({ isOpen, onClose, workOrder }: Work
 
         createMutation.mutate(workOrderData);
       } catch (error) {
+        setIsCreatingCustomer(false);
         const errorMessage = error instanceof Error && 'response' in error
           ? ((error as { response?: { data?: { message?: string } } }).response?.data?.message)
           : undefined;
@@ -595,9 +601,9 @@ export default function WorkOrderFormDialog({ isOpen, onClose, workOrder }: Work
         <Button
           type="submit"
           form="work-order-form"
-          disabled={createMutation.isPending || updateMutation.isPending}
+          disabled={createMutation.isPending || updateMutation.isPending || isCreatingCustomer}
         >
-          {createMutation.isPending || updateMutation.isPending
+          {createMutation.isPending || updateMutation.isPending || isCreatingCustomer
             ? t('common.saving')
             : t(isEdit ? 'common.update' : 'common.create')}
         </Button>
