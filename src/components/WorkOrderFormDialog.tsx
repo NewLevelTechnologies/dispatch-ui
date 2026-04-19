@@ -248,6 +248,10 @@ export default function WorkOrderFormDialog({ isOpen, onClose, workOrder }: Work
         const createdCustomer = await customerApi.create(customerRequest);
         const firstLocation = createdCustomer.serviceLocations[0];
 
+        // Invalidate customers and service-locations queries so the new data shows in those pages
+        queryClient.invalidateQueries({ queryKey: ['customers'] });
+        queryClient.invalidateQueries({ queryKey: ['service-locations'] });
+
         // Now create work order with the new customer's first location
         const workOrderData: Omit<WorkOrder, 'id' | 'createdAt' | 'updatedAt'> = {
           customerId: createdCustomer.id,
