@@ -81,6 +81,12 @@ export default function CustomersPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['customers'] });
     },
+    onError: (error: unknown) => {
+      const errorMessage = error instanceof Error && 'response' in error
+        ? ((error as { response?: { data?: { message?: string } } }).response?.data?.message)
+        : undefined;
+      alert(errorMessage || t('common.form.errorDelete', { entity: getName('customer') }));
+    },
   });
 
   const handleAdd = () => {
