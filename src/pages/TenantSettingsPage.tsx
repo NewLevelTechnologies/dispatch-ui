@@ -377,7 +377,7 @@ export default function TenantSettingsPage() {
                     : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-300'
                 }`
               }>
-                Dispatch Regions
+                {getName('dispatch')} {t('entities.regions')}
               </Tab>
             </Tab.List>
 
@@ -642,7 +642,7 @@ export default function TenantSettingsPage() {
               <Tab.Panel>
                 <div className="flex items-center justify-between mb-4">
                   <Text className="text-sm text-zinc-600 dark:text-zinc-400">
-                    {t('dispatchRegions.description')}
+                    {t('dispatchRegions.description', { dispatch: getName('dispatch') })}
                   </Text>
                   {canEdit && (
                     <Button onClick={handleAddRegion}>
@@ -652,7 +652,7 @@ export default function TenantSettingsPage() {
                 </div>
 
                 {regionsLoading && (
-                  <Text>{t('dispatchRegions.loading')}</Text>
+                  <Text>{t('dispatchRegions.loading', { dispatch: getName('dispatch') })}</Text>
                 )}
 
                 {regionsError && (
@@ -660,7 +660,7 @@ export default function TenantSettingsPage() {
                 )}
 
                 {dispatchRegions && dispatchRegions.length === 0 && (
-                  <Text>{t('dispatchRegions.empty')}</Text>
+                  <Text>{t('dispatchRegions.empty', { dispatch: getName('dispatch') })}</Text>
                 )}
 
                 {dispatchRegions && dispatchRegions.length > 0 && (
@@ -805,7 +805,7 @@ export default function TenantSettingsPage() {
                     : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-300'
                 }`
               }>
-                Dispatch Regions
+                {getName('dispatch')} {t('entities.regions')}
               </Tab>
             </Tab.List>
 

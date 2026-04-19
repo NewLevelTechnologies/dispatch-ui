@@ -243,15 +243,15 @@
       "deactivateConfirm": "Are you sure you want to deactivate \"{{name}}\"? It will be hidden from active lists but preserved in history.",
       "reactivate": "Reactivate"
     },
-    "description": "Manage geographic regions for organizing service locations and technicians on dispatch boards.",
-    "empty": "No dispatch regions found. Create your first region to get started.",
+    "description": "Manage geographic regions for organizing service locations and technicians on {{dispatch, lowercase}} boards.",
+    "empty": "No {{dispatch, lowercase}} regions found. Create your first region to get started.",
     "form": {
       "abbreviation": "Abbreviation",
       "abbreviationHelper": "Short code (e.g., \"ATL\")",
       "autoSelected": "Auto-selected: only one active region",
       "description": "Description",
-      "descriptionCreate": "Create a new dispatch region for organizing service locations and technicians.",
-      "descriptionEdit": "Update the dispatch region details.",
+      "descriptionCreate": "Create a new {{dispatch, lowercase}} region for organizing service locations and technicians.",
+      "descriptionEdit": "Update the {{dispatch, lowercase}} region details.",
       "logoUrl": "Logo URL",
       "logoUrlHelper": "Optional URL to region-specific logo image",
       "name": "Name",
@@ -261,11 +261,11 @@
       "sortOrderHelper": "Lower numbers appear first",
       "state": "State",
       "tabDisplayName": "Tab Display Name",
-      "tabDisplayNameHelper": "Optional name for dispatch board tabs",
-      "titleCreate": "Create Dispatch Region",
-      "titleEdit": "Edit Dispatch Region"
+      "tabDisplayNameHelper": "Optional name for {{dispatch, lowercase}} board tabs",
+      "titleCreate": "Create {{dispatch}} Region",
+      "titleEdit": "Edit {{dispatch}} Region"
     },
-    "loading": "Loading dispatch regions...",
+    "loading": "Loading {{dispatch, lowercase}} regions...",
     "table": {
       "abbreviation": "Abbreviation",
       "name": "Name",
