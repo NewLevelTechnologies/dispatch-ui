@@ -101,8 +101,9 @@ export default function NotificationLogsList({
   }
 
   const logs = data?.content || [];
-  const totalPages = data?.totalPages || 0;
   const totalElements = data?.totalElements || 0;
+  const totalPages = data?.totalPages || 1;
+  const currentPage = page + 1; // Convert 0-indexed to 1-indexed for display
 
   return (
     <div>
@@ -222,30 +223,24 @@ export default function NotificationLogsList({
           {/* Pagination */}
           {totalPages > 1 && (
             <div className="mt-4 flex items-center justify-between">
-              <Text className="text-sm text-zinc-500 dark:text-zinc-400">
-                {t('notifications.logs.pagination.showing', {
-                  start: page * 20 + 1,
-                  end: Math.min((page + 1) * 20, totalElements),
-                  total: totalElements,
-                })}
-              </Text>
+              <div className="flex gap-4 text-sm text-zinc-600 dark:text-zinc-400">
+                <span>{t('common.pagination.showing', { start: page * 20 + 1, end: Math.min((page + 1) * 20, totalElements), total: totalElements })}</span>
+                <span>{t('common.pagination.pageOf', { page: currentPage, total: totalPages })}</span>
+              </div>
               <div className="flex gap-2">
                 <Button
                   plain
                   disabled={page === 0}
                   onClick={() => setPage(page - 1)}
                 >
-                  {t('notifications.logs.pagination.previous')}
+                  {t('common.pagination.previous')}
                 </Button>
-                <Text className="text-sm">
-                  {t('notifications.logs.pagination.page', { current: page + 1, total: totalPages })}
-                </Text>
                 <Button
                   plain
-                  disabled={page >= totalPages - 1}
+                  disabled={page === totalPages - 1}
                   onClick={() => setPage(page + 1)}
                 >
-                  {t('notifications.logs.pagination.next')}
+                  {t('common.pagination.next')}
                 </Button>
               </div>
             </div>

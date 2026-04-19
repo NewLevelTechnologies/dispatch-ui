@@ -31,10 +31,11 @@ export default function ServiceLocationDetailPage() {
   // Permission checks
   const canEditServiceLocations = useHasCapability('EDIT_SERVICE_LOCATIONS');
 
-  // Fetch all customers to find the service location
-  const { data: customers, isLoading, error } = useQuery({
-    queryKey: ['customers'],
-    queryFn: () => customerApi.getAll(),
+  // Fetch service location by ID (full details with customer info)
+  const { data: location, isLoading, error } = useQuery({
+    queryKey: ['service-location', id],
+    queryFn: () => customerApi.getServiceLocationById(id!),
+    enabled: !!id,
   });
 
   // Fetch dispatch regions to display region name
@@ -43,19 +44,14 @@ export default function ServiceLocationDetailPage() {
     queryFn: () => dispatchRegionApi.getAll(false),
   });
 
-  // Find the service location and its customer
-  const locationData = customers
-    ?.flatMap((customer) =>
-      customer.serviceLocations.map((location) => ({
-        location,
-        customer,
-      }))
-    )
-    .find((item) => item.location.id === id);
-
-  const location = locationData?.location;
-  const customer = locationData?.customer;
   const dispatchRegion = dispatchRegions?.find(r => r.id === location?.dispatchRegionId);
+
+  // Create customer object from location data for display
+  const customer = location ? {
+    id: location.customerId,
+    name: location.customerName,
+    displayMode: location.customerDisplayMode,
+  } : undefined;
 
   if (isLoading) {
     return (
@@ -241,7 +237,7 @@ export default function ServiceLocationDetailPage() {
                     parentId={location.id}
                     parentType="serviceLocation"
                     customerId={customer.id}
-                    queryKey={['customers']}
+                    queryKey={['service-location', id!]}
                     canEdit={canEditServiceLocations}
                     showAddButton={true}
                   />

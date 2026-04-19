@@ -92,10 +92,16 @@
       "zipCode": "Zip Code"
     },
     "moreOptions": "More options",
-    "showAll": "Show All",
     "none": "None",
+    "pagination": {
+      "next": "Next",
+      "pageOf": "Page {{page}} of {{total}}",
+      "previous": "Previous",
+      "showing": "Showing {{start}}-{{end}} of {{total}}"
+    },
     "save": "Save",
     "saving": "Saving...",
+    "showAll": "Show All",
     "signOut": "Sign out",
     "theme": "Theme",
     "update": "Update",
@@ -158,6 +164,9 @@
     "displayMode": {
       "simple": "Simple",
       "standard": "Standard"
+    },
+    "filter": {
+      "allStatuses": "All Statuses"
     },
     "form": {
       "accessInstructionsOptional": "Access Instructions (optional)",

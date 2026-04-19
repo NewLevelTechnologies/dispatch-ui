@@ -131,6 +131,10 @@ export default function ServiceLocationFormDialog({ isOpen, onClose, serviceLoca
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['customers', effectiveCustomerId] });
       queryClient.invalidateQueries({ queryKey: ['customers'] });
+      queryClient.invalidateQueries({ queryKey: ['service-locations'] });
+      if (serviceLocation) {
+        queryClient.invalidateQueries({ queryKey: ['service-location', serviceLocation.id] });
+      }
       onClose();
     },
     onError: (error: unknown) => {
@@ -156,7 +160,7 @@ export default function ServiceLocationFormDialog({ isOpen, onClose, serviceLoca
         notes: data.notes || null,
       };
 
-      await customerApi.updateServiceLocation(effectiveCustomerId, serviceLocation.id, updateRequest);
+      await customerApi.updateServiceLocation(serviceLocation.id, updateRequest);
 
       // Check if address changed, if so update it separately
       const addressChanged =
@@ -174,12 +178,16 @@ export default function ServiceLocationFormDialog({ isOpen, onClose, serviceLoca
           state: data.state,
           zipCode: data.zipCode,
         };
-        await customerApi.updateServiceLocationAddress(effectiveCustomerId, serviceLocation.id, addressRequest);
+        await customerApi.updateServiceLocationAddress(serviceLocation.id, addressRequest);
       }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['customers', effectiveCustomerId] });
       queryClient.invalidateQueries({ queryKey: ['customers'] });
+      queryClient.invalidateQueries({ queryKey: ['service-locations'] });
+      if (serviceLocation) {
+        queryClient.invalidateQueries({ queryKey: ['service-location', serviceLocation.id] });
+      }
       onClose();
     },
     onError: (error: unknown) => {
