@@ -141,10 +141,10 @@ export default function DispatchRegionFormDialog({ isOpen, onClose, region }: Di
   return (
     <Dialog open={isOpen} onClose={onClose}>
       <DialogTitle>
-        {t(isEdit ? 'dispatchRegions.form.titleEdit' : 'dispatchRegions.form.titleCreate')}
+        {t(isEdit ? 'dispatchRegions.form.titleEdit' : 'dispatchRegions.form.titleCreate', { dispatch: getName('dispatch') })}
       </DialogTitle>
       <DialogDescription>
-        {t(isEdit ? 'dispatchRegions.form.descriptionEdit' : 'dispatchRegions.form.descriptionCreate')}
+        {t(isEdit ? 'dispatchRegions.form.descriptionEdit' : 'dispatchRegions.form.descriptionCreate', { dispatch: getName('dispatch') })}
       </DialogDescription>
       <form onSubmit={handleSubmit}>
         <DialogBody>
@@ -221,7 +221,7 @@ export default function DispatchRegionFormDialog({ isOpen, onClose, region }: Di
 
                   {/* Tab Display Name */}
                   <Field>
-                    <Label className="text-xs">{t('dispatchRegions.form.tabDisplayName')}</Label>
+                    <Label className="text-xs">{t('dispatchRegions.form.tabDisplayName', { dispatch: getName('dispatch') })}</Label>
                     <Input
                       name="tabDisplayName"
                       value={formData.tabDisplayName || ''}

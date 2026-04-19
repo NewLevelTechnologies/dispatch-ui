@@ -363,7 +363,7 @@ describe('TenantSettingsPage', () => {
     expect(screen.getByRole('tab', { name: /general/i })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: /terminology/i })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: /notification templates/i })).toBeInTheDocument();
-    expect(screen.getByRole('tab', { name: /dispatch regions/i })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: /regions/i })).toBeInTheDocument();
 
     // Click each tab to ensure they work
     const terminologyTab = screen.getByRole('tab', { name: /terminology/i });
@@ -372,7 +372,7 @@ describe('TenantSettingsPage', () => {
     const templatesTab = screen.getByRole('tab', { name: /notification templates/i });
     await user.click(templatesTab);
 
-    const regionsTab = screen.getByRole('tab', { name: /dispatch regions/i });
+    const regionsTab = screen.getByRole('tab', { name: /regions/i });
     await user.click(regionsTab);
 
     const generalTab = screen.getByRole('tab', { name: /general/i });
@@ -394,7 +394,7 @@ describe('TenantSettingsPage', () => {
       renderWithProviders(<TenantSettingsPage />);
 
       await waitFor(() => {
-        expect(screen.getByRole('tab', { name: /dispatch regions/i })).toBeInTheDocument();
+        expect(screen.getByRole('tab', { name: /regions/i })).toBeInTheDocument();
       });
     });
 
@@ -416,7 +416,7 @@ describe('TenantSettingsPage', () => {
         expect(screen.getByText('Acme HVAC Services')).toBeInTheDocument();
       });
 
-      const dispatchTab = screen.getByRole('tab', { name: /dispatch regions/i });
+      const dispatchTab = screen.getByRole('tab', { name: /regions/i });
       await user.click(dispatchTab);
 
       await waitFor(() => {
@@ -443,7 +443,7 @@ describe('TenantSettingsPage', () => {
         expect(screen.getByText('Acme HVAC Services')).toBeInTheDocument();
       });
 
-      const dispatchTab = screen.getByRole('tab', { name: /dispatch regions/i });
+      const dispatchTab = screen.getByRole('tab', { name: /regions/i });
       await user.click(dispatchTab);
 
       await waitFor(() => {
@@ -470,7 +470,7 @@ describe('TenantSettingsPage', () => {
         expect(screen.getByText('Acme HVAC Services')).toBeInTheDocument();
       });
 
-      const dispatchTab = screen.getByRole('tab', { name: /dispatch regions/i });
+      const dispatchTab = screen.getByRole('tab', { name: /regions/i });
       await user.click(dispatchTab);
 
       await waitFor(() => {
@@ -497,7 +497,7 @@ describe('TenantSettingsPage', () => {
         expect(screen.getByText('Acme HVAC Services')).toBeInTheDocument();
       });
 
-      const dispatchTab = screen.getByRole('tab', { name: /dispatch regions/i });
+      const dispatchTab = screen.getByRole('tab', { name: /regions/i });
       await user.click(dispatchTab);
 
       await waitFor(() => {
@@ -528,7 +528,7 @@ describe('TenantSettingsPage', () => {
         expect(screen.getByText('Acme HVAC Services')).toBeInTheDocument();
       });
 
-      const dispatchTab = screen.getByRole('tab', { name: /dispatch regions/i });
+      const dispatchTab = screen.getByRole('tab', { name: /regions/i });
       await user.click(dispatchTab);
 
       await waitFor(() => {
@@ -558,7 +558,7 @@ describe('TenantSettingsPage', () => {
         expect(screen.getByText('Acme HVAC Services')).toBeInTheDocument();
       });
 
-      const dispatchTab = screen.getByRole('tab', { name: /dispatch regions/i });
+      const dispatchTab = screen.getByRole('tab', { name: /regions/i });
       await user.click(dispatchTab);
 
       await waitFor(() => {
@@ -588,7 +588,7 @@ describe('TenantSettingsPage', () => {
         expect(screen.getByText('Acme HVAC Services')).toBeInTheDocument();
       });
 
-      const dispatchTab = screen.getByRole('tab', { name: /dispatch regions/i });
+      const dispatchTab = screen.getByRole('tab', { name: /regions/i });
       await user.click(dispatchTab);
 
       const addButton = await screen.findByRole('button', { name: /add.*region/i });
@@ -619,7 +619,7 @@ describe('TenantSettingsPage', () => {
         expect(screen.getByText('Acme HVAC Services')).toBeInTheDocument();
       });
 
-      const dispatchTab = screen.getByRole('tab', { name: /dispatch regions/i });
+      const dispatchTab = screen.getByRole('tab', { name: /regions/i });
       await user.click(dispatchTab);
 
       await waitFor(() => {
@@ -684,7 +684,7 @@ describe('TenantSettingsPage', () => {
         expect(screen.getByText('Acme HVAC Services')).toBeInTheDocument();
       });
 
-      const dispatchTab = screen.getByRole('tab', { name: /dispatch regions/i });
+      const dispatchTab = screen.getByRole('tab', { name: /regions/i });
       await user.click(dispatchTab);
 
       await waitFor(() => {
@@ -735,7 +735,7 @@ describe('TenantSettingsPage', () => {
         expect(screen.getByText('Acme HVAC Services')).toBeInTheDocument();
       });
 
-      const dispatchTab = screen.getByRole('tab', { name: /dispatch regions/i });
+      const dispatchTab = screen.getByRole('tab', { name: /regions/i });
       await user.click(dispatchTab);
 
       await waitFor(() => {
@@ -787,7 +787,7 @@ describe('TenantSettingsPage', () => {
         expect(screen.getByText('Acme HVAC Services')).toBeInTheDocument();
       });
 
-      const dispatchTab = screen.getByRole('tab', { name: /dispatch regions/i });
+      const dispatchTab = screen.getByRole('tab', { name: /regions/i });
       await user.click(dispatchTab);
 
       await waitFor(() => {
@@ -816,7 +816,7 @@ describe('TenantSettingsPage', () => {
         expect(screen.getByText('Acme HVAC Services')).toBeInTheDocument();
       });
 
-      const dispatchTab = screen.getByRole('tab', { name: /dispatch regions/i });
+      const dispatchTab = screen.getByRole('tab', { name: /regions/i });
       await user.click(dispatchTab);
 
       // Find and click Add button
@@ -857,7 +857,7 @@ describe('TenantSettingsPage', () => {
         expect(screen.getByText('Acme HVAC Services')).toBeInTheDocument();
       });
 
-      const dispatchTab = screen.getByRole('tab', { name: /dispatch regions/i });
+      const dispatchTab = screen.getByRole('tab', { name: /regions/i });
       await user.click(dispatchTab);
 
       await waitFor(() => {
@@ -1236,7 +1236,7 @@ describe('TenantSettingsPage', () => {
       });
 
       // Switch to dispatch regions tab - this calls setSelectedTab
-      const dispatchTab = screen.getByRole('tab', { name: /dispatch regions/i });
+      const dispatchTab = screen.getByRole('tab', { name: /regions/i });
       await user.click(dispatchTab);
 
       await waitFor(() => {
@@ -1604,7 +1604,7 @@ describe('TenantSettingsPage', () => {
       });
 
       // Switch to dispatch regions tab
-      const dispatchTab = screen.getByRole('tab', { name: /dispatch regions/i });
+      const dispatchTab = screen.getByRole('tab', { name: /regions/i });
       await user.click(dispatchTab);
 
       await waitFor(() => {
