@@ -75,6 +75,7 @@ export default function WorkOrderFormDialog({ isOpen, onClose, workOrder }: Work
 
   const [billingAddressSameAsService, setBillingAddressSameAsService] = useState(true);
   const [showSiteContact, setShowSiteContact] = useState(false);
+  const [showAccessInstructions, setShowAccessInstructions] = useState(false);
   const [showBusinessTerms, setShowBusinessTerms] = useState(false);
 
   const [siteContact, setSiteContact] = useState({
@@ -144,6 +145,7 @@ export default function WorkOrderFormDialog({ isOpen, onClose, workOrder }: Work
       setBillingAddress({ streetAddress: '', streetAddressLine2: '', city: '', state: '', zipCode: '' });
       setBillingAddressSameAsService(true);
       setShowSiteContact(false);
+      setShowAccessInstructions(false);
       setShowBusinessTerms(false);
       setSiteContact({ name: '', phone: '', email: '' });
       setAccessInstructions('');
@@ -334,10 +336,11 @@ export default function WorkOrderFormDialog({ isOpen, onClose, workOrder }: Work
               {/* Conditional: New Customer - Inline Form */}
               {customerMode === 'new' && (
                 <div className="space-y-4 rounded-lg border border-zinc-200 p-4 dark:border-zinc-800">
-                  <Subheading className="text-sm font-semibold">{t('workOrders.form.newCustomerDetails', { entity: getName('customer') })}</Subheading>
-
-                  <div className="space-y-2">
-                    {/* Row 1: Name, Phone, Email */}
+                  {/* PRIMARY SECTION: Service Location Info */}
+                  <div>
+                    <Subheading className="mb-3 text-base font-semibold">{t('customers.form.serviceLocationPrompt')}</Subheading>
+                    <div className="space-y-2">
+                      {/* Row 1: Name, Phone, Email */}
                     <div className="grid grid-cols-12 gap-2">
                       <Field className="col-span-5">
                         <Label className="text-xs">{t('common.form.name')} *</Label>
@@ -440,44 +443,59 @@ export default function WorkOrderFormDialog({ isOpen, onClose, workOrder }: Work
                         />
                       </Field>
                     </div>
+
+                    {/* Dispatch Region - Only show if 2+ regions */}
+                    {showRegionDropdown && (
+                      <Field>
+                        <Label className="text-xs">{getName('dispatch')} {t('entities.region')} *</Label>
+                        <Select
+                          name="dispatchRegionId"
+                          value={dispatchRegionId}
+                          onChange={(e) => setDispatchRegionId(e.target.value)}
+                          required
+                        >
+                          <option value="">{t('dispatchRegions.form.selectRegion')}</option>
+                          {activeRegions?.map((region) => (
+                            <option key={region.id} value={region.id}>
+                              {region.name} ({region.abbreviation})
+                            </option>
+                          ))}
+                        </Select>
+                      </Field>
+                    )}
+                    </div>
                   </div>
 
-                  {/* Dispatch Region - Only show if 2+ regions */}
-                  {showRegionDropdown && (
-                    <Field>
-                      <Label className="text-xs">{getName('dispatch')} {t('entities.region')} *</Label>
-                      <Select
-                        name="dispatchRegionId"
-                        value={dispatchRegionId}
-                        onChange={(e) => setDispatchRegionId(e.target.value)}
-                        required
-                      >
-                        <option value="">{t('dispatchRegions.form.selectRegion')}</option>
-                        {activeRegions?.map((region) => (
-                          <option key={region.id} value={region.id}>
-                            {region.name} ({region.abbreviation})
-                          </option>
-                        ))}
-                      </Select>
-                    </Field>
-                  )}
+                  {/* BILLING CHECKBOX */}
+                  <div className="border-t border-zinc-200 pt-3 dark:border-zinc-800">
+                    <CheckboxField>
+                      <Checkbox
+                        name="billingAddressSameAsService"
+                        checked={billingAddressSameAsService}
+                        onChange={(checked) => setBillingAddressSameAsService(checked)}
+                      />
+                      <Label className="font-medium">{t('common.form.billingAddressSameAsService')}</Label>
+                    </CheckboxField>
+                  </div>
 
-                  {/* Billing Address Checkbox */}
-                  <CheckboxField>
-                    <Checkbox
-                      name="billingAddressSameAsService"
-                      checked={billingAddressSameAsService}
-                      onChange={(checked) => setBillingAddressSameAsService(checked)}
-                    />
-                    <Label className="text-xs">{t('common.form.billingAddressSameAsService')}</Label>
-                  </CheckboxField>
-
-                  {/* Conditional: Different Billing Address */}
+                  {/* CONDITIONAL: Billing Address (if different) */}
                   {!billingAddressSameAsService && (
-                    <div className="space-y-2">
-                      <Subheading className="text-xs font-semibold">{t('common.form.billingAddress')}</Subheading>
+                    <div className="border-t border-zinc-200 pt-3 dark:border-zinc-800">
+                      <Subheading className="mb-3 text-sm font-semibold">{t('customers.form.billingInvoiceRecipient')}</Subheading>
+                      <div className="space-y-2">
+                        {/* Billing Name */}
+                        <Field>
+                          <Label className="text-xs">{t('customers.form.companyName')}</Label>
+                          <Input
+                            name="billingName"
+                            value={customerName}
+                            onChange={(e) => setCustomerName(e.target.value)}
+                            placeholder="e.g., Burger King Corporate"
+                            required
+                          />
+                        </Field>
 
-                      {/* Street + Apt */}
+                        {/* Street + Apt */}
                       <div className="grid grid-cols-4 gap-2">
                         <Field className="col-span-3">
                           <Label className="text-xs">{t('common.form.streetAddress')} *</Label>
@@ -546,11 +564,14 @@ export default function WorkOrderFormDialog({ isOpen, onClose, workOrder }: Work
                           />
                         </Field>
                       </div>
+                      </div>
                     </div>
                   )}
 
-                  {/* Collapsible: Site Contact */}
-                  <div>
+                  {/* OPTIONAL SECTIONS - Collapsible */}
+                  <div className="space-y-2 border-t border-zinc-200 pt-3 dark:border-zinc-800">
+                    {/* Site Contact - Collapsible */}
+                    <div>
                     <button
                       type="button"
                       onClick={() => setShowSiteContact(!showSiteContact)}
@@ -595,19 +616,32 @@ export default function WorkOrderFormDialog({ isOpen, onClose, workOrder }: Work
                     )}
                   </div>
 
-                  {/* Access Instructions */}
-                  <Field>
-                    <Label className="text-xs">{t('common.form.accessInstructions')}</Label>
-                    <Input
-                      name="accessInstructions"
-                      value={accessInstructions}
-                      onChange={(e) => setAccessInstructions(e.target.value)}
-                      placeholder={t('customers.form.accessInstructionsPlaceholder')}
-                    />
-                  </Field>
+                    {/* Access Instructions - Collapsible */}
+                    <div>
+                      <button
+                        type="button"
+                        onClick={() => setShowAccessInstructions(!showAccessInstructions)}
+                        className="flex w-full items-center gap-2 text-sm font-medium text-zinc-700 hover:text-zinc-900 dark:text-zinc-300 dark:hover:text-zinc-100"
+                      >
+                        <svg className={`h-4 w-4 transition-transform ${showAccessInstructions ? 'rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                        </svg>
+                        {t('customers.form.accessInstructionsOptional')}
+                      </button>
+                      {showAccessInstructions && (
+                        <div className="mt-2 pl-6">
+                          <Input
+                            name="accessInstructions"
+                            value={accessInstructions}
+                            onChange={(e) => setAccessInstructions(e.target.value)}
+                            placeholder="e.g., Use back entrance, gate code 1234"
+                          />
+                        </div>
+                      )}
+                    </div>
 
-                  {/* Collapsible: Business Terms */}
-                  <div>
+                    {/* Business Terms - Collapsible */}
+                    <div>
                     <button
                       type="button"
                       onClick={() => setShowBusinessTerms(!showBusinessTerms)}
@@ -687,6 +721,7 @@ export default function WorkOrderFormDialog({ isOpen, onClose, workOrder }: Work
                         </Field>
                       </div>
                     )}
+                  </div>
                   </div>
                 </div>
               )}
