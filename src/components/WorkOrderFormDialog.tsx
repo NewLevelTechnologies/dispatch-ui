@@ -14,7 +14,15 @@ import { Select } from './catalyst/select';
 import { Radio, RadioField, RadioGroup } from './catalyst/radio';
 import { Subheading } from './catalyst/heading';
 import ServiceLocationPicker from './ServiceLocationPicker';
-import AddressFields, { type AddressData } from './forms/AddressFields';
+import { US_STATES } from '../constants/states';
+
+interface AddressData {
+  streetAddress: string;
+  streetAddressLine2: string;
+  city: string;
+  state: string;
+  zipCode: string;
+}
 
 interface WorkOrderFormDialogProps {
   isOpen: boolean;
@@ -328,48 +336,110 @@ export default function WorkOrderFormDialog({ isOpen, onClose, workOrder }: Work
                 <div className="space-y-4 rounded-lg border border-zinc-200 p-4 dark:border-zinc-800">
                   <Subheading className="text-sm font-semibold">{t('workOrders.form.newCustomerDetails', { entity: getName('customer') })}</Subheading>
 
-                  {/* Customer Name, Phone, Email */}
-                  <div className="grid grid-cols-12 gap-2">
-                    <Field className="col-span-5">
-                      <Label className="text-xs">{t('common.form.name')} *</Label>
-                      <Input
-                        name="customerName"
-                        value={customerName}
-                        onChange={(e) => setCustomerName(e.target.value)}
-                        required
-                      />
-                    </Field>
-                    <Field className="col-span-4">
-                      <Label className="text-xs">{t('common.form.phone')}</Label>
-                      <PatternFormat
-                        format="(###) ###-####"
-                        mask="_"
-                        customInput={Input}
-                        name="customerPhone"
-                        value={customerPhone}
-                        onValueChange={(values) => setCustomerPhone(values.value)}
-                      />
-                    </Field>
-                    <Field className="col-span-3">
-                      <Label className="text-xs">{t('common.form.email')} *</Label>
-                      <Input
-                        type="email"
-                        name="customerEmail"
-                        value={customerEmail}
-                        onChange={(e) => setCustomerEmail(e.target.value)}
-                        required
-                      />
-                    </Field>
-                  </div>
-
-                  {/* Service Address */}
                   <div className="space-y-2">
-                    <Subheading className="text-xs font-semibold">{t('common.form.serviceAddress')}</Subheading>
-                    <AddressFields
-                      address={serviceAddress}
-                      onChange={setServiceAddress}
-                      namePrefix="service-"
-                    />
+                    {/* Row 1: Name, Phone, Email */}
+                    <div className="grid grid-cols-12 gap-2">
+                      <Field className="col-span-5">
+                        <Label className="text-xs">{t('common.form.name')} *</Label>
+                        <Input
+                          name="customerName"
+                          value={customerName}
+                          onChange={(e) => setCustomerName(e.target.value)}
+                          required
+                        />
+                      </Field>
+                      <Field className="col-span-4">
+                        <Label className="text-xs">{t('common.form.phone')}</Label>
+                        <PatternFormat
+                          format="(###) ###-####"
+                          mask="_"
+                          customInput={Input}
+                          name="customerPhone"
+                          value={customerPhone}
+                          onValueChange={(values) => setCustomerPhone(values.value)}
+                        />
+                      </Field>
+                      <Field className="col-span-3">
+                        <Label className="text-xs">{t('common.form.email')} *</Label>
+                        <Input
+                          type="email"
+                          name="customerEmail"
+                          value={customerEmail}
+                          onChange={(e) => setCustomerEmail(e.target.value)}
+                          required
+                        />
+                      </Field>
+                    </div>
+
+                    {/* Row 2: Street + Apt */}
+                    <div className="grid grid-cols-4 gap-2">
+                      <Field className="col-span-3">
+                        <Label className="text-xs">{t('common.form.streetAddress')} *</Label>
+                        <Input
+                          name="serviceStreetAddress"
+                          value={serviceAddress.streetAddress}
+                          onChange={(e) =>
+                            setServiceAddress((prev) => ({ ...prev, streetAddress: e.target.value }))
+                          }
+                          required
+                        />
+                      </Field>
+                      <Field className="col-span-1">
+                        <Label className="text-xs">{t('common.form.addressLine2')}</Label>
+                        <Input
+                          name="serviceStreetAddressLine2"
+                          value={serviceAddress.streetAddressLine2}
+                          onChange={(e) =>
+                            setServiceAddress((prev) => ({ ...prev, streetAddressLine2: e.target.value }))
+                          }
+                          placeholder="Apt"
+                        />
+                      </Field>
+                    </div>
+
+                    {/* Row 3: City/State/Zip */}
+                    <div className="grid grid-cols-12 gap-2">
+                      <Field className="col-span-6">
+                        <Label className="text-xs">{t('common.form.city')} *</Label>
+                        <Input
+                          name="serviceCity"
+                          value={serviceAddress.city}
+                          onChange={(e) =>
+                            setServiceAddress((prev) => ({ ...prev, city: e.target.value }))
+                          }
+                          required
+                        />
+                      </Field>
+                      <Field className="col-span-2">
+                        <Label className="text-xs">{t('common.form.state')} *</Label>
+                        <Select
+                          name="serviceState"
+                          value={serviceAddress.state}
+                          onChange={(e) =>
+                            setServiceAddress((prev) => ({ ...prev, state: e.target.value }))
+                          }
+                          required
+                        >
+                          <option value="">{t('common.form.select')}</option>
+                          {US_STATES.map((state) => (
+                            <option key={state} value={state}>
+                              {state}
+                            </option>
+                          ))}
+                        </Select>
+                      </Field>
+                      <Field className="col-span-4">
+                        <Label className="text-xs">{t('common.form.zipCode')} *</Label>
+                        <Input
+                          name="serviceZipCode"
+                          value={serviceAddress.zipCode}
+                          onChange={(e) =>
+                            setServiceAddress((prev) => ({ ...prev, zipCode: e.target.value }))
+                          }
+                          required
+                        />
+                      </Field>
+                    </div>
                   </div>
 
                   {/* Dispatch Region - Only show if 2+ regions */}
@@ -406,11 +476,76 @@ export default function WorkOrderFormDialog({ isOpen, onClose, workOrder }: Work
                   {!billingAddressSameAsService && (
                     <div className="space-y-2">
                       <Subheading className="text-xs font-semibold">{t('common.form.billingAddress')}</Subheading>
-                      <AddressFields
-                        address={billingAddress}
-                        onChange={setBillingAddress}
-                        namePrefix="billing-"
-                      />
+
+                      {/* Street + Apt */}
+                      <div className="grid grid-cols-4 gap-2">
+                        <Field className="col-span-3">
+                          <Label className="text-xs">{t('common.form.streetAddress')} *</Label>
+                          <Input
+                            name="billingStreetAddress"
+                            value={billingAddress.streetAddress}
+                            onChange={(e) =>
+                              setBillingAddress((prev) => ({ ...prev, streetAddress: e.target.value }))
+                            }
+                            required
+                          />
+                        </Field>
+                        <Field className="col-span-1">
+                          <Label className="text-xs">{t('common.form.addressLine2')}</Label>
+                          <Input
+                            name="billingStreetAddressLine2"
+                            value={billingAddress.streetAddressLine2}
+                            onChange={(e) =>
+                              setBillingAddress((prev) => ({ ...prev, streetAddressLine2: e.target.value }))
+                            }
+                            placeholder="Apt"
+                          />
+                        </Field>
+                      </div>
+
+                      {/* City/State/Zip */}
+                      <div className="grid grid-cols-12 gap-2">
+                        <Field className="col-span-6">
+                          <Label className="text-xs">{t('common.form.city')} *</Label>
+                          <Input
+                            name="billingCity"
+                            value={billingAddress.city}
+                            onChange={(e) =>
+                              setBillingAddress((prev) => ({ ...prev, city: e.target.value }))
+                            }
+                            required
+                          />
+                        </Field>
+                        <Field className="col-span-2">
+                          <Label className="text-xs">{t('common.form.state')} *</Label>
+                          <Select
+                            name="billingState"
+                            value={billingAddress.state}
+                            onChange={(e) =>
+                              setBillingAddress((prev) => ({ ...prev, state: e.target.value }))
+                            }
+                            required
+                          >
+                            <option value="">{t('common.form.select')}</option>
+                            {US_STATES.map((state) => (
+                              <option key={state} value={state}>
+                                {state}
+                              </option>
+                            ))}
+                          </Select>
+                        </Field>
+                        <Field className="col-span-4">
+                          <Label className="text-xs">{t('common.form.zipCode')} *</Label>
+                          <Input
+                            name="billingZipCode"
+                            value={billingAddress.zipCode}
+                            onChange={(e) =>
+                              setBillingAddress((prev) => ({ ...prev, zipCode: e.target.value }))
+                            }
+                            required
+                          />
+                        </Field>
+                      </div>
                     </div>
                   )}
 
