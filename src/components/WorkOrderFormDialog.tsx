@@ -15,7 +15,6 @@ import { Radio, RadioField, RadioGroup } from './catalyst/radio';
 import { Subheading } from './catalyst/heading';
 import ServiceLocationPicker from './ServiceLocationPicker';
 import AddressFields, { type AddressData } from './forms/AddressFields';
-import ContactFields, { type ContactData } from './forms/ContactFields';
 
 interface WorkOrderFormDialogProps {
   isOpen: boolean;
@@ -46,11 +45,9 @@ export default function WorkOrderFormDialog({ isOpen, onClose, workOrder }: Work
   const [selectedLocation, setSelectedLocation] = useState<ServiceLocationSearchResult | null>(null);
 
   // New customer form data
-  const [newCustomer, setNewCustomer] = useState<ContactData>({
-    name: '',
-    phone: '',
-    email: '',
-  });
+  const [customerName, setCustomerName] = useState('');
+  const [customerPhone, setCustomerPhone] = useState('');
+  const [customerEmail, setCustomerEmail] = useState('');
 
   const [serviceAddress, setServiceAddress] = useState<AddressData>({
     streetAddress: '',
@@ -132,7 +129,9 @@ export default function WorkOrderFormDialog({ isOpen, onClose, workOrder }: Work
         notes: '',
       });
       setSelectedLocation(null);
-      setNewCustomer({ name: '', phone: '', email: '' });
+      setCustomerName('');
+      setCustomerPhone('');
+      setCustomerEmail('');
       setServiceAddress({ streetAddress: '', streetAddressLine2: '', city: '', state: '', zipCode: '' });
       setBillingAddress({ streetAddress: '', streetAddressLine2: '', city: '', state: '', zipCode: '' });
       setBillingAddressSameAsService(true);
@@ -220,14 +219,14 @@ export default function WorkOrderFormDialog({ isOpen, onClose, workOrder }: Work
       setIsCreatingCustomer(true);
       try {
         const customerRequest: CreateCustomerRequest = {
-          name: newCustomer.name,
-          email: newCustomer.email,
-          phone: newCustomer.phone || null,
+          name: customerName,
+          email: customerEmail,
+          phone: customerPhone || null,
           billingAddress: billingAddressSameAsService ? serviceAddress : billingAddress,
           serviceLocations: [
             {
               dispatchRegionId,
-              locationName: newCustomer.name, // Default location name to customer name
+              locationName: customerName, // Default location name to customer name
               address: serviceAddress,
               siteContactName: siteContact.name || null,
               siteContactPhone: siteContact.phone || null,
@@ -329,12 +328,39 @@ export default function WorkOrderFormDialog({ isOpen, onClose, workOrder }: Work
                 <div className="space-y-4 rounded-lg border border-zinc-200 p-4 dark:border-zinc-800">
                   <Subheading className="text-sm font-semibold">{t('workOrders.form.newCustomerDetails', { entity: getName('customer') })}</Subheading>
 
-                  {/* Contact Fields */}
-                  <ContactFields
-                    contact={newCustomer}
-                    onChange={setNewCustomer}
-                    namePrefix="customer-"
-                  />
+                  {/* Customer Name, Phone, Email */}
+                  <div className="grid grid-cols-12 gap-2">
+                    <Field className="col-span-5">
+                      <Label className="text-xs">{t('common.form.name')} *</Label>
+                      <Input
+                        name="customerName"
+                        value={customerName}
+                        onChange={(e) => setCustomerName(e.target.value)}
+                        required
+                      />
+                    </Field>
+                    <Field className="col-span-4">
+                      <Label className="text-xs">{t('common.form.phone')}</Label>
+                      <PatternFormat
+                        format="(###) ###-####"
+                        mask="_"
+                        customInput={Input}
+                        name="customerPhone"
+                        value={customerPhone}
+                        onValueChange={(values) => setCustomerPhone(values.value)}
+                      />
+                    </Field>
+                    <Field className="col-span-3">
+                      <Label className="text-xs">{t('common.form.email')} *</Label>
+                      <Input
+                        type="email"
+                        name="customerEmail"
+                        value={customerEmail}
+                        onChange={(e) => setCustomerEmail(e.target.value)}
+                        required
+                      />
+                    </Field>
+                  </div>
 
                   {/* Service Address */}
                   <div className="space-y-2">
