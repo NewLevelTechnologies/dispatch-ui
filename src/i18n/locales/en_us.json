@@ -170,6 +170,7 @@
     },
     "form": {
       "accessInstructionsOptional": "Access Instructions (optional)",
+      "accessInstructionsPlaceholder": "e.g., Use back entrance, gate code 1234",
       "billingAddressHelp": "Check this if invoices should be sent to the service address",
       "billingAddressSection": "Billing Address",
       "billingInvoiceRecipient": "Invoice Recipient",
@@ -789,7 +790,11 @@
     "form": {
       "customerPlaceholder": "Select a customer...",
       "customerRequired": "Please select a customer",
-      "scheduledDate": "Scheduled Date"
+      "existingCustomer": "Existing {{entity, lowercase}}",
+      "newCustomer": "New {{entity, lowercase}}",
+      "newCustomerDetails": "New {{entity}} Details",
+      "scheduledDate": "Scheduled Date",
+      "selectServiceLocation": "Please select a {{entity, lowercase}}"
     },
     "status": {
       "cancelled": "Cancelled",

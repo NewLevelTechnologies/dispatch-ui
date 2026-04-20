@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, fireEvent } from '@testing-library/react';
 import { renderWithProviders, userEvent } from '../test/utils';
 import WorkOrderFormDialog from './WorkOrderFormDialog';
 import apiClient from '../api/client';
@@ -28,6 +28,19 @@ const mockServiceLocations = {
   size: 50,
   number: 0,
 };
+
+const mockDispatchRegions = [
+  {
+    id: 'region-1',
+    name: 'Atlanta Region',
+    abbreviation: 'ATL',
+    isActive: true,
+    sortOrder: 1,
+    createdAt: '2024-01-01T00:00:00Z',
+    updatedAt: '2024-01-01T00:00:00Z',
+    version: 1,
+  },
+];
 
 describe('WorkOrderFormDialog', () => {
   const mockOnClose = vi.fn();
@@ -407,6 +420,128 @@ describe('WorkOrderFormDialog', () => {
       const statusSelect = screen.getByLabelText(/status/i);
       await user.selectOptions(statusSelect, 'COMPLETED');
       expect(statusSelect).toHaveValue('COMPLETED');
+    });
+  });
+
+  describe('Inline customer creation', () => {
+    it('shows radio toggle for existing vs new customer in create mode', async () => {
+      renderWithProviders(<WorkOrderFormDialog isOpen={true} onClose={mockOnClose} />);
+
+      expect(screen.getByText('Customer')).toBeInTheDocument();
+      expect(screen.getByRole('radio', { name: /existing/i })).toBeInTheDocument();
+      expect(screen.getByRole('radio', { name: /new/i })).toBeInTheDocument();
+    });
+
+    it('defaults to existing customer mode', async () => {
+      renderWithProviders(<WorkOrderFormDialog isOpen={true} onClose={mockOnClose} />);
+
+      const existingRadio = screen.getByRole('radio', { name: /existing/i });
+      expect(existingRadio).toBeChecked();
+    });
+
+    it('shows service location picker when existing customer is selected', async () => {
+      renderWithProviders(<WorkOrderFormDialog isOpen={true} onClose={mockOnClose} />);
+
+      expect(screen.getByPlaceholderText('Search by customer, address, or phone...')).toBeInTheDocument();
+    });
+
+    it('shows inline customer form when new customer is selected', async () => {
+      // Mock dispatch regions API call
+      vi.mocked(apiClient.get).mockResolvedValue({ data: mockDispatchRegions });
+
+      renderWithProviders(<WorkOrderFormDialog isOpen={true} onClose={mockOnClose} />);
+
+      // Service location picker should be visible initially
+      expect(screen.getByPlaceholderText('Search by customer, address, or phone...')).toBeInTheDocument();
+
+      // Use fireEvent to click the actual radio input element
+      const newCustomerRadio = screen.getByRole('radio', { name: /new/i });
+      fireEvent.click(newCustomerRadio);
+
+      // Service location picker should disappear
+      await waitFor(() => {
+        expect(screen.queryByPlaceholderText('Search by customer, address, or phone...')).not.toBeInTheDocument();
+      });
+
+      // Inline form should appear - check for "Where do you need service?" heading
+      await waitFor(() => {
+        expect(screen.getByText(/where do you need service/i)).toBeInTheDocument();
+      });
+    });
+
+    it('shows address fields in new customer form', async () => {
+      vi.mocked(apiClient.get).mockImplementation((url: string) => {
+        if (url === '/tenant/dispatch-regions' || url.startsWith('/tenant/dispatch-regions?')) {
+          return Promise.resolve({ data: mockDispatchRegions });
+        }
+        return Promise.resolve({ data: mockServiceLocations });
+      });
+
+      renderWithProviders(<WorkOrderFormDialog isOpen={true} onClose={mockOnClose} />);
+
+      fireEvent.click(screen.getByRole('radio', { name: /new/i }));
+
+      await waitFor(() => {
+        expect(screen.getByText(/where do you need service/i)).toBeInTheDocument();
+      });
+
+      // Check for address fields
+      const streetInputs = screen.getAllByLabelText(/street address.*\*/i);
+      expect(streetInputs.length).toBeGreaterThan(0);
+      expect(screen.getByLabelText(/city.*\*/i)).toBeInTheDocument();
+      expect(screen.getByLabelText(/state.*\*/i)).toBeInTheDocument();
+      expect(screen.getByLabelText(/zip code.*\*/i)).toBeInTheDocument();
+    });
+
+    it('shows billing address checkbox in new customer form', async () => {
+      vi.mocked(apiClient.get).mockImplementation((url: string) => {
+        if (url === '/tenant/dispatch-regions' || url.startsWith('/tenant/dispatch-regions?')) {
+          return Promise.resolve({ data: mockDispatchRegions });
+        }
+        return Promise.resolve({ data: mockServiceLocations });
+      });
+
+      renderWithProviders(<WorkOrderFormDialog isOpen={true} onClose={mockOnClose} />);
+
+      fireEvent.click(screen.getByRole('radio', { name: /new/i }));
+
+      await waitFor(() => {
+        expect(screen.getByLabelText(/send invoice to same address/i)).toBeInTheDocument();
+      });
+    });
+
+
+    it('does not show radio toggle in edit mode', async () => {
+      const existingWorkOrder = {
+        id: '1',
+        customerId: 'customer-1',
+        serviceLocationId: 'location-1',
+        status: 'SCHEDULED' as const,
+        scheduledDate: '2024-03-15',
+        description: 'Fix leaking pipe',
+        notes: 'Customer prefers morning',
+        createdAt: '2024-03-10T10:00:00Z',
+        updatedAt: '2024-03-10T10:00:00Z',
+      };
+
+      renderWithProviders(
+        <WorkOrderFormDialog isOpen={true} onClose={mockOnClose} workOrder={existingWorkOrder} />
+      );
+
+      // Should not show customer mode radio buttons in edit mode
+      expect(screen.queryByRole('radio', { name: /existing/i })).not.toBeInTheDocument();
+      expect(screen.queryByRole('radio', { name: /new/i })).not.toBeInTheDocument();
+    });
+
+    it('updates scheduled date field', async () => {
+      const user = userEvent.setup();
+
+      renderWithProviders(<WorkOrderFormDialog isOpen={true} onClose={mockOnClose} />);
+
+      const dateInput = screen.getByLabelText(/scheduled date/i);
+      await user.type(dateInput, '2024-12-25');
+
+      expect(dateInput).toHaveValue('2024-12-25');
     });
   });
 });

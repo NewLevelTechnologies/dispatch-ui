@@ -382,6 +382,10 @@ export const customerApi = {
     return response.data;
   },
 
+  deleteServiceLocation: async (locationId: string): Promise<void> => {
+    await apiClient.delete(`/service-locations/${locationId}`);
+  },
+
   // Paginated search for pickers (BREAKING: was search(name) returning Customer[])
   search: async (params: {
     q: string;         // Query string (was "name")
