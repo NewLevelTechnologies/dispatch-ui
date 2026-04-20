@@ -463,9 +463,9 @@ describe('WorkOrderFormDialog', () => {
         expect(screen.queryByPlaceholderText('Search by customer, address, or phone...')).not.toBeInTheDocument();
       });
 
-      // Inline form should appear
+      // Inline form should appear - check for "Where do you need service?" heading
       await waitFor(() => {
-        expect(screen.getByText(/new.*details/i)).toBeInTheDocument();
+        expect(screen.getByText(/where do you need service/i)).toBeInTheDocument();
       });
     });
 
@@ -482,7 +482,7 @@ describe('WorkOrderFormDialog', () => {
       fireEvent.click(screen.getByRole('radio', { name: /new/i }));
 
       await waitFor(() => {
-        expect(screen.getByText('Service Address')).toBeInTheDocument();
+        expect(screen.getByText(/where do you need service/i)).toBeInTheDocument();
       });
 
       // Check for address fields
