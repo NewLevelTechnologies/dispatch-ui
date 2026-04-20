@@ -340,7 +340,7 @@ export default function WorkOrderFormDialog({ isOpen, onClose, workOrder }: Work
                   <div>
                     <Subheading className="mb-3 text-base font-semibold">{t('customers.form.serviceLocationPrompt')}</Subheading>
                     <div className="space-y-2">
-                      {/* Row 1: Name, Phone, Email */}
+                      {/* Row 1: Name, Email, Phone */}
                     <div className="grid grid-cols-12 gap-2">
                       <Field className="col-span-5">
                         <Label className="text-xs">{t('common.form.name')} *</Label>
@@ -348,6 +348,16 @@ export default function WorkOrderFormDialog({ isOpen, onClose, workOrder }: Work
                           name="customerName"
                           value={customerName}
                           onChange={(e) => setCustomerName(e.target.value)}
+                          required
+                        />
+                      </Field>
+                      <Field className="col-span-3">
+                        <Label className="text-xs">{t('common.form.email')} *</Label>
+                        <Input
+                          type="email"
+                          name="customerEmail"
+                          value={customerEmail}
+                          onChange={(e) => setCustomerEmail(e.target.value)}
                           required
                         />
                       </Field>
@@ -360,16 +370,6 @@ export default function WorkOrderFormDialog({ isOpen, onClose, workOrder }: Work
                           name="customerPhone"
                           value={customerPhone}
                           onValueChange={(values) => setCustomerPhone(values.value)}
-                        />
-                      </Field>
-                      <Field className="col-span-3">
-                        <Label className="text-xs">{t('common.form.email')} *</Label>
-                        <Input
-                          type="email"
-                          name="customerEmail"
-                          value={customerEmail}
-                          onChange={(e) => setCustomerEmail(e.target.value)}
-                          required
                         />
                       </Field>
                     </div>

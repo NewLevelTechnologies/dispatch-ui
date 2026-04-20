@@ -343,7 +343,7 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
             <div>
               <Subheading className="mb-3 text-base font-semibold">{t('customers.form.serviceLocationPrompt')}</Subheading>
               <div className="space-y-2">
-                {/* Row 1: Name, Phone, Email */}
+                {/* Row 1: Name, Email, Phone */}
                 <div className="grid grid-cols-12 gap-2">
                   <Field className="col-span-5">
                     <Label className="text-xs">{t('common.form.name')} *</Label>
@@ -361,6 +361,16 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
                       required
                     />
                   </Field>
+                  <Field className="col-span-3">
+                    <Label className="text-xs">{t('common.form.email')} *</Label>
+                    <Input
+                      type="email"
+                      name="email"
+                      value={createFormData.email}
+                      onChange={(e) => setCreateFormData((prev) => ({ ...prev, email: e.target.value }))}
+                      required
+                    />
+                  </Field>
                   <Field className="col-span-4">
                     <Label className="text-xs">{t('common.form.phone')}</Label>
                     <PatternFormat
@@ -370,16 +380,6 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
                       name="phone"
                       value={createFormData.phone}
                       onValueChange={(values) => setCreateFormData((prev) => ({ ...prev, phone: values.value }))}
-                    />
-                  </Field>
-                  <Field className="col-span-3">
-                    <Label className="text-xs">{t('common.form.email')} *</Label>
-                    <Input
-                      type="email"
-                      name="email"
-                      value={createFormData.email}
-                      onChange={(e) => setCreateFormData((prev) => ({ ...prev, email: e.target.value }))}
-                      required
                     />
                   </Field>
                 </div>
