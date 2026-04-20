@@ -261,7 +261,9 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
     e.preventDefault();
 
     const request: CreateCustomerRequest = {
-      name: createFormData.name,
+      name: createFormData.billingAddressSameAsService
+        ? createFormData.locationName
+        : createFormData.name,
       email: createFormData.email,
       phone: createFormData.phone || null,
       billingAddress: createFormData.billingAddressSameAsService
@@ -270,8 +272,7 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
       serviceLocations: [
         {
           dispatchRegionId: createFormData.dispatchRegionId,
-          // Location name is the same as customer name (homeowner) or business name
-          locationName: createFormData.locationName || createFormData.name,
+          locationName: createFormData.locationName,
           address: createFormData.serviceAddress,
           siteContactName: createFormData.siteContactName || null,
           siteContactPhone: createFormData.siteContactPhone || null,
@@ -348,16 +349,9 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
                   <Field className="col-span-5">
                     <Label className="text-xs">{t('common.form.name')} *</Label>
                     <Input
-                      name="name"
-                      value={createFormData.name}
-                      onChange={(e) => {
-                        const name = e.target.value;
-                        setCreateFormData((prev) => ({
-                          ...prev,
-                          name,
-                          locationName: prev.locationName === '' || prev.locationName === prev.name ? name : prev.locationName
-                        }));
-                      }}
+                      name="locationName"
+                      value={createFormData.locationName}
+                      onChange={(e) => setCreateFormData((prev) => ({ ...prev, locationName: e.target.value }))}
                       required
                     />
                   </Field>

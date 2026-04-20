@@ -53,9 +53,10 @@ export default function WorkOrderFormDialog({ isOpen, onClose, workOrder }: Work
   const [selectedLocation, setSelectedLocation] = useState<ServiceLocationSearchResult | null>(null);
 
   // New customer form data
+  const [locationName, setLocationName] = useState('');
+  const [locationPhone, setLocationPhone] = useState('');
+  const [locationEmail, setLocationEmail] = useState('');
   const [customerName, setCustomerName] = useState('');
-  const [customerPhone, setCustomerPhone] = useState('');
-  const [customerEmail, setCustomerEmail] = useState('');
 
   const [serviceAddress, setServiceAddress] = useState<AddressData>({
     streetAddress: '',
@@ -138,9 +139,10 @@ export default function WorkOrderFormDialog({ isOpen, onClose, workOrder }: Work
         notes: '',
       });
       setSelectedLocation(null);
+      setLocationName('');
+      setLocationPhone('');
+      setLocationEmail('');
       setCustomerName('');
-      setCustomerPhone('');
-      setCustomerEmail('');
       setServiceAddress({ streetAddress: '', streetAddressLine2: '', city: '', state: '', zipCode: '' });
       setBillingAddress({ streetAddress: '', streetAddressLine2: '', city: '', state: '', zipCode: '' });
       setBillingAddressSameAsService(true);
@@ -229,14 +231,14 @@ export default function WorkOrderFormDialog({ isOpen, onClose, workOrder }: Work
       setIsCreatingCustomer(true);
       try {
         const customerRequest: CreateCustomerRequest = {
-          name: customerName,
-          email: customerEmail,
-          phone: customerPhone || null,
+          name: billingAddressSameAsService ? locationName : customerName,
+          email: locationEmail,
+          phone: locationPhone || null,
           billingAddress: billingAddressSameAsService ? serviceAddress : billingAddress,
           serviceLocations: [
             {
               dispatchRegionId,
-              locationName: customerName, // Default location name to customer name
+              locationName: locationName,
               address: serviceAddress,
               siteContactName: siteContact.name || null,
               siteContactPhone: siteContact.phone || null,
@@ -340,14 +342,14 @@ export default function WorkOrderFormDialog({ isOpen, onClose, workOrder }: Work
                   <div>
                     <Subheading className="mb-3 text-base font-semibold">{t('customers.form.serviceLocationPrompt')}</Subheading>
                     <div className="space-y-2">
-                      {/* Row 1: Name, Email, Phone */}
+                      {/* Row 1: Name, Email, Phone (Service Location) */}
                     <div className="grid grid-cols-12 gap-2">
                       <Field className="col-span-5">
                         <Label className="text-xs">{t('common.form.name')} *</Label>
                         <Input
-                          name="customerName"
-                          value={customerName}
-                          onChange={(e) => setCustomerName(e.target.value)}
+                          name="locationName"
+                          value={locationName}
+                          onChange={(e) => setLocationName(e.target.value)}
                           required
                         />
                       </Field>
@@ -355,9 +357,9 @@ export default function WorkOrderFormDialog({ isOpen, onClose, workOrder }: Work
                         <Label className="text-xs">{t('common.form.email')} *</Label>
                         <Input
                           type="email"
-                          name="customerEmail"
-                          value={customerEmail}
-                          onChange={(e) => setCustomerEmail(e.target.value)}
+                          name="locationEmail"
+                          value={locationEmail}
+                          onChange={(e) => setLocationEmail(e.target.value)}
                           required
                         />
                       </Field>
@@ -367,9 +369,9 @@ export default function WorkOrderFormDialog({ isOpen, onClose, workOrder }: Work
                           format="(###) ###-####"
                           mask="_"
                           customInput={Input}
-                          name="customerPhone"
-                          value={customerPhone}
-                          onValueChange={(values) => setCustomerPhone(values.value)}
+                          name="locationPhone"
+                          value={locationPhone}
+                          onValueChange={(values) => setLocationPhone(values.value)}
                         />
                       </Field>
                     </div>
