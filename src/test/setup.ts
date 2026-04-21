@@ -2,13 +2,16 @@ import { expect, afterEach, vi } from 'vitest';
 import { cleanup } from '@testing-library/react';
 import * as matchers from '@testing-library/jest-dom/matchers';
 import { mockAnimationsApi } from 'jsdom-testing-mocks';
+import { transferableAbortController } from 'node:util';
 
-// Replace jsdom's AbortSignal with Node's native one so React Router 7 doesn't throw
-// "Expected signal to be an instance of AbortSignal" in tests
-Object.assign(globalThis, {
-  AbortController: globalThis.AbortController,
-  AbortSignal: globalThis.AbortSignal,
-});
+// jsdom 27 installs its own AbortController/AbortSignal on globalThis, but Node's
+// native `Request` (used internally by React Router 7) checks `signal instanceof
+// AbortSignal` against undici's class and throws. Pull the pristine Node classes
+// via util.transferableAbortController() (which returns a real Node instance) and
+// install them over jsdom's.
+const realController = transferableAbortController();
+globalThis.AbortController = realController.constructor as typeof AbortController;
+globalThis.AbortSignal = realController.signal.constructor as typeof AbortSignal;
 
 // Mock animations API for Headless UI
 mockAnimationsApi();

@@ -48,7 +48,7 @@ const mockCustomers = [
 describe('EquipmentPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(apiClient.get).mockResolvedValue({ data: mockCustomers });
+    vi.mocked(apiClient.get).mockResolvedValue({ data: { content: mockCustomers } });
   });
 
   it('renders the page title and add button', async () => {

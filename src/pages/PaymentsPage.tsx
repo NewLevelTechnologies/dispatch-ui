@@ -13,12 +13,7 @@ import { Select } from '../components/catalyst/select';
 import { Textarea } from '../components/catalyst/textarea';
 import { PaymentMethod, paymentsApi, invoicesApi } from '../api/financialApi';
 import type { Payment, CreatePaymentRequest } from '../api/financialApi';
-import apiClient from '../api/client';
-
-interface Customer {
-  id: string;
-  name: string;
-}
+import { customerApi } from '../api';
 
 export default function PaymentsPage() {
   const queryClient = useQueryClient();
@@ -58,8 +53,8 @@ export default function PaymentsPage() {
   const { data: customers = [] } = useQuery({
     queryKey: ['customers'],
     queryFn: async () => {
-      const response = await apiClient.get<Customer[]>('/customers');
-      return response.data;
+      const response = await customerApi.getAllPaginated({ limit: 500 });
+      return response.content;
     },
   });
 

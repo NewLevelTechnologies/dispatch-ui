@@ -29,7 +29,7 @@ import {
   MagnifyingGlassIcon,
 } from '@heroicons/react/24/outline';
 import { Sidebar, SidebarBody, SidebarDivider, SidebarFooter, SidebarHeader, SidebarItem, SidebarSection } from './catalyst/sidebar';
-import { Navbar, NavbarItem, NavbarSection, NavbarSpacer } from './catalyst/navbar';
+import { Navbar, NavbarSection, NavbarSpacer } from './catalyst/navbar';
 import { Dropdown, DropdownButton, DropdownItem, DropdownLabel, DropdownMenu } from './catalyst/dropdown';
 import { Avatar } from './catalyst/avatar';
 import { useTheme } from '../contexts/ThemeContext';
@@ -309,14 +309,16 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           <NavbarSpacer />
           {/* ⌘K search stub */}
           <NavbarSection>
-            <NavbarItem aria-label="Search">
-              <button className="flex items-center gap-2 rounded-md border border-border-default bg-surface-sunken px-3 py-1.5 text-xs text-text-tertiary hover:bg-surface-overlay transition-colors">
-                <MagnifyingGlassIcon className="h-3.5 w-3.5" />
-                <span>{t('common.search')}</span>
-                {/* eslint-disable-next-line i18next/no-literal-string */}
-                <span className="ml-1 font-mono text-[10px] text-text-tertiary">cmd+K</span>
-              </button>
-            </NavbarItem>
+            <button
+              type="button"
+              aria-label="Search"
+              className="flex items-center gap-2 rounded-md border border-border-default bg-surface-sunken px-3 py-1.5 text-xs text-text-tertiary hover:bg-surface-overlay transition-colors"
+            >
+              <MagnifyingGlassIcon className="h-3.5 w-3.5" />
+              <span>{t('common.search')}</span>
+              {/* eslint-disable-next-line i18next/no-literal-string */}
+              <span className="ml-1 font-mono text-[10px] text-text-tertiary">cmd+K</span>
+            </button>
           </NavbarSection>
         </Navbar>
       }

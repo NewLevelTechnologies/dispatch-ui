@@ -59,7 +59,7 @@ const mockEquipment = [
 describe('RecurringOrdersPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(apiClient.get).mockResolvedValue({ data: mockCustomers });
+    vi.mocked(apiClient.get).mockResolvedValue({ data: { content: mockCustomers } });
     mockEquipmentGetAll.mockResolvedValue(mockEquipment);
   });
 

@@ -12,17 +12,7 @@ import { Select } from '../components/catalyst/select';
 import { Textarea } from '../components/catalyst/textarea';
 import { InvoiceStatus, invoicesApi } from '../api/financialApi';
 import type { Invoice, CreateInvoiceRequest, CreateInvoiceLineItemRequest } from '../api/financialApi';
-import apiClient from '../api/client';
-
-interface Customer {
-  id: string;
-  name: string;
-}
-
-interface WorkOrder {
-  id: string;
-  description: string;
-}
+import { customerApi, workOrderApi } from '../api';
 
 export default function InvoicesPage() {
   const queryClient = useQueryClient();
@@ -62,17 +52,14 @@ export default function InvoicesPage() {
   const { data: customers = [] } = useQuery({
     queryKey: ['customers'],
     queryFn: async () => {
-      const response = await apiClient.get<Customer[]>('/customers');
-      return response.data;
+      const response = await customerApi.getAllPaginated({ limit: 500 });
+      return response.content;
     },
   });
 
   const { data: workOrders = [] } = useQuery({
     queryKey: ['work-orders'],
-    queryFn: async () => {
-      const response = await apiClient.get<WorkOrder[]>('/work-orders');
-      return response.data;
-    },
+    queryFn: () => workOrderApi.getAll(),
   });
 
   const safeInvoices = useMemo(() => Array.isArray(invoices) ? invoices : [], [invoices]);
