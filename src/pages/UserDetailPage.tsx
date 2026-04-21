@@ -8,6 +8,7 @@ import { useHasCapability } from '../hooks/useCurrentUser';
 import AppLayout from '../components/AppLayout';
 import UserFormDialog from '../components/UserFormDialog';
 import CapabilitiesSection from '../components/CapabilitiesSection';
+import AuditHistory from '../components/AuditHistory';
 import { Heading, Subheading } from '../components/catalyst/heading';
 import { Button } from '../components/catalyst/button';
 import { Badge } from '../components/catalyst/badge';
@@ -23,6 +24,7 @@ export default function UserDetailPage() {
 
   // Permission checks
   const canEditUsers = useHasCapability('EDIT_USERS');
+  const canViewAuditLogs = useHasCapability('VIEW_AUDIT_LOGS');
 
   const { data: user, isLoading, error } = useQuery({
     queryKey: ['users', id],
@@ -251,22 +253,15 @@ export default function UserDetailPage() {
           <CapabilitiesSection capabilities={user.capabilities || []} />
         </div>
 
-        {/* Future sections placeholder */}
-        <Divider className="my-8" />
-
-        <div className="grid gap-8">
-          <div>
-            <Subheading>{t('users.table.auditLog')}</Subheading>
-            <div className="mt-4 rounded-lg bg-zinc-50 p-6 text-center dark:bg-zinc-900">
-              <p className="text-sm text-zinc-600 dark:text-zinc-400">
-                {t('users.detail.auditComingSoon')}
-              </p>
-              <p className="mt-2 text-xs text-zinc-500">
-                {t('users.detail.auditHelper')}
-              </p>
+        {/* Audit Log Section */}
+        {canViewAuditLogs && (
+          <>
+            <Divider className="my-8" />
+            <div className="grid gap-8">
+              <AuditHistory entityType="TenantUser" entityId={user.id} />
             </div>
-          </div>
-        </div>
+          </>
+        )}
       </div>
 
       <UserFormDialog

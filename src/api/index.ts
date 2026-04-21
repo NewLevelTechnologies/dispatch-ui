@@ -1,6 +1,9 @@
 // Central API exports
 export { default as apiClient } from './client';
 
+// Audit API
+export { auditApi, type AuditLog } from './auditApi';
+
 // Customer API
 export { customerApi, type Customer, type CreateCustomerRequest, type UpdateCustomerRequest } from './customerApi';
 
