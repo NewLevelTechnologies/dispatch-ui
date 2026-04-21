@@ -1,18 +1,16 @@
 import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { EllipsisVerticalIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
+import { EllipsisVerticalIcon } from '@heroicons/react/24/outline';
 import apiClient from '../api/client';
 import { useGlossary } from '../contexts/GlossaryContext';
 import AppLayout from '../components/AppLayout';
-import { Heading } from '../components/catalyst/heading';
+import { PageHeader, StatusBadge, Toolbar, DataTable, type DataTableColumn } from '../components/shell';
 import { Button } from '../components/catalyst/button';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/catalyst/table';
-import { Badge } from '../components/catalyst/badge';
 import { Dropdown, DropdownButton, DropdownItem, DropdownLabel, DropdownMenu } from '../components/catalyst/dropdown';
 import { Dialog, DialogActions, DialogBody, DialogDescription, DialogTitle } from '../components/catalyst/dialog';
 import { Field, FieldGroup, Fieldset, Label } from '../components/catalyst/fieldset';
-import { Input, InputGroup } from '../components/catalyst/input';
+import { Input } from '../components/catalyst/input';
 import { Select } from '../components/catalyst/select';
 import { Textarea } from '../components/catalyst/textarea';
 import {
@@ -168,118 +166,98 @@ export default function DispatchesPage() {
     });
   };
 
-  const getStatusBadge = (status: string) => {
-    const colors: Record<string, 'lime' | 'sky' | 'amber' | 'rose' | 'zinc'> = {
-      SCHEDULED: 'sky',
-      IN_PROGRESS: 'amber',
-      COMPLETED: 'lime',
-      CANCELLED: 'zinc',
-    };
-    return <Badge color={colors[status] || 'zinc'}>{status}</Badge>;
-  };
+  const columns: DataTableColumn<Dispatch>[] = [
+    {
+      key: 'workOrder',
+      header: t('scheduling.table.workOrder'),
+      cellClassName: 'font-medium',
+      cell: (item) => getWorkOrderDescription(item.workOrderId),
+    },
+    {
+      key: 'assignedUser',
+      header: t('scheduling.table.assignedUser'),
+      cell: (item) => item.assignedUserId,
+    },
+    {
+      key: 'scheduledDate',
+      header: t('scheduling.table.scheduledDate'),
+      cell: (item) => formatDateTime(item.scheduledDate),
+    },
+    {
+      key: 'duration',
+      header: t('scheduling.table.estimatedDuration'),
+      cell: (item) => (item.estimatedDuration ? `${item.estimatedDuration} min` : '-'),
+    },
+    {
+      key: 'status',
+      header: t('common.form.status'),
+      cell: (item) => <StatusBadge status={item.status.toLowerCase()} label={item.status} />,
+    },
+    {
+      key: 'actions',
+      header: '',
+      cell: (item) => (
+        <div className="-mx-3 -my-1.5 sm:-mx-2.5">
+          <Dropdown>
+            <DropdownButton plain aria-label={t('common.moreOptions')}>
+              <EllipsisVerticalIcon className="size-5" />
+            </DropdownButton>
+            <DropdownMenu anchor="bottom end">
+              <DropdownItem onClick={() => handleEdit(item)}>
+                <DropdownLabel>{t('common.edit')}</DropdownLabel>
+              </DropdownItem>
+              <DropdownItem onClick={() => handleDelete(item)}>
+                <DropdownLabel>{t('common.delete')}</DropdownLabel>
+              </DropdownItem>
+            </DropdownMenu>
+          </Dropdown>
+        </div>
+      ),
+    },
+  ];
 
   return (
     <AppLayout>
-      <div className="flex items-center justify-between gap-4">
-        <Heading>{getName('dispatch', true)}</Heading>
-        <Button onClick={handleAdd}>
-          {t('common.actions.add', { entity: getName('dispatch') })}
-        </Button>
-      </div>
+      <PageHeader
+        title={getName('dispatch', true)}
+        actions={<Button color="accent" onClick={handleAdd}>{t('common.actions.add', { entity: getName('dispatch') })}</Button>}
+      />
 
-      {/* Quick Search Bar */}
-      <div className="mt-2 flex items-center gap-4">
-        <InputGroup className="flex-1 max-w-md">
-          <MagnifyingGlassIcon data-slot="icon" />
-          <Input
-            type="text"
-            placeholder={t('common.search')}
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
-        </InputGroup>
-        {safeDispatches.length > 0 && (
-          <div className="text-sm text-zinc-600 dark:text-zinc-400">
-            {filteredDispatches.length === safeDispatches.length
+      <Toolbar
+        searchValue={searchQuery}
+        onSearchChange={setSearchQuery}
+        searchPlaceholder={t('common.search')}
+        rowCount={
+          safeDispatches.length > 0
+            ? filteredDispatches.length === safeDispatches.length
               ? `${safeDispatches.length} ${safeDispatches.length === 1 ? getName('dispatch').toLowerCase() : getName('dispatch', true).toLowerCase()}`
-              : `${filteredDispatches.length} of ${safeDispatches.length}`}
-          </div>
-        )}
-      </div>
+              : `${filteredDispatches.length} of ${safeDispatches.length}`
+            : undefined
+        }
+      />
 
       {error && (
-        <div className="mt-4 rounded-lg bg-red-50 p-3 ring-1 ring-red-200 dark:bg-red-950/10 dark:ring-red-900/20">
+        <div className="rounded-lg bg-red-50 p-3 ring-1 ring-red-200 dark:bg-red-950/10 dark:ring-red-900/20">
           <p className="text-sm text-red-800 dark:text-red-400">
             {t('common.actions.errorLoading', { entities: getName('dispatch', true) })}: {(error as Error).message}
           </p>
         </div>
       )}
 
-      {isLoading ? (
-        <div className="mt-4 text-center">
-          <p className="text-sm text-zinc-600 dark:text-zinc-400">
-            {t('common.actions.loading', { entities: getName('dispatch', true) })}
-          </p>
-        </div>
-      ) : safeDispatches.length === 0 ? (
-        <div className="mt-4 rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700 p-4">
-          <p className="text-sm text-zinc-600 dark:text-zinc-400">
+      {!isLoading && safeDispatches.length === 0 ? (
+        <div className="rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700 p-4">
+          <p className="text-sm text-zinc-500 dark:text-zinc-400">
             {t('common.actions.notFound', { entities: getName('dispatch', true) })}
           </p>
         </div>
-      ) : filteredDispatches.length === 0 ? (
-        <div className="mt-4 rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700 p-4">
-          <p className="text-sm text-zinc-600 dark:text-zinc-400">
-            {t('common.actions.noMatchSearch', { entities: getName('dispatch', true) })}
-          </p>
-        </div>
       ) : (
-        <div className="mt-4">
-          <Table dense className="[--gutter:theme(spacing.1)] text-sm">
-            <TableHead>
-              <TableRow>
-                <TableHeader>{t('scheduling.table.workOrder')}</TableHeader>
-                <TableHeader>{t('scheduling.table.assignedUser')}</TableHeader>
-                <TableHeader>{t('scheduling.table.scheduledDate')}</TableHeader>
-                <TableHeader>{t('scheduling.table.estimatedDuration')}</TableHeader>
-                <TableHeader>{t('common.form.status')}</TableHeader>
-                <TableHeader></TableHeader>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {filteredDispatches.map((item) => (
-                <TableRow key={item.id}>
-                  <TableCell className="font-medium">
-                    {getWorkOrderDescription(item.workOrderId)}
-                  </TableCell>
-                  <TableCell>{item.assignedUserId}</TableCell>
-                  <TableCell>{formatDateTime(item.scheduledDate)}</TableCell>
-                  <TableCell>
-                    {item.estimatedDuration ? `${item.estimatedDuration} min` : '-'}
-                  </TableCell>
-                  <TableCell>{getStatusBadge(item.status)}</TableCell>
-                  <TableCell>
-                    <div className="-mx-3 -my-1.5 sm:-mx-2.5">
-                      <Dropdown>
-                        <DropdownButton plain aria-label={t('common.moreOptions')}>
-                          <EllipsisVerticalIcon className="size-5" />
-                        </DropdownButton>
-                        <DropdownMenu anchor="bottom end">
-                          <DropdownItem onClick={() => handleEdit(item)}>
-                            <DropdownLabel>{t('common.edit')}</DropdownLabel>
-                          </DropdownItem>
-                          <DropdownItem onClick={() => handleDelete(item)}>
-                            <DropdownLabel>{t('common.delete')}</DropdownLabel>
-                          </DropdownItem>
-                        </DropdownMenu>
-                      </Dropdown>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
+        <DataTable
+          columns={columns}
+          rows={filteredDispatches}
+          isLoading={isLoading}
+          getRowKey={(d) => d.id}
+          emptyState={t('common.actions.noMatchSearch', { entities: getName('dispatch', true) })}
+        />
       )}
 
       {/* Dialog */}

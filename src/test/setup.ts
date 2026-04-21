@@ -3,6 +3,13 @@ import { cleanup } from '@testing-library/react';
 import * as matchers from '@testing-library/jest-dom/matchers';
 import { mockAnimationsApi } from 'jsdom-testing-mocks';
 
+// Replace jsdom's AbortSignal with Node's native one so React Router 7 doesn't throw
+// "Expected signal to be an instance of AbortSignal" in tests
+Object.assign(globalThis, {
+  AbortController: globalThis.AbortController,
+  AbortSignal: globalThis.AbortSignal,
+});
+
 // Mock animations API for Headless UI
 mockAnimationsApi();
 
@@ -223,6 +230,7 @@ vi.mock('react-i18next', () => {
     'dashboard.stats.thisMonth': 'This month',
     'dashboard.stats.totalCustomers': 'Total customers',
     'dashboard.welcome': 'Welcome to Dispatch',
+    'entities.admin': 'Administration',
     'entities.customer': 'Customer',
     'entities.customers': 'Customers',
     'entities.dashboard': 'Dashboard',
@@ -341,6 +349,10 @@ vi.mock('react-i18next', () => {
     'scheduling.frequency.monthly': 'Monthly',
     'scheduling.frequency.quarterly': 'Quarterly',
     'scheduling.frequency.weekly': 'Weekly',
+    'scheduling.status.available': 'Available',
+    'scheduling.status.busy': 'Busy',
+    'scheduling.status.tentative': 'Tentative',
+    'scheduling.status.unavailable': 'Unavailable',
     'serviceLocations.actions.close': 'Close Location',
     'serviceLocations.actions.closeConfirm': 'Are you sure you want to close {{name}}? This location will no longer be available for new work orders.',
     'serviceLocations.description': 'Manage service locations across all customers',

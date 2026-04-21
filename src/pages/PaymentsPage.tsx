@@ -1,20 +1,18 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import { useGlossary } from '../contexts/GlossaryContext';
 import AppLayout from '../components/AppLayout';
-import { Heading } from '../components/catalyst/heading';
+import { PageHeader, Toolbar, DataTable, type DataTableColumn } from '../components/shell';
 import { Button } from '../components/catalyst/button';
-import { Input, InputGroup } from '../components/catalyst/input';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/catalyst/table';
+import { Input } from '../components/catalyst/input';
 import { Badge } from '../components/catalyst/badge';
 import { Dialog, DialogActions, DialogBody, DialogDescription, DialogTitle } from '../components/catalyst/dialog';
 import { Field, Label } from '../components/catalyst/fieldset';
 import { Select } from '../components/catalyst/select';
 import { Textarea } from '../components/catalyst/textarea';
 import { PaymentMethod, paymentsApi, invoicesApi } from '../api/financialApi';
-import type { CreatePaymentRequest } from '../api/financialApi';
+import type { Payment, CreatePaymentRequest } from '../api/financialApi';
 import apiClient from '../api/client';
 
 interface Customer {
@@ -29,7 +27,6 @@ export default function PaymentsPage() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
 
-  // Form state
   const [formData, setFormData] = useState<{
     invoiceId: string;
     paymentDate: string;
@@ -65,6 +62,8 @@ export default function PaymentsPage() {
       return response.data;
     },
   });
+
+  const safePayments = useMemo(() => Array.isArray(payments) ? payments : [], [payments]);
 
   const createMutation = useMutation({
     mutationFn: (request: CreatePaymentRequest) => paymentsApi.create(request),
@@ -143,15 +142,16 @@ export default function PaymentsPage() {
     return invoice?.balanceDue || 0;
   };
 
-  const getPaymentMethodBadge = (method: PaymentMethod) => {
-    return <Badge color="zinc">{t(`payments.methods.${method.toLowerCase()}`)}</Badge>;
-  };
-
-  const filteredPayments = Array.isArray(payments) ? payments.filter(payment =>
-    payment.paymentNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    getInvoiceNumber(payment.invoiceId).toLowerCase().includes(searchTerm.toLowerCase()) ||
-    getCustomerName(payment.customerId).toLowerCase().includes(searchTerm.toLowerCase())
-  ) : [];
+  const filteredPayments = useMemo(() => {
+    if (!searchTerm.trim()) return safePayments;
+    const q = searchTerm.toLowerCase();
+    return safePayments.filter(payment =>
+      payment.paymentNumber.toLowerCase().includes(q) ||
+      getInvoiceNumber(payment.invoiceId).toLowerCase().includes(q) ||
+      getCustomerName(payment.customerId).toLowerCase().includes(q)
+    );
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [safePayments, searchTerm, customers, invoices]);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
@@ -161,80 +161,89 @@ export default function PaymentsPage() {
     return new Date(dateString).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
   };
 
+  const columns: DataTableColumn<Payment>[] = [
+    {
+      key: 'paymentNumber',
+      header: t('payments.table.paymentNumber'),
+      cellClassName: 'font-medium',
+      cell: (payment) => payment.paymentNumber,
+    },
+    {
+      key: 'customer',
+      header: t('payments.table.customer'),
+      cell: (payment) => getCustomerName(payment.customerId),
+    },
+    {
+      key: 'invoice',
+      header: t('payments.table.invoice'),
+      cell: (payment) => getInvoiceNumber(payment.invoiceId),
+    },
+    {
+      key: 'paymentDate',
+      header: t('payments.table.paymentDate'),
+      cell: (payment) => formatDate(payment.paymentDate),
+    },
+    {
+      key: 'amount',
+      header: t('payments.table.amount'),
+      cell: (payment) => formatCurrency(payment.amount),
+    },
+    {
+      key: 'method',
+      header: t('payments.table.method'),
+      cell: (payment) => (
+        <Badge color="zinc">{t(`payments.methods.${payment.paymentMethod.toLowerCase()}`)}</Badge>
+      ),
+    },
+    {
+      key: 'reference',
+      header: t('payments.table.reference'),
+      cellClassName: 'text-zinc-500',
+      cell: (payment) => payment.referenceNumber || '-',
+    },
+  ];
+
   return (
     <AppLayout>
-      <div className="flex items-end justify-between gap-4">
-        <div>
-          <Heading>{getName('payment', true)}</Heading>
-          <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">{t('payments.description')}</p>
-        </div>
-        <Button onClick={() => setIsCreateOpen(true)}>
-          {t('common.actions.create', { entity: getName('payment') })}
-        </Button>
-      </div>
+      <PageHeader
+        title={getName('payment', true)}
+        subtitle={t('payments.description')}
+        actions={
+          <Button color="accent" onClick={() => setIsCreateOpen(true)}>
+            {t('common.actions.create', { entity: getName('payment') })}
+          </Button>
+        }
+      />
 
-      {/* Quick Search Bar */}
-      <div className="mt-2 flex items-center gap-4">
-        <InputGroup className="flex-1 max-w-md">
-          <MagnifyingGlassIcon data-slot="icon" />
-          <Input
-            type="text"
-            placeholder={t('common.search')}
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-        </InputGroup>
-        {payments && payments.length > 0 && (
-          <div className="text-sm text-zinc-600 dark:text-zinc-400">
-            {filteredPayments.length === payments.length
-              ? `${payments.length} ${payments.length === 1 ? getName('payment').toLowerCase() : getName('payment', true).toLowerCase()}`
-              : `${filteredPayments.length} of ${payments.length}`}
-          </div>
-        )}
-      </div>
+      <Toolbar
+        searchValue={searchTerm}
+        onSearchChange={setSearchTerm}
+        searchPlaceholder={t('common.search')}
+        rowCount={
+          safePayments.length > 0
+            ? filteredPayments.length === safePayments.length
+              ? `${safePayments.length} ${safePayments.length === 1 ? getName('payment').toLowerCase() : getName('payment', true).toLowerCase()}`
+              : `${filteredPayments.length} of ${safePayments.length}`
+            : undefined
+        }
+      />
 
-      {paymentsLoading ? (
-        <div className="mt-4 text-center">
-          <p className="text-sm text-zinc-600 dark:text-zinc-400">{t('common.actions.loading', { entities: getName('payment', true) })}</p>
-        </div>
-      ) : filteredPayments.length === 0 ? (
-        <div className="mt-4 rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700 p-4">
+      {safePayments.length === 0 && !paymentsLoading ? (
+        <div className="rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700 p-4">
           <p className="text-sm text-zinc-600 dark:text-zinc-400">
-            {searchTerm ? t('common.actions.noMatchSearch', { entities: getName('payment', true) }) : t('common.actions.notFound', { entities: getName('payment', true) })}
+            {t('common.actions.notFound', { entities: getName('payment', true) })}
           </p>
         </div>
       ) : (
-        <div className="mt-4">
-          <Table dense className="[--gutter:theme(spacing.1)] text-sm">
-          <TableHead>
-            <TableRow>
-              <TableHeader>{t('payments.table.paymentNumber')}</TableHeader>
-              <TableHeader>{t('payments.table.customer')}</TableHeader>
-              <TableHeader>{t('payments.table.invoice')}</TableHeader>
-              <TableHeader>{t('payments.table.paymentDate')}</TableHeader>
-              <TableHeader>{t('payments.table.amount')}</TableHeader>
-              <TableHeader>{t('payments.table.method')}</TableHeader>
-              <TableHeader>{t('payments.table.reference')}</TableHeader>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {filteredPayments.map((payment) => (
-              <TableRow key={payment.id}>
-                <TableCell className="font-medium">{payment.paymentNumber}</TableCell>
-                <TableCell>{getCustomerName(payment.customerId)}</TableCell>
-                <TableCell>{getInvoiceNumber(payment.invoiceId)}</TableCell>
-                <TableCell>{formatDate(payment.paymentDate)}</TableCell>
-                <TableCell>{formatCurrency(payment.amount)}</TableCell>
-                <TableCell>{getPaymentMethodBadge(payment.paymentMethod)}</TableCell>
-                <TableCell className="text-zinc-500">{payment.referenceNumber || '-'}</TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-        </div>
+        <DataTable
+          columns={columns}
+          rows={filteredPayments}
+          isLoading={paymentsLoading}
+          getRowKey={(payment) => payment.id}
+          emptyState={t('common.actions.noMatchSearch', { entities: getName('payment', true) })}
+        />
       )}
 
-      {/* Create Payment Dialog */}
       <Dialog open={isCreateOpen} onClose={setIsCreateOpen}>
         <DialogTitle>{t('common.actions.create', { entity: getName('payment') })}</DialogTitle>
         <DialogDescription>{t('common.form.descriptionCreate', { entity: getName('payment') })}</DialogDescription>

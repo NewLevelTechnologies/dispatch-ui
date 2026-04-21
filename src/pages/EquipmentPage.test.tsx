@@ -67,7 +67,7 @@ describe('EquipmentPage', () => {
 
     renderWithProviders(<EquipmentPage />);
 
-    expect(screen.getByText('Loading equipment...')).toBeInTheDocument();
+    expect(document.querySelectorAll('.animate-pulse').length).toBeGreaterThan(0);
   });
 
   it('displays equipment in a table', async () => {

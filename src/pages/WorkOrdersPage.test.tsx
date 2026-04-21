@@ -88,9 +88,9 @@ describe('WorkOrdersPage', () => {
       () => new Promise(() => {}) // Never resolves
     );
 
-    renderWithProviders(<WorkOrdersPage />);
+    const { container } = renderWithProviders(<WorkOrdersPage />);
 
-    expect(screen.getByText('Loading work orders...')).toBeInTheDocument();
+    expect(container.querySelectorAll('.animate-pulse').length).toBeGreaterThan(0);
   });
 
   it('displays work orders in a table', async () => {

@@ -1,14 +1,11 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import { useGlossary } from '../contexts/GlossaryContext';
 import AppLayout from '../components/AppLayout';
-import { Heading } from '../components/catalyst/heading';
+import { PageHeader, StatusBadge, Toolbar, DataTable, type DataTableColumn } from '../components/shell';
 import { Button } from '../components/catalyst/button';
-import { Input, InputGroup } from '../components/catalyst/input';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/catalyst/table';
-import { Badge } from '../components/catalyst/badge';
+import { Input } from '../components/catalyst/input';
 import { Dialog, DialogActions, DialogBody, DialogDescription, DialogTitle } from '../components/catalyst/dialog';
 import { Field, Label } from '../components/catalyst/fieldset';
 import { Select } from '../components/catalyst/select';
@@ -36,7 +33,6 @@ export default function InvoicesPage() {
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
 
-  // Form state
   const [formData, setFormData] = useState<{
     customerId: string;
     workOrderId: string;
@@ -78,6 +74,8 @@ export default function InvoicesPage() {
       return response.data;
     },
   });
+
+  const safeInvoices = useMemo(() => Array.isArray(invoices) ? invoices : [], [invoices]);
 
   const createMutation = useMutation({
     mutationFn: (request: CreateInvoiceRequest) => invoicesApi.create(request),
@@ -187,28 +185,21 @@ export default function InvoicesPage() {
     setFormData({ ...formData, lineItems: updated });
   };
 
-  const getStatusBadge = (status: InvoiceStatus) => {
-    const colors: Record<InvoiceStatus, 'lime' | 'sky' | 'amber' | 'rose' | 'zinc'> = {
-      [InvoiceStatus.DRAFT]: 'zinc',
-      [InvoiceStatus.SENT]: 'sky',
-      [InvoiceStatus.PAID]: 'lime',
-      [InvoiceStatus.OVERDUE]: 'rose',
-      [InvoiceStatus.CANCELLED]: 'zinc',
-      [InvoiceStatus.VOID]: 'zinc',
-    };
-    return <Badge color={colors[status]}>{t(`invoices.status.${status.toLowerCase()}`)}</Badge>;
-  };
-
   const getCustomerName = (customerId: string) => {
     if (!Array.isArray(customers)) return customerId;
     const customer = customers.find(c => c.id === customerId);
     return customer?.name || customerId;
   };
 
-  const filteredInvoices = Array.isArray(invoices) ? invoices.filter(invoice =>
-    invoice.invoiceNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    getCustomerName(invoice.customerId).toLowerCase().includes(searchTerm.toLowerCase())
-  ) : [];
+  const filteredInvoices = useMemo(() => {
+    if (!searchTerm.trim()) return safeInvoices;
+    const q = searchTerm.toLowerCase();
+    return safeInvoices.filter(invoice =>
+      invoice.invoiceNumber.toLowerCase().includes(q) ||
+      getCustomerName(invoice.customerId).toLowerCase().includes(q)
+    );
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [safeInvoices, searchTerm, customers]);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
@@ -218,93 +209,107 @@ export default function InvoicesPage() {
     return new Date(dateString).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
   };
 
+  const columns: DataTableColumn<Invoice>[] = [
+    {
+      key: 'invoiceNumber',
+      header: t('invoices.table.invoiceNumber'),
+      cellClassName: 'font-medium',
+      cell: (invoice) => invoice.invoiceNumber,
+    },
+    {
+      key: 'customer',
+      header: t('invoices.table.customer'),
+      cell: (invoice) => getCustomerName(invoice.customerId),
+    },
+    {
+      key: 'invoiceDate',
+      header: t('invoices.table.invoiceDate'),
+      cell: (invoice) => formatDate(invoice.invoiceDate),
+    },
+    {
+      key: 'dueDate',
+      header: t('invoices.table.dueDate'),
+      cell: (invoice) => formatDate(invoice.dueDate),
+    },
+    {
+      key: 'totalAmount',
+      header: t('invoices.table.totalAmount'),
+      cell: (invoice) => formatCurrency(invoice.totalAmount),
+    },
+    {
+      key: 'balanceDue',
+      header: t('invoices.table.balanceDue'),
+      cell: (invoice) => formatCurrency(invoice.balanceDue),
+    },
+    {
+      key: 'status',
+      header: t('invoices.table.status'),
+      cell: (invoice) => (
+        <StatusBadge
+          status={invoice.status}
+          label={t(`invoices.status.${invoice.status.toLowerCase()}`)}
+        />
+      ),
+    },
+    {
+      key: 'actions',
+      header: '',
+      cell: (invoice) => (
+        <Button
+          plain
+          onClick={() => {
+            setSelectedInvoice(invoice);
+            setNewStatus(invoice.status);
+            setIsStatusOpen(true);
+          }}
+        >
+          {t('common.edit')}
+        </Button>
+      ),
+    },
+  ];
+
   return (
     <AppLayout>
-      <div className="flex items-end justify-between gap-4">
-        <div>
-          <Heading>{getName('invoice', true)}</Heading>
-          <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">{t('invoices.description')}</p>
-        </div>
-        <Button onClick={() => setIsCreateOpen(true)}>
-          {t('common.actions.create', { entity: getName('invoice') })}
-        </Button>
-      </div>
+      <PageHeader
+        title={getName('invoice', true)}
+        subtitle={t('invoices.description')}
+        actions={
+          <Button color="accent" onClick={() => setIsCreateOpen(true)}>
+            {t('common.actions.create', { entity: getName('invoice') })}
+          </Button>
+        }
+      />
 
-      {/* Quick Search Bar */}
-      <div className="mt-2 flex items-center gap-4">
-        <InputGroup className="flex-1 max-w-md">
-          <MagnifyingGlassIcon data-slot="icon" />
-          <Input
-            type="text"
-            placeholder={t('common.search')}
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-        </InputGroup>
-        {invoices && invoices.length > 0 && (
-          <div className="text-sm text-zinc-600 dark:text-zinc-400">
-            {filteredInvoices.length === invoices.length
-              ? `${invoices.length} ${invoices.length === 1 ? getName('invoice').toLowerCase() : getName('invoice', true).toLowerCase()}`
-              : `${filteredInvoices.length} of ${invoices.length}`}
-          </div>
-        )}
-      </div>
+      <Toolbar
+        searchValue={searchTerm}
+        onSearchChange={setSearchTerm}
+        searchPlaceholder={t('common.search')}
+        rowCount={
+          safeInvoices.length > 0
+            ? filteredInvoices.length === safeInvoices.length
+              ? `${safeInvoices.length} ${safeInvoices.length === 1 ? getName('invoice').toLowerCase() : getName('invoice', true).toLowerCase()}`
+              : `${filteredInvoices.length} of ${safeInvoices.length}`
+            : undefined
+        }
+      />
 
-      {invoicesLoading ? (
-        <div className="mt-4 text-center">
-          <p className="text-sm text-zinc-600 dark:text-zinc-400">{t('common.actions.loading', { entities: getName('invoice', true) })}</p>
-        </div>
-      ) : filteredInvoices.length === 0 ? (
-        <div className="mt-4 rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700 p-4">
+      {safeInvoices.length === 0 && !invoicesLoading ? (
+        <div className="rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700 p-4">
           <p className="text-sm text-zinc-600 dark:text-zinc-400">
-            {searchTerm ? t('common.actions.noMatchSearch', { entities: getName('invoice', true) }) : t('common.actions.notFound', { entities: getName('invoice', true) })}
+            {t('common.actions.notFound', { entities: getName('invoice', true) })}
           </p>
         </div>
       ) : (
-        <div className="mt-4">
-          <Table dense className="[--gutter:theme(spacing.1)] text-sm">
-          <TableHead>
-            <TableRow>
-              <TableHeader>{t('invoices.table.invoiceNumber')}</TableHeader>
-              <TableHeader>{t('invoices.table.customer')}</TableHeader>
-              <TableHeader>{t('invoices.table.invoiceDate')}</TableHeader>
-              <TableHeader>{t('invoices.table.dueDate')}</TableHeader>
-              <TableHeader>{t('invoices.table.totalAmount')}</TableHeader>
-              <TableHeader>{t('invoices.table.balanceDue')}</TableHeader>
-              <TableHeader>{t('invoices.table.status')}</TableHeader>
-              <TableHeader></TableHeader>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {filteredInvoices.map((invoice) => (
-              <TableRow key={invoice.id}>
-                <TableCell className="font-medium">{invoice.invoiceNumber}</TableCell>
-                <TableCell>{getCustomerName(invoice.customerId)}</TableCell>
-                <TableCell>{formatDate(invoice.invoiceDate)}</TableCell>
-                <TableCell>{formatDate(invoice.dueDate)}</TableCell>
-                <TableCell>{formatCurrency(invoice.totalAmount)}</TableCell>
-                <TableCell>{formatCurrency(invoice.balanceDue)}</TableCell>
-                <TableCell>{getStatusBadge(invoice.status)}</TableCell>
-                <TableCell>
-                  <Button
-                    plain
-                    onClick={() => {
-                      setSelectedInvoice(invoice);
-                      setNewStatus(invoice.status);
-                      setIsStatusOpen(true);
-                    }}
-                  >
-                    {t('common.edit')}
-                  </Button>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-        </div>
+        <DataTable
+          columns={columns}
+          rows={filteredInvoices}
+          isLoading={invoicesLoading}
+          getRowKey={(invoice) => invoice.id}
+          emptyState={t('common.actions.noMatchSearch', { entities: getName('invoice', true) })}
+        />
       )}
 
-      {/* Create Invoice Dialog */}
       <Dialog open={isCreateOpen} onClose={setIsCreateOpen}>
         <DialogTitle>{t('common.actions.create', { entity: getName('invoice') })}</DialogTitle>
         <DialogDescription>{t('common.form.descriptionCreate', { entity: getName('invoice') })}</DialogDescription>
@@ -438,7 +443,6 @@ export default function InvoicesPage() {
         </form>
       </Dialog>
 
-      {/* Update Status Dialog */}
       <Dialog open={isStatusOpen} onClose={setIsStatusOpen}>
         <DialogTitle>{t('common.actions.edit', { entity: getName('invoice') })}</DialogTitle>
         <DialogDescription>{t('common.updateStatus', { entity: getName('invoice') })}</DialogDescription>

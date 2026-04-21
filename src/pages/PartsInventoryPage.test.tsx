@@ -82,7 +82,7 @@ describe('PartsInventoryPage', () => {
 
     renderWithProviders(<PartsInventoryPage />);
 
-    expect(screen.getByText('Loading parts...')).toBeInTheDocument();
+    expect(document.querySelectorAll('.animate-pulse').length).toBeGreaterThan(0);
   });
 
   it('displays parts in a table', async () => {

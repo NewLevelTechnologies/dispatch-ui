@@ -1,23 +1,20 @@
 import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { EllipsisVerticalIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
+import { EllipsisVerticalIcon } from '@heroicons/react/24/outline';
 import apiClient from '../api/client';
 import { useGlossary } from '../contexts/GlossaryContext';
 import AppLayout from '../components/AppLayout';
-import { Heading } from '../components/catalyst/heading';
+import { PageHeader, StatusBadge, Toolbar, DataTable, type DataTableColumn } from '../components/shell';
 import { Button } from '../components/catalyst/button';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/catalyst/table';
-import { Badge } from '../components/catalyst/badge';
 import { Dropdown, DropdownButton, DropdownItem, DropdownLabel, DropdownMenu } from '../components/catalyst/dropdown';
 import { Dialog, DialogActions, DialogBody, DialogDescription, DialogTitle } from '../components/catalyst/dialog';
 import { Field, FieldGroup, Fieldset, Label } from '../components/catalyst/fieldset';
-import { Input, InputGroup } from '../components/catalyst/input';
+import { Input } from '../components/catalyst/input';
 import { Select } from '../components/catalyst/select';
 import { Textarea } from '../components/catalyst/textarea';
 import {
   equipmentApi,
-  EquipmentStatus,
   type Equipment,
   type CreateEquipmentRequest,
   type UpdateEquipmentRequest,
@@ -57,11 +54,9 @@ export default function EquipmentPage() {
     },
   });
 
-  // Ensure all data is always an array
   const safeEquipment = useMemo(() => Array.isArray(equipment) ? equipment : [], [equipment]);
   const safeCustomers = useMemo(() => Array.isArray(customers) ? customers : [], [customers]);
 
-  // Filter equipment based on search query
   const filteredEquipment = useMemo(() => {
     if (safeEquipment.length === 0) return [];
     if (!searchQuery.trim()) return safeEquipment;
@@ -150,119 +145,109 @@ export default function EquipmentPage() {
     });
   };
 
-  const getStatusBadge = (status: EquipmentStatus) => {
-    const colors: Record<EquipmentStatus, 'lime' | 'sky' | 'amber' | 'zinc'> = {
-      ACTIVE: 'lime',
-      INACTIVE: 'zinc',
-      MAINTENANCE: 'amber',
-      RETIRED: 'zinc',
-    };
-    return <Badge color={colors[status]}>{status}</Badge>;
-  };
+  const columns: DataTableColumn<Equipment>[] = [
+    {
+      key: 'equipmentType',
+      header: t('equipment.table.equipmentType'),
+      cellClassName: 'font-medium',
+      cell: (item) => item.equipmentType,
+    },
+    {
+      key: 'customer',
+      header: t('equipment.table.customer'),
+      cell: (item) => item.customerName || item.customerId,
+    },
+    {
+      key: 'modelNumber',
+      header: t('equipment.table.modelNumber'),
+      cell: (item) => item.modelNumber || '-',
+    },
+    {
+      key: 'serialNumber',
+      header: t('equipment.table.serialNumber'),
+      cell: (item) => item.serialNumber || '-',
+    },
+    {
+      key: 'location',
+      header: t('equipment.table.location'),
+      cell: (item) => item.location || '-',
+    },
+    {
+      key: 'status',
+      header: t('common.form.status'),
+      cell: (item) => <StatusBadge status={item.status} />,
+    },
+    {
+      key: 'actions',
+      header: '',
+      cell: (item) => (
+        <div className="-mx-3 -my-1.5 sm:-mx-2.5">
+          <Dropdown>
+            <DropdownButton plain aria-label={t('common.moreOptions')}>
+              <EllipsisVerticalIcon className="size-5" />
+            </DropdownButton>
+            <DropdownMenu anchor="bottom end">
+              <DropdownItem onClick={() => handleEdit(item)}>
+                <DropdownLabel>{t('common.edit')}</DropdownLabel>
+              </DropdownItem>
+              <DropdownItem onClick={() => handleDelete(item)}>
+                <DropdownLabel>{t('common.delete')}</DropdownLabel>
+              </DropdownItem>
+            </DropdownMenu>
+          </Dropdown>
+        </div>
+      ),
+    },
+  ];
 
   return (
     <AppLayout>
-      <div className="flex items-center justify-between gap-4">
-        <Heading>{getName('equipment', true)}</Heading>
-        <Button onClick={handleAdd}>
-          {t('common.actions.add', { entity: getName('equipment') })}
-        </Button>
-      </div>
+      <PageHeader
+        title={getName('equipment', true)}
+        actions={
+          <Button color="accent" onClick={handleAdd}>
+            {t('common.actions.add', { entity: getName('equipment') })}
+          </Button>
+        }
+      />
 
-      {/* Quick Search Bar */}
-      <div className="mt-2 flex items-center gap-4">
-        <InputGroup className="flex-1 max-w-md">
-          <MagnifyingGlassIcon data-slot="icon" />
-          <Input
-            type="text"
-            placeholder={t('common.search')}
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
-        </InputGroup>
-        {safeEquipment.length > 0 && (
-          <div className="text-sm text-zinc-600 dark:text-zinc-400">
-            {filteredEquipment.length === safeEquipment.length
+      <Toolbar
+        searchValue={searchQuery}
+        onSearchChange={setSearchQuery}
+        searchPlaceholder={t('common.search')}
+        rowCount={
+          safeEquipment.length > 0
+            ? filteredEquipment.length === safeEquipment.length
               ? `${safeEquipment.length} ${safeEquipment.length === 1 ? getName('equipment').toLowerCase() : getName('equipment', true).toLowerCase()}`
-              : `${filteredEquipment.length} of ${safeEquipment.length}`}
-          </div>
-        )}
-      </div>
+              : `${filteredEquipment.length} of ${safeEquipment.length}`
+            : undefined
+        }
+      />
 
       {error && (
-        <div className="mt-4 rounded-lg bg-red-50 p-3 ring-1 ring-red-200 dark:bg-red-950/10 dark:ring-red-900/20">
+        <div className="rounded-lg bg-red-50 p-3 ring-1 ring-red-200 dark:bg-red-950/10 dark:ring-red-900/20">
           <p className="text-sm text-red-800 dark:text-red-400">
             {t('common.actions.errorLoading', { entities: getName('equipment', true) })}: {(error as Error).message}
           </p>
         </div>
       )}
 
-      {isLoading ? (
-        <div className="mt-4 text-center">
-          <p className="text-sm text-zinc-600 dark:text-zinc-400">
-            {t('common.actions.loading', { entities: getName('equipment', true) })}
-          </p>
-        </div>
-      ) : safeEquipment.length === 0 ? (
-        <div className="mt-4 rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700 p-4">
+      {safeEquipment.length === 0 && !isLoading ? (
+        <div className="rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700 p-4">
           <p className="text-sm text-zinc-600 dark:text-zinc-400">
             {t('common.actions.notFound', { entities: getName('equipment', true) })}
           </p>
         </div>
-      ) : filteredEquipment.length === 0 ? (
-        <div className="mt-4 rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700 p-4">
-          <p className="text-sm text-zinc-600 dark:text-zinc-400">
-            {t('common.actions.noMatchSearch', { entities: getName('equipment', true) })}
-          </p>
-        </div>
       ) : (
-        <div className="mt-4">
-          <Table dense className="[--gutter:theme(spacing.1)] text-sm">
-            <TableHead>
-              <TableRow>
-                <TableHeader>{t('equipment.table.equipmentType')}</TableHeader>
-                <TableHeader>{t('equipment.table.customer')}</TableHeader>
-                <TableHeader>{t('equipment.table.modelNumber')}</TableHeader>
-                <TableHeader>{t('equipment.table.serialNumber')}</TableHeader>
-                <TableHeader>{t('equipment.table.location')}</TableHeader>
-                <TableHeader>{t('common.form.status')}</TableHeader>
-                <TableHeader></TableHeader>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {filteredEquipment.map((item) => (
-                <TableRow key={item.id}>
-                  <TableCell className="font-medium">{item.equipmentType}</TableCell>
-                  <TableCell>{item.customerName || item.customerId}</TableCell>
-                  <TableCell>{item.modelNumber || '-'}</TableCell>
-                  <TableCell>{item.serialNumber || '-'}</TableCell>
-                  <TableCell>{item.location || '-'}</TableCell>
-                  <TableCell>{getStatusBadge(item.status)}</TableCell>
-                  <TableCell>
-                    <div className="-mx-3 -my-1.5 sm:-mx-2.5">
-                      <Dropdown>
-                        <DropdownButton plain aria-label={t('common.moreOptions')}>
-                          <EllipsisVerticalIcon className="size-5" />
-                        </DropdownButton>
-                        <DropdownMenu anchor="bottom end">
-                          <DropdownItem onClick={() => handleEdit(item)}>
-                            <DropdownLabel>{t('common.edit')}</DropdownLabel>
-                          </DropdownItem>
-                          <DropdownItem onClick={() => handleDelete(item)}>
-                            <DropdownLabel>{t('common.delete')}</DropdownLabel>
-                          </DropdownItem>
-                        </DropdownMenu>
-                      </Dropdown>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
+        <DataTable
+          columns={columns}
+          rows={filteredEquipment}
+          isLoading={isLoading}
+          getRowKey={(item) => item.id}
+          emptyState={t('common.actions.noMatchSearch', { entities: getName('equipment', true) })}
+        />
       )}
 
-      {/* Dialog */}
       <Dialog open={isDialogOpen} onClose={setIsDialogOpen}>
         <DialogTitle>
           {selectedEquipment

@@ -155,9 +155,9 @@ describe('CustomersPage', () => {
       () => new Promise(() => {}) // Never resolves
     );
 
-    renderWithProviders(<CustomersPage />);
+    const { container } = renderWithProviders(<CustomersPage />);
 
-    expect(screen.getByText('Loading customers...')).toBeInTheDocument();
+    expect(container.querySelectorAll('.animate-pulse').length).toBeGreaterThan(0);
   });
 
   it('displays customers in a table', async () => {

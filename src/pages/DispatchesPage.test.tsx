@@ -63,9 +63,9 @@ describe('DispatchesPage', () => {
   it('displays loading state', () => {
     mockDispatchesGetAll.mockImplementation(() => new Promise(() => {}));
 
-    renderWithProviders(<DispatchesPage />);
+    const { container } = renderWithProviders(<DispatchesPage />);
 
-    expect(screen.getByText('Loading dispatches...')).toBeInTheDocument();
+    expect(container.querySelectorAll('.animate-pulse').length).toBeGreaterThan(0);
   });
 
   it('displays dispatches in a table', async () => {

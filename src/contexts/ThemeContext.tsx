@@ -42,10 +42,10 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   // Initialize theme from API preferences or localStorage
   const [theme, setThemeState] = useState<Theme>(() => {
     const stored = localStorage.getItem('theme');
-    return (stored as Theme) || 'system';
+    return (stored as Theme) || 'dark';
   });
 
-  const [resolvedTheme, setResolvedTheme] = useState<'light' | 'dark'>('light');
+  const [resolvedTheme, setResolvedTheme] = useState<'light' | 'dark'>('dark');
 
   // Update preferences mutation
   const updatePreferencesMutation = useMutation({
@@ -78,8 +78,10 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
       if (resolved === 'dark') {
         root.classList.add('dark');
+        root.classList.remove('light');
       } else {
         root.classList.remove('dark');
+        root.classList.add('light');
       }
     };
 

@@ -155,6 +155,10 @@ const styles = {
       'text-white [--btn-hover-overlay:var(--color-white)]/10 [--btn-bg:var(--color-rose-500)] [--btn-border:var(--color-rose-600)]/90',
       '[--btn-icon:var(--color-rose-300)] data-active:[--btn-icon:var(--color-rose-200)] data-hover:[--btn-icon:var(--color-rose-200)]',
     ],
+    accent: [
+      'text-white [--btn-hover-overlay:var(--color-white)]/10 [--btn-bg:var(--color-accent)] [--btn-border:var(--color-accent)]',
+      '[--btn-icon:var(--color-white)]/70 data-active:[--btn-icon:var(--color-white)]/90 data-hover:[--btn-icon:var(--color-white)]/90',
+    ],
   },
 }
 

@@ -14,6 +14,7 @@ import { Textarea } from './catalyst/textarea';
 import { Radio, RadioField, RadioGroup } from './catalyst/radio';
 import { US_STATES } from '../constants/states';
 import { Subheading } from './catalyst/heading';
+import { FormGrid, FormRow } from './shell';
 
 interface CustomerFormDialogProps {
   isOpen: boolean;
@@ -343,130 +344,109 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
             {/* PRIMARY SECTION: Where do you need service? */}
             <div>
               <Subheading className="mb-3 text-base font-semibold">{t('customers.form.serviceLocationPrompt')}</Subheading>
-              <div className="space-y-2">
-                {/* Row 1: Name, Email, Phone */}
-                <div className="grid grid-cols-12 gap-2">
-                  <Field className="col-span-5">
-                    <Label className="text-xs">{t('common.form.name')} *</Label>
-                    <Input
-                      name="locationName"
-                      value={createFormData.locationName}
-                      onChange={(e) => setCreateFormData((prev) => ({ ...prev, locationName: e.target.value }))}
-                      required
-                    />
-                  </Field>
-                  <Field className="col-span-3">
-                    <Label className="text-xs">{t('common.form.email')} *</Label>
-                    <Input
-                      type="email"
-                      name="email"
-                      value={createFormData.email}
-                      onChange={(e) => setCreateFormData((prev) => ({ ...prev, email: e.target.value }))}
-                      required
-                    />
-                  </Field>
-                  <Field className="col-span-4">
-                    <Label className="text-xs">{t('common.form.phone')}</Label>
-                    <PatternFormat
-                      format="(###) ###-####"
-                      mask="_"
-                      customInput={Input}
-                      name="phone"
-                      value={createFormData.phone}
-                      onValueChange={(values) => setCreateFormData((prev) => ({ ...prev, phone: values.value }))}
-                    />
-                  </Field>
-                </div>
+              <FormGrid>
+                <FormRow span={5} label={<>{t('common.form.name')} *</>}>
+                  <Input
+                    name="locationName"
+                    value={createFormData.locationName}
+                    onChange={(e) => setCreateFormData((prev) => ({ ...prev, locationName: e.target.value }))}
+                    required
+                  />
+                </FormRow>
+                <FormRow span={3} label={<>{t('common.form.email')} *</>}>
+                  <Input
+                    type="email"
+                    name="email"
+                    value={createFormData.email}
+                    onChange={(e) => setCreateFormData((prev) => ({ ...prev, email: e.target.value }))}
+                    required
+                  />
+                </FormRow>
+                <FormRow span={4} label={t('common.form.phone')}>
+                  <PatternFormat
+                    format="(###) ###-####"
+                    mask="_"
+                    customInput={Input}
+                    name="phone"
+                    value={createFormData.phone}
+                    onValueChange={(values) => setCreateFormData((prev) => ({ ...prev, phone: values.value }))}
+                  />
+                </FormRow>
 
-                {/* Row 2: Street + Apt */}
-                <div className="grid grid-cols-4 gap-2">
-                  <Field className="col-span-3">
-                    <Label className="text-xs">{t('common.form.streetAddress')} *</Label>
-                    <Input
-                      name="serviceStreetAddress"
-                      value={createFormData.serviceAddress.streetAddress}
-                      onChange={(e) =>
-                        setCreateFormData((prev) => ({
-                          ...prev,
-                          serviceAddress: { ...prev.serviceAddress, streetAddress: e.target.value },
-                        }))
-                      }
-                      required
-                    />
-                  </Field>
-                  <Field className="col-span-1">
-                    <Label className="text-xs">{t('common.form.addressLine2')}</Label>
-                    <Input
-                      name="serviceStreetAddressLine2"
-                      value={createFormData.serviceAddress.streetAddressLine2}
-                      onChange={(e) =>
-                        setCreateFormData((prev) => ({
-                          ...prev,
-                          serviceAddress: { ...prev.serviceAddress, streetAddressLine2: e.target.value },
-                        }))
-                      }
-                      placeholder="Apt"
-                    />
-                  </Field>
-                </div>
+                <FormRow span={9} label={<>{t('common.form.streetAddress')} *</>}>
+                  <Input
+                    name="serviceStreetAddress"
+                    value={createFormData.serviceAddress.streetAddress}
+                    onChange={(e) =>
+                      setCreateFormData((prev) => ({
+                        ...prev,
+                        serviceAddress: { ...prev.serviceAddress, streetAddress: e.target.value },
+                      }))
+                    }
+                    required
+                  />
+                </FormRow>
+                <FormRow span={3} label={t('common.form.addressLine2')}>
+                  <Input
+                    name="serviceStreetAddressLine2"
+                    value={createFormData.serviceAddress.streetAddressLine2}
+                    onChange={(e) =>
+                      setCreateFormData((prev) => ({
+                        ...prev,
+                        serviceAddress: { ...prev.serviceAddress, streetAddressLine2: e.target.value },
+                      }))
+                    }
+                    placeholder="Apt"
+                  />
+                </FormRow>
 
-                {/* Row 3: City/State/Zip */}
-                <div className="grid grid-cols-12 gap-2">
-                  <Field className="col-span-6">
-                    <Label className="text-xs">{t('common.form.city')} *</Label>
-                    <Input
-                      name="serviceCity"
-                      value={createFormData.serviceAddress.city}
-                      onChange={(e) =>
-                        setCreateFormData((prev) => ({
-                          ...prev,
-                          serviceAddress: { ...prev.serviceAddress, city: e.target.value },
-                        }))
-                      }
-                      required
-                    />
-                  </Field>
-                  <Field className="col-span-2">
-                    <Label className="text-xs">{t('common.form.state')} *</Label>
-                    <Select
-                      name="serviceState"
-                      value={createFormData.serviceAddress.state}
-                      onChange={(e) =>
-                        setCreateFormData((prev) => ({
-                          ...prev,
-                          serviceAddress: { ...prev.serviceAddress, state: e.target.value },
-                        }))
-                      }
-                      required
-                    >
-                      <option value="">{t('common.form.select')}</option>
-                      {US_STATES.map((state) => (
-                        <option key={state} value={state}>
-                          {state}
-                        </option>
-                      ))}
-                    </Select>
-                  </Field>
-                  <Field className="col-span-4">
-                    <Label className="text-xs">{t('common.form.zipCode')} *</Label>
-                    <Input
-                      name="serviceZipCode"
-                      value={createFormData.serviceAddress.zipCode}
-                      onChange={(e) =>
-                        setCreateFormData((prev) => ({
-                          ...prev,
-                          serviceAddress: { ...prev.serviceAddress, zipCode: e.target.value },
-                        }))
-                      }
-                      required
-                    />
-                  </Field>
-                </div>
+                <FormRow span={6} label={<>{t('common.form.city')} *</>}>
+                  <Input
+                    name="serviceCity"
+                    value={createFormData.serviceAddress.city}
+                    onChange={(e) =>
+                      setCreateFormData((prev) => ({
+                        ...prev,
+                        serviceAddress: { ...prev.serviceAddress, city: e.target.value },
+                      }))
+                    }
+                    required
+                  />
+                </FormRow>
+                <FormRow span={2} label={<>{t('common.form.state')} *</>}>
+                  <Select
+                    name="serviceState"
+                    value={createFormData.serviceAddress.state}
+                    onChange={(e) =>
+                      setCreateFormData((prev) => ({
+                        ...prev,
+                        serviceAddress: { ...prev.serviceAddress, state: e.target.value },
+                      }))
+                    }
+                    required
+                  >
+                    <option value="">{t('common.form.select')}</option>
+                    {US_STATES.map((state) => (
+                      <option key={state} value={state}>{state}</option>
+                    ))}
+                  </Select>
+                </FormRow>
+                <FormRow span={4} label={<>{t('common.form.zipCode')} *</>}>
+                  <Input
+                    name="serviceZipCode"
+                    value={createFormData.serviceAddress.zipCode}
+                    onChange={(e) =>
+                      setCreateFormData((prev) => ({
+                        ...prev,
+                        serviceAddress: { ...prev.serviceAddress, zipCode: e.target.value },
+                      }))
+                    }
+                    required
+                  />
+                </FormRow>
 
-                {/* Dispatch Region - Only show dropdown if 2+ regions */}
                 {showRegionDropdown && (
-                  <Field>
-                    <Label className="text-xs">{getName('dispatch')} {t('entities.region')} *</Label>
+                  <FormRow span={6} label={<>{getName('dispatch')} {t('entities.region')} *</>}>
                     <Select
                       name="dispatchRegionId"
                       value={createFormData.dispatchRegionId}
@@ -480,9 +460,9 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
                         </option>
                       ))}
                     </Select>
-                  </Field>
+                  </FormRow>
                 )}
-              </div>
+              </FormGrid>
             </div>
 
             {/* BILLING CHECKBOX */}
@@ -503,10 +483,8 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
             {!createFormData.billingAddressSameAsService && (
               <div className="border-t border-zinc-200 pt-3 dark:border-zinc-800">
                 <Subheading className="mb-3 text-sm font-semibold">{t('customers.form.billingInvoiceRecipient')}</Subheading>
-                <div className="space-y-2">
-                  {/* Billing Name */}
-                  <Field>
-                    <Label className="text-xs">{t('customers.form.companyName')}</Label>
+                <FormGrid>
+                  <FormRow span={12} label={t('customers.form.companyName')}>
                     <Input
                       name="billingName"
                       value={createFormData.name}
@@ -514,93 +492,78 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
                       placeholder="e.g., Burger King Corporate"
                       required
                     />
-                  </Field>
-
-                  {/* Street + Apt */}
-                  <div className="grid grid-cols-4 gap-2">
-                    <Field className="col-span-3">
-                      <Label className="text-xs">{t('common.form.streetAddress')} *</Label>
-                      <Input
-                        name="billingStreetAddress"
-                        value={createFormData.billingAddress.streetAddress}
-                        onChange={(e) =>
-                          setCreateFormData((prev) => ({
-                            ...prev,
-                            billingAddress: { ...prev.billingAddress, streetAddress: e.target.value },
-                          }))
-                        }
-                        required
-                      />
-                    </Field>
-                    <Field className="col-span-1">
-                      <Label className="text-xs">{t('common.form.addressLine2')}</Label>
-                      <Input
-                        name="billingStreetAddressLine2"
-                        value={createFormData.billingAddress.streetAddressLine2}
-                        onChange={(e) =>
-                          setCreateFormData((prev) => ({
-                            ...prev,
-                            billingAddress: { ...prev.billingAddress, streetAddressLine2: e.target.value },
-                          }))
-                        }
-                        placeholder="Apt"
-                      />
-                    </Field>
-                  </div>
-
-                  {/* City/State/Zip */}
-                  <div className="grid grid-cols-12 gap-2">
-                    <Field className="col-span-6">
-                      <Label className="text-xs">{t('common.form.city')} *</Label>
-                      <Input
-                        name="billingCity"
-                        value={createFormData.billingAddress.city}
-                        onChange={(e) =>
-                          setCreateFormData((prev) => ({
-                            ...prev,
-                            billingAddress: { ...prev.billingAddress, city: e.target.value },
-                          }))
-                        }
-                        required
-                      />
-                    </Field>
-                    <Field className="col-span-2">
-                      <Label className="text-xs">{t('common.form.state')} *</Label>
-                      <Select
-                        name="billingState"
-                        value={createFormData.billingAddress.state}
-                        onChange={(e) =>
-                          setCreateFormData((prev) => ({
-                            ...prev,
-                            billingAddress: { ...prev.billingAddress, state: e.target.value },
-                          }))
-                        }
-                        required
-                      >
-                        <option value="">{t('common.form.select')}</option>
-                        {US_STATES.map((state) => (
-                          <option key={state} value={state}>
-                            {state}
-                          </option>
-                        ))}
-                      </Select>
-                    </Field>
-                    <Field className="col-span-4">
-                      <Label className="text-xs">{t('common.form.zipCode')} *</Label>
-                      <Input
-                        name="billingZipCode"
-                        value={createFormData.billingAddress.zipCode}
-                        onChange={(e) =>
-                          setCreateFormData((prev) => ({
-                            ...prev,
-                            billingAddress: { ...prev.billingAddress, zipCode: e.target.value },
-                          }))
-                        }
-                        required
-                      />
-                    </Field>
-                  </div>
-                </div>
+                  </FormRow>
+                  <FormRow span={9} label={<>{t('common.form.streetAddress')} *</>}>
+                    <Input
+                      name="billingStreetAddress"
+                      value={createFormData.billingAddress.streetAddress}
+                      onChange={(e) =>
+                        setCreateFormData((prev) => ({
+                          ...prev,
+                          billingAddress: { ...prev.billingAddress, streetAddress: e.target.value },
+                        }))
+                      }
+                      required
+                    />
+                  </FormRow>
+                  <FormRow span={3} label={t('common.form.addressLine2')}>
+                    <Input
+                      name="billingStreetAddressLine2"
+                      value={createFormData.billingAddress.streetAddressLine2}
+                      onChange={(e) =>
+                        setCreateFormData((prev) => ({
+                          ...prev,
+                          billingAddress: { ...prev.billingAddress, streetAddressLine2: e.target.value },
+                        }))
+                      }
+                      placeholder="Apt"
+                    />
+                  </FormRow>
+                  <FormRow span={6} label={<>{t('common.form.city')} *</>}>
+                    <Input
+                      name="billingCity"
+                      value={createFormData.billingAddress.city}
+                      onChange={(e) =>
+                        setCreateFormData((prev) => ({
+                          ...prev,
+                          billingAddress: { ...prev.billingAddress, city: e.target.value },
+                        }))
+                      }
+                      required
+                    />
+                  </FormRow>
+                  <FormRow span={2} label={<>{t('common.form.state')} *</>}>
+                    <Select
+                      name="billingState"
+                      value={createFormData.billingAddress.state}
+                      onChange={(e) =>
+                        setCreateFormData((prev) => ({
+                          ...prev,
+                          billingAddress: { ...prev.billingAddress, state: e.target.value },
+                        }))
+                      }
+                      required
+                    >
+                      <option value="">{t('common.form.select')}</option>
+                      {US_STATES.map((state) => (
+                        <option key={state} value={state}>{state}</option>
+                      ))}
+                    </Select>
+                  </FormRow>
+                  <FormRow span={4} label={<>{t('common.form.zipCode')} *</>}>
+                    <Input
+                      name="billingZipCode"
+                      value={createFormData.billingAddress.zipCode}
+                      onChange={(e) =>
+                        setCreateFormData((prev) => ({
+                          ...prev,
+                          billingAddress: { ...prev.billingAddress, zipCode: e.target.value },
+                        }))
+                      }
+                      required
+                    />
+                  </FormRow>
+                </FormGrid>
               </div>
             )}
 
@@ -619,17 +582,15 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
                   {t('customers.detail.siteContact')}
                 </button>
                 {showSiteContact && (
-                  <div className="mt-2 grid grid-cols-3 gap-2 pl-6">
-                    <Field>
-                      <Label className="text-xs">{t('common.form.name')}</Label>
+                  <FormGrid className="mt-2 pl-6">
+                    <FormRow span={4} label={t('common.form.name')}>
                       <Input
                         name="siteContactName"
                         value={createFormData.siteContactName}
                         onChange={(e) => setCreateFormData((prev) => ({ ...prev, siteContactName: e.target.value }))}
                       />
-                    </Field>
-                    <Field>
-                      <Label className="text-xs">{t('common.form.phone')}</Label>
+                    </FormRow>
+                    <FormRow span={4} label={t('common.form.phone')}>
                       <PatternFormat
                         format="(###) ###-####"
                         mask="_"
@@ -638,17 +599,16 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
                         value={createFormData.siteContactPhone}
                         onValueChange={(values) => setCreateFormData((prev) => ({ ...prev, siteContactPhone: values.value }))}
                       />
-                    </Field>
-                    <Field>
-                      <Label className="text-xs">{t('common.form.email')}</Label>
+                    </FormRow>
+                    <FormRow span={4} label={t('common.form.email')}>
                       <Input
                         type="email"
                         name="siteContactEmail"
                         value={createFormData.siteContactEmail}
                         onChange={(e) => setCreateFormData((prev) => ({ ...prev, siteContactEmail: e.target.value }))}
                       />
-                    </Field>
-                  </div>
+                    </FormRow>
+                  </FormGrid>
                 )}
               </div>
 
@@ -690,10 +650,8 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
                 </button>
                 {showBusinessTerms && (
                   <div className="mt-2 space-y-2 pl-6">
-                    {/* Payment Terms + Contract Tier */}
-                    <div className="grid grid-cols-2 gap-2">
-                      <Field>
-                        <Label className="text-xs">{t('customers.detail.paymentTerms')}</Label>
+                    <FormGrid>
+                      <FormRow span={6} label={t('customers.detail.paymentTerms')}>
                         <Input
                           type="number"
                           name="paymentTermsDays"
@@ -704,17 +662,16 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
                           min="0"
                           placeholder="0 = Due on receipt"
                         />
-                      </Field>
-                      <Field>
-                        <Label className="text-xs">{t('customers.detail.contractTier')}</Label>
+                      </FormRow>
+                      <FormRow span={6} label={t('customers.detail.contractTier')}>
                         <Input
                           name="contractPricingTier"
                           value={createFormData.contractPricingTier}
                           onChange={(e) => setCreateFormData((prev) => ({ ...prev, contractPricingTier: e.target.value }))}
                           placeholder="e.g., GOLD"
                         />
-                      </Field>
-                    </div>
+                      </FormRow>
+                    </FormGrid>
 
                     {/* Checkboxes + Tax Cert */}
                     <div className="flex items-end gap-2">
@@ -770,18 +727,16 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
         ) : (
           <form onSubmit={handleEditSubmit} id="customer-form" className="space-y-4">
             {/* PRIMARY SECTION */}
-            <div className="grid grid-cols-12 gap-2">
-              <Field className="col-span-5">
-                <Label className="text-xs">{t('common.form.name')} *</Label>
+            <FormGrid>
+              <FormRow span={5} label={<>{t('common.form.name')} *</>}>
                 <Input
                   name="name"
                   value={editFormData.name}
                   onChange={(e) => setEditFormData((prev) => ({ ...prev, name: e.target.value }))}
                   required
                 />
-              </Field>
-              <Field className="col-span-4">
-                <Label className="text-xs">{t('common.form.phone')}</Label>
+              </FormRow>
+              <FormRow span={4} label={t('common.form.phone')}>
                 <PatternFormat
                   format="(###) ###-####"
                   mask="_"
@@ -790,9 +745,8 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
                   value={editFormData.phone}
                   onValueChange={(values) => setEditFormData((prev) => ({ ...prev, phone: values.value }))}
                 />
-              </Field>
-              <Field className="col-span-3">
-                <Label className="text-xs">{t('common.form.email')} *</Label>
+              </FormRow>
+              <FormRow span={3} label={<>{t('common.form.email')} *</>}>
                 <Input
                   type="email"
                   name="email"
@@ -800,16 +754,14 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
                   onChange={(e) => setEditFormData((prev) => ({ ...prev, email: e.target.value }))}
                   required
                 />
-              </Field>
-            </div>
+              </FormRow>
+            </FormGrid>
 
             {/* BILLING ADDRESS - Always Visible */}
-            <div className="space-y-2 border-t border-zinc-200 pt-3 dark:border-zinc-800">
-              <Subheading className="text-sm font-semibold">{t('common.form.billingAddress')}</Subheading>
-              {/* Street + Apt */}
-              <div className="grid grid-cols-4 gap-2">
-                <Field className="col-span-3">
-                  <Label className="text-xs">{t('common.form.streetAddress')} *</Label>
+            <div className="border-t border-zinc-200 pt-3 dark:border-zinc-800">
+              <Subheading className="mb-3 text-sm font-semibold">{t('common.form.billingAddress')}</Subheading>
+              <FormGrid>
+                <FormRow span={9} label={<>{t('common.form.streetAddress')} *</>}>
                   <Input
                     name="billingStreetAddress"
                     value={editFormData.billingAddress.streetAddress}
@@ -821,9 +773,8 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
                     }
                     required
                   />
-                </Field>
-                <Field className="col-span-1">
-                  <Label className="text-xs">{t('common.form.addressLine2')}</Label>
+                </FormRow>
+                <FormRow span={3} label={t('common.form.addressLine2')}>
                   <Input
                     name="billingStreetAddressLine2"
                     value={editFormData.billingAddress.streetAddressLine2}
@@ -835,13 +786,8 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
                     }
                     placeholder="Apt"
                   />
-                </Field>
-              </div>
-
-              {/* City/State/Zip */}
-              <div className="grid grid-cols-12 gap-2">
-                <Field className="col-span-6">
-                  <Label className="text-xs">{t('common.form.city')} *</Label>
+                </FormRow>
+                <FormRow span={6} label={<>{t('common.form.city')} *</>}>
                   <Input
                     name="billingCity"
                     value={editFormData.billingAddress.city}
@@ -853,9 +799,8 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
                     }
                     required
                   />
-                </Field>
-                <Field className="col-span-2">
-                  <Label className="text-xs">{t('common.form.state')} *</Label>
+                </FormRow>
+                <FormRow span={2} label={<>{t('common.form.state')} *</>}>
                   <Select
                     name="billingState"
                     value={editFormData.billingAddress.state}
@@ -869,14 +814,11 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
                   >
                     <option value="">{t('common.form.select')}</option>
                     {US_STATES.map((state) => (
-                      <option key={state} value={state}>
-                        {state}
-                      </option>
+                      <option key={state} value={state}>{state}</option>
                     ))}
                   </Select>
-                </Field>
-                <Field className="col-span-4">
-                  <Label className="text-xs">{t('common.form.zipCode')} *</Label>
+                </FormRow>
+                <FormRow span={4} label={<>{t('common.form.zipCode')} *</>}>
                   <Input
                     name="billingZipCode"
                     value={editFormData.billingAddress.zipCode}
@@ -888,8 +830,8 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
                     }
                     required
                   />
-                </Field>
-              </div>
+                </FormRow>
+              </FormGrid>
             </div>
 
             {/* OPTIONAL SECTIONS - Collapsible */}

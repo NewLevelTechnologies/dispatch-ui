@@ -199,7 +199,7 @@ export default function RecurringOrdersPage() {
     <AppLayout>
       <div className="flex items-center justify-between gap-4">
         <Heading>{t('scheduling.entities.recurringOrders')}</Heading>
-        <Button onClick={handleAdd}>
+        <Button color="accent" onClick={handleAdd}>
           {t('common.actions.add', { entity: t('scheduling.entities.recurringOrder') })}
         </Button>
       </div>

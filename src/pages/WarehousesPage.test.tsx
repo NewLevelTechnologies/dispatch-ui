@@ -65,7 +65,7 @@ describe('WarehousesPage', () => {
 
     renderWithProviders(<WarehousesPage />);
 
-    expect(screen.getByText('Loading warehouses...')).toBeInTheDocument();
+    expect(document.querySelectorAll('.animate-pulse').length).toBeGreaterThan(0);
   });
 
   it('displays warehouses in a table', async () => {
@@ -73,13 +73,10 @@ describe('WarehousesPage', () => {
 
     renderWithProviders(<WarehousesPage />);
 
-    // Wait for data to load - just check that we're past loading state
     await waitFor(() => {
-      expect(screen.queryByText('Loading warehouses...')).not.toBeInTheDocument();
+      expect(screen.getByText('Main Warehouse')).toBeInTheDocument();
     });
 
-    // Verify warehouse names are displayed
-    expect(screen.getByText('Main Warehouse')).toBeInTheDocument();
     expect(screen.getByText('East Warehouse')).toBeInTheDocument();
   });
 
@@ -144,11 +141,9 @@ describe('WarehousesPage', () => {
     renderWithProviders(<WarehousesPage />);
 
     await waitFor(() => {
-      expect(screen.queryByText('Loading warehouses...')).not.toBeInTheDocument();
+      expect(screen.getByText('Main Warehouse')).toBeInTheDocument();
     });
 
-    // Check that warehouse names are displayed
-    expect(screen.getByText('Main Warehouse')).toBeInTheDocument();
     expect(screen.getByText('East Warehouse')).toBeInTheDocument();
   });
 
@@ -161,7 +156,7 @@ describe('WarehousesPage', () => {
     renderWithProviders(<WarehousesPage />);
 
     await waitFor(() => {
-      expect(screen.queryByText('Loading warehouses...')).not.toBeInTheDocument();
+      expect(screen.getByText('Main Warehouse')).toBeInTheDocument();
     });
 
     const dropdownButtons = screen.getAllByRole('button', { name: /more options/i });
@@ -211,7 +206,7 @@ describe('WarehousesPage', () => {
     renderWithProviders(<WarehousesPage />);
 
     await waitFor(() => {
-      expect(screen.queryByText('Loading warehouses...')).not.toBeInTheDocument();
+      expect(screen.getByText('Main Warehouse')).toBeInTheDocument();
     });
 
     const dropdownButtons = screen.getAllByRole('button', { name: /more options/i });
@@ -408,7 +403,7 @@ describe('WarehousesPage', () => {
     renderWithProviders(<WarehousesPage />);
 
     await waitFor(() => {
-      expect(screen.queryByText('Loading warehouses...')).not.toBeInTheDocument();
+      expect(screen.getByText('Main Warehouse')).toBeInTheDocument();
     });
 
     const dropdownButtons = screen.getAllByRole('button', { name: /more options/i });

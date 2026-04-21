@@ -59,7 +59,7 @@ describe('AvailabilityPage', () => {
 
     renderWithProviders(<AvailabilityPage />);
 
-    expect(screen.getByText('Loading availability...')).toBeInTheDocument();
+    expect(document.querySelectorAll('.animate-pulse').length).toBeGreaterThan(0);
   });
 
   it('displays availability in a table', async () => {
@@ -166,11 +166,11 @@ describe('AvailabilityPage', () => {
       expect(screen.getByText('user1')).toBeInTheDocument();
     });
 
-    // Status badges should be rendered (function getStatusBadge called)
-    expect(screen.getAllByText('AVAILABLE').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('UNAVAILABLE').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('TENTATIVE').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('BUSY').length).toBeGreaterThan(0);
+    // Status badges should be rendered with translated labels
+    expect(screen.getAllByText('Available').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Unavailable').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Tentative').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Busy').length).toBeGreaterThan(0);
   });
 
   it('formats dates and times correctly', async () => {

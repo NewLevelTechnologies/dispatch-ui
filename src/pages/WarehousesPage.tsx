@@ -2,19 +2,16 @@ import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { PatternFormat } from 'react-number-format';
-import { EllipsisVerticalIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
+import { EllipsisVerticalIcon } from '@heroicons/react/24/outline';
 import AppLayout from '../components/AppLayout';
-import { Heading } from '../components/catalyst/heading';
+import { PageHeader, StatusBadge, Toolbar, DataTable, type DataTableColumn } from '../components/shell';
 import { Button } from '../components/catalyst/button';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/catalyst/table';
-import { Badge } from '../components/catalyst/badge';
 import { Dropdown, DropdownButton, DropdownItem, DropdownLabel, DropdownMenu } from '../components/catalyst/dropdown';
 import { Dialog, DialogActions, DialogBody, DialogDescription, DialogTitle } from '../components/catalyst/dialog';
 import { Field, FieldGroup, Fieldset, Label } from '../components/catalyst/fieldset';
-import { Input, InputGroup } from '../components/catalyst/input';
+import { Input } from '../components/catalyst/input';
 import {
   warehousesApi,
-  WarehouseStatus,
   type Warehouse,
   type CreateWarehouseRequest,
   type UpdateWarehouseRequest,
@@ -41,10 +38,8 @@ export default function WarehousesPage() {
     queryFn: () => warehousesApi.getAll(),
   });
 
-  // Ensure warehouses is always an array
   const safeWarehouses = useMemo(() => Array.isArray(warehouses) ? warehouses : [], [warehouses]);
 
-  // Filter warehouses based on search query
   const filteredWarehouses = useMemo(() => {
     if (safeWarehouses.length === 0) return [];
     if (!searchQuery.trim()) return safeWarehouses;
@@ -133,117 +128,104 @@ export default function WarehousesPage() {
     });
   };
 
-  const getStatusBadge = (status: WarehouseStatus) => {
-    const colors: Record<WarehouseStatus, 'lime' | 'zinc'> = {
-      ACTIVE: 'lime',
-      INACTIVE: 'zinc',
-    };
-    return <Badge color={colors[status]}>{status}</Badge>;
-  };
+  const columns: DataTableColumn<Warehouse>[] = [
+    {
+      key: 'name',
+      header: t('common.form.name'),
+      cellClassName: 'font-medium',
+      cell: (item) => item.name,
+    },
+    {
+      key: 'location',
+      header: t('equipment.table.location'),
+      cell: (item) => (item.city && item.state ? `${item.city}, ${item.state}` : '-'),
+    },
+    {
+      key: 'manager',
+      header: t('equipment.table.manager'),
+      cell: (item) => item.managerName || '-',
+    },
+    {
+      key: 'phone',
+      header: t('common.form.phone'),
+      cell: (item) => item.phone || '-',
+    },
+    {
+      key: 'status',
+      header: t('common.form.status'),
+      cell: (item) => <StatusBadge status={item.status} />,
+    },
+    {
+      key: 'actions',
+      header: '',
+      cell: (item) => (
+        <div className="-mx-3 -my-1.5 sm:-mx-2.5">
+          <Dropdown>
+            <DropdownButton plain aria-label={t('common.moreOptions')}>
+              <EllipsisVerticalIcon className="size-5" />
+            </DropdownButton>
+            <DropdownMenu anchor="bottom end">
+              <DropdownItem onClick={() => handleEdit(item)}>
+                <DropdownLabel>{t('common.edit')}</DropdownLabel>
+              </DropdownItem>
+              <DropdownItem onClick={() => handleDelete(item)}>
+                <DropdownLabel>{t('common.delete')}</DropdownLabel>
+              </DropdownItem>
+            </DropdownMenu>
+          </Dropdown>
+        </div>
+      ),
+    },
+  ];
 
   return (
     <AppLayout>
-      <div className="flex items-center justify-between gap-4">
-        <Heading>{t('equipment.entities.warehouses')}</Heading>
-        <Button onClick={handleAdd}>
-          {t('common.actions.add', { entity: t('equipment.entities.warehouse') })}
-        </Button>
-      </div>
+      <PageHeader
+        title={t('equipment.entities.warehouses')}
+        actions={
+          <Button color="accent" onClick={handleAdd}>
+            {t('common.actions.add', { entity: t('equipment.entities.warehouse') })}
+          </Button>
+        }
+      />
 
-      {/* Quick Search Bar */}
-      <div className="mt-2 flex items-center gap-4">
-        <InputGroup className="flex-1 max-w-md">
-          <MagnifyingGlassIcon data-slot="icon" />
-          <Input
-            type="text"
-            placeholder={t('common.search')}
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
-        </InputGroup>
-        {safeWarehouses.length > 0 && (
-          <div className="text-sm text-zinc-600 dark:text-zinc-400">
-            {filteredWarehouses.length === safeWarehouses.length
+      <Toolbar
+        searchValue={searchQuery}
+        onSearchChange={setSearchQuery}
+        searchPlaceholder={t('common.search')}
+        rowCount={
+          safeWarehouses.length > 0
+            ? filteredWarehouses.length === safeWarehouses.length
               ? `${safeWarehouses.length} ${safeWarehouses.length === 1 ? t('equipment.entities.warehouse').toLowerCase() : t('equipment.entities.warehouses').toLowerCase()}`
-              : `${filteredWarehouses.length} of ${safeWarehouses.length}`}
-          </div>
-        )}
-      </div>
+              : `${filteredWarehouses.length} of ${safeWarehouses.length}`
+            : undefined
+        }
+      />
 
       {error && (
-        <div className="mt-4 rounded-lg bg-red-50 p-3 ring-1 ring-red-200 dark:bg-red-950/10 dark:ring-red-900/20">
-            <p className="text-sm text-red-800 dark:text-red-400">
-              {t('common.actions.errorLoading', { entities: t('equipment.entities.warehouses') })}: {(error as Error).message}
-            </p>
-          </div>
-        )}
-
-      {isLoading ? (
-        <div className="mt-4 text-center">
-          <p className="text-sm text-zinc-600 dark:text-zinc-400">
-            {t('common.actions.loading', { entities: t('equipment.entities.warehouses') })}
+        <div className="rounded-lg bg-red-50 p-3 ring-1 ring-red-200 dark:bg-red-950/10 dark:ring-red-900/20">
+          <p className="text-sm text-red-800 dark:text-red-400">
+            {t('common.actions.errorLoading', { entities: t('equipment.entities.warehouses') })}: {(error as Error).message}
           </p>
         </div>
-      ) : safeWarehouses.length === 0 ? (
-        <div className="mt-4 rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700 p-4">
+      )}
+
+      {safeWarehouses.length === 0 && !isLoading ? (
+        <div className="rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700 p-4">
           <p className="text-sm text-zinc-600 dark:text-zinc-400">
             {t('common.actions.notFound', { entities: t('equipment.entities.warehouses') })}
           </p>
         </div>
-      ) : filteredWarehouses.length === 0 ? (
-        <div className="mt-4 rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700 p-4">
-          <p className="text-sm text-zinc-600 dark:text-zinc-400">
-            {t('common.actions.noMatchSearch', { entities: t('equipment.entities.warehouses') })}
-          </p>
-        </div>
       ) : (
-        <div className="mt-4">
-          <Table dense className="[--gutter:theme(spacing.1)] text-sm">
-            <TableHead>
-              <TableRow>
-                <TableHeader>{t('common.form.name')}</TableHeader>
-                <TableHeader>{t('equipment.table.location')}</TableHeader>
-                <TableHeader>{t('equipment.table.manager')}</TableHeader>
-                <TableHeader>{t('common.form.phone')}</TableHeader>
-                <TableHeader>{t('common.form.status')}</TableHeader>
-                <TableHeader></TableHeader>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {filteredWarehouses.map((item) => (
-                <TableRow key={item.id}>
-                  <TableCell className="font-medium">{item.name}</TableCell>
-                  <TableCell>
-                    {item.city && item.state ? `${item.city}, ${item.state}` : '-'}
-                  </TableCell>
-                  <TableCell>{item.managerName || '-'}</TableCell>
-                  <TableCell>{item.phone || '-'}</TableCell>
-                  <TableCell>{getStatusBadge(item.status)}</TableCell>
-                  <TableCell>
-                    <div className="-mx-3 -my-1.5 sm:-mx-2.5">
-                      <Dropdown>
-                        <DropdownButton plain aria-label={t('common.moreOptions')}>
-                          <EllipsisVerticalIcon className="size-5" />
-                        </DropdownButton>
-                        <DropdownMenu anchor="bottom end">
-                          <DropdownItem onClick={() => handleEdit(item)}>
-                            <DropdownLabel>{t('common.edit')}</DropdownLabel>
-                          </DropdownItem>
-                          <DropdownItem onClick={() => handleDelete(item)}>
-                            <DropdownLabel>{t('common.delete')}</DropdownLabel>
-                          </DropdownItem>
-                        </DropdownMenu>
-                      </Dropdown>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
+        <DataTable
+          columns={columns}
+          rows={filteredWarehouses}
+          isLoading={isLoading}
+          getRowKey={(item) => item.id}
+          emptyState={t('common.actions.noMatchSearch', { entities: t('equipment.entities.warehouses') })}
+        />
       )}
 
-      {/* Dialog */}
       <Dialog open={isDialogOpen} onClose={setIsDialogOpen}>
         <DialogTitle>
           {selectedWarehouse

@@ -99,7 +99,7 @@ describe('UsersPage', () => {
 
     renderWithProviders(<UsersPage />);
 
-    expect(screen.getByText('Loading users...')).toBeInTheDocument();
+    expect(document.querySelectorAll('.animate-pulse').length).toBeGreaterThan(0);
   });
 
   it('displays users in a table', async () => {
@@ -232,7 +232,6 @@ describe('UsersPage', () => {
   });
 
   it('navigates to detail page when row is clicked', async () => {
-    const user = userEvent.setup();
     vi.mocked(apiClient.get).mockImplementation((url) => {
       if (url === '/users') {
         return Promise.resolve({ data: mockUsers });
@@ -249,10 +248,8 @@ describe('UsersPage', () => {
       expect(screen.getByText('John Doe')).toBeInTheDocument();
     });
 
-    const nameCell = screen.getByText('John Doe');
-    await user.click(nameCell);
-
-    expect(mockNavigate).toHaveBeenCalledWith('/users/user-1');
+    const link = document.querySelector('a[href="/users/user-1"]');
+    expect(link).toBeInTheDocument();
   });
 
   it('opens edit dialog when edit button is clicked', async () => {
@@ -611,7 +608,6 @@ describe('UsersPage', () => {
 
   describe('Row navigation', () => {
     it('navigates to user detail page when user name is clicked', async () => {
-      const user = userEvent.setup();
       vi.mocked(apiClient.get).mockImplementation((url) => {
         if (url === '/users') {
           return Promise.resolve({ data: mockUsers });
@@ -628,10 +624,8 @@ describe('UsersPage', () => {
         expect(screen.getByText('John Doe')).toBeInTheDocument();
       });
 
-      const nameCell = screen.getByText('John Doe');
-      await user.click(nameCell);
-
-      expect(mockNavigate).toHaveBeenCalledWith('/users/user-1');
+      const link = document.querySelector('a[href="/users/user-1"]');
+      expect(link).toBeInTheDocument();
     });
 
     it('does not navigate when clicking dropdown button', async () => {

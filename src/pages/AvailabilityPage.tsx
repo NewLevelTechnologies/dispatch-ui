@@ -1,16 +1,14 @@
 import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { EllipsisVerticalIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
+import { EllipsisVerticalIcon } from '@heroicons/react/24/outline';
 import AppLayout from '../components/AppLayout';
-import { Heading } from '../components/catalyst/heading';
+import { PageHeader, StatusBadge, Toolbar, DataTable, type DataTableColumn } from '../components/shell';
 import { Button } from '../components/catalyst/button';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/catalyst/table';
-import { Badge } from '../components/catalyst/badge';
 import { Dropdown, DropdownButton, DropdownItem, DropdownLabel, DropdownMenu } from '../components/catalyst/dropdown';
 import { Dialog, DialogActions, DialogBody, DialogDescription, DialogTitle } from '../components/catalyst/dialog';
 import { Field, FieldGroup, Fieldset, Label } from '../components/catalyst/fieldset';
-import { Input, InputGroup } from '../components/catalyst/input';
+import { Input } from '../components/catalyst/input';
 import { Select } from '../components/catalyst/select';
 import { Textarea } from '../components/catalyst/textarea';
 import {
@@ -41,7 +39,6 @@ export default function AvailabilityPage() {
     queryFn: () => availabilityApi.getAll(),
   });
 
-  // Ensure data is always an array
   const safeAvailability = useMemo(() => Array.isArray(availability) ? availability : [], [availability]);
 
   const createMutation = useMutation({
@@ -99,7 +96,6 @@ export default function AvailabilityPage() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Combine date with time for startTime and endTime
     const dateStr = formData.date;
     const startDateTime = new Date(`${dateStr}T${formData.startTime}:00`).toISOString();
     const endDateTime = new Date(`${dateStr}T${formData.endTime}:00`).toISOString();
@@ -134,16 +130,6 @@ export default function AvailabilityPage() {
     });
   };
 
-  const getStatusBadge = (status: string) => {
-    const colors: Record<string, 'lime' | 'sky' | 'amber' | 'rose' | 'zinc'> = {
-      AVAILABLE: 'lime',
-      UNAVAILABLE: 'rose',
-      TENTATIVE: 'amber',
-      BUSY: 'zinc',
-    };
-    return <Badge color={colors[status] || 'zinc'}>{status}</Badge>;
-  };
-
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
       year: 'numeric',
@@ -159,7 +145,6 @@ export default function AvailabilityPage() {
     });
   };
 
-  // Filter availability based on search query
   const filteredAvailability = useMemo(() => {
     if (safeAvailability.length === 0) return [];
     if (!searchQuery.trim()) return safeAvailability;
@@ -174,109 +159,114 @@ export default function AvailabilityPage() {
     );
   }, [safeAvailability, searchQuery]);
 
+  const columns: DataTableColumn<Availability>[] = [
+    {
+      key: 'user',
+      header: t('scheduling.table.user'),
+      cellClassName: 'font-medium',
+      cell: (item) => item.userId,
+    },
+    {
+      key: 'date',
+      header: t('scheduling.table.date'),
+      cell: (item) => formatDate(item.date),
+    },
+    {
+      key: 'startTime',
+      header: t('scheduling.table.startTime'),
+      cell: (item) => formatTime(item.startTime),
+    },
+    {
+      key: 'endTime',
+      header: t('scheduling.table.endTime'),
+      cell: (item) => formatTime(item.endTime),
+    },
+    {
+      key: 'status',
+      header: t('common.form.status'),
+      cell: (item) => (
+        <StatusBadge
+          status={item.status}
+          label={t(`scheduling.status.${item.status.toLowerCase()}`)}
+        />
+      ),
+    },
+    {
+      key: 'reason',
+      header: t('scheduling.table.reason'),
+      cell: (item) => item.reason || '-',
+    },
+    {
+      key: 'actions',
+      header: '',
+      cell: (item) => (
+        <div className="-mx-3 -my-1.5 sm:-mx-2.5">
+          <Dropdown>
+            <DropdownButton plain aria-label={t('common.moreOptions')}>
+              <EllipsisVerticalIcon className="size-5" />
+            </DropdownButton>
+            <DropdownMenu anchor="bottom end">
+              <DropdownItem onClick={() => handleEdit(item)}>
+                <DropdownLabel>{t('common.edit')}</DropdownLabel>
+              </DropdownItem>
+              <DropdownItem onClick={() => handleDelete(item)}>
+                <DropdownLabel>{t('common.delete')}</DropdownLabel>
+              </DropdownItem>
+            </DropdownMenu>
+          </Dropdown>
+        </div>
+      ),
+    },
+  ];
+
   return (
     <AppLayout>
-      <div className="flex items-center justify-between gap-4">
-        <Heading>{t('scheduling.entities.availability')}</Heading>
-        <Button onClick={handleAdd}>
-          {t('common.actions.add', { entity: t('scheduling.entities.availabilityRecord') })}
-        </Button>
-      </div>
+      <PageHeader
+        title={t('scheduling.entities.availability')}
+        actions={
+          <Button color="accent" onClick={handleAdd}>
+            {t('common.actions.add', { entity: t('scheduling.entities.availabilityRecord') })}
+          </Button>
+        }
+      />
 
-      {/* Quick Search Bar */}
-      <div className="mt-2 flex items-center gap-4">
-        <InputGroup className="flex-1 max-w-md">
-          <MagnifyingGlassIcon data-slot="icon" />
-          <Input
-            type="text"
-            placeholder={t('common.search')}
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
-        </InputGroup>
-        {safeAvailability.length > 0 && (
-          <div className="text-sm text-zinc-600 dark:text-zinc-400">
-            {filteredAvailability.length === safeAvailability.length
+      <Toolbar
+        searchValue={searchQuery}
+        onSearchChange={setSearchQuery}
+        searchPlaceholder={t('common.search')}
+        rowCount={
+          safeAvailability.length > 0
+            ? filteredAvailability.length === safeAvailability.length
               ? `${safeAvailability.length} ${safeAvailability.length === 1 ? t('scheduling.entities.availabilityRecord').toLowerCase() : t('scheduling.entities.availability').toLowerCase()}`
-              : `${filteredAvailability.length} of ${safeAvailability.length}`}
-          </div>
-        )}
-      </div>
+              : `${filteredAvailability.length} of ${safeAvailability.length}`
+            : undefined
+        }
+      />
 
-      <div className="mt-4">
-        {error && (
-          <div className="rounded-lg bg-red-50 p-3 ring-1 ring-red-200 dark:bg-red-950/10 dark:ring-red-900/20">
-            <p className="text-sm text-red-800 dark:text-red-400">
-              {t('common.actions.errorLoading', { entities: t('scheduling.entities.availability') })}: {(error as Error).message}
-            </p>
-          </div>
-        )}
+      {error && (
+        <div className="rounded-lg bg-red-50 p-3 ring-1 ring-red-200 dark:bg-red-950/10 dark:ring-red-900/20">
+          <p className="text-sm text-red-800 dark:text-red-400">
+            {t('common.actions.errorLoading', { entities: t('scheduling.entities.availability') })}: {(error as Error).message}
+          </p>
+        </div>
+      )}
 
-        {isLoading ? (
-          <div className="text-center">
-            <p className="text-sm text-zinc-600 dark:text-zinc-400">
-              {t('common.actions.loading', { entities: t('scheduling.entities.availability') })}
-            </p>
-          </div>
-        ) : safeAvailability.length === 0 ? (
-          <div className="rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700 p-4">
-            <p className="text-sm text-zinc-600 dark:text-zinc-400">
-              {t('common.actions.notFound', { entities: t('scheduling.entities.availability') })}
-            </p>
-          </div>
-        ) : filteredAvailability.length === 0 ? (
-          <div className="rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700 p-4">
-            <p className="text-sm text-zinc-600 dark:text-zinc-400">
-              {t('common.actions.noMatchSearch', { entities: t('scheduling.entities.availability') })}
-            </p>
-          </div>
-        ) : (
-          <Table dense className="[--gutter:theme(spacing.1)] text-sm">
-            <TableHead>
-              <TableRow>
-                <TableHeader>{t('scheduling.table.user')}</TableHeader>
-                <TableHeader>{t('scheduling.table.date')}</TableHeader>
-                <TableHeader>{t('scheduling.table.startTime')}</TableHeader>
-                <TableHeader>{t('scheduling.table.endTime')}</TableHeader>
-                <TableHeader>{t('common.form.status')}</TableHeader>
-                <TableHeader>{t('scheduling.table.reason')}</TableHeader>
-                <TableHeader></TableHeader>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {filteredAvailability.map((item) => (
-                <TableRow key={item.id}>
-                  <TableCell className="font-medium">{item.userId}</TableCell>
-                  <TableCell>{formatDate(item.date)}</TableCell>
-                  <TableCell>{formatTime(item.startTime)}</TableCell>
-                  <TableCell>{formatTime(item.endTime)}</TableCell>
-                  <TableCell>{getStatusBadge(item.status)}</TableCell>
-                  <TableCell>{item.reason || '-'}</TableCell>
-                  <TableCell>
-                    <div className="-mx-3 -my-1.5 sm:-mx-2.5">
-                      <Dropdown>
-                        <DropdownButton plain aria-label={t('common.moreOptions')}>
-                          <EllipsisVerticalIcon className="size-5" />
-                        </DropdownButton>
-                        <DropdownMenu anchor="bottom end">
-                          <DropdownItem onClick={() => handleEdit(item)}>
-                            <DropdownLabel>{t('common.edit')}</DropdownLabel>
-                          </DropdownItem>
-                          <DropdownItem onClick={() => handleDelete(item)}>
-                            <DropdownLabel>{t('common.delete')}</DropdownLabel>
-                          </DropdownItem>
-                        </DropdownMenu>
-                      </Dropdown>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        )}
-      </div>
+      {safeAvailability.length === 0 && !isLoading ? (
+        <div className="rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700 p-4">
+          <p className="text-sm text-zinc-600 dark:text-zinc-400">
+            {t('common.actions.notFound', { entities: t('scheduling.entities.availability') })}
+          </p>
+        </div>
+      ) : (
+        <DataTable
+          columns={columns}
+          rows={filteredAvailability}
+          isLoading={isLoading}
+          getRowKey={(item) => item.id}
+          emptyState={t('common.actions.noMatchSearch', { entities: t('scheduling.entities.availability') })}
+        />
+      )}
 
-      {/* Dialog */}
       <Dialog open={isDialogOpen} onClose={setIsDialogOpen}>
         <DialogTitle>
           {selectedAvailability

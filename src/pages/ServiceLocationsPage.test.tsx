@@ -104,7 +104,7 @@ describe('ServiceLocationsPage', () => {
 
     renderWithProviders(<ServiceLocationsPage />);
 
-    expect(screen.getByText(/loading service locations/i)).toBeInTheDocument();
+    expect(document.querySelectorAll('.animate-pulse').length).toBeGreaterThan(0);
   });
 
   it('displays error state', async () => {

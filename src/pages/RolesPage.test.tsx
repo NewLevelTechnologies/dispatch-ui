@@ -92,7 +92,7 @@ describe('RolesPage', () => {
 
     renderWithProviders(<RolesPage />);
 
-    expect(screen.getByText('Loading roles...')).toBeInTheDocument();
+    expect(document.querySelectorAll('.animate-pulse').length).toBeGreaterThan(0);
   });
 
   it('displays roles in a table', async () => {
@@ -216,7 +216,6 @@ describe('RolesPage', () => {
   });
 
   it('navigates to detail page when row is clicked', async () => {
-    const user = userEvent.setup();
     vi.mocked(apiClient.get).mockResolvedValue({ data: mockRoles });
 
     renderWithProviders(<RolesPage />);
@@ -225,10 +224,8 @@ describe('RolesPage', () => {
       expect(screen.getByText('Field Technician')).toBeInTheDocument();
     });
 
-    const nameCell = screen.getByText('Field Technician');
-    await user.click(nameCell);
-
-    expect(mockNavigate).toHaveBeenCalledWith('/roles/1');
+    const link = document.querySelector('a[href="/roles/1"]');
+    expect(link).toBeInTheDocument();
   });
 
   it('opens edit dialog when edit button is clicked', async () => {
