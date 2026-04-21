@@ -1,4 +1,7 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
+import { useMutation, useQuery } from '@tanstack/react-query';
+import { getUserPreferences, updateUserPreferences } from '../api/userPreferencesApi';
+import { useAuth } from './AuthContext';
 
 type Theme = 'light' | 'dark' | 'system';
 
@@ -6,17 +9,44 @@ interface ThemeContextType {
   theme: Theme;
   setTheme: (theme: Theme) => void;
   resolvedTheme: 'light' | 'dark';
+  isLoading: boolean;
 }
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
+  const { isAuthenticated } = useAuth();
+
+  // Fetch user preferences from API (only when authenticated)
+  const { data: preferences, isLoading } = useQuery({
+    queryKey: ['userPreferences'],
+    queryFn: getUserPreferences,
+    enabled: isAuthenticated,
+  });
+
+  // Initialize theme from API preferences or localStorage
   const [theme, setThemeState] = useState<Theme>(() => {
     const stored = localStorage.getItem('theme');
     return (stored as Theme) || 'system';
   });
 
   const [resolvedTheme, setResolvedTheme] = useState<'light' | 'dark'>('light');
+
+  // Update preferences mutation
+  const updatePreferencesMutation = useMutation({
+    mutationFn: updateUserPreferences,
+  });
+
+  // Sync theme from API preferences when they become available
+  useEffect(() => {
+    if (preferences?.theme && preferences.theme !== theme) {
+      const apiTheme = preferences.theme as Theme;
+      setThemeState(apiTheme);
+      localStorage.setItem('theme', apiTheme);
+    }
+    // Only sync when preferences first load, not on every theme change
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [preferences?.theme]);
 
   useEffect(() => {
     const root = window.document.documentElement;
@@ -50,10 +80,15 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const setTheme = (newTheme: Theme) => {
     localStorage.setItem('theme', newTheme);
     setThemeState(newTheme);
+
+    // Persist to API if authenticated
+    if (isAuthenticated) {
+      updatePreferencesMutation.mutate({ theme: newTheme });
+    }
   };
 
   return (
-    <ThemeContext.Provider value={{ theme, setTheme, resolvedTheme }}>
+    <ThemeContext.Provider value={{ theme, setTheme, resolvedTheme, isLoading }}>
       {children}
     </ThemeContext.Provider>
   );
