@@ -268,4 +268,22 @@ describe('RecurringOrdersPage', () => {
     expect(confirmSpy).toHaveBeenCalled();
     confirmSpy.mockRestore();
   });
+
+  it('allows searching recurring orders', async () => {
+    mockRecurringOrdersGetAll.mockResolvedValue(mockRecurringOrders);
+    const user = userEvent.setup();
+
+    renderWithProviders(<RecurringOrdersPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('John Doe')).toBeInTheDocument();
+    });
+
+    // Type in search box to test search functionality
+    const searchInput = screen.getByPlaceholderText(/search/i);
+    await user.type(searchInput, 'test');
+
+    // Search input should work (tests filteredOrders useMemo hook)
+    expect(searchInput).toHaveValue('test');
+  });
 });

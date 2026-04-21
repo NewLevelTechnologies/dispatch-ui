@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { ArrowLeftIcon } from '@heroicons/react/24/outline';
-import { userApi } from '../api';
+import { userApi, dispatchRegionApi } from '../api';
 import { useHasCapability } from '../hooks/useCurrentUser';
 import AppLayout from '../components/AppLayout';
 import UserFormDialog from '../components/UserFormDialog';
@@ -14,6 +14,7 @@ import { Button } from '../components/catalyst/button';
 import { Badge } from '../components/catalyst/badge';
 import { DescriptionList, DescriptionTerm, DescriptionDetails } from '../components/catalyst/description-list';
 import { Divider } from '../components/catalyst/divider';
+import { Text } from '../components/catalyst/text';
 
 export default function UserDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -34,6 +35,11 @@ export default function UserDetailPage() {
   const { data: roles } = useQuery({
     queryKey: ['roles'],
     queryFn: () => userApi.getRoles(),
+  });
+
+  const { data: allRegions } = useQuery({
+    queryKey: ['dispatch-regions'],
+    queryFn: () => dispatchRegionApi.getAll(true),
   });
 
   const disableMutation = useMutation({
@@ -78,16 +84,6 @@ export default function UserDetailPage() {
     setIsEditDialogOpen(false);
   };
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  };
-
   if (isLoading) {
     return (
       <AppLayout>
@@ -121,9 +117,9 @@ export default function UserDetailPage() {
 
   return (
     <AppLayout>
-      <div className="max-w-5xl">
+      <div>
         {/* Header */}
-        <div className="mb-4">
+        <div className="mb-2">
           <Button plain onClick={() => navigate('/users')}>
             <ArrowLeftIcon className="size-4" />
             {t('common.actions.back')}
@@ -135,9 +131,9 @@ export default function UserDetailPage() {
             <Heading>
               {user.firstName} {user.lastName}
             </Heading>
-            <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
+            <Text className="mt-1">
               {user.email}
-            </p>
+            </Text>
           </div>
           {canEditUsers && (
             <div className="flex gap-2">
@@ -157,42 +153,27 @@ export default function UserDetailPage() {
           )}
         </div>
 
-        <Divider className="my-8" />
+        <Divider className="my-4" />
 
-        {/* Content Grid */}
-        <div className="grid gap-8 lg:grid-cols-2">
-          {/* Basic Information */}
+        {/* Dense Two-Column Layout */}
+        <div className="grid gap-6 lg:grid-cols-2">
+          {/* Left Column: Role & Permissions */}
           <div>
-            <Subheading>{t('users.detail.basicInfo')}</Subheading>
-            <DescriptionList className="mt-4">
-              <DescriptionTerm>{t('common.form.firstName')}</DescriptionTerm>
-              <DescriptionDetails>{user.firstName}</DescriptionDetails>
-
-              <DescriptionTerm>{t('common.form.lastName')}</DescriptionTerm>
-              <DescriptionDetails>{user.lastName}</DescriptionDetails>
-
-              <DescriptionTerm>{t('common.form.email')}</DescriptionTerm>
-              <DescriptionDetails>{user.email}</DescriptionDetails>
-
-              <DescriptionTerm>{t('common.form.status')}</DescriptionTerm>
-              <DescriptionDetails>
+            <Subheading>{t('users.detail.rolePermissions')}</Subheading>
+            <DescriptionList className="mt-2 text-sm">
+              <DescriptionTerm className="!py-0.5">{t('common.form.status')}</DescriptionTerm>
+              <DescriptionDetails className="!py-0.5">
                 {user.enabled ? (
                   <Badge color="lime">{t('common.enabled')}</Badge>
                 ) : (
                   <Badge color="zinc">{t('common.disabled')}</Badge>
                 )}
               </DescriptionDetails>
-            </DescriptionList>
-          </div>
 
-          {/* Role & Permissions */}
-          <div>
-            <Subheading>{t('users.detail.rolePermissions')}</Subheading>
-            <DescriptionList className="mt-4">
-              <DescriptionTerm>{t('common.form.role')}</DescriptionTerm>
-              <DescriptionDetails>
+              <DescriptionTerm className="!py-0.5">{t('common.form.role')}</DescriptionTerm>
+              <DescriptionDetails className="!py-0.5">
                 {user.roles && user.roles.length > 0 ? (
-                  <div className="flex flex-wrap gap-2">
+                  <div className="flex flex-wrap gap-1.5">
                     {user.roles.map(role => (
                       <Badge key={role.id} color="sky">{role.name}</Badge>
                     ))}
@@ -202,65 +183,37 @@ export default function UserDetailPage() {
                 )}
               </DescriptionDetails>
 
-            </DescriptionList>
-          </div>
-        </div>
-
-        <div className="grid gap-8 lg:grid-cols-2">
-          {/* System Information */}
-          <div>
-            <Subheading>{t('users.detail.systemInfo')}</Subheading>
-            <DescriptionList className="mt-4">
-              <DescriptionTerm>{t('users.detail.userId')}</DescriptionTerm>
-              <DescriptionDetails>
-                <code className="text-xs text-zinc-600 dark:text-zinc-400">
-                  {user.id}
-                </code>
+              <DescriptionTerm className="!py-0.5">{t('users.form.assignedRegions')}</DescriptionTerm>
+              <DescriptionDetails className="!py-0.5">
+                {user.dispatchRegionIds && user.dispatchRegionIds.length > 0 && allRegions ? (
+                  <div className="flex flex-wrap gap-1.5">
+                    {user.dispatchRegionIds.map(regionId => {
+                      const region = allRegions.find(r => r.id === regionId);
+                      return region ? (
+                        <Badge key={region.id} color="purple">{region.name}</Badge>
+                      ) : null;
+                    })}
+                  </div>
+                ) : (
+                  <span className="text-zinc-500">{t('users.detail.noRegionsAssigned')}</span>
+                )}
               </DescriptionDetails>
-
-              <DescriptionTerm>{t('users.detail.cognitoSub')}</DescriptionTerm>
-              <DescriptionDetails>
-                <code className="text-xs text-zinc-600 dark:text-zinc-400">
-                  {user.cognitoSub}
-                </code>
-              </DescriptionDetails>
-
-              <DescriptionTerm>{t('users.detail.created')}</DescriptionTerm>
-              <DescriptionDetails>{formatDate(user.createdAt)}</DescriptionDetails>
-
-              <DescriptionTerm>{t('users.detail.lastUpdated')}</DescriptionTerm>
-              <DescriptionDetails>{formatDate(user.updatedAt)}</DescriptionDetails>
             </DescriptionList>
           </div>
 
-          {/* Activity Section - Placeholder for future */}
+          {/* Right Column: Capabilities Summary */}
           <div>
-            <Subheading>{t('users.detail.recentActivity')}</Subheading>
-            <div className="mt-4 rounded-lg bg-zinc-50 p-6 text-center dark:bg-zinc-900">
-              <p className="text-sm text-zinc-600 dark:text-zinc-400">
-                {t('users.detail.activityComingSoon')}
-              </p>
-              <p className="mt-2 text-xs text-zinc-500">
-                {t('users.detail.activityHelper')}
-              </p>
-            </div>
+            <CapabilitiesSection capabilities={user.capabilities || []} />
           </div>
         </div>
 
-        {/* Capabilities Section - Collapsible, below main content */}
-        <Divider className="my-8" />
-        <div>
-          <CapabilitiesSection capabilities={user.capabilities || []} />
-        </div>
+        <Divider className="my-4" />
 
         {/* Audit Log Section */}
         {canViewAuditLogs && (
-          <>
-            <Divider className="my-8" />
-            <div className="grid gap-8">
-              <AuditHistory entityType="TenantUser" entityId={user.id} />
-            </div>
-          </>
+          <div>
+            <AuditHistory entityType="TenantUser" entityId={user.id} />
+          </div>
         )}
       </div>
 

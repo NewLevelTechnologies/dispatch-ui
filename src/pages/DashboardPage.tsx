@@ -1,9 +1,11 @@
 import { useTranslation } from 'react-i18next';
+import { useGlossary } from '../contexts/GlossaryContext';
 import AppLayout from '../components/AppLayout';
 import { Heading } from '../components/catalyst/heading';
 
 export default function DashboardPage() {
   const { t } = useTranslation();
+  const { getName } = useGlossary();
 
   return (
     <AppLayout>
@@ -15,7 +17,7 @@ export default function DashboardPage() {
       <div className="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
         <div className="rounded-lg bg-white p-6 shadow ring-1 ring-zinc-950/5 dark:bg-zinc-900 dark:ring-white/10">
           <h3 className="text-base font-medium text-zinc-900 dark:text-white">
-            {t('entities.customers')}
+            {getName('customer', true)}
           </h3>
           <p className="mt-2 text-3xl font-semibold text-indigo-600 dark:text-indigo-400">
             --
@@ -27,7 +29,7 @@ export default function DashboardPage() {
 
         <div className="rounded-lg bg-white p-6 shadow ring-1 ring-zinc-950/5 dark:bg-zinc-900 dark:ring-white/10">
           <h3 className="text-base font-medium text-zinc-900 dark:text-white">
-            {t('entities.workOrders')}
+            {getName('work_order', true)}
           </h3>
           <p className="mt-2 text-3xl font-semibold text-indigo-600 dark:text-indigo-400">
             --

@@ -5,7 +5,38 @@ export { default as apiClient } from './client';
 export { auditApi, type AuditLog } from './auditApi';
 
 // Customer API
-export { customerApi, type Customer, type CreateCustomerRequest, type UpdateCustomerRequest } from './customerApi';
+export {
+  customerApi,
+  type Customer,
+  type Address,
+  type ServiceLocation,
+  type ServiceLocationSearchResult,
+  type ServiceLocationSearchResponse,
+  type AdditionalContact,
+  type CustomerDisplayMode,
+  type CustomerStatus,
+  type CreateCustomerRequest,
+  type CreateServiceLocationRequest,
+  type UpdateCustomerRequest,
+  type UpdateBillingAddressRequest,
+  type UpdateServiceLocationRequest,
+  type UpdateServiceLocationAddressRequest,
+  type Pageable,
+  type CustomerListDto,
+  type CustomerListResponse,
+  type CustomerSearchResult,
+  type CustomerSearchResponse,
+  type ServiceLocationListDto,
+  type ServiceLocationListResponse,
+  type ServiceLocationDetailDto,
+} from './customerApi';
+
+// Contact API
+export {
+  contactApi,
+  type CreateAdditionalContactRequest,
+  type UpdateAdditionalContactRequest,
+} from './contactApi';
 
 // User API
 export {
@@ -21,7 +52,8 @@ export {
   type UpdateUserEnabledRequest,
   type CreateRoleRequest,
   type UpdateRoleRequest,
-  type RestoreAllDefaultsResponse
+  type RestoreAllDefaultsResponse,
+  type AuditLogEntry
 } from './userApi';
 
 // Work Order API
@@ -89,3 +121,55 @@ export {
   type CreateRecurringOrderRequest,
   type UpdateRecurringOrderRequest,
 } from './schedulingApi';
+
+// Tenant Settings API
+export {
+  tenantSettingsApi,
+  type TenantSettings,
+  type UpdateTenantSettingsRequest,
+  type LogoUrls,
+  type UploadLogoResponse,
+  type Glossary,
+  type GlossaryEntry,
+} from './tenantSettingsApi';
+
+// Glossary API
+export { glossaryApi, type EntityInfo } from './glossaryApi';
+
+// Notification API
+export {
+  notificationApi,
+  NotificationStatus,
+  NotificationChannel,
+  type NotificationLogDto,
+  type NotificationPreferenceDto,
+  type CreateNotificationPreferenceRequest,
+  type UpdateNotificationPreferenceRequest,
+  type NotificationLogsQueryParams,
+  type PageableResponse,
+} from './notificationApi';
+
+// Notification Template API
+export {
+  notificationTemplateApi,
+  type NotificationTemplate,
+  type NotificationTemplateListItem,
+  type NotificationTemplateVariable,
+  type CreateNotificationTemplateRequest,
+  type UpdateNotificationTemplateRequest,
+  type TemplatePreviewRequest,
+  type TemplatePreviewResponse,
+  type ValidateTemplateRequest,
+  type ValidateTemplateResponse,
+  type ValidationWarning,
+  type TemplateVersion,
+  type TemplateVersionHistoryResponse,
+} from './notificationTemplateApi';
+
+// Dispatch Region API
+export {
+  dispatchRegionApi,
+  type DispatchRegion,
+  type CreateDispatchRegionRequest,
+  type UpdateDispatchRegionRequest,
+} from './dispatchRegionApi';

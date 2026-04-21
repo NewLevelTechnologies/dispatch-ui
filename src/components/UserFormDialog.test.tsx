@@ -3,6 +3,7 @@ import { screen, waitFor } from '@testing-library/react';
 import { renderWithProviders, userEvent } from '../test/utils';
 import UserFormDialog from './UserFormDialog';
 import apiClient from '../api/client';
+import type { User } from '../api';
 
 // Mock the API client
 vi.mock('../api/client');
@@ -101,6 +102,7 @@ describe('UserFormDialog', () => {
           lastName: 'Doe',
           email: 'john@example.com',
           roleIds: ['role-2'],
+          dispatchRegionIds: [],
           phoneNumber: null,
           sendInvite: true,
         });
@@ -546,6 +548,122 @@ describe('UserFormDialog', () => {
 
       // SendInvite should not be visible in edit mode
       expect(screen.queryByRole('checkbox', { name: /send invitation email/i })).not.toBeInTheDocument();
+    });
+  });
+
+  describe('Dispatch Regions', () => {
+    const mockDispatchRegions = [
+      { id: 'region-1', name: 'North', abbreviation: 'N', isActive: true, sortOrder: 0, createdAt: '', updatedAt: '', version: 0 },
+      { id: 'region-2', name: 'South', abbreviation: 'S', isActive: true, sortOrder: 1, createdAt: '', updatedAt: '', version: 0 },
+    ];
+
+    beforeEach(() => {
+      vi.mocked(apiClient.get).mockResolvedValue({ data: mockDispatchRegions });
+    });
+
+    it('displays dispatch region checkboxes when regions exist', async () => {
+      renderWithProviders(<UserFormDialog isOpen={true} onClose={mockOnClose} roles={mockRoles} />);
+
+      await waitFor(() => {
+        expect(screen.getByRole('checkbox', { name: /north/i })).toBeInTheDocument();
+        expect(screen.getByRole('checkbox', { name: /south/i })).toBeInTheDocument();
+      });
+    });
+
+    it('includes selected dispatch regions in create submission', async () => {
+      const user = userEvent.setup();
+      vi.mocked(apiClient.post).mockResolvedValue({ data: { id: 'user-123' } });
+
+      renderWithProviders(<UserFormDialog isOpen={true} onClose={mockOnClose} roles={mockRoles} />);
+
+      await user.type(screen.getByLabelText('First Name *'), 'John');
+      await user.type(screen.getByLabelText('Last Name *'), 'Doe');
+      await user.type(screen.getByLabelText('Email *'), 'john@example.com');
+      await user.click(screen.getByRole('checkbox', { name: /technician/i }));
+
+      // Wait for regions to load and select one
+      await waitFor(() => {
+        expect(screen.getByRole('checkbox', { name: /north/i })).toBeInTheDocument();
+      });
+      await user.click(screen.getByRole('checkbox', { name: /north/i }));
+
+      const submitButton = screen.getByRole('button', { name: /create/i });
+      await user.click(submitButton);
+
+      await waitFor(() => {
+        expect(apiClient.post).toHaveBeenCalledWith('/users', expect.objectContaining({
+          dispatchRegionIds: ['region-1'],
+        }));
+      });
+    });
+
+    it('pre-selects dispatch regions in edit mode', async () => {
+      const existingUser: User = {
+        id: 'user-123',
+        tenantId: 'tenant-1',
+        cognitoSub: 'cognito-123',
+        firstName: 'John',
+        lastName: 'Doe',
+        email: 'john@example.com',
+        enabled: true,
+        roles: [mockRoles[1]],
+        dispatchRegionIds: ['region-1', 'region-2'],
+        createdAt: '2024-01-01T00:00:00Z',
+        updatedAt: '2024-01-01T00:00:00Z',
+      };
+
+      renderWithProviders(
+        <UserFormDialog isOpen={true} onClose={mockOnClose} user={existingUser} roles={mockRoles} />
+      );
+
+      await waitFor(() => {
+        const northCheckbox = screen.getByRole('checkbox', { name: /north/i });
+        const southCheckbox = screen.getByRole('checkbox', { name: /south/i });
+        expect(northCheckbox).toBeChecked();
+        expect(southCheckbox).toBeChecked();
+      });
+    });
+
+    it('updates dispatch regions in edit mode', async () => {
+      const user = userEvent.setup();
+      const existingUser: User = {
+        id: 'user-123',
+        tenantId: 'tenant-1',
+        cognitoSub: 'cognito-123',
+        firstName: 'John',
+        lastName: 'Doe',
+        email: 'john@example.com',
+        enabled: true,
+        roles: [mockRoles[1]],
+        dispatchRegionIds: ['region-1'],
+        createdAt: '2024-01-01T00:00:00Z',
+        updatedAt: '2024-01-01T00:00:00Z',
+      };
+
+      vi.mocked(apiClient.put).mockResolvedValue({ data: existingUser });
+
+      renderWithProviders(
+        <UserFormDialog isOpen={true} onClose={mockOnClose} user={existingUser} roles={mockRoles} />
+      );
+
+      await waitFor(() => {
+        expect(screen.getByRole('checkbox', { name: /north/i })).toBeChecked();
+      });
+
+      // Add south region
+      await user.click(screen.getByRole('checkbox', { name: /south/i }));
+
+      const submitButton = screen.getByRole('button', { name: /update/i });
+      await user.click(submitButton);
+
+      await waitFor(() => {
+        expect(apiClient.put).toHaveBeenCalledWith(
+          '/users/user-123/dispatch-regions',
+          expect.objectContaining({
+            dispatchRegionIds: ['region-1', 'region-2'],
+          })
+        );
+      });
     });
   });
 });

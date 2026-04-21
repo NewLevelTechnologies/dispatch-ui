@@ -32,3 +32,6 @@ dist-ssr
 check-menu-sizes.js
 menu-*.png
 menu-*.md
+
+# Test coverage
+coverage

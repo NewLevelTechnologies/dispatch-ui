@@ -11,6 +11,7 @@ export interface User {
   enabled: boolean;
   roles?: Role[];
   capabilities?: string[];
+  dispatchRegionIds?: string[];
   createdAt: string;
   updatedAt: string;
 }
@@ -48,6 +49,7 @@ export interface CreateUserRequest {
   lastName: string;
   email: string;
   roleIds: string[];
+  dispatchRegionIds?: string[];
   phoneNumber?: string | null;
   sendInvite?: boolean;
 }
@@ -60,6 +62,10 @@ export interface UpdateUserProfileRequest {
 
 export interface UpdateUserRolesRequest {
   roleIds: string[];
+}
+
+export interface UpdateUserRegionsRequest {
+  dispatchRegionIds: string[];
 }
 
 export interface UpdateUserEnabledRequest {
@@ -85,6 +91,16 @@ export interface RestoreAllDefaultsResponse {
   restoredRoles: Role[];
   recreatedRoles: Role[];
   preservedCustomRoles: Role[];
+}
+
+export interface AuditLogEntry {
+  id: string;
+  entityType: string;
+  entityId: string;
+  eventType: string;
+  userId: string;
+  changes: Record<string, string>;
+  timestamp: string;
 }
 
 export const userApi = {
@@ -125,6 +141,11 @@ export const userApi = {
 
   updateRoles: async (id: string, request: UpdateUserRolesRequest): Promise<User> => {
     const response = await apiClient.put<User>(`/users/${id}/roles`, request);
+    return response.data;
+  },
+
+  updateRegions: async (id: string, request: UpdateUserRegionsRequest): Promise<User> => {
+    const response = await apiClient.put<User>(`/users/${id}/dispatch-regions`, request);
     return response.data;
   },
 
@@ -179,6 +200,12 @@ export const userApi = {
 
   restoreAllDefaults: async (): Promise<RestoreAllDefaultsResponse> => {
     const response = await apiClient.post<RestoreAllDefaultsResponse>('/users/roles/restore-all-defaults');
+    return response.data;
+  },
+
+  // Audit log
+  getAuditLog: async (userId: string): Promise<AuditLogEntry[]> => {
+    const response = await apiClient.get<AuditLogEntry[]>(`/audit/user/${userId}`);
     return response.data;
   },
 };

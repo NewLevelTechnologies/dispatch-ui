@@ -21,6 +21,109 @@ Dispatch UI is the frontend for the Dispatch management platform, built with **V
 
 **Live URL**: https://dev.dispatch.newleveltech.net
 
+## End Users & Context
+
+**IMPORTANT**: This is an **internal business tool**, not a customer-facing application.
+
+**End Users (who uses the software):**
+- **Customer Service Reps (CSRs)** - Take incoming calls, create/update customer records, schedule work orders
+- **Dispatchers** - Assign technicians, manage schedules, track service calls
+- **Field Technicians** - View assigned work orders, update job status (mobile)
+- **Office Managers** - Generate reports, manage invoices, track payments
+
+**Customers (NOT end users):**
+- Homeowners (90% of service calls)
+- Business owners (restaurants, offices, retail)
+- Property managers (landlords with rental properties)
+
+**Critical UI/UX Implications:**
+
+1. **Data Density Over Simplicity**
+   - ✅ CSRs are trained users who work in this system all day
+   - ✅ Prefer dense, information-rich screens over minimal designs
+   - ✅ Minimize scrolling - CSRs want everything visible at once
+   - ✅ Use tables, grids, and compact layouts (not cards with lots of whitespace)
+   - ❌ Don't over-simplify or hide information "to reduce clutter"
+   - ❌ Don't make CSRs click through multiple screens for common tasks
+
+2. **Efficiency Over Aesthetics**
+   - ✅ Fast data entry is more important than beautiful animations
+   - ✅ Keyboard shortcuts and tab navigation are critical
+   - ✅ Bulk actions and batch operations are valuable
+   - ✅ Quick search/filter at the top of every list
+   - ❌ Don't add unnecessary animations that slow down workflows
+   - ❌ Don't prioritize visual polish over speed
+
+3. **Desktop-First Design**
+   - ✅ CSRs work on large monitors (1920x1080 or larger)
+   - ✅ Use the screen real estate - show more columns, more rows
+   - ✅ Multi-column layouts are good (sidebar + main content + details panel)
+   - ✅ Tables can have 8-10+ columns if the data is relevant
+   - ❌ Don't constrain layouts to narrow containers
+   - ❌ Don't hide columns in responsive dropdowns on desktop
+
+4. **Industry Terminology is Expected**
+   - ✅ Use domain language: "PO", "Net 30", "service location", "dispatch"
+   - ✅ CSRs understand technical and business terms
+   - ❌ Don't over-explain or add tooltips for standard industry concepts
+
+5. **Context Switching is Expensive**
+   - ✅ Show related information on the same screen (customer + locations + recent work orders)
+   - ✅ Use dialogs/modals for quick edits (keeps context)
+   - ✅ Inline editing where possible
+   - ❌ Don't make CSRs navigate between multiple pages for related data
+
+**Example: Good CSR UI Design**
+```
+┌─────────────────────────────────────────────────────────────────┐
+│ Customers  [🔍 Quick search...]  [+ Add Customer]              │
+├─────────────────────────────────────────────────────────────────┤
+│ ┌───────────────────────────────────────────────────────────┐  │
+│ │ Name         │ Phone      │ Email           │ Locations  │  │
+│ │─────────────────────────────────────────────────────────────│
+│ │ Bob Smith    │ 555-1234   │ bob@email.com   │ 1          │  │
+│ │ Joe's Pizza  │ 555-5678   │ joe@pizza.com   │ 3          │  │
+│ │ Jane Doe     │ 555-9999   │ jane@email.com  │ 2          │  │
+│ │ [25 more rows visible without scrolling]                  │  │
+│ └───────────────────────────────────────────────────────────┘  │
+│                                               Showing 1-30 of 127│
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**Example: Bad CSR UI Design (Too Much Whitespace)**
+```
+┌────────────────────────┐
+│                        │
+│   Customers            │
+│                        │
+│   ┌──────────────────┐ │
+│   │  Bob Smith       │ │  ← Only 3 customers visible
+│   │  555-1234        │ │  ← CSR has to scroll constantly
+│   └──────────────────┘ │
+│                        │
+│   ┌──────────────────┐ │
+│   │  Joe's Pizza     │ │
+│   │  555-5678        │ │
+│   └──────────────────┘ │
+│                        │
+└────────────────────────┘
+```
+
+**When Building Features:**
+- Show more data per screen
+- Reduce padding and margins (within accessibility limits)
+- Use compact Catalyst components (tables over cards)
+- Add keyboard shortcuts for common actions
+- Test with realistic data volumes (100+ rows, long names, multiple phone numbers)
+- Ask: "Can a CSR complete this task in 30 seconds or less?"
+
+**CSR-Optimized UI Patterns:**
+- All entity pages follow established patterns for maximum density
+- See **[CSR_PATTERNS.md](./CSR_PATTERNS.md)** for detailed implementation patterns
+- Quick checklist: dense tables (`dense` prop + `[--gutter:theme(spacing.1)] text-sm`), InputGroup search, mt-4/mt-2 spacing, row counts
+
+---
+
 ## Technology Stack
 
 - **Build Tool**: Vite 6.4.1
@@ -78,6 +181,39 @@ VITE_ENV=development
 
 ## Branching Strategy
 
+### ⚠️ CRITICAL: NEVER PUSH DIRECTLY TO DEV ⚠️
+
+**ABSOLUTELY REQUIRED WORKFLOW:**
+
+1. **ALWAYS create a feature branch FIRST** before making any commits
+2. **NEVER commit directly to `dev`**
+3. **NEVER push directly to `dev`**
+4. **ALWAYS create a pull request** from your feature branch
+
+**Correct workflow:**
+```bash
+# 1. Create feature branch from dev
+git checkout dev
+git pull origin dev
+git checkout -b feat/your-feature-name
+
+# 2. Make changes and commit to feature branch
+git add <files>
+git commit -m "Your commit message"
+
+# 3. Push feature branch
+git push -u origin feat/your-feature-name
+
+# 4. Create PR via GitHub or gh CLI
+gh pr create --base dev --title "Your PR title"
+```
+
+**Why this matters:**
+- `dev` is a protected branch that requires PR reviews
+- Direct pushes bypass code review and CI checks
+- Breaking this rule requires manual cleanup and wastes time
+- All changes MUST go through the PR process
+
 ### Default Branch
 
 **The default branch is `dev`** - all PRs should target this branch unless explicitly instructed otherwise.
@@ -89,7 +225,7 @@ dev (default) ──→ qa ──→ main (production)
 ```
 
 **Key branches**:
-- `dev` - Default branch, integration environment
+- `dev` - Default branch, integration environment (protected - no direct pushes)
 - `qa` - Quality assurance testing
 - `main` - Production releases
 - `master` - **⚠️ DO NOT USE** - Legacy branch, not part of current workflow
@@ -121,12 +257,17 @@ Use descriptive branch names with prefixes:
 
 ### Pull Request Process
 
-1. Create feature branch from `dev`
-2. Develop and test locally
-3. Create PR targeting `dev`
-4. Ensure PR checks pass (lint, tests, build)
-5. Request review
-6. Merge to `dev` after approval
+**MANDATORY STEPS - NO EXCEPTIONS:**
+
+1. **Create feature branch from `dev` BEFORE making any changes**
+2. **Develop and test locally on your feature branch**
+3. **Push feature branch to remote**
+4. **Create PR targeting `dev`**
+5. **Ensure PR checks pass** (lint, tests, build)
+6. **Request review**
+7. **Merge to `dev` after approval** (via GitHub UI, not command line)
+
+**NEVER commit or push directly to dev. ALWAYS use feature branches and PRs.**
 
 ---
 
@@ -308,6 +449,100 @@ const deleteMutation = useMutation({
 
 ---
 
+## Glossary Integration
+
+**CRITICAL**: All entity names flow through the glossary system for tenant customization.
+
+Tenants can customize entity names (e.g., "Work Orders" → "Jobs", "Service Locations" → "Properties"). Every page and component that displays entity names MUST use the glossary.
+
+### Core Pattern
+
+```typescript
+import { useGlossary } from '../contexts/GlossaryContext';
+
+export default function MyPage() {
+  const { t } = useTranslation();
+  const { getName } = useGlossary(); // Always add this
+
+  return (
+    <AppLayout>
+      {/* Use getName() for all entity references */}
+      <Heading>{getName('customer', true)}</Heading>
+
+      <Button>
+        {t('common.actions.add', { entity: getName('customer') })}
+      </Button>
+
+      <Text>
+        {t('common.actions.notFound', { entities: getName('customer', true) })}
+      </Text>
+    </AppLayout>
+  );
+}
+```
+
+### Quick Rules
+
+**✅ DO use `getName()` for:**
+- Page titles: `getName('customer', true)` → "Customers" or "Clients"
+- Buttons: `t('common.actions.add', { entity: getName('customer') })` → "Add Customer" or "Add Client"
+- Loading/error/empty states with parameterized `common.*` keys
+- Dialog titles and descriptions
+- Section headings that reference entities
+
+**❌ DON'T use `getName()` for:**
+- Generic form fields: "Name", "Email", "Phone" (use `common.form.*`)
+- Non-entity text: "Save", "Cancel", "Search"
+- Technical terms that aren't tenant-facing
+
+### Entity Codes
+
+Use these exact codes:
+- `customer`, `work_order`, `service_location`, `equipment`
+- `invoice`, `quote`, `payment`, `dispatch`
+- `user`, `role`
+
+**Plural**: Always pass `true` as second parameter for plural forms:
+- `getName('customer')` → "Customer"
+- `getName('customer', true)` → "Customers"
+
+### Parameterized i18n Keys
+
+Use these common keys that accept entity names:
+
+```typescript
+// Actions
+t('common.actions.add', { entity: getName('customer') })
+t('common.actions.backTo', { entities: getName('customer', true) })
+t('common.actions.loading', { entities: getName('customer', true) })
+t('common.actions.errorLoadingEntity', { entity: getName('customer') })
+t('common.actions.notFound', { entities: getName('customer', true) })
+t('common.actions.noEntitiesYet', { entities: getName('customer', true) })
+
+// Counts
+t('common.entitiesCount', { entities: getName('service_location', true), count: 5 })
+t('common.recentEntities', { entities: getName('work_order', true) })
+
+// Forms
+t('common.form.titleCreate', { action: t('common.create'), entity: getName('customer') })
+t('common.form.descriptionCreate', { entity: getName('customer') })
+t('common.form.errorCreate', { entity: getName('customer') })
+```
+
+### Complete Guide
+
+See **[GLOSSARY_INTEGRATION.md](./GLOSSARY_INTEGRATION.md)** for:
+- Complete pattern reference with examples
+- When to use vs not use glossary
+- Full list of parameterized translation keys
+- Testing patterns
+- Migration checklist
+- Common pitfalls
+
+**IMPORTANT**: When creating or modifying pages/forms, always reference GLOSSARY_INTEGRATION.md to ensure proper glossary usage.
+
+---
+
 ## Adding a New Entity Page
 
 Follow this pattern for consistency. **See `CustomersPage.tsx` and `CustomerFormDialog.tsx` as reference examples.**
@@ -316,52 +551,18 @@ Follow this pattern for consistency. **See `CustomersPage.tsx` and `CustomerForm
 
 **File**: `src/pages/EntityPage.tsx`
 
-**Key structure**:
+**Key imports and structure**:
 ```typescript
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
+import { useGlossary } from '../contexts/GlossaryContext'; // ALWAYS add this
 import { entityApi, type Entity } from '../api';
 import AppLayout from '../components/AppLayout';
 import EntityFormDialog from '../components/EntityFormDialog';
-import { Heading, Button, Table, Badge, Dropdown } from '../components/catalyst/*';
-
-export default function EntityPage() {
-  const queryClient = useQueryClient();
-  const { t } = useTranslation();
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [selectedEntity, setSelectedEntity] = useState<Entity | null>(null);
-
-  // Fetch data with React Query
-  const { data: entities, isLoading, error } = useQuery({
-    queryKey: ['entities'],
-    queryFn: () => entityApi.getAll(),
-  });
-
-  // Delete mutation
-  const deleteMutation = useMutation({
-    mutationFn: (id: string) => entityApi.delete(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['entities'] });
-    },
-  });
-
-  // Handlers: handleAdd(), handleEdit(item), handleDelete(item), handleCloseDialog()
-
-  return (
-    <AppLayout>
-      <div className="p-8">
-        {/* Header with title and Add button */}
-        {/* Loading state */}
-        {/* Error state */}
-        {/* Empty state */}
-        {/* Table with data and actions */}
-      </div>
-      <EntityFormDialog isOpen={isDialogOpen} onClose={handleCloseDialog} entity={selectedEntity} />
-    </AppLayout>
-  );
-}
 ```
+
+**Pattern**: Fetch data with `useQuery`, delete with `useMutation`, manage dialog state, handle Add/Edit/Delete actions.
 
 **See `src/pages/CustomersPage.tsx` for complete implementation.**
 
@@ -369,68 +570,17 @@ export default function EntityPage() {
 
 **File**: `src/components/EntityFormDialog.tsx`
 
-**Key structure**:
+**Key imports and structure**:
 ```typescript
 import { useState, useEffect } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
+import { useGlossary } from '../contexts/GlossaryContext'; // ALWAYS add this
 import { entityApi, type Entity } from '../api';
 import { Dialog, DialogActions, DialogBody, DialogDescription, DialogTitle } from './catalyst/dialog';
-import { Button, Field, FieldGroup, Fieldset, Label, Input } from './catalyst/*';
-
-export default function EntityFormDialog({ isOpen, onClose, entity }) {
-  const queryClient = useQueryClient();
-  const { t } = useTranslation();
-  const isEdit = !!entity?.id;
-  const [formData, setFormData] = useState<Entity>({ /* defaults */ });
-
-  // Reset form when dialog opens
-  useEffect(() => {
-    if (!isOpen) return;
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setFormData(entity || { /* defaults */ });
-  }, [entity, isOpen]);
-
-  // Create and update mutations with proper error handling
-  const createMutation = useMutation({
-    mutationFn: (data: Entity) => entityApi.create(data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['entities'] });
-      onClose();
-    },
-    onError: (error: unknown) => {
-      const errorMessage = error instanceof Error && 'response' in error
-        ? ((error as { response?: { data?: { message?: string } } }).response?.data?.message)
-        : undefined;
-      alert(errorMessage || t('common.form.errorCreate', { entity: t('entities.entity') }));
-    },
-  });
-
-  // Similar updateMutation pattern
-
-  return (
-    <Dialog open={isOpen} onClose={onClose}>
-      <DialogTitle>{/* Use i18n */}</DialogTitle>
-      <DialogDescription>{/* Use i18n */}</DialogDescription>
-      <DialogBody>
-        <form onSubmit={handleSubmit} id="entity-form">
-          <Fieldset>
-            <FieldGroup>
-              {/* Fields using Field, Label, Input pattern */}
-            </FieldGroup>
-          </Fieldset>
-        </form>
-      </DialogBody>
-      <DialogActions>
-        <Button plain onClick={onClose}>{t('common.cancel')}</Button>
-        <Button type="submit" form="entity-form" disabled={/* pending */}>
-          {/* Show saving state */}
-        </Button>
-      </DialogActions>
-    </Dialog>
-  );
-}
 ```
+
+**Pattern**: Form state management, create/update mutations with error handling, form reset on open.
 
 **See `src/components/CustomerFormDialog.tsx` for complete implementation.**
 
@@ -491,46 +641,25 @@ The application uses **react-i18next** for internationalization with a centraliz
     "customers": "Customers",
     "workOrder": "Work Order",
     "workOrders": "Work Orders",
-    "equipment": "Equipment",
-    "dashboard": "Dashboard",
-    "financial": "Financial",
-    "scheduling": "Scheduling"
+    // ... more entities
   }
 }
 ```
 
-**Benefits**:
-- Change "Customer" to "Client" in ONE place
-- All references (nav, headings, buttons, forms) update automatically
-- Complete consistency across the application
-
 ### Compound Keys with Interpolation
 
-**Reusable action patterns**:
+**Reusable patterns**:
 ```json
 {
   "common": {
     "actions": {
       "add": "Add {{entity}}",
-      "addFirst": "Add your first {{entity, lowercase}}",
       "loading": "Loading {{entities, lowercase}}...",
-      "errorLoading": "Error loading {{entities, lowercase}}",
       "deleteConfirm": "Are you sure you want to delete {{name}}?"
-    }
-  }
-}
-```
-
-**Reusable form patterns**:
-```json
-{
-  "common": {
+    },
     "form": {
       "titleCreate": "{{action}} {{entity}}",
       "descriptionCreate": "Create a new {{entity, lowercase}} record.",
-      "descriptionEdit": "Update {{entity, lowercase}} information.",
-      "name": "Name",
-      "email": "Email",
       "errorCreate": "Failed to create {{entity, lowercase}}"
     }
   }
@@ -539,47 +668,30 @@ The application uses **react-i18next** for internationalization with a centraliz
 
 ### Using Translations in Components
 
-**Import and setup**:
 ```typescript
 import { useTranslation } from 'react-i18next';
 
-export default function MyComponent() {
-  const { t } = useTranslation();
-  // ...
-}
-```
+const { t } = useTranslation();
 
-**Examples**:
-```typescript
-// Simple translation
+// Simple
 <Heading>{t('entities.customers')}</Heading>
-<Button>{t('common.cancel')}</Button>
 
-// With variable interpolation
+// With interpolation
 <Button onClick={handleAdd}>
   {t('common.actions.add', { entity: t('entities.customer') })}
 </Button>
 // Output: "Add Customer"
 
-// Lowercase modifier
-<p>{t('common.actions.loading', { entities: t('entities.customers') })}</p>
-// Output: "Loading customers..."
+// With glossary (PREFERRED)
+<Button>{t('common.actions.add', { entity: getName('customer') })}</Button>
 
-// Named variable
-if (window.confirm(t('common.actions.deleteConfirm', { name: customer.name }))) {
-  deleteMutation.mutate(customer.id);
-}
-// Output: "Are you sure you want to delete John Doe?"
-
-// Form titles and descriptions
+// Form titles
 <DialogTitle>
   {t('common.form.titleCreate', {
     action: isEdit ? t('common.edit') : t('common.create'),
-    entity: t('entities.customer')
+    entity: getName('customer')
   })}
 </DialogTitle>
-// Create mode: "Create Customer"
-// Edit mode: "Edit Customer"
 ```
 
 ### Adding a New Entity
@@ -608,11 +720,6 @@ When adding a new entity (e.g., "Invoice"), follow these steps:
     "table": {
       "invoiceNumber": "Invoice #",
       "dueDate": "Due Date"
-    },
-    "status": {
-      "draft": "Draft",
-      "sent": "Sent",
-      "paid": "Paid"
     }
   }
 }
@@ -623,7 +730,6 @@ When adding a new entity (e.g., "Invoice"), follow these steps:
 const translations = {
   'entities.invoice': 'Invoice',
   'entities.invoices': 'Invoices',
-  'invoices.description': 'Manage invoices and billing',
   // ... other keys alphabetically
 };
 ```
@@ -759,28 +865,6 @@ const createMutation = useMutation({
 
 **API Client** (`src/api/client.ts`) automatically adds JWT tokens to all requests via Axios interceptor using AWS Amplify `fetchAuthSession()`.
 
-### Form Initialization Pattern
-
-Use this pattern for form dialogs:
-
-```typescript
-useEffect(() => {
-  if (!isOpen) return;
-
-  // Intentionally setting form state based on props in useEffect
-  // This is the recommended pattern for initializing controlled forms
-  if (entity) {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setFormData(entity);
-  } else {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setFormData({ /* default values */ });
-  }
-}, [entity, isOpen]);
-```
-
-**Why**: This is the correct React pattern for initializing controlled forms from props.
-
 ---
 
 ## Common Utilities
@@ -807,14 +891,6 @@ const formatCurrency = (amount?: number) => {
     style: 'currency',
     currency: 'USD',
   }).format(amount);
-};
-```
-
-### ID Truncation
-
-```typescript
-const truncateId = (id: string) => {
-  return `${id.substring(0, 8)}...`;
 };
 ```
 
@@ -946,47 +1022,6 @@ vi.mock('../api/client');
 vi.mocked(apiClient.get).mockResolvedValue({ data: mockData });
 ```
 
-### Example: Testing a Page Component
-
-**File**: `src/pages/CustomersPage.test.tsx`
-
-```typescript
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { screen, waitFor } from '@testing-library/react';
-import { renderWithProviders, userEvent } from '../test/utils';
-import CustomersPage from './CustomersPage';
-import apiClient from '../api/client';
-
-vi.mock('../api/client');
-
-const mockCustomers = [
-  { id: '1', name: 'John Doe', email: 'john@example.com', phone: '555-1234' },
-];
-
-describe('CustomersPage', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  it('displays customers in a table', async () => {
-    vi.mocked(apiClient.get).mockResolvedValue({ data: mockCustomers });
-    renderWithProviders(<CustomersPage />);
-    await waitFor(() => {
-      expect(screen.getByText('John Doe')).toBeInTheDocument();
-    });
-  });
-
-  it('opens create dialog when add button is clicked', async () => {
-    vi.mocked(apiClient.get).mockResolvedValue({ data: [] });
-    const user = userEvent.setup();
-    renderWithProviders(<CustomersPage />);
-    const addButton = screen.getByRole('button', { name: /add customer/i });
-    await user.click(addButton);
-    expect(screen.getByRole('dialog')).toBeInTheDocument();
-  });
-});
-```
-
 ### Testing Best Practices
 
 1. **Mock API calls at the module level**: `vi.mock('../api/client')`
@@ -995,6 +1030,23 @@ describe('CustomersPage', () => {
 4. **Simulate user interactions with `userEvent`**: `await user.click(button)`
 5. **Use accessible queries**: `screen.getByRole('button', { name: /submit/i })`
 6. **Test user-facing behavior, not implementation**: Test what user sees, not internal state
+7. **Mock window.confirm for confirmation dialogs**: `vi.spyOn(window, 'confirm').mockReturnValue(true)`
+
+### Testing Headless UI / Catalyst Components
+
+**Headless UI components ARE fully testable** - they use proper ARIA roles making them easier to test:
+
+```typescript
+// Dropdown/Menu: Find button, click to open, find menuitem
+const dropdownButton = allButtons.find(btn => 
+  btn.closest('td') && btn.querySelector('svg')
+);
+await user.click(dropdownButton!);
+const menuItem = await screen.findByRole('menuitem', { name: /edit/i });
+await user.click(menuItem);
+```
+
+**ARIA roles used**: `menu`, `menuitem`, `tab`, `tabpanel`, `dialog` - all standard RTL queries work.
 
 ### What to Test
 
@@ -1042,57 +1094,17 @@ export default defineConfig({
 - Mocks `window.matchMedia`
 - Cleans up after each test
 
-### Manual Testing Checklist
-
-For each entity page:
-- [ ] Page loads and displays data
-- [ ] Loading state displays
-- [ ] Error state displays (try with backend down)
-- [ ] Empty state displays (with fresh database)
-- [ ] "Add" button opens dialog
-- [ ] Create form validates required fields
-- [ ] Create operation works and updates list
-- [ ] Edit menu option opens dialog with existing data
-- [ ] Update operation works and updates list
-- [ ] Delete confirmation works
-- [ ] Delete operation works and updates list
-- [ ] React Query caching works (no duplicate requests in Network tab)
-- [ ] JWT token is included in API requests (check Network tab)
-
 ---
 
 ## Deployment
-
-### Manual Deployment
-
-```bash
-# Build for production
-npm run build
-
-# Test production build locally
-npm run preview
-
-# Deploy to S3 (done automatically via GitHub Actions)
-aws s3 sync dist/ s3://dispatch-dev-frontend/ \
-  --delete \
-  --cache-control "public,max-age=31536000,immutable" \
-  --exclude "index.html"
-
-# Upload index.html with no-cache
-aws s3 cp dist/index.html s3://dispatch-dev-frontend/index.html \
-  --cache-control "public,max-age=0,must-revalidate"
-
-# Invalidate CloudFront
-aws cloudfront create-invalidation \
-  --distribution-id E21TOAR61GO7PC \
-  --paths "/*"
-```
 
 ### Deployment URLs
 
 - **Dev**: https://dev.dispatch.newleveltech.net
 - **S3 Bucket**: dispatch-dev-frontend
 - **CloudFront Distribution**: E21TOAR61GO7PC
+
+**Note**: Deployment is automated via GitHub Actions on push to `dev`. Manual deployment commands available in deploy workflow if needed.
 
 ---
 
@@ -1117,11 +1129,7 @@ aws cloudfront create-invalidation \
 - **Problem**: ESLint errors block PR checks
 - **Solution**: Run `npm run lint -- --fix` to auto-fix, then manually fix remaining issues
 
-**5. Build size warning**
-- **Problem**: Bundle > 500KB
-- **Solution**: This is expected with Catalyst UI. Consider code-splitting if it grows significantly
-
-**6. CORS errors**
+**5. CORS errors**
 - **Problem**: API calls blocked
 - **Solution**: Ensure backend CORS allows origin, or use proxy in vite.config.ts for local dev
 
@@ -1131,30 +1139,10 @@ aws cloudfront create-invalidation \
 
 - **Backend API**: See dispatch-api CLAUDE.md
 - **Infrastructure**: See dispatch-infra CLAUDE.md
-- **Catalyst UI Docs**: https://catalyst.tailwindui.com
-- **React Query Docs**: https://tanstack.com/query/latest
-- **Vite Docs**: https://vitejs.dev
-
----
-
-## Key Files Reference
-
-| File | Purpose |
-|------|---------|
-| `src/main.tsx` | Entry point, sets up Amplify + React Query |
-| `src/App.tsx` | Routes and authentication logic |
-| `src/api/client.ts` | Shared Axios instance with JWT interceptor |
-| `src/api/index.ts` | Central barrel export for all API services |
-| `src/api/*Api.ts` | API service methods for each domain |
-| `src/components/AppLayout.tsx` | Main layout with navigation |
-| `src/config/amplify.ts` | AWS Amplify/Cognito configuration |
-| `src/test/setup.ts` | Test environment configuration and mocks |
-| `src/test/utils.tsx` | Custom render with providers |
-| `.github/workflows/deploy.yml` | Deployment to S3/CloudFront |
-| `.github/workflows/pr-checks.yml` | PR validation (lint + test + build) |
-| `vite.config.ts` | Vite build configuration |
-| `vitest.config.ts` | Vitest test configuration |
-| `package.json` | Dependencies and scripts |
+- **CSR UI Patterns**: See [CSR_PATTERNS.md](./CSR_PATTERNS.md)
+- **Glossary Integration**: See [GLOSSARY_INTEGRATION.md](./GLOSSARY_INTEGRATION.md)
+- **Catalyst UI**: https://catalyst.tailwindui.com
+- **React Query**: https://tanstack.com/query/latest
 
 ---
 
@@ -1164,21 +1152,25 @@ This frontend uses a **modern, simple architecture**:
 - ✅ Single page + dialog pattern (no separate Create/Detail routes)
 - ✅ Dedicated API service classes (type-safe, maintainable)
 - ✅ React Query for data management (caching, refetching, mutations)
+- ✅ Glossary system for tenant-customizable entity names
 - ✅ Catalyst UI for consistent components
 - ✅ TypeScript for type safety
 - ✅ Vite for fast builds
 - ✅ AWS Amplify for authentication
-- ✅ i18n support with react-i18next
+- ✅ i18n support with react-i18next and parameterized keys
 
 **When adding new features**:
-1. Create API service class in `src/api/` with TypeScript interfaces
-2. Export from `src/api/index.ts` barrel file
-3. Follow the Entity Page + Form Dialog pattern (see CustomersPage.tsx as reference)
-4. Use the API service with React Query
-5. Use Catalyst UI components
-6. Add i18n translations to `src/i18n/locales/en_us.json`
-7. Handle loading, error, and empty states
-8. Add proper TypeScript types throughout
-9. Write tests before creating PR
+1. **CRITICAL**: Import `useGlossary` and use `getName()` for all entity names (see GLOSSARY_INTEGRATION.md)
+2. Create API service class in `src/api/` with TypeScript interfaces
+3. Export from `src/api/index.ts` barrel file
+4. Follow the Entity Page + Form Dialog pattern (see CustomersPage.tsx as reference)
+5. Use the API service with React Query
+6. Use Catalyst UI components
+7. Use parameterized `common.*` i18n keys with `getName()` for entity references
+8. Add i18n translations to `src/i18n/locales/en_us.json` (only if new keys needed)
+9. Handle loading, error, and empty states with glossary
+10. Add proper TypeScript types throughout
+11. Write tests with flexible matchers (not exact entity names)
+12. Run lint and tests before creating PR
 
-**Remember**: The pattern is consistent across all pages. Look at CustomersPage, WorkOrdersPage, and their corresponding API services as reference examples.
+**Remember**: The pattern is consistent across all pages. Look at CustomersPage, WorkOrdersPage, and their corresponding API services as reference examples. **Always check GLOSSARY_INTEGRATION.md** for proper glossary usage patterns.

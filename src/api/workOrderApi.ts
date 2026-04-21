@@ -13,7 +13,9 @@ export const WorkOrderStatus = {
 
 export interface WorkOrder {
   id: string;
+  workOrderNumber?: string; // e.g., "WO-00001" - display this prominently
   customerId: string;
+  serviceLocationId: string;
   status: WorkOrderStatus;
   scheduledDate?: string;
   completedDate?: string;
@@ -22,10 +24,30 @@ export interface WorkOrder {
   totalAmount?: number;
   createdAt: string;
   updatedAt: string;
+  // Enriched response fields from backend
+  customer?: {
+    id: string;
+    name: string;
+    email: string;
+    phone?: string;
+  };
+  serviceLocation?: {
+    id: string;
+    locationName?: string;
+    address: {
+      streetAddress: string;
+      city: string;
+      state: string;
+      zipCode: string;
+    };
+    siteContactName?: string;
+    siteContactPhone?: string;
+  };
 }
 
 export interface CreateWorkOrderRequest {
   customerId: string;
+  serviceLocationId: string;
   status?: WorkOrderStatus;
   scheduledDate?: string;
   description?: string;
@@ -56,6 +78,13 @@ export const workOrderApi = {
 
   getByCustomer: async (customerId: string): Promise<WorkOrder[]> => {
     const response = await apiClient.get<WorkOrder[]>(`/work-orders/customer/${customerId}`);
+    return response.data;
+  },
+
+  getByNumber: async (workOrderNumber: string): Promise<WorkOrder> => {
+    // Strip "WO-" prefix if user included it
+    const number = workOrderNumber.replace(/^WO-/i, '');
+    const response = await apiClient.get<WorkOrder>(`/work-orders/by-number/WO-${number}`);
     return response.data;
   },
 

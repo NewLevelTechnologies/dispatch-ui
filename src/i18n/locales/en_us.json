@@ -11,18 +11,27 @@
       "add": "Add {{entity}}",
       "addFirst": "Add your first {{entity, lowercase}}",
       "back": "Back",
+      "backTo": "Back to {{entities}}",
       "create": "Create {{entity}}",
       "createFirst": "Create your first {{entity, lowercase}}",
       "deleteConfirm": "Are you sure you want to delete {{name}}?",
       "deleteConfirmGeneric": "Are you sure you want to delete this {{entity, lowercase}}?",
       "edit": "Edit {{entity}}",
       "errorLoading": "Error loading {{entities, lowercase}}",
+      "errorLoadingEntity": "Error loading {{entity, lowercase}}",
       "loading": "Loading {{entities, lowercase}}...",
-      "notFound": "No {{entities, lowercase}} found"
+      "loadingEntity": "Loading {{entity, lowercase}}...",
+      "new": "New {{entity}}",
+      "noEntitiesYet": "No {{entities, lowercase}} yet",
+      "noMatchSearch": "No {{entities, lowercase}} match your search.",
+      "notFound": "No {{entities, lowercase}} found",
+      "open": "Open {{entities}}",
+      "title": "Actions"
     },
     "active": "Active",
     "add": "Add",
     "cancel": "Cancel",
+    "close": "Close",
     "cloning": "Cloning...",
     "create": "Create",
     "delete": "Delete",
@@ -30,46 +39,166 @@
     "edit": "Edit",
     "disabled": "Disabled",
     "enabled": "Enabled",
+    "entitiesCount": "{{entities}} ({{count}})",
     "hide": "Hide",
     "inactive": "Inactive",
+    "loading": "Loading...",
+    "recentEntities": "Recent {{entities}}",
     "restoring": "Restoring...",
+    "search": "Search...",
     "show": "Show",
     "view": "View",
     "form": {
+      "accessInstructions": "Access Instructions",
       "address": "Address",
+      "addressLine2": "Address Line 2",
+      "billingAddress": "Billing Address",
+      "billingAddressSameAsService": "Send invoice to same address",
       "city": "City",
+      "contractPricingTier": "Contract Pricing Tier",
       "description": "Description",
       "descriptionCreate": "Create a new {{entity, lowercase}} record.",
       "descriptionEdit": "Update {{entity, lowercase}} information.",
       "email": "Email",
       "errorCreate": "Failed to create {{entity, lowercase}}",
+      "errorDelete": "Failed to delete {{entity, lowercase}}",
       "errorUpdate": "Failed to update {{entity, lowercase}}",
+      "invalidEmail": "Invalid email address",
       "firstName": "First Name",
       "lastName": "Last Name",
+      "locationName": "Location Name",
       "name": "Name",
       "notes": "Notes",
+      "optional": "optional",
+      "optionalCount": "{{count}} optional",
+      "paymentTermsDays": "Payment Terms (Days)",
       "phone": "Phone",
+      "requiresPurchaseOrder": "Requires Purchase Order",
+      "required": "{{field}} is required",
       "role": "Role",
       "select": "Select...",
+      "serviceAddress": "Service Address",
+      "siteContactEmail": "Site Contact Email",
+      "siteContactName": "Site Contact Name",
+      "siteContactPhone": "Site Contact Phone",
       "state": "State",
       "stateHelper": "CA",
       "status": "Status",
+      "streetAddress": "Street Address",
+      "taxExempt": "Tax Exempt",
+      "taxExemptCertificate": "Tax Exempt Certificate",
       "titleCreate": "{{action}} {{entity}}",
       "titleEdit": "{{action}} {{entity}}",
       "zipCode": "Zip Code"
     },
     "moreOptions": "More options",
     "none": "None",
+    "pagination": {
+      "next": "Next",
+      "pageOf": "Page {{page}} of {{total}}",
+      "previous": "Previous",
+      "showing": "Showing {{start}}-{{end}} of {{total}}"
+    },
+    "save": "Save",
     "saving": "Saving...",
+    "showAll": "Show All",
     "signOut": "Sign out",
     "theme": "Theme",
     "update": "Update",
     "updateStatus": "Update {{entity, lowercase}} status"
   },
+  "contacts": {
+    "actions": {
+      "add": "Add Additional Contact"
+    },
+    "delete": {
+      "message": "Are you sure you want to delete {{name}}?",
+      "title": "Delete Contact"
+    },
+    "entity": "contact",
+    "form": {
+      "descriptionCreate": "Add an additional contact for this record.",
+      "descriptionEdit": "Update contact information.",
+      "titleCreate": "Add Contact",
+      "titleEdit": "Edit Contact"
+    },
+    "noContacts": "No additional contacts yet",
+    "table": {
+      "contact": "Contact"
+    },
+    "title": "Additional Contacts"
+  },
   "customers": {
     "description": "Manage your customer database",
+    "detail": {
+      "addEquipment": "Add Equipment",
+      "addLocation": "Add Location",
+      "addServiceLocation": "Add Service Location",
+      "addServiceLocationDescription": "Add a new service location for this customer.",
+      "balance": "Balance",
+      "backToCustomers": "Back to Customers",
+      "billingAddressLabel": "Billing Address",
+      "businessTerms": "Business Terms",
+      "businessTermsOptional": "Business Terms (optional)",
+      "contractTier": "Contract Tier",
+      "equipment": "Equipment",
+      "equipmentCount": "Equipment: {{count}}",
+      "errorLoading": "Error loading customer",
+      "lastService": "Last Service",
+      "lastServiceNever": "Last service: Never",
+      "netTerms": "Net-{{days}}",
+      "never": "Never",
+      "noEquipment": "No equipment recorded yet",
+      "noPhone": "No phone",
+      "noWorkOrders": "No work orders yet",
+      "openWorkOrders": "Open Work Orders",
+      "paymentTerms": "Payment Terms (Days)",
+      "recentWorkOrders": "Recent Work Orders",
+      "requiresPo": "Requires PO",
+      "serviceLocationsCount": "Service Locations ({{count}})",
+      "siteContact": "Site Contact (optional)",
+      "taxCert": "Tax Cert #",
+      "taxExemptBadge": "Tax Exempt",
+      "viewDetails": "View Details →"
+    },
+    "displayMode": {
+      "simple": "Simple",
+      "standard": "Standard"
+    },
+    "filter": {
+      "allStatuses": "All Statuses"
+    },
+    "form": {
+      "accessInstructionsOptional": "Access Instructions (optional)",
+      "accessInstructionsPlaceholder": "e.g., Use back entrance, gate code 1234",
+      "billingAddressHelp": "Check this if invoices should be sent to the service address",
+      "billingAddressSection": "Billing Address",
+      "billingInvoiceRecipient": "Invoice Recipient",
+      "businessDetails": "Business Details",
+      "companyName": "Company/Name *",
+      "locationNameHelp": "Optional - useful for businesses with multiple locations",
+      "newWorkOrder": "New Work Order",
+      "paymentTermsHelp": "0 = Due on receipt",
+      "serviceLocationPrompt": "Where do you need service?",
+      "serviceLocationSection": "Service Location"
+    },
     "table": {
-      "location": "Location"
+      "billingAddress": "Billing Address",
+      "location": "Location",
+      "locationName": "Location Name",
+      "locationAddress": "Address",
+      "locationContact": "Contact",
+      "locations": "Locations",
+      "locationsCount": "{{count}} locations",
+      "moreLocations": "+{{count}} more",
+      "none": "None",
+      "terms": "Terms",
+      "type": "Type"
+    },
+    "tabs": {
+      "activity": "Activity",
+      "financial": "Financial",
+      "overview": "Overview"
     }
   },
   "dashboard": {
@@ -84,6 +213,8 @@
     "customer": "Customer",
     "customers": "Customers",
     "dashboard": "Dashboard",
+    "dispatch": "Dispatch",
+    "dispatches": "Dispatches",
     "equipment": "Equipment",
     "financial": "Financial",
     "invoice": "Invoice",
@@ -92,14 +223,113 @@
     "payments": "Payments",
     "quote": "Quote",
     "quotes": "Quotes",
+    "region": "Region",
+    "regions": "Regions",
     "revenue": "Revenue",
     "role": "Role",
     "roles": "Roles",
     "scheduling": "Scheduling",
+    "serviceLocation": "Service Location",
+    "serviceLocations": "Service Locations",
+    "settings": "Settings",
+    "tenantSettings": "Tenant Settings",
     "user": "User",
     "users": "Users",
     "workOrder": "Work Order",
     "workOrders": "Work Orders"
+  },
+  "dispatchRegions": {
+    "actions": {
+      "deactivate": "Deactivate",
+      "deactivateConfirm": "Are you sure you want to deactivate \"{{name}}\"? It will be hidden from active lists but preserved in history.",
+      "reactivate": "Reactivate"
+    },
+    "description": "Manage geographic regions for organizing service locations and technicians on {{dispatch, lowercase}} boards.",
+    "empty": "No {{dispatch, lowercase}} regions found. Create your first region to get started.",
+    "form": {
+      "abbreviation": "Abbreviation",
+      "abbreviationHelper": "Short code (e.g., \"ATL\")",
+      "autoSelected": "Auto-selected: only one active region",
+      "description": "Description",
+      "descriptionCreate": "Create a new {{dispatch, lowercase}} region for organizing service locations and technicians.",
+      "descriptionEdit": "Update the {{dispatch, lowercase}} region details.",
+      "logoUrl": "Logo URL",
+      "logoUrlHelper": "Optional URL to region-specific logo image",
+      "name": "Name",
+      "nameHelper": "Full region name (e.g., \"Atlanta Region\")",
+      "selectRegion": "Select region",
+      "sortOrder": "Sort Order",
+      "sortOrderHelper": "Lower numbers appear first",
+      "state": "State",
+      "tabDisplayName": "Tab Display Name",
+      "tabDisplayNameHelper": "Optional name for {{dispatch, lowercase}} board tabs",
+      "titleCreate": "Create {{dispatch}} Region",
+      "titleEdit": "Edit {{dispatch}} Region"
+    },
+    "loading": "Loading {{dispatch, lowercase}} regions...",
+    "table": {
+      "abbreviation": "Abbreviation",
+      "name": "Name",
+      "sortOrder": "Sort Order",
+      "state": "State",
+      "status": "Status"
+    }
+  },
+  "serviceLocations": {
+    "actions": {
+      "close": "Close Location",
+      "closeConfirm": "Are you sure you want to close {{name}}? This location will no longer be available for new work orders."
+    },
+    "description": "Manage service locations across all customers",
+    "detail": {
+      "addEquipment": "Add Equipment",
+      "address": "Address",
+      "backToList": "Back to Service Locations",
+      "belongsTo": "Belongs to",
+      "businessLocation": "Business",
+      "created": "Created",
+      "equipment": "Equipment",
+      "errorLoading": "Error loading service location",
+      "lastService": "Last Service",
+      "lastUpdated": "Last Updated",
+      "loading": "Loading service location...",
+      "locationId": "Location ID",
+      "never": "Never",
+      "newWorkOrder": "New Work Order",
+      "noEquipment": "No equipment recorded yet",
+      "noWorkOrders": "No work orders yet",
+      "openWorkOrders": "Open Work Orders",
+      "quickStats": "Quick Stats",
+      "recentWorkOrders": "Recent Work Orders",
+      "siteContact": "Site Contact",
+      "systemInfo": "System Information",
+      "totalEquipment": "Total Equipment",
+      "totalRevenue": "Total Revenue",
+      "unnamedLocation": "Unnamed Location",
+      "uspsValidated": "USPS Validated"
+    },
+    "filter": {
+      "allStatuses": "All statuses"
+    },
+    "status": {
+      "active": "Active",
+      "closed": "Closed",
+      "inactive": "Inactive"
+    },
+    "table": {
+      "address": "Address",
+      "contact": "Contact",
+      "customer": "Customer",
+      "equipment": "Equipment",
+      "lastService": "Last Service",
+      "locationName": "Location Name",
+      "neverServiced": "Never",
+      "type": "Type"
+    },
+    "tabs": {
+      "activity": "Activity",
+      "overview": "Overview"
+    }
   },
   "equipment": {
     "description": "Manage customer equipment, parts inventory, and warehouses",
@@ -191,6 +421,53 @@
       "totalAmount": "Total"
     }
   },
+  "notifications": {
+    "description": "View notification history and manage preferences",
+    "logs": {
+      "errorLoad": "Failed to load notification logs",
+      "filters": {
+        "allChannels": "All Channels",
+        "allStatuses": "All Statuses"
+      },
+      "loading": "Loading notification logs...",
+      "noLogs": "No notification logs found",
+      "pagination": {
+        "next": "Next",
+        "page": "Page {{current}} of {{total}}",
+        "previous": "Previous",
+        "showing": "Showing {{start}}-{{end}} of {{total}}"
+      },
+      "status": {
+        "bounced": "Bounced",
+        "delivered": "Delivered",
+        "failed": "Failed",
+        "pending": "Pending",
+        "sent": "Sent"
+      },
+      "table": {
+        "channel": "Channel",
+        "delivered": "Delivered",
+        "recipient": "Recipient",
+        "sent": "Sent",
+        "status": "Status",
+        "type": "Type"
+      },
+      "title": "Notification History"
+    },
+    "preferences": {
+      "channelEmail": "Email",
+      "channelPush": "Push",
+      "channelSms": "SMS",
+      "description": "Manage notification preferences for {{name}}",
+      "errorLoad": "Failed to load notification preferences",
+      "errorUpdate": "Failed to update notification preference",
+      "formDescription": "Choose which notifications this contact should receive",
+      "manage": "Manage Notifications",
+      "noPreferences": "No notification preferences available",
+      "notificationType": "Notification Type",
+      "title": "Notification Preferences"
+    }
+  },
   "payments": {
     "description": "Track customer payments and transactions",
     "form": {
@@ -229,6 +506,7 @@
     "errorLoading": "Error loading capabilities",
     "expandAll": "Expand All",
     "label": "Capabilities",
+    "moreAreas": "+{{count}} more",
     "noCapabilities": "No capabilities assigned",
     "rolesWillHave": "Users assigned this role will have the following capabilities",
     "selected": "selected",
@@ -375,6 +653,75 @@
       "workOrder": "Work Order"
     }
   },
+  "tenantSettings": {
+    "description": "Manage company branding, contact information, and business settings",
+    "sections": {
+      "branding": "Branding & Logo",
+      "businessSettings": "Business Settings",
+      "companyInfo": "Company Information",
+      "contactInfo": "Contact Information",
+      "featureFlags": "Feature Flags",
+      "terminology": "Terminology"
+    },
+    "tabs": {
+      "general": "General",
+      "terminology": "Terminology"
+    },
+    "form": {
+      "address": "Address",
+      "city": "City",
+      "companyName": "Company Name",
+      "companyNameShort": "Short Name",
+      "companyNameShortHelper": "Optional - used in tight spaces",
+      "companySlogan": "Company Slogan",
+      "companySloganHelper": "Optional - tagline or motto",
+      "defaultTaxRate": "Default Tax Rate",
+      "defaultTaxRateHelper": "e.g., 0.0825 = 8.25%",
+      "email": "Email",
+      "enableEmailNotifications": "Enable Email Notifications",
+      "enableOnlineBooking": "Enable Online Booking",
+      "enableSmsNotifications": "Enable SMS Notifications",
+      "fax": "Fax",
+      "invoiceTerms": "Invoice Terms",
+      "invoiceTermsHelper": "e.g., Net 30, Due on receipt",
+      "logo": "Company Logo",
+      "logoHelper": "Max 5MB. Square images work best.",
+      "phone": "Phone",
+      "primaryColor": "Primary Color",
+      "primaryColorHelper": "Main brand color (hex code)",
+      "secondaryColor": "Secondary Color",
+      "secondaryColorHelper": "Accent color (hex code)",
+      "state": "State",
+      "stateHelper": "Two-letter code (e.g., CA)",
+      "streetAddress": "Street Address",
+      "timezone": "Timezone",
+      "timezoneHelper": "For dates and scheduling",
+      "uploadLogo": "Upload Logo",
+      "zipCode": "Zip Code"
+    },
+    "glossary": {
+      "customizedCount": "Customized entity names: {{count}} override",
+      "customizedCount_other": "Customized entity names: {{count}} overrides",
+      "description": "Customize how entity names appear throughout the application. Leave blank to use defaults.",
+      "entity": "Entity",
+      "emptyState": "No custom terminology configured. Using default entity names.",
+      "loadingEntities": "Loading entity types...",
+      "pluralForm": "Plural Form",
+      "resetToDefault": "Reset to default",
+      "singularForm": "Singular Form"
+    },
+    "messages": {
+      "errorLoadingSettings": "Error loading tenant settings",
+      "errorUpdateSettings": "Failed to update settings",
+      "errorUploadLogo": "Failed to upload logo",
+      "fileSizeTooLarge": "File size must be less than 5MB",
+      "invalidFileType": "Only PNG and JPEG files are supported",
+      "loadingSettings": "Loading settings...",
+      "logoUploadedSuccess": "Logo uploaded successfully",
+      "noLogo": "No logo uploaded",
+      "settingsUpdatedSuccess": "Settings updated successfully"
+    }
+  },
   "users": {
     "actions": {
       "deleteWarning": "This action cannot be undone. All user data and history will be permanently removed.",
@@ -385,14 +732,20 @@
     "detail": {
       "activityComingSoon": "Activity history coming soon",
       "activityHelper": "Will show login history, actions performed, etc.",
+      "auditChanges": "Changes",
       "auditComingSoon": "Audit trail coming soon",
+      "auditEntity": "Entity",
+      "auditEvent": "Event",
       "auditHelper": "Will show permission changes, profile updates, etc.",
+      "auditWhen": "When",
       "basicInfo": "Basic Information",
       "capabilities": "Capabilities",
       "cognitoSub": "Cognito Sub",
       "created": "Created",
       "lastUpdated": "Last Updated",
+      "noActivityYet": "No activity recorded yet",
       "noCapabilities": "No capabilities assigned",
+      "noRegionsAssigned": "No regions assigned",
       "recentActivity": "Recent Activity",
       "rolePermissions": "Role & Permissions",
       "showLess": "Show less",
@@ -411,6 +764,7 @@
     },
     "form": {
       "adminRoleInfo": "Admin role includes all permissions. Other roles are not needed.",
+      "assignedRegions": "Assigned Regions",
       "rolePlaceholder": "Select a role...",
       "roleRequired": "Please select at least one role",
       "sendInvite": "Send invitation email"
@@ -436,7 +790,11 @@
     "form": {
       "customerPlaceholder": "Select a customer...",
       "customerRequired": "Please select a customer",
-      "scheduledDate": "Scheduled Date"
+      "existingCustomer": "Existing {{entity, lowercase}}",
+      "newCustomer": "New {{entity, lowercase}}",
+      "newCustomerDetails": "New {{entity}} Details",
+      "scheduledDate": "Scheduled Date",
+      "selectServiceLocation": "Please select a {{entity, lowercase}}"
     },
     "status": {
       "cancelled": "Cancelled",

@@ -51,10 +51,20 @@ describe('CapabilitiesSection', () => {
       expect(screen.getByText('Show')).toBeInTheDocument();
     });
 
-    it('does not fetch capabilities data when collapsed', () => {
-      renderWithProviders(<CapabilitiesSection capabilities={['customers:read']} />);
+    it('fetches capabilities data immediately to show collapsed preview', async () => {
+      vi.mocked(apiClient.get).mockResolvedValue({ data: mockCapabilitiesData });
 
-      expect(apiClient.get).not.toHaveBeenCalled();
+      renderWithProviders(<CapabilitiesSection capabilities={['customers:read', 'work_orders:write']} />);
+
+      // Should fetch immediately for collapsed preview
+      await waitFor(() => {
+        expect(apiClient.get).toHaveBeenCalledWith('/users/capabilities/grouped');
+      });
+
+      // Should show preview badges
+      await waitFor(() => {
+        expect(screen.getByText('Customers')).toBeInTheDocument();
+      });
     });
   });
 
@@ -113,7 +123,10 @@ describe('CapabilitiesSection', () => {
       await user.click(hideButton);
 
       expect(screen.getByText('Show')).toBeInTheDocument();
-      expect(screen.queryByText('Customers')).not.toBeInTheDocument();
+      // Collapsed preview should still show "Customers" badge
+      expect(screen.getByText('Customers')).toBeInTheDocument();
+      // But detail badges should be gone
+      expect(screen.queryByText('View Customers')).not.toBeInTheDocument();
     });
 
     it('displays loading state while fetching', async () => {

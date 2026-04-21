@@ -1,6 +1,7 @@
 import { useAuthenticator } from '@aws-amplify/ui-react';
 import { useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { useGlossary } from '../contexts/GlossaryContext';
 import {
   HomeIcon,
   UserGroupIcon,
@@ -10,6 +11,7 @@ import {
   CalendarIcon,
   ShieldCheckIcon,
   KeyIcon,
+  Cog6ToothIcon,
   SunIcon,
   MoonIcon,
   ComputerDesktopIcon,
@@ -20,6 +22,7 @@ import {
   BuildingStorefrontIcon,
   ClockIcon,
   ArrowPathIcon,
+  MapPinIcon,
 } from '@heroicons/react/24/outline';
 import { Sidebar, SidebarBody, SidebarFooter, SidebarHeader, SidebarItem, SidebarSection } from './catalyst/sidebar';
 import { SidebarLayout } from './catalyst/sidebar-layout';
@@ -33,32 +36,35 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, signOut } = useAuthenticator((context) => [context.user]);
   const location = useLocation();
   const { t } = useTranslation();
+  const { getName } = useGlossary();
   const { theme, setTheme } = useTheme();
 
   // Permission checks for navigation visibility
   const canViewUsers = useHasAnyCapability('VIEW_USERS');
   const canViewRoles = useHasAnyCapability('VIEW_ROLES');
+  const canViewSettings = useHasAnyCapability('VIEW_SETTINGS');
 
   const mainNavigation = [
     { name: t('entities.dashboard'), href: '/dashboard', icon: HomeIcon },
-    { name: t('entities.customers'), href: '/customers', icon: UserGroupIcon },
-    { name: t('entities.workOrders'), href: '/work-orders', icon: ClipboardDocumentListIcon },
+    { name: getName('customer', true), href: '/customers', icon: UserGroupIcon },
+    { name: getName('service_location', true), href: '/service-locations', icon: MapPinIcon },
+    { name: getName('work_order', true), href: '/work-orders', icon: ClipboardDocumentListIcon },
   ];
 
   const equipmentNavigation = [
-    { name: t('entities.equipment'), href: '/equipment', icon: WrenchScrewdriverIcon },
+    { name: getName('equipment', true), href: '/equipment', icon: WrenchScrewdriverIcon },
     { name: t('equipment.entities.parts'), href: '/parts-inventory', icon: CubeIcon },
     { name: t('equipment.entities.warehouses'), href: '/warehouses', icon: BuildingStorefrontIcon },
   ];
 
   const financialNavigation = [
-    { name: t('entities.invoices'), href: '/invoices', icon: DocumentTextIcon },
-    { name: t('entities.quotes'), href: '/quotes', icon: DocumentChartBarIcon },
-    { name: t('entities.payments'), href: '/payments', icon: CreditCardIcon },
+    { name: getName('invoice', true), href: '/invoices', icon: DocumentTextIcon },
+    { name: getName('quote', true), href: '/quotes', icon: DocumentChartBarIcon },
+    { name: getName('payment', true), href: '/payments', icon: CreditCardIcon },
   ];
 
   const schedulingNavigation = [
-    { name: t('scheduling.entities.dispatches'), href: '/dispatches', icon: CalendarIcon },
+    { name: getName('dispatch', true), href: '/dispatches', icon: CalendarIcon },
     { name: t('scheduling.entities.availability'), href: '/availability', icon: ClockIcon },
     { name: t('scheduling.entities.recurringOrders'), href: '/recurring-orders', icon: ArrowPathIcon },
   ];
@@ -66,6 +72,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const adminNavigation = [
     ...(canViewUsers ? [{ name: t('entities.users'), href: '/users', icon: ShieldCheckIcon }] : []),
     ...(canViewRoles ? [{ name: t('entities.roles'), href: '/roles', icon: KeyIcon }] : []),
+    ...(canViewSettings ? [{ name: t('entities.settings'), href: '/settings', icon: Cog6ToothIcon }] : []),
   ];
 
   return (
@@ -97,10 +104,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               ))}
             </SidebarSection>
 
-            <SidebarSection className="max-lg:hidden">
+            <SidebarSection>
               <div className="flex items-center gap-3 px-2 py-1">
                 <WrenchScrewdriverIcon className="h-5 w-5 text-zinc-500" />
-                <span className="text-sm/6 font-medium text-zinc-500 dark:text-zinc-400">{t('entities.equipment')}</span>
+                <span className="text-sm/6 font-medium text-zinc-500 dark:text-zinc-400">{getName('equipment', true)}</span>
               </div>
               {equipmentNavigation.map((item) => (
                 <SidebarItem
@@ -114,7 +121,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               ))}
             </SidebarSection>
 
-            <SidebarSection className="max-lg:hidden">
+            <SidebarSection>
               <div className="flex items-center gap-3 px-2 py-1">
                 <CurrencyDollarIcon className="h-5 w-5 text-zinc-500" />
                 <span className="text-sm/6 font-medium text-zinc-500 dark:text-zinc-400">{t('entities.financial')}</span>
@@ -131,7 +138,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               ))}
             </SidebarSection>
 
-            <SidebarSection className="max-lg:hidden">
+            <SidebarSection>
               <div className="flex items-center gap-3 px-2 py-1">
                 <CalendarIcon className="h-5 w-5 text-zinc-500" />
                 <span className="text-sm/6 font-medium text-zinc-500 dark:text-zinc-400">{t('entities.scheduling')}</span>
@@ -149,7 +156,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             </SidebarSection>
 
             {adminNavigation.length > 0 && (
-              <SidebarSection className="max-lg:hidden">
+              <SidebarSection>
                 {adminNavigation.map((item) => (
                   <SidebarItem
                     key={item.name}
@@ -235,7 +242,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </Navbar>
       }
     >
-      <div className="p-3">
+      <div className="p-2">
         {children}
       </div>
     </SidebarLayout>

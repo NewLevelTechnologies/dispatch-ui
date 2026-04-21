@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { EllipsisVerticalIcon, ClockIcon } from '@heroicons/react/24/outline';
+import { EllipsisVerticalIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import AppLayout from '../components/AppLayout';
 import { Heading } from '../components/catalyst/heading';
 import { Button } from '../components/catalyst/button';
@@ -10,7 +10,7 @@ import { Badge } from '../components/catalyst/badge';
 import { Dropdown, DropdownButton, DropdownItem, DropdownLabel, DropdownMenu } from '../components/catalyst/dropdown';
 import { Dialog, DialogActions, DialogBody, DialogDescription, DialogTitle } from '../components/catalyst/dialog';
 import { Field, FieldGroup, Fieldset, Label } from '../components/catalyst/fieldset';
-import { Input } from '../components/catalyst/input';
+import { Input, InputGroup } from '../components/catalyst/input';
 import { Select } from '../components/catalyst/select';
 import { Textarea } from '../components/catalyst/textarea';
 import {
@@ -25,6 +25,7 @@ export default function AvailabilityPage() {
   const { t } = useTranslation();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedAvailability, setSelectedAvailability] = useState<Availability | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
   const [formData, setFormData] = useState<CreateAvailabilityRequest>({
     userId: '',
     date: new Date().toISOString().split('T')[0],
@@ -41,7 +42,7 @@ export default function AvailabilityPage() {
   });
 
   // Ensure data is always an array
-  const safeAvailability = Array.isArray(availability) ? availability : [];
+  const safeAvailability = useMemo(() => Array.isArray(availability) ? availability : [], [availability]);
 
   const createMutation = useMutation({
     mutationFn: (request: CreateAvailabilityRequest) => availabilityApi.create(request),
@@ -158,23 +159,53 @@ export default function AvailabilityPage() {
     });
   };
 
+  // Filter availability based on search query
+  const filteredAvailability = useMemo(() => {
+    if (safeAvailability.length === 0) return [];
+    if (!searchQuery.trim()) return safeAvailability;
+
+    const query = searchQuery.toLowerCase();
+    return safeAvailability.filter(
+      (item) =>
+        item.userId.toLowerCase().includes(query) ||
+        item.status.toLowerCase().includes(query) ||
+        item.reason?.toLowerCase().includes(query) ||
+        formatDate(item.date).toLowerCase().includes(query)
+    );
+  }, [safeAvailability, searchQuery]);
+
   return (
     <AppLayout>
-      <div className="flex items-end justify-between gap-4">
-        <div>
-          <Heading>{t('scheduling.entities.availability')}</Heading>
-          <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
-            {t('scheduling.descriptionAvailability')}
-          </p>
-        </div>
+      <div className="flex items-center justify-between gap-4">
+        <Heading>{t('scheduling.entities.availability')}</Heading>
         <Button onClick={handleAdd}>
           {t('common.actions.add', { entity: t('scheduling.entities.availabilityRecord') })}
         </Button>
       </div>
 
-      <div className="mt-8">
+      {/* Quick Search Bar */}
+      <div className="mt-2 flex items-center gap-4">
+        <InputGroup className="flex-1 max-w-md">
+          <MagnifyingGlassIcon data-slot="icon" />
+          <Input
+            type="text"
+            placeholder={t('common.search')}
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+        </InputGroup>
+        {safeAvailability.length > 0 && (
+          <div className="text-sm text-zinc-600 dark:text-zinc-400">
+            {filteredAvailability.length === safeAvailability.length
+              ? `${safeAvailability.length} ${safeAvailability.length === 1 ? t('scheduling.entities.availabilityRecord').toLowerCase() : t('scheduling.entities.availability').toLowerCase()}`
+              : `${filteredAvailability.length} of ${safeAvailability.length}`}
+          </div>
+        )}
+      </div>
+
+      <div className="mt-4">
         {error && (
-          <div className="rounded-lg bg-red-50 p-4 ring-1 ring-red-200 dark:bg-red-950/10 dark:ring-red-900/20 mb-4">
+          <div className="rounded-lg bg-red-50 p-3 ring-1 ring-red-200 dark:bg-red-950/10 dark:ring-red-900/20">
             <p className="text-sm text-red-800 dark:text-red-400">
               {t('common.actions.errorLoading', { entities: t('scheduling.entities.availability') })}: {(error as Error).message}
             </p>
@@ -182,20 +213,25 @@ export default function AvailabilityPage() {
         )}
 
         {isLoading ? (
-          <div className="flex flex-col items-center justify-center py-12">
+          <div className="text-center">
             <p className="text-sm text-zinc-600 dark:text-zinc-400">
               {t('common.actions.loading', { entities: t('scheduling.entities.availability') })}
             </p>
           </div>
         ) : safeAvailability.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-12">
-            <ClockIcon className="h-12 w-12 text-zinc-400" />
-            <p className="mt-4 text-sm text-zinc-600 dark:text-zinc-400">
+          <div className="rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700 p-4">
+            <p className="text-sm text-zinc-600 dark:text-zinc-400">
               {t('common.actions.notFound', { entities: t('scheduling.entities.availability') })}
             </p>
           </div>
+        ) : filteredAvailability.length === 0 ? (
+          <div className="rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700 p-4">
+            <p className="text-sm text-zinc-600 dark:text-zinc-400">
+              {t('common.actions.noMatchSearch', { entities: t('scheduling.entities.availability') })}
+            </p>
+          </div>
         ) : (
-          <Table>
+          <Table dense className="[--gutter:theme(spacing.1)] text-sm">
             <TableHead>
               <TableRow>
                 <TableHeader>{t('scheduling.table.user')}</TableHeader>
@@ -208,7 +244,7 @@ export default function AvailabilityPage() {
               </TableRow>
             </TableHead>
             <TableBody>
-              {safeAvailability.map((item) => (
+              {filteredAvailability.map((item) => (
                 <TableRow key={item.id}>
                   <TableCell className="font-medium">{item.userId}</TableCell>
                   <TableCell>{formatDate(item.date)}</TableCell>
