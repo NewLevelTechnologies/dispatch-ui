@@ -11,8 +11,8 @@ export interface AuditLog {
   entityType: string;
   entityId: string;
   action: 'CREATE' | 'UPDATE' | 'DELETE';
-  oldValues?: Record<string, any>;
-  newValues?: Record<string, any>;
+  oldValues?: Record<string, unknown>;
+  newValues?: Record<string, unknown>;
   timestamp: string;
   ipAddress?: string;
   userAgent?: string;

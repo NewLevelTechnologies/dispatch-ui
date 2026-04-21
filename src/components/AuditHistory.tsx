@@ -65,7 +65,7 @@ export default function AuditHistory({ entityType, entityId }: AuditHistoryProps
     }
 
     if (log.action === 'UPDATE') {
-      const changes: [string, any, any][] = [];
+      const changes: [string, unknown, unknown][] = [];
       if (log.oldValues && log.newValues) {
         Object.keys(log.newValues).forEach(key => {
           // Skip internal/system fields and unchanged values
@@ -141,7 +141,7 @@ export default function AuditHistory({ entityType, entityId }: AuditHistoryProps
     return null;
   };
 
-  const renderValue = (value: any): string => {
+  const renderValue = (value: unknown): string => {
     if (value === null || value === undefined) {
       return '(empty)';
     }
