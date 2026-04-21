@@ -220,6 +220,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                     </button>
                   </div>
                 </div>
+                <DropdownItem href="/account/settings">
+                  <DropdownLabel>{t('account.settings')}</DropdownLabel>
+                </DropdownItem>
                 <DropdownItem onClick={() => signOut()}>
                   <DropdownLabel>{t('common.signOut')}</DropdownLabel>
                 </DropdownItem>

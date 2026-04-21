@@ -809,6 +809,24 @@
       "scheduled": "Scheduled"
     }
   },
+  "account": {
+    "settings": "Account Settings",
+    "settingsDescription": "Manage your personal account preferences and security settings",
+    "changePassword": "Change Password",
+    "changePasswordDescription": "Update your account password",
+    "currentPassword": "Current Password",
+    "newPassword": "New Password",
+    "confirmPassword": "Confirm New Password",
+    "updatePassword": "Update Password",
+    "passwordChangeSuccess": "Password changed successfully",
+    "passwordMismatch": "New passwords do not match",
+    "passwordTooShort": "Password must be at least 8 characters",
+    "twoFactorAuth": "Two-Factor Authentication",
+    "twoFactorAuthDescription": "Add an extra layer of security to your account",
+    "mfaEnabled": "Two-factor authentication is enabled",
+    "mfaDisabled": "Two-factor authentication is disabled",
+    "mfaEnabledInfo": "You will need to enter a code from your authenticator app when signing in"
+  },
   "audit": {
     "title": "Audit History",
     "loading": "Loading audit history...",
