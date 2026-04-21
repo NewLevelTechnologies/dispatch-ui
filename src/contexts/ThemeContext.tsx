@@ -1,11 +1,11 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
+import { useAuthenticator } from '@aws-amplify/ui-react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import {
   getUserPreferences,
   updateUserPreferences,
   type ThemePreference,
 } from '../api/userPreferencesApi';
-import { useAuth } from './AuthContext';
 
 type Theme = 'light' | 'dark' | 'system';
 
@@ -29,7 +29,8 @@ interface ThemeContextType {
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const { isAuthenticated } = useAuth();
+  const { authStatus } = useAuthenticator((context) => [context.authStatus]);
+  const isAuthenticated = authStatus === 'authenticated';
 
   // Fetch user preferences from API (only when authenticated)
   const { data: preferences, isLoading } = useQuery({
