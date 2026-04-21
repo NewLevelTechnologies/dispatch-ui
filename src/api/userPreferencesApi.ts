@@ -1,12 +1,14 @@
 import { apiClient } from './apiClient';
 
+export type ThemePreference = 'LIGHT' | 'DARK' | 'SYSTEM';
+
 export interface UserPreferencesResponse {
-  theme: string | null;
+  theme: ThemePreference | null;
   additionalPreferences: Record<string, unknown>;
 }
 
 export interface UpdatePreferencesRequest {
-  theme?: string;
+  theme?: ThemePreference;
 }
 
 export const getUserPreferences = async (): Promise<UserPreferencesResponse> => {

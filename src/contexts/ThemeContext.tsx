@@ -1,9 +1,23 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { getUserPreferences, updateUserPreferences } from '../api/userPreferencesApi';
+import {
+  getUserPreferences,
+  updateUserPreferences,
+  type ThemePreference,
+} from '../api/userPreferencesApi';
 import { useAuth } from './AuthContext';
 
 type Theme = 'light' | 'dark' | 'system';
+
+// Map between UI theme values and API enum values
+const themeToApiTheme = (theme: Theme): ThemePreference => {
+  return theme.toUpperCase() as ThemePreference;
+};
+
+const apiThemeToTheme = (apiTheme: ThemePreference | null): Theme => {
+  if (!apiTheme) return 'system';
+  return apiTheme.toLowerCase() as Theme;
+};
 
 interface ThemeContextType {
   theme: Theme;
@@ -39,10 +53,12 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   // Sync theme from API preferences when they become available
   useEffect(() => {
-    if (preferences?.theme && preferences.theme !== theme) {
-      const apiTheme = preferences.theme as Theme;
-      setThemeState(apiTheme);
-      localStorage.setItem('theme', apiTheme);
+    if (preferences?.theme) {
+      const convertedTheme = apiThemeToTheme(preferences.theme);
+      if (convertedTheme !== theme) {
+        setThemeState(convertedTheme);
+        localStorage.setItem('theme', convertedTheme);
+      }
     }
     // Only sync when preferences first load, not on every theme change
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -83,7 +99,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
     // Persist to API if authenticated
     if (isAuthenticated) {
-      updatePreferencesMutation.mutate({ theme: newTheme });
+      updatePreferencesMutation.mutate({ theme: themeToApiTheme(newTheme) });
     }
   };
 
