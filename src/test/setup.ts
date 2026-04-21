@@ -638,7 +638,7 @@ vi.mock('../hooks/useCurrentUser', () => ({
       'VIEW_ROLES',
       'CREATE_ROLES',
       'EDIT_ROLES',
-      'DELETE_USERS',
+      'DELETE_ROLES',
       'VIEW_CUSTOMERS',
       'ADD_CUSTOMERS',
       'EDIT_CUSTOMERS',
