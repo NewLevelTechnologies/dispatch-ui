@@ -622,6 +622,7 @@ vi.mock('../hooks/useCurrentUser', () => ({
         'CLOSE_SERVICE_LOCATIONS',
         'VIEW_SETTINGS',
         'EDIT_SETTINGS',
+        'VIEW_AUDIT_LOGS',
       ],
       roles: [],
     },
@@ -648,6 +649,7 @@ vi.mock('../hooks/useCurrentUser', () => ({
       'CLOSE_SERVICE_LOCATIONS',
       'VIEW_SETTINGS',
       'EDIT_SETTINGS',
+      'VIEW_AUDIT_LOGS',
     ];
     return capabilities.includes(capability);
   }),
@@ -671,6 +673,7 @@ vi.mock('../hooks/useCurrentUser', () => ({
       'CLOSE_SERVICE_LOCATIONS',
       'VIEW_SETTINGS',
       'EDIT_SETTINGS',
+      'VIEW_AUDIT_LOGS',
     ];
     return capabilities.some(cap => mockCapabilities.includes(cap));
   }),
@@ -694,6 +697,7 @@ vi.mock('../hooks/useCurrentUser', () => ({
       'CLOSE_SERVICE_LOCATIONS',
       'VIEW_SETTINGS',
       'EDIT_SETTINGS',
+      'VIEW_AUDIT_LOGS',
     ];
     return capabilities.every(cap => mockCapabilities.includes(cap));
   }),

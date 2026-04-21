@@ -808,5 +808,17 @@
       "id": "ID",
       "scheduled": "Scheduled"
     }
+  },
+  "audit": {
+    "title": "Audit History",
+    "loading": "Loading audit history...",
+    "errorLoading": "Error loading audit history",
+    "noHistory": "No audit history available",
+    "noHistoryHelper": "Changes to this record will appear here",
+    "initialValues": "Initial values",
+    "changedFields": "Changed fields",
+    "deletedValues": "Deleted values",
+    "noFieldChanges": "No field changes detected",
+    "totalEvents": "{{count}} audit events"
   }
 }
