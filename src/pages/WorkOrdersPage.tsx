@@ -108,7 +108,6 @@ export default function WorkOrdersPage() {
 
   const handleCloseDialog = () => {
     setIsDialogOpen(false);
-    setSelectedWorkOrder(null);
   };
 
   return (

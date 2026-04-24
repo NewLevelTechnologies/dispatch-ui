@@ -35,11 +35,7 @@ export default function WorkOrderFormDialog({ isOpen, onClose, workOrder }: Work
   const { t } = useTranslation();
   const { getName } = useGlossary();
 
-  // Stable edit flag: only updates when the dialog opens, stays frozen during close animation
-  const [isEdit, setIsEdit] = useState(false);
-  useEffect(() => {
-    if (isOpen) setIsEdit(!!workOrder?.id);
-  }, [isOpen, workOrder?.id]);
+  const isEdit = !!workOrder?.id;
 
   // Customer mode: existing or new
   const [customerMode, setCustomerMode] = useState<'existing' | 'new'>('existing');
