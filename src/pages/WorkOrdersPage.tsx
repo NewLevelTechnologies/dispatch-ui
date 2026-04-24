@@ -29,6 +29,20 @@ const STATUS_TRANSLATION_KEYS: Record<string, string> = {
   CANCELLED: 'cancelled',
 };
 
+const PRIORITY_COLORS = {
+  LOW: 'zinc',
+  NORMAL: 'sky',
+  HIGH: 'amber',
+  URGENT: 'rose',
+} as const;
+
+const PRIORITY_TRANSLATION_KEYS: Record<string, string> = {
+  LOW: 'low',
+  NORMAL: 'normal',
+  HIGH: 'high',
+  URGENT: 'urgent',
+};
+
 export default function WorkOrdersPage() {
   const queryClient = useQueryClient();
   const { t } = useTranslation();
@@ -63,7 +77,9 @@ export default function WorkOrdersPage() {
         workOrder.id.toLowerCase().includes(query) ||
         workOrder.customerId.toLowerCase().includes(query) ||
         workOrder.status.toLowerCase().includes(query) ||
-        workOrder.description?.toLowerCase().includes(query)
+        workOrder.description?.toLowerCase().includes(query) ||
+        workOrder.customerOrderNumber?.toLowerCase().includes(query) ||
+        workOrder.customer?.name.toLowerCase().includes(query)
     );
   }, [workOrders, searchQuery]);
 
@@ -159,7 +175,9 @@ export default function WorkOrdersPage() {
                 <TableHeader>{t('workOrders.table.id')}</TableHeader>
                 <TableHeader>{getName('service_location')}</TableHeader>
                 <TableHeader>{t('common.form.status')}</TableHeader>
+                <TableHeader>{t('workOrders.table.priority')}</TableHeader>
                 <TableHeader>{t('workOrders.table.scheduled')}</TableHeader>
+                <TableHeader>{t('workOrders.table.customerPO')}</TableHeader>
                 <TableHeader>{t('common.form.description')}</TableHeader>
                 <TableHeader></TableHeader>
               </TableRow>
@@ -186,8 +204,16 @@ export default function WorkOrdersPage() {
                       {t(`workOrders.status.${STATUS_TRANSLATION_KEYS[workOrder.status]}`)}
                     </Badge>
                   </TableCell>
+                  <TableCell>
+                    <Badge color={PRIORITY_COLORS[workOrder.priority ?? 'NORMAL']}>
+                      {t(`workOrders.priority.${PRIORITY_TRANSLATION_KEYS[workOrder.priority ?? 'NORMAL']}`)}
+                    </Badge>
+                  </TableCell>
                   <TableCell className="text-zinc-500">
                     {formatDate(workOrder.scheduledDate)}
+                  </TableCell>
+                  <TableCell className="font-mono text-xs text-zinc-500">
+                    {workOrder.customerOrderNumber || '-'}
                   </TableCell>
                   <TableCell className="text-zinc-500">
                     {workOrder.description

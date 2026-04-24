@@ -60,6 +60,7 @@ export {
 export {
   workOrderApi,
   WorkOrderStatus,
+  WorkOrderPriority,
   type WorkOrder,
   type CreateWorkOrderRequest,
   type UpdateWorkOrderRequest

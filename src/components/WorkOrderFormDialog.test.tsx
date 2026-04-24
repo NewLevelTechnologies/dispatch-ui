@@ -81,9 +81,10 @@ describe('WorkOrderFormDialog', () => {
       customerId: 'customer-1',
       serviceLocationId: 'location-1',
       status: 'SCHEDULED' as const,
+      priority: 'NORMAL' as const,
       scheduledDate: '2024-03-15',
       description: 'Fix leaking pipe',
-      notes: 'Customer prefers morning',
+      internalNotes: 'Customer prefers morning',
       createdAt: '2024-03-10T10:00:00Z',
       updatedAt: '2024-03-10T10:00:00Z',
     };
@@ -108,7 +109,7 @@ describe('WorkOrderFormDialog', () => {
         expect(descriptionTextarea).toHaveValue('Fix leaking pipe');
       });
 
-      const notesTextarea = screen.getByLabelText(/notes/i);
+      const notesTextarea = screen.getByLabelText(/internal notes/i);
       expect(notesTextarea).toHaveValue('Customer prefers morning');
     });
 
@@ -163,7 +164,7 @@ describe('WorkOrderFormDialog', () => {
       expect(screen.getByLabelText(/service location/i)).toBeInTheDocument();
       expect(screen.getByLabelText(/scheduled date/i)).toBeInTheDocument();
       expect(screen.getByLabelText(/description/i)).toBeInTheDocument();
-      expect(screen.getByLabelText(/notes/i)).toBeInTheDocument();
+      expect(screen.getByLabelText(/internal notes/i)).toBeInTheDocument();
     });
   });
 
@@ -227,8 +228,9 @@ describe('WorkOrderFormDialog', () => {
           customerId: 'customer-1',
           serviceLocationId: 'location-1',
           status: 'PENDING',
+          priority: 'NORMAL',
           description: 'Test work order',
-          notes: 'Test notes',
+          internalNotes: 'Test notes',
           createdAt: '2024-03-15T10:00:00Z',
           updatedAt: '2024-03-15T10:00:00Z',
         },
@@ -253,8 +255,8 @@ describe('WorkOrderFormDialog', () => {
       const descriptionTextarea = screen.getByLabelText(/description/i);
       await user.type(descriptionTextarea, 'Test work order');
 
-      // Fill in notes
-      const notesTextarea = screen.getByLabelText(/notes/i);
+      // Fill in internal notes
+      const notesTextarea = screen.getByLabelText(/internal notes/i);
       await user.type(notesTextarea, 'Test notes');
 
       // Submit form
@@ -268,7 +270,7 @@ describe('WorkOrderFormDialog', () => {
           serviceLocationId: 'location-1',
           status: 'PENDING',
           description: 'Test work order',
-          notes: 'Test notes',
+          internalNotes: 'Test notes',
         }));
       });
 
@@ -282,15 +284,16 @@ describe('WorkOrderFormDialog', () => {
         customerId: 'customer-1',
         serviceLocationId: 'location-1',
         status: 'SCHEDULED' as const,
+        priority: 'NORMAL' as const,
         scheduledDate: '2024-03-15',
         description: 'Fix leaking pipe',
-        notes: 'Customer prefers morning',
+        internalNotes: 'Customer prefers morning',
         createdAt: '2024-03-10T10:00:00Z',
         updatedAt: '2024-03-10T10:00:00Z',
       };
 
       vi.mocked(apiClient.get).mockResolvedValue({ data: mockServiceLocations });
-      vi.mocked(apiClient.put).mockResolvedValue({
+      vi.mocked(apiClient.patch).mockResolvedValue({
         data: { ...existingWorkOrder, status: 'COMPLETED' },
       });
 
@@ -325,7 +328,7 @@ describe('WorkOrderFormDialog', () => {
 
       // Should call API with update data
       await waitFor(() => {
-        expect(apiClient.put).toHaveBeenCalledWith('/work-orders/1', expect.objectContaining({
+        expect(apiClient.patch).toHaveBeenCalledWith('/work-orders/1', expect.objectContaining({
           status: 'COMPLETED',
         }));
       });
@@ -386,7 +389,7 @@ describe('WorkOrderFormDialog', () => {
       await user.type(descriptionTextarea, 'Test description');
       expect(descriptionTextarea).toHaveValue('Test description');
 
-      const notesTextarea = screen.getByLabelText(/notes/i);
+      const notesTextarea = screen.getByLabelText(/internal notes/i);
       await user.type(notesTextarea, 'Test notes');
       expect(notesTextarea).toHaveValue('Test notes');
 
@@ -402,9 +405,10 @@ describe('WorkOrderFormDialog', () => {
         customerId: 'customer-1',
         serviceLocationId: 'location-1',
         status: 'SCHEDULED' as const,
+        priority: 'NORMAL' as const,
         scheduledDate: '2024-03-15',
         description: 'Fix leaking pipe',
-        notes: 'Customer prefers morning',
+        internalNotes: 'Customer prefers morning',
         createdAt: '2024-03-10T10:00:00Z',
         updatedAt: '2024-03-10T10:00:00Z',
       };
@@ -517,9 +521,10 @@ describe('WorkOrderFormDialog', () => {
         customerId: 'customer-1',
         serviceLocationId: 'location-1',
         status: 'SCHEDULED' as const,
+        priority: 'NORMAL' as const,
         scheduledDate: '2024-03-15',
         description: 'Fix leaking pipe',
-        notes: 'Customer prefers morning',
+        internalNotes: 'Customer prefers morning',
         createdAt: '2024-03-10T10:00:00Z',
         updatedAt: '2024-03-10T10:00:00Z',
       };

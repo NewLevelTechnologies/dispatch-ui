@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { PatternFormat } from 'react-number-format';
-import { workOrderApi, customerApi, dispatchRegionApi, type WorkOrder, type ServiceLocationSearchResult, type CreateCustomerRequest } from '../api';
+import { workOrderApi, customerApi, dispatchRegionApi, type WorkOrder, type WorkOrderPriority, type ServiceLocationSearchResult, type CreateCustomerRequest } from '../api';
 import { useGlossary } from '../contexts/GlossaryContext';
 import { Dialog, DialogActions, DialogBody, DialogDescription, DialogTitle } from './catalyst/dialog';
 import { Button } from './catalyst/button';
@@ -34,7 +34,12 @@ export default function WorkOrderFormDialog({ isOpen, onClose, workOrder }: Work
   const queryClient = useQueryClient();
   const { t } = useTranslation();
   const { getName } = useGlossary();
-  const isEdit = !!workOrder?.id;
+
+  // Stable edit flag: only updates when the dialog opens, stays frozen during close animation
+  const [isEdit, setIsEdit] = useState(false);
+  useEffect(() => {
+    if (isOpen) setIsEdit(!!workOrder?.id);
+  }, [isOpen, workOrder?.id]);
 
   // Customer mode: existing or new
   const [customerMode, setCustomerMode] = useState<'existing' | 'new'>('existing');
@@ -45,9 +50,11 @@ export default function WorkOrderFormDialog({ isOpen, onClose, workOrder }: Work
     customerId: '',
     serviceLocationId: '',
     status: 'PENDING',
+    priority: 'NORMAL',
     scheduledDate: '',
     description: '',
-    notes: '',
+    customerOrderNumber: '',
+    internalNotes: '',
   });
 
   const [selectedLocation, setSelectedLocation] = useState<ServiceLocationSearchResult | null>(null);
@@ -121,11 +128,26 @@ export default function WorkOrderFormDialog({ isOpen, onClose, workOrder }: Work
         customerId: workOrder.customerId,
         serviceLocationId: workOrder.serviceLocationId,
         status: workOrder.status,
+        priority: workOrder.priority ?? 'NORMAL',
         scheduledDate: workOrder.scheduledDate || '',
         description: workOrder.description || '',
-        notes: workOrder.notes || '',
+        customerOrderNumber: workOrder.customerOrderNumber || '',
+        internalNotes: workOrder.internalNotes || '',
       });
-      setSelectedLocation(null); // TODO: Load from workOrder if editing
+      setSelectedLocation(
+        workOrder.serviceLocation
+          ? {
+              id: workOrder.serviceLocationId,
+              customerId: workOrder.customerId,
+              customerName: workOrder.customer?.name ?? '',
+              locationName: workOrder.serviceLocation.locationName ?? null,
+              address: workOrder.serviceLocation.address,
+              siteContactName: workOrder.serviceLocation.siteContactName ?? null,
+              siteContactPhone: workOrder.serviceLocation.siteContactPhone ?? null,
+              status: 'ACTIVE',
+            }
+          : null
+      );
     } else {
       // Create mode - reset everything
       setCustomerMode('existing');
@@ -134,9 +156,11 @@ export default function WorkOrderFormDialog({ isOpen, onClose, workOrder }: Work
         customerId: '',
         serviceLocationId: '',
         status: 'PENDING',
+        priority: 'NORMAL',
         scheduledDate: '',
         description: '',
-        notes: '',
+        customerOrderNumber: '',
+        internalNotes: '',
       });
       setSelectedLocation(null);
       setLocationName('');
@@ -184,9 +208,11 @@ export default function WorkOrderFormDialog({ isOpen, onClose, workOrder }: Work
     mutationFn: (data: Omit<WorkOrder, 'id' | 'createdAt' | 'updatedAt'>) =>
       workOrderApi.update(workOrder!.id!, {
         status: data.status,
+        priority: data.priority as WorkOrderPriority,
         scheduledDate: data.scheduledDate || undefined,
         description: data.description,
-        notes: data.notes,
+        customerOrderNumber: data.customerOrderNumber || undefined,
+        internalNotes: data.internalNotes,
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['work-orders'] });
@@ -268,9 +294,11 @@ export default function WorkOrderFormDialog({ isOpen, onClose, workOrder }: Work
           customerId: createdCustomer.id,
           serviceLocationId: firstLocation.id,
           status: 'PENDING',
+          priority: formData.priority ?? 'NORMAL',
           scheduledDate: formData.scheduledDate || '',
           description: formData.description,
-          notes: formData.notes,
+          customerOrderNumber: formData.customerOrderNumber || '',
+          internalNotes: formData.internalNotes,
         };
 
         createMutation.mutate(workOrderData);
@@ -763,15 +791,53 @@ export default function WorkOrderFormDialog({ isOpen, onClose, workOrder }: Work
                 </>
               )}
 
+              {/* Priority */}
               <Field>
-                <Label>{t('workOrders.form.scheduledDate')}</Label>
-                <Input
-                  type="date"
-                  name="scheduledDate"
-                  value={formData.scheduledDate}
-                  onChange={(e) => handleChange('scheduledDate', e.target.value)}
-                />
+                <Label>{t('workOrders.form.priority')}</Label>
+                <div className="mt-1 flex gap-1">
+                  {(['LOW', 'NORMAL', 'HIGH', 'URGENT'] as const).map((p) => (
+                    <button
+                      key={p}
+                      type="button"
+                      onClick={() => handleChange('priority', p)}
+                      className={[
+                        'flex-1 rounded px-2 py-1 text-xs font-medium ring-1 ring-inset transition-colors',
+                        formData.priority === p
+                          ? p === 'LOW'    ? 'bg-zinc-100 text-zinc-800 ring-zinc-400 dark:bg-zinc-700 dark:text-zinc-100 dark:ring-zinc-500'
+                          : p === 'NORMAL' ? 'bg-sky-100 text-sky-800 ring-sky-400 dark:bg-sky-900 dark:text-sky-100 dark:ring-sky-600'
+                          : p === 'HIGH'   ? 'bg-amber-100 text-amber-800 ring-amber-400 dark:bg-amber-900 dark:text-amber-100 dark:ring-amber-600'
+                                           : 'bg-rose-100 text-rose-800 ring-rose-400 dark:bg-rose-900 dark:text-rose-100 dark:ring-rose-600'
+                          : 'bg-white text-zinc-500 ring-zinc-200 hover:bg-zinc-50 dark:bg-zinc-900 dark:text-zinc-400 dark:ring-zinc-700 dark:hover:bg-zinc-800',
+                      ].join(' ')}
+                    >
+                      {t(`workOrders.priority.${p.toLowerCase()}`)}
+                    </button>
+                  ))}
+                </div>
               </Field>
+
+              <div className="grid grid-cols-2 gap-4">
+                <Field>
+                  <Label>{t('workOrders.form.scheduledDate')}</Label>
+                  <Input
+                    type="date"
+                    name="scheduledDate"
+                    value={formData.scheduledDate}
+                    onChange={(e) => handleChange('scheduledDate', e.target.value)}
+                  />
+                </Field>
+
+                <Field>
+                  <Label>{t('workOrders.form.customerOrderNumber')}</Label>
+                  <Input
+                    name="customerOrderNumber"
+                    value={formData.customerOrderNumber || ''}
+                    onChange={(e) => handleChange('customerOrderNumber', e.target.value)}
+                    placeholder={t('workOrders.form.customerOrderNumberPlaceholder')}
+                    maxLength={100}
+                  />
+                </Field>
+              </div>
 
               <Field>
                 <Label>{t('common.form.description')}</Label>
@@ -779,17 +845,18 @@ export default function WorkOrderFormDialog({ isOpen, onClose, workOrder }: Work
                   name="description"
                   value={formData.description || ''}
                   onChange={(e) => handleChange('description', e.target.value)}
-                  rows={3}
+                  rows={2}
                 />
               </Field>
 
               <Field>
-                <Label>{t('common.form.notes')}</Label>
+                <Label>{t('workOrders.form.internalNotes')}</Label>
+                <div className="mb-1 text-xs text-zinc-500 dark:text-zinc-400">{t('workOrders.form.internalNotesHint')}</div>
                 <Textarea
-                  name="notes"
-                  value={formData.notes || ''}
-                  onChange={(e) => handleChange('notes', e.target.value)}
-                  rows={3}
+                  name="internalNotes"
+                  value={formData.internalNotes || ''}
+                  onChange={(e) => handleChange('internalNotes', e.target.value)}
+                  rows={2}
                 />
               </Field>
             </FieldGroup>

@@ -11,16 +11,28 @@ export const WorkOrderStatus = {
   CANCELLED: 'CANCELLED',
 } as const;
 
+export type WorkOrderPriority = 'LOW' | 'NORMAL' | 'HIGH' | 'URGENT';
+
+export const WorkOrderPriority = {
+  LOW: 'LOW',
+  NORMAL: 'NORMAL',
+  HIGH: 'HIGH',
+  URGENT: 'URGENT',
+} as const;
+
 export interface WorkOrder {
   id: string;
   workOrderNumber?: string; // e.g., "WO-00001" - display this prominently
   customerId: string;
   serviceLocationId: string;
   status: WorkOrderStatus;
+  priority: WorkOrderPriority;
   scheduledDate?: string;
   completedDate?: string;
   description?: string;
-  notes?: string;
+  customerOrderNumber?: string;
+  internalNotes?: string;
+  createdByUserId?: string;
   totalAmount?: number;
   createdAt: string;
   updatedAt: string;
@@ -49,19 +61,23 @@ export interface CreateWorkOrderRequest {
   customerId: string;
   serviceLocationId: string;
   status?: WorkOrderStatus;
+  priority?: WorkOrderPriority;
   scheduledDate?: string;
   description?: string;
-  notes?: string;
+  customerOrderNumber?: string;
+  internalNotes?: string;
   totalAmount?: number;
 }
 
 export interface UpdateWorkOrderRequest {
   customerId?: string;
   status?: WorkOrderStatus;
+  priority?: WorkOrderPriority;
   scheduledDate?: string;
   completedDate?: string;
   description?: string;
-  notes?: string;
+  customerOrderNumber?: string;
+  internalNotes?: string;
   totalAmount?: number;
 }
 
@@ -94,7 +110,7 @@ export const workOrderApi = {
   },
 
   update: async (id: string, request: UpdateWorkOrderRequest): Promise<WorkOrder> => {
-    const response = await apiClient.put<WorkOrder>(`/work-orders/${id}`, request);
+    const response = await apiClient.patch<WorkOrder>(`/work-orders/${id}`, request);
     return response.data;
   },
 
