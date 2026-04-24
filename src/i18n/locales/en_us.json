@@ -788,13 +788,24 @@
   "workOrders": {
     "description": "Manage work orders and service requests",
     "form": {
+      "customerOrderNumber": "Customer PO / Order #",
+      "customerOrderNumberPlaceholder": "e.g., PO-12345",
       "customerPlaceholder": "Select a customer...",
       "customerRequired": "Please select a customer",
       "existingCustomer": "Existing {{entity, lowercase}}",
+      "internalNotes": "Internal Notes",
+      "internalNotesHint": "Not visible to the customer",
       "newCustomer": "New {{entity, lowercase}}",
       "newCustomerDetails": "New {{entity}} Details",
+      "priority": "Priority",
       "scheduledDate": "Scheduled Date",
       "selectServiceLocation": "Please select a {{entity, lowercase}}"
+    },
+    "priority": {
+      "high": "High",
+      "low": "Low",
+      "normal": "Normal",
+      "urgent": "Urgent"
     },
     "status": {
       "cancelled": "Cancelled",
@@ -805,7 +816,9 @@
     },
     "table": {
       "amount": "Amount",
+      "customerPO": "Customer PO",
       "id": "ID",
+      "priority": "Priority",
       "scheduled": "Scheduled"
     }
   },
