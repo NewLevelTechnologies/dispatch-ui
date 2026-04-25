@@ -7,7 +7,6 @@ import {
   UserGroupIcon,
   ClipboardDocumentListIcon,
   WrenchScrewdriverIcon,
-  CurrencyDollarIcon,
   CalendarIcon,
   ShieldCheckIcon,
   Cog6ToothIcon,
@@ -31,6 +30,26 @@ import { Avatar } from './catalyst/avatar';
 import { useTheme } from '../contexts/ThemeContext';
 import { useHasAnyCapability } from '../hooks/useCurrentUser';
 
+const ENV_BADGE: Record<string, { label: string; className: string }> = {
+  development: { label: 'DEV', className: 'bg-amber-500/15 text-amber-700 ring-amber-500/30 dark:text-amber-400' },
+  qa: { label: 'QA', className: 'bg-sky-500/15 text-sky-700 ring-sky-500/30 dark:text-sky-400' },
+  staging: { label: 'STG', className: 'bg-violet-500/15 text-violet-700 ring-violet-500/30 dark:text-violet-400' },
+};
+
+function SectionHeading({ children }: { children: React.ReactNode }) {
+  return (
+    <h3 className="mt-1 mb-1 px-2 text-[11px] font-semibold tracking-wider text-zinc-500 uppercase dark:text-zinc-400">
+      {children}
+    </h3>
+  );
+}
+
+function navItemClasses(isCurrent: boolean) {
+  return isCurrent
+    ? 'rounded-lg bg-zinc-950/[0.04] dark:bg-white/[0.06]'
+    : '';
+}
+
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, signOut } = useAuthenticator((context) => [context.user]);
   const location = useLocation();
@@ -41,6 +60,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   // Permission checks for navigation visibility
   const canViewUsers = useHasAnyCapability('VIEW_USERS');
   const canViewSettings = useHasAnyCapability('VIEW_SETTINGS');
+
+  const envKey = (import.meta.env.VITE_ENV || '').toLowerCase();
+  const envBadge = ENV_BADGE[envKey];
+
+  const isCurrent = (href: string) =>
+    href === '/dashboard' ? location.pathname === href : location.pathname.startsWith(href);
 
   const mainNavigation = [
     { name: t('entities.dashboard'), href: '/dashboard', icon: HomeIcon },
@@ -78,92 +103,112 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         <Sidebar>
           <SidebarHeader>
             <div className="flex items-center gap-3">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-600">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-600 shadow-sm">
                 <span className="text-sm font-bold text-white">D</span>
               </div>
-              <div className="text-base font-semibold text-zinc-900 dark:text-white">
-                {t('app.name')}
+              <div className="flex min-w-0 flex-1 items-center gap-2">
+                <span className="text-base font-semibold text-zinc-900 dark:text-white">
+                  {t('app.name')}
+                </span>
+                {envBadge && (
+                  <span
+                    className={`inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-bold tracking-wider ring-1 ring-inset ${envBadge.className}`}
+                  >
+                    {envBadge.label}
+                  </span>
+                )}
               </div>
             </div>
           </SidebarHeader>
 
-          <SidebarBody>
+          <SidebarBody className="[&>[data-slot=section]+[data-slot=section]]:mt-5">
             <SidebarSection>
-              {mainNavigation.map((item) => (
-                <SidebarItem
-                  key={item.name}
-                  href={item.href}
-                  current={location.pathname === item.href}
-                >
-                  <item.icon className="h-5 w-5" />
-                  <span>{item.name}</span>
-                </SidebarItem>
-              ))}
-            </SidebarSection>
-
-            <SidebarSection>
-              <div className="flex items-center gap-3 px-2 py-1">
-                <WrenchScrewdriverIcon className="h-5 w-5 text-zinc-500" />
-                <span className="text-sm/6 font-medium text-zinc-500 dark:text-zinc-400">{getName('equipment', true)}</span>
-              </div>
-              {equipmentNavigation.map((item) => (
-                <SidebarItem
-                  key={item.name}
-                  href={item.href}
-                  current={location.pathname === item.href}
-                >
-                  <item.icon className="h-5 w-5" />
-                  <span>{item.name}</span>
-                </SidebarItem>
-              ))}
-            </SidebarSection>
-
-            <SidebarSection>
-              <div className="flex items-center gap-3 px-2 py-1">
-                <CurrencyDollarIcon className="h-5 w-5 text-zinc-500" />
-                <span className="text-sm/6 font-medium text-zinc-500 dark:text-zinc-400">{t('entities.financial')}</span>
-              </div>
-              {financialNavigation.map((item) => (
-                <SidebarItem
-                  key={item.name}
-                  href={item.href}
-                  current={location.pathname === item.href}
-                >
-                  <item.icon className="h-5 w-5" />
-                  <span>{item.name}</span>
-                </SidebarItem>
-              ))}
-            </SidebarSection>
-
-            <SidebarSection>
-              <div className="flex items-center gap-3 px-2 py-1">
-                <CalendarIcon className="h-5 w-5 text-zinc-500" />
-                <span className="text-sm/6 font-medium text-zinc-500 dark:text-zinc-400">{t('entities.scheduling')}</span>
-              </div>
-              {schedulingNavigation.map((item) => (
-                <SidebarItem
-                  key={item.name}
-                  href={item.href}
-                  current={location.pathname === item.href}
-                >
-                  <item.icon className="h-5 w-5" />
-                  <span>{item.name}</span>
-                </SidebarItem>
-              ))}
-            </SidebarSection>
-
-            {adminNavigation.length > 0 && (
-              <SidebarSection>
-                {adminNavigation.map((item) => (
+              {mainNavigation.map((item) => {
+                const current = isCurrent(item.href);
+                return (
                   <SidebarItem
                     key={item.name}
                     href={item.href}
-                    current={location.pathname === item.href}
+                    current={current}
+                    className={navItemClasses(current)}
                   >
                     <item.icon className="h-5 w-5" />
                     <span>{item.name}</span>
                   </SidebarItem>
-                ))}
+                );
+              })}
+            </SidebarSection>
+
+            <SidebarSection>
+              <SectionHeading>{t('entities.inventory')}</SectionHeading>
+              {equipmentNavigation.map((item) => {
+                const current = isCurrent(item.href);
+                return (
+                  <SidebarItem
+                    key={item.name}
+                    href={item.href}
+                    current={current}
+                    className={navItemClasses(current)}
+                  >
+                    <item.icon className="h-5 w-5" />
+                    <span>{item.name}</span>
+                  </SidebarItem>
+                );
+              })}
+            </SidebarSection>
+
+            <SidebarSection>
+              <SectionHeading>{t('entities.financial')}</SectionHeading>
+              {financialNavigation.map((item) => {
+                const current = isCurrent(item.href);
+                return (
+                  <SidebarItem
+                    key={item.name}
+                    href={item.href}
+                    current={current}
+                    className={navItemClasses(current)}
+                  >
+                    <item.icon className="h-5 w-5" />
+                    <span>{item.name}</span>
+                  </SidebarItem>
+                );
+              })}
+            </SidebarSection>
+
+            <SidebarSection>
+              <SectionHeading>{t('entities.scheduling')}</SectionHeading>
+              {schedulingNavigation.map((item) => {
+                const current = isCurrent(item.href);
+                return (
+                  <SidebarItem
+                    key={item.name}
+                    href={item.href}
+                    current={current}
+                    className={navItemClasses(current)}
+                  >
+                    <item.icon className="h-5 w-5" />
+                    <span>{item.name}</span>
+                  </SidebarItem>
+                );
+              })}
+            </SidebarSection>
+
+            {adminNavigation.length > 0 && (
+              <SidebarSection>
+                {adminNavigation.map((item) => {
+                  const current = isCurrent(item.href);
+                  return (
+                    <SidebarItem
+                      key={item.name}
+                      href={item.href}
+                      current={current}
+                      className={navItemClasses(current)}
+                    >
+                      <item.icon className="h-5 w-5" />
+                      <span>{item.name}</span>
+                    </SidebarItem>
+                  );
+                })}
               </SidebarSection>
             )}
           </SidebarBody>
