@@ -17,7 +17,6 @@ const mockWorkOrders = [
     scheduledDate: '2024-03-15T10:00:00Z',
     description: 'Fix leaking pipe',
     notes: 'Customer prefers morning appointments',
-    totalAmount: 150.00,
     createdAt: '2024-03-01T10:00:00Z',
     updatedAt: '2024-03-01T10:00:00Z',
     customer: {
@@ -48,7 +47,6 @@ const mockWorkOrders = [
     scheduledDate: '2024-03-14T10:00:00Z',
     description: 'Install new HVAC system',
     notes: '',
-    totalAmount: 5000.00,
     createdAt: '2024-03-02T11:00:00Z',
     updatedAt: '2024-03-02T11:00:00Z',
     customer: {
