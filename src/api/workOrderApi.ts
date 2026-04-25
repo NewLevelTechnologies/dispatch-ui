@@ -33,7 +33,6 @@ export interface WorkOrder {
   customerOrderNumber?: string;
   internalNotes?: string;
   createdByUserId?: string;
-  totalAmount?: number;
   createdAt: string;
   updatedAt: string;
   // Enriched response fields from backend
@@ -66,7 +65,6 @@ export interface CreateWorkOrderRequest {
   description?: string;
   customerOrderNumber?: string;
   internalNotes?: string;
-  totalAmount?: number;
 }
 
 export interface UpdateWorkOrderRequest {
@@ -78,7 +76,6 @@ export interface UpdateWorkOrderRequest {
   description?: string;
   customerOrderNumber?: string;
   internalNotes?: string;
-  totalAmount?: number;
 }
 
 export const workOrderApi = {
