@@ -54,7 +54,7 @@ export default function CloneRoleDialog({ isOpen, onClose, role }: CloneRoleDial
       queryClient.invalidateQueries({ queryKey: ['roles'] });
       onClose();
       // Navigate to the new cloned role
-      navigate(`/roles/${newRole.id}`);
+      navigate(`/settings/access/roles/${newRole.id}`);
     },
     onError: (error: unknown) => {
       const errorMessage = error instanceof Error && 'response' in error

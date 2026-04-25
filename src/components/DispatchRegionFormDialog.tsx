@@ -15,9 +15,10 @@ interface DispatchRegionFormDialogProps {
   isOpen: boolean;
   onClose: () => void;
   region?: DispatchRegion;
+  nextSortOrder: number;
 }
 
-export default function DispatchRegionFormDialog({ isOpen, onClose, region }: DispatchRegionFormDialogProps) {
+export default function DispatchRegionFormDialog({ isOpen, onClose, region, nextSortOrder }: DispatchRegionFormDialogProps) {
   const queryClient = useQueryClient();
   const { t } = useTranslation();
   const { getName } = useGlossary();
@@ -30,11 +31,8 @@ export default function DispatchRegionFormDialog({ isOpen, onClose, region }: Di
     description: '',
     state: '',
     tabDisplayName: '',
-    sortOrder: 0,
   });
 
-  // Intentionally setting form state based on props in useEffect
-  // This is the recommended pattern for initializing controlled forms when a dialog opens
   useEffect(() => {
     if (!isOpen) return;
 
@@ -45,7 +43,6 @@ export default function DispatchRegionFormDialog({ isOpen, onClose, region }: Di
           description: region.description || '',
           state: region.state || '',
           tabDisplayName: region.tabDisplayName || '',
-          sortOrder: region.sortOrder,
         }
       : {
           name: '',
@@ -53,7 +50,6 @@ export default function DispatchRegionFormDialog({ isOpen, onClose, region }: Di
           description: '',
           state: '',
           tabDisplayName: '',
-          sortOrder: 0,
         };
 
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -120,19 +116,23 @@ export default function DispatchRegionFormDialog({ isOpen, onClose, region }: Di
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    const data = {
-      name: formData.name,
-      abbreviation: formData.abbreviation,
-      description: formData.description?.trim() || '',
-      state: formData.state?.trim() || '',
-      tabDisplayName: formData.tabDisplayName?.trim() || '',
-      sortOrder: formData.sortOrder ?? 0,
-    };
-
     if (isEdit) {
-      updateMutation.mutate(data);
+      updateMutation.mutate({
+        name: formData.name,
+        abbreviation: formData.abbreviation,
+        description: formData.description?.trim() || '',
+        state: formData.state?.trim() || '',
+        tabDisplayName: formData.tabDisplayName?.trim() || '',
+      });
     } else {
-      createMutation.mutate(data as CreateDispatchRegionRequest);
+      createMutation.mutate({
+        name: formData.name as string,
+        abbreviation: formData.abbreviation as string,
+        description: formData.description?.trim() || '',
+        state: formData.state?.trim() || '',
+        tabDisplayName: formData.tabDisplayName?.trim() || '',
+        sortOrder: nextSortOrder,
+      });
     }
   };
 
@@ -187,37 +187,25 @@ export default function DispatchRegionFormDialog({ isOpen, onClose, region }: Di
                   <svg className={`h-4 w-4 transition-transform ${showOptionalFields ? 'rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                   </svg>
-                  {t('common.form.optional')} (4)
+                  {t('common.form.optional')} (3)
                 </button>
                 {showOptionalFields && (
                   <div className="mt-2 space-y-2 pl-6">
-                    {/* State + Sort Order */}
-                    <div className="grid grid-cols-2 gap-2">
-                      <Field>
-                        <Label className="text-xs">{t('dispatchRegions.form.state')}</Label>
-                        <Select
-                          name="state"
-                          value={formData.state || ''}
-                          onChange={(e: React.ChangeEvent<HTMLSelectElement>) => handleChange('state', e.target.value)}
-                        >
-                          <option value="">{t('common.form.select')}</option>
-                          {US_STATES.map((state) => (
-                            <option key={state} value={state}>
-                              {state}
-                            </option>
-                          ))}
-                        </Select>
-                      </Field>
-                      <Field>
-                        <Label className="text-xs">{t('dispatchRegions.form.sortOrder')}</Label>
-                        <Input
-                          name="sortOrder"
-                          type="number"
-                          value={formData.sortOrder ?? 0}
-                          onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange('sortOrder', parseInt(e.target.value) || 0)}
-                        />
-                      </Field>
-                    </div>
+                    <Field>
+                      <Label className="text-xs">{t('dispatchRegions.form.state')}</Label>
+                      <Select
+                        name="state"
+                        value={formData.state || ''}
+                        onChange={(e: React.ChangeEvent<HTMLSelectElement>) => handleChange('state', e.target.value)}
+                      >
+                        <option value="">{t('common.form.select')}</option>
+                        {US_STATES.map((state) => (
+                          <option key={state} value={state}>
+                            {state}
+                          </option>
+                        ))}
+                      </Select>
+                    </Field>
 
                   {/* Tab Display Name */}
                   <Field>

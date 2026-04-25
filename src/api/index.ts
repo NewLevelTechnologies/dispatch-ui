@@ -1,5 +1,6 @@
 // Central API exports
 export { default as apiClient } from './client';
+export { getApiErrorMessage } from './errors';
 
 // Audit API
 export { auditApi, type AuditLog } from './auditApi';
@@ -174,3 +175,25 @@ export {
   type CreateDispatchRegionRequest,
   type UpdateDispatchRegionRequest,
 } from './dispatchRegionApi';
+
+// Work Order Config API (Phase 4)
+export {
+  workOrderTypesApi,
+  divisionsApi,
+  workItemStatusesApi,
+  statusWorkflowsApi,
+  workflowConfigApi,
+  STATUS_CATEGORIES,
+  type TaxonomyItem,
+  type CreateTaxonomyItemRequest,
+  type UpdateTaxonomyItemRequest,
+  type WorkItemStatus,
+  type CreateWorkItemStatusRequest,
+  type UpdateWorkItemStatusRequest,
+  type StatusCategory,
+  type StatusWorkflowRule,
+  type CreateStatusWorkflowRequest,
+  type WorkflowConfig,
+  type UpdateWorkflowConfigRequest,
+  type DispatchBoardType,
+} from './workOrderConfigApi';

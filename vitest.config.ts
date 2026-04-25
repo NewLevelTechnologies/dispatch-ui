@@ -56,6 +56,7 @@ export default defineConfig({
         'src/api/tenantSettingsApi.ts',
         'src/api/glossaryApi.ts',
         'src/api/dispatchRegionApi.ts',
+        'src/api/workOrderConfigApi.ts',
         // Exclude temporary/debug files
         '**/check-menu-sizes.js',
         'coverage/**',

@@ -23,6 +23,7 @@ import type { Glossary, GlossaryEntry } from '../api';
 export const GLOSSARY_DEFAULTS: Record<string, GlossaryEntry> = {
   customer: { singular: 'Customer', plural: 'Customers' },
   dispatch: { singular: 'Dispatch', plural: 'Dispatches' },
+  division: { singular: 'Division', plural: 'Divisions' },
   equipment: { singular: 'Equipment', plural: 'Equipment' },
   invoice: { singular: 'Invoice', plural: 'Invoices' },
   payment: { singular: 'Payment', plural: 'Payments' },

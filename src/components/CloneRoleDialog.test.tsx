@@ -204,7 +204,7 @@ describe('CloneRoleDialog', () => {
     await user.click(submitButton);
 
     await waitFor(() => {
-      expect(mockNavigate).toHaveBeenCalledWith('/roles/2');
+      expect(mockNavigate).toHaveBeenCalledWith('/settings/access/roles/2');
     });
   });
 
