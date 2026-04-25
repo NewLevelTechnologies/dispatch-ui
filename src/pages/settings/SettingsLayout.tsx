@@ -53,10 +53,10 @@ export default function SettingsLayout() {
 
   return (
     <AppLayout>
-      <div className="px-6 pt-6 pb-2">
+      <div className="pb-2">
         <Heading>{t('entities.settings')}</Heading>
       </div>
-      <div className="flex gap-8 px-6 pb-8">
+      <div className="flex gap-8 pb-8">
         <aside className="w-56 shrink-0">
           <nav className="space-y-6">
             {sections.map((section) => (

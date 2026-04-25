@@ -224,6 +224,7 @@
     "divisions": "Divisions",
     "equipment": "Equipment",
     "financial": "Financial",
+    "inventory": "Inventory",
     "invoice": "Invoice",
     "invoices": "Invoices",
     "payment": "Payment",
