@@ -43,6 +43,8 @@
     "hide": "Hide",
     "inactive": "Inactive",
     "loading": "Loading...",
+    "moveDown": "Move down",
+    "moveUp": "Move up",
     "recentEntities": "Recent {{entities}}",
     "restoring": "Restoring...",
     "search": "Search...",
@@ -55,6 +57,8 @@
       "billingAddress": "Billing Address",
       "billingAddressSameAsService": "Send invoice to same address",
       "city": "City",
+      "code": "Code",
+      "color": "Color",
       "contractPricingTier": "Contract Pricing Tier",
       "description": "Description",
       "descriptionCreate": "Create a new {{entity, lowercase}} record.",
@@ -81,6 +85,7 @@
       "siteContactEmail": "Site Contact Email",
       "siteContactName": "Site Contact Name",
       "siteContactPhone": "Site Contact Phone",
+      "sortOrder": "Sort Order",
       "state": "State",
       "stateHelper": "CA",
       "status": "Status",
@@ -215,6 +220,8 @@
     "dashboard": "Dashboard",
     "dispatch": "Dispatch",
     "dispatches": "Dispatches",
+    "division": "Division",
+    "divisions": "Divisions",
     "equipment": "Equipment",
     "financial": "Financial",
     "invoice": "Invoice",
@@ -651,6 +658,59 @@
       "startTime": "Start Time",
       "user": "User",
       "workOrder": "Work Order"
+    }
+  },
+  "settings": {
+    "itemStatuses": {
+      "categoryHelper": "How this status behaves in workflows and reports.",
+      "description": "Customize the lifecycle statuses that work items move through.",
+      "isTerminalHelper": "Terminal statuses end the work item; no further transitions are allowed.",
+      "table": {
+        "category": "Category",
+        "terminal": "Terminal"
+      }
+    },
+    "nav": {
+      "general": "General",
+      "itemStatuses": "Item Statuses",
+      "notificationTemplates": "Notification Templates",
+      "statusWorkflows": "Status Workflows",
+      "terminology": "Terminology",
+      "types": "Types",
+      "workflowConfig": "Workflow Config"
+    },
+    "sections": {
+      "access": "Access",
+      "dispatch": "{{dispatch}}",
+      "organization": "Organization",
+      "workOrders": "{{workOrders}}"
+    },
+    "statusWorkflows": {
+      "addRule": "Add Transition",
+      "description": "Define which status transitions are allowed. Only enforced when 'Enforce Workflow' is enabled in Workflow Config.",
+      "empty": "No transition rules defined. Without rules, all transitions are allowed (or all blocked, depending on enforcement).",
+      "from": "From",
+      "to": "To"
+    },
+    "taxonomy": {
+      "codeHelper": "Stable identifier. UPPERCASE_WITH_UNDERSCORES. Auto-generated from name.",
+      "codeImmutable": "Code cannot be changed after creation.",
+      "deleteConfirm": "Delete \"{{name}}\"? If it's referenced by existing records it will be marked inactive instead."
+    },
+    "divisions": {
+      "description": "Operating units (e.g., HVAC, Electrical, Plumbing) used to organize {{divisions}} and route work."
+    },
+    "workOrderTypes": {
+      "description": "Categories that classify {{workOrder}}s (e.g., Service Call, Installation, Maintenance).",
+      "singular": "Type"
+    },
+    "workflowConfig": {
+      "boardTypeHelper": "Choose how the dispatch board groups work — by current status or by scheduled time.",
+      "defaultStatusHelper": "Starting status applied to newly created work items.",
+      "defaultTypeHelper": "Pre-selected on the create work order form.",
+      "description": "Tenant-wide rules that govern how work moves through the system.",
+      "enforceHelper": "When enabled, only transitions defined in Status Workflows are allowed.",
+      "noneOption": "None"
     }
   },
   "tenantSettings": {

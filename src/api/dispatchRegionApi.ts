@@ -94,6 +94,15 @@ export const dispatchRegionApi = {
     const response = await apiClient.post<DispatchRegion>(`/tenant/dispatch-regions/${id}/reactivate`);
     return response.data;
   },
+
+  /**
+   * Reorder dispatch regions atomically. Pass the complete ordered list of
+   * active region IDs; server applies all sortOrder updates in one transaction.
+   */
+  reorder: async (orderedIds: string[]): Promise<DispatchRegion[]> => {
+    const response = await apiClient.post<DispatchRegion[]>('/tenant/dispatch-regions/reorder', { orderedIds });
+    return response.data;
+  },
 };
 
 export default dispatchRegionApi;

@@ -10,7 +10,6 @@ import {
   CurrencyDollarIcon,
   CalendarIcon,
   ShieldCheckIcon,
-  KeyIcon,
   Cog6ToothIcon,
   SunIcon,
   MoonIcon,
@@ -41,7 +40,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   // Permission checks for navigation visibility
   const canViewUsers = useHasAnyCapability('VIEW_USERS');
-  const canViewRoles = useHasAnyCapability('VIEW_ROLES');
   const canViewSettings = useHasAnyCapability('VIEW_SETTINGS');
 
   const mainNavigation = [
@@ -71,7 +69,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   const adminNavigation = [
     ...(canViewUsers ? [{ name: t('entities.users'), href: '/users', icon: ShieldCheckIcon }] : []),
-    ...(canViewRoles ? [{ name: t('entities.roles'), href: '/roles', icon: KeyIcon }] : []),
     ...(canViewSettings ? [{ name: t('entities.settings'), href: '/settings', icon: Cog6ToothIcon }] : []),
   ];
 

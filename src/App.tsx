@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useParams } from 'react-router-dom';
 import { useAuthenticator } from '@aws-amplify/ui-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { tenantSettingsApi } from './api';
@@ -25,12 +25,27 @@ import UsersPage from './pages/UsersPage';
 import UserDetailPage from './pages/UserDetailPage';
 import RolesPage from './pages/RolesPage';
 import RoleDetailPage from './pages/RoleDetailPage';
-import TenantSettingsPage from './pages/TenantSettingsPage';
+import SettingsLayout from './pages/settings/SettingsLayout';
+import GeneralPanel from './pages/settings/GeneralPanel';
+import TerminologyPanel from './pages/settings/TerminologyPanel';
+import NotificationTemplatesPanel from './pages/settings/NotificationTemplatesPanel';
+import DispatchRegionsPanel from './pages/settings/DispatchRegionsPanel';
+import WorkOrderTypesPanel from './pages/settings/work-orders/WorkOrderTypesPanel';
+import DivisionsPanel from './pages/settings/work-orders/DivisionsPanel';
+import ItemStatusesPanel from './pages/settings/work-orders/ItemStatusesPanel';
+import StatusWorkflowsPanel from './pages/settings/work-orders/StatusWorkflowsPanel';
+import WorkflowConfigPanel from './pages/settings/work-orders/WorkflowConfigPanel';
 import AccountSettingsPage from './pages/AccountSettingsPage';
 
 // ProtectedRoute component - defined outside of App to avoid recreation on every render
 const ProtectedRoute = ({ element, isAuthenticated }: { element: React.ReactElement; isAuthenticated: boolean }) => {
   return isAuthenticated ? element : <Navigate to="/login" replace />;
+};
+
+// Preserves the :id param when redirecting from old /roles/:id route to the new location.
+const LegacyRolesRedirect = () => {
+  const { id } = useParams();
+  return <Navigate to={`/settings/access/roles/${id}`} replace />;
 };
 
 function App() {
@@ -100,9 +115,23 @@ function App() {
       <Route path="/scheduling" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<SchedulingPage />} />} />
       <Route path="/users" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<UsersPage />} />} />
       <Route path="/users/:id" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<UserDetailPage />} />} />
-      <Route path="/roles" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<RolesPage />} />} />
-      <Route path="/roles/:id" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<RoleDetailPage />} />} />
-      <Route path="/settings" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<TenantSettingsPage />} />} />
+      {/* Legacy redirects: /roles moved under /settings/access */}
+      <Route path="/roles" element={<Navigate to="/settings/access/roles" replace />} />
+      <Route path="/roles/:id" element={<LegacyRolesRedirect />} />
+      <Route path="/settings" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<SettingsLayout />} />}>
+        <Route index element={<Navigate to="/settings/general" replace />} />
+        <Route path="general" element={<GeneralPanel />} />
+        <Route path="terminology" element={<TerminologyPanel />} />
+        <Route path="notification-templates" element={<NotificationTemplatesPanel />} />
+        <Route path="dispatch-regions" element={<DispatchRegionsPanel />} />
+        <Route path="work-orders/types" element={<WorkOrderTypesPanel />} />
+        <Route path="work-orders/divisions" element={<DivisionsPanel />} />
+        <Route path="work-orders/item-statuses" element={<ItemStatusesPanel />} />
+        <Route path="work-orders/status-workflows" element={<StatusWorkflowsPanel />} />
+        <Route path="work-orders/workflow-config" element={<WorkflowConfigPanel />} />
+        <Route path="access/roles" element={<RolesPage />} />
+        <Route path="access/roles/:id" element={<RoleDetailPage />} />
+      </Route>
       <Route path="/account/settings" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<AccountSettingsPage />} />} />
       <Route
         path="/"

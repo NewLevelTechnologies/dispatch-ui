@@ -30,7 +30,7 @@ describe('DispatchRegionFormDialog', () => {
   describe('Create mode', () => {
     it('renders create dialog with empty form', () => {
       renderWithProviders(
-        <DispatchRegionFormDialog isOpen={true} onClose={mockOnClose} />
+        <DispatchRegionFormDialog isOpen={true} onClose={mockOnClose} nextSortOrder={0} />
       );
 
       expect(screen.getByRole('heading', { name: /create/i })).toBeInTheDocument();
@@ -43,7 +43,7 @@ describe('DispatchRegionFormDialog', () => {
       vi.mocked(apiClient.post).mockResolvedValue({ data: mockRegion });
 
       renderWithProviders(
-        <DispatchRegionFormDialog isOpen={true} onClose={mockOnClose} />
+        <DispatchRegionFormDialog isOpen={true} onClose={mockOnClose} nextSortOrder={0} />
       );
 
       await user.type(screen.getByLabelText(/name.*\*/i), 'Test Region');
@@ -71,7 +71,7 @@ describe('DispatchRegionFormDialog', () => {
       vi.mocked(apiClient.post).mockResolvedValue({ data: mockRegion });
 
       renderWithProviders(
-        <DispatchRegionFormDialog isOpen={true} onClose={mockOnClose} />
+        <DispatchRegionFormDialog isOpen={true} onClose={mockOnClose} nextSortOrder={0} />
       );
 
       const abbreviationInput = screen.getByLabelText(/abbreviation.*\*/i);
@@ -87,7 +87,7 @@ describe('DispatchRegionFormDialog', () => {
       );
 
       renderWithProviders(
-        <DispatchRegionFormDialog isOpen={true} onClose={mockOnClose} />
+        <DispatchRegionFormDialog isOpen={true} onClose={mockOnClose} nextSortOrder={0} />
       );
 
       await user.type(screen.getByLabelText(/name.*\*/i), 'Test Region');
@@ -105,20 +105,19 @@ describe('DispatchRegionFormDialog', () => {
       const user = userEvent.setup();
 
       renderWithProviders(
-        <DispatchRegionFormDialog isOpen={true} onClose={mockOnClose} />
+        <DispatchRegionFormDialog isOpen={true} onClose={mockOnClose} nextSortOrder={0} />
       );
 
       // Optional fields should not be visible initially
       expect(screen.queryByLabelText(/state/i)).not.toBeInTheDocument();
 
       // Click the optional fields toggle
-      const toggleButton = screen.getByRole('button', { name: /optional \(4\)/i });
+      const toggleButton = screen.getByRole('button', { name: /optional \(3\)/i });
       await user.click(toggleButton);
 
       // Optional fields should now be visible
       await waitFor(() => {
         expect(screen.getByLabelText(/state/i)).toBeInTheDocument();
-        expect(screen.getByLabelText(/sort/i)).toBeInTheDocument();
         expect(screen.getByLabelText(/tab/i)).toBeInTheDocument();
         expect(screen.getByLabelText(/description/i)).toBeInTheDocument();
       });
@@ -129,14 +128,14 @@ describe('DispatchRegionFormDialog', () => {
       vi.mocked(apiClient.post).mockResolvedValue({ data: mockRegion });
 
       renderWithProviders(
-        <DispatchRegionFormDialog isOpen={true} onClose={mockOnClose} />
+        <DispatchRegionFormDialog isOpen={true} onClose={mockOnClose} nextSortOrder={5} />
       );
 
       await user.type(screen.getByLabelText(/name.*\*/i), 'Test Region');
       await user.type(screen.getByLabelText(/abbreviation.*\*/i), 'TEST');
 
       // Expand optional fields
-      await user.click(screen.getByRole('button', { name: /optional \(4\)/i }));
+      await user.click(screen.getByRole('button', { name: /optional \(3\)/i }));
 
       await waitFor(() => {
         expect(screen.getByLabelText(/state/i)).toBeInTheDocument();
@@ -144,9 +143,6 @@ describe('DispatchRegionFormDialog', () => {
 
       // Fill optional fields
       await user.selectOptions(screen.getByLabelText(/state/i), 'GA');
-      const sortInput = screen.getByLabelText(/sort/i);
-      await user.clear(sortInput);
-      await user.type(sortInput, '5');
       await user.type(screen.getByLabelText(/tab/i), 'North');
       await user.type(screen.getByLabelText(/description/i), 'Test description');
 
@@ -172,7 +168,7 @@ describe('DispatchRegionFormDialog', () => {
       );
 
       renderWithProviders(
-        <DispatchRegionFormDialog isOpen={true} onClose={mockOnClose} />
+        <DispatchRegionFormDialog isOpen={true} onClose={mockOnClose} nextSortOrder={0} />
       );
 
       await user.type(screen.getByLabelText(/name.*\*/i), 'Test Region');
@@ -195,6 +191,7 @@ describe('DispatchRegionFormDialog', () => {
           isOpen={true}
           onClose={mockOnClose}
           region={mockRegion}
+          nextSortOrder={0}
         />
       );
 
@@ -211,15 +208,15 @@ describe('DispatchRegionFormDialog', () => {
           isOpen={true}
           onClose={mockOnClose}
           region={mockRegion}
+          nextSortOrder={0}
         />
       );
 
       // Expand optional fields
-      await user.click(screen.getByRole('button', { name: /optional \(4\)/i }));
+      await user.click(screen.getByRole('button', { name: /optional \(3\)/i }));
 
       await waitFor(() => {
         expect(screen.getByLabelText(/state/i)).toHaveValue('GA');
-        expect(screen.getByLabelText(/sort/i)).toHaveValue(0);
         expect(screen.getByLabelText(/tab/i)).toHaveValue('North');
         expect(screen.getByLabelText(/description/i)).toHaveValue('Northern service area');
       });
@@ -234,6 +231,7 @@ describe('DispatchRegionFormDialog', () => {
           isOpen={true}
           onClose={mockOnClose}
           region={mockRegion}
+          nextSortOrder={0}
         />
       );
 
@@ -268,6 +266,7 @@ describe('DispatchRegionFormDialog', () => {
           isOpen={true}
           onClose={mockOnClose}
           region={mockRegion}
+          nextSortOrder={0}
         />
       );
 
@@ -286,7 +285,7 @@ describe('DispatchRegionFormDialog', () => {
       const user = userEvent.setup();
 
       renderWithProviders(
-        <DispatchRegionFormDialog isOpen={true} onClose={mockOnClose} />
+        <DispatchRegionFormDialog isOpen={true} onClose={mockOnClose} nextSortOrder={0} />
       );
 
       const cancelButton = screen.getByRole('button', { name: /cancel/i });
@@ -297,17 +296,17 @@ describe('DispatchRegionFormDialog', () => {
 
     it('resets form when reopened', async () => {
       const { rerender } = renderWithProviders(
-        <DispatchRegionFormDialog isOpen={true} onClose={mockOnClose} />
+        <DispatchRegionFormDialog isOpen={true} onClose={mockOnClose} nextSortOrder={0} />
       );
 
       const nameInput = screen.getByLabelText(/name.*\*/i);
       await userEvent.setup().type(nameInput, 'Test');
 
       // Close dialog
-      rerender(<DispatchRegionFormDialog isOpen={false} onClose={mockOnClose} />);
+      rerender(<DispatchRegionFormDialog isOpen={false} onClose={mockOnClose} nextSortOrder={0} />);
 
       // Reopen dialog
-      rerender(<DispatchRegionFormDialog isOpen={true} onClose={mockOnClose} />);
+      rerender(<DispatchRegionFormDialog isOpen={true} onClose={mockOnClose} nextSortOrder={0} />);
 
       // Form should be reset
       expect(screen.getByLabelText(/name.*\*/i)).toHaveValue('');
@@ -320,7 +319,7 @@ describe('DispatchRegionFormDialog', () => {
       );
 
       renderWithProviders(
-        <DispatchRegionFormDialog isOpen={true} onClose={mockOnClose} />
+        <DispatchRegionFormDialog isOpen={true} onClose={mockOnClose} nextSortOrder={0} />
       );
 
       await user.type(screen.getByLabelText(/name.*\*/i), 'Test');
@@ -340,11 +339,11 @@ describe('DispatchRegionFormDialog', () => {
       const user = userEvent.setup();
 
       renderWithProviders(
-        <DispatchRegionFormDialog isOpen={true} onClose={mockOnClose} />
+        <DispatchRegionFormDialog isOpen={true} onClose={mockOnClose} nextSortOrder={0} />
       );
 
       // Expand optional fields
-      const toggleButton = screen.getByRole('button', { name: /optional \(4\)/i });
+      const toggleButton = screen.getByRole('button', { name: /optional \(3\)/i });
       await user.click(toggleButton);
 
       await waitFor(() => {

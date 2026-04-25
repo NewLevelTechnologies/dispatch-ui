@@ -5,7 +5,6 @@ import { useTranslation } from 'react-i18next';
 import { ArrowLeftIcon } from '@heroicons/react/24/outline';
 import { userApi } from '../api';
 import { useHasCapability } from '../hooks/useCurrentUser';
-import AppLayout from '../components/AppLayout';
 import RoleFormDialog from '../components/RoleFormDialog';
 import CloneRoleDialog from '../components/CloneRoleDialog';
 import CapabilitiesSection from '../components/CapabilitiesSection';
@@ -39,7 +38,7 @@ export default function RoleDetailPage() {
     mutationFn: () => userApi.deleteRole(id!),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['roles'] });
-      navigate('/roles');
+      navigate('/settings/access/roles');
     },
     onError: (error: unknown) => {
       const errorMessage = error instanceof Error && 'response' in error
@@ -109,41 +108,37 @@ export default function RoleDetailPage() {
 
   if (isLoading) {
     return (
-      <AppLayout>
-        <div className="p-8 text-center">
-          <p className="text-zinc-600 dark:text-zinc-400">
-            {t('common.actions.loading', { entities: t('entities.role') })}
-          </p>
-        </div>
-      </AppLayout>
+      <div className="p-8 text-center">
+        <p className="text-zinc-600 dark:text-zinc-400">
+          {t('common.actions.loading', { entities: t('entities.role') })}
+        </p>
+      </div>
     );
   }
 
   if (error || !role) {
     return (
-      <AppLayout>
-        <div className="p-8">
-          <div className="rounded-lg bg-red-50 p-4 ring-1 ring-red-200 dark:bg-red-950/10 dark:ring-red-900/20">
-            <p className="text-sm text-red-800 dark:text-red-400">
-              {t('common.actions.errorLoading', { entities: t('entities.role') })}
-              {error && `: ${(error as Error).message}`}
-            </p>
-          </div>
-          <Button className="mt-4" onClick={() => navigate('/roles')}>
-            <ArrowLeftIcon className="size-4" />
-            {t('common.actions.back')}
-          </Button>
+      <div className="p-8">
+        <div className="rounded-lg bg-red-50 p-4 ring-1 ring-red-200 dark:bg-red-950/10 dark:ring-red-900/20">
+          <p className="text-sm text-red-800 dark:text-red-400">
+            {t('common.actions.errorLoading', { entities: t('entities.role') })}
+            {error && `: ${(error as Error).message}`}
+          </p>
         </div>
-      </AppLayout>
+        <Button className="mt-4" onClick={() => navigate('/settings/access/roles')}>
+          <ArrowLeftIcon className="size-4" />
+          {t('common.actions.back')}
+        </Button>
+      </div>
     );
   }
 
   return (
-    <AppLayout>
+    <div>
       <div>
         {/* Header */}
         <div className="mb-4">
-          <Button plain onClick={() => navigate('/roles')}>
+          <Button plain onClick={() => navigate('/settings/access/roles')}>
             <ArrowLeftIcon className="size-4" />
             {t('common.actions.back')}
           </Button>
@@ -287,6 +282,6 @@ export default function RoleDetailPage() {
           </Button>
         </AlertActions>
       </Alert>
-    </AppLayout>
+    </div>
   );
 }

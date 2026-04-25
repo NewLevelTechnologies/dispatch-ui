@@ -228,7 +228,7 @@ describe('RolesPage', () => {
     const nameCell = screen.getByText('Field Technician');
     await user.click(nameCell);
 
-    expect(mockNavigate).toHaveBeenCalledWith('/roles/1');
+    expect(mockNavigate).toHaveBeenCalledWith('/settings/access/roles/1');
   });
 
   it('opens edit dialog when edit button is clicked', async () => {

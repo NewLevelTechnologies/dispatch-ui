@@ -134,7 +134,7 @@ describe('RoleDetailPage', () => {
     const backButton = screen.getByRole('button', { name: /back/i });
     await user.click(backButton);
 
-    expect(mockNavigate).toHaveBeenCalledWith('/roles');
+    expect(mockNavigate).toHaveBeenCalledWith('/settings/access/roles');
   });
 
   it('renders role details with all information', async () => {
@@ -262,7 +262,7 @@ describe('RoleDetailPage', () => {
     const backButtons = screen.getAllByRole('button', { name: /back/i });
     await user.click(backButtons[0]);
 
-    expect(mockNavigate).toHaveBeenCalledWith('/roles');
+    expect(mockNavigate).toHaveBeenCalledWith('/settings/access/roles');
   });
 
   it('renders edit and delete buttons', async () => {
@@ -387,7 +387,7 @@ describe('RoleDetailPage', () => {
 
     await waitFor(() => {
       expect(apiClient.delete).toHaveBeenCalledWith('/users/roles/role-123');
-      expect(mockNavigate).toHaveBeenCalledWith('/roles');
+      expect(mockNavigate).toHaveBeenCalledWith('/settings/access/roles');
     });
   });
 

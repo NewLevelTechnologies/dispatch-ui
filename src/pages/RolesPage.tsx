@@ -5,7 +5,6 @@ import { useTranslation } from 'react-i18next';
 import { EllipsisVerticalIcon, ShieldCheckIcon, ArrowPathIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import { userApi, type Role, type RestoreAllDefaultsResponse } from '../api';
 import { useHasCapability } from '../hooks/useCurrentUser';
-import AppLayout from '../components/AppLayout';
 import RoleFormDialog from '../components/RoleFormDialog';
 import { Heading } from '../components/catalyst/heading';
 import { Button } from '../components/catalyst/button';
@@ -147,7 +146,7 @@ export default function RolesPage() {
   }, [roles, searchQuery]);
 
   return (
-    <AppLayout>
+    <div>
       <div className="flex items-center justify-between">
         <div>
           <Heading>{t('entities.roles')}</Heading>
@@ -246,11 +245,11 @@ export default function RolesPage() {
               {filteredRoles.map((role) => (
                 <TableRow
                   key={role.id}
-                  href={`/roles/${role.id}`}
+                  href={`/settings/access/roles/${role.id}`}
                   onClick={(e: React.MouseEvent) => {
                     const target = e.target as HTMLElement;
                     if (!target.closest('[role="menu"]') && !target.closest('button[aria-label]')) {
-                      navigate(`/roles/${role.id}`);
+                      navigate(`/settings/access/roles/${role.id}`);
                     }
                   }}
                   className="cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-900/50"
@@ -281,7 +280,7 @@ export default function RolesPage() {
                               <DropdownLabel>{t('common.edit')}</DropdownLabel>
                             </DropdownItem>
                           )}
-                          <DropdownItem onClick={() => navigate(`/roles/${role.id}`)}>
+                          <DropdownItem onClick={() => navigate(`/settings/access/roles/${role.id}`)}>
                             <DropdownLabel>{t('common.view')}</DropdownLabel>
                           </DropdownItem>
                           {canDeleteRoles && !role.isProtected && (
@@ -345,6 +344,6 @@ export default function RolesPage() {
           </Button>
         </AlertActions>
       </Alert>
-    </AppLayout>
+    </div>
   );
 }
