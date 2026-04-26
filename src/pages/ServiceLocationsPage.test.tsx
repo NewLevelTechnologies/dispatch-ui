@@ -188,11 +188,19 @@ describe('ServiceLocationsPage', () => {
   });
 
   it('opens edit dialog when edit is clicked', async () => {
-    // First call: paginated list
-    vi.mocked(apiClient.get)
-      .mockResolvedValueOnce({ data: mockServiceLocationsResponse })
-      // Second call: standalone service location detail for edit
-      .mockResolvedValueOnce({ data: mockServiceLocationsResponse.content[0] });
+    // The page now also queries /tenant/dispatch-regions for the region filter,
+    // so order-based mockResolvedValueOnce is unreliable — match by URL instead.
+    vi.mocked(apiClient.get).mockImplementation((url) => {
+      if (typeof url === 'string') {
+        if (url === '/service-locations') {
+          return Promise.resolve({ data: mockServiceLocationsResponse });
+        }
+        if (url.startsWith('/service-locations/')) {
+          return Promise.resolve({ data: mockServiceLocationsResponse.content[0] });
+        }
+      }
+      return Promise.resolve({ data: [] });
+    });
 
     const user = userEvent.setup();
 

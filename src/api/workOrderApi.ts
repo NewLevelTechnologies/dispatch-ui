@@ -42,27 +42,26 @@ export interface WorkItemResponse {
   updatedAt: string;
 }
 
-export interface WorkOrder {
+// Slim shape returned by the list endpoint — excludes workItems and other detail-only fields
+// to keep the list payload small. Use getById() for the full WorkOrder.
+export interface WorkOrderSummary {
   id: string;
   workOrderNumber?: string;
-  tenantId?: string;
   customerId: string;
   serviceLocationId: string;
 
-  // Tenant taxonomy (Phase 4)
+  // Tenant taxonomy
   workOrderTypeId?: string | null;
   divisionId?: string | null;
 
-  // Replaces old `status`
+  // Lifecycle / progress
   lifecycleState: LifecycleState;
   progressCategory: ProgressCategory;
 
-  // Visibility flag — null means visible in default views
+  // Visibility
   archivedAt?: string | null;
 
-  // Cancellation metadata — populated only when lifecycleState = CANCELLED
-  cancellationReason?: string | null;
-  cancelledByUserId?: string | null;
+  // Cancellation summary (if cancelled)
   cancelledAt?: string | null;
 
   priority: WorkOrderPriority;
@@ -70,16 +69,14 @@ export interface WorkOrder {
   completedDate?: string | null;
   description?: string | null;
   customerOrderNumber?: string | null;
-  createdByUserId?: string;
-  internalNotes?: string | null;
 
-  workItems?: WorkItemResponse[];
-
-  // Enriched response fields
+  // Enriched display fields. Site-contact and other extras are only populated by
+  // the detail endpoint, but typed as optional here so the same shape is usable
+  // on the list page without casts.
   customer?: {
     id: string;
     name: string;
-    email: string;
+    email?: string;
     phone?: string;
   };
   serviceLocation?: {
@@ -101,6 +98,31 @@ export interface WorkOrder {
   createdAt: string;
   updatedAt: string;
 }
+
+export interface WorkOrder extends WorkOrderSummary {
+  tenantId?: string;
+
+  // Detail-only fields
+  cancellationReason?: string | null;
+  cancelledByUserId?: string | null;
+  createdByUserId?: string;
+  internalNotes?: string | null;
+  workItems?: WorkItemResponse[];
+}
+
+// Spring Data Page<T> response wrapper
+export interface Page<T> {
+  content: T[];
+  totalElements: number;
+  totalPages: number;
+  number: number; // current page index, 0-based
+  size: number;
+  first?: boolean;
+  last?: boolean;
+}
+
+export type WorkOrderSortField = 'scheduledDate' | 'createdAt' | 'workOrderNumber' | 'priority';
+export type SortDirection = 'asc' | 'desc';
 
 export interface CreateWorkItemRequest {
   itemType: WorkItemType;
@@ -145,15 +167,55 @@ export interface TransitionWorkItemStatusRequest {
 }
 
 export interface ListWorkOrdersParams {
+  // Free-text search across workOrderNumber, customerOrderNumber, customer name/phone,
+  // service location name/address, site contact name, and description.
+  search?: string;
+
+  // Lifecycle / progress
   lifecycleState?: LifecycleState;
   progressCategory?: ProgressCategory;
+
+  // Tenant taxonomy
+  workOrderTypeId?: string;
+  divisionId?: string;
+  dispatchRegionId?: string;
+
+  // At least one work item must be in this status (specific tenant status, not a category)
+  workItemStatusId?: string;
+
+  // Customer scope
   customerId?: string;
+
+  // Scheduled date range — ISO yyyy-mm-dd. From is inclusive at 00:00,
+  // To is exclusive at 00:00 of the next day (handled server-side).
+  scheduledDateFrom?: string;
+  scheduledDateTo?: string;
+
+  // Visibility
   includeArchived?: boolean;
+
+  // Pagination — backend wraps the response as Page<WorkOrderSummary>.
+  // page is 0-based; default size is 50 if omitted.
+  page?: number;
+  size?: number;
+
+  // Sort — whitelist enforced server-side: scheduledDate, createdAt, workOrderNumber, priority
+  sort?: `${WorkOrderSortField},${SortDirection}`;
+}
+
+function cleanParams(params?: ListWorkOrdersParams): Record<string, string | number | boolean> {
+  if (!params) return {};
+  const out: Record<string, string | number | boolean> = {};
+  for (const [key, value] of Object.entries(params)) {
+    if (value === undefined || value === null || value === '') continue;
+    out[key] = value;
+  }
+  return out;
 }
 
 export const workOrderApi = {
-  getAll: async (params?: ListWorkOrdersParams): Promise<WorkOrder[]> => {
-    const response = await apiClient.get<WorkOrder[]>('/work-orders', { params });
+  getAll: async (params?: ListWorkOrdersParams): Promise<Page<WorkOrderSummary>> => {
+    const response = await apiClient.get<Page<WorkOrderSummary>>('/work-orders', { params: cleanParams(params) });
     return response.data;
   },
 
@@ -162,9 +224,9 @@ export const workOrderApi = {
     return response.data;
   },
 
-  getByCustomer: async (customerId: string, params?: Omit<ListWorkOrdersParams, 'customerId'>): Promise<WorkOrder[]> => {
-    const response = await apiClient.get<WorkOrder[]>('/work-orders', {
-      params: { customerId, ...params },
+  getByCustomer: async (customerId: string, params?: Omit<ListWorkOrdersParams, 'customerId'>): Promise<Page<WorkOrderSummary>> => {
+    const response = await apiClient.get<Page<WorkOrderSummary>>('/work-orders', {
+      params: cleanParams({ customerId, ...params }),
     });
     return response.data;
   },

@@ -1,9 +1,9 @@
-import { useState, useDeferredValue } from 'react';
+import { useEffect, useState, useDeferredValue } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { EllipsisVerticalIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
-import { customerApi, type ServiceLocation } from '../api';
+import { customerApi, dispatchRegionApi, type ServiceLocation } from '../api';
 import { useGlossary } from '../contexts/GlossaryContext';
 import { useHasCapability } from '../hooks/useCurrentUser';
 import AppLayout from '../components/AppLayout';
@@ -15,6 +15,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '.
 import { Badge } from '../components/catalyst/badge';
 import { Dropdown, DropdownButton, DropdownItem, DropdownLabel, DropdownMenu } from '../components/catalyst/dropdown';
 import { Input, InputGroup } from '../components/catalyst/input';
+import { Select } from '../components/catalyst/select';
 import { Pagination, PaginationGap, PaginationList, PaginationNext, PaginationPage, PaginationPrevious } from '../components/catalyst/pagination';
 
 export default function ServiceLocationsPage() {
@@ -26,20 +27,41 @@ export default function ServiceLocationsPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedLocation, setSelectedLocation] = useState<ServiceLocation | null>(null);
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState(searchParams.get('search') || '');
-  const deferredSearch = useDeferredValue(searchQuery);
 
   // Read filters from URL
+  const urlSearch = searchParams.get('search') ?? '';
   const page = parseInt(searchParams.get('page') || '1', 10);
   const statusFilter = searchParams.get('status') || 'all';
+  const regionId = searchParams.get('region') ?? '';
+
+  // Local input state mirrors the URL but lets typing feel instant. The sync
+  // effect below keeps it aligned with the URL when navigation happens externally
+  // (back/forward, deep link).
+  const [searchQuery, setSearchQuery] = useState(urlSearch);
+  useEffect(() => {
+    setSearchQuery(urlSearch);
+  }, [urlSearch]);
+  const deferredSearch = useDeferredValue(searchQuery);
+
+  // Tenant config — dispatch regions for the filter dropdown and chip lookup
+  const { data: regions } = useQuery({
+    queryKey: ['dispatch-regions'],
+    queryFn: () => dispatchRegionApi.getAll(),
+  });
+  const activeRegions = (Array.isArray(regions) ? regions : []).filter((r) => r.isActive !== false);
 
   // Permission checks
   const canAddServiceLocations = useHasCapability('ADD_SERVICE_LOCATIONS');
   const canEditServiceLocations = useHasCapability('EDIT_SERVICE_LOCATIONS');
   const canCloseServiceLocations = useHasCapability('CLOSE_SERVICE_LOCATIONS');
 
-  // Update URL when search/filter changes
-  const updateFilters = (updates: { search?: string; status?: string }) => {
+  // Update URL when search/filter changes. Pass `replace: true` for high-frequency
+  // updates (typing) so the back button doesn't have to step through every keystroke.
+  // Default values (page=1, status=all) are omitted to keep URLs clean.
+  const updateFilters = (
+    updates: { search?: string; status?: string; region?: string },
+    options: { replace?: boolean } = {}
+  ) => {
     const newParams = new URLSearchParams(searchParams);
     if (updates.search !== undefined) {
       if (updates.search) {
@@ -47,7 +69,7 @@ export default function ServiceLocationsPage() {
       } else {
         newParams.delete('search');
       }
-      newParams.set('page', '1');
+      newParams.delete('page'); // Reset to page 1 (the default) on filter change
     }
     if (updates.status !== undefined) {
       if (updates.status === 'all') {
@@ -55,19 +77,38 @@ export default function ServiceLocationsPage() {
       } else {
         newParams.set('status', updates.status);
       }
-      newParams.set('page', '1');
+      newParams.delete('page');
     }
-    setSearchParams(newParams);
+    if (updates.region !== undefined) {
+      if (updates.region) {
+        newParams.set('region', updates.region);
+      } else {
+        newParams.delete('region');
+      }
+      newParams.delete('page');
+    }
+    setSearchParams(newParams, { replace: options.replace ?? false });
+  };
+
+  // Build a relative href that preserves all current filters but jumps to a
+  // specific page (omitting the page param when it would be the default).
+  const pageHref = (target: number): string => {
+    const next = new URLSearchParams(searchParams);
+    if (target <= 1) next.delete('page');
+    else next.set('page', target.toString());
+    const qs = next.toString();
+    return qs ? `?${qs}` : '?';
   };
 
   // Fetch paginated service locations
   const { data, isLoading, error } = useQuery({
-    queryKey: ['service-locations', page, statusFilter, deferredSearch],
+    queryKey: ['service-locations', page, statusFilter, deferredSearch, regionId],
     queryFn: () => customerApi.getAllServiceLocationsPaginated({
       page,
       limit: 50,
       status: statusFilter === 'all' ? undefined : (statusFilter as 'ACTIVE' | 'INACTIVE' | 'CLOSED'),
       search: deferredSearch || undefined,
+      dispatchRegionId: regionId || undefined,
     }),
   });
 
@@ -150,10 +191,24 @@ export default function ServiceLocationsPage() {
             value={searchQuery}
             onChange={(e) => {
               setSearchQuery(e.target.value);
-              updateFilters({ search: e.target.value });
+              updateFilters({ search: e.target.value }, { replace: true });
             }}
           />
         </InputGroup>
+        {activeRegions.length > 0 && (
+          <div className="w-44">
+            <Select
+              aria-label={t('serviceLocations.filter.region')}
+              value={regionId}
+              onChange={(e) => updateFilters({ region: e.target.value })}
+            >
+              <option value="">{t('serviceLocations.filter.allRegions')}</option>
+              {activeRegions.map((r) => (
+                <option key={r.id} value={r.id}>{r.name}</option>
+              ))}
+            </Select>
+          </div>
+        )}
         <div className="flex items-center gap-2">
           <Button
             plain
@@ -332,7 +387,7 @@ export default function ServiceLocationsPage() {
       {/* Pagination */}
       {totalPages > 1 && (
         <Pagination className="mt-4">
-          <PaginationPrevious href={page > 1 ? `?${new URLSearchParams({ ...Object.fromEntries(searchParams), page: (page - 1).toString() })}` : undefined} />
+          <PaginationPrevious href={page > 1 ? pageHref(page - 1) : null} />
           <PaginationList>
             {(() => {
               const pages: (number | 'gap')[] = [];
@@ -353,7 +408,7 @@ export default function ServiceLocationsPage() {
                 ) : (
                   <PaginationPage
                     key={p}
-                    href={`?${new URLSearchParams({ ...Object.fromEntries(searchParams), page: p.toString() })}`}
+                    href={pageHref(p)}
                     current={p === page}
                   >
                     {p}
@@ -362,7 +417,7 @@ export default function ServiceLocationsPage() {
               );
             })()}
           </PaginationList>
-          <PaginationNext href={page < totalPages ? `?${new URLSearchParams({ ...Object.fromEntries(searchParams), page: (page + 1).toString() })}` : undefined} />
+          <PaginationNext href={page < totalPages ? pageHref(page + 1) : null} />
         </Pagination>
       )}
 

@@ -1,4 +1,4 @@
-import { useState, useDeferredValue } from 'react';
+import { useEffect, useState, useDeferredValue } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
@@ -25,20 +25,33 @@ export default function CustomersPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
-  const [searchQuery, setSearchQuery] = useState(searchParams.get('search') || '');
-  const deferredSearch = useDeferredValue(searchQuery);
 
   // Read filters from URL
+  const urlSearch = searchParams.get('search') ?? '';
   const page = parseInt(searchParams.get('page') || '1', 10);
   const statusFilter = searchParams.get('status') || 'all';
+
+  // Local input state mirrors the URL but lets typing feel instant. The sync
+  // effect below keeps it aligned with the URL when navigation happens externally
+  // (back/forward, deep link).
+  const [searchQuery, setSearchQuery] = useState(urlSearch);
+  useEffect(() => {
+    setSearchQuery(urlSearch);
+  }, [urlSearch]);
+  const deferredSearch = useDeferredValue(searchQuery);
 
   // Permission checks
   const canAddCustomers = useHasCapability('ADD_CUSTOMERS');
   const canEditCustomers = useHasCapability('EDIT_CUSTOMERS');
   const canArchiveCustomers = useHasCapability('ARCHIVE_CUSTOMERS');
 
-  // Update URL when search/filter changes
-  const updateFilters = (updates: { search?: string; status?: string; page?: number }) => {
+  // Update URL when search/filter changes. Pass `replace: true` for high-frequency
+  // updates (typing) so the back button doesn't have to step through every keystroke.
+  // Default values (page=1, status=all) are omitted to keep URLs clean.
+  const updateFilters = (
+    updates: { search?: string; status?: string; page?: number },
+    options: { replace?: boolean } = {}
+  ) => {
     const newParams = new URLSearchParams(searchParams);
     if (updates.search !== undefined) {
       if (updates.search) {
@@ -46,7 +59,7 @@ export default function CustomersPage() {
       } else {
         newParams.delete('search');
       }
-      newParams.set('page', '1'); // Reset to page 1 on filter change
+      newParams.delete('page'); // Reset to page 1 (the default) on filter change
     }
     if (updates.status !== undefined) {
       if (updates.status === 'all') {
@@ -54,12 +67,26 @@ export default function CustomersPage() {
       } else {
         newParams.set('status', updates.status);
       }
-      newParams.set('page', '1'); // Reset to page 1 on filter change
+      newParams.delete('page');
     }
     if (updates.page !== undefined) {
-      newParams.set('page', updates.page.toString());
+      if (updates.page <= 1) {
+        newParams.delete('page');
+      } else {
+        newParams.set('page', updates.page.toString());
+      }
     }
-    setSearchParams(newParams);
+    setSearchParams(newParams, { replace: options.replace ?? false });
+  };
+
+  // Build a relative href that preserves all current filters but jumps to a
+  // specific page (omitting the page param when it would be the default).
+  const pageHref = (target: number): string => {
+    const next = new URLSearchParams(searchParams);
+    if (target <= 1) next.delete('page');
+    else next.set('page', target.toString());
+    const qs = next.toString();
+    return qs ? `?${qs}` : '?';
   };
 
   const { data, isLoading, error } = useQuery({
@@ -129,7 +156,7 @@ export default function CustomersPage() {
             value={searchQuery}
             onChange={(e) => {
               setSearchQuery(e.target.value);
-              updateFilters({ search: e.target.value });
+              updateFilters({ search: e.target.value }, { replace: true });
             }}
           />
         </InputGroup>
@@ -338,7 +365,7 @@ export default function CustomersPage() {
       {/* Pagination */}
       {totalPages > 1 && (
         <Pagination className="mt-4">
-          <PaginationPrevious href={page > 1 ? `?${new URLSearchParams({ ...Object.fromEntries(searchParams), page: (page - 1).toString() })}` : undefined} />
+          <PaginationPrevious href={page > 1 ? pageHref(page - 1) : null} />
           <PaginationList>
             {(() => {
               const pages: (number | 'gap')[] = [];
@@ -359,7 +386,7 @@ export default function CustomersPage() {
                 ) : (
                   <PaginationPage
                     key={p}
-                    href={`?${new URLSearchParams({ ...Object.fromEntries(searchParams), page: p.toString() })}`}
+                    href={pageHref(p)}
                     current={p === page}
                   >
                     {p}
@@ -368,7 +395,7 @@ export default function CustomersPage() {
               );
             })()}
           </PaginationList>
-          <PaginationNext href={page < totalPages ? `?${new URLSearchParams({ ...Object.fromEntries(searchParams), page: (page + 1).toString() })}` : undefined} />
+          <PaginationNext href={page < totalPages ? pageHref(page + 1) : null} />
         </Pagination>
       )}
 

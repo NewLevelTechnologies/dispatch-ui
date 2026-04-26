@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { workOrderApi, type WorkOrder } from '../api';
+import { workOrderApi, type WorkOrderSummary } from '../api';
 import { useGlossary } from '../contexts/GlossaryContext';
 import { Dialog, DialogActions, DialogBody, DialogDescription, DialogTitle } from './catalyst/dialog';
 import { Button } from './catalyst/button';
@@ -14,7 +14,7 @@ const REASON_MAX = 2000;
 interface CancelWorkOrderDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  workOrder: WorkOrder | null;
+  workOrder: WorkOrderSummary | null;
 }
 
 export default function CancelWorkOrderDialog({ isOpen, onClose, workOrder }: CancelWorkOrderDialogProps) {
