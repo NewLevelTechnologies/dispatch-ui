@@ -13,7 +13,9 @@ const mockWorkOrders = [
     workOrderNumber: 'WO-00001',
     customerId: 'cccccccc-dddd-eeee-ffff-222222222222',
     serviceLocationId: 'location-1',
-    status: 'PENDING' as const,
+    lifecycleState: 'ACTIVE' as const,
+    progressCategory: 'NOT_STARTED' as const,
+    priority: 'NORMAL' as const,
     scheduledDate: '2024-03-15T10:00:00Z',
     description: 'Fix leaking pipe',
     notes: 'Customer prefers morning appointments',
@@ -43,7 +45,9 @@ const mockWorkOrders = [
     workOrderNumber: 'WO-00002',
     customerId: 'dddddddd-eeee-ffff-0000-444444444444',
     serviceLocationId: 'location-2',
-    status: 'IN_PROGRESS' as const,
+    lifecycleState: 'ACTIVE' as const,
+    progressCategory: 'IN_PROGRESS' as const,
+    priority: 'NORMAL' as const,
     scheduledDate: '2024-03-14T10:00:00Z',
     description: 'Install new HVAC system',
     notes: '',
@@ -105,13 +109,13 @@ describe('WorkOrdersPage', () => {
     expect(screen.getByText('WO-00002')).toBeInTheDocument();
   });
 
-  it('displays status badges with correct styling', async () => {
+  it('displays progress badges with correct labels', async () => {
     vi.mocked(apiClient.get).mockResolvedValue({ data: mockWorkOrders });
 
     renderWithProviders(<WorkOrdersPage />);
 
     await waitFor(() => {
-      expect(screen.getByText('Pending')).toBeInTheDocument();
+      expect(screen.getByText('Not Started')).toBeInTheDocument();
     });
 
     expect(screen.getByText('In Progress')).toBeInTheDocument();

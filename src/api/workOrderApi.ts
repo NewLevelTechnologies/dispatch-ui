@@ -1,12 +1,19 @@
 // Work Order API Client
 import apiClient from './client';
 
-export type WorkOrderStatus = 'PENDING' | 'SCHEDULED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
+export type LifecycleState = 'ACTIVE' | 'CANCELLED';
 
-export const WorkOrderStatus = {
-  PENDING: 'PENDING',
-  SCHEDULED: 'SCHEDULED',
+export const LifecycleState = {
+  ACTIVE: 'ACTIVE',
+  CANCELLED: 'CANCELLED',
+} as const;
+
+export type ProgressCategory = 'NOT_STARTED' | 'IN_PROGRESS' | 'BLOCKED' | 'COMPLETED' | 'CANCELLED';
+
+export const ProgressCategory = {
+  NOT_STARTED: 'NOT_STARTED',
   IN_PROGRESS: 'IN_PROGRESS',
+  BLOCKED: 'BLOCKED',
   COMPLETED: 'COMPLETED',
   CANCELLED: 'CANCELLED',
 } as const;
@@ -20,22 +27,55 @@ export const WorkOrderPriority = {
   URGENT: 'URGENT',
 } as const;
 
-export interface WorkOrder {
+export type WorkItemType = 'LABOR' | 'PARTS' | 'SERVICE' | 'OTHER';
+
+export interface WorkItemResponse {
   id: string;
-  workOrderNumber?: string; // e.g., "WO-00001" - display this prominently
-  customerId: string;
-  serviceLocationId: string;
-  status: WorkOrderStatus;
-  priority: WorkOrderPriority;
-  scheduledDate?: string;
-  completedDate?: string;
-  description?: string;
-  customerOrderNumber?: string;
-  internalNotes?: string;
-  createdByUserId?: string;
+  itemType: WorkItemType;
+  statusId: string | null;
+  statusCategory: ProgressCategory;
+  description: string;
+  quantity: number;
+  unitPrice: number;
+  totalPrice: number;
   createdAt: string;
   updatedAt: string;
-  // Enriched response fields from backend
+}
+
+export interface WorkOrder {
+  id: string;
+  workOrderNumber?: string;
+  tenantId?: string;
+  customerId: string;
+  serviceLocationId: string;
+
+  // Tenant taxonomy (Phase 4)
+  workOrderTypeId?: string | null;
+  divisionId?: string | null;
+
+  // Replaces old `status`
+  lifecycleState: LifecycleState;
+  progressCategory: ProgressCategory;
+
+  // Visibility flag — null means visible in default views
+  archivedAt?: string | null;
+
+  // Cancellation metadata — populated only when lifecycleState = CANCELLED
+  cancellationReason?: string | null;
+  cancelledByUserId?: string | null;
+  cancelledAt?: string | null;
+
+  priority: WorkOrderPriority;
+  scheduledDate?: string | null;
+  completedDate?: string | null;
+  description?: string | null;
+  customerOrderNumber?: string | null;
+  createdByUserId?: string;
+  internalNotes?: string | null;
+
+  workItems?: WorkItemResponse[];
+
+  // Enriched response fields
   customer?: {
     id: string;
     name: string;
@@ -44,6 +84,7 @@ export interface WorkOrder {
   };
   serviceLocation?: {
     id: string;
+    customerId?: string;
     locationName?: string;
     address: {
       streetAddress: string;
@@ -53,23 +94,39 @@ export interface WorkOrder {
     };
     siteContactName?: string;
     siteContactPhone?: string;
+    siteContactEmail?: string;
+    status?: string;
   };
+
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateWorkItemRequest {
+  itemType: WorkItemType;
+  description: string;
+  quantity: number;
+  unitPrice: number;
+  statusId?: string;
 }
 
 export interface CreateWorkOrderRequest {
   customerId: string;
   serviceLocationId: string;
-  status?: WorkOrderStatus;
+  workOrderTypeId?: string;
+  divisionId?: string;
   priority?: WorkOrderPriority;
   scheduledDate?: string;
-  description?: string;
   customerOrderNumber?: string;
+  description?: string;
   internalNotes?: string;
+  workItems?: CreateWorkItemRequest[];
 }
 
+// `status` is no longer updatable. Use /cancel for cancellation; progress is derived.
 export interface UpdateWorkOrderRequest {
-  customerId?: string;
-  status?: WorkOrderStatus;
+  workOrderTypeId?: string | null;
+  divisionId?: string | null;
   priority?: WorkOrderPriority;
   scheduledDate?: string;
   completedDate?: string;
@@ -78,9 +135,25 @@ export interface UpdateWorkOrderRequest {
   internalNotes?: string;
 }
 
+export interface CancelWorkOrderRequest {
+  reason: string;
+}
+
+export interface TransitionWorkItemStatusRequest {
+  statusId: string;
+  reason?: string;
+}
+
+export interface ListWorkOrdersParams {
+  lifecycleState?: LifecycleState;
+  progressCategory?: ProgressCategory;
+  customerId?: string;
+  includeArchived?: boolean;
+}
+
 export const workOrderApi = {
-  getAll: async (): Promise<WorkOrder[]> => {
-    const response = await apiClient.get<WorkOrder[]>('/work-orders');
+  getAll: async (params?: ListWorkOrdersParams): Promise<WorkOrder[]> => {
+    const response = await apiClient.get<WorkOrder[]>('/work-orders', { params });
     return response.data;
   },
 
@@ -89,8 +162,10 @@ export const workOrderApi = {
     return response.data;
   },
 
-  getByCustomer: async (customerId: string): Promise<WorkOrder[]> => {
-    const response = await apiClient.get<WorkOrder[]>(`/work-orders/customer/${customerId}`);
+  getByCustomer: async (customerId: string, params?: Omit<ListWorkOrdersParams, 'customerId'>): Promise<WorkOrder[]> => {
+    const response = await apiClient.get<WorkOrder[]>('/work-orders', {
+      params: { customerId, ...params },
+    });
     return response.data;
   },
 
@@ -113,6 +188,33 @@ export const workOrderApi = {
 
   delete: async (id: string): Promise<void> => {
     await apiClient.delete(`/work-orders/${id}`);
+  },
+
+  cancel: async (id: string, request: CancelWorkOrderRequest): Promise<WorkOrder> => {
+    const response = await apiClient.post<WorkOrder>(`/work-orders/${id}/cancel`, request);
+    return response.data;
+  },
+
+  archive: async (id: string): Promise<WorkOrder> => {
+    const response = await apiClient.post<WorkOrder>(`/work-orders/${id}/archive`);
+    return response.data;
+  },
+
+  unarchive: async (id: string): Promise<WorkOrder> => {
+    const response = await apiClient.post<WorkOrder>(`/work-orders/${id}/unarchive`);
+    return response.data;
+  },
+
+  updateWorkItemStatus: async (
+    workOrderId: string,
+    workItemId: string,
+    request: TransitionWorkItemStatusRequest
+  ): Promise<WorkItemResponse> => {
+    const response = await apiClient.patch<WorkItemResponse>(
+      `/work-orders/${workOrderId}/work-items/${workItemId}/status`,
+      request
+    );
+    return response.data;
   },
 };
 
