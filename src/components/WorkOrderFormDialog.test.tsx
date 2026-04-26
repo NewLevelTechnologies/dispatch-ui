@@ -80,7 +80,8 @@ describe('WorkOrderFormDialog', () => {
       id: '1',
       customerId: 'customer-1',
       serviceLocationId: 'location-1',
-      status: 'SCHEDULED' as const,
+      lifecycleState: 'ACTIVE' as const,
+      progressCategory: 'NOT_STARTED' as const,
       priority: 'NORMAL' as const,
       scheduledDate: '2024-03-15',
       description: 'Fix leaking pipe',
@@ -95,7 +96,6 @@ describe('WorkOrderFormDialog', () => {
       );
 
       expect(screen.getByText('Edit Work Order')).toBeInTheDocument();
-      expect(screen.getByText('Update work order information.')).toBeInTheDocument();
       expect(screen.getByRole('button', { name: /update/i })).toBeInTheDocument();
     });
 
@@ -113,18 +113,17 @@ describe('WorkOrderFormDialog', () => {
       expect(notesTextarea).toHaveValue('Customer prefers morning');
     });
 
-    it('shows status dropdown in edit mode', async () => {
+    it('shows progress badge in dialog header in edit mode', async () => {
       renderWithProviders(
         <WorkOrderFormDialog isOpen={true} onClose={mockOnClose} workOrder={existingWorkOrder} />
       );
 
+      // Progress badge appears in the dialog header next to the title
       await waitFor(() => {
-        expect(screen.getByLabelText(/status/i)).toBeInTheDocument();
+        expect(screen.getByText('Not Started')).toBeInTheDocument();
       });
-
-      // Check some status options
-      expect(screen.getByText('Pending')).toBeInTheDocument();
-      expect(screen.getByText('Scheduled')).toBeInTheDocument();
+      // No status select in edit mode anymore
+      expect(screen.queryByLabelText(/^status$/i)).not.toBeInTheDocument();
     });
   });
 
@@ -227,7 +226,8 @@ describe('WorkOrderFormDialog', () => {
           id: 'new-work-order-1',
           customerId: 'customer-1',
           serviceLocationId: 'location-1',
-          status: 'PENDING',
+          lifecycleState: 'ACTIVE',
+          progressCategory: 'NOT_STARTED',
           priority: 'NORMAL',
           description: 'Test work order',
           internalNotes: 'Test notes',
@@ -263,16 +263,17 @@ describe('WorkOrderFormDialog', () => {
       const createButton = screen.getByRole('button', { name: /create/i });
       await user.click(createButton);
 
-      // Should call API with correct data
+      // Should call API with correct data — status is no longer part of the payload
       await waitFor(() => {
         expect(apiClient.post).toHaveBeenCalledWith('/work-orders', expect.objectContaining({
           customerId: 'customer-1',
           serviceLocationId: 'location-1',
-          status: 'PENDING',
           description: 'Test work order',
           internalNotes: 'Test notes',
         }));
       });
+      const postCall = vi.mocked(apiClient.post).mock.calls[0][1] as Record<string, unknown>;
+      expect(postCall).not.toHaveProperty('status');
 
       // Dialog should close
       expect(mockOnClose).toHaveBeenCalled();
@@ -283,7 +284,8 @@ describe('WorkOrderFormDialog', () => {
         id: '1',
         customerId: 'customer-1',
         serviceLocationId: 'location-1',
-        status: 'SCHEDULED' as const,
+        lifecycleState: 'ACTIVE' as const,
+        progressCategory: 'NOT_STARTED' as const,
         priority: 'NORMAL' as const,
         scheduledDate: '2024-03-15',
         description: 'Fix leaking pipe',
@@ -294,7 +296,7 @@ describe('WorkOrderFormDialog', () => {
 
       vi.mocked(apiClient.get).mockResolvedValue({ data: mockServiceLocations });
       vi.mocked(apiClient.patch).mockResolvedValue({
-        data: { ...existingWorkOrder, status: 'COMPLETED' },
+        data: { ...existingWorkOrder, description: 'Updated description' },
       });
 
       const user = userEvent.setup();
@@ -304,7 +306,7 @@ describe('WorkOrderFormDialog', () => {
       );
 
       await waitFor(() => {
-        expect(screen.getByLabelText(/status/i)).toBeInTheDocument();
+        expect(screen.getByText('Not Started')).toBeInTheDocument();
       });
 
       // Select a service location first (required even in edit mode)
@@ -318,20 +320,23 @@ describe('WorkOrderFormDialog', () => {
       const firstResult = screen.getByText("John's House").closest('button');
       await user.click(firstResult!);
 
-      // Now change status to completed
-      const statusSelect = screen.getByLabelText(/status/i);
-      await user.selectOptions(statusSelect, 'COMPLETED');
+      // Update description
+      const descriptionTextarea = screen.getByLabelText(/description/i);
+      await user.clear(descriptionTextarea);
+      await user.type(descriptionTextarea, 'Updated description');
 
       // Submit form
       const updateButton = screen.getByRole('button', { name: /update/i });
       await user.click(updateButton);
 
-      // Should call API with update data
+      // Should call API with update data — status must NOT be in payload
       await waitFor(() => {
         expect(apiClient.patch).toHaveBeenCalledWith('/work-orders/1', expect.objectContaining({
-          status: 'COMPLETED',
+          description: 'Updated description',
         }));
       });
+      const patchCall = vi.mocked(apiClient.patch).mock.calls[0][1] as Record<string, unknown>;
+      expect(patchCall).not.toHaveProperty('status');
 
       // Dialog should close
       expect(mockOnClose).toHaveBeenCalled();
@@ -398,32 +403,35 @@ describe('WorkOrderFormDialog', () => {
       expect(dateInput).toHaveValue('2024-03-20');
     });
 
-    it('updates status field in edit mode', async () => {
-      const user = userEvent.setup();
-      const existingWorkOrder = {
+    it('shows cancellation banner and disables submit when work order is cancelled', async () => {
+      const cancelledWorkOrder = {
         id: '1',
         customerId: 'customer-1',
         serviceLocationId: 'location-1',
-        status: 'SCHEDULED' as const,
+        lifecycleState: 'CANCELLED' as const,
+        progressCategory: 'CANCELLED' as const,
         priority: 'NORMAL' as const,
         scheduledDate: '2024-03-15',
         description: 'Fix leaking pipe',
         internalNotes: 'Customer prefers morning',
+        cancellationReason: 'Customer requested cancellation',
+        cancelledAt: '2024-03-12T10:00:00Z',
         createdAt: '2024-03-10T10:00:00Z',
-        updatedAt: '2024-03-10T10:00:00Z',
+        updatedAt: '2024-03-12T10:00:00Z',
       };
 
       renderWithProviders(
-        <WorkOrderFormDialog isOpen={true} onClose={mockOnClose} workOrder={existingWorkOrder} />
+        <WorkOrderFormDialog isOpen={true} onClose={mockOnClose} workOrder={cancelledWorkOrder} />
       );
 
-      await waitFor(() => {
-        expect(screen.getByLabelText(/status/i)).toBeInTheDocument();
-      });
-
-      const statusSelect = screen.getByLabelText(/status/i);
-      await user.selectOptions(statusSelect, 'COMPLETED');
-      expect(statusSelect).toHaveValue('COMPLETED');
+      // Cancellation banner shows
+      expect(screen.getByText(/can no longer be edited/i)).toBeInTheDocument();
+      // Reason is rendered
+      expect(screen.getByText(/customer requested cancellation/i)).toBeInTheDocument();
+      // No update button
+      expect(screen.queryByRole('button', { name: /^update$/i })).not.toBeInTheDocument();
+      // Close button is shown instead of Cancel
+      expect(screen.getByRole('button', { name: /close/i })).toBeInTheDocument();
     });
   });
 
@@ -520,7 +528,8 @@ describe('WorkOrderFormDialog', () => {
         id: '1',
         customerId: 'customer-1',
         serviceLocationId: 'location-1',
-        status: 'SCHEDULED' as const,
+        lifecycleState: 'ACTIVE' as const,
+        progressCategory: 'NOT_STARTED' as const,
         priority: 'NORMAL' as const,
         scheduledDate: '2024-03-15',
         description: 'Fix leaking pipe',

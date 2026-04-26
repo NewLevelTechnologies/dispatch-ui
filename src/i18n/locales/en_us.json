@@ -847,26 +847,68 @@
     }
   },
   "workOrders": {
+    "actions": {
+      "archive": "Archive",
+      "archiveConfirm": "Archive this {{entity, lowercase}}? It will be hidden from the default list.",
+      "archived": "Archived",
+      "archiveError": "Failed to archive {{entity, lowercase}}",
+      "cancel": "Cancel {{entity}}",
+      "cancelButton": "Cancel work order",
+      "cancelDescription": "Cancelling marks this {{entity, lowercase}} as no longer in scope. The reason is recorded and shown in the audit trail.",
+      "cancelError": "Failed to cancel {{entity, lowercase}}",
+      "cancelledBadge": "Cancelled",
+      "cancelReasonLabel": "Reason for cancelling",
+      "cancelReasonPlaceholder": "e.g., Customer called to cancel",
+      "cancelReasonRequired": "A reason is required to cancel.",
+      "cancelTitle": "Cancel {{entity}}?",
+      "charactersRemaining": "{{count}} characters remaining",
+      "frozenHelper": "This {{entity, lowercase}} is cancelled and can no longer be edited.",
+      "showArchived": "Show archived",
+      "unarchive": "Unarchive",
+      "unarchiveError": "Failed to unarchive {{entity, lowercase}}"
+    },
     "description": "Manage work orders and service requests",
+    "filters": {
+      "all": "All",
+      "blocked": "Blocked",
+      "cancelled": "Cancelled",
+      "completed": "Completed",
+      "inProgress": "In Progress",
+      "notStarted": "Not Started",
+      "open": "Open"
+    },
     "form": {
       "customerOrderNumber": "Customer PO / Order #",
       "customerOrderNumberPlaceholder": "e.g., PO-12345",
       "customerPlaceholder": "Select a customer...",
       "customerRequired": "Please select a customer",
+      "division": "Division",
+      "divisionPlaceholder": "Unassigned",
       "existingCustomer": "Existing {{entity, lowercase}}",
       "internalNotes": "Internal Notes",
       "internalNotesHint": "Not visible to the customer",
       "newCustomer": "New {{entity, lowercase}}",
       "newCustomerDetails": "New {{entity}} Details",
       "priority": "Priority",
+      "progressLabel": "Progress",
+      "progressHelper": "Derived automatically from work item statuses.",
       "scheduledDate": "Scheduled Date",
-      "selectServiceLocation": "Please select a {{entity, lowercase}}"
+      "selectServiceLocation": "Please select a {{entity, lowercase}}",
+      "type": "Type",
+      "typePlaceholder": "Unassigned"
     },
     "priority": {
       "high": "High",
       "low": "Low",
       "normal": "Normal",
       "urgent": "Urgent"
+    },
+    "progress": {
+      "blocked": "Blocked",
+      "cancelled": "Cancelled",
+      "completed": "Completed",
+      "inProgress": "In Progress",
+      "notStarted": "Not Started"
     },
     "status": {
       "cancelled": "Cancelled",
@@ -877,10 +919,21 @@
     },
     "table": {
       "amount": "Amount",
+      "cancelledOn": "Cancelled on {{date}}",
       "customerPO": "Customer PO",
       "id": "ID",
       "priority": "Priority",
-      "scheduled": "Scheduled"
+      "scheduled": "Scheduled",
+      "statusHeader": "Status"
+    },
+    "workItems": {
+      "empty": "No work items on this {{entity, lowercase}} yet.",
+      "frozenHelper": "This {{entity, lowercase}} is cancelled — item statuses are read-only.",
+      "qtyHeader": "Qty",
+      "statusUpdateError": "Failed to update item status",
+      "title": "Work Items",
+      "totalHeader": "Total",
+      "unitHeader": "Unit"
     }
   },
   "account": {

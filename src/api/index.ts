@@ -60,11 +60,18 @@ export {
 // Work Order API
 export {
   workOrderApi,
-  WorkOrderStatus,
+  LifecycleState,
+  ProgressCategory,
   WorkOrderPriority,
   type WorkOrder,
+  type WorkItemResponse,
+  type WorkItemType,
   type CreateWorkOrderRequest,
-  type UpdateWorkOrderRequest
+  type CreateWorkItemRequest,
+  type UpdateWorkOrderRequest,
+  type CancelWorkOrderRequest,
+  type TransitionWorkItemStatusRequest,
+  type ListWorkOrdersParams
 } from './workOrderApi';
 
 // Equipment APIs
