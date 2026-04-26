@@ -7,6 +7,27 @@ import apiClient from '../api/client';
 // Mock the API client
 vi.mock('../api/client');
 
+// Wrap a list in the Spring Page<T> shape the work-orders endpoint now returns.
+function pageOf<T>(items: T[], totalElements: number = items.length): {
+  content: T[];
+  totalElements: number;
+  totalPages: number;
+  number: number;
+  size: number;
+  first: boolean;
+  last: boolean;
+} {
+  return {
+    content: items,
+    totalElements,
+    totalPages: Math.max(1, Math.ceil(totalElements / 50)),
+    number: 0,
+    size: 50,
+    first: true,
+    last: totalElements <= 50,
+  };
+}
+
 const mockWorkOrders = [
   {
     id: 'aaaaaaaa-bbbb-cccc-dddd-111111111111',
@@ -77,7 +98,7 @@ describe('WorkOrdersPage', () => {
   });
 
   it('renders the page title and create button', () => {
-    vi.mocked(apiClient.get).mockResolvedValue({ data: [] });
+    vi.mocked(apiClient.get).mockResolvedValue({ data: pageOf([]) });
 
     renderWithProviders(<WorkOrdersPage />);
 
@@ -96,7 +117,7 @@ describe('WorkOrdersPage', () => {
   });
 
   it('displays work orders in a table', async () => {
-    vi.mocked(apiClient.get).mockResolvedValue({ data: mockWorkOrders });
+    vi.mocked(apiClient.get).mockResolvedValue({ data: pageOf(mockWorkOrders) });
 
     renderWithProviders(<WorkOrdersPage />);
 
@@ -110,7 +131,7 @@ describe('WorkOrdersPage', () => {
   });
 
   it('displays progress badges with correct labels', async () => {
-    vi.mocked(apiClient.get).mockResolvedValue({ data: mockWorkOrders });
+    vi.mocked(apiClient.get).mockResolvedValue({ data: pageOf(mockWorkOrders) });
 
     renderWithProviders(<WorkOrdersPage />);
 
@@ -132,7 +153,7 @@ describe('WorkOrdersPage', () => {
   });
 
   it('displays empty state when no work orders exist', async () => {
-    vi.mocked(apiClient.get).mockResolvedValue({ data: [] });
+    vi.mocked(apiClient.get).mockResolvedValue({ data: pageOf([]) });
 
     renderWithProviders(<WorkOrdersPage />);
 
@@ -142,7 +163,7 @@ describe('WorkOrdersPage', () => {
   });
 
   it('opens create dialog when create button is clicked', async () => {
-    vi.mocked(apiClient.get).mockResolvedValue({ data: [] });
+    vi.mocked(apiClient.get).mockResolvedValue({ data: pageOf([]) });
     const user = userEvent.setup();
 
     renderWithProviders(<WorkOrdersPage />);
@@ -159,7 +180,7 @@ describe('WorkOrdersPage', () => {
   });
 
   it('formats scheduled dates correctly', async () => {
-    vi.mocked(apiClient.get).mockResolvedValue({ data: mockWorkOrders });
+    vi.mocked(apiClient.get).mockResolvedValue({ data: pageOf(mockWorkOrders) });
 
     renderWithProviders(<WorkOrdersPage />);
 
@@ -171,7 +192,7 @@ describe('WorkOrdersPage', () => {
   });
 
   it('displays work order numbers', async () => {
-    vi.mocked(apiClient.get).mockResolvedValue({ data: [mockWorkOrders[0]] });
+    vi.mocked(apiClient.get).mockResolvedValue({ data: pageOf([mockWorkOrders[0]]) });
 
     renderWithProviders(<WorkOrdersPage />);
 
@@ -186,7 +207,7 @@ describe('WorkOrdersPage', () => {
       workOrderNumber: undefined,
     };
 
-    vi.mocked(apiClient.get).mockResolvedValue({ data: [workOrderWithoutNumber] });
+    vi.mocked(apiClient.get).mockResolvedValue({ data: pageOf([workOrderWithoutNumber]) });
 
     renderWithProviders(<WorkOrdersPage />);
 
@@ -201,7 +222,7 @@ describe('WorkOrdersPage', () => {
       scheduledDate: undefined,
     };
 
-    vi.mocked(apiClient.get).mockResolvedValue({ data: [workOrderWithoutDate] });
+    vi.mocked(apiClient.get).mockResolvedValue({ data: pageOf([workOrderWithoutDate]) });
 
     renderWithProviders(<WorkOrdersPage />);
 
@@ -215,7 +236,7 @@ describe('WorkOrdersPage', () => {
   });
 
   it('displays service location information', async () => {
-    vi.mocked(apiClient.get).mockResolvedValue({ data: mockWorkOrders });
+    vi.mocked(apiClient.get).mockResolvedValue({ data: pageOf(mockWorkOrders) });
 
     renderWithProviders(<WorkOrdersPage />);
 
@@ -233,7 +254,7 @@ describe('WorkOrdersPage', () => {
 
 
   it('opens edit dialog when edit button is clicked', { timeout: 10000 }, async () => {
-    vi.mocked(apiClient.get).mockResolvedValue({ data: mockWorkOrders });
+    vi.mocked(apiClient.get).mockResolvedValue({ data: pageOf(mockWorkOrders) });
     const user = userEvent.setup();
 
     renderWithProviders(<WorkOrdersPage />);
@@ -256,7 +277,7 @@ describe('WorkOrdersPage', () => {
   });
 
   it('calls delete mutation when delete is confirmed', { timeout: 10000 }, async () => {
-    vi.mocked(apiClient.get).mockResolvedValue({ data: mockWorkOrders });
+    vi.mocked(apiClient.get).mockResolvedValue({ data: pageOf(mockWorkOrders) });
     vi.mocked(apiClient.delete).mockResolvedValue({ data: {} });
     const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
     const user = userEvent.setup();
@@ -284,7 +305,7 @@ describe('WorkOrdersPage', () => {
   });
 
   it('does not delete when deletion is cancelled', { timeout: 10000 }, async () => {
-    vi.mocked(apiClient.get).mockResolvedValue({ data: mockWorkOrders });
+    vi.mocked(apiClient.get).mockResolvedValue({ data: pageOf(mockWorkOrders) });
     vi.mocked(apiClient.delete).mockResolvedValue({ data: {} });
     const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
     const user = userEvent.setup();
@@ -307,5 +328,66 @@ describe('WorkOrdersPage', () => {
     expect(apiClient.delete).not.toHaveBeenCalled();
 
     confirmSpy.mockRestore();
+  });
+
+  describe('Filters', () => {
+    it('renders the wider search input with the new descriptive placeholder', async () => {
+      vi.mocked(apiClient.get).mockResolvedValue({ data: pageOf([]) });
+      renderWithProviders(<WorkOrdersPage />);
+
+      expect(
+        screen.getByPlaceholderText(/search by wo#, customer, phone, address/i)
+      ).toBeInTheDocument();
+    });
+
+    it('debounces search input and forwards it to the work-orders endpoint', async () => {
+      vi.mocked(apiClient.get).mockResolvedValue({ data: pageOf([]) });
+      const user = userEvent.setup();
+
+      renderWithProviders(<WorkOrdersPage />);
+
+      const searchInput = screen.getByPlaceholderText(/search by wo#, customer, phone, address/i);
+      await user.type(searchInput, 'lenox');
+
+      // Wait past the 300ms debounce for the new request to fire
+      await waitFor(() => {
+        const workOrderCalls = vi.mocked(apiClient.get).mock.calls.filter(
+          ([url]) => url === '/work-orders'
+        );
+        const lastCall = workOrderCalls[workOrderCalls.length - 1];
+        expect(lastCall?.[1]?.params).toEqual(expect.objectContaining({ search: 'lenox' }));
+      }, { timeout: 2000 });
+    });
+
+    it('renders an active filter chip when the URL has a search param', async () => {
+      vi.mocked(apiClient.get).mockResolvedValue({ data: pageOf([]) });
+
+      renderWithProviders(<WorkOrdersPage />, { initialPath: '/?search=lenox' });
+
+      // Chip is rendered for the search filter; the input also reflects the URL value
+      await screen.findByText(/search:.*lenox/i);
+      expect(screen.getByPlaceholderText(/search by wo#, customer, phone, address/i)).toHaveValue('lenox');
+    });
+
+    it('shows custom date inputs when the URL has date=custom', async () => {
+      vi.mocked(apiClient.get).mockResolvedValue({ data: pageOf([]) });
+
+      renderWithProviders(<WorkOrdersPage />, { initialPath: '/?date=custom' });
+
+      expect(screen.getByLabelText(/^from$/i)).toBeInTheDocument();
+      expect(screen.getByLabelText(/^to$/i)).toBeInTheDocument();
+    });
+
+    it('reads filter dropdown value from the URL', async () => {
+      vi.mocked(apiClient.get).mockResolvedValue({ data: pageOf([]) });
+
+      renderWithProviders(<WorkOrdersPage />, { initialPath: '/?tab=blocked' });
+
+      // The "Blocked" tab is the active one
+      await waitFor(() => {
+        const blockedBtn = screen.getByRole('button', { name: /^blocked$/i });
+        expect(blockedBtn.className).toMatch(/bg-zinc-900|bg-zinc-100/);
+      });
+    });
   });
 });

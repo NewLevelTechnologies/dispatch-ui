@@ -64,14 +64,18 @@ export {
   ProgressCategory,
   WorkOrderPriority,
   type WorkOrder,
+  type WorkOrderSummary,
   type WorkItemResponse,
   type WorkItemType,
+  type Page,
   type CreateWorkOrderRequest,
   type CreateWorkItemRequest,
   type UpdateWorkOrderRequest,
   type CancelWorkOrderRequest,
   type TransitionWorkItemStatusRequest,
-  type ListWorkOrdersParams
+  type ListWorkOrdersParams,
+  type WorkOrderSortField,
+  type SortDirection
 } from './workOrderApi';
 
 // Equipment APIs

@@ -26,6 +26,7 @@
       "noMatchSearch": "No {{entities, lowercase}} match your search.",
       "notFound": "No {{entities, lowercase}} found",
       "open": "Open {{entities}}",
+      "removeFilter": "Remove {{name}} filter",
       "title": "Actions"
     },
     "active": "Active",
@@ -317,7 +318,9 @@
       "uspsValidated": "USPS Validated"
     },
     "filter": {
-      "allStatuses": "All statuses"
+      "allRegions": "All regions",
+      "allStatuses": "All statuses",
+      "region": "Region"
     },
     "status": {
       "active": "Active",
@@ -868,14 +871,36 @@
       "unarchiveError": "Failed to unarchive {{entity, lowercase}}"
     },
     "description": "Manage work orders and service requests",
+    "dates": {
+      "any": "Any time",
+      "custom": "Custom range…",
+      "from": "From",
+      "last30": "Last 30 days",
+      "last7": "Last 7 days",
+      "thisMonth": "This month",
+      "thisWeek": "This week",
+      "to": "To",
+      "today": "Today",
+      "yesterday": "Yesterday"
+    },
     "filters": {
       "all": "All",
+      "any": "Any {{entity, lowercase}}",
+      "anyDivision": "Any division",
+      "anyItemStatus": "Any item status",
+      "anyRegion": "Any region",
+      "anyType": "Any type",
       "blocked": "Blocked",
       "cancelled": "Cancelled",
+      "clearAll": "Clear all",
       "completed": "Completed",
       "inProgress": "In Progress",
+      "itemStatus": "Item status",
       "notStarted": "Not Started",
-      "open": "Open"
+      "open": "Open",
+      "region": "Region",
+      "scheduled": "Scheduled",
+      "searchPlaceholder": "Search by WO#, customer, phone, address…"
     },
     "form": {
       "customerOrderNumber": "Customer PO / Order #",

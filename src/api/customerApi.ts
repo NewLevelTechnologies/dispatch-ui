@@ -412,15 +412,22 @@ export const customerApi = {
     limit?: number;
     status?: 'ACTIVE' | 'INACTIVE' | 'CLOSED';
     search?: string;
+    dispatchRegionId?: string;
     sort?: string;
   }): Promise<ServiceLocationListResponse> => {
-    const apiParams = {
+    const apiParams: Record<string, string | number | undefined> = {
       page: params?.page ? params.page - 1 : 0,  // Convert to 0-indexed
       limit: params?.limit,
       status: params?.status,
       search: params?.search,
+      dispatchRegionId: params?.dispatchRegionId,
       sort: params?.sort,
     };
+    // Strip empty values so we don't send ?dispatchRegionId= etc.
+    for (const key of Object.keys(apiParams)) {
+      const v = apiParams[key];
+      if (v === undefined || v === '' || v === null) delete apiParams[key];
+    }
     const response = await apiClient.get<ServiceLocationListResponse>('/service-locations', {
       params: apiParams,
     });

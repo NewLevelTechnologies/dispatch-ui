@@ -10,6 +10,7 @@ import {
   divisionsApi,
   workItemStatusesApi,
   type WorkOrder,
+  type WorkOrderSummary,
   type WorkOrderPriority,
   type ProgressCategory,
   type ServiceLocationSearchResult,
@@ -84,7 +85,10 @@ const PROGRESS_TRANSLATION_KEYS: Record<ProgressCategory, string> = {
 interface WorkOrderFormDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  workOrder?: WorkOrder | null;
+  // Accepts a list-page summary or the full WorkOrder. The dialog will fetch the
+  // full detail via getById on open so it has work items, internal notes, cancellation
+  // reason, and any other detail-only fields.
+  workOrder?: WorkOrderSummary | WorkOrder | null;
 }
 
 export default function WorkOrderFormDialog({ isOpen, onClose, workOrder }: WorkOrderFormDialogProps) {
@@ -93,7 +97,19 @@ export default function WorkOrderFormDialog({ isOpen, onClose, workOrder }: Work
   const { getName } = useGlossary();
 
   const isEdit = !!workOrder?.id;
-  const isCancelled = workOrder?.lifecycleState === 'CANCELLED';
+
+  // Fetch the full WorkOrder detail when the dialog opens with a work order.
+  // The summary gives us instant render; the detail brings work items, cancellation
+  // reason, internal notes, and other detail-only fields.
+  const { data: detail } = useQuery({
+    queryKey: ['work-order', workOrder?.id],
+    queryFn: () => workOrderApi.getById(workOrder!.id),
+    enabled: isOpen && !!workOrder?.id,
+  });
+
+  // Prefer the detail when it has loaded; fall back to the summary for instant render.
+  const effective: WorkOrder | WorkOrderSummary | null | undefined = detail ?? workOrder;
+  const isCancelled = effective?.lifecycleState === 'CANCELLED';
   const readOnly = isCancelled;
 
   // Customer mode: existing or new
@@ -164,8 +180,9 @@ export default function WorkOrderFormDialog({ isOpen, onClose, workOrder }: Work
   });
   const activeDivisions = Array.isArray(divisions) ? divisions.filter((d) => d.isActive) : [];
 
-  // Item statuses — only needed when editing an order that has items
-  const hasWorkItems = !!workOrder?.workItems?.length;
+  // Item statuses — only needed when editing an order that has items.
+  // Read from the detail (which carries workItems), not the summary.
+  const hasWorkItems = !!detail?.workItems?.length;
   const { data: itemStatuses } = useQuery({
     queryKey: ['work-item-statuses'],
     queryFn: () => workItemStatusesApi.getAll(),
@@ -189,29 +206,33 @@ export default function WorkOrderFormDialog({ isOpen, onClose, workOrder }: Work
     if (!isOpen) return;
 
     /* eslint-disable react-hooks/set-state-in-effect */
-    if (workOrder) {
-      // Edit mode
+    if (effective) {
+      // Edit mode — populate from the most authoritative shape we have
+      // (detail when loaded, falling back to the summary for instant render).
+      // The internalNotes field is detail-only; it'll be empty until the
+      // detail query lands, then populate when this effect re-runs.
+      const wo = effective as WorkOrder;
       setFormData({
-        customerId: workOrder.customerId,
-        serviceLocationId: workOrder.serviceLocationId,
-        workOrderTypeId: workOrder.workOrderTypeId ?? '',
-        divisionId: workOrder.divisionId ?? '',
-        priority: workOrder.priority ?? 'NORMAL',
-        scheduledDate: workOrder.scheduledDate || '',
-        description: workOrder.description || '',
-        customerOrderNumber: workOrder.customerOrderNumber || '',
-        internalNotes: workOrder.internalNotes || '',
+        customerId: wo.customerId,
+        serviceLocationId: wo.serviceLocationId,
+        workOrderTypeId: wo.workOrderTypeId ?? '',
+        divisionId: wo.divisionId ?? '',
+        priority: wo.priority ?? 'NORMAL',
+        scheduledDate: wo.scheduledDate || '',
+        description: wo.description || '',
+        customerOrderNumber: wo.customerOrderNumber || '',
+        internalNotes: wo.internalNotes || '',
       });
       setSelectedLocation(
-        workOrder.serviceLocation
+        wo.serviceLocation
           ? {
-              id: workOrder.serviceLocationId,
-              customerId: workOrder.customerId,
-              customerName: workOrder.customer?.name ?? '',
-              locationName: workOrder.serviceLocation.locationName ?? null,
-              address: workOrder.serviceLocation.address,
-              siteContactName: workOrder.serviceLocation.siteContactName ?? null,
-              siteContactPhone: workOrder.serviceLocation.siteContactPhone ?? null,
+              id: wo.serviceLocationId,
+              customerId: wo.customerId,
+              customerName: wo.customer?.name ?? '',
+              locationName: wo.serviceLocation.locationName ?? null,
+              address: wo.serviceLocation.address,
+              siteContactName: wo.serviceLocation.siteContactName ?? null,
+              siteContactPhone: wo.serviceLocation.siteContactPhone ?? null,
               status: 'ACTIVE',
             }
           : null
@@ -245,7 +266,10 @@ export default function WorkOrderFormDialog({ isOpen, onClose, workOrder }: Work
       setDispatchRegionId(defaultRegionId);
     }
     /* eslint-enable react-hooks/set-state-in-effect */
-  }, [workOrder, isOpen, defaultRegionId]);
+    // Re-runs on open, on workOrder identity change, and again when the detail
+    // query lands so detail-only fields (internalNotes, etc.) replace the
+    // empty values that came from the summary.
+  }, [effective, isOpen, defaultRegionId]);
 
   const createMutation = useMutation({
     mutationFn: (data: CreateWorkOrderRequest) => workOrderApi.create(data),
@@ -265,9 +289,10 @@ export default function WorkOrderFormDialog({ isOpen, onClose, workOrder }: Work
 
   const updateMutation = useMutation({
     mutationFn: (data: UpdateWorkOrderRequest) =>
-      workOrderApi.update(workOrder!.id!, data),
+      workOrderApi.update(effective!.id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['work-orders'] });
+      queryClient.invalidateQueries({ queryKey: ['work-order', effective?.id] });
       onClose();
     },
     onError: (error: unknown) => {
@@ -394,12 +419,12 @@ export default function WorkOrderFormDialog({ isOpen, onClose, workOrder }: Work
               entity: getName('work_order')
             })}
           </span>
-          {isEdit && workOrder?.workOrderNumber && (
-            <span className="font-mono text-sm font-normal text-zinc-500">{workOrder.workOrderNumber}</span>
+          {isEdit && effective?.workOrderNumber && (
+            <span className="font-mono text-sm font-normal text-zinc-500">{effective.workOrderNumber}</span>
           )}
-          {isEdit && workOrder && !isCancelled && (
-            <Badge color={PROGRESS_COLORS[workOrder.progressCategory]}>
-              {t(`workOrders.progress.${PROGRESS_TRANSLATION_KEYS[workOrder.progressCategory]}`)}
+          {isEdit && effective && !isCancelled && (
+            <Badge color={PROGRESS_COLORS[effective.progressCategory]}>
+              {t(`workOrders.progress.${PROGRESS_TRANSLATION_KEYS[effective.progressCategory]}`)}
             </Badge>
           )}
         </div>
@@ -418,10 +443,10 @@ export default function WorkOrderFormDialog({ isOpen, onClose, workOrder }: Work
                 {t('workOrders.actions.frozenHelper', { entity: getName('work_order') })}
               </span>
             </div>
-            {workOrder?.cancellationReason && (
+            {detail?.cancellationReason && (
               <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
                 <span className="font-medium">{t('workOrders.actions.cancelReasonLabel')}:</span>{' '}
-                {workOrder.cancellationReason}
+                {detail.cancellationReason}
               </p>
             )}
           </div>
@@ -890,7 +915,7 @@ export default function WorkOrderFormDialog({ isOpen, onClose, workOrder }: Work
                 )}
                 {activeDivisions.length > 0 && (
                   <Field className="col-span-3">
-                    <Label className="text-xs">{t('workOrders.form.division')}</Label>
+                    <Label className="text-xs">{getName('division')}</Label>
                     <Select
                       name="divisionId"
                       value={formData.divisionId}
@@ -984,11 +1009,11 @@ export default function WorkOrderFormDialog({ isOpen, onClose, workOrder }: Work
             </FieldGroup>
           </Fieldset>
 
-          {/* Work Items - edit mode only */}
-          {isEdit && (
+          {/* Work Items - edit mode only. Items only exist on the detail response. */}
+          {isEdit && effective && (
             <WorkItemsSection
-              workOrderId={workOrder!.id}
-              items={workOrder!.workItems ?? []}
+              workOrderId={effective.id}
+              items={detail?.workItems ?? []}
               statuses={itemStatuses ?? []}
               readOnly={readOnly}
             />

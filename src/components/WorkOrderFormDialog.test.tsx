@@ -294,7 +294,13 @@ describe('WorkOrderFormDialog', () => {
         updatedAt: '2024-03-10T10:00:00Z',
       };
 
-      vi.mocked(apiClient.get).mockResolvedValue({ data: mockServiceLocations });
+      // Dialog now fetches detail via getById on open, so mock that URL distinctly
+      vi.mocked(apiClient.get).mockImplementation((url) => {
+        if (typeof url === 'string' && url === `/work-orders/${existingWorkOrder.id}`) {
+          return Promise.resolve({ data: existingWorkOrder });
+        }
+        return Promise.resolve({ data: mockServiceLocations });
+      });
       vi.mocked(apiClient.patch).mockResolvedValue({
         data: { ...existingWorkOrder, description: 'Updated description' },
       });
@@ -420,14 +426,24 @@ describe('WorkOrderFormDialog', () => {
         updatedAt: '2024-03-12T10:00:00Z',
       };
 
+      // Dialog fetches detail via getById; mock that URL to return the cancelled order
+      vi.mocked(apiClient.get).mockImplementation((url) => {
+        if (typeof url === 'string' && url === `/work-orders/${cancelledWorkOrder.id}`) {
+          return Promise.resolve({ data: cancelledWorkOrder });
+        }
+        return Promise.resolve({ data: [] });
+      });
+
       renderWithProviders(
         <WorkOrderFormDialog isOpen={true} onClose={mockOnClose} workOrder={cancelledWorkOrder} />
       );
 
       // Cancellation banner shows
       expect(screen.getByText(/can no longer be edited/i)).toBeInTheDocument();
-      // Reason is rendered
-      expect(screen.getByText(/customer requested cancellation/i)).toBeInTheDocument();
+      // Reason is rendered (comes from the detail fetch)
+      await waitFor(() => {
+        expect(screen.getByText(/customer requested cancellation/i)).toBeInTheDocument();
+      });
       // No update button
       expect(screen.queryByRole('button', { name: /^update$/i })).not.toBeInTheDocument();
       // Close button is shown instead of Cancel
