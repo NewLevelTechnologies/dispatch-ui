@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { customerApi, dispatchRegionApi } from '../api';
@@ -8,6 +8,8 @@ import { useHasCapability } from '../hooks/useCurrentUser';
 import AppLayout from '../components/AppLayout';
 import ServiceLocationFormDialog from '../components/ServiceLocationFormDialog';
 import AdditionalContactsList from '../components/AdditionalContactsList';
+import WorkOrdersList from '../components/WorkOrdersList';
+import { workOrdersListQueryOptions } from '../api/workOrdersListQuery';
 import NotificationLogsList from '../components/NotificationLogsList';
 import TabNavigation from '../components/TabNavigation';
 import { formatPhone } from '../utils/formatPhone';
@@ -23,10 +25,21 @@ type TabId = 'overview' | 'work-orders' | 'equipment' | 'activity';
 export default function ServiceLocationDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { key: routeKey } = useLocation();
   const { t } = useTranslation();
   const { getName } = useGlossary();
   const [activeTab, setActiveTab] = useState<TabId>('overview');
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+
+  // Return to wherever we came from (could be the WO detail, customer detail, etc.).
+  // Falls back to the list when there's no internal history (direct URL entry / new tab).
+  const handleBack = () => {
+    if (routeKey !== 'default') {
+      navigate(-1);
+    } else {
+      navigate('/service-locations');
+    }
+  };
 
   // Permission checks
   const canEditServiceLocations = useHasCapability('EDIT_SERVICE_LOCATIONS');
@@ -43,6 +56,15 @@ export default function ServiceLocationDetailPage() {
     queryKey: ['dispatch-regions', 'active'],
     queryFn: () => dispatchRegionApi.getAll(false),
   });
+
+  // Shared cache with the rendered list — one request, count + table both read it.
+  // Disabled until location loads (customerId ?? '' is falsy → enabled: false).
+  const { data: workOrdersData } = useQuery(
+    workOrdersListQueryOptions({
+      customerId: location?.customerId ?? '',
+      serviceLocationId: location?.id ?? '',
+    })
+  );
 
   const dispatchRegion = dispatchRegions?.find(r => r.id === location?.dispatchRegionId);
 
@@ -96,7 +118,7 @@ export default function ServiceLocationDetailPage() {
   // Tab configuration
   const tabs = [
     { id: 'overview', label: t('serviceLocations.tabs.overview'), count: undefined },
-    { id: 'work-orders', label: getName('work_order', true), count: 0 }, // TODO: actual count
+    { id: 'work-orders', label: getName('work_order', true), count: workOrdersData?.totalElements ?? 0 },
     { id: 'equipment', label: getName('equipment'), count: undefined },
     { id: 'activity', label: t('serviceLocations.tabs.activity'), count: undefined },
   ];
@@ -106,7 +128,7 @@ export default function ServiceLocationDetailPage() {
       <div className="p-4">
         {/* Back Button */}
         <div className="mb-2">
-          <Button plain onClick={() => navigate('/service-locations')}>
+          <Button plain onClick={handleBack}>
             <ArrowLeftIcon className="size-4" />
             {t('common.actions.back')}
           </Button>
@@ -302,11 +324,11 @@ export default function ServiceLocationDetailPage() {
                     {t('common.actions.new', { entity: getName('work_order') })}
                   </Button>
                 </div>
-                <div className="rounded-lg border border-zinc-200 p-8 text-center dark:border-zinc-800">
-                  <Text className="text-zinc-500 dark:text-zinc-400">
-                    {t('common.actions.noEntitiesYet', { entities: getName('work_order', true) })}
-                  </Text>
-                </div>
+                <WorkOrdersList
+                  customerId={location.customerId}
+                  serviceLocationId={location.id}
+                  showLocation={false}
+                />
               </div>
             )}
 

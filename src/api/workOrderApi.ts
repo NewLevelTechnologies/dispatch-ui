@@ -186,6 +186,9 @@ export interface ListWorkOrdersParams {
   // Customer scope
   customerId?: string;
 
+  // Service location scope (composes with customerId)
+  serviceLocationId?: string;
+
   // Scheduled date range — ISO yyyy-mm-dd. From is inclusive at 00:00,
   // To is exclusive at 00:00 of the next day (handled server-side).
   scheduledDateFrom?: string;

@@ -1,5 +1,5 @@
 import { useDeferredValue, useEffect, useMemo, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, Link as RouterLink } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { EllipsisVerticalIcon, MagnifyingGlassIcon, XMarkIcon } from '@heroicons/react/24/outline';
@@ -661,7 +661,12 @@ export default function WorkOrdersPage() {
                   <TableRow key={workOrder.id} className={rowClass}>
                     <TableCell className="font-mono text-sm text-zinc-500">
                       <div className="flex flex-col">
-                        <span>{workOrder.workOrderNumber || `#${workOrder.id.substring(0, 8)}`}</span>
+                        <RouterLink
+                          to={`/work-orders/${workOrder.id}`}
+                          className="text-zinc-700 hover:text-blue-600 hover:underline dark:text-zinc-300 dark:hover:text-blue-400"
+                        >
+                          {workOrder.workOrderNumber || `#${workOrder.id.substring(0, 8)}`}
+                        </RouterLink>
                         {archived && (
                           <span className="text-[10px] uppercase tracking-wide text-zinc-400">
                             {t('workOrders.actions.archived')}

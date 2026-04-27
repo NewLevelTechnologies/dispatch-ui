@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { customerApi, notificationApi, dispatchRegionApi } from '../api';
@@ -9,6 +9,8 @@ import AppLayout from '../components/AppLayout';
 import ServiceLocationFormDialog from '../components/ServiceLocationFormDialog';
 import CustomerFormDialog from '../components/CustomerFormDialog';
 import AdditionalContactsList from '../components/AdditionalContactsList';
+import WorkOrdersList from '../components/WorkOrdersList';
+import { workOrdersListQueryOptions } from '../api/workOrdersListQuery';
 import NotificationPreferencesDialog from '../components/NotificationPreferencesDialog';
 import NotificationLogsList from '../components/NotificationLogsList';
 import TabNavigation from '../components/TabNavigation';
@@ -37,11 +39,22 @@ type TabId = 'overview' | 'work-orders' | 'financial' | 'equipment' | 'activity'
 export default function CustomerDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { key: routeKey } = useLocation();
   const { t } = useTranslation();
   const { getName } = useGlossary();
   const [activeTab, setActiveTab] = useState<TabId>('overview');
   const [isAddLocationDialogOpen, setIsAddLocationDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+
+  // Return to wherever we came from (could be the WO detail, service location, etc.).
+  // Falls back to the list when there's no internal history (direct URL entry / new tab).
+  const handleBack = () => {
+    if (routeKey !== 'default') {
+      navigate(-1);
+    } else {
+      navigate('/customers');
+    }
+  };
   const [isNotificationDialogOpen, setIsNotificationDialogOpen] = useState(false);
   const [locationSearchQuery, setLocationSearchQuery] = useState('');
 
@@ -53,6 +66,12 @@ export default function CustomerDetailPage() {
     queryKey: ['customers', id],
     queryFn: () => customerApi.getById(id!),
   });
+
+  // Shared cache with the rendered list — one request, count + table both read it.
+  // Disabled until the customer loads (id ?? '' is falsy → enabled: false).
+  const { data: workOrdersData } = useQuery(
+    workOrdersListQueryOptions({ customerId: customer?.id ?? '' })
+  );
 
   // Fetch notification preferences to show opt-in count
   const { data: preferences = [] } = useQuery({
@@ -135,7 +154,7 @@ export default function CustomerDetailPage() {
   // Tab configuration
   const tabs = [
     { id: 'overview', label: t('customers.tabs.overview'), count: undefined },
-    { id: 'work-orders', label: getName('work_order', true), count: 0 }, // TODO: actual count
+    { id: 'work-orders', label: getName('work_order', true), count: workOrdersData?.totalElements ?? 0 },
     { id: 'financial', label: t('customers.tabs.financial'), count: undefined },
     { id: 'equipment', label: getName('equipment'), count: undefined },
     { id: 'activity', label: t('customers.tabs.activity'), count: undefined },
@@ -146,7 +165,7 @@ export default function CustomerDetailPage() {
       <div className="p-4">
         {/* Back Button */}
         <div className="mb-2">
-          <Button plain onClick={() => navigate('/customers')}>
+          <Button plain onClick={handleBack}>
             <ArrowLeftIcon className="size-4" />
             {t('common.actions.back')}
           </Button>
@@ -291,11 +310,7 @@ export default function CustomerDetailPage() {
                       {t('common.actions.new', { entity: getName('work_order') })}
                     </Button>
                   </div>
-                  <div className="rounded-lg border border-zinc-200 p-8 text-center dark:border-zinc-800">
-                    <Text className="text-zinc-500 dark:text-zinc-400">
-                      {t('common.actions.noEntitiesYet', { entities: getName('work_order', true) })}
-                    </Text>
-                  </div>
+                  <WorkOrdersList customerId={customer.id} />
                 </div>
               )}
 
@@ -549,11 +564,7 @@ export default function CustomerDetailPage() {
         )}
 
         {activeTab === 'work-orders' && (
-          <div className="rounded-lg border border-zinc-200 p-8 text-center dark:border-zinc-800">
-            <Text className="text-zinc-500 dark:text-zinc-400">
-              {t('common.actions.noEntitiesYet', { entities: getName('work_order', true) })}
-            </Text>
-          </div>
+          <WorkOrdersList customerId={customer.id} />
         )}
 
         {activeTab === 'financial' && (

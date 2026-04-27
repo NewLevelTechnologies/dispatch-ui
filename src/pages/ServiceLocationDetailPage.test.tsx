@@ -49,6 +49,11 @@ describe('ServiceLocationDetailPage', () => {
       if (url.includes('/dispatch-regions')) {
         return Promise.resolve({ data: regions });
       }
+      if (url.includes('/work-orders')) {
+        return Promise.resolve({
+          data: { content: [], totalElements: 0, totalPages: 0, number: 0, size: 25 },
+        });
+      }
       return Promise.reject(new Error('Unknown endpoint'));
     });
   };
