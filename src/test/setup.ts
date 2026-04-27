@@ -679,6 +679,8 @@ vi.mock('react-i18next', () => {
     'workOrders.detail.money.placeholder': '{{label}}: —',
     'workOrders.detail.money.quoted': 'Quoted',
     'workOrders.detail.print': 'Print',
+    'workOrders.workItems.changeStatus': 'Change status (currently {{current}})',
+    'workOrders.workItems.lastUpdated': 'Last updated',
   };
 
   return {

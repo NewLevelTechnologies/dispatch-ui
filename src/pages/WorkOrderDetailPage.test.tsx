@@ -62,6 +62,17 @@ describe('WorkOrderDetailPage', () => {
           data: [{ id: 'div-1', name: 'HVAC', code: 'HVAC', isActive: true, sortOrder: 0 }],
         });
       }
+      if (url.includes('/work-orders/config/item-statuses')) {
+        return Promise.resolve({ data: [] });
+      }
+      if (url.includes('/work-orders/config/status-workflows')) {
+        return Promise.resolve({ data: [] });
+      }
+      if (url.includes('/work-orders/config/workflow')) {
+        return Promise.resolve({
+          data: { enforceStatusWorkflow: false, dispatchBoardType: 'STATUS_BASED' },
+        });
+      }
       if (url.match(/\/work-orders\/[^/]+$/)) {
         return workOrder
           ? Promise.resolve({ data: workOrder })
@@ -236,6 +247,38 @@ describe('WorkOrderDetailPage', () => {
       expect(screen.getAllByText(/1942 LENOX RD NE/i).length).toBeGreaterThan(0);
     });
     expect(screen.queryByText("Paul's House")).not.toBeInTheDocument();
+  });
+
+  it('renders the work items empty state when there are no work items', async () => {
+    mockApiResponses();
+    renderPage();
+    await waitFor(() => {
+      expect(screen.getByText(/no work items/i)).toBeInTheDocument();
+    });
+  });
+
+  it('renders work items table with descriptions when work items exist', async () => {
+    mockApiResponses({
+      ...mockWorkOrder,
+      workItems: [
+        {
+          id: 'wi-1',
+          itemType: 'SERVICE',
+          statusId: null,
+          statusCategory: 'NOT_STARTED',
+          description: 'Replace filter',
+          quantity: 1,
+          unitPrice: 0,
+          totalPrice: 0,
+          createdAt: '2026-04-21T13:40:00Z',
+          updatedAt: '2026-04-22T10:30:00Z',
+        },
+      ],
+    });
+    renderPage();
+    await waitFor(() => {
+      expect(screen.getByText('Replace filter')).toBeInTheDocument();
+    });
   });
 
   it('renders click-to-copy phone and address controls', async () => {

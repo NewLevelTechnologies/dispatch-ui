@@ -973,8 +973,10 @@
       "statusHeader": "Status"
     },
     "workItems": {
+      "changeStatus": "Change status (currently {{current}})",
       "empty": "No work items on this {{entity, lowercase}} yet.",
       "frozenHelper": "This {{entity, lowercase}} is cancelled — item statuses are read-only.",
+      "lastUpdated": "Last updated",
       "qtyHeader": "Qty",
       "statusUpdateError": "Failed to update item status",
       "title": "Work Items",
