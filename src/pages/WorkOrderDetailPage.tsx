@@ -6,11 +6,15 @@ import {
   workOrderApi,
   workOrderTypesApi,
   divisionsApi,
+  workItemStatusesApi,
+  statusWorkflowsApi,
+  workflowConfigApi,
   type ProgressCategory,
   type WorkOrderPriority,
 } from '../api';
 import { useGlossary } from '../contexts/GlossaryContext';
 import AppLayout from '../components/AppLayout';
+import WorkItemsTable from '../components/WorkItemsTable';
 import { formatPhone } from '../utils/formatPhone';
 import { formatRelativeTime } from '../utils/formatRelativeTime';
 import { Heading } from '../components/catalyst/heading';
@@ -113,6 +117,23 @@ export default function WorkOrderDetailPage() {
   const { data: divisions } = useQuery({
     queryKey: ['divisions'],
     queryFn: () => divisionsApi.getAll(),
+  });
+
+  // Tenant work-item statuses + workflow rules + config drive the inline status pill.
+  // Lifted to the page so all rows share one cache hit per query.
+  const { data: workItemStatuses = [] } = useQuery({
+    queryKey: ['work-item-statuses'],
+    queryFn: () => workItemStatusesApi.getAll(),
+  });
+
+  const { data: statusWorkflows = [] } = useQuery({
+    queryKey: ['status-workflows'],
+    queryFn: () => statusWorkflowsApi.getAll(),
+  });
+
+  const { data: workflowConfig } = useQuery({
+    queryKey: ['workflow-config'],
+    queryFn: () => workflowConfigApi.get(),
   });
 
   const handleCopy = async (kind: 'phone' | 'address', value: string) => {
@@ -396,8 +417,17 @@ export default function WorkOrderDetailPage() {
             </Card>
           </aside>
 
-          {/* Main canvas placeholder — work items render here in phase 2. */}
-          <main className="mt-6 lg:mt-0" />
+          {/* Main canvas — work items table. Cancelled WOs render the pills read-only. */}
+          <main className="mt-6 lg:mt-0">
+            <WorkItemsTable
+              workOrderId={workOrder.id}
+              workItems={workOrder.workItems ?? []}
+              statuses={workItemStatuses}
+              workflows={statusWorkflows}
+              enforceWorkflow={workflowConfig?.enforceStatusWorkflow ?? false}
+              readOnly={isCancelled || isArchived}
+            />
+          </main>
         </div>
       </div>
     </AppLayout>
