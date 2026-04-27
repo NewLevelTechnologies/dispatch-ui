@@ -883,6 +883,27 @@
       "today": "Today",
       "yesterday": "Yesterday"
     },
+    "detail": {
+      "actionPending": "Available in a future phase",
+      "addNote": "Add Note",
+      "completed": "Completed",
+      "copyAddress": "Click to copy address",
+      "copyPhone": "Click to copy phone",
+      "created": "Created",
+      "duplicate": "Duplicate",
+      "eta": "ETA {{date}}",
+      "info": "{{entity}} Info",
+      "lastUpdated": "Updated {{time}}",
+      "money": {
+        "balance": "Balance",
+        "invoiced": "Invoiced",
+        "nte": "NTE",
+        "paid": "Paid",
+        "placeholder": "{{label}}: —",
+        "quoted": "Quoted"
+      },
+      "print": "Print"
+    },
     "filters": {
       "all": "All",
       "any": "Any {{entity, lowercase}}",

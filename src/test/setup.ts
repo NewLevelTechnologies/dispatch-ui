@@ -662,6 +662,23 @@ vi.mock('react-i18next', () => {
     'tenantSettings.sections.terminology': 'Terminology',
     'tenantSettings.tabs.general': 'General',
     'tenantSettings.tabs.terminology': 'Terminology',
+    'workOrders.detail.actionPending': 'Available in a future phase',
+    'workOrders.detail.addNote': 'Add Note',
+    'workOrders.detail.completed': 'Completed',
+    'workOrders.detail.copyAddress': 'Click to copy address',
+    'workOrders.detail.copyPhone': 'Click to copy phone',
+    'workOrders.detail.created': 'Created',
+    'workOrders.detail.duplicate': 'Duplicate',
+    'workOrders.detail.eta': 'ETA {{date}}',
+    'workOrders.detail.info': '{{entity}} Info',
+    'workOrders.detail.lastUpdated': 'Updated {{time}}',
+    'workOrders.detail.money.balance': 'Balance',
+    'workOrders.detail.money.invoiced': 'Invoiced',
+    'workOrders.detail.money.nte': 'NTE',
+    'workOrders.detail.money.paid': 'Paid',
+    'workOrders.detail.money.placeholder': '{{label}}: —',
+    'workOrders.detail.money.quoted': 'Quoted',
+    'workOrders.detail.print': 'Print',
   };
 
   return {
