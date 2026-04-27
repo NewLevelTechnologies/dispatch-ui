@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
-import { renderWithProviders, userEvent } from '../test/utils';
+import { renderWithProviders } from '../test/utils';
 import WorkOrderDetailPage from './WorkOrderDetailPage';
 import apiClient from '../api/client';
 import type { RouteObject } from 'react-router-dom';
@@ -72,12 +72,14 @@ describe('WorkOrderDetailPage', () => {
   };
 
   const renderPage = (id = 'wo-1') => {
+    /* eslint-disable i18next/no-literal-string -- test-only placeholder routes */
     const routes: RouteObject[] = [
       { path: '/work-orders/:id', element: <WorkOrderDetailPage /> },
       { path: '/work-orders', element: <div>Work Orders List</div> },
       { path: '/customers/:id', element: <div>Customer Detail</div> },
       { path: '/service-locations/:id', element: <div>Service Location Detail</div> },
     ];
+    /* eslint-enable i18next/no-literal-string */
 
     return renderWithProviders(<WorkOrderDetailPage />, {
       routes,
