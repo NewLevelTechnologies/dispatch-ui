@@ -59,6 +59,10 @@ export default function WorkItemStatusPill({
       workOrderApi.updateWorkItemStatus(workOrderId, workItem.id, { statusId }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['work-orders'] });
+      // The status change emits a WORK_ITEM_STATUS_CHANGED event on the backend,
+      // which the activity listener writes into work_order_activity. Refetch the
+      // activity rail so the new event surfaces without a manual reload.
+      queryClient.invalidateQueries({ queryKey: ['work-order-activity', workOrderId] });
     },
     onError: (err: unknown) => {
       const msg =
