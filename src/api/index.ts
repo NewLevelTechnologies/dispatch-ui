@@ -5,6 +5,24 @@ export { getApiErrorMessage } from './errors';
 // Audit API
 export { auditApi, type AuditLog } from './auditApi';
 
+// Activity API (WO activity feed)
+export {
+  activityApi,
+  type ActivityCategory,
+  type ActivityKind,
+  type ActivityActor,
+  type ActivityEvent,
+  type ActivityPage,
+  type ListActivityParams,
+} from './activityApi';
+
+// Notes API (WO notes sub-resource)
+export {
+  notesApi,
+  type WorkOrderNote,
+  type CreateNoteRequest,
+} from './notesApi';
+
 // Customer API
 export {
   customerApi,

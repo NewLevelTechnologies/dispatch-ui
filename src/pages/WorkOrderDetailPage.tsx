@@ -15,6 +15,8 @@ import {
 import { useGlossary } from '../contexts/GlossaryContext';
 import AppLayout from '../components/AppLayout';
 import WorkItemsTable from '../components/WorkItemsTable';
+import WorkOrderActivityRail from '../components/WorkOrderActivityRail';
+import { SlideOver } from '../components/catalyst/slideover';
 import { formatPhone } from '../utils/formatPhone';
 import { formatRelativeTime } from '../utils/formatRelativeTime';
 import { Heading } from '../components/catalyst/heading';
@@ -98,6 +100,7 @@ export default function WorkOrderDetailPage() {
   const { t } = useTranslation();
   const { getName } = useGlossary();
   const [copied, setCopied] = useState<'phone' | 'address' | null>(null);
+  const [activitySheetOpen, setActivitySheetOpen] = useState(false);
 
   const {
     data: workOrder,
@@ -200,9 +203,15 @@ export default function WorkOrderDetailPage() {
 
   return (
     <AppLayout>
-      <div className="flex flex-col">
-        {/* Sticky header */}
-        <div className="sticky top-0 z-10 border-b border-zinc-950/10 bg-white/95 px-4 py-3 backdrop-blur dark:border-white/10 dark:bg-zinc-900/95">
+      {/* Multi-column independent scroll on lg+ — header is a fixed row, each
+          column scrolls in its own viewport. AppLayout uses min-h-svh so we have
+          to compute the page height explicitly (7rem ≈ AppLayout's chrome on lg+:
+          p-2 + p-10 + main pt-2/pb-2). Below lg, fall back to natural document
+          flow with the sticky header. */}
+      <div className="flex flex-col lg:h-[calc(100svh-7rem)] lg:overflow-hidden">
+        {/* Header — sticky on small viewports; on lg+ it's a static layout row
+            since the parent has overflow-hidden and the body grid scrolls per-column. */}
+        <div className="sticky top-0 z-10 border-b border-zinc-950/10 bg-white/95 px-4 py-3 backdrop-blur dark:border-white/10 dark:bg-zinc-900/95 lg:relative lg:shrink-0 lg:top-auto">
           {/* Back link */}
           <div className="mb-2">
             <Button plain onClick={() => navigate('/work-orders')}>
@@ -301,7 +310,7 @@ export default function WorkOrderDetailPage() {
               <PlusIcon className="size-4" />
               {t('common.actions.add', { entity: getName('dispatch') })}
             </Button>
-            <Button disabled title={t('workOrders.detail.actionPending')}>
+            <Button onClick={() => setActivitySheetOpen(true)}>
               <PlusIcon className="size-4" />
               {t('workOrders.detail.addNote')}
             </Button>
@@ -329,10 +338,14 @@ export default function WorkOrderDetailPage() {
           </div>
         </div>
 
-        {/* Body — phase 1 ships the left strip only. Work items table arrives in phase 2;
-            activity rail in phase 3. */}
-        <div className="p-4 lg:grid lg:grid-cols-[260px_1fr] lg:gap-6">
-          <aside className="flex flex-col gap-6">
+        {/* Body grid:
+            - <lg: stacked, document-level scroll
+            - lg-xl: 2-col (left strip + main); rail accessed via slide-over
+            - xl+: 3-col (left strip + main + right rail)
+            On lg+, the body fills the remaining viewport (flex-1 min-h-0) and
+            each column owns its scroll. */}
+        <div className="p-4 lg:grid lg:grid-cols-[260px_1fr] lg:gap-6 lg:flex-1 lg:min-h-0 lg:overflow-hidden xl:grid-cols-[260px_1fr_360px]">
+          <aside className="flex flex-col gap-6 lg:min-h-0 lg:overflow-y-auto">
             {location && (
               <Card title={getName('service_location')}>
                 <CatLink
@@ -418,7 +431,7 @@ export default function WorkOrderDetailPage() {
           </aside>
 
           {/* Main canvas — work items table. Cancelled WOs render the pills read-only. */}
-          <main className="mt-6 lg:mt-0">
+          <main className="mt-6 lg:mt-0 lg:min-h-0 lg:overflow-y-auto">
             <WorkItemsTable
               workOrderId={workOrder.id}
               workItems={workOrder.workItems ?? []}
@@ -428,8 +441,37 @@ export default function WorkOrderDetailPage() {
               readOnly={isCancelled || isArchived}
             />
           </main>
+
+          {/* Right rail (xl+ only) — same content also appears in the slide-over below. */}
+          {/* Right rail — visible on xl+. Independent scroll within its column
+              (parent body grid is overflow-hidden + flex-1, so each column owns
+              its scroll viewport). */}
+          <aside className="mt-6 hidden xl:mt-0 xl:block xl:min-h-0 xl:overflow-y-auto">
+            <WorkOrderActivityRail workOrderId={workOrder.id} />
+          </aside>
         </div>
       </div>
+
+      {/* Slide-over for non-xl viewports (and as the "+ Note" entry point on any viewport).
+          Catalyst SlideOver only mounts content when `open`, so React Query duplication
+          is bounded to the moment the sheet is visible. */}
+      <SlideOver
+        open={activitySheetOpen}
+        onClose={setActivitySheetOpen}
+        className="!max-w-md"
+      >
+        <div className="flex items-center justify-between border-b border-zinc-200 px-4 py-3 dark:border-zinc-800">
+          <h2 className="text-sm font-semibold text-zinc-950 dark:text-white">
+            {t('workOrders.activity.heading')}
+          </h2>
+          <Button plain onClick={() => setActivitySheetOpen(false)}>
+            {t('common.close')}
+          </Button>
+        </div>
+        <div className="flex-1 overflow-y-auto p-4">
+          <WorkOrderActivityRail workOrderId={workOrder.id} />
+        </div>
+      </SlideOver>
     </AppLayout>
   );
 }
