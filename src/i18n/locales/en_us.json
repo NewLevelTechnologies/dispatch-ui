@@ -883,6 +883,63 @@
       "today": "Today",
       "yesterday": "Yesterday"
     },
+    "activity": {
+      "activeDispatches": "Active {{entities}}",
+      "byline": "by {{actor}} · {{time}}",
+      "composer": {
+        "ariaLabel": "Add a note to this work order",
+        "error": "Couldn't save note",
+        "hint": "Press N to focus, Cmd+Enter to save",
+        "placeholder": "Add a note…",
+        "save": "Save",
+        "saving": "Saving…"
+      },
+      "day": {
+        "thisWeek": "This week",
+        "today": "Today",
+        "yesterday": "Yesterday"
+      },
+      "empty": "No activity yet.",
+      "emptyForFilter": "No matching events for this filter.",
+      "errorLoading": "Couldn't load activity.",
+      "filter": {
+        "all": "All",
+        "dispatches": "Dispatches",
+        "financial": "$",
+        "notes": "Notes",
+        "status": "Status"
+      },
+      "heading": "Activity",
+      "kind": {
+        "dispatchArrived": "{{techName}} arrived",
+        "dispatchAssigned": "{{entity}} assigned to {{techName}}",
+        "dispatchCancelled": "{{entity}} cancelled",
+        "dispatchCheckedOut": "{{techName}} checked out",
+        "dispatchDeparted": "{{techName}} departed",
+        "invoiceIssued": "{{entity}} {{invoiceNumber}} issued for {{amount}}",
+        "invoicePaid": "{{entity}} {{invoiceNumber}} paid",
+        "noteAdded": "{{bodyExcerpt}}",
+        "noteDeleted": "Note deleted: {{bodyExcerpt}}",
+        "paymentReceived": "{{entity}} received: {{amount}}",
+        "poCreated": "Purchase order {{poNumber}} created",
+        "quoteAccepted": "{{entity}} {{quoteNumber}} accepted",
+        "quoteDeclined": "{{entity}} {{quoteNumber}} declined",
+        "quoteSent": "{{entity}} {{quoteNumber}} sent for {{amount}}",
+        "unknown": "Unrecognized activity",
+        "workItemCreated": "Added {{entity, lowercase}}: {{description}}",
+        "workItemDeleted": "Removed {{entity, lowercase}}: {{description}}",
+        "workItemStatusChanged": "{{workItemDescription}} — status changed from {{fromStatusName}} to {{toStatusName}}",
+        "workItemUpdated": "{{entity}} {{workItemDescription}}: {{field}} changed",
+        "workOrderArchived": "{{entity}} archived",
+        "workOrderCancelled": "{{entity}} cancelled",
+        "workOrderCreated": "{{entity}} created",
+        "workOrderUnarchived": "{{entity}} unarchived",
+        "workOrderUpdated": "{{field}} changed from {{fromValue}} to {{toValue}}"
+      },
+      "loadMore": "Load more",
+      "loading": "Loading activity…",
+      "systemActor": "System"
+    },
     "detail": {
       "actionPending": "Available in a future phase",
       "addNote": "Add Note",

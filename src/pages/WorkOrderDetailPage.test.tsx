@@ -73,6 +73,17 @@ describe('WorkOrderDetailPage', () => {
           data: { enforceStatusWorkflow: false, dispatchBoardType: 'STATUS_BASED' },
         });
       }
+      if (url.includes('/scheduling/dispatches')) {
+        return Promise.resolve({ data: [] });
+      }
+      if (url.match(/\/work-orders\/[^/]+\/activity$/)) {
+        return Promise.resolve({
+          data: { content: [], nextCursor: null, hasMore: false },
+        });
+      }
+      if (url.match(/\/work-orders\/[^/]+\/notes$/)) {
+        return Promise.resolve({ data: [] });
+      }
       if (url.match(/\/work-orders\/[^/]+$/)) {
         return workOrder
           ? Promise.resolve({ data: workOrder })

@@ -681,6 +681,56 @@ vi.mock('react-i18next', () => {
     'workOrders.detail.print': 'Print',
     'workOrders.workItems.changeStatus': 'Change status (currently {{current}})',
     'workOrders.workItems.lastUpdated': 'Last updated',
+    'workOrders.activity.activeDispatches': 'Active {{entities}}',
+    'workOrders.activity.byline': 'by {{actor}} · {{time}}',
+    'workOrders.activity.composer.ariaLabel': 'Add a note to this work order',
+    'workOrders.activity.composer.error': "Couldn't save note",
+    'workOrders.activity.composer.hint': 'Press N to focus, Cmd+Enter to save',
+    'workOrders.activity.composer.placeholder': 'Add a note…',
+    'workOrders.activity.composer.save': 'Save',
+    'workOrders.activity.composer.saving': 'Saving…',
+    'workOrders.activity.day.thisWeek': 'This week',
+    'workOrders.activity.day.today': 'Today',
+    'workOrders.activity.day.yesterday': 'Yesterday',
+    'workOrders.activity.empty': 'No activity yet.',
+    'workOrders.activity.emptyForFilter': 'No matching events for this filter.',
+    'workOrders.activity.errorLoading': "Couldn't load activity.",
+    'workOrders.activity.filter.all': 'All',
+    'workOrders.activity.filter.dispatches': 'Dispatches',
+    'workOrders.activity.filter.financial': '$',
+    'workOrders.activity.filter.notes': 'Notes',
+    'workOrders.activity.filter.status': 'Status',
+    'workOrders.activity.heading': 'Activity',
+    'workOrders.activity.kind.dispatchAssigned': '{{entity}} assigned to {{techName}}',
+    'workOrders.activity.kind.dispatchCancelled': '{{entity}} cancelled',
+    'workOrders.activity.kind.invoiceIssued':
+      '{{entity}} {{invoiceNumber}} issued for {{amount}}',
+    'workOrders.activity.kind.invoicePaid': '{{entity}} {{invoiceNumber}} paid',
+    'workOrders.activity.kind.noteAdded': '{{bodyExcerpt}}',
+    'workOrders.activity.kind.noteDeleted': 'Note deleted: {{bodyExcerpt}}',
+    'workOrders.activity.kind.paymentReceived': '{{entity}} received: {{amount}}',
+    'workOrders.activity.kind.quoteAccepted': '{{entity}} {{quoteNumber}} accepted',
+    'workOrders.activity.kind.quoteDeclined': '{{entity}} {{quoteNumber}} declined',
+    'workOrders.activity.kind.quoteSent':
+      '{{entity}} {{quoteNumber}} sent for {{amount}}',
+    'workOrders.activity.kind.unknown': 'Unrecognized activity',
+    'workOrders.activity.kind.workItemCreated':
+      'Added {{entity, lowercase}}: {{description}}',
+    'workOrders.activity.kind.workItemDeleted':
+      'Removed {{entity, lowercase}}: {{description}}',
+    'workOrders.activity.kind.workItemStatusChanged':
+      '{{workItemDescription}} — status changed from {{fromStatusName}} to {{toStatusName}}',
+    'workOrders.activity.kind.workItemUpdated':
+      '{{entity}} {{workItemDescription}}: {{field}} changed',
+    'workOrders.activity.kind.workOrderArchived': '{{entity}} archived',
+    'workOrders.activity.kind.workOrderCancelled': '{{entity}} cancelled',
+    'workOrders.activity.kind.workOrderCreated': '{{entity}} created',
+    'workOrders.activity.kind.workOrderUnarchived': '{{entity}} unarchived',
+    'workOrders.activity.kind.workOrderUpdated':
+      '{{field}} changed from {{fromValue}} to {{toValue}}',
+    'workOrders.activity.loadMore': 'Load more',
+    'workOrders.activity.loading': 'Loading activity…',
+    'workOrders.activity.systemActor': 'System',
   };
 
   return {
