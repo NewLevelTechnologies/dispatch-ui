@@ -58,7 +58,7 @@ export default function WorkItemsTable({
       </TableHead>
       <TableBody>
         {workItems.map((wi) => (
-          <TableRow key={wi.id}>
+          <TableRow key={wi.id} className="align-top">
             <TableCell>
               <WorkItemStatusPill
                 workOrderId={workOrderId}
@@ -69,10 +69,10 @@ export default function WorkItemsTable({
                 readOnly={readOnly}
               />
             </TableCell>
-            <TableCell className="max-w-[40ch] truncate" title={wi.description}>
+            <TableCell className="whitespace-pre-wrap break-words">
               {wi.description}
             </TableCell>
-            <TableCell className="text-zinc-600 dark:text-zinc-400">
+            <TableCell className="whitespace-nowrap text-zinc-600 dark:text-zinc-400">
               {formatRelativeTime(wi.updatedAt)}
             </TableCell>
           </TableRow>
