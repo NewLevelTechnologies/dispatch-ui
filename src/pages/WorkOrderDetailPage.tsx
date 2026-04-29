@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import {
   workOrderApi,
@@ -10,10 +10,12 @@ import {
   statusWorkflowsApi,
   workflowConfigApi,
   type ProgressCategory,
+  type WorkItemResponse,
   type WorkOrderPriority,
 } from '../api';
 import { useGlossary } from '../contexts/GlossaryContext';
 import AppLayout from '../components/AppLayout';
+import WorkItemFormDialog from '../components/WorkItemFormDialog';
 import WorkItemsTable from '../components/WorkItemsTable';
 import WorkOrderActivityRail from '../components/WorkOrderActivityRail';
 import { SlideOver } from '../components/catalyst/slideover';
@@ -97,10 +99,61 @@ function formatDate(iso: string | null | undefined): string {
 export default function WorkOrderDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { t } = useTranslation();
   const { getName } = useGlossary();
   const [copied, setCopied] = useState<'phone' | 'address' | null>(null);
   const [activitySheetOpen, setActivitySheetOpen] = useState(false);
+  const [workItemDialogOpen, setWorkItemDialogOpen] = useState(false);
+  const [editingWorkItem, setEditingWorkItem] = useState<WorkItemResponse | null>(null);
+
+
+  const deleteWorkItemMutation = useMutation({
+    mutationFn: ({ workItemId }: { workItemId: string }) =>
+      workOrderApi.deleteWorkItem(id!, workItemId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['work-orders'] });
+      queryClient.invalidateQueries({ queryKey: ['work-order-activity', id] });
+    },
+    onError: (err: unknown) => {
+      const msg =
+        err instanceof Error && 'response' in err
+          ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
+          : undefined;
+      alert(msg || t('workOrders.workItems.deleteError'));
+    },
+  });
+
+  const handleDeleteWorkItem = (wi: WorkItemResponse) => {
+    if (!window.confirm(t('workOrders.workItems.deleteConfirm'))) return;
+    deleteWorkItemMutation.mutate({ workItemId: wi.id });
+  };
+
+  // W shortcut → open the work item dialog in create mode. Mirrors the N
+  // shortcut in NoteComposer: ignored when an input is focused, when modifier
+  // keys are held, or when the dialog is already open. Re-binds on open-state
+  // change so the closed-only check is reliable.
+  useEffect(() => {
+    if (workItemDialogOpen) return; // listener inactive while dialog is open
+    const handler = (e: KeyboardEvent) => {
+      if (e.key !== 'w' && e.key !== 'W') return;
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      const target = e.target as HTMLElement | null;
+      if (
+        target &&
+        (target.tagName === 'INPUT' ||
+          target.tagName === 'TEXTAREA' ||
+          target.isContentEditable)
+      ) {
+        return;
+      }
+      e.preventDefault();
+      setEditingWorkItem(null);
+      setWorkItemDialogOpen(true);
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [workItemDialogOpen]);
 
   const {
     data: workOrder,
@@ -302,7 +355,18 @@ export default function WorkOrderDetailPage() {
               later phases (work-item dialog phase 4, dispatch phase 6, notes phase 5,
               edit/overflow phase 4+). */}
           <div className="mt-3 flex flex-wrap items-center gap-2">
-            <Button disabled title={t('workOrders.detail.actionPending')}>
+            <Button
+              onClick={() => {
+                setEditingWorkItem(null);
+                setWorkItemDialogOpen(true);
+              }}
+              disabled={isCancelled || isArchived}
+              title={
+                isCancelled || isArchived
+                  ? t('workOrders.detail.frozen')
+                  : undefined
+              }
+            >
               <PlusIcon className="size-4" />
               {t('common.actions.add', { entity: getName('work_item') })}
             </Button>
@@ -439,6 +503,11 @@ export default function WorkOrderDetailPage() {
               workflows={statusWorkflows}
               enforceWorkflow={workflowConfig?.enforceStatusWorkflow ?? false}
               readOnly={isCancelled || isArchived}
+              onEdit={(wi) => {
+                setEditingWorkItem(wi);
+                setWorkItemDialogOpen(true);
+              }}
+              onDelete={handleDeleteWorkItem}
             />
           </main>
 
@@ -472,6 +541,17 @@ export default function WorkOrderDetailPage() {
           <WorkOrderActivityRail workOrderId={workOrder.id} />
         </div>
       </SlideOver>
+
+      <WorkItemFormDialog
+        isOpen={workItemDialogOpen}
+        onClose={() => {
+          setWorkItemDialogOpen(false);
+          setEditingWorkItem(null);
+        }}
+        workOrderId={workOrder.id}
+        workItem={editingWorkItem}
+        readOnly={isCancelled || isArchived}
+      />
     </AppLayout>
   );
 }
