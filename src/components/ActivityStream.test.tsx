@@ -195,6 +195,26 @@ describe('ActivityStream', () => {
     expect(screen.getByText(/Invoice 11079 issued for \$9,800/)).toBeInTheDocument();
   });
 
+  it('falls back to the unknown-activity label when the backend sends incomplete data', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({
+      data: page([
+        event({
+          id: 'e-broken',
+          kind: 'WORK_ORDER_UPDATED',
+          category: 'STATUS',
+          // Missing field/fromValue/toValue — template can't interpolate
+          data: {},
+        }),
+      ]),
+    });
+    renderWithProviders(<ActivityStream workOrderId="wo-1" />);
+    await waitFor(() => {
+      expect(screen.getByText(/unrecognized activity/i)).toBeInTheDocument();
+    });
+    // Raw template tokens must never leak to users
+    expect(screen.queryByText(/\{\{/)).not.toBeInTheDocument();
+  });
+
   it('shows the filter-aware empty state when a non-All filter has no events', async () => {
     vi.mocked(apiClient.get).mockResolvedValue({ data: page([]) });
     const user = userEvent.setup();
