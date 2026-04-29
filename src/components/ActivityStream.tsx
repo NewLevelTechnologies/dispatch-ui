@@ -230,7 +230,14 @@ function ActivityRow({ event }: { event: ActivityEvent }) {
   const entityFields = entityCode
     ? { entity: getName(entityCode), entities: getName(entityCode, true) }
     : {};
-  const summary = t(templateKey, { ...data, ...entityFields });
+  const rendered = t(templateKey, { ...data, ...entityFields });
+  // Defensive: if the backend sent an event with missing data fields, the i18n
+  // template renders raw "{{placeholder}}" tokens. Don't leak that to users —
+  // fall back to the unknown-activity label so the row reads as informational
+  // rather than broken.
+  const summary = rendered.includes('{{')
+    ? t('workOrders.activity.kind.unknown')
+    : rendered;
   const rawActorName = event.actor?.userName?.trim();
   const isMeaningfulActor =
     !!rawActorName && rawActorName.toLowerCase() !== 'unknown';
