@@ -670,6 +670,7 @@ vi.mock('react-i18next', () => {
     'workOrders.detail.created': 'Created',
     'workOrders.detail.duplicate': 'Duplicate',
     'workOrders.detail.eta': 'ETA {{date}}',
+    'workOrders.detail.frozen': 'Cancelled or archived — actions are disabled',
     'workOrders.detail.info': '{{entity}} Info',
     'workOrders.detail.lastUpdated': 'Updated {{time}}',
     'workOrders.detail.money.balance': 'Balance',
@@ -680,6 +681,9 @@ vi.mock('react-i18next', () => {
     'workOrders.detail.money.quoted': 'Quoted',
     'workOrders.detail.print': 'Print',
     'workOrders.workItems.changeStatus': 'Change status (currently {{current}})',
+    'workOrders.workItems.deleteConfirm': 'Delete this work item? This cannot be undone.',
+    'workOrders.workItems.deleteError': 'Failed to delete work item',
+    'workOrders.workItems.descriptionRequired': 'Description is required',
     'workOrders.workItems.lastUpdated': 'Last updated',
     'workOrders.activity.activeDispatches': 'Active {{entities}}',
     'workOrders.activity.byline': 'by {{actor}} · {{time}}',
@@ -714,14 +718,11 @@ vi.mock('react-i18next', () => {
     'workOrders.activity.kind.quoteSent':
       '{{entity}} {{quoteNumber}} sent for {{amount}}',
     'workOrders.activity.kind.unknown': 'Unrecognized activity',
-    'workOrders.activity.kind.workItemCreated':
-      'Added {{entity, lowercase}}: {{description}}',
-    'workOrders.activity.kind.workItemDeleted':
-      'Removed {{entity, lowercase}}: {{description}}',
+    'workOrders.activity.kind.workItemCreated': 'Added {{entity, lowercase}}',
+    'workOrders.activity.kind.workItemDeleted': 'Removed {{entity, lowercase}}',
     'workOrders.activity.kind.workItemStatusChanged':
-      '{{workItemDescription}} — status changed from {{fromStatusName}} to {{toStatusName}}',
-    'workOrders.activity.kind.workItemUpdated':
-      '{{entity}} {{workItemDescription}}: {{field}} changed',
+      'Status changed from {{fromStatusName}} to {{toStatusName}}',
+    'workOrders.activity.kind.workItemUpdated': '{{entity}}: {{field}} changed',
     'workOrders.activity.kind.workOrderArchived': '{{entity}} archived',
     'workOrders.activity.kind.workOrderCancelled': '{{entity}} cancelled',
     'workOrders.activity.kind.workOrderCreated': '{{entity}} created',

@@ -74,6 +74,36 @@ export function getEventEntityCode(kind: ActivityKind | string): string | undefi
 }
 
 /**
+ * Returns a short identifier for which entity this event is *about*, rendered
+ * as a secondary muted line below the action summary in the activity rail.
+ *
+ * Today the only entities surfaced this way are work items (description acts as
+ * a stop-gap label until equipment FK lands per design §7.5). When the equipment
+ * relation ships, this function should return the equipment name instead — the
+ * UI structure stays the same; only the source field changes.
+ *
+ * Returns null for events that don't reference a sub-entity (WO-level events,
+ * notes, dispatches, financial events) — those render summary-only.
+ */
+export function getEventContext(event: ActivityEvent): string | null {
+  switch (event.kind) {
+    case 'WORK_ITEM_CREATED':
+    case 'WORK_ITEM_UPDATED':
+    case 'WORK_ITEM_STATUS_CHANGED':
+    case 'WORK_ITEM_DELETED': {
+      const desc =
+        (typeof event.data.workItemDescription === 'string' &&
+          event.data.workItemDescription) ||
+        (typeof event.data.description === 'string' && event.data.description) ||
+        null;
+      return desc;
+    }
+    default:
+      return null;
+  }
+}
+
+/**
  * Stringify event.data fields for i18n interpolation. Numbers and dates that
  * benefit from formatting (currency amounts, ISO timestamps) are pre-formatted
  * here so templates stay readable. Everything else falls through as a string.

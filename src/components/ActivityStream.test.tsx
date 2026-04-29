@@ -59,12 +59,65 @@ describe('ActivityStream', () => {
       ]),
     });
     renderWithProviders(<ActivityStream workOrderId="wo-1" />);
+    // Action is the primary summary; description renders as a muted secondary line.
     await waitFor(() => {
       expect(
-        screen.getByText(/Replace filter — status changed from Pending to In Progress/i)
+        screen.getByText(/Status changed from Pending to In Progress/i)
       ).toBeInTheDocument();
     });
+    expect(screen.getByText('Replace filter')).toBeInTheDocument();
     expect(screen.getByText(/by Jamie Smith/)).toBeInTheDocument();
+  });
+
+  it('renders the work item description as a secondary context line for WI events', async () => {
+    const longDescription =
+      'no ac, svc fee $99 call Rich otw 425-200-2999, for repairs need approval from Steven';
+    vi.mocked(apiClient.get).mockResolvedValue({
+      data: page([
+        event({
+          id: 'e-wi-status',
+          kind: 'WORK_ITEM_STATUS_CHANGED',
+          category: 'STATUS',
+          data: {
+            workItemId: 'wi-1',
+            workItemDescription: longDescription,
+            fromStatusName: 'Pending',
+            toStatusName: 'In Progress',
+          },
+        }),
+      ]),
+    });
+    renderWithProviders(<ActivityStream workOrderId="wo-1" />);
+    await waitFor(() => {
+      // Action summary is concise — no description prefix in the template
+      expect(
+        screen.getByText('Status changed from Pending to In Progress')
+      ).toBeInTheDocument();
+    });
+    // Long description still appears in the DOM (single-line clamp via CSS).
+    // title attribute exposes the full text on hover for CSRs who need it.
+    const contextNode = screen.getByText(longDescription);
+    expect(contextNode).toHaveAttribute('title', longDescription);
+  });
+
+  it('does not render a context line for non-work-item events', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({
+      data: page([
+        event({
+          id: 'e-wo-cancelled',
+          kind: 'WORK_ORDER_CANCELLED',
+          category: 'STATUS',
+          data: {},
+        }),
+      ]),
+    });
+    const { container } = renderWithProviders(<ActivityStream workOrderId="wo-1" />);
+    await waitFor(() => {
+      expect(screen.getByText('Work Order cancelled')).toBeInTheDocument();
+    });
+    // Only summary + byline → exactly two <p> per row (Catalyst Text wraps in <p>)
+    const paragraphs = container.querySelectorAll('li p');
+    expect(paragraphs).toHaveLength(2);
   });
 
   it('renders the note body for NOTE_ADDED events', async () => {
