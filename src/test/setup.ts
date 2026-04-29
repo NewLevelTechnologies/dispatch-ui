@@ -714,14 +714,11 @@ vi.mock('react-i18next', () => {
     'workOrders.activity.kind.quoteSent':
       '{{entity}} {{quoteNumber}} sent for {{amount}}',
     'workOrders.activity.kind.unknown': 'Unrecognized activity',
-    'workOrders.activity.kind.workItemCreated':
-      'Added {{entity, lowercase}}: {{description}}',
-    'workOrders.activity.kind.workItemDeleted':
-      'Removed {{entity, lowercase}}: {{description}}',
+    'workOrders.activity.kind.workItemCreated': 'Added {{entity, lowercase}}',
+    'workOrders.activity.kind.workItemDeleted': 'Removed {{entity, lowercase}}',
     'workOrders.activity.kind.workItemStatusChanged':
-      '{{workItemDescription}} — status changed from {{fromStatusName}} to {{toStatusName}}',
-    'workOrders.activity.kind.workItemUpdated':
-      '{{entity}} {{workItemDescription}}: {{field}} changed',
+      'Status changed from {{fromStatusName}} to {{toStatusName}}',
+    'workOrders.activity.kind.workItemUpdated': '{{entity}}: {{field}} changed',
     'workOrders.activity.kind.workOrderArchived': '{{entity}} archived',
     'workOrders.activity.kind.workOrderCancelled': '{{entity}} cancelled',
     'workOrders.activity.kind.workOrderCreated': '{{entity}} created',

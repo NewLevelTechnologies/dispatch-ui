@@ -18,6 +18,7 @@ import {
 } from '@heroicons/react/24/outline';
 import {
   CATEGORY_ICON_KEY,
+  getEventContext,
   getEventEntityCode,
   getEventTemplateKey,
   preFormatEventData,
@@ -245,6 +246,13 @@ function ActivityRow({ event }: { event: ActivityEvent }) {
     ? rawActorName
     : t('workOrders.activity.systemActor');
 
+  // Optional secondary line — for work-item events, render the work item's
+  // identifier (today: description; future: equipment name when §7.5 lands)
+  // as small muted text. Single-line clamp keeps long descriptions from
+  // dominating the rail; the full text remains available via the work items
+  // table on the main canvas.
+  const context = getEventContext(event);
+
   return (
     <li className="flex gap-2 border-t border-zinc-100 py-2 first:border-t-0 dark:border-zinc-800">
       <div className="mt-0.5 shrink-0">
@@ -256,6 +264,14 @@ function ActivityRow({ event }: { event: ActivityEvent }) {
         <Text className="whitespace-pre-wrap text-sm break-words text-zinc-700 dark:text-zinc-300">
           {summary}
         </Text>
+        {context && (
+          <Text
+            className="mt-0.5 line-clamp-1 text-xs text-zinc-500 dark:text-zinc-400"
+            title={context}
+          >
+            {context}
+          </Text>
+        )}
         <Text className="mt-0.5 text-xs text-zinc-500">
           {t('workOrders.activity.byline', {
             actor: actorName,
