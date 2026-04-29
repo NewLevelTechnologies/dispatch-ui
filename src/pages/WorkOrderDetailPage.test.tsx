@@ -194,17 +194,20 @@ describe('WorkOrderDetailPage', () => {
     expect(screen.getByText('HVAC Service')).toBeInTheDocument();
   });
 
-  it('renders the action bar with disabled phase-pending buttons', async () => {
+  it('renders the action bar with the right enabled/disabled state', async () => {
     mockApiResponses();
     renderPage();
     await waitFor(() => {
       expect(screen.getByText('WO-00010')).toBeInTheDocument();
     });
-    // Add Work Item / Add Dispatch / Add Note / Edit are all disabled in phase 1
+    // Phase 4 wired up "+ Work Item" — should be enabled on an active WO.
     const addWorkItemButton = screen.getByRole('button', { name: /add work item/i });
-    expect(addWorkItemButton).toBeDisabled();
+    expect(addWorkItemButton).not.toBeDisabled();
+    // Edit / + Dispatch remain disabled until their phases land.
     const editButton = screen.getByRole('button', { name: /edit/i });
     expect(editButton).toBeDisabled();
+    const addDispatchButton = screen.getByRole('button', { name: /add dispatch/i });
+    expect(addDispatchButton).toBeDisabled();
   });
 
   it('renders a back button to the work orders list', async () => {
