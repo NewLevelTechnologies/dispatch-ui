@@ -8,7 +8,6 @@ import {
   dispatchRegionApi,
   workOrderTypesApi,
   divisionsApi,
-  workItemStatusesApi,
   type WorkOrder,
   type WorkOrderSummary,
   type WorkOrderPriority,
@@ -17,8 +16,6 @@ import {
   type CreateCustomerRequest,
   type CreateWorkOrderRequest,
   type UpdateWorkOrderRequest,
-  type WorkItemStatus,
-  type WorkItemResponse,
 } from '../api';
 import { useGlossary } from '../contexts/GlossaryContext';
 import { Dialog, DialogActions, DialogBody, DialogDescription, DialogTitle } from './catalyst/dialog';
@@ -49,9 +46,11 @@ interface WorkOrderFormState {
   divisionId: string;
   priority: WorkOrderPriority;
   scheduledDate: string;
-  description: string;
   customerOrderNumber: string;
-  internalNotes: string;
+  // Create-mode only: the description for the first work item, sent inside the
+  // atomic POST /work-orders payload as workItems: [{ description }]. Edit mode
+  // ignores this field — work item edits go through WorkItemFormDialog.
+  firstWorkItemDescription: string;
 }
 
 const EMPTY_FORM: WorkOrderFormState = {
@@ -61,9 +60,8 @@ const EMPTY_FORM: WorkOrderFormState = {
   divisionId: '',
   priority: 'NORMAL',
   scheduledDate: '',
-  description: '',
   customerOrderNumber: '',
-  internalNotes: '',
+  firstWorkItemDescription: '',
 };
 
 const PROGRESS_COLORS: Record<ProgressCategory, 'zinc' | 'blue' | 'amber' | 'lime'> = {
@@ -180,15 +178,6 @@ export default function WorkOrderFormDialog({ isOpen, onClose, workOrder }: Work
   });
   const activeDivisions = Array.isArray(divisions) ? divisions.filter((d) => d.isActive) : [];
 
-  // Item statuses — only needed when editing an order that has items.
-  // Read from the detail (which carries workItems), not the summary.
-  const hasWorkItems = !!detail?.workItems?.length;
-  const { data: itemStatuses } = useQuery({
-    queryKey: ['work-item-statuses'],
-    queryFn: () => workItemStatusesApi.getAll(),
-    enabled: isOpen && isEdit && hasWorkItems,
-  });
-
   // Active dispatch regions — for new-customer flow
   const { data: activeRegions } = useQuery({
     queryKey: ['dispatch-regions', 'active'],
@@ -209,8 +198,6 @@ export default function WorkOrderFormDialog({ isOpen, onClose, workOrder }: Work
     if (effective) {
       // Edit mode — populate from the most authoritative shape we have
       // (detail when loaded, falling back to the summary for instant render).
-      // The internalNotes field is detail-only; it'll be empty until the
-      // detail query lands, then populate when this effect re-runs.
       const wo = effective as WorkOrder;
       setFormData({
         customerId: wo.customerId,
@@ -219,9 +206,8 @@ export default function WorkOrderFormDialog({ isOpen, onClose, workOrder }: Work
         divisionId: wo.divisionId ?? '',
         priority: wo.priority ?? 'NORMAL',
         scheduledDate: wo.scheduledDate || '',
-        description: wo.description || '',
         customerOrderNumber: wo.customerOrderNumber || '',
-        internalNotes: wo.internalNotes || '',
+        firstWorkItemDescription: '', // not used in edit mode
       });
       setSelectedLocation(
         wo.serviceLocation
@@ -267,8 +253,7 @@ export default function WorkOrderFormDialog({ isOpen, onClose, workOrder }: Work
     }
     /* eslint-enable react-hooks/set-state-in-effect */
     // Re-runs on open, on workOrder identity change, and again when the detail
-    // query lands so detail-only fields (internalNotes, etc.) replace the
-    // empty values that came from the summary.
+    // query lands so detail-only fields populate when they arrive.
   }, [effective, isOpen, defaultRegionId]);
 
   const createMutation = useMutation({
@@ -314,6 +299,8 @@ export default function WorkOrderFormDialog({ isOpen, onClose, workOrder }: Work
     }
   };
 
+  // The atomic create endpoint requires a non-empty workItems array. We send a
+  // single first work item with the description the CSR captured up front.
   const buildCreateRequest = (overrides?: Partial<CreateWorkOrderRequest>): CreateWorkOrderRequest => ({
     customerId: formData.customerId,
     serviceLocationId: formData.serviceLocationId,
@@ -321,9 +308,8 @@ export default function WorkOrderFormDialog({ isOpen, onClose, workOrder }: Work
     divisionId: formData.divisionId || undefined,
     priority: formData.priority,
     scheduledDate: formData.scheduledDate || undefined,
-    description: formData.description || undefined,
     customerOrderNumber: formData.customerOrderNumber || undefined,
-    internalNotes: formData.internalNotes || undefined,
+    workItems: [{ description: formData.firstWorkItemDescription.trim() }],
     ...overrides,
   });
 
@@ -337,11 +323,16 @@ export default function WorkOrderFormDialog({ isOpen, onClose, workOrder }: Work
         divisionId: formData.divisionId || null,
         priority: formData.priority,
         scheduledDate: formData.scheduledDate || undefined,
-        description: formData.description,
         customerOrderNumber: formData.customerOrderNumber || undefined,
-        internalNotes: formData.internalNotes,
       };
       updateMutation.mutate(updateRequest);
+      return;
+    }
+
+    // Create mode validation — atomic endpoint requires a non-empty first work
+    // item description.
+    if (!formData.firstWorkItemDescription.trim()) {
+      alert(t('workOrders.form.firstWorkItemRequired'));
       return;
     }
 
@@ -984,40 +975,35 @@ export default function WorkOrderFormDialog({ isOpen, onClose, workOrder }: Work
                 </Field>
               </div>
 
-              <Field>
-                <Label className="text-xs">{t('common.form.description')}</Label>
-                <Textarea
-                  name="description"
-                  value={formData.description || ''}
-                  onChange={(e) => handleChange('description', e.target.value)}
-                  rows={2}
-                />
-              </Field>
-
-              <Field>
-                <div className="flex items-baseline justify-between">
-                  <Label className="text-xs">{t('workOrders.form.internalNotes')}</Label>
-                  <span className="text-[11px] text-zinc-500 dark:text-zinc-400">{t('workOrders.form.internalNotesHint')}</span>
-                </div>
-                <Textarea
-                  name="internalNotes"
-                  value={formData.internalNotes || ''}
-                  onChange={(e) => handleChange('internalNotes', e.target.value)}
-                  rows={2}
-                />
-              </Field>
+              {/* First work item — required on create. The atomic POST sends
+                  this as workItems: [{ description }]. Edit mode hides it; work
+                  item edits go through WorkItemFormDialog on the detail page. */}
+              {!isEdit && (
+                <Field>
+                  <Label className="text-xs">
+                    {t('workOrders.form.firstWorkItemDescription', {
+                      entity: getName('work_item'),
+                    })}
+                  </Label>
+                  <Textarea
+                    name="firstWorkItemDescription"
+                    value={formData.firstWorkItemDescription}
+                    onChange={(e) =>
+                      handleChange('firstWorkItemDescription', e.target.value)
+                    }
+                    rows={3}
+                    required
+                  />
+                </Field>
+              )}
             </FieldGroup>
           </Fieldset>
 
-          {/* Work Items - edit mode only. Items only exist on the detail response. */}
-          {isEdit && effective && (
-            <WorkItemsSection
-              workOrderId={effective.id}
-              items={detail?.workItems ?? []}
-              statuses={itemStatuses ?? []}
-              readOnly={readOnly}
-            />
-          )}
+          {/* Work items aren't editable in this dialog. The WO detail page is
+              the dedicated surface — inline status pill on the table for status
+              edits, WorkItemFormDialog for adding new items / editing description.
+              Keeping work items here would duplicate UIs and violate the
+              three-pattern rule (§1.1 of WORK_ORDER_DETAIL_DESIGN.md). */}
         </form>
       </DialogBody>
       <DialogActions>
@@ -1040,101 +1026,3 @@ export default function WorkOrderFormDialog({ isOpen, onClose, workOrder }: Work
   );
 }
 
-interface WorkItemsSectionProps {
-  workOrderId: string;
-  items: WorkItemResponse[];
-  statuses: WorkItemStatus[];
-  readOnly: boolean;
-}
-
-function WorkItemsSection({ workOrderId, items, statuses, readOnly }: WorkItemsSectionProps) {
-  const queryClient = useQueryClient();
-  const { t } = useTranslation();
-  const { getName } = useGlossary();
-
-  const updateStatusMutation = useMutation({
-    mutationFn: ({ workItemId, statusId }: { workItemId: string; statusId: string }) =>
-      workOrderApi.updateWorkItemStatus(workOrderId, workItemId, { statusId }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['work-orders'] });
-    },
-    onError: (err: unknown) => {
-      const msg = err instanceof Error && 'response' in err
-        ? ((err as { response?: { data?: { message?: string } } }).response?.data?.message)
-        : undefined;
-      alert(msg || t('workOrders.workItems.statusUpdateError'));
-    },
-  });
-
-  const activeStatuses = Array.isArray(statuses) ? statuses.filter((s) => s.isActive) : [];
-
-  // Empty state: collapse to a thin one-liner so it doesn't dominate the dialog
-  if (items.length === 0) {
-    return (
-      <div className="mt-1 flex items-center justify-between rounded-md border border-dashed border-zinc-200 px-3 py-1.5 text-xs text-zinc-500 dark:border-zinc-800 dark:text-zinc-400">
-        <span className="font-medium uppercase tracking-wide text-zinc-600 dark:text-zinc-400">
-          {t('workOrders.workItems.title')}
-        </span>
-        <span>{t('workOrders.workItems.empty', { entity: getName('work_order') })}</span>
-      </div>
-    );
-  }
-
-  return (
-    <div className="mt-1 rounded-lg border border-zinc-200 p-2 dark:border-zinc-800">
-      <Subheading className="mb-1.5 text-sm font-semibold">{t('workOrders.workItems.title')}</Subheading>
-      {readOnly && (
-        <p className="mb-1.5 text-xs text-zinc-500 dark:text-zinc-400">
-          {t('workOrders.workItems.frozenHelper', { entity: getName('work_order') })}
-        </p>
-      )}
-      <div className="overflow-hidden rounded-md ring-1 ring-zinc-200 dark:ring-zinc-800">
-          <table className="w-full text-sm">
-            <thead className="bg-zinc-50 text-xs uppercase tracking-wide text-zinc-500 dark:bg-zinc-900/40 dark:text-zinc-400">
-              <tr>
-                <th className="px-2 py-1.5 text-left">{t('common.form.description')}</th>
-                <th className="px-2 py-1.5 text-right">{t('workOrders.workItems.qtyHeader')}</th>
-                <th className="px-2 py-1.5 text-right">{t('workOrders.workItems.unitHeader')}</th>
-                <th className="px-2 py-1.5 text-right">{t('workOrders.workItems.totalHeader')}</th>
-                <th className="px-2 py-1.5 text-left">{t('workOrders.table.statusHeader')}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {items.map((item) => (
-                <tr key={item.id} className="border-t border-zinc-100 dark:border-zinc-800">
-                  <td className="px-2 py-1.5">{item.description}</td>
-                  <td className="px-2 py-1.5 text-right">{item.quantity}</td>
-                  <td className="px-2 py-1.5 text-right">${item.unitPrice.toFixed(2)}</td>
-                  <td className="px-2 py-1.5 text-right">${item.totalPrice.toFixed(2)}</td>
-                  <td className="px-2 py-1.5">
-                    {activeStatuses.length > 0 && !readOnly ? (
-                      <Select
-                        name={`item-status-${item.id}`}
-                        value={item.statusId ?? ''}
-                        disabled={updateStatusMutation.isPending}
-                        onChange={(e) => {
-                          const next = e.target.value;
-                          if (next && next !== item.statusId) {
-                            updateStatusMutation.mutate({ workItemId: item.id, statusId: next });
-                          }
-                        }}
-                      >
-                        <option value="" disabled>{t('common.form.select')}</option>
-                        {activeStatuses.map((s) => (
-                          <option key={s.id} value={s.id}>{s.name}</option>
-                        ))}
-                      </Select>
-                    ) : (
-                      <Badge color={PROGRESS_COLORS[item.statusCategory]}>
-                        {t(`workOrders.progress.${PROGRESS_TRANSLATION_KEYS[item.statusCategory]}`)}
-                      </Badge>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-    </div>
-  );
-}

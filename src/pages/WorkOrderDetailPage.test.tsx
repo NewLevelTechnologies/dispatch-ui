@@ -274,13 +274,9 @@ describe('WorkOrderDetailPage', () => {
       workItems: [
         {
           id: 'wi-1',
-          itemType: 'SERVICE',
           statusId: null,
           statusCategory: 'NOT_STARTED',
           description: 'Replace filter',
-          quantity: 1,
-          unitPrice: 0,
-          totalPrice: 0,
           createdAt: '2026-04-21T13:40:00Z',
           updatedAt: '2026-04-22T10:30:00Z',
         },
