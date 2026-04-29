@@ -27,17 +27,11 @@ export const WorkOrderPriority = {
   URGENT: 'URGENT',
 } as const;
 
-export type WorkItemType = 'LABOR' | 'PARTS' | 'SERVICE' | 'OTHER';
-
 export interface WorkItemResponse {
   id: string;
-  itemType: WorkItemType;
   statusId: string | null;
   statusCategory: ProgressCategory;
   description: string;
-  quantity: number;
-  unitPrice: number;
-  totalPrice: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -67,7 +61,6 @@ export interface WorkOrderSummary {
   priority: WorkOrderPriority;
   scheduledDate?: string | null;
   completedDate?: string | null;
-  description?: string | null;
   customerOrderNumber?: string | null;
 
   // Enriched display fields. Site-contact and other extras are only populated by
@@ -106,7 +99,6 @@ export interface WorkOrder extends WorkOrderSummary {
   cancellationReason?: string | null;
   cancelledByUserId?: string | null;
   createdByUserId?: string;
-  internalNotes?: string | null;
   workItems?: WorkItemResponse[];
 }
 
@@ -125,10 +117,12 @@ export type WorkOrderSortField = 'scheduledDate' | 'createdAt' | 'workOrderNumbe
 export type SortDirection = 'asc' | 'desc';
 
 export interface CreateWorkItemRequest {
-  itemType: WorkItemType;
   description: string;
-  quantity: number;
-  unitPrice: number;
+  statusId?: string;
+}
+
+export interface UpdateWorkItemRequest {
+  description?: string;
   statusId?: string;
 }
 
@@ -140,9 +134,8 @@ export interface CreateWorkOrderRequest {
   priority?: WorkOrderPriority;
   scheduledDate?: string;
   customerOrderNumber?: string;
-  description?: string;
-  internalNotes?: string;
-  workItems?: CreateWorkItemRequest[];
+  /** Required by the atomic-create contract — must contain at least one item. */
+  workItems: CreateWorkItemRequest[];
 }
 
 // `status` is no longer updatable. Use /cancel for cancellation; progress is derived.
@@ -152,9 +145,7 @@ export interface UpdateWorkOrderRequest {
   priority?: WorkOrderPriority;
   scheduledDate?: string;
   completedDate?: string;
-  description?: string;
   customerOrderNumber?: string;
-  internalNotes?: string;
 }
 
 export interface CancelWorkOrderRequest {
@@ -268,6 +259,36 @@ export const workOrderApi = {
   unarchive: async (id: string): Promise<WorkOrder> => {
     const response = await apiClient.post<WorkOrder>(`/work-orders/${id}/unarchive`);
     return response.data;
+  },
+
+  // ===== Work item write endpoints =====
+  // Status change has its own dedicated route; create/update/delete are general edits.
+
+  createWorkItem: async (
+    workOrderId: string,
+    request: CreateWorkItemRequest
+  ): Promise<WorkItemResponse> => {
+    const response = await apiClient.post<WorkItemResponse>(
+      `/work-orders/${workOrderId}/work-items`,
+      request
+    );
+    return response.data;
+  },
+
+  updateWorkItem: async (
+    workOrderId: string,
+    workItemId: string,
+    request: UpdateWorkItemRequest
+  ): Promise<WorkItemResponse> => {
+    const response = await apiClient.patch<WorkItemResponse>(
+      `/work-orders/${workOrderId}/work-items/${workItemId}`,
+      request
+    );
+    return response.data;
+  },
+
+  deleteWorkItem: async (workOrderId: string, workItemId: string): Promise<void> => {
+    await apiClient.delete(`/work-orders/${workOrderId}/work-items/${workItemId}`);
   },
 
   updateWorkItemStatus: async (

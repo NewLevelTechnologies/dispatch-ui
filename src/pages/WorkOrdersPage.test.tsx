@@ -38,8 +38,6 @@ const mockWorkOrders = [
     progressCategory: 'NOT_STARTED' as const,
     priority: 'NORMAL' as const,
     scheduledDate: '2024-03-15T10:00:00Z',
-    description: 'Fix leaking pipe',
-    notes: 'Customer prefers morning appointments',
     createdAt: '2024-03-01T10:00:00Z',
     updatedAt: '2024-03-01T10:00:00Z',
     customer: {
@@ -70,8 +68,6 @@ const mockWorkOrders = [
     progressCategory: 'IN_PROGRESS' as const,
     priority: 'NORMAL' as const,
     scheduledDate: '2024-03-14T10:00:00Z',
-    description: 'Install new HVAC system',
-    notes: '',
     createdAt: '2024-03-02T11:00:00Z',
     updatedAt: '2024-03-02T11:00:00Z',
     customer: {
@@ -122,10 +118,10 @@ describe('WorkOrdersPage', () => {
     renderWithProviders(<WorkOrdersPage />);
 
     await waitFor(() => {
-      expect(screen.getByText('Fix leaking pipe')).toBeInTheDocument();
+      expect(screen.getByText('WO-00001')).toBeInTheDocument();
     });
 
-    expect(screen.getByText('Install new HVAC system')).toBeInTheDocument();
+    expect(screen.getByText('WO-00002')).toBeInTheDocument();
     expect(screen.getByText('WO-00001')).toBeInTheDocument();
     expect(screen.getByText('WO-00002')).toBeInTheDocument();
   });
@@ -227,7 +223,7 @@ describe('WorkOrdersPage', () => {
     renderWithProviders(<WorkOrdersPage />);
 
     await waitFor(() => {
-      expect(screen.getByText('Fix leaking pipe')).toBeInTheDocument();
+      expect(screen.getByText('WO-00001')).toBeInTheDocument();
     });
 
     // Should display dash for missing date
@@ -260,7 +256,7 @@ describe('WorkOrdersPage', () => {
     renderWithProviders(<WorkOrdersPage />);
 
     await waitFor(() => {
-      expect(screen.getByText('Fix leaking pipe')).toBeInTheDocument();
+      expect(screen.getByText('WO-00001')).toBeInTheDocument();
     });
 
     // Click the dropdown button
@@ -285,7 +281,7 @@ describe('WorkOrdersPage', () => {
     renderWithProviders(<WorkOrdersPage />);
 
     await waitFor(() => {
-      expect(screen.getByText('Fix leaking pipe')).toBeInTheDocument();
+      expect(screen.getByText('WO-00001')).toBeInTheDocument();
     });
 
     // Click the dropdown button
@@ -313,7 +309,7 @@ describe('WorkOrdersPage', () => {
     renderWithProviders(<WorkOrdersPage />);
 
     await waitFor(() => {
-      expect(screen.getByText('Fix leaking pipe')).toBeInTheDocument();
+      expect(screen.getByText('WO-00001')).toBeInTheDocument();
     });
 
     // Click the dropdown button

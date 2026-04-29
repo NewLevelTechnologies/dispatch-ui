@@ -104,13 +104,15 @@ describe('WorkOrderFormDialog', () => {
         <WorkOrderFormDialog isOpen={true} onClose={mockOnClose} workOrder={existingWorkOrder} />
       );
 
+      // Description and internalNotes are no longer on the WO; work item edits
+      // happen via WorkItemFormDialog and notes via the activity rail composer.
+      // Edit-mode pre-fill should populate the still-editable fields.
       await waitFor(() => {
-        const descriptionTextarea = screen.getByLabelText(/description/i);
-        expect(descriptionTextarea).toHaveValue('Fix leaking pipe');
+        const dateInput = screen.getByLabelText(/scheduled date/i);
+        expect(dateInput).toHaveValue('2024-03-15');
       });
-
-      const notesTextarea = screen.getByLabelText(/internal notes/i);
-      expect(notesTextarea).toHaveValue('Customer prefers morning');
+      // The first-work-item description field is create-only, never present in edit mode.
+      expect(screen.queryByLabelText(/first.*description/i)).not.toBeInTheDocument();
     });
 
     it('shows progress badge in dialog header in edit mode', async () => {
@@ -152,8 +154,8 @@ describe('WorkOrderFormDialog', () => {
       rerender(<WorkOrderFormDialog isOpen={true} onClose={mockOnClose} />);
 
       await waitFor(() => {
-        const descriptionTextarea = screen.getByLabelText(/description/i);
-        expect(descriptionTextarea).toHaveValue('');
+        const firstWorkItem = screen.getByLabelText(/first.*description/i);
+        expect(firstWorkItem).toHaveValue('');
       });
     });
 
@@ -162,8 +164,10 @@ describe('WorkOrderFormDialog', () => {
 
       expect(screen.getByLabelText(/service location/i)).toBeInTheDocument();
       expect(screen.getByLabelText(/scheduled date/i)).toBeInTheDocument();
-      expect(screen.getByLabelText(/description/i)).toBeInTheDocument();
-      expect(screen.getByLabelText(/internal notes/i)).toBeInTheDocument();
+      // First work item description replaces the old WO description + internalNotes
+      expect(screen.getByLabelText(/first.*description/i)).toBeInTheDocument();
+      // Old fields should be gone
+      expect(screen.queryByLabelText(/internal notes/i)).not.toBeInTheDocument();
     });
   });
 
@@ -174,9 +178,9 @@ describe('WorkOrderFormDialog', () => {
 
       renderWithProviders(<WorkOrderFormDialog isOpen={true} onClose={mockOnClose} />);
 
-      // Fill in description but not service location
-      const descriptionTextarea = screen.getByLabelText(/description/i);
-      await user.type(descriptionTextarea, 'Test description');
+      // Fill in first work item description but not service location
+      const firstWorkItem = screen.getByLabelText(/first.*description/i);
+      await user.type(firstWorkItem, 'Test description');
 
       // Try to submit without selecting location by submitting the form
       const form = document.getElementById('work-order-form');
@@ -251,29 +255,27 @@ describe('WorkOrderFormDialog', () => {
       const firstResult = screen.getByText("John's House").closest('button');
       await user.click(firstResult!);
 
-      // Fill in description
-      const descriptionTextarea = screen.getByLabelText(/description/i);
-      await user.type(descriptionTextarea, 'Test work order');
-
-      // Fill in internal notes
-      const notesTextarea = screen.getByLabelText(/internal notes/i);
-      await user.type(notesTextarea, 'Test notes');
+      // Fill in first work item description (required by atomic create)
+      const firstWorkItem = screen.getByLabelText(/first.*description/i);
+      await user.type(firstWorkItem, 'Test work order');
 
       // Submit form
       const createButton = screen.getByRole('button', { name: /create/i });
       await user.click(createButton);
 
-      // Should call API with correct data — status is no longer part of the payload
+      // Atomic create — workItems[0].description carries the description.
+      // No more status/internalNotes/description fields on the WO payload.
       await waitFor(() => {
         expect(apiClient.post).toHaveBeenCalledWith('/work-orders', expect.objectContaining({
           customerId: 'customer-1',
           serviceLocationId: 'location-1',
-          description: 'Test work order',
-          internalNotes: 'Test notes',
+          workItems: [{ description: 'Test work order' }],
         }));
       });
       const postCall = vi.mocked(apiClient.post).mock.calls[0][1] as Record<string, unknown>;
       expect(postCall).not.toHaveProperty('status');
+      expect(postCall).not.toHaveProperty('description');
+      expect(postCall).not.toHaveProperty('internalNotes');
 
       // Dialog should close
       expect(mockOnClose).toHaveBeenCalled();
@@ -326,23 +328,26 @@ describe('WorkOrderFormDialog', () => {
       const firstResult = screen.getByText("John's House").closest('button');
       await user.click(firstResult!);
 
-      // Update description
-      const descriptionTextarea = screen.getByLabelText(/description/i);
-      await user.clear(descriptionTextarea);
-      await user.type(descriptionTextarea, 'Updated description');
+      // Update an editable WO field — priority is a segmented button group;
+      // click "High" to flip from the default "Normal".
+      const highButton = screen.getByRole('button', { name: 'High' });
+      await user.click(highButton);
 
       // Submit form
       const updateButton = screen.getByRole('button', { name: /update/i });
       await user.click(updateButton);
 
-      // Should call API with update data — status must NOT be in payload
+      // Update payload contains only editable fields.
+      // status / description / internalNotes are NOT part of the contract anymore.
       await waitFor(() => {
         expect(apiClient.patch).toHaveBeenCalledWith('/work-orders/1', expect.objectContaining({
-          description: 'Updated description',
+          priority: 'HIGH',
         }));
       });
       const patchCall = vi.mocked(apiClient.patch).mock.calls[0][1] as Record<string, unknown>;
       expect(patchCall).not.toHaveProperty('status');
+      expect(patchCall).not.toHaveProperty('description');
+      expect(patchCall).not.toHaveProperty('internalNotes');
 
       // Dialog should close
       expect(mockOnClose).toHaveBeenCalled();
@@ -370,9 +375,9 @@ describe('WorkOrderFormDialog', () => {
       const firstResult = screen.getByText("John's House").closest('button');
       await user.click(firstResult!);
 
-      // Fill in description
-      const descriptionTextarea = screen.getByLabelText(/description/i);
-      await user.type(descriptionTextarea, 'Test work order');
+      // Fill in first work item description
+      const firstWorkItem = screen.getByLabelText(/first.*description/i);
+      await user.type(firstWorkItem, 'Test work order');
 
       // Submit form
       const createButton = screen.getByRole('button', { name: /create/i });
@@ -396,13 +401,9 @@ describe('WorkOrderFormDialog', () => {
 
       renderWithProviders(<WorkOrderFormDialog isOpen={true} onClose={mockOnClose} />);
 
-      const descriptionTextarea = screen.getByLabelText(/description/i);
-      await user.type(descriptionTextarea, 'Test description');
-      expect(descriptionTextarea).toHaveValue('Test description');
-
-      const notesTextarea = screen.getByLabelText(/internal notes/i);
-      await user.type(notesTextarea, 'Test notes');
-      expect(notesTextarea).toHaveValue('Test notes');
+      const firstWorkItem = screen.getByLabelText(/first.*description/i);
+      await user.type(firstWorkItem, 'Test description');
+      expect(firstWorkItem).toHaveValue('Test description');
 
       const dateInput = screen.getByLabelText(/scheduled date/i);
       await user.type(dateInput, '2024-03-20');

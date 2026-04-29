@@ -645,7 +645,6 @@ export default function WorkOrdersPage() {
                 <TableHeader>{t('workOrders.table.priority')}</TableHeader>
                 <TableHeader>{t('workOrders.table.scheduled')}</TableHeader>
                 <TableHeader>{t('workOrders.table.customerPO')}</TableHeader>
-                <TableHeader>{t('common.form.description')}</TableHeader>
                 <TableHeader></TableHeader>
               </TableRow>
             </TableHead>
@@ -711,11 +710,6 @@ export default function WorkOrdersPage() {
                     </TableCell>
                     <TableCell className="font-mono text-xs text-zinc-500">
                       {workOrder.customerOrderNumber || '-'}
-                    </TableCell>
-                    <TableCell className="text-zinc-500">
-                      {workOrder.description
-                        ? workOrder.description.substring(0, 50) + (workOrder.description.length > 50 ? '...' : '')
-                        : '-'}
                     </TableCell>
                     <TableCell>
                       <div className="-mx-3 -my-1.5 sm:-mx-2.5">
