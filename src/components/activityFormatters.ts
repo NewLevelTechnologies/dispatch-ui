@@ -74,6 +74,33 @@ export function getEventEntityCode(kind: ActivityKind | string): string | undefi
 }
 
 /**
+ * Resolves a backend field key (e.g. `workOrderTypeId`, `divisionId`) to the
+ * label a CSR expects to read in the activity feed. The backend emits stable
+ * keys; the user-facing copy lives here so it can be translated and routed
+ * through the glossary where appropriate.
+ *
+ * `divisionId` flows through the glossary so a tenant who renames "Division"
+ * to "Region" sees the activity feed match the rest of the UI. Other fields
+ * use static i18n labels under `workOrders.activity.fieldLabel.*`.
+ *
+ * Falls back to the raw key for anything unmapped — better than crashing or
+ * rendering an empty string when the backend adds a new field ahead of the UI.
+ */
+export function getFieldLabel(
+  field: string,
+  t: (key: string) => string,
+  getName: (entityCode: string) => string
+): string {
+  if (!field) return field;
+  if (field === 'divisionId') return getName('division');
+  const labelKey = `workOrders.activity.fieldLabel.${field}`;
+  const translated = t(labelKey);
+  // i18next returns the key when no translation exists; treat that as the
+  // miss case and fall back to the raw field key.
+  return translated === labelKey ? field : translated;
+}
+
+/**
  * Returns a short identifier for which entity this event is *about*, rendered
  * as a secondary muted line below the action summary in the activity rail.
  *

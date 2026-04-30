@@ -10,11 +10,13 @@ import {
   statusWorkflowsApi,
   workflowConfigApi,
   type ProgressCategory,
+  type UpdateWorkOrderRequest,
   type WorkItemResponse,
   type WorkOrderPriority,
 } from '../api';
 import { useGlossary } from '../contexts/GlossaryContext';
 import AppLayout from '../components/AppLayout';
+import EditableField from '../components/EditableField';
 import WorkItemFormDialog from '../components/WorkItemFormDialog';
 import WorkItemsTable from '../components/WorkItemsTable';
 import WorkOrderActivityRail from '../components/WorkOrderActivityRail';
@@ -129,6 +131,49 @@ export default function WorkOrderDetailPage() {
     deleteWorkItemMutation.mutate({ workItemId: wi.id });
   };
 
+  // Inline description edit on each row. EditableField stays in edit mode if
+  // this throws (the user can retry/cancel), so we let the error propagate
+  // after surfacing it via alert.
+  const handleSaveWorkItemDescription = async (
+    wi: WorkItemResponse,
+    next: string
+  ) => {
+    try {
+      await workOrderApi.updateWorkItem(id!, wi.id, { description: next });
+      queryClient.invalidateQueries({ queryKey: ['work-orders'] });
+      queryClient.invalidateQueries({ queryKey: ['work-order-activity', id] });
+    } catch (err) {
+      const msg =
+        err instanceof Error && 'response' in err
+          ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
+          : undefined;
+      alert(msg || t('common.form.errorUpdate', { entity: getName('work_item') }));
+      throw err;
+    }
+  };
+
+  // Generic single-field PATCH for inline edits on the WO meta card. Each
+  // EditableField calls this with the field name and new value. EditableField
+  // stays in edit mode if we throw, so we propagate after alert so the user
+  // can retry / cancel.
+  const handleSaveWorkOrderField = async <K extends keyof UpdateWorkOrderRequest>(
+    field: K,
+    next: UpdateWorkOrderRequest[K]
+  ) => {
+    try {
+      await workOrderApi.update(id!, { [field]: next } as UpdateWorkOrderRequest);
+      queryClient.invalidateQueries({ queryKey: ['work-orders'] });
+      queryClient.invalidateQueries({ queryKey: ['work-order-activity', id] });
+    } catch (err) {
+      const msg =
+        err instanceof Error && 'response' in err
+          ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
+          : undefined;
+      alert(msg || t('common.form.errorUpdate', { entity: getName('work_order') }));
+      throw err;
+    }
+  };
+
   // W shortcut → open the work item dialog in create mode. Mirrors the N
   // shortcut in NoteComposer: ignored when an input is focused, when modifier
   // keys are held, or when the dialog is already open. Re-binds on open-state
@@ -239,8 +284,6 @@ export default function WorkOrderDetailPage() {
     );
   }
 
-  const typeName = workOrderTypes?.find((x) => x.id === workOrder.workOrderTypeId)?.name;
-  const divisionName = divisions?.find((x) => x.id === workOrder.divisionId)?.name;
   const customer = workOrder.customer;
   const location = workOrder.serviceLocation;
 
@@ -452,38 +495,84 @@ export default function WorkOrderDetailPage() {
               <DescriptionList>
                 <DescriptionTerm>{t('workOrders.detail.created')}</DescriptionTerm>
                 <DescriptionDetails>{formatDate(workOrder.createdAt)}</DescriptionDetails>
-                {workOrder.customerOrderNumber && (
-                  <>
-                    <DescriptionTerm>{t('workOrders.form.customerOrderNumber')}</DescriptionTerm>
-                    <DescriptionDetails className="font-mono">
-                      {workOrder.customerOrderNumber}
-                    </DescriptionDetails>
-                  </>
-                )}
-                {divisionName && (
-                  <>
-                    <DescriptionTerm>{getName('division')}</DescriptionTerm>
-                    <DescriptionDetails>{divisionName}</DescriptionDetails>
-                  </>
-                )}
-                {typeName && (
-                  <>
-                    <DescriptionTerm>{t('workOrders.form.type')}</DescriptionTerm>
-                    <DescriptionDetails>{typeName}</DescriptionDetails>
-                  </>
-                )}
+
+                <DescriptionTerm>{t('workOrders.form.customerOrderNumber')}</DescriptionTerm>
+                <DescriptionDetails>
+                  <EditableField
+                    value={workOrder.customerOrderNumber ?? ''}
+                    onSave={(v) => handleSaveWorkOrderField('customerOrderNumber', v || undefined)}
+                    disabled={isCancelled || isArchived}
+                    placeholder={t('workOrders.form.customerOrderNumberPlaceholder')}
+                    ariaLabel={t('workOrders.form.customerOrderNumber')}
+                    className="font-mono"
+                  />
+                </DescriptionDetails>
+
+                <DescriptionTerm>{getName('division')}</DescriptionTerm>
+                <DescriptionDetails>
+                  <EditableField
+                    as="select"
+                    value={workOrder.divisionId ?? ''}
+                    options={[
+                      { value: '', label: t('workOrders.form.divisionPlaceholder') },
+                      ...((divisions ?? [])
+                        .filter((d) => d.isActive)
+                        .map((d) => ({ value: d.id, label: d.name }))),
+                    ]}
+                    onSave={(v) => handleSaveWorkOrderField('divisionId', v || null)}
+                    disabled={isCancelled || isArchived}
+                    ariaLabel={getName('division')}
+                  />
+                </DescriptionDetails>
+
+                <DescriptionTerm>{t('workOrders.form.type')}</DescriptionTerm>
+                <DescriptionDetails>
+                  <EditableField
+                    as="select"
+                    value={workOrder.workOrderTypeId ?? ''}
+                    options={[
+                      { value: '', label: t('workOrders.form.typePlaceholder') },
+                      ...((workOrderTypes ?? [])
+                        .filter((t) => t.isActive)
+                        .map((t) => ({ value: t.id, label: t.name }))),
+                    ]}
+                    onSave={(v) => handleSaveWorkOrderField('workOrderTypeId', v || null)}
+                    disabled={isCancelled || isArchived}
+                    ariaLabel={t('workOrders.form.type')}
+                  />
+                </DescriptionDetails>
+
                 <DescriptionTerm>{t('workOrders.form.priority')}</DescriptionTerm>
                 <DescriptionDetails>
-                  <Badge color={PRIORITY_COLORS[priority]}>
-                    {t(`workOrders.priority.${PRIORITY_TRANSLATION_KEYS[priority]}`)}
-                  </Badge>
+                  <EditableField
+                    as="select"
+                    value={priority}
+                    options={(['LOW', 'NORMAL', 'HIGH', 'URGENT'] as WorkOrderPriority[]).map((p) => ({
+                      value: p,
+                      label: t(`workOrders.priority.${PRIORITY_TRANSLATION_KEYS[p]}`),
+                    }))}
+                    onSave={(v) => handleSaveWorkOrderField('priority', v as WorkOrderPriority)}
+                    disabled={isCancelled || isArchived}
+                    ariaLabel={t('workOrders.form.priority')}
+                    renderDisplay={(v) => (
+                      <Badge color={PRIORITY_COLORS[v as WorkOrderPriority]}>
+                        {t(`workOrders.priority.${PRIORITY_TRANSLATION_KEYS[v as WorkOrderPriority]}`)}
+                      </Badge>
+                    )}
+                  />
                 </DescriptionDetails>
-                {workOrder.scheduledDate && (
-                  <>
-                    <DescriptionTerm>{t('workOrders.form.scheduledDate')}</DescriptionTerm>
-                    <DescriptionDetails>{formatDate(workOrder.scheduledDate)}</DescriptionDetails>
-                  </>
-                )}
+
+                <DescriptionTerm>{t('workOrders.form.scheduledDate')}</DescriptionTerm>
+                <DescriptionDetails>
+                  <EditableField
+                    value={workOrder.scheduledDate ?? ''}
+                    onSave={(v) => handleSaveWorkOrderField('scheduledDate', v || undefined)}
+                    disabled={isCancelled || isArchived}
+                    ariaLabel={t('workOrders.form.scheduledDate')}
+                    renderDisplay={(v) => (v ? formatDate(v) : '—')}
+                  />
+                </DescriptionDetails>
+
                 {workOrder.completedDate && (
                   <>
                     <DescriptionTerm>{t('workOrders.detail.completed')}</DescriptionTerm>
@@ -508,6 +597,7 @@ export default function WorkOrderDetailPage() {
                 setWorkItemDialogOpen(true);
               }}
               onDelete={handleDeleteWorkItem}
+              onSaveDescription={handleSaveWorkItemDescription}
             />
           </main>
 
@@ -515,7 +605,11 @@ export default function WorkOrderDetailPage() {
           {/* Right rail — visible on xl+. Independent scroll within its column
               (parent body grid is overflow-hidden + flex-1, so each column owns
               its scroll viewport). */}
-          <aside className="mt-6 hidden xl:mt-0 xl:block xl:min-h-0 xl:overflow-y-auto">
+          {/* px-1 keeps the rail content (chips, etc.) away from the aside's
+              overflow boundary so focus outlines aren't clipped. The
+              ActivityStream's sticky header uses -mx-1 px-1 to extend its bg
+              back to the aside's edge for a clean visual bleed. */}
+          <aside className="mt-6 hidden xl:mt-0 xl:block xl:min-h-0 xl:overflow-y-auto xl:px-1">
             <WorkOrderActivityRail workOrderId={workOrder.id} />
           </aside>
         </div>
