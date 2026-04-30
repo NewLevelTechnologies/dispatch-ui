@@ -902,6 +902,13 @@
       "empty": "No activity yet.",
       "emptyForFilter": "No matching events for this filter.",
       "errorLoading": "Couldn't load activity.",
+      "fieldLabel": {
+        "completedDate": "Completed Date",
+        "customerOrderNumber": "Customer PO / Order #",
+        "priority": "Priority",
+        "scheduledDate": "Scheduled Date",
+        "workOrderTypeId": "Type"
+      },
       "filter": {
         "all": "All",
         "dispatches": "Dispatches",
@@ -1035,6 +1042,7 @@
       "deleteConfirm": "Delete this work item? This cannot be undone.",
       "deleteError": "Failed to delete work item",
       "descriptionRequired": "Description is required",
+      "editDescription": "Edit description",
       "empty": "No work items on this {{entity, lowercase}} yet.",
       "frozenHelper": "This {{entity, lowercase}} is cancelled — item statuses are read-only.",
       "lastUpdated": "Last updated",

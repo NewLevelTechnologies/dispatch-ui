@@ -23,6 +23,7 @@ import {
   DropdownMenu,
 } from './catalyst/dropdown';
 import { EllipsisHorizontalIcon } from '@heroicons/react/24/outline';
+import EditableField from './EditableField';
 import WorkItemStatusPill from './WorkItemStatusPill';
 
 interface Props {
@@ -36,6 +37,12 @@ interface Props {
   onEdit?: (wi: WorkItemResponse) => void;
   /** When provided, each row gets a per-row menu with a Delete option. */
   onDelete?: (wi: WorkItemResponse) => void;
+  /**
+   * When provided, the description cell becomes click-to-edit (textarea via
+   * EditableField). Returns a Promise so the field can stay in edit mode on
+   * error. Status edits go through the pill, not this callback.
+   */
+  onSaveDescription?: (wi: WorkItemResponse, next: string) => Promise<void>;
 }
 
 export default function WorkItemsTable({
@@ -47,6 +54,7 @@ export default function WorkItemsTable({
   readOnly = false,
   onEdit,
   onDelete,
+  onSaveDescription,
 }: Props) {
   const { t } = useTranslation();
   const { getName } = useGlossary();
@@ -69,9 +77,15 @@ export default function WorkItemsTable({
     <Table dense className="[--gutter:theme(spacing.1)] text-sm">
       <TableHead>
         <TableRow>
-          <TableHeader>{t('workOrders.table.statusHeader')}</TableHeader>
-          <TableHeader>{t('common.form.description')}</TableHeader>
-          <TableHeader>{t('workOrders.workItems.lastUpdated')}</TableHeader>
+          <TableHeader className="w-px whitespace-nowrap">{t('workOrders.table.statusHeader')}</TableHeader>
+          {/* w-full on this header makes description the "fill" column under
+              table-layout: auto, so its width is decided by the layout pass
+              rather than the cell's content. Without this, the column shrinks
+              when a row swaps from display text to a <textarea>, whose
+              intrinsic preferred width (cols=20) is narrower than the wrapped
+              text's max-content. */}
+          <TableHeader className="w-full">{t('common.form.description')}</TableHeader>
+          <TableHeader className="w-px whitespace-nowrap">{t('workOrders.workItems.lastUpdated')}</TableHeader>
           {showActions && <TableHeader className="w-12" />}
         </TableRow>
       </TableHead>
@@ -89,7 +103,17 @@ export default function WorkItemsTable({
               />
             </TableCell>
             <TableCell className="whitespace-pre-wrap break-words">
-              {wi.description}
+              {onSaveDescription && !readOnly ? (
+                <EditableField
+                  as="textarea"
+                  value={wi.description}
+                  onSave={(next) => onSaveDescription(wi, next)}
+                  rows={3}
+                  ariaLabel={t('workOrders.workItems.editDescription')}
+                />
+              ) : (
+                wi.description
+              )}
             </TableCell>
             <TableCell className="whitespace-nowrap text-zinc-600 dark:text-zinc-400">
               {formatRelativeTime(wi.updatedAt)}

@@ -21,6 +21,7 @@ import {
   getEventContext,
   getEventEntityCode,
   getEventTemplateKey,
+  getFieldLabel,
   preFormatEventData,
 } from './activityFormatters';
 
@@ -40,6 +41,42 @@ export default function ActivityStream({ workOrderId }: Props) {
   const { getName } = useGlossary();
   const [filter, setFilter] = useState<ActivityCategory | 'ALL'>('ALL');
   const queryFilter = filter === 'ALL' ? undefined : [filter];
+  const filterGroupRef = useRef<HTMLDivElement>(null);
+
+  // `/` shortcut → focus the active filter chip so a half-keyboard CSR can
+  // tab/arrow through filters without reaching for the mouse. Mirrors the
+  // N/W shortcut pattern: ignored when an input/textarea/contenteditable has
+  // focus and when modifier keys are held.
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key !== '/') return;
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      const target = e.target as HTMLElement | null;
+      if (
+        target &&
+        (target.tagName === 'INPUT' ||
+          target.tagName === 'TEXTAREA' ||
+          target.isContentEditable)
+      ) {
+        return;
+      }
+      const group = filterGroupRef.current;
+      if (!group) return;
+      // Prefer the currently-selected chip so keyboard focus matches the
+      // active filter; fall back to the first chip if (somehow) none is
+      // pressed.
+      const selected = group.querySelector<HTMLButtonElement>(
+        'button[aria-pressed="true"]'
+      );
+      const chip = selected ?? group.querySelector<HTMLButtonElement>('button');
+      if (chip) {
+        e.preventDefault();
+        chip.focus();
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, []);
 
   // Filter chip labels resolved per render — DISPATCH flows through glossary so a
   // tenant who renames "Dispatch" to "Service Call" sees "Service Calls" here.
@@ -108,7 +145,7 @@ export default function ActivityStream({ workOrderId }: Props) {
           {t('workOrders.activity.heading')}
         </h3>
 
-        <div className="mb-3 flex flex-wrap gap-1">
+        <div ref={filterGroupRef} className="mb-3 flex flex-wrap gap-1">
           {filterOptions.map((f) => {
             const selected = filter === f.id;
             return (
@@ -231,6 +268,11 @@ function ActivityRow({ event }: { event: ActivityEvent }) {
   const entityFields = entityCode
     ? { entity: getName(entityCode), entities: getName(entityCode, true) }
     : {};
+  // Diff-style events ship a raw field key (e.g. `workOrderTypeId`); swap it
+  // for the user-facing label so CSRs read "Type" not the backend column name.
+  if (typeof data.field === 'string' && data.field) {
+    data.field = getFieldLabel(data.field, t, getName);
+  }
   const rendered = t(templateKey, { ...data, ...entityFields });
   // Defensive: if the backend sent an event with missing data fields, the i18n
   // template renders raw "{{placeholder}}" tokens. Don't leak that to users —
