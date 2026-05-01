@@ -40,9 +40,21 @@ export default function EquipmentPicker({
   const [query, setQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
   const [isOpen, setIsOpen] = useState(false);
+  // Anchor the dropdown above the input when there isn't enough room below —
+  // inside dialogs the body clips an "absolute mt-1" panel onto the action row.
+  const [anchorUp, setAnchorUp] = useState(false);
   const [quickCreateOpen, setQuickCreateOpen] = useState(false);
   const [quickCreateInitialName, setQuickCreateInitialName] = useState('');
   const containerRef = useRef<HTMLDivElement>(null);
+
+  const openDropdown = () => {
+    const input = containerRef.current?.querySelector('input');
+    if (input) {
+      const rect = input.getBoundingClientRect();
+      setAnchorUp(window.innerHeight - rect.bottom < 280);
+    }
+    setIsOpen(true);
+  };
 
   // Debounce query → backend search.
   useEffect(() => {
@@ -119,13 +131,13 @@ export default function EquipmentPicker({
           value={inputValue}
           onChange={(e) => {
             setQuery(e.target.value);
-            setIsOpen(true);
+            openDropdown();
           }}
           onFocus={() => {
             // Clear the displayed selection so the user can search; selection
             // is preserved unless they pick something else.
             if (value) setQuery('');
-            setIsOpen(true);
+            openDropdown();
           }}
           placeholder={t('equipment.picker.placeholder')}
           disabled={disabled || !serviceLocationId}
@@ -143,7 +155,11 @@ export default function EquipmentPicker({
         )}
 
         {isOpen && (
-          <div className="absolute z-10 mt-1 w-full rounded-lg bg-white shadow-lg ring-1 ring-zinc-950/10 dark:bg-zinc-900 dark:ring-white/10">
+          <div
+            className={`absolute z-10 w-full rounded-lg bg-white shadow-lg ring-1 ring-zinc-950/10 dark:bg-zinc-900 dark:ring-white/10 ${
+              anchorUp ? 'bottom-full mb-1' : 'mt-1'
+            }`}
+          >
             {isFetching && (
               <div className="p-3 text-sm text-zinc-600 dark:text-zinc-400">
                 {t('common.actions.loading', { entities: getName('equipment', true) })}
