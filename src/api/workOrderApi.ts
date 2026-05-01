@@ -27,11 +27,26 @@ export const WorkOrderPriority = {
   URGENT: 'URGENT',
 } as const;
 
+// Inline shape matching EquipmentSummary in equipmentApi.ts. Inlined to avoid a circular
+// type-import (equipmentApi imports Page<T> from this file).
+export interface WorkItemEquipmentSummary {
+  id: string;
+  name: string;
+  equipmentTypeName?: string | null;
+  equipmentCategoryName?: string | null;
+  make?: string | null;
+  model?: string | null;
+  serialNumber?: string | null;
+  locationOnSite?: string | null;
+}
+
 export interface WorkItemResponse {
   id: string;
   statusId: string | null;
   statusCategory: ProgressCategory;
   description: string;
+  equipmentId: string | null;
+  equipment: WorkItemEquipmentSummary | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -119,11 +134,14 @@ export type SortDirection = 'asc' | 'desc';
 export interface CreateWorkItemRequest {
   description: string;
   statusId?: string;
+  equipmentId?: string | null;
 }
 
+// equipmentId uses JsonNullable semantics: omit = no change, null = clear, value = set.
 export interface UpdateWorkItemRequest {
   description?: string;
   statusId?: string;
+  equipmentId?: string | null;
 }
 
 export interface CreateWorkOrderRequest {

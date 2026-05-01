@@ -1,102 +1,81 @@
-import { useState, useMemo } from 'react';
+import { useState, useDeferredValue } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { EllipsisVerticalIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
-import apiClient from '../api/client';
 import { useGlossary } from '../contexts/GlossaryContext';
+import {
+  equipmentApi,
+  equipmentTypesApi,
+  equipmentCategoriesApi,
+  EquipmentStatus,
+  type Equipment,
+  type EquipmentSummary,
+  type EquipmentSortField,
+  type EquipmentSortDirection,
+} from '../api';
 import AppLayout from '../components/AppLayout';
+import EquipmentFormDialog from '../components/EquipmentFormDialog';
 import { Heading } from '../components/catalyst/heading';
 import { Button } from '../components/catalyst/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/catalyst/table';
 import { Badge } from '../components/catalyst/badge';
 import { Dropdown, DropdownButton, DropdownItem, DropdownLabel, DropdownMenu } from '../components/catalyst/dropdown';
-import { Dialog, DialogActions, DialogBody, DialogDescription, DialogTitle } from '../components/catalyst/dialog';
-import { Field, FieldGroup, Fieldset, Label } from '../components/catalyst/fieldset';
 import { Input, InputGroup } from '../components/catalyst/input';
 import { Select } from '../components/catalyst/select';
-import { Textarea } from '../components/catalyst/textarea';
-import {
-  equipmentApi,
-  EquipmentStatus,
-  type Equipment,
-  type CreateEquipmentRequest,
-  type UpdateEquipmentRequest,
-} from '../api/equipmentApi';
 
-interface Customer {
-  id: string;
-  name: string;
-}
+const PAGE_SIZE = 50;
 
 export default function EquipmentPage() {
   const queryClient = useQueryClient();
   const { t } = useTranslation();
   const { getName } = useGlossary();
+
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedEquipment, setSelectedEquipment] = useState<Equipment | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [formData, setFormData] = useState<CreateEquipmentRequest>({
-    customerId: '',
-    equipmentType: '',
-    modelNumber: '',
-    serialNumber: '',
-    location: '',
-    notes: '',
+  const [typeFilter, setTypeFilter] = useState<string>('');
+  const [categoryFilter, setCategoryFilter] = useState<string>('');
+  const [statusFilter, setStatusFilter] = useState<EquipmentStatus>(EquipmentStatus.ACTIVE);
+  const [page, setPage] = useState(0); // 0-indexed
+  const [sortBy] = useState<EquipmentSortField>('name');
+  const [sortDir] = useState<EquipmentSortDirection>('asc');
+
+  // Defer the search input so we don't fire a request on every keystroke
+  const deferredSearch = useDeferredValue(searchQuery.trim());
+
+  const { data: equipmentTypes = [] } = useQuery({
+    queryKey: ['equipment-types'],
+    queryFn: () => equipmentTypesApi.getAll(),
   });
 
-  const { data: equipment = [], isLoading, error } = useQuery({
-    queryKey: ['equipment'],
-    queryFn: () => equipmentApi.getAll(),
+  const { data: equipmentCategories = [] } = useQuery({
+    queryKey: ['equipment-categories', typeFilter],
+    queryFn: () => equipmentCategoriesApi.getAll(typeFilter || undefined),
+    enabled: Boolean(typeFilter),
   });
 
-  const { data: customers = [] } = useQuery({
-    queryKey: ['customers'],
-    queryFn: async () => {
-      const response = await apiClient.get<Customer[]>('/customers');
-      return response.data;
-    },
+  const {
+    data: equipmentPage,
+    isLoading,
+    error,
+  } = useQuery({
+    queryKey: ['equipment', { search: deferredSearch, typeFilter, categoryFilter, statusFilter, page, sortBy, sortDir }],
+    queryFn: () =>
+      equipmentApi.list({
+        search: deferredSearch || undefined,
+        equipmentTypeId: typeFilter || undefined,
+        equipmentCategoryId: categoryFilter || undefined,
+        status: statusFilter,
+        page,
+        size: PAGE_SIZE,
+        sortBy,
+        sortDir,
+      }),
   });
 
-  // Ensure all data is always an array
-  const safeEquipment = useMemo(() => Array.isArray(equipment) ? equipment : [], [equipment]);
-  const safeCustomers = useMemo(() => Array.isArray(customers) ? customers : [], [customers]);
-
-  // Filter equipment based on search query
-  const filteredEquipment = useMemo(() => {
-    if (safeEquipment.length === 0) return [];
-    if (!searchQuery.trim()) return safeEquipment;
-
-    const query = searchQuery.toLowerCase();
-    return safeEquipment.filter(
-      (item) =>
-        item.equipmentType.toLowerCase().includes(query) ||
-        item.customerId.toLowerCase().includes(query) ||
-        item.customerName?.toLowerCase().includes(query) ||
-        item.modelNumber?.toLowerCase().includes(query) ||
-        item.serialNumber?.toLowerCase().includes(query) ||
-        item.location?.toLowerCase().includes(query) ||
-        item.status.toLowerCase().includes(query)
-    );
-  }, [safeEquipment, searchQuery]);
-
-  const createMutation = useMutation({
-    mutationFn: (request: CreateEquipmentRequest) => equipmentApi.create(request),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['equipment'] });
-      setIsDialogOpen(false);
-      resetForm();
-    },
-  });
-
-  const updateMutation = useMutation({
-    mutationFn: ({ id, data }: { id: string; data: UpdateEquipmentRequest }) =>
-      equipmentApi.update(id, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['equipment'] });
-      setIsDialogOpen(false);
-      setSelectedEquipment(null);
-    },
-  });
+  const equipment: EquipmentSummary[] = equipmentPage?.content ?? [];
+  const totalElements = equipmentPage?.totalElements ?? 0;
+  const totalPages = equipmentPage?.totalPages ?? 0;
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => equipmentApi.delete(id),
@@ -106,58 +85,41 @@ export default function EquipmentPage() {
   });
 
   const handleAdd = () => {
-    resetForm();
     setSelectedEquipment(null);
     setIsDialogOpen(true);
   };
 
-  const handleEdit = (item: Equipment) => {
-    setSelectedEquipment(item);
-    setFormData({
-      customerId: item.customerId,
-      equipmentType: item.equipmentType,
-      modelNumber: item.modelNumber || '',
-      serialNumber: item.serialNumber || '',
-      location: item.location || '',
-      notes: item.notes || '',
-    });
+  const handleEdit = async (item: EquipmentSummary) => {
+    // Fetch the full record so the dialog has all fields (description, install date, etc.)
+    const full = await equipmentApi.getById(item.id);
+    setSelectedEquipment(full);
     setIsDialogOpen(true);
   };
 
-  const handleDelete = (item: Equipment) => {
-    if (window.confirm(t('common.actions.deleteConfirm', { name: item.equipmentType }))) {
+  const handleDelete = (item: EquipmentSummary) => {
+    if (window.confirm(t('common.actions.deleteConfirm', { name: item.name }))) {
       deleteMutation.mutate(item.id);
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (selectedEquipment) {
-      updateMutation.mutate({ id: selectedEquipment.id, data: formData });
-    } else {
-      createMutation.mutate(formData);
-    }
-  };
-
-  const resetForm = () => {
-    setFormData({
-      customerId: '',
-      equipmentType: '',
-      modelNumber: '',
-      serialNumber: '',
-      location: '',
-      notes: '',
-    });
-  };
-
   const getStatusBadge = (status: EquipmentStatus) => {
-    const colors: Record<EquipmentStatus, 'lime' | 'sky' | 'amber' | 'zinc'> = {
-      ACTIVE: 'lime',
-      INACTIVE: 'zinc',
-      MAINTENANCE: 'amber',
-      RETIRED: 'zinc',
-    };
-    return <Badge color={colors[status]}>{status}</Badge>;
+    return status === EquipmentStatus.ACTIVE ? (
+      <Badge color="lime">{t('equipment.status.active')}</Badge>
+    ) : (
+      <Badge color="zinc">{t('equipment.status.retired')}</Badge>
+    );
+  };
+
+  const formatTypeCategory = (item: EquipmentSummary) => {
+    if (item.equipmentTypeName && item.equipmentCategoryName) {
+      return `${item.equipmentTypeName} / ${item.equipmentCategoryName}`;
+    }
+    return item.equipmentTypeName || item.equipmentCategoryName || '-';
+  };
+
+  const formatMakeModel = (item: EquipmentSummary) => {
+    if (item.make && item.model) return `${item.make} ${item.model}`;
+    return item.make || item.model || '-';
   };
 
   return (
@@ -169,22 +131,74 @@ export default function EquipmentPage() {
         </Button>
       </div>
 
-      {/* Quick Search Bar */}
-      <div className="mt-2 flex items-center gap-4">
-        <InputGroup className="flex-1 max-w-md">
+      {/* Filters */}
+      <div className="mt-2 flex flex-wrap items-center gap-3">
+        <InputGroup className="flex-1 min-w-64 max-w-md">
           <MagnifyingGlassIcon data-slot="icon" />
           <Input
             type="text"
             placeholder={t('common.search')}
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={(e) => {
+              setSearchQuery(e.target.value);
+              setPage(0);
+            }}
           />
         </InputGroup>
-        {safeEquipment.length > 0 && (
-          <div className="text-sm text-zinc-600 dark:text-zinc-400">
-            {filteredEquipment.length === safeEquipment.length
-              ? `${safeEquipment.length} ${safeEquipment.length === 1 ? getName('equipment').toLowerCase() : getName('equipment', true).toLowerCase()}`
-              : `${filteredEquipment.length} of ${safeEquipment.length}`}
+
+        <Select
+          value={typeFilter}
+          onChange={(e) => {
+            setTypeFilter(e.target.value);
+            setCategoryFilter('');
+            setPage(0);
+          }}
+          className="max-w-48"
+        >
+          <option value="">{t('equipment.filter.allTypes')}</option>
+          {equipmentTypes.map((type) => (
+            <option key={type.id} value={type.id}>
+              {type.name}
+            </option>
+          ))}
+        </Select>
+
+        <Select
+          value={categoryFilter}
+          onChange={(e) => {
+            setCategoryFilter(e.target.value);
+            setPage(0);
+          }}
+          disabled={!typeFilter}
+          className="max-w-48"
+        >
+          <option value="">{t('equipment.filter.allCategories')}</option>
+          {equipmentCategories.map((cat) => (
+            <option key={cat.id} value={cat.id}>
+              {cat.name}
+            </option>
+          ))}
+        </Select>
+
+        <Select
+          value={statusFilter}
+          onChange={(e) => {
+            setStatusFilter(e.target.value as EquipmentStatus);
+            setPage(0);
+          }}
+          className="max-w-36"
+        >
+          <option value={EquipmentStatus.ACTIVE}>{t('equipment.status.active')}</option>
+          <option value={EquipmentStatus.RETIRED}>{t('equipment.status.retired')}</option>
+        </Select>
+
+        {totalElements > 0 && (
+          <div className="text-sm text-zinc-600 dark:text-zinc-400 ml-auto">
+            {t('common.pagination.showing', {
+              start: page * PAGE_SIZE + 1,
+              end: Math.min((page + 1) * PAGE_SIZE, totalElements),
+              total: totalElements,
+            })}
           </div>
         )}
       </div>
@@ -203,16 +217,12 @@ export default function EquipmentPage() {
             {t('common.actions.loading', { entities: getName('equipment', true) })}
           </p>
         </div>
-      ) : safeEquipment.length === 0 ? (
+      ) : equipment.length === 0 ? (
         <div className="mt-4 rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700 p-4">
           <p className="text-sm text-zinc-600 dark:text-zinc-400">
-            {t('common.actions.notFound', { entities: getName('equipment', true) })}
-          </p>
-        </div>
-      ) : filteredEquipment.length === 0 ? (
-        <div className="mt-4 rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700 p-4">
-          <p className="text-sm text-zinc-600 dark:text-zinc-400">
-            {t('common.actions.noMatchSearch', { entities: getName('equipment', true) })}
+            {deferredSearch || typeFilter || categoryFilter
+              ? t('common.actions.noMatchSearch', { entities: getName('equipment', true) })
+              : t('common.actions.notFound', { entities: getName('equipment', true) })}
           </p>
         </div>
       ) : (
@@ -220,24 +230,24 @@ export default function EquipmentPage() {
           <Table dense className="[--gutter:theme(spacing.1)] text-sm">
             <TableHead>
               <TableRow>
-                <TableHeader>{t('equipment.table.equipmentType')}</TableHeader>
-                <TableHeader>{t('equipment.table.customer')}</TableHeader>
-                <TableHeader>{t('equipment.table.modelNumber')}</TableHeader>
-                <TableHeader>{t('equipment.table.serialNumber')}</TableHeader>
-                <TableHeader>{t('equipment.table.location')}</TableHeader>
+                <TableHeader>{t('common.form.name')}</TableHeader>
+                <TableHeader>{t('equipment.table.type')}</TableHeader>
+                <TableHeader>{t('equipment.table.makeModel')}</TableHeader>
+                <TableHeader>{t('equipment.form.serialNumber')}</TableHeader>
+                <TableHeader>{t('equipment.form.locationOnSite')}</TableHeader>
                 <TableHeader>{t('common.form.status')}</TableHeader>
                 <TableHeader></TableHeader>
               </TableRow>
             </TableHead>
             <TableBody>
-              {filteredEquipment.map((item) => (
+              {equipment.map((item) => (
                 <TableRow key={item.id}>
-                  <TableCell className="font-medium">{item.equipmentType}</TableCell>
-                  <TableCell>{item.customerName || item.customerId}</TableCell>
-                  <TableCell>{item.modelNumber || '-'}</TableCell>
+                  <TableCell className="font-medium">{item.name}</TableCell>
+                  <TableCell>{formatTypeCategory(item)}</TableCell>
+                  <TableCell>{formatMakeModel(item)}</TableCell>
                   <TableCell>{item.serialNumber || '-'}</TableCell>
-                  <TableCell>{item.location || '-'}</TableCell>
-                  <TableCell>{getStatusBadge(item.status)}</TableCell>
+                  <TableCell>{item.locationOnSite || '-'}</TableCell>
+                  <TableCell>{getStatusBadge(statusFilter)}</TableCell>
                   <TableCell>
                     <div className="-mx-3 -my-1.5 sm:-mx-2.5">
                       <Dropdown>
@@ -259,101 +269,39 @@ export default function EquipmentPage() {
               ))}
             </TableBody>
           </Table>
+
+          {totalPages > 1 && (
+            <div className="mt-4 flex items-center justify-end gap-2">
+              <Button
+                plain
+                disabled={page === 0}
+                onClick={() => setPage((p) => Math.max(0, p - 1))}
+              >
+                {t('common.pagination.previous')}
+              </Button>
+              <span className="text-sm text-zinc-600 dark:text-zinc-400">
+                {t('common.pagination.pageOf', { page: page + 1, total: totalPages })}
+              </span>
+              <Button
+                plain
+                disabled={page >= totalPages - 1}
+                onClick={() => setPage((p) => p + 1)}
+              >
+                {t('common.pagination.next')}
+              </Button>
+            </div>
+          )}
         </div>
       )}
 
-      {/* Dialog */}
-      <Dialog open={isDialogOpen} onClose={setIsDialogOpen}>
-        <DialogTitle>
-          {selectedEquipment
-            ? t('common.actions.edit', { entity: getName('equipment') })
-            : t('common.actions.add', { entity: getName('equipment') })}
-        </DialogTitle>
-        <DialogDescription>
-          {selectedEquipment
-            ? t('common.form.descriptionEdit', { entity: getName('equipment') })
-            : t('common.form.descriptionCreate', { entity: getName('equipment') })}
-        </DialogDescription>
-        <form onSubmit={handleSubmit}>
-          <DialogBody>
-            <Fieldset>
-              <FieldGroup>
-                <Field>
-                  <Label>{t('equipment.form.customer')} *</Label>
-                  <Select
-                    name="customerId"
-                    value={formData.customerId}
-                    onChange={(e) => setFormData({ ...formData, customerId: e.target.value })}
-                    required
-                  >
-                    <option value="">{t('common.form.select')}</option>
-                    {safeCustomers.map((customer) => (
-                      <option key={customer.id} value={customer.id}>
-                        {customer.name}
-                      </option>
-                    ))}
-                  </Select>
-                </Field>
-
-                <Field>
-                  <Label>{t('equipment.form.equipmentType')} *</Label>
-                  <Input
-                    name="equipmentType"
-                    value={formData.equipmentType}
-                    onChange={(e) => setFormData({ ...formData, equipmentType: e.target.value })}
-                    required
-                  />
-                </Field>
-
-                <Field>
-                  <Label>{t('equipment.form.modelNumber')}</Label>
-                  <Input
-                    name="modelNumber"
-                    value={formData.modelNumber}
-                    onChange={(e) => setFormData({ ...formData, modelNumber: e.target.value })}
-                  />
-                </Field>
-
-                <Field>
-                  <Label>{t('equipment.form.serialNumber')}</Label>
-                  <Input
-                    name="serialNumber"
-                    value={formData.serialNumber}
-                    onChange={(e) => setFormData({ ...formData, serialNumber: e.target.value })}
-                  />
-                </Field>
-
-                <Field>
-                  <Label>{t('equipment.form.location')}</Label>
-                  <Input
-                    name="location"
-                    value={formData.location}
-                    onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-                  />
-                </Field>
-
-                <Field>
-                  <Label>{t('common.form.notes')}</Label>
-                  <Textarea
-                    name="notes"
-                    value={formData.notes}
-                    onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                    rows={3}
-                  />
-                </Field>
-              </FieldGroup>
-            </Fieldset>
-          </DialogBody>
-          <DialogActions>
-            <Button plain onClick={() => setIsDialogOpen(false)}>
-              {t('common.cancel')}
-            </Button>
-            <Button type="submit">
-              {selectedEquipment ? t('common.update') : t('common.create')}
-            </Button>
-          </DialogActions>
-        </form>
-      </Dialog>
+      <EquipmentFormDialog
+        isOpen={isDialogOpen}
+        onClose={() => {
+          setIsDialogOpen(false);
+          setSelectedEquipment(null);
+        }}
+        equipment={selectedEquipment}
+      />
     </AppLayout>
   );
 }

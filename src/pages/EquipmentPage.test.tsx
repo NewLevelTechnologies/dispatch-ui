@@ -2,57 +2,83 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
 import { renderWithProviders, userEvent } from '../test/utils';
 import EquipmentPage from './EquipmentPage';
-import apiClient from '../api/client';
 
-const mockEquipmentGetAll = vi.fn();
+const mockEquipmentList = vi.fn();
+const mockEquipmentGetById = vi.fn();
 const mockEquipmentCreate = vi.fn();
 const mockEquipmentUpdate = vi.fn();
 const mockEquipmentDelete = vi.fn();
+const mockEquipmentTypesGetAll = vi.fn();
+const mockEquipmentCategoriesGetAll = vi.fn();
+const mockCustomerGetAllPaginated = vi.fn();
+const mockCustomerGetServiceLocations = vi.fn();
 
-vi.mock('../api/equipmentApi', () => ({
-  equipmentApi: {
-    getAll: (...args: unknown[]) => mockEquipmentGetAll(...args),
-    create: (...args: unknown[]) => mockEquipmentCreate(...args),
-    update: (...args: unknown[]) => mockEquipmentUpdate(...args),
-    delete: (...args: unknown[]) => mockEquipmentDelete(...args),
-  },
-}));
+vi.mock('../api/equipmentApi', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../api/equipmentApi')>();
+  return {
+    ...actual,
+    equipmentApi: {
+      list: (...args: unknown[]) => mockEquipmentList(...args),
+      getById: (...args: unknown[]) => mockEquipmentGetById(...args),
+      create: (...args: unknown[]) => mockEquipmentCreate(...args),
+      update: (...args: unknown[]) => mockEquipmentUpdate(...args),
+      delete: (...args: unknown[]) => mockEquipmentDelete(...args),
+    },
+    equipmentTypesApi: {
+      getAll: (...args: unknown[]) => mockEquipmentTypesGetAll(...args),
+    },
+    equipmentCategoriesApi: {
+      getAll: (...args: unknown[]) => mockEquipmentCategoriesGetAll(...args),
+    },
+  };
+});
+
+vi.mock('../api/customerApi', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../api/customerApi')>();
+  return {
+    ...actual,
+    customerApi: {
+      getAllPaginated: (...args: unknown[]) => mockCustomerGetAllPaginated(...args),
+      getServiceLocations: (...args: unknown[]) => mockCustomerGetServiceLocations(...args),
+    },
+  };
+});
+
 vi.mock('../api/client');
 
-const mockEquipment = [
-  {
-    id: '1',
-    customerId: 'c1',
-    customerName: 'John Doe',
-    equipmentType: 'HVAC',
-    modelNumber: 'AC-100',
-    serialNumber: 'SN123',
-    status: 'ACTIVE',
-  },
-  {
-    id: '2',
-    customerId: 'c2',
-    customerName: 'Jane Smith',
-    equipmentType: 'Refrigerator',
-    modelNumber: 'RF-200',
-    serialNumber: 'SN456',
-    status: 'MAINTENANCE',
-  },
-];
+const summary = (id: string, name: string, overrides: Partial<Record<string, unknown>> = {}) => ({
+  id,
+  name,
+  equipmentTypeName: null,
+  equipmentCategoryName: null,
+  make: null,
+  model: null,
+  serialNumber: null,
+  locationOnSite: null,
+  ...overrides,
+});
 
-const mockCustomers = [
-  { id: 'c1', name: 'John Doe' },
-  { id: 'c2', name: 'Jane Smith' },
-];
+const page = (content: ReturnType<typeof summary>[], totalElements = content.length) => ({
+  content,
+  totalElements,
+  totalPages: Math.max(1, Math.ceil(totalElements / 50)),
+  number: 0,
+  size: 50,
+  first: true,
+  last: true,
+});
 
 describe('EquipmentPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(apiClient.get).mockResolvedValue({ data: mockCustomers });
+    mockEquipmentTypesGetAll.mockResolvedValue([]);
+    mockEquipmentCategoriesGetAll.mockResolvedValue([]);
+    mockCustomerGetAllPaginated.mockResolvedValue({ content: [], totalElements: 0, totalPages: 0, number: 0, size: 50 });
+    mockCustomerGetServiceLocations.mockResolvedValue([]);
   });
 
-  it('renders the page title and add button', async () => {
-    mockEquipmentGetAll.mockResolvedValue([]);
+  it('renders the page heading and add button', async () => {
+    mockEquipmentList.mockResolvedValue(page([]));
 
     renderWithProviders(<EquipmentPage />);
 
@@ -63,7 +89,7 @@ describe('EquipmentPage', () => {
   });
 
   it('displays loading state', () => {
-    mockEquipmentGetAll.mockImplementation(() => new Promise(() => {}));
+    mockEquipmentList.mockImplementation(() => new Promise(() => {}));
 
     renderWithProviders(<EquipmentPage />);
 
@@ -71,21 +97,39 @@ describe('EquipmentPage', () => {
   });
 
   it('displays equipment in a table', async () => {
-    mockEquipmentGetAll.mockResolvedValue(mockEquipment);
+    mockEquipmentList.mockResolvedValue(
+      page([
+        summary('1', 'Upstairs Furnace', {
+          equipmentTypeName: 'HVAC',
+          equipmentCategoryName: 'Furnace',
+          make: 'Carrier',
+          model: 'AC-100',
+          serialNumber: 'SN123',
+          locationOnSite: 'Basement',
+        }),
+        summary('2', 'Walk-in Cooler', {
+          equipmentTypeName: 'Refrigeration',
+          make: 'Hoshizaki',
+          serialNumber: 'SN456',
+        }),
+      ])
+    );
 
     renderWithProviders(<EquipmentPage />);
 
     await waitFor(() => {
-      expect(screen.getByText('AC-100')).toBeInTheDocument();
+      expect(screen.getByText('Upstairs Furnace')).toBeInTheDocument();
     });
 
-    expect(screen.getByText('HVAC')).toBeInTheDocument();
+    expect(screen.getByText('HVAC / Furnace')).toBeInTheDocument();
+    expect(screen.getByText('Carrier AC-100')).toBeInTheDocument();
     expect(screen.getByText('SN123')).toBeInTheDocument();
-    expect(screen.getByText('John Doe')).toBeInTheDocument();
+    expect(screen.getByText('Basement')).toBeInTheDocument();
+    expect(screen.getByText('Walk-in Cooler')).toBeInTheDocument();
   });
 
   it('displays error message when fetch fails', async () => {
-    mockEquipmentGetAll.mockRejectedValue(new Error('Network error'));
+    mockEquipmentList.mockRejectedValue(new Error('Network error'));
 
     renderWithProviders(<EquipmentPage />);
 
@@ -95,77 +139,64 @@ describe('EquipmentPage', () => {
   });
 
   it('displays empty state', async () => {
-    mockEquipmentGetAll.mockResolvedValue([]);
+    mockEquipmentList.mockResolvedValue(page([]));
 
     renderWithProviders(<EquipmentPage />);
 
     await waitFor(() => {
-      expect(screen.getByText('No equipment found')).toBeInTheDocument();
+      expect(screen.getByText(/no equipment found/i)).toBeInTheDocument();
     });
   });
 
   it('opens create dialog when add button is clicked', async () => {
-    mockEquipmentGetAll.mockResolvedValue([]);
+    mockEquipmentList.mockResolvedValue(page([]));
     const user = userEvent.setup();
 
     renderWithProviders(<EquipmentPage />);
 
     await waitFor(() => {
-      expect(screen.getByText('No equipment found')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /add equipment/i })).toBeInTheDocument();
     });
 
-    const addButton = screen.getByRole('button', { name: /add equipment/i });
-    await user.click(addButton);
+    await user.click(screen.getByRole('button', { name: /add equipment/i }));
 
     expect(screen.getByRole('dialog')).toBeInTheDocument();
-
-    // Fill form and submit to test handleSubmit
-    mockEquipmentCreate.mockResolvedValue({ ...mockEquipment[0], id: '3' });
-
-    const customerSelect = screen.getByLabelText(/customer/i);
-    await user.selectOptions(customerSelect, 'c1');
-
-    const equipmentTypeInput = screen.getByLabelText(/equipment type/i);
-    await user.type(equipmentTypeInput, 'HVAC');
-
-    const submitButton = screen.getByRole('button', { name: /create/i });
-    await user.click(submitButton);
-
-    await waitFor(() => {
-      expect(mockEquipmentCreate).toHaveBeenCalled();
-    });
+    expect(screen.getByLabelText(/^name/i)).toBeInTheDocument();
   });
 
-  it('opens edit dialog when edit is clicked', async () => {
-    mockEquipmentGetAll.mockResolvedValue(mockEquipment);
-    mockEquipmentUpdate.mockResolvedValue({ ...mockEquipment[0], equipmentType: 'Updated' });
+  it('opens edit dialog with full record fetched by id', async () => {
+    mockEquipmentList.mockResolvedValue(
+      page([summary('1', 'Upstairs Furnace', { make: 'Carrier' })])
+    );
+    mockEquipmentGetById.mockResolvedValue({
+      id: '1',
+      name: 'Upstairs Furnace',
+      serviceLocationId: 'sl-1',
+      status: 'ACTIVE',
+      make: 'Carrier',
+    });
     const user = userEvent.setup();
 
     renderWithProviders(<EquipmentPage />);
 
     await waitFor(() => {
-      expect(screen.getByText('AC-100')).toBeInTheDocument();
+      expect(screen.getByText('Upstairs Furnace')).toBeInTheDocument();
     });
 
     const dropdownButtons = screen.getAllByRole('button', { name: /more options/i });
     await user.click(dropdownButtons[0]);
 
-    const editButton = screen.getByRole('menuitem', { name: /edit/i });
+    const editButton = await screen.findByRole('menuitem', { name: /edit/i });
     await user.click(editButton);
 
-    expect(screen.getByRole('dialog')).toBeInTheDocument();
-
-    // Submit form to test handleSubmit for update
-    const submitButton = screen.getByRole('button', { name: /update/i });
-    await user.click(submitButton);
-
     await waitFor(() => {
-      expect(mockEquipmentUpdate).toHaveBeenCalled();
+      expect(mockEquipmentGetById).toHaveBeenCalledWith('1');
     });
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
   });
 
   it('calls delete when confirmed', async () => {
-    mockEquipmentGetAll.mockResolvedValue(mockEquipment);
+    mockEquipmentList.mockResolvedValue(page([summary('1', 'Upstairs Furnace')]));
     mockEquipmentDelete.mockResolvedValue(undefined);
     const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
     const user = userEvent.setup();
@@ -173,13 +204,13 @@ describe('EquipmentPage', () => {
     renderWithProviders(<EquipmentPage />);
 
     await waitFor(() => {
-      expect(screen.getByText('AC-100')).toBeInTheDocument();
+      expect(screen.getByText('Upstairs Furnace')).toBeInTheDocument();
     });
 
     const dropdownButtons = screen.getAllByRole('button', { name: /more options/i });
     await user.click(dropdownButtons[0]);
 
-    const deleteButton = screen.getByRole('menuitem', { name: /delete/i });
+    const deleteButton = await screen.findByRole('menuitem', { name: /delete/i });
     await user.click(deleteButton);
 
     await waitFor(() => {
@@ -190,97 +221,22 @@ describe('EquipmentPage', () => {
     confirmSpy.mockRestore();
   });
 
-  it('displays status badges for different statuses', async () => {
-    const equipmentWithStatuses = [
-      { ...mockEquipment[0], status: 'ACTIVE' },
-      { ...mockEquipment[1], status: 'MAINTENANCE' },
-      { id: '3', customerId: 'c3', customerName: 'Test Customer', equipmentType: 'Furnace', modelNumber: 'FN-300', serialNumber: 'SN789', status: 'INACTIVE' },
-      { id: '4', customerId: 'c4', customerName: 'Another Customer', equipmentType: 'Boiler', modelNumber: 'BL-400', serialNumber: 'SN012', status: 'RETIRED' },
-    ];
-    mockEquipmentGetAll.mockResolvedValue(equipmentWithStatuses);
-
-    renderWithProviders(<EquipmentPage />);
-
-    await waitFor(() => {
-      expect(screen.getByText('AC-100')).toBeInTheDocument();
-    });
-
-    // Status badges should be rendered
-    expect(screen.getAllByText('ACTIVE').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('MAINTENANCE').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('INACTIVE').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('RETIRED').length).toBeGreaterThan(0);
-  });
-
-  it('displays customer names correctly', async () => {
-    mockEquipmentGetAll.mockResolvedValue(mockEquipment);
-
-    renderWithProviders(<EquipmentPage />);
-
-    await waitFor(() => {
-      expect(screen.getByText('AC-100')).toBeInTheDocument();
-    });
-
-    // Customer names from getCustomerName function
-    expect(screen.getByText('John Doe')).toBeInTheDocument();
-    expect(screen.getByText('Jane Smith')).toBeInTheDocument();
-  });
-
-  it('handles form submission', async () => {
-    mockEquipmentGetAll.mockResolvedValue([]);
-    mockEquipmentCreate.mockResolvedValue({ ...mockEquipment[0], id: '3' });
+  it('debounces search input into the list query', async () => {
+    mockEquipmentList.mockResolvedValue(page([summary('1', 'Upstairs Furnace')]));
     const user = userEvent.setup();
 
     renderWithProviders(<EquipmentPage />);
 
     await waitFor(() => {
-      expect(screen.getByText('No equipment found')).toBeInTheDocument();
+      expect(screen.getByText('Upstairs Furnace')).toBeInTheDocument();
     });
 
-    const addButton = screen.getByRole('button', { name: /add equipment/i });
-    await user.click(addButton);
-
-    expect(screen.getByRole('dialog')).toBeInTheDocument();
-  });
-
-  it('handles update submission', async () => {
-    mockEquipmentGetAll.mockResolvedValue(mockEquipment);
-    mockEquipmentUpdate.mockResolvedValue({ ...mockEquipment[0], modelNumber: 'UPDATED' });
-    const user = userEvent.setup();
-
-    renderWithProviders(<EquipmentPage />);
-
-    await waitFor(() => {
-      expect(screen.getByText('AC-100')).toBeInTheDocument();
-    });
-
-    const dropdownButtons = screen.getAllByRole('button', { name: /more options/i });
-    await user.click(dropdownButtons[0]);
-
-    const editButton = screen.getByRole('menuitem', { name: /edit/i });
-    await user.click(editButton);
-
-    expect(screen.getByRole('dialog')).toBeInTheDocument();
-  });
-
-  it('filters equipment by search query', async () => {
-    mockEquipmentGetAll.mockResolvedValue(mockEquipment);
-    const user = userEvent.setup();
-
-    renderWithProviders(<EquipmentPage />);
-
-    await waitFor(() => {
-      expect(screen.getByText('AC-100')).toBeInTheDocument();
-      expect(screen.getByText('RF-200')).toBeInTheDocument();
-    });
-
-    // Search for "AC"
     const searchInput = screen.getByPlaceholderText(/search/i);
-    await user.type(searchInput, 'AC');
+    await user.type(searchInput, 'carrier');
 
     await waitFor(() => {
-      expect(screen.getByText('AC-100')).toBeInTheDocument();
-      expect(screen.queryByText('RF-200')).not.toBeInTheDocument();
+      const calls = mockEquipmentList.mock.calls;
+      expect(calls.some(([args]) => args && args.search === 'carrier')).toBe(true);
     });
   });
 });

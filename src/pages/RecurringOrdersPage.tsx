@@ -20,7 +20,6 @@ import {
   type CreateRecurringOrderRequest,
   type UpdateRecurringOrderRequest,
 } from '../api/schedulingApi';
-import { equipmentApi } from '../api/equipmentApi';
 
 interface Customer {
   id: string;
@@ -35,7 +34,6 @@ export default function RecurringOrdersPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [formData, setFormData] = useState<CreateRecurringOrderRequest>({
     customerId: '',
-    equipmentId: '',
     frequency: 'MONTHLY',
     nextScheduledDate: new Date().toISOString().split('T')[0],
     description: '',
@@ -55,15 +53,9 @@ export default function RecurringOrdersPage() {
     },
   });
 
-  const { data: equipment = [] } = useQuery({
-    queryKey: ['equipment'],
-    queryFn: () => equipmentApi.getAll(),
-  });
-
   // Ensure all data is always an array
   const safeOrders = useMemo(() => Array.isArray(recurringOrders) ? recurringOrders : [], [recurringOrders]);
   const safeCustomers = useMemo(() => Array.isArray(customers) ? customers : [], [customers]);
-  const safeEquipment = useMemo(() => Array.isArray(equipment) ? equipment : [], [equipment]);
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -82,7 +74,6 @@ export default function RecurringOrdersPage() {
     return safeOrders.filter(
       (order) =>
         order.customerId.toLowerCase().includes(query) ||
-        order.equipmentId.toLowerCase().includes(query) ||
         order.frequency.toLowerCase().includes(query) ||
         order.description?.toLowerCase().includes(query)
     );
@@ -124,7 +115,6 @@ export default function RecurringOrdersPage() {
     setSelectedOrder(item);
     setFormData({
       customerId: item.customerId,
-      equipmentId: item.equipmentId,
       frequency: item.frequency,
       nextScheduledDate: new Date(item.nextScheduledDate).toISOString().split('T')[0],
       description: item.description || '',
@@ -157,7 +147,6 @@ export default function RecurringOrdersPage() {
   const resetForm = () => {
     setFormData({
       customerId: '',
-      equipmentId: '',
       frequency: 'MONTHLY',
       nextScheduledDate: new Date().toISOString().split('T')[0],
       description: '',
@@ -188,11 +177,6 @@ export default function RecurringOrdersPage() {
   const getCustomerName = (customerId: string) => {
     const customer = safeCustomers.find(c => c.id === customerId);
     return customer?.name || customerId;
-  };
-
-  const getEquipmentType = (equipmentId: string) => {
-    const eq = safeEquipment.find(e => e.id === equipmentId);
-    return eq?.equipmentType || equipmentId;
   };
 
   return (
@@ -256,7 +240,6 @@ export default function RecurringOrdersPage() {
             <TableHead>
               <TableRow>
                 <TableHeader>{t('scheduling.table.customer')}</TableHeader>
-                <TableHeader>{t('scheduling.table.equipment')}</TableHeader>
                 <TableHeader>{t('scheduling.table.frequency')}</TableHeader>
                 <TableHeader>{t('scheduling.table.nextScheduled')}</TableHeader>
                 <TableHeader>{t('common.form.description')}</TableHeader>
@@ -268,7 +251,6 @@ export default function RecurringOrdersPage() {
               {filteredOrders.map((item) => (
                 <TableRow key={item.id}>
                   <TableCell className="font-medium">{getCustomerName(item.customerId)}</TableCell>
-                  <TableCell>{getEquipmentType(item.equipmentId)}</TableCell>
                   <TableCell>{getFrequencyBadge(item.frequency)}</TableCell>
                   <TableCell>{formatDate(item.nextScheduledDate)}</TableCell>
                   <TableCell>{item.description || '-'}</TableCell>
@@ -325,23 +307,6 @@ export default function RecurringOrdersPage() {
                     {safeCustomers.map((customer) => (
                       <option key={customer.id} value={customer.id}>
                         {customer.name}
-                      </option>
-                    ))}
-                  </Select>
-                </Field>
-
-                <Field>
-                  <Label>{t('scheduling.form.equipment')} *</Label>
-                  <Select
-                    name="equipmentId"
-                    value={formData.equipmentId}
-                    onChange={(e) => setFormData({ ...formData, equipmentId: e.target.value })}
-                    required
-                  >
-                    <option value="">{t('common.form.select')}</option>
-                    {safeEquipment.map((eq) => (
-                      <option key={eq.id} value={eq.id}>
-                        {eq.equipmentType} - {eq.modelNumber || eq.serialNumber || eq.id}
                       </option>
                     ))}
                   </Select>

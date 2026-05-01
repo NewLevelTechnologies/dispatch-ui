@@ -136,7 +136,7 @@ export interface RecurringOrder {
   id: string;
   tenantId: string;
   customerId: string;
-  equipmentId: string;
+  equipmentId?: string | null;
   frequency: string;
   nextScheduledDate: string;
   description?: string;
@@ -148,7 +148,7 @@ export interface RecurringOrder {
 
 export interface CreateRecurringOrderRequest {
   customerId: string;
-  equipmentId: string;
+  equipmentId?: string | null;
   frequency: string;
   nextScheduledDate: string;
   description?: string;
