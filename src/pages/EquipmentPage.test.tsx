@@ -239,4 +239,103 @@ describe('EquipmentPage', () => {
       expect(calls.some(([args]) => args && args.search === 'carrier')).toBe(true);
     });
   });
+
+  it('forwards type and category filters into the list query', async () => {
+    mockEquipmentList.mockResolvedValue(page([summary('1', 'Upstairs Furnace')]));
+    mockEquipmentTypesGetAll.mockResolvedValue([
+      { id: 't-hvac', tenantId: 't', name: 'HVAC', sortOrder: 0, archivedAt: null, createdAt: '', updatedAt: '' },
+    ]);
+    mockEquipmentCategoriesGetAll.mockResolvedValue([
+      { id: 'c-furnace', tenantId: 't', equipmentTypeId: 't-hvac', name: 'Furnace', sortOrder: 0, archivedAt: null, createdAt: '', updatedAt: '' },
+    ]);
+    const user = userEvent.setup();
+
+    renderWithProviders(<EquipmentPage />);
+
+    await waitFor(() => expect(screen.getByText('Upstairs Furnace')).toBeInTheDocument());
+
+    // Pick type — kicks off categories query and refetches list
+    const [typeSelect, categorySelect] = screen.getAllByRole('combobox');
+    await user.selectOptions(typeSelect, 't-hvac');
+
+    await waitFor(() => {
+      expect(mockEquipmentCategoriesGetAll).toHaveBeenCalledWith('t-hvac');
+    });
+    await waitFor(() => {
+      expect(mockEquipmentList.mock.calls.some(([args]) => args?.equipmentTypeId === 't-hvac')).toBe(true);
+    });
+
+    // Pick category
+    await waitFor(() => expect(categorySelect).not.toBeDisabled());
+    await user.selectOptions(categorySelect, 'c-furnace');
+    await waitFor(() => {
+      expect(mockEquipmentList.mock.calls.some(([args]) => args?.equipmentCategoryId === 'c-furnace')).toBe(true);
+    });
+  });
+
+  it('switches the status filter to RETIRED', async () => {
+    mockEquipmentList.mockResolvedValue(page([summary('1', 'Upstairs Furnace')]));
+    const user = userEvent.setup();
+
+    renderWithProviders(<EquipmentPage />);
+
+    await waitFor(() => expect(screen.getByText('Upstairs Furnace')).toBeInTheDocument());
+
+    const selects = screen.getAllByRole('combobox');
+    const statusSelect = selects[selects.length - 1];
+    await user.selectOptions(statusSelect, 'RETIRED');
+
+    await waitFor(() => {
+      expect(mockEquipmentList.mock.calls.some(([args]) => args?.status === 'RETIRED')).toBe(true);
+    });
+  });
+
+  it('paginates with previous and next buttons', async () => {
+    // 120 results across 3 pages of 50
+    mockEquipmentList.mockResolvedValue({
+      content: [summary('1', 'Page 1 Item')],
+      totalElements: 120,
+      totalPages: 3,
+      number: 0,
+      size: 50,
+      first: true,
+      last: false,
+    });
+    const user = userEvent.setup();
+
+    renderWithProviders(<EquipmentPage />);
+
+    await waitFor(() => expect(screen.getByText('Page 1 Item')).toBeInTheDocument());
+
+    await user.click(screen.getByRole('button', { name: /next/i }));
+    await waitFor(() => {
+      expect(mockEquipmentList.mock.calls.some(([args]) => args?.page === 1)).toBe(true);
+    });
+
+    await user.click(screen.getByRole('button', { name: /previous/i }));
+    await waitFor(() => {
+      // The last call should be back to page 0
+      const lastArgs = mockEquipmentList.mock.calls[mockEquipmentList.mock.calls.length - 1][0];
+      expect(lastArgs?.page).toBe(0);
+    });
+  });
+
+  it('closes the form dialog on cancel', async () => {
+    mockEquipmentList.mockResolvedValue(page([]));
+    const user = userEvent.setup();
+
+    renderWithProviders(<EquipmentPage />);
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /add equipment/i })).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole('button', { name: /add equipment/i }));
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /cancel/i }));
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    });
+  });
 });
