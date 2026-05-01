@@ -358,6 +358,13 @@
       "allCategories": "All Categories",
       "allTypes": "All Types"
     },
+    "picker": {
+      "clear": "Clear selection",
+      "createNew": "+ Create new equipment \"{{name}}\"",
+      "noResults": "No equipment found at this location.",
+      "placeholder": "Search by name, serial, model…",
+      "quickCreateHint": "Other details (make, model, serial, install date) can be filled in later from the equipment page."
+    },
     "form": {
       "assetTag": "Asset Tag",
       "category": "Category",

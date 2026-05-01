@@ -93,6 +93,7 @@ export function getFieldLabel(
 ): string {
   if (!field) return field;
   if (field === 'divisionId') return getName('division');
+  if (field === 'equipmentId') return getName('equipment');
   const labelKey = `workOrders.activity.fieldLabel.${field}`;
   const translated = t(labelKey);
   // i18next returns the key when no translation exists; treat that as the
@@ -104,10 +105,8 @@ export function getFieldLabel(
  * Returns a short identifier for which entity this event is *about*, rendered
  * as a secondary muted line below the action summary in the activity rail.
  *
- * Today the only entities surfaced this way are work items (description acts as
- * a stop-gap label until equipment FK lands per design §7.5). When the equipment
- * relation ships, this function should return the equipment name instead — the
- * UI structure stays the same; only the source field changes.
+ * For work-item events, prefers the linked equipment's name (per design §7.5)
+ * and falls back to the work item description when no equipment is attached.
  *
  * Returns null for events that don't reference a sub-entity (WO-level events,
  * notes, dispatches, financial events) — those render summary-only.
@@ -118,6 +117,11 @@ export function getEventContext(event: ActivityEvent): string | null {
     case 'WORK_ITEM_UPDATED':
     case 'WORK_ITEM_STATUS_CHANGED':
     case 'WORK_ITEM_DELETED': {
+      const equipmentName =
+        typeof event.data.equipmentName === 'string' && event.data.equipmentName
+          ? event.data.equipmentName
+          : null;
+      if (equipmentName) return equipmentName;
       const desc =
         (typeof event.data.workItemDescription === 'string' &&
           event.data.workItemDescription) ||

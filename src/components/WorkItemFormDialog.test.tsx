@@ -89,7 +89,7 @@ describe('WorkItemFormDialog', () => {
     await waitFor(() => {
       expect(apiClient.post).toHaveBeenCalledWith(
         '/work-orders/wo-1/work-items',
-        { description: 'New job', statusId: undefined }
+        { description: 'New job', statusId: undefined, equipmentId: null }
       );
     });
     await waitFor(() => {
@@ -150,6 +150,50 @@ describe('WorkItemFormDialog', () => {
     });
     expect(apiClient.post).not.toHaveBeenCalled();
     alertSpy.mockRestore();
+  });
+
+  it('attaches equipmentId on create when equipment is picked from the typeahead', async () => {
+    vi.mocked(apiClient.post).mockResolvedValue({
+      data: { id: 'wi-new', description: 'New job', equipmentId: 'eq-1' },
+    });
+    // Picker fetches the scoped equipment list once opened.
+    vi.mocked(apiClient.get).mockImplementation((url: string) => {
+      if (url.startsWith('/equipment')) {
+        return Promise.resolve({
+          data: {
+            content: [{ id: 'eq-1', name: 'Upstairs Furnace' }],
+            totalElements: 1,
+            totalPages: 1,
+            number: 0,
+            size: 20,
+          },
+        });
+      }
+      return Promise.resolve({ data: allStatuses });
+    });
+    const user = userEvent.setup();
+    renderWithProviders(
+      <WorkItemFormDialog
+        isOpen={true}
+        onClose={vi.fn()}
+        workOrderId="wo-1"
+        serviceLocationId="loc-1"
+      />
+    );
+
+    await user.type(screen.getByLabelText(/description/i), 'Replace filter');
+    await user.click(screen.getByLabelText(/equipment/i));
+    await waitFor(() => expect(screen.getByText('Upstairs Furnace')).toBeInTheDocument());
+    await user.click(screen.getByText('Upstairs Furnace'));
+
+    await user.click(screen.getByRole('button', { name: /create/i }));
+
+    await waitFor(() => {
+      expect(apiClient.post).toHaveBeenCalledWith(
+        '/work-orders/wo-1/work-items',
+        expect.objectContaining({ description: 'Replace filter', equipmentId: 'eq-1' })
+      );
+    });
   });
 
   it('shows Close button (no Save) and disables the textarea when readOnly', async () => {

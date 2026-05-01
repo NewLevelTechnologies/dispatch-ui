@@ -643,6 +643,7 @@ export default function WorkOrderDetailPage() {
           setEditingWorkItem(null);
         }}
         workOrderId={workOrder.id}
+        serviceLocationId={workOrder.serviceLocationId}
         workItem={editingWorkItem}
         readOnly={isCancelled || isArchived}
       />
