@@ -30,6 +30,8 @@ const existingItem: WorkItemResponse = {
   statusId: 's-pending',
   statusCategory: 'NOT_STARTED',
   description: 'Replace filter',
+  equipmentId: null,
+  equipment: null,
   createdAt: '2026-04-21T13:40:00Z',
   updatedAt: '2026-04-22T10:30:00Z',
 };

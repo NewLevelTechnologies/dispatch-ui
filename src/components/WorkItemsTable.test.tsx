@@ -11,6 +11,8 @@ const wi = (id: string, description: string): WorkItemResponse => ({
   statusId: null,
   statusCategory: 'NOT_STARTED',
   description,
+  equipmentId: null,
+  equipment: null,
   createdAt: '2026-04-21T13:40:00Z',
   updatedAt: '2026-04-22T10:30:00Z',
 });

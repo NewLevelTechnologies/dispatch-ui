@@ -1,64 +1,127 @@
 // Equipment API Client
 import apiClient from './client';
+import type { Page } from './workOrderApi';
 
 // ========== EQUIPMENT ==========
 
-export type EquipmentStatus = 'ACTIVE' | 'INACTIVE' | 'MAINTENANCE' | 'RETIRED';
+export type EquipmentStatus = 'ACTIVE' | 'RETIRED';
 
 export const EquipmentStatus = {
   ACTIVE: 'ACTIVE',
-  INACTIVE: 'INACTIVE',
-  MAINTENANCE: 'MAINTENANCE',
   RETIRED: 'RETIRED',
 } as const;
 
 export interface Equipment {
   id: string;
-  tenantId: string;
-  customerId: string;
-  customerName?: string;
-  manufacturerId?: string;
-  manufacturerName?: string;
-  equipmentType: string;
-  modelNumber?: string;
-  serialNumber?: string;
-  installationDate?: string;
-  warrantyExpiration?: string;
-  location?: string;
+  tenantId?: string;
+  name: string;
+  description?: string | null;
+  make?: string | null;
+  model?: string | null;
+  serialNumber?: string | null;
+  assetTag?: string | null;
+  parentId?: string | null;
+  equipmentTypeId?: string | null;
+  equipmentTypeName?: string | null;
+  equipmentCategoryId?: string | null;
+  equipmentCategoryName?: string | null;
+  serviceLocationId: string;
+  locationOnSite?: string | null;
+  installDate?: string | null;
+  lastServicedAt?: string | null;
   status: EquipmentStatus;
-  notes?: string;
-  createdAt: string;
-  updatedAt: string;
+  profileImageUrl?: string | null;
+  // JSONB stored as string per backend; parse client-side when needed.
+  attributes?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+// Slim projection returned by the list endpoint and embedded on WorkItemResponse.equipment.
+export interface EquipmentSummary {
+  id: string;
+  name: string;
+  equipmentTypeName?: string | null;
+  equipmentCategoryName?: string | null;
+  make?: string | null;
+  model?: string | null;
+  serialNumber?: string | null;
+  locationOnSite?: string | null;
 }
 
 export interface CreateEquipmentRequest {
-  customerId: string;
-  manufacturerId?: string;
-  equipmentType: string;
-  modelNumber?: string;
-  serialNumber?: string;
-  installationDate?: string;
-  warrantyExpiration?: string;
-  location?: string;
-  notes?: string;
+  name: string;
+  serviceLocationId: string;
+  description?: string | null;
+  make?: string | null;
+  model?: string | null;
+  serialNumber?: string | null;
+  assetTag?: string | null;
+  parentId?: string | null;
+  equipmentTypeId?: string | null;
+  equipmentCategoryId?: string | null;
+  locationOnSite?: string | null;
+  installDate?: string | null;
+  status?: EquipmentStatus;
+  profileImageUrl?: string | null;
+  attributes?: string;
 }
 
+// PATCH semantics: omit a field for no change, send null to clear, send a value to set.
+// serviceLocationId cannot be changed via PATCH; lastServicedAt is backend-managed.
 export interface UpdateEquipmentRequest {
-  manufacturerId?: string;
-  equipmentType?: string;
-  modelNumber?: string;
-  serialNumber?: string;
-  installationDate?: string;
-  warrantyExpiration?: string;
-  location?: string;
+  name?: string;
+  description?: string | null;
+  make?: string | null;
+  model?: string | null;
+  serialNumber?: string | null;
+  assetTag?: string | null;
+  parentId?: string | null;
+  equipmentTypeId?: string | null;
+  equipmentCategoryId?: string | null;
+  locationOnSite?: string | null;
+  installDate?: string | null;
   status?: EquipmentStatus;
-  notes?: string;
+  profileImageUrl?: string | null;
+  attributes?: string;
+}
+
+export type EquipmentSortField =
+  | 'name'
+  | 'createdAt'
+  | 'updatedAt'
+  | 'lastServicedAt'
+  | 'installDate';
+
+export type EquipmentSortDirection = 'asc' | 'desc';
+
+export interface ListEquipmentParams {
+  serviceLocationId?: string;
+  equipmentTypeId?: string;
+  equipmentCategoryId?: string;
+  search?: string;
+  status?: EquipmentStatus;
+  sortBy?: EquipmentSortField;
+  sortDir?: EquipmentSortDirection;
+  page?: number;
+  size?: number;
+}
+
+function cleanParams(params?: ListEquipmentParams): Record<string, string | number | boolean> {
+  if (!params) return {};
+  const out: Record<string, string | number | boolean> = {};
+  for (const [key, value] of Object.entries(params)) {
+    if (value === undefined || value === null || value === '') continue;
+    out[key] = value;
+  }
+  return out;
 }
 
 export const equipmentApi = {
-  getAll: async (customerId?: string): Promise<Equipment[]> => {
-    const params = customerId ? { customerId } : {};
-    const response = await apiClient.get<Equipment[]>('/equipment', { params });
+  list: async (params?: ListEquipmentParams): Promise<Page<EquipmentSummary>> => {
+    const response = await apiClient.get<Page<EquipmentSummary>>('/equipment', {
+      params: cleanParams(params),
+    });
     return response.data;
   },
 
@@ -73,7 +136,7 @@ export const equipmentApi = {
   },
 
   update: async (id: string, request: UpdateEquipmentRequest): Promise<Equipment> => {
-    const response = await apiClient.put<Equipment>(`/equipment/${id}`, request);
+    const response = await apiClient.patch<Equipment>(`/equipment/${id}`, request);
     return response.data;
   },
 
@@ -82,7 +145,127 @@ export const equipmentApi = {
   },
 };
 
+// ========== EQUIPMENT TYPES (taxonomy) ==========
+
+export interface EquipmentType {
+  id: string;
+  tenantId: string;
+  name: string;
+  sortOrder: number;
+  archivedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateEquipmentTypeRequest {
+  name: string;
+  sortOrder?: number;
+}
+
+export interface UpdateEquipmentTypeRequest {
+  name?: string;
+  sortOrder?: number;
+}
+
+export const equipmentTypesApi = {
+  getAll: async (): Promise<EquipmentType[]> => {
+    const response = await apiClient.get<EquipmentType[]>('/equipment/config/types');
+    return response.data;
+  },
+
+  create: async (request: CreateEquipmentTypeRequest): Promise<EquipmentType> => {
+    const response = await apiClient.post<EquipmentType>('/equipment/config/types', request);
+    return response.data;
+  },
+
+  update: async (id: string, request: UpdateEquipmentTypeRequest): Promise<EquipmentType> => {
+    const response = await apiClient.patch<EquipmentType>(`/equipment/config/types/${id}`, request);
+    return response.data;
+  },
+
+  delete: async (id: string): Promise<void> => {
+    await apiClient.delete(`/equipment/config/types/${id}`);
+  },
+
+  reorder: async (orderedIds: string[]): Promise<EquipmentType[]> => {
+    const response = await apiClient.post<EquipmentType[]>(
+      '/equipment/config/types/reorder',
+      orderedIds
+    );
+    return response.data;
+  },
+};
+
+// ========== EQUIPMENT CATEGORIES (taxonomy) ==========
+
+export interface EquipmentCategory {
+  id: string;
+  tenantId: string;
+  equipmentTypeId: string;
+  name: string;
+  sortOrder: number;
+  archivedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateEquipmentCategoryRequest {
+  equipmentTypeId: string;
+  name: string;
+  sortOrder?: number;
+}
+
+export interface UpdateEquipmentCategoryRequest {
+  name?: string;
+  sortOrder?: number;
+}
+
+export const equipmentCategoriesApi = {
+  getAll: async (equipmentTypeId?: string): Promise<EquipmentCategory[]> => {
+    const params = equipmentTypeId ? { equipmentTypeId } : undefined;
+    const response = await apiClient.get<EquipmentCategory[]>('/equipment/config/categories', {
+      params,
+    });
+    return response.data;
+  },
+
+  create: async (request: CreateEquipmentCategoryRequest): Promise<EquipmentCategory> => {
+    const response = await apiClient.post<EquipmentCategory>(
+      '/equipment/config/categories',
+      request
+    );
+    return response.data;
+  },
+
+  update: async (
+    id: string,
+    request: UpdateEquipmentCategoryRequest
+  ): Promise<EquipmentCategory> => {
+    const response = await apiClient.patch<EquipmentCategory>(
+      `/equipment/config/categories/${id}`,
+      request
+    );
+    return response.data;
+  },
+
+  delete: async (id: string): Promise<void> => {
+    await apiClient.delete(`/equipment/config/categories/${id}`);
+  },
+
+  reorder: async (
+    equipmentTypeId: string,
+    orderedIds: string[]
+  ): Promise<EquipmentCategory[]> => {
+    const response = await apiClient.post<EquipmentCategory[]>(
+      '/equipment/config/categories/reorder',
+      { equipmentTypeId, orderedIds }
+    );
+    return response.data;
+  },
+};
+
 // ========== PARTS INVENTORY ==========
+// Lives on inventory-service (formerly equipment-service) at /api/v1/inventory/*.
 
 export interface PartsInventory {
   id: string;
@@ -137,35 +320,35 @@ export const partsInventoryApi = {
     const params: Record<string, string | boolean> = {};
     if (warehouseId) params.warehouseId = warehouseId;
     if (needsReorder !== undefined) params.needsReorder = needsReorder;
-    const response = await apiClient.get<PartsInventory[]>('/equipment/parts-inventory', { params });
+    const response = await apiClient.get<PartsInventory[]>('/inventory/parts-inventory', { params });
     return response.data;
   },
 
   getById: async (id: string): Promise<PartsInventory> => {
-    const response = await apiClient.get<PartsInventory>(`/equipment/parts-inventory/${id}`);
+    const response = await apiClient.get<PartsInventory>(`/inventory/parts-inventory/${id}`);
     return response.data;
   },
 
   create: async (request: CreatePartsInventoryRequest): Promise<PartsInventory> => {
-    const response = await apiClient.post<PartsInventory>('/equipment/parts-inventory', request);
+    const response = await apiClient.post<PartsInventory>('/inventory/parts-inventory', request);
     return response.data;
   },
 
   update: async (id: string, request: UpdatePartsInventoryRequest): Promise<PartsInventory> => {
-    const response = await apiClient.put<PartsInventory>(`/equipment/parts-inventory/${id}`, request);
+    const response = await apiClient.put<PartsInventory>(`/inventory/parts-inventory/${id}`, request);
     return response.data;
   },
 
   adjustQuantity: async (id: string, adjustment: number): Promise<PartsInventory> => {
     const response = await apiClient.post<PartsInventory>(
-      `/equipment/parts-inventory/${id}/adjust-quantity`,
+      `/inventory/parts-inventory/${id}/adjust-quantity`,
       { adjustment }
     );
     return response.data;
   },
 
   delete: async (id: string): Promise<void> => {
-    await apiClient.delete(`/equipment/parts-inventory/${id}`);
+    await apiClient.delete(`/inventory/parts-inventory/${id}`);
   },
 };
 
@@ -216,33 +399,35 @@ export interface UpdateWarehouseRequest {
 
 export const warehousesApi = {
   getAll: async (): Promise<Warehouse[]> => {
-    const response = await apiClient.get<Warehouse[]>('/equipment/warehouses');
+    const response = await apiClient.get<Warehouse[]>('/inventory/warehouses');
     return response.data;
   },
 
   getById: async (id: string): Promise<Warehouse> => {
-    const response = await apiClient.get<Warehouse>(`/equipment/warehouses/${id}`);
+    const response = await apiClient.get<Warehouse>(`/inventory/warehouses/${id}`);
     return response.data;
   },
 
   create: async (request: CreateWarehouseRequest): Promise<Warehouse> => {
-    const response = await apiClient.post<Warehouse>('/equipment/warehouses', request);
+    const response = await apiClient.post<Warehouse>('/inventory/warehouses', request);
     return response.data;
   },
 
   update: async (id: string, request: UpdateWarehouseRequest): Promise<Warehouse> => {
-    const response = await apiClient.put<Warehouse>(`/equipment/warehouses/${id}`, request);
+    const response = await apiClient.put<Warehouse>(`/inventory/warehouses/${id}`, request);
     return response.data;
   },
 
   delete: async (id: string): Promise<void> => {
-    await apiClient.delete(`/equipment/warehouses/${id}`);
+    await apiClient.delete(`/inventory/warehouses/${id}`);
   },
 };
 
-// Export combined API
+// Combined export for convenience
 export const allEquipmentApis = {
   equipment: equipmentApi,
+  equipmentTypes: equipmentTypesApi,
+  equipmentCategories: equipmentCategoriesApi,
   partsInventory: partsInventoryApi,
   warehouses: warehousesApi,
 };

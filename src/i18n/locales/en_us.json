@@ -354,12 +354,22 @@
       "warehouse": "Warehouse",
       "warehouses": "Warehouses"
     },
+    "filter": {
+      "allCategories": "All Categories",
+      "allTypes": "All Types"
+    },
     "form": {
+      "assetTag": "Asset Tag",
+      "category": "Category",
       "customer": "Customer",
       "equipmentType": "Equipment Type",
+      "installDate": "Install Date",
       "locationBin": "Bin Location",
       "location": "Location",
+      "locationOnSite": "Location on Site",
+      "make": "Make",
       "manager": "Manager Name",
+      "model": "Model",
       "modelNumber": "Model Number",
       "partName": "Part Name",
       "partNumber": "Part Number",
@@ -367,20 +377,31 @@
       "reorderPoint": "Reorder Point",
       "reorderQuantity": "Reorder Quantity",
       "serialNumber": "Serial Number",
+      "serviceLocation": "Service Location",
+      "type": "Type",
       "unitCost": "Unit Cost",
       "warehouse": "Warehouse"
     },
+    "status": {
+      "active": "Active",
+      "retired": "Retired"
+    },
     "table": {
+      "category": "Category",
       "customer": "Customer",
       "equipmentType": "Equipment Type",
+      "lastServiced": "Last Serviced",
       "location": "Location",
+      "makeModel": "Make · Model",
       "manager": "Manager",
       "modelNumber": "Model",
+      "name": "Name",
       "partName": "Part Name",
       "partNumber": "Part Number",
       "quantity": "Quantity",
       "reorderPoint": "Reorder Point",
       "serialNumber": "Serial Number",
+      "type": "Type",
       "unitCost": "Unit Cost",
       "warehouse": "Warehouse"
     },

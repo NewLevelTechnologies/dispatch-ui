@@ -8,7 +8,6 @@ const mockRecurringOrdersGetAll = vi.fn();
 const mockRecurringOrdersCreate = vi.fn();
 const mockRecurringOrdersUpdate = vi.fn();
 const mockRecurringOrdersDelete = vi.fn();
-const mockEquipmentGetAll = vi.fn();
 
 vi.mock('../api/schedulingApi', () => ({
   recurringOrdersApi: {
@@ -16,11 +15,6 @@ vi.mock('../api/schedulingApi', () => ({
     create: (...args: unknown[]) => mockRecurringOrdersCreate(...args),
     update: (...args: unknown[]) => mockRecurringOrdersUpdate(...args),
     delete: (...args: unknown[]) => mockRecurringOrdersDelete(...args),
-  },
-}));
-vi.mock('../api/equipmentApi', () => ({
-  equipmentApi: {
-    getAll: (...args: unknown[]) => mockEquipmentGetAll(...args),
   },
 }));
 vi.mock('../api/client');
@@ -51,16 +45,10 @@ const mockCustomers = [
   { id: 'c2', name: 'Jane Smith' },
 ];
 
-const mockEquipment = [
-  { id: 'e1', equipmentType: 'HVAC', modelNumber: 'AC-100' },
-  { id: 'e2', equipmentType: 'Refrigerator', modelNumber: 'RF-200' },
-];
-
 describe('RecurringOrdersPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(apiClient.get).mockResolvedValue({ data: mockCustomers });
-    mockEquipmentGetAll.mockResolvedValue(mockEquipment);
   });
 
   it('renders the page title and add button', async () => {
@@ -136,9 +124,6 @@ describe('RecurringOrdersPage', () => {
     // Fill in required form fields to test handleSubmit
     const customerSelect = screen.getByLabelText(/customer/i);
     await user.selectOptions(customerSelect, 'c1');
-
-    const equipmentSelect = screen.getByLabelText(/equipment/i);
-    await user.selectOptions(equipmentSelect, 'e1');
 
     const submitButton = screen.getByRole('button', { name: /create/i });
     await user.click(submitButton);
@@ -229,7 +214,7 @@ describe('RecurringOrdersPage', () => {
     expect(rows.length).toBeGreaterThan(2); // Header + 2 data rows
   });
 
-  it('resolves customer and equipment names', async () => {
+  it('resolves customer names', async () => {
     mockRecurringOrdersGetAll.mockResolvedValue(mockRecurringOrders);
 
     renderWithProviders(<RecurringOrdersPage />);
@@ -241,10 +226,6 @@ describe('RecurringOrdersPage', () => {
     // Customer names should be resolved via getCustomerName
     expect(screen.getByText('John Doe')).toBeInTheDocument();
     expect(screen.getByText('Jane Smith')).toBeInTheDocument();
-
-    // Equipment types should be resolved via getEquipmentType
-    expect(screen.getByText('HVAC')).toBeInTheDocument();
-    expect(screen.getByText('Refrigerator')).toBeInTheDocument();
   });
 
   it('handles delete confirmation', async () => {
