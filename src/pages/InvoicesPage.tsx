@@ -15,17 +15,8 @@ import { Select } from '../components/catalyst/select';
 import { Textarea } from '../components/catalyst/textarea';
 import { InvoiceStatus, invoicesApi } from '../api/financialApi';
 import type { Invoice, CreateInvoiceRequest, CreateInvoiceLineItemRequest } from '../api/financialApi';
-import apiClient from '../api/client';
-
-interface Customer {
-  id: string;
-  name: string;
-}
-
-interface WorkOrder {
-  id: string;
-  description: string;
-}
+import { customerApi } from '../api/customerApi';
+import { workOrderApi } from '../api/workOrderApi';
 
 export default function InvoicesPage() {
   const queryClient = useQueryClient();
@@ -64,18 +55,18 @@ export default function InvoicesPage() {
   });
 
   const { data: customers = [] } = useQuery({
-    queryKey: ['customers'],
+    queryKey: ['invoice-form-customers'],
     queryFn: async () => {
-      const response = await apiClient.get<Customer[]>('/customers');
-      return response.data;
+      const page = await customerApi.getAllPaginated({ limit: 200, status: 'ACTIVE' });
+      return page.content;
     },
   });
 
   const { data: workOrders = [] } = useQuery({
-    queryKey: ['work-orders'],
+    queryKey: ['invoice-form-work-orders'],
     queryFn: async () => {
-      const response = await apiClient.get<WorkOrder[]>('/work-orders');
-      return response.data;
+      const page = await workOrderApi.getAll({ size: 200 });
+      return page.content;
     },
   });
 
@@ -338,7 +329,9 @@ export default function InvoicesPage() {
                   <option value="">{t('common.none')}</option>
                   {workOrders.map((wo) => (
                     <option key={wo.id} value={wo.id}>
-                      {wo.description || wo.id}
+                      {wo.workOrderNumber
+                        ? `${wo.workOrderNumber}${wo.customer?.name ? ` — ${wo.customer.name}` : ''}`
+                        : wo.id}
                     </option>
                   ))}
                 </Select>

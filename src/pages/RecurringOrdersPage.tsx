@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { EllipsisVerticalIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
-import apiClient from '../api/client';
+import { customerApi } from '../api/customerApi';
 import AppLayout from '../components/AppLayout';
 import { Heading } from '../components/catalyst/heading';
 import { Button } from '../components/catalyst/button';
@@ -20,11 +20,6 @@ import {
   type CreateRecurringOrderRequest,
   type UpdateRecurringOrderRequest,
 } from '../api/schedulingApi';
-
-interface Customer {
-  id: string;
-  name: string;
-}
 
 export default function RecurringOrdersPage() {
   const queryClient = useQueryClient();
@@ -46,10 +41,10 @@ export default function RecurringOrdersPage() {
   });
 
   const { data: customers = [] } = useQuery({
-    queryKey: ['customers'],
+    queryKey: ['recurring-orders-form-customers'],
     queryFn: async () => {
-      const response = await apiClient.get<Customer[]>('/customers');
-      return response.data;
+      const page = await customerApi.getAllPaginated({ limit: 200, status: 'ACTIVE' });
+      return page.content;
     },
   });
 
