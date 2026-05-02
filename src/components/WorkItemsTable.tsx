@@ -1,3 +1,4 @@
+import { Link as RouterLink } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
   type StatusWorkflowRule,
@@ -116,7 +117,12 @@ export default function WorkItemsTable({
               )}
               {wi.equipment && (
                 <div className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-                  {wi.equipment.name}
+                  <RouterLink
+                    to={`/equipment/${wi.equipment.id}`}
+                    className="hover:text-blue-600 hover:underline dark:hover:text-blue-400"
+                  >
+                    {wi.equipment.name}
+                  </RouterLink>
                 </div>
               )}
             </TableCell>

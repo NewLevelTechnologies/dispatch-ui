@@ -107,6 +107,13 @@ export default function CustomerDetailPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['equipment', { customerId: id }] });
     },
+    onError: (err: unknown) => {
+      const msg =
+        err instanceof Error && 'response' in err
+          ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
+          : undefined;
+      alert(msg || t('common.form.errorDelete', { entity: getName('equipment') }));
+    },
   });
 
   const handleEditEquipment = async (item: EquipmentSummary) => {
@@ -194,7 +201,14 @@ export default function CustomerDetailPage() {
           <TableBody>
             {equipment.map((item) => (
               <TableRow key={item.id}>
-                <TableCell className="font-medium">{item.name}</TableCell>
+                <TableCell className="font-medium">
+                  <RouterLink
+                    to={`/equipment/${item.id}`}
+                    className="text-zinc-700 hover:text-blue-600 hover:underline dark:text-zinc-300 dark:hover:text-blue-400"
+                  >
+                    {item.name}
+                  </RouterLink>
+                </TableCell>
                 <TableCell>
                   {item.serviceLocationId ? (
                     <RouterLink

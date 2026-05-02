@@ -9,6 +9,11 @@ const mockGetById = vi.fn();
 const mockUpdate = vi.fn();
 const mockTypesGetAll = vi.fn();
 const mockCategoriesGetAll = vi.fn();
+const mockFiltersGetAll = vi.fn();
+const mockFilterCreate = vi.fn();
+const mockFilterUpdate = vi.fn();
+const mockFilterDelete = vi.fn();
+const mockFilterSizesGetAll = vi.fn();
 
 vi.mock('../api/equipmentApi', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../api/equipmentApi')>();
@@ -23,6 +28,15 @@ vi.mock('../api/equipmentApi', async (importOriginal) => {
     },
     equipmentCategoriesApi: {
       getAll: (...args: unknown[]) => mockCategoriesGetAll(...args),
+    },
+    equipmentFiltersApi: {
+      getAll: (...args: unknown[]) => mockFiltersGetAll(...args),
+      create: (...args: unknown[]) => mockFilterCreate(...args),
+      update: (...args: unknown[]) => mockFilterUpdate(...args),
+      delete: (...args: unknown[]) => mockFilterDelete(...args),
+    },
+    tenantFilterSizesApi: {
+      getAll: (...args: unknown[]) => mockFilterSizesGetAll(...args),
     },
   };
 });
@@ -72,6 +86,8 @@ describe('EquipmentDetailPage', () => {
     mockCategoriesGetAll.mockResolvedValue([
       { id: 'c-furnace', tenantId: 't', equipmentTypeId: 't-hvac', name: 'Furnace', sortOrder: 0, archivedAt: null, createdAt: '', updatedAt: '' },
     ]);
+    mockFiltersGetAll.mockResolvedValue([]);
+    mockFilterSizesGetAll.mockResolvedValue([]);
   });
 
   it('shows loading state while equipment loads', () => {
@@ -175,7 +191,7 @@ describe('EquipmentDetailPage', () => {
     });
   });
 
-  it('switches to a placeholder for non-overview tabs', async () => {
+  it('switches to a placeholder for service-history and components tabs', async () => {
     mockGetById.mockResolvedValue(baseEquipment);
     const user = userEvent.setup();
     renderPage();
@@ -184,8 +200,338 @@ describe('EquipmentDetailPage', () => {
       expect(screen.getByRole('heading', { name: 'Upstairs Furnace' })).toBeInTheDocument();
     });
 
-    await user.click(screen.getByRole('button', { name: /^filters$/i }));
+    await user.click(screen.getByRole('button', { name: /^service history/i }));
     expect(screen.getByText(/coming soon/i)).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /^components/i }));
+    expect(screen.getByText(/coming soon/i)).toBeInTheDocument();
+  });
+
+  it('renders empty state on the filters tab when no filters exist', async () => {
+    mockGetById.mockResolvedValue(baseEquipment);
+    const user = userEvent.setup();
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Upstairs Furnace' })).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole('button', { name: /^filters/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/no filters added yet/i)).toBeInTheDocument();
+    });
+    // No quick-add chips when no tenant filter sizes are configured.
+    expect(screen.queryByText(/quick add:/i)).not.toBeInTheDocument();
+  });
+
+  it('renders the filter list and tab count badge', async () => {
+    mockGetById.mockResolvedValue(baseEquipment);
+    mockFiltersGetAll.mockResolvedValue([
+      {
+        id: 'f-1',
+        equipmentId: 'eq-1',
+        lengthIn: 20,
+        widthIn: 25,
+        thicknessIn: 1,
+        quantity: 2,
+        label: 'Return air',
+      },
+    ]);
+    const user = userEvent.setup();
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Upstairs Furnace' })).toBeInTheDocument();
+    });
+
+    // Tab badge shows the count even before navigating.
+    const filtersTab = await screen.findByRole('button', { name: /^filters\s*1$/i });
+    await user.click(filtersTab);
+
+    await waitFor(() => {
+      expect(screen.getByText('20 × 25 × 1')).toBeInTheDocument();
+    });
+    expect(screen.getByText('Return air')).toBeInTheDocument();
+  });
+
+  it('renders quick-add chips and pre-fills dimensions when one is clicked', async () => {
+    mockGetById.mockResolvedValue(baseEquipment);
+    mockFilterSizesGetAll.mockResolvedValue([
+      {
+        id: 's-1',
+        tenantId: 't',
+        lengthIn: 16,
+        widthIn: 20,
+        thicknessIn: 1,
+        sortOrder: 0,
+        archivedAt: null,
+        createdAt: '',
+      },
+    ]);
+    const user = userEvent.setup();
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Upstairs Furnace' })).toBeInTheDocument();
+    });
+    await user.click(screen.getByRole('button', { name: /^filters/i }));
+
+    const chip = await screen.findByRole('button', { name: '16 × 20 × 1' });
+    await user.click(chip);
+
+    // Dialog opens with dimensions pre-filled.
+    const dialog = await screen.findByRole('dialog');
+    expect(dialog).toBeInTheDocument();
+    const lengthInput = screen.getByLabelText(/length/i) as HTMLInputElement;
+    const widthInput = screen.getByLabelText(/width/i) as HTMLInputElement;
+    const thicknessInput = screen.getByLabelText(/thickness/i) as HTMLInputElement;
+    expect(lengthInput.value).toBe('16');
+    expect(widthInput.value).toBe('20');
+    expect(thicknessInput.value).toBe('1');
+  });
+
+  it('deletes a filter after confirmation', async () => {
+    mockGetById.mockResolvedValue(baseEquipment);
+    mockFiltersGetAll.mockResolvedValue([
+      {
+        id: 'f-1',
+        equipmentId: 'eq-1',
+        lengthIn: 20,
+        widthIn: 25,
+        thicknessIn: 1,
+        quantity: 1,
+        label: null,
+      },
+    ]);
+    mockFilterDelete.mockResolvedValue(undefined);
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const user = userEvent.setup();
+
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Upstairs Furnace' })).toBeInTheDocument();
+    });
+    await user.click(screen.getByRole('button', { name: /^filters/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText('20 × 25 × 1')).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole('button', { name: /more options/i }));
+    const deleteItem = await screen.findByRole('menuitem', { name: /delete/i });
+    await user.click(deleteItem);
+
+    await waitFor(() => {
+      expect(confirmSpy).toHaveBeenCalled();
+      expect(mockFilterDelete).toHaveBeenCalledWith('eq-1', 'f-1');
+    });
+    confirmSpy.mockRestore();
+  });
+
+  it('inline-edits a sweep of text fields (model, serial, asset tag, location on site, description)', async () => {
+    mockGetById.mockResolvedValue(baseEquipment);
+    mockUpdate.mockResolvedValue(baseEquipment);
+    const user = userEvent.setup();
+    renderPage();
+
+    await waitFor(() => expect(screen.getByText('AC-100')).toBeInTheDocument());
+
+    await user.click(screen.getByRole('button', { name: /^model$/i }));
+    const modelInput = await screen.findByRole('textbox', { name: /^model$/i });
+    await user.clear(modelInput);
+    await user.type(modelInput, 'AC-200');
+    modelInput.blur();
+    await waitFor(() => {
+      expect(mockUpdate).toHaveBeenCalledWith('eq-1', { model: 'AC-200' });
+    });
+
+    await user.click(screen.getByRole('button', { name: /serial number/i }));
+    const serialInput = await screen.findByRole('textbox', { name: /serial number/i });
+    await user.clear(serialInput);
+    await user.type(serialInput, 'SN999');
+    serialInput.blur();
+    await waitFor(() => {
+      expect(mockUpdate).toHaveBeenCalledWith('eq-1', { serialNumber: 'SN999' });
+    });
+
+    await user.click(screen.getByRole('button', { name: /asset tag/i }));
+    const tagInput = await screen.findByRole('textbox', { name: /asset tag/i });
+    await user.clear(tagInput);
+    await user.type(tagInput, 'TAG-9');
+    tagInput.blur();
+    await waitFor(() => {
+      expect(mockUpdate).toHaveBeenCalledWith('eq-1', { assetTag: 'TAG-9' });
+    });
+
+    await user.click(screen.getByRole('button', { name: /location on site/i }));
+    const locInput = await screen.findByRole('textbox', { name: /location on site/i });
+    await user.clear(locInput);
+    await user.type(locInput, 'Roof');
+    locInput.blur();
+    await waitFor(() => {
+      expect(mockUpdate).toHaveBeenCalledWith('eq-1', { locationOnSite: 'Roof' });
+    });
+
+    await user.click(screen.getByRole('button', { name: /description/i }));
+    const descInput = await screen.findByRole('textbox', { name: /description/i });
+    await user.clear(descInput);
+    await user.type(descInput, 'Updated note');
+    descInput.blur();
+    await waitFor(() => {
+      expect(mockUpdate).toHaveBeenCalledWith('eq-1', { description: 'Updated note' });
+    });
+  });
+
+  it('inline-edits date fields and warranty details', async () => {
+    mockGetById.mockResolvedValue(baseEquipment);
+    mockUpdate.mockResolvedValue(baseEquipment);
+    const user = userEvent.setup();
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Upstairs Furnace' })).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole('button', { name: /install date/i }));
+    const installInput = await screen.findByRole('textbox', { name: /install date/i });
+    await user.clear(installInput);
+    await user.type(installInput, '2024-03-15');
+    installInput.blur();
+    await waitFor(() => {
+      expect(mockUpdate).toHaveBeenCalledWith('eq-1', { installDate: '2024-03-15' });
+    });
+
+    await user.click(screen.getByRole('button', { name: /warranty expires/i }));
+    const warrInput = await screen.findByRole('textbox', { name: /warranty expires/i });
+    await user.clear(warrInput);
+    await user.type(warrInput, '2030-01-01');
+    warrInput.blur();
+    await waitFor(() => {
+      expect(mockUpdate).toHaveBeenCalledWith('eq-1', { warrantyExpiresAt: '2030-01-01' });
+    });
+
+    await user.click(screen.getByRole('button', { name: /warranty details/i }));
+    const detailsInput = await screen.findByRole('textbox', { name: /warranty details/i });
+    await user.clear(detailsInput);
+    await user.type(detailsInput, '10-year compressor');
+    detailsInput.blur();
+    await waitFor(() => {
+      expect(mockUpdate).toHaveBeenCalledWith('eq-1', { warrantyDetails: '10-year compressor' });
+    });
+  });
+
+  it('inline-edits the status select and clearing the category', async () => {
+    mockGetById.mockResolvedValue(baseEquipment);
+    mockUpdate.mockResolvedValue(baseEquipment);
+    const user = userEvent.setup();
+    renderPage();
+
+    await waitFor(() => expect(screen.getByText('Furnace')).toBeInTheDocument());
+
+    await user.click(screen.getByRole('button', { name: /^status/i }));
+    const statusSelect = await screen.findByRole('combobox', { name: /^status/i });
+    await user.selectOptions(statusSelect, 'RETIRED');
+    await waitFor(() => {
+      expect(mockUpdate).toHaveBeenCalledWith('eq-1', { status: 'RETIRED' });
+    });
+
+    await user.click(screen.getByRole('button', { name: /^category/i }));
+    const categorySelect = await screen.findByRole('combobox', { name: /^category/i });
+    await user.selectOptions(categorySelect, '');
+    await waitFor(() => {
+      expect(mockUpdate).toHaveBeenCalledWith('eq-1', { equipmentCategoryId: null });
+    });
+  });
+
+  it('opens the Add Filter dialog from the Add Filter button', async () => {
+    mockGetById.mockResolvedValue(baseEquipment);
+    const user = userEvent.setup();
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Upstairs Furnace' })).toBeInTheDocument();
+    });
+    await user.click(screen.getByRole('button', { name: /^filters/i }));
+    await user.click(screen.getByRole('button', { name: /add filter/i }));
+
+    const dialog = await screen.findByRole('dialog');
+    expect(dialog).toBeInTheDocument();
+    expect((screen.getByLabelText(/length/i) as HTMLInputElement).value).toBe('');
+  });
+
+  it('opens the edit dialog for a filter row with values pre-filled', async () => {
+    mockGetById.mockResolvedValue(baseEquipment);
+    mockFiltersGetAll.mockResolvedValue([
+      {
+        id: 'f-1',
+        equipmentId: 'eq-1',
+        lengthIn: 16,
+        widthIn: 20,
+        thicknessIn: 1,
+        quantity: 4,
+        label: 'Pre-filter',
+      },
+    ]);
+    const user = userEvent.setup();
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Upstairs Furnace' })).toBeInTheDocument();
+    });
+    await user.click(screen.getByRole('button', { name: /^filters/i }));
+
+    await waitFor(() => expect(screen.getByText('16 × 20 × 1')).toBeInTheDocument());
+    await user.click(screen.getByRole('button', { name: /more options/i }));
+    const editItem = await screen.findByRole('menuitem', { name: /edit/i });
+    await user.click(editItem);
+
+    const dialog = await screen.findByRole('dialog');
+    expect(dialog).toBeInTheDocument();
+    expect((screen.getByLabelText(/length/i) as HTMLInputElement).value).toBe('16');
+    expect((screen.getByLabelText(/quantity/i) as HTMLInputElement).value).toBe('4');
+    expect((screen.getByLabelText(/label/i) as HTMLInputElement).value).toBe('Pre-filter');
+  });
+
+  it('alerts the backend message when filter delete fails', async () => {
+    mockGetById.mockResolvedValue(baseEquipment);
+    mockFiltersGetAll.mockResolvedValue([
+      {
+        id: 'f-1',
+        equipmentId: 'eq-1',
+        lengthIn: 20,
+        widthIn: 25,
+        thicknessIn: 1,
+        quantity: 1,
+        label: null,
+      },
+    ]);
+    mockFilterDelete.mockRejectedValue(
+      Object.assign(new Error('boom'), {
+        response: { data: { message: 'Filter is referenced by an open work order.' } },
+      })
+    );
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
+    const user = userEvent.setup();
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Upstairs Furnace' })).toBeInTheDocument();
+    });
+    await user.click(screen.getByRole('button', { name: /^filters/i }));
+    await waitFor(() => expect(screen.getByText('20 × 25 × 1')).toBeInTheDocument());
+
+    await user.click(screen.getByRole('button', { name: /more options/i }));
+    const deleteItem = await screen.findByRole('menuitem', { name: /delete/i });
+    await user.click(deleteItem);
+
+    await waitFor(() => {
+      expect(alertSpy).toHaveBeenCalledWith('Filter is referenced by an open work order.');
+    });
+    confirmSpy.mockRestore();
+    alertSpy.mockRestore();
   });
 
   it('alerts and stays in edit mode when PATCH fails', async () => {

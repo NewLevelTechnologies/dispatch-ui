@@ -1,28 +1,53 @@
 import { useState } from 'react';
 import { useParams, useNavigate, useLocation, Link as RouterLink } from 'react-router-dom';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import {
   equipmentApi,
   equipmentTypesApi,
   equipmentCategoriesApi,
+  equipmentFiltersApi,
+  tenantFilterSizesApi,
   EquipmentStatus,
+  type EquipmentFilter,
+  type TenantFilterSize,
   type UpdateEquipmentRequest,
 } from '../api';
 import { useGlossary } from '../contexts/GlossaryContext';
 import AppLayout from '../components/AppLayout';
 import TabNavigation from '../components/TabNavigation';
 import EditableField from '../components/EditableField';
+import EquipmentFilterFormDialog from '../components/EquipmentFilterFormDialog';
 import { Heading } from '../components/catalyst/heading';
 import { Text } from '../components/catalyst/text';
 import { Button } from '../components/catalyst/button';
 import { Badge } from '../components/catalyst/badge';
 import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '../components/catalyst/table';
+import {
+  Dropdown,
+  DropdownButton,
+  DropdownItem,
+  DropdownLabel,
+  DropdownMenu,
+} from '../components/catalyst/dropdown';
+import {
   DescriptionList,
   DescriptionTerm,
   DescriptionDetails,
 } from '../components/catalyst/description-list';
-import { ArrowLeftIcon, PhotoIcon } from '@heroicons/react/24/outline';
+import {
+  ArrowLeftIcon,
+  EllipsisVerticalIcon,
+  PhotoIcon,
+  PlusIcon,
+} from '@heroicons/react/24/outline';
 
 type TabId = 'overview' | 'filters' | 'service-history' | 'components';
 
@@ -35,6 +60,11 @@ function formatDate(iso: string | null | undefined): string {
   });
 }
 
+// JS Number.toString() naturally drops trailing zeros, so 20.00 → "20" and 1.5 stays "1.5".
+function formatInches(n: number): string {
+  return String(n);
+}
+
 export default function EquipmentDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -43,6 +73,11 @@ export default function EquipmentDetailPage() {
   const { getName } = useGlossary();
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<TabId>('overview');
+  const [isFilterDialogOpen, setIsFilterDialogOpen] = useState(false);
+  const [editingFilter, setEditingFilter] = useState<EquipmentFilter | null>(null);
+  const [prefilledSize, setPrefilledSize] = useState<
+    { lengthIn: number; widthIn: number; thicknessIn: number } | null
+  >(null);
 
   // Fall back to the equipment list when the user landed here directly (no in-app history).
   const handleBack = () => {
@@ -69,6 +104,34 @@ export default function EquipmentDetailPage() {
     queryKey: ['equipment-categories', equipment?.equipmentTypeId ?? ''],
     queryFn: () => equipmentCategoriesApi.getAll(equipment?.equipmentTypeId ?? undefined),
     enabled: Boolean(equipment?.equipmentTypeId),
+  });
+
+  // Per-equipment filter list and tenant-wide common sizes for the quick-add chips.
+  const { data: filters = [], isLoading: filtersLoading, error: filtersError } = useQuery({
+    queryKey: ['equipment-filters', id],
+    queryFn: () => equipmentFiltersApi.getAll(id!),
+    enabled: !!id,
+  });
+
+  const { data: filterSizes = [] } = useQuery({
+    queryKey: ['tenant-filter-sizes'],
+    queryFn: () => tenantFilterSizesApi.getAll(),
+  });
+  const activeFilterSizes = filterSizes.filter((s) => !s.archivedAt);
+
+  const deleteFilterMutation = useMutation({
+    mutationFn: (filterId: string) => equipmentFiltersApi.delete(id!, filterId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['equipment-filters', id] });
+      queryClient.invalidateQueries({ queryKey: ['equipment-detail', id] });
+    },
+    onError: (err: unknown) => {
+      const msg =
+        err instanceof Error && 'response' in err
+          ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
+          : undefined;
+      alert(msg || t('equipment.filters.errorDelete'));
+    },
   });
 
   // Single-field PATCH used by every EditableField on the page. EditableField
@@ -143,10 +206,41 @@ export default function EquipmentDetailPage() {
 
   const tabs = [
     { id: 'overview', label: t('equipment.tabs.overview') },
-    { id: 'filters', label: t('equipment.tabs.filters') },
+    { id: 'filters', label: t('equipment.tabs.filters'), count: filters.length },
     { id: 'service-history', label: t('equipment.tabs.serviceHistory') },
     { id: 'components', label: t('equipment.tabs.components') },
   ];
+
+  const openCreateFilter = () => {
+    setEditingFilter(null);
+    setPrefilledSize(null);
+    setIsFilterDialogOpen(true);
+  };
+
+  const openCreateFromSize = (size: TenantFilterSize) => {
+    setEditingFilter(null);
+    setPrefilledSize({
+      lengthIn: size.lengthIn,
+      widthIn: size.widthIn,
+      thicknessIn: size.thicknessIn,
+    });
+    setIsFilterDialogOpen(true);
+  };
+
+  const openEditFilter = (f: EquipmentFilter) => {
+    setEditingFilter(f);
+    setPrefilledSize(null);
+    setIsFilterDialogOpen(true);
+  };
+
+  const handleDeleteFilter = (f: EquipmentFilter) => {
+    if (window.confirm(t('equipment.filters.deleteConfirm'))) {
+      deleteFilterMutation.mutate(f.id);
+    }
+  };
+
+  const formatFilterSize = (f: { lengthIn: number; widthIn: number; thicknessIn: number }) =>
+    `${formatInches(f.lengthIn)} × ${formatInches(f.widthIn)} × ${formatInches(f.thicknessIn)}`;
 
   const typeOptions = [
     { value: '', label: t('common.none') },
@@ -386,7 +480,98 @@ export default function EquipmentDetailPage() {
             </div>
           )}
 
-          {activeTab !== 'overview' && (
+          {activeTab === 'filters' && (
+            <div>
+              <div className="mb-3 flex items-center justify-between gap-3">
+                {activeFilterSizes.length > 0 ? (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Text className="text-xs uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                      {t('equipment.filters.quickAdd')}:
+                    </Text>
+                    {activeFilterSizes.map((s) => (
+                      <button
+                        key={s.id}
+                        type="button"
+                        onClick={() => openCreateFromSize(s)}
+                        className="rounded-full bg-zinc-100 px-2.5 py-1 text-xs font-medium text-zinc-700 ring-1 ring-inset ring-zinc-200 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-200 dark:ring-zinc-700 dark:hover:bg-zinc-700"
+                      >
+                        {formatFilterSize(s)}
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <span />
+                )}
+                <Button onClick={openCreateFilter}>
+                  <PlusIcon className="size-4" />
+                  {t('equipment.filters.addFilter')}
+                </Button>
+              </div>
+
+              {filtersError && (
+                <div className="rounded-lg bg-red-50 p-3 ring-1 ring-red-200 dark:bg-red-950/10 dark:ring-red-900/20">
+                  <Text className="text-sm text-red-800 dark:text-red-400">
+                    {t('equipment.filters.errorLoading')}: {(filtersError as Error).message}
+                  </Text>
+                </div>
+              )}
+
+              {!filtersError && filtersLoading ? (
+                <div className="rounded-lg border border-zinc-200 p-6 text-center dark:border-zinc-800">
+                  <Text className="text-zinc-500 dark:text-zinc-400">
+                    {t('equipment.filters.loading')}
+                  </Text>
+                </div>
+              ) : !filtersError && filters.length === 0 ? (
+                <div className="rounded-lg border border-dashed border-zinc-300 p-6 text-center dark:border-zinc-700">
+                  <Text className="text-zinc-600 dark:text-zinc-400">
+                    {t('equipment.filters.empty')}
+                  </Text>
+                </div>
+              ) : (
+                !filtersError && (
+                  <Table dense className="[--gutter:theme(spacing.1)] text-sm">
+                    <TableHead>
+                      <TableRow>
+                        <TableHeader>{t('equipment.filters.size')}</TableHeader>
+                        <TableHeader>{t('equipment.filters.quantity')}</TableHeader>
+                        <TableHeader>{t('equipment.filters.label')}</TableHeader>
+                        <TableHeader></TableHeader>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {filters.map((f) => (
+                        <TableRow key={f.id}>
+                          <TableCell className="font-mono">{formatFilterSize(f)}</TableCell>
+                          <TableCell>{f.quantity}</TableCell>
+                          <TableCell>{f.label || '—'}</TableCell>
+                          <TableCell>
+                            <div className="-mx-3 -my-1.5 sm:-mx-2.5">
+                              <Dropdown>
+                                <DropdownButton plain aria-label={t('common.moreOptions')}>
+                                  <EllipsisVerticalIcon className="size-5" />
+                                </DropdownButton>
+                                <DropdownMenu anchor="bottom end">
+                                  <DropdownItem onClick={() => openEditFilter(f)}>
+                                    <DropdownLabel>{t('common.edit')}</DropdownLabel>
+                                  </DropdownItem>
+                                  <DropdownItem onClick={() => handleDeleteFilter(f)}>
+                                    <DropdownLabel>{t('common.delete')}</DropdownLabel>
+                                  </DropdownItem>
+                                </DropdownMenu>
+                              </Dropdown>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )
+              )}
+            </div>
+          )}
+
+          {(activeTab === 'service-history' || activeTab === 'components') && (
             <div className="rounded-lg border border-dashed border-zinc-300 p-8 text-center dark:border-zinc-700">
               <Text className="text-zinc-600 dark:text-zinc-400">
                 {t('equipment.detail.tabComingSoon')}
@@ -395,6 +580,18 @@ export default function EquipmentDetailPage() {
           )}
         </div>
       </div>
+
+      <EquipmentFilterFormDialog
+        isOpen={isFilterDialogOpen}
+        onClose={() => {
+          setIsFilterDialogOpen(false);
+          setEditingFilter(null);
+          setPrefilledSize(null);
+        }}
+        equipmentId={id!}
+        filter={editingFilter}
+        prefilledSize={prefilledSize}
+      />
     </AppLayout>
   );
 }

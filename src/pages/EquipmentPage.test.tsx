@@ -273,6 +273,37 @@ describe('EquipmentPage', () => {
     confirmSpy.mockRestore();
   });
 
+  it('alerts the backend message when delete is blocked by FK', async () => {
+    mockEquipmentList.mockResolvedValue(page([summary('1', 'Upstairs Furnace')]));
+    mockEquipmentDelete.mockRejectedValue(
+      Object.assign(new Error('boom'), {
+        response: { data: { message: 'Equipment is in use by 3 work order items.' } },
+      })
+    );
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
+    const user = userEvent.setup();
+
+    renderWithProviders(<EquipmentPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Upstairs Furnace')).toBeInTheDocument();
+    });
+
+    const dropdownButtons = screen.getAllByRole('button', { name: /more options/i });
+    await user.click(dropdownButtons[0]);
+
+    const deleteButton = await screen.findByRole('menuitem', { name: /delete/i });
+    await user.click(deleteButton);
+
+    await waitFor(() => {
+      expect(alertSpy).toHaveBeenCalledWith('Equipment is in use by 3 work order items.');
+    });
+
+    confirmSpy.mockRestore();
+    alertSpy.mockRestore();
+  });
+
   it('debounces search input into the list query', async () => {
     mockEquipmentList.mockResolvedValue(page([summary('1', 'Upstairs Furnace')]));
     const user = userEvent.setup();
