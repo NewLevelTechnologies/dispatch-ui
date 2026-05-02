@@ -457,24 +457,29 @@ export default function WorkOrderFormDialog({ isOpen, onClose, workOrder, prefil
         <form onSubmit={handleSubmit} id="work-order-form" className="space-y-3">
           {!isEdit && (
             <>
-              {/* Radio Toggle: Existing vs New Customer */}
-              <Fieldset>
-                <Legend>{getName('customer')}</Legend>
-                <RadioGroup
-                  value={customerMode}
-                  onChange={(value) => setCustomerMode(value as 'existing' | 'new')}
-                  className="mt-2 flex gap-6"
-                >
-                  <RadioField>
-                    <Radio value="existing" />
-                    <Label>{t('workOrders.form.existingCustomer', { entity: getName('customer') })}</Label>
-                  </RadioField>
-                  <RadioField>
-                    <Radio value="new" />
-                    <Label>{t('workOrders.form.newCustomer', { entity: getName('customer') })}</Label>
-                  </RadioField>
-                </RadioGroup>
-              </Fieldset>
+              {/* Radio Toggle: Existing vs New Customer.
+                  Hidden when launched from a service-location detail page
+                  (prefilledServiceLocation) — the customer is already known
+                  in that flow, so the choice doesn't apply. */}
+              {!prefilledServiceLocation && (
+                <Fieldset>
+                  <Legend>{getName('customer')}</Legend>
+                  <RadioGroup
+                    value={customerMode}
+                    onChange={(value) => setCustomerMode(value as 'existing' | 'new')}
+                    className="mt-2 flex gap-6"
+                  >
+                    <RadioField>
+                      <Radio value="existing" />
+                      <Label>{t('workOrders.form.existingCustomer', { entity: getName('customer') })}</Label>
+                    </RadioField>
+                    <RadioField>
+                      <Radio value="new" />
+                      <Label>{t('workOrders.form.newCustomer', { entity: getName('customer') })}</Label>
+                    </RadioField>
+                  </RadioGroup>
+                </Fieldset>
+              )}
 
               {/* Conditional: Existing Customer - Service Location Picker */}
               {customerMode === 'existing' && (

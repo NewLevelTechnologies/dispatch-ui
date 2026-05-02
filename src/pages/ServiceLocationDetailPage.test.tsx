@@ -787,6 +787,9 @@ describe('ServiceLocationDetailPage', () => {
       expect(
         screen.getByDisplayValue(/Main Office.*123 Main St.*Springfield/i)
       ).toBeInTheDocument();
+      // The customer-mode toggle is hidden when prefilled — the customer is implied.
+      expect(screen.queryByRole('radio', { name: /existing customer/i })).not.toBeInTheDocument();
+      expect(screen.queryByRole('radio', { name: /new customer/i })).not.toBeInTheDocument();
     });
 
     it('clicking the equipment quick-stat switches to the equipment tab', async () => {
