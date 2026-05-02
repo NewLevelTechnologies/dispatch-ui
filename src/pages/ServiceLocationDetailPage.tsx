@@ -74,10 +74,10 @@ export default function ServiceLocationDetailPage() {
   });
 
   // Shared cache with the rendered list — one request, count + table both read it.
-  // Disabled until location loads (customerId ?? '' is falsy → enabled: false).
+  // Scope by serviceLocationId only; sending customerId alongside risks the backend
+  // treating the pair as OR and returning the customer's other locations' WOs.
   const { data: workOrdersData } = useQuery(
     workOrdersListQueryOptions({
-      customerId: location?.customerId ?? '',
       serviceLocationId: location?.id ?? '',
     })
   );
@@ -393,7 +393,6 @@ export default function ServiceLocationDetailPage() {
                   </Button>
                 </div>
                 <WorkOrdersList
-                  customerId={location.customerId}
                   serviceLocationId={location.id}
                   showLocation={false}
                 />

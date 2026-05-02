@@ -390,6 +390,27 @@ describe('ServiceLocationDetailPage', () => {
     });
   });
 
+  it('scopes work-orders fetch to serviceLocationId only (not customerId)', async () => {
+    // Regression: passing both customerId and serviceLocationId caused the backend to
+    // return all of the customer's work orders, leaking sibling locations' WOs into
+    // this location's tab. The page must filter by serviceLocationId only.
+    mockApiResponses();
+    renderDetailPage();
+
+    await waitFor(() => {
+      expect(screen.getByText('Main Office')).toBeInTheDocument();
+    });
+
+    const calls = vi.mocked(apiClient.get).mock.calls;
+    const workOrdersCall = calls.find(
+      ([url]) => typeof url === 'string' && url === '/work-orders'
+    );
+    expect(workOrdersCall).toBeDefined();
+    const params = (workOrdersCall![1] as { params?: Record<string, unknown> })?.params ?? {};
+    expect(params).toHaveProperty('serviceLocationId', 'location-1');
+    expect(params).not.toHaveProperty('customerId');
+  });
+
   it('switches to equipment tab', async () => {
     mockApiResponses();
     const user = userEvent.setup();

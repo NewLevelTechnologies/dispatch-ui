@@ -62,8 +62,12 @@ function formatAddress(address: { streetAddress: string; city: string; state: st
 }
 
 interface Props {
-  customerId: string;
-  /** When provided, narrows the list to WOs at this service location (server-side filter). */
+  /**
+   * Pass exactly one of `customerId` / `serviceLocationId` — whichever scope the
+   * page is on. Service location is the more specific filter and implies the
+   * customer, so service-location pages should NOT pass both.
+   */
+  customerId?: string;
   serviceLocationId?: string;
   /** Whether to render the Service Location column. Defaults to true. */
   showLocation?: boolean;
