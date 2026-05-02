@@ -107,6 +107,13 @@ export default function CustomerDetailPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['equipment', { customerId: id }] });
     },
+    onError: (err: unknown) => {
+      const msg =
+        err instanceof Error && 'response' in err
+          ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
+          : undefined;
+      alert(msg || t('common.form.errorDelete', { entity: getName('equipment') }));
+    },
   });
 
   const handleEditEquipment = async (item: EquipmentSummary) => {

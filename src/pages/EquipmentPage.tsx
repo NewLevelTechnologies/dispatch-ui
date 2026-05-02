@@ -83,6 +83,13 @@ export default function EquipmentPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['equipment'] });
     },
+    onError: (err: unknown) => {
+      const msg =
+        err instanceof Error && 'response' in err
+          ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
+          : undefined;
+      alert(msg || t('common.form.errorDelete', { entity: getName('equipment') }));
+    },
   });
 
   const handleAdd = () => {
