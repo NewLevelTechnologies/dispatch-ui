@@ -40,21 +40,13 @@ export default function EquipmentPicker({
   const [query, setQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
   const [isOpen, setIsOpen] = useState(false);
-  // Anchor the dropdown above the input when there isn't enough room below —
-  // inside dialogs the body clips an "absolute mt-1" panel onto the action row.
-  const [anchorUp, setAnchorUp] = useState(false);
   const [quickCreateOpen, setQuickCreateOpen] = useState(false);
   const [quickCreateInitialName, setQuickCreateInitialName] = useState('');
   const containerRef = useRef<HTMLDivElement>(null);
-
-  const openDropdown = () => {
-    const input = containerRef.current?.querySelector('input');
-    if (input) {
-      const rect = input.getBoundingClientRect();
-      setAnchorUp(window.innerHeight - rect.bottom < 280);
-    }
-    setIsOpen(true);
-  };
+  // After quick-create, Headless restores focus to this input; the auto-open
+  // onFocus would re-show the dropdown over the freshly selected equipment.
+  // Suppress the next focus-driven open so the picker shows the selection.
+  const skipNextFocusOpenRef = useRef(false);
 
   // Debounce query → backend search.
   useEffect(() => {
@@ -112,6 +104,7 @@ export default function EquipmentPicker({
     onChange(created);
     setQuickCreateOpen(false);
     setQuery('');
+    skipNextFocusOpenRef.current = true;
   };
 
   // The visible input value: free-text query when the user is typing, otherwise
@@ -125,22 +118,27 @@ export default function EquipmentPicker({
   return (
     <Field>
       {label && <Label>{label}</Label>}
-      <div ref={containerRef} className="relative">
+      <div ref={containerRef} className="relative" data-slot="control">
         <Input
           type="text"
           value={inputValue}
           onChange={(e) => {
             setQuery(e.target.value);
-            openDropdown();
+            setIsOpen(true);
           }}
           onFocus={() => {
+            if (skipNextFocusOpenRef.current) {
+              skipNextFocusOpenRef.current = false;
+              return;
+            }
             // Clear the displayed selection so the user can search; selection
             // is preserved unless they pick something else.
             if (value) setQuery('');
-            openDropdown();
+            setIsOpen(true);
           }}
           placeholder={t('equipment.picker.placeholder')}
           disabled={disabled || !serviceLocationId}
+          autoComplete="off"
         />
         {value && !isOpen && (
           <button
@@ -155,11 +153,7 @@ export default function EquipmentPicker({
         )}
 
         {isOpen && (
-          <div
-            className={`absolute z-10 w-full rounded-lg bg-white shadow-lg ring-1 ring-zinc-950/10 dark:bg-zinc-900 dark:ring-white/10 ${
-              anchorUp ? 'bottom-full mb-1' : 'mt-1'
-            }`}
-          >
+          <div className="absolute z-10 mt-1 w-full rounded-lg bg-white shadow-lg ring-1 ring-zinc-950/10 dark:bg-zinc-900 dark:ring-white/10">
             {isFetching && (
               <div className="p-3 text-sm text-zinc-600 dark:text-zinc-400">
                 {t('common.actions.loading', { entities: getName('equipment', true) })}
@@ -292,6 +286,12 @@ function EquipmentQuickCreateDialog({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    // React synthetic events bubble through the React component tree, not the
+    // DOM tree. Without this stop, submitting the portaled quick-create form
+    // would also trigger the outer WorkItemFormDialog's <form onSubmit> via
+    // the React tree — silently saving the work item before this POST has
+    // even completed.
+    e.stopPropagation();
     if (!name.trim()) return;
     createMutation.mutate();
   };
@@ -316,6 +316,7 @@ function EquipmentQuickCreateDialog({
               onChange={(e) => setName(e.target.value)}
               required
               autoFocus
+              autoComplete="off"
             />
           </Field>
           <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
