@@ -13,6 +13,7 @@ import ServiceLocationDetailPage from './pages/ServiceLocationDetailPage';
 import WorkOrdersPage from './pages/WorkOrdersPage';
 import WorkOrderDetailPage from './pages/WorkOrderDetailPage';
 import EquipmentPage from './pages/EquipmentPage';
+import EquipmentDetailPage from './pages/EquipmentDetailPage';
 import PartsInventoryPage from './pages/PartsInventoryPage';
 import WarehousesPage from './pages/WarehousesPage';
 import InvoicesPage from './pages/InvoicesPage';
@@ -106,6 +107,7 @@ function App() {
       <Route path="/work-orders" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<WorkOrdersPage />} />} />
       <Route path="/work-orders/:id" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<WorkOrderDetailPage />} />} />
       <Route path="/equipment" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<EquipmentPage />} />} />
+      <Route path="/equipment/:id" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<EquipmentDetailPage />} />} />
       <Route path="/parts-inventory" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<PartsInventoryPage />} />} />
       <Route path="/warehouses" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<WarehousesPage />} />} />
       <Route path="/invoices" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<InvoicesPage />} />} />

@@ -347,6 +347,16 @@
     "descriptionEquipment": "Manage customer equipment, parts inventory, and warehouses",
     "descriptionParts": "Manage parts inventory across warehouses",
     "descriptionWarehouses": "Manage warehouse locations and inventory storage",
+    "detail": {
+      "created": "Created",
+      "descriptionPlaceholder": "Add a description…",
+      "identification": "Identification",
+      "lastServiced": "Last Serviced",
+      "lifecycle": "Lifecycle",
+      "noProfileImage": "No profile image",
+      "profileImageAlt": "{{name}} profile image",
+      "tabComingSoon": "Coming soon."
+    },
     "lowStock": "Low Stock",
     "entities": {
       "part": "Part",
@@ -415,8 +425,12 @@
       "warehouse": "Warehouse"
     },
     "tabs": {
+      "components": "Components",
       "equipment": "Equipment",
+      "filters": "Filters",
+      "overview": "Overview",
       "partsInventory": "Parts Inventory",
+      "serviceHistory": "Service History",
       "warehouses": "Warehouses"
     }
   },
