@@ -214,4 +214,87 @@ describe('EquipmentPicker', () => {
     );
     expect(screen.getByLabelText('Equipment')).toBeDisabled();
   });
+
+  // Regression: React synthetic events bubble through the React tree, even
+  // across portals. Without stopPropagation on the inner quick-create form,
+  // submitting it would trigger the wrapping work-item form's onSubmit and
+  // save the work item before the equipment POST has even completed.
+  it('does not bubble the quick-create submit to a wrapping form', async () => {
+    mockEquipmentList.mockResolvedValue(page([]));
+    mockEquipmentCreate.mockResolvedValue({
+      id: 'eq-new',
+      name: 'Rooftop',
+      serviceLocationId: 'loc-1',
+      status: 'ACTIVE',
+    });
+    const outerSubmit = vi.fn((e: React.FormEvent) => e.preventDefault());
+    const user = userEvent.setup();
+
+    renderWithProviders(
+      <form onSubmit={outerSubmit}>
+        <EquipmentPicker
+          value={null}
+          onChange={vi.fn()}
+          serviceLocationId="loc-1"
+          label="Equipment"
+        />
+      </form>
+    );
+
+    await user.click(screen.getByLabelText('Equipment'));
+    await user.type(screen.getByLabelText('Equipment'), 'Rooftop');
+    await user.click(await screen.findByText(/Create new equipment/i));
+
+    // Quick-create dialog opens and we click its Create button.
+    await screen.findByRole('dialog');
+    await user.click(screen.getByRole('button', { name: /^create$/i }));
+
+    await waitFor(() => {
+      expect(mockEquipmentCreate).toHaveBeenCalled();
+    });
+    expect(outerSubmit).not.toHaveBeenCalled();
+  });
+
+  // Regression: Headless restores focus to the picker input after the
+  // quick-create dialog closes; the focus listener used to auto-open the
+  // dropdown, leaving the user staring at search results instead of the
+  // newly selected equipment.
+  it('does not reopen the dropdown after quick-create finishes', async () => {
+    mockEquipmentList.mockResolvedValue(page([summary('eq-existing', 'Existing')]));
+    mockEquipmentCreate.mockResolvedValue({
+      id: 'eq-new',
+      name: 'Rooftop',
+      serviceLocationId: 'loc-1',
+      status: 'ACTIVE',
+    });
+    const onChange = vi.fn();
+    const user = userEvent.setup();
+
+    renderWithProviders(
+      <EquipmentPicker
+        value={null}
+        onChange={onChange}
+        serviceLocationId="loc-1"
+        label="Equipment"
+      />
+    );
+
+    await user.click(screen.getByLabelText('Equipment'));
+    await user.type(screen.getByLabelText('Equipment'), 'Rooftop');
+    await user.click(await screen.findByText(/Create new equipment/i));
+    await screen.findByRole('dialog');
+    await user.click(screen.getByRole('button', { name: /^create$/i }));
+
+    // Wait for the create + onChange to settle.
+    await waitFor(() => {
+      expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ id: 'eq-new' }));
+    });
+
+    // After the quick-create dialog closes and Headless restores focus to the
+    // picker input, the dropdown should NOT be open. The "Existing" option
+    // was rendered while the dropdown was open earlier — assert it's gone now.
+    await waitFor(() => {
+      expect(screen.queryByText('Existing')).not.toBeInTheDocument();
+    });
+  });
 });
