@@ -347,13 +347,13 @@ export default function ServiceLocationDetailPage() {
                 <Subheading>{t('serviceLocations.detail.quickStats')}</Subheading>
                 <div className="mt-2 space-y-3">
                   <div>
-                    <Text className="text-xs">{t('serviceLocations.detail.totalEquipment')}</Text>
-                    <Strong className="mt-1 block text-lg">0</Strong>
+                    <Text className="text-xs">{getName('equipment', true)}</Text>
+                    <Strong className="mt-1 block text-lg">{equipmentPage?.totalElements ?? 0}</Strong>
                   </div>
                   <Divider />
                   <div>
-                    <Text className="text-xs">{t('common.actions.open', { entities: getName('work_order', true) })}</Text>
-                    <Strong className="mt-1 block text-lg">0</Strong>
+                    <Text className="text-xs">{getName('work_order', true)}</Text>
+                    <Strong className="mt-1 block text-lg">{workOrdersData?.totalElements ?? 0}</Strong>
                   </div>
                   <Divider />
                   <div>
