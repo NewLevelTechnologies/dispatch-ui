@@ -772,7 +772,7 @@ export default function CustomerDetailPage() {
           setEditingEquipment(null);
         }}
         equipment={editingEquipment}
-        lockedCustomerId={customer.id}
+        lockedCustomer={{ id: customer.id, name: customer.name }}
       />
     </AppLayout>
   );

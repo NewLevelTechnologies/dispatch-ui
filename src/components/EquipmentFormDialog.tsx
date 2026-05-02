@@ -6,20 +6,18 @@ import {
   equipmentApi,
   equipmentTypesApi,
   equipmentCategoriesApi,
-  customerApi,
   EquipmentStatus,
   type Equipment,
   type CreateEquipmentRequest,
   type UpdateEquipmentRequest,
-  type CustomerListDto,
-  type ServiceLocation,
+  type ServiceLocationSearchResult,
 } from '../api';
 import { Dialog, DialogActions, DialogBody, DialogDescription, DialogTitle } from './catalyst/dialog';
 import { Button } from './catalyst/button';
 import { Field, FieldGroup, Fieldset, Label } from './catalyst/fieldset';
 import { Input } from './catalyst/input';
 import { Select } from './catalyst/select';
-import { Textarea } from './catalyst/textarea';
+import ServiceLocationPicker from './ServiceLocationPicker';
 
 interface EquipmentFormDialogProps {
   isOpen: boolean;
@@ -27,44 +25,34 @@ interface EquipmentFormDialogProps {
   equipment?: Equipment | null;
   /**
    * When provided in create mode, locks the equipment to this service location
-   * (skips the customer + service-location pickers). Used when adding equipment
-   * from a service-location detail page where the location context is implicit.
+   * and hides the location picker entirely. Used from a service-location detail
+   * page where the location context is implicit.
    */
   lockedServiceLocationId?: string;
   /**
-   * When provided in create mode, locks the customer (skips the customer picker)
-   * but keeps the service-location picker visible — restricted to that customer's
-   * locations via the existing cascade. Used from a customer detail page where
-   * the customer is implicit but the location still needs to be picked.
+   * When provided in create mode, restricts the location picker to this
+   * customer's locations (opens-on-focus, no min-char typing). Used from a
+   * customer detail page where the customer is implicit.
    */
-  lockedCustomerId?: string;
+  lockedCustomer?: { id: string; name: string } | null;
 }
 
 interface FormState {
-  // Scope (create-only; immutable on edit)
-  customerId: string;
   serviceLocationId: string;
-
-  // Identification
   name: string;
   description: string;
   make: string;
   model: string;
   serialNumber: string;
   assetTag: string;
-
-  // Taxonomy
   equipmentTypeId: string;
   equipmentCategoryId: string;
-
-  // Location & lifecycle
   locationOnSite: string;
   installDate: string;
   status: EquipmentStatus;
 }
 
 const emptyForm: FormState = {
-  customerId: '',
   serviceLocationId: '',
   name: '',
   description: '',
@@ -79,25 +67,31 @@ const emptyForm: FormState = {
   status: EquipmentStatus.ACTIVE,
 };
 
-export default function EquipmentFormDialog({ isOpen, onClose, equipment, lockedServiceLocationId, lockedCustomerId }: EquipmentFormDialogProps) {
+export default function EquipmentFormDialog({
+  isOpen,
+  onClose,
+  equipment,
+  lockedServiceLocationId,
+  lockedCustomer,
+}: EquipmentFormDialogProps) {
   const queryClient = useQueryClient();
   const { t } = useTranslation();
   const { getName } = useGlossary();
 
   const isEdit = Boolean(equipment);
   const [formData, setFormData] = useState<FormState>(emptyForm);
+  const [selectedLocation, setSelectedLocation] = useState<ServiceLocationSearchResult | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   // Reset / hydrate when dialog opens. setState calls here are intentional form-init
-  // synchronization with the `equipment` prop and dialog visibility — same pattern as
-  // CustomerFormDialog.
+  // synchronization with the `equipment` prop and dialog visibility.
   /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (!isOpen) return;
     setErrorMessage(null);
+    setSelectedLocation(null);
     if (equipment) {
       setFormData({
-        customerId: '',
         serviceLocationId: equipment.serviceLocationId,
         name: equipment.name,
         description: equipment.description ?? '',
@@ -114,11 +108,10 @@ export default function EquipmentFormDialog({ isOpen, onClose, equipment, locked
     } else {
       setFormData({
         ...emptyForm,
-        customerId: lockedCustomerId ?? '',
         serviceLocationId: lockedServiceLocationId ?? '',
       });
     }
-  }, [isOpen, equipment, lockedServiceLocationId, lockedCustomerId]);
+  }, [isOpen, equipment, lockedServiceLocationId]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
   // ===== Reference data =====
@@ -132,27 +125,6 @@ export default function EquipmentFormDialog({ isOpen, onClose, equipment, locked
     queryKey: ['equipment-categories', formData.equipmentTypeId],
     queryFn: () => equipmentCategoriesApi.getAll(formData.equipmentTypeId || undefined),
     enabled: isOpen && Boolean(formData.equipmentTypeId),
-  });
-
-  // Customers + locations are fetched only when we need to drive cascade pickers.
-  // - In edit mode the location is fixed.
-  // - With a locked service location, both pickers are hidden.
-  // - With a locked customer, the customer picker is hidden but the service-location
-  //   picker is still shown (driven by the customer's locations).
-  const needsCustomerList = isOpen && !isEdit && !lockedServiceLocationId && !lockedCustomerId;
-  const needsCustomerLocations = isOpen && !isEdit && !lockedServiceLocationId;
-
-  const { data: customersPage } = useQuery({
-    queryKey: ['equipment-form-customers'],
-    queryFn: () => customerApi.getAllPaginated({ page: 1, limit: 200, status: 'ACTIVE' }),
-    enabled: needsCustomerList,
-  });
-  const customers: CustomerListDto[] = customersPage?.content ?? [];
-
-  const { data: customerLocations = [] } = useQuery({
-    queryKey: ['customer-service-locations', formData.customerId],
-    queryFn: () => customerApi.getServiceLocations(formData.customerId),
-    enabled: needsCustomerLocations && Boolean(formData.customerId),
   });
 
   // ===== Mutations =====
@@ -178,6 +150,11 @@ export default function EquipmentFormDialog({ isOpen, onClose, equipment, locked
       setErrorMessage(extractErrorMessage(error, t('common.form.errorUpdate', { entity: getName('equipment') })));
     },
   });
+
+  const handleLocationChange = (location: ServiceLocationSearchResult | null) => {
+    setSelectedLocation(location);
+    setFormData((prev) => ({ ...prev, serviceLocationId: location?.id ?? '' }));
+  };
 
   // ===== Submit =====
   const handleSubmit = (e: React.FormEvent) => {
@@ -223,6 +200,7 @@ export default function EquipmentFormDialog({ isOpen, onClose, equipment, locked
   };
 
   const isSaving = createMutation.isPending || updateMutation.isPending;
+  const showLocationPicker = !isEdit && !lockedServiceLocationId;
 
   return (
     <Dialog open={isOpen} onClose={onClose} size="2xl">
@@ -246,53 +224,14 @@ export default function EquipmentFormDialog({ isOpen, onClose, equipment, locked
 
           <Fieldset>
             <FieldGroup>
-              {!isEdit && !lockedServiceLocationId && (
-                <>
-                  {!lockedCustomerId && (
-                    <Field>
-                      <Label>{getName('customer')} *</Label>
-                      <Select
-                        name="customerId"
-                        value={formData.customerId}
-                        onChange={(e) =>
-                          setFormData({
-                            ...formData,
-                            customerId: e.target.value,
-                            serviceLocationId: '',
-                          })
-                        }
-                        required
-                      >
-                        <option value="">{t('common.form.select')}</option>
-                        {customers.map((c) => (
-                          <option key={c.id} value={c.id}>
-                            {c.name}
-                          </option>
-                        ))}
-                      </Select>
-                    </Field>
-                  )}
-
-                  <Field>
-                    <Label>{t('equipment.form.serviceLocation')} *</Label>
-                    <Select
-                      name="serviceLocationId"
-                      value={formData.serviceLocationId}
-                      onChange={(e) =>
-                        setFormData({ ...formData, serviceLocationId: e.target.value })
-                      }
-                      required
-                      disabled={!formData.customerId}
-                    >
-                      <option value="">{t('common.form.select')}</option>
-                      {customerLocations.map((loc: ServiceLocation) => (
-                        <option key={loc.id} value={loc.id}>
-                          {formatLocationLabel(loc)}
-                        </option>
-                      ))}
-                    </Select>
-                  </Field>
-                </>
+              {showLocationPicker && (
+                <ServiceLocationPicker
+                  value={selectedLocation}
+                  onChange={handleLocationChange}
+                  label={t('equipment.form.serviceLocation')}
+                  required
+                  restrictToCustomer={lockedCustomer ?? undefined}
+                />
               )}
 
               <Field>
@@ -302,57 +241,9 @@ export default function EquipmentFormDialog({ isOpen, onClose, equipment, locked
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   required
-                  autoFocus={!isEdit}
+                  autoFocus={!isEdit && !showLocationPicker}
                 />
               </Field>
-
-              <Field>
-                <Label>{t('common.form.description')}</Label>
-                <Textarea
-                  name="description"
-                  value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  rows={2}
-                />
-              </Field>
-
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <Field>
-                  <Label>{t('equipment.form.make')}</Label>
-                  <Input
-                    name="make"
-                    value={formData.make}
-                    onChange={(e) => setFormData({ ...formData, make: e.target.value })}
-                  />
-                </Field>
-
-                <Field>
-                  <Label>{t('equipment.form.model')}</Label>
-                  <Input
-                    name="model"
-                    value={formData.model}
-                    onChange={(e) => setFormData({ ...formData, model: e.target.value })}
-                  />
-                </Field>
-
-                <Field>
-                  <Label>{t('equipment.form.serialNumber')}</Label>
-                  <Input
-                    name="serialNumber"
-                    value={formData.serialNumber}
-                    onChange={(e) => setFormData({ ...formData, serialNumber: e.target.value })}
-                  />
-                </Field>
-
-                <Field>
-                  <Label>{t('equipment.form.assetTag')}</Label>
-                  <Input
-                    name="assetTag"
-                    value={formData.assetTag}
-                    onChange={(e) => setFormData({ ...formData, assetTag: e.target.value })}
-                  />
-                </Field>
-              </div>
 
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <Field>
@@ -397,6 +288,42 @@ export default function EquipmentFormDialog({ isOpen, onClose, equipment, locked
                 </Field>
 
                 <Field>
+                  <Label>{t('equipment.form.make')}</Label>
+                  <Input
+                    name="make"
+                    value={formData.make}
+                    onChange={(e) => setFormData({ ...formData, make: e.target.value })}
+                  />
+                </Field>
+
+                <Field>
+                  <Label>{t('equipment.form.model')}</Label>
+                  <Input
+                    name="model"
+                    value={formData.model}
+                    onChange={(e) => setFormData({ ...formData, model: e.target.value })}
+                  />
+                </Field>
+
+                <Field>
+                  <Label>{t('equipment.form.serialNumber')}</Label>
+                  <Input
+                    name="serialNumber"
+                    value={formData.serialNumber}
+                    onChange={(e) => setFormData({ ...formData, serialNumber: e.target.value })}
+                  />
+                </Field>
+
+                <Field>
+                  <Label>{t('equipment.form.assetTag')}</Label>
+                  <Input
+                    name="assetTag"
+                    value={formData.assetTag}
+                    onChange={(e) => setFormData({ ...formData, assetTag: e.target.value })}
+                  />
+                </Field>
+
+                <Field>
                   <Label>{t('equipment.form.locationOnSite')}</Label>
                   <Input
                     name="locationOnSite"
@@ -415,6 +342,15 @@ export default function EquipmentFormDialog({ isOpen, onClose, equipment, locked
                   />
                 </Field>
               </div>
+
+              <Field>
+                <Label>{t('common.form.description')}</Label>
+                <Input
+                  name="description"
+                  value={formData.description}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                />
+              </Field>
 
               {isEdit && (
                 <Field>
@@ -449,12 +385,6 @@ export default function EquipmentFormDialog({ isOpen, onClose, equipment, locked
       </form>
     </Dialog>
   );
-}
-
-function formatLocationLabel(loc: ServiceLocation): string {
-  if (loc.locationName) return loc.locationName;
-  const a = loc.address;
-  return a ? `${a.streetAddress}, ${a.city}` : loc.id;
 }
 
 function extractErrorMessage(error: unknown, fallback: string): string {
