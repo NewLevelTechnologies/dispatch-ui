@@ -357,6 +357,28 @@
       "profileImageAlt": "{{name}} profile image",
       "tabComingSoon": "Coming soon."
     },
+    "filters": {
+      "addFilter": "Add Filter",
+      "deleteConfirm": "Delete this filter?",
+      "empty": "No filters added yet.",
+      "errorCreate": "Failed to add filter",
+      "errorDelete": "Failed to delete filter",
+      "errorLoading": "Failed to load filters",
+      "errorUpdate": "Failed to update filter",
+      "invalidDimensions": "Length, width, and thickness must all be greater than zero.",
+      "invalidQuantity": "Quantity must be a whole number of 1 or more.",
+      "label": "Label",
+      "labelPlaceholder": "e.g. Return air, Pre-filter",
+      "length": "Length (in)",
+      "loading": "Loading filters…",
+      "quantity": "Quantity",
+      "quickAdd": "Quick add",
+      "size": "Size",
+      "thickness": "Thickness (in)",
+      "titleAdd": "Add Filter",
+      "titleEdit": "Edit Filter",
+      "width": "Width (in)"
+    },
     "lowStock": "Low Stock",
     "entities": {
       "part": "Part",

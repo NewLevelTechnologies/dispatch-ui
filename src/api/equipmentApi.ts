@@ -35,6 +35,9 @@ export interface Equipment {
   profileImageUrl?: string | null;
   // JSONB stored as string per backend; parse client-side when needed.
   attributes?: string;
+  // Filters embedded in EquipmentResponse; the standalone /equipment/{id}/filters
+  // endpoint also returns these and is the canonical mutation target.
+  filters?: EquipmentFilter[];
   createdAt?: string;
   updatedAt?: string;
 }
@@ -281,6 +284,100 @@ export const equipmentCategoriesApi = {
   },
 };
 
+// ========== EQUIPMENT FILTERS ==========
+// Per-equipment filter sub-resource. Sized in inches.
+
+export interface EquipmentFilter {
+  id: string;
+  tenantId?: string;
+  equipmentId: string;
+  lengthIn: number;
+  widthIn: number;
+  thicknessIn: number;
+  quantity: number;
+  label?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface CreateEquipmentFilterRequest {
+  lengthIn: number;
+  widthIn: number;
+  thicknessIn: number;
+  quantity?: number;
+  label?: string | null;
+}
+
+// PATCH semantics: omit a field for no change, send null to clear, send a value to set.
+export interface UpdateEquipmentFilterRequest {
+  lengthIn?: number;
+  widthIn?: number;
+  thicknessIn?: number;
+  quantity?: number;
+  label?: string | null;
+}
+
+export const equipmentFiltersApi = {
+  getAll: async (equipmentId: string): Promise<EquipmentFilter[]> => {
+    const response = await apiClient.get<EquipmentFilter[]>(
+      `/equipment/${equipmentId}/filters`
+    );
+    return response.data;
+  },
+
+  create: async (
+    equipmentId: string,
+    request: CreateEquipmentFilterRequest
+  ): Promise<EquipmentFilter> => {
+    const response = await apiClient.post<EquipmentFilter>(
+      `/equipment/${equipmentId}/filters`,
+      request
+    );
+    return response.data;
+  },
+
+  update: async (
+    equipmentId: string,
+    filterId: string,
+    request: UpdateEquipmentFilterRequest
+  ): Promise<EquipmentFilter> => {
+    const response = await apiClient.patch<EquipmentFilter>(
+      `/equipment/${equipmentId}/filters/${filterId}`,
+      request
+    );
+    return response.data;
+  },
+
+  delete: async (equipmentId: string, filterId: string): Promise<void> => {
+    await apiClient.delete(`/equipment/${equipmentId}/filters/${filterId}`);
+  },
+};
+
+// ========== TENANT FILTER SIZES ==========
+// Tenant-configurable "common sizes" used to populate the quick-add chips on
+// the equipment filters tab. Read-only on the detail page; admin CRUD lives on
+// a settings page (separate effort).
+
+export interface TenantFilterSize {
+  id: string;
+  tenantId: string;
+  lengthIn: number;
+  widthIn: number;
+  thicknessIn: number;
+  sortOrder: number;
+  archivedAt?: string | null;
+  createdAt: string;
+}
+
+export const tenantFilterSizesApi = {
+  getAll: async (): Promise<TenantFilterSize[]> => {
+    const response = await apiClient.get<TenantFilterSize[]>(
+      '/equipment/config/filter-sizes'
+    );
+    return response.data;
+  },
+};
+
 // ========== PARTS INVENTORY ==========
 // Lives on inventory-service (formerly equipment-service) at /api/v1/inventory/*.
 
@@ -445,6 +542,8 @@ export const allEquipmentApis = {
   equipment: equipmentApi,
   equipmentTypes: equipmentTypesApi,
   equipmentCategories: equipmentCategoriesApi,
+  equipmentFilters: equipmentFiltersApi,
+  tenantFilterSizes: tenantFilterSizesApi,
   partsInventory: partsInventoryApi,
   warehouses: warehousesApi,
 };
