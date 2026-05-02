@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import { renderWithProviders, userEvent } from '../test/utils';
 import ServiceLocationDetailPage from './ServiceLocationDetailPage';
 import apiClient from '../api/client';
@@ -363,8 +363,8 @@ describe('ServiceLocationDetailPage', () => {
 
     // Check that all tabs are present
     expect(screen.getByRole('button', { name: /overview/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /work order/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /equipment/i })).toBeInTheDocument();
+    expect(within(screen.getByRole('navigation', { name: 'Tabs' })).getByRole('button', { name: /work order/i })).toBeInTheDocument();
+    expect(within(screen.getByRole('navigation', { name: 'Tabs' })).getByRole('button', { name: /equipment/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /activity/i })).toBeInTheDocument();
   });
 
@@ -379,7 +379,7 @@ describe('ServiceLocationDetailPage', () => {
     });
 
     // Click on Work Orders tab
-    const workOrdersTab = screen.getByRole('button', { name: /work order/i });
+    const workOrdersTab = within(screen.getByRole('navigation', { name: 'Tabs' })).getByRole('button', { name: /work order/i });
     await user.click(workOrdersTab);
 
     await waitFor(() => {
@@ -398,7 +398,7 @@ describe('ServiceLocationDetailPage', () => {
     });
 
     // Click on Equipment tab
-    const equipmentTab = screen.getByRole('button', { name: /equipment/i });
+    const equipmentTab = within(screen.getByRole('navigation', { name: 'Tabs' })).getByRole('button', { name: /equipment/i });
     await user.click(equipmentTab);
 
     await waitFor(() => {
@@ -514,7 +514,7 @@ describe('ServiceLocationDetailPage', () => {
     });
 
     // Switch to work orders tab
-    const workOrdersTab = screen.getByRole('button', { name: /work order/i });
+    const workOrdersTab = within(screen.getByRole('navigation', { name: 'Tabs' })).getByRole('button', { name: /work order/i });
     await user.click(workOrdersTab);
 
     await waitFor(() => {
@@ -534,7 +534,7 @@ describe('ServiceLocationDetailPage', () => {
     });
 
     // Switch to equipment tab
-    const equipmentTab = screen.getByRole('button', { name: /equipment/i });
+    const equipmentTab = within(screen.getByRole('navigation', { name: 'Tabs' })).getByRole('button', { name: /equipment/i });
     await user.click(equipmentTab);
 
     await waitFor(() => {
@@ -621,7 +621,7 @@ describe('ServiceLocationDetailPage', () => {
     });
 
     // Switch to work orders tab
-    const workOrdersTab = screen.getByRole('button', { name: /work order/i });
+    const workOrdersTab = within(screen.getByRole('navigation', { name: 'Tabs' })).getByRole('button', { name: /work order/i });
     await user.click(workOrdersTab);
 
     await waitFor(() => {
@@ -640,7 +640,7 @@ describe('ServiceLocationDetailPage', () => {
     });
 
     // Switch to equipment tab
-    const equipmentTab = screen.getByRole('button', { name: /equipment/i });
+    const equipmentTab = within(screen.getByRole('navigation', { name: 'Tabs' })).getByRole('button', { name: /equipment/i });
     await user.click(equipmentTab);
 
     await waitFor(() => {
@@ -715,7 +715,7 @@ describe('ServiceLocationDetailPage', () => {
       renderDetailPage();
 
       await waitFor(() => expect(screen.getByText('Main Office')).toBeInTheDocument());
-      await user.click(screen.getByRole('button', { name: /equipment/i }));
+      await user.click(within(screen.getByRole('navigation', { name: 'Tabs' })).getByRole('button', { name: /equipment/i }));
 
       await waitFor(() => {
         expect(screen.getByText('Upstairs Furnace')).toBeInTheDocument();
@@ -733,7 +733,7 @@ describe('ServiceLocationDetailPage', () => {
       renderDetailPage();
 
       await waitFor(() => expect(screen.getByText('Main Office')).toBeInTheDocument());
-      await user.click(screen.getByRole('button', { name: /equipment/i }));
+      await user.click(within(screen.getByRole('navigation', { name: 'Tabs' })).getByRole('button', { name: /equipment/i }));
       await user.click(await screen.findByRole('button', { name: /add equipment/i }));
 
       // Dialog opens. Customer + service-location selectors should NOT be present
@@ -752,7 +752,7 @@ describe('ServiceLocationDetailPage', () => {
       renderDetailPage();
 
       await waitFor(() => expect(screen.getByText('Main Office')).toBeInTheDocument());
-      await user.click(screen.getByRole('button', { name: /equipment/i }));
+      await user.click(within(screen.getByRole('navigation', { name: 'Tabs' })).getByRole('button', { name: /equipment/i }));
       await waitFor(() => expect(screen.getByText('Upstairs Furnace')).toBeInTheDocument());
 
       const moreButtons = screen.getAllByRole('button', { name: /more options/i });
@@ -760,6 +760,29 @@ describe('ServiceLocationDetailPage', () => {
       await user.click(await screen.findByRole('menuitem', { name: /edit/i }));
 
       await waitFor(() => expect(screen.getByRole('dialog')).toBeInTheDocument());
+    });
+
+    it('clicking the equipment quick-stat switches to the equipment tab', async () => {
+      mockApiResponses(mockLocation, [], equipmentList);
+      const user = userEvent.setup();
+
+      renderDetailPage();
+
+      await waitFor(() => expect(screen.getByText('Main Office')).toBeInTheDocument());
+
+      // The quick-stat button shares the "Equipment" name with the tab; pick it
+      // by scoping to the rendered count (2 equipment items in the fixture).
+      const buttons = screen.getAllByRole('button', { name: /equipment/i });
+      // The tab is inside the Tabs nav; the stat is outside of it.
+      const tabsNav = screen.getByRole('navigation', { name: 'Tabs' });
+      const statButton = buttons.find((b) => !tabsNav.contains(b));
+      expect(statButton).toBeTruthy();
+      await user.click(statButton!);
+
+      // Equipment tab is now active — table should render.
+      await waitFor(() => {
+        expect(screen.getByText('Upstairs Furnace')).toBeInTheDocument();
+      });
     });
 
     it('confirms before deleting and calls the delete endpoint', async () => {
@@ -771,7 +794,7 @@ describe('ServiceLocationDetailPage', () => {
       renderDetailPage();
 
       await waitFor(() => expect(screen.getByText('Main Office')).toBeInTheDocument());
-      await user.click(screen.getByRole('button', { name: /equipment/i }));
+      await user.click(within(screen.getByRole('navigation', { name: 'Tabs' })).getByRole('button', { name: /equipment/i }));
       await waitFor(() => expect(screen.getByText('Upstairs Furnace')).toBeInTheDocument());
 
       const moreButtons = screen.getAllByRole('button', { name: /more options/i });

@@ -346,15 +346,23 @@ export default function ServiceLocationDetailPage() {
               <div className="rounded-lg border border-zinc-200 p-3 dark:border-zinc-800">
                 <Subheading>{t('serviceLocations.detail.quickStats')}</Subheading>
                 <div className="mt-2 space-y-3">
-                  <div>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('equipment')}
+                    className="block w-full -m-2 rounded p-2 text-left transition hover:bg-zinc-50 dark:hover:bg-zinc-800/50"
+                  >
                     <Text className="text-xs">{getName('equipment', true)}</Text>
                     <Strong className="mt-1 block text-lg">{equipmentPage?.totalElements ?? 0}</Strong>
-                  </div>
+                  </button>
                   <Divider />
-                  <div>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('work-orders')}
+                    className="block w-full -m-2 rounded p-2 text-left transition hover:bg-zinc-50 dark:hover:bg-zinc-800/50"
+                  >
                     <Text className="text-xs">{getName('work_order', true)}</Text>
                     <Strong className="mt-1 block text-lg">{workOrdersData?.totalElements ?? 0}</Strong>
-                  </div>
+                  </button>
                   <Divider />
                   <div>
                     <Text className="text-xs">{t('serviceLocations.detail.lastService')}</Text>
