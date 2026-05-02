@@ -5,6 +5,7 @@ import {
   workOrderApi,
   workItemStatusesApi,
   type WorkItemResponse,
+  type EquipmentSummary,
 } from '../api';
 import { useGlossary } from '../contexts/GlossaryContext';
 import { Dialog, DialogActions, DialogBody, DialogTitle } from './catalyst/dialog';
@@ -12,11 +13,18 @@ import { Button } from './catalyst/button';
 import { Field, FieldGroup, Fieldset, Label } from './catalyst/fieldset';
 import { Textarea } from './catalyst/textarea';
 import { Select } from './catalyst/select';
+import EquipmentPicker from './EquipmentPicker';
 
 interface Props {
   isOpen: boolean;
   onClose: () => void;
   workOrderId: string;
+  /**
+   * Service location of the parent WO — required to scope the equipment
+   * typeahead and quick-create. When absent the equipment field is hidden
+   * (e.g. legacy work orders missing the field).
+   */
+  serviceLocationId?: string;
   /** When provided → edit mode; otherwise → create mode. */
   workItem?: WorkItemResponse | null;
   /** Locks the dialog to read-only when the parent WO is cancelled / archived. */
@@ -26,9 +34,10 @@ interface Props {
 interface FormState {
   description: string;
   statusId: string;
+  equipment: EquipmentSummary | null;
 }
 
-const EMPTY_FORM: FormState = { description: '', statusId: '' };
+const EMPTY_FORM: FormState = { description: '', statusId: '', equipment: null };
 
 /**
  * Create / edit a single work item from the WO detail page.
@@ -40,6 +49,7 @@ export default function WorkItemFormDialog({
   isOpen,
   onClose,
   workOrderId,
+  serviceLocationId,
   workItem,
   readOnly = false,
 }: Props) {
@@ -64,6 +74,7 @@ export default function WorkItemFormDialog({
       setFormData({
         description: workItem.description,
         statusId: workItem.statusId ?? '',
+        equipment: workItem.equipment ?? null,
       });
     } else {
       setFormData(EMPTY_FORM);
@@ -90,17 +101,25 @@ export default function WorkItemFormDialog({
       workOrderApi.createWorkItem(workOrderId, {
         description: formData.description.trim(),
         statusId: formData.statusId || undefined,
+        equipmentId: formData.equipment?.id ?? null,
       }),
     onSuccess,
     onError: (err) => onError(err, 'common.form.errorCreate'),
   });
 
   const updateMutation = useMutation({
-    mutationFn: () =>
-      workOrderApi.updateWorkItem(workOrderId, workItem!.id, {
+    mutationFn: () => {
+      // PATCH semantics: only send equipmentId when it has actually changed.
+      // Sending the same value is harmless but sending null when nothing was
+      // linked previously would emit a spurious "cleared" activity event.
+      const previousId = workItem?.equipment?.id ?? null;
+      const nextId = formData.equipment?.id ?? null;
+      return workOrderApi.updateWorkItem(workOrderId, workItem!.id, {
         description: formData.description.trim(),
         statusId: formData.statusId || undefined,
-      }),
+        ...(previousId !== nextId ? { equipmentId: nextId } : {}),
+      });
+    },
     onSuccess,
     onError: (err) => onError(err, 'common.form.errorUpdate'),
   });
@@ -168,6 +187,17 @@ export default function WorkItemFormDialog({
                     ))}
                   </Select>
                 </Field>
+              )}
+              {serviceLocationId && (
+                <EquipmentPicker
+                  label={getName('equipment')}
+                  value={formData.equipment}
+                  onChange={(eq) =>
+                    setFormData((prev) => ({ ...prev, equipment: eq }))
+                  }
+                  serviceLocationId={serviceLocationId}
+                  disabled={readOnly}
+                />
               )}
             </FieldGroup>
           </Fieldset>
