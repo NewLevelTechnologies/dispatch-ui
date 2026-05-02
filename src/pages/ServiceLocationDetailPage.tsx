@@ -1,12 +1,20 @@
 import { useState } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { customerApi, dispatchRegionApi } from '../api';
+import {
+  customerApi,
+  dispatchRegionApi,
+  equipmentApi,
+  EquipmentStatus,
+  type Equipment,
+  type EquipmentSummary,
+} from '../api';
 import { useGlossary } from '../contexts/GlossaryContext';
 import { useHasCapability } from '../hooks/useCurrentUser';
 import AppLayout from '../components/AppLayout';
 import ServiceLocationFormDialog from '../components/ServiceLocationFormDialog';
+import EquipmentFormDialog from '../components/EquipmentFormDialog';
 import AdditionalContactsList from '../components/AdditionalContactsList';
 import WorkOrdersList from '../components/WorkOrdersList';
 import { workOrdersListQueryOptions } from '../api/workOrdersListQuery';
@@ -17,7 +25,9 @@ import { Heading, Subheading } from '../components/catalyst/heading';
 import { Text, Strong } from '../components/catalyst/text';
 import { Button } from '../components/catalyst/button';
 import { Badge } from '../components/catalyst/badge';
-import { ArrowLeftIcon, PencilIcon, PlusIcon } from '@heroicons/react/24/outline';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/catalyst/table';
+import { Dropdown, DropdownButton, DropdownItem, DropdownLabel, DropdownMenu } from '../components/catalyst/dropdown';
+import { ArrowLeftIcon, EllipsisVerticalIcon, PencilIcon, PlusIcon } from '@heroicons/react/24/outline';
 import { Divider } from '../components/catalyst/divider';
 
 type TabId = 'overview' | 'work-orders' | 'equipment' | 'activity';
@@ -30,6 +40,9 @@ export default function ServiceLocationDetailPage() {
   const { getName } = useGlossary();
   const [activeTab, setActiveTab] = useState<TabId>('overview');
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isEquipmentDialogOpen, setIsEquipmentDialogOpen] = useState(false);
+  const [editingEquipment, setEditingEquipment] = useState<Equipment | null>(null);
+  const queryClient = useQueryClient();
 
   // Return to wherever we came from (could be the WO detail, customer detail, etc.).
   // Falls back to the list when there's no internal history (direct URL entry / new tab).
@@ -65,6 +78,50 @@ export default function ServiceLocationDetailPage() {
       serviceLocationId: location?.id ?? '',
     })
   );
+
+  // Equipment scoped to this service location.
+  const { data: equipmentPage, isLoading: equipmentLoading, error: equipmentError } = useQuery({
+    queryKey: ['equipment', { serviceLocationId: id }],
+    queryFn: () =>
+      equipmentApi.list({
+        serviceLocationId: id!,
+        status: EquipmentStatus.ACTIVE,
+        size: 100,
+      }),
+    enabled: !!id,
+  });
+  const equipment: EquipmentSummary[] = equipmentPage?.content ?? [];
+
+  const deleteEquipmentMutation = useMutation({
+    mutationFn: (equipmentId: string) => equipmentApi.delete(equipmentId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['equipment', { serviceLocationId: id }] });
+    },
+  });
+
+  const handleEditEquipment = async (item: EquipmentSummary) => {
+    const full = await equipmentApi.getById(item.id);
+    setEditingEquipment(full);
+    setIsEquipmentDialogOpen(true);
+  };
+
+  const handleDeleteEquipment = (item: EquipmentSummary) => {
+    if (window.confirm(t('common.actions.deleteConfirm', { name: item.name }))) {
+      deleteEquipmentMutation.mutate(item.id);
+    }
+  };
+
+  const formatTypeCategory = (item: EquipmentSummary) => {
+    if (item.equipmentTypeName && item.equipmentCategoryName) {
+      return `${item.equipmentTypeName} / ${item.equipmentCategoryName}`;
+    }
+    return item.equipmentTypeName || item.equipmentCategoryName || '-';
+  };
+
+  const formatMakeModel = (item: EquipmentSummary) => {
+    if (item.make && item.model) return `${item.make} ${item.model}`;
+    return item.make || item.model || '-';
+  };
 
   const dispatchRegion = dispatchRegions?.find(r => r.id === location?.dispatchRegionId);
 
@@ -119,7 +176,7 @@ export default function ServiceLocationDetailPage() {
   const tabs = [
     { id: 'overview', label: t('serviceLocations.tabs.overview'), count: undefined },
     { id: 'work-orders', label: getName('work_order', true), count: workOrdersData?.totalElements ?? 0 },
-    { id: 'equipment', label: getName('equipment'), count: undefined },
+    { id: 'equipment', label: getName('equipment'), count: equipmentPage?.totalElements ?? 0 },
     { id: 'activity', label: t('serviceLocations.tabs.activity'), count: undefined },
   ];
 
@@ -336,17 +393,80 @@ export default function ServiceLocationDetailPage() {
               <div>
                 <div className="flex items-center justify-between mb-3">
                   <Subheading>{getName('equipment')}</Subheading>
-                  {/* TODO: Add equipment permission check when equipment management is implemented */}
-                  <Button plain>
+                  <Button
+                    plain
+                    onClick={() => {
+                      setEditingEquipment(null);
+                      setIsEquipmentDialogOpen(true);
+                    }}
+                  >
                     <PlusIcon className="size-4" />
                     {t('common.actions.add', { entity: getName('equipment') })}
                   </Button>
                 </div>
-                <div className="rounded-lg border border-zinc-200 p-8 text-center dark:border-zinc-800">
-                  <Text className="text-zinc-500 dark:text-zinc-400">
-                    {t('common.actions.noEntitiesYet', { entities: getName('equipment', true) })}
-                  </Text>
-                </div>
+
+                {equipmentError && (
+                  <div className="mb-3 rounded-lg bg-red-50 p-3 ring-1 ring-red-200 dark:bg-red-950/10 dark:ring-red-900/20">
+                    <Text className="text-sm text-red-800 dark:text-red-400">
+                      {t('common.actions.errorLoading', { entities: getName('equipment', true) })}: {(equipmentError as Error).message}
+                    </Text>
+                  </div>
+                )}
+
+                {equipmentLoading ? (
+                  <div className="rounded-lg border border-zinc-200 p-6 text-center dark:border-zinc-800">
+                    <Text className="text-zinc-500 dark:text-zinc-400">
+                      {t('common.actions.loading', { entities: getName('equipment', true) })}
+                    </Text>
+                  </div>
+                ) : equipment.length === 0 ? (
+                  <div className="rounded-lg border border-zinc-200 p-8 text-center dark:border-zinc-800">
+                    <Text className="text-zinc-500 dark:text-zinc-400">
+                      {t('common.actions.noEntitiesYet', { entities: getName('equipment', true) })}
+                    </Text>
+                  </div>
+                ) : (
+                  <Table dense className="[--gutter:theme(spacing.1)] text-sm">
+                    <TableHead>
+                      <TableRow>
+                        <TableHeader>{t('common.form.name')}</TableHeader>
+                        <TableHeader>{t('equipment.table.type')}</TableHeader>
+                        <TableHeader>{t('equipment.table.makeModel')}</TableHeader>
+                        <TableHeader>{t('equipment.form.serialNumber')}</TableHeader>
+                        <TableHeader>{t('equipment.form.locationOnSite')}</TableHeader>
+                        <TableHeader></TableHeader>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {equipment.map((item) => (
+                        <TableRow key={item.id}>
+                          <TableCell className="font-medium">{item.name}</TableCell>
+                          <TableCell>{formatTypeCategory(item)}</TableCell>
+                          <TableCell>{formatMakeModel(item)}</TableCell>
+                          <TableCell>{item.serialNumber || '-'}</TableCell>
+                          <TableCell>{item.locationOnSite || '-'}</TableCell>
+                          <TableCell>
+                            <div className="-mx-3 -my-1.5 sm:-mx-2.5">
+                              <Dropdown>
+                                <DropdownButton plain aria-label={t('common.moreOptions')}>
+                                  <EllipsisVerticalIcon className="size-5" />
+                                </DropdownButton>
+                                <DropdownMenu anchor="bottom end">
+                                  <DropdownItem onClick={() => handleEditEquipment(item)}>
+                                    <DropdownLabel>{t('common.edit')}</DropdownLabel>
+                                  </DropdownItem>
+                                  <DropdownItem onClick={() => handleDeleteEquipment(item)}>
+                                    <DropdownLabel>{t('common.delete')}</DropdownLabel>
+                                  </DropdownItem>
+                                </DropdownMenu>
+                              </Dropdown>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
               </div>
             )}
 
@@ -367,6 +487,16 @@ export default function ServiceLocationDetailPage() {
         onClose={() => setIsEditDialogOpen(false)}
         serviceLocation={location}
         customerId={customer.id}
+      />
+
+      <EquipmentFormDialog
+        isOpen={isEquipmentDialogOpen}
+        onClose={() => {
+          setIsEquipmentDialogOpen(false);
+          setEditingEquipment(null);
+        }}
+        equipment={editingEquipment}
+        lockedServiceLocationId={location.id}
       />
     </AppLayout>
   );

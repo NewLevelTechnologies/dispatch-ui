@@ -41,7 +41,11 @@ describe('ServiceLocationDetailPage', () => {
     vi.clearAllMocks();
   });
 
-  const mockApiResponses = (location: ServiceLocationDetailDto | null = mockLocation, regions: unknown[] = []) => {
+  const mockApiResponses = (
+    location: ServiceLocationDetailDto | null = mockLocation,
+    regions: unknown[] = [],
+    equipment: unknown[] = []
+  ) => {
     vi.mocked(apiClient.get).mockImplementation((url) => {
       if (url.includes('/service-locations/')) {
         return location ? Promise.resolve({ data: location }) : Promise.reject(new Error('Not found'));
@@ -53,6 +57,27 @@ describe('ServiceLocationDetailPage', () => {
         return Promise.resolve({
           data: { content: [], totalElements: 0, totalPages: 0, number: 0, size: 25 },
         });
+      }
+      if (url === '/equipment' || url.startsWith('/equipment?')) {
+        return Promise.resolve({
+          data: {
+            content: equipment,
+            totalElements: equipment.length,
+            totalPages: 1,
+            number: 0,
+            size: 100,
+          },
+        });
+      }
+      if (url === '/equipment/config/types') {
+        return Promise.resolve({ data: [] });
+      }
+      if (url.startsWith('/equipment/config/categories')) {
+        return Promise.resolve({ data: [] });
+      }
+      if (url.startsWith('/equipment/')) {
+        // Equipment getById — used when opening the edit dialog.
+        return Promise.resolve({ data: equipment[0] ?? null });
       }
       return Promise.reject(new Error('Unknown endpoint'));
     });
@@ -657,5 +682,107 @@ describe('ServiceLocationDetailPage', () => {
     // Verify button exists and is clickable
     expect(backButton).toBeInTheDocument();
     await user.click(backButton);
+  });
+
+  describe('equipment tab', () => {
+    const equipmentList = [
+      {
+        id: 'eq-1',
+        name: 'Upstairs Furnace',
+        equipmentTypeName: 'HVAC',
+        equipmentCategoryName: 'Furnace',
+        make: 'Carrier',
+        model: 'C-100',
+        serialNumber: 'SN1',
+        locationOnSite: 'Basement',
+      },
+      {
+        id: 'eq-2',
+        name: 'Walk-in Cooler',
+        equipmentTypeName: null,
+        equipmentCategoryName: null,
+        make: null,
+        model: null,
+        serialNumber: 'SN2',
+        locationOnSite: null,
+      },
+    ];
+
+    it('renders equipment in a table when scoped to this service location', async () => {
+      mockApiResponses(mockLocation, [], equipmentList);
+      const user = userEvent.setup();
+
+      renderDetailPage();
+
+      await waitFor(() => expect(screen.getByText('Main Office')).toBeInTheDocument());
+      await user.click(screen.getByRole('button', { name: /equipment/i }));
+
+      await waitFor(() => {
+        expect(screen.getByText('Upstairs Furnace')).toBeInTheDocument();
+      });
+      expect(screen.getByText('HVAC / Furnace')).toBeInTheDocument();
+      expect(screen.getByText('Carrier C-100')).toBeInTheDocument();
+      expect(screen.getByText('Basement')).toBeInTheDocument();
+      expect(screen.getByText('Walk-in Cooler')).toBeInTheDocument();
+    });
+
+    it('opens the equipment form dialog in create mode when Add is clicked', async () => {
+      mockApiResponses();
+      const user = userEvent.setup();
+
+      renderDetailPage();
+
+      await waitFor(() => expect(screen.getByText('Main Office')).toBeInTheDocument());
+      await user.click(screen.getByRole('button', { name: /equipment/i }));
+      await user.click(await screen.findByRole('button', { name: /add equipment/i }));
+
+      // Dialog opens. Customer + service-location selectors should NOT be present
+      // because the location is locked to the service-location detail page.
+      await waitFor(() => expect(screen.getByRole('dialog')).toBeInTheDocument());
+      expect(screen.queryByLabelText(/customer/i)).not.toBeInTheDocument();
+      expect(screen.queryByLabelText(/service location/i)).not.toBeInTheDocument();
+      expect(screen.getByLabelText(/^name/i)).toBeInTheDocument();
+    });
+
+    it('opens the edit dialog with the full record when Edit is selected', async () => {
+      const fullRecord = { ...equipmentList[0], serviceLocationId: 'location-1', status: 'ACTIVE', attributes: '{}' };
+      mockApiResponses(mockLocation, [], [fullRecord]);
+      const user = userEvent.setup();
+
+      renderDetailPage();
+
+      await waitFor(() => expect(screen.getByText('Main Office')).toBeInTheDocument());
+      await user.click(screen.getByRole('button', { name: /equipment/i }));
+      await waitFor(() => expect(screen.getByText('Upstairs Furnace')).toBeInTheDocument());
+
+      const moreButtons = screen.getAllByRole('button', { name: /more options/i });
+      await user.click(moreButtons[0]);
+      await user.click(await screen.findByRole('menuitem', { name: /edit/i }));
+
+      await waitFor(() => expect(screen.getByRole('dialog')).toBeInTheDocument());
+    });
+
+    it('confirms before deleting and calls the delete endpoint', async () => {
+      mockApiResponses(mockLocation, [], equipmentList);
+      const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+      const deleteSpy = vi.mocked(apiClient.delete).mockResolvedValue({ data: undefined });
+      const user = userEvent.setup();
+
+      renderDetailPage();
+
+      await waitFor(() => expect(screen.getByText('Main Office')).toBeInTheDocument());
+      await user.click(screen.getByRole('button', { name: /equipment/i }));
+      await waitFor(() => expect(screen.getByText('Upstairs Furnace')).toBeInTheDocument());
+
+      const moreButtons = screen.getAllByRole('button', { name: /more options/i });
+      await user.click(moreButtons[0]);
+      await user.click(await screen.findByRole('menuitem', { name: /delete/i }));
+
+      await waitFor(() => {
+        expect(confirmSpy).toHaveBeenCalled();
+        expect(deleteSpy).toHaveBeenCalledWith('/equipment/eq-1');
+      });
+      confirmSpy.mockRestore();
+    });
   });
 });

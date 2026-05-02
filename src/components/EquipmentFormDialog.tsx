@@ -25,6 +25,12 @@ interface EquipmentFormDialogProps {
   isOpen: boolean;
   onClose: () => void;
   equipment?: Equipment | null;
+  /**
+   * When provided in create mode, locks the equipment to this service location
+   * (skips the customer + service-location pickers). Used when adding equipment
+   * from a service-location detail page where the location context is implicit.
+   */
+  lockedServiceLocationId?: string;
 }
 
 interface FormState {
@@ -66,7 +72,7 @@ const emptyForm: FormState = {
   status: EquipmentStatus.ACTIVE,
 };
 
-export default function EquipmentFormDialog({ isOpen, onClose, equipment }: EquipmentFormDialogProps) {
+export default function EquipmentFormDialog({ isOpen, onClose, equipment, lockedServiceLocationId }: EquipmentFormDialogProps) {
   const queryClient = useQueryClient();
   const { t } = useTranslation();
   const { getName } = useGlossary();
@@ -99,9 +105,12 @@ export default function EquipmentFormDialog({ isOpen, onClose, equipment }: Equi
         status: equipment.status,
       });
     } else {
-      setFormData(emptyForm);
+      setFormData({
+        ...emptyForm,
+        serviceLocationId: lockedServiceLocationId ?? '',
+      });
     }
-  }, [isOpen, equipment]);
+  }, [isOpen, equipment, lockedServiceLocationId]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
   // ===== Reference data =====
@@ -117,18 +126,21 @@ export default function EquipmentFormDialog({ isOpen, onClose, equipment }: Equi
     enabled: isOpen && Boolean(formData.equipmentTypeId),
   });
 
-  // Customers — only needed for create mode (to drive the service-location cascade).
+  // Customers + locations only fetched when we need to drive the cascade pickers.
+  // In edit mode the location is fixed; with a locked location it's implicit.
+  const needsCustomerCascade = isOpen && !isEdit && !lockedServiceLocationId;
+
   const { data: customersPage } = useQuery({
     queryKey: ['equipment-form-customers'],
     queryFn: () => customerApi.getAllPaginated({ page: 1, limit: 200, status: 'ACTIVE' }),
-    enabled: isOpen && !isEdit,
+    enabled: needsCustomerCascade,
   });
   const customers: CustomerListDto[] = customersPage?.content ?? [];
 
   const { data: customerLocations = [] } = useQuery({
     queryKey: ['customer-service-locations', formData.customerId],
     queryFn: () => customerApi.getServiceLocations(formData.customerId),
-    enabled: isOpen && !isEdit && Boolean(formData.customerId),
+    enabled: needsCustomerCascade && Boolean(formData.customerId),
   });
 
   // ===== Mutations =====
@@ -222,7 +234,7 @@ export default function EquipmentFormDialog({ isOpen, onClose, equipment }: Equi
 
           <Fieldset>
             <FieldGroup>
-              {!isEdit && (
+              {!isEdit && !lockedServiceLocationId && (
                 <>
                   <Field>
                     <Label>{getName('customer')} *</Label>
