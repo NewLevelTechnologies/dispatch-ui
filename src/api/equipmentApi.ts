@@ -97,6 +97,7 @@ export type EquipmentSortDirection = 'asc' | 'desc';
 
 export interface ListEquipmentParams {
   serviceLocationId?: string;
+  customerId?: string;
   equipmentTypeId?: string;
   equipmentCategoryId?: string;
   search?: string;
