@@ -8,7 +8,7 @@ const mockEquipmentCreate = vi.fn();
 const mockEquipmentUpdate = vi.fn();
 const mockEquipmentTypesGetAll = vi.fn();
 const mockEquipmentCategoriesGetAll = vi.fn();
-const mockCustomerGetAllPaginated = vi.fn();
+const mockSearchServiceLocations = vi.fn();
 const mockCustomerGetServiceLocations = vi.fn();
 
 vi.mock('../api/equipmentApi', async (importOriginal) => {
@@ -33,7 +33,7 @@ vi.mock('../api/customerApi', async (importOriginal) => {
   return {
     ...actual,
     customerApi: {
-      getAllPaginated: (...args: unknown[]) => mockCustomerGetAllPaginated(...args),
+      searchServiceLocations: (...args: unknown[]) => mockSearchServiceLocations(...args),
       getServiceLocations: (...args: unknown[]) => mockCustomerGetServiceLocations(...args),
     },
   };
@@ -50,20 +50,35 @@ const mockCategories = [
   { id: 'c-furnace', tenantId: 't', equipmentTypeId: 't-hvac', name: 'Furnace', sortOrder: 0, archivedAt: null, createdAt: '', updatedAt: '' },
 ];
 
-const mockCustomers = {
+const mockSearchResults = {
   content: [
-    { id: 'cust-1', name: 'Acme Restaurant' },
-    { id: 'cust-2', name: 'Bob Properties' },
+    {
+      id: 'loc-1',
+      customerId: 'cust-1',
+      customerName: 'Acme Restaurant',
+      locationName: 'Main Kitchen',
+      address: { streetAddress: '123 Main St', city: 'Atlanta', state: 'GA', zipCode: '30301' },
+      siteContactName: null,
+      siteContactPhone: null,
+      status: 'ACTIVE' as const,
+    },
   ],
-  totalElements: 2,
+  totalElements: 1,
   totalPages: 1,
-  number: 0,
   size: 50,
+  number: 0,
 };
 
-const mockLocations = [
-  { id: 'loc-1', locationName: 'Main Kitchen', address: { streetAddress: '123 Main', city: 'Anytown', state: 'CA', zipCode: '90210' } },
-  { id: 'loc-2', address: { streetAddress: '456 Side', city: 'Anytown', state: 'CA', zipCode: '90210' } },
+const mockCustomerLocations = [
+  {
+    id: 'loc-1',
+    customerId: 'cust-1',
+    locationName: 'Main Kitchen',
+    address: { streetAddress: '123 Main St', city: 'Atlanta', state: 'GA', zipCode: '30301' },
+    siteContactName: null,
+    siteContactPhone: null,
+    status: 'ACTIVE' as const,
+  },
 ];
 
 const existingEquipment: Equipment = {
@@ -92,8 +107,8 @@ describe('EquipmentFormDialog', () => {
     vi.clearAllMocks();
     mockEquipmentTypesGetAll.mockResolvedValue(mockTypes);
     mockEquipmentCategoriesGetAll.mockResolvedValue(mockCategories);
-    mockCustomerGetAllPaginated.mockResolvedValue(mockCustomers);
-    mockCustomerGetServiceLocations.mockResolvedValue(mockLocations);
+    mockSearchServiceLocations.mockResolvedValue(mockSearchResults);
+    mockCustomerGetServiceLocations.mockResolvedValue(mockCustomerLocations);
   });
 
   it('renders nothing when closed', () => {
@@ -101,41 +116,19 @@ describe('EquipmentFormDialog', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
-  it('renders create mode with empty form', async () => {
+  it('renders create mode with location picker (no customer dropdown)', async () => {
     renderWithProviders(<EquipmentFormDialog isOpen={true} onClose={vi.fn()} />);
 
     await waitFor(() => {
       expect(screen.getByRole('dialog')).toBeInTheDocument();
     });
 
-    // Customer + service location selectors only in create mode
-    expect(screen.getByLabelText(/customer/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/service location/i)).toBeInTheDocument();
+    // Location picker present, no customer Select
+    expect(screen.getByPlaceholderText(/search by customer, address/i)).toBeInTheDocument();
+    expect(screen.queryByLabelText(/^customer/i)).not.toBeInTheDocument();
+    // Status is hidden on create
+    expect(screen.queryByLabelText(/^status$/i)).not.toBeInTheDocument();
     expect((screen.getByLabelText(/^name/i) as HTMLInputElement).value).toBe('');
-  });
-
-  it('cascades service locations when a customer is picked', async () => {
-    const user = userEvent.setup();
-    renderWithProviders(<EquipmentFormDialog isOpen={true} onClose={vi.fn()} />);
-
-    await waitFor(() => {
-      expect(screen.getByText('Acme Restaurant')).toBeInTheDocument();
-    });
-
-    const serviceLocSelect = screen.getByLabelText(/service location/i);
-    expect(serviceLocSelect).toBeDisabled();
-
-    await user.selectOptions(screen.getByLabelText(/customer/i), 'cust-1');
-
-    await waitFor(() => {
-      expect(mockCustomerGetServiceLocations).toHaveBeenCalledWith('cust-1');
-    });
-    await waitFor(() => {
-      expect(serviceLocSelect).not.toBeDisabled();
-    });
-    await waitFor(() => {
-      expect(screen.getByText('Main Kitchen')).toBeInTheDocument();
-    });
   });
 
   it('cascades categories when a type is picked', async () => {
@@ -159,21 +152,27 @@ describe('EquipmentFormDialog', () => {
     });
   });
 
-  it('submits a create with all fields filled in', async () => {
+  it('submits a create with picker-selected location and remaining fields', async () => {
     mockEquipmentCreate.mockResolvedValue({ id: 'new-eq' });
     const onClose = vi.fn();
     const user = userEvent.setup();
 
     renderWithProviders(<EquipmentFormDialog isOpen={true} onClose={onClose} />);
 
-    await waitFor(() => expect(screen.getByText('Acme Restaurant')).toBeInTheDocument());
-    await user.selectOptions(screen.getByLabelText(/customer/i), 'cust-1');
-    await waitFor(() => expect(screen.getByText('Main Kitchen')).toBeInTheDocument());
-    await user.selectOptions(screen.getByLabelText(/service location/i), 'loc-1');
+    await waitFor(() => expect(screen.getByRole('dialog')).toBeInTheDocument());
+
+    // Drive the picker via typing → select first result
+    const pickerInput = screen.getByPlaceholderText(/search by customer, address/i);
+    await user.type(pickerInput, 'main');
+
+    await waitFor(() => {
+      expect(mockSearchServiceLocations).toHaveBeenCalled();
+    });
+    const option = await screen.findByRole('button', { name: /Main Kitchen/i });
+    await user.click(option);
 
     // Touch every field so each onChange handler is exercised.
     await user.type(screen.getByLabelText(/^name/i), 'New Furnace');
-    await user.type(screen.getByLabelText(/^description/i), 'A description');
     await user.type(screen.getByLabelText(/make/i), 'Carrier');
     await user.type(screen.getByLabelText(/^model$/i), 'C-200');
     await user.type(screen.getByLabelText(/serial number/i), 'SN-1');
@@ -187,6 +186,7 @@ describe('EquipmentFormDialog', () => {
 
     await user.type(screen.getByLabelText(/location on site/i), 'Roof');
     await user.type(screen.getByLabelText(/install date/i), '2024-03-15');
+    await user.type(screen.getByLabelText(/^description/i), 'A description');
 
     await user.click(screen.getByRole('button', { name: /create/i }));
 
@@ -210,6 +210,61 @@ describe('EquipmentFormDialog', () => {
     await waitFor(() => expect(onClose).toHaveBeenCalled());
   });
 
+  it('hides the picker and submits with the locked service location id', async () => {
+    mockEquipmentCreate.mockResolvedValue({ id: 'new-eq' });
+    const onClose = vi.fn();
+    const user = userEvent.setup();
+
+    renderWithProviders(
+      <EquipmentFormDialog
+        isOpen={true}
+        onClose={onClose}
+        lockedServiceLocationId="loc-locked"
+      />
+    );
+
+    await waitFor(() => expect(screen.getByRole('dialog')).toBeInTheDocument());
+    expect(screen.queryByPlaceholderText(/search by customer, address/i)).not.toBeInTheDocument();
+
+    await user.type(screen.getByLabelText(/^name/i), 'Locked Eq');
+    await user.click(screen.getByRole('button', { name: /create/i }));
+
+    await waitFor(() => {
+      expect(mockEquipmentCreate).toHaveBeenCalled();
+    });
+    expect(mockEquipmentCreate.mock.calls[0][0]).toMatchObject({
+      name: 'Locked Eq',
+      serviceLocationId: 'loc-locked',
+    });
+  });
+
+  it('lockedCustomer restricts the picker to that customer (opens on focus)', async () => {
+    const user = userEvent.setup();
+
+    renderWithProviders(
+      <EquipmentFormDialog
+        isOpen={true}
+        onClose={vi.fn()}
+        lockedCustomer={{ id: 'cust-1', name: 'Acme Restaurant' }}
+      />
+    );
+
+    await waitFor(() => expect(screen.getByRole('dialog')).toBeInTheDocument());
+
+    // Picker hits the customer's locations endpoint, not tenant-wide search
+    await waitFor(() => {
+      expect(mockCustomerGetServiceLocations).toHaveBeenCalledWith('cust-1');
+    });
+
+    // Focus opens the dropdown without typing (restrictToCustomer mode)
+    const pickerInput = screen.getByPlaceholderText(/search by customer, address/i);
+    await user.click(pickerInput);
+    await waitFor(() => {
+      expect(screen.getByText('Main Kitchen')).toBeInTheDocument();
+    });
+    expect(mockSearchServiceLocations).not.toHaveBeenCalled();
+  });
+
   it('hydrates edit mode with existing equipment values and submits update', async () => {
     mockEquipmentUpdate.mockResolvedValue(existingEquipment);
     const onClose = vi.fn();
@@ -223,18 +278,17 @@ describe('EquipmentFormDialog', () => {
       expect((screen.getByLabelText(/^name/i) as HTMLInputElement).value).toBe('Walk-in Freezer');
     });
 
-    // Customer/service-location selectors are absent in edit mode
-    expect(screen.queryByLabelText(/customer/i)).not.toBeInTheDocument();
+    // Picker is hidden in edit mode
+    expect(screen.queryByPlaceholderText(/search by customer, address/i)).not.toBeInTheDocument();
 
     expect((screen.getByLabelText(/make/i) as HTMLInputElement).value).toBe('Hoshizaki');
     expect((screen.getByLabelText(/^model$/i) as HTMLInputElement).value).toBe('WF-100');
+    // Status reappears on edit
     expect(screen.getByLabelText(/status/i)).toBeInTheDocument();
 
-    // Edit a field and submit
     const nameInput = screen.getByLabelText(/^name/i);
     await user.clear(nameInput);
     await user.type(nameInput, 'Renamed Freezer');
-    // Toggle status to RETIRED to exercise the status onChange handler
     await user.selectOptions(screen.getByLabelText(/status/i), 'RETIRED');
     await user.click(screen.getByRole('button', { name: /update/i }));
 
@@ -244,6 +298,7 @@ describe('EquipmentFormDialog', () => {
     const [id, data] = mockEquipmentUpdate.mock.calls[0];
     expect(id).toBe('eq-1');
     expect(data.name).toBe('Renamed Freezer');
+    expect(data.status).toBe('RETIRED');
     await waitFor(() => expect(onClose).toHaveBeenCalled());
   });
 
@@ -255,14 +310,16 @@ describe('EquipmentFormDialog', () => {
     );
     const user = userEvent.setup();
 
-    renderWithProviders(<EquipmentFormDialog isOpen={true} onClose={vi.fn()} />);
+    renderWithProviders(
+      <EquipmentFormDialog
+        isOpen={true}
+        onClose={vi.fn()}
+        lockedServiceLocationId="loc-locked"
+      />
+    );
 
-    await waitFor(() => expect(screen.getByText('Acme Restaurant')).toBeInTheDocument());
-    await user.selectOptions(screen.getByLabelText(/customer/i), 'cust-1');
-    await waitFor(() => expect(screen.getByText('Main Kitchen')).toBeInTheDocument());
-    await user.selectOptions(screen.getByLabelText(/service location/i), 'loc-1');
+    await waitFor(() => expect(screen.getByRole('dialog')).toBeInTheDocument());
     await user.type(screen.getByLabelText(/^name/i), 'Anything');
-
     await user.click(screen.getByRole('button', { name: /create/i }));
 
     await waitFor(() => {
@@ -289,6 +346,20 @@ describe('EquipmentFormDialog', () => {
     await waitFor(() => {
       expect(screen.getByText('Update failed')).toBeInTheDocument();
     });
+  });
+
+  it('blocks submit and surfaces required-field error when no location is selected', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<EquipmentFormDialog isOpen={true} onClose={vi.fn()} />);
+
+    await waitFor(() => expect(screen.getByRole('dialog')).toBeInTheDocument());
+    await user.type(screen.getByLabelText(/^name/i), 'No location');
+    await user.click(screen.getByRole('button', { name: /create/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/service location/i)).toBeInTheDocument();
+    });
+    expect(mockEquipmentCreate).not.toHaveBeenCalled();
   });
 
   it('cancel button calls onClose', async () => {
