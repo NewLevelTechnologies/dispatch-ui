@@ -87,9 +87,12 @@ interface WorkOrderFormDialogProps {
   // full detail via getById on open so it has work items, internal notes, cancellation
   // reason, and any other detail-only fields.
   workOrder?: WorkOrderSummary | WorkOrder | null;
+  // Pre-fill the customer + service location in create mode. Used when launching
+  // the dialog from a service-location detail page where that context is implicit.
+  prefilledServiceLocation?: ServiceLocationSearchResult | null;
 }
 
-export default function WorkOrderFormDialog({ isOpen, onClose, workOrder }: WorkOrderFormDialogProps) {
+export default function WorkOrderFormDialog({ isOpen, onClose, workOrder, prefilledServiceLocation }: WorkOrderFormDialogProps) {
   const queryClient = useQueryClient();
   const { t } = useTranslation();
   const { getName } = useGlossary();
@@ -227,8 +230,16 @@ export default function WorkOrderFormDialog({ isOpen, onClose, workOrder }: Work
       // Create mode - reset everything
       setCustomerMode('existing');
       setIsCreatingCustomer(false);
-      setFormData(EMPTY_FORM);
-      setSelectedLocation(null);
+      setFormData(
+        prefilledServiceLocation
+          ? {
+              ...EMPTY_FORM,
+              customerId: prefilledServiceLocation.customerId,
+              serviceLocationId: prefilledServiceLocation.id,
+            }
+          : EMPTY_FORM
+      );
+      setSelectedLocation(prefilledServiceLocation ?? null);
       setLocationName('');
       setLocationPhone('');
       setLocationEmail('');
@@ -254,7 +265,7 @@ export default function WorkOrderFormDialog({ isOpen, onClose, workOrder }: Work
     /* eslint-enable react-hooks/set-state-in-effect */
     // Re-runs on open, on workOrder identity change, and again when the detail
     // query lands so detail-only fields populate when they arrive.
-  }, [effective, isOpen, defaultRegionId]);
+  }, [effective, isOpen, defaultRegionId, prefilledServiceLocation]);
 
   const createMutation = useMutation({
     mutationFn: (data: CreateWorkOrderRequest) => workOrderApi.create(data),

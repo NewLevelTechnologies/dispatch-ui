@@ -53,6 +53,9 @@ describe('ServiceLocationDetailPage', () => {
       if (url.includes('/dispatch-regions')) {
         return Promise.resolve({ data: regions });
       }
+      if (url.startsWith('/work-orders/config/')) {
+        return Promise.resolve({ data: [] });
+      }
       if (url.includes('/work-orders')) {
         return Promise.resolve({
           data: { content: [], totalElements: 0, totalPages: 0, number: 0, size: 25 },
@@ -760,6 +763,30 @@ describe('ServiceLocationDetailPage', () => {
       await user.click(await screen.findByRole('menuitem', { name: /edit/i }));
 
       await waitFor(() => expect(screen.getByRole('dialog')).toBeInTheDocument());
+    });
+
+    it('opens the new-work-order dialog with the service location pre-selected', async () => {
+      mockApiResponses();
+      const user = userEvent.setup();
+
+      renderDetailPage();
+
+      await waitFor(() => expect(screen.getByText('Main Office')).toBeInTheDocument());
+
+      // Switch to work orders tab
+      await user.click(
+        within(screen.getByRole('navigation', { name: 'Tabs' })).getByRole('button', {
+          name: /work order/i,
+        })
+      );
+      await user.click(await screen.findByRole('button', { name: /new work order/i }));
+
+      // Dialog opens — the prefilled location's display value should be visible
+      // in the picker input. Picker formats as "{locationName} - {address}".
+      await waitFor(() => expect(screen.getByRole('dialog')).toBeInTheDocument());
+      expect(
+        screen.getByDisplayValue(/Main Office.*123 Main St.*Springfield/i)
+      ).toBeInTheDocument();
     });
 
     it('clicking the equipment quick-stat switches to the equipment tab', async () => {

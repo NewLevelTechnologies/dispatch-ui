@@ -9,12 +9,14 @@ import {
   EquipmentStatus,
   type Equipment,
   type EquipmentSummary,
+  type ServiceLocationSearchResult,
 } from '../api';
 import { useGlossary } from '../contexts/GlossaryContext';
 import { useHasCapability } from '../hooks/useCurrentUser';
 import AppLayout from '../components/AppLayout';
 import ServiceLocationFormDialog from '../components/ServiceLocationFormDialog';
 import EquipmentFormDialog from '../components/EquipmentFormDialog';
+import WorkOrderFormDialog from '../components/WorkOrderFormDialog';
 import AdditionalContactsList from '../components/AdditionalContactsList';
 import WorkOrdersList from '../components/WorkOrdersList';
 import { workOrdersListQueryOptions } from '../api/workOrdersListQuery';
@@ -42,6 +44,7 @@ export default function ServiceLocationDetailPage() {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isEquipmentDialogOpen, setIsEquipmentDialogOpen] = useState(false);
   const [editingEquipment, setEditingEquipment] = useState<Equipment | null>(null);
+  const [isNewWorkOrderOpen, setIsNewWorkOrderOpen] = useState(false);
   const queryClient = useQueryClient();
 
   // Return to wherever we came from (could be the WO detail, customer detail, etc.).
@@ -384,7 +387,7 @@ export default function ServiceLocationDetailPage() {
                 <div className="flex items-center justify-between mb-3">
                   <Subheading>{t('common.recentEntities', { entities: getName('work_order', true) })}</Subheading>
                   {/* TODO: Add work order permission check when work order management is implemented */}
-                  <Button plain>
+                  <Button plain onClick={() => setIsNewWorkOrderOpen(true)}>
                     <PlusIcon className="size-4" />
                     {t('common.actions.new', { entity: getName('work_order') })}
                   </Button>
@@ -505,6 +508,28 @@ export default function ServiceLocationDetailPage() {
         }}
         equipment={editingEquipment}
         lockedServiceLocationId={location.id}
+      />
+
+      <WorkOrderFormDialog
+        isOpen={isNewWorkOrderOpen}
+        onClose={() => setIsNewWorkOrderOpen(false)}
+        prefilledServiceLocation={
+          {
+            id: location.id,
+            customerId: location.customerId,
+            customerName: location.customerName,
+            locationName: location.locationName ?? null,
+            address: {
+              streetAddress: location.address.streetAddress,
+              city: location.address.city,
+              state: location.address.state,
+              zipCode: location.address.zipCode,
+            },
+            siteContactName: location.siteContactName ?? null,
+            siteContactPhone: location.siteContactPhone ?? null,
+            status: 'ACTIVE',
+          } satisfies ServiceLocationSearchResult
+        }
       />
     </AppLayout>
   );
