@@ -98,6 +98,8 @@ const existingEquipment: Equipment = {
   locationOnSite: 'Kitchen Back',
   installDate: '2022-06-15',
   lastServicedAt: null,
+  warrantyExpiresAt: '2027-06-15',
+  warrantyDetails: 'Original 5-year parts & labor',
   status: 'ACTIVE',
   profileImageUrl: null,
 };
@@ -186,6 +188,8 @@ describe('EquipmentFormDialog', () => {
 
     await user.type(screen.getByLabelText(/location on site/i), 'Roof');
     await user.type(screen.getByLabelText(/install date/i), '2024-03-15');
+    await user.type(screen.getByLabelText(/warranty expires/i), '2030-01-01');
+    await user.type(screen.getByLabelText(/warranty details/i), '5-year parts');
     await user.type(screen.getByLabelText(/^description/i), 'A description');
 
     await user.click(screen.getByRole('button', { name: /create/i }));
@@ -206,6 +210,8 @@ describe('EquipmentFormDialog', () => {
       equipmentCategoryId: 'c-furnace',
       locationOnSite: 'Roof',
       installDate: '2024-03-15',
+      warrantyExpiresAt: '2030-01-01',
+      warrantyDetails: '5-year parts',
     });
     await waitFor(() => expect(onClose).toHaveBeenCalled());
   });
@@ -283,13 +289,18 @@ describe('EquipmentFormDialog', () => {
 
     expect((screen.getByLabelText(/make/i) as HTMLInputElement).value).toBe('Hoshizaki');
     expect((screen.getByLabelText(/^model$/i) as HTMLInputElement).value).toBe('WF-100');
-    // Status reappears on edit
-    expect(screen.getByLabelText(/status/i)).toBeInTheDocument();
+    expect((screen.getByLabelText(/warranty expires/i) as HTMLInputElement).value).toBe('2027-06-15');
+    expect((screen.getByLabelText(/warranty details/i) as HTMLInputElement).value).toBe(
+      'Original 5-year parts & labor'
+    );
+    // Status renders as a segmented toggle on edit; Active is on by default
+    const activeBtn = screen.getByRole('button', { name: 'Active' });
+    expect(activeBtn).toHaveAttribute('aria-pressed', 'true');
 
     const nameInput = screen.getByLabelText(/^name/i);
     await user.clear(nameInput);
     await user.type(nameInput, 'Renamed Freezer');
-    await user.selectOptions(screen.getByLabelText(/status/i), 'RETIRED');
+    await user.click(screen.getByRole('button', { name: 'Retired' }));
     await user.click(screen.getByRole('button', { name: /update/i }));
 
     await waitFor(() => {

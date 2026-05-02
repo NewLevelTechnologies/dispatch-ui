@@ -12,7 +12,7 @@ import {
   type UpdateEquipmentRequest,
   type ServiceLocationSearchResult,
 } from '../api';
-import { Dialog, DialogActions, DialogBody, DialogDescription, DialogTitle } from './catalyst/dialog';
+import { Dialog, DialogActions, DialogBody, DialogTitle } from './catalyst/dialog';
 import { Button } from './catalyst/button';
 import { Field, FieldGroup, Fieldset, Label } from './catalyst/fieldset';
 import { Input } from './catalyst/input';
@@ -49,6 +49,8 @@ interface FormState {
   equipmentCategoryId: string;
   locationOnSite: string;
   installDate: string;
+  warrantyExpiresAt: string;
+  warrantyDetails: string;
   status: EquipmentStatus;
 }
 
@@ -64,6 +66,8 @@ const emptyForm: FormState = {
   equipmentCategoryId: '',
   locationOnSite: '',
   installDate: '',
+  warrantyExpiresAt: '',
+  warrantyDetails: '',
   status: EquipmentStatus.ACTIVE,
 };
 
@@ -103,6 +107,8 @@ export default function EquipmentFormDialog({
         equipmentCategoryId: equipment.equipmentCategoryId ?? '',
         locationOnSite: equipment.locationOnSite ?? '',
         installDate: equipment.installDate ?? '',
+        warrantyExpiresAt: equipment.warrantyExpiresAt ?? '',
+        warrantyDetails: equipment.warrantyDetails ?? '',
         status: equipment.status,
       });
     } else {
@@ -173,6 +179,8 @@ export default function EquipmentFormDialog({
         equipmentCategoryId: formData.equipmentCategoryId || null,
         locationOnSite: formData.locationOnSite || null,
         installDate: formData.installDate || null,
+        warrantyExpiresAt: formData.warrantyExpiresAt || null,
+        warrantyDetails: formData.warrantyDetails || null,
         status: formData.status,
       };
       updateMutation.mutate({ id: equipment.id, data: payload });
@@ -193,6 +201,8 @@ export default function EquipmentFormDialog({
         equipmentCategoryId: formData.equipmentCategoryId || null,
         locationOnSite: formData.locationOnSite || null,
         installDate: formData.installDate || null,
+        warrantyExpiresAt: formData.warrantyExpiresAt || null,
+        warrantyDetails: formData.warrantyDetails || null,
         status: formData.status,
       };
       createMutation.mutate(payload);
@@ -209,11 +219,6 @@ export default function EquipmentFormDialog({
           ? t('common.actions.edit', { entity: getName('equipment') })
           : t('common.actions.add', { entity: getName('equipment') })}
       </DialogTitle>
-      <DialogDescription>
-        {isEdit
-          ? t('common.form.descriptionEdit', { entity: getName('equipment') })
-          : t('common.form.descriptionCreate', { entity: getName('equipment') })}
-      </DialogDescription>
       <form onSubmit={handleSubmit}>
         <DialogBody>
           {errorMessage && (
@@ -223,7 +228,7 @@ export default function EquipmentFormDialog({
           )}
 
           <Fieldset>
-            <FieldGroup>
+            <FieldGroup className="!space-y-5">
               {showLocationPicker && (
                 <ServiceLocationPicker
                   value={selectedLocation}
@@ -234,16 +239,53 @@ export default function EquipmentFormDialog({
                 />
               )}
 
-              <Field>
-                <Label>{t('common.form.name')} *</Label>
-                <Input
-                  name="name"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  required
-                  autoFocus={!isEdit && !showLocationPicker}
-                />
-              </Field>
+              {isEdit ? (
+                <div className="grid grid-cols-12 gap-4">
+                  <Field className="col-span-9">
+                    <Label>{t('common.form.name')} *</Label>
+                    <Input
+                      name="name"
+                      value={formData.name}
+                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                      required
+                    />
+                  </Field>
+                  <Field className="col-span-3">
+                    <Label>{t('common.form.status')}</Label>
+                    <div data-slot="control" className="flex h-9 gap-1">
+                      {([EquipmentStatus.ACTIVE, EquipmentStatus.RETIRED] as const).map((s) => (
+                        <button
+                          key={s}
+                          type="button"
+                          aria-pressed={formData.status === s}
+                          onClick={() => setFormData({ ...formData, status: s })}
+                          className={[
+                            'flex flex-1 items-center justify-center rounded-lg px-2 text-xs font-medium ring-1 ring-inset transition-colors',
+                            formData.status === s
+                              ? s === EquipmentStatus.ACTIVE
+                                ? 'bg-lime-100 text-lime-800 ring-lime-400 dark:bg-lime-900 dark:text-lime-100 dark:ring-lime-600'
+                                : 'bg-zinc-200 text-zinc-800 ring-zinc-400 dark:bg-zinc-700 dark:text-zinc-100 dark:ring-zinc-500'
+                              : 'bg-white text-zinc-500 ring-zinc-200 hover:bg-zinc-50 dark:bg-zinc-900 dark:text-zinc-400 dark:ring-zinc-700 dark:hover:bg-zinc-800',
+                          ].join(' ')}
+                        >
+                          {t(`equipment.status.${s.toLowerCase()}`)}
+                        </button>
+                      ))}
+                    </div>
+                  </Field>
+                </div>
+              ) : (
+                <Field>
+                  <Label>{t('common.form.name')} *</Label>
+                  <Input
+                    name="name"
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    required
+                    autoFocus={!showLocationPicker}
+                  />
+                </Field>
+              )}
 
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <Field>
@@ -341,6 +383,29 @@ export default function EquipmentFormDialog({
                     onChange={(e) => setFormData({ ...formData, installDate: e.target.value })}
                   />
                 </Field>
+
+                <Field>
+                  <Label>{t('equipment.form.warrantyExpiresAt')}</Label>
+                  <Input
+                    type="date"
+                    name="warrantyExpiresAt"
+                    value={formData.warrantyExpiresAt}
+                    onChange={(e) =>
+                      setFormData({ ...formData, warrantyExpiresAt: e.target.value })
+                    }
+                  />
+                </Field>
+
+                <Field>
+                  <Label>{t('equipment.form.warrantyDetails')}</Label>
+                  <Input
+                    name="warrantyDetails"
+                    value={formData.warrantyDetails}
+                    onChange={(e) =>
+                      setFormData({ ...formData, warrantyDetails: e.target.value })
+                    }
+                  />
+                </Field>
               </div>
 
               <Field>
@@ -351,22 +416,6 @@ export default function EquipmentFormDialog({
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                 />
               </Field>
-
-              {isEdit && (
-                <Field>
-                  <Label>{t('common.form.status')}</Label>
-                  <Select
-                    name="status"
-                    value={formData.status}
-                    onChange={(e) =>
-                      setFormData({ ...formData, status: e.target.value as EquipmentStatus })
-                    }
-                  >
-                    <option value={EquipmentStatus.ACTIVE}>{t('equipment.status.active')}</option>
-                    <option value={EquipmentStatus.RETIRED}>{t('equipment.status.retired')}</option>
-                  </Select>
-                </Field>
-              )}
             </FieldGroup>
           </Fieldset>
         </DialogBody>
