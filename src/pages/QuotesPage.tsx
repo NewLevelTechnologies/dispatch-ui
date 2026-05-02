@@ -15,12 +15,7 @@ import { Select } from '../components/catalyst/select';
 import { Textarea } from '../components/catalyst/textarea';
 import { QuoteStatus, quotesApi } from '../api/financialApi';
 import type { Quote, CreateQuoteRequest, CreateQuoteLineItemRequest } from '../api/financialApi';
-import apiClient from '../api/client';
-
-interface Customer {
-  id: string;
-  name: string;
-}
+import { customerApi } from '../api/customerApi';
 
 export default function QuotesPage() {
   const queryClient = useQueryClient();
@@ -57,10 +52,10 @@ export default function QuotesPage() {
   });
 
   const { data: customers = [] } = useQuery({
-    queryKey: ['customers'],
+    queryKey: ['quote-form-customers'],
     queryFn: async () => {
-      const response = await apiClient.get<Customer[]>('/customers');
-      return response.data;
+      const page = await customerApi.getAllPaginated({ limit: 200, status: 'ACTIVE' });
+      return page.content;
     },
   });
 

@@ -2,12 +2,12 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
 import { renderWithProviders, userEvent } from '../test/utils';
 import RecurringOrdersPage from './RecurringOrdersPage';
-import apiClient from '../api/client';
 
 const mockRecurringOrdersGetAll = vi.fn();
 const mockRecurringOrdersCreate = vi.fn();
 const mockRecurringOrdersUpdate = vi.fn();
 const mockRecurringOrdersDelete = vi.fn();
+const mockCustomerGetAllPaginated = vi.fn();
 
 vi.mock('../api/schedulingApi', () => ({
   recurringOrdersApi: {
@@ -17,6 +17,15 @@ vi.mock('../api/schedulingApi', () => ({
     delete: (...args: unknown[]) => mockRecurringOrdersDelete(...args),
   },
 }));
+vi.mock('../api/customerApi', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../api/customerApi')>();
+  return {
+    ...actual,
+    customerApi: {
+      getAllPaginated: (...args: unknown[]) => mockCustomerGetAllPaginated(...args),
+    },
+  };
+});
 vi.mock('../api/client');
 
 const mockRecurringOrders = [
@@ -48,7 +57,13 @@ const mockCustomers = [
 describe('RecurringOrdersPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(apiClient.get).mockResolvedValue({ data: mockCustomers });
+    mockCustomerGetAllPaginated.mockResolvedValue({
+      content: mockCustomers,
+      totalElements: mockCustomers.length,
+      totalPages: 1,
+      number: 0,
+      size: 200,
+    });
   });
 
   it('renders the page title and add button', async () => {
