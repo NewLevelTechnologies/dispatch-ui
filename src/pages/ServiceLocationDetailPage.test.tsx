@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import { renderWithProviders, userEvent } from '../test/utils';
 import ServiceLocationDetailPage from './ServiceLocationDetailPage';
 import apiClient from '../api/client';
@@ -41,7 +41,11 @@ describe('ServiceLocationDetailPage', () => {
     vi.clearAllMocks();
   });
 
-  const mockApiResponses = (location: ServiceLocationDetailDto | null = mockLocation, regions: unknown[] = []) => {
+  const mockApiResponses = (
+    location: ServiceLocationDetailDto | null = mockLocation,
+    regions: unknown[] = [],
+    equipment: unknown[] = []
+  ) => {
     vi.mocked(apiClient.get).mockImplementation((url) => {
       if (url.includes('/service-locations/')) {
         return location ? Promise.resolve({ data: location }) : Promise.reject(new Error('Not found'));
@@ -49,10 +53,34 @@ describe('ServiceLocationDetailPage', () => {
       if (url.includes('/dispatch-regions')) {
         return Promise.resolve({ data: regions });
       }
+      if (url.startsWith('/work-orders/config/')) {
+        return Promise.resolve({ data: [] });
+      }
       if (url.includes('/work-orders')) {
         return Promise.resolve({
           data: { content: [], totalElements: 0, totalPages: 0, number: 0, size: 25 },
         });
+      }
+      if (url === '/equipment' || url.startsWith('/equipment?')) {
+        return Promise.resolve({
+          data: {
+            content: equipment,
+            totalElements: equipment.length,
+            totalPages: 1,
+            number: 0,
+            size: 100,
+          },
+        });
+      }
+      if (url === '/equipment/config/types') {
+        return Promise.resolve({ data: [] });
+      }
+      if (url.startsWith('/equipment/config/categories')) {
+        return Promise.resolve({ data: [] });
+      }
+      if (url.startsWith('/equipment/')) {
+        // Equipment getById — used when opening the edit dialog.
+        return Promise.resolve({ data: equipment[0] ?? null });
       }
       return Promise.reject(new Error('Unknown endpoint'));
     });
@@ -338,8 +366,8 @@ describe('ServiceLocationDetailPage', () => {
 
     // Check that all tabs are present
     expect(screen.getByRole('button', { name: /overview/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /work order/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /equipment/i })).toBeInTheDocument();
+    expect(within(screen.getByRole('navigation', { name: 'Tabs' })).getByRole('button', { name: /work order/i })).toBeInTheDocument();
+    expect(within(screen.getByRole('navigation', { name: 'Tabs' })).getByRole('button', { name: /equipment/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /activity/i })).toBeInTheDocument();
   });
 
@@ -354,7 +382,7 @@ describe('ServiceLocationDetailPage', () => {
     });
 
     // Click on Work Orders tab
-    const workOrdersTab = screen.getByRole('button', { name: /work order/i });
+    const workOrdersTab = within(screen.getByRole('navigation', { name: 'Tabs' })).getByRole('button', { name: /work order/i });
     await user.click(workOrdersTab);
 
     await waitFor(() => {
@@ -373,7 +401,7 @@ describe('ServiceLocationDetailPage', () => {
     });
 
     // Click on Equipment tab
-    const equipmentTab = screen.getByRole('button', { name: /equipment/i });
+    const equipmentTab = within(screen.getByRole('navigation', { name: 'Tabs' })).getByRole('button', { name: /equipment/i });
     await user.click(equipmentTab);
 
     await waitFor(() => {
@@ -489,7 +517,7 @@ describe('ServiceLocationDetailPage', () => {
     });
 
     // Switch to work orders tab
-    const workOrdersTab = screen.getByRole('button', { name: /work order/i });
+    const workOrdersTab = within(screen.getByRole('navigation', { name: 'Tabs' })).getByRole('button', { name: /work order/i });
     await user.click(workOrdersTab);
 
     await waitFor(() => {
@@ -509,7 +537,7 @@ describe('ServiceLocationDetailPage', () => {
     });
 
     // Switch to equipment tab
-    const equipmentTab = screen.getByRole('button', { name: /equipment/i });
+    const equipmentTab = within(screen.getByRole('navigation', { name: 'Tabs' })).getByRole('button', { name: /equipment/i });
     await user.click(equipmentTab);
 
     await waitFor(() => {
@@ -596,7 +624,7 @@ describe('ServiceLocationDetailPage', () => {
     });
 
     // Switch to work orders tab
-    const workOrdersTab = screen.getByRole('button', { name: /work order/i });
+    const workOrdersTab = within(screen.getByRole('navigation', { name: 'Tabs' })).getByRole('button', { name: /work order/i });
     await user.click(workOrdersTab);
 
     await waitFor(() => {
@@ -615,7 +643,7 @@ describe('ServiceLocationDetailPage', () => {
     });
 
     // Switch to equipment tab
-    const equipmentTab = screen.getByRole('button', { name: /equipment/i });
+    const equipmentTab = within(screen.getByRole('navigation', { name: 'Tabs' })).getByRole('button', { name: /equipment/i });
     await user.click(equipmentTab);
 
     await waitFor(() => {
@@ -657,5 +685,157 @@ describe('ServiceLocationDetailPage', () => {
     // Verify button exists and is clickable
     expect(backButton).toBeInTheDocument();
     await user.click(backButton);
+  });
+
+  describe('equipment tab', () => {
+    const equipmentList = [
+      {
+        id: 'eq-1',
+        name: 'Upstairs Furnace',
+        equipmentTypeName: 'HVAC',
+        equipmentCategoryName: 'Furnace',
+        make: 'Carrier',
+        model: 'C-100',
+        serialNumber: 'SN1',
+        locationOnSite: 'Basement',
+      },
+      {
+        id: 'eq-2',
+        name: 'Walk-in Cooler',
+        equipmentTypeName: null,
+        equipmentCategoryName: null,
+        make: null,
+        model: null,
+        serialNumber: 'SN2',
+        locationOnSite: null,
+      },
+    ];
+
+    it('renders equipment in a table when scoped to this service location', async () => {
+      mockApiResponses(mockLocation, [], equipmentList);
+      const user = userEvent.setup();
+
+      renderDetailPage();
+
+      await waitFor(() => expect(screen.getByText('Main Office')).toBeInTheDocument());
+      await user.click(within(screen.getByRole('navigation', { name: 'Tabs' })).getByRole('button', { name: /equipment/i }));
+
+      await waitFor(() => {
+        expect(screen.getByText('Upstairs Furnace')).toBeInTheDocument();
+      });
+      expect(screen.getByText('HVAC / Furnace')).toBeInTheDocument();
+      expect(screen.getByText('Carrier C-100')).toBeInTheDocument();
+      expect(screen.getByText('Basement')).toBeInTheDocument();
+      expect(screen.getByText('Walk-in Cooler')).toBeInTheDocument();
+    });
+
+    it('opens the equipment form dialog in create mode when Add is clicked', async () => {
+      mockApiResponses();
+      const user = userEvent.setup();
+
+      renderDetailPage();
+
+      await waitFor(() => expect(screen.getByText('Main Office')).toBeInTheDocument());
+      await user.click(within(screen.getByRole('navigation', { name: 'Tabs' })).getByRole('button', { name: /equipment/i }));
+      await user.click(await screen.findByRole('button', { name: /add equipment/i }));
+
+      // Dialog opens. Customer + service-location selectors should NOT be present
+      // because the location is locked to the service-location detail page.
+      await waitFor(() => expect(screen.getByRole('dialog')).toBeInTheDocument());
+      expect(screen.queryByLabelText(/customer/i)).not.toBeInTheDocument();
+      expect(screen.queryByLabelText(/service location/i)).not.toBeInTheDocument();
+      expect(screen.getByLabelText(/^name/i)).toBeInTheDocument();
+    });
+
+    it('opens the edit dialog with the full record when Edit is selected', async () => {
+      const fullRecord = { ...equipmentList[0], serviceLocationId: 'location-1', status: 'ACTIVE', attributes: '{}' };
+      mockApiResponses(mockLocation, [], [fullRecord]);
+      const user = userEvent.setup();
+
+      renderDetailPage();
+
+      await waitFor(() => expect(screen.getByText('Main Office')).toBeInTheDocument());
+      await user.click(within(screen.getByRole('navigation', { name: 'Tabs' })).getByRole('button', { name: /equipment/i }));
+      await waitFor(() => expect(screen.getByText('Upstairs Furnace')).toBeInTheDocument());
+
+      const moreButtons = screen.getAllByRole('button', { name: /more options/i });
+      await user.click(moreButtons[0]);
+      await user.click(await screen.findByRole('menuitem', { name: /edit/i }));
+
+      await waitFor(() => expect(screen.getByRole('dialog')).toBeInTheDocument());
+    });
+
+    it('opens the new-work-order dialog with the service location pre-selected', async () => {
+      mockApiResponses();
+      const user = userEvent.setup();
+
+      renderDetailPage();
+
+      await waitFor(() => expect(screen.getByText('Main Office')).toBeInTheDocument());
+
+      // Switch to work orders tab
+      await user.click(
+        within(screen.getByRole('navigation', { name: 'Tabs' })).getByRole('button', {
+          name: /work order/i,
+        })
+      );
+      await user.click(await screen.findByRole('button', { name: /new work order/i }));
+
+      // Dialog opens — the prefilled location's display value should be visible
+      // in the picker input. Picker formats as "{locationName} - {address}".
+      await waitFor(() => expect(screen.getByRole('dialog')).toBeInTheDocument());
+      expect(
+        screen.getByDisplayValue(/Main Office.*123 Main St.*Springfield/i)
+      ).toBeInTheDocument();
+      // The customer-mode toggle is hidden when prefilled — the customer is implied.
+      expect(screen.queryByRole('radio', { name: /existing customer/i })).not.toBeInTheDocument();
+      expect(screen.queryByRole('radio', { name: /new customer/i })).not.toBeInTheDocument();
+    });
+
+    it('clicking the equipment quick-stat switches to the equipment tab', async () => {
+      mockApiResponses(mockLocation, [], equipmentList);
+      const user = userEvent.setup();
+
+      renderDetailPage();
+
+      await waitFor(() => expect(screen.getByText('Main Office')).toBeInTheDocument());
+
+      // The quick-stat button shares the "Equipment" name with the tab; pick it
+      // by scoping to the rendered count (2 equipment items in the fixture).
+      const buttons = screen.getAllByRole('button', { name: /equipment/i });
+      // The tab is inside the Tabs nav; the stat is outside of it.
+      const tabsNav = screen.getByRole('navigation', { name: 'Tabs' });
+      const statButton = buttons.find((b) => !tabsNav.contains(b));
+      expect(statButton).toBeTruthy();
+      await user.click(statButton!);
+
+      // Equipment tab is now active — table should render.
+      await waitFor(() => {
+        expect(screen.getByText('Upstairs Furnace')).toBeInTheDocument();
+      });
+    });
+
+    it('confirms before deleting and calls the delete endpoint', async () => {
+      mockApiResponses(mockLocation, [], equipmentList);
+      const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+      const deleteSpy = vi.mocked(apiClient.delete).mockResolvedValue({ data: undefined });
+      const user = userEvent.setup();
+
+      renderDetailPage();
+
+      await waitFor(() => expect(screen.getByText('Main Office')).toBeInTheDocument());
+      await user.click(within(screen.getByRole('navigation', { name: 'Tabs' })).getByRole('button', { name: /equipment/i }));
+      await waitFor(() => expect(screen.getByText('Upstairs Furnace')).toBeInTheDocument());
+
+      const moreButtons = screen.getAllByRole('button', { name: /more options/i });
+      await user.click(moreButtons[0]);
+      await user.click(await screen.findByRole('menuitem', { name: /delete/i }));
+
+      await waitFor(() => {
+        expect(confirmSpy).toHaveBeenCalled();
+        expect(deleteSpy).toHaveBeenCalledWith('/equipment/eq-1');
+      });
+      confirmSpy.mockRestore();
+    });
   });
 });

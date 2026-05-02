@@ -105,6 +105,38 @@ describe('WorkOrdersList', () => {
     });
   });
 
+  it('shows the full address (street, city, state zip) under the location name', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({ data: pageOf([woAtLocation1]) });
+    renderWithProviders(<WorkOrdersList customerId="cust-1" />);
+    await waitFor(() => expect(screen.getByText('Main Office')).toBeInTheDocument());
+    expect(screen.getByText('1 Main St, Springfield, IL 62701')).toBeInTheDocument();
+  });
+
+  it('renders the service location cell as a link to the service location detail page', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({ data: pageOf([woAtLocation1]) });
+    renderWithProviders(<WorkOrdersList customerId="cust-1" />);
+    await waitFor(() => expect(screen.getByText('Main Office')).toBeInTheDocument());
+    const link = screen.getByRole('link', { name: /Main Office/ });
+    expect(link).toHaveAttribute('href', '/service-locations/loc-1');
+  });
+
+  it('falls back to the full address when the location has no locationName', async () => {
+    const woNoName: WorkOrderSummary = {
+      ...woAtLocation1,
+      id: 'wo-no-name',
+      workOrderNumber: 'WO-00099',
+      serviceLocation: {
+        id: 'loc-99',
+        address: { streetAddress: '7 No-Name Pl', city: 'Anytown', state: 'CA', zipCode: '90210' },
+      },
+    };
+    vi.mocked(apiClient.get).mockResolvedValue({ data: pageOf([woNoName]) });
+    renderWithProviders(<WorkOrdersList customerId="cust-1" />);
+    await waitFor(() => {
+      expect(screen.getByText('7 No-Name Pl, Anytown, CA 90210')).toBeInTheDocument();
+    });
+  });
+
   it('hides the Service Location column when showLocation is false', async () => {
     vi.mocked(apiClient.get).mockResolvedValue({ data: pageOf([woAtLocation1]) });
     renderWithProviders(

@@ -1315,6 +1315,177 @@ describe('CustomerDetailPage', () => {
     });
   });
 
+  describe('Customer equipment tab', () => {
+    const equipmentList = [
+      {
+        id: 'eq-1',
+        name: 'Roof Compressor',
+        equipmentTypeName: 'HVAC',
+        equipmentCategoryName: 'Compressor',
+        make: 'Carrier',
+        model: 'C-200',
+        serialNumber: 'SN-A1',
+        locationOnSite: 'Roof',
+      },
+      {
+        id: 'eq-2',
+        name: 'Walk-in Cooler',
+        equipmentTypeName: null,
+        equipmentCategoryName: null,
+        make: null,
+        model: null,
+        serialNumber: 'SN-B2',
+        locationOnSite: null,
+      },
+    ];
+
+    const mockEquipmentEndpoints = (equipment: unknown[] = []) => {
+      vi.mocked(apiClient.get).mockImplementation((url) => {
+        // Order matters: more specific paths first.
+        if (url.match(/^\/customers\/[^/]+\/service-locations$/)) {
+          return Promise.resolve({ data: [] });
+        }
+        if (url.match(/^\/customers\/[^/]+$/)) {
+          return Promise.resolve({ data: mockSimpleCustomer });
+        }
+        if (url.includes('/dispatch-regions')) {
+          return Promise.resolve({ data: [] });
+        }
+        if (url.startsWith('/work-orders/config/')) {
+          return Promise.resolve({ data: [] });
+        }
+        if (url.includes('/work-orders')) {
+          return Promise.resolve({
+            data: { content: [], totalElements: 0, totalPages: 0, number: 0, size: 25 },
+          });
+        }
+        if (url === '/equipment' || url.startsWith('/equipment?')) {
+          return Promise.resolve({
+            data: { content: equipment, totalElements: equipment.length, totalPages: 1, number: 0, size: 100 },
+          });
+        }
+        if (url === '/equipment/config/types') {
+          return Promise.resolve({ data: [] });
+        }
+        if (url.startsWith('/equipment/config/categories')) {
+          return Promise.resolve({ data: [] });
+        }
+        if (url.startsWith('/equipment/')) {
+          return Promise.resolve({ data: equipment[0] ?? null });
+        }
+        if (url.startsWith('/notifications/logs')) {
+          return Promise.resolve({ data: { content: [], totalElements: 0, totalPages: 0, number: 0, size: 25 } });
+        }
+        if (url.startsWith('/notification-preferences')) {
+          return Promise.resolve({ data: [] });
+        }
+        // Region lookup — used by the page header.
+        if (url.includes('/dispatch-regions/')) {
+          return Promise.resolve({ data: null });
+        }
+        return Promise.reject(new Error(`Unmocked: ${url}`));
+      });
+    };
+
+    const renderAtCustomerRoute = () =>
+      renderWithProviders(<CustomerDetailPage />, {
+        routes: [{ path: '/customers/:id', element: <CustomerDetailPage /> }],
+        initialPath: '/customers/1',
+      });
+
+    it('renders the customer\'s equipment in a table', async () => {
+      mockEquipmentEndpoints(equipmentList);
+      const user = userEvent.setup();
+
+      renderAtCustomerRoute();
+      await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
+
+      await user.click(screen.getByRole('button', { name: /equipment/i }));
+
+      await waitFor(() => expect(screen.getByText('Roof Compressor')).toBeInTheDocument());
+      expect(screen.getByText('HVAC / Compressor')).toBeInTheDocument();
+      expect(screen.getByText('Carrier C-200')).toBeInTheDocument();
+      expect(screen.getByText('Walk-in Cooler')).toBeInTheDocument();
+    });
+
+    it('passes customerId to the list endpoint', async () => {
+      mockEquipmentEndpoints([]);
+
+      renderAtCustomerRoute();
+      await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
+
+      await waitFor(() => {
+        const equipmentCalls = vi.mocked(apiClient.get).mock.calls.filter(
+          (c) => typeof c[0] === 'string' && c[0] === '/equipment'
+        );
+        const lastCall = equipmentCalls[equipmentCalls.length - 1];
+        const params = (lastCall?.[1] as { params?: Record<string, unknown> })?.params;
+        expect(params).toMatchObject({ customerId: '1' });
+      });
+    });
+
+    it('opens the equipment form dialog with the customer locked but a service-location picker visible', async () => {
+      mockEquipmentEndpoints();
+      const user = userEvent.setup();
+
+      renderAtCustomerRoute();
+      await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
+
+      await user.click(screen.getByRole('button', { name: /equipment/i }));
+      await user.click(await screen.findByRole('button', { name: /add equipment/i }));
+
+      await waitFor(() => expect(screen.getByRole('dialog')).toBeInTheDocument());
+
+      // Customer picker is hidden (locked); service-location picker is visible.
+      expect(screen.queryByLabelText(/^customer/i)).not.toBeInTheDocument();
+      expect(screen.getByLabelText(/service location/i)).toBeInTheDocument();
+      expect(screen.getByLabelText(/^name/i)).toBeInTheDocument();
+    });
+  });
+
+  describe('New work order from customer page', () => {
+    it('opens the dialog with the customer prefilled and the existing/new toggle hidden', async () => {
+      const user = userEvent.setup();
+      vi.mocked(apiClient.get).mockImplementation((url) => {
+        if (url.endsWith('/service-locations')) {
+          return Promise.resolve({ data: [] });
+        }
+        if (url.includes('/customers/')) {
+          return Promise.resolve({ data: mockSimpleCustomer });
+        }
+        if (url.includes('/dispatch-regions')) {
+          return Promise.resolve({ data: [] });
+        }
+        if (url.startsWith('/work-orders/config/')) {
+          return Promise.resolve({ data: [] });
+        }
+        if (url.includes('/work-orders')) {
+          return Promise.resolve({
+            data: { content: [], totalElements: 0, totalPages: 0, number: 0, size: 25 },
+          });
+        }
+        if (url.includes('/notifications')) {
+          return Promise.resolve({ data: { content: [], totalElements: 0, totalPages: 0, number: 0, size: 25 } });
+        }
+        return Promise.reject(new Error(`Unmocked: ${url}`));
+      });
+
+      renderWithProviders(<CustomerDetailPage />);
+
+      await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
+
+      // Switch to work orders tab
+      await user.click(screen.getByRole('button', { name: /work order/i }));
+      await user.click(await screen.findByRole('button', { name: /new work order/i }));
+
+      await waitFor(() => expect(screen.getByRole('dialog')).toBeInTheDocument());
+
+      // Customer-mode radios should not appear when prefilled
+      expect(screen.queryByRole('radio', { name: /existing customer/i })).not.toBeInTheDocument();
+      expect(screen.queryByRole('radio', { name: /new customer/i })).not.toBeInTheDocument();
+    });
+  });
+
   describe('Tab navigation and interaction', () => {
     it('switches to all tabs for simple customer', async () => {
       const user = userEvent.setup();

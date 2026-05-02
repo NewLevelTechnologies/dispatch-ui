@@ -25,6 +25,19 @@ interface EquipmentFormDialogProps {
   isOpen: boolean;
   onClose: () => void;
   equipment?: Equipment | null;
+  /**
+   * When provided in create mode, locks the equipment to this service location
+   * (skips the customer + service-location pickers). Used when adding equipment
+   * from a service-location detail page where the location context is implicit.
+   */
+  lockedServiceLocationId?: string;
+  /**
+   * When provided in create mode, locks the customer (skips the customer picker)
+   * but keeps the service-location picker visible — restricted to that customer's
+   * locations via the existing cascade. Used from a customer detail page where
+   * the customer is implicit but the location still needs to be picked.
+   */
+  lockedCustomerId?: string;
 }
 
 interface FormState {
@@ -66,7 +79,7 @@ const emptyForm: FormState = {
   status: EquipmentStatus.ACTIVE,
 };
 
-export default function EquipmentFormDialog({ isOpen, onClose, equipment }: EquipmentFormDialogProps) {
+export default function EquipmentFormDialog({ isOpen, onClose, equipment, lockedServiceLocationId, lockedCustomerId }: EquipmentFormDialogProps) {
   const queryClient = useQueryClient();
   const { t } = useTranslation();
   const { getName } = useGlossary();
@@ -99,9 +112,13 @@ export default function EquipmentFormDialog({ isOpen, onClose, equipment }: Equi
         status: equipment.status,
       });
     } else {
-      setFormData(emptyForm);
+      setFormData({
+        ...emptyForm,
+        customerId: lockedCustomerId ?? '',
+        serviceLocationId: lockedServiceLocationId ?? '',
+      });
     }
-  }, [isOpen, equipment]);
+  }, [isOpen, equipment, lockedServiceLocationId, lockedCustomerId]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
   // ===== Reference data =====
@@ -117,18 +134,25 @@ export default function EquipmentFormDialog({ isOpen, onClose, equipment }: Equi
     enabled: isOpen && Boolean(formData.equipmentTypeId),
   });
 
-  // Customers — only needed for create mode (to drive the service-location cascade).
+  // Customers + locations are fetched only when we need to drive cascade pickers.
+  // - In edit mode the location is fixed.
+  // - With a locked service location, both pickers are hidden.
+  // - With a locked customer, the customer picker is hidden but the service-location
+  //   picker is still shown (driven by the customer's locations).
+  const needsCustomerList = isOpen && !isEdit && !lockedServiceLocationId && !lockedCustomerId;
+  const needsCustomerLocations = isOpen && !isEdit && !lockedServiceLocationId;
+
   const { data: customersPage } = useQuery({
     queryKey: ['equipment-form-customers'],
     queryFn: () => customerApi.getAllPaginated({ page: 1, limit: 200, status: 'ACTIVE' }),
-    enabled: isOpen && !isEdit,
+    enabled: needsCustomerList,
   });
   const customers: CustomerListDto[] = customersPage?.content ?? [];
 
   const { data: customerLocations = [] } = useQuery({
     queryKey: ['customer-service-locations', formData.customerId],
     queryFn: () => customerApi.getServiceLocations(formData.customerId),
-    enabled: isOpen && !isEdit && Boolean(formData.customerId),
+    enabled: needsCustomerLocations && Boolean(formData.customerId),
   });
 
   // ===== Mutations =====
@@ -222,30 +246,32 @@ export default function EquipmentFormDialog({ isOpen, onClose, equipment }: Equi
 
           <Fieldset>
             <FieldGroup>
-              {!isEdit && (
+              {!isEdit && !lockedServiceLocationId && (
                 <>
-                  <Field>
-                    <Label>{getName('customer')} *</Label>
-                    <Select
-                      name="customerId"
-                      value={formData.customerId}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          customerId: e.target.value,
-                          serviceLocationId: '',
-                        })
-                      }
-                      required
-                    >
-                      <option value="">{t('common.form.select')}</option>
-                      {customers.map((c) => (
-                        <option key={c.id} value={c.id}>
-                          {c.name}
-                        </option>
-                      ))}
-                    </Select>
-                  </Field>
+                  {!lockedCustomerId && (
+                    <Field>
+                      <Label>{getName('customer')} *</Label>
+                      <Select
+                        name="customerId"
+                        value={formData.customerId}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            customerId: e.target.value,
+                            serviceLocationId: '',
+                          })
+                        }
+                        required
+                      >
+                        <option value="">{t('common.form.select')}</option>
+                        {customers.map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.name}
+                          </option>
+                        ))}
+                      </Select>
+                    </Field>
+                  )}
 
                   <Field>
                     <Label>{t('equipment.form.serviceLocation')} *</Label>

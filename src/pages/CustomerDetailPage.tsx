@@ -1,13 +1,23 @@
 import { useState, useMemo } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { customerApi, notificationApi, dispatchRegionApi } from '../api';
+import {
+  customerApi,
+  notificationApi,
+  dispatchRegionApi,
+  equipmentApi,
+  EquipmentStatus,
+  type Equipment,
+  type EquipmentSummary,
+} from '../api';
 import { useGlossary } from '../contexts/GlossaryContext';
 import { useHasCapability } from '../hooks/useCurrentUser';
 import AppLayout from '../components/AppLayout';
 import ServiceLocationFormDialog from '../components/ServiceLocationFormDialog';
 import CustomerFormDialog from '../components/CustomerFormDialog';
+import WorkOrderFormDialog from '../components/WorkOrderFormDialog';
+import EquipmentFormDialog from '../components/EquipmentFormDialog';
 import AdditionalContactsList from '../components/AdditionalContactsList';
 import WorkOrdersList from '../components/WorkOrdersList';
 import { workOrdersListQueryOptions } from '../api/workOrdersListQuery';
@@ -20,6 +30,7 @@ import { Text, Strong } from '../components/catalyst/text';
 import { Button } from '../components/catalyst/button';
 import { Badge } from '../components/catalyst/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/catalyst/table';
+import { Dropdown, DropdownButton, DropdownItem, DropdownLabel, DropdownMenu } from '../components/catalyst/dropdown';
 import { Input, InputGroup } from '../components/catalyst/input';
 import {
   ArrowLeftIcon,
@@ -31,7 +42,8 @@ import {
   EnvelopeIcon,
   CreditCardIcon,
   MapPinIcon,
-  BellIcon
+  BellIcon,
+  EllipsisVerticalIcon,
 } from '@heroicons/react/24/outline';
 
 type TabId = 'overview' | 'work-orders' | 'financial' | 'equipment' | 'activity';
@@ -56,7 +68,11 @@ export default function CustomerDetailPage() {
     }
   };
   const [isNotificationDialogOpen, setIsNotificationDialogOpen] = useState(false);
+  const [isNewWorkOrderOpen, setIsNewWorkOrderOpen] = useState(false);
+  const [isEquipmentDialogOpen, setIsEquipmentDialogOpen] = useState(false);
+  const [editingEquipment, setEditingEquipment] = useState<Equipment | null>(null);
   const [locationSearchQuery, setLocationSearchQuery] = useState('');
+  const queryClient = useQueryClient();
 
   // Permission checks
   const canEditCustomers = useHasCapability('EDIT_CUSTOMERS');
@@ -71,6 +87,131 @@ export default function CustomerDetailPage() {
   // Disabled until the customer loads (id ?? '' is falsy → enabled: false).
   const { data: workOrdersData } = useQuery(
     workOrdersListQueryOptions({ customerId: customer?.id ?? '' })
+  );
+
+  // Equipment scoped to the customer (across all their service locations).
+  const { data: equipmentPage, isLoading: equipmentLoading, error: equipmentError } = useQuery({
+    queryKey: ['equipment', { customerId: id }],
+    queryFn: () =>
+      equipmentApi.list({
+        customerId: id!,
+        status: EquipmentStatus.ACTIVE,
+        size: 100,
+      }),
+    enabled: !!id,
+  });
+  const equipment: EquipmentSummary[] = equipmentPage?.content ?? [];
+
+  const deleteEquipmentMutation = useMutation({
+    mutationFn: (equipmentId: string) => equipmentApi.delete(equipmentId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['equipment', { customerId: id }] });
+    },
+  });
+
+  const handleEditEquipment = async (item: EquipmentSummary) => {
+    const full = await equipmentApi.getById(item.id);
+    setEditingEquipment(full);
+    setIsEquipmentDialogOpen(true);
+  };
+
+  const handleDeleteEquipment = (item: EquipmentSummary) => {
+    if (window.confirm(t('common.actions.deleteConfirm', { name: item.name }))) {
+      deleteEquipmentMutation.mutate(item.id);
+    }
+  };
+
+  const formatTypeCategory = (item: EquipmentSummary) => {
+    if (item.equipmentTypeName && item.equipmentCategoryName) {
+      return `${item.equipmentTypeName} / ${item.equipmentCategoryName}`;
+    }
+    return item.equipmentTypeName || item.equipmentCategoryName || '-';
+  };
+
+  const formatMakeModel = (item: EquipmentSummary) => {
+    if (item.make && item.model) return `${item.make} ${item.model}`;
+    return item.make || item.model || '-';
+  };
+
+  const equipmentTabContent = (
+    <div>
+      <div className="flex items-center justify-between mb-3">
+        <Subheading>{getName('equipment')}</Subheading>
+        <Button
+          plain
+          onClick={() => {
+            setEditingEquipment(null);
+            setIsEquipmentDialogOpen(true);
+          }}
+        >
+          <PlusIcon className="size-4" />
+          {t('common.actions.add', { entity: getName('equipment') })}
+        </Button>
+      </div>
+
+      {equipmentError && (
+        <div className="mb-3 rounded-lg bg-red-50 p-3 ring-1 ring-red-200 dark:bg-red-950/10 dark:ring-red-900/20">
+          <Text className="text-sm text-red-800 dark:text-red-400">
+            {t('common.actions.errorLoading', { entities: getName('equipment', true) })}: {(equipmentError as Error).message}
+          </Text>
+        </div>
+      )}
+
+      {equipmentLoading ? (
+        <div className="rounded-lg border border-zinc-200 p-6 text-center dark:border-zinc-800">
+          <Text className="text-zinc-500 dark:text-zinc-400">
+            {t('common.actions.loading', { entities: getName('equipment', true) })}
+          </Text>
+        </div>
+      ) : equipment.length === 0 ? (
+        <div className="rounded-lg border border-zinc-200 p-8 text-center dark:border-zinc-800">
+          <Text className="text-zinc-500 dark:text-zinc-400">
+            {t('common.actions.noEntitiesYet', { entities: getName('equipment', true) })}
+          </Text>
+        </div>
+      ) : (
+        <Table dense className="[--gutter:theme(spacing.1)] text-sm">
+          <TableHead>
+            <TableRow>
+              <TableHeader>{t('common.form.name')}</TableHeader>
+              <TableHeader>{t('equipment.table.type')}</TableHeader>
+              <TableHeader>{t('equipment.table.makeModel')}</TableHeader>
+              <TableHeader>{t('equipment.form.serialNumber')}</TableHeader>
+              <TableHeader>{t('equipment.form.locationOnSite')}</TableHeader>
+              <TableHeader></TableHeader>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {equipment.map((item) => (
+              <TableRow key={item.id}>
+                <TableCell className="font-medium">{item.name}</TableCell>
+                <TableCell>{formatTypeCategory(item)}</TableCell>
+                <TableCell>{formatMakeModel(item)}</TableCell>
+                <TableCell>{item.serialNumber || '-'}</TableCell>
+                <TableCell>{item.locationOnSite || '-'}</TableCell>
+                <TableCell>
+                  <div className="-mx-3 -my-1.5 sm:-mx-2.5">
+                    <Dropdown>
+                      <DropdownButton plain aria-label={t('common.moreOptions')}>
+                        <EllipsisVerticalIcon className="size-5" />
+                      </DropdownButton>
+                      <DropdownMenu anchor="bottom end">
+                        <DropdownItem onClick={() => handleEditEquipment(item)}>
+                          <DropdownLabel>{t('common.edit')}</DropdownLabel>
+                        </DropdownItem>
+                        <DropdownItem onClick={() => handleDeleteEquipment(item)}>
+                          <DropdownLabel>{t('common.delete')}</DropdownLabel>
+                        </DropdownItem>
+                      </DropdownMenu>
+                    </Dropdown>
+                  </div>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      )}
+    </div>
   );
 
   // Fetch notification preferences to show opt-in count
@@ -152,11 +293,10 @@ export default function CustomerDetailPage() {
   };
 
   // Tab configuration
-  const tabs = [
-    { id: 'overview', label: t('customers.tabs.overview'), count: undefined },
+  const tabs = [    { id: 'overview', label: t('customers.tabs.overview'), count: undefined },
     { id: 'work-orders', label: getName('work_order', true), count: workOrdersData?.totalElements ?? 0 },
     { id: 'financial', label: t('customers.tabs.financial'), count: undefined },
-    { id: 'equipment', label: getName('equipment'), count: undefined },
+    { id: 'equipment', label: getName('equipment'), count: equipmentPage?.totalElements ?? 0 },
     { id: 'activity', label: t('customers.tabs.activity'), count: undefined },
   ];
 
@@ -304,8 +444,7 @@ export default function CustomerDetailPage() {
                 <div>
                   <div className="flex items-center justify-between mb-3">
                     <Subheading>{t('common.recentEntities', { entities: getName('work_order', true) })}</Subheading>
-                    {/* TODO: Add work order permission check when equipment management is implemented */}
-                    <Button plain>
+                    <Button plain onClick={() => setIsNewWorkOrderOpen(true)}>
                       <PlusIcon className="size-4" />
                       {t('common.actions.new', { entity: getName('work_order') })}
                     </Button>
@@ -320,23 +459,7 @@ export default function CustomerDetailPage() {
                 </div>
               )}
 
-              {activeTab === 'equipment' && (
-                <div>
-                  <div className="flex items-center justify-between mb-3">
-                    <Subheading>{getName('equipment')}</Subheading>
-                    {/* TODO: Add equipment permission check when equipment management is implemented */}
-                    <Button plain>
-                      <PlusIcon className="size-4" />
-                      {t('common.actions.add', { entity: getName('equipment') })}
-                    </Button>
-                  </div>
-                  <div className="rounded-lg border border-zinc-200 p-8 text-center dark:border-zinc-800">
-                    <Text className="text-zinc-500 dark:text-zinc-400">
-                      {t('common.actions.noEntitiesYet', { entities: getName('equipment', true) })}
-                    </Text>
-                  </div>
-                </div>
-              )}
+              {activeTab === 'equipment' && equipmentTabContent}
 
               {activeTab === 'activity' && (
                 <div className="rounded-lg border border-zinc-200 p-3 dark:border-zinc-800">
@@ -564,7 +687,16 @@ export default function CustomerDetailPage() {
         )}
 
         {activeTab === 'work-orders' && (
-          <WorkOrdersList customerId={customer.id} />
+          <div>
+            <div className="flex items-center justify-between mb-3">
+              <Subheading>{t('common.recentEntities', { entities: getName('work_order', true) })}</Subheading>
+              <Button plain onClick={() => setIsNewWorkOrderOpen(true)}>
+                <PlusIcon className="size-4" />
+                {t('common.actions.new', { entity: getName('work_order') })}
+              </Button>
+            </div>
+            <WorkOrdersList customerId={customer.id} />
+          </div>
         )}
 
         {activeTab === 'financial' && (
@@ -573,13 +705,7 @@ export default function CustomerDetailPage() {
           </div>
         )}
 
-        {activeTab === 'equipment' && (
-          <div className="rounded-lg border border-zinc-200 p-8 text-center dark:border-zinc-800">
-            <Text className="text-zinc-500 dark:text-zinc-400">
-              {t('common.actions.noEntitiesYet', { entities: getName('equipment', true) })}
-            </Text>
-          </div>
-        )}
+        {activeTab === 'equipment' && equipmentTabContent}
 
         {activeTab === 'activity' && (
           <div className="rounded-lg border border-zinc-200 p-3 dark:border-zinc-800">
@@ -606,6 +732,20 @@ export default function CustomerDetailPage() {
         onClose={() => setIsNotificationDialogOpen(false)}
         customerId={customer.id}
         contactName={customer.name}
+      />
+      <WorkOrderFormDialog
+        isOpen={isNewWorkOrderOpen}
+        onClose={() => setIsNewWorkOrderOpen(false)}
+        prefilledCustomer={{ id: customer.id, name: customer.name }}
+      />
+      <EquipmentFormDialog
+        isOpen={isEquipmentDialogOpen}
+        onClose={() => {
+          setIsEquipmentDialogOpen(false);
+          setEditingEquipment(null);
+        }}
+        equipment={editingEquipment}
+        lockedCustomerId={customer.id}
       />
     </AppLayout>
   );

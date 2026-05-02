@@ -87,9 +87,16 @@ interface WorkOrderFormDialogProps {
   // full detail via getById on open so it has work items, internal notes, cancellation
   // reason, and any other detail-only fields.
   workOrder?: WorkOrderSummary | WorkOrder | null;
+  // Pre-fill the customer + service location in create mode. Used when launching
+  // the dialog from a service-location detail page where that context is implicit.
+  prefilledServiceLocation?: ServiceLocationSearchResult | null;
+  // Restrict to a known customer in create mode without picking a specific
+  // service location. Used when launching from a customer detail page — the
+  // service-location picker filters to this customer's locations only.
+  prefilledCustomer?: { id: string; name: string } | null;
 }
 
-export default function WorkOrderFormDialog({ isOpen, onClose, workOrder }: WorkOrderFormDialogProps) {
+export default function WorkOrderFormDialog({ isOpen, onClose, workOrder, prefilledServiceLocation, prefilledCustomer }: WorkOrderFormDialogProps) {
   const queryClient = useQueryClient();
   const { t } = useTranslation();
   const { getName } = useGlossary();
@@ -227,8 +234,18 @@ export default function WorkOrderFormDialog({ isOpen, onClose, workOrder }: Work
       // Create mode - reset everything
       setCustomerMode('existing');
       setIsCreatingCustomer(false);
-      setFormData(EMPTY_FORM);
-      setSelectedLocation(null);
+      setFormData(
+        prefilledServiceLocation
+          ? {
+              ...EMPTY_FORM,
+              customerId: prefilledServiceLocation.customerId,
+              serviceLocationId: prefilledServiceLocation.id,
+            }
+          : prefilledCustomer
+            ? { ...EMPTY_FORM, customerId: prefilledCustomer.id }
+            : EMPTY_FORM
+      );
+      setSelectedLocation(prefilledServiceLocation ?? null);
       setLocationName('');
       setLocationPhone('');
       setLocationEmail('');
@@ -254,7 +271,7 @@ export default function WorkOrderFormDialog({ isOpen, onClose, workOrder }: Work
     /* eslint-enable react-hooks/set-state-in-effect */
     // Re-runs on open, on workOrder identity change, and again when the detail
     // query lands so detail-only fields populate when they arrive.
-  }, [effective, isOpen, defaultRegionId]);
+  }, [effective, isOpen, defaultRegionId, prefilledServiceLocation, prefilledCustomer]);
 
   const createMutation = useMutation({
     mutationFn: (data: CreateWorkOrderRequest) => workOrderApi.create(data),
@@ -446,24 +463,29 @@ export default function WorkOrderFormDialog({ isOpen, onClose, workOrder }: Work
         <form onSubmit={handleSubmit} id="work-order-form" className="space-y-3">
           {!isEdit && (
             <>
-              {/* Radio Toggle: Existing vs New Customer */}
-              <Fieldset>
-                <Legend>{getName('customer')}</Legend>
-                <RadioGroup
-                  value={customerMode}
-                  onChange={(value) => setCustomerMode(value as 'existing' | 'new')}
-                  className="mt-2 flex gap-6"
-                >
-                  <RadioField>
-                    <Radio value="existing" />
-                    <Label>{t('workOrders.form.existingCustomer', { entity: getName('customer') })}</Label>
-                  </RadioField>
-                  <RadioField>
-                    <Radio value="new" />
-                    <Label>{t('workOrders.form.newCustomer', { entity: getName('customer') })}</Label>
-                  </RadioField>
-                </RadioGroup>
-              </Fieldset>
+              {/* Radio Toggle: Existing vs New Customer.
+                  Hidden when launched from a service-location or customer
+                  detail page — the customer is already known in those flows,
+                  so the choice doesn't apply. */}
+              {!prefilledServiceLocation && !prefilledCustomer && (
+                <Fieldset>
+                  <Legend>{getName('customer')}</Legend>
+                  <RadioGroup
+                    value={customerMode}
+                    onChange={(value) => setCustomerMode(value as 'existing' | 'new')}
+                    className="mt-2 flex gap-6"
+                  >
+                    <RadioField>
+                      <Radio value="existing" />
+                      <Label>{t('workOrders.form.existingCustomer', { entity: getName('customer') })}</Label>
+                    </RadioField>
+                    <RadioField>
+                      <Radio value="new" />
+                      <Label>{t('workOrders.form.newCustomer', { entity: getName('customer') })}</Label>
+                    </RadioField>
+                  </RadioGroup>
+                </Fieldset>
+              )}
 
               {/* Conditional: Existing Customer - Service Location Picker */}
               {customerMode === 'existing' && (
@@ -473,6 +495,7 @@ export default function WorkOrderFormDialog({ isOpen, onClose, workOrder }: Work
                   label={getName('service_location')}
                   required
                   autoFocus
+                  restrictToCustomer={prefilledCustomer ?? undefined}
                 />
               )}
 

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { customerApi, type ServiceLocationSearchResult } from '../api';
 import { Field, Label } from './catalyst/fieldset';
@@ -10,6 +10,12 @@ interface ServiceLocationPickerProps {
   label?: string;
   required?: boolean;
   autoFocus?: boolean;
+  /**
+   * When provided, the picker stops searching tenant-wide and instead lists
+   * only this customer's service locations. The dropdown opens on focus
+   * (no 2-char minimum), and typing client-side filters that small list.
+   */
+  restrictToCustomer?: { id: string; name: string } | null;
 }
 
 export default function ServiceLocationPicker({
@@ -18,6 +24,7 @@ export default function ServiceLocationPicker({
   label = 'Service Location',
   required = false,
   autoFocus = false,
+  restrictToCustomer,
 }: ServiceLocationPickerProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
@@ -31,18 +38,63 @@ export default function ServiceLocationPicker({
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
-  // Backend search
-  const { data: searchResults, isLoading } = useQuery({
-    queryKey: ['service-locations-search', debouncedQuery],
-    queryFn: () => customerApi.searchServiceLocations(debouncedQuery, 0, 50),
-    enabled: debouncedQuery.length >= 2,
-    staleTime: 30000, // Cache for 30 seconds
+  // Restricted mode: fetch this customer's locations once and filter client-side.
+  const { data: customerLocations = [], isLoading: customerLocationsLoading } = useQuery({
+    queryKey: ['customer-service-locations', restrictToCustomer?.id],
+    queryFn: () => customerApi.getServiceLocations(restrictToCustomer!.id),
+    enabled: !!restrictToCustomer?.id,
+    staleTime: 30000,
   });
 
-  const locations = searchResults?.content || [];
+  // Tenant-wide mode: backend search.
+  const { data: searchResults, isLoading: searchLoading } = useQuery({
+    queryKey: ['service-locations-search', debouncedQuery],
+    queryFn: () => customerApi.searchServiceLocations(debouncedQuery, 0, 50),
+    enabled: !restrictToCustomer && debouncedQuery.length >= 2,
+    staleTime: 30000,
+  });
 
-  // Derive showDropdown from state instead of setting in effect
-  const shouldShowDropdown = showDropdown && searchQuery.length >= 2;
+  const locations: ServiceLocationSearchResult[] = useMemo(() => {
+    if (restrictToCustomer) {
+      const customerName = restrictToCustomer.name;
+      const adapted = customerLocations.map((loc) => ({
+        id: loc.id,
+        customerId: loc.customerId,
+        customerName,
+        locationName: loc.locationName ?? null,
+        address: {
+          streetAddress: loc.address.streetAddress,
+          city: loc.address.city,
+          state: loc.address.state,
+          zipCode: loc.address.zipCode,
+        },
+        siteContactName: loc.siteContactName ?? null,
+        siteContactPhone: loc.siteContactPhone ?? null,
+        status: loc.status === 'CLOSED' ? 'INACTIVE' : loc.status,
+      } satisfies ServiceLocationSearchResult));
+      const q = searchQuery.trim().toLowerCase();
+      if (!q) return adapted;
+      return adapted.filter((l) => {
+        const haystack = [
+          l.locationName ?? '',
+          l.address.streetAddress,
+          l.address.city,
+          l.address.state,
+          l.address.zipCode,
+        ]
+          .join(' ')
+          .toLowerCase();
+        return haystack.includes(q);
+      });
+    }
+    return searchResults?.content ?? [];
+  }, [restrictToCustomer, customerLocations, searchResults, searchQuery]);
+
+  const isLoading = restrictToCustomer ? customerLocationsLoading : searchLoading;
+
+  // Restricted mode opens on focus (small list, no min length needed).
+  // Tenant-wide mode requires 2+ chars to avoid a useless empty fetch.
+  const shouldShowDropdown = showDropdown && (restrictToCustomer ? true : searchQuery.length >= 2);
 
   const handleSelect = useCallback(
     (location: ServiceLocationSearchResult) => {
@@ -55,7 +107,7 @@ export default function ServiceLocationPicker({
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchQuery(e.target.value);
-    if (e.target.value.length >= 2) {
+    if (restrictToCustomer || e.target.value.length >= 2) {
       setShowDropdown(true);
     }
   };
@@ -79,6 +131,9 @@ export default function ServiceLocationPicker({
           onFocus={() => {
             if (value) {
               setSearchQuery('');
+            }
+            if (restrictToCustomer) {
+              setShowDropdown(true);
             }
           }}
           placeholder="Search by customer, address, or phone..."
@@ -120,7 +175,7 @@ export default function ServiceLocationPicker({
         )}
       </div>
 
-      {searchQuery.length > 0 && searchQuery.length < 2 && (
+      {!restrictToCustomer && searchQuery.length > 0 && searchQuery.length < 2 && (
         /* eslint-disable-next-line i18next/no-literal-string */
         <p className="mt-1 text-sm text-zinc-500">Type at least 2 characters to search</p>
       )}

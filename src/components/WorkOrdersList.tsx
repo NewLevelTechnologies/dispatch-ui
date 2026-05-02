@@ -57,6 +57,10 @@ function formatDate(iso: string | null | undefined): string {
   });
 }
 
+function formatAddress(address: { streetAddress: string; city: string; state: string; zipCode: string }): string {
+  return `${address.streetAddress}, ${address.city}, ${address.state} ${address.zipCode}`;
+}
+
 interface Props {
   customerId: string;
   /** When provided, narrows the list to WOs at this service location (server-side filter). */
@@ -140,18 +144,31 @@ export default function WorkOrdersList({
               </TableCell>
               {showLocation && (
                 <TableCell>
-                  <div className="flex flex-col">
-                    <span>
-                      {wo.serviceLocation?.locationName ||
-                        wo.serviceLocation?.address?.streetAddress ||
-                        '-'}
-                    </span>
-                    {wo.serviceLocation?.address && (
-                      <span className="text-xs text-zinc-500">
-                        {`${wo.serviceLocation.address.city}, ${wo.serviceLocation.address.state}`}
-                      </span>
-                    )}
-                  </div>
+                  {wo.serviceLocation ? (
+                    <RouterLink
+                      to={`/service-locations/${wo.serviceLocation.id}`}
+                      className="flex flex-col text-zinc-700 hover:text-blue-600 hover:underline dark:text-zinc-300 dark:hover:text-blue-400"
+                    >
+                      {wo.serviceLocation.locationName ? (
+                        <>
+                          <span>{wo.serviceLocation.locationName}</span>
+                          {wo.serviceLocation.address && (
+                            <span className="text-xs text-zinc-500 dark:text-zinc-500">
+                              {formatAddress(wo.serviceLocation.address)}
+                            </span>
+                          )}
+                        </>
+                      ) : (
+                        <span>
+                          {wo.serviceLocation.address
+                            ? formatAddress(wo.serviceLocation.address)
+                            : '-'}
+                        </span>
+                      )}
+                    </RouterLink>
+                  ) : (
+                    <span>-</span>
+                  )}
                 </TableCell>
               )}
               <TableCell>

@@ -485,6 +485,208 @@ describe('ServiceLocationPicker', () => {
     expect(apiClient.get).toHaveBeenCalledTimes(1);
   });
 
+  describe('restrictToCustomer mode', () => {
+    const customerLocations = [
+      {
+        id: 'loc-1',
+        customerId: 'customer-1',
+        dispatchRegionId: 'r1',
+        locationName: 'Main Office',
+        address: {
+          streetAddress: '123 Main St',
+          city: 'Atlanta',
+          state: 'GA',
+          zipCode: '30301',
+        },
+        additionalContacts: [],
+        status: 'ACTIVE' as const,
+        createdAt: '2024-01-01T00:00:00Z',
+        updatedAt: '2024-01-02T00:00:00Z',
+        version: 1,
+      },
+      {
+        id: 'loc-2',
+        customerId: 'customer-1',
+        dispatchRegionId: 'r1',
+        locationName: null,
+        address: {
+          streetAddress: '999 Side Rd',
+          city: 'Marietta',
+          state: 'GA',
+          zipCode: '30060',
+        },
+        additionalContacts: [],
+        status: 'ACTIVE' as const,
+        createdAt: '2024-01-01T00:00:00Z',
+        updatedAt: '2024-01-02T00:00:00Z',
+        version: 1,
+      },
+    ];
+
+    it('fetches the customer service-locations endpoint, not the tenant search', async () => {
+      const user = userEvent.setup();
+      vi.mocked(apiClient.get).mockResolvedValue({ data: customerLocations });
+
+      renderWithProviders(
+        <ServiceLocationPicker
+          value={null}
+          onChange={mockOnChange}
+          restrictToCustomer={{ id: 'customer-1', name: 'Acme Inc' }}
+        />
+      );
+
+      await user.click(screen.getByRole('textbox'));
+
+      await waitFor(() => {
+        expect(apiClient.get).toHaveBeenCalledWith('/customers/customer-1/service-locations');
+      });
+      expect(apiClient.get).not.toHaveBeenCalledWith(
+        '/service-locations/search',
+        expect.anything()
+      );
+    });
+
+    it('opens the dropdown on focus with no minimum character requirement', async () => {
+      const user = userEvent.setup();
+      vi.mocked(apiClient.get).mockResolvedValue({ data: customerLocations });
+
+      renderWithProviders(
+        <ServiceLocationPicker
+          value={null}
+          onChange={mockOnChange}
+          restrictToCustomer={{ id: 'customer-1', name: 'Acme Inc' }}
+        />
+      );
+
+      await user.click(screen.getByRole('textbox'));
+
+      await waitFor(() => {
+        expect(screen.getByText('Main Office')).toBeInTheDocument();
+      });
+      expect(screen.getByText('999 Side Rd, Marietta, GA 30060')).toBeInTheDocument();
+    });
+
+    it('filters the customer locations client-side as the user types', async () => {
+      const user = userEvent.setup();
+      vi.mocked(apiClient.get).mockResolvedValue({ data: customerLocations });
+
+      renderWithProviders(
+        <ServiceLocationPicker
+          value={null}
+          onChange={mockOnChange}
+          restrictToCustomer={{ id: 'customer-1', name: 'Acme Inc' }}
+        />
+      );
+
+      const input = screen.getByRole('textbox');
+      await user.click(input);
+      await waitFor(() => expect(screen.getByText('Main Office')).toBeInTheDocument());
+
+      await user.type(input, 'side');
+
+      await waitFor(() => {
+        expect(screen.queryByText('Main Office')).not.toBeInTheDocument();
+      });
+      expect(screen.getByText('999 Side Rd, Marietta, GA 30060')).toBeInTheDocument();
+    });
+
+    it('does not show the "type at least 2 characters" hint', async () => {
+      const user = userEvent.setup();
+      vi.mocked(apiClient.get).mockResolvedValue({ data: customerLocations });
+
+      renderWithProviders(
+        <ServiceLocationPicker
+          value={null}
+          onChange={mockOnChange}
+          restrictToCustomer={{ id: 'customer-1', name: 'Acme Inc' }}
+        />
+      );
+
+      const input = screen.getByRole('textbox');
+      await user.click(input);
+      await user.type(input, 'a');
+
+      expect(screen.queryByText('Type at least 2 characters to search')).not.toBeInTheDocument();
+    });
+
+    it('calls onChange with an adapted summary that includes the customer name from the prop', async () => {
+      const user = userEvent.setup();
+      vi.mocked(apiClient.get).mockResolvedValue({ data: customerLocations });
+
+      renderWithProviders(
+        <ServiceLocationPicker
+          value={null}
+          onChange={mockOnChange}
+          restrictToCustomer={{ id: 'customer-1', name: 'Acme Inc' }}
+        />
+      );
+
+      await user.click(screen.getByRole('textbox'));
+      await waitFor(() => expect(screen.getByText('Main Office')).toBeInTheDocument());
+      await user.click(screen.getByText('Main Office').closest('button')!);
+
+      expect(mockOnChange).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: 'loc-1',
+          customerId: 'customer-1',
+          customerName: 'Acme Inc',
+          locationName: 'Main Office',
+        })
+      );
+    });
+
+    it('coerces a CLOSED service location status to INACTIVE in the adapted summary', async () => {
+      const user = userEvent.setup();
+      vi.mocked(apiClient.get).mockResolvedValue({
+        data: [
+          {
+            ...customerLocations[0],
+            status: 'CLOSED',
+          },
+        ],
+      });
+
+      renderWithProviders(
+        <ServiceLocationPicker
+          value={null}
+          onChange={mockOnChange}
+          restrictToCustomer={{ id: 'customer-1', name: 'Acme Inc' }}
+        />
+      );
+
+      await user.click(screen.getByRole('textbox'));
+      await waitFor(() => expect(screen.getByText('Main Office')).toBeInTheDocument());
+      await user.click(screen.getByText('Main Office').closest('button')!);
+
+      // ServiceLocationSearchResult only accepts ACTIVE | INACTIVE; CLOSED maps to INACTIVE
+      // so downstream consumers don't have to handle a third state.
+      expect(mockOnChange).toHaveBeenCalledWith(
+        expect.objectContaining({ status: 'INACTIVE' })
+      );
+    });
+
+    it('shows an empty-results message when the customer has no locations matching the filter', async () => {
+      const user = userEvent.setup();
+      vi.mocked(apiClient.get).mockResolvedValue({ data: customerLocations });
+
+      renderWithProviders(
+        <ServiceLocationPicker
+          value={null}
+          onChange={mockOnChange}
+          restrictToCustomer={{ id: 'customer-1', name: 'Acme Inc' }}
+        />
+      );
+
+      const input = screen.getByRole('textbox');
+      await user.click(input);
+      await user.type(input, 'zzzznomatch');
+
+      await waitFor(() => {
+        expect(screen.getByText('No locations found')).toBeInTheDocument();
+      });
+    });
+  });
+
   it('updates dropdown visibility when search query changes length', async () => {
     const user = userEvent.setup();
     vi.mocked(apiClient.get).mockResolvedValue({ data: mockSearchResults });
