@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import { useParams, useNavigate, useLocation, Link as RouterLink } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import {
@@ -133,6 +133,15 @@ export default function CustomerDetailPage() {
     return item.make || item.model || '-';
   };
 
+  const formatAddress = (item: EquipmentSummary): string => {
+    const parts: string[] = [];
+    if (item.streetAddress) parts.push(item.streetAddress);
+    const cityState = [item.city, item.state].filter(Boolean).join(', ');
+    if (cityState) parts.push(cityState);
+    const tail = parts.join(', ');
+    return item.zipCode ? `${tail} ${item.zipCode}`.trim() : tail;
+  };
+
   const equipmentTabContent = (
     <div>
       <div className="flex items-center justify-between mb-3">
@@ -174,6 +183,7 @@ export default function CustomerDetailPage() {
           <TableHead>
             <TableRow>
               <TableHeader>{t('common.form.name')}</TableHeader>
+              <TableHeader>{getName('service_location')}</TableHeader>
               <TableHeader>{t('equipment.table.type')}</TableHeader>
               <TableHeader>{t('equipment.table.makeModel')}</TableHeader>
               <TableHeader>{t('equipment.form.serialNumber')}</TableHeader>
@@ -185,6 +195,23 @@ export default function CustomerDetailPage() {
             {equipment.map((item) => (
               <TableRow key={item.id}>
                 <TableCell className="font-medium">{item.name}</TableCell>
+                <TableCell>
+                  {item.serviceLocationId ? (
+                    <RouterLink
+                      to={`/service-locations/${item.serviceLocationId}`}
+                      className="flex flex-col text-zinc-700 hover:text-blue-600 hover:underline dark:text-zinc-300 dark:hover:text-blue-400"
+                    >
+                      <span>{item.serviceLocationName || formatAddress(item) || '-'}</span>
+                      {item.serviceLocationName && (
+                        <span className="text-xs text-zinc-500 dark:text-zinc-500">
+                          {formatAddress(item)}
+                        </span>
+                      )}
+                    </RouterLink>
+                  ) : (
+                    <span>-</span>
+                  )}
+                </TableCell>
                 <TableCell>{formatTypeCategory(item)}</TableCell>
                 <TableCell>{formatMakeModel(item)}</TableCell>
                 <TableCell>{item.serialNumber || '-'}</TableCell>

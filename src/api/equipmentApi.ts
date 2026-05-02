@@ -47,6 +47,16 @@ export interface EquipmentSummary {
   model?: string | null;
   serialNumber?: string | null;
   locationOnSite?: string | null;
+  // Service location & customer context, batch-loaded server-side. Returned as
+  // discrete fields rather than a pre-formatted label so the UI can compose
+  // display variants (with/without customer name, etc.).
+  serviceLocationId?: string | null;
+  serviceLocationName?: string | null;
+  streetAddress?: string | null;
+  city?: string | null;
+  state?: string | null;
+  zipCode?: string | null;
+  customerName?: string | null;
 }
 
 export interface CreateEquipmentRequest {
