@@ -29,6 +29,8 @@ export interface Equipment {
   locationOnSite?: string | null;
   installDate?: string | null;
   lastServicedAt?: string | null;
+  warrantyExpiresAt?: string | null;
+  warrantyDetails?: string | null;
   status: EquipmentStatus;
   profileImageUrl?: string | null;
   // JSONB stored as string per backend; parse client-side when needed.
@@ -72,6 +74,8 @@ export interface CreateEquipmentRequest {
   equipmentCategoryId?: string | null;
   locationOnSite?: string | null;
   installDate?: string | null;
+  warrantyExpiresAt?: string | null;
+  warrantyDetails?: string | null;
   status?: EquipmentStatus;
   profileImageUrl?: string | null;
   attributes?: string;
@@ -91,6 +95,8 @@ export interface UpdateEquipmentRequest {
   equipmentCategoryId?: string | null;
   locationOnSite?: string | null;
   installDate?: string | null;
+  warrantyExpiresAt?: string | null;
+  warrantyDetails?: string | null;
   status?: EquipmentStatus;
   profileImageUrl?: string | null;
   attributes?: string;

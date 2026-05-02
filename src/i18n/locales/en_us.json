@@ -387,7 +387,9 @@
       "serviceLocation": "Service Location",
       "type": "Type",
       "unitCost": "Unit Cost",
-      "warehouse": "Warehouse"
+      "warehouse": "Warehouse",
+      "warrantyDetails": "Warranty Details",
+      "warrantyExpiresAt": "Warranty Expires"
     },
     "status": {
       "active": "Active",

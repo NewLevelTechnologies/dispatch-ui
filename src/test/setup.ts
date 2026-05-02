@@ -297,6 +297,8 @@ vi.mock('react-i18next', () => {
     'equipment.form.type': 'Type',
     'equipment.form.unitCost': 'Unit Cost',
     'equipment.form.warehouse': 'Warehouse',
+    'equipment.form.warrantyDetails': 'Warranty Details',
+    'equipment.form.warrantyExpiresAt': 'Warranty Expires',
     'equipment.status.active': 'Active',
     'equipment.status.retired': 'Retired',
     'equipment.table.category': 'Category',
