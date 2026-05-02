@@ -128,6 +128,58 @@ describe('EquipmentPage', () => {
     expect(screen.getByText('Walk-in Cooler')).toBeInTheDocument();
   });
 
+  it('renders the service location column with name, address, and customer name', async () => {
+    mockEquipmentList.mockResolvedValue(
+      page([
+        summary('1', 'Upstairs Furnace', {
+          serviceLocationId: 'loc-1',
+          serviceLocationName: 'Main Office',
+          streetAddress: '123 Main St',
+          city: 'Atlanta',
+          state: 'GA',
+          zipCode: '30301',
+          customerName: 'Acme Inc',
+        }),
+      ])
+    );
+
+    renderWithProviders(<EquipmentPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Main Office')).toBeInTheDocument();
+    });
+
+    // Address + customer name in the secondary line.
+    expect(screen.getByText(/123 Main St, Atlanta, GA 30301.*Acme Inc/)).toBeInTheDocument();
+    // Cell is a link to the service location detail page.
+    expect(screen.getByRole('link', { name: /Main Office/ })).toHaveAttribute(
+      'href',
+      '/service-locations/loc-1'
+    );
+  });
+
+  it('falls back to address as the primary line when the location has no name', async () => {
+    mockEquipmentList.mockResolvedValue(
+      page([
+        summary('1', 'Some Equipment', {
+          serviceLocationId: 'loc-2',
+          serviceLocationName: null,
+          streetAddress: '7 Side Rd',
+          city: 'Marietta',
+          state: 'GA',
+          zipCode: '30060',
+          customerName: 'Bob LLC',
+        }),
+      ])
+    );
+
+    renderWithProviders(<EquipmentPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('7 Side Rd, Marietta, GA 30060')).toBeInTheDocument();
+    });
+  });
+
   it('displays error message when fetch fails', async () => {
     mockEquipmentList.mockRejectedValue(new Error('Network error'));
 

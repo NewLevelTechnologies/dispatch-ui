@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import { renderWithProviders, userEvent } from '../test/utils';
 import CustomerDetailPage from './CustomerDetailPage';
 import apiClient from '../api/client';
@@ -1406,6 +1406,36 @@ describe('CustomerDetailPage', () => {
       expect(screen.getByText('HVAC / Compressor')).toBeInTheDocument();
       expect(screen.getByText('Carrier C-200')).toBeInTheDocument();
       expect(screen.getByText('Walk-in Cooler')).toBeInTheDocument();
+    });
+
+    it('renders the service location column with a link, but suppresses the customer name (already scoped)', async () => {
+      const equipmentWithLocation = [
+        {
+          ...equipmentList[0],
+          serviceLocationId: 'loc-1',
+          serviceLocationName: 'Main Office',
+          streetAddress: '123 Main St',
+          city: 'Atlanta',
+          state: 'GA',
+          zipCode: '30301',
+          customerName: 'John Doe',
+        },
+      ];
+      mockEquipmentEndpoints(equipmentWithLocation);
+      const user = userEvent.setup();
+
+      renderAtCustomerRoute();
+      await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
+      await user.click(screen.getByRole('button', { name: /equipment/i }));
+
+      await waitFor(() => expect(screen.getByText('Main Office')).toBeInTheDocument());
+
+      const link = screen.getByRole('link', { name: /Main Office/ });
+      expect(link).toHaveAttribute('href', '/service-locations/loc-1');
+      // Customer name is in the table cell address line ONLY in tenant-wide views;
+      // here the customer is already known from the page context so the name
+      // shouldn't appear in the equipment row.
+      expect(within(link).queryByText(/John Doe/)).not.toBeInTheDocument();
     });
 
     it('passes customerId to the list endpoint', async () => {
