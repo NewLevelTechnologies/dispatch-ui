@@ -8,6 +8,7 @@ import { useHasCapability } from '../hooks/useCurrentUser';
 import AppLayout from '../components/AppLayout';
 import ServiceLocationFormDialog from '../components/ServiceLocationFormDialog';
 import CustomerFormDialog from '../components/CustomerFormDialog';
+import WorkOrderFormDialog from '../components/WorkOrderFormDialog';
 import AdditionalContactsList from '../components/AdditionalContactsList';
 import WorkOrdersList from '../components/WorkOrdersList';
 import { workOrdersListQueryOptions } from '../api/workOrdersListQuery';
@@ -56,6 +57,7 @@ export default function CustomerDetailPage() {
     }
   };
   const [isNotificationDialogOpen, setIsNotificationDialogOpen] = useState(false);
+  const [isNewWorkOrderOpen, setIsNewWorkOrderOpen] = useState(false);
   const [locationSearchQuery, setLocationSearchQuery] = useState('');
 
   // Permission checks
@@ -304,8 +306,7 @@ export default function CustomerDetailPage() {
                 <div>
                   <div className="flex items-center justify-between mb-3">
                     <Subheading>{t('common.recentEntities', { entities: getName('work_order', true) })}</Subheading>
-                    {/* TODO: Add work order permission check when equipment management is implemented */}
-                    <Button plain>
+                    <Button plain onClick={() => setIsNewWorkOrderOpen(true)}>
                       <PlusIcon className="size-4" />
                       {t('common.actions.new', { entity: getName('work_order') })}
                     </Button>
@@ -564,7 +565,16 @@ export default function CustomerDetailPage() {
         )}
 
         {activeTab === 'work-orders' && (
-          <WorkOrdersList customerId={customer.id} />
+          <div>
+            <div className="flex items-center justify-between mb-3">
+              <Subheading>{t('common.recentEntities', { entities: getName('work_order', true) })}</Subheading>
+              <Button plain onClick={() => setIsNewWorkOrderOpen(true)}>
+                <PlusIcon className="size-4" />
+                {t('common.actions.new', { entity: getName('work_order') })}
+              </Button>
+            </div>
+            <WorkOrdersList customerId={customer.id} />
+          </div>
         )}
 
         {activeTab === 'financial' && (
@@ -606,6 +616,11 @@ export default function CustomerDetailPage() {
         onClose={() => setIsNotificationDialogOpen(false)}
         customerId={customer.id}
         contactName={customer.name}
+      />
+      <WorkOrderFormDialog
+        isOpen={isNewWorkOrderOpen}
+        onClose={() => setIsNewWorkOrderOpen(false)}
+        prefilledCustomer={{ id: customer.id, name: customer.name }}
       />
     </AppLayout>
   );

@@ -1315,6 +1315,49 @@ describe('CustomerDetailPage', () => {
     });
   });
 
+  describe('New work order from customer page', () => {
+    it('opens the dialog with the customer prefilled and the existing/new toggle hidden', async () => {
+      const user = userEvent.setup();
+      vi.mocked(apiClient.get).mockImplementation((url) => {
+        if (url.endsWith('/service-locations')) {
+          return Promise.resolve({ data: [] });
+        }
+        if (url.includes('/customers/')) {
+          return Promise.resolve({ data: mockSimpleCustomer });
+        }
+        if (url.includes('/dispatch-regions')) {
+          return Promise.resolve({ data: [] });
+        }
+        if (url.startsWith('/work-orders/config/')) {
+          return Promise.resolve({ data: [] });
+        }
+        if (url.includes('/work-orders')) {
+          return Promise.resolve({
+            data: { content: [], totalElements: 0, totalPages: 0, number: 0, size: 25 },
+          });
+        }
+        if (url.includes('/notifications')) {
+          return Promise.resolve({ data: { content: [], totalElements: 0, totalPages: 0, number: 0, size: 25 } });
+        }
+        return Promise.reject(new Error(`Unmocked: ${url}`));
+      });
+
+      renderWithProviders(<CustomerDetailPage />);
+
+      await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
+
+      // Switch to work orders tab
+      await user.click(screen.getByRole('button', { name: /work order/i }));
+      await user.click(await screen.findByRole('button', { name: /new work order/i }));
+
+      await waitFor(() => expect(screen.getByRole('dialog')).toBeInTheDocument());
+
+      // Customer-mode radios should not appear when prefilled
+      expect(screen.queryByRole('radio', { name: /existing customer/i })).not.toBeInTheDocument();
+      expect(screen.queryByRole('radio', { name: /new customer/i })).not.toBeInTheDocument();
+    });
+  });
+
   describe('Tab navigation and interaction', () => {
     it('switches to all tabs for simple customer', async () => {
       const user = userEvent.setup();
