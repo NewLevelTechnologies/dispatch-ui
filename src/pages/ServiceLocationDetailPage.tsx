@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import { useParams, useNavigate, useLocation, Link as RouterLink } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import {
@@ -457,7 +457,14 @@ export default function ServiceLocationDetailPage() {
                     <TableBody>
                       {equipment.map((item) => (
                         <TableRow key={item.id}>
-                          <TableCell className="font-medium">{item.name}</TableCell>
+                          <TableCell className="font-medium">
+                            <RouterLink
+                              to={`/equipment/${item.id}`}
+                              className="text-zinc-700 hover:text-blue-600 hover:underline dark:text-zinc-300 dark:hover:text-blue-400"
+                            >
+                              {item.name}
+                            </RouterLink>
+                          </TableCell>
                           <TableCell>{formatTypeCategory(item)}</TableCell>
                           <TableCell>{formatMakeModel(item)}</TableCell>
                           <TableCell>{item.serialNumber || '-'}</TableCell>
