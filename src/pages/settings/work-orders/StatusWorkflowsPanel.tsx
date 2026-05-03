@@ -14,6 +14,7 @@ import { useHasCapability } from '../../../hooks/useCurrentUser';
 import { Heading } from '../../../components/catalyst/heading';
 import { Text } from '../../../components/catalyst/text';
 import { Button } from '../../../components/catalyst/button';
+import IconButton from '../../../components/IconButton';
 import { Badge } from '../../../components/catalyst/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../../components/catalyst/table';
 import { Dialog, DialogActions, DialogBody, DialogTitle } from '../../../components/catalyst/dialog';
@@ -224,9 +225,13 @@ export default function StatusWorkflowsPanel() {
                 <TableCell>
                   <div className="-mx-3 -my-1.5 sm:-mx-2.5 flex items-center justify-end">
                     {canEdit && (
-                      <Button plain onClick={() => handleDelete(rule)} title={t('common.delete')}>
+                      <IconButton
+                        onClick={() => handleDelete(rule)}
+                        title={t('common.delete')}
+                        aria-label={t('common.delete')}
+                      >
                         <TrashIcon className="h-4 w-4" />
-                      </Button>
+                      </IconButton>
                     )}
                   </div>
                 </TableCell>

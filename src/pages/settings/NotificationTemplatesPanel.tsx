@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { notificationTemplateApi, getApiErrorMessage, type NotificationTemplateListItem, type NotificationTemplate } from '../../api';
 import { useHasCapability } from '../../hooks/useCurrentUser';
 import NotificationTemplateEditor from '../../components/NotificationTemplateEditor';
-import { Subheading } from '../../components/catalyst/heading';
+import { Heading } from '../../components/catalyst/heading';
 import { Text } from '../../components/catalyst/text';
 import { Button } from '../../components/catalyst/button';
 import { Badge } from '../../components/catalyst/badge';
@@ -67,8 +67,8 @@ export default function NotificationTemplatesPanel() {
 
   return (
     <div>
-      <Subheading className="mb-1">Notification Templates</Subheading>
-      <Text className="text-sm text-zinc-600 dark:text-zinc-400 mb-4">
+      <Heading>Notification Templates</Heading>
+      <Text className="mt-1 mb-4 text-sm text-zinc-600 dark:text-zinc-400">
         Customize email and SMS notification templates for your organization. Templates use Mustache syntax for variable substitution.
       </Text>
 

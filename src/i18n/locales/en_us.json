@@ -801,7 +801,56 @@
         "terminal": "Terminal"
       }
     },
+    "equipmentCategories": {
+      "add": "Add Category",
+      "description": "Sub-types within an equipment type (e.g. 'Furnace' under HVAC). Used for filtering and reporting.",
+      "empty": "No categories yet for this type.",
+      "errorDelete": "Failed to delete category",
+      "errorLoad": "Failed to load categories",
+      "errorReorder": "Failed to reorder categories",
+      "errorSave": "Failed to save category",
+      "loading": "Loading categories…",
+      "noTypesYet": "Add at least one Equipment Type before creating categories.",
+      "parentType": "Equipment Type",
+      "title": "Equipment Categories",
+      "titleAdd": "Add Category",
+      "titleEdit": "Edit Category"
+    },
+    "equipmentTypes": {
+      "add": "Add Type",
+      "description": "Top-level equipment classifications (e.g. HVAC, Refrigeration, Plumbing). Categories nest within each type.",
+      "empty": "No equipment types yet.",
+      "errorDelete": "Failed to delete equipment type",
+      "errorLoad": "Failed to load equipment types",
+      "errorReorder": "Failed to reorder equipment types",
+      "errorSave": "Failed to save equipment type",
+      "loading": "Loading equipment types…",
+      "title": "Equipment Types",
+      "titleAdd": "Add Equipment Type",
+      "titleEdit": "Edit Equipment Type"
+    },
+    "filterSizes": {
+      "add": "Add Size",
+      "description": "Common filter sizes that appear as quick-add chips on the equipment filters tab.",
+      "empty": "No filter sizes configured yet.",
+      "errorDelete": "Failed to delete filter size",
+      "errorLoad": "Failed to load filter sizes",
+      "errorReorder": "Failed to reorder filter sizes",
+      "errorSave": "Failed to save filter size",
+      "invalidDimensions": "Length, width, and thickness must all be greater than zero.",
+      "length": "Length (in)",
+      "loading": "Loading filter sizes…",
+      "size": "Size",
+      "thickness": "Thickness (in)",
+      "title": "Common Filter Sizes",
+      "titleAdd": "Add Filter Size",
+      "titleEdit": "Edit Filter Size",
+      "width": "Width (in)"
+    },
     "nav": {
+      "equipmentCategories": "Categories",
+      "equipmentTypes": "Types",
+      "filterSizes": "Filter Sizes",
       "general": "General",
       "itemStatuses": "Item Statuses",
       "notificationTemplates": "Notification Templates",
@@ -813,6 +862,7 @@
     "sections": {
       "access": "Access",
       "dispatch": "{{dispatch}}",
+      "equipment": "{{equipment}}",
       "organization": "Organization",
       "workOrders": "{{workOrders}}"
     },

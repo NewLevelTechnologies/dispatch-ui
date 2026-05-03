@@ -379,10 +379,55 @@ export interface TenantFilterSize {
   createdAt: string;
 }
 
+export interface CreateTenantFilterSizeRequest {
+  lengthIn: number;
+  widthIn: number;
+  thicknessIn: number;
+  sortOrder?: number;
+}
+
+export interface UpdateTenantFilterSizeRequest {
+  lengthIn?: number;
+  widthIn?: number;
+  thicknessIn?: number;
+  sortOrder?: number;
+}
+
 export const tenantFilterSizesApi = {
   getAll: async (): Promise<TenantFilterSize[]> => {
     const response = await apiClient.get<TenantFilterSize[]>(
       '/equipment/config/filter-sizes'
+    );
+    return response.data;
+  },
+
+  create: async (request: CreateTenantFilterSizeRequest): Promise<TenantFilterSize> => {
+    const response = await apiClient.post<TenantFilterSize>(
+      '/equipment/config/filter-sizes',
+      request
+    );
+    return response.data;
+  },
+
+  update: async (
+    id: string,
+    request: UpdateTenantFilterSizeRequest
+  ): Promise<TenantFilterSize> => {
+    const response = await apiClient.patch<TenantFilterSize>(
+      `/equipment/config/filter-sizes/${id}`,
+      request
+    );
+    return response.data;
+  },
+
+  delete: async (id: string): Promise<void> => {
+    await apiClient.delete(`/equipment/config/filter-sizes/${id}`);
+  },
+
+  reorder: async (orderedIds: string[]): Promise<TenantFilterSize[]> => {
+    const response = await apiClient.post<TenantFilterSize[]>(
+      '/equipment/config/filter-sizes/reorder',
+      orderedIds
     );
     return response.data;
   },

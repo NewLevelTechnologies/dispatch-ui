@@ -5,7 +5,8 @@ import { dispatchRegionApi, getApiErrorMessage, type DispatchRegion } from '../.
 import { useHasCapability } from '../../hooks/useCurrentUser';
 import { useGlossary } from '../../contexts/GlossaryContext';
 import DispatchRegionFormDialog from '../../components/DispatchRegionFormDialog';
-import { Subheading } from '../../components/catalyst/heading';
+import { Heading } from '../../components/catalyst/heading';
+import IconButton from '../../components/IconButton';
 import { Text } from '../../components/catalyst/text';
 import { Button } from '../../components/catalyst/button';
 import { Badge } from '../../components/catalyst/badge';
@@ -104,7 +105,7 @@ export default function DispatchRegionsPanel() {
     <div>
       <div className="flex items-center justify-between mb-4">
         <div>
-          <Subheading className="mb-1">{getName('dispatch')} {t('entities.regions')}</Subheading>
+          <Heading>{getName('dispatch')} {t('entities.regions')}</Heading>
           <Text className="text-sm text-zinc-600 dark:text-zinc-400">
             {t('dispatchRegions.description', { dispatch: getName('dispatch') })}
           </Text>
@@ -158,25 +159,23 @@ export default function DispatchRegionsPanel() {
                   <TableCell className="text-zinc-500">{region.state || '-'}</TableCell>
                   <TableCell>
                     {canEdit && region.isActive && (
-                      <div className="flex items-center gap-1">
-                        <Button
-                          plain
+                      <div className="flex items-center gap-0.5">
+                        <IconButton
                           onClick={() => moveUp(region)}
                           disabled={!canMoveUp || reorderMutation.isPending}
                           title={t('common.moveUp')}
                           aria-label={t('common.moveUp')}
                         >
                           <ChevronUpIcon className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          plain
+                        </IconButton>
+                        <IconButton
                           onClick={() => moveDown(region)}
                           disabled={!canMoveDown || reorderMutation.isPending}
                           title={t('common.moveDown')}
                           aria-label={t('common.moveDown')}
                         >
                           <ChevronDownIcon className="h-4 w-4" />
-                        </Button>
+                        </IconButton>
                       </div>
                     )}
                   </TableCell>

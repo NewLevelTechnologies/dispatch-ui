@@ -6,6 +6,7 @@ import { useHasCapability } from '../../../hooks/useCurrentUser';
 import { Heading } from '../../../components/catalyst/heading';
 import { Text } from '../../../components/catalyst/text';
 import { Button } from '../../../components/catalyst/button';
+import IconButton from '../../../components/IconButton';
 import { Badge } from '../../../components/catalyst/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../../components/catalyst/table';
 import { Dropdown, DropdownButton, DropdownItem, DropdownMenu } from '../../../components/catalyst/dropdown';
@@ -157,25 +158,23 @@ export default function ItemStatusesPanel() {
                   </TableCell>
                   <TableCell>
                     {canEdit && (
-                      <div className="flex items-center gap-1">
-                        <Button
-                          plain
+                      <div className="flex items-center gap-0.5">
+                        <IconButton
                           onClick={() => moveUp(index)}
                           disabled={index === 0 || reorderMutation.isPending}
                           title={t('common.moveUp')}
                           aria-label={t('common.moveUp')}
                         >
                           <ChevronUpIcon className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          plain
+                        </IconButton>
+                        <IconButton
                           onClick={() => moveDown(index)}
                           disabled={index === sorted.length - 1 || reorderMutation.isPending}
                           title={t('common.moveDown')}
                           aria-label={t('common.moveDown')}
                         >
                           <ChevronDownIcon className="h-4 w-4" />
-                        </Button>
+                        </IconButton>
                       </div>
                     )}
                   </TableCell>

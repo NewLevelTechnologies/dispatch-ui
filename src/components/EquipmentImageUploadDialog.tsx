@@ -11,6 +11,7 @@ import { Dialog, DialogActions, DialogBody, DialogTitle } from './catalyst/dialo
 import { Button } from './catalyst/button';
 import { FieldGroup, Fieldset } from './catalyst/fieldset';
 import { Input } from './catalyst/input';
+import IconButton from './IconButton';
 import { PhotoIcon, XMarkIcon } from '@heroicons/react/24/outline';
 
 interface EquipmentImageUploadDialogProps {
@@ -381,15 +382,14 @@ export default function EquipmentImageUploadDialog({
                         {t('equipment.images.profile')}
                       </label>
 
-                      <button
-                        type="button"
+                      <IconButton
                         onClick={() => removeRow(row.id)}
                         disabled={isUploading && row.status === 'in-progress'}
                         aria-label={t('equipment.images.removeFromBatch')}
-                        className="shrink-0 rounded p-1 text-zinc-500 hover:bg-zinc-100 hover:text-zinc-700 disabled:opacity-50 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
+                        className="shrink-0"
                       >
                         <XMarkIcon className="size-4" />
-                      </button>
+                      </IconButton>
                     </li>
                   ))}
                 </ul>
