@@ -165,6 +165,12 @@ export default function EquipmentDetailPage() {
   const imageInvalidate = () => {
     queryClient.invalidateQueries({ queryKey: ['equipment-images', id] });
     queryClient.invalidateQueries({ queryKey: ['equipment-detail', id] });
+    // List-view caches (equipment list, customer/location equipment tabs)
+    // also need refreshing — they show profile thumbnails sourced from
+    // EquipmentSummary.profileImageUrl. Same for work-order responses, which
+    // embed the equipment summary on each work item.
+    queryClient.invalidateQueries({ queryKey: ['equipment'] });
+    queryClient.invalidateQueries({ queryKey: ['work-orders'] });
   };
 
   const setProfileImageMutation = useMutation({
