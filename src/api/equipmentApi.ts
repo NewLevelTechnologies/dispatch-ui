@@ -32,12 +32,19 @@ export interface Equipment {
   warrantyExpiresAt?: string | null;
   warrantyDetails?: string | null;
   status: EquipmentStatus;
+  // Convenience: presigned URL of the profile image (the one with isProfile=true
+  // in the embedded images array). Null when no images exist or none flagged
+  // profile. Re-fetch on each page load — the URL is short-lived (~1hr).
   profileImageUrl?: string | null;
   // JSONB stored as string per backend; parse client-side when needed.
   attributes?: string;
   // Filters embedded in EquipmentResponse; the standalone /equipment/{id}/filters
   // endpoint also returns these and is the canonical mutation target.
   filters?: EquipmentFilter[];
+  // Images embedded in EquipmentResponse; the standalone /equipment/{id}/images
+  // endpoint is the canonical mutation target. Sorted profile-first then by
+  // sortOrder ascending.
+  images?: EquipmentImage[];
   createdAt?: string;
   updatedAt?: string;
 }
@@ -61,6 +68,9 @@ export interface EquipmentSummary {
   city?: string | null;
   state?: string | null;
   zipCode?: string | null;
+  // Presigned URL of the profile image, if any. Short-lived; re-fetch on
+  // navigation rather than caching.
+  profileImageUrl?: string | null;
   customerName?: string | null;
 }
 
@@ -378,6 +388,142 @@ export const tenantFilterSizesApi = {
   },
 };
 
+// ========== EQUIPMENT IMAGES ==========
+// Multi-image sub-resource per equipment. Upload is a 3-step direct-to-S3 flow
+// (request URL → PUT to S3 → confirm) so the API server never streams bytes.
+// `url` and `thumbnailUrl` are presigned reads with ~1hr TTL — never cache them
+// across navigations; always read from the freshest API response.
+
+export const EQUIPMENT_IMAGE_MAX_BYTES = 25 * 1024 * 1024; // 25 MB
+export const EQUIPMENT_IMAGE_MAX_PER_EQUIPMENT = 50;
+export const EQUIPMENT_IMAGE_CAPTION_MAX_CHARS = 200;
+export const EQUIPMENT_IMAGE_CONTENT_TYPES = ['image/jpeg', 'image/png', 'image/webp'] as const;
+export type EquipmentImageContentType = (typeof EQUIPMENT_IMAGE_CONTENT_TYPES)[number];
+
+export interface EquipmentImage {
+  id: string;
+  url: string;
+  thumbnailUrl: string | null;
+  contentType: string;
+  sizeBytes: number;
+  widthPx: number | null;
+  heightPx: number | null;
+  thumbnailWidthPx: number | null;
+  thumbnailHeightPx: number | null;
+  isProfile: boolean;
+  sortOrder: number;
+  caption: string | null;
+  uploadedBy: string | null;
+  uploadedByName: string | null;
+  createdAt: string;
+}
+
+export interface RequestImageUploadUrlRequest {
+  contentType: EquipmentImageContentType;
+  sizeBytes: number;
+  caption?: string | null;
+}
+
+export interface RequestImageUploadUrlResponse {
+  imageId: string;
+  uploadUrl: string;
+  s3Key: string;
+}
+
+export interface UpdateEquipmentImageRequest {
+  isProfile?: boolean;
+  caption?: string | null;
+  sortOrder?: number;
+}
+
+export const equipmentImagesApi = {
+  list: async (equipmentId: string): Promise<EquipmentImage[]> => {
+    const response = await apiClient.get<EquipmentImage[]>(
+      `/equipment/${equipmentId}/images`
+    );
+    return response.data;
+  },
+
+  requestUploadUrl: async (
+    equipmentId: string,
+    request: RequestImageUploadUrlRequest
+  ): Promise<RequestImageUploadUrlResponse> => {
+    const response = await apiClient.post<RequestImageUploadUrlResponse>(
+      `/equipment/${equipmentId}/images/upload-url`,
+      request
+    );
+    return response.data;
+  },
+
+  // Direct-to-S3 PUT using fetch (NOT the apiClient — we don't want our auth
+  // interceptor adding the JWT to the S3 request).
+  uploadToS3: async (uploadUrl: string, contentType: string, file: File | Blob): Promise<void> => {
+    const res = await fetch(uploadUrl, {
+      method: 'PUT',
+      headers: { 'Content-Type': contentType },
+      body: file,
+    });
+    if (!res.ok) {
+      throw new Error(`S3 upload failed with ${res.status}`);
+    }
+  },
+
+  confirm: async (equipmentId: string, imageId: string): Promise<EquipmentImage> => {
+    const response = await apiClient.post<EquipmentImage>(
+      `/equipment/${equipmentId}/images/${imageId}/confirm`
+    );
+    return response.data;
+  },
+
+  /**
+   * Convenience helper that orchestrates the 3-step upload. Calls the
+   * `onProgress` callback between steps so callers can render status text.
+   */
+  upload: async (
+    equipmentId: string,
+    file: File,
+    options: {
+      caption?: string | null;
+      onProgress?: (stage: 'requesting' | 'uploading' | 'confirming') => void;
+    } = {}
+  ): Promise<EquipmentImage> => {
+    options.onProgress?.('requesting');
+    const { imageId, uploadUrl } = await equipmentImagesApi.requestUploadUrl(equipmentId, {
+      contentType: file.type as EquipmentImageContentType,
+      sizeBytes: file.size,
+      caption: options.caption ?? null,
+    });
+    options.onProgress?.('uploading');
+    await equipmentImagesApi.uploadToS3(uploadUrl, file.type, file);
+    options.onProgress?.('confirming');
+    return equipmentImagesApi.confirm(equipmentId, imageId);
+  },
+
+  patch: async (
+    equipmentId: string,
+    imageId: string,
+    request: UpdateEquipmentImageRequest
+  ): Promise<EquipmentImage> => {
+    const response = await apiClient.patch<EquipmentImage>(
+      `/equipment/${equipmentId}/images/${imageId}`,
+      request
+    );
+    return response.data;
+  },
+
+  reorder: async (equipmentId: string, orderedIds: string[]): Promise<EquipmentImage[]> => {
+    const response = await apiClient.post<EquipmentImage[]>(
+      `/equipment/${equipmentId}/images/reorder`,
+      { orderedIds }
+    );
+    return response.data;
+  },
+
+  delete: async (equipmentId: string, imageId: string): Promise<void> => {
+    await apiClient.delete(`/equipment/${equipmentId}/images/${imageId}`);
+  },
+};
+
 // ========== PARTS INVENTORY ==========
 // Lives on inventory-service (formerly equipment-service) at /api/v1/inventory/*.
 
@@ -543,6 +689,7 @@ export const allEquipmentApis = {
   equipmentTypes: equipmentTypesApi,
   equipmentCategories: equipmentCategoriesApi,
   equipmentFilters: equipmentFiltersApi,
+  equipmentImages: equipmentImagesApi,
   tenantFilterSizes: tenantFilterSizesApi,
   partsInventory: partsInventoryApi,
   warehouses: warehousesApi,
