@@ -60,6 +60,11 @@ import { StarIcon as StarIconSolid } from '@heroicons/react/24/solid';
 
 type TabId = 'overview' | 'photos' | 'filters' | 'service-history' | 'components';
 
+// Above this number of tenant filter sizes, the chip palette collapses to
+// the top N by sortOrder with a "Show all" toggle. Keeps the filters tab
+// header tight when a tenant has curated a long list.
+const FILTER_SIZE_CHIP_COLLAPSED = 10;
+
 function formatDate(iso: string | null | undefined): string {
   if (!iso) return '—';
   return new Date(iso).toLocaleDateString('en-US', {
@@ -88,6 +93,7 @@ export default function EquipmentDetailPage() {
     { lengthIn: number; widthIn: number; thicknessIn: number } | null
   >(null);
   const [isImageUploadOpen, setIsImageUploadOpen] = useState(false);
+  const [showAllFilterSizes, setShowAllFilterSizes] = useState(false);
 
   // Fall back to the equipment list when the user landed here directly (no in-app history).
   const handleBack = () => {
@@ -711,7 +717,10 @@ export default function EquipmentDetailPage() {
                     <Text className="text-xs uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
                       {t('equipment.filters.quickAdd')}:
                     </Text>
-                    {activeFilterSizes.map((s) => (
+                    {(showAllFilterSizes
+                      ? activeFilterSizes
+                      : activeFilterSizes.slice(0, FILTER_SIZE_CHIP_COLLAPSED)
+                    ).map((s) => (
                       <button
                         key={s.id}
                         type="button"
@@ -721,6 +730,19 @@ export default function EquipmentDetailPage() {
                         {formatFilterSize(s)}
                       </button>
                     ))}
+                    {activeFilterSizes.length > FILTER_SIZE_CHIP_COLLAPSED && (
+                      <button
+                        type="button"
+                        onClick={() => setShowAllFilterSizes((v) => !v)}
+                        className="rounded-full px-2.5 py-1 text-xs font-medium text-blue-600 hover:underline dark:text-blue-400"
+                      >
+                        {showAllFilterSizes
+                          ? t('equipment.filters.showFewer')
+                          : t('equipment.filters.showAll', {
+                              count: activeFilterSizes.length,
+                            })}
+                      </button>
+                    )}
                   </div>
                 ) : (
                   <span />

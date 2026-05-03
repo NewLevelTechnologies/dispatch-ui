@@ -330,6 +330,43 @@ describe('EquipmentDetailPage', () => {
     expect(screen.getByText('Return air')).toBeInTheDocument();
   });
 
+  it('collapses the chip palette to 10 entries with a show-all toggle when there are more', async () => {
+    mockGetById.mockResolvedValue(baseEquipment);
+    // 12 sizes — should render 10 by default, with a "Show all (12)" toggle.
+    const sizes = Array.from({ length: 12 }, (_, i) => ({
+      id: `s-${i}`,
+      tenantId: 't',
+      lengthIn: 10 + i,
+      widthIn: 20,
+      thicknessIn: 1,
+      sortOrder: i,
+      archivedAt: null,
+      createdAt: '',
+    }));
+    mockFilterSizesGetAll.mockResolvedValue(sizes);
+    const user = userEvent.setup();
+    renderPage();
+
+    await waitFor(() =>
+      expect(screen.getByRole('heading', { name: 'Upstairs Furnace' })).toBeInTheDocument()
+    );
+    await user.click(screen.getByRole('button', { name: /^filters/i }));
+
+    // Default view: 10 chips visible, 11th and 12th hidden until toggled.
+    await waitFor(() => expect(screen.getByText('10 × 20 × 1')).toBeInTheDocument());
+    expect(screen.queryByText('20 × 20 × 1')).not.toBeInTheDocument();
+    expect(screen.queryByText('21 × 20 × 1')).not.toBeInTheDocument();
+
+    // Click Show all → all 12 chips visible.
+    await user.click(screen.getByRole('button', { name: /show all \(12\)/i }));
+    expect(screen.getByText('20 × 20 × 1')).toBeInTheDocument();
+    expect(screen.getByText('21 × 20 × 1')).toBeInTheDocument();
+
+    // Show fewer collapses back to 10.
+    await user.click(screen.getByRole('button', { name: /show fewer/i }));
+    expect(screen.queryByText('20 × 20 × 1')).not.toBeInTheDocument();
+  });
+
   it('renders quick-add chips and pre-fills dimensions when one is clicked', async () => {
     mockGetById.mockResolvedValue(baseEquipment);
     mockFilterSizesGetAll.mockResolvedValue([

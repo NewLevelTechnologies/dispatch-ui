@@ -8,6 +8,7 @@ const mockCreate = vi.fn();
 const mockUpdate = vi.fn();
 const mockDelete = vi.fn();
 const mockReorder = vi.fn();
+const mockSeedCommon = vi.fn();
 
 vi.mock('../../../api/equipmentApi', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../../api/equipmentApi')>();
@@ -19,6 +20,7 @@ vi.mock('../../../api/equipmentApi', async (importOriginal) => {
       update: (...args: unknown[]) => mockUpdate(...args),
       delete: (...args: unknown[]) => mockDelete(...args),
       reorder: (...args: unknown[]) => mockReorder(...args),
+      seedCommon: (...args: unknown[]) => mockSeedCommon(...args),
     },
   };
 });
@@ -169,5 +171,36 @@ describe('FilterSizesPanel', () => {
     await waitFor(() => {
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     });
+  });
+
+  it('shows the seed-common CTA in the empty state', async () => {
+    mockGetAll.mockResolvedValue([]);
+    renderWithProviders(<FilterSizesPanel />);
+
+    await waitFor(() =>
+      expect(screen.getByText(/no filter sizes configured/i)).toBeInTheDocument()
+    );
+    expect(
+      screen.getByRole('button', { name: /seed common sizes/i })
+    ).toBeInTheDocument();
+  });
+
+  it('calls seedCommon and surfaces the added/skipped result', async () => {
+    mockGetAll.mockResolvedValue([]);
+    mockSeedCommon.mockResolvedValue({ added: 10, skipped: 0 });
+    const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
+    const user = userEvent.setup();
+    renderWithProviders(<FilterSizesPanel />);
+
+    await waitFor(() =>
+      expect(screen.getByText(/no filter sizes configured/i)).toBeInTheDocument()
+    );
+    await user.click(screen.getByRole('button', { name: /seed common sizes/i }));
+
+    await waitFor(() => {
+      expect(mockSeedCommon).toHaveBeenCalled();
+      expect(alertSpy).toHaveBeenCalledWith(expect.stringMatching(/added 10/i));
+    });
+    alertSpy.mockRestore();
   });
 });
