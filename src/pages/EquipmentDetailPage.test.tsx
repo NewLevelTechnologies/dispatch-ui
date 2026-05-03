@@ -18,6 +18,7 @@ const mockImagesList = vi.fn();
 const mockImageUpload = vi.fn();
 const mockImagePatch = vi.fn();
 const mockImageDelete = vi.fn();
+const mockWorkOrdersGetAll = vi.fn();
 
 vi.mock('../api/equipmentApi', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../api/equipmentApi')>();
@@ -47,6 +48,21 @@ vi.mock('../api/equipmentApi', async (importOriginal) => {
       upload: (...args: unknown[]) => mockImageUpload(...args),
       patch: (...args: unknown[]) => mockImagePatch(...args),
       delete: (...args: unknown[]) => mockImageDelete(...args),
+    },
+  };
+});
+
+vi.mock('../api/workOrderApi', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../api/workOrderApi')>();
+  return {
+    ...actual,
+    workOrderApi: {
+      ...actual.workOrderApi,
+      getAll: (...args: unknown[]) => mockWorkOrdersGetAll(...args),
+    },
+    default: {
+      ...actual.workOrderApi,
+      getAll: (...args: unknown[]) => mockWorkOrdersGetAll(...args),
     },
   };
 });
@@ -99,6 +115,15 @@ describe('EquipmentDetailPage', () => {
     mockFiltersGetAll.mockResolvedValue([]);
     mockFilterSizesGetAll.mockResolvedValue([]);
     mockImagesList.mockResolvedValue([]);
+    mockWorkOrdersGetAll.mockResolvedValue({
+      content: [],
+      totalElements: 0,
+      totalPages: 0,
+      number: 0,
+      size: 25,
+      first: true,
+      last: true,
+    });
   });
 
   it('shows loading state while equipment loads', () => {
@@ -202,8 +227,27 @@ describe('EquipmentDetailPage', () => {
     });
   });
 
-  it('switches to a placeholder for service-history and components tabs', async () => {
+  it('renders service history work orders scoped by equipmentId', async () => {
     mockGetById.mockResolvedValue(baseEquipment);
+    mockWorkOrdersGetAll.mockResolvedValue({
+      content: [
+        {
+          id: 'wo-1',
+          workOrderNumber: 'WO-00010',
+          progressCategory: 'COMPLETED',
+          priority: 'NORMAL',
+          scheduledDate: '2026-04-15',
+          serviceLocation: null,
+          lifecycleState: 'ACTIVE',
+        },
+      ],
+      totalElements: 1,
+      totalPages: 1,
+      number: 0,
+      size: 25,
+      first: true,
+      last: true,
+    });
     const user = userEvent.setup();
     renderPage();
 
@@ -211,8 +255,28 @@ describe('EquipmentDetailPage', () => {
       expect(screen.getByRole('heading', { name: 'Upstairs Furnace' })).toBeInTheDocument();
     });
 
-    await user.click(screen.getByRole('button', { name: /^service history/i }));
-    expect(screen.getByText(/coming soon/i)).toBeInTheDocument();
+    // Tab badge reflects the count returned for the equipment-scoped fetch.
+    const historyTab = await screen.findByRole('button', { name: /^service history\s*1$/i });
+    await user.click(historyTab);
+
+    await waitFor(() => {
+      expect(screen.getByText('WO-00010')).toBeInTheDocument();
+    });
+
+    // Backend was called with equipmentId only — not customer or location.
+    const allCalls = mockWorkOrdersGetAll.mock.calls.map(([args]) => args);
+    expect(allCalls.some((args) => args?.equipmentId === 'eq-1')).toBe(true);
+    expect(allCalls.every((args) => !args?.customerId && !args?.serviceLocationId)).toBe(true);
+  });
+
+  it('shows a coming-soon placeholder for the components tab', async () => {
+    mockGetById.mockResolvedValue(baseEquipment);
+    const user = userEvent.setup();
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Upstairs Furnace' })).toBeInTheDocument();
+    });
 
     await user.click(screen.getByRole('button', { name: /^components/i }));
     expect(screen.getByText(/coming soon/i)).toBeInTheDocument();

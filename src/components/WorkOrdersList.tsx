@@ -63,12 +63,13 @@ function formatAddress(address: { streetAddress: string; city: string; state: st
 
 interface Props {
   /**
-   * Pass exactly one of `customerId` / `serviceLocationId` — whichever scope the
-   * page is on. Service location is the more specific filter and implies the
-   * customer, so service-location pages should NOT pass both.
+   * Pass exactly one of `customerId` / `serviceLocationId` / `equipmentId` —
+   * whichever scope the page is on. The narrower filter wins (equipment
+   * implies its location and customer; location implies its customer).
    */
   customerId?: string;
   serviceLocationId?: string;
+  equipmentId?: string;
   /** Whether to render the Service Location column. Defaults to true. */
   showLocation?: boolean;
   /** Page size requested from the API. Defaults to 25. */
@@ -78,6 +79,7 @@ interface Props {
 export default function WorkOrdersList({
   customerId,
   serviceLocationId,
+  equipmentId,
   showLocation = true,
   pageSize = 25,
 }: Props) {
@@ -85,7 +87,7 @@ export default function WorkOrdersList({
   const { getName } = useGlossary();
 
   const { data, isLoading, error } = useQuery(
-    workOrdersListQueryOptions({ customerId, serviceLocationId, pageSize })
+    workOrdersListQueryOptions({ customerId, serviceLocationId, equipmentId, pageSize })
   );
 
   const items = data?.content ?? [];
