@@ -7,6 +7,12 @@ interface EquipmentThumbnailProps {
   name: string;
   /** Tailwind size class (size-8, size-10, size-12). Defaults to size-9 (~36px). */
   sizeClass?: string;
+  /**
+   * How the image fits its square container.
+   * - `cover` (default): crop to fill — tight in grids/lists where consistent shape matters.
+   * - `contain`: letterbox to show the whole image — better for header/preview surfaces.
+   */
+  fit?: 'cover' | 'contain';
   /** Extra wrapper classes (margins, hover states). */
   className?: string;
 }
@@ -25,6 +31,7 @@ export default function EquipmentThumbnail({
   url,
   name,
   sizeClass = 'size-9',
+  fit = 'cover',
   className = '',
 }: EquipmentThumbnailProps) {
   return (
@@ -42,7 +49,7 @@ export default function EquipmentThumbnail({
           src={url}
           alt={name}
           loading="lazy"
-          className="block size-full object-cover"
+          className={`block size-full ${fit === 'contain' ? 'object-contain' : 'object-cover'}`}
         />
       ) : (
         <div className="flex size-full items-center justify-center">

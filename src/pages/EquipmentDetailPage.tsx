@@ -369,6 +369,7 @@ export default function EquipmentDetailPage() {
             url={equipment.profileImageUrl}
             name={t('equipment.detail.profileImageAlt', { name: equipment.name })}
             sizeClass="size-24"
+            fit="contain"
           />
 
           <div className="flex-1">
