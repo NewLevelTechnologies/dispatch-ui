@@ -207,7 +207,7 @@ export default function CustomerDetailPage() {
                     to={`/equipment/${item.id}`}
                     className="flex items-center gap-2 text-zinc-700 hover:text-blue-600 hover:underline dark:text-zinc-300 dark:hover:text-blue-400"
                   >
-                    <EquipmentThumbnail url={item.profileImageUrl} name={item.name} sizeClass="size-8" />
+                    <EquipmentThumbnail url={item.profileImageUrl} name={item.name} sizeClass="size-12" />
                     <span>{item.name}</span>
                   </RouterLink>
                 </TableCell>

@@ -466,7 +466,7 @@ export default function ServiceLocationDetailPage() {
                               <EquipmentThumbnail
                                 url={item.profileImageUrl}
                                 name={item.name}
-                                sizeClass="size-8"
+                                sizeClass="size-12"
                               />
                               <span>{item.name}</span>
                             </RouterLink>
