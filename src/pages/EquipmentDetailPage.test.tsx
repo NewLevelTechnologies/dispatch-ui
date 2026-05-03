@@ -6,6 +6,7 @@ import EquipmentDetailPage from './EquipmentDetailPage';
 import type { Equipment } from '../api';
 
 const mockGetById = vi.fn();
+const mockGetDescendants = vi.fn();
 const mockUpdate = vi.fn();
 const mockTypesGetAll = vi.fn();
 const mockCategoriesGetAll = vi.fn();
@@ -27,6 +28,7 @@ vi.mock('../api/equipmentApi', async (importOriginal) => {
     equipmentApi: {
       getById: (...args: unknown[]) => mockGetById(...args),
       update: (...args: unknown[]) => mockUpdate(...args),
+      getDescendants: (...args: unknown[]) => mockGetDescendants(...args),
     },
     equipmentTypesApi: {
       getAll: (...args: unknown[]) => mockTypesGetAll(...args),
@@ -124,6 +126,7 @@ describe('EquipmentDetailPage', () => {
       first: true,
       last: true,
     });
+    mockGetDescendants.mockResolvedValue([]);
   });
 
   it('shows loading state while equipment loads', () => {
@@ -269,8 +272,60 @@ describe('EquipmentDetailPage', () => {
     expect(allCalls.every((args) => !args?.customerId && !args?.serviceLocationId)).toBe(true);
   });
 
-  it('shows a coming-soon placeholder for the components tab', async () => {
+  it('shows the empty state on the components tab when there are no descendants', async () => {
     mockGetById.mockResolvedValue(baseEquipment);
+    mockGetDescendants.mockResolvedValue([]);
+    const user = userEvent.setup();
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Upstairs Furnace' })).toBeInTheDocument();
+    });
+    await user.click(screen.getByRole('button', { name: /^components/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/no components linked/i)).toBeInTheDocument();
+    });
+  });
+
+  it('renders descendants as an indented tree on the components tab', async () => {
+    mockGetById.mockResolvedValue(baseEquipment);
+    // Tree: root (eq-1) → Compressor → Capacitor; root → Coil
+    mockGetDescendants.mockResolvedValue([
+      {
+        id: 'comp-1',
+        name: 'Compressor',
+        parentId: 'eq-1',
+        equipmentTypeName: null,
+        equipmentCategoryName: null,
+        make: null,
+        model: null,
+        serialNumber: null,
+        locationOnSite: null,
+      },
+      {
+        id: 'coil-1',
+        name: 'Evaporator Coil',
+        parentId: 'eq-1',
+        equipmentTypeName: null,
+        equipmentCategoryName: null,
+        make: null,
+        model: null,
+        serialNumber: null,
+        locationOnSite: null,
+      },
+      {
+        id: 'cap-1',
+        name: 'Capacitor',
+        parentId: 'comp-1',
+        equipmentTypeName: null,
+        equipmentCategoryName: null,
+        make: null,
+        model: null,
+        serialNumber: null,
+        locationOnSite: null,
+      },
+    ]);
     const user = userEvent.setup();
     renderPage();
 
@@ -278,8 +333,31 @@ describe('EquipmentDetailPage', () => {
       expect(screen.getByRole('heading', { name: 'Upstairs Furnace' })).toBeInTheDocument();
     });
 
+    // Tab badge reflects total descendant count.
+    const componentsTab = await screen.findByRole('button', { name: /^components\s*3$/i });
+    await user.click(componentsTab);
+
+    await waitFor(() => {
+      expect(screen.getByRole('link', { name: 'Compressor' })).toBeInTheDocument();
+    });
+    expect(screen.getByRole('link', { name: 'Evaporator Coil' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Capacitor' })).toBeInTheDocument();
+  });
+
+  it('surfaces backend errors on the components tab', async () => {
+    mockGetById.mockResolvedValue(baseEquipment);
+    mockGetDescendants.mockRejectedValue(new Error('Network down'));
+    const user = userEvent.setup();
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Upstairs Furnace' })).toBeInTheDocument();
+    });
     await user.click(screen.getByRole('button', { name: /^components/i }));
-    expect(screen.getByText(/coming soon/i)).toBeInTheDocument();
+
+    await waitFor(() => {
+      expect(screen.getByText(/failed to load components/i)).toBeInTheDocument();
+    });
   });
 
   it('renders empty state on the filters tab when no filters exist', async () => {

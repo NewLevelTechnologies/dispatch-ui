@@ -72,6 +72,9 @@ export interface EquipmentSummary {
   // navigation rather than caching.
   profileImageUrl?: string | null;
   customerName?: string | null;
+  // Populated on the descendants endpoint — lets the UI reconstruct the
+  // parent/child tree from a flat array. May be omitted on other endpoints.
+  parentId?: string | null;
 }
 
 export interface CreateEquipmentRequest {
@@ -172,6 +175,19 @@ export const equipmentApi = {
 
   delete: async (id: string): Promise<void> => {
     await apiClient.delete(`/equipment/${id}`);
+  },
+
+  /**
+   * Returns the flat list of all descendants (children + grandchildren + …)
+   * for a piece of equipment. Each row carries `parentId` so the UI can
+   * reconstruct the tree client-side. Empty array when there are no
+   * descendants; the backend 404s if the root equipment doesn't exist.
+   */
+  getDescendants: async (id: string): Promise<EquipmentSummary[]> => {
+    const response = await apiClient.get<EquipmentSummary[]>(
+      `/equipment/${id}/descendants`
+    );
+    return response.data;
   },
 };
 
