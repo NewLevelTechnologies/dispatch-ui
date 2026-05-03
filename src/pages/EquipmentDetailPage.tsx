@@ -383,31 +383,15 @@ export default function EquipmentDetailPage() {
             </div>
             <Text className="mt-1">
               {t('serviceLocations.detail.belongsTo')}{' '}
-              {serviceLocation ? (
-                <>
-                  <RouterLink
-                    to={`/customers/${serviceLocation.customerId}`}
-                    className="font-medium hover:underline"
-                  >
-                    {serviceLocation.customerName}
-                  </RouterLink>
-                  {' · '}
-                  <RouterLink
-                    to={`/service-locations/${serviceLocation.id}`}
-                    className="font-medium hover:underline"
-                  >
-                    {serviceLocation.locationName ||
-                      `${serviceLocation.address.streetAddress}, ${serviceLocation.address.city}`}
-                  </RouterLink>
-                </>
-              ) : (
-                <RouterLink
-                  to={`/service-locations/${equipment.serviceLocationId}`}
-                  className="font-medium hover:underline"
-                >
-                  {getName('service_location')}
-                </RouterLink>
-              )}
+              <RouterLink
+                to={`/service-locations/${equipment.serviceLocationId}`}
+                className="font-medium hover:underline"
+              >
+                {serviceLocation
+                  ? serviceLocation.locationName ||
+                    `${serviceLocation.address.streetAddress}, ${serviceLocation.address.city}`
+                  : getName('service_location')}
+              </RouterLink>
             </Text>
           </div>
         </div>
