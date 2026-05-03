@@ -19,6 +19,8 @@ vi.mock('../api/equipmentApi', async (importOriginal) => {
 
 vi.mock('../api/client');
 
+const jpeg = (name: string) => new File(['x'], name, { type: 'image/jpeg' });
+
 describe('EquipmentImageUploadDialog', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -31,51 +33,71 @@ describe('EquipmentImageUploadDialog', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
-  it('blocks submit when no file is chosen', async () => {
+  it('shows the empty-batch hint and disables the submit button', async () => {
     renderWithProviders(
       <EquipmentImageUploadDialog isOpen={true} onClose={vi.fn()} equipmentId="eq-1" />
     );
     await waitFor(() => expect(screen.getByRole('dialog')).toBeInTheDocument());
-    // Submit button is disabled until a file is chosen
-    const submit = screen.getByRole('button', { name: /create/i });
-    expect(submit).toBeDisabled();
+
+    expect(screen.getByText(/choose one or more photos/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /create/i })).toBeDisabled();
   });
 
-  it('rejects unsupported content types client-side (HEIC drag-in)', async () => {
+  it('queues each selected file as its own row', async () => {
+    const user = userEvent.setup();
     renderWithProviders(
       <EquipmentImageUploadDialog isOpen={true} onClose={vi.fn()} equipmentId="eq-1" />
     );
     const input = screen.getByLabelText(/choose file/i) as HTMLInputElement;
-    // Bypass userEvent's accept-attribute filter and our React state machine
-    // by firing the change event directly — simulates a drag-and-drop or
-    // programmatic upload that escapes the OS picker.
-    const heic = new File(['x'], 'photo.heic', { type: 'image/heic' });
-    fireEvent.change(input, { target: { files: [heic] } });
+    await user.upload(input, [jpeg('a.jpg'), jpeg('b.jpg'), jpeg('c.jpg')]);
 
-    await waitFor(() => {
-      expect(
-        screen.getByText(/only jpeg, png, and webp are supported/i)
-      ).toBeInTheDocument();
-    });
+    expect(screen.getByText('a.jpg')).toBeInTheDocument();
+    expect(screen.getByText('b.jpg')).toBeInTheDocument();
+    expect(screen.getByText('c.jpg')).toBeInTheDocument();
+    // The submit button switches to the plural label with the count.
+    expect(screen.getByRole('button', { name: /upload 3 photos/i })).toBeInTheDocument();
   });
 
-  it('rejects oversized files client-side', async () => {
+  it('rejects HEIC drag-ins per row without polluting the queue', async () => {
     renderWithProviders(
       <EquipmentImageUploadDialog isOpen={true} onClose={vi.fn()} equipmentId="eq-1" />
     );
     const input = screen.getByLabelText(/choose file/i) as HTMLInputElement;
-    // 26 MB JPEG via direct change-event injection; userEvent.upload has size
-    // quirks in jsdom for large files.
-    const big = new File(['x'.repeat(26 * 1024 * 1024 + 1)], 'big.jpg', { type: 'image/jpeg' });
-    fireEvent.change(input, { target: { files: [big] } });
-
-    await waitFor(() => {
-      expect(screen.getByText(/the maximum is 25 mb/i)).toBeInTheDocument();
+    fireEvent.change(input, {
+      target: {
+        files: [new File(['x'], 'photo.heic', { type: 'image/heic' }), jpeg('ok.jpg')],
+      },
     });
+
+    // Top-level error names the rejected file
+    expect(screen.getByText(/photo\.heic/)).toBeInTheDocument();
+    expect(
+      screen.getByText(/only jpeg, png, and webp are supported/i)
+    ).toBeInTheDocument();
+    // The valid file still gets added
+    expect(screen.getByText('ok.jpg')).toBeInTheDocument();
   });
 
-  it('runs the 3-step upload helper with caption when valid', async () => {
-    mockUpload.mockResolvedValue({ id: 'img-1' });
+  it('removes a queued row via the per-row remove button', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(
+      <EquipmentImageUploadDialog isOpen={true} onClose={vi.fn()} equipmentId="eq-1" />
+    );
+    const input = screen.getByLabelText(/choose file/i) as HTMLInputElement;
+    await user.upload(input, [jpeg('a.jpg'), jpeg('b.jpg')]);
+
+    const removeButtons = screen.getAllByRole('button', { name: /remove from batch/i });
+    expect(removeButtons).toHaveLength(2);
+    await user.click(removeButtons[0]);
+
+    expect(screen.queryByText('a.jpg')).not.toBeInTheDocument();
+    expect(screen.getByText('b.jpg')).toBeInTheDocument();
+  });
+
+  it('uploads all queued files sequentially and closes on full success', async () => {
+    mockUpload
+      .mockResolvedValueOnce({ id: 'img-a', isProfile: false })
+      .mockResolvedValueOnce({ id: 'img-b', isProfile: false });
     const onClose = vi.fn();
     const user = userEvent.setup();
     renderWithProviders(
@@ -83,96 +105,42 @@ describe('EquipmentImageUploadDialog', () => {
     );
 
     const input = screen.getByLabelText(/choose file/i) as HTMLInputElement;
-    const jpeg = new File(['x'], 'photo.jpg', { type: 'image/jpeg' });
-    await user.upload(input, jpeg);
-
-    await user.type(screen.getByLabelText(/^label$/i), 'Nameplate');
-    await user.click(screen.getByRole('button', { name: /create/i }));
+    await user.upload(input, [jpeg('a.jpg'), jpeg('b.jpg')]);
+    await user.click(screen.getByRole('button', { name: /upload 2 photos/i }));
 
     await waitFor(() => {
-      expect(mockUpload).toHaveBeenCalledWith(
-        'eq-1',
-        jpeg,
-        expect.objectContaining({ caption: 'Nameplate' })
-      );
+      expect(mockUpload).toHaveBeenCalledTimes(2);
     });
     await waitFor(() => expect(onClose).toHaveBeenCalled());
   });
 
-  it('surfaces server error message on upload failure', async () => {
-    mockUpload.mockRejectedValue(
-      Object.assign(new Error('boom'), {
-        response: { data: { message: 'Upload exceeded the limit.' } },
-      })
-    );
+  it('promotes the chosen row to profile after its upload completes', async () => {
+    mockUpload
+      .mockResolvedValueOnce({ id: 'img-a', isProfile: false })
+      .mockResolvedValueOnce({ id: 'img-b', isProfile: false });
+    mockPatch.mockResolvedValue({ id: 'img-b', isProfile: true });
     const user = userEvent.setup();
     renderWithProviders(
       <EquipmentImageUploadDialog isOpen={true} onClose={vi.fn()} equipmentId="eq-1" />
     );
 
     const input = screen.getByLabelText(/choose file/i) as HTMLInputElement;
-    const jpeg = new File(['x'], 'photo.jpg', { type: 'image/jpeg' });
-    await user.upload(input, jpeg);
-    await user.click(screen.getByRole('button', { name: /create/i }));
+    await user.upload(input, [jpeg('a.jpg'), jpeg('b.jpg')]);
+
+    // Pick the second row's profile radio
+    const radios = screen.getAllByRole('radio', { name: /set as profile/i });
+    await user.click(radios[1]);
+
+    await user.click(screen.getByRole('button', { name: /upload 2 photos/i }));
 
     await waitFor(() => {
-      expect(screen.getByText('Upload exceeded the limit.')).toBeInTheDocument();
+      expect(mockPatch).toHaveBeenCalledWith('eq-1', 'img-b', { isProfile: true });
     });
+    // The non-selected row's image is NOT patched
+    expect(mockPatch).not.toHaveBeenCalledWith('eq-1', 'img-a', expect.anything());
   });
 
-  it('checkbox is unchecked by default', async () => {
-    renderWithProviders(
-      <EquipmentImageUploadDialog isOpen={true} onClose={vi.fn()} equipmentId="eq-1" />
-    );
-    await waitFor(() => expect(screen.getByRole('dialog')).toBeInTheDocument());
-    const checkbox = screen.getByRole('checkbox', { name: /set as profile/i });
-    expect(checkbox).toHaveAttribute('aria-checked', 'false');
-  });
-
-  it('checkbox is checked by default when defaultSetProfile is true', async () => {
-    renderWithProviders(
-      <EquipmentImageUploadDialog
-        isOpen={true}
-        onClose={vi.fn()}
-        equipmentId="eq-1"
-        defaultSetProfile
-      />
-    );
-    await waitFor(() => expect(screen.getByRole('dialog')).toBeInTheDocument());
-    const checkbox = screen.getByRole('checkbox', { name: /set as profile/i });
-    expect(checkbox).toHaveAttribute('aria-checked', 'true');
-  });
-
-  it('promotes the new image to profile when checkbox is checked', async () => {
-    mockUpload.mockResolvedValue({ id: 'img-new', isProfile: false });
-    mockPatch.mockResolvedValue({ id: 'img-new', isProfile: true });
-    const onClose = vi.fn();
-    const user = userEvent.setup();
-    renderWithProviders(
-      <EquipmentImageUploadDialog
-        isOpen={true}
-        onClose={onClose}
-        equipmentId="eq-1"
-        defaultSetProfile
-      />
-    );
-
-    const input = screen.getByLabelText(/choose file/i) as HTMLInputElement;
-    const jpeg = new File(['x'], 'photo.jpg', { type: 'image/jpeg' });
-    await user.upload(input, jpeg);
-    await user.click(screen.getByRole('button', { name: /create/i }));
-
-    await waitFor(() => expect(mockUpload).toHaveBeenCalled());
-    await waitFor(() => {
-      expect(mockPatch).toHaveBeenCalledWith('eq-1', 'img-new', { isProfile: true });
-    });
-    await waitFor(() => expect(onClose).toHaveBeenCalled());
-  });
-
-  it('skips the profile patch when the upload already returns isProfile=true', async () => {
-    // Backend safety net (auto-promote first photo) shows up as the upload's
-    // own response — UI should NOT issue a redundant PATCH in that case.
-    mockUpload.mockResolvedValue({ id: 'img-new', isProfile: true });
+  it('defaults the first added row to profile when defaultSetProfile is true', async () => {
     const user = userEvent.setup();
     renderWithProviders(
       <EquipmentImageUploadDialog
@@ -182,14 +150,58 @@ describe('EquipmentImageUploadDialog', () => {
         defaultSetProfile
       />
     );
-
     const input = screen.getByLabelText(/choose file/i) as HTMLInputElement;
-    const jpeg = new File(['x'], 'photo.jpg', { type: 'image/jpeg' });
-    await user.upload(input, jpeg);
+    await user.upload(input, [jpeg('a.jpg'), jpeg('b.jpg')]);
+
+    const radios = screen.getAllByRole('radio', { name: /set as profile/i }) as HTMLInputElement[];
+    expect(radios[0].checked).toBe(true);
+    expect(radios[1].checked).toBe(false);
+  });
+
+  it('skips redundant profile patch when upload already returned isProfile=true', async () => {
+    mockUpload.mockResolvedValueOnce({ id: 'img-a', isProfile: true });
+    const user = userEvent.setup();
+    renderWithProviders(
+      <EquipmentImageUploadDialog
+        isOpen={true}
+        onClose={vi.fn()}
+        equipmentId="eq-1"
+        defaultSetProfile
+      />
+    );
+    const input = screen.getByLabelText(/choose file/i) as HTMLInputElement;
+    await user.upload(input, [jpeg('a.jpg')]);
     await user.click(screen.getByRole('button', { name: /create/i }));
 
     await waitFor(() => expect(mockUpload).toHaveBeenCalled());
     expect(mockPatch).not.toHaveBeenCalled();
+  });
+
+  it('keeps the dialog open and shows per-row error when a single upload fails', async () => {
+    mockUpload
+      .mockResolvedValueOnce({ id: 'img-a', isProfile: false })
+      .mockRejectedValueOnce(
+        Object.assign(new Error('boom'), {
+          response: { data: { message: 'Image is corrupt.' } },
+        })
+      );
+    const onClose = vi.fn();
+    const user = userEvent.setup();
+    renderWithProviders(
+      <EquipmentImageUploadDialog isOpen={true} onClose={onClose} equipmentId="eq-1" />
+    );
+
+    const input = screen.getByLabelText(/choose file/i) as HTMLInputElement;
+    await user.upload(input, [jpeg('a.jpg'), jpeg('b.jpg')]);
+    await user.click(screen.getByRole('button', { name: /upload 2 photos/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText('Image is corrupt.')).toBeInTheDocument();
+    });
+    // Dialog stays open so user can see the failure
+    expect(onClose).not.toHaveBeenCalled();
+    // Successful row shows the done state
+    expect(screen.getByText(/uploaded/i)).toBeInTheDocument();
   });
 
   it('cancel calls onClose', async () => {
