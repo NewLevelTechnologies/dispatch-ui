@@ -33,13 +33,13 @@ describe('EquipmentImageUploadDialog', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
-  it('shows the empty-batch hint and disables the submit button', async () => {
+  it('shows the drop zone and disables submit when nothing is queued', async () => {
     renderWithProviders(
       <EquipmentImageUploadDialog isOpen={true} onClose={vi.fn()} equipmentId="eq-1" />
     );
     await waitFor(() => expect(screen.getByRole('dialog')).toBeInTheDocument());
 
-    expect(screen.getByText(/choose one or more photos/i)).toBeInTheDocument();
+    expect(screen.getByText(/drag photos here/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /create/i })).toBeDisabled();
   });
 
@@ -213,5 +213,69 @@ describe('EquipmentImageUploadDialog', () => {
     await waitFor(() => expect(screen.getByRole('dialog')).toBeInTheDocument());
     await user.click(screen.getByRole('button', { name: /cancel/i }));
     expect(onClose).toHaveBeenCalled();
+  });
+
+  it('queues files dropped onto the drop zone', async () => {
+    renderWithProviders(
+      <EquipmentImageUploadDialog isOpen={true} onClose={vi.fn()} equipmentId="eq-1" />
+    );
+    const dropZone = screen.getByTestId('image-upload-drop-zone');
+    fireEvent.drop(dropZone, {
+      dataTransfer: {
+        files: [jpeg('dropped-1.jpg'), jpeg('dropped-2.jpg')],
+        types: ['Files'],
+      },
+    });
+
+    expect(screen.getByText('dropped-1.jpg')).toBeInTheDocument();
+    expect(screen.getByText('dropped-2.jpg')).toBeInTheDocument();
+  });
+
+  it('shows the active drop-here state during drag-over and reverts on drag-leave', async () => {
+    renderWithProviders(
+      <EquipmentImageUploadDialog isOpen={true} onClose={vi.fn()} equipmentId="eq-1" />
+    );
+    const dropZone = screen.getByTestId('image-upload-drop-zone');
+
+    // Browser advertises a Files drag — drop zone goes active.
+    fireEvent.dragEnter(dropZone, { dataTransfer: { types: ['Files'] } });
+    expect(screen.getByText(/drop to add/i)).toBeInTheDocument();
+
+    // Cursor leaves the drop zone — state reverts.
+    fireEvent.dragLeave(dropZone, { dataTransfer: { types: ['Files'] } });
+    expect(screen.getByText(/drag photos here/i)).toBeInTheDocument();
+  });
+
+  it('ignores non-file drags (e.g. text)', async () => {
+    renderWithProviders(
+      <EquipmentImageUploadDialog isOpen={true} onClose={vi.fn()} equipmentId="eq-1" />
+    );
+    const dropZone = screen.getByTestId('image-upload-drop-zone');
+    fireEvent.dragEnter(dropZone, { dataTransfer: { types: ['text/plain'] } });
+    // Stays in the idle state, doesn't show the active label
+    expect(screen.queryByText(/drop to add/i)).not.toBeInTheDocument();
+  });
+
+  it('runs dropped files through the same validation as the picker', async () => {
+    renderWithProviders(
+      <EquipmentImageUploadDialog isOpen={true} onClose={vi.fn()} equipmentId="eq-1" />
+    );
+    const dropZone = screen.getByTestId('image-upload-drop-zone');
+    fireEvent.drop(dropZone, {
+      dataTransfer: {
+        files: [
+          new File(['x'], 'photo.heic', { type: 'image/heic' }),
+          jpeg('ok.jpg'),
+        ],
+        types: ['Files'],
+      },
+    });
+
+    // Invalid drop is reported in the top-level error
+    expect(
+      screen.getByText(/only jpeg, png, and webp are supported/i)
+    ).toBeInTheDocument();
+    // Valid drop still queues
+    expect(screen.getByText('ok.jpg')).toBeInTheDocument();
   });
 });

@@ -9,10 +9,9 @@ import {
 } from '../api';
 import { Dialog, DialogActions, DialogBody, DialogTitle } from './catalyst/dialog';
 import { Button } from './catalyst/button';
-import { Field, FieldGroup, Fieldset, Label } from './catalyst/fieldset';
+import { FieldGroup, Fieldset } from './catalyst/fieldset';
 import { Input } from './catalyst/input';
-import { Text } from './catalyst/text';
-import { XMarkIcon } from '@heroicons/react/24/outline';
+import { PhotoIcon, XMarkIcon } from '@heroicons/react/24/outline';
 
 interface EquipmentImageUploadDialogProps {
   isOpen: boolean;
@@ -76,7 +75,12 @@ export default function EquipmentImageUploadDialog({
   const [profileRowId, setProfileRowId] = useState<string | null>(null);
   const [topLevelError, setTopLevelError] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [isDragOver, setIsDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  // Drag-enter and drag-leave fire on every child during a drag. We track a
+  // counter so the visible-drop-zone state only flips off when the cursor
+  // leaves the outer drop region, not when it crosses a nested element.
+  const dragCounter = useRef(0);
 
   /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
@@ -85,6 +89,8 @@ export default function EquipmentImageUploadDialog({
     setProfileRowId(null);
     setTopLevelError(null);
     setIsUploading(false);
+    setIsDragOver(false);
+    dragCounter.current = 0;
     if (fileInputRef.current) fileInputRef.current.value = '';
   }, [isOpen]);
   /* eslint-enable react-hooks/set-state-in-effect */
@@ -131,6 +137,47 @@ export default function EquipmentImageUploadDialog({
     addFiles(Array.from(list));
     // Reset the input so re-selecting the same file fires onChange again.
     e.target.value = '';
+  };
+
+  // Treat a drag as file-bearing only when the browser advertises Files in the
+  // payload. Filters out text drags from other apps (browsers, terminals,
+  // etc.) so they don't visually trigger the drop zone.
+  const isFileDrag = (e: React.DragEvent) =>
+    Array.from(e.dataTransfer.types ?? []).includes('Files');
+
+  const handleDragEnter = (e: React.DragEvent) => {
+    if (isUploading || !isFileDrag(e)) return;
+    e.preventDefault();
+    dragCounter.current++;
+    setIsDragOver(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    if (isUploading || !isFileDrag(e)) return;
+    e.preventDefault();
+    dragCounter.current--;
+    if (dragCounter.current <= 0) {
+      dragCounter.current = 0;
+      setIsDragOver(false);
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    if (isUploading || !isFileDrag(e)) return;
+    // preventDefault inside dragover is what tells the browser this element
+    // accepts drops — without it, the drop event never fires.
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    if (isUploading) return;
+    e.preventDefault();
+    dragCounter.current = 0;
+    setIsDragOver(false);
+    const dropped = e.dataTransfer.files;
+    if (!dropped || dropped.length === 0) return;
+    addFiles(Array.from(dropped));
   };
 
   const updateRow = (id: string, patch: Partial<QueuedFile>) => {
@@ -221,19 +268,49 @@ export default function EquipmentImageUploadDialog({
 
           <Fieldset>
             <FieldGroup className="!space-y-4">
-              <Field>
-                <Label>{t('equipment.images.chooseFile')} *</Label>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept={ACCEPT}
-                  multiple
-                  onChange={handleFileChange}
-                  disabled={isUploading}
-                  aria-label={t('equipment.images.chooseFile')}
-                  className="block w-full text-sm text-zinc-700 file:mr-3 file:rounded-md file:border-0 file:bg-zinc-100 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-zinc-700 hover:file:bg-zinc-200 dark:text-zinc-200 dark:file:bg-zinc-800 dark:file:text-zinc-200 dark:hover:file:bg-zinc-700"
-                />
-              </Field>
+              <div
+                onDragEnter={handleDragEnter}
+                onDragLeave={handleDragLeave}
+                onDragOver={handleDragOver}
+                onDrop={handleDrop}
+                data-testid="image-upload-drop-zone"
+                className={[
+                  'rounded-lg border-2 border-dashed p-6 text-center transition-colors',
+                  isDragOver
+                    ? 'border-blue-500 bg-blue-50/60 dark:border-blue-400 dark:bg-blue-950/30'
+                    : isUploading
+                      ? 'border-zinc-200 opacity-60 dark:border-zinc-800'
+                      : 'border-zinc-300 hover:border-zinc-400 dark:border-zinc-700 dark:hover:border-zinc-600',
+                ].join(' ')}
+              >
+                <PhotoIcon className="mx-auto size-8 text-zinc-400 dark:text-zinc-500" />
+                <p className="mt-2 text-sm text-zinc-700 dark:text-zinc-300">
+                  {isDragOver
+                    ? t('equipment.images.dropHereActive')
+                    : t('equipment.images.dropOrChoose')}
+                </p>
+                {!isDragOver && (
+                  <label className="mt-2 inline-block">
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept={ACCEPT}
+                      multiple
+                      onChange={handleFileChange}
+                      disabled={isUploading}
+                      className="sr-only"
+                    />
+                    <span
+                      className={[
+                        'inline-block cursor-pointer rounded-md bg-zinc-100 px-3 py-1.5 text-sm font-medium text-zinc-700 ring-1 ring-zinc-200 transition-colors hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-200 dark:ring-zinc-700 dark:hover:bg-zinc-700',
+                        isUploading ? 'pointer-events-none opacity-50' : '',
+                      ].join(' ')}
+                    >
+                      {t('equipment.images.chooseFile')}
+                    </span>
+                  </label>
+                )}
+              </div>
 
               {rows.length > 0 && (
                 <ul className="divide-y divide-zinc-200 rounded-lg ring-1 ring-zinc-950/10 dark:divide-zinc-800 dark:ring-white/10">
@@ -313,11 +390,6 @@ export default function EquipmentImageUploadDialog({
                 </ul>
               )}
 
-              {rows.length === 0 && (
-                <Text className="text-sm text-zinc-500 dark:text-zinc-400">
-                  {t('equipment.images.batchEmpty')}
-                </Text>
-              )}
             </FieldGroup>
           </Fieldset>
         </DialogBody>

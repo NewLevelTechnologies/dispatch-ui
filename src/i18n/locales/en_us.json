@@ -362,6 +362,8 @@
       "batchEmpty": "Choose one or more photos to add.",
       "captionPlaceholder": "e.g. Nameplate, Compressor model number",
       "chooseFile": "Choose file",
+      "dropHereActive": "Drop to add",
+      "dropOrChoose": "Drag photos here, or",
       "deleteConfirm": "Delete this photo?",
       "editCaption": "Edit caption",
       "empty": "No photos added yet.",

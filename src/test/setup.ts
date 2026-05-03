@@ -285,6 +285,8 @@ vi.mock('react-i18next', () => {
     'equipment.images.captionPlaceholder': 'e.g. Nameplate, Compressor model number',
     'equipment.images.chooseFile': 'Choose file',
     'equipment.images.deleteConfirm': 'Delete this photo?',
+    'equipment.images.dropHereActive': 'Drop to add',
+    'equipment.images.dropOrChoose': 'Drag photos here, or',
     'equipment.images.editCaption': 'Edit caption',
     'equipment.images.empty': 'No photos added yet.',
     'equipment.images.errorCreate': 'Failed to upload photo',
