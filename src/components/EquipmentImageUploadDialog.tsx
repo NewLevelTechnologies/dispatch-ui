@@ -10,6 +10,7 @@ import {
 } from '../api';
 import { Dialog, DialogActions, DialogBody, DialogTitle } from './catalyst/dialog';
 import { Button } from './catalyst/button';
+import { Checkbox, CheckboxField } from './catalyst/checkbox';
 import { Field, FieldGroup, Fieldset, Label } from './catalyst/fieldset';
 import { Input } from './catalyst/input';
 
@@ -17,6 +18,13 @@ interface EquipmentImageUploadDialogProps {
   isOpen: boolean;
   onClose: () => void;
   equipmentId: string;
+  /**
+   * Initial value for the "Set as profile photo" checkbox. The detail page
+   * passes `true` when the equipment has no photos yet — the first upload
+   * almost always wants to be the cover. After that, it defaults to `false`
+   * so subsequent uploads don't surprise-replace the user's chosen profile.
+   */
+  defaultSetProfile?: boolean;
 }
 
 type Stage = 'requesting' | 'uploading' | 'confirming';
@@ -28,12 +36,14 @@ export default function EquipmentImageUploadDialog({
   isOpen,
   onClose,
   equipmentId,
+  defaultSetProfile = false,
 }: EquipmentImageUploadDialogProps) {
   const queryClient = useQueryClient();
   const { t } = useTranslation();
 
   const [file, setFile] = useState<File | null>(null);
   const [caption, setCaption] = useState('');
+  const [setAsProfile, setSetAsProfile] = useState(defaultSetProfile);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [stage, setStage] = useState<Stage | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -43,17 +53,33 @@ export default function EquipmentImageUploadDialog({
     if (!isOpen) return;
     setFile(null);
     setCaption('');
+    setSetAsProfile(defaultSetProfile);
     setErrorMessage(null);
     setStage(null);
-  }, [isOpen]);
+  }, [isOpen, defaultSetProfile]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
   const uploadMutation = useMutation({
-    mutationFn: ({ file, caption }: { file: File; caption: string }) =>
-      equipmentImagesApi.upload(equipmentId, file, {
+    mutationFn: async ({
+      file,
+      caption,
+      setAsProfile,
+    }: {
+      file: File;
+      caption: string;
+      setAsProfile: boolean;
+    }) => {
+      const image = await equipmentImagesApi.upload(equipmentId, file, {
         caption: caption.trim() || null,
         onProgress: (s) => setStage(s),
-      }),
+      });
+      // Promote to profile in a follow-up PATCH. Backend supports this directly
+      // and atomically clears the flag on any prior profile.
+      if (setAsProfile && !image.isProfile) {
+        return equipmentImagesApi.patch(equipmentId, image.id, { isProfile: true });
+      }
+      return image;
+    },
     onSuccess: (image: EquipmentImage) => {
       void image;
       queryClient.invalidateQueries({ queryKey: ['equipment-images', equipmentId] });
@@ -110,7 +136,7 @@ export default function EquipmentImageUploadDialog({
       setErrorMessage(t('equipment.images.fileRequired'));
       return;
     }
-    uploadMutation.mutate({ file, caption });
+    uploadMutation.mutate({ file, caption, setAsProfile });
   };
 
   const isUploading = uploadMutation.isPending;
@@ -160,6 +186,16 @@ export default function EquipmentImageUploadDialog({
                   maxLength={EQUIPMENT_IMAGE_CAPTION_MAX_CHARS}
                 />
               </Field>
+
+              <CheckboxField>
+                <Checkbox
+                  name="setAsProfile"
+                  checked={setAsProfile}
+                  onChange={setSetAsProfile}
+                  disabled={isUploading}
+                />
+                <Label>{t('equipment.images.setAsProfile')}</Label>
+              </CheckboxField>
 
               {stageLabel && (
                 <p className="text-sm text-zinc-600 dark:text-zinc-400">{stageLabel}</p>

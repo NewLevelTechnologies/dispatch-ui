@@ -4,6 +4,7 @@ import { renderWithProviders, userEvent } from '../test/utils';
 import EquipmentImageUploadDialog from './EquipmentImageUploadDialog';
 
 const mockUpload = vi.fn();
+const mockPatch = vi.fn();
 
 vi.mock('../api/equipmentApi', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../api/equipmentApi')>();
@@ -11,6 +12,7 @@ vi.mock('../api/equipmentApi', async (importOriginal) => {
     ...actual,
     equipmentImagesApi: {
       upload: (...args: unknown[]) => mockUpload(...args),
+      patch: (...args: unknown[]) => mockPatch(...args),
     },
   };
 });
@@ -116,6 +118,78 @@ describe('EquipmentImageUploadDialog', () => {
     await waitFor(() => {
       expect(screen.getByText('Upload exceeded the limit.')).toBeInTheDocument();
     });
+  });
+
+  it('checkbox is unchecked by default', async () => {
+    renderWithProviders(
+      <EquipmentImageUploadDialog isOpen={true} onClose={vi.fn()} equipmentId="eq-1" />
+    );
+    await waitFor(() => expect(screen.getByRole('dialog')).toBeInTheDocument());
+    const checkbox = screen.getByRole('checkbox', { name: /set as profile/i });
+    expect(checkbox).toHaveAttribute('aria-checked', 'false');
+  });
+
+  it('checkbox is checked by default when defaultSetProfile is true', async () => {
+    renderWithProviders(
+      <EquipmentImageUploadDialog
+        isOpen={true}
+        onClose={vi.fn()}
+        equipmentId="eq-1"
+        defaultSetProfile
+      />
+    );
+    await waitFor(() => expect(screen.getByRole('dialog')).toBeInTheDocument());
+    const checkbox = screen.getByRole('checkbox', { name: /set as profile/i });
+    expect(checkbox).toHaveAttribute('aria-checked', 'true');
+  });
+
+  it('promotes the new image to profile when checkbox is checked', async () => {
+    mockUpload.mockResolvedValue({ id: 'img-new', isProfile: false });
+    mockPatch.mockResolvedValue({ id: 'img-new', isProfile: true });
+    const onClose = vi.fn();
+    const user = userEvent.setup();
+    renderWithProviders(
+      <EquipmentImageUploadDialog
+        isOpen={true}
+        onClose={onClose}
+        equipmentId="eq-1"
+        defaultSetProfile
+      />
+    );
+
+    const input = screen.getByLabelText(/choose file/i) as HTMLInputElement;
+    const jpeg = new File(['x'], 'photo.jpg', { type: 'image/jpeg' });
+    await user.upload(input, jpeg);
+    await user.click(screen.getByRole('button', { name: /create/i }));
+
+    await waitFor(() => expect(mockUpload).toHaveBeenCalled());
+    await waitFor(() => {
+      expect(mockPatch).toHaveBeenCalledWith('eq-1', 'img-new', { isProfile: true });
+    });
+    await waitFor(() => expect(onClose).toHaveBeenCalled());
+  });
+
+  it('skips the profile patch when the upload already returns isProfile=true', async () => {
+    // Backend safety net (auto-promote first photo) shows up as the upload's
+    // own response — UI should NOT issue a redundant PATCH in that case.
+    mockUpload.mockResolvedValue({ id: 'img-new', isProfile: true });
+    const user = userEvent.setup();
+    renderWithProviders(
+      <EquipmentImageUploadDialog
+        isOpen={true}
+        onClose={vi.fn()}
+        equipmentId="eq-1"
+        defaultSetProfile
+      />
+    );
+
+    const input = screen.getByLabelText(/choose file/i) as HTMLInputElement;
+    const jpeg = new File(['x'], 'photo.jpg', { type: 'image/jpeg' });
+    await user.upload(input, jpeg);
+    await user.click(screen.getByRole('button', { name: /create/i }));
+
+    await waitFor(() => expect(mockUpload).toHaveBeenCalled());
+    expect(mockPatch).not.toHaveBeenCalled();
   });
 
   it('cancel calls onClose', async () => {

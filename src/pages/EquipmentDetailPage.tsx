@@ -52,7 +52,9 @@ import {
   EllipsisVerticalIcon,
   PhotoIcon,
   PlusIcon,
+  StarIcon as StarIconOutline,
 } from '@heroicons/react/24/outline';
+import { StarIcon as StarIconSolid } from '@heroicons/react/24/solid';
 
 type TabId = 'overview' | 'photos' | 'filters' | 'service-history' | 'components';
 
@@ -651,11 +653,28 @@ export default function EquipmentDetailPage() {
                           />
                         </a>
 
-                        {img.isProfile && (
-                          <Badge color="lime" className="absolute left-2 top-2 text-xs">
-                            {t('equipment.images.profile')}
-                          </Badge>
-                        )}
+                        <button
+                          type="button"
+                          onClick={() => handleSetProfileImage(img)}
+                          aria-label={
+                            img.isProfile
+                              ? t('equipment.images.profile')
+                              : t('equipment.images.setAsProfile')
+                          }
+                          aria-pressed={img.isProfile}
+                          title={
+                            img.isProfile
+                              ? t('equipment.images.profile')
+                              : t('equipment.images.setAsProfile')
+                          }
+                          className="absolute left-1 top-1 flex size-8 items-center justify-center rounded-full bg-white/80 backdrop-blur transition-colors hover:bg-white dark:bg-zinc-900/80 dark:hover:bg-zinc-900"
+                        >
+                          {img.isProfile ? (
+                            <StarIconSolid className="size-5 text-amber-500" />
+                          ) : (
+                            <StarIconOutline className="size-5 text-zinc-500 hover:text-amber-500 dark:text-zinc-400" />
+                          )}
+                        </button>
 
                         <div className="absolute right-1 top-1">
                           <Dropdown>
@@ -667,11 +686,6 @@ export default function EquipmentDetailPage() {
                               <EllipsisVerticalIcon className="size-5" />
                             </DropdownButton>
                             <DropdownMenu anchor="bottom end">
-                              {!img.isProfile && (
-                                <DropdownItem onClick={() => handleSetProfileImage(img)}>
-                                  <DropdownLabel>{t('equipment.images.setAsProfile')}</DropdownLabel>
-                                </DropdownItem>
-                              )}
                               <DropdownItem onClick={() => handleEditCaption(img)}>
                                 <DropdownLabel>{t('equipment.images.editCaption')}</DropdownLabel>
                               </DropdownItem>
@@ -812,6 +826,7 @@ export default function EquipmentDetailPage() {
         isOpen={isImageUploadOpen}
         onClose={() => setIsImageUploadOpen(false)}
         equipmentId={id!}
+        defaultSetProfile={images.length === 0}
       />
     </AppLayout>
   );

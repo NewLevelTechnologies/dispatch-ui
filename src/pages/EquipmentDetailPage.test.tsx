@@ -608,15 +608,18 @@ describe('EquipmentDetailPage', () => {
     const photosTab = await screen.findByRole('button', { name: /^photos\s*2$/i });
     await user.click(photosTab);
 
-    // Caption renders for the captioned image; profile badge is shown
+    // Caption renders for the captioned image
     await waitFor(() => expect(screen.getByText('Nameplate')).toBeInTheDocument());
-    expect(screen.getByText(/^profile$/i)).toBeInTheDocument();
+    // The profile photo's star button uses "Profile" as its accessible label
+    // (filled star), the other uses "Set as profile" (empty star).
+    expect(screen.getByRole('button', { name: /^profile$/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^set as profile$/i })).toBeInTheDocument();
     // Two thumbnails
     const thumbs = screen.getAllByRole('img');
     expect(thumbs.length).toBeGreaterThanOrEqual(2);
   });
 
-  it('sets a non-profile image as profile via the action menu', async () => {
+  it('sets a non-profile image as profile by clicking the star toggle', async () => {
     mockGetById.mockResolvedValue(baseEquipment);
     mockImagesList.mockResolvedValue([
       {
@@ -646,11 +649,10 @@ describe('EquipmentDetailPage', () => {
     });
     await user.click(screen.getByRole('button', { name: /^photos/i }));
 
-    // Open the per-tile dropdown
-    const moreButtons = await screen.findAllByRole('button', { name: /more options/i });
-    await user.click(moreButtons[0]);
-    const setProfile = await screen.findByRole('menuitem', { name: /set as profile/i });
-    await user.click(setProfile);
+    // Star button uses "Set as profile" as its accessible label when the image
+    // isn't already the profile.
+    const star = await screen.findByRole('button', { name: /set as profile/i });
+    await user.click(star);
 
     await waitFor(() => {
       expect(mockImagePatch).toHaveBeenCalledWith('eq-1', 'img-1', { isProfile: true });
