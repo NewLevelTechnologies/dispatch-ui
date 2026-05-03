@@ -23,6 +23,7 @@ import TabNavigation from '../components/TabNavigation';
 import EditableField from '../components/EditableField';
 import EquipmentFilterFormDialog from '../components/EquipmentFilterFormDialog';
 import EquipmentImageUploadDialog from '../components/EquipmentImageUploadDialog';
+import EquipmentThumbnail from '../components/EquipmentThumbnail';
 import { Heading } from '../components/catalyst/heading';
 import { Text } from '../components/catalyst/text';
 import { Button } from '../components/catalyst/button';
@@ -50,7 +51,6 @@ import {
 import {
   ArrowLeftIcon,
   EllipsisVerticalIcon,
-  PhotoIcon,
   PlusIcon,
   StarIcon as StarIconOutline,
 } from '@heroicons/react/24/outline';
@@ -165,6 +165,12 @@ export default function EquipmentDetailPage() {
   const imageInvalidate = () => {
     queryClient.invalidateQueries({ queryKey: ['equipment-images', id] });
     queryClient.invalidateQueries({ queryKey: ['equipment-detail', id] });
+    // List-view caches (equipment list, customer/location equipment tabs)
+    // also need refreshing — they show profile thumbnails sourced from
+    // EquipmentSummary.profileImageUrl. Same for work-order responses, which
+    // embed the equipment summary on each work item.
+    queryClient.invalidateQueries({ queryKey: ['equipment'] });
+    queryClient.invalidateQueries({ queryKey: ['work-orders'] });
   };
 
   const setProfileImageMutation = useMutation({
@@ -359,20 +365,12 @@ export default function EquipmentDetailPage() {
 
         {/* Header */}
         <div className="flex items-start gap-4">
-          <div className="flex size-24 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-zinc-100 ring-1 ring-zinc-950/5 dark:bg-zinc-900 dark:ring-white/10">
-            {equipment.profileImageUrl ? (
-              <img
-                src={equipment.profileImageUrl}
-                alt={t('equipment.detail.profileImageAlt', { name: equipment.name })}
-                className="size-full object-cover"
-              />
-            ) : (
-              <PhotoIcon
-                className="size-10 text-zinc-300 dark:text-zinc-700"
-                aria-label={t('equipment.detail.noProfileImage')}
-              />
-            )}
-          </div>
+          <EquipmentThumbnail
+            url={equipment.profileImageUrl}
+            name={t('equipment.detail.profileImageAlt', { name: equipment.name })}
+            sizeClass="size-24"
+            fit="contain"
+          />
 
           <div className="flex-1">
             <div className="flex items-center gap-2">

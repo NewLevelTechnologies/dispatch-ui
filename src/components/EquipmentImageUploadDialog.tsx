@@ -236,6 +236,11 @@ export default function EquipmentImageUploadDialog({
     setIsUploading(false);
     queryClient.invalidateQueries({ queryKey: ['equipment-images', equipmentId] });
     queryClient.invalidateQueries({ queryKey: ['equipment-detail', equipmentId] });
+    // Refresh list-view caches so thumbnails reflect the new (or replaced)
+    // profile image — equipment lists, customer/location equipment tabs, and
+    // the WO equipment subtitle all key off ['equipment', ...].
+    queryClient.invalidateQueries({ queryKey: ['equipment'] });
+    queryClient.invalidateQueries({ queryKey: ['work-orders'] });
 
     // All-success → close. Any failure → stay open so the user sees the
     // per-row error messages.
