@@ -16,6 +16,7 @@ import { useHasCapability } from '../hooks/useCurrentUser';
 import AppLayout from '../components/AppLayout';
 import ServiceLocationFormDialog from '../components/ServiceLocationFormDialog';
 import EquipmentFormDialog from '../components/EquipmentFormDialog';
+import EquipmentThumbnail from '../components/EquipmentThumbnail';
 import WorkOrderFormDialog from '../components/WorkOrderFormDialog';
 import AdditionalContactsList from '../components/AdditionalContactsList';
 import WorkOrdersList from '../components/WorkOrdersList';
@@ -460,9 +461,15 @@ export default function ServiceLocationDetailPage() {
                           <TableCell className="font-medium">
                             <RouterLink
                               to={`/equipment/${item.id}`}
-                              className="text-zinc-700 hover:text-blue-600 hover:underline dark:text-zinc-300 dark:hover:text-blue-400"
+                              className="flex items-center gap-2 text-zinc-700 hover:text-blue-600 hover:underline dark:text-zinc-300 dark:hover:text-blue-400"
                             >
-                              {item.name}
+                              <EquipmentThumbnail
+                                url={item.profileImageUrl}
+                                name={item.name}
+                                sizeClass="size-12"
+                                fit="contain"
+                              />
+                              <span>{item.name}</span>
                             </RouterLink>
                           </TableCell>
                           <TableCell>{formatTypeCategory(item)}</TableCell>

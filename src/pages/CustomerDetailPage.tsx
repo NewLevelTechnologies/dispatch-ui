@@ -18,6 +18,7 @@ import ServiceLocationFormDialog from '../components/ServiceLocationFormDialog';
 import CustomerFormDialog from '../components/CustomerFormDialog';
 import WorkOrderFormDialog from '../components/WorkOrderFormDialog';
 import EquipmentFormDialog from '../components/EquipmentFormDialog';
+import EquipmentThumbnail from '../components/EquipmentThumbnail';
 import AdditionalContactsList from '../components/AdditionalContactsList';
 import WorkOrdersList from '../components/WorkOrdersList';
 import { workOrdersListQueryOptions } from '../api/workOrdersListQuery';
@@ -204,9 +205,15 @@ export default function CustomerDetailPage() {
                 <TableCell className="font-medium">
                   <RouterLink
                     to={`/equipment/${item.id}`}
-                    className="text-zinc-700 hover:text-blue-600 hover:underline dark:text-zinc-300 dark:hover:text-blue-400"
+                    className="flex items-center gap-2 text-zinc-700 hover:text-blue-600 hover:underline dark:text-zinc-300 dark:hover:text-blue-400"
                   >
-                    {item.name}
+                    <EquipmentThumbnail
+                      url={item.profileImageUrl}
+                      name={item.name}
+                      sizeClass="size-12"
+                      fit="contain"
+                    />
+                    <span>{item.name}</span>
                   </RouterLink>
                 </TableCell>
                 <TableCell>

@@ -38,6 +38,8 @@ export interface WorkItemEquipmentSummary {
   model?: string | null;
   serialNumber?: string | null;
   locationOnSite?: string | null;
+  // Presigned URL of the profile image, if any. Short-lived (~1hr).
+  profileImageUrl?: string | null;
 }
 
 export interface WorkItemResponse {
