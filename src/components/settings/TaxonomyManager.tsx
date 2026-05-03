@@ -14,6 +14,7 @@ import { Button } from '../catalyst/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../catalyst/table';
 import { Dropdown, DropdownButton, DropdownItem, DropdownMenu } from '../catalyst/dropdown';
 import { ChevronUpIcon, ChevronDownIcon, EllipsisVerticalIcon } from '@heroicons/react/16/solid';
+import IconButton from '../IconButton';
 import TaxonomyFormDialog from './TaxonomyFormDialog';
 
 interface TaxonomyApi {
@@ -163,25 +164,23 @@ export default function TaxonomyManager({
                   <TableCell className="text-zinc-500 font-mono text-xs">{item.code}</TableCell>
                   <TableCell>
                     {canEdit && (
-                      <div className="flex items-center gap-1">
-                        <Button
-                          plain
+                      <div className="flex items-center gap-0.5">
+                        <IconButton
                           onClick={() => moveUp(index)}
                           disabled={index === 0 || reorderMutation.isPending}
                           title={t('common.moveUp')}
                           aria-label={t('common.moveUp')}
                         >
                           <ChevronUpIcon className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          plain
+                        </IconButton>
+                        <IconButton
                           onClick={() => moveDown(index)}
                           disabled={index === sorted.length - 1 || reorderMutation.isPending}
                           title={t('common.moveDown')}
                           aria-label={t('common.moveDown')}
                         >
                           <ChevronDownIcon className="h-4 w-4" />
-                        </Button>
+                        </IconButton>
                       </div>
                     )}
                   </TableCell>
