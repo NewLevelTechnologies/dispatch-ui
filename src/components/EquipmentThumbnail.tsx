@@ -16,6 +16,10 @@ interface EquipmentThumbnailProps {
  * profile image when present, otherwise a neutral placeholder icon. Square
  * aspect, rounded corners, with a subtle ring so it reads as an image even
  * when the placeholder is shown against a similar-toned background.
+ *
+ * Note: the wrapper is intentionally a plain block (not flex) so the inner
+ * <img>'s `size-full + object-cover` can fill the box correctly. The
+ * placeholder branch carries its own flex centering.
  */
 export default function EquipmentThumbnail({
   url,
@@ -28,19 +32,25 @@ export default function EquipmentThumbnail({
       className={[
         sizeClass,
         'shrink-0 overflow-hidden rounded-md bg-zinc-100 ring-1 ring-zinc-950/5 dark:bg-zinc-900 dark:ring-white/10',
-        'flex items-center justify-center',
         className,
       ]
         .filter(Boolean)
         .join(' ')}
     >
       {url ? (
-        <img src={url} alt={name} className="size-full object-cover" loading="lazy" />
-      ) : (
-        <PhotoIcon
-          className="size-1/2 text-zinc-300 dark:text-zinc-700"
-          aria-label={name}
+        <img
+          src={url}
+          alt={name}
+          loading="lazy"
+          className="block size-full object-cover"
         />
+      ) : (
+        <div className="flex size-full items-center justify-center">
+          <PhotoIcon
+            className="size-1/2 text-zinc-300 dark:text-zinc-700"
+            aria-label={name}
+          />
+        </div>
       )}
     </div>
   );
