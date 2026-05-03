@@ -200,6 +200,11 @@ export interface ListWorkOrdersParams {
   // Service location scope (composes with customerId)
   serviceLocationId?: string;
 
+  // Equipment scope — returns work orders that have at least one work item
+  // attached to this equipment. Powers the Service History tab on the
+  // equipment detail page.
+  equipmentId?: string;
+
   // Scheduled date range — ISO yyyy-mm-dd. From is inclusive at 00:00,
   // To is exclusive at 00:00 of the next day (handled server-side).
   scheduledDateFrom?: string;

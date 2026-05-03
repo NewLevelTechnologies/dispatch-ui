@@ -24,6 +24,8 @@ import EditableField from '../components/EditableField';
 import EquipmentFilterFormDialog from '../components/EquipmentFilterFormDialog';
 import EquipmentImageUploadDialog from '../components/EquipmentImageUploadDialog';
 import EquipmentThumbnail from '../components/EquipmentThumbnail';
+import WorkOrdersList from '../components/WorkOrdersList';
+import { workOrdersListQueryOptions } from '../api/workOrdersListQuery';
 import { Heading } from '../components/catalyst/heading';
 import { Text } from '../components/catalyst/text';
 import { Button } from '../components/catalyst/button';
@@ -162,6 +164,12 @@ export default function EquipmentDetailPage() {
     enabled: !!id,
   });
 
+  // Service history — work orders touching this equipment. Shared cache with
+  // the rendered WorkOrdersList below so we read the count off the same fetch.
+  const { data: serviceHistoryData } = useQuery(
+    workOrdersListQueryOptions({ equipmentId: id ?? '' })
+  );
+
   const imageInvalidate = () => {
     queryClient.invalidateQueries({ queryKey: ['equipment-images', id] });
     queryClient.invalidateQueries({ queryKey: ['equipment-detail', id] });
@@ -285,7 +293,11 @@ export default function EquipmentDetailPage() {
     { id: 'overview', label: t('equipment.tabs.overview') },
     { id: 'photos', label: t('equipment.tabs.photos'), count: images.length },
     { id: 'filters', label: t('equipment.tabs.filters'), count: filters.length },
-    { id: 'service-history', label: t('equipment.tabs.serviceHistory') },
+    {
+      id: 'service-history',
+      label: t('equipment.tabs.serviceHistory'),
+      count: serviceHistoryData?.totalElements ?? 0,
+    },
     { id: 'components', label: t('equipment.tabs.components') },
   ];
 
@@ -782,7 +794,11 @@ export default function EquipmentDetailPage() {
             </div>
           )}
 
-          {(activeTab === 'service-history' || activeTab === 'components') && (
+          {activeTab === 'service-history' && id && (
+            <WorkOrdersList equipmentId={id} />
+          )}
+
+          {activeTab === 'components' && (
             <div className="rounded-lg border border-dashed border-zinc-300 p-8 text-center dark:border-zinc-700">
               <Text className="text-zinc-600 dark:text-zinc-400">
                 {t('equipment.detail.tabComingSoon')}
