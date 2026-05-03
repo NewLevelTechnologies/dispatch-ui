@@ -431,6 +431,18 @@ export const tenantFilterSizesApi = {
     );
     return response.data;
   },
+
+  /**
+   * One-shot seed of the 10 most-common HVAC residential filter sizes.
+   * Idempotent — sizes already in the tenant's list are skipped, not
+   * duplicated. Returns the count of newly added vs. skipped rows.
+   */
+  seedCommon: async (): Promise<{ added: number; skipped: number }> => {
+    const response = await apiClient.post<{ added: number; skipped: number }>(
+      '/equipment/config/filter-sizes/seed-common'
+    );
+    return response.data;
+  },
 };
 
 // ========== FILTER PULL LIST (REPORT) ==========

@@ -65,6 +65,20 @@ export default function FilterSizesPanel() {
     },
   });
 
+  const seedCommonMutation = useMutation({
+    mutationFn: () => tenantFilterSizesApi.seedCommon(),
+    onSuccess: ({ added, skipped }) => {
+      queryClient.invalidateQueries({ queryKey: QUERY_KEY });
+      // Tell the user what happened — added=10 first time, skipped=10 if
+      // they hit it again. Idempotent on the backend, so we don't need a
+      // confirm prompt; just surface the result.
+      alert(t('settings.filterSizes.seedResult', { added, skipped }));
+    },
+    onError: (err: unknown) => {
+      alert(getApiErrorMessage(err) || t('settings.filterSizes.errorSeed'));
+    },
+  });
+
   const reorderMutation = useMutation({
     mutationFn: (orderedIds: string[]) => tenantFilterSizesApi.reorder(orderedIds),
     onSuccess: (updated) => queryClient.setQueryData(QUERY_KEY, updated),
@@ -120,7 +134,21 @@ export default function FilterSizesPanel() {
             {t('settings.filterSizes.description')}
           </Text>
         </div>
-        {canEdit && <Button onClick={handleAdd}>{t('settings.filterSizes.add')}</Button>}
+        {canEdit && (
+          <div className="flex items-center gap-2">
+            <Button
+              plain
+              onClick={() => seedCommonMutation.mutate()}
+              disabled={seedCommonMutation.isPending}
+              title={t('settings.filterSizes.seedCommonHelp')}
+            >
+              {seedCommonMutation.isPending
+                ? t('common.saving')
+                : t('settings.filterSizes.seedCommon')}
+            </Button>
+            <Button onClick={handleAdd}>{t('settings.filterSizes.add')}</Button>
+          </div>
+        )}
       </div>
 
       {isLoading && <Text>{t('settings.filterSizes.loading')}</Text>}
@@ -129,7 +157,25 @@ export default function FilterSizesPanel() {
           {getApiErrorMessage(error) || t('settings.filterSizes.errorLoad')}
         </Text>
       )}
-      {items && active.length === 0 && <Text>{t('settings.filterSizes.empty')}</Text>}
+      {items && active.length === 0 && (
+        <div className="rounded-lg border border-dashed border-zinc-300 p-6 text-center dark:border-zinc-700">
+          <Text className="text-zinc-600 dark:text-zinc-400">
+            {t('settings.filterSizes.empty')}
+          </Text>
+          {canEdit && (
+            <div className="mt-3">
+              <Button
+                onClick={() => seedCommonMutation.mutate()}
+                disabled={seedCommonMutation.isPending}
+              >
+                {seedCommonMutation.isPending
+                  ? t('common.saving')
+                  : t('settings.filterSizes.seedCommonCta')}
+              </Button>
+            </div>
+          )}
+        </div>
+      )}
 
       {sorted.length > 0 && (
         <Table dense className="[--gutter:theme(spacing.1)] text-sm">
