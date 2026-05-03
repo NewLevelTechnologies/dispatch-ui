@@ -359,8 +359,11 @@
     },
     "images": {
       "addPhoto": "Add Photo",
+      "batchEmpty": "Choose one or more photos to add.",
       "captionPlaceholder": "e.g. Nameplate, Compressor model number",
       "chooseFile": "Choose file",
+      "dropHereActive": "Drop to add",
+      "dropOrChoose": "Drag photos here, or",
       "deleteConfirm": "Delete this photo?",
       "editCaption": "Edit caption",
       "empty": "No photos added yet.",
@@ -375,6 +378,8 @@
       "noFileChosen": "No file chosen",
       "openFullSize": "Open full-size in a new tab",
       "profile": "Profile",
+      "removeFromBatch": "Remove from batch",
+      "rowDone": "Uploaded",
       "setAsProfile": "Set as profile",
       "stageConfirming": "Processing…",
       "stageRequesting": "Preparing upload…",
@@ -382,7 +387,8 @@
       "titleAdd": "Add Photo",
       "titleEditCaption": "Edit Caption",
       "tooLarge": "File is {{size}} MB; the maximum is {{max}} MB.",
-      "unsupportedType": "Only JPEG, PNG, and WEBP are supported. HEIC photos must be converted before upload."
+      "unsupportedType": "Only JPEG, PNG, and WEBP are supported. HEIC photos must be converted before upload.",
+      "uploadCount": "Upload {{count}} photos"
     },
     "filters": {
       "addFilter": "Add Filter",

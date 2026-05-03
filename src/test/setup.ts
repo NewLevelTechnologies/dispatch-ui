@@ -56,6 +56,15 @@ global.ResizeObserver = class ResizeObserver {
 // Mock scrollIntoView for jsdom
 Element.prototype.scrollIntoView = vi.fn();
 
+// Mock URL.createObjectURL/revokeObjectURL for jsdom (used by image previews
+// in EquipmentImageUploadDialog).
+if (!URL.createObjectURL) {
+  URL.createObjectURL = vi.fn(() => 'blob:mock');
+}
+if (!URL.revokeObjectURL) {
+  URL.revokeObjectURL = vi.fn();
+}
+
 // Mock window.alert
 global.alert = vi.fn();
 
@@ -272,9 +281,12 @@ vi.mock('react-i18next', () => {
     'equipment.detail.profileImageAlt': '{{name}} profile image',
     'equipment.detail.tabComingSoon': 'Coming soon.',
     'equipment.images.addPhoto': 'Add Photo',
+    'equipment.images.batchEmpty': 'Choose one or more photos to add.',
     'equipment.images.captionPlaceholder': 'e.g. Nameplate, Compressor model number',
     'equipment.images.chooseFile': 'Choose file',
     'equipment.images.deleteConfirm': 'Delete this photo?',
+    'equipment.images.dropHereActive': 'Drop to add',
+    'equipment.images.dropOrChoose': 'Drag photos here, or',
     'equipment.images.editCaption': 'Edit caption',
     'equipment.images.empty': 'No photos added yet.',
     'equipment.images.errorCreate': 'Failed to upload photo',
@@ -288,6 +300,8 @@ vi.mock('react-i18next', () => {
     'equipment.images.noFileChosen': 'No file chosen',
     'equipment.images.openFullSize': 'Open full-size in a new tab',
     'equipment.images.profile': 'Profile',
+    'equipment.images.removeFromBatch': 'Remove from batch',
+    'equipment.images.rowDone': 'Uploaded',
     'equipment.images.setAsProfile': 'Set as profile',
     'equipment.images.stageConfirming': 'Processing…',
     'equipment.images.stageRequesting': 'Preparing upload…',
@@ -296,6 +310,7 @@ vi.mock('react-i18next', () => {
     'equipment.images.titleEditCaption': 'Edit Caption',
     'equipment.images.tooLarge': 'File is {{size}} MB; the maximum is {{max}} MB.',
     'equipment.images.unsupportedType': 'Only JPEG, PNG, and WEBP are supported. HEIC photos must be converted before upload.',
+    'equipment.images.uploadCount': 'Upload {{count}} photos',
     'equipment.tabs.photos': 'Photos',
     'equipment.filters.addFilter': 'Add Filter',
     'equipment.filters.deleteConfirm': 'Delete this filter?',
