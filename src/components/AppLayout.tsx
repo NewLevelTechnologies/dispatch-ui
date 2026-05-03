@@ -18,6 +18,7 @@ import {
   CreditCardIcon,
   CubeIcon,
   BuildingStorefrontIcon,
+  ChartBarIcon,
   ClockIcon,
   ArrowPathIcon,
   MapPinIcon,
@@ -93,6 +94,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   ];
 
   const adminNavigation = [
+    // Reports lives here as a role-restricted utility surface (alongside Users
+    // and Settings). Not gated yet — when we wire capability checks, gate on
+    // "user has access to at least one report" via the registry's
+    // requiresCapability fields.
+    { name: t('reports.title'), href: '/reports', icon: ChartBarIcon },
     ...(canViewUsers ? [{ name: t('entities.users'), href: '/users', icon: ShieldCheckIcon }] : []),
     ...(canViewSettings ? [{ name: t('entities.settings'), href: '/settings', icon: Cog6ToothIcon }] : []),
   ];

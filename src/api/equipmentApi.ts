@@ -388,6 +388,38 @@ export const tenantFilterSizesApi = {
   },
 };
 
+// ========== FILTER PULL LIST (REPORT) ==========
+// Aggregates equipment_filters across all equipment attached to non-cancelled
+// work orders scheduled in the requested date window. Backend requires either
+// scheduledDate (single day) or scheduledDateFrom (range).
+
+export interface FilterPullListEntry {
+  lengthIn: number;
+  widthIn: number;
+  thicknessIn: number;
+  totalQuantity: number;
+  equipmentCount: number;
+}
+
+export interface FilterPullListParams {
+  /** Single-day mode (YYYY-MM-DD). Mutually exclusive with the From/To pair. */
+  scheduledDate?: string;
+  /** Range start (YYYY-MM-DD). Required if scheduledDate is omitted. */
+  scheduledDateFrom?: string;
+  /** Range end (YYYY-MM-DD). Inclusive on the backend side. */
+  scheduledDateTo?: string;
+}
+
+export const reportsApi = {
+  filterPullList: async (params: FilterPullListParams): Promise<FilterPullListEntry[]> => {
+    const response = await apiClient.get<FilterPullListEntry[]>(
+      '/equipment/filter-pull-list',
+      { params }
+    );
+    return response.data;
+  },
+};
+
 // ========== EQUIPMENT IMAGES ==========
 // Multi-image sub-resource per equipment. Upload is a 3-step direct-to-S3 flow
 // (request URL → PUT to S3 → confirm) so the API server never streams bytes.
@@ -691,6 +723,7 @@ export const allEquipmentApis = {
   equipmentFilters: equipmentFiltersApi,
   equipmentImages: equipmentImagesApi,
   tenantFilterSizes: tenantFilterSizesApi,
+  reports: reportsApi,
   partsInventory: partsInventoryApi,
   warehouses: warehousesApi,
 };
