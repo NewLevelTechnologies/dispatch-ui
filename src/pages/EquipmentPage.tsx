@@ -16,6 +16,7 @@ import {
 } from '../api';
 import AppLayout from '../components/AppLayout';
 import EquipmentFormDialog from '../components/EquipmentFormDialog';
+import EquipmentThumbnail from '../components/EquipmentThumbnail';
 import { Heading } from '../components/catalyst/heading';
 import { Button } from '../components/catalyst/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/catalyst/table';
@@ -266,9 +267,10 @@ export default function EquipmentPage() {
                   <TableCell className="font-medium">
                     <RouterLink
                       to={`/equipment/${item.id}`}
-                      className="text-zinc-700 hover:text-blue-600 hover:underline dark:text-zinc-300 dark:hover:text-blue-400"
+                      className="flex items-center gap-2 text-zinc-700 hover:text-blue-600 hover:underline dark:text-zinc-300 dark:hover:text-blue-400"
                     >
-                      {item.name}
+                      <EquipmentThumbnail url={item.profileImageUrl} name={item.name} sizeClass="size-8" />
+                      <span>{item.name}</span>
                     </RouterLink>
                   </TableCell>
                   <TableCell>
