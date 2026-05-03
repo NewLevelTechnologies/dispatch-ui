@@ -3,13 +3,17 @@ import { useParams, useNavigate, useLocation, Link as RouterLink } from 'react-r
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import {
+  customerApi,
   equipmentApi,
   equipmentTypesApi,
   equipmentCategoriesApi,
   equipmentFiltersApi,
+  equipmentImagesApi,
   tenantFilterSizesApi,
   EquipmentStatus,
+  EQUIPMENT_IMAGE_MAX_PER_EQUIPMENT,
   type EquipmentFilter,
+  type EquipmentImage,
   type TenantFilterSize,
   type UpdateEquipmentRequest,
 } from '../api';
@@ -18,6 +22,7 @@ import AppLayout from '../components/AppLayout';
 import TabNavigation from '../components/TabNavigation';
 import EditableField from '../components/EditableField';
 import EquipmentFilterFormDialog from '../components/EquipmentFilterFormDialog';
+import EquipmentImageUploadDialog from '../components/EquipmentImageUploadDialog';
 import { Heading } from '../components/catalyst/heading';
 import { Text } from '../components/catalyst/text';
 import { Button } from '../components/catalyst/button';
@@ -49,7 +54,7 @@ import {
   PlusIcon,
 } from '@heroicons/react/24/outline';
 
-type TabId = 'overview' | 'filters' | 'service-history' | 'components';
+type TabId = 'overview' | 'photos' | 'filters' | 'service-history' | 'components';
 
 function formatDate(iso: string | null | undefined): string {
   if (!iso) return '—';
@@ -78,6 +83,7 @@ export default function EquipmentDetailPage() {
   const [prefilledSize, setPrefilledSize] = useState<
     { lengthIn: number; widthIn: number; thicknessIn: number } | null
   >(null);
+  const [isImageUploadOpen, setIsImageUploadOpen] = useState(false);
 
   // Fall back to the equipment list when the user landed here directly (no in-app history).
   const handleBack = () => {
@@ -106,6 +112,16 @@ export default function EquipmentDetailPage() {
     enabled: Boolean(equipment?.equipmentTypeId),
   });
 
+  // Resolve the service location for the header breadcrumb. Equipment.serviceLocationId
+  // is the only context the equipment payload carries; we fetch the location DTO so the
+  // header can render "Belongs to {customer} at {location}" with real names instead of
+  // a class-name placeholder.
+  const { data: serviceLocation } = useQuery({
+    queryKey: ['service-location', equipment?.serviceLocationId ?? ''],
+    queryFn: () => customerApi.getServiceLocationById(equipment!.serviceLocationId),
+    enabled: Boolean(equipment?.serviceLocationId),
+  });
+
   // Per-equipment filter list and tenant-wide common sizes for the quick-add chips.
   const { data: filters = [], isLoading: filtersLoading, error: filtersError } = useQuery({
     queryKey: ['equipment-filters', id],
@@ -131,6 +147,59 @@ export default function EquipmentDetailPage() {
           ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
           : undefined;
       alert(msg || t('equipment.filters.errorDelete'));
+    },
+  });
+
+  // Photos. URLs in EquipmentImage are presigned and short-lived, so refetch on
+  // each visit rather than caching aggressively. The query is independently
+  // keyed from the embedded equipment.images array so we can invalidate it
+  // after mutations without re-fetching the entire equipment detail payload.
+  const { data: images = [], isLoading: imagesLoading, error: imagesError } = useQuery({
+    queryKey: ['equipment-images', id],
+    queryFn: () => equipmentImagesApi.list(id!),
+    enabled: !!id,
+  });
+
+  const imageInvalidate = () => {
+    queryClient.invalidateQueries({ queryKey: ['equipment-images', id] });
+    queryClient.invalidateQueries({ queryKey: ['equipment-detail', id] });
+  };
+
+  const setProfileImageMutation = useMutation({
+    mutationFn: (imageId: string) =>
+      equipmentImagesApi.patch(id!, imageId, { isProfile: true }),
+    onSuccess: imageInvalidate,
+    onError: (err: unknown) => {
+      const msg =
+        err instanceof Error && 'response' in err
+          ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
+          : undefined;
+      alert(msg || t('equipment.images.errorUpdate'));
+    },
+  });
+
+  const updateCaptionMutation = useMutation({
+    mutationFn: ({ imageId, caption }: { imageId: string; caption: string | null }) =>
+      equipmentImagesApi.patch(id!, imageId, { caption }),
+    onSuccess: imageInvalidate,
+    onError: (err: unknown) => {
+      const msg =
+        err instanceof Error && 'response' in err
+          ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
+          : undefined;
+      alert(msg || t('equipment.images.errorUpdate'));
+    },
+  });
+
+  const deleteImageMutation = useMutation({
+    mutationFn: (imageId: string) => equipmentImagesApi.delete(id!, imageId),
+    onSuccess: imageInvalidate,
+    onError: (err: unknown) => {
+      const msg =
+        err instanceof Error && 'response' in err
+          ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
+          : undefined;
+      alert(msg || t('equipment.images.errorDelete'));
     },
   });
 
@@ -206,6 +275,7 @@ export default function EquipmentDetailPage() {
 
   const tabs = [
     { id: 'overview', label: t('equipment.tabs.overview') },
+    { id: 'photos', label: t('equipment.tabs.photos'), count: images.length },
     { id: 'filters', label: t('equipment.tabs.filters'), count: filters.length },
     { id: 'service-history', label: t('equipment.tabs.serviceHistory') },
     { id: 'components', label: t('equipment.tabs.components') },
@@ -241,6 +311,26 @@ export default function EquipmentDetailPage() {
 
   const formatFilterSize = (f: { lengthIn: number; widthIn: number; thicknessIn: number }) =>
     `${formatInches(f.lengthIn)} × ${formatInches(f.widthIn)} × ${formatInches(f.thicknessIn)}`;
+
+  const handleSetProfileImage = (img: EquipmentImage) => {
+    if (img.isProfile) return;
+    setProfileImageMutation.mutate(img.id);
+  };
+
+  const handleEditCaption = (img: EquipmentImage) => {
+    const next = window.prompt(t('equipment.images.newCaption'), img.caption ?? '');
+    if (next === null) return; // user cancelled
+    const trimmed = next.trim();
+    updateCaptionMutation.mutate({ imageId: img.id, caption: trimmed || null });
+  };
+
+  const handleDeleteImage = (img: EquipmentImage) => {
+    if (window.confirm(t('equipment.images.deleteConfirm'))) {
+      deleteImageMutation.mutate(img.id);
+    }
+  };
+
+  const imageLimitReached = images.length >= EQUIPMENT_IMAGE_MAX_PER_EQUIPMENT;
 
   const typeOptions = [
     { value: '', label: t('common.none') },
@@ -291,12 +381,31 @@ export default function EquipmentDetailPage() {
             </div>
             <Text className="mt-1">
               {t('serviceLocations.detail.belongsTo')}{' '}
-              <RouterLink
-                to={`/service-locations/${equipment.serviceLocationId}`}
-                className="font-medium hover:underline"
-              >
-                {getName('service_location')}
-              </RouterLink>
+              {serviceLocation ? (
+                <>
+                  <RouterLink
+                    to={`/customers/${serviceLocation.customerId}`}
+                    className="font-medium hover:underline"
+                  >
+                    {serviceLocation.customerName}
+                  </RouterLink>
+                  {' · '}
+                  <RouterLink
+                    to={`/service-locations/${serviceLocation.id}`}
+                    className="font-medium hover:underline"
+                  >
+                    {serviceLocation.locationName ||
+                      `${serviceLocation.address.streetAddress}, ${serviceLocation.address.city}`}
+                  </RouterLink>
+                </>
+              ) : (
+                <RouterLink
+                  to={`/service-locations/${equipment.serviceLocationId}`}
+                  className="font-medium hover:underline"
+                >
+                  {getName('service_location')}
+                </RouterLink>
+              )}
             </Text>
           </div>
         </div>
@@ -480,6 +589,112 @@ export default function EquipmentDetailPage() {
             </div>
           )}
 
+          {activeTab === 'photos' && (
+            <div>
+              <div className="mb-3 flex items-center justify-end">
+                <Button
+                  onClick={() => setIsImageUploadOpen(true)}
+                  disabled={imageLimitReached}
+                  title={
+                    imageLimitReached
+                      ? t('equipment.images.limitReached', {
+                          max: EQUIPMENT_IMAGE_MAX_PER_EQUIPMENT,
+                        })
+                      : undefined
+                  }
+                >
+                  <PlusIcon className="size-4" />
+                  {t('equipment.images.addPhoto')}
+                </Button>
+              </div>
+
+              {imagesError && (
+                <div className="rounded-lg bg-red-50 p-3 ring-1 ring-red-200 dark:bg-red-950/10 dark:ring-red-900/20">
+                  <Text className="text-sm text-red-800 dark:text-red-400">
+                    {t('equipment.images.errorLoading')}: {(imagesError as Error).message}
+                  </Text>
+                </div>
+              )}
+
+              {!imagesError && imagesLoading ? (
+                <div className="rounded-lg border border-zinc-200 p-6 text-center dark:border-zinc-800">
+                  <Text className="text-zinc-500 dark:text-zinc-400">
+                    {t('equipment.images.loading')}
+                  </Text>
+                </div>
+              ) : !imagesError && images.length === 0 ? (
+                <div className="rounded-lg border border-dashed border-zinc-300 p-6 text-center dark:border-zinc-700">
+                  <Text className="text-zinc-600 dark:text-zinc-400">
+                    {t('equipment.images.empty')}
+                  </Text>
+                </div>
+              ) : (
+                !imagesError && (
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+                    {images.map((img) => (
+                      <div
+                        key={img.id}
+                        className="group relative overflow-hidden rounded-lg ring-1 ring-zinc-950/10 dark:ring-white/10"
+                      >
+                        <a
+                          href={img.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          aria-label={t('equipment.images.openFullSize')}
+                          className="block aspect-square w-full bg-zinc-100 dark:bg-zinc-900"
+                        >
+                          <img
+                            src={img.thumbnailUrl ?? img.url}
+                            alt={img.caption ?? equipment.name}
+                            className="size-full object-cover transition-opacity group-hover:opacity-90"
+                            loading="lazy"
+                          />
+                        </a>
+
+                        {img.isProfile && (
+                          <Badge color="lime" className="absolute left-2 top-2 text-xs">
+                            {t('equipment.images.profile')}
+                          </Badge>
+                        )}
+
+                        <div className="absolute right-1 top-1">
+                          <Dropdown>
+                            <DropdownButton
+                              plain
+                              aria-label={t('common.moreOptions')}
+                              className="rounded-full bg-white/80 backdrop-blur dark:bg-zinc-900/80"
+                            >
+                              <EllipsisVerticalIcon className="size-5" />
+                            </DropdownButton>
+                            <DropdownMenu anchor="bottom end">
+                              {!img.isProfile && (
+                                <DropdownItem onClick={() => handleSetProfileImage(img)}>
+                                  <DropdownLabel>{t('equipment.images.setAsProfile')}</DropdownLabel>
+                                </DropdownItem>
+                              )}
+                              <DropdownItem onClick={() => handleEditCaption(img)}>
+                                <DropdownLabel>{t('equipment.images.editCaption')}</DropdownLabel>
+                              </DropdownItem>
+                              <DropdownItem onClick={() => handleDeleteImage(img)}>
+                                <DropdownLabel>{t('common.delete')}</DropdownLabel>
+                              </DropdownItem>
+                            </DropdownMenu>
+                          </Dropdown>
+                        </div>
+
+                        {img.caption && (
+                          <div className="border-t border-zinc-200 bg-white px-2 py-1.5 text-xs text-zinc-700 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-300">
+                            <span className="line-clamp-1">{img.caption}</span>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )
+              )}
+            </div>
+          )}
+
           {activeTab === 'filters' && (
             <div>
               <div className="mb-3 flex items-center justify-between gap-3">
@@ -591,6 +806,12 @@ export default function EquipmentDetailPage() {
         equipmentId={id!}
         filter={editingFilter}
         prefilledSize={prefilledSize}
+      />
+
+      <EquipmentImageUploadDialog
+        isOpen={isImageUploadOpen}
+        onClose={() => setIsImageUploadOpen(false)}
+        equipmentId={id!}
       />
     </AppLayout>
   );

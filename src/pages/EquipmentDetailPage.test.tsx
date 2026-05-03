@@ -14,6 +14,10 @@ const mockFilterCreate = vi.fn();
 const mockFilterUpdate = vi.fn();
 const mockFilterDelete = vi.fn();
 const mockFilterSizesGetAll = vi.fn();
+const mockImagesList = vi.fn();
+const mockImageUpload = vi.fn();
+const mockImagePatch = vi.fn();
+const mockImageDelete = vi.fn();
 
 vi.mock('../api/equipmentApi', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../api/equipmentApi')>();
@@ -37,6 +41,12 @@ vi.mock('../api/equipmentApi', async (importOriginal) => {
     },
     tenantFilterSizesApi: {
       getAll: (...args: unknown[]) => mockFilterSizesGetAll(...args),
+    },
+    equipmentImagesApi: {
+      list: (...args: unknown[]) => mockImagesList(...args),
+      upload: (...args: unknown[]) => mockImageUpload(...args),
+      patch: (...args: unknown[]) => mockImagePatch(...args),
+      delete: (...args: unknown[]) => mockImageDelete(...args),
     },
   };
 });
@@ -88,6 +98,7 @@ describe('EquipmentDetailPage', () => {
     ]);
     mockFiltersGetAll.mockResolvedValue([]);
     mockFilterSizesGetAll.mockResolvedValue([]);
+    mockImagesList.mockResolvedValue([]);
   });
 
   it('shows loading state while equipment loads', () => {
@@ -532,6 +543,174 @@ describe('EquipmentDetailPage', () => {
     });
     confirmSpy.mockRestore();
     alertSpy.mockRestore();
+  });
+
+  it('renders empty state on the photos tab when no photos exist', async () => {
+    mockGetById.mockResolvedValue(baseEquipment);
+    const user = userEvent.setup();
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Upstairs Furnace' })).toBeInTheDocument();
+    });
+    await user.click(screen.getByRole('button', { name: /^photos/i }));
+    await waitFor(() => {
+      expect(screen.getByText(/no photos added yet/i)).toBeInTheDocument();
+    });
+  });
+
+  it('renders the photos grid with profile badge and tab count', async () => {
+    mockGetById.mockResolvedValue(baseEquipment);
+    mockImagesList.mockResolvedValue([
+      {
+        id: 'img-1',
+        url: 'https://cdn.example.com/full-1.jpg',
+        thumbnailUrl: 'https://cdn.example.com/thumb-1.jpg',
+        contentType: 'image/jpeg',
+        sizeBytes: 100,
+        widthPx: 800,
+        heightPx: 600,
+        thumbnailWidthPx: 400,
+        thumbnailHeightPx: 300,
+        isProfile: true,
+        sortOrder: 0,
+        caption: 'Nameplate',
+        uploadedBy: null,
+        uploadedByName: null,
+        createdAt: '',
+      },
+      {
+        id: 'img-2',
+        url: 'https://cdn.example.com/full-2.jpg',
+        thumbnailUrl: 'https://cdn.example.com/thumb-2.jpg',
+        contentType: 'image/jpeg',
+        sizeBytes: 100,
+        widthPx: 800,
+        heightPx: 600,
+        thumbnailWidthPx: 400,
+        thumbnailHeightPx: 300,
+        isProfile: false,
+        sortOrder: 1,
+        caption: null,
+        uploadedBy: null,
+        uploadedByName: null,
+        createdAt: '',
+      },
+    ]);
+    const user = userEvent.setup();
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Upstairs Furnace' })).toBeInTheDocument();
+    });
+
+    // Tab badge shows the count
+    const photosTab = await screen.findByRole('button', { name: /^photos\s*2$/i });
+    await user.click(photosTab);
+
+    // Caption renders for the captioned image; profile badge is shown
+    await waitFor(() => expect(screen.getByText('Nameplate')).toBeInTheDocument());
+    expect(screen.getByText(/^profile$/i)).toBeInTheDocument();
+    // Two thumbnails
+    const thumbs = screen.getAllByRole('img');
+    expect(thumbs.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('sets a non-profile image as profile via the action menu', async () => {
+    mockGetById.mockResolvedValue(baseEquipment);
+    mockImagesList.mockResolvedValue([
+      {
+        id: 'img-1',
+        url: 'https://cdn.example.com/full-1.jpg',
+        thumbnailUrl: 'https://cdn.example.com/thumb-1.jpg',
+        contentType: 'image/jpeg',
+        sizeBytes: 100,
+        widthPx: 800,
+        heightPx: 600,
+        thumbnailWidthPx: 400,
+        thumbnailHeightPx: 300,
+        isProfile: false,
+        sortOrder: 0,
+        caption: null,
+        uploadedBy: null,
+        uploadedByName: null,
+        createdAt: '',
+      },
+    ]);
+    mockImagePatch.mockResolvedValue({});
+    const user = userEvent.setup();
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Upstairs Furnace' })).toBeInTheDocument();
+    });
+    await user.click(screen.getByRole('button', { name: /^photos/i }));
+
+    // Open the per-tile dropdown
+    const moreButtons = await screen.findAllByRole('button', { name: /more options/i });
+    await user.click(moreButtons[0]);
+    const setProfile = await screen.findByRole('menuitem', { name: /set as profile/i });
+    await user.click(setProfile);
+
+    await waitFor(() => {
+      expect(mockImagePatch).toHaveBeenCalledWith('eq-1', 'img-1', { isProfile: true });
+    });
+  });
+
+  it('deletes a photo after confirmation', async () => {
+    mockGetById.mockResolvedValue(baseEquipment);
+    mockImagesList.mockResolvedValue([
+      {
+        id: 'img-1',
+        url: 'https://cdn.example.com/full-1.jpg',
+        thumbnailUrl: 'https://cdn.example.com/thumb-1.jpg',
+        contentType: 'image/jpeg',
+        sizeBytes: 100,
+        widthPx: 800,
+        heightPx: 600,
+        thumbnailWidthPx: 400,
+        thumbnailHeightPx: 300,
+        isProfile: false,
+        sortOrder: 0,
+        caption: null,
+        uploadedBy: null,
+        uploadedByName: null,
+        createdAt: '',
+      },
+    ]);
+    mockImageDelete.mockResolvedValue(undefined);
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const user = userEvent.setup();
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Upstairs Furnace' })).toBeInTheDocument();
+    });
+    await user.click(screen.getByRole('button', { name: /^photos/i }));
+
+    const moreButtons = await screen.findAllByRole('button', { name: /more options/i });
+    await user.click(moreButtons[0]);
+    const deleteItem = await screen.findByRole('menuitem', { name: /delete/i });
+    await user.click(deleteItem);
+
+    await waitFor(() => {
+      expect(mockImageDelete).toHaveBeenCalledWith('eq-1', 'img-1');
+    });
+    confirmSpy.mockRestore();
+  });
+
+  it('opens the upload dialog from the Add Photo button', async () => {
+    mockGetById.mockResolvedValue(baseEquipment);
+    const user = userEvent.setup();
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Upstairs Furnace' })).toBeInTheDocument();
+    });
+    await user.click(screen.getByRole('button', { name: /^photos/i }));
+    await user.click(screen.getByRole('button', { name: /add photo/i }));
+
+    expect(await screen.findByRole('dialog')).toBeInTheDocument();
   });
 
   it('alerts and stays in edit mode when PATCH fails', async () => {

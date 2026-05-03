@@ -357,6 +357,33 @@
       "profileImageAlt": "{{name}} profile image",
       "tabComingSoon": "Coming soon."
     },
+    "images": {
+      "addPhoto": "Add Photo",
+      "captionPlaceholder": "e.g. Nameplate, Compressor model number",
+      "chooseFile": "Choose file",
+      "deleteConfirm": "Delete this photo?",
+      "editCaption": "Edit caption",
+      "empty": "No photos added yet.",
+      "errorCreate": "Failed to upload photo",
+      "errorDelete": "Failed to delete photo",
+      "errorLoading": "Failed to load photos",
+      "errorUpdate": "Failed to update photo",
+      "fileRequired": "Choose a photo to upload.",
+      "limitReached": "This piece of equipment already has the maximum {{max}} photos.",
+      "loading": "Loading photos…",
+      "newCaption": "New caption",
+      "noFileChosen": "No file chosen",
+      "openFullSize": "Open full-size in a new tab",
+      "profile": "Profile",
+      "setAsProfile": "Set as profile",
+      "stageConfirming": "Processing…",
+      "stageRequesting": "Preparing upload…",
+      "stageUploading": "Uploading…",
+      "titleAdd": "Add Photo",
+      "titleEditCaption": "Edit Caption",
+      "tooLarge": "File is {{size}} MB; the maximum is {{max}} MB.",
+      "unsupportedType": "Only JPEG, PNG, and WEBP are supported. HEIC photos must be converted before upload."
+    },
     "filters": {
       "addFilter": "Add Filter",
       "deleteConfirm": "Delete this filter?",
@@ -452,6 +479,7 @@
       "filters": "Filters",
       "overview": "Overview",
       "partsInventory": "Parts Inventory",
+      "photos": "Photos",
       "serviceHistory": "Service History",
       "warehouses": "Warehouses"
     }
