@@ -34,11 +34,19 @@ export default function EquipmentThumbnail({
   fit = 'cover',
   className = '',
 }: EquipmentThumbnailProps) {
+  // When the image is letterboxed (contain), the background and ring become
+  // visible chrome around the photo and look like padding. Drop them so the
+  // image sits "in space." Cover mode keeps the chrome — img fills the box,
+  // chrome only matters when the photo is missing or while it loads.
+  const showChrome = !url || fit !== 'contain';
   return (
     <div
       className={[
         sizeClass,
-        'shrink-0 overflow-hidden rounded-md bg-zinc-100 ring-1 ring-zinc-950/5 dark:bg-zinc-900 dark:ring-white/10',
+        'shrink-0 overflow-hidden rounded-md',
+        showChrome
+          ? 'bg-zinc-100 ring-1 ring-zinc-950/5 dark:bg-zinc-900 dark:ring-white/10'
+          : '',
         className,
       ]
         .filter(Boolean)
