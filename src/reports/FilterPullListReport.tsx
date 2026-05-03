@@ -80,7 +80,7 @@ export default function FilterPullListReport() {
                   type="button"
                   onClick={() => setMode(m)}
                   className={[
-                    'flex flex-1 items-center justify-center rounded-lg px-3 text-xs font-medium ring-1 ring-inset transition-colors',
+                    'flex items-center justify-center whitespace-nowrap rounded-lg px-3 text-xs font-medium ring-1 ring-inset transition-colors',
                     mode === m
                       ? 'bg-blue-100 text-blue-800 ring-blue-400 dark:bg-blue-900 dark:text-blue-100 dark:ring-blue-600'
                       : 'bg-white text-zinc-500 ring-zinc-200 hover:bg-zinc-50 dark:bg-zinc-900 dark:text-zinc-400 dark:ring-zinc-700 dark:hover:bg-zinc-800',
