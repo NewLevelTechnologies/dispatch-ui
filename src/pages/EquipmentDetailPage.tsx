@@ -14,6 +14,7 @@ import {
   EQUIPMENT_IMAGE_MAX_PER_EQUIPMENT,
   type EquipmentFilter,
   type EquipmentImage,
+  type EquipmentSummary,
   type TenantFilterSize,
   type UpdateEquipmentRequest,
 } from '../api';
@@ -176,6 +177,18 @@ export default function EquipmentDetailPage() {
     workOrdersListQueryOptions({ equipmentId: id ?? '' })
   );
 
+  // Descendants tree (Components tab). Backend returns a flat array with
+  // each row's parentId; we group client-side to render an indented tree.
+  const {
+    data: descendants = [],
+    isLoading: descendantsLoading,
+    error: descendantsError,
+  } = useQuery({
+    queryKey: ['equipment-descendants', id],
+    queryFn: () => equipmentApi.getDescendants(id!),
+    enabled: !!id,
+  });
+
   const imageInvalidate = () => {
     queryClient.invalidateQueries({ queryKey: ['equipment-images', id] });
     queryClient.invalidateQueries({ queryKey: ['equipment-detail', id] });
@@ -304,8 +317,26 @@ export default function EquipmentDetailPage() {
       label: t('equipment.tabs.serviceHistory'),
       count: serviceHistoryData?.totalElements ?? 0,
     },
-    { id: 'components', label: t('equipment.tabs.components') },
+    {
+      id: 'components',
+      label: t('equipment.tabs.components'),
+      count: descendants.length,
+    },
   ];
+
+  // Group descendants by parent for tree rendering. The map's keys are
+  // parent ids; values are the children of that parent. Top-level children
+  // of the current equipment use `id` as their parent key.
+  const descendantsByParent = new Map<string, typeof descendants>();
+  for (const d of descendants) {
+    const key = d.parentId ?? '';
+    const list = descendantsByParent.get(key) ?? [];
+    list.push(d);
+    descendantsByParent.set(key, list);
+  }
+  for (const list of descendantsByParent.values()) {
+    list.sort((a, b) => a.name.localeCompare(b.name));
+  }
 
   const openCreateFilter = () => {
     setEditingFilter(null);
@@ -821,11 +852,12 @@ export default function EquipmentDetailPage() {
           )}
 
           {activeTab === 'components' && (
-            <div className="rounded-lg border border-dashed border-zinc-300 p-8 text-center dark:border-zinc-700">
-              <Text className="text-zinc-600 dark:text-zinc-400">
-                {t('equipment.detail.tabComingSoon')}
-              </Text>
-            </div>
+            <ComponentsTree
+              rootId={id!}
+              descendantsByParent={descendantsByParent}
+              loading={descendantsLoading}
+              error={descendantsError as Error | null}
+            />
           )}
         </div>
       </div>
@@ -849,5 +881,136 @@ export default function EquipmentDetailPage() {
         defaultSetProfile={images.length === 0}
       />
     </AppLayout>
+  );
+}
+
+interface ComponentsTreeProps {
+  rootId: string;
+  descendantsByParent: Map<string, EquipmentSummary[]>;
+  loading: boolean;
+  error: Error | null;
+}
+
+/**
+ * Indented tree view of an equipment's descendants. Each node renders a
+ * thumbnail, name (linking to its detail page), and type/category meta.
+ * Children render at one indent level deeper than their parent.
+ *
+ * Recursion bottoms out when a parent has no children — the descendantsByParent
+ * map only holds entries for parents that have descendants.
+ */
+function ComponentsTree({
+  rootId,
+  descendantsByParent,
+  loading,
+  error,
+}: ComponentsTreeProps) {
+  const { t } = useTranslation();
+
+  if (loading) {
+    return (
+      <div className="rounded-lg border border-zinc-200 p-6 text-center dark:border-zinc-800">
+        <Text className="text-zinc-500 dark:text-zinc-400">
+          {t('equipment.components.loading')}
+        </Text>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="rounded-lg bg-red-50 p-3 ring-1 ring-red-200 dark:bg-red-950/10 dark:ring-red-900/20">
+        <Text className="text-sm text-red-800 dark:text-red-400">
+          {t('equipment.components.errorLoading')}: {error.message}
+        </Text>
+      </div>
+    );
+  }
+
+  // First-level children: parentId === rootId. Backend may emit them with
+  // parentId=null too if the rooted entity is the parent and the API doesn't
+  // round-trip parentId for direct children. We try rootId first, fall back
+  // to '' (the no-parent bucket) when nothing matches.
+  const directChildren =
+    descendantsByParent.get(rootId) ?? descendantsByParent.get('') ?? [];
+
+  if (directChildren.length === 0) {
+    return (
+      <div className="rounded-lg border border-dashed border-zinc-300 p-6 text-center dark:border-zinc-700">
+        <Text className="text-zinc-600 dark:text-zinc-400">
+          {t('equipment.components.empty')}
+        </Text>
+      </div>
+    );
+  }
+
+  return (
+    <ul className="space-y-1">
+      {directChildren.map((child) => (
+        <ComponentsTreeNode
+          key={child.id}
+          node={child}
+          depth={0}
+          descendantsByParent={descendantsByParent}
+        />
+      ))}
+    </ul>
+  );
+}
+
+interface ComponentsTreeNodeProps {
+  node: EquipmentSummary;
+  depth: number;
+  descendantsByParent: Map<string, EquipmentSummary[]>;
+}
+
+function ComponentsTreeNode({ node, depth, descendantsByParent }: ComponentsTreeNodeProps) {
+  const children = descendantsByParent.get(node.id) ?? [];
+  const typeCategory =
+    node.equipmentTypeName && node.equipmentCategoryName
+      ? `${node.equipmentTypeName} / ${node.equipmentCategoryName}`
+      : node.equipmentTypeName || node.equipmentCategoryName || null;
+  const makeModel =
+    node.make && node.model ? `${node.make} ${node.model}` : node.make || node.model || null;
+
+  return (
+    <li>
+      <div
+        className="flex items-center gap-3 rounded-md py-1.5 hover:bg-zinc-50 dark:hover:bg-zinc-900/50"
+        style={{ paddingLeft: `${depth * 24}px` }}
+      >
+        <EquipmentThumbnail
+          url={node.profileImageUrl}
+          name={node.name}
+          sizeClass="size-9"
+          fit="contain"
+        />
+        <div className="min-w-0 flex-1">
+          <RouterLink
+            to={`/equipment/${node.id}`}
+            className="text-sm font-medium text-zinc-700 hover:text-blue-600 hover:underline dark:text-zinc-200 dark:hover:text-blue-400"
+          >
+            {node.name}
+          </RouterLink>
+          {(typeCategory || makeModel || node.serialNumber) && (
+            <div className="text-xs text-zinc-500 dark:text-zinc-400">
+              {[typeCategory, makeModel, node.serialNumber].filter(Boolean).join(' · ')}
+            </div>
+          )}
+        </div>
+      </div>
+      {children.length > 0 && (
+        <ul className="mt-1 space-y-1">
+          {children.map((child) => (
+            <ComponentsTreeNode
+              key={child.id}
+              node={child}
+              depth={depth + 1}
+              descendantsByParent={descendantsByParent}
+            />
+          ))}
+        </ul>
+      )}
+    </li>
   );
 }

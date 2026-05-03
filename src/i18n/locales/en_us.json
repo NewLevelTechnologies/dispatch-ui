@@ -347,6 +347,11 @@
     "descriptionEquipment": "Manage customer equipment, parts inventory, and warehouses",
     "descriptionParts": "Manage parts inventory across warehouses",
     "descriptionWarehouses": "Manage warehouse locations and inventory storage",
+    "components": {
+      "empty": "No components linked to this equipment yet.",
+      "errorLoading": "Failed to load components",
+      "loading": "Loading components…"
+    },
     "detail": {
       "created": "Created",
       "descriptionPlaceholder": "Add a description…",
