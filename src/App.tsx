@@ -39,6 +39,9 @@ import DivisionsPanel from './pages/settings/work-orders/DivisionsPanel';
 import ItemStatusesPanel from './pages/settings/work-orders/ItemStatusesPanel';
 import StatusWorkflowsPanel from './pages/settings/work-orders/StatusWorkflowsPanel';
 import WorkflowConfigPanel from './pages/settings/work-orders/WorkflowConfigPanel';
+import EquipmentTypesPanel from './pages/settings/equipment/EquipmentTypesPanel';
+import EquipmentCategoriesPanel from './pages/settings/equipment/EquipmentCategoriesPanel';
+import FilterSizesPanel from './pages/settings/equipment/FilterSizesPanel';
 import AccountSettingsPage from './pages/AccountSettingsPage';
 
 // ProtectedRoute component - defined outside of App to avoid recreation on every render
@@ -137,6 +140,9 @@ function App() {
         <Route path="work-orders/item-statuses" element={<ItemStatusesPanel />} />
         <Route path="work-orders/status-workflows" element={<StatusWorkflowsPanel />} />
         <Route path="work-orders/workflow-config" element={<WorkflowConfigPanel />} />
+        <Route path="equipment/types" element={<EquipmentTypesPanel />} />
+        <Route path="equipment/categories" element={<EquipmentCategoriesPanel />} />
+        <Route path="equipment/filter-sizes" element={<FilterSizesPanel />} />
         <Route path="access/roles" element={<RolesPage />} />
         <Route path="access/roles/:id" element={<RoleDetailPage />} />
       </Route>

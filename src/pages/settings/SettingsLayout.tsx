@@ -44,6 +44,14 @@ export default function SettingsLayout() {
       ],
     },
     {
+      label: t('settings.sections.equipment', { equipment: getName('equipment', true) }),
+      items: [
+        { label: t('settings.nav.equipmentTypes'), to: '/settings/equipment/types' },
+        { label: t('settings.nav.equipmentCategories'), to: '/settings/equipment/categories' },
+        { label: t('settings.nav.filterSizes'), to: '/settings/equipment/filter-sizes' },
+      ],
+    },
+    {
       label: t('settings.sections.access'),
       items: [
         { label: getName('role', true), to: '/settings/access/roles' },
