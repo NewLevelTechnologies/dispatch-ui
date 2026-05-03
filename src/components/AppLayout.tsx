@@ -18,6 +18,7 @@ import {
   CreditCardIcon,
   CubeIcon,
   BuildingStorefrontIcon,
+  ChartBarIcon,
   ClockIcon,
   ArrowPathIcon,
   MapPinIcon,
@@ -90,6 +91,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     { name: getName('dispatch', true), href: '/dispatches', icon: CalendarIcon },
     { name: t('scheduling.entities.availability'), href: '/availability', icon: ClockIcon },
     { name: t('scheduling.entities.recurringOrders'), href: '/recurring-orders', icon: ArrowPathIcon },
+  ];
+
+  const reportsNavigation = [
+    { name: t('reports.title'), href: '/reports', icon: ChartBarIcon },
   ];
 
   const adminNavigation = [
@@ -178,6 +183,23 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             <SidebarSection>
               <SectionHeading>{t('entities.scheduling')}</SectionHeading>
               {schedulingNavigation.map((item) => {
+                const current = isCurrent(item.href);
+                return (
+                  <SidebarItem
+                    key={item.name}
+                    href={item.href}
+                    current={current}
+                    className={navItemClasses(current)}
+                  >
+                    <item.icon className="h-5 w-5" />
+                    <span>{item.name}</span>
+                  </SidebarItem>
+                );
+              })}
+            </SidebarSection>
+
+            <SidebarSection>
+              {reportsNavigation.map((item) => {
                 const current = isCurrent(item.href);
                 return (
                   <SidebarItem

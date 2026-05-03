@@ -705,6 +705,33 @@
       "userAssignmentsPreserved": "All user assignments have been preserved."
     }
   },
+  "reports": {
+    "backToReports": "Back to Reports",
+    "description": "Operational, financial, and equipment reports.",
+    "empty": "No reports are available yet.",
+    "errorLoading": "Error loading report",
+    "filterPullList": {
+      "date": "Date",
+      "description": "Filter sizes and quantities needed for scheduled work orders. Print and tape to the truck before heading out.",
+      "empty": "No filters needed for {{date}}.",
+      "equipmentCount": "Equipment",
+      "from": "From",
+      "mode": "Date mode",
+      "mode_range": "Range",
+      "mode_single": "Single day",
+      "printContext": "For scheduled work on {{date}}",
+      "quantity": "Quantity",
+      "size": "Size",
+      "title": "Filter Pull List",
+      "to": "To",
+      "total": "Total filters: {{count}}"
+    },
+    "loading": "Loading report…",
+    "notFound": "That report does not exist.",
+    "print": "Print",
+    "title": "Reports",
+    "uncategorized": "Other"
+  },
   "scheduling": {
     "description": "Manage dispatches, availability, and recurring orders",
     "descriptionDispatches": "Schedule and manage work order dispatches",
