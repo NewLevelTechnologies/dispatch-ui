@@ -467,6 +467,7 @@ export default function ServiceLocationDetailPage() {
                                 url={item.profileImageUrl}
                                 name={item.name}
                                 sizeClass="size-12"
+                                fit="contain"
                               />
                               <span>{item.name}</span>
                             </RouterLink>
