@@ -73,7 +73,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     { name: getName('customer', true), href: '/customers', icon: UserGroupIcon },
     { name: getName('service_location', true), href: '/service-locations', icon: MapPinIcon },
     { name: getName('work_order', true), href: '/work-orders', icon: ClipboardDocumentListIcon },
-    { name: t('reports.title'), href: '/reports', icon: ChartBarIcon },
   ];
 
   const equipmentNavigation = [
@@ -95,6 +94,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   ];
 
   const adminNavigation = [
+    // Reports lives here as a role-restricted utility surface (alongside Users
+    // and Settings). Not gated yet — when we wire capability checks, gate on
+    // "user has access to at least one report" via the registry's
+    // requiresCapability fields.
+    { name: t('reports.title'), href: '/reports', icon: ChartBarIcon },
     ...(canViewUsers ? [{ name: t('entities.users'), href: '/users', icon: ShieldCheckIcon }] : []),
     ...(canViewSettings ? [{ name: t('entities.settings'), href: '/settings', icon: Cog6ToothIcon }] : []),
   ];
