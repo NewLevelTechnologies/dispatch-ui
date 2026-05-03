@@ -25,6 +25,7 @@ import {
   DropdownMenu,
 } from '../../../components/catalyst/dropdown';
 import { Dialog, DialogActions, DialogBody, DialogTitle } from '../../../components/catalyst/dialog';
+import IconButton from '../../../components/IconButton';
 import { Field, FieldGroup, Fieldset, Label } from '../../../components/catalyst/fieldset';
 import { Input } from '../../../components/catalyst/input';
 import {
@@ -146,26 +147,22 @@ export default function FilterSizesPanel() {
                 <TableCell>
                   {canEdit && (
                     <div className="flex items-center gap-0.5">
-                      <button
-                        type="button"
+                      <IconButton
                         onClick={() => moveUp(index)}
                         disabled={index === 0 || reorderMutation.isPending}
                         title={t('common.moveUp')}
                         aria-label={t('common.moveUp')}
-                        className="rounded p-0.5 text-zinc-500 hover:bg-zinc-100 hover:text-zinc-700 disabled:opacity-30 disabled:hover:bg-transparent dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
                       >
                         <ChevronUpIcon className="h-4 w-4" />
-                      </button>
-                      <button
-                        type="button"
+                      </IconButton>
+                      <IconButton
                         onClick={() => moveDown(index)}
                         disabled={index === sorted.length - 1 || reorderMutation.isPending}
                         title={t('common.moveDown')}
                         aria-label={t('common.moveDown')}
-                        className="rounded p-0.5 text-zinc-500 hover:bg-zinc-100 hover:text-zinc-700 disabled:opacity-30 disabled:hover:bg-transparent dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
                       >
                         <ChevronDownIcon className="h-4 w-4" />
-                      </button>
+                      </IconButton>
                     </div>
                   )}
                 </TableCell>
