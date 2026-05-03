@@ -6,6 +6,7 @@ import {
   type WorkOrderPriority,
 } from '../api';
 import { workOrdersListQueryOptions } from '../api/workOrdersListQuery';
+import { getApiErrorMessage } from '../api';
 import { useGlossary } from '../contexts/GlossaryContext';
 import {
   Table,
@@ -103,11 +104,15 @@ export default function WorkOrdersList({
   }
 
   if (error) {
+    // Prefer the backend's response.data.message ("equipmentId is required",
+    // "Invalid UUID", etc.) over axios's generic "Request failed with status
+    // code 400" — gives engineers and users something they can act on.
+    const detail = getApiErrorMessage(error) || (error as Error).message;
     return (
       <div className="rounded-lg bg-red-50 p-4 ring-1 ring-red-200 dark:bg-red-950/10 dark:ring-red-900/20">
         <Text className="text-red-800 dark:text-red-400">
           {t('common.actions.errorLoading', { entities: getName('work_order', true) })}
-          {`: ${(error as Error).message}`}
+          {`: ${detail}`}
         </Text>
       </div>
     );
