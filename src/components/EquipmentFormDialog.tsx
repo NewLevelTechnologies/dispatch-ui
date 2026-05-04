@@ -143,10 +143,20 @@ export default function EquipmentFormDialog({
   });
 
   // ===== Mutations =====
+  // Shared invalidation set — equipment list rows, the per-equipment detail
+  // payload, and any descendants tree that includes this equipment as a node
+  // need to refresh after a create/update. ['equipment'] catches the list
+  // queries; the prefixed keys catch the detail and descendants caches.
+  const invalidateEquipmentCaches = () => {
+    queryClient.invalidateQueries({ queryKey: ['equipment'] });
+    queryClient.invalidateQueries({ queryKey: ['equipment-detail'] });
+    queryClient.invalidateQueries({ queryKey: ['equipment-descendants'] });
+  };
+
   const createMutation = useMutation({
     mutationFn: (request: CreateEquipmentRequest) => equipmentApi.create(request),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['equipment'] });
+      invalidateEquipmentCaches();
       onClose();
     },
     onError: (error: unknown) => {
@@ -158,7 +168,7 @@ export default function EquipmentFormDialog({
     mutationFn: ({ id, data }: { id: string; data: UpdateEquipmentRequest }) =>
       equipmentApi.update(id, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['equipment'] });
+      invalidateEquipmentCaches();
       onClose();
     },
     onError: (error: unknown) => {

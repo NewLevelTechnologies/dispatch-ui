@@ -8,6 +8,7 @@ import type { Equipment } from '../api';
 const mockGetById = vi.fn();
 const mockGetDescendants = vi.fn();
 const mockUpdate = vi.fn();
+const mockDelete = vi.fn();
 const mockTypesGetAll = vi.fn();
 const mockCategoriesGetAll = vi.fn();
 const mockFiltersGetAll = vi.fn();
@@ -28,6 +29,7 @@ vi.mock('../api/equipmentApi', async (importOriginal) => {
     equipmentApi: {
       getById: (...args: unknown[]) => mockGetById(...args),
       update: (...args: unknown[]) => mockUpdate(...args),
+      delete: (...args: unknown[]) => mockDelete(...args),
       getDescendants: (...args: unknown[]) => mockGetDescendants(...args),
     },
     equipmentTypesApi: {
@@ -530,7 +532,9 @@ describe('EquipmentDetailPage', () => {
       expect(screen.getByText('20 × 25 × 1')).toBeInTheDocument();
     });
 
-    await user.click(screen.getByRole('button', { name: /more options/i }));
+    // Header overflow is [0]; the filter row's overflow is [1].
+    const moreButtons = screen.getAllByRole('button', { name: /more options/i });
+    await user.click(moreButtons[1]);
     const deleteItem = await screen.findByRole('menuitem', { name: /delete/i });
     await user.click(deleteItem);
 
@@ -694,7 +698,9 @@ describe('EquipmentDetailPage', () => {
     await user.click(screen.getByRole('button', { name: /^filters/i }));
 
     await waitFor(() => expect(screen.getByText('16 × 20 × 1')).toBeInTheDocument());
-    await user.click(screen.getByRole('button', { name: /more options/i }));
+    // Header overflow is [0]; the filter row's overflow is [1].
+    const moreButtons = screen.getAllByRole('button', { name: /more options/i });
+    await user.click(moreButtons[1]);
     const editItem = await screen.findByRole('menuitem', { name: /edit/i });
     await user.click(editItem);
 
@@ -734,7 +740,9 @@ describe('EquipmentDetailPage', () => {
     await user.click(screen.getByRole('button', { name: /^filters/i }));
     await waitFor(() => expect(screen.getByText('20 × 25 × 1')).toBeInTheDocument());
 
-    await user.click(screen.getByRole('button', { name: /more options/i }));
+    // Header overflow is [0]; the filter row's overflow is [1].
+    const moreButtons = screen.getAllByRole('button', { name: /more options/i });
+    await user.click(moreButtons[1]);
     const deleteItem = await screen.findByRole('menuitem', { name: /delete/i });
     await user.click(deleteItem);
 
@@ -890,8 +898,9 @@ describe('EquipmentDetailPage', () => {
     });
     await user.click(screen.getByRole('button', { name: /^photos/i }));
 
+    // Header overflow is [0]; the photo tile's kebab is [1].
     const moreButtons = await screen.findAllByRole('button', { name: /more options/i });
-    await user.click(moreButtons[0]);
+    await user.click(moreButtons[1]);
     const deleteItem = await screen.findByRole('menuitem', { name: /delete/i });
     await user.click(deleteItem);
 
@@ -942,6 +951,78 @@ describe('EquipmentDetailPage', () => {
     // Field still in edit mode (input is still the active surface)
     expect(screen.queryByRole('textbox', { name: /^make$/i })).toBeInTheDocument();
 
+    alertSpy.mockRestore();
+  });
+
+  it('opens the edit dialog from the header Edit button', async () => {
+    mockGetById.mockResolvedValue(baseEquipment);
+    const user = userEvent.setup();
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Upstairs Furnace' })).toBeInTheDocument();
+    });
+
+    // The header Edit button — distinct from EditableField buttons (which
+    // are field-specific). This one opens the form dialog in edit mode.
+    const editButtons = screen.getAllByRole('button', { name: /^edit$/i });
+    // The header button is the last one (after all the inline EditableField
+    // hover-state buttons that share the "Edit" name).
+    await user.click(editButtons[editButtons.length - 1]);
+
+    // Dialog opens in edit mode — title says "Edit Equipment"
+    expect(await screen.findByText(/edit equipment/i)).toBeInTheDocument();
+  });
+
+  it('deletes the equipment after confirmation and navigates away', async () => {
+    mockGetById.mockResolvedValue(baseEquipment);
+    mockDelete.mockResolvedValue(undefined);
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const user = userEvent.setup();
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Upstairs Furnace' })).toBeInTheDocument();
+    });
+
+    // Header overflow menu → Delete
+    const moreButtons = screen.getAllByRole('button', { name: /more options/i });
+    await user.click(moreButtons[0]);
+    const deleteItem = await screen.findByRole('menuitem', { name: /delete/i });
+    await user.click(deleteItem);
+
+    await waitFor(() => {
+      expect(confirmSpy).toHaveBeenCalled();
+      expect(mockDelete).toHaveBeenCalledWith('eq-1');
+    });
+    confirmSpy.mockRestore();
+  });
+
+  it('alerts the backend message when delete is blocked by FK', async () => {
+    mockGetById.mockResolvedValue(baseEquipment);
+    mockDelete.mockRejectedValue(
+      Object.assign(new Error('boom'), {
+        response: { data: { message: 'Equipment is in use by 3 work order items.' } },
+      })
+    );
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
+    const user = userEvent.setup();
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Upstairs Furnace' })).toBeInTheDocument();
+    });
+
+    const moreButtons = screen.getAllByRole('button', { name: /more options/i });
+    await user.click(moreButtons[0]);
+    const deleteItem = await screen.findByRole('menuitem', { name: /delete/i });
+    await user.click(deleteItem);
+
+    await waitFor(() => {
+      expect(alertSpy).toHaveBeenCalledWith('Equipment is in use by 3 work order items.');
+    });
+    confirmSpy.mockRestore();
     alertSpy.mockRestore();
   });
 });

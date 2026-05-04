@@ -55,6 +55,7 @@ import {
 import {
   ArrowLeftIcon,
   EllipsisVerticalIcon,
+  PencilIcon,
   PlusIcon,
   StarIcon as StarIconOutline,
 } from '@heroicons/react/24/outline';
@@ -96,6 +97,7 @@ export default function EquipmentDetailPage() {
   >(null);
   const [isImageUploadOpen, setIsImageUploadOpen] = useState(false);
   const [isAddComponentOpen, setIsAddComponentOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [showAllFilterSizes, setShowAllFilterSizes] = useState(false);
 
   // Fall back to the equipment list when the user landed here directly (no in-app history).
@@ -239,6 +241,41 @@ export default function EquipmentDetailPage() {
       alert(msg || t('equipment.images.errorDelete'));
     },
   });
+
+  // Delete the equipment itself (header overflow → Delete). Backend returns
+  // 409 with a structured message when the equipment is referenced by work
+  // items; the alert surfaces whatever the backend tells us. Invalidate
+  // descendants too — if the user came here from a parent's Components tab
+  // and is deleting one of its children, the tree on that page must refetch.
+  const deleteEquipmentMutation = useMutation({
+    mutationFn: () => equipmentApi.delete(id!),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['equipment'] });
+      queryClient.invalidateQueries({ queryKey: ['equipment-descendants'] });
+      // Prefer browser-back so a user who came from a parent's Components
+      // tab (or list view) lands back where they were. Fall back to the
+      // equipment list when we have no in-app history.
+      if (routeKey !== 'default') {
+        navigate(-1);
+      } else {
+        navigate('/equipment');
+      }
+    },
+    onError: (err: unknown) => {
+      const msg =
+        err instanceof Error && 'response' in err
+          ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
+          : undefined;
+      alert(msg || t('common.form.errorDelete', { entity: getName('equipment') }));
+    },
+  });
+
+  const handleDelete = () => {
+    if (!equipment) return;
+    if (window.confirm(t('common.actions.deleteConfirm', { name: equipment.name }))) {
+      deleteEquipmentMutation.mutate();
+    }
+  };
 
   // Single-field PATCH used by every EditableField on the page. EditableField
   // stays in edit mode if this throws, so we propagate after surfacing via alert
@@ -442,6 +479,25 @@ export default function EquipmentDetailPage() {
                   : getName('service_location')}
               </RouterLink>
             </Text>
+          </div>
+
+          {/* Header actions — Edit opens the form dialog (alternative to
+              inline editing); overflow carries Delete. */}
+          <div className="flex shrink-0 items-center gap-2">
+            <Button color="zinc" onClick={() => setIsEditDialogOpen(true)}>
+              <PencilIcon className="size-4" />
+              {t('common.edit')}
+            </Button>
+            <Dropdown>
+              <DropdownButton plain aria-label={t('common.moreOptions')}>
+                <EllipsisVerticalIcon className="size-5" />
+              </DropdownButton>
+              <DropdownMenu anchor="bottom end">
+                <DropdownItem onClick={handleDelete}>
+                  <DropdownLabel>{t('common.delete')}</DropdownLabel>
+                </DropdownItem>
+              </DropdownMenu>
+            </Dropdown>
           </div>
         </div>
 
@@ -901,6 +957,14 @@ export default function EquipmentDetailPage() {
         onClose={() => setIsAddComponentOpen(false)}
         lockedParent={equipment ? { id: equipment.id, name: equipment.name } : null}
         lockedServiceLocationId={equipment?.serviceLocationId}
+      />
+
+      {/* Edit dialog — same form, edit mode. An alternative to inline
+          editing for users who prefer modal flow; both write the same API. */}
+      <EquipmentFormDialog
+        isOpen={isEditDialogOpen}
+        onClose={() => setIsEditDialogOpen(false)}
+        equipment={equipment}
       />
     </AppLayout>
   );
