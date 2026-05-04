@@ -286,6 +286,27 @@ describe('EquipmentDetailPage', () => {
     await waitFor(() => {
       expect(screen.getByText(/no components linked/i)).toBeInTheDocument();
     });
+    // Empty state offers a prominent CTA in addition to the header button.
+    expect(
+      screen.getByRole('button', { name: /add the first component/i })
+    ).toBeInTheDocument();
+  });
+
+  it('opens the Add Component dialog from the Components tab header button', async () => {
+    mockGetById.mockResolvedValue(baseEquipment);
+    mockGetDescendants.mockResolvedValue([]);
+    const user = userEvent.setup();
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Upstairs Furnace' })).toBeInTheDocument();
+    });
+    await user.click(screen.getByRole('button', { name: /^components/i }));
+
+    await user.click(screen.getByRole('button', { name: /^add component$/i }));
+
+    // Dialog opens with the parent-aware title
+    expect(await screen.findByText(/add component to upstairs furnace/i)).toBeInTheDocument();
   });
 
   it('renders descendants as an indented tree on the components tab', async () => {

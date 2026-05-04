@@ -348,9 +348,12 @@
     "descriptionParts": "Manage parts inventory across warehouses",
     "descriptionWarehouses": "Manage warehouse locations and inventory storage",
     "components": {
+      "addComponent": "Add Component",
+      "addFirstComponent": "Add the first component",
       "empty": "No components linked to this equipment yet.",
       "errorLoading": "Failed to load components",
-      "loading": "Loading components…"
+      "loading": "Loading components…",
+      "titleAdd": "Add Component to {{parent}}"
     },
     "detail": {
       "created": "Created",

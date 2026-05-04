@@ -244,6 +244,38 @@ describe('EquipmentFormDialog', () => {
     });
   });
 
+  it('submits parentId when lockedParent is provided', async () => {
+    mockEquipmentCreate.mockResolvedValue({ id: 'new-comp' });
+    const user = userEvent.setup();
+
+    renderWithProviders(
+      <EquipmentFormDialog
+        isOpen={true}
+        onClose={vi.fn()}
+        lockedServiceLocationId="loc-locked"
+        lockedParent={{ id: 'parent-eq', name: 'Rooftop Unit 01' }}
+      />
+    );
+
+    // Title shifts to "Add Component to {parent}" when locked-from-context
+    expect(screen.getByText(/add component to rooftop unit 01/i)).toBeInTheDocument();
+    // No location picker (locked) and no separate parent UI in unrestricted
+    // create — parent is implicit from context.
+    expect(screen.queryByPlaceholderText(/search by customer, address/i)).not.toBeInTheDocument();
+
+    await user.type(screen.getByLabelText(/^name/i), 'Compressor');
+    await user.click(screen.getByRole('button', { name: /create/i }));
+
+    await waitFor(() => {
+      expect(mockEquipmentCreate).toHaveBeenCalled();
+    });
+    expect(mockEquipmentCreate.mock.calls[0][0]).toMatchObject({
+      name: 'Compressor',
+      serviceLocationId: 'loc-locked',
+      parentId: 'parent-eq',
+    });
+  });
+
   it('lockedCustomer restricts the picker to that customer (opens on focus)', async () => {
     const user = userEvent.setup();
 

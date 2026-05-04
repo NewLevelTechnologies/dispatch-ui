@@ -35,6 +35,14 @@ interface EquipmentFormDialogProps {
    * customer detail page where the customer is implicit.
    */
   lockedCustomer?: { id: string; name: string } | null;
+  /**
+   * When provided in create mode, sets the new equipment's parent to this
+   * equipment. Used from the Components tab on the parent's detail page —
+   * the dialog title shifts, no parent UI is shown (it's locked from
+   * context). Combine with `lockedServiceLocationId` (the parent's location)
+   * since components share their parent's service location.
+   */
+  lockedParent?: { id: string; name: string } | null;
 }
 
 interface FormState {
@@ -77,6 +85,7 @@ export default function EquipmentFormDialog({
   equipment,
   lockedServiceLocationId,
   lockedCustomer,
+  lockedParent,
 }: EquipmentFormDialogProps) {
   const queryClient = useQueryClient();
   const { t } = useTranslation();
@@ -192,6 +201,11 @@ export default function EquipmentFormDialog({
       const payload: CreateEquipmentRequest = {
         name: formData.name,
         serviceLocationId: formData.serviceLocationId,
+        // parentId is set from context (Components tab "+ Add Component"
+        // flow) — there's no UI for it in unrestricted create mode, only
+        // the locked-from-context prop. Reparenting an existing equipment
+        // happens elsewhere.
+        parentId: lockedParent?.id ?? null,
         description: formData.description || null,
         make: formData.make || null,
         model: formData.model || null,
@@ -217,7 +231,9 @@ export default function EquipmentFormDialog({
       <DialogTitle>
         {isEdit
           ? t('common.actions.edit', { entity: getName('equipment') })
-          : t('common.actions.add', { entity: getName('equipment') })}
+          : lockedParent
+            ? t('equipment.components.titleAdd', { parent: lockedParent.name })
+            : t('common.actions.add', { entity: getName('equipment') })}
       </DialogTitle>
       <form onSubmit={handleSubmit}>
         <DialogBody>

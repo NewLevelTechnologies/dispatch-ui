@@ -23,6 +23,7 @@ import AppLayout from '../components/AppLayout';
 import TabNavigation from '../components/TabNavigation';
 import EditableField from '../components/EditableField';
 import EquipmentFilterFormDialog from '../components/EquipmentFilterFormDialog';
+import EquipmentFormDialog from '../components/EquipmentFormDialog';
 import EquipmentImageUploadDialog from '../components/EquipmentImageUploadDialog';
 import EquipmentThumbnail from '../components/EquipmentThumbnail';
 import WorkOrdersList from '../components/WorkOrdersList';
@@ -94,6 +95,7 @@ export default function EquipmentDetailPage() {
     { lengthIn: number; widthIn: number; thicknessIn: number } | null
   >(null);
   const [isImageUploadOpen, setIsImageUploadOpen] = useState(false);
+  const [isAddComponentOpen, setIsAddComponentOpen] = useState(false);
   const [showAllFilterSizes, setShowAllFilterSizes] = useState(false);
 
   // Fall back to the equipment list when the user landed here directly (no in-app history).
@@ -852,12 +854,21 @@ export default function EquipmentDetailPage() {
           )}
 
           {activeTab === 'components' && (
-            <ComponentsTree
-              rootId={id!}
-              descendantsByParent={descendantsByParent}
-              loading={descendantsLoading}
-              error={descendantsError as Error | null}
-            />
+            <div>
+              <div className="mb-3 flex items-center justify-end">
+                <Button onClick={() => setIsAddComponentOpen(true)}>
+                  <PlusIcon className="size-4" />
+                  {t('equipment.components.addComponent')}
+                </Button>
+              </div>
+              <ComponentsTree
+                rootId={id!}
+                descendantsByParent={descendantsByParent}
+                loading={descendantsLoading}
+                error={descendantsError as Error | null}
+                onAddComponent={() => setIsAddComponentOpen(true)}
+              />
+            </div>
           )}
         </div>
       </div>
@@ -880,6 +891,17 @@ export default function EquipmentDetailPage() {
         equipmentId={id!}
         defaultSetProfile={images.length === 0}
       />
+
+      {/* Add Component dialog — same EquipmentFormDialog as elsewhere, but
+          locked to this equipment's id (parent) and service location. The
+          parent and location are implicit from context, so the dialog hides
+          both fields and submits parentId from the locked prop. */}
+      <EquipmentFormDialog
+        isOpen={isAddComponentOpen}
+        onClose={() => setIsAddComponentOpen(false)}
+        lockedParent={equipment ? { id: equipment.id, name: equipment.name } : null}
+        lockedServiceLocationId={equipment?.serviceLocationId}
+      />
     </AppLayout>
   );
 }
@@ -889,6 +911,8 @@ interface ComponentsTreeProps {
   descendantsByParent: Map<string, EquipmentSummary[]>;
   loading: boolean;
   error: Error | null;
+  /** Optional callback to open the Add Component dialog from the empty-state CTA. */
+  onAddComponent?: () => void;
 }
 
 /**
@@ -904,6 +928,7 @@ function ComponentsTree({
   descendantsByParent,
   loading,
   error,
+  onAddComponent,
 }: ComponentsTreeProps) {
   const { t } = useTranslation();
 
@@ -940,6 +965,13 @@ function ComponentsTree({
         <Text className="text-zinc-600 dark:text-zinc-400">
           {t('equipment.components.empty')}
         </Text>
+        {onAddComponent && (
+          <div className="mt-3">
+            <Button onClick={onAddComponent}>
+              {t('equipment.components.addFirstComponent')}
+            </Button>
+          </div>
+        )}
       </div>
     );
   }
