@@ -272,6 +272,7 @@ vi.mock('react-i18next', () => {
     'equipment.description': 'Track equipment and inventory',
     'equipment.descriptionParts': 'Manage parts inventory across warehouses',
     'equipment.descriptionWarehouses': 'Manage warehouse locations and inventory storage',
+    'equipment.detail.breadcrumbAriaLabel': 'Equipment location',
     'equipment.detail.created': 'Created',
     'equipment.detail.descriptionPlaceholder': 'Add a description…',
     'equipment.detail.identification': 'Identification',

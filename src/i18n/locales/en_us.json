@@ -353,6 +353,7 @@
       "loading": "Loading components…"
     },
     "detail": {
+      "breadcrumbAriaLabel": "Equipment location",
       "created": "Created",
       "descriptionPlaceholder": "Add a description…",
       "identification": "Identification",
