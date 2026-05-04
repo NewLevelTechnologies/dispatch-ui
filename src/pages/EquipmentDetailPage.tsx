@@ -53,6 +53,7 @@ import {
 } from '../components/catalyst/description-list';
 import {
   ArrowLeftIcon,
+  ChevronRightIcon,
   EllipsisVerticalIcon,
   PlusIcon,
   StarIcon as StarIconOutline,
@@ -125,8 +126,7 @@ export default function EquipmentDetailPage() {
 
   // Resolve the service location for the header breadcrumb. Equipment.serviceLocationId
   // is the only context the equipment payload carries; we fetch the location DTO so the
-  // header can render "Belongs to {customer} at {location}" with real names instead of
-  // a class-name placeholder.
+  // header can render the location name in the breadcrumb instead of a placeholder.
   const { data: serviceLocation } = useQuery({
     queryKey: ['service-location', equipment?.serviceLocationId ?? ''],
     queryFn: () => customerApi.getServiceLocationById(equipment!.serviceLocationId),
@@ -412,6 +412,34 @@ export default function EquipmentDetailPage() {
           </Button>
         </div>
 
+        {/* Breadcrumb: location › parent (if component). Heading below carries the
+            current item, per breadcrumb-omits-self convention. */}
+        <nav
+          aria-label={t('equipment.detail.breadcrumbAriaLabel')}
+          className="mb-2 flex flex-wrap items-center gap-x-1.5 text-xs text-zinc-500 dark:text-zinc-400"
+        >
+          <RouterLink
+            to={`/service-locations/${equipment.serviceLocationId}`}
+            className="hover:text-zinc-700 hover:underline dark:hover:text-zinc-200"
+          >
+            {serviceLocation
+              ? serviceLocation.locationName ||
+                `${serviceLocation.address.streetAddress}, ${serviceLocation.address.city}`
+              : getName('service_location')}
+          </RouterLink>
+          {equipment.parentId && (
+            <>
+              <ChevronRightIcon className="size-3 text-zinc-400 dark:text-zinc-600" aria-hidden />
+              <RouterLink
+                to={`/equipment/${equipment.parentId}`}
+                className="hover:text-zinc-700 hover:underline dark:hover:text-zinc-200"
+              >
+                {equipment.parentName ?? getName('equipment')}
+              </RouterLink>
+            </>
+          )}
+        </nav>
+
         {/* Header */}
         <div className="flex items-start gap-4">
           <EquipmentThumbnail
@@ -428,18 +456,6 @@ export default function EquipmentDetailPage() {
                 {t(`equipment.status.${equipment.status.toLowerCase()}`)}
               </Badge>
             </div>
-            <Text className="mt-1">
-              {t('serviceLocations.detail.belongsTo')}{' '}
-              <RouterLink
-                to={`/service-locations/${equipment.serviceLocationId}`}
-                className="font-medium hover:underline"
-              >
-                {serviceLocation
-                  ? serviceLocation.locationName ||
-                    `${serviceLocation.address.streetAddress}, ${serviceLocation.address.city}`
-                  : getName('service_location')}
-              </RouterLink>
-            </Text>
           </div>
         </div>
 

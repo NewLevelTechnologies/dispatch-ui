@@ -21,6 +21,7 @@ export interface Equipment {
   serialNumber?: string | null;
   assetTag?: string | null;
   parentId?: string | null;
+  parentName?: string | null;
   equipmentTypeId?: string | null;
   equipmentTypeName?: string | null;
   equipmentCategoryId?: string | null;
@@ -75,6 +76,9 @@ export interface EquipmentSummary {
   // Populated on the descendants endpoint — lets the UI reconstruct the
   // parent/child tree from a flat array. May be omitted on other endpoints.
   parentId?: string | null;
+  // Immediate parent's display name. Backend-denormalized, null when this is
+  // top-level equipment.
+  parentName?: string | null;
 }
 
 export interface CreateEquipmentRequest {
