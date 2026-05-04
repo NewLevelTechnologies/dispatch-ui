@@ -4,6 +4,8 @@ import { renderWithProviders, userEvent } from '../test/utils';
 import FilterPullListReport from './FilterPullListReport';
 
 const mockFilterPullList = vi.fn();
+const mockTypesGetAll = vi.fn();
+const mockDivisionsGetAll = vi.fn();
 
 vi.mock('../api/equipmentApi', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../api/equipmentApi')>();
@@ -15,12 +17,37 @@ vi.mock('../api/equipmentApi', async (importOriginal) => {
   };
 });
 
+vi.mock('../api/workOrderConfigApi', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../api/workOrderConfigApi')>();
+  return {
+    ...actual,
+    workOrderTypesApi: { getAll: (...args: unknown[]) => mockTypesGetAll(...args) },
+    divisionsApi: { getAll: (...args: unknown[]) => mockDivisionsGetAll(...args) },
+  };
+});
+
 vi.mock('../api/client');
+
+const mkTaxonomy = (id: string, name: string, isActive = true) => ({
+  id,
+  tenantId: 't',
+  name,
+  code: name.toUpperCase(),
+  description: null,
+  color: null,
+  icon: null,
+  isActive,
+  sortOrder: 0,
+  createdAt: '',
+  updatedAt: '',
+});
 
 describe('FilterPullListReport', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockFilterPullList.mockResolvedValue([]);
+    mockTypesGetAll.mockResolvedValue([]);
+    mockDivisionsGetAll.mockResolvedValue([]);
   });
 
   it('defaults to single-day mode for today and queries the backend', async () => {
@@ -84,5 +111,82 @@ describe('FilterPullListReport', () => {
     await waitFor(() => {
       expect(screen.getByText(/error loading report/i)).toBeInTheDocument();
     });
+  });
+
+  it('omits work order type and division dropdowns when no taxonomy items exist', async () => {
+    renderWithProviders(<FilterPullListReport />);
+    await waitFor(() => expect(mockFilterPullList).toHaveBeenCalled());
+    expect(screen.queryByRole('combobox', { name: /^type$/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('combobox', { name: /^division$/i })).not.toBeInTheDocument();
+    // The first request should not include the optional filters.
+    const params = mockFilterPullList.mock.calls[0][0];
+    expect(params).not.toHaveProperty('workOrderTypeId');
+    expect(params).not.toHaveProperty('divisionId');
+  });
+
+  it('sends workOrderTypeId when a type is picked', async () => {
+    mockTypesGetAll.mockResolvedValue([
+      mkTaxonomy('t-install', 'Install'),
+      mkTaxonomy('t-service', 'Service'),
+    ]);
+    const user = userEvent.setup();
+    renderWithProviders(<FilterPullListReport />);
+
+    const typeSelect = await screen.findByRole('combobox', { name: /^type$/i });
+    mockFilterPullList.mockClear();
+    await user.selectOptions(typeSelect, 't-install');
+
+    await waitFor(() => expect(mockFilterPullList).toHaveBeenCalled());
+    const lastCall = mockFilterPullList.mock.calls[mockFilterPullList.mock.calls.length - 1][0];
+    expect(lastCall.workOrderTypeId).toBe('t-install');
+  });
+
+  it('sends divisionId when a division is picked', async () => {
+    mockDivisionsGetAll.mockResolvedValue([
+      mkTaxonomy('d-hvac', 'HVAC'),
+      mkTaxonomy('d-plumbing', 'Plumbing'),
+    ]);
+    const user = userEvent.setup();
+    renderWithProviders(<FilterPullListReport />);
+
+    const divSelect = await screen.findByRole('combobox', { name: /^division$/i });
+    mockFilterPullList.mockClear();
+    await user.selectOptions(divSelect, 'd-hvac');
+
+    await waitFor(() => expect(mockFilterPullList).toHaveBeenCalled());
+    const lastCall = mockFilterPullList.mock.calls[mockFilterPullList.mock.calls.length - 1][0];
+    expect(lastCall.divisionId).toBe('d-hvac');
+  });
+
+  it('hides retired (inactive) taxonomy entries from the dropdowns', async () => {
+    mockTypesGetAll.mockResolvedValue([
+      mkTaxonomy('t-install', 'Install', true),
+      mkTaxonomy('t-old', 'Retired Type', false),
+    ]);
+    renderWithProviders(<FilterPullListReport />);
+
+    const typeSelect = await screen.findByRole('combobox', { name: /^type$/i });
+    expect(typeSelect).toHaveTextContent('Install');
+    expect(typeSelect).not.toHaveTextContent('Retired Type');
+  });
+
+  it('clears the type filter when "Any type" is reselected', async () => {
+    mockTypesGetAll.mockResolvedValue([mkTaxonomy('t-install', 'Install')]);
+    const user = userEvent.setup();
+    renderWithProviders(<FilterPullListReport />);
+
+    const typeSelect = await screen.findByRole('combobox', { name: /^type$/i });
+    await user.selectOptions(typeSelect, 't-install');
+    await waitFor(() => {
+      const last = mockFilterPullList.mock.calls[mockFilterPullList.mock.calls.length - 1][0];
+      expect(last.workOrderTypeId).toBe('t-install');
+    });
+
+    mockFilterPullList.mockClear();
+    await user.selectOptions(typeSelect, '');
+
+    await waitFor(() => expect(mockFilterPullList).toHaveBeenCalled());
+    const lastCall = mockFilterPullList.mock.calls[mockFilterPullList.mock.calls.length - 1][0];
+    expect(lastCall).not.toHaveProperty('workOrderTypeId');
   });
 });

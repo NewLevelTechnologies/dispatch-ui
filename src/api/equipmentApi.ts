@@ -485,6 +485,10 @@ export interface FilterPullListParams {
   scheduledDateFrom?: string;
   /** Range end (YYYY-MM-DD). Inclusive on the backend side. */
   scheduledDateTo?: string;
+  /** Optional work order type UUID — when set, only equipment on work orders of this type are aggregated. */
+  workOrderTypeId?: string;
+  /** Optional division UUID — when set, only equipment on work orders in this division are aggregated. */
+  divisionId?: string;
 }
 
 export const reportsApi = {

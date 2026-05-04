@@ -1,10 +1,18 @@
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { reportsApi, type FilterPullListEntry } from '../api';
+import {
+  divisionsApi,
+  reportsApi,
+  workOrderTypesApi,
+  type FilterPullListEntry,
+  type FilterPullListParams,
+} from '../api';
+import { useGlossary } from '../contexts/GlossaryContext';
 import ReportLayout from '../components/ReportLayout';
 import { Field, Label } from '../components/catalyst/fieldset';
 import { Input } from '../components/catalyst/input';
+import { Select } from '../components/catalyst/select';
 import { Text } from '../components/catalyst/text';
 import {
   Table,
@@ -38,17 +46,36 @@ function formatSize(e: FilterPullListEntry): string {
 
 export default function FilterPullListReport() {
   const { t } = useTranslation();
+  const { getName } = useGlossary();
   const [mode, setMode] = useState<Mode>('single');
   const [singleDate, setSingleDate] = useState<string>(todayLocal());
   const [rangeFrom, setRangeFrom] = useState<string>(todayLocal());
   const [rangeTo, setRangeTo] = useState<string>(todayLocal());
+  const [workOrderTypeId, setWorkOrderTypeId] = useState<string>('');
+  const [divisionId, setDivisionId] = useState<string>('');
 
-  const params = useMemo(() => {
-    if (mode === 'single') {
-      return { scheduledDate: singleDate };
-    }
-    return { scheduledDateFrom: rangeFrom, scheduledDateTo: rangeTo };
-  }, [mode, singleDate, rangeFrom, rangeTo]);
+  // Taxonomy lookups for the filter dropdowns. Inactive entries are hidden so
+  // dispatchers can't slice the report by a retired type/division.
+  const { data: workOrderTypes = [] } = useQuery({
+    queryKey: ['work-order-types'],
+    queryFn: () => workOrderTypesApi.getAll(),
+  });
+  const { data: divisions = [] } = useQuery({
+    queryKey: ['divisions'],
+    queryFn: () => divisionsApi.getAll(),
+  });
+  const activeTypes = workOrderTypes.filter((tx) => tx.isActive);
+  const activeDivisions = divisions.filter((d) => d.isActive);
+
+  const params = useMemo<FilterPullListParams>(() => {
+    const base: FilterPullListParams =
+      mode === 'single'
+        ? { scheduledDate: singleDate }
+        : { scheduledDateFrom: rangeFrom, scheduledDateTo: rangeTo };
+    if (workOrderTypeId) base.workOrderTypeId = workOrderTypeId;
+    if (divisionId) base.divisionId = divisionId;
+    return base;
+  }, [mode, singleDate, rangeFrom, rangeTo, workOrderTypeId, divisionId]);
 
   const { data: entries = [], isLoading, error } = useQuery({
     queryKey: ['report-filter-pull-list', params],
@@ -120,6 +147,38 @@ export default function FilterPullListReport() {
                 />
               </Field>
             </>
+          )}
+
+          {activeTypes.length > 0 && (
+            <Field>
+              <Label className="text-xs">{t('workOrders.form.type')}</Label>
+              <Select
+                aria-label={t('workOrders.form.type')}
+                value={workOrderTypeId}
+                onChange={(e) => setWorkOrderTypeId(e.target.value)}
+              >
+                <option value="">{t('workOrders.filters.anyType')}</option>
+                {activeTypes.map((tx) => (
+                  <option key={tx.id} value={tx.id}>{tx.name}</option>
+                ))}
+              </Select>
+            </Field>
+          )}
+
+          {activeDivisions.length > 0 && (
+            <Field>
+              <Label className="text-xs">{getName('division')}</Label>
+              <Select
+                aria-label={getName('division')}
+                value={divisionId}
+                onChange={(e) => setDivisionId(e.target.value)}
+              >
+                <option value="">{t('workOrders.filters.anyDivision')}</option>
+                {activeDivisions.map((d) => (
+                  <option key={d.id} value={d.id}>{d.name}</option>
+                ))}
+              </Select>
+            </Field>
           )}
         </>
       }
