@@ -107,6 +107,7 @@ export default function CustomerDetailPage() {
     mutationFn: (equipmentId: string) => equipmentApi.delete(equipmentId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['equipment', { customerId: id }] });
+      queryClient.invalidateQueries({ queryKey: ['equipment-descendants'] });
     },
     onError: (err: unknown) => {
       const msg =

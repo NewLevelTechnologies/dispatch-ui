@@ -100,6 +100,7 @@ export default function ServiceLocationDetailPage() {
     mutationFn: (equipmentId: string) => equipmentApi.delete(equipmentId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['equipment', { serviceLocationId: id }] });
+      queryClient.invalidateQueries({ queryKey: ['equipment-descendants'] });
     },
     onError: (err: unknown) => {
       const msg =

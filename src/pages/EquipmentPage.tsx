@@ -83,6 +83,9 @@ export default function EquipmentPage() {
     mutationFn: (id: string) => equipmentApi.delete(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['equipment'] });
+      // Refresh any open Components tab — a deleted child should disappear
+      // from its parent's tree without a manual reload.
+      queryClient.invalidateQueries({ queryKey: ['equipment-descendants'] });
     },
     onError: (err: unknown) => {
       const msg =
