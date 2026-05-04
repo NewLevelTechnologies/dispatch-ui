@@ -133,15 +133,6 @@ export default function EquipmentDetailPage() {
     enabled: Boolean(equipment?.serviceLocationId),
   });
 
-  // Chained fetch for the parent's name when this is a component. Reuses the
-  // ['equipment-detail', id] cache key so navigating into the parent (or
-  // arriving here from the parent) is instant.
-  const { data: parentEquipment } = useQuery({
-    queryKey: ['equipment-detail', equipment?.parentId ?? ''],
-    queryFn: () => equipmentApi.getById(equipment!.parentId!),
-    enabled: Boolean(equipment?.parentId),
-  });
-
   // Per-equipment filter list and tenant-wide common sizes for the quick-add chips.
   const { data: filters = [], isLoading: filtersLoading, error: filtersError } = useQuery({
     queryKey: ['equipment-filters', id],
@@ -443,7 +434,7 @@ export default function EquipmentDetailPage() {
                 to={`/equipment/${equipment.parentId}`}
                 className="hover:text-zinc-700 hover:underline dark:hover:text-zinc-200"
               >
-                {parentEquipment?.name ?? '…'}
+                {equipment.parentName ?? getName('equipment')}
               </RouterLink>
             </>
           )}
