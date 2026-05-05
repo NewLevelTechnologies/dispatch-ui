@@ -64,7 +64,10 @@ export default function WorkItemsTable({
     return (
       <div className="rounded-lg border border-dashed border-zinc-200 p-6 text-center dark:border-zinc-800">
         <Text className="text-zinc-500 dark:text-zinc-400">
-          {t('workOrders.workItems.empty', { entity: getName('work_order') })}
+          {t('workOrders.workItems.empty', {
+            children: getName('work_item', true),
+            entity: getName('work_order'),
+          })}
         </Text>
       </div>
     );

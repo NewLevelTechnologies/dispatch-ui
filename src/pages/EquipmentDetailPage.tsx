@@ -415,7 +415,7 @@ export default function EquipmentDetailPage() {
         {/* Breadcrumb: location › parent (if component). Heading below carries the
             current item, per breadcrumb-omits-self convention. */}
         <nav
-          aria-label={t('equipment.detail.breadcrumbAriaLabel')}
+          aria-label={t('equipment.detail.breadcrumbAriaLabel', { entity: getName('equipment') })}
           className="mb-2 flex flex-wrap items-center gap-x-1.5 text-xs text-zinc-500 dark:text-zinc-400"
         >
           <RouterLink
@@ -647,6 +647,7 @@ export default function EquipmentDetailPage() {
                   title={
                     imageLimitReached
                       ? t('equipment.images.limitReached', {
+                          entity: getName('equipment'),
                           max: EQUIPMENT_IMAGE_MAX_PER_EQUIPMENT,
                         })
                       : undefined
