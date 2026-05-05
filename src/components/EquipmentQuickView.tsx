@@ -4,7 +4,6 @@ import {
   equipmentApi,
   EquipmentStatus,
   type Equipment,
-  type EquipmentSummary,
   type UpdateEquipmentRequest,
 } from '../api';
 import { useGlossary } from '../contexts/GlossaryContext';
@@ -50,29 +49,20 @@ export default function EquipmentQuickView({
   const { getName } = useGlossary();
   const queryClient = useQueryClient();
 
-  // Shares the ['equipment-detail', id] cache key with EquipmentDetailPage,
-  // so navigating between the drawer and the full page is instant.
+  // The drawer needs descendants on the response so the sub-unit chip row
+  // can render. That's an opt-in projection — default getById callers
+  // (e.g. EquipmentDetailPage) get the lean shape. Cache key carries the
+  // option so the two flavors don't collide; prefix-based invalidation
+  // (`['equipment-detail', id]`) still hits both entries in lockstep.
   const { data: equipment, isLoading, error } = useQuery({
-    queryKey: ['equipment-detail', equipmentId],
-    queryFn: () => equipmentApi.getById(equipmentId),
+    queryKey: ['equipment-detail', equipmentId, { includeDescendants: true }],
+    queryFn: () => equipmentApi.getById(equipmentId, { includeDescendants: true }),
   });
-
-  // Direct children for the sub-unit chip row. Once backend projects
-  // descendants on the Equipment response (getById), this query goes away
-  // and we read straight from `equipment.descendants`. Until then we make
-  // the round-trip ourselves; both queries fire in parallel.
-  const { data: descendants = [] } = useQuery({
-    queryKey: ['equipment-descendants', equipmentId],
-    queryFn: () => equipmentApi.getDescendants(equipmentId),
-  });
-  // The descendants endpoint returns the full tree (children + grandchildren
-  // + …). For the chip row we want direct children only.
-  const directChildren = descendants.filter((d) => d.parentId === equipmentId);
+  const directChildren = equipment?.descendants ?? [];
 
   const invalidateEquipmentRelatedCaches = () => {
     queryClient.invalidateQueries({ queryKey: ['equipment-detail', equipmentId] });
     queryClient.invalidateQueries({ queryKey: ['equipment'] });
-    queryClient.invalidateQueries({ queryKey: ['equipment-descendants'] });
     queryClient.invalidateQueries({ queryKey: ['work-orders'] });
     queryClient.invalidateQueries({ queryKey: ['work-orders-list'] });
   };
@@ -255,7 +245,7 @@ export default function EquipmentQuickView({
 }
 
 interface SubUnitChipProps {
-  subUnit: EquipmentSummary;
+  subUnit: { id: string; name: string; profileImageUrl?: string | null };
   onSelect: () => void;
 }
 

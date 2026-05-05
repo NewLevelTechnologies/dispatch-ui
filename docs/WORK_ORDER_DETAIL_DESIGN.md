@@ -352,10 +352,10 @@ What shipped:
 
 Architecturally only ONE `SlideOver` is mounted at a time — content swaps based on top-of-stack rather than physically stacking dialogs. Visually the UX is identical and state stays simple.
 
-Backend asks open (not blocking — drawer works today):
+Backend asks resolved:
 
-- Add `descendants[]` and `descendantCount` to the `Equipment` response from `GET /equipment/{id}` (mirror what's already on `EquipmentSummary`). The drawer currently fires `equipmentApi.getDescendants` as a parallel query; this projection drops the second round-trip.
-- Add `profileImageUrl` to descendants[] entries everywhere (`WorkItemEquipmentSummary.descendants`, `EquipmentSummary.descendants`, the new `Equipment.descendants` projection from #1). Sub-unit chips render a 20px thumbnail before the name for visual scan id; field is wired and waiting.
+- ✅ `descendants[]` and `descendantCount` projected on the `Equipment` response from `GET /equipment/{id}?includeDescendants=true`. Opt-in via the query param so default callers (EquipmentDetailPage et al.) stay lean. Drawer passes the option; the parallel `equipmentApi.getDescendants` query was dropped.
+- ✅ `profileImageUrl` on `descendants[]` entries everywhere — sub-unit chips render their 20px thumbnails directly off the projected URL.
 
 ### 5c. Open follow-ups across the page
 
