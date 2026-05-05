@@ -756,13 +756,13 @@ export default function WorkOrderDetailPage() {
 
       {/* Equipment quickview drawer — slides in from the right when a
           sub-unit chip is clicked. Manages its own internal stack for
-          drawer-over-drawer recursion. "+ Add unit" inside the drawer
-          routes back through handleAddSubUnit so EquipmentFormDialog
-          state stays single-sourced here. */}
+          drawer-over-drawer recursion. The drawer doesn't expose "+ Add
+          unit" because adding from a sub-unit would create depth-2
+          equipment (product rule restricts to 2 levels deep); creation
+          happens only from the WO row's primary equipment chip row. */}
       <EquipmentQuickViewDrawer
         initialEquipment={drawerEquipment}
         onClose={() => setDrawerEquipment(null)}
-        onAddSubUnit={handleAddSubUnit}
       />
     </AppLayout>
   );

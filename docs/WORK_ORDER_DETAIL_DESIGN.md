@@ -30,7 +30,7 @@ The page uses three UI patterns and three only. They do not overlap:
 
 If a future feature doesn't fit one of these three, that's a signal to question the feature, not to add a fourth pattern.
 
-A drawer is a *context*; a dialog is an *action within a context*. They nest cleanly: clicking `+ New Invoice` inside the financials drawer (or `+ Add unit` inside the equipment quickview drawer) opens a create dialog *over* the drawer, the drawer stays mounted underneath, and dialog close returns the user to the drawer (§3.5, §3.5b).
+A drawer is a *context*; a dialog is an *action within a context*. They nest cleanly: clicking `+ New Invoice` inside the financials drawer opens a create dialog *over* the drawer, the drawer stays mounted underneath, and dialog close returns the user to the drawer (§3.5).
 
 ---
 
@@ -346,9 +346,9 @@ What shipped:
 - 64px hero thumbnail + name (inline-editable) + status pill (lime/amber, ACTIVE/RETIRED, inline-editable both ways in this context) + type/category subline.
 - Identification block: name, make, model, serial, asset tag, location-on-site — all inline-editable via `EditableField`. Cache invalidation hits `['equipment']`, `['equipment-detail', id]`, `['equipment-descendants']`, `['work-orders']`, `['work-orders-list']` — same triple-key pattern as the row's primary equipment block.
 - Lifecycle block: install date, last serviced (read-only, backend-managed), warranty expires, warranty details — inline-editable.
-- Sub-units chip row inside the drawer with `+ Add unit` — clicking another sub-unit pushes onto the drawer's internal stack (drawer-over-drawer recursion). Back button at the top of the header is labeled with the parent name when the stack is more than one deep ("← Back to {parentName}"); at the root it's a plain X close.
+- Sub-units chip row inside the drawer (no `+ Add` — see depth restriction below). Clicking a sub-unit chip pushes onto the drawer's internal stack (drawer-over-drawer recursion). Back button at the top of the header is labeled with the parent name when the stack is more than one deep ("← Back to {parentName}"); at the root it's a plain X close. The chip row hides entirely when there are no existing sub-units to display (avoids an orphaned "(0):" label).
 - "Open full page" link at the footer routes to the dedicated `/equipment/{id}` for the full surface (Photos, Filters, Service History, Components tabs).
-- `+ Add unit` (in the row chip row OR inside the drawer) opens `EquipmentFormDialog` with `lockedParent` set; the new sub-unit's `parentId` is set on create and it inherits the parent's `serviceLocationId` implicitly.
+- `+ Add unit` ONLY in the work-item row's primary equipment chip row — opens `EquipmentFormDialog` with `lockedParent` set; the new sub-unit's `parentId` is set on create and it inherits the parent's `serviceLocationId` implicitly. Not exposed inside the drawer because the drawer always views a sub-unit (depth 1+), and the product rule restricts the equipment hierarchy to 2 levels deep — adding from inside the drawer would create depth-2 records.
 
 Architecturally only ONE `SlideOver` is mounted at a time — content swaps based on top-of-stack rather than physically stacking dialogs. Visually the UX is identical and state stays simple.
 

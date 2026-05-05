@@ -16,7 +16,6 @@ import { Text } from './catalyst/text';
 import {
   ArrowTopRightOnSquareIcon,
   ChevronRightIcon,
-  PlusIcon,
 } from '@heroicons/react/24/outline';
 
 interface EquipmentQuickViewProps {
@@ -25,9 +24,6 @@ interface EquipmentQuickViewProps {
    *  drawer stack so the user can drill into nested components without
    *  losing the chain. */
   onSelectSubUnit: (subUnit: { id: string; name: string }) => void;
-  /** Click handler for the "+ Add" affordance on the sub-units row. Parent
-   *  opens EquipmentFormDialog with lockedParent set to this equipment. */
-  onAddSubUnit: (parent: { id: string; name: string }) => void;
 }
 
 /**
@@ -49,7 +45,6 @@ interface EquipmentQuickViewProps {
 export default function EquipmentQuickView({
   equipmentId,
   onSelectSubUnit,
-  onAddSubUnit,
 }: EquipmentQuickViewProps) {
   const { t } = useTranslation();
   const { getName } = useGlossary();
@@ -218,33 +213,33 @@ export default function EquipmentQuickView({
         </FieldGrid>
       </Section>
 
-      {/* Sub-units chip row. Always renders (even when empty) so the "+ Add"
-          affordance is discoverable — sub-unit creation happens ~100% in
-          this WO context per CSR workflow. */}
-      <Section
-        label={t('workOrders.workItems.subUnits', {
-          entities: getName('equipment_component', true),
-          count: directChildren.length,
-        })}
-      >
-        <div className="flex flex-wrap items-center gap-2">
-          {directChildren.map((sub) => (
-            <SubUnitChip
-              key={sub.id}
-              subUnit={sub}
-              onSelect={() => onSelectSubUnit({ id: sub.id, name: sub.name })}
-            />
-          ))}
-          <button
-            type="button"
-            onClick={() => onAddSubUnit({ id: equipment.id, name: equipment.name })}
-            className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs text-blue-600 ring-1 ring-inset ring-blue-200 hover:bg-blue-50 dark:text-blue-400 dark:ring-blue-900 dark:hover:bg-blue-950/30"
-          >
-            <PlusIcon className="size-3.5" />
-            {t('common.actions.add', { entity: getName('equipment_component') })}
-          </button>
-        </div>
-      </Section>
+      {/* Sub-units chip row. The drawer is opened from a sub-unit chip in
+          the WO row, so the equipment displayed here is itself a sub-unit
+          (depth 1 from the WO's primary equipment). The product rule
+          restricts the hierarchy to 2 levels deep, so we don't render the
+          "+ Add unit" affordance here — adding from the drawer would create
+          depth-2 records. The row hides entirely when there are no
+          existing sub-units to display (avoids an orphaned "(0):" label).
+          Existing sub-units, if any (e.g. legacy data), still render so
+          the user can navigate into them via drawer-over-drawer. */}
+      {directChildren.length > 0 && (
+        <Section
+          label={t('workOrders.workItems.subUnits', {
+            entities: getName('equipment_component', true),
+            count: directChildren.length,
+          })}
+        >
+          <div className="flex flex-wrap items-center gap-2">
+            {directChildren.map((sub) => (
+              <SubUnitChip
+                key={sub.id}
+                subUnit={sub}
+                onSelect={() => onSelectSubUnit({ id: sub.id, name: sub.name })}
+              />
+            ))}
+          </div>
+        </Section>
+      )}
 
       {/* Footer: explicit escape to the dedicated detail route for tabs and
           deeper editing surfaces (Photos, Filters, Service History,
@@ -301,7 +296,7 @@ function Section({ label, children }: SectionProps) {
 
 function FieldGrid({ children }: { children: React.ReactNode }) {
   return (
-    <dl className="grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1 text-sm">
+    <dl className="grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1 text-sm text-zinc-950 dark:text-white">
       {children}
     </dl>
   );

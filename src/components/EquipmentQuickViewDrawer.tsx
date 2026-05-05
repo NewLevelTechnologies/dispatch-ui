@@ -10,11 +10,6 @@ interface EquipmentQuickViewDrawerProps {
    *  null to close the drawer (parent owns the open/closed state). */
   initialEquipment: { id: string; name: string } | null;
   onClose: () => void;
-  /** Forwards "+ Add unit" clicks back to the parent so EquipmentFormDialog
-   *  state lives in one place (alongside the existing add-equipment-from-WO
-   *  flow). The parent locks the dialog to the supplied parent and links the
-   *  new equipment as its child on save. */
-  onAddSubUnit: (parent: { id: string; name: string }) => void;
 }
 
 /**
@@ -35,7 +30,6 @@ interface EquipmentQuickViewDrawerProps {
 export default function EquipmentQuickViewDrawer({
   initialEquipment,
   onClose,
-  onAddSubUnit,
 }: EquipmentQuickViewDrawerProps) {
   const { t } = useTranslation();
   const { getName } = useGlossary();
@@ -74,12 +68,6 @@ export default function EquipmentQuickViewDrawer({
     }
   };
 
-  // Forwarded to EquipmentQuickView's onAddSubUnit. Parent owns the dialog;
-  // the drawer just relays the click with the currently-displayed equipment
-  // as the parent context.
-  const handleAddSubUnitFromQuickView = (parent: { id: string; name: string }) => {
-    onAddSubUnit(parent);
-  };
 
   return (
     <SlideOver open={open} onClose={onClose} className="!max-w-[480px]">
@@ -117,7 +105,6 @@ export default function EquipmentQuickViewDrawer({
           <EquipmentQuickView
             equipmentId={top.id}
             onSelectSubUnit={handlePushSubUnit}
-            onAddSubUnit={handleAddSubUnitFromQuickView}
           />
         )}
       </div>
