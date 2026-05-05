@@ -381,4 +381,42 @@ describe('EquipmentFormDialog', () => {
     await user.click(screen.getByRole('button', { name: /cancel/i }));
     expect(onClose).toHaveBeenCalled();
   });
+
+  describe('lockedParent (sub-unit creation)', () => {
+    it('surfaces the parent in the title and sends parentId on create', async () => {
+      mockEquipmentCreate.mockResolvedValue({ id: 'new-sub' });
+      const onCreated = vi.fn();
+      const user = userEvent.setup();
+
+      renderWithProviders(
+        <EquipmentFormDialog
+          isOpen={true}
+          onClose={vi.fn()}
+          lockedServiceLocationId="sl-1"
+          lockedParent={{ id: 'parent-eq', name: 'Outdoor HVAC unit' }}
+          onCreated={onCreated}
+        />
+      );
+
+      await waitFor(() => expect(screen.getByRole('dialog')).toBeInTheDocument());
+
+      // Title surfaces the parent's name so the user knows the new equipment
+      // becomes a sub-unit of that parent.
+      expect(screen.getByText(/Outdoor HVAC unit/)).toBeInTheDocument();
+
+      await user.type(screen.getByLabelText(/^name/i), 'Blower');
+      await user.click(screen.getByRole('button', { name: /create/i }));
+
+      await waitFor(() => {
+        expect(mockEquipmentCreate).toHaveBeenCalledWith(
+          expect.objectContaining({
+            name: 'Blower',
+            serviceLocationId: 'sl-1',
+            parentId: 'parent-eq',
+          })
+        );
+      });
+      expect(onCreated).toHaveBeenCalledWith({ id: 'new-sub' });
+    });
+  });
 });

@@ -455,6 +455,7 @@
       "reorderQuantity": "Reorder Quantity",
       "serialNumber": "Serial Number",
       "serviceLocation": "Service Location",
+      "titleAddSubUnit": "Add {{entity}} to {{parent}}",
       "type": "Type",
       "unitCost": "Unit Cost",
       "warehouse": "Warehouse",
@@ -1226,6 +1227,7 @@
       "statusHeader": "Status"
     },
     "workItems": {
+      "backToEntity": "Back to {{entity}}",
       "changeStatus": "Change status (currently {{current}})",
       "collapseRow": "Hide details",
       "deleteConfirm": "Delete this {{entity, lowercase}}? This cannot be undone.",

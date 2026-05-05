@@ -46,6 +46,12 @@ export interface Equipment {
   // endpoint is the canonical mutation target. Sorted profile-first then by
   // sortOrder ascending.
   images?: EquipmentImage[];
+  // Direct children, populated only when the request opted in via
+  // includeDescendants=true (see equipmentApi.getById). Empty/absent when
+  // not opted in — default callers don't pay for the extra projection.
+  descendants?: Array<{ id: string; name: string; profileImageUrl?: string | null }>;
+  // Total direct-child count. Companion to descendants[]; same opt-in.
+  descendantCount?: number;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -166,8 +172,22 @@ export const equipmentApi = {
     return response.data;
   },
 
-  getById: async (id: string): Promise<Equipment> => {
-    const response = await apiClient.get<Equipment>(`/equipment/${id}`);
+  /**
+   * Fetch a single equipment record. By default the response is the lean
+   * shape — pass `{ includeDescendants: true }` to also project direct
+   * children (`descendants[]` + `descendantCount`) for chip-row rendering
+   * (e.g. the equipment quickview drawer). Default callers don't pay for
+   * the extra projection.
+   */
+  getById: async (
+    id: string,
+    options?: { includeDescendants?: boolean }
+  ): Promise<Equipment> => {
+    const params: Record<string, string> = {};
+    if (options?.includeDescendants) params.includeDescendants = 'true';
+    const response = await apiClient.get<Equipment>(`/equipment/${id}`, {
+      params,
+    });
     return response.data;
   },
 
