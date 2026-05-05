@@ -189,15 +189,22 @@ export default function EquipmentDetailPage() {
     enabled: !!id,
   });
 
-  const imageInvalidate = () => {
-    queryClient.invalidateQueries({ queryKey: ['equipment-images', id] });
+  // Invalidates every cache that could be holding a stale equipment summary
+  // for this id. Equipment data lives in three places: the equipment-side
+  // queries, the single-WO detail (`['work-orders', id]` carries
+  // workItems[].equipment), and the paginated lists used by Customer /
+  // ServiceLocation work-order tabs and the Equipment Service History tab
+  // (`['work-orders-list', ...]`).
+  const invalidateEquipmentRelatedCaches = () => {
     queryClient.invalidateQueries({ queryKey: ['equipment-detail', id] });
-    // List-view caches (equipment list, customer/location equipment tabs)
-    // also need refreshing — they show profile thumbnails sourced from
-    // EquipmentSummary.profileImageUrl. Same for work-order responses, which
-    // embed the equipment summary on each work item.
     queryClient.invalidateQueries({ queryKey: ['equipment'] });
     queryClient.invalidateQueries({ queryKey: ['work-orders'] });
+    queryClient.invalidateQueries({ queryKey: ['work-orders-list'] });
+  };
+
+  const imageInvalidate = () => {
+    queryClient.invalidateQueries({ queryKey: ['equipment-images', id] });
+    invalidateEquipmentRelatedCaches();
   };
 
   const setProfileImageMutation = useMutation({
@@ -247,8 +254,7 @@ export default function EquipmentDetailPage() {
   ) => {
     try {
       await equipmentApi.update(id!, { [field]: next } as UpdateEquipmentRequest);
-      queryClient.invalidateQueries({ queryKey: ['equipment-detail', id] });
-      queryClient.invalidateQueries({ queryKey: ['equipment'] });
+      invalidateEquipmentRelatedCaches();
     } catch (err) {
       const msg =
         err instanceof Error && 'response' in err
@@ -267,8 +273,7 @@ export default function EquipmentDetailPage() {
         equipmentTypeId: typeId || null,
         equipmentCategoryId: null,
       });
-      queryClient.invalidateQueries({ queryKey: ['equipment-detail', id] });
-      queryClient.invalidateQueries({ queryKey: ['equipment'] });
+      invalidateEquipmentRelatedCaches();
     } catch (err) {
       const msg =
         err instanceof Error && 'response' in err

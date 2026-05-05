@@ -133,11 +133,22 @@ export default function EquipmentFormDialog({
     enabled: isOpen && Boolean(formData.equipmentTypeId),
   });
 
+  // Equipment data lives in equipment-side queries AND embedded on
+  // workItems[].equipment in WO detail and list responses. Edits here must
+  // refresh both shapes or downstream surfaces (work item row expansion,
+  // service history) keep showing stale fields.
+  const invalidateEquipmentRelatedCaches = () => {
+    queryClient.invalidateQueries({ queryKey: ['equipment'] });
+    queryClient.invalidateQueries({ queryKey: ['equipment-detail'] });
+    queryClient.invalidateQueries({ queryKey: ['work-orders'] });
+    queryClient.invalidateQueries({ queryKey: ['work-orders-list'] });
+  };
+
   // ===== Mutations =====
   const createMutation = useMutation({
     mutationFn: (request: CreateEquipmentRequest) => equipmentApi.create(request),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['equipment'] });
+      invalidateEquipmentRelatedCaches();
       onClose();
     },
     onError: (error: unknown) => {
@@ -149,7 +160,7 @@ export default function EquipmentFormDialog({
     mutationFn: ({ id, data }: { id: string; data: UpdateEquipmentRequest }) =>
       equipmentApi.update(id, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['equipment'] });
+      invalidateEquipmentRelatedCaches();
       onClose();
     },
     onError: (error: unknown) => {

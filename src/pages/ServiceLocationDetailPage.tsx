@@ -100,6 +100,9 @@ export default function ServiceLocationDetailPage() {
     mutationFn: (equipmentId: string) => equipmentApi.delete(equipmentId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['equipment', { serviceLocationId: id }] });
+      // WO detail + list caches embed workItems[].equipment summaries.
+      queryClient.invalidateQueries({ queryKey: ['work-orders'] });
+      queryClient.invalidateQueries({ queryKey: ['work-orders-list'] });
     },
     onError: (err: unknown) => {
       const msg =
