@@ -4,6 +4,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import {
   equipmentApi,
+  EquipmentStatus,
   type StatusWorkflowRule,
   type UpdateEquipmentRequest,
   type WorkItemEquipmentSummary,
@@ -22,6 +23,7 @@ import {
   TableRow,
 } from './catalyst/table';
 import { Text } from './catalyst/text';
+import { Badge } from './catalyst/badge';
 import { Button } from './catalyst/button';
 import {
   Dropdown,
@@ -465,7 +467,7 @@ function EquipmentBlock({
         }
       />
 
-      {/* Identity row: thumbnail (48px) + name + type/category subline. */}
+      {/* Identity row: thumbnail (48px) + name + status pill + type/category subline. */}
       <div className="mt-1 flex items-start gap-3">
         <EquipmentThumbnail
           url={equipment.profileImageUrl}
@@ -474,21 +476,30 @@ function EquipmentBlock({
           fit="contain"
         />
         <div className="min-w-0 flex-1">
-          {readOnly ? (
-            <RouterLink
-              to={`/equipment/${equipment.id}`}
-              className="font-medium text-zinc-950 hover:text-blue-600 hover:underline dark:text-white dark:hover:text-blue-400"
-            >
-              {equipment.name}
-            </RouterLink>
-          ) : (
-            <EditableField
-              value={equipment.name}
-              onSave={(v) => saveField('name', v)}
-              ariaLabel={t('common.form.name')}
-              className="font-medium"
-            />
-          )}
+          <div className="flex flex-wrap items-center gap-2">
+            {readOnly ? (
+              <RouterLink
+                to={`/equipment/${equipment.id}`}
+                className="font-medium text-zinc-950 hover:text-blue-600 hover:underline dark:text-white dark:hover:text-blue-400"
+              >
+                {equipment.name}
+              </RouterLink>
+            ) : (
+              <EditableField
+                value={equipment.name}
+                onSave={(v) => saveField('name', v)}
+                ariaLabel={t('common.form.name')}
+                className="font-medium"
+              />
+            )}
+            {equipment.status && (
+              <EquipmentStatusPill
+                status={equipment.status}
+                readOnly={readOnly}
+                onSave={(next) => saveField('status', next)}
+              />
+            )}
+          </div>
           {typeCategoryLine && (
             <div className="text-xs text-zinc-500 dark:text-zinc-400">
               {typeCategoryLine}
@@ -497,9 +508,10 @@ function EquipmentBlock({
         </div>
       </div>
 
-      {/* Inline-edit grid of currently-projected fields. Make/Model/Serial/
-          Location-on-Site cover the day-to-day edits; deeper fields (asset
-          tag, install date, warranty, description) live behind "Edit all". */}
+      {/* Inline-edit grid. Make / Model on row 1, Serial / Asset Tag on
+          row 2 (both unique-identifier fields), Location on row 3. Deeper
+          fields (install date, warranty, description) live behind "Edit
+          all". */}
       <dl className="mt-2 grid grid-cols-1 gap-x-6 gap-y-1 text-sm sm:grid-cols-[max-content_1fr_max-content_1fr]">
         <FieldRow
           label={t('equipment.form.make')}
@@ -524,6 +536,14 @@ function EquipmentBlock({
           className="font-mono"
         />
         <FieldRow
+          label={t('equipment.form.assetTag')}
+          value={equipment.assetTag ?? ''}
+          onSave={(v) => saveField('assetTag', v || null)}
+          ariaLabel={t('equipment.form.assetTag')}
+          readOnly={readOnly}
+          className="font-mono"
+        />
+        <FieldRow
           label={t('equipment.form.locationOnSite')}
           value={equipment.locationOnSite ?? ''}
           onSave={(v) => saveField('locationOnSite', v || null)}
@@ -531,7 +551,116 @@ function EquipmentBlock({
           readOnly={readOnly}
         />
       </dl>
+
+      <SubUnitsRow
+        descendants={equipment.descendants}
+        descendantCount={equipment.descendantCount}
+        equipmentId={equipment.id}
+      />
     </section>
+  );
+}
+
+interface EquipmentStatusPillProps {
+  status: 'ACTIVE' | 'RETIRED';
+  readOnly: boolean;
+  onSave: (next: EquipmentStatus) => Promise<void>;
+}
+
+/**
+ * Status pill with click-to-edit and a confirm dialog on the consequential
+ * ACTIVE → RETIRED transition. Going back to ACTIVE doesn't prompt — un-
+ * retiring something a colleague mis-clicked should be one click. The
+ * confirm-cancel path throws so EditableField stays in edit mode; the user
+ * presses Esc to back out.
+ */
+function EquipmentStatusPill({ status, readOnly, onSave }: EquipmentStatusPillProps) {
+  const { t } = useTranslation();
+  const { getName } = useGlossary();
+  const renderBadge = (s: 'ACTIVE' | 'RETIRED') => (
+    <Badge color={s === EquipmentStatus.ACTIVE ? 'lime' : 'zinc'}>
+      {t(`equipment.status.${s.toLowerCase()}`)}
+    </Badge>
+  );
+
+  if (readOnly) {
+    return renderBadge(status);
+  }
+
+  const handleSave = async (nextRaw: string) => {
+    const next = nextRaw as EquipmentStatus;
+    if (next === EquipmentStatus.RETIRED && status === EquipmentStatus.ACTIVE) {
+      const ok = window.confirm(
+        t('workOrders.workItems.confirmRetire', { entity: getName('equipment') })
+      );
+      if (!ok) {
+        // Throw so EditableField keeps the dropdown open; user can pick
+        // another value or press Esc to revert.
+        throw new Error('cancelled');
+      }
+    }
+    await onSave(next);
+  };
+
+  return (
+    <EditableField
+      as="select"
+      value={status}
+      options={[
+        { value: EquipmentStatus.ACTIVE, label: t('equipment.status.active') },
+        { value: EquipmentStatus.RETIRED, label: t('equipment.status.retired') },
+      ]}
+      onSave={handleSave}
+      ariaLabel={t('common.form.status')}
+      renderDisplay={(v) => renderBadge(v as 'ACTIVE' | 'RETIRED')}
+    />
+  );
+}
+
+interface SubUnitsRowProps {
+  descendants?: Array<{ id: string; name: string }>;
+  descendantCount?: number;
+  equipmentId: string;
+}
+
+/**
+ * Renders direct sub-units (children) of the equipment as compact chips.
+ * Hides entirely when there are no descendants. When the backend truncates
+ * the list (descendantCount > descendants.length), a trailing "+N more"
+ * link routes to the equipment detail page where the full Components tab
+ * lives.
+ */
+function SubUnitsRow({ descendants, descendantCount, equipmentId }: SubUnitsRowProps) {
+  const { t } = useTranslation();
+  const { getName } = useGlossary();
+  if (!descendants || descendants.length === 0) return null;
+  const total = descendantCount ?? descendants.length;
+  const remainder = Math.max(0, total - descendants.length);
+
+  return (
+    <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
+      <span className="text-xs uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+        {t('workOrders.workItems.subUnits', { entities: getName('equipment_component', true), count: total })}
+      </span>
+      {descendants.map((d) => (
+        <RouterLink
+          key={d.id}
+          to={`/equipment/${d.id}`}
+          className="inline-flex items-center gap-1 rounded-full bg-zinc-100 px-2.5 py-0.5 text-xs text-zinc-700 ring-1 ring-inset ring-zinc-200 hover:bg-zinc-200 hover:text-blue-600 dark:bg-zinc-800 dark:text-zinc-200 dark:ring-zinc-700 dark:hover:bg-zinc-700 dark:hover:text-blue-400"
+        >
+          {d.name}
+          <ChevronRightIcon className="size-3" aria-hidden />
+        </RouterLink>
+      ))}
+      {remainder > 0 && (
+        <RouterLink
+          to={`/equipment/${equipmentId}`}
+          className="text-xs text-blue-600 hover:underline dark:text-blue-400"
+        >
+          {t('workOrders.workItems.subUnitsMore', { count: remainder })}
+        </RouterLink>
+      )}
+    </div>
   );
 }
 
