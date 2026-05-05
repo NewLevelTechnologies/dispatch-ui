@@ -439,7 +439,12 @@ export default function WorkOrderDetailPage() {
           {/* Action bar — buttons render to lock in the layout; functionality lands in
               later phases (work-item dialog phase 4, dispatch phase 6, notes phase 5,
               edit/overflow phase 4+). */}
-          <div className="mt-3 flex flex-wrap items-center gap-2">
+          {/* Tighten the action-bar buttons. Catalyst Button defaults to
+              ~36-40px tall (sm:py-1.5 + text-sm/6) which dominates the dense
+              page above the work-items table. The override drops vertical
+              padding and line-height so the row reads as a toolbar, not a
+              landing-page CTA strip. */}
+          <div className="mt-3 flex flex-wrap items-center gap-2 [&_button]:sm:py-1 [&_button]:sm:text-sm/5">
             <Button
               onClick={() => {
                 setEditingWorkItem(null);
