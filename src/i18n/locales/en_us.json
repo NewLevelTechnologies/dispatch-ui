@@ -1145,6 +1145,7 @@
       "created": "Created",
       "duplicate": "Duplicate",
       "eta": "ETA {{date}}",
+      "etaLabel": "ETA",
       "frozen": "Cancelled or archived — actions are disabled",
       "info": "{{entity}} Info",
       "lastUpdated": "Updated {{time}}",

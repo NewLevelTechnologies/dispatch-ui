@@ -49,6 +49,7 @@ import {
   CalendarIcon,
   CheckIcon,
   EllipsisHorizontalIcon,
+  EnvelopeIcon,
   MapPinIcon,
   PencilIcon,
   PhoneIcon,
@@ -387,7 +388,9 @@ export default function WorkOrderDetailPage() {
             </Button>
           </div>
 
-          {/* Row 1 — identity & state */}
+          {/* Row 1 — identity & state. Priority pill is now click-to-edit
+              (matches the work-item status pill pattern); the previous
+              row in the WO Info card is gone in this same change. */}
           <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
             <Heading className="!text-lg">{woDisplayNumber}</Heading>
             <Badge color={PROGRESS_COLORS[workOrder.progressCategory]}>
@@ -399,28 +402,84 @@ export default function WorkOrderDetailPage() {
             {isArchived && (
               <Badge color="zinc">{t('workOrders.actions.archived')}</Badge>
             )}
-            <Badge color={PRIORITY_COLORS[priority]}>
-              {t(`workOrders.priority.${PRIORITY_TRANSLATION_KEYS[priority]}`)}
-            </Badge>
+            {isCancelled || isArchived ? (
+              <Badge color={PRIORITY_COLORS[priority]}>
+                {t(`workOrders.priority.${PRIORITY_TRANSLATION_KEYS[priority]}`)}
+              </Badge>
+            ) : (
+              <EditableField
+                as="select"
+                value={priority}
+                options={(['LOW', 'NORMAL', 'HIGH', 'URGENT'] as WorkOrderPriority[]).map((p) => ({
+                  value: p,
+                  label: t(`workOrders.priority.${PRIORITY_TRANSLATION_KEYS[p]}`),
+                }))}
+                onSave={(v) => handleSaveWorkOrderField('priority', v as WorkOrderPriority)}
+                ariaLabel={t('workOrders.form.priority')}
+                renderDisplay={(v) => (
+                  <Badge color={PRIORITY_COLORS[v as WorkOrderPriority]}>
+                    {t(`workOrders.priority.${PRIORITY_TRANSLATION_KEYS[v as WorkOrderPriority]}`)}
+                  </Badge>
+                )}
+              />
+            )}
             <Text className="!text-sm !text-zinc-500">
               {t('workOrders.detail.lastUpdated', { time: formatRelativeTime(workOrder.updatedAt) })}
             </Text>
           </div>
 
-          {/* Row 2 — contact & schedule */}
-          <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-zinc-600 dark:text-zinc-400">
-            {customer && (
-              <CatLink
-                href={`/customers/${customer.id}`}
-                className="font-medium text-zinc-950 hover:underline dark:text-white"
-              >
-                {customer.name}
-              </CatLink>
+          {/* Row 2 — operational identity. Service location is the prime
+              identifier (where work happens), customer is the B2B context
+              (Tenant 2 Inc. owns Baba's Kitchen). For residential where
+              the location name is unset or matches the customer, we just
+              show the customer name and skip the secondary line. */}
+          <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+            {location?.locationName && location.locationName !== customer?.name ? (
+              <>
+                <CatLink
+                  href={`/service-locations/${location.id}`}
+                  className="font-medium text-zinc-950 hover:underline dark:text-white"
+                >
+                  {location.locationName}
+                </CatLink>
+                {customer && (
+                  <>
+                    <span className="text-zinc-400 dark:text-zinc-600">·</span>
+                    <CatLink
+                      href={`/customers/${customer.id}`}
+                      className="text-zinc-600 hover:underline dark:text-zinc-400"
+                    >
+                      {customer.name}
+                    </CatLink>
+                  </>
+                )}
+              </>
+            ) : (
+              customer && (
+                <CatLink
+                  href={`/customers/${customer.id}`}
+                  className="font-medium text-zinc-950 hover:underline dark:text-white"
+                >
+                  {customer.name}
+                </CatLink>
+              )
             )}
-            {customer?.phone && (
+          </div>
+
+          {/* Row 3 — contact & schedule. Phone falls back from the location
+              site contact (typical operational contact) to the customer
+              record. Email is location-only (customer email lives on the
+              customer page, not relevant for a service call). ETA is
+              click-to-edit; the previous Scheduled Date row in the WO Info
+              card is gone in this same change. */}
+          <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-zinc-600 dark:text-zinc-400">
+            {(location?.siteContactPhone || customer?.phone) && (
               <button
                 type="button"
-                onClick={() => handleCopy('phone', formatPhone(customer.phone) || customer.phone!)}
+                onClick={() => {
+                  const phone = location?.siteContactPhone || customer?.phone || '';
+                  handleCopy('phone', formatPhone(phone) || phone);
+                }}
                 className="inline-flex items-center gap-1 hover:text-zinc-950 dark:hover:text-white"
                 title={t('workOrders.detail.copyPhone')}
               >
@@ -429,8 +488,17 @@ export default function WorkOrderDetailPage() {
                 ) : (
                   <PhoneIcon className="size-4" />
                 )}
-                <span>{formatPhone(customer.phone)}</span>
+                <span>{formatPhone(location?.siteContactPhone || customer?.phone || '')}</span>
               </button>
+            )}
+            {location?.siteContactEmail && (
+              <a
+                href={`mailto:${location.siteContactEmail}`}
+                className="inline-flex items-center gap-1 hover:text-zinc-950 dark:hover:text-white"
+              >
+                <EnvelopeIcon className="size-4" />
+                <span>{location.siteContactEmail}</span>
+              </a>
             )}
             {addressLine && (
               <button
@@ -447,12 +515,20 @@ export default function WorkOrderDetailPage() {
                 <span>{addressLine}</span>
               </button>
             )}
-            {workOrder.scheduledDate && (
-              <span className="inline-flex items-center gap-1">
-                <CalendarIcon className="size-4" />
-                {t('workOrders.detail.eta', { date: formatDate(workOrder.scheduledDate) })}
-              </span>
-            )}
+            <span className="inline-flex items-center gap-1">
+              <CalendarIcon className="size-4" />
+              <span className="mr-1">{t('workOrders.detail.etaLabel')}</span>
+              {isCancelled || isArchived ? (
+                <span>{workOrder.scheduledDate ? formatDate(workOrder.scheduledDate) : '—'}</span>
+              ) : (
+                <EditableField
+                  value={workOrder.scheduledDate ?? ''}
+                  onSave={(v) => handleSaveWorkOrderField('scheduledDate', v || undefined)}
+                  ariaLabel={t('workOrders.form.scheduledDate')}
+                  renderDisplay={(v) => (v ? formatDate(v) : '—')}
+                />
+              )}
+            </span>
           </div>
 
           {/* Row 3 — money chips, hidden until phase 7 (financial detail
@@ -519,41 +595,19 @@ export default function WorkOrderDetailPage() {
             each column owns its scroll. */}
         <div className="p-4 lg:grid lg:grid-cols-[260px_1fr] lg:gap-6 lg:flex-1 lg:min-h-0 lg:overflow-hidden xl:grid-cols-[260px_1fr_360px]">
           <aside className="flex flex-col gap-6 lg:min-h-0 lg:overflow-y-auto">
-            {location && (
+            {/* Service Location card. Location name, address, and phone
+                live in the header now (operational identity belongs in the
+                most-glanceable surface). The card carries on-site contact
+                NAME — the one piece of unique data the header doesn't
+                already show — and renders only when that data is present.
+                Once gate codes / location notes ship as fields, they slot
+                in here. */}
+            {location?.siteContactName && (
               <Card title={getName('service_location')}>
-                <CatLink
-                  href={`/service-locations/${location.id}`}
-                  className="-m-1 block cursor-pointer rounded-md p-1 hover:bg-zinc-100 dark:hover:bg-white/5"
-                >
-                  {location.locationName && (
-                    <div className="font-medium text-zinc-950 dark:text-white">
-                      {location.locationName}
-                    </div>
-                  )}
-                  <div className="text-sm text-zinc-700 dark:text-zinc-300">
-                    {location.address.streetAddress}
-                  </div>
-                  <div className="text-sm text-zinc-700 dark:text-zinc-300">
-                    {`${location.address.city}, ${location.address.state} ${location.address.zipCode}`}
-                  </div>
-                </CatLink>
-
-                {(location.siteContactName || location.siteContactPhone) && (
-                  <DescriptionList className="mt-3">
-                    {location.siteContactName && (
-                      <>
-                        <DescriptionTerm>{t('common.form.siteContactName')}</DescriptionTerm>
-                        <DescriptionDetails>{location.siteContactName}</DescriptionDetails>
-                      </>
-                    )}
-                    {location.siteContactPhone && (
-                      <>
-                        <DescriptionTerm>{t('common.form.siteContactPhone')}</DescriptionTerm>
-                        <DescriptionDetails>{formatPhone(location.siteContactPhone)}</DescriptionDetails>
-                      </>
-                    )}
-                  </DescriptionList>
-                )}
+                <DescriptionList>
+                  <DescriptionTerm>{t('common.form.siteContactName')}</DescriptionTerm>
+                  <DescriptionDetails>{location.siteContactName}</DescriptionDetails>
+                </DescriptionList>
               </Card>
             )}
 
@@ -608,36 +662,11 @@ export default function WorkOrderDetailPage() {
                   />
                 </DescriptionDetails>
 
-                <DescriptionTerm>{t('workOrders.form.priority')}</DescriptionTerm>
-                <DescriptionDetails>
-                  <EditableField
-                    as="select"
-                    value={priority}
-                    options={(['LOW', 'NORMAL', 'HIGH', 'URGENT'] as WorkOrderPriority[]).map((p) => ({
-                      value: p,
-                      label: t(`workOrders.priority.${PRIORITY_TRANSLATION_KEYS[p]}`),
-                    }))}
-                    onSave={(v) => handleSaveWorkOrderField('priority', v as WorkOrderPriority)}
-                    disabled={isCancelled || isArchived}
-                    ariaLabel={t('workOrders.form.priority')}
-                    renderDisplay={(v) => (
-                      <Badge color={PRIORITY_COLORS[v as WorkOrderPriority]}>
-                        {t(`workOrders.priority.${PRIORITY_TRANSLATION_KEYS[v as WorkOrderPriority]}`)}
-                      </Badge>
-                    )}
-                  />
-                </DescriptionDetails>
-
-                <DescriptionTerm>{t('workOrders.form.scheduledDate')}</DescriptionTerm>
-                <DescriptionDetails>
-                  <EditableField
-                    value={workOrder.scheduledDate ?? ''}
-                    onSave={(v) => handleSaveWorkOrderField('scheduledDate', v || undefined)}
-                    disabled={isCancelled || isArchived}
-                    ariaLabel={t('workOrders.form.scheduledDate')}
-                    renderDisplay={(v) => (v ? formatDate(v) : '—')}
-                  />
-                </DescriptionDetails>
+                {/* Priority and Scheduled Date moved to the header — see
+                    Row 1 (priority pill) and Row 3 (ETA chip) above. The
+                    card row used to render them but the header is the
+                    glanceable surface and CSRs were seeing the same fact
+                    twice. Inline-edit lives in the header now. */}
 
                 {workOrder.completedDate && (
                   <>

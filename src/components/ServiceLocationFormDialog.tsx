@@ -188,6 +188,14 @@ export default function ServiceLocationFormDialog({ isOpen, onClose, serviceLoca
       if (serviceLocation) {
         queryClient.invalidateQueries({ queryKey: ['service-location', serviceLocation.id] });
       }
+      // WO detail responses embed serviceLocation (siteContactName /
+      // siteContactPhone / siteContactEmail / address). When the location
+      // is edited, every cached WO that references it is stale until
+      // these caches refetch — surfaces like the WO detail page header
+      // and the embedded WorkItemEquipmentSummary derive their contact
+      // info from the embedded shape.
+      queryClient.invalidateQueries({ queryKey: ['work-orders'] });
+      queryClient.invalidateQueries({ queryKey: ['work-orders-list'] });
       onClose();
     },
     onError: (error: unknown) => {

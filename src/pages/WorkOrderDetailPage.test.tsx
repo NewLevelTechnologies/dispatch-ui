@@ -302,8 +302,12 @@ describe('WorkOrderDetailPage', () => {
     await waitFor(() => {
       expect(screen.getByText('WO-00010')).toBeInTheDocument();
     });
+    // Phone now sources from location.siteContactPhone first (operational
+    // contact for the WO), falling back to customer.phone only when the
+    // location has no site contact set. Fixture has siteContactPhone:
+    // 5559876543 → formatted (555) 987-6543.
     expect(
-      screen.getByRole('button', { name: /\(555\) 123-4567/ })
+      screen.getByRole('button', { name: /\(555\) 987-6543/ })
     ).toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: /1942 LENOX RD NE/i })
