@@ -138,12 +138,21 @@ export default function WorkOrderDetailPage() {
   // invalidated equipment + work-order caches on its own; this PATCH is a
   // second mutation that sets workItem.equipmentId, then re-invalidates so
   // the row swaps from empty state to populated.
+  //
+  // We resend the existing description because the backend currently rejects
+  // an equipmentId-only PATCH with 400 (description-only PATCHes work fine —
+  // see handleSaveWorkItemDescription below — so this is an asymmetric
+  // validation quirk). WorkItemFormDialog hits the same shape and works for
+  // the same reason. Flagged as a backend follow-up.
   const handleEquipmentCreatedForWorkItem = async (created: Equipment) => {
     const wi = addEquipmentForWorkItem;
     setAddEquipmentForWorkItem(null);
     if (!wi || !id) return;
     try {
-      await workOrderApi.updateWorkItem(id, wi.id, { equipmentId: created.id });
+      await workOrderApi.updateWorkItem(id, wi.id, {
+        description: wi.description,
+        equipmentId: created.id,
+      });
       queryClient.invalidateQueries({ queryKey: ['work-orders'] });
       queryClient.invalidateQueries({ queryKey: ['work-orders-list'] });
       queryClient.invalidateQueries({ queryKey: ['work-order-activity', id] });
