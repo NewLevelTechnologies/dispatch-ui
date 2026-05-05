@@ -185,14 +185,21 @@ Collapses to icons (and expands on click) below 1280px (see §3.7).
 
 Dense Catalyst `Table` of work items with click-to-expand rows. **No tabs in this region. No financials strip below it.**
 
-- **Row content:** drag handle (when reorder is wired up — see §7) · status pill (inline-editable) · description (inline-editable) · equipment summary (single line, model/serial as text — no thumbnails) · `⋯` per-row menu.
-- **Expanded row** reveals (full-width below the row):
-  - Equipment detail with sub-units (text only — no thumbnails; thumbnails belong on the equipment profile page).
-  - Internal notes preview (last 2 entries).
-  - Files: count + last-added timestamp (no thumbnail grid; thumbnails are a tech/manager surface).
-  - Linked-entity chips: any quote/invoice/PO that references this work item (driven by the optional `InvoiceLineItem.workItemId` from §2.3, when present). Clicking a chip opens the financial detail drawer to that record.
-- **Default expansion state:** all rows collapsed. CSRs scan, then expand the one they're working on.
-- **Inline editing:** status pill (dropdown of allowed transitions), description (click-to-edit input), per-row delete via `⋯`.
+- **Columns:** chevron (expand toggle) · status pill (inline-editable) · description (inline-editable) · `⋯` per-row menu. *No "Last Updated" column* — it duplicated the WO header / activity rail timestamps and burned width that description needs more; the value lives in the muted footer at the bottom of the expansion now.
+- **Collapsed row content:** chevron + status pill + description text (which wraps) + a 32px equipment thumbnail (left of the description) when an equipment is linked. The equipment thumbnail is a CSR scan-id aid — without it the table reads as a wall of text. *(Earlier drafts of this doc forbade thumbnails; the live page reverses that call. See §4.)*
+- **Expanded row** is a sectioned detail block with subtle muted bg signaling "detail of the row above":
+  - **EQUIPMENT block** — first-class inline-edit surface, not a read-only summary. Most equipment writes happen in WO context, so the expansion treats equipment as an edit target.
+    - Section header: `EQUIPMENT` label + `[✎ Edit all]` + `[↗ Open page]` actions.
+    - Identity row: 48px thumbnail + equipment name + status pill (lime/zinc, inline-editable with confirm-on-RETIRED) + type · category subline.
+    - 2-col inline-edit grid: Make / Model · Serial / Location-on-Site · (Asset Tag when projected on the summary).
+    - Sub-units chip row when descendants exist: `Sub-units (3): [Compressor →] [Coil →] [Fan →]`. Each chip links to that sub-unit's detail page.
+    - Empty state when no equipment linked: section header + `+ Add Equipment` action that opens `EquipmentFormDialog` in CREATE mode with the WO's service location pre-locked. On save the new equipment auto-links to the work item via `EquipmentFormDialog.onCreated`.
+  - **PHOTOS sub-section** (nested under Equipment, not a peer): row of thumbnails + count + `[Manage →]` link. Hides when empty. Sourced from existing `equipmentImagesApi`.
+  - **EQUIPMENT NOTES sub-section** (nested, persistent service knowledge — *not* WO-scoped notes): muted helper text *"Saved with this equipment, not this work order"* under the heading so CSRs from legacy don't confuse this with WO conversation. Always renders with a `+ Add note` affordance even when empty (encourages capture). Needs a new `equipment_notes` sub-resource on the backend.
+  - **LINKED block** (peer-level, *outside* Equipment): chips for any Quote / Invoice / PO that references this work item. Driven by the optional `InvoiceLineItem.workItemId` from §2.3. Clicking a chip opens the financial detail drawer to that record.
+  - **Footer line** (outside any block): muted italic *"Updated 2d ago by Jamie"* — this is the work item's `updatedAt`, not the equipment's. Putting it inside Equipment would conflate two entities.
+- **Default expansion state:** all rows collapsed. Multiple rows may be expanded simultaneously (CSRs comparing two items). State is in-memory; resets on navigation.
+- **Inline editing:** status pill (dropdown of allowed transitions per workflow), description (click-to-edit textarea), every visible equipment field in the expansion (click-to-edit text via `EditableField`). Per-row delete via `⋯`. `readOnly` (cancelled/archived WO) suppresses Edit / Add / Delete.
 
 ### 3.4 Right rail (~360px)
 
@@ -252,10 +259,10 @@ The two-column layout assumes ≥1280px effective width. Below that:
 
 ### 3.8 Custom components (everything else maps to Catalyst)
 
-Two custom components are required — and only two. Build them once in `components/`; do not inline.
+Two custom components were planned. Status:
 
-1. **`ExpandableTableRow`** — Catalyst `Table` does not ship row expansion. A small wrapper that toggles a hidden detail row beneath each main row. Used for the work items table (§3.3) and reusable elsewhere.
-2. **`EditableField`** — generic click-to-edit field swapper. Renders a value as text; on click swaps to an input; saves on blur or Enter; reverts on Esc. Wraps any underlying input (text, number, select). Used everywhere inline editing is wired up (§3.6).
+1. **`ExpandableTableRow`** — *not extracted as a standalone component.* The expansion logic is currently inlined in `WorkItemsTable` (single consumer; extracting prematurely was YAGNI). Extract when a second consumer earns it. Pattern: track an expanded `Set<string>` of row ids in component state, render a chevron toggle in a leftmost cell, and emit a second `<TableRow>` with `colSpan` carrying the detail content when expanded.
+2. **`EditableField`** — *shipped.* Generic click-to-edit field swapper. Renders a value as text; on click swaps to an input; saves on blur or Enter; reverts on Esc. Wraps text, textarea, and select. Used everywhere inline editing is wired up (§3.6, the equipment block in §3.3, the left strip on the WO page, and the equipment detail page).
 
 Everything else — header layout, `DescriptionList`, money chips, action bar, drawer, dialogs, status pills, badges, dropdowns, table, filter chips, activity-stream rows — maps directly to Catalyst primitives or Headless UI components Catalyst already wraps.
 
@@ -269,7 +276,7 @@ Everything else — header layout, `DescriptionList`, money chips, action bar, d
 | **`History` tab** (proposed in critique) | Activity stream *is* the history | Activity rail (§3.4) |
 | **Three-column layout** (earlier draft) | Wastes ~340px when dispatches are quiet; legacy 2010s admin DNA | Two columns + activity rail (§3.3, §3.4) |
 | **Vertical work-item cards** (earlier draft) | 2–3 items per screen; CSRs need scan, not stack of mini-dashboards | Dense expandable Catalyst Table (§3.3) |
-| **Equipment thumbnails in work item rows** | CSR doesn't need photos; tech/manager surface | Model/serial as text; thumbnails on equipment profile page (later) |
+| ~~**Equipment thumbnails in work item rows**~~ | ~~CSR doesn't need photos; tech/manager surface~~ | ~~Model/serial as text; thumbnails on equipment profile page (later)~~ <br/> **Reversed 2026-05-04:** the live page shows a 32px thumbnail in collapsed rows (visual scan id) and a 48px thumbnail in the expansion (anchors the equipment block). CSRs *do* scan visually; the original anti-thumbnail call overcorrected against legacy. |
 | **Files thumbnail grid in work item rows** | CSR cares about "are there files?" + recency | Count + last-added timestamp |
 | **Maintenance Reports as a parallel entity** | A maintenance report is a *kind* of work item, not a separate thing | Work item template |
 | **Separate `Add PM Inspection` / `Add HVAC Inspection` / `Add Maintenance Report` buttons** (legacy) | Button clutter; not extensible across industries | One `+ Work Item` button → choose template |
@@ -286,20 +293,55 @@ Everything else — header layout, `DescriptionList`, money chips, action bar, d
 
 Each phase produces a working page that's better than the previous. We don't ship a page that requires phase 7 to be useful. The activity rail lands early because it's the highest-value surface; inline status edit lands in phase 2 because without it phase 2 is a placeholder, not a useful page.
 
-1. **Page skeleton** — sticky header (3 rows + action bar; click-to-copy phone behavior, money chips render values but the drawer doesn't exist yet so chip clicks no-op) + left strip with `DescriptionList` cards (Service Location, Order Info, Billing-if-different). Reachable from the WO list at `/work-orders/:id`. Header status pill renders read-only.
-2. **Work items dense table + inline status pill edit.** Catalyst `Table` rendered into the main canvas. Columns: status pill (inline-editable), description, last updated. **Inline status pill edits** wire up here on the header pill and on each row — smallest, highest-frequency inline op, makes phase 2 ship as a useful page rather than a placeholder. Empty state: "No work items on this work order."
+**Status as of 2026-05-04:** phases 1–5 shipped. Row expansion v2 shipped (with equipment as a first-class inline-edit surface, see §5a below). Phase 6 (Dispatch) and phase 7 (Financial drawer) not started. Several action-bar buttons (Edit WO, Print, Duplicate, Delete) still render disabled placeholders pending follow-up work.
 
-   **Row expansion is deferred.** The expanded-row content described in §3.3 (equipment detail, notes preview, files count, linked-entity chips) requires backend additions that don't exist today: equipment FK on `WorkItem`, per-work-item notes, files, and the optional `InvoiceLineItem.workItemId` from §2.3. Building the expand mechanism over an empty payload would be a half-finished implementation. The `ExpandableTableRow` custom component (§3.8) lands with the first content that needs it, not with phase 2. Drag-to-reorder (§7) and inline description edit (phase 5) are out of scope here.
-3. **Activity stream + pinned Active Dispatches widget + functional note composer** in the right rail. Merged feed (dispatches, status changes, notes, financial events) sourced from a new aggregating endpoint. Inline `+ note` composer at the top of the rail is **functional** (writes via `POST /work-orders/{id}/notes` against the new notes sub-resource). Pagination/virtualization in place from day one. `N` keyboard shortcut wires up here. **Responsive bottom-sheet behavior (§3.7) also ships here** — the activity rail is the first piece that wouldn't fit on a 1280px laptop; the bottom-sheet pattern needs to exist before users hit the wall.
+1. **Page skeleton** — sticky header (3 rows + action bar; click-to-copy phone behavior, money chips render values but the drawer doesn't exist yet so chip clicks no-op) + left strip with `DescriptionList` cards (Service Location, Order Info, Billing-if-different). Reachable from the WO list at `/work-orders/:id`. Header status pill renders read-only. ✅ shipped
+2. **Work items dense table + inline status pill edit.** Catalyst `Table` rendered into the main canvas. Columns: status pill (inline-editable), description, last updated. **Inline status pill edits** wire up here on the header pill and on each row — smallest, highest-frequency inline op, makes phase 2 ship as a useful page rather than a placeholder. Empty state: "No work items on this work order." ✅ shipped (Last Updated column subsequently dropped — moved into the row-expansion footer per §5a)
+3. **Activity stream + pinned Active Dispatches widget + functional note composer** in the right rail. Merged feed (dispatches, status changes, notes, financial events) sourced from a new aggregating endpoint. Inline `+ note` composer at the top of the rail is **functional** (writes via `POST /work-orders/{id}/notes` against the new notes sub-resource). Pagination/virtualization in place from day one. `N` keyboard shortcut wires up here. **Responsive bottom-sheet behavior (§3.7) also ships here** — the activity rail is the first piece that wouldn't fit on a 1280px laptop; the bottom-sheet pattern needs to exist before users hit the wall. ✅ shipped
 
    *Note creation lives here, not in phase 5, because the composer pattern (empty textarea + Save) is structurally different from `EditableField`'s click-swap-on-existing-value pattern. Bundling them just because both are write surfaces is a weak grouping when no implementation is shared.*
 
-4. **Work item create/edit dialog + `WorkOrder.description` → `WorkItem.description` migration.** Focused dialog with description, type, status, equipment typeahead (mirror `ServiceLocationPicker` pattern). WO create flow gains a "First work item description" field that creates WO + first work item atomically (or two sequential calls if the atomic-create endpoint in §7 is not yet resolved). The `WorkOrderFormDialog`'s `internalNotes` field is also removed here (notes are now a sub-resource — initial note creation, if any, is a separate `POST /work-orders/{id}/notes` call after the WO is created). `W` keyboard shortcut wires up here.
-5. **Inline edits on existing fields.** Click-to-edit for description / NTE / type / division / priority / work item description — `EditableField` custom component (§3.8) built here, then reused. `/` keyboard shortcut wires up here. *Note creation moved to phase 3 — phase 5 owns the click-to-edit-existing-value pattern only.*
-6. **Dispatch create flow + Active Dispatches widget interactivity.** `+ Dispatch` opens create dialog; widget primary actions (Check Out, etc.) wired up. `D` keyboard shortcut wires up here.
-7. **Financial detail drawer.** Header money chips become live; linked-entity chips on work-item rows become live. Drawer with `POs · Quotes · Invoices · Payments` internal tabs. Create dialogs open over the drawer per §3.5. `Esc` close-topmost shortcut formalized here (it can land earlier with whatever first introduces a drawer or dialog; phase 7 just makes it the canonical close behavior across all surfaces).
+4. **Work item create/edit dialog + `WorkOrder.description` → `WorkItem.description` migration.** Focused dialog with description, type, status, equipment typeahead (mirror `ServiceLocationPicker` pattern). WO create flow gains a "First work item description" field that creates WO + first work item atomically (or two sequential calls if the atomic-create endpoint in §7 is not yet resolved). The `WorkOrderFormDialog`'s `internalNotes` field is also removed here (notes are now a sub-resource — initial note creation, if any, is a separate `POST /work-orders/{id}/notes` call after the WO is created). `W` keyboard shortcut wires up here. ✅ shipped
+5. **Inline edits on existing fields.** Click-to-edit for description / NTE / type / division / priority / work item description — `EditableField` custom component (§3.8) built here, then reused. `/` keyboard shortcut wires up here. *Note creation moved to phase 3 — phase 5 owns the click-to-edit-existing-value pattern only.* ✅ shipped (NTE inline edit waits on backend `WorkOrder.notToExceed` field — not blocking)
+6. **Dispatch create flow + Active Dispatches widget interactivity.** `+ Dispatch` opens create dialog; widget primary actions (Check Out, etc.) wired up. `D` keyboard shortcut wires up here. ⏳ not started — `dispatchApi.create` already exists, no backend dependency.
+7. **Financial detail drawer.** Header money chips become live; linked-entity chips on work-item rows become live. Drawer with `POs · Quotes · Invoices · Payments` internal tabs. Create dialogs open over the drawer per §3.5. `Esc` close-topmost shortcut formalized here (it can land earlier with whatever first introduces a drawer or dialog; phase 7 just makes it the canonical close behavior across all surfaces). ⏳ not started — biggest remaining surface; warrants a dedicated scoping pass before code (invoice/quote/PO/payment create-form designs in particular). Money chip row currently hidden on the page until phase 7 starts populating real values.
 
 Each phase ships behind the same route — `/work-orders/:id` is wired up at phase 1 and progressively gains capability.
+
+### 5a. Phase 5b — Work-item row expansion (shipped 2026-05-04)
+
+Inserted between phase 5 and phase 6 once equipment FK on `WorkItem` shipped on the backend. Treats the expanded equipment block as a first-class edit surface, not a read-only summary, because most equipment writes happen in WO context.
+
+What shipped:
+
+- `ExpandableTableRow`-style toggle on each row (chevron at the leftmost column, rotates 90° on expand). Multiple rows can be expanded simultaneously. State is in-memory; resets on navigation.
+- 32px equipment thumbnail in the collapsed row's description cell (visual scan id).
+- Last Updated column dropped from the table; the value moved to a muted italic footer at the bottom of the expanded row, **outside the equipment block** (it's the work item's `updatedAt`, not the equipment's — nesting it inside EQUIPMENT conflated entities).
+- Equipment block in the expansion: section label + actions (`Edit all`, `Open page`) + 48px thumbnail + name + type/category subline + 2-col inline-edit grid (Make / Model · Serial / Location-on-Site).
+- `Edit all` opens `EquipmentFormDialog` for fields not in the visible grid (description, install date, warranty, etc.).
+- `Open page` links to the full equipment detail page (Photos, Filters, Service History, Components tabs).
+- Inline edits on every visible equipment field call `equipmentApi.update` and invalidate equipment + both work-order query prefixes (`['work-orders']`, `['work-orders-list']`) so the row, list views, and Equipment Service History all refresh in lockstep.
+- Empty state when no equipment is linked: section header + `+ Add Equipment` action that opens `EquipmentFormDialog` in CREATE mode with the WO's service location pre-locked. On create, the new equipment is automatically linked to the work item via `EquipmentFormDialog.onCreated`.
+- `readOnly` mode (cancelled/archived WO) renders fields as static text and suppresses Edit / Add / Delete actions.
+- Money chip row (header row 3) hidden until phase 7 (a row of `$ —` placeholders communicates nothing on a fresh WO and burns vertical real estate).
+
+What's deferred — slot in as their backends ship, no redesign needed:
+
+- **Status pill** (lime/zinc, inline-editable with confirm-on-RETIRED). Needs `status` on `WorkItemEquipmentSummary`. **Backend has projected this; UI follow-up pending.**
+- **Asset tag** in the inline grid. Needs `assetTag` on `WorkItemEquipmentSummary`. **Backend has projected this; UI follow-up pending.**
+- **Sub-unit chips** (with `descendantCount` truncation indicator). Needs `descendants[]` and `descendantCount` on `WorkItemEquipmentSummary`. **Backend has projected this; UI follow-up pending.**
+- **Equipment Photos sub-section** (nested inside the Equipment block, not a peer). Use existing `equipmentImagesApi` lazy-loaded on row expansion, OR project `recentPhotos[]` onto `WorkItemEquipmentSummary` to avoid the N+1. Hides when empty.
+- **Equipment Notes sub-section** (also nested, with helper text "Saved with this equipment, not this work order" so CSRs don't write WO-scoped content here). Always renders with `+ Add note` even when empty. **Needs new backend sub-resource: `POST/GET/DELETE /equipment/{id}/notes`** with body, author, timestamp. Same shape as legacy "Internal Notes."
+- **Linked-entity chips** (Quote/Invoice/PO chips on work item rows). Needs the optional `InvoiceLineItem.workItemId` from §2.3 — build only when per-work-item profitability reporting earns it.
+
+### 5c. Open follow-ups across the page
+
+Independent of the phase ordering — each is a small, separate branch.
+
+- **Edit WO button** in the header action bar (currently disabled). Wires `onClick` to open the existing `WorkOrderFormDialog`. One-line change once the dialog is verified to still match the page's data shape.
+- **Overflow menu** on the header (Print, Duplicate, Delete). All three currently render disabled; each needs its own scoping pass — Delete is the smallest (confirm + `workOrderApi.delete` + navigate back).
+- **NTE field** in left strip + header chip. Backend doesn't have `WorkOrder.notToExceed` yet; add it as a small backend ask alongside the financial drawer scoping (phase 7 reads from it).
+- **Money chip row reveal logic**: when phase 7 ships and chips have real values, reveal the row when at least one chip has a non-zero value; keep hidden on fresh WOs.
 
 ---
 
@@ -321,19 +363,23 @@ These do not block phase 1. Calling them out so we know they exist.
 2. **Drag-to-reorder work items.** Worth it now, or only when WOs routinely have 3+ items? Cheap to add later if not in phase 2.
 3. **Per-work-item profitability reporting** — depends on the future `InvoiceLineItem.workItemId`. Document the schema option but don't build the report.
 4. **Customer-facing technician portal / customer view of the WO.** Out of scope for this page; that's a separate read-only render.
-5. **Backend additions required before work-item row expansion ships.** The expanded-row content in §3.3 (equipment detail, notes preview, files, linked-entity chips) currently has no API support. Each piece needs its own backend work before it can render:
-   - Equipment FK on `WorkItem` (entity addition + endpoint).
-   - Per-work-item internal notes (new sub-resource; today notes are a single string on the WO).
-   - Files / attachments on work items (new domain — not in any existing service yet).
-   - `InvoiceLineItem.workItemId` (additive future-proofing called out in §2.3; build only when there's a use case).
+5. **Backend additions required before work-item row expansion ships.** *(Mostly resolved — see below for what's left.)*
 
-   These can be tackled independently and progressively populate the expansion. Phase 2 ships without expansion; expansion is added with each piece as it lands.
+   - ✅ Equipment FK on `WorkItem` — shipped.
+   - ✅ `WorkItemEquipmentSummary` projects `status`, `assetTag`, `parentName`, `descendants[]`, `descendantCount`, `profileImageUrl` — shipped (UI follow-up to wire status pill / asset tag / sub-units pending).
+   - ✅ `PATCH /work-orders/{woId}/work-items/{wiId}` accepts truly partial bodies (e.g. `{ equipmentId: "..." }` alone) — fixed 2026-05-04.
+   - ⏳ **Per-equipment internal notes** — new sub-resource needed: `POST /equipment/{id}/notes`, `GET /equipment/{id}/notes`, `DELETE /equipment/{id}/notes/{noteId}`. Body, author, timestamp. Same shape as legacy "Internal Notes." *Equipment-scoped per the realization that legacy "Notes" were equipment-attached service knowledge, not WO-scoped — see §5a above.*
+   - ⏳ **Files / attachments** — *no longer needed.* Realized that legacy "Files" were ~95% equipment photos; the existing `equipmentImagesApi` covers it. No parallel WI-files entity to build.
+   - ⏳ `InvoiceLineItem.workItemId` (optional future-proofing called out in §2.3; build only when per-work-item profitability reporting earns it).
 
 **Resolved (formerly open):**
 
 - *Audit log / activity feed* — addressed by the activity stream in §3.4. The merged feed (notes · dispatch events · status changes · financial events) *is* the audit log surface; no separate UI needed.
 - *`WorkItemType` enum re-evaluation* — decided: drop the enum entirely. Captured in §2.6.
-- *Atomic WO + first-work-item create endpoint* — backend change in flight (see backend instructions package).
+- *Atomic WO + first-work-item create endpoint* — backend change shipped.
+- *Equipment FK on `WorkItem`* — shipped, see above.
+- *Per-WI notes vs. equipment-scoped notes* — decided: equipment-scoped. Per-WI notes were never built and shouldn't be; activity rail covers WO-scoped conversation, equipment notes (when shipped) cover persistent service knowledge.
+- *Per-WI files* — decided: don't build. Use equipment photos.
 
 ---
 
