@@ -224,6 +224,8 @@
     "division": "Division",
     "divisions": "Divisions",
     "equipment": "Equipment",
+    "equipmentComponent": "Unit",
+    "equipmentComponents": "Units",
     "financial": "Financial",
     "inventory": "Inventory",
     "invoice": "Invoice",
@@ -347,13 +349,8 @@
     "descriptionEquipment": "Manage customer equipment, parts inventory, and warehouses",
     "descriptionParts": "Manage parts inventory across warehouses",
     "descriptionWarehouses": "Manage warehouse locations and inventory storage",
-    "components": {
-      "empty": "No components linked to this equipment yet.",
-      "errorLoading": "Failed to load components",
-      "loading": "Loading components…"
-    },
     "detail": {
-      "breadcrumbAriaLabel": "Equipment location",
+      "breadcrumbAriaLabel": "{{entity}} location",
       "created": "Created",
       "descriptionPlaceholder": "Add a description…",
       "identification": "Identification",
@@ -378,7 +375,7 @@
       "errorLoading": "Failed to load photos",
       "errorUpdate": "Failed to update photo",
       "fileRequired": "Choose a photo to upload.",
-      "limitReached": "This piece of equipment already has the maximum {{max}} photos.",
+      "limitReached": "This {{entity, lowercase}} already has the maximum {{max}} photos.",
       "loading": "Loading photos…",
       "newCaption": "New caption",
       "noFileChosen": "No file chosen",
@@ -433,10 +430,10 @@
     },
     "picker": {
       "clear": "Clear selection",
-      "createNew": "+ Create new equipment \"{{name}}\"",
-      "noResults": "No equipment found at this location.",
+      "createNew": "+ Create new {{entity, lowercase}} \"{{name}}\"",
+      "noResults": "No {{entity, lowercase}} found at this location.",
       "placeholder": "Search by name, serial, model…",
-      "quickCreateHint": "Other details (make, model, serial, install date) can be filled in later from the equipment page."
+      "quickCreateHint": "Other details (make, model, serial, install date) can be filled in later from the {{entity, lowercase}} page."
     },
     "form": {
       "assetTag": "Asset Tag",
@@ -466,10 +463,12 @@
     },
     "status": {
       "active": "Active",
+      "all": "All",
       "retired": "Retired"
     },
     "table": {
       "category": "Category",
+      "componentOf": "{{entity}} of {{parent}}",
       "customer": "Customer",
       "equipmentType": "Equipment Type",
       "lastServiced": "Last Serviced",
@@ -488,7 +487,6 @@
       "warehouse": "Warehouse"
     },
     "tabs": {
-      "components": "Components",
       "equipment": "Equipment",
       "filters": "Filters",
       "overview": "Overview",
@@ -1229,16 +1227,14 @@
     },
     "workItems": {
       "changeStatus": "Change status (currently {{current}})",
-      "deleteConfirm": "Delete this work item? This cannot be undone.",
-      "deleteError": "Failed to delete work item",
+      "deleteConfirm": "Delete this {{entity, lowercase}}? This cannot be undone.",
       "descriptionRequired": "Description is required",
       "editDescription": "Edit description",
-      "empty": "No work items on this {{entity, lowercase}} yet.",
+      "empty": "No {{children, lowercase}} on this {{entity, lowercase}} yet.",
       "frozenHelper": "This {{entity, lowercase}} is cancelled — item statuses are read-only.",
       "lastUpdated": "Last updated",
       "qtyHeader": "Qty",
       "statusUpdateError": "Failed to update item status",
-      "title": "Work Items",
       "totalHeader": "Total",
       "unitHeader": "Unit"
     }

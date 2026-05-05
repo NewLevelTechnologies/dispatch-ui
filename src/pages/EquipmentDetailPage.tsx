@@ -319,7 +319,7 @@ export default function EquipmentDetailPage() {
     },
     {
       id: 'components',
-      label: t('equipment.tabs.components'),
+      label: getName('equipment_component', true),
       count: descendants.length,
     },
   ];
@@ -415,7 +415,7 @@ export default function EquipmentDetailPage() {
         {/* Breadcrumb: location › parent (if component). Heading below carries the
             current item, per breadcrumb-omits-self convention. */}
         <nav
-          aria-label={t('equipment.detail.breadcrumbAriaLabel')}
+          aria-label={t('equipment.detail.breadcrumbAriaLabel', { entity: getName('equipment') })}
           className="mb-2 flex flex-wrap items-center gap-x-1.5 text-xs text-zinc-500 dark:text-zinc-400"
         >
           <RouterLink
@@ -647,6 +647,7 @@ export default function EquipmentDetailPage() {
                   title={
                     imageLimitReached
                       ? t('equipment.images.limitReached', {
+                          entity: getName('equipment'),
                           max: EQUIPMENT_IMAGE_MAX_PER_EQUIPMENT,
                         })
                       : undefined
@@ -922,12 +923,13 @@ function ComponentsTree({
   error,
 }: ComponentsTreeProps) {
   const { t } = useTranslation();
+  const { getName } = useGlossary();
 
   if (loading) {
     return (
       <div className="rounded-lg border border-zinc-200 p-6 text-center dark:border-zinc-800">
         <Text className="text-zinc-500 dark:text-zinc-400">
-          {t('equipment.components.loading')}
+          {t('common.actions.loading', { entities: getName('equipment_component', true) })}
         </Text>
       </div>
     );
@@ -937,7 +939,7 @@ function ComponentsTree({
     return (
       <div className="rounded-lg bg-red-50 p-3 ring-1 ring-red-200 dark:bg-red-950/10 dark:ring-red-900/20">
         <Text className="text-sm text-red-800 dark:text-red-400">
-          {t('equipment.components.errorLoading')}: {error.message}
+          {t('common.actions.errorLoading', { entities: getName('equipment_component', true) })}: {error.message}
         </Text>
       </div>
     );
@@ -954,7 +956,7 @@ function ComponentsTree({
     return (
       <div className="rounded-lg border border-dashed border-zinc-300 p-6 text-center dark:border-zinc-700">
         <Text className="text-zinc-600 dark:text-zinc-400">
-          {t('equipment.components.empty')}
+          {t('common.actions.noEntitiesYet', { entities: getName('equipment_component', true) })}
         </Text>
       </div>
     );

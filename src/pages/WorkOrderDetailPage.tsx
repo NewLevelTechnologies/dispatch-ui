@@ -122,12 +122,12 @@ export default function WorkOrderDetailPage() {
         err instanceof Error && 'response' in err
           ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
           : undefined;
-      alert(msg || t('workOrders.workItems.deleteError'));
+      alert(msg || t('common.form.errorDelete', { entity: getName('work_item') }));
     },
   });
 
   const handleDeleteWorkItem = (wi: WorkItemResponse) => {
-    if (!window.confirm(t('workOrders.workItems.deleteConfirm'))) return;
+    if (!window.confirm(t('workOrders.workItems.deleteConfirm', { entity: getName('work_item') }))) return;
     deleteWorkItemMutation.mutate({ workItemId: wi.id });
   };
 

@@ -180,7 +180,7 @@ export default function EquipmentPicker({
 
             {!isFetching && results.length === 0 && (
               <div className="p-3 text-sm text-zinc-600 dark:text-zinc-400">
-                {t('equipment.picker.noResults')}
+                {t('equipment.picker.noResults', { entity: getName('equipment', true) })}
               </div>
             )}
 
@@ -191,7 +191,10 @@ export default function EquipmentPicker({
                 onClick={handleOpenQuickCreate}
                 className="block w-full border-t border-zinc-200 px-3 py-2 text-left text-sm text-blue-600 hover:bg-blue-50 dark:border-zinc-800 dark:text-blue-400 dark:hover:bg-blue-950/30"
               >
-                {t('equipment.picker.createNew', { name: trimmedQuery })}
+                {t('equipment.picker.createNew', {
+                  entity: getName('equipment'),
+                  name: trimmedQuery,
+                })}
               </button>
             )}
           </div>
@@ -320,7 +323,7 @@ function EquipmentQuickCreateDialog({
             />
           </Field>
           <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
-            {t('equipment.picker.quickCreateHint')}
+            {t('equipment.picker.quickCreateHint', { entity: getName('equipment') })}
           </p>
         </DialogBody>
         <DialogActions>

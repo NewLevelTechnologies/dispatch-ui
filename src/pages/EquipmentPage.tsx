@@ -37,7 +37,9 @@ export default function EquipmentPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState<string>('');
   const [categoryFilter, setCategoryFilter] = useState<string>('');
-  const [statusFilter, setStatusFilter] = useState<EquipmentStatus>(EquipmentStatus.ACTIVE);
+  // Empty string = "All" (both ACTIVE and RETIRED). Default lands on ACTIVE so
+  // retired equipment doesn't crowd the day-to-day view.
+  const [statusFilter, setStatusFilter] = useState<EquipmentStatus | ''>(EquipmentStatus.ACTIVE);
   const [page, setPage] = useState(0); // 0-indexed
   const [sortBy] = useState<EquipmentSortField>('name');
   const [sortDir] = useState<EquipmentSortDirection>('asc');
@@ -67,7 +69,7 @@ export default function EquipmentPage() {
         search: deferredSearch || undefined,
         equipmentTypeId: typeFilter || undefined,
         equipmentCategoryId: categoryFilter || undefined,
-        status: statusFilter,
+        status: statusFilter || undefined,
         page,
         size: PAGE_SIZE,
         sortBy,
@@ -111,12 +113,13 @@ export default function EquipmentPage() {
     }
   };
 
-  const getStatusBadge = (status: EquipmentStatus) => {
-    return status === EquipmentStatus.ACTIVE ? (
-      <Badge color="lime">{t('equipment.status.active')}</Badge>
-    ) : (
-      <Badge color="zinc">{t('equipment.status.retired')}</Badge>
-    );
+  const getStatusBadge = (status: EquipmentStatus | undefined) => {
+    if (status === EquipmentStatus.RETIRED) {
+      return <Badge color="zinc">{t('equipment.status.retired')}</Badge>;
+    }
+    // Default to active when the backend omits status (older payloads). Most
+    // equipment is active, so this avoids a misleading "Retired" badge.
+    return <Badge color="lime">{t('equipment.status.active')}</Badge>;
   };
 
   const formatTypeCategory = (item: EquipmentSummary) => {
@@ -204,13 +207,15 @@ export default function EquipmentPage() {
         <Select
           value={statusFilter}
           onChange={(e) => {
-            setStatusFilter(e.target.value as EquipmentStatus);
+            setStatusFilter(e.target.value as EquipmentStatus | '');
             setPage(0);
           }}
           className="max-w-36"
+          aria-label={t('common.form.status')}
         >
           <option value={EquipmentStatus.ACTIVE}>{t('equipment.status.active')}</option>
           <option value={EquipmentStatus.RETIRED}>{t('equipment.status.retired')}</option>
+          <option value="">{t('equipment.status.all')}</option>
         </Select>
 
         {totalElements > 0 && (
@@ -265,18 +270,38 @@ export default function EquipmentPage() {
               {equipment.map((item) => (
                 <TableRow key={item.id}>
                   <TableCell className="font-medium">
-                    <RouterLink
-                      to={`/equipment/${item.id}`}
-                      className="flex items-center gap-2 text-zinc-700 hover:text-blue-600 hover:underline dark:text-zinc-300 dark:hover:text-blue-400"
-                    >
-                      <EquipmentThumbnail
-                        url={item.profileImageUrl}
-                        name={item.name}
-                        sizeClass="size-12"
-                        fit="contain"
-                      />
-                      <span>{item.name}</span>
-                    </RouterLink>
+                    <div className="flex items-center gap-2">
+                      <RouterLink
+                        to={`/equipment/${item.id}`}
+                        className="text-zinc-700 hover:text-blue-600 hover:underline dark:text-zinc-300 dark:hover:text-blue-400"
+                      >
+                        <EquipmentThumbnail
+                          url={item.profileImageUrl}
+                          name={item.name}
+                          sizeClass="size-12"
+                          fit="contain"
+                        />
+                      </RouterLink>
+                      <div className="flex min-w-0 flex-col">
+                        <RouterLink
+                          to={`/equipment/${item.id}`}
+                          className="truncate text-zinc-700 hover:text-blue-600 hover:underline dark:text-zinc-300 dark:hover:text-blue-400"
+                        >
+                          {item.name}
+                        </RouterLink>
+                        {item.parentId && item.parentName && (
+                          <RouterLink
+                            to={`/equipment/${item.parentId}`}
+                            className="truncate text-xs text-zinc-500 hover:text-blue-600 hover:underline dark:text-zinc-500 dark:hover:text-blue-400"
+                          >
+                            {t('equipment.table.componentOf', {
+                              entity: getName('equipment_component'),
+                              parent: item.parentName,
+                            })}
+                          </RouterLink>
+                        )}
+                      </div>
+                    </div>
                   </TableCell>
                   <TableCell>
                     {item.serviceLocationId ? (
@@ -302,7 +327,7 @@ export default function EquipmentPage() {
                   <TableCell>{formatMakeModel(item)}</TableCell>
                   <TableCell>{item.serialNumber || '-'}</TableCell>
                   <TableCell>{item.locationOnSite || '-'}</TableCell>
-                  <TableCell>{getStatusBadge(statusFilter)}</TableCell>
+                  <TableCell>{getStatusBadge(item.status)}</TableCell>
                   <TableCell>
                     <div className="-mx-3 -my-1.5 sm:-mx-2.5">
                       <Dropdown>
