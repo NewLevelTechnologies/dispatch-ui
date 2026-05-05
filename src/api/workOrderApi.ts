@@ -174,6 +174,10 @@ export interface CreateWorkOrderRequest {
 
 // `status` is no longer updatable. Use /cancel for cancellation; progress is derived.
 export interface UpdateWorkOrderRequest {
+  // Reassigns the work order to a different service location. Cross-customer
+  // moves are allowed — backend updates customerId implicitly to match the
+  // target location's customer.
+  serviceLocationId?: string;
   workOrderTypeId?: string | null;
   divisionId?: string | null;
   priority?: WorkOrderPriority;

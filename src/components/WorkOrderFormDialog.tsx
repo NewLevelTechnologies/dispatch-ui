@@ -295,6 +295,14 @@ export default function WorkOrderFormDialog({ isOpen, onClose, workOrder, prefil
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['work-orders'] });
       queryClient.invalidateQueries({ queryKey: ['work-order', effective?.id] });
+      // Paginated list views (customer / service-location / equipment-
+      // service-history tabs) keyed under work-orders-list. A WO that just
+      // moved between locations / customers has to disappear from one
+      // filtered list and appear in another.
+      queryClient.invalidateQueries({ queryKey: ['work-orders-list'] });
+      // Activity rail picks up the WORK_ORDER_UPDATED event the backend emits
+      // for the change.
+      queryClient.invalidateQueries({ queryKey: ['work-order-activity', effective?.id] });
       onClose();
     },
     onError: (error: unknown) => {
@@ -336,6 +344,13 @@ export default function WorkOrderFormDialog({ isOpen, onClose, workOrder, prefil
 
     if (isEdit) {
       const updateRequest: UpdateWorkOrderRequest = {
+        // Service location is editable in edit mode; cross-customer moves
+        // are allowed. The picker is required, so this should always be
+        // present, but guard against the edge case so we never PATCH an
+        // empty string.
+        ...(formData.serviceLocationId
+          ? { serviceLocationId: formData.serviceLocationId }
+          : {}),
         workOrderTypeId: formData.workOrderTypeId || null,
         divisionId: formData.divisionId || null,
         priority: formData.priority,

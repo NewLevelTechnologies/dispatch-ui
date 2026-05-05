@@ -339,9 +339,12 @@ describe('WorkOrderFormDialog', () => {
 
       // Update payload contains only editable fields.
       // status / description / internalNotes are NOT part of the contract anymore.
+      // serviceLocationId IS now editable (cross-customer reassignment is in
+      // scope) — confirm it's carried through on the patch.
       await waitFor(() => {
         expect(apiClient.patch).toHaveBeenCalledWith('/work-orders/1', expect.objectContaining({
           priority: 'HIGH',
+          serviceLocationId: 'location-1',
         }));
       });
       const patchCall = vi.mocked(apiClient.patch).mock.calls[0][1] as Record<string, unknown>;
