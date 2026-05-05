@@ -85,6 +85,11 @@ export default function EquipmentPage() {
     mutationFn: (id: string) => equipmentApi.delete(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['equipment'] });
+      // Equipment summaries are embedded on workItems[].equipment in WO
+      // detail and list responses — refresh both so deleted equipment
+      // disappears from row expansions / service history.
+      queryClient.invalidateQueries({ queryKey: ['work-orders'] });
+      queryClient.invalidateQueries({ queryKey: ['work-orders-list'] });
     },
     onError: (err: unknown) => {
       const msg =

@@ -511,7 +511,8 @@ describe('EquipmentDetailPage', () => {
       expect(screen.getByText('20 × 25 × 1')).toBeInTheDocument();
     });
 
-    await user.click(screen.getByRole('button', { name: /more options/i }));
+    // Header carries its own overflow (Delete equipment); row-level menu is the second match.
+    await user.click(screen.getAllByRole('button', { name: /more options/i })[1]);
     const deleteItem = await screen.findByRole('menuitem', { name: /delete/i });
     await user.click(deleteItem);
 
@@ -675,7 +676,8 @@ describe('EquipmentDetailPage', () => {
     await user.click(screen.getByRole('button', { name: /^filters/i }));
 
     await waitFor(() => expect(screen.getByText('16 × 20 × 1')).toBeInTheDocument());
-    await user.click(screen.getByRole('button', { name: /more options/i }));
+    // Header carries its own overflow (Delete equipment); row-level menu is the second match.
+    await user.click(screen.getAllByRole('button', { name: /more options/i })[1]);
     const editItem = await screen.findByRole('menuitem', { name: /edit/i });
     await user.click(editItem);
 
@@ -715,7 +717,8 @@ describe('EquipmentDetailPage', () => {
     await user.click(screen.getByRole('button', { name: /^filters/i }));
     await waitFor(() => expect(screen.getByText('20 × 25 × 1')).toBeInTheDocument());
 
-    await user.click(screen.getByRole('button', { name: /more options/i }));
+    // Header carries its own overflow (Delete equipment); row-level menu is the second match.
+    await user.click(screen.getAllByRole('button', { name: /more options/i })[1]);
     const deleteItem = await screen.findByRole('menuitem', { name: /delete/i });
     await user.click(deleteItem);
 
@@ -871,8 +874,9 @@ describe('EquipmentDetailPage', () => {
     });
     await user.click(screen.getByRole('button', { name: /^photos/i }));
 
+    // Header overflow appears first; the photo row's overflow is at index 1.
     const moreButtons = await screen.findAllByRole('button', { name: /more options/i });
-    await user.click(moreButtons[0]);
+    await user.click(moreButtons[1]);
     const deleteItem = await screen.findByRole('menuitem', { name: /delete/i });
     await user.click(deleteItem);
 
@@ -924,5 +928,46 @@ describe('EquipmentDetailPage', () => {
     expect(screen.queryByRole('textbox', { name: /^make$/i })).toBeInTheDocument();
 
     alertSpy.mockRestore();
+  });
+
+  it('opens the edit dialog from the header Edit button', async () => {
+    mockGetById.mockResolvedValue(baseEquipment);
+    const user = userEvent.setup();
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Upstairs Furnace' })).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole('button', { name: /^edit$/i }));
+    // EquipmentFormDialog renders a dialog when isOpen is true.
+    expect(await screen.findByRole('dialog')).toBeInTheDocument();
+  });
+
+  it('deletes the equipment from the header overflow and navigates back', async () => {
+    mockGetById.mockResolvedValue(baseEquipment);
+    const mockDelete = vi.fn().mockResolvedValue(undefined);
+    // Reach into the equipmentApi mock to wire the delete method for this test.
+    const equipmentApi = (await import('../api/equipmentApi')).equipmentApi;
+    (equipmentApi as unknown as { delete: typeof mockDelete }).delete = mockDelete;
+
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const user = userEvent.setup();
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Upstairs Furnace' })).toBeInTheDocument();
+    });
+
+    // Header overflow is the first ⋯ button on the page (no row-level overflow
+    // visible on the default Overview tab).
+    await user.click(screen.getAllByRole('button', { name: /more options/i })[0]);
+    const deleteItem = await screen.findByRole('menuitem', { name: /delete/i });
+    await user.click(deleteItem);
+
+    await waitFor(() => {
+      expect(mockDelete).toHaveBeenCalledWith('eq-1');
+    });
+    confirmSpy.mockRestore();
   });
 });

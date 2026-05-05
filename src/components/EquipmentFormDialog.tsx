@@ -35,6 +35,13 @@ interface EquipmentFormDialogProps {
    * customer detail page where the customer is implicit.
    */
   lockedCustomer?: { id: string; name: string } | null;
+  /**
+   * Fired after a successful create with the newly-created Equipment record.
+   * Lets callers chain a follow-up mutation (e.g. linking the new equipment
+   * to a work item) without losing the freshly-returned id. Not invoked on
+   * update — listeners that need post-edit hooks should re-fetch instead.
+   */
+  onCreated?: (equipment: Equipment) => void;
 }
 
 interface FormState {
@@ -77,6 +84,7 @@ export default function EquipmentFormDialog({
   equipment,
   lockedServiceLocationId,
   lockedCustomer,
+  onCreated,
 }: EquipmentFormDialogProps) {
   const queryClient = useQueryClient();
   const { t } = useTranslation();
@@ -133,11 +141,23 @@ export default function EquipmentFormDialog({
     enabled: isOpen && Boolean(formData.equipmentTypeId),
   });
 
+  // Equipment data lives in equipment-side queries AND embedded on
+  // workItems[].equipment in WO detail and list responses. Edits here must
+  // refresh both shapes or downstream surfaces (work item row expansion,
+  // service history) keep showing stale fields.
+  const invalidateEquipmentRelatedCaches = () => {
+    queryClient.invalidateQueries({ queryKey: ['equipment'] });
+    queryClient.invalidateQueries({ queryKey: ['equipment-detail'] });
+    queryClient.invalidateQueries({ queryKey: ['work-orders'] });
+    queryClient.invalidateQueries({ queryKey: ['work-orders-list'] });
+  };
+
   // ===== Mutations =====
   const createMutation = useMutation({
     mutationFn: (request: CreateEquipmentRequest) => equipmentApi.create(request),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['equipment'] });
+    onSuccess: (created) => {
+      invalidateEquipmentRelatedCaches();
+      onCreated?.(created);
       onClose();
     },
     onError: (error: unknown) => {
@@ -149,7 +169,7 @@ export default function EquipmentFormDialog({
     mutationFn: ({ id, data }: { id: string; data: UpdateEquipmentRequest }) =>
       equipmentApi.update(id, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['equipment'] });
+      invalidateEquipmentRelatedCaches();
       onClose();
     },
     onError: (error: unknown) => {
