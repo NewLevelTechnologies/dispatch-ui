@@ -281,10 +281,11 @@ describe('EquipmentDetailPage', () => {
     await waitFor(() => {
       expect(screen.getByRole('heading', { name: 'Upstairs Furnace' })).toBeInTheDocument();
     });
-    await user.click(screen.getByRole('button', { name: /^components/i }));
+    // Default glossary maps equipment_component → "Units" (plural).
+    await user.click(screen.getByRole('button', { name: /^units/i }));
 
     await waitFor(() => {
-      expect(screen.getByText(/no components linked/i)).toBeInTheDocument();
+      expect(screen.getByText(/no units yet/i)).toBeInTheDocument();
     });
   });
 
@@ -333,8 +334,9 @@ describe('EquipmentDetailPage', () => {
       expect(screen.getByRole('heading', { name: 'Upstairs Furnace' })).toBeInTheDocument();
     });
 
-    // Tab badge reflects total descendant count.
-    const componentsTab = await screen.findByRole('button', { name: /^components\s*3$/i });
+    // Tab badge reflects total descendant count. Tab label uses the glossary
+    // entity name; default for equipment_component is "Units".
+    const componentsTab = await screen.findByRole('button', { name: /^units\s*3$/i });
     await user.click(componentsTab);
 
     await waitFor(() => {
@@ -353,10 +355,10 @@ describe('EquipmentDetailPage', () => {
     await waitFor(() => {
       expect(screen.getByRole('heading', { name: 'Upstairs Furnace' })).toBeInTheDocument();
     });
-    await user.click(screen.getByRole('button', { name: /^components/i }));
+    await user.click(screen.getByRole('button', { name: /^units/i }));
 
     await waitFor(() => {
-      expect(screen.getByText(/failed to load components/i)).toBeInTheDocument();
+      expect(screen.getByText(/error loading units/i)).toBeInTheDocument();
     });
   });
 

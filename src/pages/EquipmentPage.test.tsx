@@ -426,16 +426,17 @@ describe('EquipmentPage', () => {
     );
     renderWithProviders(<EquipmentPage />);
 
-    const hint = await screen.findByRole('link', { name: /component of hvac system 01/i });
+    // Default glossary maps equipment_component → "Unit", so the hint reads "Unit of {parent}".
+    const hint = await screen.findByRole('link', { name: /unit of hvac system 01/i });
     expect(hint).toHaveAttribute('href', '/equipment/parent-1');
   });
 
   it('does not render the component hint for top-level equipment', async () => {
-    mockEquipmentList.mockResolvedValue(page([summary('1', 'Standalone Unit')]));
+    mockEquipmentList.mockResolvedValue(page([summary('1', 'Standalone Furnace')]));
     renderWithProviders(<EquipmentPage />);
 
-    await waitFor(() => expect(screen.getByText('Standalone Unit')).toBeInTheDocument());
-    expect(screen.queryByText(/component of/i)).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText('Standalone Furnace')).toBeInTheDocument());
+    expect(screen.queryByText(/unit of/i)).not.toBeInTheDocument();
   });
 
   it('paginates with previous and next buttons', async () => {

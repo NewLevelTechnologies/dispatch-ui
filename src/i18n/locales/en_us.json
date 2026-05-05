@@ -224,6 +224,8 @@
     "division": "Division",
     "divisions": "Divisions",
     "equipment": "Equipment",
+    "equipmentComponent": "Unit",
+    "equipmentComponents": "Units",
     "financial": "Financial",
     "inventory": "Inventory",
     "invoice": "Invoice",
@@ -347,11 +349,6 @@
     "descriptionEquipment": "Manage customer equipment, parts inventory, and warehouses",
     "descriptionParts": "Manage parts inventory across warehouses",
     "descriptionWarehouses": "Manage warehouse locations and inventory storage",
-    "components": {
-      "empty": "No components linked to this equipment yet.",
-      "errorLoading": "Failed to load components",
-      "loading": "Loading components…"
-    },
     "detail": {
       "breadcrumbAriaLabel": "Equipment location",
       "created": "Created",
@@ -471,7 +468,7 @@
     },
     "table": {
       "category": "Category",
-      "componentOf": "Component of {{parent}}",
+      "componentOf": "{{entity}} of {{parent}}",
       "customer": "Customer",
       "equipmentType": "Equipment Type",
       "lastServiced": "Last Serviced",
@@ -490,7 +487,6 @@
       "warehouse": "Warehouse"
     },
     "tabs": {
-      "components": "Components",
       "equipment": "Equipment",
       "filters": "Filters",
       "overview": "Overview",

@@ -319,7 +319,7 @@ export default function EquipmentDetailPage() {
     },
     {
       id: 'components',
-      label: t('equipment.tabs.components'),
+      label: getName('equipment_component', true),
       count: descendants.length,
     },
   ];
@@ -922,12 +922,13 @@ function ComponentsTree({
   error,
 }: ComponentsTreeProps) {
   const { t } = useTranslation();
+  const { getName } = useGlossary();
 
   if (loading) {
     return (
       <div className="rounded-lg border border-zinc-200 p-6 text-center dark:border-zinc-800">
         <Text className="text-zinc-500 dark:text-zinc-400">
-          {t('equipment.components.loading')}
+          {t('common.actions.loading', { entities: getName('equipment_component', true) })}
         </Text>
       </div>
     );
@@ -937,7 +938,7 @@ function ComponentsTree({
     return (
       <div className="rounded-lg bg-red-50 p-3 ring-1 ring-red-200 dark:bg-red-950/10 dark:ring-red-900/20">
         <Text className="text-sm text-red-800 dark:text-red-400">
-          {t('equipment.components.errorLoading')}: {error.message}
+          {t('common.actions.errorLoading', { entities: getName('equipment_component', true) })}: {error.message}
         </Text>
       </div>
     );
@@ -954,7 +955,7 @@ function ComponentsTree({
     return (
       <div className="rounded-lg border border-dashed border-zinc-300 p-6 text-center dark:border-zinc-700">
         <Text className="text-zinc-600 dark:text-zinc-400">
-          {t('equipment.components.empty')}
+          {t('common.actions.noEntitiesYet', { entities: getName('equipment_component', true) })}
         </Text>
       </div>
     );

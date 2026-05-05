@@ -294,7 +294,10 @@ export default function EquipmentPage() {
                             to={`/equipment/${item.parentId}`}
                             className="truncate text-xs text-zinc-500 hover:text-blue-600 hover:underline dark:text-zinc-500 dark:hover:text-blue-400"
                           >
-                            {t('equipment.table.componentOf', { parent: item.parentName })}
+                            {t('equipment.table.componentOf', {
+                              entity: getName('equipment_component'),
+                              parent: item.parentName,
+                            })}
                           </RouterLink>
                         )}
                       </div>
