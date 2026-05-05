@@ -12,7 +12,6 @@ import {
   type WorkItemStatus,
 } from '../api';
 import { useGlossary } from '../contexts/GlossaryContext';
-import { formatRelativeTime } from '../utils/formatRelativeTime';
 import EquipmentThumbnail from './EquipmentThumbnail';
 import {
   Table,
@@ -350,7 +349,6 @@ function WorkItemDetailSections({
   onAddEquipment,
   onSaveEquipmentField,
 }: DetailSectionsProps) {
-  const { t } = useTranslation();
   const equipment = workItem.equipment;
 
   return (
@@ -364,15 +362,6 @@ function WorkItemDetailSections({
         onEditEquipment={onEditEquipment}
         onSaveEquipmentField={onSaveEquipmentField}
       />
-
-      {/* Work-item metadata footer — OUTSIDE the equipment block. This is the
-          work item's updatedAt, not the equipment's; nesting it inside
-          Equipment would conflate two entities. */}
-      <div className="text-xs italic text-zinc-500 dark:text-zinc-400">
-        {t('workOrders.workItems.updatedFooter', {
-          time: formatRelativeTime(workItem.updatedAt),
-        })}
-      </div>
     </div>
   );
 }
@@ -508,10 +497,11 @@ function EquipmentBlock({
         </div>
       </div>
 
-      {/* Inline-edit grid. Make / Model on row 1, Serial / Asset Tag on
-          row 2 (both unique-identifier fields), Location on row 3. Deeper
-          fields (install date, warranty, description) live behind "Edit
-          all". */}
+      {/* Inline-edit grid: Make / Model on row 1, Serial / Location on
+          row 2. Deeper fields (asset tag, install date, warranty,
+          description) live behind "Edit all" — asset tag in particular is
+          a tech/scanner field, not a CSR scan field, so it doesn't earn
+          the inline real estate. */}
       <dl className="mt-2 grid grid-cols-1 gap-x-6 gap-y-1 text-sm sm:grid-cols-[max-content_1fr_max-content_1fr]">
         <FieldRow
           label={t('equipment.form.make')}
@@ -532,14 +522,6 @@ function EquipmentBlock({
           value={equipment.serialNumber ?? ''}
           onSave={(v) => saveField('serialNumber', v || null)}
           ariaLabel={t('equipment.form.serialNumber')}
-          readOnly={readOnly}
-          className="font-mono"
-        />
-        <FieldRow
-          label={t('equipment.form.assetTag')}
-          value={equipment.assetTag ?? ''}
-          onSave={(v) => saveField('assetTag', v || null)}
-          ariaLabel={t('equipment.form.assetTag')}
           readOnly={readOnly}
           className="font-mono"
         />
@@ -568,39 +550,21 @@ interface EquipmentStatusPillProps {
 }
 
 /**
- * Status pill with click-to-edit and a confirm dialog on the consequential
- * ACTIVE → RETIRED transition. Going back to ACTIVE doesn't prompt — un-
- * retiring something a colleague mis-clicked should be one click. The
- * confirm-cancel path throws so EditableField stays in edit mode; the user
- * presses Esc to back out.
+ * Renders an attention-grabbing badge when (and only when) the linked
+ * equipment is RETIRED — a WO scheduled against a retired unit is a real
+ * signal CSRs should notice. Clicking the badge offers a one-click
+ * un-retire (RETIRED → ACTIVE). Going the other direction (ACTIVE →
+ * RETIRED) is intentionally NOT reachable inline — that's a destructive
+ * lifecycle change that routes through the "Edit all" dialog where the
+ * full equipment context is visible. Returns null for the ACTIVE case so
+ * the common-path UI stays uncluttered.
  */
 function EquipmentStatusPill({ status, readOnly, onSave }: EquipmentStatusPillProps) {
   const { t } = useTranslation();
-  const { getName } = useGlossary();
-  const renderBadge = (s: 'ACTIVE' | 'RETIRED') => (
-    <Badge color={s === EquipmentStatus.ACTIVE ? 'lime' : 'zinc'}>
-      {t(`equipment.status.${s.toLowerCase()}`)}
-    </Badge>
-  );
+  if (status === EquipmentStatus.ACTIVE) return null;
 
-  if (readOnly) {
-    return renderBadge(status);
-  }
-
-  const handleSave = async (nextRaw: string) => {
-    const next = nextRaw as EquipmentStatus;
-    if (next === EquipmentStatus.RETIRED && status === EquipmentStatus.ACTIVE) {
-      const ok = window.confirm(
-        t('workOrders.workItems.confirmRetire', { entity: getName('equipment') })
-      );
-      if (!ok) {
-        // Throw so EditableField keeps the dropdown open; user can pick
-        // another value or press Esc to revert.
-        throw new Error('cancelled');
-      }
-    }
-    await onSave(next);
-  };
+  const retiredBadge = <Badge color="amber">{t('equipment.status.retired')}</Badge>;
+  if (readOnly) return retiredBadge;
 
   return (
     <EditableField
@@ -610,9 +574,9 @@ function EquipmentStatusPill({ status, readOnly, onSave }: EquipmentStatusPillPr
         { value: EquipmentStatus.ACTIVE, label: t('equipment.status.active') },
         { value: EquipmentStatus.RETIRED, label: t('equipment.status.retired') },
       ]}
-      onSave={handleSave}
+      onSave={(v) => onSave(v as EquipmentStatus)}
       ariaLabel={t('common.form.status')}
-      renderDisplay={(v) => renderBadge(v as 'ACTIVE' | 'RETIRED')}
+      renderDisplay={() => retiredBadge}
     />
   );
 }

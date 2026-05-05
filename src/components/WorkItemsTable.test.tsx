@@ -128,11 +128,11 @@ describe('WorkItemsTable', () => {
       );
       const toggle = screen.getByRole('button', { name: /show details/i });
       expect(toggle).toHaveAttribute('aria-expanded', 'false');
-      // Footer text only renders when expanded.
-      expect(screen.queryByText(/^updated /i)).not.toBeInTheDocument();
+      // Equipment fields aren't rendered until the row is expanded.
+      expect(screen.queryByText(/HVAC · Furnace/)).not.toBeInTheDocument();
     });
 
-    it('expands the row to reveal equipment details and the updated footer', async () => {
+    it('expands the row to reveal equipment details', async () => {
       const user = userEvent.setup();
       renderWithProviders(
         <WorkItemsTable
@@ -158,9 +158,6 @@ describe('WorkItemsTable', () => {
       expect(screen.getByText('58TN0A080-V17')).toBeInTheDocument();
       expect(screen.getByText('CHB1234567')).toBeInTheDocument();
       expect(screen.getByText('Basement')).toBeInTheDocument();
-
-      // Work-item updated footer renders below the equipment block.
-      expect(screen.getByText(/^updated /i)).toBeInTheDocument();
     });
 
     it('renders the "Edit all" button only when onEditEquipment is provided', async () => {
@@ -341,7 +338,7 @@ describe('WorkItemsTable', () => {
       ).not.toBeInTheDocument();
     });
 
-    it('renders a colored status pill in the identity row when status is projected', async () => {
+    it('hides the status pill when the linked equipment is ACTIVE', async () => {
       const user = userEvent.setup();
       renderWithProviders(
         <WorkItemsTable
@@ -353,19 +350,32 @@ describe('WorkItemsTable', () => {
         />
       );
       await user.click(screen.getByRole('button', { name: /show details/i }));
-      // The pill appears as part of the identity row in the expansion. The
-      // matching label in the EditableField's renderDisplay shows the badge
-      // text "Active" alongside the equipment name.
-      expect(screen.getAllByText(/^active$/i).length).toBeGreaterThanOrEqual(1);
+      // No "Active" badge in the expansion — common-case status is not surfaced.
+      expect(screen.queryByText(/^active$/i)).not.toBeInTheDocument();
     });
 
-    it('confirms before transitioning equipment status from ACTIVE to RETIRED', async () => {
-      const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    it('renders an attention-grabbing pill when the linked equipment is RETIRED', async () => {
       const user = userEvent.setup();
       renderWithProviders(
         <WorkItemsTable
           workOrderId="wo-1"
-          workItems={[wi('wi-1', 'Replace filter', { equipment: equip({ id: 'eq-9', status: 'ACTIVE' }) })]}
+          workItems={[wi('wi-1', 'Replace filter', { equipment: equip({ status: 'RETIRED' }) })]}
+          statuses={[]}
+          workflows={[]}
+          enforceWorkflow={false}
+        />
+      );
+      await user.click(screen.getByRole('button', { name: /show details/i }));
+      expect(screen.getByText(/^retired$/i)).toBeInTheDocument();
+    });
+
+    it('un-retires equipment in one click via the pill (no confirm)', async () => {
+      const confirmSpy = vi.spyOn(window, 'confirm');
+      const user = userEvent.setup();
+      renderWithProviders(
+        <WorkItemsTable
+          workOrderId="wo-1"
+          workItems={[wi('wi-1', 'Replace filter', { equipment: equip({ id: 'eq-9', status: 'RETIRED' }) })]}
           statuses={[]}
           workflows={[]}
           enforceWorkflow={false}
@@ -373,57 +383,17 @@ describe('WorkItemsTable', () => {
       );
       await user.click(screen.getByRole('button', { name: /show details/i }));
 
-      // Click the status pill (EditableField renders as a button containing the badge).
       await user.click(screen.getByRole('button', { name: /^status$/i }));
       const select = await screen.findByRole('combobox', { name: /^status$/i });
-      await user.selectOptions(select, 'RETIRED');
+      await user.selectOptions(select, 'ACTIVE');
       select.blur();
 
-      await waitFor(() => expect(confirmSpy).toHaveBeenCalled());
       await waitFor(() => {
-        expect(mockEquipmentUpdate).toHaveBeenCalledWith('eq-9', { status: 'RETIRED' });
+        expect(mockEquipmentUpdate).toHaveBeenCalledWith('eq-9', { status: 'ACTIVE' });
       });
+      // Un-retiring is one click — no confirm dialog.
+      expect(confirmSpy).not.toHaveBeenCalled();
       confirmSpy.mockRestore();
-    });
-
-    it('aborts the RETIRED transition when the user cancels the confirm', async () => {
-      const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
-      const user = userEvent.setup();
-      renderWithProviders(
-        <WorkItemsTable
-          workOrderId="wo-1"
-          workItems={[wi('wi-1', 'Replace filter', { equipment: equip({ id: 'eq-9', status: 'ACTIVE' }) })]}
-          statuses={[]}
-          workflows={[]}
-          enforceWorkflow={false}
-        />
-      );
-      await user.click(screen.getByRole('button', { name: /show details/i }));
-
-      await user.click(screen.getByRole('button', { name: /^status$/i }));
-      const select = await screen.findByRole('combobox', { name: /^status$/i });
-      await user.selectOptions(select, 'RETIRED');
-      select.blur();
-
-      await waitFor(() => expect(confirmSpy).toHaveBeenCalled());
-      // Mutation NOT called when the user declines the confirm.
-      expect(mockEquipmentUpdate).not.toHaveBeenCalled();
-      confirmSpy.mockRestore();
-    });
-
-    it('renders the asset tag field in the inline grid', async () => {
-      const user = userEvent.setup();
-      renderWithProviders(
-        <WorkItemsTable
-          workOrderId="wo-1"
-          workItems={[wi('wi-1', 'Replace filter', { equipment: equip({ id: 'eq-7', assetTag: 'TAG-77' }) })]}
-          statuses={[]}
-          workflows={[]}
-          enforceWorkflow={false}
-        />
-      );
-      await user.click(screen.getByRole('button', { name: /show details/i }));
-      expect(screen.getByText('TAG-77')).toBeInTheDocument();
     });
 
     it('renders sub-unit chips when descendants are present, with truncation indicator', async () => {

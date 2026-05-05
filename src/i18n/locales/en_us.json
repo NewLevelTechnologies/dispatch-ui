@@ -1228,7 +1228,6 @@
     "workItems": {
       "changeStatus": "Change status (currently {{current}})",
       "collapseRow": "Hide details",
-      "confirmRetire": "Mark this {{entity, lowercase}} as retired?",
       "deleteConfirm": "Delete this {{entity, lowercase}}? This cannot be undone.",
       "descriptionRequired": "Description is required",
       "editAll": "Edit all",
@@ -1244,8 +1243,7 @@
       "subUnits": "{{entities}} ({{count}}):",
       "subUnitsMore": "+{{count}} more →",
       "totalHeader": "Total",
-      "unitHeader": "Unit",
-      "updatedFooter": "Updated {{time}}"
+      "unitHeader": "Unit"
     }
   },
   "account": {
