@@ -150,14 +150,17 @@ describe('WorkOrderDetailPage', () => {
     });
   });
 
-  it('renders the address text in the header', async () => {
+  it('renders the address text in the Service Location card', async () => {
     mockApiResponses();
     renderPage();
+    // Address moved out of the header into the Service Location card —
+    // location identity belongs in its own surface so "where is this work
+    // happening?" jumps out at a glance instead of mixing with status
+    // pills and contact data.
     await waitFor(() => {
-      expect(
-        screen.getByText(/1942 LENOX RD NE, Atlanta, GA 30306-3035/i)
-      ).toBeInTheDocument();
+      expect(screen.getByText(/1942 LENOX RD NE/i)).toBeInTheDocument();
     });
+    expect(screen.getByText(/Atlanta, GA 30306-3035/i)).toBeInTheDocument();
   });
 
   it('hides the money chip row until phase 7 (financial detail drawer)', async () => {
@@ -296,17 +299,17 @@ describe('WorkOrderDetailPage', () => {
     });
   });
 
-  it('renders click-to-copy phone and address controls', async () => {
+  it('renders the site contact phone with click-to-copy in the Service Location card', async () => {
     mockApiResponses();
     renderPage();
     await waitFor(() => {
       expect(screen.getByText('WO-00010')).toBeInTheDocument();
     });
+    // Site contact lives in the Service Location card. The phone is a
+    // click-to-copy button. Fixture has siteContactPhone: 5559876543 →
+    // formatted (555) 987-6543.
     expect(
-      screen.getByRole('button', { name: /\(555\) 123-4567/ })
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole('button', { name: /1942 LENOX RD NE/i })
+      screen.getByRole('button', { name: /\(555\) 987-6543/ })
     ).toBeInTheDocument();
   });
 });

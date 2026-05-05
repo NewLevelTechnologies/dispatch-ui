@@ -47,11 +47,8 @@ import { Link as CatLink } from '../components/catalyst/link';
 import {
   ArrowLeftIcon,
   CalendarIcon,
-  CheckIcon,
   EllipsisHorizontalIcon,
-  MapPinIcon,
   PencilIcon,
-  PhoneIcon,
   PlusIcon,
 } from '@heroicons/react/24/outline';
 
@@ -314,7 +311,7 @@ export default function WorkOrderDetailPage() {
     // assumes a desktop with a separate softphone). On desktop, copy to clipboard.
     const isDesktop = window.matchMedia('(min-width: 1024px)').matches;
     if (kind === 'phone' && !isDesktop) {
-      window.location.href = `tel:${value.replace(/\D/g, '')}`;
+      window.location.assign(`tel:${value.replace(/\D/g, '')}`);
       return;
     }
     try {
@@ -358,10 +355,6 @@ export default function WorkOrderDetailPage() {
   const customer = workOrder.customer;
   const location = workOrder.serviceLocation;
 
-  const addressLine = location
-    ? `${location.address.streetAddress}, ${location.address.city}, ${location.address.state} ${location.address.zipCode}`.trim()
-    : '';
-
   const isCancelled = workOrder.lifecycleState === 'CANCELLED';
   const isArchived = !!workOrder.archivedAt;
   const priority = workOrder.priority ?? 'NORMAL';
@@ -387,7 +380,9 @@ export default function WorkOrderDetailPage() {
             </Button>
           </div>
 
-          {/* Row 1 — identity & state */}
+          {/* Row 1 — identity & state. Priority pill is now click-to-edit
+              (matches the work-item status pill pattern); the previous
+              row in the WO Info card is gone in this same change. */}
           <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
             <Heading className="!text-lg">{woDisplayNumber}</Heading>
             <Badge color={PROGRESS_COLORS[workOrder.progressCategory]}>
@@ -399,60 +394,78 @@ export default function WorkOrderDetailPage() {
             {isArchived && (
               <Badge color="zinc">{t('workOrders.actions.archived')}</Badge>
             )}
-            <Badge color={PRIORITY_COLORS[priority]}>
-              {t(`workOrders.priority.${PRIORITY_TRANSLATION_KEYS[priority]}`)}
-            </Badge>
+            {isCancelled || isArchived ? (
+              <Badge color={PRIORITY_COLORS[priority]}>
+                {t(`workOrders.priority.${PRIORITY_TRANSLATION_KEYS[priority]}`)}
+              </Badge>
+            ) : (
+              // Priority click-to-edit follows the WorkItemStatusPill pattern:
+              // Badge is the trigger of a Headless Dropdown so the badge stays
+              // sized to its label and the menu pops below. EditableField's
+              // Select swap was visually awkward here because the underlying
+              // Catalyst Select is `block w-full`, blowing the trigger out to
+              // fill the flex row.
+              <Dropdown>
+                <DropdownButton
+                  as="button"
+                  type="button"
+                  className="cursor-pointer rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                  aria-label={t('workOrders.form.priority')}
+                >
+                  <Badge color={PRIORITY_COLORS[priority]}>
+                    {t(`workOrders.priority.${PRIORITY_TRANSLATION_KEYS[priority]}`)}
+                  </Badge>
+                </DropdownButton>
+                <DropdownMenu anchor="bottom start">
+                  {(['LOW', 'NORMAL', 'HIGH', 'URGENT'] as WorkOrderPriority[])
+                    .filter((p) => p !== priority)
+                    .map((p) => (
+                      <DropdownItem
+                        key={p}
+                        onClick={() => handleSaveWorkOrderField('priority', p)}
+                      >
+                        <DropdownLabel>
+                          {t(`workOrders.priority.${PRIORITY_TRANSLATION_KEYS[p]}`)}
+                        </DropdownLabel>
+                      </DropdownItem>
+                    ))}
+                </DropdownMenu>
+              </Dropdown>
+            )}
             <Text className="!text-sm !text-zinc-500">
               {t('workOrders.detail.lastUpdated', { time: formatRelativeTime(workOrder.updatedAt) })}
             </Text>
           </div>
 
-          {/* Row 2 — contact & schedule */}
-          <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-zinc-600 dark:text-zinc-400">
+          {/* Row 2 — B2B context + ETA. Customer name is a thin breadcrumb;
+              the operational location identity (name + address + site
+              contact) lives in the Service Location card on the left strip,
+              not here. ETA is read-only display: a WO can have multiple
+              dispatches with their own scheduled dates, so editing a single
+              "WO ETA" doesn't model reality — the field will be derived
+              from the next dispatch when phase 6 ships. Until then,
+              workOrder.scheduledDate is editable via the Edit WO dialog. */}
+          <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-zinc-600 dark:text-zinc-400">
             {customer && (
+              // Permanent affordance: darker than the surrounding muted row
+              // text + medium weight + always-on subtle underline so it reads
+              // as "this is a link" sitting next to non-link text like the ETA
+              // chip. Hover brightens the underline.
               <CatLink
                 href={`/customers/${customer.id}`}
-                className="font-medium text-zinc-950 hover:underline dark:text-white"
+                className="font-medium text-zinc-950 underline decoration-zinc-300 underline-offset-2 hover:decoration-zinc-700 dark:text-white dark:decoration-zinc-600 dark:hover:decoration-zinc-300"
               >
                 {customer.name}
               </CatLink>
             )}
-            {customer?.phone && (
-              <button
-                type="button"
-                onClick={() => handleCopy('phone', formatPhone(customer.phone) || customer.phone!)}
-                className="inline-flex items-center gap-1 hover:text-zinc-950 dark:hover:text-white"
-                title={t('workOrders.detail.copyPhone')}
-              >
-                {copied === 'phone' ? (
-                  <CheckIcon className="size-4" />
-                ) : (
-                  <PhoneIcon className="size-4" />
-                )}
-                <span>{formatPhone(customer.phone)}</span>
-              </button>
-            )}
-            {addressLine && (
-              <button
-                type="button"
-                onClick={() => handleCopy('address', addressLine)}
-                className="inline-flex items-center gap-1 text-left hover:text-zinc-950 dark:hover:text-white"
-                title={t('workOrders.detail.copyAddress')}
-              >
-                {copied === 'address' ? (
-                  <CheckIcon className="size-4" />
-                ) : (
-                  <MapPinIcon className="size-4" />
-                )}
-                <span>{addressLine}</span>
-              </button>
-            )}
-            {workOrder.scheduledDate && (
-              <span className="inline-flex items-center gap-1">
-                <CalendarIcon className="size-4" />
-                {t('workOrders.detail.eta', { date: formatDate(workOrder.scheduledDate) })}
+            <span className="inline-flex items-center gap-1">
+              <CalendarIcon className="size-4" />
+              <span>
+                {workOrder.scheduledDate
+                  ? t('workOrders.detail.eta', { date: formatDate(workOrder.scheduledDate) })
+                  : t('workOrders.detail.notScheduled')}
               </span>
-            )}
+            </span>
           </div>
 
           {/* Row 3 — money chips, hidden until phase 7 (financial detail
@@ -519,6 +532,13 @@ export default function WorkOrderDetailPage() {
             each column owns its scroll. */}
         <div className="p-4 lg:grid lg:grid-cols-[260px_1fr] lg:gap-6 lg:flex-1 lg:min-h-0 lg:overflow-hidden xl:grid-cols-[260px_1fr_360px]">
           <aside className="flex flex-col gap-6 lg:min-h-0 lg:overflow-y-auto">
+            {/* Service Location card. Location identity belongs here, not
+                in the header — bold name + multi-line address gives the
+                "where is this work happening?" answer at a glance. Site
+                contact (name + phone + email) lives in the same card so
+                location-scoped contact data clusters together. Click the
+                card body to navigate to the dedicated location page;
+                phone/email use click-to-copy and mailto. */}
             {location && (
               <Card title={getName('service_location')}>
                 <CatLink
@@ -538,22 +558,70 @@ export default function WorkOrderDetailPage() {
                   </div>
                 </CatLink>
 
-                {(location.siteContactName || location.siteContactPhone) && (
-                  <DescriptionList className="mt-3">
-                    {location.siteContactName && (
-                      <>
-                        <DescriptionTerm>{t('common.form.siteContactName')}</DescriptionTerm>
-                        <DescriptionDetails>{location.siteContactName}</DescriptionDetails>
-                      </>
-                    )}
-                    {location.siteContactPhone && (
-                      <>
-                        <DescriptionTerm>{t('common.form.siteContactPhone')}</DescriptionTerm>
-                        <DescriptionDetails>{formatPhone(location.siteContactPhone)}</DescriptionDetails>
-                      </>
-                    )}
-                  </DescriptionList>
-                )}
+                {(() => {
+                  // Strict fallback: site contact wins when ANY site field is
+                  // populated. Otherwise, surface the customer-level contact
+                  // (name + phone + email) so CSRs always have an actionable
+                  // number/email instead of a blank section. The label
+                  // ("Site Contact" vs "Customer Contact") makes the source
+                  // explicit so the CSR knows whether they're calling the
+                  // on-site person or the account holder.
+                  const hasSiteContact =
+                    !!location.siteContactName ||
+                    !!location.siteContactPhone ||
+                    !!location.siteContactEmail;
+                  const hasCustomerContact =
+                    !!customer && (!!customer.phone || !!customer.email);
+                  if (!hasSiteContact && !hasCustomerContact) return null;
+
+                  const label = hasSiteContact
+                    ? t('workOrders.detail.siteContact')
+                    : t('workOrders.detail.customerContact');
+                  const contactName = hasSiteContact
+                    ? location.siteContactName
+                    : customer?.name;
+                  const contactPhone = hasSiteContact
+                    ? location.siteContactPhone
+                    : customer?.phone;
+                  const contactEmail = hasSiteContact
+                    ? location.siteContactEmail
+                    : customer?.email;
+
+                  return (
+                    <div className="mt-3 border-t border-zinc-200 pt-3 dark:border-zinc-800">
+                      <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                        {label}
+                      </div>
+                      {contactName && (
+                        <div className="text-sm text-zinc-950 dark:text-white">
+                          {contactName}
+                        </div>
+                      )}
+                      {contactPhone && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const phone = contactPhone || '';
+                            handleCopy('phone', formatPhone(phone) || phone);
+                          }}
+                          className="block text-left text-sm text-zinc-700 hover:text-zinc-950 dark:text-zinc-300 dark:hover:text-white"
+                          title={t('workOrders.detail.copyPhone')}
+                        >
+                          {copied === 'phone' ? '✓ ' : ''}
+                          {formatPhone(contactPhone)}
+                        </button>
+                      )}
+                      {contactEmail && (
+                        <a
+                          href={`mailto:${contactEmail}`}
+                          className="block text-sm text-zinc-700 hover:text-zinc-950 dark:text-zinc-300 dark:hover:text-white"
+                        >
+                          {contactEmail}
+                        </a>
+                      )}
+                    </div>
+                  );
+                })()}
               </Card>
             )}
 
@@ -608,36 +676,11 @@ export default function WorkOrderDetailPage() {
                   />
                 </DescriptionDetails>
 
-                <DescriptionTerm>{t('workOrders.form.priority')}</DescriptionTerm>
-                <DescriptionDetails>
-                  <EditableField
-                    as="select"
-                    value={priority}
-                    options={(['LOW', 'NORMAL', 'HIGH', 'URGENT'] as WorkOrderPriority[]).map((p) => ({
-                      value: p,
-                      label: t(`workOrders.priority.${PRIORITY_TRANSLATION_KEYS[p]}`),
-                    }))}
-                    onSave={(v) => handleSaveWorkOrderField('priority', v as WorkOrderPriority)}
-                    disabled={isCancelled || isArchived}
-                    ariaLabel={t('workOrders.form.priority')}
-                    renderDisplay={(v) => (
-                      <Badge color={PRIORITY_COLORS[v as WorkOrderPriority]}>
-                        {t(`workOrders.priority.${PRIORITY_TRANSLATION_KEYS[v as WorkOrderPriority]}`)}
-                      </Badge>
-                    )}
-                  />
-                </DescriptionDetails>
-
-                <DescriptionTerm>{t('workOrders.form.scheduledDate')}</DescriptionTerm>
-                <DescriptionDetails>
-                  <EditableField
-                    value={workOrder.scheduledDate ?? ''}
-                    onSave={(v) => handleSaveWorkOrderField('scheduledDate', v || undefined)}
-                    disabled={isCancelled || isArchived}
-                    ariaLabel={t('workOrders.form.scheduledDate')}
-                    renderDisplay={(v) => (v ? formatDate(v) : '—')}
-                  />
-                </DescriptionDetails>
+                {/* Priority and Scheduled Date moved to the header — see
+                    Row 1 (priority pill) and Row 3 (ETA chip) above. The
+                    card row used to render them but the header is the
+                    glanceable surface and CSRs were seeing the same fact
+                    twice. Inline-edit lives in the header now. */}
 
                 {workOrder.completedDate && (
                   <>
