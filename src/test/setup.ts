@@ -839,6 +839,7 @@ vi.mock('react-i18next', () => {
     'workOrders.detail.copyAddress': 'Click to copy address',
     'workOrders.detail.copyPhone': 'Click to copy phone',
     'workOrders.detail.created': 'Created',
+    'workOrders.detail.customerContact': 'Customer Contact',
     'workOrders.detail.duplicate': 'Duplicate',
     'workOrders.detail.eta': 'ETA {{date}}',
     'workOrders.detail.etaLabel': 'ETA',

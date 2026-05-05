@@ -311,7 +311,7 @@ export default function WorkOrderDetailPage() {
     // assumes a desktop with a separate softphone). On desktop, copy to clipboard.
     const isDesktop = window.matchMedia('(min-width: 1024px)').matches;
     if (kind === 'phone' && !isDesktop) {
-      window.location.href = `tel:${value.replace(/\D/g, '')}`;
+      window.location.assign(`tel:${value.replace(/\D/g, '')}`);
       return;
     }
     try {
@@ -399,21 +399,38 @@ export default function WorkOrderDetailPage() {
                 {t(`workOrders.priority.${PRIORITY_TRANSLATION_KEYS[priority]}`)}
               </Badge>
             ) : (
-              <EditableField
-                as="select"
-                value={priority}
-                options={(['LOW', 'NORMAL', 'HIGH', 'URGENT'] as WorkOrderPriority[]).map((p) => ({
-                  value: p,
-                  label: t(`workOrders.priority.${PRIORITY_TRANSLATION_KEYS[p]}`),
-                }))}
-                onSave={(v) => handleSaveWorkOrderField('priority', v as WorkOrderPriority)}
-                ariaLabel={t('workOrders.form.priority')}
-                renderDisplay={(v) => (
-                  <Badge color={PRIORITY_COLORS[v as WorkOrderPriority]}>
-                    {t(`workOrders.priority.${PRIORITY_TRANSLATION_KEYS[v as WorkOrderPriority]}`)}
+              // Priority click-to-edit follows the WorkItemStatusPill pattern:
+              // Badge is the trigger of a Headless Dropdown so the badge stays
+              // sized to its label and the menu pops below. EditableField's
+              // Select swap was visually awkward here because the underlying
+              // Catalyst Select is `block w-full`, blowing the trigger out to
+              // fill the flex row.
+              <Dropdown>
+                <DropdownButton
+                  as="button"
+                  type="button"
+                  className="cursor-pointer rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                  aria-label={t('workOrders.form.priority')}
+                >
+                  <Badge color={PRIORITY_COLORS[priority]}>
+                    {t(`workOrders.priority.${PRIORITY_TRANSLATION_KEYS[priority]}`)}
                   </Badge>
-                )}
-              />
+                </DropdownButton>
+                <DropdownMenu anchor="bottom start">
+                  {(['LOW', 'NORMAL', 'HIGH', 'URGENT'] as WorkOrderPriority[])
+                    .filter((p) => p !== priority)
+                    .map((p) => (
+                      <DropdownItem
+                        key={p}
+                        onClick={() => handleSaveWorkOrderField('priority', p)}
+                      >
+                        <DropdownLabel>
+                          {t(`workOrders.priority.${PRIORITY_TRANSLATION_KEYS[p]}`)}
+                        </DropdownLabel>
+                      </DropdownItem>
+                    ))}
+                </DropdownMenu>
+              </Dropdown>
             )}
             <Text className="!text-sm !text-zinc-500">
               {t('workOrders.detail.lastUpdated', { time: formatRelativeTime(workOrder.updatedAt) })}
@@ -430,9 +447,13 @@ export default function WorkOrderDetailPage() {
               workOrder.scheduledDate is editable via the Edit WO dialog. */}
           <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-zinc-600 dark:text-zinc-400">
             {customer && (
+              // Permanent affordance: darker than the surrounding muted row
+              // text + medium weight + always-on subtle underline so it reads
+              // as "this is a link" sitting next to non-link text like the ETA
+              // chip. Hover brightens the underline.
               <CatLink
                 href={`/customers/${customer.id}`}
-                className="hover:text-zinc-950 hover:underline dark:hover:text-white"
+                className="font-medium text-zinc-950 underline decoration-zinc-300 underline-offset-2 hover:decoration-zinc-700 dark:text-white dark:decoration-zinc-600 dark:hover:decoration-zinc-300"
               >
                 {customer.name}
               </CatLink>
@@ -537,42 +558,70 @@ export default function WorkOrderDetailPage() {
                   </div>
                 </CatLink>
 
-                {(location.siteContactName ||
-                  location.siteContactPhone ||
-                  location.siteContactEmail) && (
-                  <div className="mt-3 border-t border-zinc-200 pt-3 dark:border-zinc-800">
-                    <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-                      {t('workOrders.detail.siteContact')}
-                    </div>
-                    {location.siteContactName && (
-                      <div className="text-sm text-zinc-950 dark:text-white">
-                        {location.siteContactName}
+                {(() => {
+                  // Strict fallback: site contact wins when ANY site field is
+                  // populated. Otherwise, surface the customer-level contact
+                  // (name + phone + email) so CSRs always have an actionable
+                  // number/email instead of a blank section. The label
+                  // ("Site Contact" vs "Customer Contact") makes the source
+                  // explicit so the CSR knows whether they're calling the
+                  // on-site person or the account holder.
+                  const hasSiteContact =
+                    !!location.siteContactName ||
+                    !!location.siteContactPhone ||
+                    !!location.siteContactEmail;
+                  const hasCustomerContact =
+                    !!customer && (!!customer.phone || !!customer.email);
+                  if (!hasSiteContact && !hasCustomerContact) return null;
+
+                  const label = hasSiteContact
+                    ? t('workOrders.detail.siteContact')
+                    : t('workOrders.detail.customerContact');
+                  const contactName = hasSiteContact
+                    ? location.siteContactName
+                    : customer?.name;
+                  const contactPhone = hasSiteContact
+                    ? location.siteContactPhone
+                    : customer?.phone;
+                  const contactEmail = hasSiteContact
+                    ? location.siteContactEmail
+                    : customer?.email;
+
+                  return (
+                    <div className="mt-3 border-t border-zinc-200 pt-3 dark:border-zinc-800">
+                      <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                        {label}
                       </div>
-                    )}
-                    {location.siteContactPhone && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const phone = location.siteContactPhone || '';
-                          handleCopy('phone', formatPhone(phone) || phone);
-                        }}
-                        className="block text-left text-sm text-zinc-700 hover:text-zinc-950 dark:text-zinc-300 dark:hover:text-white"
-                        title={t('workOrders.detail.copyPhone')}
-                      >
-                        {copied === 'phone' ? '✓ ' : ''}
-                        {formatPhone(location.siteContactPhone)}
-                      </button>
-                    )}
-                    {location.siteContactEmail && (
-                      <a
-                        href={`mailto:${location.siteContactEmail}`}
-                        className="block text-sm text-zinc-700 hover:text-zinc-950 dark:text-zinc-300 dark:hover:text-white"
-                      >
-                        {location.siteContactEmail}
-                      </a>
-                    )}
-                  </div>
-                )}
+                      {contactName && (
+                        <div className="text-sm text-zinc-950 dark:text-white">
+                          {contactName}
+                        </div>
+                      )}
+                      {contactPhone && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const phone = contactPhone || '';
+                            handleCopy('phone', formatPhone(phone) || phone);
+                          }}
+                          className="block text-left text-sm text-zinc-700 hover:text-zinc-950 dark:text-zinc-300 dark:hover:text-white"
+                          title={t('workOrders.detail.copyPhone')}
+                        >
+                          {copied === 'phone' ? '✓ ' : ''}
+                          {formatPhone(contactPhone)}
+                        </button>
+                      )}
+                      {contactEmail && (
+                        <a
+                          href={`mailto:${contactEmail}`}
+                          className="block text-sm text-zinc-700 hover:text-zinc-950 dark:text-zinc-300 dark:hover:text-white"
+                        >
+                          {contactEmail}
+                        </a>
+                      )}
+                    </div>
+                  );
+                })()}
               </Card>
             )}
 

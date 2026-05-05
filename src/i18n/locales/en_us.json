@@ -1143,6 +1143,7 @@
       "copyAddress": "Click to copy address",
       "copyPhone": "Click to copy phone",
       "created": "Created",
+      "customerContact": "Customer Contact",
       "duplicate": "Duplicate",
       "eta": "ETA {{date}}",
       "etaLabel": "ETA",
