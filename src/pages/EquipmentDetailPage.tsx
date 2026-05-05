@@ -503,28 +503,27 @@ export default function EquipmentDetailPage() {
           )}
         </nav>
 
-        {/* Header — 48px thumbnail + name + status pill + actions on one row.
-            Big-hero treatment was wasting ~120px of vertical real estate;
-            equipment isn't an asset surface that needs a cover photo, just a
-            scan-id glyph alongside the name. */}
-        <div className="flex items-center gap-3">
+        {/* Header */}
+        <div className="flex items-start gap-4">
           <EquipmentThumbnail
             url={equipment.profileImageUrl}
             name={t('equipment.detail.profileImageAlt', { name: equipment.name })}
-            sizeClass="size-12"
+            sizeClass="size-24"
             fit="contain"
           />
-          <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <Heading className="!text-lg">{equipment.name}</Heading>
+
+          <div className="flex-1">
+            <div className="flex items-center gap-2">
+              <Heading className="text-2xl">{equipment.name}</Heading>
               <Badge color={equipment.status === EquipmentStatus.ACTIVE ? 'lime' : 'zinc'}>
                 {t(`equipment.status.${equipment.status.toLowerCase()}`)}
               </Badge>
             </div>
           </div>
 
-          {/* Header action group. Edit opens the full form dialog; the
-              overflow menu carries the destructive Delete. */}
+          {/* Header action group. Edit opens the full form dialog (covers
+              fields not in the inline-edit grid like description/install date/
+              warranty); the overflow menu carries the destructive Delete. */}
           <div className="flex items-center gap-1">
             <Button outline onClick={() => setIsEditDialogOpen(true)}>
               <PencilIcon className="size-4" />
@@ -544,7 +543,7 @@ export default function EquipmentDetailPage() {
         </div>
 
         {/* Tabs */}
-        <div className="mt-3">
+        <div className="mt-4">
           <TabNavigation
             tabs={tabs}
             activeTab={activeTab}
