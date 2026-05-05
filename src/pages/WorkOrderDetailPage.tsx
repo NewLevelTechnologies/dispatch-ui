@@ -109,6 +109,11 @@ export default function WorkOrderDetailPage() {
   // date, warranty, etc.).
   const [equipmentDialogOpen, setEquipmentDialogOpen] = useState(false);
   const [editingEquipment, setEditingEquipment] = useState<Equipment | null>(null);
+  // "Add Equipment" from a work-item row's empty-state opens the same dialog
+  // in CREATE mode with the WO's service location pre-locked. The work item
+  // tracked here is the one we'll link the new equipment to once it's
+  // created (via EquipmentFormDialog's onCreated callback).
+  const [addEquipmentForWorkItem, setAddEquipmentForWorkItem] = useState<WorkItemResponse | null>(null);
 
   const handleEditEquipment = async (equipmentId: string) => {
     try {
@@ -121,6 +126,33 @@ export default function WorkOrderDetailPage() {
           ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
           : undefined;
       alert(msg || t('common.actions.errorLoadingEntity', { entity: getName('equipment') }));
+    }
+  };
+
+  const handleAddEquipmentToWorkItem = (wi: WorkItemResponse) => {
+    setAddEquipmentForWorkItem(wi);
+  };
+
+  // After the user creates new equipment from the row's empty state, link it
+  // to the work item that triggered the flow. EquipmentFormDialog already
+  // invalidated equipment + work-order caches on its own; this PATCH is a
+  // second mutation that sets workItem.equipmentId, then re-invalidates so
+  // the row swaps from empty state to populated.
+  const handleEquipmentCreatedForWorkItem = async (created: Equipment) => {
+    const wi = addEquipmentForWorkItem;
+    setAddEquipmentForWorkItem(null);
+    if (!wi || !id) return;
+    try {
+      await workOrderApi.updateWorkItem(id, wi.id, { equipmentId: created.id });
+      queryClient.invalidateQueries({ queryKey: ['work-orders'] });
+      queryClient.invalidateQueries({ queryKey: ['work-orders-list'] });
+      queryClient.invalidateQueries({ queryKey: ['work-order-activity', id] });
+    } catch (err) {
+      const msg =
+        err instanceof Error && 'response' in err
+          ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
+          : undefined;
+      alert(msg || t('common.form.errorUpdate', { entity: getName('work_item') }));
     }
   };
 
@@ -609,6 +641,7 @@ export default function WorkOrderDetailPage() {
               onDelete={handleDeleteWorkItem}
               onSaveDescription={handleSaveWorkItemDescription}
               onEditEquipment={handleEditEquipment}
+              onAddEquipment={handleAddEquipmentToWorkItem}
             />
           </main>
 
@@ -666,6 +699,19 @@ export default function WorkOrderDetailPage() {
           setEditingEquipment(null);
         }}
         equipment={editingEquipment}
+      />
+
+      {/* Same dialog component, opened in CREATE mode with the WO's service
+          location pre-locked. onCreated wires the new equipment back to the
+          work item that triggered the flow. */}
+      <EquipmentFormDialog
+        isOpen={addEquipmentForWorkItem !== null}
+        onClose={() => setAddEquipmentForWorkItem(null)}
+        equipment={null}
+        lockedServiceLocationId={
+          workOrder?.serviceLocationId || workOrder?.serviceLocation?.id
+        }
+        onCreated={handleEquipmentCreatedForWorkItem}
       />
     </AppLayout>
   );

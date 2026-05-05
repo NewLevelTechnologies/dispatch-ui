@@ -64,6 +64,13 @@ interface Props {
    * Equipment record and open EquipmentFormDialog over the work order page.
    */
   onEditEquipment?: (equipmentId: string) => void;
+  /**
+   * When provided, the empty-state "+ Add Equipment" affordance opens a
+   * focused create flow (EquipmentFormDialog with the WO's service location
+   * pre-locked) instead of the generic Edit Work Item dialog. The parent
+   * patches the work item with the new equipment id on success.
+   */
+  onAddEquipment?: (wi: WorkItemResponse) => void;
 }
 
 export default function WorkItemsTable({
@@ -77,6 +84,7 @@ export default function WorkItemsTable({
   onDelete,
   onSaveDescription,
   onEditEquipment,
+  onAddEquipment,
 }: Props) {
   const { t } = useTranslation();
   const { getName } = useGlossary();
@@ -294,6 +302,7 @@ export default function WorkItemsTable({
                       readOnly={readOnly}
                       onEdit={onEdit}
                       onEditEquipment={onEditEquipment}
+                      onAddEquipment={onAddEquipment}
                       onSaveEquipmentField={handleSaveEquipmentField}
                     />
                   </div>
@@ -313,6 +322,7 @@ interface DetailSectionsProps {
   readOnly: boolean;
   onEdit?: (wi: WorkItemResponse) => void;
   onEditEquipment?: (equipmentId: string) => void;
+  onAddEquipment?: (wi: WorkItemResponse) => void;
   onSaveEquipmentField: <K extends keyof UpdateEquipmentRequest>(
     equipmentId: string,
     field: K,
@@ -335,6 +345,7 @@ function WorkItemDetailSections({
   readOnly,
   onEdit,
   onEditEquipment,
+  onAddEquipment,
   onSaveEquipmentField,
 }: DetailSectionsProps) {
   const { t } = useTranslation();
@@ -347,6 +358,7 @@ function WorkItemDetailSections({
         workItem={workItem}
         readOnly={readOnly}
         onEditWorkItem={onEdit}
+        onAddEquipment={onAddEquipment}
         onEditEquipment={onEditEquipment}
         onSaveEquipmentField={onSaveEquipmentField}
       />
@@ -368,6 +380,7 @@ interface EquipmentBlockProps {
   workItem: WorkItemResponse;
   readOnly: boolean;
   onEditWorkItem?: (wi: WorkItemResponse) => void;
+  onAddEquipment?: (wi: WorkItemResponse) => void;
   onEditEquipment?: (equipmentId: string) => void;
   onSaveEquipmentField: <K extends keyof UpdateEquipmentRequest>(
     equipmentId: string,
@@ -381,16 +394,24 @@ function EquipmentBlock({
   workItem,
   readOnly,
   onEditWorkItem,
+  onAddEquipment,
   onEditEquipment,
   onSaveEquipmentField,
 }: EquipmentBlockProps) {
   const { t } = useTranslation();
   const { getName } = useGlossary();
 
-  // Empty state — no equipment linked. Show the section header so the surface
-  // is consistent across rows, plus an inline action to attach equipment via
-  // the work-item edit dialog (where the equipment picker lives).
+  // Empty state — no equipment linked. Prefer the focused create flow
+  // (onAddEquipment → EquipmentFormDialog with the WO's location pre-locked +
+  // auto-link on save). Fall back to the generic Edit Work Item dialog when
+  // the parent didn't wire onAddEquipment, so picking an existing equipment
+  // is still reachable.
   if (!equipment) {
+    const canAdd = !readOnly && (onAddEquipment || onEditWorkItem);
+    const handleAdd = () => {
+      if (onAddEquipment) onAddEquipment(workItem);
+      else if (onEditWorkItem) onEditWorkItem(workItem);
+    };
     return (
       <section aria-label={getName('equipment')}>
         <SectionHeader label={getName('equipment')} />
@@ -400,10 +421,10 @@ function EquipmentBlock({
               entity: getName('equipment'),
             })}
           </Text>
-          {!readOnly && onEditWorkItem && (
+          {canAdd && (
             <button
               type="button"
-              onClick={() => onEditWorkItem(workItem)}
+              onClick={handleAdd}
               className="inline-flex items-center gap-1 text-blue-600 hover:underline dark:text-blue-400"
             >
               <PlusIcon className="size-4" />

@@ -35,6 +35,13 @@ interface EquipmentFormDialogProps {
    * customer detail page where the customer is implicit.
    */
   lockedCustomer?: { id: string; name: string } | null;
+  /**
+   * Fired after a successful create with the newly-created Equipment record.
+   * Lets callers chain a follow-up mutation (e.g. linking the new equipment
+   * to a work item) without losing the freshly-returned id. Not invoked on
+   * update — listeners that need post-edit hooks should re-fetch instead.
+   */
+  onCreated?: (equipment: Equipment) => void;
 }
 
 interface FormState {
@@ -77,6 +84,7 @@ export default function EquipmentFormDialog({
   equipment,
   lockedServiceLocationId,
   lockedCustomer,
+  onCreated,
 }: EquipmentFormDialogProps) {
   const queryClient = useQueryClient();
   const { t } = useTranslation();
@@ -147,8 +155,9 @@ export default function EquipmentFormDialog({
   // ===== Mutations =====
   const createMutation = useMutation({
     mutationFn: (request: CreateEquipmentRequest) => equipmentApi.create(request),
-    onSuccess: () => {
+    onSuccess: (created) => {
       invalidateEquipmentRelatedCaches();
+      onCreated?.(created);
       onClose();
     },
     onError: (error: unknown) => {
