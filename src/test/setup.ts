@@ -842,6 +842,8 @@ vi.mock('react-i18next', () => {
     'workOrders.detail.duplicate': 'Duplicate',
     'workOrders.detail.eta': 'ETA {{date}}',
     'workOrders.detail.etaLabel': 'ETA',
+    'workOrders.detail.notScheduled': 'Not scheduled',
+    'workOrders.detail.siteContact': 'Site Contact',
     'workOrders.detail.frozen': 'Cancelled or archived — actions are disabled',
     'workOrders.detail.info': '{{entity}} Info',
     'workOrders.detail.lastUpdated': 'Updated {{time}}',
