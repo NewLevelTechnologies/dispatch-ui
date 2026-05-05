@@ -465,65 +465,76 @@ export default function EquipmentDetailPage() {
     { value: EquipmentStatus.RETIRED, label: t('equipment.status.retired') },
   ];
 
+  // Lifecycle is hidden when every editable field is empty AND lastServicedAt
+  // is null — six rows of "—" next to a fully-populated Identification card
+  // makes the page feel half-broken. Add the data through the Edit dialog
+  // when there's nothing here yet; once any field is set the section
+  // unhides automatically.
+  const lifecycleHasData =
+    Boolean(equipment.installDate) ||
+    Boolean(equipment.lastServicedAt) ||
+    Boolean(equipment.warrantyExpiresAt) ||
+    Boolean(equipment.warrantyDetails);
+  const hasDescription = Boolean(equipment.description?.trim());
+
   return (
     <AppLayout>
       <div className="p-4">
-        <div className="mb-2">
+        <div className="mb-1">
           <Button plain onClick={handleBack}>
             <ArrowLeftIcon className="size-4" />
             {t('common.actions.back')}
           </Button>
         </div>
 
-        {/* Breadcrumb: location › parent (if component). Heading below carries the
-            current item, per breadcrumb-omits-self convention. */}
-        <nav
-          aria-label={t('equipment.detail.breadcrumbAriaLabel', { entity: getName('equipment') })}
-          className="mb-2 flex flex-wrap items-center gap-x-1.5 text-xs text-zinc-500 dark:text-zinc-400"
-        >
-          <RouterLink
-            to={`/service-locations/${equipment.serviceLocationId}`}
-            className="hover:text-zinc-700 hover:underline dark:hover:text-zinc-200"
-          >
-            {serviceLocation
-              ? serviceLocation.locationName ||
-                `${serviceLocation.address.streetAddress}, ${serviceLocation.address.city}`
-              : getName('service_location')}
-          </RouterLink>
-          {equipment.parentId && (
-            <>
-              <ChevronRightIcon className="size-3 text-zinc-400 dark:text-zinc-600" aria-hidden />
-              <RouterLink
-                to={`/equipment/${equipment.parentId}`}
-                className="hover:text-zinc-700 hover:underline dark:hover:text-zinc-200"
-              >
-                {equipment.parentName ?? getName('equipment')}
-              </RouterLink>
-            </>
-          )}
-        </nav>
-
-        {/* Header */}
-        <div className="flex items-start gap-4">
+        {/* Header: 48px thumbnail + (breadcrumb above name) + status pill +
+            actions, all on a single row. Folding the breadcrumb into the
+            header saves a row vs. a separate <nav> above. 48px matches the
+            cap-height of the breadcrumb + title block — Linear/Notion/GitHub
+            avatar scale, recognition cue not display. */}
+        <div className="flex items-center gap-3">
           <EquipmentThumbnail
             url={equipment.profileImageUrl}
             name={t('equipment.detail.profileImageAlt', { name: equipment.name })}
-            sizeClass="size-24"
+            sizeClass="size-12"
             fit="contain"
           />
-
-          <div className="flex-1">
-            <div className="flex items-center gap-2">
-              <Heading className="text-2xl">{equipment.name}</Heading>
+          <div className="min-w-0 flex-1">
+            <nav
+              aria-label={t('equipment.detail.breadcrumbAriaLabel', { entity: getName('equipment') })}
+              className="flex flex-wrap items-center gap-x-1.5 text-xs text-zinc-500 dark:text-zinc-400"
+            >
+              <RouterLink
+                to={`/service-locations/${equipment.serviceLocationId}`}
+                className="hover:text-zinc-700 hover:underline dark:hover:text-zinc-200"
+              >
+                {serviceLocation
+                  ? serviceLocation.locationName ||
+                    `${serviceLocation.address.streetAddress}, ${serviceLocation.address.city}`
+                  : getName('service_location')}
+              </RouterLink>
+              {equipment.parentId && (
+                <>
+                  <ChevronRightIcon className="size-3 text-zinc-400 dark:text-zinc-600" aria-hidden />
+                  <RouterLink
+                    to={`/equipment/${equipment.parentId}`}
+                    className="hover:text-zinc-700 hover:underline dark:hover:text-zinc-200"
+                  >
+                    {equipment.parentName ?? getName('equipment')}
+                  </RouterLink>
+                </>
+              )}
+            </nav>
+            <div className="flex flex-wrap items-center gap-2">
+              <Heading className="!text-lg">{equipment.name}</Heading>
               <Badge color={equipment.status === EquipmentStatus.ACTIVE ? 'lime' : 'zinc'}>
                 {t(`equipment.status.${equipment.status.toLowerCase()}`)}
               </Badge>
             </div>
           </div>
 
-          {/* Header action group. Edit opens the full form dialog (covers
-              fields not in the inline-edit grid like description/install date/
-              warranty); the overflow menu carries the destructive Delete. */}
+          {/* Header action group. Edit opens the full form dialog; the
+              overflow menu carries the destructive Delete. */}
           <div className="flex items-center gap-1">
             <Button outline onClick={() => setIsEditDialogOpen(true)}>
               <PencilIcon className="size-4" />
@@ -543,7 +554,7 @@ export default function EquipmentDetailPage() {
         </div>
 
         {/* Tabs */}
-        <div className="mt-4">
+        <div className="mt-2">
           <TabNavigation
             tabs={tabs}
             activeTab={activeTab}
@@ -639,57 +650,68 @@ export default function EquipmentDetailPage() {
                 </FieldGrid>
               </section>
 
-              {/* Lifecycle */}
-              <section className="rounded-lg border border-zinc-200 p-2.5 dark:border-zinc-800">
-                <SectionLabel>{t('equipment.detail.lifecycle')}</SectionLabel>
-                <FieldGrid className="mt-1.5">
-                  <FieldRow label={t('equipment.form.installDate')}>
-                    <EditableField
-                      value={equipment.installDate ?? ''}
-                      onSave={(v) => handleSaveField('installDate', v || null)}
-                      ariaLabel={t('equipment.form.installDate')}
-                      renderDisplay={(v) => (v ? formatDate(v) : '—')}
-                    />
-                  </FieldRow>
-                  <FieldRow label={t('equipment.detail.lastServiced')}>
-                    <span>
-                      {equipment.lastServicedAt ? formatDate(equipment.lastServicedAt) : '—'}
-                    </span>
-                  </FieldRow>
-                  <FieldRow label={t('equipment.form.warrantyExpiresAt')}>
-                    <EditableField
-                      value={equipment.warrantyExpiresAt ?? ''}
-                      onSave={(v) => handleSaveField('warrantyExpiresAt', v || null)}
-                      ariaLabel={t('equipment.form.warrantyExpiresAt')}
-                      renderDisplay={(v) => (v ? formatDate(v) : '—')}
-                    />
-                  </FieldRow>
-                  <FieldRow label={t('equipment.form.warrantyDetails')}>
-                    <EditableField
-                      value={equipment.warrantyDetails ?? ''}
-                      onSave={(v) => handleSaveField('warrantyDetails', v || null)}
-                      ariaLabel={t('equipment.form.warrantyDetails')}
-                    />
-                  </FieldRow>
-                  <FieldRow label={t('equipment.detail.created')}>
-                    <span>{formatDate(equipment.createdAt)}</span>
-                  </FieldRow>
-                </FieldGrid>
-              </section>
+              {/* Lifecycle. Hidden entirely when every editable field is
+                  empty (and lastServicedAt is null) — six rows of "—"
+                  alongside a populated Identification card was reading as
+                  "this page is half-broken." Add via the Edit dialog;
+                  once any field is set the section reappears. */}
+              {lifecycleHasData && (
+                <section className="rounded-lg border border-zinc-200 p-2.5 dark:border-zinc-800">
+                  <SectionLabel>{t('equipment.detail.lifecycle')}</SectionLabel>
+                  <FieldGrid className="mt-1.5">
+                    <FieldRow label={t('equipment.form.installDate')}>
+                      <EditableField
+                        value={equipment.installDate ?? ''}
+                        onSave={(v) => handleSaveField('installDate', v || null)}
+                        ariaLabel={t('equipment.form.installDate')}
+                        renderDisplay={(v) => (v ? formatDate(v) : '—')}
+                      />
+                    </FieldRow>
+                    <FieldRow label={t('equipment.detail.lastServiced')}>
+                      <span>
+                        {equipment.lastServicedAt ? formatDate(equipment.lastServicedAt) : '—'}
+                      </span>
+                    </FieldRow>
+                    <FieldRow label={t('equipment.form.warrantyExpiresAt')}>
+                      <EditableField
+                        value={equipment.warrantyExpiresAt ?? ''}
+                        onSave={(v) => handleSaveField('warrantyExpiresAt', v || null)}
+                        ariaLabel={t('equipment.form.warrantyExpiresAt')}
+                        renderDisplay={(v) => (v ? formatDate(v) : '—')}
+                      />
+                    </FieldRow>
+                    <FieldRow label={t('equipment.form.warrantyDetails')}>
+                      <EditableField
+                        value={equipment.warrantyDetails ?? ''}
+                        onSave={(v) => handleSaveField('warrantyDetails', v || null)}
+                        ariaLabel={t('equipment.form.warrantyDetails')}
+                      />
+                    </FieldRow>
+                    <FieldRow label={t('equipment.detail.created')}>
+                      <span>{formatDate(equipment.createdAt)}</span>
+                    </FieldRow>
+                  </FieldGrid>
+                </section>
+              )}
 
-              {/* Description (full-width) */}
-              <section className="rounded-lg border border-zinc-200 p-2.5 lg:col-span-2 dark:border-zinc-800">
-                <SectionLabel>{t('common.form.description')}</SectionLabel>
-                <div className="mt-1.5">
-                  <EditableField
-                    as="textarea"
-                    value={equipment.description ?? ''}
-                    onSave={(v) => handleSaveField('description', v || null)}
-                    ariaLabel={t('common.form.description')}
-                    placeholder={t('equipment.detail.descriptionPlaceholder')}
-                  />
-                </div>
-              </section>
+              {/* Description. Hidden when empty — same reasoning as
+                  Lifecycle; an empty card with a placeholder textarea
+                  doesn't earn its vertical weight. Adding a description is
+                  rare and reachable via the Edit dialog. */}
+              {hasDescription && (
+                <section className="rounded-lg border border-zinc-200 p-2.5 lg:col-span-2 dark:border-zinc-800">
+                  <SectionLabel>{t('common.form.description')}</SectionLabel>
+                  <div className="mt-1.5">
+                    <EditableField
+                      as="textarea"
+                      value={equipment.description ?? ''}
+                      onSave={(v) => handleSaveField('description', v || null)}
+                      ariaLabel={t('common.form.description')}
+                      placeholder={t('equipment.detail.descriptionPlaceholder')}
+                    />
+                  </div>
+                </section>
+              )}
             </div>
           )}
 
