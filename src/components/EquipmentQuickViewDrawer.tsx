@@ -1,7 +1,11 @@
 import { useEffect, useState } from 'react';
+import { Link as RouterLink } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { ArrowLeftIcon, XMarkIcon } from '@heroicons/react/24/outline';
-import { useGlossary } from '../contexts/GlossaryContext';
+import {
+  ArrowLeftIcon,
+  ArrowTopRightOnSquareIcon,
+  XMarkIcon,
+} from '@heroicons/react/24/outline';
 import EquipmentQuickView from './EquipmentQuickView';
 import { SlideOver } from './catalyst/slideover';
 
@@ -32,7 +36,6 @@ export default function EquipmentQuickViewDrawer({
   onClose,
 }: EquipmentQuickViewDrawerProps) {
   const { t } = useTranslation();
-  const { getName } = useGlossary();
 
   // Stack of equipment {id, name} pairs. The top is the currently-rendered
   // equipment; the rest are the parent chain (for the back-button label).
@@ -94,9 +97,15 @@ export default function EquipmentQuickViewDrawer({
             <XMarkIcon className="size-5" />
           )}
         </button>
-        <div className="ml-2 truncate text-xs uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-          {getName('equipment')}
-        </div>
+        {top && (
+          <RouterLink
+            to={`/equipment/${top.id}`}
+            className="ml-2 inline-flex items-center gap-1 rounded-md p-1 text-sm text-zinc-700 hover:bg-zinc-100 hover:text-blue-600 dark:text-zinc-300 dark:hover:bg-zinc-800 dark:hover:text-blue-400"
+          >
+            <ArrowTopRightOnSquareIcon className="size-4" />
+            {t('workOrders.workItems.openPage')}
+          </RouterLink>
+        )}
       </div>
 
       {/* Body — top-of-stack equipment */}

@@ -48,11 +48,6 @@ import {
   DropdownMenu,
 } from '../components/catalyst/dropdown';
 import {
-  DescriptionList,
-  DescriptionTerm,
-  DescriptionDetails,
-} from '../components/catalyst/description-list';
-import {
   ArrowLeftIcon,
   ChevronRightIcon,
   EllipsisVerticalIcon,
@@ -470,65 +465,76 @@ export default function EquipmentDetailPage() {
     { value: EquipmentStatus.RETIRED, label: t('equipment.status.retired') },
   ];
 
+  // Lifecycle is hidden when every editable field is empty AND lastServicedAt
+  // is null — six rows of "—" next to a fully-populated Identification card
+  // makes the page feel half-broken. Add the data through the Edit dialog
+  // when there's nothing here yet; once any field is set the section
+  // unhides automatically.
+  const lifecycleHasData =
+    Boolean(equipment.installDate) ||
+    Boolean(equipment.lastServicedAt) ||
+    Boolean(equipment.warrantyExpiresAt) ||
+    Boolean(equipment.warrantyDetails);
+  const hasDescription = Boolean(equipment.description?.trim());
+
   return (
     <AppLayout>
       <div className="p-4">
-        <div className="mb-2">
+        <div className="mb-1">
           <Button plain onClick={handleBack}>
             <ArrowLeftIcon className="size-4" />
             {t('common.actions.back')}
           </Button>
         </div>
 
-        {/* Breadcrumb: location › parent (if component). Heading below carries the
-            current item, per breadcrumb-omits-self convention. */}
-        <nav
-          aria-label={t('equipment.detail.breadcrumbAriaLabel', { entity: getName('equipment') })}
-          className="mb-2 flex flex-wrap items-center gap-x-1.5 text-xs text-zinc-500 dark:text-zinc-400"
-        >
-          <RouterLink
-            to={`/service-locations/${equipment.serviceLocationId}`}
-            className="hover:text-zinc-700 hover:underline dark:hover:text-zinc-200"
-          >
-            {serviceLocation
-              ? serviceLocation.locationName ||
-                `${serviceLocation.address.streetAddress}, ${serviceLocation.address.city}`
-              : getName('service_location')}
-          </RouterLink>
-          {equipment.parentId && (
-            <>
-              <ChevronRightIcon className="size-3 text-zinc-400 dark:text-zinc-600" aria-hidden />
-              <RouterLink
-                to={`/equipment/${equipment.parentId}`}
-                className="hover:text-zinc-700 hover:underline dark:hover:text-zinc-200"
-              >
-                {equipment.parentName ?? getName('equipment')}
-              </RouterLink>
-            </>
-          )}
-        </nav>
-
-        {/* Header */}
-        <div className="flex items-start gap-4">
+        {/* Header: 48px thumbnail + (breadcrumb above name) + status pill +
+            actions, all on a single row. Folding the breadcrumb into the
+            header saves a row vs. a separate <nav> above. 48px matches the
+            cap-height of the breadcrumb + title block — Linear/Notion/GitHub
+            avatar scale, recognition cue not display. */}
+        <div className="flex items-center gap-3">
           <EquipmentThumbnail
             url={equipment.profileImageUrl}
             name={t('equipment.detail.profileImageAlt', { name: equipment.name })}
-            sizeClass="size-24"
+            sizeClass="size-16"
             fit="contain"
           />
-
-          <div className="flex-1">
-            <div className="flex items-center gap-2">
-              <Heading className="text-2xl">{equipment.name}</Heading>
+          <div className="min-w-0 flex-1">
+            <nav
+              aria-label={t('equipment.detail.breadcrumbAriaLabel', { entity: getName('equipment') })}
+              className="flex flex-wrap items-center gap-x-1.5 text-xs text-zinc-500 dark:text-zinc-400"
+            >
+              <RouterLink
+                to={`/service-locations/${equipment.serviceLocationId}`}
+                className="hover:text-zinc-700 hover:underline dark:hover:text-zinc-200"
+              >
+                {serviceLocation
+                  ? serviceLocation.locationName ||
+                    `${serviceLocation.address.streetAddress}, ${serviceLocation.address.city}`
+                  : getName('service_location')}
+              </RouterLink>
+              {equipment.parentId && (
+                <>
+                  <ChevronRightIcon className="size-3 text-zinc-400 dark:text-zinc-600" aria-hidden />
+                  <RouterLink
+                    to={`/equipment/${equipment.parentId}`}
+                    className="hover:text-zinc-700 hover:underline dark:hover:text-zinc-200"
+                  >
+                    {equipment.parentName ?? getName('equipment')}
+                  </RouterLink>
+                </>
+              )}
+            </nav>
+            <div className="flex flex-wrap items-center gap-2">
+              <Heading className="!text-lg">{equipment.name}</Heading>
               <Badge color={equipment.status === EquipmentStatus.ACTIVE ? 'lime' : 'zinc'}>
                 {t(`equipment.status.${equipment.status.toLowerCase()}`)}
               </Badge>
             </div>
           </div>
 
-          {/* Header action group. Edit opens the full form dialog (covers
-              fields not in the inline-edit grid like description/install date/
-              warranty); the overflow menu carries the destructive Delete. */}
+          {/* Header action group. Edit opens the full form dialog; the
+              overflow menu carries the destructive Delete. */}
           <div className="flex items-center gap-1">
             <Button outline onClick={() => setIsEditDialogOpen(true)}>
               <PencilIcon className="size-4" />
@@ -548,7 +554,7 @@ export default function EquipmentDetailPage() {
         </div>
 
         {/* Tabs */}
-        <div className="mt-4">
+        <div className="mt-2">
           <TabNavigation
             tabs={tabs}
             activeTab={activeTab}
@@ -557,26 +563,21 @@ export default function EquipmentDetailPage() {
         </div>
 
         {/* Tab content */}
-        <div className="mt-4">
+        <div className="mt-3">
           {activeTab === 'overview' && (
-            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+            <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
               {/* Identification */}
-              <div className="rounded-lg border border-zinc-200 p-3 dark:border-zinc-800">
-                <Heading level={3} className="text-base">
-                  {t('equipment.detail.identification')}
-                </Heading>
-                <DescriptionList className="mt-2">
-                  <DescriptionTerm>{t('common.form.name')}</DescriptionTerm>
-                  <DescriptionDetails>
+              <section className="rounded-lg border border-zinc-200 p-2.5 dark:border-zinc-800">
+                <SectionLabel>{t('equipment.detail.identification')}</SectionLabel>
+                <FieldGrid className="mt-1.5">
+                  <FieldRow label={t('common.form.name')}>
                     <EditableField
                       value={equipment.name}
                       onSave={(v) => handleSaveField('name', v)}
                       ariaLabel={t('common.form.name')}
                     />
-                  </DescriptionDetails>
-
-                  <DescriptionTerm>{t('common.form.status')}</DescriptionTerm>
-                  <DescriptionDetails>
+                  </FieldRow>
+                  <FieldRow label={t('common.form.status')}>
                     <EditableField
                       as="select"
                       value={equipment.status}
@@ -589,10 +590,8 @@ export default function EquipmentDetailPage() {
                         </Badge>
                       )}
                     />
-                  </DescriptionDetails>
-
-                  <DescriptionTerm>{t('equipment.form.type')}</DescriptionTerm>
-                  <DescriptionDetails>
+                  </FieldRow>
+                  <FieldRow label={t('equipment.form.type')}>
                     <EditableField
                       as="select"
                       value={equipment.equipmentTypeId ?? ''}
@@ -600,10 +599,8 @@ export default function EquipmentDetailPage() {
                       onSave={(v) => handleSaveType(v)}
                       ariaLabel={t('equipment.form.type')}
                     />
-                  </DescriptionDetails>
-
-                  <DescriptionTerm>{t('equipment.form.category')}</DescriptionTerm>
-                  <DescriptionDetails>
+                  </FieldRow>
+                  <FieldRow label={t('equipment.form.category')}>
                     <EditableField
                       as="select"
                       value={equipment.equipmentCategoryId ?? ''}
@@ -612,117 +609,109 @@ export default function EquipmentDetailPage() {
                       disabled={!equipment.equipmentTypeId}
                       ariaLabel={t('equipment.form.category')}
                     />
-                  </DescriptionDetails>
-
-                  <DescriptionTerm>{t('equipment.form.make')}</DescriptionTerm>
-                  <DescriptionDetails>
+                  </FieldRow>
+                  <FieldRow label={t('equipment.form.make')}>
                     <EditableField
                       value={equipment.make ?? ''}
                       onSave={(v) => handleSaveField('make', v || null)}
                       ariaLabel={t('equipment.form.make')}
                     />
-                  </DescriptionDetails>
-
-                  <DescriptionTerm>{t('equipment.form.model')}</DescriptionTerm>
-                  <DescriptionDetails>
+                  </FieldRow>
+                  <FieldRow label={t('equipment.form.model')}>
                     <EditableField
                       value={equipment.model ?? ''}
                       onSave={(v) => handleSaveField('model', v || null)}
                       ariaLabel={t('equipment.form.model')}
                     />
-                  </DescriptionDetails>
-
-                  <DescriptionTerm>{t('equipment.form.serialNumber')}</DescriptionTerm>
-                  <DescriptionDetails>
+                  </FieldRow>
+                  <FieldRow label={t('equipment.form.serialNumber')}>
                     <EditableField
                       value={equipment.serialNumber ?? ''}
                       onSave={(v) => handleSaveField('serialNumber', v || null)}
                       ariaLabel={t('equipment.form.serialNumber')}
                       className="font-mono"
                     />
-                  </DescriptionDetails>
-
-                  <DescriptionTerm>{t('equipment.form.assetTag')}</DescriptionTerm>
-                  <DescriptionDetails>
+                  </FieldRow>
+                  <FieldRow label={t('equipment.form.assetTag')}>
                     <EditableField
                       value={equipment.assetTag ?? ''}
                       onSave={(v) => handleSaveField('assetTag', v || null)}
                       ariaLabel={t('equipment.form.assetTag')}
                       className="font-mono"
                     />
-                  </DescriptionDetails>
-
-                  <DescriptionTerm>{t('equipment.form.locationOnSite')}</DescriptionTerm>
-                  <DescriptionDetails>
+                  </FieldRow>
+                  <FieldRow label={t('equipment.form.locationOnSite')}>
                     <EditableField
                       value={equipment.locationOnSite ?? ''}
                       onSave={(v) => handleSaveField('locationOnSite', v || null)}
                       ariaLabel={t('equipment.form.locationOnSite')}
                     />
-                  </DescriptionDetails>
-                </DescriptionList>
-              </div>
+                  </FieldRow>
+                </FieldGrid>
+              </section>
 
-              {/* Lifecycle */}
-              <div className="rounded-lg border border-zinc-200 p-3 dark:border-zinc-800">
-                <Heading level={3} className="text-base">
-                  {t('equipment.detail.lifecycle')}
-                </Heading>
-                <DescriptionList className="mt-2">
-                  <DescriptionTerm>{t('equipment.form.installDate')}</DescriptionTerm>
-                  <DescriptionDetails>
+              {/* Lifecycle. Hidden entirely when every editable field is
+                  empty (and lastServicedAt is null) — six rows of "—"
+                  alongside a populated Identification card was reading as
+                  "this page is half-broken." Add via the Edit dialog;
+                  once any field is set the section reappears. */}
+              {lifecycleHasData && (
+                <section className="rounded-lg border border-zinc-200 p-2.5 dark:border-zinc-800">
+                  <SectionLabel>{t('equipment.detail.lifecycle')}</SectionLabel>
+                  <FieldGrid className="mt-1.5">
+                    <FieldRow label={t('equipment.form.installDate')}>
+                      <EditableField
+                        value={equipment.installDate ?? ''}
+                        onSave={(v) => handleSaveField('installDate', v || null)}
+                        ariaLabel={t('equipment.form.installDate')}
+                        renderDisplay={(v) => (v ? formatDate(v) : '—')}
+                      />
+                    </FieldRow>
+                    <FieldRow label={t('equipment.detail.lastServiced')}>
+                      <span>
+                        {equipment.lastServicedAt ? formatDate(equipment.lastServicedAt) : '—'}
+                      </span>
+                    </FieldRow>
+                    <FieldRow label={t('equipment.form.warrantyExpiresAt')}>
+                      <EditableField
+                        value={equipment.warrantyExpiresAt ?? ''}
+                        onSave={(v) => handleSaveField('warrantyExpiresAt', v || null)}
+                        ariaLabel={t('equipment.form.warrantyExpiresAt')}
+                        renderDisplay={(v) => (v ? formatDate(v) : '—')}
+                      />
+                    </FieldRow>
+                    <FieldRow label={t('equipment.form.warrantyDetails')}>
+                      <EditableField
+                        value={equipment.warrantyDetails ?? ''}
+                        onSave={(v) => handleSaveField('warrantyDetails', v || null)}
+                        ariaLabel={t('equipment.form.warrantyDetails')}
+                      />
+                    </FieldRow>
+                    <FieldRow label={t('equipment.detail.created')}>
+                      <span>{formatDate(equipment.createdAt)}</span>
+                    </FieldRow>
+                  </FieldGrid>
+                </section>
+              )}
+
+              {/* Description. Hidden when empty — same reasoning as
+                  Lifecycle; an empty card with a placeholder textarea
+                  doesn't earn its vertical weight. Adding a description is
+                  rare and reachable via the Edit dialog. */}
+              {hasDescription && (
+                <section className="rounded-lg border border-zinc-200 p-2.5 lg:col-span-2 dark:border-zinc-800">
+                  <SectionLabel>{t('common.form.description')}</SectionLabel>
+                  <div className="mt-1.5">
                     <EditableField
-                      value={equipment.installDate ?? ''}
-                      onSave={(v) => handleSaveField('installDate', v || null)}
-                      ariaLabel={t('equipment.form.installDate')}
-                      renderDisplay={(v) => (v ? formatDate(v) : '—')}
+                      as="textarea"
+                      value={equipment.description ?? ''}
+                      onSave={(v) => handleSaveField('description', v || null)}
+                      ariaLabel={t('common.form.description')}
+                      placeholder={t('equipment.detail.descriptionPlaceholder')}
                     />
-                  </DescriptionDetails>
-
-                  <DescriptionTerm>{t('equipment.detail.lastServiced')}</DescriptionTerm>
-                  <DescriptionDetails>
-                    {equipment.lastServicedAt ? formatDate(equipment.lastServicedAt) : '—'}
-                  </DescriptionDetails>
-
-                  <DescriptionTerm>{t('equipment.form.warrantyExpiresAt')}</DescriptionTerm>
-                  <DescriptionDetails>
-                    <EditableField
-                      value={equipment.warrantyExpiresAt ?? ''}
-                      onSave={(v) => handleSaveField('warrantyExpiresAt', v || null)}
-                      ariaLabel={t('equipment.form.warrantyExpiresAt')}
-                      renderDisplay={(v) => (v ? formatDate(v) : '—')}
-                    />
-                  </DescriptionDetails>
-
-                  <DescriptionTerm>{t('equipment.form.warrantyDetails')}</DescriptionTerm>
-                  <DescriptionDetails>
-                    <EditableField
-                      value={equipment.warrantyDetails ?? ''}
-                      onSave={(v) => handleSaveField('warrantyDetails', v || null)}
-                      ariaLabel={t('equipment.form.warrantyDetails')}
-                    />
-                  </DescriptionDetails>
-
-                  <DescriptionTerm>{t('equipment.detail.created')}</DescriptionTerm>
-                  <DescriptionDetails>{formatDate(equipment.createdAt)}</DescriptionDetails>
-                </DescriptionList>
-              </div>
-
-              {/* Description (full-width) */}
-              <div className="rounded-lg border border-zinc-200 p-3 lg:col-span-2 dark:border-zinc-800">
-                <Heading level={3} className="text-base">
-                  {t('common.form.description')}
-                </Heading>
-                <div className="mt-2">
-                  <EditableField
-                    as="textarea"
-                    value={equipment.description ?? ''}
-                    onSave={(v) => handleSaveField('description', v || null)}
-                    ariaLabel={t('common.form.description')}
-                    placeholder={t('equipment.detail.descriptionPlaceholder')}
-                  />
-                </div>
-              </div>
+                  </div>
+                </section>
+              )}
             </div>
           )}
 
@@ -1124,5 +1113,54 @@ function ComponentsTreeNode({ node, depth, descendantsByParent }: ComponentsTree
         </ul>
       )}
     </li>
+  );
+}
+
+/** Small uppercase section header used by the dense overview cards. */
+function SectionLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <h3 className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+      {children}
+    </h3>
+  );
+}
+
+/**
+ * Compact 2-col label/value grid. Replaces Catalyst DescriptionList on
+ * dense surfaces — DescriptionList's per-row borders + 12px padding each
+ * side eat ~24px per row; this grid uses 4px gaps and no borders, taking
+ * each row down to ~24px total height.
+ */
+function FieldGrid({ children, className }: { children: React.ReactNode; className?: string }) {
+  return (
+    <dl
+      className={[
+        'grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1 text-sm text-zinc-950 dark:text-white',
+        className ?? '',
+      ]
+        .filter(Boolean)
+        .join(' ')}
+    >
+      {children}
+    </dl>
+  );
+}
+
+interface FieldRowProps {
+  label: string;
+  children: React.ReactNode;
+}
+
+/** Single row in a FieldGrid. Consumer passes the value via children
+ *  (typically an EditableField) so we don't have to expose every variant
+ *  of EditableField as props. */
+function FieldRow({ label, children }: FieldRowProps) {
+  return (
+    <>
+      <dt className="self-center text-xs uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+        {label}
+      </dt>
+      <dd className="min-w-0 self-center">{children}</dd>
+    </>
   );
 }
