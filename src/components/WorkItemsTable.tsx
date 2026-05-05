@@ -1,13 +1,18 @@
 import { useState } from 'react';
 import { Link as RouterLink } from 'react-router-dom';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import {
+  equipmentApi,
   type StatusWorkflowRule,
+  type UpdateEquipmentRequest,
+  type WorkItemEquipmentSummary,
   type WorkItemResponse,
   type WorkItemStatus,
 } from '../api';
 import { useGlossary } from '../contexts/GlossaryContext';
 import { formatRelativeTime } from '../utils/formatRelativeTime';
+import EquipmentThumbnail from './EquipmentThumbnail';
 import {
   Table,
   TableBody,
@@ -16,12 +21,8 @@ import {
   TableHeader,
   TableRow,
 } from './catalyst/table';
-import {
-  DescriptionList,
-  DescriptionTerm,
-  DescriptionDetails,
-} from './catalyst/description-list';
 import { Text } from './catalyst/text';
+import { Button } from './catalyst/button';
 import {
   Dropdown,
   DropdownButton,
@@ -30,8 +31,10 @@ import {
   DropdownMenu,
 } from './catalyst/dropdown';
 import {
+  ArrowTopRightOnSquareIcon,
   ChevronRightIcon,
   EllipsisHorizontalIcon,
+  PencilIcon,
   PlusIcon,
 } from '@heroicons/react/24/outline';
 import EditableField from './EditableField';
@@ -44,7 +47,8 @@ interface Props {
   workflows: StatusWorkflowRule[];
   enforceWorkflow: boolean;
   readOnly?: boolean;
-  /** When provided, each row gets a per-row menu with an Edit option. */
+  /** When provided, each row gets a per-row menu with an Edit option. Also
+   *  drives the "Add equipment" affordance in the empty-state expansion. */
   onEdit?: (wi: WorkItemResponse) => void;
   /** When provided, each row gets a per-row menu with a Delete option. */
   onDelete?: (wi: WorkItemResponse) => void;
@@ -54,6 +58,12 @@ interface Props {
    * error. Status edits go through the pill, not this callback.
    */
   onSaveDescription?: (wi: WorkItemResponse, next: string) => Promise<void>;
+  /**
+   * When provided, the "Edit all" button in an expanded equipment block calls
+   * this with the equipment id. The parent is expected to fetch the full
+   * Equipment record and open EquipmentFormDialog over the work order page.
+   */
+  onEditEquipment?: (equipmentId: string) => void;
 }
 
 export default function WorkItemsTable({
@@ -66,9 +76,11 @@ export default function WorkItemsTable({
   onEdit,
   onDelete,
   onSaveDescription,
+  onEditEquipment,
 }: Props) {
   const { t } = useTranslation();
   const { getName } = useGlossary();
+  const queryClient = useQueryClient();
 
   // Independent expansion state per row — multiple rows may be expanded at the
   // same time (CSRs comparing two items). Resets on navigation; not persisted.
@@ -83,6 +95,52 @@ export default function WorkItemsTable({
       }
       return next;
     });
+  };
+
+  // Equipment summaries are embedded on workItems[].equipment in WO responses,
+  // so single-field PATCHes have to refresh both work-order query prefixes
+  // (single detail and paginated lists). Mirrors the helper on
+  // EquipmentDetailPage so cross-surface edits stay coherent.
+  const invalidateEquipmentRelatedCaches = (equipmentId: string) => {
+    queryClient.invalidateQueries({ queryKey: ['equipment-detail', equipmentId] });
+    queryClient.invalidateQueries({ queryKey: ['equipment'] });
+    queryClient.invalidateQueries({ queryKey: ['work-orders'] });
+    queryClient.invalidateQueries({ queryKey: ['work-orders-list'] });
+  };
+
+  const updateEquipmentMutation = useMutation({
+    mutationFn: ({
+      equipmentId,
+      data,
+    }: {
+      equipmentId: string;
+      data: UpdateEquipmentRequest;
+    }) => equipmentApi.update(equipmentId, data),
+    onSuccess: (_data, vars) => invalidateEquipmentRelatedCaches(vars.equipmentId),
+  });
+
+  // Single-field equipment PATCH used by every EditableField in the expanded
+  // equipment block. Throws on failure so the field stays in edit mode and the
+  // user can retry / Esc to cancel — same pattern as EquipmentDetailPage and
+  // WorkOrderDetailPage.
+  const handleSaveEquipmentField = async <K extends keyof UpdateEquipmentRequest>(
+    equipmentId: string,
+    field: K,
+    next: UpdateEquipmentRequest[K]
+  ) => {
+    try {
+      await updateEquipmentMutation.mutateAsync({
+        equipmentId,
+        data: { [field]: next } as UpdateEquipmentRequest,
+      });
+    } catch (err) {
+      const msg =
+        err instanceof Error && 'response' in err
+          ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
+          : undefined;
+      alert(msg || t('common.form.errorUpdate', { entity: getName('equipment') }));
+      throw err;
+    }
   };
 
   if (workItems.length === 0) {
@@ -101,8 +159,10 @@ export default function WorkItemsTable({
   // Show the actions column only when at least one callback is wired up and the
   // WO isn't frozen — keeps the column out entirely on read-only views.
   const showActions = !readOnly && !!(onEdit || onDelete);
-  // chevron + status + description + lastUpdated (+ actions)
-  const totalCols = 4 + (showActions ? 1 : 0);
+  // chevron + status + description (+ actions). "Last updated" column dropped
+  // — its content lives in the muted footer at the bottom of the expansion now,
+  // so it doesn't have to fight description for column width.
+  const totalCols = 3 + (showActions ? 1 : 0);
 
   return (
     <Table dense className="[--gutter:theme(spacing.1)] text-sm">
@@ -117,7 +177,6 @@ export default function WorkItemsTable({
               intrinsic preferred width (cols=20) is narrower than the wrapped
               text's max-content. */}
           <TableHeader className="w-full">{t('common.form.description')}</TableHeader>
-          <TableHeader className="w-px whitespace-nowrap">{t('workOrders.workItems.lastUpdated')}</TableHeader>
           {showActions && <TableHeader className="w-12" />}
         </TableRow>
       </TableHead>
@@ -158,31 +217,45 @@ export default function WorkItemsTable({
                   readOnly={readOnly}
                 />
               </TableCell>
-              <TableCell className="whitespace-pre-wrap break-words">
-                {onSaveDescription && !readOnly ? (
-                  <EditableField
-                    as="textarea"
-                    value={wi.description}
-                    onSave={(next) => onSaveDescription(wi, next)}
-                    rows={3}
-                    ariaLabel={t('workOrders.workItems.editDescription')}
-                  />
-                ) : (
-                  wi.description
-                )}
-                {wi.equipment && (
-                  <div className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-                    <RouterLink
-                      to={`/equipment/${wi.equipment.id}`}
-                      className="hover:text-blue-600 hover:underline dark:hover:text-blue-400"
-                    >
-                      {wi.equipment.name}
-                    </RouterLink>
+              <TableCell>
+                {/* Thumbnail + description as a 2-column flex. Thumbnail
+                    gives CSRs a visual id when scanning the table — much
+                    faster than reading model/serial. */}
+                <div className="flex items-start gap-2">
+                  {wi.equipment ? (
+                    <EquipmentThumbnail
+                      url={wi.equipment.profileImageUrl}
+                      name={wi.equipment.name}
+                      sizeClass="size-8"
+                      fit="contain"
+                    />
+                  ) : (
+                    <div className="size-8 shrink-0" aria-hidden />
+                  )}
+                  <div className="min-w-0 flex-1 whitespace-pre-wrap break-words">
+                    {onSaveDescription && !readOnly ? (
+                      <EditableField
+                        as="textarea"
+                        value={wi.description}
+                        onSave={(next) => onSaveDescription(wi, next)}
+                        rows={3}
+                        ariaLabel={t('workOrders.workItems.editDescription')}
+                      />
+                    ) : (
+                      wi.description
+                    )}
+                    {wi.equipment && (
+                      <div className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                        <RouterLink
+                          to={`/equipment/${wi.equipment.id}`}
+                          className="hover:text-blue-600 hover:underline dark:hover:text-blue-400"
+                        >
+                          {wi.equipment.name}
+                        </RouterLink>
+                      </div>
+                    )}
                   </div>
-                )}
-              </TableCell>
-              <TableCell className="whitespace-nowrap text-zinc-600 dark:text-zinc-400">
-                {formatRelativeTime(wi.updatedAt)}
+                </div>
               </TableCell>
               {showActions && (
                 <TableCell>
@@ -210,21 +283,18 @@ export default function WorkItemsTable({
           if (expanded) {
             rows.push(
               <TableRow key={detailsId}>
-                {/* Subtle muted bg signals "detail of the row above". The
-                    Catalyst dense cell uses gutter (1) for horizontal
-                    padding, which is too tight for the section content;
-                    inner div restores breathable padding without fighting
-                    Tailwind important overrides. */}
                 <TableCell
                   colSpan={totalCols}
                   className="bg-zinc-50/70 dark:bg-zinc-900/40"
                   id={detailsId}
                 >
-                  <div className="px-3 py-1">
+                  <div className="px-3 py-2">
                     <WorkItemDetailSections
                       workItem={wi}
                       readOnly={readOnly}
                       onEdit={onEdit}
+                      onEditEquipment={onEditEquipment}
+                      onSaveEquipmentField={handleSaveEquipmentField}
                     />
                   </div>
                 </TableCell>
@@ -242,83 +312,98 @@ interface DetailSectionsProps {
   workItem: WorkItemResponse;
   readOnly: boolean;
   onEdit?: (wi: WorkItemResponse) => void;
+  onEditEquipment?: (equipmentId: string) => void;
+  onSaveEquipmentField: <K extends keyof UpdateEquipmentRequest>(
+    equipmentId: string,
+    field: K,
+    next: UpdateEquipmentRequest[K]
+  ) => Promise<void>;
 }
 
 /**
- * Sections rendered inside an expanded work-item row. Today only the
- * Equipment section has data; notes / files / linked entities slot in here
- * as separate sections when their backends ship (see WORK_ORDER_DETAIL_DESIGN.md
- * §3.3 / §7).
+ * Sections rendered inside an expanded work-item row. The Equipment section is
+ * the primary edit surface — most equipment writes happen in WO context, so
+ * fields here are inline-editable rather than read-only summaries.
+ *
+ * Sub-units, photos, equipment notes, and linked-entity chips slot in as
+ * follow-up sections nested under the Equipment block once their backends
+ * land. The "Updated" footer is OUTSIDE the equipment block — it's the work
+ * item's timestamp, not the equipment's.
  */
-function WorkItemDetailSections({ workItem, readOnly, onEdit }: DetailSectionsProps) {
+function WorkItemDetailSections({
+  workItem,
+  readOnly,
+  onEdit,
+  onEditEquipment,
+  onSaveEquipmentField,
+}: DetailSectionsProps) {
   const { t } = useTranslation();
-  const { getName } = useGlossary();
   const equipment = workItem.equipment;
 
-  const typeCategoryLine = equipment
-    ? [equipment.equipmentTypeName, equipment.equipmentCategoryName]
-        .filter(Boolean)
-        .join(' · ')
-    : '';
-  const makeModel = equipment
-    ? [equipment.make, equipment.model].filter(Boolean).join(' ')
-    : '';
-
   return (
-    <section aria-label={getName('equipment')}>
-      <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-        {getName('equipment')}
-      </div>
+    <div className="space-y-3">
+      <EquipmentBlock
+        equipment={equipment}
+        workItem={workItem}
+        readOnly={readOnly}
+        onEditWorkItem={onEdit}
+        onEditEquipment={onEditEquipment}
+        onSaveEquipmentField={onSaveEquipmentField}
+      />
 
-      {equipment ? (
-        <div className="mt-2">
-          <RouterLink
-            to={`/equipment/${equipment.id}`}
-            className="font-medium text-zinc-950 hover:text-blue-600 hover:underline dark:text-white dark:hover:text-blue-400"
-          >
-            {equipment.name}
-          </RouterLink>
-          {typeCategoryLine && (
-            <div className="text-xs text-zinc-500 dark:text-zinc-400">
-              {typeCategoryLine}
-            </div>
-          )}
-          {(makeModel || equipment.serialNumber || equipment.locationOnSite) && (
-            <DescriptionList className="mt-2">
-              {makeModel && (
-                <>
-                  <DescriptionTerm>{t('equipment.table.makeModel')}</DescriptionTerm>
-                  <DescriptionDetails>{makeModel}</DescriptionDetails>
-                </>
-              )}
-              {equipment.serialNumber && (
-                <>
-                  <DescriptionTerm>{t('equipment.form.serialNumber')}</DescriptionTerm>
-                  <DescriptionDetails className="font-mono">
-                    {equipment.serialNumber}
-                  </DescriptionDetails>
-                </>
-              )}
-              {equipment.locationOnSite && (
-                <>
-                  <DescriptionTerm>{t('equipment.form.locationOnSite')}</DescriptionTerm>
-                  <DescriptionDetails>{equipment.locationOnSite}</DescriptionDetails>
-                </>
-              )}
-            </DescriptionList>
-          )}
-        </div>
-      ) : (
-        <div className="mt-2 flex flex-wrap items-center gap-2">
+      {/* Work-item metadata footer — OUTSIDE the equipment block. This is the
+          work item's updatedAt, not the equipment's; nesting it inside
+          Equipment would conflate two entities. */}
+      <div className="text-xs italic text-zinc-500 dark:text-zinc-400">
+        {t('workOrders.workItems.updatedFooter', {
+          time: formatRelativeTime(workItem.updatedAt),
+        })}
+      </div>
+    </div>
+  );
+}
+
+interface EquipmentBlockProps {
+  equipment: WorkItemEquipmentSummary | null;
+  workItem: WorkItemResponse;
+  readOnly: boolean;
+  onEditWorkItem?: (wi: WorkItemResponse) => void;
+  onEditEquipment?: (equipmentId: string) => void;
+  onSaveEquipmentField: <K extends keyof UpdateEquipmentRequest>(
+    equipmentId: string,
+    field: K,
+    next: UpdateEquipmentRequest[K]
+  ) => Promise<void>;
+}
+
+function EquipmentBlock({
+  equipment,
+  workItem,
+  readOnly,
+  onEditWorkItem,
+  onEditEquipment,
+  onSaveEquipmentField,
+}: EquipmentBlockProps) {
+  const { t } = useTranslation();
+  const { getName } = useGlossary();
+
+  // Empty state — no equipment linked. Show the section header so the surface
+  // is consistent across rows, plus an inline action to attach equipment via
+  // the work-item edit dialog (where the equipment picker lives).
+  if (!equipment) {
+    return (
+      <section aria-label={getName('equipment')}>
+        <SectionHeader label={getName('equipment')} />
+        <div className="mt-1 flex flex-wrap items-center gap-2">
           <Text className="text-zinc-600 dark:text-zinc-400">
             {t('workOrders.workItems.noEquipmentLinked', {
               entity: getName('equipment'),
             })}
           </Text>
-          {!readOnly && onEdit && (
+          {!readOnly && onEditWorkItem && (
             <button
               type="button"
-              onClick={() => onEdit(workItem)}
+              onClick={() => onEditWorkItem(workItem)}
               className="inline-flex items-center gap-1 text-blue-600 hover:underline dark:text-blue-400"
             >
               <PlusIcon className="size-4" />
@@ -326,7 +411,158 @@ function WorkItemDetailSections({ workItem, readOnly, onEdit }: DetailSectionsPr
             </button>
           )}
         </div>
-      )}
+      </section>
+    );
+  }
+
+  const typeCategoryLine = [equipment.equipmentTypeName, equipment.equipmentCategoryName]
+    .filter(Boolean)
+    .join(' · ');
+
+  const saveField = <K extends keyof UpdateEquipmentRequest>(
+    field: K,
+    value: UpdateEquipmentRequest[K]
+  ) => onSaveEquipmentField(equipment.id, field, value);
+
+  return (
+    <section aria-label={getName('equipment')}>
+      <SectionHeader
+        label={getName('equipment')}
+        actions={
+          <>
+            {!readOnly && onEditEquipment && (
+              <Button plain onClick={() => onEditEquipment(equipment.id)}>
+                <PencilIcon className="size-4" />
+                {t('workOrders.workItems.editAll')}
+              </Button>
+            )}
+            <Button plain href={`/equipment/${equipment.id}`}>
+              <ArrowTopRightOnSquareIcon className="size-4" />
+              {t('workOrders.workItems.openPage')}
+            </Button>
+          </>
+        }
+      />
+
+      {/* Identity row: thumbnail (48px) + name + type/category subline. */}
+      <div className="mt-1 flex items-start gap-3">
+        <EquipmentThumbnail
+          url={equipment.profileImageUrl}
+          name={equipment.name}
+          sizeClass="size-12"
+          fit="contain"
+        />
+        <div className="min-w-0 flex-1">
+          {readOnly ? (
+            <RouterLink
+              to={`/equipment/${equipment.id}`}
+              className="font-medium text-zinc-950 hover:text-blue-600 hover:underline dark:text-white dark:hover:text-blue-400"
+            >
+              {equipment.name}
+            </RouterLink>
+          ) : (
+            <EditableField
+              value={equipment.name}
+              onSave={(v) => saveField('name', v)}
+              ariaLabel={t('common.form.name')}
+              className="font-medium"
+            />
+          )}
+          {typeCategoryLine && (
+            <div className="text-xs text-zinc-500 dark:text-zinc-400">
+              {typeCategoryLine}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Inline-edit grid of currently-projected fields. Make/Model/Serial/
+          Location-on-Site cover the day-to-day edits; deeper fields (asset
+          tag, install date, warranty, description) live behind "Edit all". */}
+      <dl className="mt-2 grid grid-cols-1 gap-x-6 gap-y-1 text-sm sm:grid-cols-[max-content_1fr_max-content_1fr]">
+        <FieldRow
+          label={t('equipment.form.make')}
+          value={equipment.make ?? ''}
+          onSave={(v) => saveField('make', v || null)}
+          ariaLabel={t('equipment.form.make')}
+          readOnly={readOnly}
+        />
+        <FieldRow
+          label={t('equipment.form.model')}
+          value={equipment.model ?? ''}
+          onSave={(v) => saveField('model', v || null)}
+          ariaLabel={t('equipment.form.model')}
+          readOnly={readOnly}
+        />
+        <FieldRow
+          label={t('equipment.form.serialNumber')}
+          value={equipment.serialNumber ?? ''}
+          onSave={(v) => saveField('serialNumber', v || null)}
+          ariaLabel={t('equipment.form.serialNumber')}
+          readOnly={readOnly}
+          className="font-mono"
+        />
+        <FieldRow
+          label={t('equipment.form.locationOnSite')}
+          value={equipment.locationOnSite ?? ''}
+          onSave={(v) => saveField('locationOnSite', v || null)}
+          ariaLabel={t('equipment.form.locationOnSite')}
+          readOnly={readOnly}
+        />
+      </dl>
     </section>
+  );
+}
+
+interface SectionHeaderProps {
+  label: string;
+  actions?: React.ReactNode;
+}
+
+function SectionHeader({ label, actions }: SectionHeaderProps) {
+  return (
+    <div className="flex items-center justify-between gap-2">
+      <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+        {label}
+      </div>
+      {actions && <div className="flex items-center gap-1">{actions}</div>}
+    </div>
+  );
+}
+
+interface FieldRowProps {
+  label: string;
+  value: string;
+  onSave: (next: string) => Promise<void>;
+  ariaLabel: string;
+  readOnly: boolean;
+  className?: string;
+}
+
+/**
+ * Row in the inline-edit grid. Renders a label cell + a value cell; the value
+ * cell is an EditableField when not readOnly. The grid lives in the parent
+ * (`grid-cols-[max-content_1fr_max-content_1fr]`) so two FieldRows side-by-side
+ * fill one visual row.
+ */
+function FieldRow({ label, value, onSave, ariaLabel, readOnly, className }: FieldRowProps) {
+  return (
+    <>
+      <dt className="self-center text-xs uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+        {label}
+      </dt>
+      <dd className="self-center">
+        {readOnly ? (
+          <span className={className}>{value || '—'}</span>
+        ) : (
+          <EditableField
+            value={value}
+            onSave={onSave}
+            ariaLabel={ariaLabel}
+            className={className}
+          />
+        )}
+      </dd>
+    </>
   );
 }

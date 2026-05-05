@@ -3,12 +3,14 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import {
+  equipmentApi,
   workOrderApi,
   workOrderTypesApi,
   divisionsApi,
   workItemStatusesApi,
   statusWorkflowsApi,
   workflowConfigApi,
+  type Equipment,
   type ProgressCategory,
   type UpdateWorkOrderRequest,
   type WorkItemResponse,
@@ -17,6 +19,7 @@ import {
 import { useGlossary } from '../contexts/GlossaryContext';
 import AppLayout from '../components/AppLayout';
 import EditableField from '../components/EditableField';
+import EquipmentFormDialog from '../components/EquipmentFormDialog';
 import WorkItemFormDialog from '../components/WorkItemFormDialog';
 import WorkItemsTable from '../components/WorkItemsTable';
 import WorkOrderActivityRail from '../components/WorkOrderActivityRail';
@@ -81,14 +84,6 @@ const PRIORITY_TRANSLATION_KEYS: Record<WorkOrderPriority, string> = {
   URGENT: 'urgent',
 };
 
-const MONEY_CHIPS: { key: string; labelKey: string }[] = [
-  { key: 'quoted', labelKey: 'workOrders.detail.money.quoted' },
-  { key: 'invoiced', labelKey: 'workOrders.detail.money.invoiced' },
-  { key: 'paid', labelKey: 'workOrders.detail.money.paid' },
-  { key: 'nte', labelKey: 'workOrders.detail.money.nte' },
-  { key: 'balance', labelKey: 'workOrders.detail.money.balance' },
-];
-
 function formatDate(iso: string | null | undefined): string {
   if (!iso) return '-';
   return new Date(iso).toLocaleDateString('en-US', {
@@ -108,6 +103,26 @@ export default function WorkOrderDetailPage() {
   const [activitySheetOpen, setActivitySheetOpen] = useState(false);
   const [workItemDialogOpen, setWorkItemDialogOpen] = useState(false);
   const [editingWorkItem, setEditingWorkItem] = useState<WorkItemResponse | null>(null);
+  // Equipment edit dialog opens from a work-item row's "Edit all" button. We
+  // fetch the full Equipment record on demand because WorkItemEquipmentSummary
+  // doesn't carry the deeper fields the dialog edits (description, install
+  // date, warranty, etc.).
+  const [equipmentDialogOpen, setEquipmentDialogOpen] = useState(false);
+  const [editingEquipment, setEditingEquipment] = useState<Equipment | null>(null);
+
+  const handleEditEquipment = async (equipmentId: string) => {
+    try {
+      const full = await equipmentApi.getById(equipmentId);
+      setEditingEquipment(full);
+      setEquipmentDialogOpen(true);
+    } catch (err) {
+      const msg =
+        err instanceof Error && 'response' in err
+          ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
+          : undefined;
+      alert(msg || t('common.actions.errorLoadingEntity', { entity: getName('equipment') }));
+    }
+  };
 
 
   const deleteWorkItemMutation = useMutation({
@@ -384,15 +399,10 @@ export default function WorkOrderDetailPage() {
             )}
           </div>
 
-          {/* Row 3 — money chips. Phase 1: render values as placeholders;
-              the financial detail drawer (and live values) wires up in phase 7. */}
-          <div className="mt-2 flex flex-wrap items-center gap-2">
-            {MONEY_CHIPS.map((chip) => (
-              <Badge key={chip.key} color="zinc" className="cursor-default opacity-70">
-                {t('workOrders.detail.money.placeholder', { label: t(chip.labelKey) })}
-              </Badge>
-            ))}
-          </div>
+          {/* Row 3 — money chips, hidden until phase 7 (financial detail
+              drawer + live values). A row of "$ —" placeholders communicates
+              nothing on a fresh WO and burns vertical real estate; better to
+              show nothing until there's something to show. */}
 
           {/* Action bar — buttons render to lock in the layout; functionality lands in
               later phases (work-item dialog phase 4, dispatch phase 6, notes phase 5,
@@ -598,6 +608,7 @@ export default function WorkOrderDetailPage() {
               }}
               onDelete={handleDeleteWorkItem}
               onSaveDescription={handleSaveWorkItemDescription}
+              onEditEquipment={handleEditEquipment}
             />
           </main>
 
@@ -646,6 +657,15 @@ export default function WorkOrderDetailPage() {
         serviceLocationId={workOrder.serviceLocationId || workOrder.serviceLocation?.id}
         workItem={editingWorkItem}
         readOnly={isCancelled || isArchived}
+      />
+
+      <EquipmentFormDialog
+        isOpen={equipmentDialogOpen}
+        onClose={() => {
+          setEquipmentDialogOpen(false);
+          setEditingEquipment(null);
+        }}
+        equipment={editingEquipment}
       />
     </AppLayout>
   );

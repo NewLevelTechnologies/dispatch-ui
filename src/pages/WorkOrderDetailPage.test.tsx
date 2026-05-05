@@ -160,15 +160,18 @@ describe('WorkOrderDetailPage', () => {
     });
   });
 
-  it('renders money chip placeholders', async () => {
+  it('hides the money chip row until phase 7 (financial detail drawer)', async () => {
     mockApiResponses();
     renderPage();
+    // Wait for the page to settle then assert no chip placeholders render —
+    // a row of "$ —" stubs communicates nothing on a fresh WO and is hidden
+    // until live values flow in phase 7.
     await waitFor(() => {
-      expect(screen.getByText(/quoted/i)).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: /WO-/i })).toBeInTheDocument();
     });
-    expect(screen.getByText(/invoiced/i)).toBeInTheDocument();
-    expect(screen.getByText(/paid/i)).toBeInTheDocument();
-    expect(screen.getByText(/balance/i)).toBeInTheDocument();
+    expect(screen.queryByText(/quoted/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/invoiced/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/balance/i)).not.toBeInTheDocument();
   });
 
   it('renders the Service Location card with location name and address linked', async () => {

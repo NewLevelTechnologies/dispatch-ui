@@ -1,8 +1,21 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { screen } from '@testing-library/react';
+import { screen, waitFor } from '@testing-library/react';
 import { renderWithProviders, userEvent } from '../test/utils';
 import WorkItemsTable from './WorkItemsTable';
 import type { WorkItemEquipmentSummary, WorkItemResponse } from '../api';
+
+const mockEquipmentUpdate = vi.fn();
+
+vi.mock('../api/equipmentApi', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../api/equipmentApi')>();
+  return {
+    ...actual,
+    equipmentApi: {
+      ...actual.equipmentApi,
+      update: (...args: unknown[]) => mockEquipmentUpdate(...args),
+    },
+  };
+});
 
 vi.mock('../api/client');
 
@@ -38,6 +51,7 @@ const equip = (overrides: Partial<WorkItemEquipmentSummary> = {}): WorkItemEquip
 describe('WorkItemsTable', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockEquipmentUpdate.mockResolvedValue({ id: 'eq-1' });
   });
 
   it('renders the empty state when there are no work items', () => {
@@ -84,6 +98,23 @@ describe('WorkItemsTable', () => {
     ).not.toBeInTheDocument();
   });
 
+  it('does not render a "Last updated" column header in the table', () => {
+    renderWithProviders(
+      <WorkItemsTable
+        workOrderId="wo-1"
+        workItems={[wi('wi-1', 'Replace filter', { equipment: equip() })]}
+        statuses={[]}
+        workflows={[]}
+        enforceWorkflow={false}
+      />
+    );
+    // The table now has Status / Description / (actions) headers only —
+    // last-updated moved into the expansion footer.
+    expect(
+      screen.queryByRole('columnheader', { name: /last updated/i })
+    ).not.toBeInTheDocument();
+  });
+
   describe('row expansion', () => {
     it('renders a collapsed row with an expand toggle', () => {
       renderWithProviders(
@@ -97,11 +128,11 @@ describe('WorkItemsTable', () => {
       );
       const toggle = screen.getByRole('button', { name: /show details/i });
       expect(toggle).toHaveAttribute('aria-expanded', 'false');
-      // Equipment detail content should not be in the document yet.
-      expect(screen.queryByText('Carrier 58TN0A080-V17')).not.toBeInTheDocument();
+      // Footer text only renders when expanded.
+      expect(screen.queryByText(/^updated /i)).not.toBeInTheDocument();
     });
 
-    it('expands the row to reveal equipment details when the toggle is clicked', async () => {
+    it('expands the row to reveal equipment details and the updated footer', async () => {
       const user = userEvent.setup();
       renderWithProviders(
         <WorkItemsTable
@@ -115,15 +146,108 @@ describe('WorkItemsTable', () => {
 
       await user.click(screen.getByRole('button', { name: /show details/i }));
 
-      // Toggle now reads as collapse, aria-expanded flipped.
+      // Toggle flipped state.
       const toggle = screen.getByRole('button', { name: /hide details/i });
       expect(toggle).toHaveAttribute('aria-expanded', 'true');
 
-      // Equipment fields show.
-      expect(screen.getByText('Carrier 58TN0A080-V17')).toBeInTheDocument();
+      // Type/Category subline.
+      expect(screen.getByText(/HVAC · Furnace/)).toBeInTheDocument();
+
+      // Field grid renders each value separately (not "Carrier 58TN..." combined).
+      expect(screen.getByText('Carrier')).toBeInTheDocument();
+      expect(screen.getByText('58TN0A080-V17')).toBeInTheDocument();
       expect(screen.getByText('CHB1234567')).toBeInTheDocument();
       expect(screen.getByText('Basement')).toBeInTheDocument();
-      expect(screen.getByText(/HVAC · Furnace/)).toBeInTheDocument();
+
+      // Work-item updated footer renders below the equipment block.
+      expect(screen.getByText(/^updated /i)).toBeInTheDocument();
+    });
+
+    it('renders the "Edit all" button only when onEditEquipment is provided', async () => {
+      const onEditEquipment = vi.fn();
+      const user = userEvent.setup();
+      renderWithProviders(
+        <WorkItemsTable
+          workOrderId="wo-1"
+          workItems={[wi('wi-1', 'Replace filter', { equipment: equip({ id: 'eq-99' }) })]}
+          statuses={[]}
+          workflows={[]}
+          enforceWorkflow={false}
+          onEditEquipment={onEditEquipment}
+        />
+      );
+
+      await user.click(screen.getByRole('button', { name: /show details/i }));
+
+      const editAll = await screen.findByRole('button', { name: /edit all/i });
+      await user.click(editAll);
+      expect(onEditEquipment).toHaveBeenCalledWith('eq-99');
+    });
+
+    it('renders an "Open page" link to the equipment detail page when expanded', async () => {
+      const user = userEvent.setup();
+      renderWithProviders(
+        <WorkItemsTable
+          workOrderId="wo-1"
+          workItems={[wi('wi-1', 'Replace filter', { equipment: equip({ id: 'eq-42' }) })]}
+          statuses={[]}
+          workflows={[]}
+          enforceWorkflow={false}
+        />
+      );
+
+      await user.click(screen.getByRole('button', { name: /show details/i }));
+
+      const open = await screen.findByRole('link', { name: /open page/i });
+      expect(open).toHaveAttribute('href', '/equipment/eq-42');
+    });
+
+    it('omits "Edit all" in readOnly mode', async () => {
+      const user = userEvent.setup();
+      renderWithProviders(
+        <WorkItemsTable
+          workOrderId="wo-1"
+          workItems={[wi('wi-1', 'Replace filter', { equipment: equip() })]}
+          statuses={[]}
+          workflows={[]}
+          enforceWorkflow={false}
+          readOnly
+          onEditEquipment={vi.fn()}
+        />
+      );
+
+      await user.click(screen.getByRole('button', { name: /show details/i }));
+      expect(
+        screen.queryByRole('button', { name: /edit all/i })
+      ).not.toBeInTheDocument();
+    });
+
+    it('inline-edits the make field via equipmentApi.update', async () => {
+      const user = userEvent.setup();
+      renderWithProviders(
+        <WorkItemsTable
+          workOrderId="wo-1"
+          workItems={[wi('wi-1', 'Replace filter', { equipment: equip({ id: 'eq-7' }) })]}
+          statuses={[]}
+          workflows={[]}
+          enforceWorkflow={false}
+        />
+      );
+
+      await user.click(screen.getByRole('button', { name: /show details/i }));
+
+      // Click the Make field's value (EditableField in display mode renders
+      // a button) — there are two grid cells with "Make" label, so target the
+      // value via aria-label.
+      await user.click(screen.getByRole('button', { name: /^make$/i }));
+      const input = await screen.findByRole('textbox', { name: /^make$/i });
+      await user.clear(input);
+      await user.type(input, 'Trane');
+      input.blur();
+
+      await waitFor(() => {
+        expect(mockEquipmentUpdate).toHaveBeenCalledWith('eq-7', { make: 'Trane' });
+      });
     });
 
     it('collapses the row when the toggle is clicked again', async () => {
@@ -170,27 +294,6 @@ describe('WorkItemsTable', () => {
 
       expect(screen.getByText('SN-A')).toBeInTheDocument();
       expect(screen.getByText('SN-B')).toBeInTheDocument();
-    });
-
-    it('renders the equipment name as a link to its detail page when expanded', async () => {
-      const user = userEvent.setup();
-      renderWithProviders(
-        <WorkItemsTable
-          workOrderId="wo-1"
-          workItems={[wi('wi-1', 'Replace filter', { equipment: equip({ id: 'eq-42' }) })]}
-          statuses={[]}
-          workflows={[]}
-          enforceWorkflow={false}
-        />
-      );
-
-      await user.click(screen.getByRole('button', { name: /show details/i }));
-
-      // Two links to /equipment/eq-42 on the row when expanded — the inline
-      // hint in the description cell and the section header in the expansion.
-      const links = screen.getAllByRole('link', { name: 'Upstairs Furnace' });
-      expect(links.length).toBeGreaterThanOrEqual(1);
-      expect(links[0]).toHaveAttribute('href', '/equipment/eq-42');
     });
 
     it('shows an empty state with an Add Equipment action when no equipment is linked', async () => {
