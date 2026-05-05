@@ -23,6 +23,7 @@ import AppLayout from '../components/AppLayout';
 import TabNavigation from '../components/TabNavigation';
 import EditableField from '../components/EditableField';
 import EquipmentFilterFormDialog from '../components/EquipmentFilterFormDialog';
+import EquipmentFormDialog from '../components/EquipmentFormDialog';
 import EquipmentImageUploadDialog from '../components/EquipmentImageUploadDialog';
 import EquipmentThumbnail from '../components/EquipmentThumbnail';
 import WorkOrdersList from '../components/WorkOrdersList';
@@ -55,6 +56,7 @@ import {
   ArrowLeftIcon,
   ChevronRightIcon,
   EllipsisVerticalIcon,
+  PencilIcon,
   PlusIcon,
   StarIcon as StarIconOutline,
 } from '@heroicons/react/24/outline';
@@ -96,6 +98,7 @@ export default function EquipmentDetailPage() {
   >(null);
   const [isImageUploadOpen, setIsImageUploadOpen] = useState(false);
   const [showAllFilterSizes, setShowAllFilterSizes] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
 
   // Fall back to the equipment list when the user landed here directly (no in-app history).
   const handleBack = () => {
@@ -244,6 +247,42 @@ export default function EquipmentDetailPage() {
       alert(msg || t('equipment.images.errorDelete'));
     },
   });
+
+  // Top-level delete from the header overflow. On success we navigate back to
+  // the list (or wherever in-app history takes us) — the detail page can't
+  // render a deleted record. Cache invalidation pulls in the same prefixes
+  // that EquipmentPage's delete does so list views and embedded WO summaries
+  // refresh in lockstep.
+  const deleteEquipmentMutation = useMutation({
+    mutationFn: () => equipmentApi.delete(id!),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['equipment'] });
+      queryClient.invalidateQueries({ queryKey: ['equipment-descendants'] });
+      queryClient.invalidateQueries({ queryKey: ['work-orders'] });
+      queryClient.invalidateQueries({ queryKey: ['work-orders-list'] });
+      if (routeKey !== 'default') {
+        navigate(-1);
+      } else {
+        navigate('/equipment');
+      }
+    },
+    onError: (err: unknown) => {
+      const msg =
+        err instanceof Error && 'response' in err
+          ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
+          : undefined;
+      alert(msg || t('common.form.errorDelete', { entity: getName('equipment') }));
+    },
+  });
+
+  const handleDeleteEquipment = () => {
+    if (!equipment) return;
+    if (
+      window.confirm(t('common.actions.deleteConfirm', { name: equipment.name }))
+    ) {
+      deleteEquipmentMutation.mutate();
+    }
+  };
 
   // Single-field PATCH used by every EditableField on the page. EditableField
   // stays in edit mode if this throws, so we propagate after surfacing via alert
@@ -461,6 +500,26 @@ export default function EquipmentDetailPage() {
                 {t(`equipment.status.${equipment.status.toLowerCase()}`)}
               </Badge>
             </div>
+          </div>
+
+          {/* Header action group. Edit opens the full form dialog (covers
+              fields not in the inline-edit grid like description/install date/
+              warranty); the overflow menu carries the destructive Delete. */}
+          <div className="flex items-center gap-1">
+            <Button outline onClick={() => setIsEditDialogOpen(true)}>
+              <PencilIcon className="size-4" />
+              {t('common.edit')}
+            </Button>
+            <Dropdown>
+              <DropdownButton plain aria-label={t('common.moreOptions')}>
+                <EllipsisVerticalIcon className="size-5" />
+              </DropdownButton>
+              <DropdownMenu anchor="bottom end">
+                <DropdownItem onClick={handleDeleteEquipment}>
+                  <DropdownLabel>{t('common.delete')}</DropdownLabel>
+                </DropdownItem>
+              </DropdownMenu>
+            </Dropdown>
           </div>
         </div>
 
@@ -901,6 +960,12 @@ export default function EquipmentDetailPage() {
         onClose={() => setIsImageUploadOpen(false)}
         equipmentId={id!}
         defaultSetProfile={images.length === 0}
+      />
+
+      <EquipmentFormDialog
+        isOpen={isEditDialogOpen}
+        onClose={() => setIsEditDialogOpen(false)}
+        equipment={equipment}
       />
     </AppLayout>
   );
