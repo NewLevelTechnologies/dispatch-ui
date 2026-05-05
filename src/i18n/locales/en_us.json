@@ -1240,9 +1240,10 @@
       "openPage": "Open page",
       "qtyHeader": "Qty",
       "statusUpdateError": "Failed to update item status",
+      "subUnits": "{{entities}} ({{count}}):",
+      "subUnitsMore": "+{{count}} more →",
       "totalHeader": "Total",
-      "unitHeader": "Unit",
-      "updatedFooter": "Updated {{time}}"
+      "unitHeader": "Unit"
     }
   },
   "account": {

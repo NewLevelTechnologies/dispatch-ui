@@ -32,6 +32,12 @@ export const WorkOrderPriority = {
 export interface WorkItemEquipmentSummary {
   id: string;
   name: string;
+  // Lifecycle status, projected from the equipment record so the row
+  // expansion can render and edit it without a second fetch. String literal
+  // mirrors equipmentApi's EquipmentStatus enum (the import is one-way to
+  // avoid the circular dependency between these two API modules).
+  status?: 'ACTIVE' | 'RETIRED';
+  assetTag?: string | null;
   equipmentTypeName?: string | null;
   equipmentCategoryName?: string | null;
   make?: string | null;
@@ -40,6 +46,14 @@ export interface WorkItemEquipmentSummary {
   locationOnSite?: string | null;
   // Presigned URL of the profile image, if any. Short-lived (~1hr).
   profileImageUrl?: string | null;
+  // Immediate parent's display name (when this equipment is itself a
+  // component of another piece of equipment). Backend-denormalized.
+  parentName?: string | null;
+  // Direct children of this equipment, bounded by the backend (typically
+  // top-N by name). Used to render sub-unit chips in the row expansion.
+  // descendantCount carries the total even when descendants is truncated.
+  descendants?: Array<{ id: string; name: string }>;
+  descendantCount?: number;
 }
 
 export interface WorkItemResponse {
@@ -160,6 +174,10 @@ export interface CreateWorkOrderRequest {
 
 // `status` is no longer updatable. Use /cancel for cancellation; progress is derived.
 export interface UpdateWorkOrderRequest {
+  // Reassigns the work order to a different service location. Cross-customer
+  // moves are allowed — backend updates customerId implicitly to match the
+  // target location's customer.
+  serviceLocationId?: string;
   workOrderTypeId?: string | null;
   divisionId?: string | null;
   priority?: WorkOrderPriority;

@@ -128,11 +128,11 @@ describe('WorkItemsTable', () => {
       );
       const toggle = screen.getByRole('button', { name: /show details/i });
       expect(toggle).toHaveAttribute('aria-expanded', 'false');
-      // Footer text only renders when expanded.
-      expect(screen.queryByText(/^updated /i)).not.toBeInTheDocument();
+      // Equipment fields aren't rendered until the row is expanded.
+      expect(screen.queryByText(/HVAC · Furnace/)).not.toBeInTheDocument();
     });
 
-    it('expands the row to reveal equipment details and the updated footer', async () => {
+    it('expands the row to reveal equipment details', async () => {
       const user = userEvent.setup();
       renderWithProviders(
         <WorkItemsTable
@@ -158,9 +158,6 @@ describe('WorkItemsTable', () => {
       expect(screen.getByText('58TN0A080-V17')).toBeInTheDocument();
       expect(screen.getByText('CHB1234567')).toBeInTheDocument();
       expect(screen.getByText('Basement')).toBeInTheDocument();
-
-      // Work-item updated footer renders below the equipment block.
-      expect(screen.getByText(/^updated /i)).toBeInTheDocument();
     });
 
     it('renders the "Edit all" button only when onEditEquipment is provided', async () => {
@@ -339,6 +336,110 @@ describe('WorkItemsTable', () => {
       expect(
         screen.queryByRole('button', { name: /add equipment/i })
       ).not.toBeInTheDocument();
+    });
+
+    it('hides the status pill when the linked equipment is ACTIVE', async () => {
+      const user = userEvent.setup();
+      renderWithProviders(
+        <WorkItemsTable
+          workOrderId="wo-1"
+          workItems={[wi('wi-1', 'Replace filter', { equipment: equip({ status: 'ACTIVE' }) })]}
+          statuses={[]}
+          workflows={[]}
+          enforceWorkflow={false}
+        />
+      );
+      await user.click(screen.getByRole('button', { name: /show details/i }));
+      // No "Active" badge in the expansion — common-case status is not surfaced.
+      expect(screen.queryByText(/^active$/i)).not.toBeInTheDocument();
+    });
+
+    it('renders an attention-grabbing pill when the linked equipment is RETIRED', async () => {
+      const user = userEvent.setup();
+      renderWithProviders(
+        <WorkItemsTable
+          workOrderId="wo-1"
+          workItems={[wi('wi-1', 'Replace filter', { equipment: equip({ status: 'RETIRED' }) })]}
+          statuses={[]}
+          workflows={[]}
+          enforceWorkflow={false}
+        />
+      );
+      await user.click(screen.getByRole('button', { name: /show details/i }));
+      expect(screen.getByText(/^retired$/i)).toBeInTheDocument();
+    });
+
+    it('un-retires equipment in one click via the pill (no confirm)', async () => {
+      const confirmSpy = vi.spyOn(window, 'confirm');
+      const user = userEvent.setup();
+      renderWithProviders(
+        <WorkItemsTable
+          workOrderId="wo-1"
+          workItems={[wi('wi-1', 'Replace filter', { equipment: equip({ id: 'eq-9', status: 'RETIRED' }) })]}
+          statuses={[]}
+          workflows={[]}
+          enforceWorkflow={false}
+        />
+      );
+      await user.click(screen.getByRole('button', { name: /show details/i }));
+
+      await user.click(screen.getByRole('button', { name: /^status$/i }));
+      const select = await screen.findByRole('combobox', { name: /^status$/i });
+      await user.selectOptions(select, 'ACTIVE');
+      select.blur();
+
+      await waitFor(() => {
+        expect(mockEquipmentUpdate).toHaveBeenCalledWith('eq-9', { status: 'ACTIVE' });
+      });
+      // Un-retiring is one click — no confirm dialog.
+      expect(confirmSpy).not.toHaveBeenCalled();
+      confirmSpy.mockRestore();
+    });
+
+    it('renders sub-unit chips when descendants are present, with truncation indicator', async () => {
+      const user = userEvent.setup();
+      renderWithProviders(
+        <WorkItemsTable
+          workOrderId="wo-1"
+          workItems={[
+            wi('wi-1', 'Replace filter', {
+              equipment: equip({
+                id: 'eq-1',
+                descendants: [
+                  { id: 'sub-1', name: 'Compressor' },
+                  { id: 'sub-2', name: 'Coil' },
+                ],
+                descendantCount: 5,
+              }),
+            }),
+          ]}
+          statuses={[]}
+          workflows={[]}
+          enforceWorkflow={false}
+        />
+      );
+      await user.click(screen.getByRole('button', { name: /show details/i }));
+
+      const compressorLink = screen.getByRole('link', { name: /compressor/i });
+      expect(compressorLink).toHaveAttribute('href', '/equipment/sub-1');
+      expect(screen.getByRole('link', { name: /coil/i })).toBeInTheDocument();
+      expect(screen.getByText(/\+3 more/i)).toBeInTheDocument();
+    });
+
+    it('hides the sub-units row when there are no descendants', async () => {
+      const user = userEvent.setup();
+      renderWithProviders(
+        <WorkItemsTable
+          workOrderId="wo-1"
+          workItems={[wi('wi-1', 'Replace filter', { equipment: equip() })]}
+          statuses={[]}
+          workflows={[]}
+          enforceWorkflow={false}
+        />
+      );
+      await user.click(screen.getByRole('button', { name: /show details/i }));
+      // No "(N):" label appears because the SubUnitsRow short-circuits.
+      expect(screen.queryByText(/\(\d+\):/)).not.toBeInTheDocument();
     });
   });
 });
