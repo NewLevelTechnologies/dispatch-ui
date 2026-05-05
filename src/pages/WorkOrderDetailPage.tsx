@@ -20,6 +20,7 @@ import { useGlossary } from '../contexts/GlossaryContext';
 import AppLayout from '../components/AppLayout';
 import EditableField from '../components/EditableField';
 import EquipmentFormDialog from '../components/EquipmentFormDialog';
+import EquipmentQuickViewDrawer from '../components/EquipmentQuickViewDrawer';
 import WorkItemFormDialog from '../components/WorkItemFormDialog';
 import WorkItemsTable from '../components/WorkItemsTable';
 import WorkOrderActivityRail from '../components/WorkOrderActivityRail';
@@ -114,6 +115,16 @@ export default function WorkOrderDetailPage() {
   // tracked here is the one we'll link the new equipment to once it's
   // created (via EquipmentFormDialog's onCreated callback).
   const [addEquipmentForWorkItem, setAddEquipmentForWorkItem] = useState<WorkItemResponse | null>(null);
+  // Sub-unit chip click opens the equipment quickview drawer in-context.
+  // Drawer manages its own stack of pushed sub-units internally; this state
+  // is just the seed (the equipment whose chip was clicked).
+  const [drawerEquipment, setDrawerEquipment] = useState<{ id: string; name: string } | null>(null);
+  // "+ Add unit" inside a chip row OR inside the drawer opens
+  // EquipmentFormDialog with this equipment locked as the parent. Same dialog
+  // component as the empty-state add-equipment flow, just with a different
+  // lock and no work-item linking (sub-units belong to their parent
+  // equipment, not directly to the work item).
+  const [addSubUnitParent, setAddSubUnitParent] = useState<{ id: string; name: string } | null>(null);
 
   const handleEditEquipment = async (equipmentId: string) => {
     try {
@@ -131,6 +142,19 @@ export default function WorkOrderDetailPage() {
 
   const handleAddEquipmentToWorkItem = (wi: WorkItemResponse) => {
     setAddEquipmentForWorkItem(wi);
+  };
+
+  // Sub-unit chip click → open the quickview drawer for that equipment.
+  // Drawer pushes its own stack internally for further drill-in.
+  const handleSelectSubUnit = (subUnit: { id: string; name: string }) => {
+    setDrawerEquipment(subUnit);
+  };
+
+  // "+ Add unit" → EquipmentFormDialog with the parent locked. Routes from
+  // both the work-item row's chip row AND the inside-drawer chip row through
+  // this single handler so dialog state lives in one place.
+  const handleAddSubUnit = (parent: { id: string; name: string }) => {
+    setAddSubUnitParent(parent);
   };
 
   // After the user creates new equipment from the row's empty state, link it
@@ -642,6 +666,8 @@ export default function WorkOrderDetailPage() {
               onSaveDescription={handleSaveWorkItemDescription}
               onEditEquipment={handleEditEquipment}
               onAddEquipment={handleAddEquipmentToWorkItem}
+              onSelectSubUnit={handleSelectSubUnit}
+              onAddSubUnit={handleAddSubUnit}
             />
           </main>
 
@@ -712,6 +738,31 @@ export default function WorkOrderDetailPage() {
           workOrder?.serviceLocationId || workOrder?.serviceLocation?.id
         }
         onCreated={handleEquipmentCreatedForWorkItem}
+      />
+
+      {/* Sub-unit creation: same dialog, but locked to a parent equipment
+          rather than a work item. Used by the chip-row and the in-drawer
+          "+ Add" affordance. The new sub-unit inherits the parent's service
+          location implicitly on the backend. */}
+      <EquipmentFormDialog
+        isOpen={addSubUnitParent !== null}
+        onClose={() => setAddSubUnitParent(null)}
+        equipment={null}
+        lockedServiceLocationId={
+          workOrder?.serviceLocationId || workOrder?.serviceLocation?.id
+        }
+        lockedParent={addSubUnitParent}
+      />
+
+      {/* Equipment quickview drawer — slides in from the right when a
+          sub-unit chip is clicked. Manages its own internal stack for
+          drawer-over-drawer recursion. "+ Add unit" inside the drawer
+          routes back through handleAddSubUnit so EquipmentFormDialog
+          state stays single-sourced here. */}
+      <EquipmentQuickViewDrawer
+        initialEquipment={drawerEquipment}
+        onClose={() => setDrawerEquipment(null)}
+        onAddSubUnit={handleAddSubUnit}
       />
     </AppLayout>
   );

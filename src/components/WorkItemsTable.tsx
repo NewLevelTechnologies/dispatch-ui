@@ -72,6 +72,18 @@ interface Props {
    * patches the work item with the new equipment id on success.
    */
   onAddEquipment?: (wi: WorkItemResponse) => void;
+  /**
+   * Sub-unit chip click → parent opens the equipment quickview drawer with
+   * the chosen sub-unit. When omitted, chips fall back to RouterLink
+   * navigation (legacy behavior).
+   */
+  onSelectSubUnit?: (subUnit: { id: string; name: string }) => void;
+  /**
+   * "+ Add unit" click → parent opens EquipmentFormDialog with the supplied
+   * equipment locked as the parent. The new sub-unit's parentId is set on
+   * create; serviceLocationId is inherited (same location as the parent).
+   */
+  onAddSubUnit?: (parent: { id: string; name: string }) => void;
 }
 
 export default function WorkItemsTable({
@@ -86,6 +98,8 @@ export default function WorkItemsTable({
   onSaveDescription,
   onEditEquipment,
   onAddEquipment,
+  onSelectSubUnit,
+  onAddSubUnit,
 }: Props) {
   const { t } = useTranslation();
   const { getName } = useGlossary();
@@ -304,6 +318,8 @@ export default function WorkItemsTable({
                       onEdit={onEdit}
                       onEditEquipment={onEditEquipment}
                       onAddEquipment={onAddEquipment}
+                      onSelectSubUnit={onSelectSubUnit}
+                      onAddSubUnit={onAddSubUnit}
                       onSaveEquipmentField={handleSaveEquipmentField}
                     />
                   </div>
@@ -324,6 +340,8 @@ interface DetailSectionsProps {
   onEdit?: (wi: WorkItemResponse) => void;
   onEditEquipment?: (equipmentId: string) => void;
   onAddEquipment?: (wi: WorkItemResponse) => void;
+  onSelectSubUnit?: (subUnit: { id: string; name: string }) => void;
+  onAddSubUnit?: (parent: { id: string; name: string }) => void;
   onSaveEquipmentField: <K extends keyof UpdateEquipmentRequest>(
     equipmentId: string,
     field: K,
@@ -347,6 +365,8 @@ function WorkItemDetailSections({
   onEdit,
   onEditEquipment,
   onAddEquipment,
+  onSelectSubUnit,
+  onAddSubUnit,
   onSaveEquipmentField,
 }: DetailSectionsProps) {
   const equipment = workItem.equipment;
@@ -360,6 +380,8 @@ function WorkItemDetailSections({
         onEditWorkItem={onEdit}
         onAddEquipment={onAddEquipment}
         onEditEquipment={onEditEquipment}
+        onSelectSubUnit={onSelectSubUnit}
+        onAddSubUnit={onAddSubUnit}
         onSaveEquipmentField={onSaveEquipmentField}
       />
     </div>
@@ -373,6 +395,8 @@ interface EquipmentBlockProps {
   onEditWorkItem?: (wi: WorkItemResponse) => void;
   onAddEquipment?: (wi: WorkItemResponse) => void;
   onEditEquipment?: (equipmentId: string) => void;
+  onSelectSubUnit?: (subUnit: { id: string; name: string }) => void;
+  onAddSubUnit?: (parent: { id: string; name: string }) => void;
   onSaveEquipmentField: <K extends keyof UpdateEquipmentRequest>(
     equipmentId: string,
     field: K,
@@ -387,6 +411,8 @@ function EquipmentBlock({
   onEditWorkItem,
   onAddEquipment,
   onEditEquipment,
+  onSelectSubUnit,
+  onAddSubUnit,
   onSaveEquipmentField,
 }: EquipmentBlockProps) {
   const { t } = useTranslation();
@@ -538,6 +564,10 @@ function EquipmentBlock({
         descendants={equipment.descendants}
         descendantCount={equipment.descendantCount}
         equipmentId={equipment.id}
+        equipmentName={equipment.name}
+        readOnly={readOnly}
+        onSelectSubUnit={onSelectSubUnit}
+        onAddSubUnit={onAddSubUnit}
       />
     </section>
   );
@@ -582,40 +612,100 @@ function EquipmentStatusPill({ status, readOnly, onSave }: EquipmentStatusPillPr
 }
 
 interface SubUnitsRowProps {
-  descendants?: Array<{ id: string; name: string }>;
+  descendants?: Array<{ id: string; name: string; profileImageUrl?: string | null }>;
   descendantCount?: number;
   equipmentId: string;
+  equipmentName: string;
+  readOnly: boolean;
+  /** Click on a chip → push onto the drawer stack to peek at the sub-unit. */
+  onSelectSubUnit?: (subUnit: { id: string; name: string }) => void;
+  /** Click on "+ Add" → open EquipmentFormDialog with this equipment locked
+   *  as the parent. Suppressed in readOnly mode. */
+  onAddSubUnit?: (parent: { id: string; name: string }) => void;
 }
 
 /**
- * Renders direct sub-units (children) of the equipment as compact chips.
- * Hides entirely when there are no descendants. When the backend truncates
- * the list (descendantCount > descendants.length), a trailing "+N more"
- * link routes to the equipment detail page where the full Components tab
- * lives.
+ * Direct sub-units rendered as compact chips with thumbnails for visual
+ * scan id. Always renders even when empty so the "+ Add" affordance is
+ * discoverable — sub-unit creation happens ~100% in WO context per CSR
+ * workflow. Chip click hands off to the drawer stack (onSelectSubUnit)
+ * so the user can drill in without leaving the WO; "+ Add" hands off to
+ * the parent's EquipmentFormDialog with the parent equipment locked.
+ *
+ * When the backend truncates the descendants list (descendantCount >
+ * descendants.length), a trailing "+N more" link routes to the equipment
+ * detail page where the full Components tab lives — this case ships
+ * unchanged from the previous version.
  */
-function SubUnitsRow({ descendants, descendantCount, equipmentId }: SubUnitsRowProps) {
+function SubUnitsRow({
+  descendants,
+  descendantCount,
+  equipmentId,
+  equipmentName,
+  readOnly,
+  onSelectSubUnit,
+  onAddSubUnit,
+}: SubUnitsRowProps) {
   const { t } = useTranslation();
   const { getName } = useGlossary();
-  if (!descendants || descendants.length === 0) return null;
-  const total = descendantCount ?? descendants.length;
-  const remainder = Math.max(0, total - descendants.length);
+  const list = descendants ?? [];
+  const total = descendantCount ?? list.length;
+  const remainder = Math.max(0, total - list.length);
+  const canAdd = !readOnly && onAddSubUnit;
+
+  // Hide the row entirely only when there's nothing to show AND no add
+  // affordance — keeps the row out of readOnly views with empty units.
+  if (list.length === 0 && !canAdd) return null;
 
   return (
     <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
       <span className="text-xs uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
         {t('workOrders.workItems.subUnits', { entities: getName('equipment_component', true), count: total })}
       </span>
-      {descendants.map((d) => (
-        <RouterLink
-          key={d.id}
-          to={`/equipment/${d.id}`}
-          className="inline-flex items-center gap-1 rounded-full bg-zinc-100 px-2.5 py-0.5 text-xs text-zinc-700 ring-1 ring-inset ring-zinc-200 hover:bg-zinc-200 hover:text-blue-600 dark:bg-zinc-800 dark:text-zinc-200 dark:ring-zinc-700 dark:hover:bg-zinc-700 dark:hover:text-blue-400"
+      {list.map((d) =>
+        onSelectSubUnit ? (
+          <button
+            key={d.id}
+            type="button"
+            onClick={() => onSelectSubUnit({ id: d.id, name: d.name })}
+            className="inline-flex items-center gap-1.5 rounded-full bg-zinc-100 py-0.5 pl-1 pr-2.5 text-xs text-zinc-700 ring-1 ring-inset ring-zinc-200 hover:bg-zinc-200 hover:text-blue-600 dark:bg-zinc-800 dark:text-zinc-200 dark:ring-zinc-700 dark:hover:bg-zinc-700 dark:hover:text-blue-400"
+          >
+            <EquipmentThumbnail
+              url={d.profileImageUrl}
+              name={d.name}
+              sizeClass="size-5"
+              fit="cover"
+            />
+            <span>{d.name}</span>
+            <ChevronRightIcon className="size-3" aria-hidden />
+          </button>
+        ) : (
+          <RouterLink
+            key={d.id}
+            to={`/equipment/${d.id}`}
+            className="inline-flex items-center gap-1.5 rounded-full bg-zinc-100 py-0.5 pl-1 pr-2.5 text-xs text-zinc-700 ring-1 ring-inset ring-zinc-200 hover:bg-zinc-200 hover:text-blue-600 dark:bg-zinc-800 dark:text-zinc-200 dark:ring-zinc-700 dark:hover:bg-zinc-700 dark:hover:text-blue-400"
+          >
+            <EquipmentThumbnail
+              url={d.profileImageUrl}
+              name={d.name}
+              sizeClass="size-5"
+              fit="cover"
+            />
+            <span>{d.name}</span>
+            <ChevronRightIcon className="size-3" aria-hidden />
+          </RouterLink>
+        )
+      )}
+      {canAdd && (
+        <button
+          type="button"
+          onClick={() => onAddSubUnit({ id: equipmentId, name: equipmentName })}
+          className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs text-blue-600 ring-1 ring-inset ring-blue-200 hover:bg-blue-50 dark:text-blue-400 dark:ring-blue-900 dark:hover:bg-blue-950/30"
         >
-          {d.name}
-          <ChevronRightIcon className="size-3" aria-hidden />
-        </RouterLink>
-      ))}
+          <PlusIcon className="size-3.5" />
+          {t('common.actions.add', { entity: getName('equipment_component') })}
+        </button>
+      )}
       {remainder > 0 && (
         <RouterLink
           to={`/equipment/${equipmentId}`}

@@ -25,12 +25,12 @@ If this page is slow, cluttered, or forces context-switching to other screens, t
 The page uses three UI patterns and three only. They do not overlap:
 
 - **Main canvas** — the primary work surface (header + left strip + work items + activity rail). Always visible. Never hidden behind tabs.
-- **Drawer** — slide-in panel from the right edge, used to *see more on a peripheral entity* (financials, etc.) without leaving the WO context. May contain internal tabs because it is itself a focused, intentional surface.
+- **Drawer** — slide-in panel from the right edge, used to *see more on a peripheral entity* without leaving the WO context. May contain internal tabs because it is itself a focused, intentional surface. Two surfaces use this pattern today: the financial detail drawer (§3.5, ~760–840px) and the equipment quickview drawer (~480px). Drawers can also stack — clicking a sub-unit chip inside the equipment drawer pushes onto the drawer's internal stack so the user can drill into nested components without losing the chain (one drawer is mounted at a time; the visible content swaps based on top-of-stack, with a back button labeled with the parent's name when stack > 1).
 - **Dialog** — modal centered over the page, used for *create/edit forms*. Canonical Catalyst use.
 
 If a future feature doesn't fit one of these three, that's a signal to question the feature, not to add a fourth pattern.
 
-A drawer is a *context*; a dialog is an *action within a context*. They nest cleanly: clicking `+ New Invoice` inside the financials drawer opens a create dialog *over* the drawer, the drawer stays mounted underneath, and dialog close returns the user to the drawer (§3.5).
+A drawer is a *context*; a dialog is an *action within a context*. They nest cleanly: clicking `+ New Invoice` inside the financials drawer (or `+ Add unit` inside the equipment quickview drawer) opens a create dialog *over* the drawer, the drawer stays mounted underneath, and dialog close returns the user to the drawer (§3.5, §3.5b).
 
 ---
 
@@ -325,14 +325,37 @@ What shipped:
 - `readOnly` mode (cancelled/archived WO) renders fields as static text and suppresses Edit / Add / Delete actions.
 - Money chip row (header row 3) hidden until phase 7 (a row of `$ —` placeholders communicates nothing on a fresh WO and burns vertical real estate).
 
+**Subsequently shipped (2026-05-05):**
+
+- ✅ **Status pill** — but trimmed: renders only when equipment is RETIRED (amber). Common-case ACTIVE shows nothing, retired stands out. One-click un-retire via the pill; ACTIVE → RETIRED routes through "Edit all" (intentional friction for the destructive transition).
+- ✅ **Asset tag** initially shipped, then dropped — it's a tech/scanner field, not a CSR scan field, and didn't earn the inline real estate. Lives behind "Edit all" alongside install date and warranty.
+- ✅ **Sub-unit chips** with `descendantCount` truncation indicator and per-chip thumbnails. Click a chip to open the equipment quickview drawer (§3.5b). `+ Add unit` chip at the end of the row opens `EquipmentFormDialog` with the parent equipment locked.
+
 What's deferred — slot in as their backends ship, no redesign needed:
 
-- **Status pill** (lime/zinc, inline-editable with confirm-on-RETIRED). Needs `status` on `WorkItemEquipmentSummary`. **Backend has projected this; UI follow-up pending.**
-- **Asset tag** in the inline grid. Needs `assetTag` on `WorkItemEquipmentSummary`. **Backend has projected this; UI follow-up pending.**
-- **Sub-unit chips** (with `descendantCount` truncation indicator). Needs `descendants[]` and `descendantCount` on `WorkItemEquipmentSummary`. **Backend has projected this; UI follow-up pending.**
 - **Equipment Photos sub-section** (nested inside the Equipment block, not a peer). Use existing `equipmentImagesApi` lazy-loaded on row expansion, OR project `recentPhotos[]` onto `WorkItemEquipmentSummary` to avoid the N+1. Hides when empty.
 - **Equipment Notes sub-section** (also nested, with helper text "Saved with this equipment, not this work order" so CSRs don't write WO-scoped content here). Always renders with `+ Add note` even when empty. **Needs new backend sub-resource: `POST/GET/DELETE /equipment/{id}/notes`** with body, author, timestamp. Same shape as legacy "Internal Notes."
 - **Linked-entity chips** (Quote/Invoice/PO chips on work item rows). Needs the optional `InvoiceLineItem.workItemId` from §2.3 — build only when per-work-item profitability reporting earns it.
+
+### 5b. Equipment quickview drawer (shipped 2026-05-05)
+
+Slide-over drawer (~480px) opened from a sub-unit chip click in the work-item row's equipment block. Lets CSRs inspect AND edit a sub-unit without leaving the WO context — sub-unit creates and edits both happen ~100% in WO context per actual CSR workflow, so the drawer is a first-class edit surface, not a read-only peek.
+
+What shipped:
+
+- 64px hero thumbnail + name (inline-editable) + status pill (lime/amber, ACTIVE/RETIRED, inline-editable both ways in this context) + type/category subline.
+- Identification block: name, make, model, serial, asset tag, location-on-site — all inline-editable via `EditableField`. Cache invalidation hits `['equipment']`, `['equipment-detail', id]`, `['equipment-descendants']`, `['work-orders']`, `['work-orders-list']` — same triple-key pattern as the row's primary equipment block.
+- Lifecycle block: install date, last serviced (read-only, backend-managed), warranty expires, warranty details — inline-editable.
+- Sub-units chip row inside the drawer with `+ Add unit` — clicking another sub-unit pushes onto the drawer's internal stack (drawer-over-drawer recursion). Back button at the top of the header is labeled with the parent name when the stack is more than one deep ("← Back to {parentName}"); at the root it's a plain X close.
+- "Open full page" link at the footer routes to the dedicated `/equipment/{id}` for the full surface (Photos, Filters, Service History, Components tabs).
+- `+ Add unit` (in the row chip row OR inside the drawer) opens `EquipmentFormDialog` with `lockedParent` set; the new sub-unit's `parentId` is set on create and it inherits the parent's `serviceLocationId` implicitly.
+
+Architecturally only ONE `SlideOver` is mounted at a time — content swaps based on top-of-stack rather than physically stacking dialogs. Visually the UX is identical and state stays simple.
+
+Backend asks open (not blocking — drawer works today):
+
+- Add `descendants[]` and `descendantCount` to the `Equipment` response from `GET /equipment/{id}` (mirror what's already on `EquipmentSummary`). The drawer currently fires `equipmentApi.getDescendants` as a parallel query; this projection drops the second round-trip.
+- Add `profileImageUrl` to descendants[] entries everywhere (`WorkItemEquipmentSummary.descendants`, `EquipmentSummary.descendants`, the new `Equipment.descendants` projection from #1). Sub-unit chips render a 20px thumbnail before the name for visual scan id; field is wired and waiting.
 
 ### 5c. Open follow-ups across the page
 

@@ -36,6 +36,15 @@ interface EquipmentFormDialogProps {
    */
   lockedCustomer?: { id: string; name: string } | null;
   /**
+   * When provided in create mode, locks the new equipment to be a child of
+   * this parent (sub-unit creation). Backend receives parentId on the
+   * create payload; the dialog title surfaces the parent's name so the
+   * user understands the context. The parent's serviceLocationId still
+   * applies — pair with `lockedServiceLocationId` so the form doesn't
+   * ask for a location that the new sub-unit must inherit.
+   */
+  lockedParent?: { id: string; name: string } | null;
+  /**
    * Fired after a successful create with the newly-created Equipment record.
    * Lets callers chain a follow-up mutation (e.g. linking the new equipment
    * to a work item) without losing the freshly-returned id. Not invoked on
@@ -84,6 +93,7 @@ export default function EquipmentFormDialog({
   equipment,
   lockedServiceLocationId,
   lockedCustomer,
+  lockedParent,
   onCreated,
 }: EquipmentFormDialogProps) {
   const queryClient = useQueryClient();
@@ -212,6 +222,10 @@ export default function EquipmentFormDialog({
       const payload: CreateEquipmentRequest = {
         name: formData.name,
         serviceLocationId: formData.serviceLocationId,
+        // Sub-unit creation: backend takes parentId and threads it onto the
+        // new equipment row. Only set when lockedParent was provided —
+        // unlocked create flows produce top-level equipment.
+        parentId: lockedParent?.id ?? null,
         description: formData.description || null,
         make: formData.make || null,
         model: formData.model || null,
@@ -237,7 +251,12 @@ export default function EquipmentFormDialog({
       <DialogTitle>
         {isEdit
           ? t('common.actions.edit', { entity: getName('equipment') })
-          : t('common.actions.add', { entity: getName('equipment') })}
+          : lockedParent
+            ? t('equipment.form.titleAddSubUnit', {
+                entity: getName('equipment_component'),
+                parent: lockedParent.name,
+              })
+            : t('common.actions.add', { entity: getName('equipment') })}
       </DialogTitle>
       <form onSubmit={handleSubmit}>
         <DialogBody>

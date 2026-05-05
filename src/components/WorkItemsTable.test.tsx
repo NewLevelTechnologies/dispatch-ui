@@ -438,8 +438,93 @@ describe('WorkItemsTable', () => {
         />
       );
       await user.click(screen.getByRole('button', { name: /show details/i }));
-      // No "(N):" label appears because the SubUnitsRow short-circuits.
+      // No "(N):" label appears because the SubUnitsRow short-circuits when
+      // there's nothing to show AND no add affordance.
       expect(screen.queryByText(/\(\d+\):/)).not.toBeInTheDocument();
+    });
+
+    it('routes sub-unit chip clicks through onSelectSubUnit when provided', async () => {
+      const onSelectSubUnit = vi.fn();
+      const user = userEvent.setup();
+      renderWithProviders(
+        <WorkItemsTable
+          workOrderId="wo-1"
+          workItems={[
+            wi('wi-1', 'Replace filter', {
+              equipment: equip({
+                id: 'eq-1',
+                descendants: [{ id: 'sub-1', name: 'Compressor' }],
+                descendantCount: 1,
+              }),
+            }),
+          ]}
+          statuses={[]}
+          workflows={[]}
+          enforceWorkflow={false}
+          onSelectSubUnit={onSelectSubUnit}
+        />
+      );
+      await user.click(screen.getByRole('button', { name: /show details/i }));
+
+      // Chip is now a button (not a RouterLink) when the callback is wired.
+      const chip = screen.getByRole('button', { name: /compressor/i });
+      await user.click(chip);
+      expect(onSelectSubUnit).toHaveBeenCalledWith({ id: 'sub-1', name: 'Compressor' });
+      // No legacy navigation link rendered for the chip.
+      expect(screen.queryByRole('link', { name: /compressor/i })).not.toBeInTheDocument();
+    });
+
+    it('renders the "+ Add unit" affordance and forwards the parent equipment to onAddSubUnit', async () => {
+      const onAddSubUnit = vi.fn();
+      const user = userEvent.setup();
+      renderWithProviders(
+        <WorkItemsTable
+          workOrderId="wo-1"
+          workItems={[
+            wi('wi-1', 'Replace filter', {
+              equipment: equip({
+                id: 'eq-77',
+                name: 'Outdoor HVAC unit',
+                descendants: [],
+                descendantCount: 0,
+              }),
+            }),
+          ]}
+          statuses={[]}
+          workflows={[]}
+          enforceWorkflow={false}
+          onAddSubUnit={onAddSubUnit}
+        />
+      );
+      await user.click(screen.getByRole('button', { name: /show details/i }));
+
+      const addBtn = screen.getByRole('button', { name: /add unit/i });
+      await user.click(addBtn);
+      expect(onAddSubUnit).toHaveBeenCalledWith({
+        id: 'eq-77',
+        name: 'Outdoor HVAC unit',
+      });
+    });
+
+    it('hides the "+ Add unit" affordance in readOnly mode', async () => {
+      const user = userEvent.setup();
+      renderWithProviders(
+        <WorkItemsTable
+          workOrderId="wo-1"
+          workItems={[
+            wi('wi-1', 'Replace filter', {
+              equipment: equip({ id: 'eq-1', descendants: [], descendantCount: 0 }),
+            }),
+          ]}
+          statuses={[]}
+          workflows={[]}
+          enforceWorkflow={false}
+          readOnly
+          onAddSubUnit={vi.fn()}
+        />
+      );
+      await user.click(screen.getByRole('button', { name: /show details/i }));
+      expect(screen.queryByRole('button', { name: /add unit/i })).not.toBeInTheDocument();
     });
   });
 });

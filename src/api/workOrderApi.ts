@@ -51,8 +51,10 @@ export interface WorkItemEquipmentSummary {
   parentName?: string | null;
   // Direct children of this equipment, bounded by the backend (typically
   // top-N by name). Used to render sub-unit chips in the row expansion.
-  // descendantCount carries the total even when descendants is truncated.
-  descendants?: Array<{ id: string; name: string }>;
+  // Each entry carries profileImageUrl so chips render a small thumbnail
+  // for visual scan id. descendantCount carries the total even when
+  // descendants is truncated.
+  descendants?: Array<{ id: string; name: string; profileImageUrl?: string | null }>;
   descendantCount?: number;
 }
 
