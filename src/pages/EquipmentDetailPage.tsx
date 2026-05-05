@@ -496,7 +496,7 @@ export default function EquipmentDetailPage() {
           <EquipmentThumbnail
             url={equipment.profileImageUrl}
             name={t('equipment.detail.profileImageAlt', { name: equipment.name })}
-            sizeClass="size-12"
+            sizeClass="size-16"
             fit="contain"
           />
           <div className="min-w-0 flex-1">
