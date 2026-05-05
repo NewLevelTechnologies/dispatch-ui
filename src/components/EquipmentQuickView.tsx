@@ -140,7 +140,7 @@ export default function EquipmentQuickView({
               value={equipment.name}
               onSave={(v) => saveField('name', v)}
               ariaLabel={t('common.form.name')}
-              className="text-lg font-semibold"
+              className="text-lg font-semibold text-zinc-950 dark:text-white"
             />
             <Badge color={equipment.status === EquipmentStatus.ACTIVE ? 'lime' : 'amber'}>
               {t(`equipment.status.${equipment.status.toLowerCase()}`)}

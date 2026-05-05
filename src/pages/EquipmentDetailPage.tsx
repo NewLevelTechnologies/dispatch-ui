@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, useNavigate, useLocation, Link as RouterLink } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
@@ -114,6 +114,20 @@ export default function EquipmentDetailPage() {
     queryFn: () => equipmentApi.getById(id!),
     enabled: !!id,
   });
+
+  // Components/Units tab is hidden when this equipment is itself a
+  // sub-unit (parentId set) — the 2-level hierarchy rule means a sub-unit
+  // can't have its own children. If the user had Components active and
+  // then navigates to a sub-unit, fall back to Overview so we don't
+  // render content for a now-hidden tab. setState in effect is intentional
+  // here — we're reconciling prior state with a fetched record.
+  /* eslint-disable react-hooks/set-state-in-effect */
+  useEffect(() => {
+    if (equipment?.parentId && activeTab === 'components') {
+      setActiveTab('overview');
+    }
+  }, [equipment?.parentId, activeTab]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   // Reference data for inline-editable Type / Category selects.
   const { data: equipmentTypes = [] } = useQuery({
@@ -352,6 +366,12 @@ export default function EquipmentDetailPage() {
     );
   }
 
+  // The Components/Units tab is hidden when this equipment is itself a
+  // sub-unit (parentId set). The product rule restricts the hierarchy to
+  // 2 levels deep, so a sub-unit can't have its own children — surfacing
+  // an empty tab on it would imply otherwise. Top-level equipment shows
+  // the tab as usual.
+  const isSubUnit = Boolean(equipment.parentId);
   const tabs = [
     { id: 'overview', label: t('equipment.tabs.overview') },
     { id: 'photos', label: t('equipment.tabs.photos'), count: images.length },
@@ -361,11 +381,15 @@ export default function EquipmentDetailPage() {
       label: t('equipment.tabs.serviceHistory'),
       count: serviceHistoryData?.totalElements ?? 0,
     },
-    {
-      id: 'components',
-      label: getName('equipment_component', true),
-      count: descendants.length,
-    },
+    ...(isSubUnit
+      ? []
+      : [
+          {
+            id: 'components',
+            label: getName('equipment_component', true),
+            count: descendants.length,
+          },
+        ]),
   ];
 
   // Group descendants by parent for tree rendering. The map's keys are
