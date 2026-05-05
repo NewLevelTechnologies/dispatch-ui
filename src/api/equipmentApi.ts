@@ -54,6 +54,10 @@ export interface Equipment {
 export interface EquipmentSummary {
   id: string;
   name: string;
+  // Lifecycle status, projected straight from the entity. Lets list views
+  // render correct per-row badges and offer an "All" filter without a second
+  // round-trip per row.
+  status?: EquipmentStatus;
   equipmentTypeName?: string | null;
   equipmentCategoryName?: string | null;
   make?: string | null;

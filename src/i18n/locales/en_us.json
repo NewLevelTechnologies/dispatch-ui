@@ -466,10 +466,12 @@
     },
     "status": {
       "active": "Active",
+      "all": "All",
       "retired": "Retired"
     },
     "table": {
       "category": "Category",
+      "componentOf": "Component of {{parent}}",
       "customer": "Customer",
       "equipmentType": "Equipment Type",
       "lastServiced": "Last Serviced",

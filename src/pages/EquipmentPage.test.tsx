@@ -49,12 +49,15 @@ vi.mock('../api/client');
 const summary = (id: string, name: string, overrides: Partial<Record<string, unknown>> = {}) => ({
   id,
   name,
+  status: 'ACTIVE',
   equipmentTypeName: null,
   equipmentCategoryName: null,
   make: null,
   model: null,
   serialNumber: null,
   locationOnSite: null,
+  parentId: null,
+  parentName: null,
   ...overrides,
 });
 
@@ -364,13 +367,75 @@ describe('EquipmentPage', () => {
 
     await waitFor(() => expect(screen.getByText('Upstairs Furnace')).toBeInTheDocument());
 
-    const selects = screen.getAllByRole('combobox');
-    const statusSelect = selects[selects.length - 1];
+    const statusSelect = screen.getByRole('combobox', { name: /^status$/i });
     await user.selectOptions(statusSelect, 'RETIRED');
 
     await waitFor(() => {
       expect(mockEquipmentList.mock.calls.some(([args]) => args?.status === 'RETIRED')).toBe(true);
     });
+  });
+
+  it('omits status param when "All" is selected', async () => {
+    mockEquipmentList.mockResolvedValue(page([summary('1', 'Upstairs Furnace')]));
+    const user = userEvent.setup();
+
+    renderWithProviders(<EquipmentPage />);
+
+    await waitFor(() => expect(screen.getByText('Upstairs Furnace')).toBeInTheDocument());
+    mockEquipmentList.mockClear();
+
+    const statusSelect = screen.getByRole('combobox', { name: /^status$/i });
+    await user.selectOptions(statusSelect, '');
+
+    await waitFor(() => expect(mockEquipmentList).toHaveBeenCalled());
+    const lastCall = mockEquipmentList.mock.calls[mockEquipmentList.mock.calls.length - 1][0];
+    expect(lastCall.status).toBeUndefined();
+  });
+
+  it('renders per-row status badges using each row\'s actual status', async () => {
+    mockEquipmentList.mockResolvedValue(
+      page([
+        summary('1', 'Active Unit', { status: 'ACTIVE' }),
+        summary('2', 'Retired Unit', { status: 'RETIRED' }),
+      ])
+    );
+    const user = userEvent.setup();
+    renderWithProviders(<EquipmentPage />);
+
+    await waitFor(() => expect(screen.getByText('Active Unit')).toBeInTheDocument());
+
+    // Switch to "All" so both rows are rendered
+    const statusSelect = screen.getByRole('combobox', { name: /^status$/i });
+    await user.selectOptions(statusSelect, '');
+
+    // Both badges should appear regardless of the filter — "Active" for row 1, "Retired" for row 2.
+    const activeRow = screen.getByText('Active Unit').closest('tr')!;
+    const retiredRow = screen.getByText('Retired Unit').closest('tr')!;
+    expect(activeRow).toHaveTextContent('Active');
+    expect(retiredRow).toHaveTextContent('Retired');
+  });
+
+  it('shows "Component of {parent}" link for components with parentName', async () => {
+    mockEquipmentList.mockResolvedValue(
+      page([
+        summary('child-1', 'Compressor', {
+          parentId: 'parent-1',
+          parentName: 'HVAC System 01',
+        }),
+      ])
+    );
+    renderWithProviders(<EquipmentPage />);
+
+    const hint = await screen.findByRole('link', { name: /component of hvac system 01/i });
+    expect(hint).toHaveAttribute('href', '/equipment/parent-1');
+  });
+
+  it('does not render the component hint for top-level equipment', async () => {
+    mockEquipmentList.mockResolvedValue(page([summary('1', 'Standalone Unit')]));
+    renderWithProviders(<EquipmentPage />);
+
+    await waitFor(() => expect(screen.getByText('Standalone Unit')).toBeInTheDocument());
+    expect(screen.queryByText(/component of/i)).not.toBeInTheDocument();
   });
 
   it('paginates with previous and next buttons', async () => {
