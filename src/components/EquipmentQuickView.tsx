@@ -10,12 +10,8 @@ import { useGlossary } from '../contexts/GlossaryContext';
 import EditableField from './EditableField';
 import EquipmentThumbnail from './EquipmentThumbnail';
 import { Badge } from './catalyst/badge';
-import { Button } from './catalyst/button';
 import { Text } from './catalyst/text';
-import {
-  ArrowTopRightOnSquareIcon,
-  ChevronRightIcon,
-} from '@heroicons/react/24/outline';
+import { ChevronRightIcon } from '@heroicons/react/24/outline';
 
 interface EquipmentQuickViewProps {
   equipmentId: string;
@@ -230,16 +226,6 @@ export default function EquipmentQuickView({
           </div>
         </Section>
       )}
-
-      {/* Footer: explicit escape to the dedicated detail route for tabs and
-          deeper editing surfaces (Photos, Filters, Service History,
-          Components). */}
-      <div className="flex justify-end pt-2">
-        <Button plain href={`/equipment/${equipment.id}`}>
-          <ArrowTopRightOnSquareIcon className="size-4" />
-          {t('workOrders.workItems.openPage')}
-        </Button>
-      </div>
     </div>
   );
 }
