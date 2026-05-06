@@ -1,17 +1,23 @@
+import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import {
   equipmentApi,
   EquipmentStatus,
   type Equipment,
+  type EquipmentImage,
   type UpdateEquipmentRequest,
 } from '../api';
 import { useGlossary } from '../contexts/GlossaryContext';
 import EditableField from './EditableField';
+import EquipmentImageUploadDialog from './EquipmentImageUploadDialog';
+import EquipmentPhotoLightbox from './EquipmentPhotoLightbox';
+import EquipmentPhotosSection from './EquipmentPhotosSection';
 import EquipmentThumbnail from './EquipmentThumbnail';
 import { Badge } from './catalyst/badge';
+import { Button } from './catalyst/button';
 import { Text } from './catalyst/text';
-import { ChevronRightIcon } from '@heroicons/react/24/outline';
+import { ChevronRightIcon, PlusIcon } from '@heroicons/react/24/outline';
 
 interface EquipmentQuickViewProps {
   equipmentId: string;
@@ -44,6 +50,8 @@ export default function EquipmentQuickView({
   const { t } = useTranslation();
   const { getName } = useGlossary();
   const queryClient = useQueryClient();
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+  const [isImageUploadOpen, setIsImageUploadOpen] = useState(false);
 
   // The drawer needs descendants on the response so the sub-unit chip row
   // can render. That's an opt-in projection — default getById callers
@@ -110,16 +118,44 @@ export default function EquipmentQuickView({
     .filter(Boolean)
     .join(' · ');
 
+  // Sort defensively: profile-first then sortOrder. The same lightbox
+  // serves the hero thumbnail click and the photos thumbnails below.
+  const orderedImages: EquipmentImage[] = (equipment.images ?? [])
+    .slice()
+    .sort((a, b) => {
+      if (a.isProfile && !b.isProfile) return -1;
+      if (!a.isProfile && b.isProfile) return 1;
+      return a.sortOrder - b.sortOrder;
+    });
+  const hasImages = orderedImages.length > 0;
+  const heroClickable = hasImages && !!equipment.profileImageUrl;
+
+  const heroThumbnail = (
+    <EquipmentThumbnail
+      url={equipment.profileImageUrl}
+      name={equipment.name}
+      sizeClass="size-16"
+      fit="contain"
+    />
+  );
+
   return (
     <div className="flex flex-col gap-5 p-6">
-      {/* Hero: 64px thumbnail + name + status pill + type/category subline. */}
+      {/* Hero: 64px thumbnail + name + status pill + type/category subline.
+          Hero becomes click-to-lightbox when the equipment has images. */}
       <div className="flex items-start gap-4">
-        <EquipmentThumbnail
-          url={equipment.profileImageUrl}
-          name={equipment.name}
-          sizeClass="size-16"
-          fit="contain"
-        />
+        {heroClickable ? (
+          <button
+            type="button"
+            onClick={() => setLightboxIndex(0)}
+            aria-label={t('equipment.images.openFullSize')}
+            className="rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+          >
+            {heroThumbnail}
+          </button>
+        ) : (
+          heroThumbnail
+        )}
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <EditableField
@@ -138,6 +174,13 @@ export default function EquipmentQuickView({
             </div>
           )}
         </div>
+        {/* + Photo lives at the top-right of the hero row — drawer doesn't
+            have an "actions row" like the WO row's equipment block, so the
+            hero cluster is the natural home for the manage-side affordance. */}
+        <Button plain onClick={() => setIsImageUploadOpen(true)}>
+          <PlusIcon className="size-4" />
+          {t('equipment.images.addPhoto')}
+        </Button>
       </div>
 
       {/* Identification */}
@@ -226,6 +269,26 @@ export default function EquipmentQuickView({
           </div>
         </Section>
       )}
+
+      {/* Photos section. Drawer's equipment fetch already embeds images[];
+          pass them through so we don't refetch the same URL list. */}
+      <EquipmentPhotosSection
+        images={orderedImages}
+        onSelectImage={(i) => setLightboxIndex(i)}
+      />
+
+      <EquipmentPhotoLightbox
+        images={orderedImages}
+        startIndex={lightboxIndex}
+        onClose={() => setLightboxIndex(null)}
+      />
+
+      <EquipmentImageUploadDialog
+        isOpen={isImageUploadOpen}
+        onClose={() => setIsImageUploadOpen(false)}
+        equipmentId={equipment.id}
+        defaultSetProfile={!hasImages}
+      />
     </div>
   );
 }

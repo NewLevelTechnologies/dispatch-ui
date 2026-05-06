@@ -25,6 +25,7 @@ import EditableField from '../components/EditableField';
 import EquipmentFilterFormDialog from '../components/EquipmentFilterFormDialog';
 import EquipmentFormDialog from '../components/EquipmentFormDialog';
 import EquipmentImageUploadDialog from '../components/EquipmentImageUploadDialog';
+import EquipmentPhotoLightbox from '../components/EquipmentPhotoLightbox';
 import EquipmentThumbnail from '../components/EquipmentThumbnail';
 import WorkOrdersList from '../components/WorkOrdersList';
 import { workOrdersListQueryOptions } from '../api/workOrdersListQuery';
@@ -92,6 +93,7 @@ export default function EquipmentDetailPage() {
     { lengthIn: number; widthIn: number; thicknessIn: number } | null
   >(null);
   const [isImageUploadOpen, setIsImageUploadOpen] = useState(false);
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [showAllFilterSizes, setShowAllFilterSizes] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
 
@@ -758,17 +760,16 @@ export default function EquipmentDetailPage() {
               ) : (
                 !imagesError && (
                   <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-                    {images.map((img) => (
+                    {images.map((img, i) => (
                       <div
                         key={img.id}
                         className="group relative overflow-hidden rounded-lg ring-1 ring-zinc-950/10 dark:ring-white/10"
                       >
-                        <a
-                          href={img.url}
-                          target="_blank"
-                          rel="noreferrer"
+                        <button
+                          type="button"
+                          onClick={() => setLightboxIndex(i)}
                           aria-label={t('equipment.images.openFullSize')}
-                          className="block aspect-square w-full bg-zinc-100 dark:bg-zinc-900"
+                          className="block aspect-square w-full bg-zinc-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:bg-zinc-900"
                         >
                           <img
                             src={img.thumbnailUrl ?? img.url}
@@ -776,7 +777,7 @@ export default function EquipmentDetailPage() {
                             className="size-full object-cover transition-opacity group-hover:opacity-90"
                             loading="lazy"
                           />
-                        </a>
+                        </button>
 
                         <button
                           type="button"
@@ -973,6 +974,12 @@ export default function EquipmentDetailPage() {
         onClose={() => setIsImageUploadOpen(false)}
         equipmentId={id!}
         defaultSetProfile={images.length === 0}
+      />
+
+      <EquipmentPhotoLightbox
+        images={images}
+        startIndex={lightboxIndex}
+        onClose={() => setLightboxIndex(null)}
       />
 
       <EquipmentFormDialog
