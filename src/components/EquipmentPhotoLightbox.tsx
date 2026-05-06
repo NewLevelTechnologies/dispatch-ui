@@ -318,7 +318,11 @@ function LightboxInner({
               caption affordance is reachable on multi-photo equipment that
               still has no caption metadata). */}
           {(current.caption || total > 1 || !readOnly) && (
-            <div className="absolute inset-x-0 bottom-0 flex flex-col items-center gap-1 bg-gradient-to-t from-black/70 to-transparent px-4 pb-4 pt-8 text-center text-white">
+            // Stronger gradient + via stop so the band where the caption
+            // actually sits reads as ~55% black against the worst-case
+            // sun-on-concrete photo. Without the via stop the linear
+            // interpolation is too pale at caption height.
+            <div className="absolute inset-x-0 bottom-0 flex flex-col items-center gap-1 bg-gradient-to-t from-black/85 via-black/55 to-transparent px-4 pb-4 pt-10 text-center text-white">
               {isEditingCaption ? (
                 <input
                   ref={captionInputRef}
@@ -337,14 +341,20 @@ function LightboxInner({
                   }}
                   placeholder={t('equipment.images.captionPlaceholder')}
                   aria-label={t('equipment.images.editCaption')}
-                  className="w-full max-w-md rounded border border-white/30 bg-white/10 px-3 py-1.5 text-center text-sm text-white placeholder-white/50 focus:border-white/60 focus:outline-none"
+                  // bg-black/50 (not white/10) so the input is its own
+                  // legible dark surface regardless of what photo's behind
+                  // it. White-bg-against-light-photo had the text and
+                  // placeholder camouflaging into the image.
+                  className="w-full max-w-md rounded border border-white/40 bg-black/50 px-3 py-1.5 text-center text-sm text-white placeholder-white/60 focus:border-white/70 focus:outline-none"
                 />
               ) : current.caption ? (
                 <button
                   type="button"
                   onClick={startCaptionEdit}
                   disabled={readOnly}
-                  className="rounded px-2 py-0.5 text-sm text-white hover:bg-white/10 disabled:cursor-default disabled:hover:bg-transparent"
+                  // Drop-shadow on the text so it stays legible if the
+                  // gradient still loses to a particularly bright photo.
+                  className="rounded px-2 py-0.5 text-sm text-white [text-shadow:0_1px_2px_rgb(0_0_0_/_60%)] hover:bg-white/10 disabled:cursor-default disabled:hover:bg-transparent"
                 >
                   {current.caption}
                 </button>
@@ -366,7 +376,7 @@ function LightboxInner({
                 )
               )}
               {total > 1 && (
-                <div className="text-xs text-white/70">
+                <div className="text-xs text-white/80 [text-shadow:0_1px_2px_rgb(0_0_0_/_60%)]">
                   {t('equipment.images.lightboxPosition', {
                     current: safeIndex + 1,
                     total,
