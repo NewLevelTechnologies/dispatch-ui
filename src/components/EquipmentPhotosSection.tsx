@@ -83,13 +83,18 @@ export default function EquipmentPhotosSection({
             key={img.id}
             type="button"
             onClick={() => setLightboxIndex(i)}
-            className="block size-12 overflow-hidden rounded ring-1 ring-zinc-950/10 hover:ring-blue-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:ring-white/10"
+            // bg-zinc-100/-800 is the letterbox color for non-square photos —
+            // object-contain preserves the full frame so CSRs see the whole
+            // photo (rather than object-cover's center-crop which clips
+            // nameplates / serial-tag corners). Square footprint kept so the
+            // row reads as a neat grid; the bg makes the bars look intentional.
+            className="block size-12 overflow-hidden rounded bg-zinc-100 ring-1 ring-zinc-950/10 hover:ring-blue-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:bg-zinc-800 dark:ring-white/10"
             title={img.caption ?? t('equipment.images.openFullSize')}
           >
             <img
               src={img.thumbnailUrl ?? img.url}
               alt={img.caption ?? ''}
-              className="size-full object-cover"
+              className="size-full object-contain"
               loading="lazy"
             />
           </button>
