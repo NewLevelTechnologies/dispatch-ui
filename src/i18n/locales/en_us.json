@@ -98,6 +98,7 @@
       "zipCode": "Zip Code"
     },
     "moreOptions": "More options",
+    "next": "Next",
     "none": "None",
     "pagination": {
       "next": "Next",
@@ -105,6 +106,7 @@
       "previous": "Previous",
       "showing": "Showing {{start}}-{{end}} of {{total}}"
     },
+    "previous": "Previous",
     "save": "Save",
     "saving": "Saving...",
     "showAll": "Show All",
@@ -376,6 +378,7 @@
       "errorUpdate": "Failed to update photo",
       "fileRequired": "Choose a photo to upload.",
       "headingWithCount": "Photos ({{count}})",
+      "lightboxPosition": "{{current}} of {{total}}",
       "limitReached": "This {{entity, lowercase}} already has the maximum {{max}} photos.",
       "loading": "Loading photos…",
       "manage": "Manage",

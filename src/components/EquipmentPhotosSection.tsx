@@ -1,8 +1,10 @@
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { Link as RouterLink } from 'react-router-dom';
 import { equipmentImagesApi, type EquipmentImage } from '../api';
 import { ArrowTopRightOnSquareIcon } from '@heroicons/react/24/outline';
+import EquipmentPhotoLightbox from './EquipmentPhotoLightbox';
 
 interface Props {
   equipmentId: string;
@@ -34,6 +36,7 @@ export default function EquipmentPhotosSection({
   images: providedImages,
 }: Props) {
   const { t } = useTranslation();
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
 
   // Fetch only when the parent didn't supply images. React Query treats
   // `enabled: false` as "use whatever's in cache, never refetch" — fine here
@@ -75,13 +78,12 @@ export default function EquipmentPhotosSection({
         </RouterLink>
       </div>
       <div className="mt-2 flex flex-wrap gap-2">
-        {visible.map((img) => (
-          <a
+        {visible.map((img, i) => (
+          <button
             key={img.id}
-            href={img.url}
-            target="_blank"
-            rel="noreferrer"
-            className="block size-12 overflow-hidden rounded ring-1 ring-zinc-950/10 hover:ring-blue-500 dark:ring-white/10"
+            type="button"
+            onClick={() => setLightboxIndex(i)}
+            className="block size-12 overflow-hidden rounded ring-1 ring-zinc-950/10 hover:ring-blue-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:ring-white/10"
             title={img.caption ?? t('equipment.images.openFullSize')}
           >
             <img
@@ -90,17 +92,28 @@ export default function EquipmentPhotosSection({
               className="size-full object-cover"
               loading="lazy"
             />
-          </a>
+          </button>
         ))}
         {overflow > 0 && (
-          <RouterLink
-            to={`/equipment/${equipmentId}`}
-            className="flex size-12 items-center justify-center rounded text-sm font-medium text-zinc-700 ring-1 ring-zinc-950/10 hover:bg-zinc-50 hover:text-blue-600 dark:text-zinc-300 dark:ring-white/10 dark:hover:bg-white/5 dark:hover:text-blue-400"
+          // The +N chip jumps into the lightbox at the first hidden image —
+          // CSRs can flip through every photo without leaving context. The
+          // "Manage" link in the section header still routes to the
+          // equipment page when they want to edit/upload.
+          <button
+            type="button"
+            onClick={() => setLightboxIndex(visible.length)}
+            className="flex size-12 items-center justify-center rounded text-sm font-medium text-zinc-700 ring-1 ring-zinc-950/10 hover:bg-zinc-50 hover:text-blue-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:text-zinc-300 dark:ring-white/10 dark:hover:bg-white/5 dark:hover:text-blue-400"
           >
             +{overflow}
-          </RouterLink>
+          </button>
         )}
       </div>
+
+      <EquipmentPhotoLightbox
+        images={ordered}
+        startIndex={lightboxIndex}
+        onClose={() => setLightboxIndex(null)}
+      />
     </section>
   );
 }
