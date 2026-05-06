@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { Link as RouterLink } from 'react-router-dom';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import {
   equipmentApi,
+  equipmentImagesApi,
   EquipmentStatus,
   type StatusWorkflowRule,
   type UpdateEquipmentRequest,
@@ -40,6 +41,7 @@ import {
   PlusIcon,
 } from '@heroicons/react/24/outline';
 import EditableField from './EditableField';
+import EquipmentPhotoLightbox from './EquipmentPhotoLightbox';
 import WorkItemStatusPill from './WorkItemStatusPill';
 
 interface Props {
@@ -454,6 +456,63 @@ function EquipmentBlock({
     );
   }
 
+  return (
+    <EquipmentBlockBody
+      equipment={equipment}
+      readOnly={readOnly}
+      onEditEquipment={onEditEquipment}
+      onSelectSubUnit={onSelectSubUnit}
+      onAddSubUnit={onAddSubUnit}
+      onSaveEquipmentField={onSaveEquipmentField}
+    />
+  );
+}
+
+interface EquipmentBlockBodyProps {
+  equipment: WorkItemEquipmentSummary;
+  readOnly: boolean;
+  onEditEquipment?: (equipmentId: string) => void;
+  onSelectSubUnit?: (subUnit: { id: string; name: string }) => void;
+  onAddSubUnit?: (parent: { id: string; name: string }) => void;
+  onSaveEquipmentField: <K extends keyof UpdateEquipmentRequest>(
+    equipmentId: string,
+    field: K,
+    next: UpdateEquipmentRequest[K]
+  ) => Promise<void>;
+}
+
+function EquipmentBlockBody({
+  equipment,
+  readOnly,
+  onEditEquipment,
+  onSelectSubUnit,
+  onAddSubUnit,
+  onSaveEquipmentField,
+}: EquipmentBlockBodyProps) {
+  const { t } = useTranslation();
+  const { getName } = useGlossary();
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+
+  // Lazy-fetch the image list for this equipment when the row is expanded.
+  // Cache key matches EquipmentDetailPage so uploads on the dedicated page
+  // invalidate this surface in lockstep. The hero thumbnail and PhotosSection
+  // both feed into a single lightbox owned here.
+  const { data: images = [] } = useQuery({
+    queryKey: ['equipment-images', equipment.id],
+    queryFn: () => equipmentImagesApi.list(equipment.id),
+  });
+
+  // Sort defensively: profile-first then sortOrder. Same contract the
+  // PhotosSection used to enforce internally.
+  const orderedImages = [...images].sort((a, b) => {
+    if (a.isProfile && !b.isProfile) return -1;
+    if (!a.isProfile && b.isProfile) return 1;
+    return a.sortOrder - b.sortOrder;
+  });
+
+  const hasImages = orderedImages.length > 0;
+  const heroClickable = hasImages && !!equipment.profileImageUrl;
+
   const typeCategoryLine = [equipment.equipmentTypeName, equipment.equipmentCategoryName]
     .filter(Boolean)
     .join(' · ');
@@ -462,6 +521,15 @@ function EquipmentBlock({
     field: K,
     value: UpdateEquipmentRequest[K]
   ) => onSaveEquipmentField(equipment.id, field, value);
+
+  const heroThumbnail = (
+    <EquipmentThumbnail
+      url={equipment.profileImageUrl}
+      name={equipment.name}
+      sizeClass="size-12"
+      fit="contain"
+    />
+  );
 
   return (
     <section aria-label={getName('equipment')}>
@@ -483,14 +551,22 @@ function EquipmentBlock({
         }
       />
 
-      {/* Identity row: thumbnail (48px) + name + status pill + type/category subline. */}
+      {/* Identity row: thumbnail (48px) + name + status pill + type/category subline.
+          Hero thumbnail becomes a click target when images exist — opens the
+          shared lightbox at index 0 (the profile image, by sort contract). */}
       <div className="mt-1 flex items-start gap-3">
-        <EquipmentThumbnail
-          url={equipment.profileImageUrl}
-          name={equipment.name}
-          sizeClass="size-12"
-          fit="contain"
-        />
+        {heroClickable ? (
+          <button
+            type="button"
+            onClick={() => setLightboxIndex(0)}
+            aria-label={t('equipment.images.openFullSize')}
+            className="rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+          >
+            {heroThumbnail}
+          </button>
+        ) : (
+          heroThumbnail
+        )}
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             {readOnly ? (
@@ -571,7 +647,17 @@ function EquipmentBlock({
         onAddSubUnit={onAddSubUnit}
       />
 
-      <EquipmentPhotosSection equipmentId={equipment.id} />
+      <EquipmentPhotosSection
+        equipmentId={equipment.id}
+        images={orderedImages}
+        onSelectImage={(i) => setLightboxIndex(i)}
+      />
+
+      <EquipmentPhotoLightbox
+        images={orderedImages}
+        startIndex={lightboxIndex}
+        onClose={() => setLightboxIndex(null)}
+      />
     </section>
   );
 }

@@ -1,21 +1,19 @@
-import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { Link as RouterLink } from 'react-router-dom';
-import { equipmentImagesApi, type EquipmentImage } from '../api';
+import { type EquipmentImage } from '../api';
 import { ArrowTopRightOnSquareIcon } from '@heroicons/react/24/outline';
-import EquipmentPhotoLightbox from './EquipmentPhotoLightbox';
 
 interface Props {
   equipmentId: string;
+  /** Sorted image list. The component renders nothing when empty. */
+  images: EquipmentImage[];
   /** Cap on visible thumbnails before the +N overflow chip. Default 6 fits
    *  cleanly in the WO row expansion / quickview drawer width without wrapping. */
   maxThumbnails?: number;
-  /** Optional pre-loaded list — when provided, skip the lazy fetch. The
-   *  EquipmentQuickViewDrawer already has images embedded on its
-   *  EquipmentResponse fetch and can pass them in to avoid a duplicate
-   *  request. */
-  images?: EquipmentImage[];
+  /** Click handler for thumbnails. Receives the index in `images`. The +N
+   *  overflow chip jumps to the first hidden index so the parent's lightbox
+   *  can flip through the entire set. The parent owns the lightbox. */
+  onSelectImage: (index: number) => void;
 }
 
 /**
@@ -25,40 +23,22 @@ interface Props {
  * "0 photos" placeholder communicates noise on the dominant case (CSR
  * scanning a row to find the equipment, not auditing photo coverage).
  *
- * Lazy-loaded via the standalone `/equipment/{id}/images` endpoint so
- * the WO row expansion only pays for the fetch when the user expands a
- * row with linked equipment. Cache key matches `EquipmentDetailPage` so
- * uploads on the dedicated page invalidate this surface in lockstep.
+ * Presentational: the parent owns image fetching and the lightbox so the
+ * hero equipment thumbnail and the photos thumbnails can share one
+ * lightbox instance per equipment block.
  */
 export default function EquipmentPhotosSection({
   equipmentId,
+  images,
   maxThumbnails = 6,
-  images: providedImages,
+  onSelectImage,
 }: Props) {
   const { t } = useTranslation();
-  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
 
-  // Fetch only when the parent didn't supply images. React Query treats
-  // `enabled: false` as "use whatever's in cache, never refetch" — fine here
-  // because the prop path means the parent already has the data fresh.
-  const { data: fetchedImages } = useQuery({
-    queryKey: ['equipment-images', equipmentId],
-    queryFn: () => equipmentImagesApi.list(equipmentId),
-    enabled: !providedImages,
-  });
+  if (images.length === 0) return null;
 
-  const images = providedImages ?? fetchedImages;
-  if (!images || images.length === 0) return null;
-
-  // Profile-first then sortOrder is the contract from the API; defensively
-  // sort here so callers passing a raw images[] still get the expected order.
-  const ordered = [...images].sort((a, b) => {
-    if (a.isProfile && !b.isProfile) return -1;
-    if (!a.isProfile && b.isProfile) return 1;
-    return a.sortOrder - b.sortOrder;
-  });
-  const visible = ordered.slice(0, maxThumbnails);
-  const overflow = ordered.length - visible.length;
+  const visible = images.slice(0, maxThumbnails);
+  const overflow = images.length - visible.length;
 
   return (
     <section
@@ -67,7 +47,7 @@ export default function EquipmentPhotosSection({
     >
       <div className="flex items-center justify-between gap-2">
         <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-          {t('equipment.images.headingWithCount', { count: ordered.length })}
+          {t('equipment.images.headingWithCount', { count: images.length })}
         </div>
         <RouterLink
           to={`/equipment/${equipmentId}`}
@@ -82,7 +62,7 @@ export default function EquipmentPhotosSection({
           <button
             key={img.id}
             type="button"
-            onClick={() => setLightboxIndex(i)}
+            onClick={() => onSelectImage(i)}
             // bg-zinc-100/-800 is the letterbox color for non-square photos —
             // object-contain preserves the full frame so CSRs see the whole
             // photo (rather than object-cover's center-crop which clips
@@ -100,25 +80,15 @@ export default function EquipmentPhotosSection({
           </button>
         ))}
         {overflow > 0 && (
-          // The +N chip jumps into the lightbox at the first hidden image —
-          // CSRs can flip through every photo without leaving context. The
-          // "Manage" link in the section header still routes to the
-          // equipment page when they want to edit/upload.
           <button
             type="button"
-            onClick={() => setLightboxIndex(visible.length)}
+            onClick={() => onSelectImage(visible.length)}
             className="flex size-12 items-center justify-center rounded text-sm font-medium text-zinc-700 ring-1 ring-zinc-950/10 hover:bg-zinc-50 hover:text-blue-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:text-zinc-300 dark:ring-white/10 dark:hover:bg-white/5 dark:hover:text-blue-400"
           >
             +{overflow}
           </button>
         )}
       </div>
-
-      <EquipmentPhotoLightbox
-        images={ordered}
-        startIndex={lightboxIndex}
-        onClose={() => setLightboxIndex(null)}
-      />
     </section>
   );
 }
