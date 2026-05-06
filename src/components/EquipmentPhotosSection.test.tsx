@@ -27,15 +27,24 @@ const makeImage = (overrides: Partial<EquipmentImage> = {}): EquipmentImage => (
 describe('EquipmentPhotosSection', () => {
   it('renders nothing when the images list is empty', () => {
     const { container } = renderWithProviders(
-      <EquipmentPhotosSection equipmentId="eq-1" images={[]} onSelectImage={() => {}} />
+      <EquipmentPhotosSection images={[]} onSelectImage={() => {}} />
     );
     expect(container.querySelector('section')).toBeNull();
   });
 
-  it('renders thumbnail row + count + Manage link when images exist', () => {
+  it('renders nothing when there is only one photo (hero handles it)', () => {
+    const { container } = renderWithProviders(
+      <EquipmentPhotosSection
+        images={[makeImage({ id: 'a', isProfile: true, caption: 'Nameplate' })]}
+        onSelectImage={() => {}}
+      />
+    );
+    expect(container.querySelector('section')).toBeNull();
+  });
+
+  it('renders thumbnail row + count when 2+ images exist', () => {
     renderWithProviders(
       <EquipmentPhotosSection
-        equipmentId="eq-1"
         images={[
           makeImage({ id: 'a', isProfile: true, caption: 'Nameplate' }),
           makeImage({ id: 'b', sortOrder: 1, caption: 'Compressor' }),
@@ -46,16 +55,11 @@ describe('EquipmentPhotosSection', () => {
     expect(screen.getByText(/Photos \(2\)/)).toBeInTheDocument();
     expect(screen.getByAltText('Nameplate')).toBeInTheDocument();
     expect(screen.getByAltText('Compressor')).toBeInTheDocument();
-    const manageLinks = screen.getAllByRole('link');
-    expect(
-      manageLinks.some((a) => a.getAttribute('href') === '/equipment/eq-1')
-    ).toBe(true);
   });
 
   it('renders a +N overflow chip when images exceed maxThumbnails', () => {
     renderWithProviders(
       <EquipmentPhotosSection
-        equipmentId="eq-1"
         images={Array.from({ length: 8 }, (_, i) =>
           makeImage({ id: `img-${i}`, sortOrder: i, caption: `Photo ${i}` })
         )}
@@ -74,7 +78,6 @@ describe('EquipmentPhotosSection', () => {
     const onSelectImage = vi.fn();
     renderWithProviders(
       <EquipmentPhotosSection
-        equipmentId="eq-1"
         images={[
           makeImage({ id: 'a', caption: 'A' }),
           makeImage({ id: 'b', sortOrder: 1, caption: 'B' }),
@@ -91,7 +94,6 @@ describe('EquipmentPhotosSection', () => {
     const onSelectImage = vi.fn();
     renderWithProviders(
       <EquipmentPhotosSection
-        equipmentId="eq-1"
         images={Array.from({ length: 5 }, (_, i) =>
           makeImage({ id: `img-${i}`, sortOrder: i, caption: `Photo ${i}` })
         )}

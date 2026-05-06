@@ -10,12 +10,14 @@ import {
 } from '../api';
 import { useGlossary } from '../contexts/GlossaryContext';
 import EditableField from './EditableField';
+import EquipmentImageUploadDialog from './EquipmentImageUploadDialog';
 import EquipmentPhotoLightbox from './EquipmentPhotoLightbox';
 import EquipmentPhotosSection from './EquipmentPhotosSection';
 import EquipmentThumbnail from './EquipmentThumbnail';
 import { Badge } from './catalyst/badge';
+import { Button } from './catalyst/button';
 import { Text } from './catalyst/text';
-import { ChevronRightIcon } from '@heroicons/react/24/outline';
+import { ChevronRightIcon, PlusIcon } from '@heroicons/react/24/outline';
 
 interface EquipmentQuickViewProps {
   equipmentId: string;
@@ -49,6 +51,7 @@ export default function EquipmentQuickView({
   const { getName } = useGlossary();
   const queryClient = useQueryClient();
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+  const [isImageUploadOpen, setIsImageUploadOpen] = useState(false);
 
   // The drawer needs descendants on the response so the sub-unit chip row
   // can render. That's an opt-in projection — default getById callers
@@ -171,6 +174,13 @@ export default function EquipmentQuickView({
             </div>
           )}
         </div>
+        {/* + Photo lives at the top-right of the hero row — drawer doesn't
+            have an "actions row" like the WO row's equipment block, so the
+            hero cluster is the natural home for the manage-side affordance. */}
+        <Button plain onClick={() => setIsImageUploadOpen(true)}>
+          <PlusIcon className="size-4" />
+          {t('equipment.images.addPhoto')}
+        </Button>
       </div>
 
       {/* Identification */}
@@ -263,7 +273,6 @@ export default function EquipmentQuickView({
       {/* Photos section. Drawer's equipment fetch already embeds images[];
           pass them through so we don't refetch the same URL list. */}
       <EquipmentPhotosSection
-        equipmentId={equipment.id}
         images={orderedImages}
         onSelectImage={(i) => setLightboxIndex(i)}
       />
@@ -272,6 +281,13 @@ export default function EquipmentQuickView({
         images={orderedImages}
         startIndex={lightboxIndex}
         onClose={() => setLightboxIndex(null)}
+      />
+
+      <EquipmentImageUploadDialog
+        isOpen={isImageUploadOpen}
+        onClose={() => setIsImageUploadOpen(false)}
+        equipmentId={equipment.id}
+        defaultSetProfile={!hasImages}
       />
     </div>
   );

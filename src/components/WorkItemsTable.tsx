@@ -41,6 +41,7 @@ import {
   PlusIcon,
 } from '@heroicons/react/24/outline';
 import EditableField from './EditableField';
+import EquipmentImageUploadDialog from './EquipmentImageUploadDialog';
 import EquipmentPhotoLightbox from './EquipmentPhotoLightbox';
 import WorkItemStatusPill from './WorkItemStatusPill';
 
@@ -492,6 +493,7 @@ function EquipmentBlockBody({
   const { t } = useTranslation();
   const { getName } = useGlossary();
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+  const [isImageUploadOpen, setIsImageUploadOpen] = useState(false);
 
   // Lazy-fetch the image list for this equipment when the row is expanded.
   // Cache key matches EquipmentDetailPage so uploads on the dedicated page
@@ -541,6 +543,12 @@ function EquipmentBlockBody({
               <Button plain onClick={() => onEditEquipment(equipment.id)}>
                 <PencilIcon className="size-4" />
                 {t('workOrders.workItems.editAll')}
+              </Button>
+            )}
+            {!readOnly && (
+              <Button plain onClick={() => setIsImageUploadOpen(true)}>
+                <PlusIcon className="size-4" />
+                {t('equipment.images.addPhoto')}
               </Button>
             )}
             <Button plain href={`/equipment/${equipment.id}`}>
@@ -648,7 +656,6 @@ function EquipmentBlockBody({
       />
 
       <EquipmentPhotosSection
-        equipmentId={equipment.id}
         images={orderedImages}
         onSelectImage={(i) => setLightboxIndex(i)}
       />
@@ -657,6 +664,13 @@ function EquipmentBlockBody({
         images={orderedImages}
         startIndex={lightboxIndex}
         onClose={() => setLightboxIndex(null)}
+      />
+
+      <EquipmentImageUploadDialog
+        isOpen={isImageUploadOpen}
+        onClose={() => setIsImageUploadOpen(false)}
+        equipmentId={equipment.id}
+        defaultSetProfile={!hasImages}
       />
     </section>
   );
