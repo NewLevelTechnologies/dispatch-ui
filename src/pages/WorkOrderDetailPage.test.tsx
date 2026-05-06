@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { renderWithProviders } from '../test/utils';
 import WorkOrderDetailPage from './WorkOrderDetailPage';
 import apiClient from '../api/client';
@@ -209,11 +210,64 @@ describe('WorkOrderDetailPage', () => {
     // Phase 4 wired up "+ Work Item" — should be enabled on an active WO.
     const addWorkItemButton = screen.getByRole('button', { name: /add work item/i });
     expect(addWorkItemButton).not.toBeDisabled();
-    // Edit / + Dispatch remain disabled until their phases land.
+    // Edit WO is wired up to the existing WorkOrderFormDialog — enabled on an active WO.
     const editButton = screen.getByRole('button', { name: /edit/i });
-    expect(editButton).toBeDisabled();
+    expect(editButton).not.toBeDisabled();
+    // + Dispatch remains disabled until phase 6 lands.
     const addDispatchButton = screen.getByRole('button', { name: /add dispatch/i });
     expect(addDispatchButton).toBeDisabled();
+  });
+
+  it('opens the edit dialog when the Edit button is clicked', async () => {
+    mockApiResponses();
+    const user = userEvent.setup();
+    renderPage();
+    await waitFor(() => {
+      expect(screen.getByText('WO-00010')).toBeInTheDocument();
+    });
+    const editButton = screen.getByRole('button', { name: /edit/i });
+    await user.click(editButton);
+    // WorkOrderFormDialog mounts a Catalyst Dialog with role="dialog";
+    // confirms the click wired through.
+    await waitFor(() => {
+      expect(screen.getByRole('dialog')).toBeInTheDocument();
+    });
+  });
+
+  it('deletes the work order from the overflow menu and navigates back', async () => {
+    mockApiResponses();
+    vi.mocked(apiClient.delete).mockResolvedValue({ data: {} });
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const user = userEvent.setup();
+    renderPage();
+    await waitFor(() => {
+      expect(screen.getByText('WO-00010')).toBeInTheDocument();
+    });
+    await user.click(screen.getByRole('button', { name: /more options/i }));
+    await user.click(await screen.findByRole('menuitem', { name: /delete/i }));
+    await waitFor(() => {
+      expect(confirmSpy).toHaveBeenCalledWith(
+        expect.stringContaining('WO-00010')
+      );
+      expect(apiClient.delete).toHaveBeenCalledWith('/work-orders/wo-1');
+    });
+    confirmSpy.mockRestore();
+  });
+
+  it('does not delete when the user cancels the confirm', async () => {
+    mockApiResponses();
+    vi.mocked(apiClient.delete).mockResolvedValue({ data: {} });
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    const user = userEvent.setup();
+    renderPage();
+    await waitFor(() => {
+      expect(screen.getByText('WO-00010')).toBeInTheDocument();
+    });
+    await user.click(screen.getByRole('button', { name: /more options/i }));
+    await user.click(await screen.findByRole('menuitem', { name: /delete/i }));
+    expect(confirmSpy).toHaveBeenCalled();
+    expect(apiClient.delete).not.toHaveBeenCalled();
+    confirmSpy.mockRestore();
   });
 
   it('renders a back button to the work orders list', async () => {
