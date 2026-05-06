@@ -8,6 +8,7 @@ import {
 } from '../api';
 import { useGlossary } from '../contexts/GlossaryContext';
 import EditableField from './EditableField';
+import EquipmentPhotosSection from './EquipmentPhotosSection';
 import EquipmentThumbnail from './EquipmentThumbnail';
 import { Badge } from './catalyst/badge';
 import { Text } from './catalyst/text';
@@ -226,6 +227,13 @@ export default function EquipmentQuickView({
           </div>
         </Section>
       )}
+
+      {/* Photos section. Drawer's equipment fetch already embeds images[];
+          pass them through so we don't refetch the same URL list. */}
+      <EquipmentPhotosSection
+        equipmentId={equipment.id}
+        images={equipment.images}
+      />
     </div>
   );
 }

@@ -12,6 +12,7 @@ import {
   type WorkItemStatus,
 } from '../api';
 import { useGlossary } from '../contexts/GlossaryContext';
+import EquipmentPhotosSection from './EquipmentPhotosSection';
 import EquipmentThumbnail from './EquipmentThumbnail';
 import {
   Table,
@@ -569,6 +570,8 @@ function EquipmentBlock({
         onSelectSubUnit={onSelectSubUnit}
         onAddSubUnit={onAddSubUnit}
       />
+
+      <EquipmentPhotosSection equipmentId={equipment.id} />
     </section>
   );
 }
