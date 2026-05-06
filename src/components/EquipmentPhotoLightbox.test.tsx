@@ -332,6 +332,29 @@ describe('EquipmentPhotoLightbox', () => {
     });
   });
 
+  it('sends caption: null when the user clears an existing caption', async () => {
+    vi.mocked(apiClient.patch).mockResolvedValue({ data: {} });
+    const user = userEvent.setup();
+    renderWithProviders(
+      <EquipmentPhotoLightbox
+        equipmentId="eq-1"
+        images={[makeImage({ id: 'a', caption: 'Existing' })]}
+        startIndex={0}
+        onClose={() => {}}
+      />
+    );
+    await user.click(screen.getByRole('button', { name: 'Existing' }));
+    const input = screen.getByRole('textbox');
+    await user.clear(input);
+    await user.keyboard('{Enter}');
+    await waitFor(() => {
+      expect(apiClient.patch).toHaveBeenCalledWith(
+        '/equipment/eq-1/images/a',
+        { caption: null }
+      );
+    });
+  });
+
   it('reverts the draft on Escape without calling the API', async () => {
     const user = userEvent.setup();
     renderWithProviders(
