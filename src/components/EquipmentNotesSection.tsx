@@ -152,16 +152,17 @@ export default function EquipmentNotesSection({
 
       {/* Recent notes preview */}
       {recentNotes.length > 0 && (
-        <ul className="mt-2 space-y-2">
+        // Plain divided list — no card wrapping per note. Matches the
+        // density of the surrounding work-item / equipment rows; the
+        // card-and-ring treatment was making notes feel like a different
+        // surface than the rest of the expansion.
+        <ul className="mt-2 divide-y divide-zinc-200 dark:divide-zinc-800">
           {recentNotes.map((note) => (
-            <li
-              key={note.id}
-              className="rounded-md bg-zinc-50 p-2 ring-1 ring-zinc-200 dark:bg-zinc-900/50 dark:ring-zinc-800"
-            >
+            <li key={note.id} className="py-1.5 first:pt-0 last:pb-0">
               <p className="whitespace-pre-wrap text-sm text-zinc-900 dark:text-zinc-100">
                 {note.body}
               </p>
-              <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+              <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
                 {note.authorName ?? t('equipment.notes.systemAuthor')}
                 {' · '}
                 {formatRelativeTime(note.createdAt)}
