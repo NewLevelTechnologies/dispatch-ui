@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import {
   ChevronLeftIcon,
   ChevronRightIcon,
+  PlusIcon,
   StarIcon as StarIconOutline,
   TrashIcon,
   XMarkIcon,
@@ -349,11 +350,17 @@ function LightboxInner({
                 </button>
               ) : (
                 !readOnly && (
+                  // Empty-state CTA: chip styling matches the top toolbar
+                  // buttons so it reads as "this is a control, not a label"
+                  // when sitting over a busy photo. The populated caption
+                  // case (above) doesn't need this because the caption text
+                  // itself is the content/anchor.
                   <button
                     type="button"
                     onClick={startCaptionEdit}
-                    className="rounded px-2 py-0.5 text-sm italic text-white/60 hover:bg-white/10 hover:text-white/90"
+                    className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 text-sm text-white ring-1 ring-inset ring-white/20 hover:bg-white/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-white"
                   >
+                    <PlusIcon className="size-4" />
                     {t('equipment.images.addCaption')}
                   </button>
                 )
