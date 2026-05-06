@@ -284,11 +284,12 @@ function NoteRow({ note, readOnly, onSave, onDelete, isPending }: NoteRowProps) 
           type="button"
           onClick={startEdit}
           disabled={readOnly}
-          // Dimmer than work-item-description text — notes are supporting
-          // reference material, not the primary row content. Dropping
-          // brightness (not size) keeps multi-sentence service notes
+          // Dimmer + smaller than work-item-description text — notes are
+          // supporting reference material, not the primary row content.
+          // text-xs matches the equipment field-label scale; the dimmer
+          // zinc-600/-400 color keeps multi-sentence service notes
           // readable while letting them recede visually.
-          className="flex-1 rounded text-left text-sm text-zinc-600 hover:bg-zinc-50 disabled:cursor-default disabled:hover:bg-transparent dark:text-zinc-400 dark:hover:bg-white/5"
+          className="flex-1 rounded text-left text-xs text-zinc-600 hover:bg-zinc-50 disabled:cursor-default disabled:hover:bg-transparent dark:text-zinc-400 dark:hover:bg-white/5"
           title={readOnly ? undefined : t('equipment.notes.editHover')}
         >
           <span className="whitespace-pre-wrap">{note.body}</span>
