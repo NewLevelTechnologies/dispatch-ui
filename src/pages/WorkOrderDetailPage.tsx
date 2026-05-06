@@ -24,6 +24,7 @@ import EquipmentQuickViewDrawer from '../components/EquipmentQuickViewDrawer';
 import WorkItemFormDialog from '../components/WorkItemFormDialog';
 import WorkItemsTable from '../components/WorkItemsTable';
 import WorkOrderActivityRail from '../components/WorkOrderActivityRail';
+import WorkOrderFormDialog from '../components/WorkOrderFormDialog';
 import { SlideOver } from '../components/catalyst/slideover';
 import { formatPhone } from '../utils/formatPhone';
 import { formatRelativeTime } from '../utils/formatRelativeTime';
@@ -101,6 +102,7 @@ export default function WorkOrderDetailPage() {
   const [activitySheetOpen, setActivitySheetOpen] = useState(false);
   const [workItemDialogOpen, setWorkItemDialogOpen] = useState(false);
   const [editingWorkItem, setEditingWorkItem] = useState<WorkItemResponse | null>(null);
+  const [editWorkOrderDialogOpen, setEditWorkOrderDialogOpen] = useState(false);
   // Equipment edit dialog opens from a work-item row's "Edit all" button. We
   // fetch the full Equipment record on demand because WorkItemEquipmentSummary
   // doesn't carry the deeper fields the dialog edits (description, install
@@ -197,6 +199,28 @@ export default function WorkOrderDetailPage() {
   const handleDeleteWorkItem = (wi: WorkItemResponse) => {
     if (!window.confirm(t('workOrders.workItems.deleteConfirm', { entity: getName('work_item') }))) return;
     deleteWorkItemMutation.mutate({ workItemId: wi.id });
+  };
+
+  const deleteWorkOrderMutation = useMutation({
+    mutationFn: () => workOrderApi.delete(id!),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['work-orders'] });
+      queryClient.invalidateQueries({ queryKey: ['work-orders-list'] });
+      navigate('/work-orders');
+    },
+    onError: (err: unknown) => {
+      const msg =
+        err instanceof Error && 'response' in err
+          ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
+          : undefined;
+      alert(msg || t('common.form.errorDelete', { entity: getName('work_order') }));
+    },
+  });
+
+  const handleDeleteWorkOrder = () => {
+    const name = workOrder?.workOrderNumber || (workOrder ? `#${workOrder.id.slice(0, 8)}` : '');
+    if (!window.confirm(t('common.actions.deleteConfirm', { name }))) return;
+    deleteWorkOrderMutation.mutate();
   };
 
   // Inline description edit on each row. EditableField stays in edit mode if
@@ -501,7 +525,16 @@ export default function WorkOrderDetailPage() {
               {t('workOrders.detail.addNote')}
             </Button>
             <div className="grow" />
-            <Button outline disabled title={t('workOrders.detail.actionPending')}>
+            <Button
+              outline
+              onClick={() => setEditWorkOrderDialogOpen(true)}
+              disabled={isCancelled || isArchived}
+              title={
+                isCancelled || isArchived
+                  ? t('workOrders.detail.frozen')
+                  : undefined
+              }
+            >
               <PencilIcon className="size-4" />
               {t('common.edit')}
             </Button>
@@ -516,7 +549,7 @@ export default function WorkOrderDetailPage() {
                 <DropdownItem disabled>
                   <DropdownLabel>{t('workOrders.detail.duplicate')}</DropdownLabel>
                 </DropdownItem>
-                <DropdownItem disabled>
+                <DropdownItem onClick={handleDeleteWorkOrder}>
                   <DropdownLabel>{t('common.delete')}</DropdownLabel>
                 </DropdownItem>
               </DropdownMenu>
@@ -759,6 +792,12 @@ export default function WorkOrderDetailPage() {
         serviceLocationId={workOrder.serviceLocationId || workOrder.serviceLocation?.id}
         workItem={editingWorkItem}
         readOnly={isCancelled || isArchived}
+      />
+
+      <WorkOrderFormDialog
+        isOpen={editWorkOrderDialogOpen}
+        onClose={() => setEditWorkOrderDialogOpen(false)}
+        workOrder={workOrder}
       />
 
       <EquipmentFormDialog
