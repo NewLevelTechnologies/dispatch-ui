@@ -331,6 +331,7 @@ vi.mock('react-i18next', () => {
     'equipment.notes.errorUpdate': 'Failed to update note',
     'equipment.notes.heading': 'Notes',
     'equipment.notes.headingWithCount': 'Notes ({{count}})',
+    'equipment.notes.helper': 'Saved with this equipment, not this work order',
     'equipment.notes.systemAuthor': 'System',
     'equipment.notes.viewAll': '{{count}} more on the equipment page',
     'equipment.tabs.photos': 'Photos',

@@ -411,6 +411,7 @@
       "errorUpdate": "Failed to update note",
       "heading": "Notes",
       "headingWithCount": "Notes ({{count}})",
+      "helper": "Saved with this equipment, not this work order",
       "systemAuthor": "System",
       "viewAll": "{{count}} more on the equipment page"
     },

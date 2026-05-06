@@ -132,6 +132,12 @@ export default function EquipmentNotesSection({
           </button>
         )}
       </div>
+      {/* Helper text — disambiguates from WO activity rail notes. CSRs
+          coming from legacy systems wrote per-equipment service knowledge
+          where the new system put per-WO conversation; this line redirects. */}
+      <p className="mt-0.5 text-xs italic text-zinc-500 dark:text-zinc-400">
+        {t('equipment.notes.helper')}
+      </p>
 
       {/* Composer */}
       {!readOnly && isComposing && (
