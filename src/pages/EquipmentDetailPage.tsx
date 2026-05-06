@@ -977,6 +977,7 @@ export default function EquipmentDetailPage() {
       />
 
       <EquipmentPhotoLightbox
+        equipmentId={id!}
         images={images}
         startIndex={lightboxIndex}
         onClose={() => setLightboxIndex(null)}

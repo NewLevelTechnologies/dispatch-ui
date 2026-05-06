@@ -278,6 +278,7 @@ export default function EquipmentQuickView({
       />
 
       <EquipmentPhotoLightbox
+        equipmentId={equipment.id}
         images={orderedImages}
         startIndex={lightboxIndex}
         onClose={() => setLightboxIndex(null)}
