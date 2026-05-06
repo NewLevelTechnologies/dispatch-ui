@@ -363,6 +363,7 @@
       "tabComingSoon": "Coming soon."
     },
     "images": {
+      "addCaption": "Add caption",
       "addPhoto": "Add Photo",
       "batchEmpty": "Choose one or more photos to add.",
       "captionPlaceholder": "e.g. Nameplate, Compressor model number",

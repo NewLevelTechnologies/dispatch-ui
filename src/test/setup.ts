@@ -285,6 +285,7 @@ vi.mock('react-i18next', () => {
     'equipment.detail.noProfileImage': 'No profile image',
     'equipment.detail.profileImageAlt': '{{name}} profile image',
     'equipment.detail.tabComingSoon': 'Coming soon.',
+    'equipment.images.addCaption': 'Add caption',
     'equipment.images.addPhoto': 'Add Photo',
     'equipment.images.batchEmpty': 'Choose one or more photos to add.',
     'equipment.images.captionPlaceholder': 'e.g. Nameplate, Compressor model number',
