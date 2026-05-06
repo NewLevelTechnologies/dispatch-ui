@@ -52,6 +52,14 @@ export interface Equipment {
   descendants?: Array<{ id: string; name: string; profileImageUrl?: string | null }>;
   // Total direct-child count. Companion to descendants[]; same opt-in.
   descendantCount?: number;
+  // Up to 3 most recent notes (newest first). Always projected on
+  // EquipmentResponse so the WO row / quickview / detail page can render
+  // the inline preview without a follow-up fetch. Use noteCount to know
+  // when to surface a "View all (N)" affordance — fetch the full list via
+  // equipmentNotesApi.list(equipmentId).
+  recentNotes?: EquipmentNote[];
+  // Total notes for this equipment. Companion to recentNotes[].
+  noteCount?: number;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -89,6 +97,11 @@ export interface EquipmentSummary {
   // Immediate parent's display name. Backend-denormalized, null when this is
   // top-level equipment.
   parentName?: string | null;
+  // Up to 3 most recent notes — same projection as on EquipmentResponse so
+  // the WO row's equipment block can render the notes preview directly off
+  // WorkItemResponse.equipment without a per-row fetch.
+  recentNotes?: EquipmentNote[];
+  noteCount?: number;
 }
 
 export interface CreateEquipmentRequest {
@@ -661,6 +674,70 @@ export const equipmentImagesApi = {
   },
 };
 
+// ========== EQUIPMENT NOTES ==========
+// Persistent service knowledge attached to the equipment, NOT to a WO.
+// Surfaces nested under the EQUIPMENT block on the WO row expansion, the
+// quickview drawer, and the equipment detail page. Notes survive across
+// every WO ever performed on the unit — so don't conflate with the WO
+// activity rail (which is WO-scoped commentary).
+
+/** Server-side enforced max length on the note body (matches the backend
+ *  validation). UI textareas should soft-cap at this so the user sees the
+ *  limit before the request rejects. */
+export const EQUIPMENT_NOTE_BODY_MAX_CHARS = 4000;
+
+export interface EquipmentNote {
+  id: string;
+  body: string;
+  authorUserId: string | null;
+  authorName: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** POST and PATCH share this body shape — body is required and non-blank.
+ *  Author is set server-side from the authenticated principal; never send
+ *  authorUserId / authorName from the client. */
+export interface SaveEquipmentNoteRequest {
+  body: string;
+}
+
+export const equipmentNotesApi = {
+  list: async (equipmentId: string): Promise<EquipmentNote[]> => {
+    const response = await apiClient.get<EquipmentNote[]>(
+      `/equipment/${equipmentId}/notes`
+    );
+    return response.data;
+  },
+
+  create: async (
+    equipmentId: string,
+    request: SaveEquipmentNoteRequest
+  ): Promise<EquipmentNote> => {
+    const response = await apiClient.post<EquipmentNote>(
+      `/equipment/${equipmentId}/notes`,
+      request
+    );
+    return response.data;
+  },
+
+  update: async (
+    equipmentId: string,
+    noteId: string,
+    request: SaveEquipmentNoteRequest
+  ): Promise<EquipmentNote> => {
+    const response = await apiClient.patch<EquipmentNote>(
+      `/equipment/${equipmentId}/notes/${noteId}`,
+      request
+    );
+    return response.data;
+  },
+
+  delete: async (equipmentId: string, noteId: string): Promise<void> => {
+    await apiClient.delete(`/equipment/${equipmentId}/notes/${noteId}`);
+  },
+};
+
 // ========== PARTS INVENTORY ==========
 // Lives on inventory-service (formerly equipment-service) at /api/v1/inventory/*.
 
@@ -827,6 +904,7 @@ export const allEquipmentApis = {
   equipmentCategories: equipmentCategoriesApi,
   equipmentFilters: equipmentFiltersApi,
   equipmentImages: equipmentImagesApi,
+  equipmentNotes: equipmentNotesApi,
   tenantFilterSizes: tenantFilterSizesApi,
   reports: reportsApi,
   partsInventory: partsInventoryApi,

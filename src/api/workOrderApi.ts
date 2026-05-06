@@ -56,6 +56,19 @@ export interface WorkItemEquipmentSummary {
   // descendants is truncated.
   descendants?: Array<{ id: string; name: string; profileImageUrl?: string | null }>;
   descendantCount?: number;
+  // Up to 3 most recent equipment notes (newest first) + total count.
+  // Same projection shape as on EquipmentResponse; lets the WO row's
+  // expansion render the inline preview without a per-row /notes fetch.
+  // Inlined here to avoid a circular type import from equipmentApi.
+  recentNotes?: Array<{
+    id: string;
+    body: string;
+    authorUserId: string | null;
+    authorName: string | null;
+    createdAt: string;
+    updatedAt: string;
+  }>;
+  noteCount?: number;
 }
 
 export interface WorkItemResponse {
