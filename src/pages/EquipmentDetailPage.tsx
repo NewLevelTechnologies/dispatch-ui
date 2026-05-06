@@ -774,7 +774,7 @@ export default function EquipmentDetailPage() {
                           <img
                             src={img.thumbnailUrl ?? img.url}
                             alt={img.caption ?? equipment.name}
-                            className="size-full object-contain transition-opacity group-hover:opacity-90"
+                            className="size-full object-cover transition-opacity group-hover:opacity-90"
                             loading="lazy"
                           />
                         </button>
