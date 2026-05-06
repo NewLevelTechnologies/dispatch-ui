@@ -11,6 +11,7 @@ import {
 import { useGlossary } from '../contexts/GlossaryContext';
 import EditableField from './EditableField';
 import EquipmentImageUploadDialog from './EquipmentImageUploadDialog';
+import EquipmentNotesSection from './EquipmentNotesSection';
 import EquipmentPhotoLightbox from './EquipmentPhotoLightbox';
 import EquipmentPhotosSection from './EquipmentPhotosSection';
 import EquipmentThumbnail from './EquipmentThumbnail';
@@ -275,6 +276,14 @@ export default function EquipmentQuickView({
       <EquipmentPhotosSection
         images={orderedImages}
         onSelectImage={(i) => setLightboxIndex(i)}
+      />
+
+      {/* Notes section uses the same recentNotes / noteCount projection
+          as the WO row. EquipmentResponse here already carries them. */}
+      <EquipmentNotesSection
+        equipmentId={equipment.id}
+        recentNotes={equipment.recentNotes ?? []}
+        noteCount={equipment.noteCount ?? 0}
       />
 
       <EquipmentPhotoLightbox

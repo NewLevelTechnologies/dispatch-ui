@@ -6,6 +6,7 @@ import {
   equipmentApi,
   equipmentImagesApi,
   EquipmentStatus,
+  type EquipmentNote,
   type StatusWorkflowRule,
   type UpdateEquipmentRequest,
   type WorkItemEquipmentSummary,
@@ -13,6 +14,7 @@ import {
   type WorkItemStatus,
 } from '../api';
 import { useGlossary } from '../contexts/GlossaryContext';
+import EquipmentNotesSection from './EquipmentNotesSection';
 import EquipmentPhotosSection from './EquipmentPhotosSection';
 import EquipmentThumbnail from './EquipmentThumbnail';
 import {
@@ -658,6 +660,16 @@ function EquipmentBlockBody({
       <EquipmentPhotosSection
         images={orderedImages}
         onSelectImage={(i) => setLightboxIndex(i)}
+      />
+
+      {/* recentNotes shape on WorkItemEquipmentSummary is inlined (not the
+          EquipmentNote type) to avoid a circular import in workOrderApi.
+          The fields match exactly, so the cast is structural equality. */}
+      <EquipmentNotesSection
+        equipmentId={equipment.id}
+        recentNotes={(equipment.recentNotes ?? []) as EquipmentNote[]}
+        noteCount={equipment.noteCount ?? 0}
+        readOnly={readOnly}
       />
 
       <EquipmentPhotoLightbox

@@ -399,6 +399,19 @@
       "unsupportedType": "Only JPEG, PNG, and WEBP are supported. HEIC photos must be converted before upload.",
       "uploadCount": "Upload {{count}} photos"
     },
+    "notes": {
+      "addNote": "Add note",
+      "composerLabel": "Note body",
+      "composerPlaceholder": "Replaced compressor 2025-08-12 with non-OEM Brand X — track for premature failure.",
+      "errorCreate": "Failed to add note",
+      "errorDelete": "Failed to delete note",
+      "errorUpdate": "Failed to update note",
+      "heading": "Notes",
+      "headingWithCount": "Notes ({{count}})",
+      "helper": "Saved with this equipment, not this work order",
+      "systemAuthor": "System",
+      "viewAll": "{{count}} more on the equipment page"
+    },
     "filters": {
       "addFilter": "Add Filter",
       "deleteConfirm": "Delete this filter?",
