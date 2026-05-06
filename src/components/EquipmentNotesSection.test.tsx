@@ -23,7 +23,7 @@ describe('EquipmentNotesSection', () => {
     vi.clearAllMocks();
   });
 
-  it('renders the heading + helper text + Add note CTA when empty', () => {
+  it('renders the heading + Add note CTA when empty', () => {
     renderWithProviders(
       <EquipmentNotesSection
         equipmentId="eq-1"
@@ -32,9 +32,6 @@ describe('EquipmentNotesSection', () => {
       />
     );
     expect(screen.getByText('Notes (0)')).toBeInTheDocument();
-    expect(
-      screen.getByText(/saved with this equipment, not this work order/i)
-    ).toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: /add note/i })
     ).toBeInTheDocument();
@@ -178,5 +175,114 @@ describe('EquipmentNotesSection', () => {
       />
     );
     expect(screen.getByText(/System/)).toBeInTheDocument();
+  });
+
+  // ===== Per-note edit / delete =====
+
+  it('opens an inline editor when the note body is clicked', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(
+      <EquipmentNotesSection
+        equipmentId="eq-1"
+        recentNotes={[makeNote({ id: 'a', body: 'Original' })]}
+        noteCount={1}
+      />
+    );
+    await user.click(screen.getByRole('button', { name: 'Original' }));
+    const textarea = screen.getByRole('textbox');
+    expect(textarea).toHaveValue('Original');
+  });
+
+  it('saves edits via PATCH on Cmd+Enter', async () => {
+    vi.mocked(apiClient.patch).mockResolvedValue({ data: makeNote({ id: 'a', body: 'Updated' }) });
+    const user = userEvent.setup();
+    renderWithProviders(
+      <EquipmentNotesSection
+        equipmentId="eq-1"
+        recentNotes={[makeNote({ id: 'a', body: 'Original' })]}
+        noteCount={1}
+      />
+    );
+    await user.click(screen.getByRole('button', { name: 'Original' }));
+    const textarea = screen.getByRole('textbox');
+    await user.clear(textarea);
+    await user.type(textarea, 'Updated');
+    await user.keyboard('{Meta>}{Enter}{/Meta}');
+    await waitFor(() => {
+      expect(apiClient.patch).toHaveBeenCalledWith(
+        '/equipment/eq-1/notes/a',
+        { body: 'Updated' }
+      );
+    });
+  });
+
+  it('reverts the draft on Escape without calling the API', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(
+      <EquipmentNotesSection
+        equipmentId="eq-1"
+        recentNotes={[makeNote({ id: 'a', body: 'Original' })]}
+        noteCount={1}
+      />
+    );
+    await user.click(screen.getByRole('button', { name: 'Original' }));
+    const textarea = screen.getByRole('textbox');
+    await user.clear(textarea);
+    await user.type(textarea, 'Throwaway');
+    await user.keyboard('{Escape}');
+    expect(apiClient.patch).not.toHaveBeenCalled();
+    expect(screen.getByText('Original')).toBeInTheDocument();
+  });
+
+  it('deletes a note after confirm', async () => {
+    vi.mocked(apiClient.delete).mockResolvedValue({ data: {} });
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const user = userEvent.setup();
+    renderWithProviders(
+      <EquipmentNotesSection
+        equipmentId="eq-1"
+        recentNotes={[makeNote({ id: 'a', body: 'Bye' })]}
+        noteCount={1}
+      />
+    );
+    // Hover-revealed actions are still tabbable + queryable in tests; the
+    // group-hover only affects visibility, not the DOM.
+    await user.click(screen.getByRole('button', { name: /^delete$/i }));
+    expect(confirmSpy).toHaveBeenCalled();
+    await waitFor(() => {
+      expect(apiClient.delete).toHaveBeenCalledWith('/equipment/eq-1/notes/a');
+    });
+    confirmSpy.mockRestore();
+  });
+
+  it('does not delete when the user cancels the confirm', async () => {
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    const user = userEvent.setup();
+    renderWithProviders(
+      <EquipmentNotesSection
+        equipmentId="eq-1"
+        recentNotes={[makeNote({ id: 'a', body: 'Stay' })]}
+        noteCount={1}
+      />
+    );
+    await user.click(screen.getByRole('button', { name: /^delete$/i }));
+    expect(apiClient.delete).not.toHaveBeenCalled();
+    confirmSpy.mockRestore();
+  });
+
+  it('hides per-note edit / delete affordances in readOnly mode', () => {
+    renderWithProviders(
+      <EquipmentNotesSection
+        equipmentId="eq-1"
+        recentNotes={[makeNote({ id: 'a', body: 'Static' })]}
+        noteCount={1}
+        readOnly
+      />
+    );
+    expect(screen.queryByRole('button', { name: /^delete$/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^edit$/i })).not.toBeInTheDocument();
+    // Body still renders, but the wrapping button is disabled (no edit on click).
+    const bodyButton = screen.getByText('Static').closest('button');
+    expect(bodyButton).toBeDisabled();
   });
 });

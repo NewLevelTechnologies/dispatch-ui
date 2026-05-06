@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import {
@@ -8,7 +8,7 @@ import {
 } from '../api';
 import { Button } from './catalyst/button';
 import { Textarea } from './catalyst/textarea';
-import { PlusIcon } from '@heroicons/react/24/outline';
+import { PencilIcon, PlusIcon, TrashIcon } from '@heroicons/react/24/outline';
 import { formatRelativeTime } from '../utils/formatRelativeTime';
 
 interface Props {
@@ -22,8 +22,8 @@ interface Props {
   /** Total notes for this equipment. Used to decide whether to surface a
    *  "+N more" indicator next to the heading. */
   noteCount: number;
-  /** Cancelled / archived WOs collapse the composer + edit affordances.
-   *  Existing notes still display. */
+  /** Cancelled / archived WOs collapse the composer + edit / delete
+   *  affordances. Existing notes still display read-only. */
   readOnly?: boolean;
 }
 
@@ -32,15 +32,17 @@ interface Props {
  *
  * Always renders (even at noteCount = 0) with a "+ Add note" affordance —
  * the design explicitly calls out "always renders ... when empty
- * (encourages capture)." Helper text below the heading distinguishes
- * equipment notes ("saved with this equipment") from WO-scoped activity
- * stream notes — legacy users came from a system that didn't separate
- * them.
+ * (encourages capture)."
+ *
+ * Per-note edit + delete live inline (matching the photos lightbox's
+ * inline-management pattern): click a note's body to swap to an inline
+ * textarea, Cmd/Ctrl+Enter or blur saves, Esc reverts. A small trash
+ * icon on each row confirms then deletes.
  *
  * Presentational regarding fetching: the parent passes the projected
- * recentNotes / noteCount. Mutations (create) live here because they're
- * local to the composer and don't ripple up. On success we invalidate the
- * cross-surface caches that carry the projection.
+ * recentNotes / noteCount. Mutations live here because they're local to
+ * each note and don't ripple up. On success we invalidate the cross-
+ * surface caches that carry the projection.
  */
 export default function EquipmentNotesSection({
   equipmentId,
@@ -66,6 +68,14 @@ export default function EquipmentNotesSection({
     queryClient.invalidateQueries({ queryKey: ['work-orders-list'] });
   };
 
+  const surfaceError = (err: unknown, fallbackKey: string) => {
+    const msg =
+      err instanceof Error && 'response' in err
+        ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
+        : undefined;
+    alert(msg || t(fallbackKey));
+  };
+
   const createMutation = useMutation({
     mutationFn: (body: string) => equipmentNotesApi.create(equipmentId, { body }),
     onSuccess: () => {
@@ -73,13 +83,20 @@ export default function EquipmentNotesSection({
       setDraft('');
       setIsComposing(false);
     },
-    onError: (err: unknown) => {
-      const msg =
-        err instanceof Error && 'response' in err
-          ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
-          : undefined;
-      alert(msg || t('equipment.notes.errorCreate'));
-    },
+    onError: (err) => surfaceError(err, 'equipment.notes.errorCreate'),
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: ({ noteId, body }: { noteId: string; body: string }) =>
+      equipmentNotesApi.update(equipmentId, noteId, { body }),
+    onSuccess: invalidate,
+    onError: (err) => surfaceError(err, 'equipment.notes.errorUpdate'),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (noteId: string) => equipmentNotesApi.delete(equipmentId, noteId),
+    onSuccess: invalidate,
+    onError: (err) => surfaceError(err, 'equipment.notes.errorDelete'),
   });
 
   const handleSave = () => {
@@ -115,12 +132,6 @@ export default function EquipmentNotesSection({
           </button>
         )}
       </div>
-      {/* Helper text — disambiguates from WO activity rail notes. CSRs
-          coming from legacy systems wrote per-equipment service knowledge
-          where the new system put per-WO conversation; this line redirects. */}
-      <p className="mt-0.5 text-xs italic text-zinc-500 dark:text-zinc-400">
-        {t('equipment.notes.helper')}
-      </p>
 
       {/* Composer */}
       {!readOnly && isComposing && (
@@ -150,35 +161,168 @@ export default function EquipmentNotesSection({
         </div>
       )}
 
-      {/* Recent notes preview */}
+      {/* Recent notes preview — divided list (no per-note card chrome)
+          so the section reads as part of the surrounding equipment block
+          density rather than an inset surface. */}
       {recentNotes.length > 0 && (
-        <ul className="mt-2 space-y-2">
+        <ul className="mt-2 divide-y divide-zinc-200 dark:divide-zinc-800">
           {recentNotes.map((note) => (
-            <li
+            <NoteRow
               key={note.id}
-              className="rounded-md bg-zinc-50 p-2 ring-1 ring-zinc-200 dark:bg-zinc-900/50 dark:ring-zinc-800"
-            >
-              <p className="whitespace-pre-wrap text-sm text-zinc-900 dark:text-zinc-100">
-                {note.body}
-              </p>
-              <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-                {note.authorName ?? t('equipment.notes.systemAuthor')}
-                {' · '}
-                {formatRelativeTime(note.createdAt)}
-              </p>
-            </li>
+              note={note}
+              readOnly={readOnly}
+              onSave={(body) =>
+                updateMutation.mutateAsync({ noteId: note.id, body })
+              }
+              onDelete={() => {
+                if (!window.confirm(t('equipment.notes.deleteConfirm'))) return;
+                deleteMutation.mutate(note.id);
+              }}
+              isPending={
+                (updateMutation.isPending &&
+                  updateMutation.variables?.noteId === note.id) ||
+                (deleteMutation.isPending && deleteMutation.variables === note.id)
+              }
+            />
           ))}
         </ul>
       )}
 
       {/* Overflow hint when more notes exist than the recentNotes
           projection includes. Routes the user to the equipment detail
-          page where the full list + edit/delete live (PR2). */}
+          page where the full list lives. */}
       {overflow > 0 && (
         <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
           {t('equipment.notes.viewAll', { count: overflow })}
         </p>
       )}
     </section>
+  );
+}
+
+interface NoteRowProps {
+  note: EquipmentNote;
+  readOnly: boolean;
+  onSave: (body: string) => Promise<unknown>;
+  onDelete: () => void;
+  isPending: boolean;
+}
+
+function NoteRow({ note, readOnly, onSave, onDelete, isPending }: NoteRowProps) {
+  const { t } = useTranslation();
+  const [isEditing, setIsEditing] = useState(false);
+  const [draft, setDraft] = useState(note.body);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+
+  // Focus + select on entering edit mode.
+  useEffect(() => {
+    if (isEditing) {
+      textareaRef.current?.focus();
+      textareaRef.current?.select();
+    }
+  }, [isEditing]);
+
+  const startEdit = () => {
+    if (readOnly) return;
+    setDraft(note.body);
+    setIsEditing(true);
+  };
+
+  const commit = async () => {
+    const next = draft.trim();
+    if (!next || next === note.body) {
+      setIsEditing(false);
+      setDraft(note.body);
+      return;
+    }
+    try {
+      await onSave(next);
+      setIsEditing(false);
+    } catch {
+      // Stay in edit mode — parent surfaces the error via alert.
+    }
+  };
+
+  const cancel = () => {
+    setDraft(note.body);
+    setIsEditing(false);
+  };
+
+  if (isEditing) {
+    return (
+      <li className="py-1.5 first:pt-0 last:pb-0">
+        <Textarea
+          ref={textareaRef}
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={() => void commit()}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') {
+              e.preventDefault();
+              cancel();
+            } else if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+              e.preventDefault();
+              void commit();
+            }
+          }}
+          rows={3}
+          maxLength={EQUIPMENT_NOTE_BODY_MAX_CHARS}
+          disabled={isPending}
+          aria-label={t('equipment.notes.composerLabel')}
+        />
+        <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
+          {t('equipment.notes.editHint')}
+        </p>
+      </li>
+    );
+  }
+
+  return (
+    <li className="group py-1.5 first:pt-0 last:pb-0">
+      <div className="flex items-start gap-2">
+        <button
+          type="button"
+          onClick={startEdit}
+          disabled={readOnly}
+          // Dimmer than work-item-description text — notes are supporting
+          // reference material, not the primary row content. Dropping
+          // brightness (not size) keeps multi-sentence service notes
+          // readable while letting them recede visually.
+          className="flex-1 rounded text-left text-sm text-zinc-600 hover:bg-zinc-50 disabled:cursor-default disabled:hover:bg-transparent dark:text-zinc-400 dark:hover:bg-white/5"
+          title={readOnly ? undefined : t('equipment.notes.editHover')}
+        >
+          <span className="whitespace-pre-wrap">{note.body}</span>
+        </button>
+        {!readOnly && (
+          // Per-note actions only render on hover/focus to keep the row
+          // scannable; tabbing exposes them too via focus-within.
+          <div className="flex shrink-0 items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+            <button
+              type="button"
+              onClick={startEdit}
+              disabled={isPending}
+              aria-label={t('common.edit')}
+              className="rounded p-1 text-zinc-500 hover:bg-zinc-100 hover:text-zinc-700 disabled:cursor-not-allowed disabled:opacity-50 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
+            >
+              <PencilIcon className="size-4" />
+            </button>
+            <button
+              type="button"
+              onClick={onDelete}
+              disabled={isPending}
+              aria-label={t('common.delete')}
+              className="rounded p-1 text-zinc-500 hover:bg-rose-50 hover:text-rose-600 disabled:cursor-not-allowed disabled:opacity-50 dark:text-zinc-400 dark:hover:bg-rose-950/30 dark:hover:text-rose-400"
+            >
+              <TrashIcon className="size-4" />
+            </button>
+          </div>
+        )}
+      </div>
+      <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
+        {note.authorName ?? t('equipment.notes.systemAuthor')}
+        {' · '}
+        {formatRelativeTime(note.createdAt)}
+      </p>
+    </li>
   );
 }
