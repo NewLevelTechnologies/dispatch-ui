@@ -77,8 +77,10 @@ export function SidebarLayout({
         <header className="sticky top-0 z-10 hidden h-12 items-center border-b border-zinc-950/10 bg-zinc-50 px-4 lg:flex dark:border-white/10 dark:bg-zinc-950">
           {navbar}
         </header>
-        <div className="grow bg-white p-4 dark:bg-zinc-900">
-          {children}
+        <div className="grow bg-zinc-50 pr-2 pb-2 dark:bg-zinc-950">
+          <div className="h-full rounded-r-lg bg-white p-4 shadow-xs ring-1 ring-zinc-950/5 dark:bg-zinc-900 dark:ring-white/10">
+            {children}
+          </div>
         </div>
       </main>
     </div>
