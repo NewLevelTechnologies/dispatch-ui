@@ -52,7 +52,25 @@ Catalyst's `navbar` prop was only rendered on mobile — desktop had no top chro
 </header>
 ```
 
-### 5. Sidebar section gap `mt-8` → `mt-4` (sidebar.tsx)
+### 5. Sidebar width `w-64` → `w-60` (sidebar-layout.tsx)
+
+Catalyst's default sidebar is 256px (`w-64`). Inspinia's is 235px. Our longest nav labels ("Service Locations", "Recurring Orders") need ~168px to fit cleanly at `text-sm` with icon + gap + padding, so 256px is more than needed. Dropped to 240px (`w-60`, the next standard Tailwind step down) — saves 16px of horizontal real estate, leaves comfortable headroom for tenant-renamed entity labels.
+
+The change is two paired edits — the fixed-position sidebar div *and* the `<main>`'s left padding both have to match.
+
+```diff
+- <div className="fixed inset-y-0 left-0 w-64 max-lg:hidden">{sidebar}</div>
++ <div className="fixed inset-y-0 left-0 w-60 max-lg:hidden">{sidebar}</div>
+...
+- <main className="flex flex-1 flex-col lg:min-w-0 lg:pl-64">
++ <main className="flex flex-1 flex-col lg:min-w-0 lg:pl-60">
+```
+
+After this change, our content's first pixel sits at 256px from the viewport's left edge (240px sidebar + 16px card padding), within 1px of Inspinia's 255px.
+
+**Trade-off:** if a tenant glossary-customizes an entity to a label longer than ~17 chars, it could truncate. `w-56` would have been even denser but cuts that headroom too close.
+
+### 6. Sidebar section gap `mt-8` → `mt-4` (sidebar.tsx)
 
 ```diff
 - 'flex flex-1 flex-col overflow-y-auto p-4 [&>[data-slot=section]+[data-slot=section]]:mt-8'
@@ -61,16 +79,16 @@ Catalyst's `navbar` prop was only rendered on mobile — desktop had no top chro
 
 Group labels now visually cluster with their items instead of floating in 32px voids.
 
-### 6. Sidebar item padding `sm:py-2` → `sm:py-1.5` (sidebar.tsx)
+### 7. Sidebar item padding `sm:py-2` → `sm:py-1.5` (sidebar.tsx)
 
 ```diff
 - 'flex w-full items-center gap-3 rounded-lg px-2 py-2.5 ... sm:py-2 sm:text-sm/5',
 + 'flex w-full items-center gap-3 rounded-lg px-2 py-2.5 ... sm:py-1.5 sm:text-sm/5',
 ```
 
-Combined with #5, the entire sidebar nav now fits on a 1080p monitor without scrolling (Settings used to be cut off the bottom).
+Combined with #6, the entire sidebar nav now fits on a 1080p monitor without scrolling (Settings used to be cut off the bottom).
 
-### 7. Removed AppLayout `<div className="p-2">` wrapper (AppLayout.tsx)
+### 8. Removed AppLayout `<div className="p-2">` wrapper (AppLayout.tsx)
 
 Redundant — SidebarLayout now provides its own padding scheme. Was stacking 8px on top of the layout's own padding.
 
@@ -81,7 +99,7 @@ Redundant — SidebarLayout now provides its own padding scheme. Was stacking 8p
 + {children}
 ```
 
-### 8. Theme toggle in the topbar (AppLayout.tsx)
+### 9. Theme toggle in the topbar (AppLayout.tsx)
 
 Cosmetic, not density. The new topbar needed actual chrome content so the avatar didn't float alone. Added a single icon-button that cycles `dark → light → system`.
 
@@ -98,7 +116,7 @@ Cosmetic, not density. The new topbar needed actual chrome content so the avatar
 
 **Note:** the original 3-button theme picker is still in the SidebarFooter dropdown — not removed. Two theme controls now exist. Pick one before merge.
 
-### 9. Global font-size override scaffold (index.css)
+### 10. Global font-size override scaffold (index.css)
 
 A commented-out A/B knob. Browser default 16px is in effect. Set to 14px or 15px to retest a tighter type scale system-wide.
 
@@ -123,6 +141,6 @@ This affects **all** text in the app — table cells, headings, dialog text, sid
 ## Open decisions before merging anywhere real
 
 1. **Full-width content** (#2) — fine for tables, risky for long-text reading on ultrawides.
-2. **Two theme controls** (#8 + leftover dropdown picker) — pick one source of truth.
+2. **Two theme controls** (#9 + leftover dropdown picker) — pick one source of truth.
 3. **Forking Catalyst components in place** — all changes edit `src/components/catalyst/*.tsx` directly. For a real merge, decide whether to keep the in-place fork, extract a `DenseSidebarLayout` wrapper, or push fixes upstream as a Tailwind config layer.
 4. **No tests added** — none of the changes affected behavior. If this becomes the new standard, the visual diffs should be locked in via screenshot tests.

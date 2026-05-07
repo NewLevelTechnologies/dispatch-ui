@@ -54,7 +54,7 @@ export function SidebarLayout({
   return (
     <div className="relative isolate flex min-h-svh w-full bg-white max-lg:flex-col lg:bg-zinc-100 dark:bg-zinc-900 dark:lg:bg-zinc-950">
       {/* Sidebar on desktop */}
-      <div className="fixed inset-y-0 left-0 w-64 max-lg:hidden">{sidebar}</div>
+      <div className="fixed inset-y-0 left-0 w-60 max-lg:hidden">{sidebar}</div>
 
       {/* Sidebar on mobile */}
       <MobileSidebar open={showSidebar} close={() => setShowSidebar(false)}>
@@ -72,7 +72,7 @@ export function SidebarLayout({
       </header>
 
       {/* Content */}
-      <main className="flex flex-1 flex-col lg:min-w-0 lg:pl-64">
+      <main className="flex flex-1 flex-col lg:min-w-0 lg:pl-60">
         {/* Desktop topbar — Inspinia-style chrome. */}
         <header className="sticky top-0 z-10 hidden h-12 items-center border-b border-zinc-950/10 bg-zinc-50 px-4 lg:flex dark:border-white/10 dark:bg-zinc-950">
           {navbar}
