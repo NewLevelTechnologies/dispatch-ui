@@ -283,6 +283,15 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         <Navbar>
           <NavbarSpacer />
           <NavbarSection>
+            {/* Theme toggle inline (not buried in user dropdown) — Inspinia-style chrome. */}
+            <button
+              onClick={() => setTheme(theme === 'dark' ? 'light' : theme === 'light' ? 'system' : 'dark')}
+              className="flex h-8 w-8 items-center justify-center rounded-md text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 dark:hover:bg-zinc-800 dark:hover:text-white"
+              aria-label="Toggle theme"
+              title={`Theme: ${theme}`}
+            >
+              {theme === 'dark' ? <MoonIcon className="h-5 w-5" /> : theme === 'light' ? <SunIcon className="h-5 w-5" /> : <ComputerDesktopIcon className="h-5 w-5" />}
+            </button>
             <NavbarItem>
               <Avatar
                 initials={user?.signInDetails?.loginId?.charAt(0).toUpperCase() || 'U'}
@@ -293,9 +302,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </Navbar>
       }
     >
-      <div className="p-2">
-        {children}
-      </div>
+      {children}
     </SidebarLayout>
   );
 }

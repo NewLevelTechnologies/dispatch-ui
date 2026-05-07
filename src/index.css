@@ -1,3 +1,11 @@
 @import "tailwindcss";
 
 @variant dark (&:where(.dark, .dark *));
+
+/* Density experiment — Inspinia-style admin base font size.
+   Tailwind's text-base, text-sm, etc. are rem-based, so this rescales
+   the entire type system at once. Revert to remove.
+   Currently disabled (16px browser default) for A/B comparison. */
+/* html {
+  font-size: 15px;
+} */

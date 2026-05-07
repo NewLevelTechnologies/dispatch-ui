@@ -72,9 +72,13 @@ export function SidebarLayout({
       </header>
 
       {/* Content */}
-      <main className="flex flex-1 flex-col pb-2 lg:min-w-0 lg:pt-2 lg:pr-2 lg:pl-64">
-        <div className="grow p-6 lg:rounded-lg lg:bg-white lg:p-10 lg:shadow-xs lg:ring-1 lg:ring-zinc-950/5 dark:lg:bg-zinc-900 dark:lg:ring-white/10">
-          <div className="mx-auto max-w-screen-2xl">{children}</div>
+      <main className="flex flex-1 flex-col lg:min-w-0 lg:pl-64">
+        {/* Desktop topbar — Inspinia-style chrome. */}
+        <header className="sticky top-0 z-10 hidden h-12 items-center border-b border-zinc-950/10 bg-zinc-50 px-4 lg:flex dark:border-white/10 dark:bg-zinc-950">
+          {navbar}
+        </header>
+        <div className="grow bg-white p-4 dark:bg-zinc-900">
+          {children}
         </div>
       </main>
     </div>
