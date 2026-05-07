@@ -108,6 +108,18 @@ A commented-out A/B knob. Browser default 16px is in effect. Set to 14px or 15px
 } */
 ```
 
+#### Trying the 15px shift locally
+
+Tailwind's `text-base`, `text-sm`, `text-xs` etc. are rem-based, so changing `html`'s font-size rescales the entire type system at once. To try it:
+
+1. Open `src/index.css`.
+2. Uncomment the `html { font-size: 15px; }` block (remove the `/*` and `*/`).
+3. Save — Vite hot-reloads. Every page picks up the new scale.
+
+To revert, comment the block back out (or change `15px` to `16px`). The number to change is `font-size: <N>px` — try `14`, `15`, or `16` to taste. Don't go below 13.
+
+This affects **all** text in the app — table cells, headings, dialog text, sidebar items, the topbar, etc. — because nothing in the app sets a font-size in `px`; it all uses Tailwind's rem-based scale.
+
 ## Open decisions before merging anywhere real
 
 1. **Full-width content** (#2) — fine for tables, risky for long-text reading on ultrawides.
