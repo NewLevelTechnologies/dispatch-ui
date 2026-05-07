@@ -1,82 +1,116 @@
-# Inspinia Density Research
+# Density Pass — Shell Changes
 
-Research notes on the Inspinia Tailwind admin demo (https://webapplayers.com/inspinia/tailwind/), captured to inform a density/look-and-feel pass on dispatch-ui.
+Reference for the shell-level density pass on `experiment/density-customers-page`. All changes are global (every page in the app inherits them). No per-page edits.
 
-**Premise:** Catalyst UI looks and feels marketing-focused — generous whitespace, large type, breathable cards. Dispatch-ui is an internal tool for trained CSRs working on big monitors all day. Inspinia is the opposite end: dense, info-rich, scannable. We want to keep Catalyst's component contracts but shift the visual system toward Inspinia's density.
+**Premise:** Catalyst UI is sized and spaced for marketing pages. Dispatch-ui is an internal tool for trained CSRs working on big monitors all day — they want more data per screen, not breathing room. Inspinia (https://webapplayers.com/inspinia/tailwind/) was the reference for the target density.
 
-## The vibe in one line
+## Files changed
 
-Bloomberg-meets-corporate-SaaS. Light sidebar, white cards on a faint gray page, sparing color, and **everything sized around 14px** — so a typical Inspinia dashboard fits 5 KPI cards + a chart + 2 tables above the fold on 1440×900.
+- `src/components/catalyst/sidebar-layout.tsx`
+- `src/components/catalyst/sidebar.tsx`
+- `src/components/AppLayout.tsx`
+- `src/index.css` (no-op; commented A/B knob retained)
 
-## Where the density actually comes from
+## Change-by-change
 
-| Lever | Inspinia | Catalyst default |
-|---|---|---|
-| Body font | **14px** | 15–16px |
-| Card padding | **p-4 (16px)** | p-6 (24px) |
-| Card gaps | **gap-4** | gap-6 / gap-8 |
-| Table cell | **px-4 py-3** | px-6 py-4 |
-| Card style | shadow-sm **+** 1px border, rounded-lg (8px) | one or the other, larger radius |
-| Page bg | **gray-50** behind white cards | white-on-white |
-| Sidebar items | tight, with **uppercase tiny "MAIN / APPS" group labels** | roomier, no group labels |
-| Status pills | rounded-full, **soft `bg-{color}-100 text-{color}-700`**, used liberally | larger, used sparingly |
-| Stacked cells | avatar + name + muted email **in one cell** | usually separate columns |
+### 1. Content padding `lg:p-10` → `p-4` (sidebar-layout.tsx)
 
-## Visual treatments worth lifting
+Catalyst's content card had 40px padding on every side. Dropped to 16px.
 
-- **Soft status pills** — `rounded-full` with `bg-{color}-100 text-{color}-700` in sky / amber / lime / rose / zinc. Replace Catalyst's heavier solid-fill badges. Used liberally; never alarming.
-- **Section labels** — `text-[11px] font-semibold uppercase tracking-wider text-zinc-500`. Chunks long forms/detail pages without needing horizontal `<Divider/>`s.
-- **Light sidebar with grouped sections** — uppercase tiny "MAIN / APPS / CUSTOM PAGES" labels above their item groups instead of one flat list.
-- **Avatar + dual-line table cell** — 32–40px avatar + bold name + muted secondary line, all in one cell. Catalyst tends to spread these across separate columns and rows.
-- **Card treatment** — `shadow-sm` **and** a 1px border (`border-zinc-200`) at `rounded-lg` (8px). Subtle but it's why Inspinia cards read as "panels" rather than "marketing tiles."
+```diff
+- <div className="grow p-6 lg:rounded-lg lg:bg-white lg:p-10 lg:shadow-xs lg:ring-1 lg:ring-zinc-950/5 dark:lg:bg-zinc-900 dark:lg:ring-white/10">
++ <div className="h-full rounded-r-lg bg-white p-4 shadow-xs ring-1 ring-zinc-950/5 dark:bg-zinc-900 dark:ring-white/10">
+```
 
-> Inspinia also has KPI strips, activity timelines, two-column detail rails, etc. — feature-level patterns, deliberately out of scope here. This doc is about the visual language only.
+### 2. Killed `mx-auto max-w-screen-2xl` content cap (sidebar-layout.tsx)
 
-## Concrete tweaks to try (low-risk, system-wide)
+Content used to be capped at 1536px and centered, leaving large gutters on wide monitors. Removed so dense tables can use the full screen on 1920+ displays. Aligns with CLAUDE.md's "use the screen real estate" doctrine.
 
-A small set of CSS variable / Tailwind config changes shifts the whole app at once without rewriting components:
+**Trade-off:** text-heavy areas (long notes, descriptions) get long line lengths on 4K/ultrawide monitors. If anyone reports "the notes are hard to read on my monitor," this is the suspect.
 
-- `html { font-size: 14px }` (or override Catalyst's `text-base` to `0.875rem`) — single biggest perceptual shift.
-- Page background → `bg-zinc-50` light / `bg-zinc-950` dark.
-- `--card-padding` token defaulting to `1rem` (16px), used by a tightened Catalyst card wrapper.
-- New badge variant: `<Badge soft color="sky">` → `bg-sky-100 text-sky-700`.
-- A `<SectionLabel>` component → `text-[11px] font-semibold uppercase tracking-wider text-zinc-500`.
-- Tighten Table defaults — `px-4 py-3` for cells (`dense` already gets us closer; this would be the new default).
-- Add an "AvatarCell" pattern: `<AvatarCell name="…" subtitle="…" />`.
-- Sidebar items: tighter vertical padding + uppercase group labels.
+### 3. Asymmetric floating card (sidebar-layout.tsx)
 
-That's roughly 80% of the Inspinia feel without abandoning Catalyst's component API.
+Final structure: card butts directly against the sidebar on the left and slides under the topbar on top (no gaps), but floats with an 8px gap on the right and bottom. Left corners are squared (`rounded-r-lg`) since they have no gap to round into.
 
-## Inspinia Apps section — what maps to dispatch-ui
+```jsx
+<div className="grow bg-zinc-50 pr-2 pb-2 dark:bg-zinc-950">
+  <div className="h-full rounded-r-lg bg-white p-4 shadow-xs ring-1 ring-zinc-950/5 dark:bg-zinc-900 dark:ring-white/10">
+    {children}
+  </div>
+</div>
+```
 
-| Inspinia page | Dispatch analog | Worth studying for |
-|---|---|---|
-| `apps-ecommerce-orders.html` | Work Orders list | KPI strip + filter chips + status pills |
-| `apps-ecommerce-order-details.html` | Work Order detail | 2-column layout + right rail + timeline |
-| `apps-ecommerce-customers.html` | Customers list | Avatar+email cell, dense table |
-| `apps-ecommerce-product-details.html` | Equipment detail | Image gallery + spec table layout |
-| `apps-invoice-list.html` | Invoices list | Soft status pills, compact toolbar |
-| `apps-invoice-details.html` | Invoice detail | Right-rail totals card |
-| `apps-calendar.html` | Dispatch board | Event chip density, mini-calendar sidebar |
-| `apps-issue-tracker.html` | Dispatcher queue | Issue row info-density, assignee avatar stacks |
-| `apps-projects-kanban.html` | Dispatch by-tech view | Compact card-per-job kanban |
-| `apps-companies.html` | Customers (commercial) | Company card grid alternative |
+The wrapper bg matches the topbar (`zinc-50` / `dark:zinc-950`) so the topbar and the gap area read as one continuous chrome layer.
 
-## Experiment plan (next)
+### 4. Real desktop topbar (sidebar-layout.tsx)
 
-Throwaway branch off `dev`. Pick one page (likely Customers or Work Orders list — high visibility, simple structure) and apply:
+Catalyst's `navbar` prop was only rendered on mobile — desktop had no top chrome at all. Now a 48px sticky bar with a stronger bottom border (`border-zinc-950/10` instead of the typical `/5`). Bg is one shade darker than the content card so chrome reads as chrome.
 
-1. Page bg `zinc-50`
-2. 14px base font (scoped to that page first, not global)
-3. Soft pills replacing the current solid badges
-4. Tightened table padding
-5. Card treatment: `shadow-sm` + 1px border + `rounded-lg`
-6. Sidebar: tighter padding + uppercase group labels
+```jsx
+<header className="sticky top-0 z-10 hidden h-12 items-center border-b border-zinc-950/10 bg-zinc-50 px-4 lg:flex dark:border-white/10 dark:bg-zinc-950">
+  {navbar}
+</header>
+```
 
-Eyeball the shift, decide which knobs are keepers, then plan a system-wide token refactor as a separate PR.
+### 5. Sidebar section gap `mt-8` → `mt-4` (sidebar.tsx)
 
-## Open questions
+```diff
+- 'flex flex-1 flex-col overflow-y-auto p-4 [&>[data-slot=section]+[data-slot=section]]:mt-8'
++ 'flex flex-1 flex-col overflow-y-auto p-4 [&>[data-slot=section]+[data-slot=section]]:mt-4'
+```
 
-- Do we want the `text-base = 14px` shift to be **global** (cleaner, riskier) or **scoped to the app shell** (safer, leaks Catalyst defaults at boundaries)?
-- Is the right move to fork Catalyst's primitives into `src/components/dense/` or to override via Tailwind `@layer`/CSS vars?
-- Theming: this overlaps with the failed prior theming work (per memory) — we should decide upfront whether we're shipping density as one fixed look or as a "Compact" mode toggle.
+Group labels now visually cluster with their items instead of floating in 32px voids.
+
+### 6. Sidebar item padding `sm:py-2` → `sm:py-1.5` (sidebar.tsx)
+
+```diff
+- 'flex w-full items-center gap-3 rounded-lg px-2 py-2.5 ... sm:py-2 sm:text-sm/5',
++ 'flex w-full items-center gap-3 rounded-lg px-2 py-2.5 ... sm:py-1.5 sm:text-sm/5',
+```
+
+Combined with #5, the entire sidebar nav now fits on a 1080p monitor without scrolling (Settings used to be cut off the bottom).
+
+### 7. Removed AppLayout `<div className="p-2">` wrapper (AppLayout.tsx)
+
+Redundant — SidebarLayout now provides its own padding scheme. Was stacking 8px on top of the layout's own padding.
+
+```diff
+- <div className="p-2">
+-   {children}
+- </div>
++ {children}
+```
+
+### 8. Theme toggle in the topbar (AppLayout.tsx)
+
+Cosmetic, not density. The new topbar needed actual chrome content so the avatar didn't float alone. Added a single icon-button that cycles `dark → light → system`.
+
+```jsx
+<button
+  onClick={() => setTheme(theme === 'dark' ? 'light' : theme === 'light' ? 'system' : 'dark')}
+  className="flex h-8 w-8 items-center justify-center rounded-md text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 dark:hover:bg-zinc-800 dark:hover:text-white"
+  aria-label="Toggle theme"
+  title={`Theme: ${theme}`}
+>
+  {theme === 'dark' ? <MoonIcon className="h-5 w-5" /> : theme === 'light' ? <SunIcon className="h-5 w-5" /> : <ComputerDesktopIcon className="h-5 w-5" />}
+</button>
+```
+
+**Note:** the original 3-button theme picker is still in the SidebarFooter dropdown — not removed. Two theme controls now exist. Pick one before merge.
+
+### 9. Global font-size override scaffold (index.css)
+
+A commented-out A/B knob. Browser default 16px is in effect. Set to 14px or 15px to retest a tighter type scale system-wide.
+
+```css
+/* html {
+  font-size: 15px;
+} */
+```
+
+## Open decisions before merging anywhere real
+
+1. **Full-width content** (#2) — fine for tables, risky for long-text reading on ultrawides.
+2. **Two theme controls** (#8 + leftover dropdown picker) — pick one source of truth.
+3. **Forking Catalyst components in place** — all changes edit `src/components/catalyst/*.tsx` directly. For a real merge, decide whether to keep the in-place fork, extract a `DenseSidebarLayout` wrapper, or push fixes upstream as a Tailwind config layer.
+4. **No tests added** — none of the changes affected behavior. If this becomes the new standard, the visual diffs should be locked in via screenshot tests.
