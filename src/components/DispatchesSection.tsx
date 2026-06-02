@@ -28,11 +28,12 @@ import {
   PlusIcon,
 } from '@heroicons/react/24/outline';
 
-const STATUS_BADGE: Record<DispatchStatus, 'sky' | 'blue' | 'lime' | 'zinc'> = {
+const STATUS_BADGE: Record<DispatchStatus, 'sky' | 'blue' | 'lime' | 'zinc' | 'amber'> = {
   SCHEDULED: 'sky',
   IN_PROGRESS: 'blue',
   COMPLETED: 'lime',
   CANCELLED: 'zinc',
+  NO_SHOW: 'amber',
 };
 
 // Linear flow per backend: SCHEDULED → IN_PROGRESS sets arrivedAt,
@@ -42,7 +43,7 @@ const NEXT_STATUS: Partial<Record<DispatchStatus, DispatchStatus>> = {
   IN_PROGRESS: 'COMPLETED',
 };
 
-const PAST_STATES: ReadonlyArray<DispatchStatus> = ['COMPLETED', 'CANCELLED'];
+const PAST_STATES: ReadonlyArray<DispatchStatus> = ['COMPLETED', 'CANCELLED', 'NO_SHOW'];
 const isPast = (s: DispatchStatus) => PAST_STATES.includes(s);
 
 const DATE_PART = new Intl.DateTimeFormat('en-US', {
@@ -138,8 +139,8 @@ function formatActiveTimestamp(d: Dispatch, t: TFunction): string {
 }
 
 function formatPastTimestamp(d: Dispatch, t: TFunction): string {
-  if (d.status === 'CANCELLED') {
-    return t('workOrders.dispatches.status.CANCELLED');
+  if (d.status === 'CANCELLED' || d.status === 'NO_SHOW') {
+    return t(`workOrders.dispatches.status.${d.status}`);
   }
   if (d.arrivedAt && d.departedAt) {
     const ms =
@@ -195,7 +196,9 @@ export default function DispatchesSection({
 
   const { data: dispatches = [], isLoading } = useQuery({
     queryKey: ['dispatches', { workOrderId }],
-    queryFn: () => dispatchesApi.getAll({ workOrderId }),
+    // WO-scoped read returns a plain array (listForWorkOrder tolerates both the
+    // array and a future paged envelope).
+    queryFn: () => dispatchesApi.listForWorkOrder(workOrderId),
     enabled: !!workOrderId,
   });
 
@@ -608,7 +611,8 @@ function PastDispatchRow({
   const techName = tech
     ? `${tech.firstName} ${tech.lastName}`.trim() || tech.email
     : '—';
-  const cancelled = dispatch.status === 'CANCELLED';
+  // CANCELLED and NO_SHOW are both "this visit didn't happen" — strike them.
+  const cancelled = dispatch.status === 'CANCELLED' || dispatch.status === 'NO_SHOW';
   const canManage = !readOnly;
 
   const handleDelete = () => {

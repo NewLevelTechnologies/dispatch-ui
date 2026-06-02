@@ -3,7 +3,9 @@ import apiClient from './client';
 
 // ========== DISPATCHES ==========
 
-export type DispatchStatus = 'SCHEDULED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
+// NO_SHOW is a terminal outcome (tech/customer didn't show) added with the
+// dispatch-board API. The FE renders it; it is not (yet) a status the UI sets.
+export type DispatchStatus = 'SCHEDULED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED' | 'NO_SHOW';
 
 // Per WORK_ORDER_DETAIL_DESIGN.md / PHASE_6_FINAL_PLAN.md: dispatches commit a
 // customer-facing arrival WINDOW (e.g. "Tue 8–10 AM") rather than a single
@@ -77,15 +79,127 @@ export interface LocationTechSummaryResponse {
   techByWorkOrder: Record<string, WorkOrderTech>; // keyed by workOrderId; {} is valid
 }
 
+// ---- Dispatch board list (GET /scheduling/dispatches) ----
+// Enriched row for the paged dispatch board. Superset of Dispatch: carries the
+// denormalized WO / customer / location / tech display fields so the board
+// renders without fan-out joins. The *Name / customer* / serviceLocation* /
+// workOrder* fields are null only in the brief window before a work order or
+// user has synced into scheduling's local cache — render defensively.
+export interface DispatchBoardRow extends Dispatch {
+  workOrderNumber: string | null;
+  workOrderTypeName: string | null;
+  workOrderSummary: string | null; // preferred row title (see dispatchRowTitle)
+  customerId: string | null;
+  customerName: string | null;
+  serviceLocationId: string | null;
+  serviceLocationCity: string | null;
+  serviceLocationState: string | null;
+  assignedUserName: string | null;
+}
+
+// PageResponse<T> as returned by the board endpoint. NOTE: the page index field
+// is `page` here (NOT Spring's `number` used by the generic Page<T> elsewhere) —
+// this endpoint ships its own envelope, so it gets its own type.
+export interface DispatchBoardPage {
+  content: DispatchBoardRow[];
+  page: number;
+  size: number;
+  totalElements: number;
+  totalPages: number;
+  first: boolean;
+  last: boolean;
+}
+
+export type DispatchSortField = 'arrivalWindowStart' | 'createdAt' | 'updatedAt' | 'status';
+
+export interface ListDispatchesParams {
+  assignedUserId?: string;
+  workOrderId?: string;
+  status?: DispatchStatus;
+  from?: string; // ISO instant — arrivalWindowStart >= from (inclusive)
+  to?: string; // ISO instant — arrivalWindowStart < to (exclusive)
+  q?: string; // matches WO #, customer name, or tech name (NOT notes)
+  page?: number; // 0-indexed
+  size?: number; // default 50, capped server-side at 200
+  sort?: `${DispatchSortField},${'asc' | 'desc'}`;
+}
+
+// Title precedence for a board/visit row: prefer the WO summary, fall back to
+// WO number, then type name. Mirrors the location-detail dispatch-row rule.
+export function dispatchRowTitle(row: DispatchBoardRow): string | null {
+  return row.workOrderSummary || row.workOrderNumber || row.workOrderTypeName || null;
+}
+
+// ---- Location-scoped visit list (GET /scheduling/dispatches?serviceLocationId=) ----
+// The Visits tab on the location detail page. SEPARATE (bespoke) mapping from
+// the paged board, selected by the serviceLocationId param — it carries the
+// `when=upcoming` card semantic + the denormalized LocationDispatchResponse
+// shape the generic board doesn't. Now returns PageResponse<LocationDispatchResponse>;
+// the client method reads `.content` (and still tolerates a bare array for
+// safety). Ordering is fixed server-side by intent (no sort param): upcoming →
+// arrival window ascending; otherwise newest first.
+//
+// FIELD NAMES inferred from the board row (workOrderNumber / workOrderTypeName /
+// workOrderSummary / assignedUserName) — confirm against the actual
+// LocationDispatchResponse DTO.
+export interface LocationDispatchResponse {
+  id: string;
+  workOrderId: string;
+  assignedUserId: string;
+  arrivalWindowStart: string;
+  arrivalWindowEnd: string;
+  estimatedDuration: number | null;
+  status: DispatchStatus;
+  arrivedAt: string | null;
+  departedAt: string | null;
+  notes: string | null;
+  createdAt: string;
+  updatedAt: string;
+  // Denormalized display fields — nullable until the WO / user syncs to cache.
+  workOrderNumber: string | null;
+  workOrderTypeName: string | null;
+  workOrderSummary: string | null;
+  assignedUserName: string | null;
+}
+
+// `when=upcoming` → arrival window ≥ now and status in (SCHEDULED, IN_PROGRESS),
+// soonest first. Omitted → all visits at the location, most recent first.
+export type LocationVisitsWhen = 'upcoming' | 'recent';
+
 export const dispatchesApi = {
-  getAll: async (params?: {
-    userId?: string;
-    workOrderId?: string;
-    status?: string;
-    startDate?: string;
-    endDate?: string;
-  }): Promise<Dispatch[]> => {
-    const response = await apiClient.get<Dispatch[]>('/scheduling/dispatches', { params });
+  // Location-scoped visit list (the Visits tab). Returns the page's rows.
+  // A single site's visit history is bounded, so we pull one large page
+  // (server caps size at 200) rather than paging the tab. Tolerates a bare
+  // array too, in case an environment predates the paging change.
+  listForServiceLocation: async (
+    serviceLocationId: string,
+    when?: LocationVisitsWhen,
+  ): Promise<LocationDispatchResponse[]> => {
+    const response = await apiClient.get<
+      LocationDispatchResponse[] | { content: LocationDispatchResponse[] }
+    >('/scheduling/dispatches', { params: { serviceLocationId, when, size: 200 } });
+    const data = response.data;
+    return Array.isArray(data) ? data : (data?.content ?? []);
+  },
+
+  // Per-work-order visit list. Like the location mapping, the work-order-scoped
+  // read on this controller returns a plain array (NOT the paged board
+  // envelope) — but tolerate both so a future paging change can't break the WO
+  // detail page (same defensive shim as listForServiceLocation).
+  listForWorkOrder: async (workOrderId: string): Promise<DispatchBoardRow[]> => {
+    const response = await apiClient.get<
+      DispatchBoardRow[] | { content: DispatchBoardRow[] }
+    >('/scheduling/dispatches', { params: { workOrderId } });
+    const data = response.data;
+    return Array.isArray(data) ? data : (data?.content ?? []);
+  },
+
+  // Paged dispatch board list. All filters AND together. Returns a
+  // DispatchBoardPage envelope (breaking change from the old bare array — the
+  // endpoint became paged + filterable + searchable). Callers that just want
+  // rows read `.content`.
+  getAll: async (params?: ListDispatchesParams): Promise<DispatchBoardPage> => {
+    const response = await apiClient.get<DispatchBoardPage>('/scheduling/dispatches', { params });
     return response.data;
   },
 

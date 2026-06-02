@@ -56,7 +56,10 @@ export default function DispatchesPage() {
 
   const { data: dispatches = [], isLoading, error } = useQuery({
     queryKey: ['dispatches'],
-    queryFn: () => dispatchesApi.getAll(),
+    // Board endpoint is paged now; this legacy list does client-side search, so
+    // pull a large first page (server caps at 200) and read .content. A proper
+    // server-filtered board is the planned follow-up.
+    queryFn: () => dispatchesApi.getAll({ size: 200 }).then((p) => p.content),
   });
 
   const { data: workOrders = [] } = useQuery({

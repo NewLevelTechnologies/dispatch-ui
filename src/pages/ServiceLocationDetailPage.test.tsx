@@ -4,7 +4,7 @@ import { renderWithProviders, userEvent } from '../test/utils';
 import ServiceLocationDetailPage from './ServiceLocationDetailPage';
 import apiClient from '../api/client';
 import type { RouteObject } from 'react-router-dom';
-import type { ServiceLocationDetailDto, WorkOrderSummary } from '../api';
+import type { ServiceLocationDetailDto, WorkOrderSummary, LocationDispatchResponse } from '../api';
 
 vi.mock('../api/client');
 
@@ -65,7 +65,8 @@ describe('ServiceLocationDetailPage', () => {
     workOrders: unknown[] = [],
     locationTech: unknown = { onSiteTech: null, techByWorkOrder: {} },
     invoices: unknown[] = [],
-    invoiceSummary: unknown = { billedYtd: 0, openCount: 0, openAmount: 0, aged91: 0, currency: 'USD' }
+    invoiceSummary: unknown = { billedYtd: 0, openCount: 0, openAmount: 0, aged91: 0, currency: 'USD' },
+    dispatches: unknown[] = []
   ) => {
     vi.mocked(apiClient.get).mockImplementation((url) => {
       // Site contact card reads the full contact collection (primary-first).
@@ -109,6 +110,21 @@ describe('ServiceLocationDetailPage', () => {
       }
       if (url.includes('/scheduling/dispatches/location-tech')) {
         return Promise.resolve({ data: locationTech });
+      }
+      // Location-scoped visit list (Visits tab) — now a paged envelope. url is
+      // the bare path; serviceLocationId rides params. Must follow location-tech.
+      if (url === '/scheduling/dispatches' || url.startsWith('/scheduling/dispatches?')) {
+        return Promise.resolve({
+          data: {
+            content: dispatches,
+            page: 0,
+            size: 200,
+            totalElements: dispatches.length,
+            totalPages: 1,
+            first: true,
+            last: true,
+          },
+        });
       }
       // Order matters: the summary path is more specific than the list path.
       if (url.includes('/financial/invoices/summary')) {
@@ -439,14 +455,79 @@ describe('ServiceLocationDetailPage', () => {
     expect(screen.getByRole('button', { name: /add contact/i })).toBeInTheDocument();
   });
 
-  it('shows the coming-soon stub for the Visits (Dispatches) tab', async () => {
-    mockApiResponses();
-    const user = userEvent.setup();
-    renderDetailPage();
-    await waitFor(() => expect(screen.getByText('Main Office')).toBeInTheDocument());
+  // ── Visits / Dispatches tab ─────────────────────────────────────────────
+  describe('visits tab', () => {
+    const makeVisit = (over: Partial<LocationDispatchResponse> = {}): LocationDispatchResponse => ({
+      id: 'd-1',
+      workOrderId: 'wo-1',
+      assignedUserId: 'u-1',
+      arrivalWindowStart: '2026-07-01T15:00:00Z',
+      arrivalWindowEnd: '2026-07-01T17:00:00Z',
+      estimatedDuration: 120,
+      status: 'SCHEDULED',
+      arrivedAt: null,
+      departedAt: null,
+      notes: null,
+      createdAt: '2026-06-01T00:00:00Z',
+      updatedAt: '2026-06-01T00:00:00Z',
+      workOrderNumber: 'WO-5000',
+      workOrderTypeName: 'Quarterly PM',
+      workOrderSummary: 'Replace compressor',
+      assignedUserName: 'Jane Tech',
+      ...over,
+    });
 
-    await user.click(screen.getByRole('tab', { name: /dispatch/i }));
-    await waitFor(() => expect(screen.getByText(/coming soon/i)).toBeInTheDocument());
+    const openVisitsTab = async (dispatches: LocationDispatchResponse[]) => {
+      mockApiResponses(mockLocation, [], [], [], undefined, [], undefined, dispatches);
+      const user = userEvent.setup();
+      renderDetailPage();
+      await waitFor(() => expect(screen.getByText('Main Office')).toBeInTheDocument());
+      await user.click(screen.getByRole('tab', { name: /dispatch/i }));
+      return user;
+    };
+
+    it('groups visits into Upcoming and Past with the resolved tech + type', async () => {
+      await openVisitsTab([
+        makeVisit({ id: 'd-1', status: 'SCHEDULED' }),
+        makeVisit({ id: 'd-2', status: 'COMPLETED', workOrderNumber: 'WO-4000', arrivedAt: '2026-05-01T15:10:00Z', departedAt: '2026-05-01T16:30:00Z' }),
+      ]);
+
+      await waitFor(() => expect(screen.getByText('Upcoming')).toBeInTheDocument());
+      expect(screen.getByText('Past')).toBeInTheDocument();
+      expect(screen.getByText('WO-5000')).toBeInTheDocument();
+      expect(screen.getAllByText('Jane Tech').length).toBeGreaterThan(0);
+      expect(screen.getAllByText('Quarterly PM').length).toBeGreaterThan(0);
+    });
+
+    it('flags an overdue scheduled visit', async () => {
+      // SCHEDULED with a window that ended in the past → Overdue treatment.
+      await openVisitsTab([
+        makeVisit({ id: 'd-1', status: 'SCHEDULED', arrivalWindowStart: '2020-01-01T08:00:00Z', arrivalWindowEnd: '2020-01-01T10:00:00Z' }),
+      ]);
+      await waitFor(() => expect(screen.getByText('Overdue')).toBeInTheDocument());
+    });
+
+    it('drills through to the owning work order on row click', async () => {
+      const user = userEvent.setup();
+      const routes: RouteObject[] = [
+        { path: '/service-locations/:id', element: <ServiceLocationDetailPage /> },
+        // eslint-disable-next-line i18next/no-literal-string
+        { path: '/work-orders/:id', element: <div>Work order stub</div> },
+      ];
+      mockApiResponses(mockLocation, [], [], [], undefined, [], undefined, [makeVisit()]);
+      renderWithProviders(<ServiceLocationDetailPage />, { routes, initialPath: '/service-locations/location-1' });
+      await waitFor(() => expect(screen.getByText('Main Office')).toBeInTheDocument());
+      await user.click(screen.getByRole('tab', { name: /dispatch/i }));
+
+      const row = (await screen.findByText('WO-5000')).closest('tr')!;
+      await user.click(row);
+      await waitFor(() => expect(screen.getByText('Work order stub')).toBeInTheDocument());
+    });
+
+    it('shows an empty state when there are no visits', async () => {
+      await openVisitsTab([]);
+      await waitFor(() => expect(screen.getByText(/no visits scheduled/i)).toBeInTheDocument());
+    });
   });
 
   // ── Invoices tab (FIN-1) ────────────────────────────────────────────────

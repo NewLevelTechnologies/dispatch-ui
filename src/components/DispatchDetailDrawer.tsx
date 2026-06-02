@@ -17,11 +17,12 @@ import { Badge } from './catalyst/badge';
 import { Button } from './catalyst/button';
 import { SlideOver } from './catalyst/slideover';
 
-const STATUS_BADGE: Record<DispatchStatus, 'sky' | 'blue' | 'lime' | 'zinc'> = {
+const STATUS_BADGE: Record<DispatchStatus, 'sky' | 'blue' | 'lime' | 'zinc' | 'amber'> = {
   SCHEDULED: 'sky',
   IN_PROGRESS: 'blue',
   COMPLETED: 'lime',
   CANCELLED: 'zinc',
+  NO_SHOW: 'amber',
 };
 
 const NOTIF_BADGE: Record<NotificationStatus, 'lime' | 'sky' | 'zinc' | 'rose'> = {

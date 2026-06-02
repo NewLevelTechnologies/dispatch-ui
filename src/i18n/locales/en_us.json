@@ -2325,6 +2325,7 @@
         "CANCELLED": "Cancelled",
         "COMPLETED": "Completed",
         "IN_PROGRESS": "In Progress",
+        "NO_SHOW": "No-show",
         "SCHEDULED": "Scheduled"
       },
       "statusUpdateError": "Failed to update dispatch status"

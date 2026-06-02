@@ -516,9 +516,10 @@ export default function WorkOrderDetailPage() {
 
   // Same query key as DispatchesSection — React Query dedupes the actual fetch.
   // Read here so the header ETA can derive from the next non-cancelled dispatch.
+  // WO-scoped read returns a plain array (listForWorkOrder tolerates both shapes).
   const { data: dispatches = [] } = useQuery({
     queryKey: ['dispatches', { workOrderId: id }],
-    queryFn: () => dispatchesApi.getAll({ workOrderId: id! }),
+    queryFn: () => dispatchesApi.listForWorkOrder(id!),
     enabled: !!id,
   });
 
