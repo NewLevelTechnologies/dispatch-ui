@@ -35,7 +35,7 @@ import {
   dispatchesApi,
   invoicesApi,
   InvoiceStatus,
-  type Invoice,
+  type InvoiceListItemRow,
   type InvoiceStatus as InvoiceStatusType,
   type LocationInvoiceSummaryResponse,
   type LocationDispatchResponse,
@@ -3170,7 +3170,7 @@ function InvoiceRow({
   fmtMoney,
   onOpen,
 }: {
-  inv: Invoice;
+  inv: InvoiceListItemRow;
   wo?: WorkOrderSummary;
   typeName?: string;
   billTo: string;

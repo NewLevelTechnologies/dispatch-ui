@@ -178,9 +178,72 @@ export interface ExtendShareLinkResponse {
   expiresAt: string;
 }
 
+/**
+ * Lean invoice row returned by the LIST endpoints (`/financial/invoices`,
+ * `/financial/invoices/customer/{id}`, and the `?serviceLocationId=` variant).
+ *
+ * ⚠️ Lean by design — NO `lineItems`, NO `payments[]`. A view that needs those
+ * must lazy-load the full {@link Invoice} via `getById` on expand/click. Carries
+ * the denormalized `customerName` + an `overdue` flag so list rows render
+ * without a customer join.
+ */
+export interface InvoiceListItemRow {
+  id: string;
+  invoiceNumber: string;
+  status: InvoiceStatus;
+  customerId: string;
+  customerName: string | null;
+  serviceLocationId: string | null;
+  workOrderId: string | null;
+  invoiceDate: string;
+  dueDate: string;
+  totalAmount: number;
+  amountPaid: number;
+  balanceDue: number;
+  overdue: boolean;
+  lastSentAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// Spring Data Page<T> envelope for the invoice list endpoints.
+export interface InvoiceListPage {
+  content: InvoiceListItemRow[];
+  totalElements: number;
+  totalPages: number;
+  number: number; // 0-based current page index
+  size: number;
+  first?: boolean;
+  last?: boolean;
+}
+
+export type InvoiceSortField =
+  | 'invoiceDate'
+  | 'dueDate'
+  | 'totalAmount'
+  | 'status'
+  | 'createdAt'
+  | 'updatedAt';
+
+export interface ListInvoicesParams {
+  customerId?: string;
+  serviceLocationId?: string;
+  status?: InvoiceStatus;
+  from?: string; // YYYY-MM-DD, inclusive
+  to?: string; // YYYY-MM-DD, inclusive
+  overdue?: boolean; // true = open + past due
+  q?: string; // invoice number or customer name
+  page?: number; // 0-indexed
+  size?: number;
+  sort?: `${InvoiceSortField},${'asc' | 'desc'}`;
+}
+
 export const invoicesApi = {
-  getAll: async (): Promise<Invoice[]> => {
-    const response = await apiClient.get<Invoice[]>('/financial/invoices');
+  // Paged AR invoice list (lean rows). All filters AND together; `q` matches
+  // invoice number or customer name. Returns the page envelope so callers can
+  // drive a pager off totalElements / totalPages.
+  getAll: async (params?: ListInvoicesParams): Promise<InvoiceListPage> => {
+    const response = await apiClient.get<InvoiceListPage>('/financial/invoices', { params });
     return response.data;
   },
 
@@ -189,8 +252,15 @@ export const invoicesApi = {
     return response.data;
   },
 
-  getByCustomer: async (customerId: string): Promise<Invoice[]> => {
-    const response = await apiClient.get<Invoice[]>(`/financial/invoices/customer/${customerId}`);
+  // Per-customer invoice list (lean rows, paged). Path unchanged.
+  getByCustomer: async (
+    customerId: string,
+    params?: Omit<ListInvoicesParams, 'customerId'>,
+  ): Promise<InvoiceListPage> => {
+    const response = await apiClient.get<InvoiceListPage>(
+      `/financial/invoices/customer/${customerId}`,
+      { params },
+    );
     return response.data;
   },
 
@@ -210,17 +280,20 @@ export const invoicesApi = {
   },
 
   /**
-   * Per-location invoice list (FIN-1) — invoices for work performed at this
-   * service location. Same `Invoice` shape as `getById`. `serviceLocationId` is
-   * resolved server-side from each invoice's work order; not paginated (volume
-   * is bounded to one location). Fire alongside `getLocationSummary` in
-   * parallel — the two are independent reads.
+   * Per-location invoice list (FIN-1) — invoices for work at this service
+   * location, as lean {@link InvoiceListItemRow}s. `serviceLocationId` is
+   * resolved server-side from each invoice's work order. A single site's volume
+   * is bounded, so we pull one large page (server caps size at 200) and return
+   * the rows rather than paging the tab. Tolerates a bare array for environments
+   * predating the paging change. Fire alongside `getLocationSummary` in parallel.
    */
-  getByServiceLocation: async (serviceLocationId: string): Promise<Invoice[]> => {
-    const response = await apiClient.get<Invoice[]>('/financial/invoices', {
-      params: { serviceLocationId },
-    });
-    return response.data;
+  getByServiceLocation: async (serviceLocationId: string): Promise<InvoiceListItemRow[]> => {
+    const response = await apiClient.get<InvoiceListItemRow[] | InvoiceListPage>(
+      '/financial/invoices',
+      { params: { serviceLocationId, size: 200 } },
+    );
+    const data = response.data;
+    return Array.isArray(data) ? data : (data?.content ?? []);
   },
 
   /**

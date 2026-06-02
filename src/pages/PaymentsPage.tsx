@@ -53,9 +53,12 @@ export default function PaymentsPage() {
     queryFn: () => paymentsApi.getAll(),
   });
 
+  // Invoice list backs the record-payment picker (id / number / balanceDue /
+  // customerId lookups). The list endpoint is paged + lean now; pull one large
+  // page for the picker (bounded; server caps at 200) and read .content.
   const { data: invoices = [] } = useQuery({
-    queryKey: ['invoices'],
-    queryFn: () => invoicesApi.getAll(),
+    queryKey: ['invoices', { picker: true }],
+    queryFn: () => invoicesApi.getAll({ size: 200 }).then((p) => p.content),
   });
 
   const { data: customers = [] } = useQuery({
