@@ -143,14 +143,18 @@ export interface PublicQuoteResponse {
   customer: PublicCustomerSummary;
 }
 
-const tokenHeaders = (token: string) => ({
+const tokenHeaders = (token: string, signal?: AbortSignal) => ({
   headers: { 'X-Share-Token': token },
+  signal,
 });
 
 const PREVIEW_TOKEN_PREFIX = 'preview-';
 
 export const publicFinancialApi = {
-  getInvoiceByToken: async (token: string): Promise<PublicInvoiceResponse> => {
+  getInvoiceByToken: async (
+    token: string,
+    signal?: AbortSignal,
+  ): Promise<PublicInvoiceResponse> => {
     // Dev-only short-circuit so the page can be previewed in the browser
     // without a real backend token. `import.meta.env.DEV` is replaced with
     // a literal `false` at production build time, so this branch and the
@@ -164,7 +168,7 @@ export const publicFinancialApi = {
     }
     const response = await publicApiClient.get<PublicInvoiceResponse>(
       '/public/invoices',
-      tokenHeaders(token),
+      tokenHeaders(token, signal),
     );
     return response.data;
   },

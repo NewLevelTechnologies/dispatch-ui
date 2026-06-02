@@ -140,18 +140,41 @@ export default function PublicInvoicePage() {
     unknown
   >({
     queryKey: ['publicInvoice', token],
-    queryFn: () => publicFinancialApi.getInvoiceByToken(token),
+    queryFn: ({ signal }) => publicFinancialApi.getInvoiceByToken(token, signal),
     enabled: !!token,
-    // Retry transient failures (flaky mobile networks / in-app email
-    // webviews stall the single request far more than desktop wifi). A
-    // real 404 means the token is revoked/expired — that's the cliff, so
-    // bail immediately rather than spinning through retries.
+    // A real 404 means the token is revoked/expired — that's the cliff, so
+    // bail immediately rather than spinning through retries. Other failures
+    // (genuinely flaky networks) get a couple of backed-off retries.
     retry: (failureCount, err) => {
       if (axios.isAxiosError(err) && err.response?.status === 404) return false;
-      return failureCount < 3;
+      return failureCount < 2;
     },
     retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 8000),
   });
+
+  // Mail's in-app browser (SFSafariViewController) prewarms this page: the
+  // initial request fires and completes during the prewarm pass — the
+  // response is visible in the network log — but its result never reaches
+  // the live page that gets shown to the customer, so React Query is stuck
+  // in 'loading' with nothing to render. Re-issuing the request from the
+  // live page fixes it every time (that's exactly what the manual "Try
+  // again" button does). Automate it: revalidate as soon as the page is
+  // actually shown/visible, plus a one-shot right after it settles, so the
+  // customer never has to tap. We tear the listeners down once data arrives.
+  useEffect(() => {
+    if (!token || data) return;
+    const revalidate = () => {
+      if (document.visibilityState === 'visible') refetch();
+    };
+    window.addEventListener('pageshow', revalidate);
+    document.addEventListener('visibilitychange', revalidate);
+    const settleId = window.setTimeout(revalidate, 600);
+    return () => {
+      window.removeEventListener('pageshow', revalidate);
+      document.removeEventListener('visibilitychange', revalidate);
+      window.clearTimeout(settleId);
+    };
+  }, [token, data, refetch]);
 
   if (!token) {
     return <CliffPage />;

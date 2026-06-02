@@ -22,10 +22,7 @@ const publicApiClient = axios.create({
   baseURL:
     import.meta.env.VITE_API_BASE_URL ||
     'https://dev.api.dispatch.newleveltech.net/api/v1',
-  // Shorter than the authenticated client: a stalled request here should
-  // fail fast so PublicInvoicePage's query retries it, rather than leaving
-  // a customer staring at "Loading invoice…" for 30s on a flaky connection.
-  timeout: 12000,
+  timeout: 30000,
   headers: {
     'Content-Type': 'application/json',
   },
