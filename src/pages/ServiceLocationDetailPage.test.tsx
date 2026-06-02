@@ -639,6 +639,57 @@ describe('ServiceLocationDetailPage', () => {
     });
   });
 
+  // ── Jobs (Work Orders) tab ──────────────────────────────────────────────
+  describe('jobs tab', () => {
+    const makeJobWO = (over: Partial<WorkOrderSummary>): WorkOrderSummary => ({
+      id: 'wo-7',
+      customerId: 'customer-1',
+      serviceLocationId: 'location-1',
+      workOrderNumber: 'WO-7001',
+      lifecycleState: 'ACTIVE',
+      progressCategory: 'IN_PROGRESS',
+      priority: 'NORMAL',
+      workItemCount: 1,
+      workItems: [{ description: 'No cooling' } as WorkOrderSummary['workItems'][number]],
+      scheduledDate: '2026-07-01T00:00:00Z',
+      createdAt: '2026-06-01T00:00:00Z',
+      updatedAt: '2026-06-01T00:00:00Z',
+      ...over,
+    });
+
+    it('renders the filterable work-order list with the New action', async () => {
+      mockApiResponses(mockLocation, [], [], [makeJobWO({})]);
+      const user = userEvent.setup();
+      renderDetailPage();
+      await waitFor(() => expect(screen.getByText('Main Office')).toBeInTheDocument());
+      await user.click(screen.getByRole('tab', { name: /work order/i }));
+
+      await waitFor(() => expect(screen.getByText('WO-7001')).toBeInTheDocument());
+      expect(screen.getByPlaceholderText(/search wo#/i)).toBeInTheDocument();
+    });
+
+    it('searches within the location’s work orders via the q param', async () => {
+      mockApiResponses(mockLocation, [], [], [makeJobWO({})]);
+      const user = userEvent.setup();
+      renderDetailPage();
+      await waitFor(() => expect(screen.getByText('Main Office')).toBeInTheDocument());
+      await user.click(screen.getByRole('tab', { name: /work order/i }));
+      await waitFor(() => expect(screen.getByText('WO-7001')).toBeInTheDocument());
+
+      await user.type(screen.getByPlaceholderText(/search wo#/i), 'cooling');
+      await waitFor(() => {
+        const sentQ = vi
+          .mocked(apiClient.get)
+          .mock.calls.some(
+            ([u, cfg]) =>
+              u === '/work-orders' &&
+              (cfg as { params?: { q?: string } } | undefined)?.params?.q === 'cooling',
+          );
+        expect(sentQ).toBe(true);
+      });
+    });
+  });
+
   it('scopes the work-orders fetch to serviceLocationId only (not customerId)', async () => {
     // Regression: passing both customerId and serviceLocationId caused the backend to
     // return all of the customer's work orders, leaking sibling locations' WOs.
