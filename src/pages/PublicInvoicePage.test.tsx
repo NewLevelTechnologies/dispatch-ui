@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { screen, waitFor } from '@testing-library/react';
+import { act, screen, waitFor } from '@testing-library/react';
 import { renderWithProviders } from '../test/utils';
 import PublicInvoicePage from './PublicInvoicePage';
 import publicApiClient from '../api/publicClient';
@@ -175,6 +175,36 @@ describe('PublicInvoicePage', () => {
     expect(screen.getByText(/credit card/i)).toBeInTheDocument();
     // "Paid −$200.00" row in totals.
     expect(screen.getByText(/−\$200\.00/)).toBeInTheDocument();
+  });
+
+  it('revalidates and renders when the page is shown after a no-data initial load', async () => {
+    // Mail's in-app browser prewarms the page; the initial request's result
+    // never reaches the live page, leaving it stuck with no data. The
+    // revalidation effect re-issues the request when the page is shown — the
+    // same recovery the manual "Try again" gives. We model the failed initial
+    // load as a 404 precisely because the page deliberately does NOT auto-retry
+    // 404s, so a successful render here can only come from that revalidation,
+    // making this a tight guard against the effect being removed.
+    vi.mocked(publicApiClient.get)
+      .mockRejectedValueOnce(
+        Object.assign(new Error('Not Found'), {
+          isAxiosError: true,
+          response: { status: 404, data: {} },
+        }),
+      )
+      .mockResolvedValue({ data: buildResponse() });
+
+    renderAt('tok-1');
+
+    // Mail adopts the prewarmed page into the visible tab.
+    act(() => {
+      window.dispatchEvent(new Event('pageshow'));
+    });
+
+    expect(await screen.findByText(/INV-0042/)).toBeInTheDocument();
+    expect(
+      vi.mocked(publicApiClient.get).mock.calls.length,
+    ).toBeGreaterThanOrEqual(2);
   });
 
   it('shows a Voided pill next to voided payment rows', async () => {

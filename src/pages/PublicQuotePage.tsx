@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
@@ -71,31 +72,92 @@ const QuoteStatusBadge = ({ status }: QuoteBadgeProps) => {
   }
 };
 
+/**
+ * Loading screen for the public quote. After ~5s with no result it surfaces
+ * a "taking longer than usual" note plus a manual retry, mirroring the public
+ * invoice page — an escape hatch if a hard stall slips past the automatic
+ * page-show revalidation below.
+ */
+const QuoteLoadingState = ({ onRetry }: { onRetry: () => void }) => {
+  const { t } = useTranslation();
+  const [slow, setSlow] = useState(false);
+
+  useEffect(() => {
+    const id = setTimeout(() => setSlow(true), 5000);
+    return () => clearTimeout(id);
+  }, []);
+
+  return (
+    <div className="flex min-h-screen flex-col items-center justify-center gap-3 bg-zinc-50 px-4 text-center">
+      <div className="text-zinc-500">{t('public.quote.loading')}</div>
+      {slow && (
+        <>
+          <div className="text-sm text-zinc-400">{t('public.common.slowLoad')}</div>
+          <button
+            type="button"
+            onClick={onRetry}
+            className="text-sm font-medium text-zinc-700 underline underline-offset-2 hover:text-zinc-900"
+          >
+            {t('public.common.retry')}
+          </button>
+        </>
+      )}
+    </div>
+  );
+};
+
 export default function PublicQuotePage() {
   const { t } = useTranslation();
   const { token = '' } = useParams<{ token: string }>();
   useScopedReferrerPolicy();
 
-  const { data, isLoading, isError, error } = useQuery<
+  const { data, isLoading, isError, error, refetch } = useQuery<
     PublicQuoteResponse,
     unknown
   >({
     queryKey: ['publicQuote', token],
-    queryFn: () => publicFinancialApi.getQuoteByToken(token),
+    queryFn: ({ signal }) => publicFinancialApi.getQuoteByToken(token, signal),
     enabled: !!token,
-    retry: false,
+    // A real 404 means the token is revoked/expired — that's the cliff, so
+    // bail immediately rather than spinning through retries. Other failures
+    // (genuinely flaky networks) get a couple of backed-off retries.
+    retry: (failureCount, err) => {
+      if (axios.isAxiosError(err) && err.response?.status === 404) return false;
+      return failureCount < 2;
+    },
+    retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 8000),
   });
+
+  // Mail's in-app browser (SFSafariViewController) prewarms this page: the
+  // initial request fires and completes during the prewarm pass — the
+  // response is visible in the network log — but its result never reaches
+  // the live page that gets shown to the customer, so React Query is stuck
+  // in 'loading' with nothing to render. Re-issuing the request from the
+  // live page fixes it every time (that's exactly what the manual "Try
+  // again" button does). Automate it: revalidate as soon as the page is
+  // actually shown/visible, plus a one-shot right after it settles, so the
+  // customer never has to tap. We tear the listeners down once data arrives.
+  useEffect(() => {
+    if (!token || data) return;
+    const revalidate = () => {
+      if (document.visibilityState === 'visible') refetch();
+    };
+    window.addEventListener('pageshow', revalidate);
+    document.addEventListener('visibilitychange', revalidate);
+    const settleId = window.setTimeout(revalidate, 600);
+    return () => {
+      window.removeEventListener('pageshow', revalidate);
+      document.removeEventListener('visibilitychange', revalidate);
+      window.clearTimeout(settleId);
+    };
+  }, [token, data, refetch]);
 
   if (!token) {
     return <CliffPage />;
   }
 
   if (isLoading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-zinc-50">
-        <div className="text-zinc-500">{t('public.quote.loading')}</div>
-      </div>
-    );
+    return <QuoteLoadingState onRetry={() => refetch()} />;
   }
 
   if (isError || !data) {

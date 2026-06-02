@@ -173,7 +173,10 @@ export const publicFinancialApi = {
     return response.data;
   },
 
-  getQuoteByToken: async (token: string): Promise<PublicQuoteResponse> => {
+  getQuoteByToken: async (
+    token: string,
+    signal?: AbortSignal,
+  ): Promise<PublicQuoteResponse> => {
     if (import.meta.env.DEV && token.startsWith(PREVIEW_TOKEN_PREFIX)) {
       const { previewQuote } = await import('../dev/publicFinancialMocks');
       const mock = previewQuote(token);
@@ -181,7 +184,7 @@ export const publicFinancialApi = {
     }
     const response = await publicApiClient.get<PublicQuoteResponse>(
       '/public/quotes',
-      tokenHeaders(token),
+      tokenHeaders(token, signal),
     );
     return response.data;
   },
