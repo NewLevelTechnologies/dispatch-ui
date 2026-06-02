@@ -63,7 +63,9 @@ describe('ServiceLocationDetailPage', () => {
     regions: unknown[] = [],
     equipment: unknown[] = [],
     workOrders: unknown[] = [],
-    locationTech: unknown = { onSiteTech: null, techByWorkOrder: {} }
+    locationTech: unknown = { onSiteTech: null, techByWorkOrder: {} },
+    invoices: unknown[] = [],
+    invoiceSummary: unknown = { billedYtd: 0, openCount: 0, openAmount: 0, aged91: 0, currency: 'USD' }
   ) => {
     vi.mocked(apiClient.get).mockImplementation((url) => {
       // Site contact card reads the full contact collection (primary-first).
@@ -107,6 +109,13 @@ describe('ServiceLocationDetailPage', () => {
       }
       if (url.includes('/scheduling/dispatches/location-tech')) {
         return Promise.resolve({ data: locationTech });
+      }
+      // Order matters: the summary path is more specific than the list path.
+      if (url.includes('/financial/invoices/summary')) {
+        return Promise.resolve({ data: invoiceSummary });
+      }
+      if (url.includes('/financial/invoices')) {
+        return Promise.resolve({ data: invoices });
       }
       if (url.includes('/work-orders')) {
         return Promise.resolve({
@@ -438,6 +447,115 @@ describe('ServiceLocationDetailPage', () => {
 
     await user.click(screen.getByRole('tab', { name: /dispatch/i }));
     await waitFor(() => expect(screen.getByText(/coming soon/i)).toBeInTheDocument());
+  });
+
+  // ── Invoices tab (FIN-1) ────────────────────────────────────────────────
+  describe('invoices tab', () => {
+    const makeInvoice = (over: Record<string, unknown> = {}) => ({
+      id: 'inv-1',
+      customerId: 'customer-1',
+      workOrderId: 'wo-1',
+      invoiceNumber: 'INV-1001',
+      status: 'SENT',
+      invoiceDate: '2026-01-15T00:00:00Z',
+      dueDate: '2026-02-15T00:00:00Z',
+      subtotal: 500,
+      taxRate: 0,
+      taxAmount: 0,
+      totalAmount: 500,
+      amountPaid: 0,
+      balanceDue: 500,
+      lineItems: [],
+      payments: [],
+      createdAt: '2026-01-15T00:00:00Z',
+      updatedAt: '2026-01-15T00:00:00Z',
+      ...over,
+    });
+
+    const summary = { billedYtd: 1234.56, openCount: 2, openAmount: 890, aged91: 150, currency: 'USD' };
+    const workOrders = [
+      {
+        id: 'wo-1',
+        customerId: 'customer-1',
+        serviceLocationId: 'location-1',
+        workOrderNumber: 'WO-5000',
+        lifecycleState: 'ACTIVE',
+        progressCategory: 'IN_PROGRESS',
+        priority: 'NORMAL',
+        workItemCount: 1,
+        workItems: [{ description: 'RTU-3 no cooling' }],
+        createdAt: '2026-01-01T00:00:00Z',
+        updatedAt: '2026-01-01T00:00:00Z',
+      },
+    ];
+
+    const openInvoicesTab = async () => {
+      const user = userEvent.setup();
+      renderDetailPage();
+      await waitFor(() => expect(screen.getByText('Main Office')).toBeInTheDocument());
+      await user.click(screen.getByRole('tab', { name: /invoice/i }));
+      return user;
+    };
+
+    it('renders the summary strip, context line, and invoice rows', async () => {
+      mockApiResponses(mockLocation, [], [], workOrders, undefined, [makeInvoice()], summary);
+      await openInvoicesTab();
+
+      // Summary strip — server-computed billed YTD, open, aged.
+      await waitFor(() => expect(screen.getByText('$1,234.56')).toBeInTheDocument());
+      expect(screen.getByText('Billed YTD')).toBeInTheDocument();
+      expect(screen.getByText('2 open')).toBeInTheDocument();
+      expect(screen.getByText('past due')).toBeInTheDocument();
+
+      // Context line links to the parent customer.
+      const customerLink = screen.getByRole('link', { name: 'Test Customer' });
+      expect(customerLink).toHaveAttribute('href', '/customers/customer-1');
+
+      // Row: number, resolved WO #, bill-to, amount.
+      expect(screen.getByText('INV-1001')).toBeInTheDocument();
+      expect(screen.getByText('WO-5000')).toBeInTheDocument();
+      expect(screen.getByText('$500.00')).toBeInTheDocument();
+    });
+
+    it('drills through to the owning work order on row click', async () => {
+      mockApiResponses(mockLocation, [], [], workOrders, undefined, [makeInvoice()], summary);
+      const user = userEvent.setup();
+      // No standalone invoice route — navigation targets the WO (financial
+      // drawer lives there). Render with a stub WO route to observe the nav.
+      const routes: RouteObject[] = [
+        { path: '/service-locations/:id', element: <ServiceLocationDetailPage /> },
+        // eslint-disable-next-line i18next/no-literal-string
+        { path: '/work-orders/:id', element: <div>Work order stub</div> },
+      ];
+      renderWithProviders(<ServiceLocationDetailPage />, {
+        routes,
+        initialPath: '/service-locations/location-1',
+      });
+      await waitFor(() => expect(screen.getByText('Main Office')).toBeInTheDocument());
+      await user.click(screen.getByRole('tab', { name: /invoice/i }));
+
+      const row = (await screen.findByText('INV-1001')).closest('tr')!;
+      await user.click(row);
+      await waitFor(() => expect(screen.getByText('Work order stub')).toBeInTheDocument());
+    });
+
+    it('strikes through and mutes the amount on a void invoice', async () => {
+      const voided = makeInvoice({ id: 'inv-2', invoiceNumber: 'INV-2002', status: 'VOID', totalAmount: 100 });
+      mockApiResponses(mockLocation, [], [], workOrders, undefined, [voided], summary);
+      await openInvoicesTab();
+
+      const amount = await screen.findByText('$100.00');
+      expect(amount.className).toContain('line-through');
+      expect(amount.className).toContain('text-fg-muted');
+    });
+
+    it('shows an empty state when the location has no invoices', async () => {
+      mockApiResponses(mockLocation, [], [], [], undefined, [], summary);
+      await openInvoicesTab();
+      await waitFor(() =>
+        expect(screen.getByText(/for work at this site will appear here/i)).toBeInTheDocument()
+      );
+    });
   });
 
   it('scopes the work-orders fetch to serviceLocationId only (not customerId)', async () => {

@@ -32,6 +32,11 @@ import {
   arrivalFactApi,
   tagApi,
   dispatchesApi,
+  invoicesApi,
+  InvoiceStatus,
+  type Invoice,
+  type InvoiceStatus as InvoiceStatusType,
+  type LocationInvoiceSummaryResponse,
   type OnSiteTech,
   type WorkOrderTech,
   type Tag,
@@ -157,6 +162,9 @@ export default function ServiceLocationDetailPage() {
   });
   const equipment: EquipmentSummary[] = useMemo(() => equipmentPage?.content ?? [], [equipmentPage]);
 
+  // Drives the Invoices tab-count badge; the tab body re-reads the same cache.
+  const { data: locationInvoices } = useQuery(locationInvoicesQueryOptions(id ?? ''));
+
   const deleteEquipmentMutation = useMutation({
     mutationFn: (equipmentId: string) => equipmentApi.delete(equipmentId),
     onSuccess: () => {
@@ -227,9 +235,7 @@ export default function ServiceLocationDetailPage() {
     { id: 'overview', label: t('serviceLocations.tabs.overview') },
     { id: 'equipment', label: getName('equipment', true), count: equipmentPage?.totalElements ?? equipment.length },
     { id: 'jobs', label: getName('work_order', true), count: workOrdersData?.totalElements ?? 0 },
-    // No per-location invoice count source yet (CNT-1 / FIN-1) — renders without
-    // a count badge until the finance slice lands.
-    { id: 'invoices', label: getName('invoice', true) },
+    { id: 'invoices', label: getName('invoice', true), count: locationInvoices?.length },
     { id: 'visits', label: getName('dispatch', true), count: mockUpcomingVisits.length },
     { id: 'contacts', label: 'Contacts', count: contactCount },
     { id: 'files', label: 'Files' },
@@ -299,9 +305,10 @@ export default function ServiceLocationDetailPage() {
             </Card>
           )}
 
-          {/* Invoices content is blocked on the per-location finance slice
-              (FIN-1). Stubbed in this shell pass; built when that lands. */}
-          {activeTab === 'invoices' && <TabStub label={getName('invoice', true)} />}
+          {activeTab === 'invoices' && <InvoicesTab location={location} />}
+          {/* Visits / Dispatches stays stubbed until the pageable/searchable
+              dispatch list lands — building it against the current shape would
+              be throwaway. */}
           {activeTab === 'visits' && <TabStub label={getName('dispatch', true)} />}
           {activeTab === 'contacts' && <ContactsTab location={location} canEdit={canEditServiceLocations} />}
           {activeTab === 'files' && <TabStub label="Files" />}
@@ -565,6 +572,17 @@ function locationTechQueryOptions(serviceLocationId: string) {
   return {
     queryKey: ['location-tech', serviceLocationId] as const,
     queryFn: () => dispatchesApi.getLocationTech(serviceLocationId),
+    enabled: Boolean(serviceLocationId),
+  };
+}
+
+// Per-location invoice list (FIN-1). Shared so the parent can read `.length`
+// for the tab-count badge and the Invoices tab re-reads the same key — one
+// request, two readers (same pattern as workOrdersListQueryOptions).
+function locationInvoicesQueryOptions(serviceLocationId: string) {
+  return {
+    queryKey: ['location-invoices', serviceLocationId] as const,
+    queryFn: () => invoicesApi.getByServiceLocation(serviceLocationId),
     enabled: Boolean(serviceLocationId),
   };
 }
@@ -2952,6 +2970,242 @@ function EquipmentRow({
             </DropdownItem>
           </DropdownMenu>
         </Dropdown>
+      </td>
+    </tr>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Invoices tab — the per-location billing slice (FIN-1). Invoices bill at the
+// CUSTOMER level; this surfaces only the invoices for work performed AT this
+// site, plus a YTD/open/aged rollup. Read + drill-through, NOT a management
+// surface — no apply-payment / no statements (those are customer-level). Rows
+// drill to the owning work order's financial drawer (there is no standalone
+// invoice-detail route yet).
+// ─────────────────────────────────────────────────────────────────────────
+const INVOICE_STATUS_TONE: Record<InvoiceStatusType, 'neutral' | 'info' | 'success' | 'warning'> = {
+  DRAFT: 'neutral',
+  SENT: 'info',
+  PAID: 'success',
+  OVERDUE: 'warning',
+  CANCELLED: 'neutral',
+  VOID: 'neutral',
+};
+const INVOICE_STATUS_LABEL: Record<InvoiceStatusType, string> = {
+  DRAFT: 'Draft',
+  SENT: 'Sent',
+  PAID: 'Paid',
+  OVERDUE: 'Overdue',
+  CANCELLED: 'Cancelled',
+  VOID: 'Void',
+};
+
+// Backend serializes money as JSON numbers, but the WO-scoped list has shown
+// runtime strings before (see FinancialInvoicesTab) — coerce defensively. For
+// display only; all totals here are server-computed, never summed client-side.
+const invMoney = (v: number | string | null | undefined): number => Number(v ?? 0) || 0;
+
+function InvoicesTab({ location }: { location: ServiceLocationDetailDto }) {
+  const { getName } = useGlossary();
+  const { t } = useTranslation();
+  const navigate = useNavigate();
+
+  // List + summary are independent reads — fire in parallel. List shares the
+  // tab-count cache; summary is its own cheap rollup.
+  const { data: invoices = [], isLoading } = useQuery(locationInvoicesQueryOptions(location.id));
+  const { data: summary } = useQuery<LocationInvoiceSummaryResponse>({
+    queryKey: ['location-invoice-summary', location.id],
+    queryFn: () => invoicesApi.getLocationSummary(location.id),
+    enabled: !!location.id,
+  });
+
+  // WO number + job blurb for the "For work" column. Invoices carry only
+  // workOrderId, so resolve display fields from the location's WO list (shared
+  // cache). A WO outside the loaded page falls back to a short id.
+  const { data: woData } = useQuery(workOrdersListQueryOptions({ serviceLocationId: location.id }));
+  const { data: workOrderTypes } = useQuery({
+    queryKey: ['work-order-types'],
+    queryFn: () => workOrderTypesApi.getAll(),
+  });
+  const safeTypes = Array.isArray(workOrderTypes) ? workOrderTypes : [];
+  const woById = useMemo(() => {
+    const map = new Map<string, WorkOrderSummary>();
+    for (const wo of woData?.content ?? []) map.set(wo.id, wo);
+    return map;
+  }, [woData]);
+
+  const currency = summary?.currency ?? 'USD';
+  const fmtMoney = useMemo(
+    () => new Intl.NumberFormat('en-US', { style: 'currency', currency }),
+    [currency],
+  );
+
+  const stats: { label: string; value: string; sub: string; tone?: 'info' | 'warning' }[] = [
+    {
+      label: 'Billed YTD',
+      value: summary ? fmtMoney.format(invMoney(summary.billedYtd)) : '—',
+      sub: t('common.entitiesCount', { entities: getName('invoice', true), count: invoices.length }),
+    },
+    {
+      label: 'Open',
+      value: summary ? fmtMoney.format(invMoney(summary.openAmount)) : '—',
+      sub: `${summary?.openCount ?? 0} open`,
+      tone: (summary?.openAmount ?? 0) > 0 ? 'info' : undefined,
+    },
+    {
+      label: '91+ aged',
+      value: summary ? fmtMoney.format(invMoney(summary.aged91)) : '—',
+      sub: (summary?.aged91 ?? 0) > 0 ? 'past due' : 'none',
+      tone: (summary?.aged91 ?? 0) > 0 ? 'warning' : undefined,
+    },
+  ];
+
+  return (
+    <div className="flex flex-col gap-3">
+      {/* Summary strip — per-location billing at a glance. */}
+      <Card padding="none">
+        <div className="grid grid-cols-3">
+          {stats.map((s, i) => (
+            <div key={s.label} className={i < stats.length - 1 ? 'border-r border-border-soft px-3.5 py-2.5' : 'px-3.5 py-2.5'}>
+              <div className="text-[10px] font-semibold uppercase tracking-wider text-fg-muted">{s.label}</div>
+              <div
+                className="mt-0.5 font-mono text-[18px] font-bold tabular-nums tracking-tight"
+                style={{
+                  color:
+                    s.tone === 'warning' ? 'var(--warning-fg)' : s.tone === 'info' ? 'var(--info-500)' : 'var(--fg-strong)',
+                }}
+              >
+                {s.value}
+              </div>
+              <div className="text-[11px] text-fg-muted">{s.sub}</div>
+            </div>
+          ))}
+        </div>
+      </Card>
+
+      {/* Context line — whose ledger this rolls up to. */}
+      <div className="flex items-center gap-2 rounded-md border border-border-soft bg-bg-elev-2 px-3 py-2 text-[11.5px] text-fg-muted">
+        <ReceiptPercentIcon className="size-3.5 shrink-0 text-fg-dim" />
+        <span>
+          Invoices for work at this location. Billed to{' '}
+          <Link to={`/customers/${location.customerId}`} className="font-medium text-fg-accent hover:underline">
+            {location.customerName}
+          </Link>{' '}
+          — full AR ledger lives on the {getName('customer').toLowerCase()}.
+        </span>
+      </div>
+
+      <Card
+        title={<CardTitle icon={<ReceiptPercentIcon className="size-3.5" />}>{getName('invoice', true)}</CardTitle>}
+        padding="none"
+      >
+        {isLoading ? (
+          <div className="px-3.5 py-6 text-center text-[12px] text-fg-muted">
+            {t('common.actions.loading', { entities: getName('invoice', true) })}
+          </div>
+        ) : invoices.length === 0 ? (
+          <div className="px-3.5 py-10 text-center">
+            <div className="text-[13px] font-semibold text-fg-strong">
+              {t('common.actions.noEntitiesYet', { entities: getName('invoice', true) })}
+            </div>
+            <div className="mt-1 text-[12px] text-fg-muted">
+              {getName('invoice', true)} for work at this site will appear here.
+            </div>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse text-[12px]">
+              <thead className="bg-bg-elev-2">
+                <tr className="text-left text-[10px] font-semibold uppercase tracking-wider text-fg-muted">
+                  <th className="px-3.5 py-2 font-semibold">{getName('invoice')}</th>
+                  <th className="px-3.5 py-2 font-semibold">For work</th>
+                  <th className="px-3.5 py-2 font-semibold">Bill to</th>
+                  <th className="px-3.5 py-2 font-semibold">Issued</th>
+                  <th className="px-3.5 py-2 font-semibold">{t('workOrders.table.statusHeader')}</th>
+                  <th className="px-3.5 py-2 text-right font-semibold">Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                {invoices.map((inv) => (
+                  <InvoiceRow
+                    key={inv.id}
+                    inv={inv}
+                    wo={inv.workOrderId ? woById.get(inv.workOrderId) : undefined}
+                    typeName={
+                      inv.workOrderId
+                        ? safeTypes.find((tp) => tp.id === woById.get(inv.workOrderId!)?.workOrderTypeId)?.name
+                        : undefined
+                    }
+                    billTo={location.customerName}
+                    fmtMoney={fmtMoney}
+                    onOpen={(workOrderId) => navigate(`/work-orders/${workOrderId}`)}
+                  />
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Card>
+    </div>
+  );
+}
+
+function InvoiceRow({
+  inv,
+  wo,
+  typeName,
+  billTo,
+  fmtMoney,
+  onOpen,
+}: {
+  inv: Invoice;
+  wo?: WorkOrderSummary;
+  typeName?: string;
+  billTo: string;
+  fmtMoney: Intl.NumberFormat;
+  onOpen: (workOrderId: string) => void;
+}) {
+  const voided = inv.status === InvoiceStatus.VOID || inv.status === InvoiceStatus.CANCELLED;
+  const forJob = wo?.workOrderNumber ?? (inv.workOrderId ? `#${inv.workOrderId.slice(0, 8)}` : '—');
+  const desc = wo ? deriveJobLabel(wo, typeName) : null;
+  const clickable = !!inv.workOrderId;
+
+  return (
+    <tr
+      className={`border-b border-border-soft ${voided ? 'opacity-60' : ''} ${clickable ? 'cursor-pointer hover:bg-bg-hover' : ''}`}
+      onClick={() => clickable && onOpen(inv.workOrderId!)}
+    >
+      <td className="px-3.5 py-2">
+        <span className="font-mono text-[12px] font-bold text-fg-strong">{inv.invoiceNumber}</span>
+      </td>
+      <td className="px-3.5 py-2">
+        <div className="font-mono text-[11px] text-fg-muted">{forJob}</div>
+        {desc && (
+          <div className="mt-0.5 max-w-[320px] truncate text-[10.5px] text-fg" title={desc}>
+            {desc}
+          </div>
+        )}
+      </td>
+      {/* Bill-to is the location's customer for every row. The job-level payer
+          override (warranty co + PAYER badge) is deferred — the Invoice DTO
+          carries no payer field yet, so there's nothing to surface; wire the
+          badge when payer lands on the invoice read model. */}
+      <td className="px-3.5 py-2 text-[11.5px] text-fg">{billTo}</td>
+      <td className="px-3.5 py-2 text-[11.5px] text-fg-muted">{formatTimestamp(inv.invoiceDate)}</td>
+      <td className="px-3.5 py-2">
+        <Pill tone={INVOICE_STATUS_TONE[inv.status]} dot>
+          {INVOICE_STATUS_LABEL[inv.status]}
+        </Pill>
+      </td>
+      {/* Void/cancelled amount is meaningless money — strike + mute it so a
+          voided $100 doesn't scan as real AR (the row dimming alone leaves the
+          bold amount pulling full weight). */}
+      <td
+        className={`px-3.5 py-2 text-right font-mono text-[12px] tabular-nums ${
+          voided ? 'font-normal text-fg-muted line-through' : 'font-bold text-fg-strong'
+        }`}
+      >
+        {fmtMoney.format(invMoney(inv.totalAmount))}
       </td>
     </tr>
   );

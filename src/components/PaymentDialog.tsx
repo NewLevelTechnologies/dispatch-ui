@@ -8,6 +8,7 @@ import {
   type PaymentMethod as PaymentMethodType,
 } from '../api';
 import { useGlossary } from '../contexts/GlossaryContext';
+import { invalidateLocationInvoiceCaches } from '../lib/invalidateFinancialCaches';
 import { Button } from './catalyst/button';
 import {
   Dialog,
@@ -138,6 +139,7 @@ export default function PaymentDialog({
       // query carries payments now — invalidate both that and the summary.
       queryClient.invalidateQueries({ queryKey: ['workOrderInvoices', workOrderId] });
       queryClient.invalidateQueries({ queryKey: ['financialSummary', workOrderId] });
+      invalidateLocationInvoiceCaches(queryClient);
       onClose();
     },
     onError: (e: unknown) => {

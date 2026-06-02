@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { useGlossary } from '../contexts/GlossaryContext';
+import { invalidateLocationInvoiceCaches } from '../lib/invalidateFinancialCaches';
 import AppLayout from '../components/AppLayout';
 import { Button } from '../components/catalyst/button';
 import { Input } from '../components/catalyst/input';
@@ -70,6 +71,7 @@ export default function PaymentsPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['payments'] });
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
+      invalidateLocationInvoiceCaches(queryClient);
       setIsCreateOpen(false);
       resetForm();
     },

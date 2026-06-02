@@ -121,6 +121,31 @@ export interface UpdateInvoiceStatusRequest {
 }
 
 /**
+ * Per-location billing rollup for the Location detail → Invoices tab header
+ * strip (FIN-1). All money fields are decimals serialized as JSON numbers;
+ * format client-side and key currency off the field rather than hardcoding.
+ *
+ *  - `billedYtd`  sum of totalAmount, calendar-year-to-date (resets Jan 1),
+ *                 excluding DRAFT / VOID / CANCELLED. Server-computed — do NOT
+ *                 re-derive from the list.
+ *  - `openCount`  count of open invoices (status SENT or OVERDUE).
+ *  - `openAmount` sum of totalAmount for those open invoices.
+ *  - `aged91`     open amount past due > 90 days (dueDate < today − 90).
+ *
+ * serviceLocationId is derived server-side from each invoice's work order, so
+ * an invoice with no work order (or whose WO has no service location) is absent
+ * from both this summary and the location list — it shows only on customer-level
+ * views.
+ */
+export interface LocationInvoiceSummaryResponse {
+  billedYtd: number;
+  openCount: number;
+  openAmount: number;
+  aged91: number;
+  currency: string;
+}
+
+/**
  * Response from `POST /financial/{invoices,quotes}/{id}/send` (§4.3). The
  * server has stamped `lastSentAt` + `lastSentToEmails` on the row by the
  * time this returns — callers should invalidate the WO list query to pick
@@ -180,6 +205,34 @@ export const invoicesApi = {
   getByWorkOrder: async (workOrderId: string): Promise<Invoice[]> => {
     const response = await apiClient.get<Invoice[]>(
       `/financial/work-orders/${workOrderId}/invoices`,
+    );
+    return response.data;
+  },
+
+  /**
+   * Per-location invoice list (FIN-1) — invoices for work performed at this
+   * service location. Same `Invoice` shape as `getById`. `serviceLocationId` is
+   * resolved server-side from each invoice's work order; not paginated (volume
+   * is bounded to one location). Fire alongside `getLocationSummary` in
+   * parallel — the two are independent reads.
+   */
+  getByServiceLocation: async (serviceLocationId: string): Promise<Invoice[]> => {
+    const response = await apiClient.get<Invoice[]>('/financial/invoices', {
+      params: { serviceLocationId },
+    });
+    return response.data;
+  },
+
+  /**
+   * Per-location billing rollup (FIN-1) for the Invoices tab header strip. One
+   * cheap call; independent of the list. See {@link LocationInvoiceSummaryResponse}.
+   */
+  getLocationSummary: async (
+    serviceLocationId: string,
+  ): Promise<LocationInvoiceSummaryResponse> => {
+    const response = await apiClient.get<LocationInvoiceSummaryResponse>(
+      '/financial/invoices/summary',
+      { params: { serviceLocationId } },
     );
     return response.data;
   },

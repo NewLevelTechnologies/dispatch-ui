@@ -9,6 +9,7 @@ import {
   type CustomerSearchResult,
 } from '../api';
 import { useGlossary } from '../contexts/GlossaryContext';
+import { invalidateLocationInvoiceCaches } from '../lib/invalidateFinancialCaches';
 import CustomerPicker from './CustomerPicker';
 import { Button } from './catalyst/button';
 import {
@@ -118,6 +119,7 @@ export default function InvoiceDialog({
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ['workOrderInvoices', workOrderId] });
     queryClient.invalidateQueries({ queryKey: ['financialSummary', workOrderId] });
+    invalidateLocationInvoiceCaches(queryClient);
   };
 
   const createMutation = useMutation({
