@@ -140,44 +140,41 @@ export default function PublicInvoicePage() {
     unknown
   >({
     queryKey: ['publicInvoice', token],
-    // Mobile email in-app webviews (Gmail/Outlook/Apple Mail) can leave the
-    // initial request stalled forever — it never resolves AND axios's native
-    // XHR timeout never fires on the dead socket, so `retry` below never
-    // triggers. JS timers keep running fine (the 5s "slow load" notice
-    // proves it), so drive an explicit abort off a setTimeout: that turns the
-    // stall into a rejection, `retry` fires a fresh request, and the fresh
-    // request succeeds (same path the manual "Try again" button exercises).
-    //
-    // The timeout uses its own AbortController rather than React Query's
-    // `signal` so the abort reads as a retryable error, not a query
-    // cancellation. Genuine RQ cancellation (unmount / key change) is still
-    // forwarded so we don't leak the in-flight request.
-    queryFn: async ({ signal }) => {
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 10000);
-      signal.addEventListener('abort', () => controller.abort(), {
-        once: true,
-      });
-      try {
-        return await publicFinancialApi.getInvoiceByToken(
-          token,
-          controller.signal,
-        );
-      } finally {
-        clearTimeout(timer);
-      }
-    },
+    queryFn: ({ signal }) => publicFinancialApi.getInvoiceByToken(token, signal),
     enabled: !!token,
-    // Retry transient failures (flaky mobile networks / in-app email
-    // webviews stall the single request far more than desktop wifi). A
-    // real 404 means the token is revoked/expired — that's the cliff, so
-    // bail immediately rather than spinning through retries.
+    // A real 404 means the token is revoked/expired — that's the cliff, so
+    // bail immediately rather than spinning through retries. Other failures
+    // (genuinely flaky networks) get a couple of backed-off retries.
     retry: (failureCount, err) => {
       if (axios.isAxiosError(err) && err.response?.status === 404) return false;
-      return failureCount < 3;
+      return failureCount < 2;
     },
     retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 8000),
   });
+
+  // Mail's in-app browser (SFSafariViewController) prewarms this page: the
+  // initial request fires and completes during the prewarm pass — the
+  // response is visible in the network log — but its result never reaches
+  // the live page that gets shown to the customer, so React Query is stuck
+  // in 'loading' with nothing to render. Re-issuing the request from the
+  // live page fixes it every time (that's exactly what the manual "Try
+  // again" button does). Automate it: revalidate as soon as the page is
+  // actually shown/visible, plus a one-shot right after it settles, so the
+  // customer never has to tap. We tear the listeners down once data arrives.
+  useEffect(() => {
+    if (!token || data) return;
+    const revalidate = () => {
+      if (document.visibilityState === 'visible') refetch();
+    };
+    window.addEventListener('pageshow', revalidate);
+    document.addEventListener('visibilitychange', revalidate);
+    const settleId = window.setTimeout(revalidate, 600);
+    return () => {
+      window.removeEventListener('pageshow', revalidate);
+      document.removeEventListener('visibilitychange', revalidate);
+      window.clearTimeout(settleId);
+    };
+  }, [token, data, refetch]);
 
   if (!token) {
     return <CliffPage />;
