@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useDeferredValue } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { useGlossary } from '../contexts/GlossaryContext';
@@ -19,7 +20,9 @@ import {
 import { ListToolbar, ListSearch } from '../components/ui/ListToolbar';
 import { ListFooter } from '../components/ui/ListFooter';
 import { InvoiceStatus, invoicesApi } from '../api/financialApi';
-import type { Invoice, CreateInvoiceRequest, CreateInvoiceLineItemRequest } from '../api/financialApi';
+import type { InvoiceListItemRow, CreateInvoiceRequest, CreateInvoiceLineItemRequest } from '../api/financialApi';
+
+const PAGE_SIZE = 25;
 import { customerApi } from '../api/customerApi';
 import { workOrderApi } from '../api/workOrderApi';
 
@@ -29,8 +32,33 @@ export default function InvoicesPage() {
   const { getName } = useGlossary();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isStatusOpen, setIsStatusOpen] = useState(false);
-  const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedInvoice, setSelectedInvoice] = useState<InvoiceListItemRow | null>(null);
+
+  // Server-side search + pagination (the list endpoint is paged + lean now, so
+  // client-side filtering would only search the loaded page). Page lives in the
+  // URL (1-based; API is 0-based); search is mirrored to the URL so the footer's
+  // page links preserve it.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchQuery, setSearchQuery] = useState(searchParams.get('search') ?? '');
+  const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10));
+  const deferredSearch = useDeferredValue(searchQuery.trim());
+
+  const onSearchChange = (value: string) => {
+    setSearchQuery(value);
+    const next = new URLSearchParams(searchParams);
+    if (value) next.set('search', value);
+    else next.delete('search');
+    next.delete('page'); // new query → back to page 1
+    setSearchParams(next, { replace: true });
+  };
+
+  const pageHref = (target: number): string => {
+    const next = new URLSearchParams(searchParams);
+    if (target <= 1) next.delete('page');
+    else next.set('page', String(target));
+    const qs = next.toString();
+    return qs ? `?${qs}` : '?';
+  };
 
   // Form state
   const [formData, setFormData] = useState<{
@@ -54,10 +82,19 @@ export default function InvoicesPage() {
   const [newStatus, setNewStatus] = useState<InvoiceStatus>(InvoiceStatus.DRAFT);
   const [submitting, setSubmitting] = useState(false);
 
-  const { data: invoices = [], isLoading: invoicesLoading } = useQuery({
-    queryKey: ['invoices'],
-    queryFn: () => invoicesApi.getAll(),
+  const { data: invoicePage, isLoading: invoicesLoading } = useQuery({
+    queryKey: ['invoices', page, deferredSearch],
+    queryFn: () =>
+      invoicesApi.getAll({
+        q: deferredSearch || undefined,
+        page: page - 1,
+        size: PAGE_SIZE,
+        sort: 'invoiceDate,desc',
+      }),
   });
+  const invoices = invoicePage?.content ?? [];
+  const total = invoicePage?.totalElements ?? 0;
+  const totalPages = invoicePage?.totalPages ?? 0;
 
   const { data: customers = [] } = useQuery({
     queryKey: ['invoice-form-customers'],
@@ -199,17 +236,6 @@ export default function InvoicesPage() {
     return <Pill tone={tones[status]} dot>{t(`invoices.status.${status.toLowerCase()}`)}</Pill>;
   };
 
-  const getCustomerName = (customerId: string) => {
-    if (!Array.isArray(customers)) return customerId;
-    const customer = customers.find(c => c.id === customerId);
-    return customer?.name || customerId;
-  };
-
-  const filteredInvoices = Array.isArray(invoices) ? invoices.filter(invoice =>
-    invoice.invoiceNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    getCustomerName(invoice.customerId).toLowerCase().includes(searchTerm.toLowerCase())
-  ) : [];
-
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
   };
@@ -218,20 +244,14 @@ export default function InvoicesPage() {
     return new Date(dateString).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
   };
 
-  const invoiceCount = Array.isArray(invoices) ? invoices.length : 0;
-  // Use the filtered count when filtering, otherwise the total — both descriptions
-  // refer to what's *currently visible*, matching the subtitle pattern used on
-  // the paginated list pages.
-  const invoiceNoun = (n: number) =>
-    n === 1 ? getName('invoice').toLowerCase() : getName('invoice', true).toLowerCase();
-  const invoiceSubtitle = invoiceCount > 0
-    ? (filteredInvoices.length === invoiceCount
-        ? `${invoiceCount.toLocaleString()} ${invoiceNoun(invoiceCount)}`
-        : t('common.pagination.showing', {
-            start: filteredInvoices.length > 0 ? 1 : 0,
-            end: filteredInvoices.length,
-            total: invoiceCount.toLocaleString(),
-          }))
+  const showingStart = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
+  const showingEnd = Math.min(page * PAGE_SIZE, total);
+  const invoiceSubtitle = total > 0
+    ? t('common.pagination.showing', {
+        start: showingStart,
+        end: showingEnd,
+        total: total.toLocaleString(),
+      })
     : t('invoices.description');
 
   return (
@@ -254,8 +274,8 @@ export default function InvoicesPage() {
                 entity: getName('invoice'),
                 customer: getName('customer'),
               })}
-              value={searchTerm}
-              onChange={setSearchTerm}
+              value={searchQuery}
+              onChange={onSearchChange}
             />
           }
         />
@@ -268,11 +288,11 @@ export default function InvoicesPage() {
               </p>
             </CardBody>
           </Card>
-        ) : filteredInvoices.length === 0 ? (
+        ) : invoices.length === 0 ? (
           <Card>
             <CardBody>
               <p className="text-[12.5px] text-fg-muted">
-                {searchTerm ? t('common.actions.noMatchSearch', { entities: getName('invoice', true) }) : t('common.actions.notFound', { entities: getName('invoice', true) })}
+                {deferredSearch ? t('common.actions.noMatchSearch', { entities: getName('invoice', true) }) : t('common.actions.notFound', { entities: getName('invoice', true) })}
               </p>
             </CardBody>
           </Card>
@@ -293,12 +313,12 @@ export default function InvoicesPage() {
                   </tr>
                 </DenseTHead>
                 <tbody>
-                  {filteredInvoices.map((invoice) => (
+                  {invoices.map((invoice) => (
                     <DenseRow key={invoice.id}>
                       <td>
                         <span className="id-mono text-fg-muted">{invoice.invoiceNumber}</span>
                       </td>
-                      <td className="strong">{getCustomerName(invoice.customerId)}</td>
+                      <td className="strong">{invoice.customerName ?? invoice.customerId}</td>
                       <td>{formatDate(invoice.invoiceDate)}</td>
                       <td>{formatDate(invoice.dueDate)}</td>
                       <td className="right num strong">{formatCurrency(invoice.totalAmount)}</td>
@@ -327,10 +347,13 @@ export default function InvoicesPage() {
                 </tbody>
               </DenseTable>
               <ListFooter
+                page={page}
+                totalPages={totalPages}
+                pageHref={pageHref}
                 left={t('common.pagination.showing', {
-                  start: filteredInvoices.length > 0 ? 1 : 0,
-                  end: filteredInvoices.length,
-                  total: invoiceCount.toLocaleString(),
+                  start: showingStart,
+                  end: showingEnd,
+                  total: total.toLocaleString(),
                 })}
               />
             </CardBody>
