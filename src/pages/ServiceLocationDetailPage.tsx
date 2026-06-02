@@ -26,6 +26,7 @@ import { BellIcon as BellSolidIcon } from '@heroicons/react/24/solid';
 import {
   customerApi,
   equipmentApi,
+  workOrderApi,
   workOrderTypesApi,
   contactApi,
   notificationApi,
@@ -56,8 +57,11 @@ import {
   type WorkOrderSummary,
   type AdditionalContact,
   type ListEquipmentParams,
+  type ListWorkOrdersParams,
 } from '../api';
 import { workOrdersListQueryOptions } from '../api/workOrdersListQuery';
+import { type DatePreset, DATE_PRESETS, rangeForPreset } from '../lib/dateRangePresets';
+import { FilterChipListbox, ChipListboxOption } from '../components/ui/FilterChipListbox';
 import { roleColor } from '../utils/roleColor';
 import { useGlossary } from '../contexts/GlossaryContext';
 import { useHasCapability } from '../hooks/useCurrentUser';
@@ -70,7 +74,6 @@ import AppLayout from '../components/AppLayout';
 import ServiceLocationFormDialog from '../components/ServiceLocationFormDialog';
 import EquipmentFormDialog from '../components/EquipmentFormDialog';
 import WorkOrderFormDialog from '../components/WorkOrderFormDialog';
-import WorkOrdersList from '../components/WorkOrdersList';
 import NotificationLogsList from '../components/NotificationLogsList';
 import ServiceLocationContactDialog from '../components/ServiceLocationContactDialog';
 import NotificationPreferencesDialog from '../components/NotificationPreferencesDialog';
@@ -293,20 +296,7 @@ export default function ServiceLocationDetailPage() {
           )}
 
           {activeTab === 'jobs' && (
-            <Card
-              title={<CardTitle icon={<ChartBarIcon className="size-3.5" />}>{getName('work_order', true)}</CardTitle>}
-              action={
-                <CardLink onClick={() => setIsNewWorkOrderOpen(true)}>
-                  <PlusIcon />
-                  {t('common.actions.new', { entity: getName('work_order') })}
-                </CardLink>
-              }
-              padding="none"
-            >
-              <div className="p-3.5">
-                <WorkOrdersList serviceLocationId={location.id} showLocation={false} />
-              </div>
-            </Card>
+            <JobsTab location={location} onNewJob={() => setIsNewWorkOrderOpen(true)} />
           )}
 
           {activeTab === 'invoices' && <InvoicesTab location={location} />}
@@ -1022,9 +1012,18 @@ function WorkOrderRow({
   const elevated = priority === 'URGENT' || priority === 'HIGH';
   const cancelled = wo.lifecycleState === 'CANCELLED';
   const jobLabel = deriveJobLabel(wo, typeName);
+  // Row tint: in-progress reads "live" (info); an unscheduled elevated-priority
+  // job is the escalation signal (warning). Cancelled rows stay untinted.
+  const tint = cancelled
+    ? ''
+    : wo.progressCategory === 'IN_PROGRESS'
+      ? 'bg-[color-mix(in_oklch,var(--info-500)_6%,var(--bg-elev))]'
+      : !wo.scheduledDate && elevated
+        ? 'bg-[color-mix(in_oklch,var(--warning-500)_7%,var(--bg-elev))]'
+        : '';
   return (
     <tr
-      className="cursor-pointer border-b border-border-soft hover:bg-bg-hover"
+      className={`cursor-pointer border-b border-border-soft hover:bg-bg-hover ${tint}`}
       onClick={() => navigate(`/work-orders/${wo.id}`)}
     >
       <td className="px-3.5 py-2">
@@ -3445,6 +3444,272 @@ function VisitTechCell({ name, live, muted }: { name: string | null; live: boole
       </span>
       <span className={`text-[12px] ${muted ? 'text-fg-muted' : 'text-fg'}`}>{display}</span>
     </span>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Jobs / Work Orders tab — the complete, filterable list of work orders at
+// this site (the Overview's Work-orders card is a 3-row peek). Reuses the
+// bespoke WorkOrderRow renderer; the toolbar reuses the shared FilterChipListbox
+// + date presets, pre-scoped to this location. Server-side filtering +
+// pagination — only the filters the backend supports today are wired (status
+// view, type, scheduled-date range, search); multi-select status / live /
+// unassigned / priority chips are pending backend support.
+// ─────────────────────────────────────────────────────────────────────────
+const JOB_STATUS_FILTERS: {
+  id: string;
+  labelKey: string;
+  params: Pick<ListWorkOrdersParams, 'lifecycleState' | 'progressCategory'>;
+}[] = [
+  { id: 'open', labelKey: 'workOrders.filters.open', params: { lifecycleState: 'ACTIVE' } },
+  { id: 'notStarted', labelKey: 'workOrders.filters.notStarted', params: { progressCategory: 'NOT_STARTED' } },
+  { id: 'inProgress', labelKey: 'workOrders.filters.inProgress', params: { progressCategory: 'IN_PROGRESS' } },
+  { id: 'blocked', labelKey: 'workOrders.filters.blocked', params: { progressCategory: 'BLOCKED' } },
+  { id: 'completed', labelKey: 'workOrders.filters.completed', params: { progressCategory: 'COMPLETED' } },
+  { id: 'cancelled', labelKey: 'workOrders.filters.cancelled', params: { lifecycleState: 'CANCELLED' } },
+  { id: 'all', labelKey: 'workOrders.filters.all', params: {} },
+];
+const JOBS_PAGE_SIZE = 25;
+
+function JobsTab({ location, onNewJob }: { location: ServiceLocationDetailDto; onNewJob: () => void }) {
+  const { getName } = useGlossary();
+  const { t } = useTranslation();
+
+  // Default to All — this tab is the site's full work-order history, not just
+  // the open set (the Overview card already surfaces the open/recent peek).
+  const [statusId, setStatusId] = useState('all');
+  const [typeIds, setTypeIds] = useState<string[]>([]);
+  const [datePreset, setDatePreset] = useState<DatePreset>('');
+  const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
+  const deferredSearch = useDeferredValue(search.trim());
+
+  const { data: workOrderTypes } = useQuery({
+    queryKey: ['work-order-types'],
+    queryFn: () => workOrderTypesApi.getAll(),
+  });
+  const safeTypes = useMemo(() => (Array.isArray(workOrderTypes) ? workOrderTypes : []), [workOrderTypes]);
+  const typeName = (id?: string | null) => safeTypes.find((tp) => tp.id === id)?.name;
+
+  // Same resolved-tech read the overview uses (shared cache). techByWorkOrder
+  // covers the relevant WOs; a row not in it renders a dash, not an error.
+  const { data: locationTech } = useQuery(locationTechQueryOptions(location.id));
+  const techByWorkOrder = locationTech?.techByWorkOrder ?? {};
+
+  const statusParams = JOB_STATUS_FILTERS.find((s) => s.id === statusId)?.params ?? {};
+  const range = datePreset && datePreset !== 'custom' ? rangeForPreset(datePreset) : undefined;
+
+  const params: ListWorkOrdersParams = {
+    serviceLocationId: location.id,
+    ...statusParams,
+    workOrderTypeIds: typeIds.length ? typeIds : undefined,
+    scheduledDateFrom: range?.from,
+    scheduledDateTo: range?.to,
+    q: deferredSearch || undefined,
+    page: page - 1, // local state is 1-based; backend Page is 0-based
+    size: JOBS_PAGE_SIZE,
+    // Most-recent-first: the tab defaults to All (full history), so newest
+    // scheduled belongs at the top. (The designer's "ascending" assumed a
+    // default-open list — different default, different right sort.)
+    sort: 'scheduledDate,desc',
+  };
+
+  // Prefix ['work-orders', …] so WO/dispatch mutations (which invalidate
+  // ['work-orders'] / ['work-orders-list']) refresh this list too.
+  const { data, isLoading } = useQuery({
+    queryKey: ['work-orders', 'location-jobs', params],
+    queryFn: () => workOrderApi.getAll(params),
+  });
+  const rows = data?.content ?? [];
+  const total = data?.totalElements ?? 0;
+  const totalPages = data?.totalPages ?? 0;
+
+  const filtersActive = statusId !== 'all' || typeIds.length > 0 || !!datePreset || !!deferredSearch;
+  const showingStart = total === 0 ? 0 : (page - 1) * JOBS_PAGE_SIZE + 1;
+  const showingEnd = Math.min(page * JOBS_PAGE_SIZE, total);
+
+  const resetPage = () => setPage(1);
+  const clearFilters = () => {
+    setStatusId('all');
+    setTypeIds([]);
+    setDatePreset('');
+    setSearch('');
+    resetPage();
+  };
+
+  const typeDisplay =
+    typeIds.length === 1 ? (typeName(typeIds[0]) ?? '1 selected') : typeIds.length > 1 ? `${typeIds.length} selected` : null;
+  const dateDisplay = datePreset ? t(DATE_PRESETS.find((p) => p.id === datePreset)?.labelKey ?? '') : null;
+
+  return (
+    <div className="flex flex-col gap-2.5">
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="flex h-8 min-w-[220px] max-w-[360px] flex-1 items-center gap-2 rounded-md border border-border bg-bg-elev px-2.5">
+          <MagnifyingGlassIcon className="size-3.5 text-fg-dim" />
+          <input
+            value={search}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              resetPage();
+            }}
+            placeholder="Search WO#, summary, tech, equipment…"
+            className="min-w-0 flex-1 bg-transparent text-[12.5px] text-fg outline-none placeholder:text-fg-dim"
+          />
+          {search && (
+            <button
+              onClick={() => {
+                setSearch('');
+                resetPage();
+              }}
+              className="px-1 text-[11px] text-fg-dim hover:text-fg-strong"
+            >
+              ×
+            </button>
+          )}
+        </div>
+
+        <FilterChipListbox
+          label="Status"
+          ariaLabel="Status"
+          value={statusId}
+          displayValue={t(JOB_STATUS_FILTERS.find((s) => s.id === statusId)?.labelKey ?? '')}
+          onChange={(id) => {
+            setStatusId(id as string);
+            resetPage();
+          }}
+        >
+          {JOB_STATUS_FILTERS.map((s) => (
+            <ChipListboxOption key={s.id} value={s.id}>
+              {t(s.labelKey)}
+            </ChipListboxOption>
+          ))}
+        </FilterChipListbox>
+
+        {safeTypes.length > 0 && (
+          <FilterChipListbox
+            multiple
+            label="Type"
+            ariaLabel="Type"
+            value={typeIds}
+            displayValue={typeDisplay}
+            onChange={(ids) => {
+              setTypeIds(ids as string[]);
+              resetPage();
+            }}
+            onClear={() => {
+              setTypeIds([]);
+              resetPage();
+            }}
+          >
+            {safeTypes.map((tp) => (
+              <ChipListboxOption key={tp.id} value={tp.id}>
+                {tp.name}
+              </ChipListboxOption>
+            ))}
+          </FilterChipListbox>
+        )}
+
+        <FilterChipListbox
+          label={t('workOrders.table.scheduled')}
+          ariaLabel="Scheduled date"
+          value={datePreset || null}
+          displayValue={dateDisplay}
+          onChange={(id) => {
+            setDatePreset(id as DatePreset);
+            resetPage();
+          }}
+          onClear={() => {
+            setDatePreset('');
+            resetPage();
+          }}
+        >
+          {DATE_PRESETS.filter((p) => p.id !== '' && p.id !== 'custom').map((p) => (
+            <ChipListboxOption key={p.id} value={p.id}>
+              {t(p.labelKey)}
+            </ChipListboxOption>
+          ))}
+        </FilterChipListbox>
+
+        {filtersActive && (
+          <Button plain size="xs" onClick={clearFilters}>
+            Clear
+          </Button>
+        )}
+
+        <span className="grow" />
+        <Button color="accent" size="xs" onClick={onNewJob}>
+          <PlusIcon className="size-4" />
+          {t('common.actions.new', { entity: getName('work_order') })}
+        </Button>
+      </div>
+
+      <Card padding="none">
+        {isLoading ? (
+          <div className="px-3.5 py-10 text-center text-[12px] text-fg-muted">
+            {t('common.actions.loading', { entities: getName('work_order', true) })}
+          </div>
+        ) : rows.length === 0 ? (
+          <div className="px-5 py-10 text-center">
+            <div className="text-[13px] font-semibold text-fg-strong">
+              {filtersActive ? 'No matching work orders' : t('common.actions.noEntitiesYet', { entities: getName('work_order', true) })}
+            </div>
+            <div className="mt-1 text-[12px] text-fg-muted">
+              {filtersActive
+                ? 'Adjust your search or clear filters.'
+                : `${getName('work_order', true)} at this site will appear here.`}
+            </div>
+            {filtersActive && (
+              <Button plain size="xs" className="mt-2" onClick={clearFilters}>
+                Clear filters
+              </Button>
+            )}
+          </div>
+        ) : (
+          <>
+            <div className="overflow-x-auto">
+              <table className="w-full border-collapse text-[12px]">
+                <thead className="bg-bg-elev-2">
+                  <tr className="text-left text-[10px] font-semibold uppercase tracking-wider text-fg-muted">
+                    <th className="px-3.5 py-2 font-semibold">{getName('work_order')}</th>
+                    <th className="px-3.5 py-2 font-semibold">{getName('equipment')}</th>
+                    <th className="px-3.5 py-2 font-semibold">{t('workOrders.table.statusHeader')}</th>
+                    <th className="px-3.5 py-2 font-semibold">Tech</th>
+                    <th className="px-3.5 py-2 font-semibold">{t('workOrders.table.scheduled')}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((wo) => (
+                    <WorkOrderRow key={wo.id} wo={wo} typeName={typeName(wo.workOrderTypeId)} tech={techByWorkOrder[wo.id]} />
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className="flex items-center justify-between border-t border-border-soft bg-bg-elev-2 px-4 py-2.5 text-[11.5px] text-fg-muted">
+              <span>
+                {t('common.pagination.showing', {
+                  start: showingStart,
+                  end: showingEnd,
+                  total: total.toLocaleString(),
+                })}
+              </span>
+              {totalPages > 1 && (
+                <div className="flex items-center gap-2">
+                  <Button plain size="xxs" disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>
+                    Prev
+                  </Button>
+                  <span className="font-mono text-[11px] tabular-nums text-fg">
+                    {page} / {totalPages}
+                  </span>
+                  <Button plain size="xxs" disabled={page >= totalPages} onClick={() => setPage((p) => Math.min(totalPages, p + 1))}>
+                    Next
+                  </Button>
+                </div>
+              )}
+            </div>
+          </>
+        )}
+      </Card>
+    </div>
   );
 }
 
