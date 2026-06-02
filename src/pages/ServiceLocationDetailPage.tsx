@@ -1902,12 +1902,10 @@ function SiteContactCard({
           <div className="flex items-center gap-2 text-[12px] text-fg-muted">
             No site contact on file.
             {canEdit && (
-              <button
-                onClick={() => setContactDialog({ open: true, contact: null })}
-                className="font-medium text-fg-accent hover:underline"
-              >
-                + Add
-              </button>
+              // .card-action (CardLink) sizing — a bare <button> renders at the
+              // global button font-size (unlayered CSS beats Tailwind text-*),
+              // which is what made this link oversized vs the row text.
+              <CardLink onClick={() => setContactDialog({ open: true, contact: null })}>+ Add</CardLink>
             )}
           </div>
         )}
