@@ -19,6 +19,7 @@ import {
   type PaymentMethod as PaymentMethodType,
 } from '../api';
 import { useGlossary } from '../contexts/GlossaryContext';
+import { invalidateLocationInvoiceCaches } from '../lib/invalidateFinancialCaches';
 import InvoiceDialog from './InvoiceDialog';
 import PaymentDialog from './PaymentDialog';
 import VoidFinancialDocDialog from './VoidFinancialDocDialog';
@@ -200,6 +201,7 @@ export default function FinancialInvoicesTab({
       // Status changes affect VOID/CANCELLED exclusion in the summary rollup
       // — invalidate so the header chips re-fetch.
       queryClient.invalidateQueries({ queryKey: ['financialSummary', workOrderId] });
+      invalidateLocationInvoiceCaches(queryClient);
     },
   });
 
@@ -211,6 +213,7 @@ export default function FinancialInvoicesTab({
       // applied to (split-payment case). Invalidate both queries.
       queryClient.invalidateQueries({ queryKey: ['workOrderInvoices', workOrderId] });
       queryClient.invalidateQueries({ queryKey: ['financialSummary', workOrderId] });
+      invalidateLocationInvoiceCaches(queryClient);
     },
   });
 
@@ -225,6 +228,7 @@ export default function FinancialInvoicesTab({
       queryClient.invalidateQueries({ queryKey: ['workOrderInvoices', workOrderId] });
       // Send auto-flips DRAFT → SENT, which affects summary rollup buckets.
       queryClient.invalidateQueries({ queryKey: ['financialSummary', workOrderId] });
+      invalidateLocationInvoiceCaches(queryClient);
       setActionBanner({
         kind: 'success',
         message: t('workOrders.financialDrawer.invoicesTab.sendSuccess', {
@@ -380,6 +384,7 @@ export default function FinancialInvoicesTab({
     }
     queryClient.invalidateQueries({ queryKey: ['workOrderInvoices', workOrderId] });
     queryClient.invalidateQueries({ queryKey: ['financialSummary', workOrderId] });
+    invalidateLocationInvoiceCaches(queryClient);
 
     if (revokeShareLink) {
       try {

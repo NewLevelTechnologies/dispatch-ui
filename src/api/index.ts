@@ -193,6 +193,7 @@ export {
   type CreateInvoiceRequest,
   type CreateInvoiceLineItemRequest,
   type UpdateInvoiceStatusRequest,
+  type LocationInvoiceSummaryResponse,
   type Quote,
   type QuoteLineItem,
   type CreateQuoteRequest,

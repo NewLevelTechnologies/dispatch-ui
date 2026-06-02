@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { useGlossary } from '../contexts/GlossaryContext';
+import { invalidateLocationInvoiceCaches } from '../lib/invalidateFinancialCaches';
 import AppLayout from '../components/AppLayout';
 import { Button } from '../components/catalyst/button';
 import { Input } from '../components/catalyst/input';
@@ -78,6 +79,7 @@ export default function InvoicesPage() {
     mutationFn: (request: CreateInvoiceRequest) => invoicesApi.create(request),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
+      invalidateLocationInvoiceCaches(queryClient);
       setIsCreateOpen(false);
       resetForm();
     },
@@ -88,6 +90,7 @@ export default function InvoicesPage() {
       invoicesApi.updateStatus(id, { status }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
+      invalidateLocationInvoiceCaches(queryClient);
       setIsStatusOpen(false);
       setSelectedInvoice(null);
     },
