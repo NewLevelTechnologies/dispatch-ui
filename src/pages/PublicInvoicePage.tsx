@@ -140,7 +140,33 @@ export default function PublicInvoicePage() {
     unknown
   >({
     queryKey: ['publicInvoice', token],
-    queryFn: () => publicFinancialApi.getInvoiceByToken(token),
+    // Mobile email in-app webviews (Gmail/Outlook/Apple Mail) can leave the
+    // initial request stalled forever — it never resolves AND axios's native
+    // XHR timeout never fires on the dead socket, so `retry` below never
+    // triggers. JS timers keep running fine (the 5s "slow load" notice
+    // proves it), so drive an explicit abort off a setTimeout: that turns the
+    // stall into a rejection, `retry` fires a fresh request, and the fresh
+    // request succeeds (same path the manual "Try again" button exercises).
+    //
+    // The timeout uses its own AbortController rather than React Query's
+    // `signal` so the abort reads as a retryable error, not a query
+    // cancellation. Genuine RQ cancellation (unmount / key change) is still
+    // forwarded so we don't leak the in-flight request.
+    queryFn: async ({ signal }) => {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 10000);
+      signal.addEventListener('abort', () => controller.abort(), {
+        once: true,
+      });
+      try {
+        return await publicFinancialApi.getInvoiceByToken(
+          token,
+          controller.signal,
+        );
+      } finally {
+        clearTimeout(timer);
+      }
+    },
     enabled: !!token,
     // Retry transient failures (flaky mobile networks / in-app email
     // webviews stall the single request far more than desktop wifi). A
