@@ -286,6 +286,22 @@ describe('ServiceLocationDetailPage', () => {
     expect(screen.getAllByText('Active').length).toBeGreaterThan(0);
   });
 
+  it('shows the premise pill in the header (Business)', async () => {
+    mockApiResponses();
+    renderDetailPage();
+    await waitFor(() => expect(screen.getByText('Main Office')).toBeInTheDocument());
+    expect(screen.getByText('Business')).toBeInTheDocument();
+    expect(screen.queryByText('Residence')).not.toBeInTheDocument();
+  });
+
+  it('shows the premise pill in the header (Residence)', async () => {
+    mockApiResponses({ ...mockLocation, premiseType: 'RESIDENCE' as const });
+    renderDetailPage();
+    await waitFor(() => expect(screen.getByText('Main Office')).toBeInTheDocument());
+    expect(screen.getByText('Residence')).toBeInTheDocument();
+    expect(screen.queryByText('Business')).not.toBeInTheDocument();
+  });
+
   it('falls back to the customer name as headline for an unnamed location', async () => {
     mockApiResponses({ ...mockLocation, locationName: '' });
     renderDetailPage();
@@ -706,7 +722,7 @@ describe('ServiceLocationDetailPage', () => {
   });
 
   // ── Header actions / dialogs ────────────────────────────────────────────
-  it('opens the edit dialog from the header', async () => {
+  it('flips the header into inline edit (no modal) from the header', async () => {
     mockApiResponses();
     const user = userEvent.setup();
     renderDetailPage();
@@ -715,20 +731,26 @@ describe('ServiceLocationDetailPage', () => {
     // Header "Edit" is the first Edit-labelled button (before the right-rail card links).
     const editButtons = screen.getAllByRole('button', { name: /^edit$/i });
     await user.click(editButtons[0]);
-    await waitFor(() => expect(screen.getByRole('dialog')).toBeInTheDocument());
+
+    // Edits in place — the address field becomes editable, no dialog opens.
+    await waitFor(() => expect(screen.getByRole('button', { name: /save changes/i })).toBeInTheDocument());
+    expect(screen.getByDisplayValue('123 Main St')).toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
-  it('closes the edit dialog on cancel', async () => {
+  it('collapses the inline editor on cancel', async () => {
     mockApiResponses();
     const user = userEvent.setup();
     renderDetailPage();
     await waitFor(() => expect(screen.getByText('Main Office')).toBeInTheDocument());
 
     await user.click(screen.getAllByRole('button', { name: /^edit$/i })[0]);
-    await waitFor(() => expect(screen.getByRole('dialog')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByRole('button', { name: /save changes/i })).toBeInTheDocument());
 
-    await user.click(screen.getByRole('button', { name: /cancel/i }));
-    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    await user.click(screen.getByRole('button', { name: /^cancel$/i }));
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: /save changes/i })).not.toBeInTheDocument()
+    );
   });
 
   it('opens the new-work-order dialog with the service location pre-selected', async () => {
