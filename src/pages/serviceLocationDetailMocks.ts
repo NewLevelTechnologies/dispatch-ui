@@ -59,23 +59,9 @@ export const mockAttention: MockAttention = {
   pmOverdueDays: 0,
 };
 
-// ── Overview: upcoming visits / PM schedule ─────────────────────────────────
-// Backend ask: scheduling-service — scheduled visits for this location.
-export interface MockVisit {
-  date: string;
-  time: string;
-  kind: string;
-  tech: string;
-  job: string;
-  tone: MockTone;
-  live?: boolean;
-}
-export const mockUpcomingVisits: MockVisit[] = [
-  { date: 'Today', time: '10:30a', kind: 'In progress', tech: 'D. Park', job: 'WO-4203 · RTU-3 no cooling', tone: 'info', live: true },
-  { date: 'Sep 22', time: '7:00a', kind: 'Quarterly PM', tech: 'B. Halvorsen', job: 'WO-4180 · 4 RTUs · CT-1', tone: 'success' },
-  { date: 'Oct 14', time: '9:00a', kind: 'Annual PM', tech: 'TBD', job: 'Water heaters', tone: 'success' },
-  { date: 'Oct 30', time: '8:00a', kind: 'Annual PM', tech: 'TBD', job: 'Boiler · BLR-1', tone: 'success' },
-];
+// (Upcoming / forward visits are now REAL — the Visits tab reads the
+// location-scoped dispatch endpoint. The former mockUpcomingVisits stub was
+// removed when that landed.)
 
 // ── Overview: operational activity feed ─────────────────────────────────────
 // Backend ask: a location-scoped operational activity feed (tech arrived, job

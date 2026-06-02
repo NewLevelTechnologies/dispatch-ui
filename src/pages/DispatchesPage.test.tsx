@@ -11,7 +11,14 @@ const mockDispatchesDelete = vi.fn();
 
 vi.mock('../api/schedulingApi', () => ({
   dispatchesApi: {
-    getAll: (...args: unknown[]) => mockDispatchesGetAll(...args),
+    // getAll is paged now; tests resolve bare arrays, so wrap them into a
+    // DispatchBoardPage envelope here (the page reads `.content`).
+    getAll: async (...args: unknown[]) => {
+      const rows = await mockDispatchesGetAll(...args);
+      return Array.isArray(rows)
+        ? { content: rows, page: 0, size: 200, totalElements: rows.length, totalPages: 1, first: true, last: true }
+        : rows;
+    },
     create: (...args: unknown[]) => mockDispatchesCreate(...args),
     update: (...args: unknown[]) => mockDispatchesUpdate(...args),
     delete: (...args: unknown[]) => mockDispatchesDelete(...args),

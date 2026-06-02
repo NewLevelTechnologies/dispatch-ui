@@ -12,7 +12,9 @@ const mockUserGetAll = vi.fn();
 
 vi.mock('../api/schedulingApi', () => ({
   dispatchesApi: {
-    getAll: (...args: unknown[]) => mockDispatchesGetAll(...args),
+    // The component reads the WO-scoped list via listForWorkOrder, which
+    // returns a plain array — tests resolve bare arrays, so pass through.
+    listForWorkOrder: (...args: unknown[]) => mockDispatchesGetAll(...args),
     update: (...args: unknown[]) => mockDispatchesUpdate(...args),
     notify: (...args: unknown[]) => mockDispatchesNotify(...args),
     delete: (...args: unknown[]) => mockDispatchesDelete(...args),

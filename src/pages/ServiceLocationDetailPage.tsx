@@ -6,6 +6,7 @@ import { useQuery, useQueries, useMutation, useQueryClient } from '@tanstack/rea
 import { useTranslation } from 'react-i18next';
 import {
   MapPinIcon,
+  CalendarDaysIcon,
   EllipsisVerticalIcon,
   PlusIcon,
   WrenchScrewdriverIcon,
@@ -37,6 +38,8 @@ import {
   type Invoice,
   type InvoiceStatus as InvoiceStatusType,
   type LocationInvoiceSummaryResponse,
+  type LocationDispatchResponse,
+  type DispatchStatus,
   type OnSiteTech,
   type WorkOrderTech,
   type Tag,
@@ -90,7 +93,6 @@ import { Tabs } from '../components/ui/Tabs';
 import type { ServiceLocationDetailDto } from '../api/customerApi';
 import {
   mockAttention,
-  mockUpcomingVisits,
   mockActivityFeed,
   type MockTone,
 } from './serviceLocationDetailMocks';
@@ -164,6 +166,8 @@ export default function ServiceLocationDetailPage() {
 
   // Drives the Invoices tab-count badge; the tab body re-reads the same cache.
   const { data: locationInvoices } = useQuery(locationInvoicesQueryOptions(id ?? ''));
+  // Drives the Visits tab-count badge; the tab body re-reads the same cache.
+  const { data: locationVisits } = useQuery(locationDispatchesQueryOptions(id ?? ''));
 
   const deleteEquipmentMutation = useMutation({
     mutationFn: (equipmentId: string) => equipmentApi.delete(equipmentId),
@@ -236,7 +240,7 @@ export default function ServiceLocationDetailPage() {
     { id: 'equipment', label: getName('equipment', true), count: equipmentPage?.totalElements ?? equipment.length },
     { id: 'jobs', label: getName('work_order', true), count: workOrdersData?.totalElements ?? 0 },
     { id: 'invoices', label: getName('invoice', true), count: locationInvoices?.length },
-    { id: 'visits', label: getName('dispatch', true), count: mockUpcomingVisits.length },
+    { id: 'visits', label: getName('dispatch', true), count: locationVisits?.length },
     { id: 'contacts', label: 'Contacts', count: contactCount },
     { id: 'files', label: 'Files' },
     { id: 'activity', label: t('serviceLocations.tabs.activity') },
@@ -306,10 +310,7 @@ export default function ServiceLocationDetailPage() {
           )}
 
           {activeTab === 'invoices' && <InvoicesTab location={location} />}
-          {/* Visits / Dispatches stays stubbed until the pageable/searchable
-              dispatch list lands — building it against the current shape would
-              be throwaway. */}
-          {activeTab === 'visits' && <TabStub label={getName('dispatch', true)} />}
+          {activeTab === 'visits' && <VisitsTab location={location} />}
           {activeTab === 'contacts' && <ContactsTab location={location} canEdit={canEditServiceLocations} />}
           {activeTab === 'files' && <TabStub label="Files" />}
 
@@ -583,6 +584,17 @@ function locationInvoicesQueryOptions(serviceLocationId: string) {
   return {
     queryKey: ['location-invoices', serviceLocationId] as const,
     queryFn: () => invoicesApi.getByServiceLocation(serviceLocationId),
+    enabled: Boolean(serviceLocationId),
+  };
+}
+
+// Location-scoped visit list (Visits tab). Shared so the parent reads `.length`
+// for the tab-count badge and the tab re-reads the same cache. All visits
+// (no `when`) — the tab partitions upcoming vs past client-side.
+function locationDispatchesQueryOptions(serviceLocationId: string) {
+  return {
+    queryKey: ['location-dispatches', serviceLocationId] as const,
+    queryFn: () => dispatchesApi.listForServiceLocation(serviceLocationId),
     enabled: Boolean(serviceLocationId),
   };
 }
@@ -3208,6 +3220,231 @@ function InvoiceRow({
         {fmtMoney.format(invMoney(inv.totalAmount))}
       </td>
     </tr>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Visits / Dispatches tab — the dispatched-visit history + schedule at this
+// site. A work order can produce many visits (multi-day, return trips, crews);
+// a visit is one tech's trip on one date. Read + drill-through, NOT a
+// scheduling surface — that lives on the dispatch board / WO detail. Reads the
+// location-scoped mapping (GET /scheduling/dispatches?serviceLocationId=),
+// partitioned client-side into Upcoming (soonest first, overdue pinned) and
+// Past (most recent first).
+// ─────────────────────────────────────────────────────────────────────────
+const VISIT_STATUS_TONE: Record<DispatchStatus, 'info' | 'success' | 'neutral' | 'warning'> = {
+  SCHEDULED: 'info',
+  IN_PROGRESS: 'success',
+  COMPLETED: 'neutral',
+  CANCELLED: 'neutral',
+  NO_SHOW: 'warning',
+};
+const VISIT_ACTIVE_STATES: ReadonlyArray<DispatchStatus> = ['SCHEDULED', 'IN_PROGRESS'];
+const visitIsActive = (v: LocationDispatchResponse) => VISIT_ACTIVE_STATES.includes(v.status);
+// Overdue = a SCHEDULED visit whose arrival window has fully elapsed and nobody
+// has progressed it — the window END is the tripwire (window-start passed is
+// normal "in window"). App runtime, so the wall clock is fine here.
+const visitIsOverdue = (v: LocationDispatchResponse, now: number) =>
+  v.status === 'SCHEDULED' && new Date(v.arrivalWindowEnd).getTime() < now;
+
+const VISIT_DATE_FMT = new Intl.DateTimeFormat('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+const VISIT_TIME_FMT = new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit' });
+function formatVisitWindow(startIso: string, endIso: string): string {
+  const s = new Date(startIso);
+  const e = new Date(endIso);
+  if (Number.isNaN(s.getTime())) return '—';
+  const sameDay = s.toDateString() === e.toDateString();
+  return sameDay
+    ? `${VISIT_DATE_FMT.format(s)} · ${VISIT_TIME_FMT.format(s)}–${VISIT_TIME_FMT.format(e)}`
+    : `${VISIT_DATE_FMT.format(s)} ${VISIT_TIME_FMT.format(s)} – ${VISIT_DATE_FMT.format(e)} ${VISIT_TIME_FMT.format(e)}`;
+}
+
+function visitRowTitle(v: LocationDispatchResponse): string | null {
+  return v.workOrderSummary || v.workOrderNumber || v.workOrderTypeName || null;
+}
+
+function VisitsTab({ location }: { location: ServiceLocationDetailDto }) {
+  const { getName } = useGlossary();
+  const { t } = useTranslation();
+  const navigate = useNavigate();
+
+  const { data: visits = [], isLoading } = useQuery(locationDispatchesQueryOptions(location.id));
+
+  const now = Date.now();
+  const { upcoming, past } = useMemo(() => {
+    const up: LocationDispatchResponse[] = [];
+    const pa: LocationDispatchResponse[] = [];
+    for (const v of visits) (visitIsActive(v) ? up : pa).push(v);
+    // Upcoming: overdue pinned (oldest window-end first), then chronological by start.
+    up.sort((a, b) => {
+      const ao = visitIsOverdue(a, now) ? 0 : 1;
+      const bo = visitIsOverdue(b, now) ? 0 : 1;
+      if (ao !== bo) return ao - bo;
+      return new Date(a.arrivalWindowStart).getTime() - new Date(b.arrivalWindowStart).getTime();
+    });
+    // Past: most recent first (departure, else window start).
+    pa.sort(
+      (a, b) =>
+        new Date(b.departedAt ?? b.arrivalWindowStart).getTime() -
+        new Date(a.departedAt ?? a.arrivalWindowStart).getTime(),
+    );
+    return { upcoming: up, past: pa };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visits]);
+
+  const completedCount = visits.filter((v) => v.status === 'COMPLETED').length;
+  const colCount = 5;
+
+  return (
+    <Card
+      title={<CardTitle icon={<CalendarDaysIcon className="size-3.5" />}>{getName('dispatch', true)}</CardTitle>}
+      action={
+        visits.length > 0 ? (
+          <span className="text-[11px] text-fg-muted">
+            {upcoming.length} upcoming · {completedCount} completed
+          </span>
+        ) : undefined
+      }
+      padding="none"
+    >
+      {isLoading ? (
+        <div className="px-3.5 py-6 text-center text-[12px] text-fg-muted">
+          {t('common.actions.loading', { entities: getName('dispatch', true) })}
+        </div>
+      ) : visits.length === 0 ? (
+        <div className="px-3.5 py-10 text-center">
+          <div className="text-[13px] font-semibold text-fg-strong">No visits scheduled</div>
+          <div className="mt-1 text-[12px] text-fg-muted">
+            Scheduled and completed visits at this site will appear here.
+          </div>
+        </div>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full border-collapse text-[12px]">
+            <thead className="bg-bg-elev-2">
+              <tr className="text-left text-[10px] font-semibold uppercase tracking-wider text-fg-muted">
+                <th className="px-3.5 py-2 font-semibold">When</th>
+                <th className="px-3.5 py-2 font-semibold">Type</th>
+                <th className="px-3.5 py-2 font-semibold">{getName('work_order')}</th>
+                <th className="px-3.5 py-2 font-semibold">Tech</th>
+                <th className="px-3.5 py-2 font-semibold">{t('workOrders.table.statusHeader')}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {upcoming.length > 0 && <VisitGroupHeader label="Upcoming" count={upcoming.length} colCount={colCount} />}
+              {upcoming.map((v) => (
+                <VisitRow key={v.id} visit={v} now={now} onOpen={() => navigate(`/work-orders/${v.workOrderId}`)} />
+              ))}
+              {past.length > 0 && <VisitGroupHeader label="Past" count={past.length} colCount={colCount} />}
+              {past.map((v) => (
+                <VisitRow key={v.id} visit={v} now={now} onOpen={() => navigate(`/work-orders/${v.workOrderId}`)} />
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </Card>
+  );
+}
+
+function VisitGroupHeader({ label, count, colCount }: { label: string; count: number; colCount: number }) {
+  return (
+    <tr>
+      <td colSpan={colCount} className="border-y border-border-soft bg-bg-elev-2 px-3.5 py-1.5">
+        <span className="text-[10px] font-semibold uppercase tracking-wider text-fg-strong">{label}</span>
+        <span className="ml-2 font-mono text-[10.5px] tabular-nums text-fg-muted">{count}</span>
+      </td>
+    </tr>
+  );
+}
+
+function VisitRow({
+  visit,
+  now,
+  onOpen,
+}: {
+  visit: LocationDispatchResponse;
+  now: number;
+  onOpen: () => void;
+}) {
+  const { t } = useTranslation();
+  const overdue = visitIsOverdue(visit, now);
+  const live = visit.status === 'IN_PROGRESS';
+  const didntHappen = visit.status === 'CANCELLED' || visit.status === 'NO_SHOW';
+  const tone = overdue ? 'warning' : VISIT_STATUS_TONE[visit.status];
+  const title = visitRowTitle(visit);
+  const techName = visit.assignedUserName;
+
+  // Subtle row tint: in-progress = info (a tech is on site now); overdue = warning.
+  const tint = live
+    ? 'bg-[color-mix(in_oklch,var(--info-500)_6%,var(--bg-elev))]'
+    : overdue
+      ? 'bg-[color-mix(in_oklch,var(--warning-500)_7%,var(--bg-elev))]'
+      : '';
+
+  return (
+    <tr
+      className={`cursor-pointer border-b border-border-soft hover:bg-bg-hover ${tint}`}
+      onClick={onOpen}
+    >
+      <td className="px-3.5 py-2 whitespace-nowrap text-[11.5px] text-fg">
+        {formatVisitWindow(visit.arrivalWindowStart, visit.arrivalWindowEnd)}
+      </td>
+      <td className="px-3.5 py-2">
+        {visit.workOrderTypeName ? (
+          <span className="rounded-[3px] border border-border-soft bg-bg-active px-1.5 text-[10px] font-semibold text-fg-muted">
+            {visit.workOrderTypeName}
+          </span>
+        ) : (
+          <span className="text-[11px] text-fg-dim">—</span>
+        )}
+      </td>
+      <td className="px-3.5 py-2">
+        <div className="font-mono text-[11px] text-fg-muted">
+          {visit.workOrderNumber ?? `#${visit.workOrderId.slice(0, 8)}`}
+        </div>
+        {title && title !== visit.workOrderNumber && (
+          <div className={`mt-0.5 max-w-[280px] truncate text-[10.5px] ${didntHappen ? 'text-fg-muted line-through' : 'text-fg'}`} title={title}>
+            {title}
+          </div>
+        )}
+      </td>
+      <td className="px-3.5 py-2">
+        <VisitTechCell name={techName} live={live} muted={didntHappen} />
+      </td>
+      <td className="px-3.5 py-2">
+        <Pill tone={tone} dot live={live}>
+          {overdue ? 'Overdue' : t(`workOrders.dispatches.status.${visit.status}`)}
+        </Pill>
+      </td>
+    </tr>
+  );
+}
+
+// Round initials avatar (round = person) + resolved tech name. Live dot when
+// on site. Name can be null while the user-cache catches up — fall back rather
+// than blank the cell. Same name-hash color as user avatars elsewhere.
+function VisitTechCell({ name, live, muted }: { name: string | null; live: boolean; muted: boolean }) {
+  const named = Boolean(name);
+  const display = name ?? 'Tech assigned';
+  return (
+    <span className="flex items-center gap-1.5">
+      <span className="relative shrink-0">
+        <span
+          className="flex size-[18px] items-center justify-center rounded-full text-[8.5px] font-bold text-white"
+          style={{ background: named ? roleColor(display) : 'var(--fg-dim)', opacity: muted ? 0.6 : 1 }}
+        >
+          {named ? techInitials(display) : '—'}
+        </span>
+        {live && (
+          <span
+            className="absolute -bottom-px -right-px size-[7px] rounded-full bg-info-500"
+            style={{ border: '1.5px solid var(--bg-elev)' }}
+          />
+        )}
+      </span>
+      <span className={`text-[12px] ${muted ? 'text-fg-muted' : 'text-fg'}`}>{display}</span>
+    </span>
   );
 }
 
