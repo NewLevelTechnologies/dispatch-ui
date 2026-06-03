@@ -84,6 +84,9 @@ export default function WorkItemFormDialog({
 
   const onSuccess = () => {
     queryClient.invalidateQueries({ queryKey: ['work-orders'] });
+    // Embedded site/customer work-order cards (e.g. the location Overview tab)
+    // read the separate 'work-orders-list' cache, so they must refetch too.
+    queryClient.invalidateQueries({ queryKey: ['work-orders-list'] });
     queryClient.invalidateQueries({ queryKey: ['work-order-activity', workOrderId] });
     onClose();
   };
