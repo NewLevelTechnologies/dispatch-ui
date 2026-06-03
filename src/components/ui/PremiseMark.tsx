@@ -17,7 +17,6 @@
 // ─────────────────────────────────────────────────────────────────
 import { BuildingOffice2Icon, HomeIcon } from '@heroicons/react/24/outline';
 import clsx from 'clsx';
-import { Pill } from './Pill';
 
 type Premise = 'BUSINESS' | 'RESIDENCE';
 
@@ -37,30 +36,17 @@ export function PremiseMark({
       title={title ?? (business ? 'Business' : 'Residence')}
       aria-label={title ?? (business ? 'Business' : 'Residence')}
       className={clsx(
+        // One premise hue map across surfaces: Business = info (blue),
+        // Residence = success (green/teal). Subtle tint here on the list; the
+        // Location-detail mark uses the same hues at saturated intensity.
         'inline-grid size-[22px] shrink-0 place-items-center rounded-[5px] border',
         business
-          ? 'border-accent-500/30 bg-accent-500/10 text-accent-700 dark:text-accent-300'
-          : 'border-border-soft bg-bg-active text-fg-muted',
+          ? 'border-info-500/30 bg-info-500/10 text-info-500'
+          : 'border-success-500/30 bg-success-500/10 text-success-500',
         className
       )}
     >
       <Icon className="size-[13px]" aria-hidden="true" />
     </span>
-  );
-}
-
-// Premise as a label pill — same vocabulary + glyph as PremiseMark, rendered in
-// the Pill primitive so it sits in a status-pill row at the shared pill sizing/
-// radius. Business reads accent (the commercial/billable default); Residence is
-// neutral with muted text. Read-only — premise is edited via the header inline
-// editor's Residence/Business toggle.
-export function PremisePill({ premise, className }: { premise: Premise; className?: string }) {
-  const business = premise === 'BUSINESS';
-  const Icon = business ? BuildingOffice2Icon : HomeIcon;
-  return (
-    <Pill tone={business ? 'accent' : 'neutral'} className={clsx(!business && 'text-fg-muted', className)}>
-      <Icon className="size-3" aria-hidden="true" />
-      {business ? 'Business' : 'Residence'}
-    </Pill>
   );
 }

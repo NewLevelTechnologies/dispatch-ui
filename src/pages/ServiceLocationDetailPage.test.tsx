@@ -286,20 +286,21 @@ describe('ServiceLocationDetailPage', () => {
     expect(screen.getAllByText('Active').length).toBeGreaterThan(0);
   });
 
-  it('shows the premise pill in the header (Business)', async () => {
+  it('premise-driven header mark labels a Business location', async () => {
     mockApiResponses();
     renderDetailPage();
     await waitFor(() => expect(screen.getByText('Main Office')).toBeInTheDocument());
-    expect(screen.getByText('Business')).toBeInTheDocument();
-    expect(screen.queryByText('Residence')).not.toBeInTheDocument();
+    // Single premise signal — the 52px mark carries it (no separate pill).
+    expect(screen.getByLabelText('Business')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Residence')).not.toBeInTheDocument();
   });
 
-  it('shows the premise pill in the header (Residence)', async () => {
+  it('premise-driven header mark labels a Residence location', async () => {
     mockApiResponses({ ...mockLocation, premiseType: 'RESIDENCE' as const });
     renderDetailPage();
     await waitFor(() => expect(screen.getByText('Main Office')).toBeInTheDocument());
-    expect(screen.getByText('Residence')).toBeInTheDocument();
-    expect(screen.queryByText('Business')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Residence')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Business')).not.toBeInTheDocument();
   });
 
   it('falls back to the customer name as headline for an unnamed location', async () => {

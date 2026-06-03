@@ -6,6 +6,8 @@ import { useQuery, useQueries, useMutation, useQueryClient } from '@tanstack/rea
 import { useTranslation } from 'react-i18next';
 import {
   MapPinIcon,
+  BuildingOffice2Icon,
+  HomeIcon,
   CalendarDaysIcon,
   EllipsisVerticalIcon,
   PlusIcon,
@@ -95,7 +97,6 @@ import { ToggleGroup, ToggleGroupOption } from '../components/ui/ToggleGroup';
 import { US_STATES } from '../constants/states';
 import { Dropdown, DropdownButton, DropdownItem, DropdownLabel, DropdownMenu } from '../components/catalyst/dropdown';
 import { Pill } from '../components/ui/Pill';
-import { PremisePill } from '../components/ui/PremiseMark';
 import { Callout } from '../components/ui/Callout';
 import { Tabs } from '../components/ui/Tabs';
 import type { ServiceLocationDetailDto, PremiseType, UpdateServiceLocationRequest } from '../api/customerApi';
@@ -436,7 +437,7 @@ function LocationHeader({
 
   return (
     <div className="mb-3 flex flex-col gap-3 rounded-[10px] border border-border bg-bg-elev px-4 py-3.5 shadow-sm sm:flex-row sm:items-center sm:gap-3.5">
-      <LocationMark />
+      <LocationMark premise={location.premiseType} />
 
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
@@ -446,8 +447,6 @@ function LocationHeader({
           <Pill tone={statusTone === 'neutral' ? 'neutral' : 'success'} dot live={location.status === 'ACTIVE'}>
             {statusLabel}
           </Pill>
-          {/* Premise sits right after status — it's identity, not a transient state. */}
-          <PremisePill premise={location.premiseType} />
         </div>
         <div className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[11.5px] text-fg-muted">
           {meta.map((node, i) => (
@@ -671,12 +670,31 @@ function LocationHeaderEdit({
   );
 }
 
-// Square mark with a pin glyph — distinguishes a location (pin) from a
-// customer (square initials) and a user (round avatar).
-function LocationMark() {
+// Premise-driven mark — building glyph (blue) for Business, house glyph (green/
+// teal) for Residence — same glyph language AND hue as the Locations-list
+// PremiseMark, just at a saturated intensity here vs the list's subtle tint.
+// One hue map (Business = `info`, Residence = `success`), two intensities. The
+// mark carries the premise signal, so there's no separate premise pill; page
+// context already says "this is a location", so the mark conveys WHAT KIND of
+// place. Decorative gradient + white glyph, dark-mode safe.
+function LocationMark({ premise }: { premise: PremiseType }) {
+  const business = premise !== 'RESIDENCE';
+  const label = business ? 'Business' : 'Residence';
   return (
-    <div className="grid size-[52px] shrink-0 place-items-center rounded-[10px] bg-gradient-to-br from-info-500 to-[color-mix(in_oklch,var(--info-500)_70%,black)] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.2),0_1px_2px_rgba(0,0,0,0.12)]">
-      <MapPinIcon className="size-[22px]" />
+    <div
+      title={label}
+      aria-label={label}
+      className={`grid size-[52px] shrink-0 place-items-center rounded-[10px] bg-gradient-to-br text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.2),0_1px_2px_rgba(0,0,0,0.12)] ${
+        business
+          ? 'from-info-500 to-[color-mix(in_oklch,var(--info-500)_70%,black)]'
+          : 'from-success-500 to-[color-mix(in_oklch,var(--success-500)_70%,black)]'
+      }`}
+    >
+      {business ? (
+        <BuildingOffice2Icon className="size-6" strokeWidth={1.8} aria-hidden="true" />
+      ) : (
+        <HomeIcon className="size-6" strokeWidth={1.8} aria-hidden="true" />
+      )}
     </div>
   );
 }
