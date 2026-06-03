@@ -17,6 +17,7 @@
 // ─────────────────────────────────────────────────────────────────
 import { BuildingOffice2Icon, HomeIcon } from '@heroicons/react/24/outline';
 import clsx from 'clsx';
+import { Pill } from './Pill';
 
 type Premise = 'BUSINESS' | 'RESIDENCE';
 
@@ -45,5 +46,21 @@ export function PremiseMark({
     >
       <Icon className="size-[13px]" aria-hidden="true" />
     </span>
+  );
+}
+
+// Premise as a label pill — same vocabulary + glyph as PremiseMark, rendered in
+// the Pill primitive so it sits in a status-pill row at the shared pill sizing/
+// radius. Business reads accent (the commercial/billable default); Residence is
+// neutral with muted text. Read-only — premise is edited via the header inline
+// editor's Residence/Business toggle.
+export function PremisePill({ premise, className }: { premise: Premise; className?: string }) {
+  const business = premise === 'BUSINESS';
+  const Icon = business ? BuildingOffice2Icon : HomeIcon;
+  return (
+    <Pill tone={business ? 'accent' : 'neutral'} className={clsx(!business && 'text-fg-muted', className)}>
+      <Icon className="size-3" aria-hidden="true" />
+      {business ? 'Business' : 'Residence'}
+    </Pill>
   );
 }

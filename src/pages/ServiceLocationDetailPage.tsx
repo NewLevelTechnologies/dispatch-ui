@@ -25,6 +25,7 @@ import {
 import { BellIcon as BellSolidIcon } from '@heroicons/react/24/solid';
 import {
   customerApi,
+  dispatchRegionApi,
   equipmentApi,
   workOrderApi,
   workOrderTypesApi,
@@ -71,7 +72,6 @@ import { TimeAgo } from '../components/TimeAgo';
 import { titleCaseAddress } from '../utils/titleCaseAddress';
 import { extractApiError, showError, showInfo, showSuccess } from '../lib/toast';
 import AppLayout from '../components/AppLayout';
-import ServiceLocationFormDialog from '../components/ServiceLocationFormDialog';
 import EquipmentFormDialog from '../components/EquipmentFormDialog';
 import WorkOrderFormDialog from '../components/WorkOrderFormDialog';
 import NotificationLogsList from '../components/NotificationLogsList';
@@ -87,13 +87,18 @@ import IconButton from '../components/IconButton';
 import { Card } from '../components/catalyst/card';
 import { Button } from '../components/catalyst/button';
 import { Input } from '../components/catalyst/input';
+import { Select } from '../components/catalyst/select';
+import { Field, Label } from '../components/catalyst/fieldset';
 import { Textarea } from '../components/catalyst/textarea';
 import { Heading } from '../components/catalyst/heading';
+import { ToggleGroup, ToggleGroupOption } from '../components/ui/ToggleGroup';
+import { US_STATES } from '../constants/states';
 import { Dropdown, DropdownButton, DropdownItem, DropdownLabel, DropdownMenu } from '../components/catalyst/dropdown';
 import { Pill } from '../components/ui/Pill';
+import { PremisePill } from '../components/ui/PremiseMark';
 import { Callout } from '../components/ui/Callout';
 import { Tabs } from '../components/ui/Tabs';
-import type { ServiceLocationDetailDto } from '../api/customerApi';
+import type { ServiceLocationDetailDto, PremiseType, UpdateServiceLocationRequest } from '../api/customerApi';
 import {
   mockAttention,
   mockActivityFeed,
@@ -141,7 +146,6 @@ export default function ServiceLocationDetailPage() {
   const queryClient = useQueryClient();
 
   const [activeTab, setActiveTab] = useState<TabId>('overview');
-  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isEquipmentDialogOpen, setIsEquipmentDialogOpen] = useState(false);
   const [editingEquipment, setEditingEquipment] = useState<Equipment | null>(null);
   const [isNewWorkOrderOpen, setIsNewWorkOrderOpen] = useState(false);
@@ -259,7 +263,7 @@ export default function ServiceLocationDetailPage() {
             location={location}
             headline={headline}
             onNewJob={() => setIsNewWorkOrderOpen(true)}
-            onEdit={canEditServiceLocations ? () => setIsEditDialogOpen(true) : undefined}
+            canEdit={canEditServiceLocations}
             onClose={
               canCloseServiceLocations && location.status !== 'CLOSED'
                 ? () => setConfirmClose(true)
@@ -323,13 +327,6 @@ export default function ServiceLocationDetailPage() {
           />
         </div>
       </div>
-
-      <ServiceLocationFormDialog
-        isOpen={isEditDialogOpen}
-        onClose={() => setIsEditDialogOpen(false)}
-        serviceLocation={location}
-        customerId={location.customerId}
-      />
 
       <EquipmentFormDialog
         isOpen={isEquipmentDialogOpen}
@@ -399,17 +396,26 @@ function LocationHeader({
   location,
   headline,
   onNewJob,
-  onEdit,
+  canEdit,
   onClose,
 }: {
   location: ServiceLocationDetailDto;
   headline: string;
   onNewJob: () => void;
-  onEdit?: () => void;
+  canEdit?: boolean;
   onClose?: () => void;
 }) {
   const { t } = useTranslation();
   const { getName } = useGlossary();
+
+  // Header "Edit" flips this card into inline-edit mode in place (no modal, no
+  // route change) — same inline pattern as the cards below. The edit form
+  // covers only the core record (name, address, premise, region); everything
+  // else edits in its own card and is intentionally absent here.
+  const [editing, setEditing] = useState(false);
+  if (editing) {
+    return <LocationHeaderEdit location={location} onDone={() => setEditing(false)} />;
+  }
 
   const statusTone: MockTone | 'neutral' =
     location.status === 'ACTIVE' ? 'success' : location.status === 'INACTIVE' ? 'neutral' : 'neutral';
@@ -440,6 +446,8 @@ function LocationHeader({
           <Pill tone={statusTone === 'neutral' ? 'neutral' : 'success'} dot live={location.status === 'ACTIVE'}>
             {statusLabel}
           </Pill>
+          {/* Premise sits right after status — it's identity, not a transient state. */}
+          <PremisePill premise={location.premiseType} />
         </div>
         <div className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[11.5px] text-fg-muted">
           {meta.map((node, i) => (
@@ -459,14 +467,14 @@ function LocationHeader({
         <Button outline size="xs" onClick={() => showInfo('Visit scheduling isn’t available yet')}>
           Schedule visit
         </Button>
-        {(onEdit || onClose) && (
+        {(canEdit || onClose) && (
           <Dropdown>
             <DropdownButton as={IconButton} aria-label={t('common.moreOptions')}>
               <EllipsisVerticalIcon className="size-4" />
             </DropdownButton>
             <DropdownMenu anchor="bottom end">
-              {onEdit && (
-                <DropdownItem onClick={onEdit}>
+              {canEdit && (
+                <DropdownItem onClick={() => setEditing(true)}>
                   <DropdownLabel>{t('common.edit')}</DropdownLabel>
                 </DropdownItem>
               )}
@@ -478,11 +486,186 @@ function LocationHeader({
             </DropdownMenu>
           </Dropdown>
         )}
-        {onEdit && (
-          <Button color="accent" size="xs" onClick={onEdit}>
+        {canEdit && (
+          <Button color="accent" size="xs" onClick={() => setEditing(true)}>
             {t('common.edit')}
           </Button>
         )}
+      </div>
+    </div>
+  );
+}
+
+// Inline edit of the CORE location record only: name, address, premise type,
+// and region. Everything else on the page edits in place in its own card
+// (site instructions, contacts, tags, notes); the status lifecycle (Close)
+// stays a footer/dropdown action with confirmation + side effects — none of
+// that belongs here.
+//
+// Address autocomplete + live USPS re-verification are deferred (no provider
+// wired yet), so the address fields are plain inputs and we surface the
+// existing validated-address metadata as a read-only badge when present.
+function LocationHeaderEdit({
+  location,
+  onDone,
+}: {
+  location: ServiceLocationDetailDto;
+  onDone: () => void;
+}) {
+  const { t } = useTranslation();
+  const { getName } = useGlossary();
+  const queryClient = useQueryClient();
+
+  const [name, setName] = useState(location.locationName || '');
+  const [premise, setPremise] = useState<PremiseType>(location.premiseType);
+  const [streetAddress, setStreetAddress] = useState(location.address.streetAddress);
+  const [streetAddressLine2, setStreetAddressLine2] = useState(location.address.streetAddressLine2 || '');
+  const [city, setCity] = useState(location.address.city);
+  const [state, setState] = useState(location.address.state);
+  const [zipCode, setZipCode] = useState(location.address.zipCode);
+  const [dispatchRegionId, setDispatchRegionId] = useState(location.dispatchRegionId);
+
+  const { data: activeRegions } = useQuery({
+    queryKey: ['dispatch-regions', 'active'],
+    queryFn: () => dispatchRegionApi.getAll(false),
+  });
+
+  const canSave =
+    streetAddress.trim() !== '' && city.trim() !== '' && state.trim() !== '' && zipCode.trim() !== '';
+
+  const saveMutation = useMutation({
+    mutationFn: async () => {
+      // Partial merge — send only the core fields that changed. `locationName`
+      // is always sent (empty clears it; residences often have none).
+      const request: UpdateServiceLocationRequest = { locationName: name.trim() || null };
+      if (premise !== location.premiseType) request.premiseType = premise;
+      if (dispatchRegionId !== location.dispatchRegionId) request.dispatchRegionId = dispatchRegionId;
+      await customerApi.updateServiceLocation(location.id, request);
+
+      // Address rides a separate endpoint — only call it when something moved.
+      const addressChanged =
+        streetAddress !== location.address.streetAddress ||
+        streetAddressLine2 !== (location.address.streetAddressLine2 || '') ||
+        city !== location.address.city ||
+        state !== location.address.state ||
+        zipCode !== location.address.zipCode;
+      if (addressChanged) {
+        await customerApi.updateServiceLocationAddress(location.id, {
+          streetAddress,
+          streetAddressLine2: streetAddressLine2 || null,
+          city,
+          state,
+          zipCode,
+        });
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['service-location', location.id] });
+      queryClient.invalidateQueries({ queryKey: ['customers', location.customerId] });
+      queryClient.invalidateQueries({ queryKey: ['customers'] });
+      queryClient.invalidateQueries({ queryKey: ['service-locations'] });
+      // WO detail/list responses embed the location's name + address + contact,
+      // so every cached WO that references this site is stale until refetch.
+      queryClient.invalidateQueries({ queryKey: ['work-orders'] });
+      queryClient.invalidateQueries({ queryKey: ['work-orders-list'] });
+      showSuccess('Location updated');
+      onDone();
+    },
+    onError: (err: unknown) => showError('Couldn’t save location', extractApiError(err) ?? undefined),
+  });
+
+  const saving = saveMutation.isPending;
+  const hasRegions = !!activeRegions && activeRegions.length > 0;
+
+  return (
+    <div className="mb-3 rounded-[10px] border border-accent-500/40 bg-bg-elev px-4 py-3.5 shadow-sm">
+      <div className="mb-3 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+        <span className="text-[13px] font-semibold text-fg-strong">Edit location</span>
+        <span className="text-[11.5px] text-fg-muted">· instructions, contacts, tags &amp; notes edit in their own cards below</span>
+      </div>
+
+      {/* Name + premise */}
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_auto]">
+        <Field>
+          <Label className="text-xs">
+            {t('common.form.locationName')} <span className="font-normal text-fg-dim">· optional for residences</span>
+          </Label>
+          <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g., Headquarters, Retail #047" />
+        </Field>
+        <Field>
+          <Label className="text-xs">Premise</Label>
+          <ToggleGroup value={premise} onChange={setPremise} aria-label="Premise type">
+            <ToggleGroupOption value="RESIDENCE">Residence</ToggleGroupOption>
+            <ToggleGroupOption value="BUSINESS">Business</ToggleGroupOption>
+          </ToggleGroup>
+        </Field>
+      </div>
+
+      {/* Street + apt */}
+      <div className="mt-3 grid grid-cols-12 gap-2">
+        <Field className="col-span-8">
+          <Label className="text-xs">
+            {t('common.form.streetAddress')} *
+            {location.address.validated && (
+              <span className="ml-1.5 font-normal text-success-600">✓ USPS verified</span>
+            )}
+          </Label>
+          <Input value={streetAddress} onChange={(e) => setStreetAddress(e.target.value)} required />
+        </Field>
+        <Field className="col-span-4">
+          <Label className="text-xs">{t('common.form.addressLine2')}</Label>
+          <Input
+            value={streetAddressLine2}
+            onChange={(e) => setStreetAddressLine2(e.target.value)}
+            placeholder="Apt"
+          />
+        </Field>
+      </div>
+
+      {/* City / state / zip / region */}
+      <div className="mt-3 grid grid-cols-12 gap-2">
+        <Field className={hasRegions ? 'col-span-4' : 'col-span-6'}>
+          <Label className="text-xs">{t('common.form.city')} *</Label>
+          <Input value={city} onChange={(e) => setCity(e.target.value)} required />
+        </Field>
+        <Field className="col-span-2">
+          <Label className="text-xs">{t('common.form.state')} *</Label>
+          <Select value={state} onChange={(e) => setState(e.target.value)} required>
+            <option value="">{t('common.form.select')}</option>
+            {US_STATES.map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </Select>
+        </Field>
+        <Field className={hasRegions ? 'col-span-2' : 'col-span-4'}>
+          <Label className="text-xs">{t('common.form.zipCode')} *</Label>
+          <Input value={zipCode} onChange={(e) => setZipCode(e.target.value)} inputMode="numeric" required />
+        </Field>
+        {hasRegions && (
+          <Field className="col-span-4">
+            <Label className="text-xs">
+              {getName('dispatch')} {t('entities.region')}
+            </Label>
+            <Select value={dispatchRegionId} onChange={(e) => setDispatchRegionId(e.target.value)}>
+              {activeRegions!.map((region) => (
+                <option key={region.id} value={region.id}>
+                  {region.name} ({region.abbreviation})
+                </option>
+              ))}
+            </Select>
+          </Field>
+        )}
+      </div>
+
+      <div className="mt-3.5 flex items-center justify-end gap-1.5">
+        <Button plain size="xs" onClick={onDone} disabled={saving}>
+          Cancel
+        </Button>
+        <Button color="accent" size="xs" onClick={() => saveMutation.mutate()} disabled={!canSave || saving}>
+          {saving ? 'Saving…' : 'Save changes'}
+        </Button>
       </div>
     </div>
   );
