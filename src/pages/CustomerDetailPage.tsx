@@ -14,7 +14,6 @@ import {
 import { useGlossary } from '../contexts/GlossaryContext';
 import { useHasCapability } from '../hooks/useCurrentUser';
 import AppLayout from '../components/AppLayout';
-import ServiceLocationFormDialog from '../components/ServiceLocationFormDialog';
 import CustomerFormDialog from '../components/CustomerFormDialog';
 import WorkOrderFormDialog from '../components/WorkOrderFormDialog';
 import EquipmentFormDialog from '../components/EquipmentFormDialog';
@@ -57,7 +56,6 @@ export default function CustomerDetailPage() {
   const { t } = useTranslation();
   const { getName } = useGlossary();
   const [activeTab, setActiveTab] = useState<TabId>('overview');
-  const [isAddLocationDialogOpen, setIsAddLocationDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
 
   // Return to wherever we came from (could be the WO detail, service location, etc.).
@@ -413,7 +411,7 @@ export default function CustomerDetailPage() {
               </div>
               <div className="flex gap-2 sm:flex-shrink-0">
                 {canAddServiceLocations && (
-                  <Button plain onClick={() => setIsAddLocationDialogOpen(true)}>
+                  <Button plain onClick={() => navigate(`/customers/${id}/service-locations/new`)}>
                     <PlusIcon className="size-4" />
                     <span className="hidden sm:inline">{t('common.actions.add', { entity: getName('service_location') })}</span>
                     <span className="sm:hidden">{t('common.actions.add', { entity: '' }).trim()}</span>
@@ -663,7 +661,7 @@ export default function CustomerDetailPage() {
                 <div className="flex flex-col gap-2 mb-2 sm:flex-row sm:items-center sm:justify-between">
                   <Subheading>{t('common.entitiesCount', { entities: getName('service_location', true), count: customer.serviceLocations.length })}</Subheading>
                 {canAddServiceLocations && (
-                  <Button plain onClick={() => setIsAddLocationDialogOpen(true)} className="text-sm sm:flex-shrink-0">
+                  <Button plain onClick={() => navigate(`/customers/${id}/service-locations/new`)} className="text-sm sm:flex-shrink-0">
                     <PlusIcon className="size-4" />
                     {t('common.actions.add', { entity: getName('service_location') })}
                   </Button>
@@ -807,11 +805,6 @@ export default function CustomerDetailPage() {
   )}
       </div>
 
-      <ServiceLocationFormDialog
-        isOpen={isAddLocationDialogOpen}
-        onClose={() => setIsAddLocationDialogOpen(false)}
-        customerId={id!}
-      />
       <CustomerFormDialog
         isOpen={isEditDialogOpen}
         onClose={() => setIsEditDialogOpen(false)}
