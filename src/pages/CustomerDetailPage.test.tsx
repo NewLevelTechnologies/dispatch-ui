@@ -7,6 +7,14 @@ import type { Customer } from '../api';
 
 vi.mock('../api/client');
 
+// Spy on navigation — "Add location" now routes to the full-page Add Location
+// form (/customers/:id/service-locations/new) instead of opening a dialog.
+const mockNavigate = vi.fn();
+vi.mock('react-router-dom', async () => {
+  const actual = await vi.importActual<typeof import('react-router-dom')>('react-router-dom');
+  return { ...actual, useNavigate: () => mockNavigate };
+});
+
 const mockResidentialCustomer: Customer = {
   id: '1',
   name: 'John Doe',
@@ -146,7 +154,7 @@ describe('CustomerDetailPage', () => {
     });
   });
 
-  it('opens add location dialog when add location is clicked', async () => {
+  it('navigates to the Add Location page when add location is clicked', async () => {
     const user = userEvent.setup();
     vi.mocked(apiClient.get).mockResolvedValue({ data: mockResidentialCustomer });
     renderWithProviders(<CustomerDetailPage />);
@@ -155,13 +163,12 @@ describe('CustomerDetailPage', () => {
       expect(screen.getByText('John Doe')).toBeInTheDocument();
     });
 
-    // Button now says "Add Service Location" (from glossary)
+    // Button now says "Add Service Location" (from glossary) and routes to the
+    // full-page Add Location form rather than opening a dialog.
     const addButton = screen.getByRole('button', { name: /add location/i });
     await user.click(addButton);
 
-    await waitFor(() => {
-      expect(screen.getByText('Create Location')).toBeInTheDocument();
-    });
+    expect(mockNavigate).toHaveBeenCalledWith(expect.stringContaining('/service-locations/new'));
   });
 
   it('uses table layout for customers with many locations', async () => {
@@ -328,31 +335,6 @@ describe('CustomerDetailPage', () => {
 
     await waitFor(() => {
       expect(screen.getByText(/apt 5b/i)).toBeInTheDocument();
-    });
-  });
-
-  it('closes add location dialog on close', async () => {
-    const user = userEvent.setup();
-    vi.mocked(apiClient.get).mockResolvedValue({ data: mockResidentialCustomer });
-    renderWithProviders(<CustomerDetailPage />);
-
-    await waitFor(() => {
-      expect(screen.getByText('John Doe')).toBeInTheDocument();
-    });
-
-    // Button now says "Add Service Location" (from glossary)
-    const addButton = screen.getByRole('button', { name: /add location/i });
-    await user.click(addButton);
-
-    await waitFor(() => {
-      expect(screen.getByText('Create Location')).toBeInTheDocument();
-    });
-
-    const cancelButton = screen.getByRole('button', { name: /cancel/i });
-    await user.click(cancelButton);
-
-    await waitFor(() => {
-      expect(screen.queryByText('Create Location')).not.toBeInTheDocument();
     });
   });
 

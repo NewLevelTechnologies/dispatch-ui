@@ -30,6 +30,7 @@ import SchedulingPage from './pages/SchedulingPage';
 import UsersPage from './pages/UsersPage';
 import UserDetailPage from './pages/UserDetailPage';
 import { UserInvitePage, UserEditPage } from './pages/UserFormPage';
+import AddLocationPage from './pages/AddLocationPage';
 import RolesPage from './pages/RolesPage';
 import RoleDetailPage from './pages/RoleDetailPage';
 import { RoleAddPage, RoleEditPage } from './pages/RoleFormPage';
@@ -162,6 +163,7 @@ function App() {
       <Route path="/dashboard" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<DashboardPage />} />} />
       <Route path="/customers" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<CustomersPage />} />} />
       <Route path="/customers/:id" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<CustomerDetailPage />} />} />
+      <Route path="/customers/:customerId/service-locations/new" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<AddLocationPage />} />} />
       <Route path="/service-locations" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<ServiceLocationsPage />} />} />
       <Route path="/service-locations/:id" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<ServiceLocationDetailPage />} />} />
       <Route path="/work-orders" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<WorkOrdersPage />} />} />
