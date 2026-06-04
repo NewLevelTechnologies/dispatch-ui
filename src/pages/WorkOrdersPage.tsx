@@ -9,6 +9,7 @@ import {
   divisionsApi,
   workItemStatusesApi,
   dispatchRegionApi,
+  userApi,
   type WorkOrderSummary,
   type ProgressCategory,
   type ListWorkOrdersParams,
@@ -36,6 +37,7 @@ import {
 import { dense } from '../components/ui/dense';
 import { ListToolbar, ListSearch } from '../components/ui/ListToolbar';
 import { ListFooter } from '../components/ui/ListFooter';
+import { AssignedUsersCell } from '../components/ui/AssignedUsersCell';
 
 // ─── Filter constants ────────────────────────────────────────────────────────
 
@@ -135,6 +137,7 @@ export default function WorkOrdersPage() {
   const divisionIds = useMemo(() => searchParams.getAll('division'), [searchParams]);
   const regionIds = useMemo(() => searchParams.getAll('region'), [searchParams]);
   const itemStatusIds = useMemo(() => searchParams.getAll('itemStatus'), [searchParams]);
+  const assignedId = searchParams.get('assigned') ?? '';
   const datePreset = (searchParams.get('date') as DatePreset | null) ?? '';
   const customFrom = searchParams.get('from') ?? '';
   const customTo = searchParams.get('to') ?? '';
@@ -198,11 +201,26 @@ export default function WorkOrdersPage() {
     queryKey: ['work-item-statuses'],
     queryFn: () => workItemStatusesApi.getAll(),
   });
+  // Assigned-user filter options. Same source as AssignTechnicianDialog: every
+  // enabled user is assignable (techs, sales, estimators) until role-based
+  // filtering exists.
+  const { data: users } = useQuery({
+    queryKey: ['users'],
+    queryFn: () => userApi.getAll(),
+  });
 
   const activeTypes = (Array.isArray(workOrderTypes) ? workOrderTypes : []).filter((x) => x.isActive);
   const activeDivisions = (Array.isArray(divisions) ? divisions : []).filter((x) => x.isActive);
   const activeRegions = (Array.isArray(regions) ? regions : []).filter((x) => x.isActive !== false);
   const activeItemStatuses = (Array.isArray(itemStatuses) ? itemStatuses : []).filter((x) => x.isActive);
+  const userOptions = useMemo(
+    () =>
+      (Array.isArray(users) ? users : [])
+        .filter((u) => u.enabled)
+        .map((u) => ({ id: u.id, name: `${u.firstName} ${u.lastName}`.trim() || u.email }))
+        .sort((a, b) => a.name.localeCompare(b.name)),
+    [users]
+  );
 
   // ── Resolve date range to send to the API ─────────────────────────────────
   const dateRange = useMemo<{ from?: string; to?: string }>(() => {
@@ -230,13 +248,14 @@ export default function WorkOrdersPage() {
       divisionIds: divisionIds.length > 0 ? divisionIds : undefined,
       dispatchRegionIds: regionIds.length > 0 ? regionIds : undefined,
       workItemStatusIds: itemStatusIds.length > 0 ? itemStatusIds : undefined,
+      assignedUserId: assignedId || undefined,
       scheduledDateFrom: dateRange.from,
       scheduledDateTo: dateRange.to,
       includeArchived: includeArchived || undefined,
       page: pageNumber - 1, // URL is 1-based; backend Spring Page is 0-based
       size: PAGE_SIZE,
     }),
-    [tab, deferredSearch, typeIds, divisionIds, regionIds, itemStatusIds, dateRange, includeArchived, pageNumber]
+    [tab, deferredSearch, typeIds, divisionIds, regionIds, itemStatusIds, assignedId, dateRange, includeArchived, pageNumber]
   );
 
   const { data: pageData, isLoading, error } = useQuery({
@@ -372,6 +391,14 @@ export default function WorkOrdersPage() {
       label: t('workOrders.filters.itemStatus'),
       value: formatMultiValue(itemStatusIds, activeItemStatuses) ?? '',
       onClear: () => updateParams({ itemStatus: [], page: null }),
+    });
+  }
+  if (assignedId) {
+    activeChips.push({
+      key: 'assigned',
+      label: t('workOrders.filters.assigned'),
+      value: lookupName(assignedId, userOptions),
+      onClear: () => updateParams({ assigned: null, page: null }),
     });
   }
   if (datePreset !== '') {
@@ -532,6 +559,28 @@ export default function WorkOrdersPage() {
                 </FilterChipListbox>
               )}
 
+              {/* Assigned is single-select — assignedUserId takes one UUID.
+                  Matches WOs with at least one non-cancelled dispatch assigned
+                  to the user, including completed/no-show visits ("Brian's
+                  work orders" includes past trips). */}
+              {userOptions.length > 0 && (
+                <FilterChipListbox
+                  label={t('workOrders.filters.assigned')}
+                  ariaLabel={t('workOrders.filters.assigned')}
+                  value={assignedId || null}
+                  displayValue={assignedId ? lookupName(assignedId, userOptions) : null}
+                  onChange={(id) => updateParams({ assigned: id, page: null })}
+                  onClear={() => updateParams({ assigned: null, page: null })}
+                  resetLabel={t('workOrders.filters.anyone')}
+                >
+                  {userOptions.map((u) => (
+                    <ChipListboxOption key={u.id} value={u.id}>
+                      {u.name}
+                    </ChipListboxOption>
+                  ))}
+                </FilterChipListbox>
+              )}
+
               <FilterChipListbox
                 label={t('workOrders.filters.scheduled')}
                 ariaLabel={t('workOrders.filters.scheduled')}
@@ -686,6 +735,7 @@ export default function WorkOrdersPage() {
                     <th>{t('workOrders.table.type')}</th>
                     <th>{t('workOrders.table.statusHeader')}</th>
                     <th>{t('workOrders.table.priority')}</th>
+                    <th>{t('workOrders.table.assigned')}</th>
                     <th>{t('workOrders.table.scheduled')}</th>
                     <th></th>
                   </tr>
@@ -763,6 +813,9 @@ export default function WorkOrdersPage() {
                           <Pill tone={PRIORITY_TONES[workOrder.priority ?? 'NORMAL']}>
                             {t(`workOrders.priority.${PRIORITY_TRANSLATION_KEYS[workOrder.priority ?? 'NORMAL']}`)}
                           </Pill>
+                        </td>
+                        <td>
+                          <AssignedUsersCell users={workOrder.technicians} />
                         </td>
                         <td>
                           {formatDate(workOrder.scheduledDate)}

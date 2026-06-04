@@ -200,12 +200,21 @@ describe('ServiceLocationDetailPage', () => {
     });
 
     const techLocation = { ...mockLocation, hasOpenJobs: true };
+    // Assigned users ride the WO search rows (`technicians[]`, most-relevant-
+    // first) — no scheduling merge. wo-4 has none → dash, not an error.
     const workOrders = [
-      makeWO({ id: 'wo-1', workOrderNumber: 'WO-5000', priority: 'URGENT', equip: { label: 'RTU-3', count: 1 } }),
-      makeWO({ id: 'wo-2', workOrderNumber: 'WO-5001' }),
-      makeWO({ id: 'wo-3', workOrderNumber: 'WO-5002', progressCategory: 'COMPLETED' }),
-      makeWO({ id: 'wo-4', workOrderNumber: 'WO-5003', progressCategory: 'NOT_STARTED' }),
+      makeWO({
+        id: 'wo-1', workOrderNumber: 'WO-5000', priority: 'URGENT', equip: { label: 'RTU-3', count: 1 },
+        technicians: [{ userId: 'u-1', name: 'Dana Park' }, { userId: 'u-2', name: 'Lee Wong' }],
+      }),
+      makeWO({ id: 'wo-2', workOrderNumber: 'WO-5001', technicians: [{ userId: 'u-3', name: null }] }),
+      makeWO({
+        id: 'wo-3', workOrderNumber: 'WO-5002', progressCategory: 'COMPLETED',
+        technicians: [{ userId: 'u-4', name: 'Sam Lee' }],
+      }),
+      makeWO({ id: 'wo-4', workOrderNumber: 'WO-5003', progressCategory: 'NOT_STARTED', technicians: [] }),
     ];
+    // location-tech now feeds the attention strip's on-site row only.
     const locationTech = {
       onSiteTech: {
         name: 'Dana Park',
@@ -215,12 +224,7 @@ describe('ServiceLocationDetailPage', () => {
         since: new Date(Date.now() - 50 * 60 * 60 * 1000).toISOString(),
         eta: new Date(Date.now() - 51 * 60 * 60 * 1000).toISOString(),
       },
-      techByWorkOrder: {
-        'wo-1': { name: 'Dana Park', state: 'ON_SITE', extra: 1, live: true },
-        'wo-2': { name: null, state: 'SCHEDULED', extra: 0, live: false },
-        'wo-3': { name: 'Sam Lee', state: 'DONE', extra: 0, live: false },
-        // wo-4 intentionally absent → renders a dash, not an error.
-      },
+      techByWorkOrder: {},
     };
 
     it('surfaces the live on-site tech row in the attention strip', async () => {
@@ -238,14 +242,14 @@ describe('ServiceLocationDetailPage', () => {
       await waitFor(() => expect(screen.getByText(/1 urgent job/)).toBeInTheDocument());
     });
 
-    it('renders the resolved tech per work-order row (name, +N, null fallback)', async () => {
+    it('renders embedded assigned users per work-order row (name, +N, null fallback)', async () => {
       mockApiResponses(techLocation, [], [], workOrders, locationTech);
       renderDetailPage();
-      // on-site lead with +N overflow
+      // lead with +N overflow
       await waitFor(() => expect(screen.getByText('Dana Park +1')).toBeInTheDocument());
       // null name falls back rather than blanking the cell
-      expect(screen.getByText('Tech assigned')).toBeInTheDocument();
-      // historical (DONE) lead still shown
+      expect(screen.getByText('Assigned user')).toBeInTheDocument();
+      // past (completed) lead still shown
       expect(screen.getByText('Sam Lee')).toBeInTheDocument();
     });
   });

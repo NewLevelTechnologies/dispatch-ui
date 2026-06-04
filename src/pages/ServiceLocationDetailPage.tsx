@@ -45,7 +45,6 @@ import {
   type LocationDispatchResponse,
   type DispatchStatus,
   type OnSiteTech,
-  type WorkOrderTech,
   type Tag,
   NotificationChannel,
   type NotificationPreferenceDto,
@@ -82,6 +81,7 @@ import NotificationPreferencesDialog from '../components/NotificationPreferences
 import EquipmentThumbnail from '../components/EquipmentThumbnail';
 import ConfirmDialog from '../components/ConfirmDialog';
 import NoteDialog from '../components/NoteDialog';
+import { AssignedUsersCell } from '../components/ui/AssignedUsersCell';
 import TagPicker from '../components/TagPicker';
 import { TagPill } from '../components/ui/TagPill';
 import { nextTagColor } from '../utils/tagColor';
@@ -764,9 +764,10 @@ function TabStub({ label }: { label: string }) {
 // ─────────────────────────────────────────────────────────────────────────
 // Overview tab
 // ─────────────────────────────────────────────────────────────────────────
-// Resolved-tech read shared by the attention strip (on-site tech) and the
-// work-orders card (per-WO tech). Same query key in both consumers → one
-// request, two readers (like workOrdersListQueryOptions).
+// Resolved-tech read for the attention strip's on-site row (name/WO/since).
+// The work-orders card no longer reads this — per-WO assigned users are
+// embedded on the WO search rows (`technicians[]`); this stays only for the
+// live on-site detail, which the embedded list doesn't carry.
 function locationTechQueryOptions(serviceLocationId: string) {
   return {
     queryKey: ['location-tech', serviceLocationId] as const,
@@ -1133,11 +1134,6 @@ function SiteWorkOrdersCard({
   });
   const safeTypes = Array.isArray(workOrderTypes) ? workOrderTypes : [];
 
-  // Resolved per-WO tech, merged into rows by workOrderId. {} (or a row not in
-  // the map) just means that WO has no dispatches — render a dash, not an error.
-  const { data: locationTech } = useQuery(locationTechQueryOptions(location.id));
-  const techByWorkOrder = locationTech?.techByWorkOrder ?? {};
-
   const items = data?.content ?? [];
   // Open first, then recent — backend already sorts by scheduledDate desc, so a
   // stable partition on open-ness is enough.
@@ -1182,9 +1178,9 @@ function SiteWorkOrdersCard({
                 <th className="px-3.5 py-2 font-semibold">{getName('work_order')}</th>
                 <th className="px-3.5 py-2 font-semibold">{getName('equipment')}</th>
                 <th className="px-3.5 py-2 font-semibold">{t('workOrders.table.statusHeader')}</th>
-                {/* Relevance-resolved tech (on-site > next scheduled > last lead),
-                    merged from scheduling-service's location-tech read. */}
-                <th className="px-3.5 py-2 font-semibold">Tech</th>
+                {/* Relevance-resolved assigned users (on-site > next scheduled
+                    > last lead), embedded on the WO row — no scheduling merge. */}
+                <th className="px-3.5 py-2 font-semibold">{t('workOrders.table.assigned')}</th>
                 <th className="px-3.5 py-2 font-semibold">{t('workOrders.table.scheduled')}</th>
               </tr>
             </thead>
@@ -1194,7 +1190,6 @@ function SiteWorkOrdersCard({
                   key={wo.id}
                   wo={wo}
                   typeName={safeTypes.find((tp) => tp.id === wo.workOrderTypeId)?.name}
-                  tech={techByWorkOrder[wo.id]}
                 />
               ))}
             </tbody>
@@ -1208,11 +1203,9 @@ function SiteWorkOrdersCard({
 function WorkOrderRow({
   wo,
   typeName,
-  tech,
 }: {
   wo: WorkOrderSummary;
   typeName?: string;
-  tech?: WorkOrderTech;
 }) {
   const navigate = useNavigate();
   const { t } = useTranslation();
@@ -1282,7 +1275,7 @@ function WorkOrderRow({
         )}
       </td>
       <td className="px-3.5 py-2">
-        <WorkOrderTechCell tech={tech} />
+        <AssignedUsersCell users={wo.technicians} />
       </td>
       <td className="px-3.5 py-2 text-[11.5px] text-fg-muted">{formatWoDate(wo.scheduledDate)}</td>
     </tr>
@@ -1292,42 +1285,6 @@ function WorkOrderRow({
 function techInitials(name: string): string {
   const parts = name.trim().split(/\s+/);
   return ((parts[0]?.[0] ?? '') + (parts[1]?.[0] ?? '')).toUpperCase();
-}
-
-// Round initials avatar (round = person) + relevance-resolved name. On-site
-// shows a live dot; a finished (DONE) tech is muted; +N for multi-dispatch (a
-// count, not stacked avatars — too dense for the row). Avatar bg uses the same
-// name-hash (roleColor) as user avatars elsewhere, so a person reads the same
-// color everywhere. Name can be null while the user-cache catches up — fall
-// back to "Tech assigned" rather than blanking.
-function WorkOrderTechCell({ tech }: { tech?: WorkOrderTech }) {
-  if (!tech) return <span className="text-[11px] text-fg-dim">—</span>;
-
-  const named = Boolean(tech.name);
-  const name = tech.name ?? 'Tech assigned';
-  const done = tech.state === 'DONE';
-  return (
-    <span className="flex items-center gap-1.5">
-      <span className="relative shrink-0">
-        <span
-          className="flex size-[18px] items-center justify-center rounded-full text-[8.5px] font-bold text-white"
-          style={{ background: named ? roleColor(name) : 'var(--fg-dim)', opacity: done ? 0.6 : 1 }}
-        >
-          {named ? techInitials(name) : '—'}
-        </span>
-        {tech.live && (
-          <span
-            className="absolute -bottom-px -right-px size-[7px] rounded-full bg-info-500"
-            style={{ border: '1.5px solid var(--bg-elev)' }}
-          />
-        )}
-      </span>
-      <span className={`text-[12px] ${done ? 'text-fg-muted' : 'text-fg'}`}>
-        {name}
-        {tech.extra > 0 ? ` +${tech.extra}` : ''}
-      </span>
-    </span>
-  );
 }
 
 const ACTIVITY_GLYPH_STYLE: Record<MockTone, { bg: string; fg: string }> = {
@@ -3465,8 +3422,10 @@ function formatVisitWindow(startIso: string, endIso: string): string {
     : `${VISIT_DATE_FMT.format(s)} ${VISIT_TIME_FMT.format(s)} – ${VISIT_DATE_FMT.format(e)} ${VISIT_TIME_FMT.format(e)}`;
 }
 
-function visitRowTitle(v: LocationDispatchResponse): string | null {
-  return v.workOrderSummary || v.workOrderNumber || v.workOrderTypeName || null;
+// Summary preferred, WO number as the floor — workOrderNumber is non-nullable
+// on this endpoint (unsynced-WO dispatches are omitted), so a title always exists.
+function visitRowTitle(v: LocationDispatchResponse): string {
+  return v.workOrderSummary || v.workOrderNumber;
 }
 
 function VisitsTab({ location }: { location: ServiceLocationDetailDto }) {
@@ -3607,9 +3566,9 @@ function VisitRow({
       </td>
       <td className="px-3.5 py-2">
         <div className="font-mono text-[11px] text-fg-muted">
-          {visit.workOrderNumber ?? `#${visit.workOrderId.slice(0, 8)}`}
+          {visit.workOrderNumber}
         </div>
-        {title && title !== visit.workOrderNumber && (
+        {title !== visit.workOrderNumber && (
           <div className={`mt-0.5 max-w-[280px] truncate text-[10.5px] ${didntHappen ? 'text-fg-muted line-through' : 'text-fg'}`} title={title}>
             {title}
           </div>
@@ -3697,11 +3656,6 @@ function JobsTab({ location, onNewJob }: { location: ServiceLocationDetailDto; o
   });
   const safeTypes = useMemo(() => (Array.isArray(workOrderTypes) ? workOrderTypes : []), [workOrderTypes]);
   const typeName = (id?: string | null) => safeTypes.find((tp) => tp.id === id)?.name;
-
-  // Same resolved-tech read the overview uses (shared cache). techByWorkOrder
-  // covers the relevant WOs; a row not in it renders a dash, not an error.
-  const { data: locationTech } = useQuery(locationTechQueryOptions(location.id));
-  const techByWorkOrder = locationTech?.techByWorkOrder ?? {};
 
   const statusParams = JOB_STATUS_FILTERS.find((s) => s.id === statusId)?.params ?? {};
   const range = datePreset && datePreset !== 'custom' ? rangeForPreset(datePreset) : undefined;
@@ -3880,13 +3834,13 @@ function JobsTab({ location, onNewJob }: { location: ServiceLocationDetailDto; o
                     <th className="px-3.5 py-2 font-semibold">{getName('work_order')}</th>
                     <th className="px-3.5 py-2 font-semibold">{getName('equipment')}</th>
                     <th className="px-3.5 py-2 font-semibold">{t('workOrders.table.statusHeader')}</th>
-                    <th className="px-3.5 py-2 font-semibold">Tech</th>
+                    <th className="px-3.5 py-2 font-semibold">{t('workOrders.table.assigned')}</th>
                     <th className="px-3.5 py-2 font-semibold">{t('workOrders.table.scheduled')}</th>
                   </tr>
                 </thead>
                 <tbody>
                   {rows.map((wo) => (
-                    <WorkOrderRow key={wo.id} wo={wo} typeName={typeName(wo.workOrderTypeId)} tech={techByWorkOrder[wo.id]} />
+                    <WorkOrderRow key={wo.id} wo={wo} typeName={typeName(wo.workOrderTypeId)} />
                   ))}
                 </tbody>
               </table>

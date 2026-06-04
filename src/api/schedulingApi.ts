@@ -134,14 +134,12 @@ export function dispatchRowTitle(row: DispatchBoardRow): string | null {
 // The Visits tab on the location detail page. SEPARATE (bespoke) mapping from
 // the paged board, selected by the serviceLocationId param — it carries the
 // `when=upcoming` card semantic + the denormalized LocationDispatchResponse
-// shape the generic board doesn't. Now returns PageResponse<LocationDispatchResponse>;
-// the client method reads `.content` (and still tolerates a bare array for
+// shape the generic board doesn't. Returns the standard page envelope; the
+// client method reads `.content` (and still tolerates a bare array for
 // safety). Ordering is fixed server-side by intent (no sort param): upcoming →
 // arrival window ascending; otherwise newest first.
 //
-// FIELD NAMES inferred from the board row (workOrderNumber / workOrderTypeName /
-// workOrderSummary / assignedUserName) — confirm against the actual
-// LocationDispatchResponse DTO.
+// Field names confirmed against the real DTO (2026-06-04).
 export interface LocationDispatchResponse {
   id: string;
   workOrderId: string;
@@ -155,8 +153,11 @@ export interface LocationDispatchResponse {
   notes: string | null;
   createdAt: string;
   updatedAt: string;
-  // Denormalized display fields — nullable until the WO / user syncs to cache.
-  workOrderNumber: string | null;
+  // Denormalized display fields. workOrderNumber is NON-nullable by contract:
+  // a dispatch whose WO hasn't synced into scheduling's cache is omitted from
+  // this list entirely, so a row always carries its number. The rest are
+  // nullable until the WO / user syncs.
+  workOrderNumber: string;
   workOrderTypeName: string | null;
   workOrderSummary: string | null;
   assignedUserName: string | null;

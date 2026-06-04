@@ -425,6 +425,68 @@ describe('WorkOrdersPage', () => {
     });
   });
 
+  describe('Assigned users (embedded technicians[])', () => {
+    const mockUsers = [
+      { id: 'user-1', firstName: 'Brian', lastName: 'Ortega', email: 'brian@example.com', enabled: true },
+      { id: 'user-2', firstName: 'Dana', lastName: 'Park', email: 'dana@example.com', enabled: true },
+    ];
+
+    // Route /users to a real user page; everything else gets the WO page.
+    const mockGets = (workOrders: unknown[]) => {
+      vi.mocked(apiClient.get).mockImplementation((url) =>
+        Promise.resolve(
+          String(url).startsWith('/users')
+            ? { data: pageOf(mockUsers) }
+            : { data: pageOf(workOrders) }
+        )
+      );
+    };
+
+    it('renders the assigned column from embedded technicians (lead + overflow, dash when empty)', async () => {
+      mockGets([
+        {
+          ...mockWorkOrders[0],
+          technicians: [
+            { userId: 'user-2', name: 'Dana Park' },
+            { userId: 'user-1', name: 'Brian Ortega' },
+          ],
+        },
+        { ...mockWorkOrders[1], technicians: [] },
+      ]);
+
+      renderWithProviders(<WorkOrdersPage />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Dana Park +1')).toBeInTheDocument();
+      });
+    });
+
+    it('selecting an assigned user updates the URL and the API query', async () => {
+      mockGets(mockWorkOrders);
+      const user = userEvent.setup();
+      const { router } = renderWithProviders(<WorkOrdersPage />);
+
+      const assignedFilter = await screen.findByRole('button', { name: /assigned/i });
+      await user.click(assignedFilter);
+
+      const brian = await screen.findByRole('option', { name: /brian ortega/i });
+      await user.click(brian);
+
+      await waitFor(() => {
+        expect(router.state.location.search).toContain('assigned=user-1');
+      });
+      await waitFor(() => {
+        const woCalls = vi.mocked(apiClient.get).mock.calls.filter(([url]) =>
+          String(url).startsWith('/work-orders')
+        );
+        const lastParams = woCalls[woCalls.length - 1]?.[1]?.params as
+          | { assignedUserId?: string }
+          | undefined;
+        expect(lastParams?.assignedUserId).toBe('user-1');
+      });
+    });
+  });
+
   describe('Archive flow', () => {
     it('shows archive confirmation when archive action is clicked', async () => {
       vi.mocked(apiClient.get).mockResolvedValue({
