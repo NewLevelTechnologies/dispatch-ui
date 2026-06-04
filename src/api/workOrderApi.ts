@@ -98,6 +98,12 @@ export interface WorkItemSummaryProjection {
   statusCategory: ProgressCategory;
 }
 
+// One distinct tech on a WO's dispatches, as embedded on search rows.
+export interface WorkOrderTechnician {
+  userId: string; // UUID — stable avatar/color lookup
+  name: string | null; // "First Last"; null only if the user cache hasn't synced
+}
+
 // Slim shape returned by the list endpoint. Includes a capped projection
 // of work items (description + statusCategory) so list surfaces can
 // answer "what is this WO about" at a glance; full WorkItemResponse[] —
@@ -166,6 +172,13 @@ export interface WorkOrderSummary {
   // when no equipment is linked. Load-bearing on rows where the AI summary
   // doesn't name the equipment.
   equip?: { label: string; count: number } | null;
+
+  // Distinct techs across the WO's non-cancelled dispatches, most-relevant-
+  // first (on-site → soonest upcoming → most recent past). Always present on
+  // search rows ([] = no dispatches) — render technicians[0] + "+N", no second
+  // fetch or merge needed. Optional on the type only because detail reads
+  // share this shape.
+  technicians?: WorkOrderTechnician[];
 
   createdAt: string;
   updatedAt: string;
@@ -283,6 +296,13 @@ export interface ListWorkOrdersParams {
   // attached to this equipment. Powers the Service History tab on the
   // equipment detail page.
   equipmentId?: string;
+
+  // Technician scope — single user UUID, combinable with every other filter.
+  // Matches work orders having at least one non-cancelled dispatch assigned to
+  // that user (completed and no-show visits count; cancelled assignments and
+  // deleted dispatches never match). Reads the same table that populates
+  // `technicians`, so a matching row always shows the user in its column.
+  assignedUserId?: string;
 
   // Scheduled date range — ISO yyyy-mm-dd. From is inclusive at 00:00,
   // To is exclusive at 00:00 of the next day (handled server-side).

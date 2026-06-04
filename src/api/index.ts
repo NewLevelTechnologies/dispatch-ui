@@ -110,6 +110,7 @@ export {
   WorkOrderPriority,
   type WorkOrder,
   type WorkOrderSummary,
+  type WorkOrderTechnician,
   type WorkItemResponse,
   type WorkItemSummaryProjection,
   type WorkItemEquipmentSummary,
