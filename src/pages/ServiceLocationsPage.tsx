@@ -555,7 +555,7 @@ export default function ServiceLocationsPage() {
                           </td>
                           <td>
                             {location.dispatchRegionName ? (
-                              <span className="font-mono text-[11.5px] text-fg-muted">
+                              <span className="text-[11.5px] text-fg-muted">
                                 {location.dispatchRegionName}
                               </span>
                             ) : (
