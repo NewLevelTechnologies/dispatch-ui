@@ -177,7 +177,7 @@ export default function NotificationPreferencesDialog({
             </span>
           )}
           {contact.email && (
-            <span className="inline-flex items-center gap-1 font-mono text-fg-strong">
+            <span className="inline-flex items-center gap-1 text-fg-strong">
               <EnvelopeIcon className="size-3.5 text-fg-muted" />
               {contact.email}
             </span>

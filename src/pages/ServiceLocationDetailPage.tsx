@@ -433,7 +433,8 @@ function LocationHeader({
   // to the Add/Edit Location pass (no writer yet), so they're intentionally absent.
   const meta: React.ReactNode[] = [];
   if (fullAddress) meta.push(<span key="addr">{fullAddress}</span>);
-  if (regionLabel) meta.push(<span key="region" className="font-mono">{regionLabel}</span>);
+  // Abbreviation is a code (read as characters) → mono; full region name is prose → proportional.
+  if (regionLabel) meta.push(<span key="region" className={location.region?.abbreviation ? 'font-mono' : undefined}>{regionLabel}</span>);
 
   return (
     <div className="mb-3 flex flex-col gap-3 rounded-[10px] border border-border bg-bg-elev px-4 py-3.5 shadow-sm sm:flex-row sm:items-center sm:gap-3.5">
@@ -1255,11 +1256,12 @@ function WorkOrderRow({
           {jobLabel}
         </div>
       </td>
-      {/* Count-led equipment — label is "RTU-04" (1) or "3 units" (>1); a dash
-          when nothing is linked. Load-bearing since the summary may not name it. */}
+      {/* Count-led equipment — label is the unit name (1) or "3 units" (>1); a dash
+          when nothing is linked. Load-bearing since the summary may not name it.
+          Read as words either way → proportional, not mono. */}
       <td className="px-3.5 py-2">
         {wo.equip && wo.equip.count > 0 ? (
-          <span className="font-mono text-[11px] text-fg-muted">{wo.equip.label}</span>
+          <span className="text-[11px] text-fg-muted">{wo.equip.label}</span>
         ) : (
           <span className="text-[11px] text-fg-dim">—</span>
         )}
@@ -1988,7 +1990,7 @@ function ContactBlock({
       {contact.email && (
         <a
           href={`mailto:${contact.email}`}
-          className="mt-0.5 block truncate font-mono text-[11px] text-fg-muted hover:text-fg-strong hover:underline"
+          className="mt-0.5 block truncate text-[11px] text-fg-muted hover:text-fg-strong hover:underline"
         >
           {contact.email}
         </a>
@@ -2319,7 +2321,7 @@ function ContactsTab({ location, canEdit }: { location: ServiceLocationDetailDto
                       {c.email ? (
                         <a
                           href={`mailto:${c.email}`}
-                          className="font-mono text-[11.5px] text-fg-muted hover:text-fg-strong hover:underline"
+                          className="text-[11.5px] text-fg-muted hover:text-fg-strong hover:underline"
                         >
                           {c.email}
                         </a>
