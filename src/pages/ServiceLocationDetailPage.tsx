@@ -433,6 +433,12 @@ function LocationHeader({
   // to the Add/Edit Location pass (no writer yet), so they're intentionally absent.
   const meta: React.ReactNode[] = [];
   if (fullAddress) meta.push(<span key="addr">{fullAddress}</span>);
+  // Record number follows the address — the address is what a CSR scans for
+  // first, so it stays directly under the name. Identifier read as
+  // characters → mono.
+  if (location.locationNumber) {
+    meta.push(<span key="num" className="font-mono">{location.locationNumber}</span>);
+  }
   // Abbreviation is a code (read as characters) → mono; full region name is prose → proportional.
   if (regionLabel) meta.push(<span key="region" className={location.region?.abbreviation ? 'font-mono' : undefined}>{regionLabel}</span>);
 
