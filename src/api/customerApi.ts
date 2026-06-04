@@ -47,6 +47,9 @@ export type PremiseType = 'BUSINESS' | 'RESIDENCE';
 
 export interface ServiceLocation {
   id: string;
+  // Server-assigned, read-only identifier (e.g. "L-00042"). Never sent on
+  // create/update; backfilled records already have numbers.
+  locationNumber?: string;
   customerId: string;
   dispatchRegionId: string;
   locationName?: string | null;
@@ -69,6 +72,7 @@ export interface ServiceLocation {
 
 export interface ServiceLocationSearchResult {
   id: string;
+  locationNumber?: string;
   customerId: string;
   customerName: string;
   locationName?: string | null;
@@ -115,6 +119,9 @@ export interface TagSummary {
 
 export interface CustomerListDto {
   id: string;
+  // Server-assigned, read-only identifier (e.g. "C-00042"). Never sent on
+  // create/update; backfilled records already have numbers.
+  customerNumber?: string;
   name: string;
   email: string;
   phone?: string | null;
@@ -168,6 +175,7 @@ export interface CustomerListResponse {
 
 export interface CustomerSearchResult {
   id: string;
+  customerNumber?: string;
   name: string;
   type: CustomerType;
   category?: CustomerCategory | null;
@@ -188,6 +196,7 @@ export interface CustomerSearchResponse {
 
 export interface ServiceLocationListDto {
   id: string;
+  locationNumber?: string;
   customerId: string;
   customerName: string;
   locationName?: string | null;
@@ -245,6 +254,7 @@ export interface ServiceLocationListResponse {
 // Includes everything: full location + customer info + contacts
 export interface ServiceLocationDetailDto {
   id: string;
+  locationNumber?: string;
   customerId: string;
   customerName: string;
   premiseType: PremiseType;
@@ -316,6 +326,7 @@ export type CustomerStatus = 'ACTIVE' | 'INACTIVE';
 
 export interface Customer {
   id: string;
+  customerNumber?: string;
   name: string;
   email: string;
   phone?: string | null;

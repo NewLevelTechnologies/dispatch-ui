@@ -452,6 +452,12 @@ export default function CustomersPage() {
                                 )}
                               </CellTop>
                               <CellSub>
+                                {customer.customerNumber && (
+                                  <span className="font-mono">{customer.customerNumber}</span>
+                                )}
+                                {customer.customerNumber && customer.serviceLocationCount > 1 && (
+                                  <span className="text-fg-dim"> · </span>
+                                )}
                                 {customer.serviceLocationCount > 1
                                   ? t('customers.table.locationsCount', { count: customer.serviceLocationCount })
                                   : null}

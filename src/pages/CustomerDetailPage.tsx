@@ -375,6 +375,12 @@ export default function CustomerDetailPage() {
               <div className="flex-1 min-w-0">
                 <Heading className="text-2xl">{customer.name}</Heading>
                 <Text className="mt-1 flex flex-wrap items-center gap-1">
+                  {customer.customerNumber && (
+                    <>
+                      <span className="font-mono">{customer.customerNumber}</span>
+                      <span className="mx-1">•</span>
+                    </>
+                  )}
                   <PhoneIcon className="inline h-4 w-4 text-zinc-400" />
                   {customer.phone ? (
                     <a href={`tel:${customer.phone}`} className="hover:underline">
@@ -539,6 +545,11 @@ export default function CustomerDetailPage() {
                   {customer.name}
                 </Heading>
                 <div className="mt-1 flex flex-wrap items-center gap-2">
+                  {customer.customerNumber && (
+                    <span className="font-mono text-sm text-zinc-500 dark:text-zinc-400">
+                      {customer.customerNumber}
+                    </span>
+                  )}
                   {isBillingOnly && (
                     <Badge color="zinc">{t('customers.detail.billingOnlyBadge')}</Badge>
                   )}
