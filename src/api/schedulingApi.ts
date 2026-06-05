@@ -136,12 +136,13 @@ export function dispatchRowTitle(row: DispatchBoardRow): string | null {
 // drop it and the same path is the tenant-wide board with a different row
 // shape and different params. Never share a query builder between the two.
 //
-// Params here are exactly { serviceLocationId, when, page, size } — no q, no
-// status, no sort (ordering is fixed server-side by `when`: upcoming → arrival
-// window ascending; anything else → newest first; sort directives are silently
-// ignored). Search/status filters on this tab are pending backend asks.
+// Params: { serviceLocationId, when, q, status, from, to, page, size }. All
+// filters AND together on top of the `when` partition. No sort — ordering is
+// fixed server-side by `when` (upcoming → arrival window ascending; otherwise
+// newest first; sort directives are silently ignored).
 //
-// Field names confirmed against the real DTO (2026-06-04).
+// Field names confirmed against the real DTO (2026-06-04); filter params
+// landed 2026-06-05.
 export interface LocationDispatchResponse {
   id: string;
   workOrderId: string;
@@ -166,13 +167,12 @@ export interface LocationDispatchResponse {
 }
 
 // `when=upcoming` → STRICTLY future open visits (arrival window start ≥ now AND
-// status SCHEDULED/IN_PROGRESS), soonest first. A tech on site whose window
-// opened an hour ago is NOT upcoming — that visit lives in the history listing
-// (live on-site state belongs to the location-tech attention strip). Any other
-// value, or omitted → full visit history (incl. CANCELLED/NO_SHOW), newest
-// first. We send `past` for the history half of the Visits tab; today the
-// server serves it as the full listing, and a pending backend ask narrows it
-// to the exact complement of `upcoming`.
+// status SCHEDULED/IN_PROGRESS), soonest first. `when=past` → the exact
+// complement (window already started OR a terminal status), newest first — so
+// a tech on site now, or a missed still-SCHEDULED visit, is in `past`, not
+// `upcoming` (live on-site state belongs to the location-tech attention
+// strip). Omitted → the full listing (the union), newest first — that's what
+// the tab-count badge reads.
 export type LocationDispatchesWhen = 'upcoming' | 'past';
 
 // Same PageResponse envelope as the board (`page`, not Spring's `number`),
@@ -189,6 +189,16 @@ export interface LocationDispatchPage {
 
 export interface ListLocationDispatchesParams {
   when?: LocationDispatchesWhen;
+  // Case-insensitive substring over WO number, WO summary, and assigned user
+  // name. Literal %/_ are escaped server-side (unlike the board's q).
+  q?: string;
+  // Repeatable — pass an array for OR semantics (?status=A&status=B; the
+  // shared client serializes arrays bracket-free). Case-insensitive; unknown
+  // values match nothing rather than erroring. Combined with when=upcoming,
+  // terminal statuses are a valid-but-always-empty request.
+  status?: DispatchStatus | DispatchStatus[];
+  from?: string; // ISO instant — arrivalWindowStart >= from (inclusive)
+  to?: string; // ISO instant — arrivalWindowStart < to (exclusive)
   page?: number; // 0-indexed
   size?: number; // clamped 1..200 server-side
 }
@@ -202,9 +212,9 @@ export const dispatchesApi = {
     serviceLocationId: string,
     params: ListLocationDispatchesParams = {},
   ): Promise<LocationDispatchPage> => {
-    const { when, page = 0, size = 200 } = params;
+    const { when, q, status, from, to, page = 0, size = 200 } = params;
     const response = await apiClient.get<LocationDispatchPage>('/scheduling/dispatches', {
-      params: { serviceLocationId, when, page, size },
+      params: { serviceLocationId, when, q, status, from, to, page, size },
     });
     return response.data;
   },

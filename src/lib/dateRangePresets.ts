@@ -31,6 +31,25 @@ export function isoDay(d: Date): string {
   return `${y}-${m}-${day}`;
 }
 
+// Same presets resolved to half-open ISO instants ([from, to)) for endpoints
+// that filter on a timestamp column rather than a day column (e.g. the
+// location dispatch list's arrivalWindowStart). Boundaries are LOCAL day
+// starts — the CSR thinks in wall-clock days — and the exclusive end is the
+// midnight AFTER the preset's inclusive last day. Built via the Date(y, m, d)
+// constructor (not start + 24h) so DST transitions can't skew the boundary.
+export function instantRangeForPreset(
+  preset: Exclude<DatePreset, '' | 'custom'>,
+  today = new Date(),
+): { from: string; to: string } {
+  const r = rangeForPreset(preset, today);
+  const [fy, fm, fd] = r.from.split('-').map(Number);
+  const [ty, tm, td] = r.to.split('-').map(Number);
+  return {
+    from: new Date(fy, fm - 1, fd).toISOString(),
+    to: new Date(ty, tm - 1, td + 1).toISOString(), // day overflow rolls the month
+  };
+}
+
 export function rangeForPreset(
   preset: Exclude<DatePreset, '' | 'custom'>,
   today = new Date(),

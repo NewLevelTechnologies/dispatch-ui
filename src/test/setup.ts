@@ -1127,6 +1127,7 @@ vi.mock('react-i18next', () => {
     'workOrders.dispatches.status.CANCELLED': 'Cancelled',
     'workOrders.dispatches.status.COMPLETED': 'Completed',
     'workOrders.dispatches.status.IN_PROGRESS': 'In Progress',
+    'workOrders.dispatches.status.NO_SHOW': 'No-show',
     'workOrders.dispatches.status.SCHEDULED': 'Scheduled',
     'workOrders.dispatches.statusUpdateError': 'Failed to update dispatch status',
     'workOrders.workItems.empty': 'No {{children, lowercase}} on this {{entity, lowercase}} yet.',
