@@ -64,15 +64,9 @@ import {
   type ListWorkOrdersParams,
 } from '../api';
 import { workOrdersListQueryOptions } from '../api/workOrdersListQuery';
-import {
-  type DatePreset,
-  DATE_PRESETS,
-  instantRangeForDays,
-  instantRangeForPreset,
-  rangeForPreset,
-} from '../lib/dateRangePresets';
+import { EMPTY_DATE_RANGE, instantRangeForDays, type DateRange } from '../lib/dateRangePresets';
 import { FilterChipListbox, ChipListboxOption } from '../components/ui/FilterChipListbox';
-import { DateRangeFields } from '../components/ui/DateRangeFields';
+import { DateRangeChip } from '../components/ui/DateRangeChip';
 import { roleColor } from '../utils/roleColor';
 import { useGlossary } from '../contexts/GlossaryContext';
 import { useHasCapability } from '../hooks/useCurrentUser';
@@ -3218,27 +3212,19 @@ function InvoicesTab({ location }: { location: ServiceLocationDetailDto }) {
   const navigate = useNavigate();
 
   const [statusId, setStatusId] = useState('all');
-  const [datePreset, setDatePreset] = useState<DatePreset>('');
-  const [customFrom, setCustomFrom] = useState('');
-  const [customTo, setCustomTo] = useState('');
+  const [dateRange, setDateRange] = useState<DateRange>(EMPTY_DATE_RANGE);
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const deferredSearch = useDeferredValue(search.trim());
 
   const statusParams = INVOICE_STATUS_FILTERS.find((s) => s.id === statusId)?.params ?? {};
-  // Inclusive day strings either way — custom inputs pass through as typed.
-  const range =
-    datePreset === 'custom'
-      ? { from: customFrom || undefined, to: customTo || undefined }
-      : datePreset
-        ? rangeForPreset(datePreset)
-        : undefined;
 
   const params: ListInvoicesParams = {
     serviceLocationId: location.id,
     ...statusParams,
-    from: range?.from,
-    to: range?.to, // inclusive on the backend — no +1-day trick
+    // The chip's inclusive day strings pass through as-is.
+    from: dateRange.from || undefined,
+    to: dateRange.to || undefined, // inclusive on the backend — no +1-day trick
     q: deferredSearch || undefined,
     page: page - 1, // local state is 1-based; backend page is 0-based
     size: INVOICES_PAGE_SIZE,
@@ -3304,26 +3290,17 @@ function InvoicesTab({ location }: { location: ServiceLocationDetailDto }) {
     },
   ];
 
-  const filtersActive = statusId !== 'all' || !!datePreset || !!deferredSearch;
+  const filtersActive = statusId !== 'all' || Boolean(dateRange.from || dateRange.to) || !!deferredSearch;
   const showingStart = total === 0 ? 0 : (page - 1) * INVOICES_PAGE_SIZE + 1;
   const showingEnd = Math.min(page * INVOICES_PAGE_SIZE, total);
 
   const resetPage = () => setPage(1);
   const clearFilters = () => {
     setStatusId('all');
-    setDatePreset('');
-    setCustomFrom('');
-    setCustomTo('');
+    setDateRange(EMPTY_DATE_RANGE);
     setSearch('');
     resetPage();
   };
-
-  const dateDisplay =
-    datePreset === 'custom'
-      ? `${customFrom || '…'} – ${customTo || '…'}`
-      : datePreset
-        ? t(DATE_PRESETS.find((p) => p.id === datePreset)?.labelKey ?? '')
-        : null;
 
   return (
     <div className="flex flex-col gap-3">
@@ -3394,32 +3371,15 @@ function InvoicesTab({ location }: { location: ServiceLocationDetailDto }) {
           ))}
         </FilterChipListbox>
 
-        <FilterChipListbox
+        <DateRangeChip
           label="Issued"
           ariaLabel="Issued date"
-          value={datePreset || null}
-          displayValue={dateDisplay}
-          onChange={(id) => {
-            setDatePreset(id as DatePreset);
-            if (id !== 'custom') {
-              setCustomFrom('');
-              setCustomTo('');
-            }
+          value={dateRange}
+          onChange={(r) => {
+            setDateRange(r);
             resetPage();
           }}
-          onClear={() => {
-            setDatePreset('');
-            setCustomFrom('');
-            setCustomTo('');
-            resetPage();
-          }}
-        >
-          {DATE_PRESETS.filter((p) => p.id !== '').map((p) => (
-            <ChipListboxOption key={p.id} value={p.id}>
-              {t(p.labelKey)}
-            </ChipListboxOption>
-          ))}
-        </FilterChipListbox>
+        />
 
         {filtersActive && (
           <Button plain size="xs" onClick={clearFilters}>
@@ -3427,21 +3387,6 @@ function InvoicesTab({ location }: { location: ServiceLocationDetailDto }) {
           </Button>
         )}
       </div>
-
-      {datePreset === 'custom' && (
-        <DateRangeFields
-          from={customFrom}
-          to={customTo}
-          onFromChange={(v) => {
-            setCustomFrom(v);
-            resetPage();
-          }}
-          onToChange={(v) => {
-            setCustomTo(v);
-            resetPage();
-          }}
-        />
-      )}
 
       <Card
         title={<CardTitle icon={<ReceiptPercentIcon className="size-3.5" />}>{getName('invoice', true)}</CardTitle>}
@@ -3670,27 +3615,20 @@ function DispatchesTab({ location }: { location: ServiceLocationDetailDto }) {
   const navigate = useNavigate();
 
   const [statusSel, setStatusSel] = useState<'all' | DispatchStatus>('all');
-  const [datePreset, setDatePreset] = useState<DatePreset>('');
-  const [customFrom, setCustomFrom] = useState('');
-  const [customTo, setCustomTo] = useState('');
+  const [dateRange, setDateRange] = useState<DateRange>(EMPTY_DATE_RANGE);
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const deferredSearch = useDeferredValue(search.trim());
 
   // Shared filter slice — ANDs with the `when` partition on both queries.
-  // The date range is half-open ISO instants on arrivalWindowStart; custom
-  // day strings (either side open-ended) convert through the same boundary.
-  const range =
-    datePreset === 'custom'
-      ? instantRangeForDays(customFrom || undefined, customTo || undefined)
-      : datePreset
-        ? instantRangeForPreset(datePreset)
-        : undefined;
+  // The chip's inclusive day strings convert to half-open ISO instants on
+  // arrivalWindowStart (either side open-ended).
+  const range = instantRangeForDays(dateRange.from || undefined, dateRange.to || undefined);
   const filters = {
     q: deferredSearch || undefined,
     status: statusSel === 'all' ? undefined : statusSel,
-    from: range?.from,
-    to: range?.to,
+    from: range.from,
+    to: range.to,
   };
 
   // Two independent server views — fire in parallel. Upcoming is the small
@@ -3717,22 +3655,14 @@ function DispatchesTab({ location }: { location: ServiceLocationDetailDto }) {
   const isLoading = upcomingLoading || pastLoading;
   const openWorkOrder = (v: LocationDispatchResponse) => navigate(`/work-orders/${v.workOrderId}`);
 
-  const filtersActive = statusSel !== 'all' || !!datePreset || !!deferredSearch;
+  const filtersActive = statusSel !== 'all' || Boolean(dateRange.from || dateRange.to) || !!deferredSearch;
   const resetPage = () => setPage(1);
   const clearFilters = () => {
     setStatusSel('all');
-    setDatePreset('');
-    setCustomFrom('');
-    setCustomTo('');
+    setDateRange(EMPTY_DATE_RANGE);
     setSearch('');
     resetPage();
   };
-  const dateDisplay =
-    datePreset === 'custom'
-      ? `${customFrom || '…'} – ${customTo || '…'}`
-      : datePreset
-        ? t(DATE_PRESETS.find((p) => p.id === datePreset)?.labelKey ?? '')
-        : null;
 
   return (
     <div className="flex flex-col gap-3">
@@ -3781,32 +3711,15 @@ function DispatchesTab({ location }: { location: ServiceLocationDetailDto }) {
           ))}
         </FilterChipListbox>
 
-        <FilterChipListbox
+        <DateRangeChip
           label={t('workOrders.table.scheduled')}
           ariaLabel="Scheduled date"
-          value={datePreset || null}
-          displayValue={dateDisplay}
-          onChange={(id) => {
-            setDatePreset(id as DatePreset);
-            if (id !== 'custom') {
-              setCustomFrom('');
-              setCustomTo('');
-            }
+          value={dateRange}
+          onChange={(r) => {
+            setDateRange(r);
             resetPage();
           }}
-          onClear={() => {
-            setDatePreset('');
-            setCustomFrom('');
-            setCustomTo('');
-            resetPage();
-          }}
-        >
-          {DATE_PRESETS.filter((p) => p.id !== '').map((p) => (
-            <ChipListboxOption key={p.id} value={p.id}>
-              {t(p.labelKey)}
-            </ChipListboxOption>
-          ))}
-        </FilterChipListbox>
+        />
 
         {filtersActive && (
           <Button plain size="xs" onClick={clearFilters}>
@@ -3814,21 +3727,6 @@ function DispatchesTab({ location }: { location: ServiceLocationDetailDto }) {
           </Button>
         )}
       </div>
-
-      {datePreset === 'custom' && (
-        <DateRangeFields
-          from={customFrom}
-          to={customTo}
-          onFromChange={(v) => {
-            setCustomFrom(v);
-            resetPage();
-          }}
-          onToChange={(v) => {
-            setCustomTo(v);
-            resetPage();
-          }}
-        />
-      )}
 
       {isLoading ? (
         <Card padding="none">
@@ -4056,9 +3954,7 @@ function JobsTab({ location, onNewJob }: { location: ServiceLocationDetailDto; o
   // the open set (the Overview card already surfaces the open/recent peek).
   const [statusId, setStatusId] = useState('all');
   const [typeIds, setTypeIds] = useState<string[]>([]);
-  const [datePreset, setDatePreset] = useState<DatePreset>('');
-  const [customFrom, setCustomFrom] = useState('');
-  const [customTo, setCustomTo] = useState('');
+  const [dateRange, setDateRange] = useState<DateRange>(EMPTY_DATE_RANGE);
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const deferredSearch = useDeferredValue(search.trim());
@@ -4071,20 +3967,14 @@ function JobsTab({ location, onNewJob }: { location: ServiceLocationDetailDto; o
   const typeName = (id?: string | null) => safeTypes.find((tp) => tp.id === id)?.name;
 
   const statusParams = JOB_STATUS_FILTERS.find((s) => s.id === statusId)?.params ?? {};
-  // Inclusive day strings either way — custom inputs pass through as typed.
-  const range =
-    datePreset === 'custom'
-      ? { from: customFrom || undefined, to: customTo || undefined }
-      : datePreset
-        ? rangeForPreset(datePreset)
-        : undefined;
 
   const params: ListWorkOrdersParams = {
     serviceLocationId: location.id,
     ...statusParams,
     workOrderTypeIds: typeIds.length ? typeIds : undefined,
-    scheduledDateFrom: range?.from,
-    scheduledDateTo: range?.to,
+    // The chip's inclusive day strings pass through as-is.
+    scheduledDateFrom: dateRange.from || undefined,
+    scheduledDateTo: dateRange.to || undefined,
     q: deferredSearch || undefined,
     page: page - 1, // local state is 1-based; backend Page is 0-based
     size: JOBS_PAGE_SIZE,
@@ -4104,7 +3994,8 @@ function JobsTab({ location, onNewJob }: { location: ServiceLocationDetailDto; o
   const total = data?.totalElements ?? 0;
   const totalPages = data?.totalPages ?? 0;
 
-  const filtersActive = statusId !== 'all' || typeIds.length > 0 || !!datePreset || !!deferredSearch;
+  const filtersActive =
+    statusId !== 'all' || typeIds.length > 0 || Boolean(dateRange.from || dateRange.to) || !!deferredSearch;
   const showingStart = total === 0 ? 0 : (page - 1) * JOBS_PAGE_SIZE + 1;
   const showingEnd = Math.min(page * JOBS_PAGE_SIZE, total);
 
@@ -4112,21 +4003,13 @@ function JobsTab({ location, onNewJob }: { location: ServiceLocationDetailDto; o
   const clearFilters = () => {
     setStatusId('all');
     setTypeIds([]);
-    setDatePreset('');
-    setCustomFrom('');
-    setCustomTo('');
+    setDateRange(EMPTY_DATE_RANGE);
     setSearch('');
     resetPage();
   };
 
   const typeDisplay =
     typeIds.length === 1 ? (typeName(typeIds[0]) ?? '1 selected') : typeIds.length > 1 ? `${typeIds.length} selected` : null;
-  const dateDisplay =
-    datePreset === 'custom'
-      ? `${customFrom || '…'} – ${customTo || '…'}`
-      : datePreset
-        ? t(DATE_PRESETS.find((p) => p.id === datePreset)?.labelKey ?? '')
-        : null;
 
   return (
     <div className="flex flex-col gap-2.5">
@@ -4196,32 +4079,15 @@ function JobsTab({ location, onNewJob }: { location: ServiceLocationDetailDto; o
           </FilterChipListbox>
         )}
 
-        <FilterChipListbox
+        <DateRangeChip
           label={t('workOrders.table.scheduled')}
           ariaLabel="Scheduled date"
-          value={datePreset || null}
-          displayValue={dateDisplay}
-          onChange={(id) => {
-            setDatePreset(id as DatePreset);
-            if (id !== 'custom') {
-              setCustomFrom('');
-              setCustomTo('');
-            }
+          value={dateRange}
+          onChange={(r) => {
+            setDateRange(r);
             resetPage();
           }}
-          onClear={() => {
-            setDatePreset('');
-            setCustomFrom('');
-            setCustomTo('');
-            resetPage();
-          }}
-        >
-          {DATE_PRESETS.filter((p) => p.id !== '').map((p) => (
-            <ChipListboxOption key={p.id} value={p.id}>
-              {t(p.labelKey)}
-            </ChipListboxOption>
-          ))}
-        </FilterChipListbox>
+        />
 
         {filtersActive && (
           <Button plain size="xs" onClick={clearFilters}>
@@ -4235,21 +4101,6 @@ function JobsTab({ location, onNewJob }: { location: ServiceLocationDetailDto; o
           {t('common.actions.new', { entity: getName('work_order') })}
         </Button>
       </div>
-
-      {datePreset === 'custom' && (
-        <DateRangeFields
-          from={customFrom}
-          to={customTo}
-          onFromChange={(v) => {
-            setCustomFrom(v);
-            resetPage();
-          }}
-          onToChange={(v) => {
-            setCustomTo(v);
-            resetPage();
-          }}
-        />
-      )}
 
       <Card padding="none">
         {isLoading ? (

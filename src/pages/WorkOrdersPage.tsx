@@ -14,7 +14,13 @@ import {
   type ProgressCategory,
   type ListWorkOrdersParams,
 } from '../api';
-import { type DatePreset, DATE_PRESETS, rangeForPreset } from '../lib/dateRangePresets';
+import {
+  EMPTY_DATE_RANGE,
+  formatDateRange,
+  rangeForPreset,
+  type DatePreset,
+  type DateRange,
+} from '../lib/dateRangePresets';
 import { useGlossary } from '../contexts/GlossaryContext';
 import AppLayout from '../components/AppLayout';
 import WorkItemsCell from '../components/WorkItemsCell';
@@ -25,7 +31,7 @@ import { Button } from '../components/catalyst/button';
 import { Dropdown, DropdownButton, DropdownDivider, DropdownItem, DropdownLabel, DropdownMenu } from '../components/catalyst/dropdown';
 import { FilterChipListbox, ChipListboxOption } from '../components/ui/FilterChipListbox';
 import IconButton from '../components/IconButton';
-import { DateRangeFields } from '../components/ui/DateRangeFields';
+import { DateRangeChip } from '../components/ui/DateRangeChip';
 import { PageHead } from '../components/ui/PageHead';
 import { Card, CardBody } from '../components/ui/Card';
 import { Pill } from '../components/ui/Pill';
@@ -136,9 +142,11 @@ export default function WorkOrdersPage() {
   const regionIds = useMemo(() => searchParams.getAll('region'), [searchParams]);
   const itemStatusIds = useMemo(() => searchParams.getAll('itemStatus'), [searchParams]);
   const assignedId = searchParams.get('assigned') ?? '';
-  const datePreset = (searchParams.get('date') as DatePreset | null) ?? '';
   const customFrom = searchParams.get('from') ?? '';
   const customTo = searchParams.get('to') ?? '';
+  // Legacy bookmarked `?date=<preset>` (pre-DateRangeChip URL shape) — resolved
+  // to its concrete range below until any new selection overwrites it.
+  const legacyDatePreset = (searchParams.get('date') as DatePreset | null) ?? '';
   const includeArchived = searchParams.get('archived') === 'true';
   const pageNumber = Math.max(1, parseInt(searchParams.get('page') ?? '1', 10) || 1);
 
@@ -220,13 +228,14 @@ export default function WorkOrdersPage() {
     [users]
   );
 
-  // ── Resolve date range to send to the API ─────────────────────────────────
-  const dateRange = useMemo<{ from?: string; to?: string }>(() => {
-    if (datePreset === '') return {};
-    if (datePreset === 'custom') return { from: customFrom || undefined, to: customTo || undefined };
-    const r = rangeForPreset(datePreset);
-    return { from: r.from, to: r.to };
-  }, [datePreset, customFrom, customTo]);
+  // ── Resolve the date range ────────────────────────────────────────────────
+  // `from`/`to` day params are the source of truth (what DateRangeChip writes);
+  // a legacy preset param resolves to concrete dates for old bookmarks.
+  const dateRange = useMemo<DateRange>(() => {
+    if (customFrom || customTo) return { from: customFrom, to: customTo };
+    if (legacyDatePreset && legacyDatePreset !== 'custom') return rangeForPreset(legacyDatePreset);
+    return EMPTY_DATE_RANGE;
+  }, [customFrom, customTo, legacyDatePreset]);
 
   const tab = useMemo(
     () => LIFECYCLE_TABS.find((f) => f.id === tabId) ?? LIFECYCLE_TABS[0],
@@ -247,8 +256,8 @@ export default function WorkOrdersPage() {
       dispatchRegionIds: regionIds.length > 0 ? regionIds : undefined,
       workItemStatusIds: itemStatusIds.length > 0 ? itemStatusIds : undefined,
       assignedUserId: assignedId || undefined,
-      scheduledDateFrom: dateRange.from,
-      scheduledDateTo: dateRange.to,
+      scheduledDateFrom: dateRange.from || undefined,
+      scheduledDateTo: dateRange.to || undefined,
       includeArchived: includeArchived || undefined,
       page: pageNumber - 1, // URL is 1-based; backend Spring Page is 0-based
       size: PAGE_SIZE,
@@ -399,14 +408,11 @@ export default function WorkOrdersPage() {
       onClear: () => updateParams({ assigned: null, page: null }),
     });
   }
-  if (datePreset !== '') {
-    const presetLabel = datePreset === 'custom'
-      ? `${customFrom || '…'} – ${customTo || '…'}`
-      : t(DATE_PRESETS.find((p) => p.id === datePreset)?.labelKey ?? '');
+  if (dateRange.from || dateRange.to) {
     activeChips.push({
       key: 'date',
       label: t('workOrders.filters.scheduled'),
-      value: presetLabel,
+      value: formatDateRange(dateRange),
       onClear: () => updateParams({ date: null, from: null, to: null, page: null }),
     });
   }
@@ -579,34 +585,14 @@ export default function WorkOrdersPage() {
                 </FilterChipListbox>
               )}
 
-              <FilterChipListbox
+              <DateRangeChip
                 label={t('workOrders.filters.scheduled')}
                 ariaLabel={t('workOrders.filters.scheduled')}
-                value={datePreset || null}
-                displayValue={
-                  datePreset === ''
-                    ? null
-                    : datePreset === 'custom'
-                      ? `${customFrom || '…'} – ${customTo || '…'}`
-                      : t(DATE_PRESETS.find((p) => p.id === datePreset)?.labelKey ?? '')
+                value={dateRange}
+                onChange={(r) =>
+                  updateParams({ from: r.from || null, to: r.to || null, date: null, page: null })
                 }
-                onChange={(id) => {
-                  const updates: Record<string, string | null> = { date: id, page: null };
-                  if (id !== 'custom') {
-                    updates.from = null;
-                    updates.to = null;
-                  }
-                  updateParams(updates);
-                }}
-                onClear={() => updateParams({ date: null, from: null, to: null, page: null })}
-                resetLabel={t('workOrders.dates.any')}
-              >
-                {DATE_PRESETS.filter((p) => p.id !== '').map((p) => (
-                  <ChipListboxOption key={p.id} value={p.id}>
-                    {t(p.labelKey)}
-                  </ChipListboxOption>
-                ))}
-              </FilterChipListbox>
+              />
 
               {/* Archived: hidden by default. "Archived only" is a backend
                   gap (no `archivedOnly` param yet) — surfaced as an option
@@ -640,16 +626,6 @@ export default function WorkOrdersPage() {
               )}
           </ListToolbar>
 
-            {/* Custom date range inputs — surface only when the date chip is in custom mode */}
-            {datePreset === 'custom' && (
-              <DateRangeFields
-                className="mt-2"
-                from={customFrom}
-                to={customTo}
-                onFromChange={(v) => updateParams({ from: v || null, page: null })}
-                onToChange={(v) => updateParams({ to: v || null, page: null })}
-              />
-            )}
         </div>
 
         {/* Lifecycle / progress tabs */}

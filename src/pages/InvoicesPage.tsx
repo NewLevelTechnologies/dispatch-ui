@@ -20,8 +20,8 @@ import {
 import { ListToolbar, ListSearch } from '../components/ui/ListToolbar';
 import { ListFooter } from '../components/ui/ListFooter';
 import { FilterChipListbox, ChipListboxOption } from '../components/ui/FilterChipListbox';
-import { DateRangeFields } from '../components/ui/DateRangeFields';
-import { type DatePreset, DATE_PRESETS, rangeForPreset } from '../lib/dateRangePresets';
+import { DateRangeChip } from '../components/ui/DateRangeChip';
+import { EMPTY_DATE_RANGE, rangeForPreset, type DatePreset, type DateRange } from '../lib/dateRangePresets';
 import { InvoiceStatus, invoicesApi } from '../api/financialApi';
 import type { InvoiceListItemRow, CreateInvoiceRequest, CreateInvoiceLineItemRequest, ListInvoicesParams } from '../api/financialApi';
 import { customerApi } from '../api/customerApi';
@@ -59,9 +59,18 @@ export default function InvoicesPage() {
   const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10));
   const deferredSearch = useDeferredValue(searchQuery.trim());
   const statusId = searchParams.get('status') ?? '';
-  const datePreset = (searchParams.get('date') as DatePreset | null) ?? '';
+  // Date range — the `from`/`to` day params are the source of truth; a legacy
+  // bookmarked `?date=<preset>` (pre-chip URL shape) resolves to its concrete
+  // range until any new selection overwrites it.
   const customFrom = searchParams.get('from') ?? '';
   const customTo = searchParams.get('to') ?? '';
+  const legacyPreset = (searchParams.get('date') as DatePreset | null) ?? '';
+  const dateRange: DateRange =
+    customFrom || customTo
+      ? { from: customFrom, to: customTo }
+      : legacyPreset && legacyPreset !== 'custom'
+        ? rangeForPreset(legacyPreset)
+        : EMPTY_DATE_RANGE;
 
   const onSearchChange = (value: string) => {
     setSearchQuery(value);
@@ -115,22 +124,16 @@ export default function InvoicesPage() {
   const [submitting, setSubmitting] = useState(false);
 
   const statusParams = INVOICE_STATUS_FILTERS.find((s) => s.id === statusId)?.params ?? {};
-  // Inclusive day strings either way — custom inputs pass through as typed.
-  const range =
-    datePreset === 'custom'
-      ? { from: customFrom || undefined, to: customTo || undefined }
-      : datePreset
-        ? rangeForPreset(datePreset)
-        : undefined;
 
   const { data: invoicePage, isLoading: invoicesLoading } = useQuery({
-    queryKey: ['invoices', page, deferredSearch, statusId, datePreset, customFrom, customTo],
+    queryKey: ['invoices', page, deferredSearch, statusId, dateRange.from, dateRange.to],
     queryFn: () =>
       invoicesApi.getAll({
         q: deferredSearch || undefined,
         ...statusParams,
-        from: range?.from,
-        to: range?.to, // inclusive on the backend — no +1-day trick
+        // The chip's inclusive day strings pass through as-is.
+        from: dateRange.from || undefined,
+        to: dateRange.to || undefined, // inclusive on the backend — no +1-day trick
         page: page - 1,
         size: PAGE_SIZE,
         sort: 'invoiceDate,desc',
@@ -348,40 +351,13 @@ export default function InvoicesPage() {
             ))}
           </FilterChipListbox>
 
-          <FilterChipListbox
+          <DateRangeChip
             label={t('invoices.filters.issued')}
             ariaLabel={t('invoices.filters.issued')}
-            value={datePreset || null}
-            displayValue={
-              datePreset === 'custom'
-                ? `${customFrom || '…'} – ${customTo || '…'}`
-                : datePreset
-                  ? t(DATE_PRESETS.find((p) => p.id === datePreset)?.labelKey ?? '')
-                  : null
-            }
-            onChange={(id) =>
-              setFilterParams(id === 'custom' ? { date: id } : { date: id, from: null, to: null })
-            }
-            onClear={() => setFilterParams({ date: null, from: null, to: null })}
-            resetLabel={t('workOrders.dates.any')}
-          >
-            {DATE_PRESETS.filter((p) => p.id !== '').map((p) => (
-              <ChipListboxOption key={p.id} value={p.id}>
-                {t(p.labelKey)}
-              </ChipListboxOption>
-            ))}
-          </FilterChipListbox>
-        </ListToolbar>
-
-        {datePreset === 'custom' && (
-          <DateRangeFields
-            className="mb-3"
-            from={customFrom}
-            to={customTo}
-            onFromChange={(v) => setFilterParam('from', v || null)}
-            onToChange={(v) => setFilterParam('to', v || null)}
+            value={dateRange}
+            onChange={(r) => setFilterParams({ from: r.from || null, to: r.to || null, date: null })}
           />
-        )}
+        </ListToolbar>
 
         {invoicesLoading ? (
           <Card>
@@ -395,7 +371,7 @@ export default function InvoicesPage() {
           <Card>
             <CardBody>
               <p className="text-[12.5px] text-fg-muted">
-                {deferredSearch || statusId || datePreset
+                {deferredSearch || statusId || dateRange.from || dateRange.to
                   ? t('common.actions.noMatchSearch', { entities: getName('invoice', true) })
                   : t('common.actions.notFound', { entities: getName('invoice', true) })}
               </p>

@@ -702,7 +702,7 @@ describe('ServiceLocationDetailPage', () => {
 
       // Scheduled preset resolves to half-open ISO instants on the window start.
       await user.click(screen.getByRole('button', { name: 'Scheduled date' }));
-      await user.click(await screen.findByRole('option', { name: 'Last 30 days' }));
+      await user.click(await screen.findByRole('button', { name: 'Last 30 days' }));
       await waitFor(() => expect(dispatchCallWith((p) => Boolean(p.from) && Boolean(p.to))).toBe(true));
 
       // Clear resets the toolbar — the button leaves with the filters.
@@ -717,10 +717,9 @@ describe('ServiceLocationDetailPage', () => {
       ]);
       await waitFor(() => expect(screen.getByText('WO-5000')).toBeInTheDocument());
 
+      // The manual From/To fields live inside the chip's popover.
       await user.click(screen.getByRole('button', { name: 'Scheduled date' }));
-      await user.click(await screen.findByRole('option', { name: 'Custom range…' }));
-
-      fireEvent.change(screen.getByLabelText('From'), { target: { value: '2026-05-01' } });
+      fireEvent.change(await screen.findByLabelText('From'), { target: { value: '2026-05-01' } });
       fireEvent.change(screen.getByLabelText('To'), { target: { value: '2026-05-31' } });
 
       // from = local midnight of the start day; to = the midnight AFTER the
@@ -928,9 +927,9 @@ describe('ServiceLocationDetailPage', () => {
       await user.click(await screen.findByRole('option', { name: 'Paid' }));
       await waitFor(() => expect(invoiceCallWith((p) => p.status === 'PAID')).toBe(true));
 
-      // Issued chip → preset resolves to a from/to range server-side.
+      // Issued chip → a popover preset resolves to a from/to range.
       await user.click(screen.getByRole('button', { name: 'Issued date' }));
-      await user.click(await screen.findByRole('option', { name: 'Last 30 days' }));
+      await user.click(await screen.findByRole('button', { name: 'Last 30 days' }));
       await waitFor(() => expect(invoiceCallWith((p) => Boolean(p.from) && Boolean(p.to))).toBe(true));
 
       // Clear resets every filter — the button itself disappears with them.
@@ -1038,9 +1037,9 @@ describe('ServiceLocationDetailPage', () => {
       await user.click(await screen.findByRole('option', { name: 'Completed' }));
       await waitFor(() => expect(jobCallWith((p) => p.progressCategory === 'COMPLETED')).toBe(true));
 
-      // Scheduled chip → preset resolves to a scheduled-date range.
+      // Scheduled chip → a popover preset resolves to a scheduled-date range.
       await user.click(screen.getByRole('button', { name: 'Scheduled date' }));
-      await user.click(await screen.findByRole('option', { name: 'Last 7 days' }));
+      await user.click(await screen.findByRole('button', { name: 'Last 7 days' }));
       await waitFor(() => expect(jobCallWith((p) => Boolean(p.scheduledDateFrom))).toBe(true));
 
       // Clear resets the toolbar (status returns to the All default).
