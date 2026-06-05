@@ -5,6 +5,7 @@ import ServiceLocationDetailPage from './ServiceLocationDetailPage';
 import apiClient from '../api/client';
 import type { RouteObject } from 'react-router-dom';
 import type { ServiceLocationDetailDto, WorkOrderSummary, LocationDispatchResponse } from '../api';
+import { formatDateRange, rangeForPreset } from '../lib/dateRangePresets';
 
 vi.mock('../api/client');
 
@@ -704,6 +705,12 @@ describe('ServiceLocationDetailPage', () => {
       await user.click(screen.getByRole('button', { name: 'Scheduled date' }));
       await user.click(await screen.findByRole('button', { name: 'Last 30 days' }));
       await waitFor(() => expect(dispatchCallWith((p) => Boolean(p.from) && Boolean(p.to))).toBe(true));
+
+      // Closed chip reflects the chosen range and grows the × to clear it.
+      expect(screen.getByRole('button', { name: 'Scheduled date' })).toHaveTextContent(
+        formatDateRange(rangeForPreset('last30')),
+      );
+      expect(screen.getByRole('button', { name: 'Scheduled date — clear' })).toBeInTheDocument();
 
       // Clear resets the toolbar — the button leaves with the filters.
       await user.click(screen.getByRole('button', { name: 'Clear' }));

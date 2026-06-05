@@ -40,8 +40,12 @@ const PRESETS: { id: Exclude<DatePreset, '' | 'custom'>; labelKey: string }[] = 
   { id: 'thisYear', labelKey: 'workOrders.dates.thisYear' },
 ];
 
+// Field chrome matching dense.input / the toolbar search boxes: 32px tall,
+// rounded-md, border-border, 12.5px inherited Geist (Preflight gives inputs
+// `font: inherit`). color-scheme follows the theme class so the native
+// calendar glyph stays visible on dark surfaces.
 const INPUT_CLASS =
-  'h-8 w-full rounded-md border border-border bg-bg-elev px-2 text-[12px] text-fg outline-none ' +
+  'h-8 w-full rounded-md border border-border bg-bg-elev px-2 text-[12.5px] text-fg outline-none ' +
   'hover:border-border-strong focus:border-accent-500/60 ' +
   '[color-scheme:light] [.theme-dark_&]:[color-scheme:dark]';
 
