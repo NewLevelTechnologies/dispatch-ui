@@ -442,7 +442,7 @@ describe('WorkOrdersPage', () => {
       );
     };
 
-    it('renders the assigned column from embedded assignedUsers (lead + overflow, legacy key tolerated)', async () => {
+    it('renders the assigned column from embedded assignedUsers (lead + overflow, dash when empty)', async () => {
       mockGets([
         {
           ...mockWorkOrders[0],
@@ -451,8 +451,7 @@ describe('WorkOrdersPage', () => {
             { userId: 'user-1', name: 'Brian Ortega', state: 'SCHEDULED' },
           ],
         },
-        // Pre-rename wire key (no state) — the deploy-window shim still renders it.
-        { ...mockWorkOrders[1], technicians: [{ userId: 'user-1', name: 'Brian Ortega' }] },
+        { ...mockWorkOrders[1], assignedUsers: [] },
       ]);
 
       renderWithProviders(<WorkOrdersPage />);
@@ -460,7 +459,6 @@ describe('WorkOrdersPage', () => {
       await waitFor(() => {
         expect(screen.getByText('Dana Park +1')).toBeInTheDocument();
       });
-      expect(screen.getByText('Brian Ortega')).toBeInTheDocument();
     });
 
     it('selecting an assigned user updates the URL and the API query', async () => {

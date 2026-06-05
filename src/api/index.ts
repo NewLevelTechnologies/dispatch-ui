@@ -105,7 +105,6 @@ export {
 // Work Order API
 export {
   workOrderApi,
-  woAssignedUsers,
   LifecycleState,
   ProgressCategory,
   WorkOrderPriority,

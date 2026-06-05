@@ -106,10 +106,7 @@ export type AssignedUserState = 'ON_SITE' | 'SCHEDULED' | 'DONE';
 export interface WorkOrderAssignedUser {
   userId: string; // UUID — stable avatar/color lookup
   name: string | null; // "First Last"; null only if the user cache hasn't synced
-  // Required on the wire post-rename; optional here only because the legacy
-  // `technicians` key (no state) is tolerated during the deploy window —
-  // tighten when the shim drops.
-  state?: AssignedUserState;
+  state: AssignedUserState;
 }
 
 // Slim shape returned by the list endpoint. Includes a capped projection
@@ -187,20 +184,9 @@ export interface WorkOrderSummary {
   // "+N", no second fetch or merge needed. Optional on the type only because
   // detail reads share this shape.
   assignedUsers?: WorkOrderAssignedUser[];
-  // Pre-rename wire key (no `state`). Dev serves `technicians` until the BE
-  // rename merges, with no aliasing window — read via `woAssignedUsers()` so
-  // either key works; DROP this field once the BE rename is live on dev.
-  technicians?: Array<Pick<WorkOrderAssignedUser, 'userId' | 'name'>>;
 
   createdAt: string;
   updatedAt: string;
-}
-
-// Deploy-window shim for the technicians → assignedUsers rename: returns
-// whichever key the row carries. Collapse to `wo.assignedUsers ?? []` (and
-// delete `technicians` above) once the BE rename is live.
-export function woAssignedUsers(wo: WorkOrderSummary): WorkOrderAssignedUser[] {
-  return wo.assignedUsers ?? wo.technicians ?? [];
 }
 
 export interface WorkOrder extends WorkOrderSummary {

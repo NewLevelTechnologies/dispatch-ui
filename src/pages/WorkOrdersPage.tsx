@@ -10,7 +10,6 @@ import {
   workItemStatusesApi,
   dispatchRegionApi,
   userApi,
-  woAssignedUsers,
   type WorkOrderSummary,
   type ProgressCategory,
   type ListWorkOrdersParams,
@@ -816,7 +815,7 @@ export default function WorkOrdersPage() {
                           </Pill>
                         </td>
                         <td>
-                          <AssignedUsersCell users={woAssignedUsers(workOrder)} />
+                          <AssignedUsersCell users={workOrder.assignedUsers} />
                         </td>
                         <td>
                           {formatDate(workOrder.scheduledDate)}
