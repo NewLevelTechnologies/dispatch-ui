@@ -9,6 +9,7 @@ import {
   BuildingOffice2Icon,
   HomeIcon,
   CalendarDaysIcon,
+  ClockIcon,
   EllipsisVerticalIcon,
   PlusIcon,
   WrenchScrewdriverIcon,
@@ -107,7 +108,7 @@ import {
   type MockTone,
 } from './serviceLocationDetailMocks';
 
-type TabId = 'overview' | 'equipment' | 'jobs' | 'invoices' | 'visits' | 'contacts' | 'files' | 'activity';
+type TabId = 'overview' | 'equipment' | 'jobs' | 'invoices' | 'dispatches' | 'contacts' | 'files' | 'activity';
 
 // ─────────────────────────────────────────────────────────────────────────
 // Smart back-link. Up-direction is dynamic — users land here from a work
@@ -175,8 +176,8 @@ export default function ServiceLocationDetailPage() {
 
   // Drives the Invoices tab-count badge; the tab re-reads the same count cache.
   const { data: locationInvoicesPage } = useQuery(locationInvoiceCountQueryOptions(id ?? ''));
-  // Drives the Visits tab-count badge; the tab body re-reads the same cache.
-  const { data: locationVisits } = useQuery(locationDispatchesQueryOptions(id ?? ''));
+  // Drives the Dispatches tab-count badge; the tab body runs its own paged queries.
+  const { data: locationDispatchesCount } = useQuery(locationDispatchCountQueryOptions(id ?? ''));
 
   const deleteEquipmentMutation = useMutation({
     mutationFn: (equipmentId: string) => equipmentApi.delete(equipmentId),
@@ -249,7 +250,7 @@ export default function ServiceLocationDetailPage() {
     { id: 'equipment', label: getName('equipment', true), count: equipmentPage?.totalElements ?? equipment.length },
     { id: 'jobs', label: getName('work_order', true), count: workOrdersData?.totalElements ?? 0 },
     { id: 'invoices', label: getName('invoice', true), count: locationInvoicesPage?.totalElements },
-    { id: 'visits', label: getName('dispatch', true), count: locationVisits?.length },
+    { id: 'dispatches', label: getName('dispatch', true), count: locationDispatchesCount?.totalElements },
     { id: 'contacts', label: 'Contacts', count: contactCount },
     { id: 'files', label: 'Files' },
     { id: 'activity', label: t('serviceLocations.tabs.activity') },
@@ -306,7 +307,7 @@ export default function ServiceLocationDetailPage() {
           )}
 
           {activeTab === 'invoices' && <InvoicesTab location={location} />}
-          {activeTab === 'visits' && <VisitsTab location={location} />}
+          {activeTab === 'dispatches' && <DispatchesTab location={location} />}
           {activeTab === 'contacts' && <ContactsTab location={location} canEdit={canEditServiceLocations} />}
           {activeTab === 'files' && <TabStub label="Files" />}
 
@@ -790,13 +791,14 @@ function locationInvoiceCountQueryOptions(serviceLocationId: string) {
   };
 }
 
-// Location-scoped visit list (Visits tab). Shared so the parent reads `.length`
-// for the tab-count badge and the tab re-reads the same cache. All visits
-// (no `when`) — the tab partitions upcoming vs past client-side.
-function locationDispatchesQueryOptions(serviceLocationId: string) {
+// Per-location dispatch count — `totalElements` off a lean size-1 page of the
+// full history listing (which counts every dispatch, incl. cancelled/no-show).
+// Drives the tab-count badge; the tab body runs its own upcoming/past queries
+// under the same ['location-dispatches'] prefix so one invalidation sweeps all.
+function locationDispatchCountQueryOptions(serviceLocationId: string) {
   return {
-    queryKey: ['location-dispatches', serviceLocationId] as const,
-    queryFn: () => dispatchesApi.listForServiceLocation(serviceLocationId),
+    queryKey: ['location-dispatches', serviceLocationId, 'count'] as const,
+    queryFn: () => dispatchesApi.listForServiceLocation(serviceLocationId, { size: 1 }),
     enabled: Boolean(serviceLocationId),
   };
 }
@@ -3567,158 +3569,217 @@ function InvoiceRow({
 }
 
 // ─────────────────────────────────────────────────────────────────────────
-// Visits / Dispatches tab — the dispatched-visit history + schedule at this
-// site. A work order can produce many visits (multi-day, return trips, crews);
-// a visit is one tech's trip on one date. Read + drill-through, NOT a
-// scheduling surface — that lives on the dispatch board / WO detail. Reads the
-// location-scoped mapping (GET /scheduling/dispatches?serviceLocationId=),
-// partitioned client-side into Upcoming (soonest first, overdue pinned) and
-// Past (most recent first).
+// Dispatches tab — the dispatched-visit history + schedule at this site. A
+// work order can produce many dispatches (multi-day, return trips, crews);
+// a dispatch is one tech's trip on one date. Read + drill-through, NOT a
+// scheduling surface — that lives on the dispatch board / WO detail. Two
+// server views off the location-scoped mapping
+// (GET /scheduling/dispatches?serviceLocationId=): Upcoming (when=upcoming,
+// strictly future open dispatches, soonest first — small and bounded, one
+// fetch) above Past (newest first, paged — history is unbounded for a busy
+// site). The endpoint's only filter is `when`; the mock's search / status /
+// date range toolbar waits on backend params (asks filed), not client sieves.
 // ─────────────────────────────────────────────────────────────────────────
-const VISIT_STATUS_TONE: Record<DispatchStatus, 'info' | 'success' | 'neutral' | 'warning'> = {
+const DISPATCH_STATUS_TONE: Record<DispatchStatus, 'info' | 'success' | 'neutral' | 'warning'> = {
   SCHEDULED: 'info',
   IN_PROGRESS: 'success',
   COMPLETED: 'neutral',
   CANCELLED: 'neutral',
   NO_SHOW: 'warning',
 };
-const VISIT_ACTIVE_STATES: ReadonlyArray<DispatchStatus> = ['SCHEDULED', 'IN_PROGRESS'];
-const visitIsActive = (v: LocationDispatchResponse) => VISIT_ACTIVE_STATES.includes(v.status);
-// Overdue = a SCHEDULED visit whose arrival window has fully elapsed and nobody
+const DISPATCH_ACTIVE_STATES: ReadonlyArray<DispatchStatus> = ['SCHEDULED', 'IN_PROGRESS'];
+const dispatchIsActive = (v: LocationDispatchResponse) => DISPATCH_ACTIVE_STATES.includes(v.status);
+// Overdue = a SCHEDULED dispatch whose arrival window has fully elapsed and nobody
 // has progressed it — the window END is the tripwire (window-start passed is
-// normal "in window"). App runtime, so the wall clock is fine here.
-const visitIsOverdue = (v: LocationDispatchResponse, now: number) =>
-  v.status === 'SCHEDULED' && new Date(v.arrivalWindowEnd).getTime() < now;
+// normal "in window"). Reads the wall clock internally so render-scope callers
+// stay clear of the react-hooks/purity rule (same convention as ApprovalsPage).
+const dispatchIsOverdue = (v: LocationDispatchResponse) =>
+  v.status === 'SCHEDULED' && new Date(v.arrivalWindowEnd).getTime() < Date.now();
 
-const VISIT_DATE_FMT = new Intl.DateTimeFormat('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-const VISIT_TIME_FMT = new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit' });
-function formatVisitWindow(startIso: string, endIso: string): string {
+// The backend `when=upcoming` predicate, client-side: strictly future window
+// start AND still open.
+const dispatchIsUpcoming = (v: LocationDispatchResponse) =>
+  dispatchIsActive(v) && new Date(v.arrivalWindowStart).getTime() >= Date.now();
+
+const DISPATCH_DATE_FMT = new Intl.DateTimeFormat('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+const DISPATCH_TIME_FMT = new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit' });
+function formatArrivalWindow(startIso: string, endIso: string): string {
   const s = new Date(startIso);
   const e = new Date(endIso);
   if (Number.isNaN(s.getTime())) return '—';
   const sameDay = s.toDateString() === e.toDateString();
   return sameDay
-    ? `${VISIT_DATE_FMT.format(s)} · ${VISIT_TIME_FMT.format(s)}–${VISIT_TIME_FMT.format(e)}`
-    : `${VISIT_DATE_FMT.format(s)} ${VISIT_TIME_FMT.format(s)} – ${VISIT_DATE_FMT.format(e)} ${VISIT_TIME_FMT.format(e)}`;
+    ? `${DISPATCH_DATE_FMT.format(s)} · ${DISPATCH_TIME_FMT.format(s)}–${DISPATCH_TIME_FMT.format(e)}`
+    : `${DISPATCH_DATE_FMT.format(s)} ${DISPATCH_TIME_FMT.format(s)} – ${DISPATCH_DATE_FMT.format(e)} ${DISPATCH_TIME_FMT.format(e)}`;
 }
 
 // Summary preferred, WO number as the floor — workOrderNumber is non-nullable
 // on this endpoint (unsynced-WO dispatches are omitted), so a title always exists.
-function visitRowTitle(v: LocationDispatchResponse): string {
+function locationDispatchTitle(v: LocationDispatchResponse): string {
   return v.workOrderSummary || v.workOrderNumber;
 }
 
-function VisitsTab({ location }: { location: ServiceLocationDetailDto }) {
+const DISPATCHES_PAGE_SIZE = 25;
+
+function DispatchesTab({ location }: { location: ServiceLocationDetailDto }) {
   const { getName } = useGlossary();
   const { t } = useTranslation();
   const navigate = useNavigate();
 
-  const { data: visits = [], isLoading } = useQuery(locationDispatchesQueryOptions(location.id));
+  const [page, setPage] = useState(1);
 
-  const now = Date.now();
-  const { upcoming, past } = useMemo(() => {
-    const up: LocationDispatchResponse[] = [];
-    const pa: LocationDispatchResponse[] = [];
-    for (const v of visits) (visitIsActive(v) ? up : pa).push(v);
-    // Upcoming: overdue pinned (oldest window-end first), then chronological by start.
-    up.sort((a, b) => {
-      const ao = visitIsOverdue(a, now) ? 0 : 1;
-      const bo = visitIsOverdue(b, now) ? 0 : 1;
-      if (ao !== bo) return ao - bo;
-      return new Date(a.arrivalWindowStart).getTime() - new Date(b.arrivalWindowStart).getTime();
-    });
-    // Past: most recent first (departure, else window start).
-    pa.sort(
-      (a, b) =>
-        new Date(b.departedAt ?? b.arrivalWindowStart).getTime() -
-        new Date(a.departedAt ?? a.arrivalWindowStart).getTime(),
-    );
-    return { upcoming: up, past: pa };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [visits]);
+  // Two independent server views — fire in parallel. Upcoming is the small
+  // actionable set; one max-size page covers any realistic schedule.
+  const { data: upcomingPage, isLoading: upcomingLoading } = useQuery({
+    queryKey: ['location-dispatches', location.id, 'upcoming'] as const,
+    queryFn: () => dispatchesApi.listForServiceLocation(location.id, { when: 'upcoming', size: 200 }),
+  });
+  const { data: pastPage, isLoading: pastLoading } = useQuery({
+    queryKey: ['location-dispatches', location.id, 'past', page] as const,
+    queryFn: () =>
+      dispatchesApi.listForServiceLocation(location.id, {
+        when: 'past',
+        page: page - 1, // local state is 1-based; backend page is 0-based
+        size: DISPATCHES_PAGE_SIZE,
+      }),
+  });
 
-  const completedCount = visits.filter((v) => v.status === 'COMPLETED').length;
-  const colCount = 5;
+  const upcoming = upcomingPage?.content ?? [];
+  // `when=past` is served as the FULL history until the complement-semantics
+  // backend ask lands, so future open dispatches (already in the card above)
+  // leak into page 1 here — drop them from the rendered rows. Started-but-
+  // active dispatches (overdue, on site) are NOT dropped: they belong to Past
+  // by the upcoming contract, and DispatchRow already flags them. Once the
+  // backend narrows `when=past`, this filter matches nothing.
+  const past = (pastPage?.content ?? []).filter((v) => !dispatchIsUpcoming(v));
+  const pastTotal = pastPage?.totalElements ?? 0;
+  const totalPages = pastPage?.totalPages ?? 0;
+  const isLoading = upcomingLoading || pastLoading;
+  const openWorkOrder = (v: LocationDispatchResponse) => navigate(`/work-orders/${v.workOrderId}`);
 
-  return (
-    <Card
-      title={<CardTitle icon={<CalendarDaysIcon className="size-3.5" />}>{getName('dispatch', true)}</CardTitle>}
-      action={
-        visits.length > 0 ? (
-          <span className="text-[11px] text-fg-muted">
-            {upcoming.length} upcoming · {completedCount} completed
-          </span>
-        ) : undefined
-      }
-      padding="none"
-    >
-      {isLoading ? (
+  if (isLoading) {
+    return (
+      <Card padding="none">
         <div className="px-3.5 py-6 text-center text-[12px] text-fg-muted">
           {t('common.actions.loading', { entities: getName('dispatch', true) })}
         </div>
-      ) : visits.length === 0 ? (
+      </Card>
+    );
+  }
+
+  if (upcoming.length === 0 && pastTotal === 0) {
+    return (
+      <Card padding="none">
         <div className="px-3.5 py-10 text-center">
-          <div className="text-[13px] font-semibold text-fg-strong">No visits scheduled</div>
+          <div className="text-[13px] font-semibold text-fg-strong">
+            {t('common.actions.noEntitiesYet', { entities: getName('dispatch', true) })}
+          </div>
           <div className="mt-1 text-[12px] text-fg-muted">
-            Scheduled and completed visits at this site will appear here.
+            {`Scheduled and completed ${getName('dispatch', true).toLowerCase()} at this site will appear here.`}
           </div>
         </div>
-      ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full border-collapse text-[12px]">
-            <thead className="bg-bg-elev-2">
-              <tr className="text-left text-[10px] font-semibold uppercase tracking-wider text-fg-muted">
-                <th className="px-3.5 py-2 font-semibold">When</th>
-                <th className="px-3.5 py-2 font-semibold">Type</th>
-                <th className="px-3.5 py-2 font-semibold">{getName('work_order')}</th>
-                <th className="px-3.5 py-2 font-semibold">Tech</th>
-                <th className="px-3.5 py-2 font-semibold">{t('workOrders.table.statusHeader')}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {upcoming.length > 0 && <VisitGroupHeader label="Upcoming" count={upcoming.length} colCount={colCount} />}
-              {upcoming.map((v) => (
-                <VisitRow key={v.id} visit={v} now={now} onOpen={() => navigate(`/work-orders/${v.workOrderId}`)} />
-              ))}
-              {past.length > 0 && <VisitGroupHeader label="Past" count={past.length} colCount={colCount} />}
-              {past.map((v) => (
-                <VisitRow key={v.id} visit={v} now={now} onOpen={() => navigate(`/work-orders/${v.workOrderId}`)} />
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </Card>
-  );
-}
+      </Card>
+    );
+  }
 
-function VisitGroupHeader({ label, count, colCount }: { label: string; count: number; colCount: number }) {
   return (
-    <tr>
-      <td colSpan={colCount} className="border-y border-border-soft bg-bg-elev-2 px-3.5 py-1.5">
-        <span className="text-[10px] font-semibold uppercase tracking-wider text-fg-strong">{label}</span>
-        <span className="ml-2 font-mono text-[10.5px] tabular-nums text-fg-muted">{count}</span>
-      </td>
-    </tr>
+    <div className="flex flex-col gap-3">
+      {upcoming.length > 0 && (
+        <Card
+          title={<CardTitle icon={<CalendarDaysIcon className="size-3.5" />}>Upcoming</CardTitle>}
+          action={
+            <span className="font-mono text-[11px] tabular-nums text-fg-muted">
+              {upcomingPage?.totalElements ?? upcoming.length}
+            </span>
+          }
+          padding="none"
+        >
+          <DispatchesTable rows={upcoming} onOpen={openWorkOrder} />
+        </Card>
+      )}
+
+      {pastTotal > 0 && (
+        <Card
+          title={<CardTitle icon={<ClockIcon className="size-3.5" />}>Past</CardTitle>}
+          action={<span className="font-mono text-[11px] tabular-nums text-fg-muted">{pastTotal}</span>}
+          padding="none"
+        >
+          {past.length === 0 ? (
+            <div className="px-3.5 py-6 text-center text-[12px] text-fg-muted">
+              {`Earlier ${getName('dispatch', true).toLowerCase()} are on the next page.`}
+            </div>
+          ) : (
+            <DispatchesTable rows={past} onOpen={openWorkOrder} />
+          )}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-end gap-2 border-t border-border-soft bg-bg-elev-2 px-4 py-2.5 text-[11.5px] text-fg-muted">
+              <Button plain size="xxs" disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>
+                Prev
+              </Button>
+              <span className="font-mono text-[11px] tabular-nums text-fg">
+                {page} / {totalPages}
+              </span>
+              <Button
+                plain
+                size="xxs"
+                disabled={page >= totalPages}
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              >
+                Next
+              </Button>
+            </div>
+          )}
+        </Card>
+      )}
+    </div>
   );
 }
 
-function VisitRow({
-  visit,
-  now,
+function DispatchesTable({
+  rows,
   onOpen,
 }: {
-  visit: LocationDispatchResponse;
-  now: number;
+  rows: LocationDispatchResponse[];
+  onOpen: (v: LocationDispatchResponse) => void;
+}) {
+  const { getName } = useGlossary();
+  const { t } = useTranslation();
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full border-collapse text-[12px]">
+        <thead className="bg-bg-elev-2">
+          <tr className="text-left text-[10px] font-semibold uppercase tracking-wider text-fg-muted">
+            <th className="px-3.5 py-2 font-semibold">When</th>
+            <th className="px-3.5 py-2 font-semibold">Type</th>
+            <th className="px-3.5 py-2 font-semibold">{getName('work_order')}</th>
+            <th className="px-3.5 py-2 font-semibold">Tech</th>
+            <th className="px-3.5 py-2 font-semibold">{t('workOrders.table.statusHeader')}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((v) => (
+            <DispatchRow key={v.id} dispatch={v} onOpen={() => onOpen(v)} />
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function DispatchRow({
+  dispatch,
+  onOpen,
+}: {
+  dispatch: LocationDispatchResponse;
   onOpen: () => void;
 }) {
   const { t } = useTranslation();
-  const overdue = visitIsOverdue(visit, now);
-  const live = visit.status === 'IN_PROGRESS';
-  const didntHappen = visit.status === 'CANCELLED' || visit.status === 'NO_SHOW';
-  const tone = overdue ? 'warning' : VISIT_STATUS_TONE[visit.status];
-  const title = visitRowTitle(visit);
-  const techName = visit.assignedUserName;
+  const overdue = dispatchIsOverdue(dispatch);
+  const live = dispatch.status === 'IN_PROGRESS';
+  const didntHappen = dispatch.status === 'CANCELLED' || dispatch.status === 'NO_SHOW';
+  const tone = overdue ? 'warning' : DISPATCH_STATUS_TONE[dispatch.status];
+  const title = locationDispatchTitle(dispatch);
+  const techName = dispatch.assignedUserName;
 
   // Subtle row tint: in-progress = info (a tech is on site now); overdue = warning.
   const tint = live
@@ -3733,12 +3794,12 @@ function VisitRow({
       onClick={onOpen}
     >
       <td className="px-3.5 py-2 whitespace-nowrap text-[11.5px] text-fg">
-        {formatVisitWindow(visit.arrivalWindowStart, visit.arrivalWindowEnd)}
+        {formatArrivalWindow(dispatch.arrivalWindowStart, dispatch.arrivalWindowEnd)}
       </td>
       <td className="px-3.5 py-2">
-        {visit.workOrderTypeName ? (
+        {dispatch.workOrderTypeName ? (
           <span className="rounded-[3px] border border-border-soft bg-bg-active px-1.5 text-[10px] font-semibold text-fg-muted">
-            {visit.workOrderTypeName}
+            {dispatch.workOrderTypeName}
           </span>
         ) : (
           <span className="text-[11px] text-fg-dim">—</span>
@@ -3746,20 +3807,20 @@ function VisitRow({
       </td>
       <td className="px-3.5 py-2">
         <div className="font-mono text-[11px] text-fg-muted">
-          {visit.workOrderNumber}
+          {dispatch.workOrderNumber}
         </div>
-        {title !== visit.workOrderNumber && (
+        {title !== dispatch.workOrderNumber && (
           <div className={`mt-0.5 max-w-[280px] truncate text-[10.5px] ${didntHappen ? 'text-fg-muted line-through' : 'text-fg'}`} title={title}>
             {title}
           </div>
         )}
       </td>
       <td className="px-3.5 py-2">
-        <VisitTechCell name={techName} live={live} muted={didntHappen} />
+        <DispatchTechCell name={techName} live={live} muted={didntHappen} />
       </td>
       <td className="px-3.5 py-2">
         <Pill tone={tone} dot live={live}>
-          {overdue ? 'Overdue' : t(`workOrders.dispatches.status.${visit.status}`)}
+          {overdue ? 'Overdue' : t(`workOrders.dispatches.status.${dispatch.status}`)}
         </Pill>
       </td>
     </tr>
@@ -3769,7 +3830,7 @@ function VisitRow({
 // Round initials avatar (round = person) + resolved tech name. Live dot when
 // on site. Name can be null while the user-cache catches up — fall back rather
 // than blank the cell. Same name-hash color as user avatars elsewhere.
-function VisitTechCell({ name, live, muted }: { name: string | null; live: boolean; muted: boolean }) {
+function DispatchTechCell({ name, live, muted }: { name: string | null; live: boolean; muted: boolean }) {
   const named = Boolean(name);
   const display = name ?? 'Tech assigned';
   return (

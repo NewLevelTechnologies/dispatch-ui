@@ -131,13 +131,15 @@ export function dispatchRowTitle(row: DispatchBoardRow): string | null {
 }
 
 // ---- Location-scoped visit list (GET /scheduling/dispatches?serviceLocationId=) ----
-// The Visits tab on the location detail page. SEPARATE (bespoke) mapping from
-// the paged board, selected by the serviceLocationId param — it carries the
-// `when=upcoming` card semantic + the denormalized LocationDispatchResponse
-// shape the generic board doesn't. Returns the standard page envelope; the
-// client method reads `.content` (and still tolerates a bare array for
-// safety). Ordering is fixed server-side by intent (no sort param): upcoming →
-// arrival window ascending; otherwise newest first.
+// The Dispatches tab on the location detail page. SEPARATE (bespoke) mapping from
+// the paged board, selected by the *presence* of the serviceLocationId param —
+// drop it and the same path is the tenant-wide board with a different row
+// shape and different params. Never share a query builder between the two.
+//
+// Params here are exactly { serviceLocationId, when, page, size } — no q, no
+// status, no sort (ordering is fixed server-side by `when`: upcoming → arrival
+// window ascending; anything else → newest first; sort directives are silently
+// ignored). Search/status filters on this tab are pending backend asks.
 //
 // Field names confirmed against the real DTO (2026-06-04).
 export interface LocationDispatchResponse {
@@ -163,24 +165,48 @@ export interface LocationDispatchResponse {
   assignedUserName: string | null;
 }
 
-// `when=upcoming` → arrival window ≥ now and status in (SCHEDULED, IN_PROGRESS),
-// soonest first. Omitted → all visits at the location, most recent first.
-export type LocationVisitsWhen = 'upcoming' | 'recent';
+// `when=upcoming` → STRICTLY future open visits (arrival window start ≥ now AND
+// status SCHEDULED/IN_PROGRESS), soonest first. A tech on site whose window
+// opened an hour ago is NOT upcoming — that visit lives in the history listing
+// (live on-site state belongs to the location-tech attention strip). Any other
+// value, or omitted → full visit history (incl. CANCELLED/NO_SHOW), newest
+// first. We send `past` for the history half of the Visits tab; today the
+// server serves it as the full listing, and a pending backend ask narrows it
+// to the exact complement of `upcoming`.
+export type LocationDispatchesWhen = 'upcoming' | 'past';
+
+// Same PageResponse envelope as the board (`page`, not Spring's `number`),
+// typed per-row-shape because the two mappings share nothing else.
+export interface LocationDispatchPage {
+  content: LocationDispatchResponse[];
+  page: number;
+  size: number;
+  totalElements: number;
+  totalPages: number;
+  first: boolean;
+  last: boolean;
+}
+
+export interface ListLocationDispatchesParams {
+  when?: LocationDispatchesWhen;
+  page?: number; // 0-indexed
+  size?: number; // clamped 1..200 server-side
+}
 
 export const dispatchesApi = {
-  // Location-scoped visit list (the Visits tab). Returns the page's rows.
-  // A single site's visit history is bounded, so we pull one large page
-  // (server caps size at 200) rather than paging the tab. Tolerates a bare
-  // array too, in case an environment predates the paging change.
+  // Location-scoped dispatch list (the Dispatches tab). Paged — history is unbounded
+  // for a busy commercial site, so callers page it and read `totalElements`
+  // for counts (never size=200-and-hope). Size is always sent explicitly; the
+  // server default is not part of the contract.
   listForServiceLocation: async (
     serviceLocationId: string,
-    when?: LocationVisitsWhen,
-  ): Promise<LocationDispatchResponse[]> => {
-    const response = await apiClient.get<
-      LocationDispatchResponse[] | { content: LocationDispatchResponse[] }
-    >('/scheduling/dispatches', { params: { serviceLocationId, when, size: 200 } });
-    const data = response.data;
-    return Array.isArray(data) ? data : (data?.content ?? []);
+    params: ListLocationDispatchesParams = {},
+  ): Promise<LocationDispatchPage> => {
+    const { when, page = 0, size = 200 } = params;
+    const response = await apiClient.get<LocationDispatchPage>('/scheduling/dispatches', {
+      params: { serviceLocationId, when, page, size },
+    });
+    return response.data;
   },
 
   // Per-work-order visit list. Like the location mapping, the work-order-scoped
