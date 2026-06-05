@@ -68,7 +68,7 @@ describe('ServiceLocationDetailPage', () => {
     invoiceSummary: unknown = { billedYtd: 0, openCount: 0, openAmount: 0, aged91: 0, currency: 'USD' },
     dispatches: unknown[] = []
   ) => {
-    vi.mocked(apiClient.get).mockImplementation((url) => {
+    vi.mocked(apiClient.get).mockImplementation((url, config) => {
       // Site contact card reads the full contact collection (primary-first).
       // Project the location's primary site-contact fields into a primary
       // contact, then append any additional contacts.
@@ -111,18 +111,36 @@ describe('ServiceLocationDetailPage', () => {
       if (url.includes('/scheduling/dispatches/location-tech')) {
         return Promise.resolve({ data: locationTech });
       }
-      // Location-scoped visit list (Visits tab) — now a paged envelope. url is
-      // the bare path; serviceLocationId rides params. Must follow location-tech.
+      // Location-scoped dispatch list (Dispatches tab) — paged envelope. url is
+      // the bare path; serviceLocationId/when/page/size ride params. Must follow
+      // location-tech. Mirrors the backend: when=upcoming → strictly future open
+      // dispatches, soonest first; anything else → full history, newest first.
       if (url === '/scheduling/dispatches' || url.startsWith('/scheduling/dispatches?')) {
+        const params = (config?.params ?? {}) as { when?: string; page?: number; size?: number };
+        const all = dispatches as LocationDispatchResponse[];
+        const rows =
+          params.when === 'upcoming'
+            ? all
+                .filter(
+                  (d) =>
+                    ['SCHEDULED', 'IN_PROGRESS'].includes(d.status) &&
+                    new Date(d.arrivalWindowStart).getTime() >= Date.now(),
+                )
+                .sort((a, b) => new Date(a.arrivalWindowStart).getTime() - new Date(b.arrivalWindowStart).getTime())
+            : [...all].sort(
+                (a, b) => new Date(b.arrivalWindowStart).getTime() - new Date(a.arrivalWindowStart).getTime(),
+              );
+        const size = params.size ?? 200;
+        const page = params.page ?? 0;
         return Promise.resolve({
           data: {
-            content: dispatches,
-            page: 0,
-            size: 200,
-            totalElements: dispatches.length,
-            totalPages: 1,
-            first: true,
-            last: true,
+            content: rows.slice(page * size, page * size + size),
+            page,
+            size,
+            totalElements: rows.length,
+            totalPages: Math.ceil(rows.length / size),
+            first: page === 0,
+            last: (page + 1) * size >= rows.length,
           },
         });
       }
@@ -132,16 +150,20 @@ describe('ServiceLocationDetailPage', () => {
       }
       // Paged list — serves both the tab body's filtered query and the size-1
       // count query (custom PageResponse envelope: `page`, not `number`).
+      // Honors page/size so paging tests see real slices.
       if (url.includes('/financial/invoices')) {
+        const params = (config?.params ?? {}) as { page?: number; size?: number };
+        const size = params.size ?? 25;
+        const page = params.page ?? 0;
         return Promise.resolve({
           data: {
-            content: invoices,
-            page: 0,
-            size: 25,
+            content: invoices.slice(page * size, page * size + size),
+            page,
+            size,
             totalElements: invoices.length,
-            totalPages: invoices.length ? 1 : 0,
-            first: true,
-            last: true,
+            totalPages: Math.ceil(invoices.length / size),
+            first: page === 0,
+            last: (page + 1) * size >= invoices.length,
           },
         });
       }
@@ -436,7 +458,7 @@ describe('ServiceLocationDetailPage', () => {
     expect(screen.getByRole('tab', { name: /overview/i })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: /equipment/i })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: /work order/i })).toBeInTheDocument();
-    // "Visits" tab is glossary-driven from the `dispatch` entity → "Dispatches".
+    // Dispatches tab label is glossary-driven from the `dispatch` entity.
     expect(screen.getByRole('tab', { name: /dispatch/i })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: /contacts/i })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: /activity/i })).toBeInTheDocument();
@@ -475,6 +497,45 @@ describe('ServiceLocationDetailPage', () => {
     await waitFor(() => expect(activityTab).toHaveAttribute('aria-selected', 'true'));
   });
 
+  it('renders the not-built stub on the Files tab', async () => {
+    mockApiResponses();
+    const user = userEvent.setup();
+    renderDetailPage();
+    await waitFor(() => expect(screen.getByText('Main Office')).toBeInTheDocument());
+
+    await user.click(screen.getByRole('tab', { name: /files/i }));
+    await waitFor(() => expect(screen.getByText(/not in this design pass/i)).toBeInTheDocument());
+    expect(screen.getByText(/coming soon/i)).toBeInTheDocument();
+  });
+
+  it('jumps to tabs from the overview view-all links', async () => {
+    // One equipment row so the equipment link reads "View all 1 →" and is
+    // distinguishable from the jobs link ("View all 0 →").
+    mockApiResponses(mockLocation, [], [
+      { id: 'eq-1', name: 'Upstairs Furnace', equipmentTypeName: 'HVAC', serialNumber: 'SN1' },
+    ]);
+    const user = userEvent.setup();
+    renderDetailPage();
+    await waitFor(() => expect(screen.getByText('Main Office')).toBeInTheDocument());
+
+    const overviewTab = screen.getByRole('tab', { name: /overview/i });
+    const equipmentTab = screen.getByRole('tab', { name: /equipment/i });
+    const jobsTab = screen.getByRole('tab', { name: /work order/i });
+    const activityTab = screen.getByRole('tab', { name: /activity/i });
+
+    await waitFor(() => expect(screen.getByRole('button', { name: 'View all 1 →' })).toBeInTheDocument());
+    await user.click(screen.getByRole('button', { name: 'View all 1 →' }));
+    await waitFor(() => expect(equipmentTab).toHaveAttribute('aria-selected', 'true'));
+
+    await user.click(overviewTab);
+    await user.click(await screen.findByRole('button', { name: 'View all 0 →' }));
+    await waitFor(() => expect(jobsTab).toHaveAttribute('aria-selected', 'true'));
+
+    await user.click(overviewTab);
+    await user.click(await screen.findByRole('button', { name: 'View activity →' }));
+    await waitFor(() => expect(activityTab).toHaveAttribute('aria-selected', 'true'));
+  });
+
   it('renders the contacts directory table on the Contacts tab', async () => {
     mockApiResponses();
     const user = userEvent.setup();
@@ -495,9 +556,9 @@ describe('ServiceLocationDetailPage', () => {
     expect(screen.getByRole('button', { name: /add contact/i })).toBeInTheDocument();
   });
 
-  // ── Visits / Dispatches tab ─────────────────────────────────────────────
-  describe('visits tab', () => {
-    const makeVisit = (over: Partial<LocationDispatchResponse> = {}): LocationDispatchResponse => ({
+  // ── Dispatches tab ──────────────────────────────────────────────────────
+  describe('dispatches tab', () => {
+    const makeDispatch = (over: Partial<LocationDispatchResponse> = {}): LocationDispatchResponse => ({
       id: 'd-1',
       workOrderId: 'wo-1',
       assignedUserId: 'u-1',
@@ -517,7 +578,7 @@ describe('ServiceLocationDetailPage', () => {
       ...over,
     });
 
-    const openVisitsTab = async (dispatches: LocationDispatchResponse[]) => {
+    const openDispatchesTab = async (dispatches: LocationDispatchResponse[]) => {
       mockApiResponses(mockLocation, [], [], [], undefined, [], undefined, dispatches);
       const user = userEvent.setup();
       renderDetailPage();
@@ -526,25 +587,59 @@ describe('ServiceLocationDetailPage', () => {
       return user;
     };
 
-    it('groups visits into Upcoming and Past with the resolved tech + type', async () => {
-      await openVisitsTab([
-        makeVisit({ id: 'd-1', status: 'SCHEDULED' }),
-        makeVisit({ id: 'd-2', status: 'COMPLETED', workOrderNumber: 'WO-4000', arrivedAt: '2026-05-01T15:10:00Z', departedAt: '2026-05-01T16:30:00Z' }),
+    it('splits dispatches into Upcoming and Past with the resolved tech + type', async () => {
+      await openDispatchesTab([
+        makeDispatch({ id: 'd-1', status: 'SCHEDULED' }),
+        makeDispatch({ id: 'd-2', status: 'COMPLETED', workOrderNumber: 'WO-4000', arrivalWindowStart: '2026-05-01T15:00:00Z', arrivalWindowEnd: '2026-05-01T17:00:00Z', arrivedAt: '2026-05-01T15:10:00Z', departedAt: '2026-05-01T16:30:00Z' }),
       ]);
 
       await waitFor(() => expect(screen.getByText('Upcoming')).toBeInTheDocument());
       expect(screen.getByText('Past')).toBeInTheDocument();
-      expect(screen.getByText('WO-5000')).toBeInTheDocument();
+      // The future SCHEDULED dispatch renders once — in Upcoming, not echoed in
+      // Past (the full-history response is filtered client-side until the
+      // backend `when=past` complement lands).
+      expect(screen.getAllByText('WO-5000')).toHaveLength(1);
+      expect(screen.getByText('WO-4000')).toBeInTheDocument();
       expect(screen.getAllByText('Jane Tech').length).toBeGreaterThan(0);
       expect(screen.getAllByText('Quarterly PM').length).toBeGreaterThan(0);
     });
 
-    it('flags an overdue scheduled visit', async () => {
-      // SCHEDULED with a window that ended in the past → Overdue treatment.
-      await openVisitsTab([
-        makeVisit({ id: 'd-1', status: 'SCHEDULED', arrivalWindowStart: '2020-01-01T08:00:00Z', arrivalWindowEnd: '2020-01-01T10:00:00Z' }),
+    it('flags an overdue scheduled dispatch', async () => {
+      // SCHEDULED with a window that ended in the past → not upcoming (the
+      // backend window is strictly future) — lands in Past with Overdue treatment.
+      await openDispatchesTab([
+        makeDispatch({ id: 'd-1', status: 'SCHEDULED', arrivalWindowStart: '2020-01-01T08:00:00Z', arrivalWindowEnd: '2020-01-01T10:00:00Z' }),
       ]);
       await waitFor(() => expect(screen.getByText('Overdue')).toBeInTheDocument());
+      expect(screen.queryByText('Upcoming')).not.toBeInTheDocument();
+    });
+
+    it('pages the Past listing', async () => {
+      // 30 completed dispatches, newest first → page 1 holds 25, page 2 the rest.
+      const all = Array.from({ length: 30 }, (_, i) =>
+        makeDispatch({
+          id: `d-${i}`,
+          status: 'COMPLETED',
+          workOrderNumber: `WO-${1000 + i}`,
+          // Descending days so row order matches index order.
+          arrivalWindowStart: new Date(Date.UTC(2026, 0, 31 - i, 15)).toISOString(),
+          arrivalWindowEnd: new Date(Date.UTC(2026, 0, 31 - i, 17)).toISOString(),
+        }),
+      );
+      const user = await openDispatchesTab(all);
+
+      await waitFor(() => expect(screen.getByText('WO-1000')).toBeInTheDocument());
+      expect(screen.queryByText('WO-1029')).not.toBeInTheDocument();
+      expect(screen.getByText('1 / 2')).toBeInTheDocument();
+
+      await user.click(screen.getByRole('button', { name: 'Next' }));
+      await waitFor(() => expect(screen.getByText('WO-1029')).toBeInTheDocument());
+      expect(screen.queryByText('WO-1000')).not.toBeInTheDocument();
+      expect(screen.getByText('2 / 2')).toBeInTheDocument();
+
+      await user.click(screen.getByRole('button', { name: 'Prev' }));
+      await waitFor(() => expect(screen.getByText('WO-1000')).toBeInTheDocument());
+      expect(screen.getByText('1 / 2')).toBeInTheDocument();
     });
 
     it('drills through to the owning work order on row click', async () => {
@@ -554,7 +649,7 @@ describe('ServiceLocationDetailPage', () => {
         // eslint-disable-next-line i18next/no-literal-string
         { path: '/work-orders/:id', element: <div>Work order stub</div> },
       ];
-      mockApiResponses(mockLocation, [], [], [], undefined, [], undefined, [makeVisit()]);
+      mockApiResponses(mockLocation, [], [], [], undefined, [], undefined, [makeDispatch()]);
       renderWithProviders(<ServiceLocationDetailPage />, { routes, initialPath: '/service-locations/location-1' });
       await waitFor(() => expect(screen.getByText('Main Office')).toBeInTheDocument());
       await user.click(screen.getByRole('tab', { name: /dispatch/i }));
@@ -564,9 +659,9 @@ describe('ServiceLocationDetailPage', () => {
       await waitFor(() => expect(screen.getByText('Work order stub')).toBeInTheDocument());
     });
 
-    it('shows an empty state when there are no visits', async () => {
-      await openVisitsTab([]);
-      await waitFor(() => expect(screen.getByText(/no visits scheduled/i)).toBeInTheDocument());
+    it('shows an empty state when there are no dispatches', async () => {
+      await openDispatchesTab([]);
+      await waitFor(() => expect(screen.getByText(/no dispatches yet/i)).toBeInTheDocument());
     });
   });
 
@@ -701,6 +796,62 @@ describe('ServiceLocationDetailPage', () => {
         expect(sentQ).toBe(true);
       });
     });
+
+    const invoiceCallWith = (match: (params: Record<string, unknown>) => boolean) =>
+      vi
+        .mocked(apiClient.get)
+        .mock.calls.some(
+          ([u, cfg]) =>
+            u === '/financial/invoices' &&
+            match(((cfg as { params?: Record<string, unknown> } | undefined)?.params ?? {})),
+        );
+
+    it('filters by status and issued-date preset, then clears the toolbar', async () => {
+      mockApiResponses(mockLocation, [], [], workOrders, undefined, [makeInvoice()], summary);
+      const user = await openInvoicesTab();
+      await waitFor(() => expect(screen.getByText('INV-1001')).toBeInTheDocument());
+
+      // Search ×-clear resets the q param.
+      await user.type(screen.getByPlaceholderText(/search invoice/i), 'zzz');
+      await user.click(screen.getByRole('button', { name: '×' }));
+      expect(screen.getByPlaceholderText(/search invoice/i)).toHaveValue('');
+
+      // Status chip → Paid rides the server-side status param.
+      await user.click(screen.getByRole('button', { name: 'Status' }));
+      await user.click(await screen.findByRole('option', { name: 'Paid' }));
+      await waitFor(() => expect(invoiceCallWith((p) => p.status === 'PAID')).toBe(true));
+
+      // Issued chip → preset resolves to a from/to range server-side.
+      await user.click(screen.getByRole('button', { name: 'Issued date' }));
+      await user.click(await screen.findByRole('option', { name: 'Last 30 days' }));
+      await waitFor(() => expect(invoiceCallWith((p) => Boolean(p.from) && Boolean(p.to))).toBe(true));
+
+      // Clear resets every filter — the button itself disappears with them.
+      await user.click(screen.getByRole('button', { name: 'Clear' }));
+      await waitFor(() => expect(screen.queryByRole('button', { name: 'Clear' })).not.toBeInTheDocument());
+      await waitFor(() =>
+        expect(invoiceCallWith((p) => p.status === undefined && p.from === undefined && p.q === undefined)).toBe(true),
+      );
+    });
+
+    it('pages the invoice list', async () => {
+      const many = Array.from({ length: 30 }, (_, i) =>
+        makeInvoice({ id: `inv-${i}`, invoiceNumber: `INV-${2000 + i}` }),
+      );
+      mockApiResponses(mockLocation, [], [], workOrders, undefined, many, summary);
+      const user = await openInvoicesTab();
+
+      await waitFor(() => expect(screen.getByText('INV-2000')).toBeInTheDocument());
+      expect(screen.queryByText('INV-2029')).not.toBeInTheDocument();
+      expect(screen.getByText('1 / 2')).toBeInTheDocument();
+
+      await user.click(screen.getByRole('button', { name: 'Next' }));
+      await waitFor(() => expect(screen.getByText('INV-2029')).toBeInTheDocument());
+      expect(screen.queryByText('INV-2000')).not.toBeInTheDocument();
+
+      await user.click(screen.getByRole('button', { name: 'Prev' }));
+      await waitFor(() => expect(screen.getByText('INV-2000')).toBeInTheDocument());
+    });
   });
 
   // ── Jobs (Work Orders) tab ──────────────────────────────────────────────
@@ -752,6 +903,48 @@ describe('ServiceLocationDetailPage', () => {
         expect(sentQ).toBe(true);
       });
     });
+
+    it('filters by status and scheduled-date preset, then clears the toolbar', async () => {
+      mockApiResponses(mockLocation, [], [], [makeJobWO({})]);
+      const user = userEvent.setup();
+      renderDetailPage();
+      await waitFor(() => expect(screen.getByText('Main Office')).toBeInTheDocument());
+      await user.click(screen.getByRole('tab', { name: /work order/i }));
+      await waitFor(() => expect(screen.getByText('WO-7001')).toBeInTheDocument());
+
+      const jobCallWith = (match: (params: Record<string, unknown>) => boolean) =>
+        vi
+          .mocked(apiClient.get)
+          .mock.calls.some(
+            ([u, cfg]) =>
+              u === '/work-orders' &&
+              match(((cfg as { params?: Record<string, unknown> } | undefined)?.params ?? {})),
+          );
+
+      // Search ×-clear resets q.
+      await user.type(screen.getByPlaceholderText(/search wo#/i), 'zzz');
+      await user.click(screen.getByRole('button', { name: '×' }));
+      expect(screen.getByPlaceholderText(/search wo#/i)).toHaveValue('');
+
+      // Status chip → Completed maps to the progressCategory param.
+      await user.click(screen.getByRole('button', { name: 'Status' }));
+      await user.click(await screen.findByRole('option', { name: 'Completed' }));
+      await waitFor(() => expect(jobCallWith((p) => p.progressCategory === 'COMPLETED')).toBe(true));
+
+      // Scheduled chip → preset resolves to a scheduled-date range.
+      await user.click(screen.getByRole('button', { name: 'Scheduled date' }));
+      await user.click(await screen.findByRole('option', { name: 'Last 7 days' }));
+      await waitFor(() => expect(jobCallWith((p) => Boolean(p.scheduledDateFrom))).toBe(true));
+
+      // Clear resets the toolbar (status returns to the All default).
+      await user.click(screen.getByRole('button', { name: 'Clear' }));
+      await waitFor(() => expect(screen.queryByRole('button', { name: 'Clear' })).not.toBeInTheDocument());
+      await waitFor(() =>
+        expect(
+          jobCallWith((p) => p.progressCategory === undefined && p.scheduledDateFrom === undefined && p.q === undefined),
+        ).toBe(true),
+      );
+    });
   });
 
   it('scopes the work-orders fetch to serviceLocationId only (not customerId)', async () => {
@@ -784,6 +977,57 @@ describe('ServiceLocationDetailPage', () => {
     await waitFor(() => expect(screen.getByRole('button', { name: /save changes/i })).toBeInTheDocument());
     expect(screen.getByDisplayValue('123 Main St')).toBeInTheDocument();
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('saves header edits — core fields and the address ride their own PUTs', async () => {
+    mockApiResponses(mockLocation, [
+      { id: 'region-1', name: 'Central', abbreviation: 'AZ-C' },
+      { id: 'region-2', name: 'North', abbreviation: 'AZ-N' },
+    ]);
+    vi.mocked(apiClient.put).mockResolvedValue({ data: {} });
+    const user = userEvent.setup();
+    renderDetailPage();
+    await waitFor(() => expect(screen.getByText('Main Office')).toBeInTheDocument());
+
+    await user.click(screen.getAllByRole('button', { name: /^edit$/i })[0]);
+    await waitFor(() => expect(screen.getByRole('button', { name: /save changes/i })).toBeInTheDocument());
+
+    // Touch every editable field group: name, street, line 2, city, state,
+    // zip, and the dispatch-region select.
+    const name = screen.getByDisplayValue('Main Office');
+    await user.clear(name);
+    await user.type(name, 'HQ');
+    const street = screen.getByDisplayValue('123 Main St');
+    await user.clear(street);
+    await user.type(street, '456 Oak Ave');
+    const line2 = screen.getByDisplayValue('Suite 100');
+    await user.clear(line2);
+    await user.type(line2, 'Suite 200');
+    const city = screen.getByDisplayValue('Springfield');
+    await user.clear(city);
+    await user.type(city, 'Chatham');
+    const zip = screen.getByDisplayValue('62701');
+    await user.clear(zip);
+    await user.type(zip, '62629');
+    await user.selectOptions(screen.getByDisplayValue('IL'), 'MO');
+    await user.selectOptions(screen.getByDisplayValue('Central (AZ-C)'), 'region-2');
+
+    await user.click(screen.getByRole('button', { name: /save changes/i }));
+
+    // Core fields and the changed address each PUT once; the editor collapses.
+    await waitFor(() =>
+      expect(
+        vi.mocked(apiClient.put).mock.calls.some(
+          ([, body]) => (body as { locationName?: string })?.locationName === 'HQ',
+        ),
+      ).toBe(true),
+    );
+    expect(
+      vi.mocked(apiClient.put).mock.calls.some(
+        ([, body]) => (body as { streetAddress?: string })?.streetAddress === '456 Oak Ave',
+      ),
+    ).toBe(true);
+    await waitFor(() => expect(screen.queryByRole('button', { name: /save changes/i })).not.toBeInTheDocument());
   });
 
   it('collapses the inline editor on cancel', async () => {
