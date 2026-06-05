@@ -1,10 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { renderWithProviders, userEvent } from '../test/utils';
 import ServiceLocationDetailPage from './ServiceLocationDetailPage';
 import apiClient from '../api/client';
 import type { RouteObject } from 'react-router-dom';
 import type { ServiceLocationDetailDto, WorkOrderSummary, LocationDispatchResponse } from '../api';
+import { formatDateRange, rangeForPreset } from '../lib/dateRangePresets';
 
 vi.mock('../api/client');
 
@@ -112,24 +113,48 @@ describe('ServiceLocationDetailPage', () => {
         return Promise.resolve({ data: locationTech });
       }
       // Location-scoped dispatch list (Dispatches tab) — paged envelope. url is
-      // the bare path; serviceLocationId/when/page/size ride params. Must follow
-      // location-tech. Mirrors the backend: when=upcoming → strictly future open
-      // dispatches, soonest first; anything else → full history, newest first.
+      // the bare path; serviceLocationId/when/q/status/page/size ride params.
+      // Must follow location-tech. Mirrors the backend: when=upcoming →
+      // strictly future open dispatches, soonest first; when=past → the exact
+      // complement, newest first; omitted → everything, newest first. q and
+      // status filter server-side on top of the partition (from/to are asserted
+      // as request params by tests, not modeled here).
       if (url === '/scheduling/dispatches' || url.startsWith('/scheduling/dispatches?')) {
-        const params = (config?.params ?? {}) as { when?: string; page?: number; size?: number };
+        const params = (config?.params ?? {}) as {
+          when?: string;
+          q?: string;
+          status?: string | string[];
+          page?: number;
+          size?: number;
+        };
         const all = dispatches as LocationDispatchResponse[];
-        const rows =
+        const isUpcoming = (d: LocationDispatchResponse) =>
+          ['SCHEDULED', 'IN_PROGRESS'].includes(d.status) &&
+          new Date(d.arrivalWindowStart).getTime() >= Date.now();
+        let rows =
           params.when === 'upcoming'
-            ? all
-                .filter(
-                  (d) =>
-                    ['SCHEDULED', 'IN_PROGRESS'].includes(d.status) &&
-                    new Date(d.arrivalWindowStart).getTime() >= Date.now(),
-                )
-                .sort((a, b) => new Date(a.arrivalWindowStart).getTime() - new Date(b.arrivalWindowStart).getTime())
-            : [...all].sort(
-                (a, b) => new Date(b.arrivalWindowStart).getTime() - new Date(a.arrivalWindowStart).getTime(),
-              );
+            ? all.filter(isUpcoming)
+            : params.when === 'past'
+              ? all.filter((d) => !isUpcoming(d))
+              : [...all];
+        if (params.q) {
+          const q = params.q.toLowerCase();
+          rows = rows.filter(
+            (d) =>
+              d.workOrderNumber.toLowerCase().includes(q) ||
+              (d.workOrderSummary ?? '').toLowerCase().includes(q) ||
+              (d.assignedUserName ?? '').toLowerCase().includes(q),
+          );
+        }
+        if (params.status) {
+          const statuses = ([] as string[]).concat(params.status);
+          rows = rows.filter((d) => statuses.includes(d.status));
+        }
+        rows.sort((a, b) =>
+          params.when === 'upcoming'
+            ? new Date(a.arrivalWindowStart).getTime() - new Date(b.arrivalWindowStart).getTime()
+            : new Date(b.arrivalWindowStart).getTime() - new Date(a.arrivalWindowStart).getTime(),
+        );
         const size = params.size ?? 200;
         const page = params.page ?? 0;
         return Promise.resolve({
@@ -595,9 +620,8 @@ describe('ServiceLocationDetailPage', () => {
 
       await waitFor(() => expect(screen.getByText('Upcoming')).toBeInTheDocument());
       expect(screen.getByText('Past')).toBeInTheDocument();
-      // The future SCHEDULED dispatch renders once — in Upcoming, not echoed in
-      // Past (the full-history response is filtered client-side until the
-      // backend `when=past` complement lands).
+      // The future SCHEDULED dispatch renders once — in Upcoming, not echoed
+      // in Past (`when=past` is the exact complement server-side).
       expect(screen.getAllByText('WO-5000')).toHaveLength(1);
       expect(screen.getByText('WO-4000')).toBeInTheDocument();
       expect(screen.getAllByText('Jane Tech').length).toBeGreaterThan(0);
@@ -640,6 +664,95 @@ describe('ServiceLocationDetailPage', () => {
       await user.click(screen.getByRole('button', { name: 'Prev' }));
       await waitFor(() => expect(screen.getByText('WO-1000')).toBeInTheDocument());
       expect(screen.getByText('1 / 2')).toBeInTheDocument();
+    });
+
+    const dispatchCallWith = (match: (params: Record<string, unknown>) => boolean) =>
+      vi
+        .mocked(apiClient.get)
+        .mock.calls.some(
+          ([u, cfg]) =>
+            (u === '/scheduling/dispatches' || (u as string).startsWith('/scheduling/dispatches?')) &&
+            match(((cfg as { params?: Record<string, unknown> } | undefined)?.params ?? {})),
+        );
+
+    it('searches dispatches via the q param on both server views', async () => {
+      const user = await openDispatchesTab([makeDispatch()]);
+      await waitFor(() => expect(screen.getByText('WO-5000')).toBeInTheDocument());
+
+      await user.type(screen.getByPlaceholderText(/search by tech or work order/i), 'jane');
+      await waitFor(() => expect(dispatchCallWith((p) => p.q === 'jane' && p.when === 'upcoming')).toBe(true));
+      expect(dispatchCallWith((p) => p.q === 'jane' && p.when === 'past')).toBe(true);
+      // Jane Tech matches — the row survives the server-side filter.
+      expect(screen.getByText('WO-5000')).toBeInTheDocument();
+    });
+
+    it('filters by status and scheduled-date preset, then clears the toolbar', async () => {
+      const user = await openDispatchesTab([
+        makeDispatch({ id: 'd-1', status: 'SCHEDULED' }), // future → Upcoming
+        makeDispatch({ id: 'd-2', status: 'COMPLETED', workOrderNumber: 'WO-4000', arrivalWindowStart: '2026-05-01T15:00:00Z', arrivalWindowEnd: '2026-05-01T17:00:00Z' }),
+      ]);
+      await waitFor(() => expect(screen.getByText('Upcoming')).toBeInTheDocument());
+
+      // Status → Completed rides the server param; a terminal status leaves
+      // when=upcoming validly empty, so the Upcoming card hides.
+      await user.click(screen.getByRole('button', { name: 'Status' }));
+      await user.click(await screen.findByRole('option', { name: 'Completed' }));
+      await waitFor(() => expect(dispatchCallWith((p) => p.status === 'COMPLETED')).toBe(true));
+      await waitFor(() => expect(screen.queryByText('Upcoming')).not.toBeInTheDocument());
+      expect(screen.getByText('WO-4000')).toBeInTheDocument();
+
+      // Scheduled preset resolves to half-open ISO instants on the window start.
+      await user.click(screen.getByRole('button', { name: 'Scheduled date' }));
+      await user.click(await screen.findByRole('button', { name: 'Last 30 days' }));
+      await waitFor(() => expect(dispatchCallWith((p) => Boolean(p.from) && Boolean(p.to))).toBe(true));
+
+      // Closed chip reflects the chosen range and grows the × to clear it.
+      expect(screen.getByRole('button', { name: 'Scheduled date' })).toHaveTextContent(
+        formatDateRange(rangeForPreset('last30')),
+      );
+      expect(screen.getByRole('button', { name: 'Scheduled date — clear' })).toBeInTheDocument();
+
+      // Clear resets the toolbar — the button leaves with the filters.
+      await user.click(screen.getByRole('button', { name: 'Clear' }));
+      await waitFor(() => expect(screen.queryByRole('button', { name: 'Clear' })).not.toBeInTheDocument());
+      await waitFor(() => expect(screen.getByText('Upcoming')).toBeInTheDocument());
+    });
+
+    it('filters by a custom date range as half-open local-midnight instants', async () => {
+      const user = await openDispatchesTab([
+        makeDispatch({ id: 'd-1', status: 'COMPLETED', arrivalWindowStart: '2026-05-01T15:00:00Z', arrivalWindowEnd: '2026-05-01T17:00:00Z' }),
+      ]);
+      await waitFor(() => expect(screen.getByText('WO-5000')).toBeInTheDocument());
+
+      // The manual From/To fields live inside the chip's popover.
+      await user.click(screen.getByRole('button', { name: 'Scheduled date' }));
+      fireEvent.change(await screen.findByLabelText('From'), { target: { value: '2026-05-01' } });
+      fireEvent.change(screen.getByLabelText('To'), { target: { value: '2026-05-31' } });
+
+      // from = local midnight of the start day; to = the midnight AFTER the
+      // inclusive end day (half-open). Expected values built with the same
+      // Date(y, m, d) constructor so the assertion is timezone-agnostic.
+      await waitFor(() =>
+        expect(
+          dispatchCallWith(
+            (p) =>
+              p.from === new Date(2026, 4, 1).toISOString() && p.to === new Date(2026, 5, 1).toISOString(),
+          ),
+        ).toBe(true),
+      );
+    });
+
+    it('shows the no-match state when filters strike out, and recovers on clear', async () => {
+      const user = await openDispatchesTab([
+        makeDispatch({ id: 'd-1', status: 'COMPLETED', arrivalWindowStart: '2026-05-01T15:00:00Z', arrivalWindowEnd: '2026-05-01T17:00:00Z' }),
+      ]);
+      await waitFor(() => expect(screen.getByText('WO-5000')).toBeInTheDocument());
+
+      await user.type(screen.getByPlaceholderText(/search by tech or work order/i), 'zzz');
+      await waitFor(() => expect(screen.getByText(/no matching dispatches/i)).toBeInTheDocument());
+
+      await user.click(screen.getByRole('button', { name: 'Clear filters' }));
+      await waitFor(() => expect(screen.getByText('WO-5000')).toBeInTheDocument());
     });
 
     it('drills through to the owning work order on row click', async () => {
@@ -821,9 +934,9 @@ describe('ServiceLocationDetailPage', () => {
       await user.click(await screen.findByRole('option', { name: 'Paid' }));
       await waitFor(() => expect(invoiceCallWith((p) => p.status === 'PAID')).toBe(true));
 
-      // Issued chip → preset resolves to a from/to range server-side.
+      // Issued chip → a popover preset resolves to a from/to range.
       await user.click(screen.getByRole('button', { name: 'Issued date' }));
-      await user.click(await screen.findByRole('option', { name: 'Last 30 days' }));
+      await user.click(await screen.findByRole('button', { name: 'Last 30 days' }));
       await waitFor(() => expect(invoiceCallWith((p) => Boolean(p.from) && Boolean(p.to))).toBe(true));
 
       // Clear resets every filter — the button itself disappears with them.
@@ -931,9 +1044,9 @@ describe('ServiceLocationDetailPage', () => {
       await user.click(await screen.findByRole('option', { name: 'Completed' }));
       await waitFor(() => expect(jobCallWith((p) => p.progressCategory === 'COMPLETED')).toBe(true));
 
-      // Scheduled chip → preset resolves to a scheduled-date range.
+      // Scheduled chip → a popover preset resolves to a scheduled-date range.
       await user.click(screen.getByRole('button', { name: 'Scheduled date' }));
-      await user.click(await screen.findByRole('option', { name: 'Last 7 days' }));
+      await user.click(await screen.findByRole('button', { name: 'Last 7 days' }));
       await waitFor(() => expect(jobCallWith((p) => Boolean(p.scheduledDateFrom))).toBe(true));
 
       // Clear resets the toolbar (status returns to the All default).

@@ -1983,13 +1983,17 @@
     },
     "description": "Manage work orders and service requests",
     "dates": {
+      "allTime": "All time",
       "any": "Any time",
+      "anyRange": "Any",
       "custom": "Custom range…",
       "from": "From",
       "last30": "Last 30 days",
       "last7": "Last 7 days",
+      "lastMonth": "Last month",
       "thisMonth": "This month",
       "thisWeek": "This week",
+      "thisYear": "This year",
       "to": "To",
       "today": "Today",
       "yesterday": "Yesterday"

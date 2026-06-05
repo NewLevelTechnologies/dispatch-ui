@@ -64,8 +64,9 @@ import {
   type ListWorkOrdersParams,
 } from '../api';
 import { workOrdersListQueryOptions } from '../api/workOrdersListQuery';
-import { type DatePreset, DATE_PRESETS, rangeForPreset } from '../lib/dateRangePresets';
+import { EMPTY_DATE_RANGE, instantRangeForDays, type DateRange } from '../lib/dateRangePresets';
 import { FilterChipListbox, ChipListboxOption } from '../components/ui/FilterChipListbox';
+import { DateRangeChip } from '../components/ui/DateRangeChip';
 import { roleColor } from '../utils/roleColor';
 import { useGlossary } from '../contexts/GlossaryContext';
 import { useHasCapability } from '../hooks/useCurrentUser';
@@ -3211,19 +3212,19 @@ function InvoicesTab({ location }: { location: ServiceLocationDetailDto }) {
   const navigate = useNavigate();
 
   const [statusId, setStatusId] = useState('all');
-  const [datePreset, setDatePreset] = useState<DatePreset>('');
+  const [dateRange, setDateRange] = useState<DateRange>(EMPTY_DATE_RANGE);
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const deferredSearch = useDeferredValue(search.trim());
 
   const statusParams = INVOICE_STATUS_FILTERS.find((s) => s.id === statusId)?.params ?? {};
-  const range = datePreset && datePreset !== 'custom' ? rangeForPreset(datePreset) : undefined;
 
   const params: ListInvoicesParams = {
     serviceLocationId: location.id,
     ...statusParams,
-    from: range?.from,
-    to: range?.to, // inclusive on the backend — no +1-day trick
+    // The chip's inclusive day strings pass through as-is.
+    from: dateRange.from || undefined,
+    to: dateRange.to || undefined, // inclusive on the backend — no +1-day trick
     q: deferredSearch || undefined,
     page: page - 1, // local state is 1-based; backend page is 0-based
     size: INVOICES_PAGE_SIZE,
@@ -3289,19 +3290,17 @@ function InvoicesTab({ location }: { location: ServiceLocationDetailDto }) {
     },
   ];
 
-  const filtersActive = statusId !== 'all' || !!datePreset || !!deferredSearch;
+  const filtersActive = statusId !== 'all' || Boolean(dateRange.from || dateRange.to) || !!deferredSearch;
   const showingStart = total === 0 ? 0 : (page - 1) * INVOICES_PAGE_SIZE + 1;
   const showingEnd = Math.min(page * INVOICES_PAGE_SIZE, total);
 
   const resetPage = () => setPage(1);
   const clearFilters = () => {
     setStatusId('all');
-    setDatePreset('');
+    setDateRange(EMPTY_DATE_RANGE);
     setSearch('');
     resetPage();
   };
-
-  const dateDisplay = datePreset ? t(DATE_PRESETS.find((p) => p.id === datePreset)?.labelKey ?? '') : null;
 
   return (
     <div className="flex flex-col gap-3">
@@ -3372,26 +3371,15 @@ function InvoicesTab({ location }: { location: ServiceLocationDetailDto }) {
           ))}
         </FilterChipListbox>
 
-        <FilterChipListbox
+        <DateRangeChip
           label="Issued"
           ariaLabel="Issued date"
-          value={datePreset || null}
-          displayValue={dateDisplay}
-          onChange={(id) => {
-            setDatePreset(id as DatePreset);
+          value={dateRange}
+          onChange={(r) => {
+            setDateRange(r);
             resetPage();
           }}
-          onClear={() => {
-            setDatePreset('');
-            resetPage();
-          }}
-        >
-          {DATE_PRESETS.filter((p) => p.id !== '' && p.id !== 'custom').map((p) => (
-            <ChipListboxOption key={p.id} value={p.id}>
-              {t(p.labelKey)}
-            </ChipListboxOption>
-          ))}
-        </FilterChipListbox>
+        />
 
         {filtersActive && (
           <Button plain size="xs" onClick={clearFilters}>
@@ -3576,9 +3564,11 @@ function InvoiceRow({
 // server views off the location-scoped mapping
 // (GET /scheduling/dispatches?serviceLocationId=): Upcoming (when=upcoming,
 // strictly future open dispatches, soonest first — small and bounded, one
-// fetch) above Past (newest first, paged — history is unbounded for a busy
-// site). The endpoint's only filter is `when`; the mock's search / status /
-// date range toolbar waits on backend params (asks filed), not client sieves.
+// fetch) above Past (the exact complement: window already started OR a
+// terminal status; newest first, paged — history is unbounded for a busy
+// site). The toolbar's search / status / date filters ride the endpoint's
+// q / status / from-to params and AND with the `when` partition on both
+// queries — everything is server-filtered, nothing is sieved client-side.
 // ─────────────────────────────────────────────────────────────────────────
 const DISPATCH_STATUS_TONE: Record<DispatchStatus, 'info' | 'success' | 'neutral' | 'warning'> = {
   SCHEDULED: 'info',
@@ -3587,19 +3577,12 @@ const DISPATCH_STATUS_TONE: Record<DispatchStatus, 'info' | 'success' | 'neutral
   CANCELLED: 'neutral',
   NO_SHOW: 'warning',
 };
-const DISPATCH_ACTIVE_STATES: ReadonlyArray<DispatchStatus> = ['SCHEDULED', 'IN_PROGRESS'];
-const dispatchIsActive = (v: LocationDispatchResponse) => DISPATCH_ACTIVE_STATES.includes(v.status);
 // Overdue = a SCHEDULED dispatch whose arrival window has fully elapsed and nobody
 // has progressed it — the window END is the tripwire (window-start passed is
 // normal "in window"). Reads the wall clock internally so render-scope callers
 // stay clear of the react-hooks/purity rule (same convention as ApprovalsPage).
 const dispatchIsOverdue = (v: LocationDispatchResponse) =>
   v.status === 'SCHEDULED' && new Date(v.arrivalWindowEnd).getTime() < Date.now();
-
-// The backend `when=upcoming` predicate, client-side: strictly future window
-// start AND still open.
-const dispatchIsUpcoming = (v: LocationDispatchResponse) =>
-  dispatchIsActive(v) && new Date(v.arrivalWindowStart).getTime() >= Date.now();
 
 const DISPATCH_DATE_FMT = new Intl.DateTimeFormat('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
 const DISPATCH_TIME_FMT = new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit' });
@@ -3620,116 +3603,201 @@ function locationDispatchTitle(v: LocationDispatchResponse): string {
 }
 
 const DISPATCHES_PAGE_SIZE = 25;
+// Status filter options mirror the wire union (status is repeatable on the
+// backend, but a single-select chip matches the invoices/jobs toolbars).
+// Picking a terminal status leaves `when=upcoming` validly empty — the
+// Upcoming card simply hides, so no per-section option scoping is needed.
+const DISPATCH_STATUS_OPTIONS: DispatchStatus[] = ['SCHEDULED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED', 'NO_SHOW'];
 
 function DispatchesTab({ location }: { location: ServiceLocationDetailDto }) {
   const { getName } = useGlossary();
   const { t } = useTranslation();
   const navigate = useNavigate();
 
+  const [statusSel, setStatusSel] = useState<'all' | DispatchStatus>('all');
+  const [dateRange, setDateRange] = useState<DateRange>(EMPTY_DATE_RANGE);
+  const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
+  const deferredSearch = useDeferredValue(search.trim());
+
+  // Shared filter slice — ANDs with the `when` partition on both queries.
+  // The chip's inclusive day strings convert to half-open ISO instants on
+  // arrivalWindowStart (either side open-ended).
+  const range = instantRangeForDays(dateRange.from || undefined, dateRange.to || undefined);
+  const filters = {
+    q: deferredSearch || undefined,
+    status: statusSel === 'all' ? undefined : statusSel,
+    from: range.from,
+    to: range.to,
+  };
 
   // Two independent server views — fire in parallel. Upcoming is the small
   // actionable set; one max-size page covers any realistic schedule.
   const { data: upcomingPage, isLoading: upcomingLoading } = useQuery({
-    queryKey: ['location-dispatches', location.id, 'upcoming'] as const,
-    queryFn: () => dispatchesApi.listForServiceLocation(location.id, { when: 'upcoming', size: 200 }),
+    queryKey: ['location-dispatches', location.id, 'upcoming', filters] as const,
+    queryFn: () => dispatchesApi.listForServiceLocation(location.id, { when: 'upcoming', size: 200, ...filters }),
   });
   const { data: pastPage, isLoading: pastLoading } = useQuery({
-    queryKey: ['location-dispatches', location.id, 'past', page] as const,
+    queryKey: ['location-dispatches', location.id, 'past', filters, page] as const,
     queryFn: () =>
       dispatchesApi.listForServiceLocation(location.id, {
         when: 'past',
         page: page - 1, // local state is 1-based; backend page is 0-based
         size: DISPATCHES_PAGE_SIZE,
+        ...filters,
       }),
   });
 
   const upcoming = upcomingPage?.content ?? [];
-  // `when=past` is served as the FULL history until the complement-semantics
-  // backend ask lands, so future open dispatches (already in the card above)
-  // leak into page 1 here — drop them from the rendered rows. Started-but-
-  // active dispatches (overdue, on site) are NOT dropped: they belong to Past
-  // by the upcoming contract, and DispatchRow already flags them. Once the
-  // backend narrows `when=past`, this filter matches nothing.
-  const past = (pastPage?.content ?? []).filter((v) => !dispatchIsUpcoming(v));
+  const past = pastPage?.content ?? [];
   const pastTotal = pastPage?.totalElements ?? 0;
   const totalPages = pastPage?.totalPages ?? 0;
   const isLoading = upcomingLoading || pastLoading;
   const openWorkOrder = (v: LocationDispatchResponse) => navigate(`/work-orders/${v.workOrderId}`);
 
-  if (isLoading) {
-    return (
-      <Card padding="none">
-        <div className="px-3.5 py-6 text-center text-[12px] text-fg-muted">
-          {t('common.actions.loading', { entities: getName('dispatch', true) })}
-        </div>
-      </Card>
-    );
-  }
-
-  if (upcoming.length === 0 && pastTotal === 0) {
-    return (
-      <Card padding="none">
-        <div className="px-3.5 py-10 text-center">
-          <div className="text-[13px] font-semibold text-fg-strong">
-            {t('common.actions.noEntitiesYet', { entities: getName('dispatch', true) })}
-          </div>
-          <div className="mt-1 text-[12px] text-fg-muted">
-            {`Scheduled and completed ${getName('dispatch', true).toLowerCase()} at this site will appear here.`}
-          </div>
-        </div>
-      </Card>
-    );
-  }
+  const filtersActive = statusSel !== 'all' || Boolean(dateRange.from || dateRange.to) || !!deferredSearch;
+  const resetPage = () => setPage(1);
+  const clearFilters = () => {
+    setStatusSel('all');
+    setDateRange(EMPTY_DATE_RANGE);
+    setSearch('');
+    resetPage();
+  };
 
   return (
     <div className="flex flex-col gap-3">
-      {upcoming.length > 0 && (
-        <Card
-          title={<CardTitle icon={<CalendarDaysIcon className="size-3.5" />}>Upcoming</CardTitle>}
-          action={
-            <span className="font-mono text-[11px] tabular-nums text-fg-muted">
-              {upcomingPage?.totalElements ?? upcoming.length}
-            </span>
-          }
-          padding="none"
-        >
-          <DispatchesTable rows={upcoming} onOpen={openWorkOrder} />
-        </Card>
-      )}
+      {/* Toolbar — same pattern as the Invoices/Jobs tabs. `q` matches WO
+          number/summary + tech name server-side (literal %/_ are escaped). */}
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="flex h-8 min-w-[200px] max-w-[320px] flex-1 items-center gap-2 rounded-md border border-border bg-bg-elev px-2.5">
+          <MagnifyingGlassIcon className="size-3.5 text-fg-dim" />
+          <input
+            value={search}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              resetPage();
+            }}
+            placeholder="Search by tech or work order…"
+            className="min-w-0 flex-1 bg-transparent text-[12.5px] text-fg outline-none placeholder:text-fg-dim"
+          />
+          {search && (
+            <button
+              onClick={() => {
+                setSearch('');
+                resetPage();
+              }}
+              className="px-1 text-[11px] text-fg-dim hover:text-fg-strong"
+            >
+              ×
+            </button>
+          )}
+        </div>
 
-      {pastTotal > 0 && (
-        <Card
-          title={<CardTitle icon={<ClockIcon className="size-3.5" />}>Past</CardTitle>}
-          action={<span className="font-mono text-[11px] tabular-nums text-fg-muted">{pastTotal}</span>}
-          padding="none"
+        <FilterChipListbox
+          label="Status"
+          ariaLabel="Status"
+          value={statusSel}
+          displayValue={statusSel === 'all' ? 'All' : t(`workOrders.dispatches.status.${statusSel}`)}
+          onChange={(id) => {
+            setStatusSel(id as 'all' | DispatchStatus);
+            resetPage();
+          }}
         >
-          {past.length === 0 ? (
-            <div className="px-3.5 py-6 text-center text-[12px] text-fg-muted">
-              {`Earlier ${getName('dispatch', true).toLowerCase()} are on the next page.`}
-            </div>
-          ) : (
-            <DispatchesTable rows={past} onOpen={openWorkOrder} />
-          )}
-          {totalPages > 1 && (
-            <div className="flex items-center justify-end gap-2 border-t border-border-soft bg-bg-elev-2 px-4 py-2.5 text-[11.5px] text-fg-muted">
-              <Button plain size="xxs" disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>
-                Prev
-              </Button>
-              <span className="font-mono text-[11px] tabular-nums text-fg">
-                {page} / {totalPages}
-              </span>
-              <Button
-                plain
-                size="xxs"
-                disabled={page >= totalPages}
-                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-              >
-                Next
-              </Button>
-            </div>
-          )}
+          <ChipListboxOption value="all">All</ChipListboxOption>
+          {DISPATCH_STATUS_OPTIONS.map((s) => (
+            <ChipListboxOption key={s} value={s}>
+              {t(`workOrders.dispatches.status.${s}`)}
+            </ChipListboxOption>
+          ))}
+        </FilterChipListbox>
+
+        <DateRangeChip
+          label={t('workOrders.table.scheduled')}
+          ariaLabel="Scheduled date"
+          value={dateRange}
+          onChange={(r) => {
+            setDateRange(r);
+            resetPage();
+          }}
+        />
+
+        {filtersActive && (
+          <Button plain size="xs" onClick={clearFilters}>
+            Clear
+          </Button>
+        )}
+      </div>
+
+      {isLoading ? (
+        <Card padding="none">
+          <div className="px-3.5 py-6 text-center text-[12px] text-fg-muted">
+            {t('common.actions.loading', { entities: getName('dispatch', true) })}
+          </div>
         </Card>
+      ) : upcoming.length === 0 && pastTotal === 0 ? (
+        <Card padding="none">
+          <div className="px-3.5 py-10 text-center">
+            <div className="text-[13px] font-semibold text-fg-strong">
+              {filtersActive
+                ? `No matching ${getName('dispatch', true).toLowerCase()}`
+                : t('common.actions.noEntitiesYet', { entities: getName('dispatch', true) })}
+            </div>
+            <div className="mt-1 text-[12px] text-fg-muted">
+              {filtersActive
+                ? 'Adjust your search or clear filters.'
+                : `Scheduled and completed ${getName('dispatch', true).toLowerCase()} at this site will appear here.`}
+            </div>
+            {filtersActive && (
+              <Button plain size="xs" className="mt-2" onClick={clearFilters}>
+                Clear filters
+              </Button>
+            )}
+          </div>
+        </Card>
+      ) : (
+        <>
+          {upcoming.length > 0 && (
+            <Card
+              title={<CardTitle icon={<CalendarDaysIcon className="size-3.5" />}>Upcoming</CardTitle>}
+              action={
+                <span className="font-mono text-[11px] tabular-nums text-fg-muted">
+                  {upcomingPage?.totalElements ?? upcoming.length}
+                </span>
+              }
+              padding="none"
+            >
+              <DispatchesTable rows={upcoming} onOpen={openWorkOrder} />
+            </Card>
+          )}
+
+          {pastTotal > 0 && (
+            <Card
+              title={<CardTitle icon={<ClockIcon className="size-3.5" />}>Past</CardTitle>}
+              action={<span className="font-mono text-[11px] tabular-nums text-fg-muted">{pastTotal}</span>}
+              padding="none"
+            >
+              <DispatchesTable rows={past} onOpen={openWorkOrder} />
+              {totalPages > 1 && (
+                <div className="flex items-center justify-end gap-2 border-t border-border-soft bg-bg-elev-2 px-4 py-2.5 text-[11.5px] text-fg-muted">
+                  <Button plain size="xxs" disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>
+                    Prev
+                  </Button>
+                  <span className="font-mono text-[11px] tabular-nums text-fg">
+                    {page} / {totalPages}
+                  </span>
+                  <Button
+                    plain
+                    size="xxs"
+                    disabled={page >= totalPages}
+                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  >
+                    Next
+                  </Button>
+                </div>
+              )}
+            </Card>
+          )}
+        </>
       )}
     </div>
   );
@@ -3886,7 +3954,7 @@ function JobsTab({ location, onNewJob }: { location: ServiceLocationDetailDto; o
   // the open set (the Overview card already surfaces the open/recent peek).
   const [statusId, setStatusId] = useState('all');
   const [typeIds, setTypeIds] = useState<string[]>([]);
-  const [datePreset, setDatePreset] = useState<DatePreset>('');
+  const [dateRange, setDateRange] = useState<DateRange>(EMPTY_DATE_RANGE);
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const deferredSearch = useDeferredValue(search.trim());
@@ -3899,14 +3967,14 @@ function JobsTab({ location, onNewJob }: { location: ServiceLocationDetailDto; o
   const typeName = (id?: string | null) => safeTypes.find((tp) => tp.id === id)?.name;
 
   const statusParams = JOB_STATUS_FILTERS.find((s) => s.id === statusId)?.params ?? {};
-  const range = datePreset && datePreset !== 'custom' ? rangeForPreset(datePreset) : undefined;
 
   const params: ListWorkOrdersParams = {
     serviceLocationId: location.id,
     ...statusParams,
     workOrderTypeIds: typeIds.length ? typeIds : undefined,
-    scheduledDateFrom: range?.from,
-    scheduledDateTo: range?.to,
+    // The chip's inclusive day strings pass through as-is.
+    scheduledDateFrom: dateRange.from || undefined,
+    scheduledDateTo: dateRange.to || undefined,
     q: deferredSearch || undefined,
     page: page - 1, // local state is 1-based; backend Page is 0-based
     size: JOBS_PAGE_SIZE,
@@ -3926,7 +3994,8 @@ function JobsTab({ location, onNewJob }: { location: ServiceLocationDetailDto; o
   const total = data?.totalElements ?? 0;
   const totalPages = data?.totalPages ?? 0;
 
-  const filtersActive = statusId !== 'all' || typeIds.length > 0 || !!datePreset || !!deferredSearch;
+  const filtersActive =
+    statusId !== 'all' || typeIds.length > 0 || Boolean(dateRange.from || dateRange.to) || !!deferredSearch;
   const showingStart = total === 0 ? 0 : (page - 1) * JOBS_PAGE_SIZE + 1;
   const showingEnd = Math.min(page * JOBS_PAGE_SIZE, total);
 
@@ -3934,14 +4003,13 @@ function JobsTab({ location, onNewJob }: { location: ServiceLocationDetailDto; o
   const clearFilters = () => {
     setStatusId('all');
     setTypeIds([]);
-    setDatePreset('');
+    setDateRange(EMPTY_DATE_RANGE);
     setSearch('');
     resetPage();
   };
 
   const typeDisplay =
     typeIds.length === 1 ? (typeName(typeIds[0]) ?? '1 selected') : typeIds.length > 1 ? `${typeIds.length} selected` : null;
-  const dateDisplay = datePreset ? t(DATE_PRESETS.find((p) => p.id === datePreset)?.labelKey ?? '') : null;
 
   return (
     <div className="flex flex-col gap-2.5">
@@ -4011,26 +4079,15 @@ function JobsTab({ location, onNewJob }: { location: ServiceLocationDetailDto; o
           </FilterChipListbox>
         )}
 
-        <FilterChipListbox
+        <DateRangeChip
           label={t('workOrders.table.scheduled')}
           ariaLabel="Scheduled date"
-          value={datePreset || null}
-          displayValue={dateDisplay}
-          onChange={(id) => {
-            setDatePreset(id as DatePreset);
+          value={dateRange}
+          onChange={(r) => {
+            setDateRange(r);
             resetPage();
           }}
-          onClear={() => {
-            setDatePreset('');
-            resetPage();
-          }}
-        >
-          {DATE_PRESETS.filter((p) => p.id !== '' && p.id !== 'custom').map((p) => (
-            <ChipListboxOption key={p.id} value={p.id}>
-              {t(p.labelKey)}
-            </ChipListboxOption>
-          ))}
-        </FilterChipListbox>
+        />
 
         {filtersActive && (
           <Button plain size="xs" onClick={clearFilters}>

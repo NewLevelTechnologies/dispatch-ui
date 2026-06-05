@@ -371,13 +371,40 @@ describe('WorkOrdersPage', () => {
       });
     });
 
-    it('shows custom date inputs when the URL has date=custom', async () => {
+    it('reads a from/to range from the URL into the scheduled-date params', async () => {
       vi.mocked(apiClient.get).mockResolvedValue({ data: pageOf([]) });
 
-      renderWithProviders(<WorkOrdersPage />, { initialPath: '/?date=custom' });
+      renderWithProviders(<WorkOrdersPage />, { initialPath: '/?from=2026-05-01&to=2026-05-31' });
 
-      expect(screen.getByLabelText(/^from$/i)).toBeInTheDocument();
-      expect(screen.getByLabelText(/^to$/i)).toBeInTheDocument();
+      await waitFor(() => {
+        const sent = vi
+          .mocked(apiClient.get)
+          .mock.calls.some(
+            ([u, cfg]) =>
+              String(u).startsWith('/work-orders') &&
+              (cfg as { params?: { scheduledDateFrom?: string } } | undefined)?.params?.scheduledDateFrom ===
+                '2026-05-01' &&
+              (cfg as { params?: { scheduledDateTo?: string } } | undefined)?.params?.scheduledDateTo === '2026-05-31',
+          );
+        expect(sent).toBe(true);
+      });
+    });
+
+    it('resolves a legacy date=preset URL to a concrete range', async () => {
+      vi.mocked(apiClient.get).mockResolvedValue({ data: pageOf([]) });
+
+      renderWithProviders(<WorkOrdersPage />, { initialPath: '/?date=last30' });
+
+      await waitFor(() => {
+        const sent = vi
+          .mocked(apiClient.get)
+          .mock.calls.some(
+            ([u, cfg]) =>
+              String(u).startsWith('/work-orders') &&
+              Boolean((cfg as { params?: { scheduledDateFrom?: string } } | undefined)?.params?.scheduledDateFrom),
+          );
+        expect(sent).toBe(true);
+      });
     });
 
     it('reads filter dropdown value from the URL', async () => {
@@ -404,23 +431,25 @@ describe('WorkOrdersPage', () => {
       expect(search).toHaveValue('lenox');
     });
 
-    it('selecting a date preset updates the URL', async () => {
+    it('selecting a date preset writes the resolved from/to range to the URL', async () => {
       vi.mocked(apiClient.get).mockResolvedValue({ data: pageOf([]) });
       const user = userEvent.setup();
       const { router } = renderWithProviders(<WorkOrdersPage />);
 
-      // Scheduled filter is the date preset filter chip.
+      // Scheduled filter is the date-range popover chip.
       const scheduledFilter = await screen.findByRole('button', {
         name: /scheduled/i,
       });
       await user.click(scheduledFilter);
 
-      // Pick "Today" preset.
-      const today = await screen.findByRole('option', { name: /today/i });
-      await user.click(today);
+      // Presets resolve to concrete day strings at click time.
+      const preset = await screen.findByRole('button', { name: /last 30 days/i });
+      await user.click(preset);
 
       await waitFor(() => {
-        expect(router.state.location.search).toContain('date=today');
+        expect(router.state.location.search).toContain('from=');
+        expect(router.state.location.search).toContain('to=');
+        expect(router.state.location.search).not.toContain('date=');
       });
     });
   });
