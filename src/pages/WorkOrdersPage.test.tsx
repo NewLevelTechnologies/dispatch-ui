@@ -442,16 +442,16 @@ describe('WorkOrdersPage', () => {
       );
     };
 
-    it('renders the assigned column from embedded technicians (lead + overflow, dash when empty)', async () => {
+    it('renders the assigned column from embedded assignedUsers (lead + overflow, dash when empty)', async () => {
       mockGets([
         {
           ...mockWorkOrders[0],
-          technicians: [
-            { userId: 'user-2', name: 'Dana Park' },
-            { userId: 'user-1', name: 'Brian Ortega' },
+          assignedUsers: [
+            { userId: 'user-2', name: 'Dana Park', state: 'ON_SITE' },
+            { userId: 'user-1', name: 'Brian Ortega', state: 'SCHEDULED' },
           ],
         },
-        { ...mockWorkOrders[1], technicians: [] },
+        { ...mockWorkOrders[1], assignedUsers: [] },
       ]);
 
       renderWithProviders(<WorkOrdersPage />);

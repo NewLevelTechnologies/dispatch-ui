@@ -815,7 +815,7 @@ export default function WorkOrdersPage() {
                           </Pill>
                         </td>
                         <td>
-                          <AssignedUsersCell users={workOrder.technicians} />
+                          <AssignedUsersCell users={workOrder.assignedUsers} />
                         </td>
                         <td>
                           {formatDate(workOrder.scheduledDate)}

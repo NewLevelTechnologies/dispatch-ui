@@ -1275,7 +1275,7 @@ function WorkOrderRow({
         )}
       </td>
       <td className="px-3.5 py-2">
-        <AssignedUsersCell users={wo.technicians} />
+        <AssignedUsersCell users={wo.assignedUsers} />
       </td>
       <td className="px-3.5 py-2 text-[11.5px] text-fg-muted">{formatWoDate(wo.scheduledDate)}</td>
     </tr>
