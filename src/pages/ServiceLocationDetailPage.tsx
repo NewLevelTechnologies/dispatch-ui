@@ -3322,18 +3322,6 @@ function InvoicesTab({ location }: { location: ServiceLocationDetailDto }) {
         </div>
       </Card>
 
-      {/* Context line — whose ledger this rolls up to. */}
-      <div className="flex items-center gap-2 rounded-md border border-border-soft bg-bg-elev-2 px-3 py-2 text-[11.5px] text-fg-muted">
-        <ReceiptPercentIcon className="size-3.5 shrink-0 text-fg-dim" />
-        <span>
-          Invoices for work at this location. Billed to{' '}
-          <Link to={`/customers/${location.customerId}`} className="font-medium text-fg-accent hover:underline">
-            {location.customerName}
-          </Link>{' '}
-          — full AR ledger lives on the {getName('customer').toLowerCase()}.
-        </span>
-      </div>
-
       {/* Filter bar — same toolbar pattern as the Jobs tab. `q` matches invoice
           number OR customer name server-side, but the customer is constant at a
           location, so the placeholder is honest about what it's for. (Heads-up:

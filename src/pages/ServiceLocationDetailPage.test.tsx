@@ -617,7 +617,7 @@ describe('ServiceLocationDetailPage', () => {
       return user;
     };
 
-    it('renders the summary strip, context line, and invoice rows', async () => {
+    it('renders the summary strip and invoice rows', async () => {
       mockApiResponses(mockLocation, [], [], workOrders, undefined, [makeInvoice()], summary);
       await openInvoicesTab();
 
@@ -626,10 +626,6 @@ describe('ServiceLocationDetailPage', () => {
       expect(screen.getByText('Billed YTD')).toBeInTheDocument();
       expect(screen.getByText('2 open')).toBeInTheDocument();
       expect(screen.getByText('past due')).toBeInTheDocument();
-
-      // Context line links to the parent customer.
-      const customerLink = screen.getByRole('link', { name: 'Test Customer' });
-      expect(customerLink).toHaveAttribute('href', '/customers/customer-1');
 
       // Row: number, resolved WO #, bill-to, amount + balance (both $500 here).
       expect(screen.getByText('INV-1001')).toBeInTheDocument();
