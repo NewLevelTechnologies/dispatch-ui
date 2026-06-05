@@ -59,6 +59,27 @@ describe('InvoicesPage', () => {
     expect(screen.getByText('Acme Co')).toBeInTheDocument();
   });
 
+  it('drives the status chip server-side — Overdue sends overdue=true, not status=OVERDUE', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<InvoicesPage />);
+    await waitFor(() => expect(screen.getByText('INV-1001')).toBeInTheDocument());
+
+    await user.click(screen.getByRole('button', { name: 'Status' }));
+    await user.click(await screen.findByRole('option', { name: /overdue/i }));
+
+    await waitFor(() => {
+      const sent = vi
+        .mocked(apiClient.get)
+        .mock.calls.some(
+          ([u, cfg]) =>
+            u === '/financial/invoices' &&
+            (cfg as { params?: { overdue?: boolean; status?: string } } | undefined)?.params?.overdue === true &&
+            (cfg as { params?: { status?: string } } | undefined)?.params?.status === undefined,
+        );
+      expect(sent).toBe(true);
+    });
+  });
+
   it('drives search server-side via the q param', async () => {
     const user = userEvent.setup();
     renderWithProviders(<InvoicesPage />);

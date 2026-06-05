@@ -19,12 +19,27 @@ import {
 } from '../components/ui/DenseTable';
 import { ListToolbar, ListSearch } from '../components/ui/ListToolbar';
 import { ListFooter } from '../components/ui/ListFooter';
+import { FilterChipListbox, ChipListboxOption } from '../components/ui/FilterChipListbox';
+import { type DatePreset, DATE_PRESETS, rangeForPreset } from '../lib/dateRangePresets';
 import { InvoiceStatus, invoicesApi } from '../api/financialApi';
-import type { InvoiceListItemRow, CreateInvoiceRequest, CreateInvoiceLineItemRequest } from '../api/financialApi';
-
-const PAGE_SIZE = 25;
+import type { InvoiceListItemRow, CreateInvoiceRequest, CreateInvoiceLineItemRequest, ListInvoicesParams } from '../api/financialApi';
 import { customerApi } from '../api/customerApi';
 import { workOrderApi } from '../api/workOrderApi';
+
+const PAGE_SIZE = 25;
+
+// Status chip — single-select (the backend has no multi-status param). "Overdue"
+// rides the server-derived `overdue=true` (open + strictly past due) rather than
+// `status=OVERDUE`, so a SENT invoice past its due date matches even before the
+// stored status flips. Same filter set as the location detail Invoices tab.
+const INVOICE_STATUS_FILTERS: { id: string; labelKey: string; params: Partial<ListInvoicesParams> }[] = [
+  { id: 'overdue', labelKey: 'invoices.status.overdue', params: { overdue: true } },
+  { id: 'draft', labelKey: 'invoices.status.draft', params: { status: InvoiceStatus.DRAFT } },
+  { id: 'sent', labelKey: 'invoices.status.sent', params: { status: InvoiceStatus.SENT } },
+  { id: 'paid', labelKey: 'invoices.status.paid', params: { status: InvoiceStatus.PAID } },
+  { id: 'cancelled', labelKey: 'invoices.status.cancelled', params: { status: InvoiceStatus.CANCELLED } },
+  { id: 'void', labelKey: 'invoices.status.void', params: { status: InvoiceStatus.VOID } },
+];
 
 export default function InvoicesPage() {
   const queryClient = useQueryClient();
@@ -34,14 +49,16 @@ export default function InvoicesPage() {
   const [isStatusOpen, setIsStatusOpen] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState<InvoiceListItemRow | null>(null);
 
-  // Server-side search + pagination (the list endpoint is paged + lean now, so
-  // client-side filtering would only search the loaded page). Page lives in the
-  // URL (1-based; API is 0-based); search is mirrored to the URL so the footer's
-  // page links preserve it.
+  // Server-side search + filters + pagination (the list endpoint is paged +
+  // lean now, so client-side filtering would only search the loaded page).
+  // Page lives in the URL (1-based; API is 0-based); search and filters are
+  // mirrored to the URL so the footer's page links preserve them.
   const [searchParams, setSearchParams] = useSearchParams();
   const [searchQuery, setSearchQuery] = useState(searchParams.get('search') ?? '');
   const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10));
   const deferredSearch = useDeferredValue(searchQuery.trim());
+  const statusId = searchParams.get('status') ?? '';
+  const datePreset = (searchParams.get('date') as DatePreset | null) ?? '';
 
   const onSearchChange = (value: string) => {
     setSearchQuery(value);
@@ -49,6 +66,15 @@ export default function InvoicesPage() {
     if (value) next.set('search', value);
     else next.delete('search');
     next.delete('page'); // new query → back to page 1
+    setSearchParams(next, { replace: true });
+  };
+
+  // Status / issued-date chips write through here. New filter → back to page 1.
+  const setFilterParam = (key: string, value: string | null) => {
+    const next = new URLSearchParams(searchParams);
+    if (value) next.set(key, value);
+    else next.delete(key);
+    next.delete('page');
     setSearchParams(next, { replace: true });
   };
 
@@ -82,11 +108,17 @@ export default function InvoicesPage() {
   const [newStatus, setNewStatus] = useState<InvoiceStatus>(InvoiceStatus.DRAFT);
   const [submitting, setSubmitting] = useState(false);
 
+  const statusParams = INVOICE_STATUS_FILTERS.find((s) => s.id === statusId)?.params ?? {};
+  const range = datePreset && datePreset !== 'custom' ? rangeForPreset(datePreset) : undefined;
+
   const { data: invoicePage, isLoading: invoicesLoading } = useQuery({
-    queryKey: ['invoices', page, deferredSearch],
+    queryKey: ['invoices', page, deferredSearch, statusId, datePreset],
     queryFn: () =>
       invoicesApi.getAll({
         q: deferredSearch || undefined,
+        ...statusParams,
+        from: range?.from,
+        to: range?.to, // inclusive on the backend — no +1-day trick
         page: page - 1,
         size: PAGE_SIZE,
         sort: 'invoiceDate,desc',
@@ -224,7 +256,7 @@ export default function InvoicesPage() {
     setFormData({ ...formData, lineItems: updated });
   };
 
-  const getStatusBadge = (status: InvoiceStatus) => {
+  const getStatusBadge = (invoice: InvoiceListItemRow) => {
     const tones: Record<InvoiceStatus, 'neutral' | 'info' | 'success' | 'warning' | 'danger'> = {
       [InvoiceStatus.DRAFT]: 'neutral',
       [InvoiceStatus.SENT]: 'info',
@@ -233,7 +265,14 @@ export default function InvoicesPage() {
       [InvoiceStatus.CANCELLED]: 'neutral',
       [InvoiceStatus.VOID]: 'neutral',
     };
-    return <Pill tone={tones[status]} dot>{t(`invoices.status.${status.toLowerCase()}`)}</Pill>;
+    // Server-derived `overdue` is canonical — same rule as the overdue filter
+    // (open + strictly past due), so badge and filter always agree. It covers
+    // SENT rows whose stored status hasn't flipped to OVERDUE yet. Never
+    // recompute from dueDate client-side (timezone drift).
+    if (invoice.overdue) {
+      return <Pill tone="danger" dot>{t('invoices.status.overdue')}</Pill>;
+    }
+    return <Pill tone={tones[invoice.status]} dot>{t(`invoices.status.${invoice.status.toLowerCase()}`)}</Pill>;
   };
 
   const formatCurrency = (amount: number) => {
@@ -278,7 +317,41 @@ export default function InvoicesPage() {
               onChange={onSearchChange}
             />
           }
-        />
+        >
+          <FilterChipListbox
+            label={t('common.form.status')}
+            ariaLabel={t('common.form.status')}
+            value={statusId || null}
+            displayValue={
+              statusId ? t(INVOICE_STATUS_FILTERS.find((s) => s.id === statusId)?.labelKey ?? '') : null
+            }
+            onChange={(id) => setFilterParam('status', id)}
+            onClear={() => setFilterParam('status', null)}
+            resetLabel={t('invoices.filters.anyStatus')}
+          >
+            {INVOICE_STATUS_FILTERS.map((s) => (
+              <ChipListboxOption key={s.id} value={s.id}>
+                {t(s.labelKey)}
+              </ChipListboxOption>
+            ))}
+          </FilterChipListbox>
+
+          <FilterChipListbox
+            label={t('invoices.filters.issued')}
+            ariaLabel={t('invoices.filters.issued')}
+            value={datePreset || null}
+            displayValue={datePreset ? t(DATE_PRESETS.find((p) => p.id === datePreset)?.labelKey ?? '') : null}
+            onChange={(id) => setFilterParam('date', id)}
+            onClear={() => setFilterParam('date', null)}
+            resetLabel={t('workOrders.dates.any')}
+          >
+            {DATE_PRESETS.filter((p) => p.id !== '' && p.id !== 'custom').map((p) => (
+              <ChipListboxOption key={p.id} value={p.id}>
+                {t(p.labelKey)}
+              </ChipListboxOption>
+            ))}
+          </FilterChipListbox>
+        </ListToolbar>
 
         {invoicesLoading ? (
           <Card>
@@ -292,7 +365,9 @@ export default function InvoicesPage() {
           <Card>
             <CardBody>
               <p className="text-[12.5px] text-fg-muted">
-                {deferredSearch ? t('common.actions.noMatchSearch', { entities: getName('invoice', true) }) : t('common.actions.notFound', { entities: getName('invoice', true) })}
+                {deferredSearch || statusId || datePreset
+                  ? t('common.actions.noMatchSearch', { entities: getName('invoice', true) })
+                  : t('common.actions.notFound', { entities: getName('invoice', true) })}
               </p>
             </CardBody>
           </Card>
@@ -313,7 +388,13 @@ export default function InvoicesPage() {
                   </tr>
                 </DenseTHead>
                 <tbody>
-                  {invoices.map((invoice) => (
+                  {invoices.map((invoice) => {
+                    // Void/cancelled money is meaningless — strike the face
+                    // value and dash the balance (not $0.00, which would read
+                    // as "paid off"). Same treatment as the location tab.
+                    const voided =
+                      invoice.status === InvoiceStatus.VOID || invoice.status === InvoiceStatus.CANCELLED;
+                    return (
                     <DenseRow key={invoice.id}>
                       <td>
                         <span className="id-mono text-fg-muted">{invoice.invoiceNumber}</span>
@@ -321,15 +402,19 @@ export default function InvoicesPage() {
                       <td className="strong">{invoice.customerName ?? invoice.customerId}</td>
                       <td>{formatDate(invoice.invoiceDate)}</td>
                       <td>{formatDate(invoice.dueDate)}</td>
-                      <td className="right num strong">{formatCurrency(invoice.totalAmount)}</td>
+                      <td className={voided ? 'right num text-fg-muted line-through' : 'right num strong'}>
+                        {formatCurrency(invoice.totalAmount)}
+                      </td>
                       <td className="right num">
-                        {invoice.balanceDue > 0 ? (
-                          <span className="font-semibold text-warning-500">{formatCurrency(invoice.balanceDue)}</span>
+                        {voided ? (
+                          <span className="text-fg-dim">—</span>
+                        ) : invoice.balanceDue > 0 ? (
+                          <span className="font-semibold text-fg-strong">{formatCurrency(invoice.balanceDue)}</span>
                         ) : (
-                          formatCurrency(invoice.balanceDue)
+                          <span className="text-fg-dim">{formatCurrency(invoice.balanceDue)}</span>
                         )}
                       </td>
-                      <td>{getStatusBadge(invoice.status)}</td>
+                      <td>{getStatusBadge(invoice)}</td>
                       <td>
                         <Button
                           plain
@@ -343,7 +428,8 @@ export default function InvoicesPage() {
                         </Button>
                       </td>
                     </DenseRow>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </DenseTable>
               <ListFooter
