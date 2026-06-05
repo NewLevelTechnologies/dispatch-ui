@@ -229,6 +229,23 @@ type ButtonProps = (
     | ({ href: string } & Omit<React.ComponentPropsWithoutRef<typeof Link>, 'className'>)
   )
 
+/**
+ * Geist optically seats text slightly high in its em-box, so a flex-centered
+ * label reads above center even though the line box is dead-center. Nudge
+ * bare text/number children down half a pixel to compensate. Element children
+ * (icons via data-slot, custom spans) are left untouched — icons already sit
+ * on the true midline and must not shift with the label.
+ */
+function nudgeLabel(children: React.ReactNode): React.ReactNode {
+  return React.Children.map(children, (child) =>
+    typeof child === 'string' || typeof child === 'number' ? (
+      <span className="relative top-[0.5px]">{child}</span>
+    ) : (
+      child
+    )
+  )
+}
+
 export const Button = forwardRef(function Button(
   { color, outline, plain, size, className, children, ...props }: ButtonProps,
   ref: React.ForwardedRef<HTMLElement>
@@ -240,14 +257,15 @@ export const Button = forwardRef(function Button(
     styles.sizes[size ?? 'md'],
     outlineStyle ? outlineStyle : plain ? styles.plain : clsx(styles.solid, styles.colors[color ?? 'dark/zinc'])
   )
+  const content = nudgeLabel(children)
 
   return typeof props.href === 'string' ? (
     <Link {...props} className={classes} ref={ref as React.ForwardedRef<HTMLAnchorElement>}>
-      <TouchTarget>{children}</TouchTarget>
+      <TouchTarget>{content}</TouchTarget>
     </Link>
   ) : (
     <Headless.Button {...props} className={clsx(classes, 'cursor-default')} ref={ref}>
-      <TouchTarget>{children}</TouchTarget>
+      <TouchTarget>{content}</TouchTarget>
     </Headless.Button>
   )
 })
