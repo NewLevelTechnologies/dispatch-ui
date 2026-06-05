@@ -20,6 +20,7 @@ import {
 import { ListToolbar, ListSearch } from '../components/ui/ListToolbar';
 import { ListFooter } from '../components/ui/ListFooter';
 import { FilterChipListbox, ChipListboxOption } from '../components/ui/FilterChipListbox';
+import { DateRangeFields } from '../components/ui/DateRangeFields';
 import { type DatePreset, DATE_PRESETS, rangeForPreset } from '../lib/dateRangePresets';
 import { InvoiceStatus, invoicesApi } from '../api/financialApi';
 import type { InvoiceListItemRow, CreateInvoiceRequest, CreateInvoiceLineItemRequest, ListInvoicesParams } from '../api/financialApi';
@@ -59,6 +60,8 @@ export default function InvoicesPage() {
   const deferredSearch = useDeferredValue(searchQuery.trim());
   const statusId = searchParams.get('status') ?? '';
   const datePreset = (searchParams.get('date') as DatePreset | null) ?? '';
+  const customFrom = searchParams.get('from') ?? '';
+  const customTo = searchParams.get('to') ?? '';
 
   const onSearchChange = (value: string) => {
     setSearchQuery(value);
@@ -70,13 +73,16 @@ export default function InvoicesPage() {
   };
 
   // Status / issued-date chips write through here. New filter → back to page 1.
-  const setFilterParam = (key: string, value: string | null) => {
+  const setFilterParams = (updates: Record<string, string | null>) => {
     const next = new URLSearchParams(searchParams);
-    if (value) next.set(key, value);
-    else next.delete(key);
+    for (const [key, value] of Object.entries(updates)) {
+      if (value) next.set(key, value);
+      else next.delete(key);
+    }
     next.delete('page');
     setSearchParams(next, { replace: true });
   };
+  const setFilterParam = (key: string, value: string | null) => setFilterParams({ [key]: value });
 
   const pageHref = (target: number): string => {
     const next = new URLSearchParams(searchParams);
@@ -109,10 +115,16 @@ export default function InvoicesPage() {
   const [submitting, setSubmitting] = useState(false);
 
   const statusParams = INVOICE_STATUS_FILTERS.find((s) => s.id === statusId)?.params ?? {};
-  const range = datePreset && datePreset !== 'custom' ? rangeForPreset(datePreset) : undefined;
+  // Inclusive day strings either way — custom inputs pass through as typed.
+  const range =
+    datePreset === 'custom'
+      ? { from: customFrom || undefined, to: customTo || undefined }
+      : datePreset
+        ? rangeForPreset(datePreset)
+        : undefined;
 
   const { data: invoicePage, isLoading: invoicesLoading } = useQuery({
-    queryKey: ['invoices', page, deferredSearch, statusId, datePreset],
+    queryKey: ['invoices', page, deferredSearch, statusId, datePreset, customFrom, customTo],
     queryFn: () =>
       invoicesApi.getAll({
         q: deferredSearch || undefined,
@@ -340,18 +352,36 @@ export default function InvoicesPage() {
             label={t('invoices.filters.issued')}
             ariaLabel={t('invoices.filters.issued')}
             value={datePreset || null}
-            displayValue={datePreset ? t(DATE_PRESETS.find((p) => p.id === datePreset)?.labelKey ?? '') : null}
-            onChange={(id) => setFilterParam('date', id)}
-            onClear={() => setFilterParam('date', null)}
+            displayValue={
+              datePreset === 'custom'
+                ? `${customFrom || '…'} – ${customTo || '…'}`
+                : datePreset
+                  ? t(DATE_PRESETS.find((p) => p.id === datePreset)?.labelKey ?? '')
+                  : null
+            }
+            onChange={(id) =>
+              setFilterParams(id === 'custom' ? { date: id } : { date: id, from: null, to: null })
+            }
+            onClear={() => setFilterParams({ date: null, from: null, to: null })}
             resetLabel={t('workOrders.dates.any')}
           >
-            {DATE_PRESETS.filter((p) => p.id !== '' && p.id !== 'custom').map((p) => (
+            {DATE_PRESETS.filter((p) => p.id !== '').map((p) => (
               <ChipListboxOption key={p.id} value={p.id}>
                 {t(p.labelKey)}
               </ChipListboxOption>
             ))}
           </FilterChipListbox>
         </ListToolbar>
+
+        {datePreset === 'custom' && (
+          <DateRangeFields
+            className="mb-3"
+            from={customFrom}
+            to={customTo}
+            onFromChange={(v) => setFilterParam('from', v || null)}
+            onToChange={(v) => setFilterParam('to', v || null)}
+          />
+        )}
 
         {invoicesLoading ? (
           <Card>

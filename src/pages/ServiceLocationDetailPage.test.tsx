@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { renderWithProviders, userEvent } from '../test/utils';
 import ServiceLocationDetailPage from './ServiceLocationDetailPage';
 import apiClient from '../api/client';
@@ -709,6 +709,31 @@ describe('ServiceLocationDetailPage', () => {
       await user.click(screen.getByRole('button', { name: 'Clear' }));
       await waitFor(() => expect(screen.queryByRole('button', { name: 'Clear' })).not.toBeInTheDocument());
       await waitFor(() => expect(screen.getByText('Upcoming')).toBeInTheDocument());
+    });
+
+    it('filters by a custom date range as half-open local-midnight instants', async () => {
+      const user = await openDispatchesTab([
+        makeDispatch({ id: 'd-1', status: 'COMPLETED', arrivalWindowStart: '2026-05-01T15:00:00Z', arrivalWindowEnd: '2026-05-01T17:00:00Z' }),
+      ]);
+      await waitFor(() => expect(screen.getByText('WO-5000')).toBeInTheDocument());
+
+      await user.click(screen.getByRole('button', { name: 'Scheduled date' }));
+      await user.click(await screen.findByRole('option', { name: 'Custom range…' }));
+
+      fireEvent.change(screen.getByLabelText('From'), { target: { value: '2026-05-01' } });
+      fireEvent.change(screen.getByLabelText('To'), { target: { value: '2026-05-31' } });
+
+      // from = local midnight of the start day; to = the midnight AFTER the
+      // inclusive end day (half-open). Expected values built with the same
+      // Date(y, m, d) constructor so the assertion is timezone-agnostic.
+      await waitFor(() =>
+        expect(
+          dispatchCallWith(
+            (p) =>
+              p.from === new Date(2026, 4, 1).toISOString() && p.to === new Date(2026, 5, 1).toISOString(),
+          ),
+        ).toBe(true),
+      );
     });
 
     it('shows the no-match state when filters strike out, and recovers on clear', async () => {

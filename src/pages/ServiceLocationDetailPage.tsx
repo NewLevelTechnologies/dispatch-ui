@@ -64,8 +64,15 @@ import {
   type ListWorkOrdersParams,
 } from '../api';
 import { workOrdersListQueryOptions } from '../api/workOrdersListQuery';
-import { type DatePreset, DATE_PRESETS, instantRangeForPreset, rangeForPreset } from '../lib/dateRangePresets';
+import {
+  type DatePreset,
+  DATE_PRESETS,
+  instantRangeForDays,
+  instantRangeForPreset,
+  rangeForPreset,
+} from '../lib/dateRangePresets';
 import { FilterChipListbox, ChipListboxOption } from '../components/ui/FilterChipListbox';
+import { DateRangeFields } from '../components/ui/DateRangeFields';
 import { roleColor } from '../utils/roleColor';
 import { useGlossary } from '../contexts/GlossaryContext';
 import { useHasCapability } from '../hooks/useCurrentUser';
@@ -3212,12 +3219,20 @@ function InvoicesTab({ location }: { location: ServiceLocationDetailDto }) {
 
   const [statusId, setStatusId] = useState('all');
   const [datePreset, setDatePreset] = useState<DatePreset>('');
+  const [customFrom, setCustomFrom] = useState('');
+  const [customTo, setCustomTo] = useState('');
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const deferredSearch = useDeferredValue(search.trim());
 
   const statusParams = INVOICE_STATUS_FILTERS.find((s) => s.id === statusId)?.params ?? {};
-  const range = datePreset && datePreset !== 'custom' ? rangeForPreset(datePreset) : undefined;
+  // Inclusive day strings either way — custom inputs pass through as typed.
+  const range =
+    datePreset === 'custom'
+      ? { from: customFrom || undefined, to: customTo || undefined }
+      : datePreset
+        ? rangeForPreset(datePreset)
+        : undefined;
 
   const params: ListInvoicesParams = {
     serviceLocationId: location.id,
@@ -3297,11 +3312,18 @@ function InvoicesTab({ location }: { location: ServiceLocationDetailDto }) {
   const clearFilters = () => {
     setStatusId('all');
     setDatePreset('');
+    setCustomFrom('');
+    setCustomTo('');
     setSearch('');
     resetPage();
   };
 
-  const dateDisplay = datePreset ? t(DATE_PRESETS.find((p) => p.id === datePreset)?.labelKey ?? '') : null;
+  const dateDisplay =
+    datePreset === 'custom'
+      ? `${customFrom || '…'} – ${customTo || '…'}`
+      : datePreset
+        ? t(DATE_PRESETS.find((p) => p.id === datePreset)?.labelKey ?? '')
+        : null;
 
   return (
     <div className="flex flex-col gap-3">
@@ -3379,14 +3401,20 @@ function InvoicesTab({ location }: { location: ServiceLocationDetailDto }) {
           displayValue={dateDisplay}
           onChange={(id) => {
             setDatePreset(id as DatePreset);
+            if (id !== 'custom') {
+              setCustomFrom('');
+              setCustomTo('');
+            }
             resetPage();
           }}
           onClear={() => {
             setDatePreset('');
+            setCustomFrom('');
+            setCustomTo('');
             resetPage();
           }}
         >
-          {DATE_PRESETS.filter((p) => p.id !== '' && p.id !== 'custom').map((p) => (
+          {DATE_PRESETS.filter((p) => p.id !== '').map((p) => (
             <ChipListboxOption key={p.id} value={p.id}>
               {t(p.labelKey)}
             </ChipListboxOption>
@@ -3399,6 +3427,21 @@ function InvoicesTab({ location }: { location: ServiceLocationDetailDto }) {
           </Button>
         )}
       </div>
+
+      {datePreset === 'custom' && (
+        <DateRangeFields
+          from={customFrom}
+          to={customTo}
+          onFromChange={(v) => {
+            setCustomFrom(v);
+            resetPage();
+          }}
+          onToChange={(v) => {
+            setCustomTo(v);
+            resetPage();
+          }}
+        />
+      )}
 
       <Card
         title={<CardTitle icon={<ReceiptPercentIcon className="size-3.5" />}>{getName('invoice', true)}</CardTitle>}
@@ -3628,13 +3671,21 @@ function DispatchesTab({ location }: { location: ServiceLocationDetailDto }) {
 
   const [statusSel, setStatusSel] = useState<'all' | DispatchStatus>('all');
   const [datePreset, setDatePreset] = useState<DatePreset>('');
+  const [customFrom, setCustomFrom] = useState('');
+  const [customTo, setCustomTo] = useState('');
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const deferredSearch = useDeferredValue(search.trim());
 
   // Shared filter slice — ANDs with the `when` partition on both queries.
-  // The date range is half-open ISO instants on arrivalWindowStart.
-  const range = datePreset && datePreset !== 'custom' ? instantRangeForPreset(datePreset) : undefined;
+  // The date range is half-open ISO instants on arrivalWindowStart; custom
+  // day strings (either side open-ended) convert through the same boundary.
+  const range =
+    datePreset === 'custom'
+      ? instantRangeForDays(customFrom || undefined, customTo || undefined)
+      : datePreset
+        ? instantRangeForPreset(datePreset)
+        : undefined;
   const filters = {
     q: deferredSearch || undefined,
     status: statusSel === 'all' ? undefined : statusSel,
@@ -3671,10 +3722,17 @@ function DispatchesTab({ location }: { location: ServiceLocationDetailDto }) {
   const clearFilters = () => {
     setStatusSel('all');
     setDatePreset('');
+    setCustomFrom('');
+    setCustomTo('');
     setSearch('');
     resetPage();
   };
-  const dateDisplay = datePreset ? t(DATE_PRESETS.find((p) => p.id === datePreset)?.labelKey ?? '') : null;
+  const dateDisplay =
+    datePreset === 'custom'
+      ? `${customFrom || '…'} – ${customTo || '…'}`
+      : datePreset
+        ? t(DATE_PRESETS.find((p) => p.id === datePreset)?.labelKey ?? '')
+        : null;
 
   return (
     <div className="flex flex-col gap-3">
@@ -3730,14 +3788,20 @@ function DispatchesTab({ location }: { location: ServiceLocationDetailDto }) {
           displayValue={dateDisplay}
           onChange={(id) => {
             setDatePreset(id as DatePreset);
+            if (id !== 'custom') {
+              setCustomFrom('');
+              setCustomTo('');
+            }
             resetPage();
           }}
           onClear={() => {
             setDatePreset('');
+            setCustomFrom('');
+            setCustomTo('');
             resetPage();
           }}
         >
-          {DATE_PRESETS.filter((p) => p.id !== '' && p.id !== 'custom').map((p) => (
+          {DATE_PRESETS.filter((p) => p.id !== '').map((p) => (
             <ChipListboxOption key={p.id} value={p.id}>
               {t(p.labelKey)}
             </ChipListboxOption>
@@ -3750,6 +3814,21 @@ function DispatchesTab({ location }: { location: ServiceLocationDetailDto }) {
           </Button>
         )}
       </div>
+
+      {datePreset === 'custom' && (
+        <DateRangeFields
+          from={customFrom}
+          to={customTo}
+          onFromChange={(v) => {
+            setCustomFrom(v);
+            resetPage();
+          }}
+          onToChange={(v) => {
+            setCustomTo(v);
+            resetPage();
+          }}
+        />
+      )}
 
       {isLoading ? (
         <Card padding="none">
@@ -3978,6 +4057,8 @@ function JobsTab({ location, onNewJob }: { location: ServiceLocationDetailDto; o
   const [statusId, setStatusId] = useState('all');
   const [typeIds, setTypeIds] = useState<string[]>([]);
   const [datePreset, setDatePreset] = useState<DatePreset>('');
+  const [customFrom, setCustomFrom] = useState('');
+  const [customTo, setCustomTo] = useState('');
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const deferredSearch = useDeferredValue(search.trim());
@@ -3990,7 +4071,13 @@ function JobsTab({ location, onNewJob }: { location: ServiceLocationDetailDto; o
   const typeName = (id?: string | null) => safeTypes.find((tp) => tp.id === id)?.name;
 
   const statusParams = JOB_STATUS_FILTERS.find((s) => s.id === statusId)?.params ?? {};
-  const range = datePreset && datePreset !== 'custom' ? rangeForPreset(datePreset) : undefined;
+  // Inclusive day strings either way — custom inputs pass through as typed.
+  const range =
+    datePreset === 'custom'
+      ? { from: customFrom || undefined, to: customTo || undefined }
+      : datePreset
+        ? rangeForPreset(datePreset)
+        : undefined;
 
   const params: ListWorkOrdersParams = {
     serviceLocationId: location.id,
@@ -4026,13 +4113,20 @@ function JobsTab({ location, onNewJob }: { location: ServiceLocationDetailDto; o
     setStatusId('all');
     setTypeIds([]);
     setDatePreset('');
+    setCustomFrom('');
+    setCustomTo('');
     setSearch('');
     resetPage();
   };
 
   const typeDisplay =
     typeIds.length === 1 ? (typeName(typeIds[0]) ?? '1 selected') : typeIds.length > 1 ? `${typeIds.length} selected` : null;
-  const dateDisplay = datePreset ? t(DATE_PRESETS.find((p) => p.id === datePreset)?.labelKey ?? '') : null;
+  const dateDisplay =
+    datePreset === 'custom'
+      ? `${customFrom || '…'} – ${customTo || '…'}`
+      : datePreset
+        ? t(DATE_PRESETS.find((p) => p.id === datePreset)?.labelKey ?? '')
+        : null;
 
   return (
     <div className="flex flex-col gap-2.5">
@@ -4109,14 +4203,20 @@ function JobsTab({ location, onNewJob }: { location: ServiceLocationDetailDto; o
           displayValue={dateDisplay}
           onChange={(id) => {
             setDatePreset(id as DatePreset);
+            if (id !== 'custom') {
+              setCustomFrom('');
+              setCustomTo('');
+            }
             resetPage();
           }}
           onClear={() => {
             setDatePreset('');
+            setCustomFrom('');
+            setCustomTo('');
             resetPage();
           }}
         >
-          {DATE_PRESETS.filter((p) => p.id !== '' && p.id !== 'custom').map((p) => (
+          {DATE_PRESETS.filter((p) => p.id !== '').map((p) => (
             <ChipListboxOption key={p.id} value={p.id}>
               {t(p.labelKey)}
             </ChipListboxOption>
@@ -4135,6 +4235,21 @@ function JobsTab({ location, onNewJob }: { location: ServiceLocationDetailDto; o
           {t('common.actions.new', { entity: getName('work_order') })}
         </Button>
       </div>
+
+      {datePreset === 'custom' && (
+        <DateRangeFields
+          from={customFrom}
+          to={customTo}
+          onFromChange={(v) => {
+            setCustomFrom(v);
+            resetPage();
+          }}
+          onToChange={(v) => {
+            setCustomTo(v);
+            resetPage();
+          }}
+        />
+      )}
 
       <Card padding="none">
         {isLoading ? (

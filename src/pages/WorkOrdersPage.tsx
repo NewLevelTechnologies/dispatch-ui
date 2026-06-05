@@ -25,8 +25,7 @@ import { Button } from '../components/catalyst/button';
 import { Dropdown, DropdownButton, DropdownDivider, DropdownItem, DropdownLabel, DropdownMenu } from '../components/catalyst/dropdown';
 import { FilterChipListbox, ChipListboxOption } from '../components/ui/FilterChipListbox';
 import IconButton from '../components/IconButton';
-import { Input } from '../components/catalyst/input';
-import { Field, Label } from '../components/catalyst/fieldset';
+import { DateRangeFields } from '../components/ui/DateRangeFields';
 import { PageHead } from '../components/ui/PageHead';
 import { Card, CardBody } from '../components/ui/Card';
 import { Pill } from '../components/ui/Pill';
@@ -34,7 +33,6 @@ import { ViewTabs } from '../components/ui/Tabs';
 import {
   DenseTable, DenseTHead, DenseRow, CellStack, CellTop, CellSub,
 } from '../components/ui/DenseTable';
-import { dense } from '../components/ui/dense';
 import { ListToolbar, ListSearch } from '../components/ui/ListToolbar';
 import { ListFooter } from '../components/ui/ListFooter';
 import { AssignedUsersCell } from '../components/ui/AssignedUsersCell';
@@ -644,26 +642,13 @@ export default function WorkOrdersPage() {
 
             {/* Custom date range inputs — surface only when the date chip is in custom mode */}
             {datePreset === 'custom' && (
-              <div className="mt-2 flex flex-wrap items-end gap-2">
-                <Field className="w-44">
-                  <Label className="text-xs text-fg-muted">{t('workOrders.dates.from')}</Label>
-                  <Input
-                    type="date"
-                    value={customFrom}
-                    onChange={(e) => updateParams({ from: e.target.value || null, page: null })}
-                    className={dense.input}
-                  />
-                </Field>
-                <Field className="w-44">
-                  <Label className="text-xs text-fg-muted">{t('workOrders.dates.to')}</Label>
-                  <Input
-                    type="date"
-                    value={customTo}
-                    onChange={(e) => updateParams({ to: e.target.value || null, page: null })}
-                    className={dense.input}
-                  />
-                </Field>
-              </div>
+              <DateRangeFields
+                className="mt-2"
+                from={customFrom}
+                to={customTo}
+                onFromChange={(v) => updateParams({ from: v || null, page: null })}
+                onToChange={(v) => updateParams({ to: v || null, page: null })}
+              />
             )}
         </div>
 

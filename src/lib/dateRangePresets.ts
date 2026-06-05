@@ -42,11 +42,24 @@ export function instantRangeForPreset(
   today = new Date(),
 ): { from: string; to: string } {
   const r = rangeForPreset(preset, today);
-  const [fy, fm, fd] = r.from.split('-').map(Number);
-  const [ty, tm, td] = r.to.split('-').map(Number);
+  return instantRangeForDays(r.from, r.to) as { from: string; to: string };
+}
+
+// Arbitrary inclusive day strings (yyyy-mm-dd, either side optional for an
+// open-ended range) → the same half-open instant pair. Backs the custom
+// range inputs: `to` is the user's inclusive last day, so the exclusive
+// boundary is the midnight after it.
+export function instantRangeForDays(
+  fromDay?: string,
+  toDay?: string,
+): { from?: string; to?: string } {
+  const localMidnight = (day: string, plusDays = 0) => {
+    const [y, m, d] = day.split('-').map(Number);
+    return new Date(y, m - 1, d + plusDays).toISOString(); // overflow rolls the month
+  };
   return {
-    from: new Date(fy, fm - 1, fd).toISOString(),
-    to: new Date(ty, tm - 1, td + 1).toISOString(), // day overflow rolls the month
+    from: fromDay ? localMidnight(fromDay) : undefined,
+    to: toDay ? localMidnight(toDay, 1) : undefined,
   };
 }
 
