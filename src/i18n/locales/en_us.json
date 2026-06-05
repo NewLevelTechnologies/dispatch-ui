@@ -724,6 +724,10 @@
   },
   "invoices": {
     "description": "Manage customer invoices and billing",
+    "filters": {
+      "anyStatus": "Any status",
+      "issued": "Issued"
+    },
     "search": {
       "placeholder": "Search by {{entity, lowercase}} #, {{customer, lowercase}}, or amount…"
     },

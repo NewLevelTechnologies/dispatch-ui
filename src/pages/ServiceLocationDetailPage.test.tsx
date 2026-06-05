@@ -130,8 +130,20 @@ describe('ServiceLocationDetailPage', () => {
       if (url.includes('/financial/invoices/summary')) {
         return Promise.resolve({ data: invoiceSummary });
       }
+      // Paged list — serves both the tab body's filtered query and the size-1
+      // count query (custom PageResponse envelope: `page`, not `number`).
       if (url.includes('/financial/invoices')) {
-        return Promise.resolve({ data: invoices });
+        return Promise.resolve({
+          data: {
+            content: invoices,
+            page: 0,
+            size: 25,
+            totalElements: invoices.length,
+            totalPages: invoices.length ? 1 : 0,
+            first: true,
+            last: true,
+          },
+        });
       }
       if (url.includes('/work-orders')) {
         return Promise.resolve({
@@ -574,8 +586,7 @@ describe('ServiceLocationDetailPage', () => {
       totalAmount: 500,
       amountPaid: 0,
       balanceDue: 500,
-      lineItems: [],
-      payments: [],
+      overdue: false,
       createdAt: '2026-01-15T00:00:00Z',
       updatedAt: '2026-01-15T00:00:00Z',
       ...over,
@@ -606,7 +617,7 @@ describe('ServiceLocationDetailPage', () => {
       return user;
     };
 
-    it('renders the summary strip, context line, and invoice rows', async () => {
+    it('renders the summary strip and invoice rows', async () => {
       mockApiResponses(mockLocation, [], [], workOrders, undefined, [makeInvoice()], summary);
       await openInvoicesTab();
 
@@ -616,14 +627,10 @@ describe('ServiceLocationDetailPage', () => {
       expect(screen.getByText('2 open')).toBeInTheDocument();
       expect(screen.getByText('past due')).toBeInTheDocument();
 
-      // Context line links to the parent customer.
-      const customerLink = screen.getByRole('link', { name: 'Test Customer' });
-      expect(customerLink).toHaveAttribute('href', '/customers/customer-1');
-
-      // Row: number, resolved WO #, bill-to, amount.
+      // Row: number, resolved WO #, bill-to, amount + balance (both $500 here).
       expect(screen.getByText('INV-1001')).toBeInTheDocument();
       expect(screen.getByText('WO-5000')).toBeInTheDocument();
-      expect(screen.getByText('$500.00')).toBeInTheDocument();
+      expect(screen.getAllByText('$500.00')).toHaveLength(2);
     });
 
     it('drills through to the owning work order on row click', async () => {
@@ -664,6 +671,35 @@ describe('ServiceLocationDetailPage', () => {
       await waitFor(() =>
         expect(screen.getByText(/for work at this site will appear here/i)).toBeInTheDocument()
       );
+    });
+
+    it('renders the server-derived overdue flag as the status pill', async () => {
+      // status still SENT but `overdue: true` (open + strictly past due) —
+      // the row badge follows the server flag, not the stored status.
+      const lagging = makeInvoice({ overdue: true, status: 'SENT' });
+      mockApiResponses(mockLocation, [], [], workOrders, undefined, [lagging], summary);
+      await openInvoicesTab();
+      await waitFor(() => expect(screen.getByText('Overdue')).toBeInTheDocument());
+      expect(screen.queryByText('Sent')).not.toBeInTheDocument();
+    });
+
+    it('searches the location’s invoices via the q param', async () => {
+      mockApiResponses(mockLocation, [], [], workOrders, undefined, [makeInvoice()], summary);
+      const user = await openInvoicesTab();
+      await waitFor(() => expect(screen.getByText('INV-1001')).toBeInTheDocument());
+
+      await user.type(screen.getByPlaceholderText(/search invoice/i), '1001');
+      await waitFor(() => {
+        const sentQ = vi
+          .mocked(apiClient.get)
+          .mock.calls.some(
+            ([u, cfg]) =>
+              u === '/financial/invoices' &&
+              (cfg as { params?: { q?: string; serviceLocationId?: string } } | undefined)?.params?.q === '1001' &&
+              (cfg as { params?: { serviceLocationId?: string } } | undefined)?.params?.serviceLocationId === 'location-1',
+          );
+        expect(sentQ).toBe(true);
+      });
     });
   });
 

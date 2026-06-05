@@ -448,6 +448,8 @@ vi.mock('react-i18next', () => {
     'financial.comingSoon': 'Coming soon...',
     'financial.description': 'Manage invoices, quotes, and payments',
     'invoices.description': 'Manage customer invoices and billing',
+    'invoices.filters.anyStatus': 'Any status',
+    'invoices.filters.issued': 'Issued',
     'invoices.search.placeholder': 'Search by invoice #, customer, or amount…',
     'notes.actions.pin': 'Pin',
     'notes.actions.unpin': 'Unpin',

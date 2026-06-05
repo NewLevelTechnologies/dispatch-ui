@@ -41,6 +41,7 @@ import {
   InvoiceStatus,
   type InvoiceListItemRow,
   type InvoiceStatus as InvoiceStatusType,
+  type ListInvoicesParams,
   type LocationInvoiceSummaryResponse,
   type LocationDispatchResponse,
   type DispatchStatus,
@@ -172,8 +173,8 @@ export default function ServiceLocationDetailPage() {
   });
   const equipment: EquipmentSummary[] = useMemo(() => equipmentPage?.content ?? [], [equipmentPage]);
 
-  // Drives the Invoices tab-count badge; the tab body re-reads the same cache.
-  const { data: locationInvoices } = useQuery(locationInvoicesQueryOptions(id ?? ''));
+  // Drives the Invoices tab-count badge; the tab re-reads the same count cache.
+  const { data: locationInvoicesPage } = useQuery(locationInvoiceCountQueryOptions(id ?? ''));
   // Drives the Visits tab-count badge; the tab body re-reads the same cache.
   const { data: locationVisits } = useQuery(locationDispatchesQueryOptions(id ?? ''));
 
@@ -247,7 +248,7 @@ export default function ServiceLocationDetailPage() {
     { id: 'overview', label: t('serviceLocations.tabs.overview') },
     { id: 'equipment', label: getName('equipment', true), count: equipmentPage?.totalElements ?? equipment.length },
     { id: 'jobs', label: getName('work_order', true), count: workOrdersData?.totalElements ?? 0 },
-    { id: 'invoices', label: getName('invoice', true), count: locationInvoices?.length },
+    { id: 'invoices', label: getName('invoice', true), count: locationInvoicesPage?.totalElements },
     { id: 'visits', label: getName('dispatch', true), count: locationVisits?.length },
     { id: 'contacts', label: 'Contacts', count: contactCount },
     { id: 'files', label: 'Files' },
@@ -776,13 +777,15 @@ function locationTechQueryOptions(serviceLocationId: string) {
   };
 }
 
-// Per-location invoice list (FIN-1). Shared so the parent can read `.length`
-// for the tab-count badge and the Invoices tab re-reads the same key — one
-// request, two readers (same pattern as workOrdersListQueryOptions).
-function locationInvoicesQueryOptions(serviceLocationId: string) {
+// Per-location invoice count (FIN-1) — `totalElements` off a lean size-1 page.
+// Drives the tab-count badge and the tab's "N invoices" rollup sub; the tab
+// body runs its own filtered/paged list query. Keyed under the
+// ['location-invoices'] prefix so invoice/payment mutations elsewhere
+// (invalidateLocationInvoiceCaches) refresh it too.
+function locationInvoiceCountQueryOptions(serviceLocationId: string) {
   return {
-    queryKey: ['location-invoices', serviceLocationId] as const,
-    queryFn: () => invoicesApi.getByServiceLocation(serviceLocationId),
+    queryKey: ['location-invoices', serviceLocationId, 'count'] as const,
+    queryFn: () => invoicesApi.getAll({ serviceLocationId, size: 1 }),
     enabled: Boolean(serviceLocationId),
   };
 }
@@ -3097,14 +3100,16 @@ function EquipmentRow({
         <div className="flex items-center gap-2.5">
           <EquipmentThumbnail url={e.profileImageUrl} name={e.name} sizeClass="size-8" fit="contain" />
           <div className="min-w-0">
-            <div className="truncate font-mono text-[12px] font-bold text-fg-strong">{e.name}</div>
-            {e.serialNumber && <div className="truncate text-[11px] text-fg-muted">{e.serialNumber}</div>}
+            {/* Name is words → proportional; the serial below is an identifier
+                matched character-by-character against a data plate → mono. */}
+            <div className="truncate text-[12px] font-bold text-fg-strong">{e.name}</div>
+            {e.serialNumber && <div className="truncate font-mono text-[11px] text-fg-muted">{e.serialNumber}</div>}
           </div>
         </div>
       </td>
       <td className="px-3.5 py-2">
         <div className="text-[12px] text-fg">{e.make || '—'}</div>
-        {e.model && <div className="font-mono text-[11px] text-fg-muted">{e.model}</div>}
+        {e.model && <div className="text-[11px] text-fg-muted">{e.model}</div>}
       </td>
       <td className="px-3.5 py-2 text-[11.5px] text-fg-muted">{e.locationOnSite || '—'}</td>
       <td className="px-3.5 py-2 text-right font-mono text-[12px] font-semibold tabular-nums text-fg-strong">
@@ -3180,14 +3185,61 @@ const INVOICE_STATUS_LABEL: Record<InvoiceStatusType, string> = {
 // display only; all totals here are server-computed, never summed client-side.
 const invMoney = (v: number | string | null | undefined): number => Number(v ?? 0) || 0;
 
+// Status chip — single-select mirror of JOB_STATUS_FILTERS. The backend has no
+// multi-status param (an "Open" entry would take two requests), so each entry
+// maps to at most one `status`. "Overdue" rides the server-derived
+// `overdue=true` (open + strictly past due) rather than `status=OVERDUE`, so a
+// SENT invoice past its due date matches even before the stored status flips.
+// Statuses come from the InvoiceStatus enum, never free text — the server
+// rejects unknown values (unlike `sort`, which silently drops them).
+const INVOICE_STATUS_FILTERS: { id: string; label: string; params: Partial<ListInvoicesParams> }[] = [
+  { id: 'all', label: 'All', params: {} },
+  { id: 'overdue', label: 'Overdue', params: { overdue: true } },
+  { id: 'draft', label: 'Draft', params: { status: InvoiceStatus.DRAFT } },
+  { id: 'sent', label: 'Sent', params: { status: InvoiceStatus.SENT } },
+  { id: 'paid', label: 'Paid', params: { status: InvoiceStatus.PAID } },
+  { id: 'cancelled', label: 'Cancelled', params: { status: InvoiceStatus.CANCELLED } },
+  { id: 'void', label: 'Void', params: { status: InvoiceStatus.VOID } },
+];
+const INVOICES_PAGE_SIZE = 25;
+
 function InvoicesTab({ location }: { location: ServiceLocationDetailDto }) {
   const { getName } = useGlossary();
   const { t } = useTranslation();
   const navigate = useNavigate();
 
-  // List + summary are independent reads — fire in parallel. List shares the
-  // tab-count cache; summary is its own cheap rollup.
-  const { data: invoices = [], isLoading } = useQuery(locationInvoicesQueryOptions(location.id));
+  const [statusId, setStatusId] = useState('all');
+  const [datePreset, setDatePreset] = useState<DatePreset>('');
+  const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
+  const deferredSearch = useDeferredValue(search.trim());
+
+  const statusParams = INVOICE_STATUS_FILTERS.find((s) => s.id === statusId)?.params ?? {};
+  const range = datePreset && datePreset !== 'custom' ? rangeForPreset(datePreset) : undefined;
+
+  const params: ListInvoicesParams = {
+    serviceLocationId: location.id,
+    ...statusParams,
+    from: range?.from,
+    to: range?.to, // inclusive on the backend — no +1-day trick
+    q: deferredSearch || undefined,
+    page: page - 1, // local state is 1-based; backend page is 0-based
+    size: INVOICES_PAGE_SIZE,
+    sort: 'invoiceDate,desc',
+  };
+
+  // Filtered/paged list + count + summary are independent reads — fire in
+  // parallel. All keyed so invalidateLocationInvoiceCaches refreshes them.
+  const { data, isLoading } = useQuery({
+    queryKey: ['location-invoices', location.id, params],
+    queryFn: () => invoicesApi.getAll(params),
+  });
+  const rows = data?.content ?? [];
+  const total = data?.totalElements ?? 0;
+  const totalPages = data?.totalPages ?? 0;
+
+  // Unfiltered site total — shared cache with the tab-count badge.
+  const { data: countPage } = useQuery(locationInvoiceCountQueryOptions(location.id));
   const { data: summary } = useQuery<LocationInvoiceSummaryResponse>({
     queryKey: ['location-invoice-summary', location.id],
     queryFn: () => invoicesApi.getLocationSummary(location.id),
@@ -3219,7 +3271,7 @@ function InvoicesTab({ location }: { location: ServiceLocationDetailDto }) {
     {
       label: 'Billed YTD',
       value: summary ? fmtMoney.format(invMoney(summary.billedYtd)) : '—',
-      sub: t('common.entitiesCount', { entities: getName('invoice', true), count: invoices.length }),
+      sub: t('common.entitiesCount', { entities: getName('invoice', true), count: countPage?.totalElements ?? 0 }),
     },
     {
       label: 'Open',
@@ -3234,6 +3286,20 @@ function InvoicesTab({ location }: { location: ServiceLocationDetailDto }) {
       tone: (summary?.aged91 ?? 0) > 0 ? 'warning' : undefined,
     },
   ];
+
+  const filtersActive = statusId !== 'all' || !!datePreset || !!deferredSearch;
+  const showingStart = total === 0 ? 0 : (page - 1) * INVOICES_PAGE_SIZE + 1;
+  const showingEnd = Math.min(page * INVOICES_PAGE_SIZE, total);
+
+  const resetPage = () => setPage(1);
+  const clearFilters = () => {
+    setStatusId('all');
+    setDatePreset('');
+    setSearch('');
+    resetPage();
+  };
+
+  const dateDisplay = datePreset ? t(DATE_PRESETS.find((p) => p.id === datePreset)?.labelKey ?? '') : null;
 
   return (
     <div className="flex flex-col gap-3">
@@ -3258,16 +3324,78 @@ function InvoicesTab({ location }: { location: ServiceLocationDetailDto }) {
         </div>
       </Card>
 
-      {/* Context line — whose ledger this rolls up to. */}
-      <div className="flex items-center gap-2 rounded-md border border-border-soft bg-bg-elev-2 px-3 py-2 text-[11.5px] text-fg-muted">
-        <ReceiptPercentIcon className="size-3.5 shrink-0 text-fg-dim" />
-        <span>
-          Invoices for work at this location. Billed to{' '}
-          <Link to={`/customers/${location.customerId}`} className="font-medium text-fg-accent hover:underline">
-            {location.customerName}
-          </Link>{' '}
-          — full AR ledger lives on the {getName('customer').toLowerCase()}.
-        </span>
+      {/* Filter bar — same toolbar pattern as the Jobs tab. `q` matches invoice
+          number OR customer name server-side, but the customer is constant at a
+          location, so the placeholder is honest about what it's for. (Heads-up:
+          the backend doesn't escape LIKE wildcards in `q` — `%` matches all.) */}
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="flex h-8 min-w-[200px] max-w-[320px] flex-1 items-center gap-2 rounded-md border border-border bg-bg-elev px-2.5">
+          <MagnifyingGlassIcon className="size-3.5 text-fg-dim" />
+          <input
+            value={search}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              resetPage();
+            }}
+            placeholder="Search invoice #…"
+            className="min-w-0 flex-1 bg-transparent text-[12.5px] text-fg outline-none placeholder:text-fg-dim"
+          />
+          {search && (
+            <button
+              onClick={() => {
+                setSearch('');
+                resetPage();
+              }}
+              className="px-1 text-[11px] text-fg-dim hover:text-fg-strong"
+            >
+              ×
+            </button>
+          )}
+        </div>
+
+        <FilterChipListbox
+          label="Status"
+          ariaLabel="Status"
+          value={statusId}
+          displayValue={INVOICE_STATUS_FILTERS.find((s) => s.id === statusId)?.label ?? 'All'}
+          onChange={(id) => {
+            setStatusId(id as string);
+            resetPage();
+          }}
+        >
+          {INVOICE_STATUS_FILTERS.map((s) => (
+            <ChipListboxOption key={s.id} value={s.id}>
+              {s.label}
+            </ChipListboxOption>
+          ))}
+        </FilterChipListbox>
+
+        <FilterChipListbox
+          label="Issued"
+          ariaLabel="Issued date"
+          value={datePreset || null}
+          displayValue={dateDisplay}
+          onChange={(id) => {
+            setDatePreset(id as DatePreset);
+            resetPage();
+          }}
+          onClear={() => {
+            setDatePreset('');
+            resetPage();
+          }}
+        >
+          {DATE_PRESETS.filter((p) => p.id !== '' && p.id !== 'custom').map((p) => (
+            <ChipListboxOption key={p.id} value={p.id}>
+              {t(p.labelKey)}
+            </ChipListboxOption>
+          ))}
+        </FilterChipListbox>
+
+        {filtersActive && (
+          <Button plain size="xs" onClick={clearFilters}>
+            Clear
+          </Button>
+        )}
       </div>
 
       <Card
@@ -3278,47 +3406,82 @@ function InvoicesTab({ location }: { location: ServiceLocationDetailDto }) {
           <div className="px-3.5 py-6 text-center text-[12px] text-fg-muted">
             {t('common.actions.loading', { entities: getName('invoice', true) })}
           </div>
-        ) : invoices.length === 0 ? (
+        ) : rows.length === 0 ? (
           <div className="px-3.5 py-10 text-center">
             <div className="text-[13px] font-semibold text-fg-strong">
-              {t('common.actions.noEntitiesYet', { entities: getName('invoice', true) })}
+              {filtersActive
+                ? 'No matching invoices'
+                : t('common.actions.noEntitiesYet', { entities: getName('invoice', true) })}
             </div>
             <div className="mt-1 text-[12px] text-fg-muted">
-              {getName('invoice', true)} for work at this site will appear here.
+              {filtersActive
+                ? 'Adjust your search or clear filters.'
+                : `${getName('invoice', true)} for work at this site will appear here.`}
             </div>
+            {filtersActive && (
+              <Button plain size="xs" className="mt-2" onClick={clearFilters}>
+                Clear filters
+              </Button>
+            )}
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse text-[12px]">
-              <thead className="bg-bg-elev-2">
-                <tr className="text-left text-[10px] font-semibold uppercase tracking-wider text-fg-muted">
-                  <th className="px-3.5 py-2 font-semibold">{getName('invoice')}</th>
-                  <th className="px-3.5 py-2 font-semibold">For work</th>
-                  <th className="px-3.5 py-2 font-semibold">Bill to</th>
-                  <th className="px-3.5 py-2 font-semibold">Issued</th>
-                  <th className="px-3.5 py-2 font-semibold">{t('workOrders.table.statusHeader')}</th>
-                  <th className="px-3.5 py-2 text-right font-semibold">Amount</th>
-                </tr>
-              </thead>
-              <tbody>
-                {invoices.map((inv) => (
-                  <InvoiceRow
-                    key={inv.id}
-                    inv={inv}
-                    wo={inv.workOrderId ? woById.get(inv.workOrderId) : undefined}
-                    typeName={
-                      inv.workOrderId
-                        ? safeTypes.find((tp) => tp.id === woById.get(inv.workOrderId!)?.workOrderTypeId)?.name
-                        : undefined
-                    }
-                    billTo={location.customerName}
-                    fmtMoney={fmtMoney}
-                    onOpen={(workOrderId) => navigate(`/work-orders/${workOrderId}`)}
-                  />
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <>
+            <div className="overflow-x-auto">
+              <table className="w-full border-collapse text-[12px]">
+                <thead className="bg-bg-elev-2">
+                  <tr className="text-left text-[10px] font-semibold uppercase tracking-wider text-fg-muted">
+                    <th className="px-3.5 py-2 font-semibold">{getName('invoice')}</th>
+                    <th className="px-3.5 py-2 font-semibold">For work</th>
+                    <th className="px-3.5 py-2 font-semibold">Bill to</th>
+                    <th className="px-3.5 py-2 font-semibold">Issued</th>
+                    <th className="px-3.5 py-2 font-semibold">Due</th>
+                    <th className="px-3.5 py-2 font-semibold">{t('workOrders.table.statusHeader')}</th>
+                    <th className="px-3.5 py-2 text-right font-semibold">Amount</th>
+                    <th className="px-3.5 py-2 text-right font-semibold">Balance</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((inv) => (
+                    <InvoiceRow
+                      key={inv.id}
+                      inv={inv}
+                      wo={inv.workOrderId ? woById.get(inv.workOrderId) : undefined}
+                      typeName={
+                        inv.workOrderId
+                          ? safeTypes.find((tp) => tp.id === woById.get(inv.workOrderId!)?.workOrderTypeId)?.name
+                          : undefined
+                      }
+                      billTo={location.customerName}
+                      fmtMoney={fmtMoney}
+                      onOpen={(workOrderId) => navigate(`/work-orders/${workOrderId}`)}
+                    />
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className="flex items-center justify-between border-t border-border-soft bg-bg-elev-2 px-4 py-2.5 text-[11.5px] text-fg-muted">
+              <span>
+                {t('common.pagination.showing', {
+                  start: showingStart,
+                  end: showingEnd,
+                  total: total.toLocaleString(),
+                })}
+              </span>
+              {totalPages > 1 && (
+                <div className="flex items-center gap-2">
+                  <Button plain size="xxs" disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>
+                    Prev
+                  </Button>
+                  <span className="font-mono text-[11px] tabular-nums text-fg">
+                    {page} / {totalPages}
+                  </span>
+                  <Button plain size="xxs" disabled={page >= totalPages} onClick={() => setPage((p) => Math.min(totalPages, p + 1))}>
+                    Next
+                  </Button>
+                </div>
+              )}
+            </div>
+          </>
         )}
       </Card>
     </div>
@@ -3341,6 +3504,12 @@ function InvoiceRow({
   onOpen: (workOrderId: string) => void;
 }) {
   const voided = inv.status === InvoiceStatus.VOID || inv.status === InvoiceStatus.CANCELLED;
+  // Server-derived `overdue` is canonical — same rule as the overdue filter
+  // (open + strictly past due), so badge and filter always agree. It also
+  // covers SENT rows whose stored status hasn't flipped to OVERDUE yet. Never
+  // recompute from dueDate client-side (timezone drift).
+  const overdue = inv.overdue && !voided;
+  const balance = invMoney(inv.balanceDue);
   const forJob = wo?.workOrderNumber ?? (inv.workOrderId ? `#${inv.workOrderId.slice(0, 8)}` : '—');
   const desc = wo ? deriveJobLabel(wo, typeName) : null;
   const clickable = !!inv.workOrderId;
@@ -3367,9 +3536,10 @@ function InvoiceRow({
           badge when payer lands on the invoice read model. */}
       <td className="px-3.5 py-2 text-[11.5px] text-fg">{billTo}</td>
       <td className="px-3.5 py-2 text-[11.5px] text-fg-muted">{formatTimestamp(inv.invoiceDate)}</td>
+      <td className="px-3.5 py-2 text-[11.5px] text-fg-muted">{formatTimestamp(inv.dueDate)}</td>
       <td className="px-3.5 py-2">
-        <Pill tone={INVOICE_STATUS_TONE[inv.status]} dot>
-          {INVOICE_STATUS_LABEL[inv.status]}
+        <Pill tone={overdue ? 'warning' : INVOICE_STATUS_TONE[inv.status]} dot>
+          {overdue ? INVOICE_STATUS_LABEL.OVERDUE : INVOICE_STATUS_LABEL[inv.status]}
         </Pill>
       </td>
       {/* Void/cancelled amount is meaningless money — strike + mute it so a
@@ -3381,6 +3551,16 @@ function InvoiceRow({
         }`}
       >
         {fmtMoney.format(invMoney(inv.totalAmount))}
+      </td>
+      {/* What's still owed — the actionable number for a CSR. Settled rows go
+          dim; voided rows have no receivable at all, so a dash (not $0.00,
+          which would read as "paid off"). */}
+      <td
+        className={`px-3.5 py-2 text-right font-mono text-[12px] tabular-nums ${
+          voided ? 'text-fg-dim' : balance > 0 ? 'font-semibold text-fg-strong' : 'text-fg-dim'
+        }`}
+      >
+        {voided ? '—' : fmtMoney.format(balance)}
       </td>
     </tr>
   );

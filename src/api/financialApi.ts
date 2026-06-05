@@ -206,15 +206,16 @@ export interface InvoiceListItemRow {
   updatedAt: string;
 }
 
-// Spring Data Page<T> envelope for the invoice list endpoints.
+// Custom PageResponse envelope for the invoice list endpoints — NOT Spring's
+// raw Page shape (the current index is `page`, not `number`).
 export interface InvoiceListPage {
   content: InvoiceListItemRow[];
+  page: number; // 0-based current page index
+  size: number;
   totalElements: number;
   totalPages: number;
-  number: number; // 0-based current page index
-  size: number;
-  first?: boolean;
-  last?: boolean;
+  first: boolean;
+  last: boolean;
 }
 
 export type InvoiceSortField =
@@ -225,16 +226,30 @@ export type InvoiceSortField =
   | 'createdAt'
   | 'updatedAt';
 
+/**
+ * Filters for the paged invoice list — all AND-ed together. Quirks worth
+ * knowing (backend-confirmed):
+ *   - `status` is single-value only; an invalid value is a server ERROR
+ *     (unknown enum) — drive it from the {@link InvoiceStatus} enum, never
+ *     free text. There's no multi-status param ("Open" = two requests).
+ *   - `sort` outside the whitelist is silently DROPPED (falls back to
+ *     `invoiceDate,DESC`) — a typo just looks like sorting doesn't work.
+ *   - `q` does NOT escape LIKE wildcards: `%` matches everything, `_` any
+ *     single char (unlike work-order search). Known backend gap.
+ *   - `overdue=true` means open (SENT/OVERDUE) + dueDate strictly before
+ *     today — same rule as the row's `overdue` flag, so filter and badge
+ *     always agree. Due-today is not overdue.
+ */
 export interface ListInvoicesParams {
   customerId?: string;
   serviceLocationId?: string;
   status?: InvoiceStatus;
-  from?: string; // YYYY-MM-DD, inclusive
-  to?: string; // YYYY-MM-DD, inclusive
-  overdue?: boolean; // true = open + past due
-  q?: string; // invoice number or customer name
+  from?: string; // YYYY-MM-DD, invoiceDate >= from (inclusive)
+  to?: string; // YYYY-MM-DD, invoiceDate <= to (inclusive — no +1-day trick)
+  overdue?: boolean; // true = open + strictly past due
+  q?: string; // case-insensitive substring on invoiceNumber OR customerName
   page?: number; // 0-indexed
-  size?: number;
+  size?: number; // server-clamped to 1..200
   sort?: `${InvoiceSortField},${'asc' | 'desc'}`;
 }
 
@@ -252,7 +267,8 @@ export const invoicesApi = {
     return response.data;
   },
 
-  // Per-customer invoice list (lean rows, paged). Path unchanged.
+  // Per-customer invoice list (lean rows, paged). Sugar for `getAll({ customerId })`
+  // with only page/size/sort — prefer `getAll` so all filters compose.
   getByCustomer: async (
     customerId: string,
     params?: Omit<ListInvoicesParams, 'customerId'>,
@@ -277,23 +293,6 @@ export const invoicesApi = {
       `/financial/work-orders/${workOrderId}/invoices`,
     );
     return response.data;
-  },
-
-  /**
-   * Per-location invoice list (FIN-1) — invoices for work at this service
-   * location, as lean {@link InvoiceListItemRow}s. `serviceLocationId` is
-   * resolved server-side from each invoice's work order. A single site's volume
-   * is bounded, so we pull one large page (server caps size at 200) and return
-   * the rows rather than paging the tab. Tolerates a bare array for environments
-   * predating the paging change. Fire alongside `getLocationSummary` in parallel.
-   */
-  getByServiceLocation: async (serviceLocationId: string): Promise<InvoiceListItemRow[]> => {
-    const response = await apiClient.get<InvoiceListItemRow[] | InvoiceListPage>(
-      '/financial/invoices',
-      { params: { serviceLocationId, size: 200 } },
-    );
-    const data = response.data;
-    return Array.isArray(data) ? data : (data?.content ?? []);
   },
 
   /**
