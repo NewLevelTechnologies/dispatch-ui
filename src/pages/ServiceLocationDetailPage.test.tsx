@@ -200,19 +200,26 @@ describe('ServiceLocationDetailPage', () => {
     });
 
     const techLocation = { ...mockLocation, hasOpenJobs: true };
-    // Assigned users ride the WO search rows (`technicians[]`, most-relevant-
-    // first) — no scheduling merge. wo-4 has none → dash, not an error.
+    // Assigned users ride the WO search rows (`assignedUsers[]`, most-relevant-
+    // first, per-entry state) — no scheduling merge. wo-4 has none → dash, not
+    // an error.
     const workOrders = [
       makeWO({
         id: 'wo-1', workOrderNumber: 'WO-5000', priority: 'URGENT', equip: { label: 'RTU-3', count: 1 },
-        technicians: [{ userId: 'u-1', name: 'Dana Park' }, { userId: 'u-2', name: 'Lee Wong' }],
+        assignedUsers: [
+          { userId: 'u-1', name: 'Dana Park', state: 'ON_SITE' },
+          { userId: 'u-2', name: 'Lee Wong', state: 'SCHEDULED' },
+        ],
       }),
-      makeWO({ id: 'wo-2', workOrderNumber: 'WO-5001', technicians: [{ userId: 'u-3', name: null }] }),
+      makeWO({
+        id: 'wo-2', workOrderNumber: 'WO-5001',
+        assignedUsers: [{ userId: 'u-3', name: null, state: 'SCHEDULED' }],
+      }),
       makeWO({
         id: 'wo-3', workOrderNumber: 'WO-5002', progressCategory: 'COMPLETED',
-        technicians: [{ userId: 'u-4', name: 'Sam Lee' }],
+        assignedUsers: [{ userId: 'u-4', name: 'Sam Lee', state: 'DONE' }],
       }),
-      makeWO({ id: 'wo-4', workOrderNumber: 'WO-5003', progressCategory: 'NOT_STARTED', technicians: [] }),
+      makeWO({ id: 'wo-4', workOrderNumber: 'WO-5003', progressCategory: 'NOT_STARTED', assignedUsers: [] }),
     ];
     // location-tech now feeds the attention strip's on-site row only.
     const locationTech = {

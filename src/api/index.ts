@@ -105,12 +105,14 @@ export {
 // Work Order API
 export {
   workOrderApi,
+  woAssignedUsers,
   LifecycleState,
   ProgressCategory,
   WorkOrderPriority,
   type WorkOrder,
   type WorkOrderSummary,
-  type WorkOrderTechnician,
+  type WorkOrderAssignedUser,
+  type AssignedUserState,
   type WorkItemResponse,
   type WorkItemSummaryProjection,
   type WorkItemEquipmentSummary,

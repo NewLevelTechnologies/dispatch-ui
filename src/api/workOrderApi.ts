@@ -98,10 +98,18 @@ export interface WorkItemSummaryProjection {
   statusCategory: ProgressCategory;
 }
 
-// One distinct tech on a WO's dispatches, as embedded on search rows.
-export interface WorkOrderTechnician {
+// The user's best dispatch on the WO decides their state: on-site > next
+// scheduled > most recent past.
+export type AssignedUserState = 'ON_SITE' | 'SCHEDULED' | 'DONE';
+
+// One distinct assigned user on a WO's dispatches, as embedded on search rows.
+export interface WorkOrderAssignedUser {
   userId: string; // UUID — stable avatar/color lookup
   name: string | null; // "First Last"; null only if the user cache hasn't synced
+  // Required on the wire post-rename; optional here only because the legacy
+  // `technicians` key (no state) is tolerated during the deploy window —
+  // tighten when the shim drops.
+  state?: AssignedUserState;
 }
 
 // Slim shape returned by the list endpoint. Includes a capped projection
@@ -173,15 +181,26 @@ export interface WorkOrderSummary {
   // doesn't name the equipment.
   equip?: { label: string; count: number } | null;
 
-  // Distinct techs across the WO's non-cancelled dispatches, most-relevant-
-  // first (on-site → soonest upcoming → most recent past). Always present on
-  // search rows ([] = no dispatches) — render technicians[0] + "+N", no second
-  // fetch or merge needed. Optional on the type only because detail reads
-  // share this shape.
-  technicians?: WorkOrderTechnician[];
+  // Distinct assigned users across the WO's non-cancelled dispatches, most-
+  // relevant-first (on-site → soonest upcoming → most recent past). Always
+  // present on search rows ([] = no dispatches) — render assignedUsers[0] +
+  // "+N", no second fetch or merge needed. Optional on the type only because
+  // detail reads share this shape.
+  assignedUsers?: WorkOrderAssignedUser[];
+  // Pre-rename wire key (no `state`). Dev serves `technicians` until the BE
+  // rename merges, with no aliasing window — read via `woAssignedUsers()` so
+  // either key works; DROP this field once the BE rename is live on dev.
+  technicians?: Array<Pick<WorkOrderAssignedUser, 'userId' | 'name'>>;
 
   createdAt: string;
   updatedAt: string;
+}
+
+// Deploy-window shim for the technicians → assignedUsers rename: returns
+// whichever key the row carries. Collapse to `wo.assignedUsers ?? []` (and
+// delete `technicians` above) once the BE rename is live.
+export function woAssignedUsers(wo: WorkOrderSummary): WorkOrderAssignedUser[] {
+  return wo.assignedUsers ?? wo.technicians ?? [];
 }
 
 export interface WorkOrder extends WorkOrderSummary {
