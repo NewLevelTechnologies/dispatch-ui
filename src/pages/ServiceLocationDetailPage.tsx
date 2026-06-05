@@ -3100,14 +3100,16 @@ function EquipmentRow({
         <div className="flex items-center gap-2.5">
           <EquipmentThumbnail url={e.profileImageUrl} name={e.name} sizeClass="size-8" fit="contain" />
           <div className="min-w-0">
-            <div className="truncate font-mono text-[12px] font-bold text-fg-strong">{e.name}</div>
-            {e.serialNumber && <div className="truncate text-[11px] text-fg-muted">{e.serialNumber}</div>}
+            {/* Name is words → proportional; the serial below is an identifier
+                matched character-by-character against a data plate → mono. */}
+            <div className="truncate text-[12px] font-bold text-fg-strong">{e.name}</div>
+            {e.serialNumber && <div className="truncate font-mono text-[11px] text-fg-muted">{e.serialNumber}</div>}
           </div>
         </div>
       </td>
       <td className="px-3.5 py-2">
         <div className="text-[12px] text-fg">{e.make || '—'}</div>
-        {e.model && <div className="font-mono text-[11px] text-fg-muted">{e.model}</div>}
+        {e.model && <div className="text-[11px] text-fg-muted">{e.model}</div>}
       </td>
       <td className="px-3.5 py-2 text-[11.5px] text-fg-muted">{e.locationOnSite || '—'}</td>
       <td className="px-3.5 py-2 text-right font-mono text-[12px] font-semibold tabular-nums text-fg-strong">
