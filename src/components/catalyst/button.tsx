@@ -232,14 +232,19 @@ type ButtonProps = (
 /**
  * Geist optically seats text slightly high in its em-box, so a flex-centered
  * label reads above center even though the line box is dead-center. Nudge
- * bare text/number children down half a pixel to compensate. Element children
- * (icons via data-slot, custom spans) are left untouched — icons already sit
- * on the true midline and must not shift with the label.
+ * bare text/number children down to compensate. Element children (icons via
+ * data-slot, custom spans) are left untouched — icons already sit on the true
+ * midline and must not shift with the label.
+ *
+ * The seating offset scales with font-size: 0.5px reads right at the tight
+ * 12.5/11.5px sizes, while md's 14px text needs the full 1px (verified by eye
+ * on the Close-location confirm).
  */
-function nudgeLabel(children: React.ReactNode): React.ReactNode {
+function nudgeLabel(children: React.ReactNode, size: keyof typeof styles.sizes): React.ReactNode {
+  const nudge = size === 'md' ? 'top-[1px]' : 'top-[0.5px]'
   return React.Children.map(children, (child) =>
     typeof child === 'string' || typeof child === 'number' ? (
-      <span className="relative top-[0.5px]">{child}</span>
+      <span className={clsx('relative', nudge)}>{child}</span>
     ) : (
       child
     )
@@ -257,7 +262,7 @@ export const Button = forwardRef(function Button(
     styles.sizes[size ?? 'md'],
     outlineStyle ? outlineStyle : plain ? styles.plain : clsx(styles.solid, styles.colors[color ?? 'dark/zinc'])
   )
-  const content = nudgeLabel(children)
+  const content = nudgeLabel(children, size ?? 'md')
 
   return typeof props.href === 'string' ? (
     <Link {...props} className={classes} ref={ref as React.ForwardedRef<HTMLAnchorElement>}>
