@@ -53,6 +53,7 @@ export default defineConfig({
         'src/api/workOrderApi.ts',
         'src/api/userApi.ts',
         'src/api/financialApi.ts',
+        'src/api/filesApi.ts',
         'src/api/equipmentApi.ts',
         'src/api/schedulingApi.ts',
         'src/api/notificationApi.ts',
