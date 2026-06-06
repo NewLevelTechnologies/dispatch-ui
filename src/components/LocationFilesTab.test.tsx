@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import { renderWithProviders, userEvent } from '../test/utils';
 import LocationFilesTab from './LocationFilesTab';
 import apiClient from '../api/client';
@@ -183,6 +183,15 @@ describe('LocationFilesTab', () => {
     expect(screen.getByText('COI')).toBeInTheDocument();
   });
 
+  it('labels the canonical site photo "Site photo" instead of its category', async () => {
+    mockApi({ direct: [{ ...sitePhoto, isProfile: true }, siteDoc] });
+    renderTab();
+    await screen.findByText('Gate + lockbox.jpg');
+    // isProfile wins over the file's ACCESS category.
+    expect(screen.getByText('Site photo')).toBeInTheDocument();
+    expect(screen.queryByText('Access')).not.toBeInTheDocument();
+  });
+
   it('filters by source: Uploaded shows only direct site uploads', async () => {
     mockApi();
     renderTab();
@@ -301,8 +310,10 @@ describe('LocationFilesTab', () => {
     const user = userEvent.setup();
 
     await user.click(await screen.findByRole('button', { name: /Gate \+ lockbox\.jpg/ }));
-    // The badge doubles as the unset control.
-    await user.click(await screen.findByRole('button', { name: /Site photo/ }));
+    // The badge doubles as the unset control. Scope to the dialog — the
+    // grid tile's "Site photo" chip shares the wording.
+    const dialog = await screen.findByRole('dialog');
+    await user.click(within(dialog).getByRole('button', { name: /Site photo/ }));
 
     await waitFor(() => {
       expect(apiClient.patch).toHaveBeenCalledWith(
