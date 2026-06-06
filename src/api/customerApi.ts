@@ -284,6 +284,10 @@ export interface ServiceLocationDetailDto {
   // on a fresh tenant; the card falls back to a default seed.
   suggestedFactLabels?: string[] | null;
   status: 'ACTIVE' | 'INACTIVE' | 'CLOSED';
+  // Presigned thumb of the location profile picture (a location-scoped image
+  // file with isProfile=true, set from the Files tab). Null = no photo set →
+  // render the premise-glyph mark instead. Short-TTL URL — don't cache.
+  profileImageThumbnailUrl?: string | null;
   createdAt: string;
   updatedAt: string;
   version: number;

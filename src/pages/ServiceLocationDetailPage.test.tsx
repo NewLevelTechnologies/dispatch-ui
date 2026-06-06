@@ -70,6 +70,28 @@ describe('ServiceLocationDetailPage', () => {
     dispatches: unknown[] = []
   ) => {
     vi.mocked(apiClient.get).mockImplementation((url, config) => {
+      // Files tab-count badge — both file sources (work-order-service
+      // aggregate + customer-service direct uploads) return the
+      // paged-with-counts envelope; empty by default. Must precede the
+      // generic /service-locations/ branch, which would otherwise swallow
+      // the direct-uploads URL with the wrong shape.
+      if (
+        url === '/files' ||
+        (url.includes('/service-locations/') && url.endsWith('/files'))
+      ) {
+        return Promise.resolve({
+          data: {
+            content: [],
+            counts: { all: 0, photos: 0, documents: 0 },
+            totalElements: 0,
+            totalPages: 0,
+            number: 0,
+            size: 1,
+            first: true,
+            last: true,
+          },
+        });
+      }
       // Site contact card reads the full contact collection (primary-first).
       // Project the location's primary site-contact fields into a primary
       // contact, then append any additional contacts.
@@ -522,15 +544,16 @@ describe('ServiceLocationDetailPage', () => {
     await waitFor(() => expect(activityTab).toHaveAttribute('aria-selected', 'true'));
   });
 
-  it('renders the not-built stub on the Files tab', async () => {
+  it('renders the Files tab (empty state when neither source has files)', async () => {
     mockApiResponses();
     const user = userEvent.setup();
     renderDetailPage();
     await waitFor(() => expect(screen.getByText('Main Office')).toBeInTheDocument());
 
     await user.click(screen.getByRole('tab', { name: /files/i }));
-    await waitFor(() => expect(screen.getByText(/not in this design pass/i)).toBeInTheDocument());
-    expect(screen.getByText(/coming soon/i)).toBeInTheDocument();
+    // Deeper coverage (merge, filters, chips, upload) lives in
+    // LocationFilesTab.test.tsx; the page test just proves the wiring.
+    await waitFor(() => expect(screen.getByText('No files yet')).toBeInTheDocument());
   });
 
   it('jumps to tabs from the overview view-all links', async () => {

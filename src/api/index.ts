@@ -181,6 +181,28 @@ export {
   type UpdateWarehouseRequest,
 } from './equipmentApi';
 
+// Files APIs (location aggregate + direct site uploads)
+export {
+  filesApi,
+  locationFilesApi,
+  FILE_MAX_BYTES,
+  FILE_CAPTION_MAX_CHARS,
+  FILE_CONTENT_TYPES,
+  LOCATION_FILE_CATEGORIES,
+  LOCATION_FILE_CATEGORY_LABELS,
+  type FileContentType,
+  type FileKind,
+  type FileCounts,
+  type PagedFiles,
+  type ListFilesParams,
+  type LocationFileCategory,
+  type LocationFile,
+  type WorkOrderFile,
+  type RequestFileUploadUrlResponse,
+  type RequestLocationFileUploadUrlRequest,
+  type PatchLocationFileRequest,
+} from './filesApi';
+
 // Financial APIs
 export {
   invoicesApi,

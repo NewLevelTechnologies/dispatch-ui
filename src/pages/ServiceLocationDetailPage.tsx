@@ -38,6 +38,8 @@ import {
   arrivalFactApi,
   tagApi,
   dispatchesApi,
+  filesApi,
+  locationFilesApi,
   invoicesApi,
   InvoiceStatus,
   type InvoiceListItemRow,
@@ -79,6 +81,7 @@ import AppLayout from '../components/AppLayout';
 import EquipmentFormDialog from '../components/EquipmentFormDialog';
 import WorkOrderFormDialog from '../components/WorkOrderFormDialog';
 import NotificationLogsList from '../components/NotificationLogsList';
+import LocationFilesTab from '../components/LocationFilesTab';
 import ServiceLocationContactDialog from '../components/ServiceLocationContactDialog';
 import NotificationPreferencesDialog from '../components/NotificationPreferencesDialog';
 import EquipmentThumbnail from '../components/EquipmentThumbnail';
@@ -179,6 +182,27 @@ export default function ServiceLocationDetailPage() {
   const { data: locationInvoicesPage } = useQuery(locationInvoiceCountQueryOptions(id ?? ''));
   // Drives the Dispatches tab-count badge; the tab body runs its own paged queries.
   const { data: locationDispatchesCount } = useQuery(locationDispatchCountQueryOptions(id ?? ''));
+  // Drives the Files tab-count badge — sums the two file sources' anchor-wide
+  // counts (job/equipment aggregate + direct site uploads) off lean limit-1
+  // pages. Keyed under the ['location-files', id] prefix so the tab's
+  // upload/delete/profile invalidations refresh the badge too. The aggregate
+  // read (work-order-service /files) can be down independently of direct
+  // uploads — its failure just drops that side of the sum.
+  const { data: directFilesCount } = useQuery({
+    queryKey: ['location-files', id, 'direct-count'] as const,
+    queryFn: () => locationFilesApi.list(id!, { limit: 1 }),
+    enabled: !!id,
+  });
+  const { data: aggFilesCount } = useQuery({
+    queryKey: ['location-files', id, 'agg-count'] as const,
+    queryFn: () => filesApi.listForServiceLocation(id!, { limit: 1 }),
+    enabled: !!id,
+    retry: 1,
+  });
+  const filesCount =
+    directFilesCount || aggFilesCount
+      ? (directFilesCount?.counts.all ?? 0) + (aggFilesCount?.counts.all ?? 0)
+      : undefined;
 
   const deleteEquipmentMutation = useMutation({
     mutationFn: (equipmentId: string) => equipmentApi.delete(equipmentId),
@@ -253,7 +277,7 @@ export default function ServiceLocationDetailPage() {
     { id: 'invoices', label: getName('invoice', true), count: locationInvoicesPage?.totalElements },
     { id: 'dispatches', label: getName('dispatch', true), count: locationDispatchesCount?.totalElements },
     { id: 'contacts', label: 'Contacts', count: contactCount },
-    { id: 'files', label: 'Files' },
+    { id: 'files', label: 'Files', count: filesCount },
     { id: 'activity', label: t('serviceLocations.tabs.activity') },
   ];
 
@@ -310,7 +334,9 @@ export default function ServiceLocationDetailPage() {
           {activeTab === 'invoices' && <InvoicesTab location={location} />}
           {activeTab === 'dispatches' && <DispatchesTab location={location} />}
           {activeTab === 'contacts' && <ContactsTab location={location} canEdit={canEditServiceLocations} />}
-          {activeTab === 'files' && <TabStub label="Files" />}
+          {activeTab === 'files' && (
+            <LocationFilesTab locationId={location.id} canEdit={canEditServiceLocations} />
+          )}
 
           {activeTab === 'activity' && (
             <Card title={t('serviceLocations.tabs.activity')} padding="none">
@@ -447,7 +473,7 @@ function LocationHeader({
 
   return (
     <div className="mb-3 flex flex-col gap-3 rounded-[10px] border border-border bg-bg-elev px-4 py-3.5 shadow-sm sm:flex-row sm:items-center sm:gap-3.5">
-      <LocationMark premise={location.premiseType} />
+      <LocationMark premise={location.premiseType} photoUrl={location.profileImageThumbnailUrl} />
 
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
@@ -687,9 +713,21 @@ function LocationHeaderEdit({
 // mark carries the premise signal, so there's no separate premise pill; page
 // context already says "this is a location", so the mark conveys WHAT KIND of
 // place. Decorative gradient + white glyph, dark-mode safe.
-function LocationMark({ premise }: { premise: PremiseType }) {
+function LocationMark({ premise, photoUrl }: { premise: PremiseType; photoUrl?: string | null }) {
   const business = premise !== 'RESIDENCE';
   const label = business ? 'Business' : 'Residence';
+  // A set site photo (Files tab → "Set as site photo") replaces the glyph —
+  // a real picture of the site beats a category icon. Null = glyph mark.
+  if (photoUrl) {
+    return (
+      <img
+        src={photoUrl}
+        alt={label}
+        title={label}
+        className="size-[52px] shrink-0 rounded-[10px] border border-border object-cover shadow-sm"
+      />
+    );
+  }
   return (
     <div
       title={label}
@@ -747,20 +785,6 @@ function CardLink({
     <button type="button" onClick={onClick} className={cls}>
       {children}
     </button>
-  );
-}
-
-function TabStub({ label }: { label: string }) {
-  return (
-    <Card padding="none">
-      <div className="px-5 py-14 text-center">
-        <div className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-fg-muted">
-          Not in this design pass
-        </div>
-        <div className="text-[14px] font-semibold text-fg-strong">{label}</div>
-        <div className="mt-1 text-[12px] text-fg-muted">Coming soon.</div>
-      </div>
-    </Card>
   );
 }
 
