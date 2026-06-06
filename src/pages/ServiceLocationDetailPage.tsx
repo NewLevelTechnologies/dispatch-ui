@@ -19,6 +19,7 @@ import {
   MagnifyingGlassIcon,
   PencilIcon,
   PhoneIcon,
+  PhotoIcon,
   BellIcon,
   TrashIcon,
   StarIcon,
@@ -40,6 +41,7 @@ import {
   dispatchesApi,
   filesApi,
   locationFilesApi,
+  FILE_MAX_BYTES,
   invoicesApi,
   InvoiceStatus,
   type InvoiceListItemRow,
@@ -103,6 +105,7 @@ import { ToggleGroup, ToggleGroupOption } from '../components/ui/ToggleGroup';
 import { US_STATES } from '../constants/states';
 import { Dropdown, DropdownButton, DropdownItem, DropdownLabel, DropdownMenu } from '../components/catalyst/dropdown';
 import { Pill } from '../components/ui/Pill';
+import { PhotoLightbox } from '../components/ui/PhotoLightbox';
 import { Callout } from '../components/ui/Callout';
 import { Tabs } from '../components/ui/Tabs';
 import type { ServiceLocationDetailDto, PremiseType, UpdateServiceLocationRequest } from '../api/customerApi';
@@ -473,7 +476,7 @@ function LocationHeader({
 
   return (
     <div className="mb-3 flex flex-col gap-3 rounded-[10px] border border-border bg-bg-elev px-4 py-3.5 shadow-sm sm:flex-row sm:items-center sm:gap-3.5">
-      <LocationMark premise={location.premiseType} photoUrl={location.profileImageThumbnailUrl} />
+      <LocationMark premise={location.premiseType} />
 
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
@@ -713,21 +716,12 @@ function LocationHeaderEdit({
 // mark carries the premise signal, so there's no separate premise pill; page
 // context already says "this is a location", so the mark conveys WHAT KIND of
 // place. Decorative gradient + white glyph, dark-mode safe.
-function LocationMark({ premise, photoUrl }: { premise: PremiseType; photoUrl?: string | null }) {
+function LocationMark({ premise }: { premise: PremiseType }) {
   const business = premise !== 'RESIDENCE';
   const label = business ? 'Business' : 'Residence';
-  // A set site photo (Files tab → "Set as site photo") replaces the glyph —
-  // a real picture of the site beats a category icon. Null = glyph mark.
-  if (photoUrl) {
-    return (
-      <img
-        src={photoUrl}
-        alt={label}
-        title={label}
-        className="size-[52px] shrink-0 rounded-[10px] border border-border object-cover shadow-sm"
-      />
-    );
-  }
+  // Always the premise glyph — the site photo deliberately does NOT replace
+  // the mark (type recognition stays stable); the photo renders as a banner
+  // on the Site instructions card instead.
   return (
     <div
       title={label}
@@ -1422,6 +1416,108 @@ function isSensitiveLabel(label: string): boolean {
   return SENSITIVE_LABEL_RE.test(label);
 }
 
+// ─────────────────────────────────────────────────────────────────────────
+// Site photo banner — the single canonical front-of-building/house shot at
+// the top of Site instructions. Arrival orientation: "what the place looks
+// like when you pull up." One image, not a gallery — additional angles are
+// ordinary Files photos. Deliberately NOT the avatar/mark (that stays the
+// premise glyph for type recognition). The same file surfaces in the Files
+// tab with a "Site photo" chip; replace/unset lives in that tab's lightbox.
+// Empty state is a slim dashed add affordance that uploads + promotes
+// (PATCH isProfile) in one gesture.
+// ─────────────────────────────────────────────────────────────────────────
+const SITE_PHOTO_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+
+function SitePhotoBanner({ location, canEdit }: { location: ServiceLocationDetailDto; canEdit: boolean }) {
+  const queryClient = useQueryClient();
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+
+  const thumb = location.profileImageThumbnailUrl;
+
+  const uploadMutation = useMutation({
+    mutationFn: async (file: File) => {
+      const uploaded = await locationFilesApi.upload(location.id, file);
+      // Promote in the same gesture — "Add site photo" IS the promotion.
+      return locationFilesApi.patch(location.id, uploaded.id, { isProfile: true });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['service-location', location.id] });
+      queryClient.invalidateQueries({ queryKey: ['service-locations'] });
+      queryClient.invalidateQueries({ queryKey: ['location-files', location.id] });
+      showSuccess('Site photo set');
+    },
+    onError: (err: unknown) => showError('Couldn’t set site photo', extractApiError(err) ?? undefined),
+  });
+
+  const handleFile = (file: File | undefined) => {
+    if (!file) return;
+    if (!SITE_PHOTO_IMAGE_TYPES.includes(file.type)) {
+      showError('Couldn’t set site photo', 'Unsupported type — JPEG, PNG, or WebP only');
+      return;
+    }
+    if (file.size > FILE_MAX_BYTES) {
+      showError('Couldn’t set site photo', `Too large — max ${Math.round(FILE_MAX_BYTES / 1024 / 1024)} MB`);
+      return;
+    }
+    uploadMutation.mutate(file);
+  };
+
+  // No photo set: slim dashed placeholder (edit-capable users only).
+  if (!thumb) {
+    if (!canEdit) return null;
+    return (
+      <div className="border-b border-border-soft">
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept={SITE_PHOTO_IMAGE_TYPES.join(',')}
+          onChange={(e) => {
+            handleFile(e.target.files?.[0]);
+            e.target.value = '';
+          }}
+          className="sr-only"
+          aria-label="Add site photo"
+        />
+        <button
+          type="button"
+          onClick={() => fileInputRef.current?.click()}
+          disabled={uploadMutation.isPending}
+          className="flex w-full items-center justify-center gap-1.5 border border-dashed border-transparent bg-bg-elev-2 px-3.5 py-2.5 text-[11.5px] font-medium text-fg-muted hover:text-fg-strong disabled:cursor-not-allowed"
+        >
+          <PhotoIcon className="size-4 text-fg-dim" />
+          {uploadMutation.isPending ? 'Uploading…' : 'Add site photo'}
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setLightboxOpen(true)}
+        title="Open photo"
+        className="relative block w-full border-b border-border-soft"
+      >
+        <img src={thumb} alt="Site photo" className="aspect-[16/7] w-full object-cover" />
+        <span className="absolute bottom-2 right-2 rounded bg-black/45 px-1.5 py-0.5 text-[10px] font-semibold text-white backdrop-blur-[2px]">
+          Site photo
+        </span>
+      </button>
+      {/* Full-size URL pending backend (profileImageUrl on the detail DTO);
+          the thumb keeps the lightbox working until it lands. */}
+      <PhotoLightbox
+        open={lightboxOpen}
+        onClose={() => setLightboxOpen(false)}
+        src={location.profileImageUrl ?? thumb}
+        alt="Site photo"
+        caption="Site photo"
+      />
+    </>
+  );
+}
+
 function SiteInstructionsCard({ location, canEdit }: { location: ServiceLocationDetailDto; canEdit: boolean }) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
@@ -1525,6 +1621,9 @@ function SiteInstructionsCard({ location, canEdit }: { location: ServiceLocation
       title={<CardTitle icon={<MapPinIcon className="size-3.5" />}>Site instructions</CardTitle>}
       padding="none"
     >
+      {/* ── Site photo banner — arrival orientation, leads the card ── */}
+      <SitePhotoBanner location={location} canEdit={canEdit} />
+
       {/* ── Arrival prose ("Before you arrive") — independent of facts ── */}
       {hasNotes || editingNotes ? (
         <div className="group/notes border-b border-border-soft px-3.5 py-2.5">

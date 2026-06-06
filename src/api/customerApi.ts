@@ -284,10 +284,16 @@ export interface ServiceLocationDetailDto {
   // on a fresh tenant; the card falls back to a default seed.
   suggestedFactLabels?: string[] | null;
   status: 'ACTIVE' | 'INACTIVE' | 'CLOSED';
-  // Presigned thumb of the location profile picture (a location-scoped image
-  // file with isProfile=true, set from the Files tab). Null = no photo set →
-  // render the premise-glyph mark instead. Short-TTL URL — don't cache.
+  // Presigned thumb of the SITE PHOTO — the single canonical front-of-building
+  // shot (a location-scoped image file with isProfile=true). Renders as the
+  // banner on the Site instructions card; null = no photo set (slim "Add site
+  // photo" placeholder). NOT the avatar/mark — that stays the premise glyph.
+  // Short-TTL URL — don't cache.
   profileImageThumbnailUrl?: string | null;
+  // Full-size presigned URL of the same file, for the banner's lightbox.
+  // PENDING BACKEND — asked alongside the thumb; lightbox falls back to the
+  // thumb until it lands.
+  profileImageUrl?: string | null;
   createdAt: string;
   updatedAt: string;
   version: number;

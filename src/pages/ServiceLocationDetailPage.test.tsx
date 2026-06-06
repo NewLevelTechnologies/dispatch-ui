@@ -544,6 +544,59 @@ describe('ServiceLocationDetailPage', () => {
     await waitFor(() => expect(activityTab).toHaveAttribute('aria-selected', 'true'));
   });
 
+  it('renders the site photo banner on Site instructions and opens the lightbox full-size', async () => {
+    mockApiResponses({
+      ...mockLocation,
+      profileImageThumbnailUrl: 'https://s3/site-thumb',
+      profileImageUrl: 'https://s3/site-full',
+    });
+    const user = userEvent.setup();
+    renderDetailPage();
+    await waitFor(() => expect(screen.getByText('Main Office')).toBeInTheDocument());
+
+    const banner = screen.getByAltText('Site photo');
+    expect(banner).toHaveAttribute('src', 'https://s3/site-thumb');
+
+    await user.click(banner);
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByAltText('Site photo')).toHaveAttribute('src', 'https://s3/site-full');
+  });
+
+  it('uploads and promotes a site photo in one gesture from the empty banner', async () => {
+    mockApiResponses(); // no site photo set
+    vi.mocked(apiClient.post).mockImplementation((url) => {
+      if (String(url).endsWith('/files/upload-url')) {
+        return Promise.resolve({ data: { fileId: 'lf-9', uploadUrl: 'https://s3/put', s3Key: 'k' } });
+      }
+      if (String(url).endsWith('/files/lf-9/confirm')) {
+        return Promise.resolve({ data: { id: 'lf-9', isProfile: false } });
+      }
+      return Promise.reject(new Error(`Unknown POST ${url}`));
+    });
+    vi.mocked(apiClient.patch).mockResolvedValue({ data: { id: 'lf-9', isProfile: true } });
+    const fetchSpy = vi.fn().mockResolvedValue({ ok: true });
+    vi.stubGlobal('fetch', fetchSpy);
+
+    const user = userEvent.setup();
+    renderDetailPage();
+    await waitFor(() => expect(screen.getByText('Main Office')).toBeInTheDocument());
+
+    expect(screen.getByRole('button', { name: 'Add site photo' })).toBeInTheDocument();
+    await user.upload(
+      screen.getByLabelText('Add site photo'),
+      new File(['x'], 'front.jpg', { type: 'image/jpeg' })
+    );
+
+    // 3-step upload (URL → S3 PUT → confirm), then the promote PATCH.
+    await waitFor(() => {
+      expect(apiClient.patch).toHaveBeenCalledWith('/service-locations/location-1/files/lf-9', {
+        isProfile: true,
+      });
+    });
+    expect(fetchSpy).toHaveBeenCalledWith('https://s3/put', expect.objectContaining({ method: 'PUT' }));
+    vi.unstubAllGlobals();
+  });
+
   it('renders the Files tab (empty state when neither source has files)', async () => {
     mockApiResponses();
     const user = userEvent.setup();

@@ -413,10 +413,18 @@ export default function LocationFilesTab({
 // characters → mono; equipment names and category labels are words →
 // proportional. Backlinks navigate to the origin record.
 // ─────────────────────────────────────────────────────────────────────────
+// Label for a direct upload's chip — the canonical site photo announces
+// itself (the isProfile flag is the source of truth, not a wire category);
+// everything else shows its category, falling back to "Site document".
+function siteFileChipLabel(f: SiteFile): string {
+  if (f.isProfile) return 'Site photo';
+  return f.category ? LOCATION_FILE_CATEGORY_LABELS[f.category] : 'Site document';
+}
+
 function SourceChips({ f }: { f: SiteFile }) {
   const stop = (e: React.MouseEvent) => e.stopPropagation();
   if (f.origin === 'site') {
-    return <Pill tone="neutral">{f.category ? LOCATION_FILE_CATEGORY_LABELS[f.category] : 'Site document'}</Pill>;
+    return <Pill tone="neutral">{siteFileChipLabel(f)}</Pill>;
   }
   return (
     <span className="flex flex-wrap items-center gap-1">
@@ -739,9 +747,7 @@ function LightboxInner({
                   {[current.workOrderNumber, current.equipmentName].filter(Boolean).join(' · ')}
                 </span>
               ) : (
-                <span>
-                  {current.category ? LOCATION_FILE_CATEGORY_LABELS[current.category] : 'Site document'}
-                </span>
+                <span>{siteFileChipLabel(current)}</span>
               )}
               {current.uploadedByName && <span>· {current.uploadedByName}</span>}
               <span>· {formatTimestamp(current.createdAt)}</span>
