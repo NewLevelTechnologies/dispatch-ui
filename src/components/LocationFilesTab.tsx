@@ -598,13 +598,16 @@ function LightboxInner({
     queryClient.invalidateQueries({ queryKey: ['service-locations'] });
   };
 
-  const setProfileMutation = useMutation({
-    mutationFn: () => locationFilesApi.patch(locationId, current.id, { isProfile: true }),
-    onSuccess: () => {
+  // Toggle — true promotes (backend demotes any previous site photo), false
+  // clears it (no photo set → the header falls back to the premise glyph).
+  const profileMutation = useMutation({
+    mutationFn: (isProfile: boolean) =>
+      locationFilesApi.patch(locationId, current.id, { isProfile }),
+    onSuccess: (_data, isProfile) => {
       invalidate();
-      showSuccess('Site photo updated');
+      showSuccess(isProfile ? 'Site photo set' : 'Site photo removed');
     },
-    onError: (err) => showError('Couldn’t set site photo', extractApiError(err) ?? undefined),
+    onError: (err) => showError('Couldn’t update site photo', extractApiError(err) ?? undefined),
   });
 
   const deleteMutation = useMutation({
@@ -650,15 +653,22 @@ function LightboxInner({
             {manageable && (
               <>
                 {current.isProfile ? (
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/20 px-3 py-1.5 text-sm font-medium text-amber-200 ring-1 ring-inset ring-amber-400/30">
+                  <button
+                    type="button"
+                    onClick={() => profileMutation.mutate(false)}
+                    disabled={profileMutation.isPending}
+                    title="Remove site photo"
+                    className="group inline-flex items-center gap-1.5 rounded-full bg-amber-500/20 px-3 py-1.5 text-sm font-medium text-amber-200 ring-1 ring-inset ring-amber-400/30 hover:bg-amber-500/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-white disabled:cursor-not-allowed disabled:opacity-50"
+                  >
                     <StarIconSolid className="size-4" />
                     Site photo
-                  </span>
+                    <XMarkIcon className="size-3.5 opacity-60 group-hover:opacity-100" />
+                  </button>
                 ) : (
                   <button
                     type="button"
-                    onClick={() => setProfileMutation.mutate()}
-                    disabled={setProfileMutation.isPending}
+                    onClick={() => profileMutation.mutate(true)}
+                    disabled={profileMutation.isPending}
                     className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5 text-sm text-white hover:bg-white/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-white disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     <StarIcon className="size-4" />

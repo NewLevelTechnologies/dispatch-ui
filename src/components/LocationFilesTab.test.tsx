@@ -277,6 +277,52 @@ describe('LocationFilesTab', () => {
     });
   });
 
+  it('sets a site-uploaded photo as the site photo from the lightbox', async () => {
+    mockApi();
+    vi.mocked(apiClient.patch).mockResolvedValue({ data: { ...sitePhoto, isProfile: true } });
+    renderTab();
+    const user = userEvent.setup();
+
+    await user.click(await screen.findByRole('button', { name: /Gate \+ lockbox\.jpg/ }));
+    await user.click(await screen.findByRole('button', { name: 'Set as site photo' }));
+
+    await waitFor(() => {
+      expect(apiClient.patch).toHaveBeenCalledWith(
+        `/service-locations/${LOCATION_ID}/files/lf-1`,
+        { isProfile: true }
+      );
+    });
+  });
+
+  it('unsets the current site photo from the lightbox badge', async () => {
+    mockApi({ direct: [{ ...sitePhoto, isProfile: true }, siteDoc] });
+    vi.mocked(apiClient.patch).mockResolvedValue({ data: sitePhoto });
+    renderTab();
+    const user = userEvent.setup();
+
+    await user.click(await screen.findByRole('button', { name: /Gate \+ lockbox\.jpg/ }));
+    // The badge doubles as the unset control.
+    await user.click(await screen.findByRole('button', { name: /Site photo/ }));
+
+    await waitFor(() => {
+      expect(apiClient.patch).toHaveBeenCalledWith(
+        `/service-locations/${LOCATION_ID}/files/lf-1`,
+        { isProfile: false }
+      );
+    });
+  });
+
+  it('offers no site-photo controls on job-born photos', async () => {
+    mockApi();
+    renderTab();
+    const user = userEvent.setup();
+
+    await user.click(await screen.findByRole('button', { name: /RTU-3 before\.jpg/ }));
+    expect(await screen.findByRole('button', { name: 'Close' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Set as site photo' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Delete' })).not.toBeInTheDocument();
+  });
+
   it('does not offer Delete on job-born documents', async () => {
     mockApi();
     renderTab();
