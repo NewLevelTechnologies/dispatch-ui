@@ -33,6 +33,13 @@ export function showInfo(message: string, description?: string) {
   toast(message, description ? { description } : undefined);
 }
 
+// Undoable action — the safety valve for instant, confirmation-free mutations
+// (e.g. removing a tag assignment from a detail header). Renders an action
+// button that fires `onUndo`; sonner dismisses the toast on click.
+export function showUndo(message: string, undoLabel: string, onUndo: () => void) {
+  toast(message, { action: { label: undoLabel, onClick: onUndo } });
+}
+
 // Promise-based — auto-renders loading → success/error. Use for long-running
 // mutations where the user benefits from seeing the in-flight state.
 export function showMutation<T>(

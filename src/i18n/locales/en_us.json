@@ -143,6 +143,7 @@
     "themeAccent": "Accent",
     "themeAccentCool": "Cool",
     "themeAccentWarm": "Warm",
+    "undo": "Undo",
     "update": "Update",
     "updateStatus": "Update {{entity, lowercase}} status"
   },
@@ -1719,6 +1720,7 @@
     }
   },
   "tags": {
+    "addTag": "Add tag",
     "allApplied": "All tags applied.",
     "createOption": "Create \"{{name}}\"",
     "empty": "No tags.",
@@ -1727,7 +1729,9 @@
     "errorRemove": "Failed to remove tag",
     "noMatches": "No matching tags.",
     "remove": "Remove tag {{name}}",
+    "removedToast": "Removed \"{{name}}\"",
     "searchPlaceholder": "Add a tag…",
+    "showAll": "Show all {{count}} tags",
     "title": "Tags"
   },
   "tenantSettings": {

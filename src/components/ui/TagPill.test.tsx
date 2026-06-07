@@ -28,4 +28,14 @@ describe('TagPill', () => {
     await user.click(screen.getByRole('button', { name: 'Remove tag VIP' }));
     expect(onRemove).toHaveBeenCalledOnce();
   });
+
+  it('hides the remove button until hover when removeOnHover is set', () => {
+    render(
+      <TagPill color="INFO" name="VIP" onRemove={vi.fn()} removeLabel="Remove tag VIP" removeOnHover />
+    );
+    // Still in the tree (so layout never shifts) but visually hidden at rest.
+    const button = screen.getByRole('button', { name: 'Remove tag VIP' });
+    expect(button).toHaveClass('opacity-0');
+    expect(button).toHaveClass('group-hover/tagpill:opacity-60');
+  });
 });

@@ -78,7 +78,7 @@ import { formatPhone } from '../utils/formatPhone';
 import { formatTimestamp, formatExactTimestamp } from '../lib/formatTimestamp';
 import { TimeAgo } from '../components/TimeAgo';
 import { titleCaseAddress } from '../utils/titleCaseAddress';
-import { extractApiError, showError, showInfo, showSuccess } from '../lib/toast';
+import { extractApiError, showError, showInfo, showSuccess, showUndo } from '../lib/toast';
 import AppLayout from '../components/AppLayout';
 import EquipmentFormDialog from '../components/EquipmentFormDialog';
 import WorkOrderFormDialog from '../components/WorkOrderFormDialog';
@@ -423,7 +423,7 @@ function BackLink({ location }: { location: ServiceLocationDetailDto }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────
-// Header card — pin mark, name, status / priority / agreement pills, meta, actions
+// Header card — pin mark, name, status pills + tag cluster, meta, actions
 // ─────────────────────────────────────────────────────────────────────────
 function LocationHeader({
   location,
@@ -486,6 +486,7 @@ function LocationHeader({
           <Pill tone={statusTone === 'neutral' ? 'neutral' : 'success'} dot live={location.status === 'ACTIVE'}>
             {statusLabel}
           </Pill>
+          <HeaderTags location={location} canEdit={!!canEdit} />
         </div>
         <div className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[11.5px] text-fg-muted">
           {meta.map((node, i) => (
@@ -535,10 +536,10 @@ function LocationHeader({
 }
 
 // Inline edit of the CORE location record only: name, address, premise type,
-// and region. Everything else on the page edits in place in its own card
-// (site instructions, contacts, tags, notes); the status lifecycle (Close)
-// stays a footer/dropdown action with confirmation + side effects — none of
-// that belongs here.
+// and region. Everything else on the page edits in place — site instructions,
+// contacts and notes in their own cards, tags right on the header pill line;
+// the status lifecycle (Close) stays a footer/dropdown action with
+// confirmation + side effects — none of that belongs here.
 //
 // Address autocomplete + live USPS re-verification are deferred (no provider
 // wired yet), so the address fields are plain inputs and we surface the
@@ -619,7 +620,7 @@ function LocationHeaderEdit({
     <div className="mb-3 rounded-[10px] border border-accent-500/40 bg-bg-elev px-4 py-3.5 shadow-sm">
       <div className="mb-3 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
         <span className="text-[13px] font-semibold text-fg-strong">Edit location</span>
-        <span className="text-[11.5px] text-fg-muted">· instructions, contacts, tags &amp; notes edit in their own cards below</span>
+        <span className="text-[11.5px] text-fg-muted">· instructions, contacts &amp; notes edit in their own cards below; tags edit on the header</span>
       </div>
 
       {/* Name + premise */}
@@ -884,12 +885,12 @@ function OverviewTab({
           <ActivityTeaser onViewActivity={onViewActivity} />
         </div>
 
-        {/* Right rail — reference / pre-arrival. Ends at Tags. */}
+        {/* Right rail — reference / pre-arrival. (Tags live on the header
+            pill line, not here.) */}
         <div className="flex flex-col gap-3">
           <SiteInstructionsCard location={location} canEdit={canEdit} />
           <SiteContactCard location={location} canEdit={canEdit} onViewAll={onViewContacts} />
           <ParentCustomerCard location={location} />
-          <TagsCard location={location} canEdit={canEdit} />
         </div>
       </div>
     </div>
@@ -2662,7 +2663,24 @@ function ParentCustomerCard({ location }: { location: ServiceLocationDetailDto }
   );
 }
 
-function TagsCard({ location, canEdit }: { location: ServiceLocationDetailDto; canEdit: boolean }) {
+// ─────────────────────────────────────────────────────────────────────────
+// Header tag cluster — tags ride the header pill line (after the status
+// pill, divider between), each tinted by its palette color, capped at 4
+// with a "+N" overflow chip. There is no Tags card; add/remove lives here.
+//
+//   · "+" chip → combobox popover anchored to the cluster (typeahead over
+//     the tenant library, inline "Create '{text}'"). Apply is immediate —
+//     no Save step — so the popover stays open for multi-tagging.
+//   · Remove: hover-revealed × on a pill, or uncheck the tag in the
+//     popover's applied section. Both are instant; an undo toast is the
+//     safety valve. Removing clears the assignment only — the tag itself
+//     stays in the tenant catalog (deleting is tag management's job).
+//   · "+N" opens the same popover (all applied tags listed with their
+//     checkmarks) rather than expanding inline, so the header stays tight.
+// ─────────────────────────────────────────────────────────────────────────
+const HEADER_TAG_CAP = 4;
+
+function HeaderTags({ location, canEdit }: { location: ServiceLocationDetailDto; canEdit: boolean }) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [picking, setPicking] = useState(false);
@@ -2684,9 +2702,19 @@ function TagsCard({ location, canEdit }: { location: ServiceLocationDetailDto; c
       showError(t('tags.errorApply'), extractApiError(err) ?? undefined),
   });
 
+  // Removal is instant (no confirm) — the undo toast restores the pre-remove
+  // id set via the idempotent sync. `tagIds` is captured at mutate time, so
+  // it still includes the tag being removed.
   const removeMutation = useMutation({
-    mutationFn: (tagId: string) => tagApi.removeFromServiceLocation(location.id, tagId),
-    onSuccess: invalidate,
+    mutationFn: (tag: { id: string; name: string }) =>
+      tagApi.removeFromServiceLocation(location.id, tag.id),
+    onSuccess: (_data, tag) => {
+      invalidate();
+      const prevIds = tagIds;
+      showUndo(t('tags.removedToast', { name: tag.name }), t('common.undo'), () =>
+        applyMutation.mutate(prevIds)
+      );
+    },
     onError: (err: unknown) =>
       showError(t('tags.errorRemove'), extractApiError(err) ?? undefined),
   });
@@ -2707,53 +2735,63 @@ function TagsCard({ location, canEdit }: { location: ServiceLocationDetailDto; c
       showError(t('tags.errorCreate'), extractApiError(err) ?? undefined),
   });
 
-  const busy = applyMutation.isPending || createMutation.isPending;
+  const busy = applyMutation.isPending || createMutation.isPending || removeMutation.isPending;
 
-  const handleApply = (tag: Tag) => {
-    applyMutation.mutate([...tagIds, tag.id]);
-    setPicking(false);
-  };
-  const handleCreate = (name: string) => {
-    createMutation.mutate(name);
-    setPicking(false);
-  };
+  const visible = tags.slice(0, HEADER_TAG_CAP);
+  const overflow = tags.length - visible.length;
+
+  // Nothing to show and nothing addable — render nothing (no divider).
+  if (tags.length === 0 && !canEdit) return null;
 
   return (
-    <Card
-      title={<CardTitle>{t('tags.title')}</CardTitle>}
-      action={
-        canEdit && !picking ? <CardLink onClick={() => setPicking(true)}>+ Add</CardLink> : undefined
-      }
-    >
-      {tags.length === 0 && !picking ? (
-        <div className="text-[12px] text-fg-muted">{t('tags.empty')}</div>
-      ) : (
-        <div className="flex flex-wrap gap-1.5">
-          {tags.map((tag) => (
-            <TagPill
-              key={tag.id}
-              color={tag.color}
-              name={tag.name}
-              onRemove={canEdit ? () => removeMutation.mutate(tag.id) : undefined}
-              removeLabel={t('tags.remove', { name: tag.name })}
+    <>
+      <span aria-hidden className="h-3.5 w-px self-center bg-border" />
+      {visible.map((tag) => (
+        <TagPill
+          key={tag.id}
+          color={tag.color}
+          name={tag.name}
+          removeOnHover
+          onRemove={canEdit ? () => removeMutation.mutate(tag) : undefined}
+          removeLabel={t('tags.remove', { name: tag.name })}
+        />
+      ))}
+      <span className="relative inline-flex items-center gap-1.5">
+        {overflow > 0 && (
+          <button
+            type="button"
+            onClick={() => setPicking(true)}
+            aria-label={t('tags.showAll', { count: tags.length })}
+            className="cursor-pointer text-[11px] font-semibold text-fg-muted hover:text-fg"
+          >
+            +{overflow}
+          </button>
+        )}
+        {canEdit && (
+          <button
+            type="button"
+            onClick={() => setPicking(true)}
+            aria-label={t('tags.addTag')}
+            className="flex h-[19px] w-[19px] cursor-pointer items-center justify-center rounded-full border border-dashed border-border text-[12px] leading-none text-fg-muted hover:border-border-strong hover:text-fg"
+          >
+            +
+          </button>
+        )}
+        {picking && (
+          <div className="absolute top-full left-0 z-50 mt-1.5 w-64">
+            <TagPicker
+              appliedTagIds={tagIds}
+              onApply={(tag: Tag) => applyMutation.mutate([...tagIds, tag.id])}
+              onCreate={(name) => createMutation.mutate(name)}
+              onRemove={canEdit ? (tag) => removeMutation.mutate(tag) : undefined}
+              onClose={() => setPicking(false)}
+              canCreate={canEdit}
+              busy={busy}
             />
-          ))}
-        </div>
-      )}
-
-      {picking && (
-        <div className="mt-2">
-          <TagPicker
-            appliedTagIds={tagIds}
-            onApply={handleApply}
-            onCreate={handleCreate}
-            onClose={() => setPicking(false)}
-            canCreate={canEdit}
-            busy={busy}
-          />
-        </div>
-      )}
-    </Card>
+          </div>
+        )}
+      </span>
+    </>
   );
 }
 

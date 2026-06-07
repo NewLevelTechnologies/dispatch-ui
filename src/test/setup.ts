@@ -206,6 +206,7 @@ vi.mock('react-i18next', () => {
     'common.themeAccent': 'Accent',
     'common.themeAccentCool': 'Cool',
     'common.themeAccentWarm': 'Warm',
+    'common.undo': 'Undo',
     'common.update': 'Update',
     'customers.description': 'Manage your customer database',
     'customers.search.placeholder': 'Search by name, phone, or email…',
@@ -1783,6 +1784,7 @@ vi.mock('react-i18next', () => {
     'settings.workflows.panel.savedUpdate': 'Transition updated',
     'settings.workflows.panel.savedDelete': 'Transition removed',
 
+    'tags.addTag': 'Add tag',
     'tags.allApplied': 'All tags applied.',
     'tags.createOption': 'Create "{{name}}"',
     'tags.empty': 'No tags.',
@@ -1791,7 +1793,9 @@ vi.mock('react-i18next', () => {
     'tags.errorRemove': 'Failed to remove tag',
     'tags.noMatches': 'No matching tags.',
     'tags.remove': 'Remove tag {{name}}',
+    'tags.removedToast': 'Removed "{{name}}"',
     'tags.searchPlaceholder': 'Add a tag…',
+    'tags.showAll': 'Show all {{count}} tags',
     'tags.title': 'Tags',
 
     // Approvals inbox / WO callout
