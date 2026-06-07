@@ -54,6 +54,13 @@ const mockLocation: ServiceLocationDetailDto = {
   lastServiceAt: null,
 };
 
+// Tenant tag library — served from /customers/tags when the header tag
+// picker opens. Ids overlap with the applied tags used in header-tag tests.
+const tagLibrary = [
+  { id: 'tag-1', name: 'VIP', color: 'ACCENT_1', archivedAt: null, createdAt: '', updatedAt: '' },
+  { id: 'tag-2', name: 'Roof access', color: 'WARNING', archivedAt: null, createdAt: '', updatedAt: '' },
+];
+
 describe('ServiceLocationDetailPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -121,6 +128,10 @@ describe('ServiceLocationDetailPage', () => {
       if (url.includes('/notification-preferences')) {
         // Contacts tab fetches per-contact prefs for the Notifications column.
         return Promise.resolve({ data: [] });
+      }
+      if (url === '/customers/tags') {
+        // Tenant tag library — the header tag-cluster picker loads it on open.
+        return Promise.resolve({ data: tagLibrary });
       }
       if (url.includes('/service-locations/')) {
         return location ? Promise.resolve({ data: location }) : Promise.reject(new Error('Not found'));
@@ -419,6 +430,64 @@ describe('ServiceLocationDetailPage', () => {
       expect(screen.getByText(/123 Main St Suite 100/i)).toBeInTheDocument();
     });
     expect(screen.getByText(/Springfield, IL 62701/i)).toBeInTheDocument();
+  });
+
+  // ── Header tags — pill-line cluster (no Tags card) ──────────────────────
+  describe('header tags', () => {
+    const locTags = [
+      { id: 'tag-1', name: 'VIP', color: 'ACCENT_1' },
+      { id: 'tag-2', name: 'Roof access', color: 'WARNING' },
+    ];
+
+    it('renders applied tags on the header pill line with their palette tone', async () => {
+      mockApiResponses({ ...mockLocation, tags: locTags });
+      renderDetailPage();
+      await waitFor(() => expect(screen.getByText('VIP')).toBeInTheDocument());
+      // Each tag carries its own palette tint — never a flat neutral.
+      expect(screen.getByText('VIP').closest('.pill')).toHaveClass('violet'); // ACCENT_1 → purple
+      expect(screen.getByText('Roof access').closest('.pill')).toHaveClass('warning');
+    });
+
+    it('caps the header at 4 tags with a +N overflow chip', async () => {
+      const many = Array.from({ length: 6 }, (_, i) => ({
+        id: `tag-${i}`,
+        name: `Tag ${i}`,
+        color: 'INFO',
+      }));
+      mockApiResponses({ ...mockLocation, tags: many });
+      renderDetailPage();
+      await waitFor(() => expect(screen.getByText('Tag 0')).toBeInTheDocument());
+      expect(screen.getByText('Tag 3')).toBeInTheDocument();
+      expect(screen.queryByText('Tag 4')).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Show all 6 tags' })).toHaveTextContent('+2');
+    });
+
+    it('removes an assignment via the pill ×', async () => {
+      const user = userEvent.setup();
+      mockApiResponses({ ...mockLocation, tags: locTags });
+      const deleteSpy = vi.mocked(apiClient.delete).mockResolvedValue({ data: undefined });
+      renderDetailPage();
+      await waitFor(() => expect(screen.getByText('VIP')).toBeInTheDocument());
+      await user.click(screen.getByRole('button', { name: 'Remove tag VIP' }));
+      await waitFor(() =>
+        expect(deleteSpy).toHaveBeenCalledWith('/service-locations/location-1/tags/tag-1')
+      );
+    });
+
+    it('the + chip opens the picker and applying syncs the full id set', async () => {
+      const user = userEvent.setup();
+      mockApiResponses({ ...mockLocation, tags: [locTags[0]] });
+      const putSpy = vi.mocked(apiClient.put).mockResolvedValue({ data: [] });
+      renderDetailPage();
+      await waitFor(() => expect(screen.getByText('VIP')).toBeInTheDocument());
+      await user.click(screen.getByRole('button', { name: 'Add tag' }));
+      await user.click(await screen.findByRole('option', { name: /Roof access/ }));
+      await waitFor(() =>
+        expect(putSpy).toHaveBeenCalledWith('/service-locations/location-1/tags', {
+          tagIds: ['tag-1', 'tag-2'],
+        })
+      );
+    });
   });
 
   // ── Back-link + customer link ───────────────────────────────────────────

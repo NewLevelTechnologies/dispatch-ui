@@ -51,10 +51,42 @@ describe('TagPicker', () => {
     expect(screen.queryByText('VIP')).not.toBeInTheDocument();
   });
 
-  it('excludes already-applied tags', async () => {
+  it('excludes already-applied tags when onRemove is not wired', async () => {
     setup({ appliedTagIds: ['1'] });
     expect(await screen.findByText('Roof access')).toBeInTheDocument();
     expect(screen.queryByText('VIP')).not.toBeInTheDocument();
+  });
+
+  it('lists applied tags at the top with a checkmark when onRemove is wired', async () => {
+    const onRemove = vi.fn();
+    setup({ appliedTagIds: ['2'], onRemove });
+    const options = await screen.findAllByRole('option');
+    // Applied ("Roof access") leads, unapplied ("VIP") follows.
+    expect(options[0]).toHaveTextContent('Roof access');
+    expect(options[0]).toHaveTextContent('✓');
+    expect(options[1]).toHaveTextContent('VIP');
+    expect(options[1]).not.toHaveTextContent('✓');
+  });
+
+  it('unchecking an applied tag calls onRemove', async () => {
+    const user = userEvent.setup();
+    const onRemove = vi.fn();
+    const { onApply } = setup({ appliedTagIds: ['1'], onRemove });
+    await user.click(await screen.findByText('VIP'));
+    expect(onRemove).toHaveBeenCalledWith(expect.objectContaining({ id: '1' }));
+    expect(onApply).not.toHaveBeenCalled();
+  });
+
+  it('a bare Enter never removes an applied tag', async () => {
+    const user = userEvent.setup();
+    const onRemove = vi.fn();
+    const { onApply } = setup({ appliedTagIds: ['1', '2'], onRemove });
+    // All tags applied → every option is an applied row; Enter without an
+    // explicit selection must be a no-op.
+    await screen.findByText('VIP');
+    await user.type(screen.getByRole('textbox'), '{Enter}');
+    expect(onRemove).not.toHaveBeenCalled();
+    expect(onApply).not.toHaveBeenCalled();
   });
 
   it('applies an existing tag on click', async () => {
