@@ -3,7 +3,12 @@ export { default as apiClient } from './client';
 export { getApiErrorMessage, getApiErrorCode } from './errors';
 
 // Audit API
-export { auditApi, type AuditLog } from './auditApi';
+export {
+  auditApi,
+  type AuditLog,
+  type AuditFieldChange,
+  type ServiceLocationAuditEntry,
+} from './auditApi';
 
 // Activity API (WO activity feed)
 export {
@@ -14,6 +19,9 @@ export {
   type ActivityEvent,
   type ActivityPage,
   type ListActivityParams,
+  type ActivityWorkOrderRef,
+  type LocationActivityEvent,
+  type LocationActivityPage,
 } from './activityApi';
 
 // Notes API (WO notes sub-resource)

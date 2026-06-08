@@ -468,6 +468,33 @@
       "close": "Close Location",
       "closeConfirm": "Are you sure you want to close {{name}}? This location will no longer be available for new work orders."
     },
+    "activity": {
+      "audit": {
+        "changedFields_one": "Changed {{count}} field",
+        "changedFields_other": "Changed {{count}} fields",
+        "created": "{{entity}} created",
+        "deleted": "{{entity}} deleted",
+        "fieldChanged": "{{field}} changed",
+        "hideDiff": "Hide",
+        "showDiff": "Show change"
+      },
+      "emptyHint": "Adjust the filter or show all changes.",
+      "emptyTitle": "No activity matches",
+      "errorLoading": "Couldn't load activity.",
+      "filter": {
+        "all": "All",
+        "changes": "Changes",
+        "notes": "Notes",
+        "payments": "Payments",
+        "visits": "Visits"
+      },
+      "heading": "Activity",
+      "loadMore": "Load more",
+      "loading": "Loading activity…",
+      "showChanges": "Show all changes",
+      "updates_one": "{{count}} update",
+      "updates_other": "{{count}} updates"
+    },
     "description": "Manage service locations across all customers",
     "detail": {
       "addEquipment": "Add Equipment",

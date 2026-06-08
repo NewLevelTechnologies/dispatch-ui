@@ -135,6 +135,33 @@ export function getEventContext(event: ActivityEvent): string | null {
 }
 
 /**
+ * Resolves an event's plain-language summary line: picks the i18n template for
+ * the kind, interpolates the pre-formatted `data` fields, resolves `{{entity}}`
+ * placeholders through the glossary, and swaps raw field keys for labels. Falls
+ * back to the unknown-activity copy when the backend ships a kind/field the UI
+ * doesn't recognize yet (rather than leaking raw `{{placeholder}}` tokens).
+ *
+ * Shared by both the per-WO rail (ActivityStream) and the location-scoped feed.
+ */
+export function resolveEventSummary(
+  event: ActivityEvent,
+  t: (key: string, params?: Record<string, unknown>) => string,
+  getName: (entityCode: string, plural?: boolean) => string
+): string {
+  const templateKey = getEventTemplateKey(event.kind);
+  const data = preFormatEventData(event);
+  const entityCode = getEventEntityCode(event.kind);
+  const entityFields = entityCode
+    ? { entity: getName(entityCode), entities: getName(entityCode, true) }
+    : {};
+  if (typeof data.field === 'string' && data.field) {
+    data.field = getFieldLabel(data.field, t, getName);
+  }
+  const rendered = t(templateKey, { ...data, ...entityFields });
+  return rendered.includes('{{') ? t(FALLBACK_TEMPLATE_KEY) : rendered;
+}
+
+/**
  * Stringify event.data fields for i18n interpolation. Numbers and dates that
  * benefit from formatting (currency amounts, ISO timestamps) are pre-formatted
  * here so templates stay readable. Everything else falls through as a string.

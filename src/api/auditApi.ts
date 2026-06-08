@@ -64,6 +64,30 @@ export interface AccountActivityEvent {
   userAgent: string | null;
 }
 
+/** One field's before/after within an audit entry. Values arrive as display
+ * strings; `sensitive` rows are pre-masked server-side (`••••`). A null old or
+ * new value means the field was added or removed. Nested fields arrive
+ * flattened with a dotted `field` and a "Parent · Child" `label`. */
+export interface AuditFieldChange {
+  field: string;
+  label: string;
+  oldValue: string | null;
+  newValue: string | null;
+  sensitive: boolean;
+}
+
+/** A service-location audit row — a deliberate who-did-what accountability
+ * record. `changes` is empty for CREATE/DELETE. Newest-first, no pagination. */
+export interface ServiceLocationAuditEntry {
+  id: string;
+  userName: string;
+  userEmail: string;
+  userRole: string;
+  action: 'CREATE' | 'UPDATE' | 'DELETE';
+  changes: AuditFieldChange[];
+  timestamp: string;
+}
+
 export const auditApi = {
   /**
    * Get audit history for a specific entity
@@ -73,6 +97,23 @@ export const auditApi = {
    */
   getEntityHistory: async (entityType: string, entityId: string): Promise<AuditLog[]> => {
     const response = await apiClient.get<AuditLog[]>(`/audit/${entityType}/${entityId}`);
+    return response.data;
+  },
+
+  /**
+   * Field-level change history for a service location, newest-first. Fetched
+   * whole in one shot (no cursor) and sort-merged into the business activity
+   * feed when "Show all changes" is on. Requires VIEW_AUDIT_LOGS (403 without).
+   * `limit` defaults to 200 server-side, max 500.
+   */
+  getServiceLocationChanges: async (
+    serviceLocationId: string,
+    limit?: number
+  ): Promise<ServiceLocationAuditEntry[]> => {
+    const response = await apiClient.get<ServiceLocationAuditEntry[]>(
+      `/audit/ServiceLocation/${serviceLocationId}`,
+      { params: { limit } }
+    );
     return response.data;
   },
 

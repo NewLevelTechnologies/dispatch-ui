@@ -1,4 +1,5 @@
 import apiClient from './client';
+import type { ProgressCategory } from './workOrderApi';
 
 export type ActivityCategory = 'DISPATCH' | 'STATUS' | 'NOTE' | 'FINANCIAL';
 
@@ -63,10 +64,64 @@ export interface ListActivityParams {
   categories?: ActivityCategory[];
 }
 
+/**
+ * The work order an event belongs to, denormalized onto each row of the
+ * location-scoped feed. Drives the WO-collapse grouping: events sharing an
+ * `id` fold into one expandable row, `activityCount` labels it ("3 updates"),
+ * and `workOrderNumber`/`summary` render the group header + backlink.
+ */
+export interface ActivityWorkOrderRef {
+  id: string;
+  workOrderNumber: string;
+  summary: string | null;
+  progressCategory: ProgressCategory;
+  /** The WO's total rows under the current category filter — the "N updates" label. */
+  activityCount: number;
+}
+
+/**
+ * An event in the location-scoped business stream. Same shape as the per-WO
+ * feed plus the originating `workOrder` block. `workOrder` is null defensively
+ * (location-scoped events not tied to a job, once those are wired).
+ */
+export interface LocationActivityEvent extends ActivityEvent {
+  workOrder: ActivityWorkOrderRef | null;
+}
+
+export interface LocationActivityPage {
+  content: LocationActivityEvent[];
+  /** Opaque token. Pass back unchanged for the next page. Null on last page. */
+  nextCursor: string | null;
+  hasMore: boolean;
+}
+
 export const activityApi = {
   list: async (workOrderId: string, params?: ListActivityParams): Promise<ActivityPage> => {
     const response = await apiClient.get<ActivityPage>(
       `/work-orders/${workOrderId}/activity`,
+      {
+        params: {
+          cursor: params?.cursor,
+          limit: params?.limit,
+          categories: params?.categories?.length ? params.categories.join(',') : undefined,
+        },
+      }
+    );
+    return response.data;
+  },
+
+  /**
+   * The location-scoped business stream — every meaningful event at a site
+   * across all its work orders. Same query contract as `list`; each row
+   * carries a `workOrder` block for grouping + backlinks. 404 = unknown
+   * location, 400 = bad cursor/category.
+   */
+  listForLocation: async (
+    serviceLocationId: string,
+    params?: ListActivityParams
+  ): Promise<LocationActivityPage> => {
+    const response = await apiClient.get<LocationActivityPage>(
+      `/work-orders/locations/${serviceLocationId}/activity`,
       {
         params: {
           cursor: params?.cursor,
