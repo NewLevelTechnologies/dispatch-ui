@@ -37,7 +37,9 @@ export interface AuditChange {
 }
 export type SingleRow = BaseRow & { kind: 'single' };
 export type GroupRow = BaseRow & { kind: 'group'; woId: string; count: number };
-export type AuditRowModel = BaseRow & { kind: 'audit'; changes: AuditChange[] };
+// `reverted` rows are a backend-flagged toggle-and-undo: `changes` holds both
+// steps (original edit, then the undo) for the expandable detail.
+export type AuditRowModel = BaseRow & { kind: 'audit'; changes: AuditChange[]; reverted?: boolean };
 export type FinancialRow = BaseRow & { kind: 'financial' };
 export type Row = SingleRow | GroupRow | AuditRowModel | FinancialRow;
 
@@ -100,25 +102,44 @@ export function buildDays({
         : financial;
 
   // A save that touched nothing isn't an event — drop UPDATE audit rows with no
-  // field deltas defensively (the backend shouldn't emit them, but the feed must
-  // not render "Changed 0 fields" noise). CREATE/DELETE legitimately carry no
-  // changes, so only UPDATE is filtered. Then fold same-actor toggle-and-undo
-  // pairs into a single "edited and reverted" row so a net no-op doesn't take
-  // two lines (backend-side dedup would be cleaner — see collapseReversals).
-  const visibleAudit = collapseReversals(
-    audit.filter((a) => !(a.action === 'UPDATE' && a.changes.length === 0))
-  );
+  // field deltas defensively (CREATE/DELETE legitimately carry none, so only
+  // UPDATE is filtered).
+  const cleaned = audit.filter((a) => !(a.action === 'UPDATE' && a.changes.length === 0));
+
+  // Toggle-and-undo is detected server-side: the undo carries `netNoOp` and
+  // points at the edit it cancels via `revertsEntryId`. Fold the pair into one
+  // "edited and reverted" row at the undo's position, and drop the original edit
+  // from the standalone stream so the net no-op doesn't take two lines.
+  const byId = new Map(cleaned.map((a) => [a.id, a]));
+  const foldedOriginalIds = new Set<string>();
+  for (const a of cleaned) {
+    if (a.netNoOp && a.revertsEntryId && byId.has(a.revertsEntryId)) {
+      foldedOriginalIds.add(a.revertsEntryId);
+    }
+  }
+  const visibleAudit = cleaned.filter((a) => !foldedOriginalIds.has(a.id));
 
   // Each stream's rows carry a timestamp; merge onto one descending timeline.
   type TimelineItem =
     | { type: 'event'; ts: string; event: LocationActivityEvent }
     | { type: 'financial'; ts: string; fin: FinancialActivityEvent }
-    | { type: 'audit'; ts: string; audit: ServiceLocationAuditEntry; reverted: boolean };
+    | {
+        type: 'audit';
+        ts: string;
+        audit: ServiceLocationAuditEntry;
+        // The edit this entry reverts (resolved from revertsEntryId), or null.
+        revertedOf: ServiceLocationAuditEntry | null;
+      };
   const timeline: TimelineItem[] = [
     ...events.map((event): TimelineItem => ({ type: 'event', ts: event.timestamp, event })),
     ...fin.map((f): TimelineItem => ({ type: 'financial', ts: f.timestamp, fin: f })),
     ...visibleAudit.map(
-      (a): TimelineItem => ({ type: 'audit', ts: a.entry.timestamp, audit: a.entry, reverted: a.reverted })
+      (a): TimelineItem => ({
+        type: 'audit',
+        ts: a.timestamp,
+        audit: a,
+        revertedOf: a.netNoOp && a.revertsEntryId ? byId.get(a.revertsEntryId) ?? null : null,
+      })
     ),
   ];
   timeline.sort((a, b) => b.ts.localeCompare(a.ts));
@@ -144,7 +165,7 @@ export function buildDays({
   const groupedWos = new Set<string>();
   for (const item of timeline) {
     if (item.type === 'audit') {
-      pushRow(item.ts, auditRowModel(item.audit, t, getName, item.reverted));
+      pushRow(item.ts, auditRowModel(item.audit, t, getName, item.revertedOf));
       continue;
     }
     if (item.type === 'financial') {
@@ -199,19 +220,23 @@ function auditRowModel(
   a: ServiceLocationAuditEntry,
   t: TFunc,
   getName: GetName,
-  reverted: boolean
+  revertedOf: ServiceLocationAuditEntry | null
 ): AuditRowModel {
   const { actor, isPerson } = actorOf(a.userName, t);
   const entity = getName('service_location');
   const single = a.changes.length === 1 ? a.changes[0] : null;
   let text: string;
-  // The component decides inline-vs-indented delta rendering off `changes`:
-  // one short field renders inline; one long field or several render below.
+  // The component decides delta rendering off `changes` + `reverted`: a reverted
+  // pair collapses and reveals both steps on expand; one short field renders
+  // inline; one long field or several render below.
   let changes: AuditChange[] = a.changes;
+  const reverted = revertedOf != null;
   if (reverted) {
-    // Toggle-and-undo: net no change, so carry no delta — just name the field.
-    text = t('serviceLocations.activity.audit.editedReverted', { field: single?.label ?? entity });
-    changes = [];
+    // Toggle-and-undo: name the field/object that was put back; carry both steps
+    // (the original edit, then this undo) for the expandable detail.
+    const fieldName = single ? single.label : t(objectLabelKey(a.changes));
+    text = t('serviceLocations.activity.audit.editedReverted', { field: fieldName });
+    changes = [...revertedOf.changes, ...a.changes];
   } else if (a.action === 'CREATE') {
     text = t('serviceLocations.activity.audit.created', { entity });
   } else if (a.action === 'DELETE') {
@@ -238,6 +263,7 @@ function auditRowModel(
     ts: formatTimestamp(a.timestamp),
     tsExact: formatExactTimestamp(a.timestamp),
     changes,
+    reverted,
   };
 }
 
@@ -259,53 +285,6 @@ function objectLabelKey(changes: ServiceLocationAuditEntry['changes']): string {
   }
   // Mixed objects, or fields with no named group → the generic location bucket.
   return 'serviceLocations.activity.audit.object.location';
-}
-
-// Window past which two opposite single-field edits read as two deliberate
-// decisions rather than a fat-fingered toggle. Same-actor exact reversals
-// inside it fold to one row.
-const REVERSAL_WINDOW_MS = 30 * 60 * 1000;
-
-export interface AuditItem {
-  entry: ServiceLocationAuditEntry;
-  reverted: boolean;
-}
-
-/**
- * Fold adjacent same-actor toggle-and-undo pairs (X→Y then Y→X on the same
- * field, within the window) into one entry flagged `reverted`. The audit stream
- * is newest-first, so entry[i] is the undo of entry[i+1]. Conservative by design
- * — only exact single-field reversals collapse, so a real edit is never hidden.
- * Backend-side dedup would be cleaner; this is the defensive UI half.
- */
-function collapseReversals(audit: ServiceLocationAuditEntry[]): AuditItem[] {
-  const out: AuditItem[] = [];
-  for (let i = 0; i < audit.length; i++) {
-    const newer = audit[i];
-    const older = audit[i + 1];
-    if (older && isExactReversal(newer, older)) {
-      out.push({ entry: newer, reverted: true });
-      i++; // consume the pair
-      continue;
-    }
-    out.push({ entry: newer, reverted: false });
-  }
-  return out;
-}
-
-function isExactReversal(
-  newer: ServiceLocationAuditEntry,
-  older: ServiceLocationAuditEntry
-): boolean {
-  if (newer.action !== 'UPDATE' || older.action !== 'UPDATE') return false;
-  if (newer.userName !== older.userName) return false;
-  if (newer.changes.length !== 1 || older.changes.length !== 1) return false;
-  const a = newer.changes[0];
-  const b = older.changes[0];
-  if (a.field !== b.field) return false;
-  if (a.oldValue !== b.newValue || a.newValue !== b.oldValue) return false;
-  const dt = Math.abs(new Date(newer.timestamp).getTime() - new Date(older.timestamp).getTime());
-  return Number.isFinite(dt) && dt <= REVERSAL_WINDOW_MS;
 }
 
 function formatMoney(amount: string): string {

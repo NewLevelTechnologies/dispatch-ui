@@ -523,19 +523,43 @@ function ActivityRow({ row }: { row: SingleRow | AuditRowModel | FinancialRow })
 // changes" on, business events still visually lead. A lone short field renders
 // its delta inline; a long field or several render indented below.
 function AuditRow({ row }: { row: AuditRowModel }) {
+  const [open, setOpen] = useState(false);
+  const reverted = !!row.reverted;
+  // A lone short field shows its delta inline; reverted pairs collapse to the
+  // header and reveal both steps on expand; everything else lists its deltas.
   const inlineChange =
-    row.changes.length === 1 && !isLongChange(row.changes[0]) ? row.changes[0] : null;
-  const indented = inlineChange ? [] : row.changes;
+    !reverted && row.changes.length === 1 && !isLongChange(row.changes[0]) ? row.changes[0] : null;
+  const indented = reverted ? (open ? row.changes : []) : inlineChange ? [] : row.changes;
+  const toggle = () => setOpen((v) => !v);
+
   return (
     <div style={{ borderBottom: '1px solid var(--border-soft)', background: 'var(--bg-sunken)' }}>
-      <div style={ROW_GRID}>
+      <div
+        style={{ ...ROW_GRID, ...(reverted ? { cursor: 'pointer' } : null) }}
+        {...(reverted
+          ? {
+              role: 'button',
+              tabIndex: 0,
+              'aria-expanded': open,
+              onClick: toggle,
+              onKeyDown: (e: React.KeyboardEvent) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  toggle();
+                }
+              },
+            }
+          : {})}
+      >
         <ActGlyph glyph={row.glyph} tone={row.tone} />
         <ActorCell name={row.actor} isPerson={row.isPerson} />
         <EventCell
           row={row}
           muted
           groupSuffix={
-            inlineChange ? (
+            reverted ? (
+              <span style={{ fontSize: 11, color: 'var(--fg-dim)', marginLeft: 6 }}>{open ? '▾' : '▸'}</span>
+            ) : inlineChange ? (
               <span style={{ fontSize: 12, color: 'var(--fg-dim)' }}>
                 {' · '}
                 <DeltaValue change={inlineChange} />
