@@ -3,8 +3,16 @@ import type { ProgressCategory } from './workOrderApi';
 
 export type ActivityCategory = 'DISPATCH' | 'STATUS' | 'NOTE' | 'FINANCIAL';
 
+/**
+ * Server-assigned split between meaningful business events and field-level
+ * change/audit churn. The "Show all changes" toggle drives the request:
+ * OFF → BUSINESS only, ON → ALL (BUSINESS + CHANGE).
+ */
+export type ActivityClassification = 'BUSINESS' | 'CHANGE';
+
 export type ActivityKind =
   | 'WORK_ORDER_CREATED'
+  | 'WORK_ORDER_COMPLETED'
   | 'WORK_ORDER_UPDATED'
   | 'WORK_ORDER_CANCELLED'
   | 'WORK_ORDER_ARCHIVED'
@@ -18,6 +26,7 @@ export type ActivityKind =
   | 'DISPATCH_ARRIVED'
   | 'DISPATCH_CHECKED_OUT'
   | 'DISPATCH_CANCELLED'
+  | 'DISPATCH_NO_SHOW'
   | 'NOTE_ADDED'
   | 'NOTE_DELETED'
   | 'QUOTE_SENT'
@@ -43,6 +52,8 @@ export interface ActivityEvent {
   id: string;
   kind: ActivityKind;
   category: ActivityCategory;
+  /** BUSINESS vs CHANGE; present on the location feed, optional on the WO rail. */
+  classification?: ActivityClassification;
   timestamp: string;
   actor: ActivityActor | null;
   data: Record<string, unknown>;
@@ -62,6 +73,8 @@ export interface ListActivityParams {
   limit?: number;
   /** Server-side filter. Empty array (or omitted) returns all categories. */
   categories?: ActivityCategory[];
+  /** BUSINESS (default) hides field-edit churn; ALL adds CHANGE rows. */
+  classification?: ActivityClassification | 'ALL';
 }
 
 /**
@@ -104,6 +117,7 @@ export const activityApi = {
           cursor: params?.cursor,
           limit: params?.limit,
           categories: params?.categories?.length ? params.categories.join(',') : undefined,
+          classification: params?.classification,
         },
       }
     );
@@ -127,6 +141,7 @@ export const activityApi = {
           cursor: params?.cursor,
           limit: params?.limit,
           categories: params?.categories?.length ? params.categories.join(',') : undefined,
+          classification: params?.classification,
         },
       }
     );

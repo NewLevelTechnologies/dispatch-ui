@@ -470,12 +470,17 @@
     },
     "activity": {
       "audit": {
-        "changedFields_one": "Changed {{count}} field",
-        "changedFields_other": "Changed {{count}} fields",
         "created": "{{entity}} created",
         "deleted": "{{entity}} deleted",
+        "editedObject": "Edited {{object}}",
+        "editedReverted": "Edited and reverted {{field}}",
         "fieldChanged": "{{field}} changed",
         "hideDiff": "Hide",
+        "object": {
+          "address": "address",
+          "location": "location details",
+          "siteContact": "site contact"
+        },
         "showDiff": "Show change"
       },
       "emptyHint": "Adjust the filter or show all changes.",
@@ -484,9 +489,12 @@
       "filter": {
         "all": "All",
         "changes": "Changes",
-        "notes": "Notes",
-        "payments": "Payments",
-        "visits": "Visits"
+        "notes": "Notes"
+      },
+      "financial": {
+        "paid": "Invoice {{invoice}} paid · {{amount}}",
+        "sent": "Invoice {{invoice}} sent · {{amount}}",
+        "viewJob": "View {{entity}}"
       },
       "heading": "Activity",
       "loadMore": "Load more",
@@ -2051,8 +2059,11 @@
       "fieldLabel": {
         "completedDate": "Completed Date",
         "customerOrderNumber": "Customer PO",
+        "description": "Description",
+        "notes": "Notes",
         "priority": "Priority",
         "scheduledDate": "Scheduled Date",
+        "summary": "Summary",
         "workOrderTypeId": "Type"
       },
       "filter": {
@@ -2069,6 +2080,7 @@
         "dispatchCancelled": "{{entity}} cancelled",
         "dispatchCheckedOut": "{{assignedUserName}} checked out",
         "dispatchDeparted": "{{assignedUserName}} departed",
+        "dispatchNoShow": "{{assignedUserName}} no-show",
         "invoiceIssued": "{{entity}} {{invoiceNumber}} issued for {{amount}}",
         "invoicePaid": "{{entity}} {{invoiceNumber}} paid",
         "noteAdded": "{{bodyExcerpt}}",
@@ -2085,9 +2097,11 @@
         "workItemUpdated": "{{entity}}: {{field}} changed",
         "workOrderArchived": "{{entity}} archived",
         "workOrderCancelled": "{{entity}} cancelled",
+        "workOrderCompleted": "{{entity}} completed",
         "workOrderCreated": "{{entity}} created",
         "workOrderUnarchived": "{{entity}} unarchived",
-        "workOrderUpdated": "{{field}} changed from {{fromValue}} to {{toValue}}"
+        "workOrderUpdated": "{{field}} changed from {{fromValue}} to {{toValue}}",
+        "workOrderUpdatedFieldOnly": "{{field}} changed"
       },
       "loadMore": "Load more",
       "loading": "Loading activity…",

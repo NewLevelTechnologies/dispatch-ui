@@ -11,6 +11,7 @@ import type {
   LocationActivityPage,
   ActivityWorkOrderRef,
   ServiceLocationAuditEntry,
+  FinancialActivityEvent,
 } from '../api';
 
 vi.mock('../api/client');
@@ -68,22 +69,38 @@ const auditEntry = (
   ...overrides,
 });
 
-/** Route the shared apiClient.get by URL: the audit stream, the location feed,
- * or the per-WO feed that powers group expansion. */
+const financialEvent = (
+  overrides: Partial<FinancialActivityEvent> = {}
+): FinancialActivityEvent => ({
+  id: 'f-1',
+  kind: 'INVOICE_PAID',
+  invoiceId: 'inv-1',
+  invoiceNumber: 'INV-1042',
+  workOrderId: null,
+  serviceLocationId: 'sl-1',
+  amount: '149.00',
+  actor: { userId: 'u-9', userName: 'Maria Chen' },
+  timestamp: '2026-06-03T14:03:00Z',
+  ...overrides,
+});
+
+/** Route the shared apiClient.get by URL across the live streams + the per-WO
+ * expansion feed. Defaults are empty so a test only sets the streams it cares
+ * about. */
 function mockFeeds(
   location: LocationActivityPage,
   perWo: ActivityPage = woPage([]),
-  audit: ServiceLocationAuditEntry[] = []
+  audit: ServiceLocationAuditEntry[] = [],
+  financial: FinancialActivityEvent[] = []
 ) {
-  vi.mocked(apiClient.get).mockImplementation((url: string) =>
-    Promise.resolve({
-      data: url.includes('/audit/')
-        ? audit
-        : url.includes('/locations/')
-          ? location
-          : perWo,
-    }) as ReturnType<typeof apiClient.get>
-  );
+  vi.mocked(apiClient.get).mockImplementation((url: string) => {
+    let data: unknown;
+    if (url.includes('/financial/')) data = financial;
+    else if (url.includes('/audit/')) data = audit;
+    else if (url.includes('/work-orders/locations/')) data = location;
+    else data = perWo; // /work-orders/{id}/activity — group expansion
+    return Promise.resolve({ data }) as ReturnType<typeof apiClient.get>;
+  });
 }
 
 describe('LocationActivityStream', () => {
@@ -265,9 +282,48 @@ describe('LocationActivityStream', () => {
 
     await waitFor(() => {
       const calls = vi.mocked(apiClient.get).mock.calls;
-      const last = calls[calls.length - 1];
-      const params = (last?.[1] as { params?: Record<string, unknown> })?.params;
-      expect(params).toMatchObject({ categories: 'NOTE' });
+      const sawNote = calls.some(
+        (c) => (c[1] as { params?: Record<string, unknown> })?.params?.categories === 'NOTE'
+      );
+      expect(sawNote).toBe(true);
+    });
+  });
+
+  it('drives the business classification from the toggle (BUSINESS → ALL)', async () => {
+    mockFeeds(locPage([]));
+    const user = userEvent.setup();
+    renderWithProviders(<LocationActivityStream serviceLocationId="sl-1" />);
+
+    await waitFor(() => {
+      const calls = vi.mocked(apiClient.get).mock.calls;
+      expect(
+        calls.some(
+          (c) =>
+            String(c[0]).includes('/work-orders/locations/') &&
+            (c[1] as { params?: Record<string, unknown> })?.params?.classification === 'BUSINESS'
+        )
+      ).toBe(true);
+    });
+
+    await user.click(screen.getByRole('checkbox'));
+
+    await waitFor(() => {
+      const calls = vi.mocked(apiClient.get).mock.calls;
+      expect(
+        calls.some(
+          (c) =>
+            String(c[0]).includes('/work-orders/locations/') &&
+            (c[1] as { params?: Record<string, unknown> })?.params?.classification === 'ALL'
+        )
+      ).toBe(true);
+    });
+  });
+
+  it('renders a financial milestone row from the financial stream', async () => {
+    mockFeeds(locPage([]), woPage([]), [], [financialEvent()]);
+    renderWithProviders(<LocationActivityStream serviceLocationId="sl-1" />);
+    await waitFor(() => {
+      expect(screen.getByText('Invoice INV-1042 paid · $149.00')).toBeInTheDocument();
     });
   });
 
@@ -276,10 +332,11 @@ describe('LocationActivityStream', () => {
     renderWithProviders(<LocationActivityStream serviceLocationId="sl-1" />);
     await waitFor(() => {
       const group = screen.getByRole('group', { name: 'Activity' });
-      // job → work orders, invoice → invoices (default glossary plurals)
+      // job → work orders, visit → dispatches, invoice → invoices, payment →
+      // payments (all default glossary plurals)
       expect(within(group).getByRole('button', { name: 'Work Orders' })).toBeInTheDocument();
       expect(within(group).getByRole('button', { name: 'Invoices' })).toBeInTheDocument();
-      expect(within(group).getByRole('button', { name: 'Visits' })).toBeInTheDocument();
+      expect(within(group).getByRole('button', { name: 'Dispatches' })).toBeInTheDocument();
       expect(within(group).getByRole('button', { name: 'Payments' })).toBeInTheDocument();
     });
   });
@@ -320,7 +377,63 @@ describe('LocationActivityStream', () => {
     await waitFor(() => {
       expect(screen.getByText('Premise Type changed')).toBeInTheDocument();
     });
-    expect(screen.getByText(/BUSINESS → RESIDENCE/)).toBeInTheDocument();
+    // Delta renders as styled spans (value / dimmed arrow / value), so the
+    // before and after are asserted separately rather than as one string.
+    expect(screen.getByText('BUSINESS')).toBeInTheDocument();
+    expect(screen.getByText('RESIDENCE')).toBeInTheDocument();
+  });
+
+  it('heads a multi-field audit row with the object touched, not a count', async () => {
+    mockFeeds(locPage([]), woPage([]), [
+      auditEntry({
+        action: 'UPDATE',
+        changes: [
+          { field: 'siteContactName', label: 'Site Contact Name', oldValue: 'Steve', newValue: 'Dana', sensitive: false },
+          { field: 'siteContactPhone', label: 'Site Contact Phone', oldValue: '555-1', newValue: '555-2', sensitive: false },
+        ],
+      }),
+    ]);
+    const user = userEvent.setup();
+    renderWithProviders(<LocationActivityStream serviceLocationId="sl-1" />);
+
+    await user.click(screen.getByRole('checkbox'));
+    await waitFor(() => {
+      expect(screen.getByText('Edited site contact')).toBeInTheDocument();
+    });
+    // The fields are named in the indented deltas; the header leads with the
+    // object, never a "Changed N fields" count.
+    expect(screen.getByText('Site Contact Name:')).toBeInTheDocument();
+    expect(screen.queryByText(/Changed \d+ field/)).not.toBeInTheDocument();
+  });
+
+  it('folds a same-actor toggle-and-undo into one reverted row', async () => {
+    mockFeeds(locPage([]), woPage([]), [
+      // Newest: the undo (Baba Yaba → Steve)
+      auditEntry({
+        id: 'a-undo',
+        timestamp: '2026-06-07T14:05:00Z',
+        changes: [
+          { field: 'siteContactName', label: 'Site Contact Name', oldValue: 'Baba Yaba', newValue: 'Steve', sensitive: false },
+        ],
+      }),
+      // Older, two minutes earlier: the edit (Steve → Baba Yaba)
+      auditEntry({
+        id: 'a-edit',
+        timestamp: '2026-06-07T14:03:00Z',
+        changes: [
+          { field: 'siteContactName', label: 'Site Contact Name', oldValue: 'Steve', newValue: 'Baba Yaba', sensitive: false },
+        ],
+      }),
+    ]);
+    const user = userEvent.setup();
+    renderWithProviders(<LocationActivityStream serviceLocationId="sl-1" />);
+
+    await user.click(screen.getByRole('checkbox'));
+    await waitFor(() => {
+      expect(screen.getByText('Edited and reverted Site Contact Name')).toBeInTheDocument();
+    });
+    // Collapsed to one row — the intermediate value isn't shown as a delta.
+    expect(screen.queryByText('Baba Yaba')).not.toBeInTheDocument();
   });
 
   it('shows only change rows under the Changes chip when audit is on', async () => {

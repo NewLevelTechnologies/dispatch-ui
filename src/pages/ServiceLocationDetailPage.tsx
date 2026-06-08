@@ -42,6 +42,7 @@ import {
   filesApi,
   locationFilesApi,
   activityApi,
+  financialActivityApi,
   FILE_MAX_BYTES,
   invoicesApi,
   InvoiceStatus,
@@ -69,8 +70,8 @@ import {
   type ListWorkOrdersParams,
 } from '../api';
 import { workOrdersListQueryOptions } from '../api/workOrdersListQuery';
-import { resolveEventSummary } from '../components/activityFormatters';
-import { ACTIVITY_TONE_STYLE, glyphFor } from '../lib/activityGlyph';
+import { buildRecentActivity } from '../lib/locationActivityRows';
+import { ACTIVITY_TONE_STYLE } from '../lib/activityGlyph';
 import { EMPTY_DATE_RANGE, instantRangeForDays, type DateRange } from '../lib/dateRangePresets';
 import { FilterChipListbox, ChipListboxOption } from '../components/ui/FilterChipListbox';
 import { DateRangeChip } from '../components/ui/DateRangeChip';
@@ -1312,10 +1313,10 @@ function techInitials(name: string): string {
 
 // Activity teaser — the overview answers "what's the state of this site," not
 // "what happened over time." Activity is an audit trail, not knowledge, so it's
-// a bounded peek at the operational feed: the 3 most recent events, not the
-// full log. The chronological feed lives on the Activity tab — don't grow this
-// past 3. Notes (knowledge) stays the prominent block above it. Shares the
-// glyph/tone mapping + summary resolution with the Activity tab.
+// a bounded peek at the operational feed: the 5 most recent events, not the
+// full log. The chronological feed lives on the Activity tab — keep this short.
+// Notes (knowledge) stays the prominent block above it. Shares the glyph/tone
+// mapping + summary resolution with the Activity tab.
 function ActivityTeaser({
   serviceLocationId,
   onViewActivity,
@@ -1325,12 +1326,25 @@ function ActivityTeaser({
 }) {
   const { t } = useTranslation();
   const { getName } = useGlossary();
-  const { data } = useQuery({
+  // Mirror the tab's default view: business (BUSINESS) + financial milestones,
+  // merged to the 5 most recent. Audit/communications are not part of the
+  // default surface.
+  const { data: businessData } = useQuery({
     queryKey: ['location-activity-teaser', serviceLocationId],
-    queryFn: () => activityApi.listForLocation(serviceLocationId, { limit: 3 }),
+    queryFn: () => activityApi.listForLocation(serviceLocationId, { limit: 5 }),
     enabled: !!serviceLocationId,
   });
-  const recent = data?.content ?? [];
+  const { data: financialData } = useQuery({
+    queryKey: ['location-financial-activity', serviceLocationId],
+    queryFn: () => financialActivityApi.getForLocation(serviceLocationId, 500),
+    enabled: !!serviceLocationId,
+  });
+  const recent = buildRecentActivity(
+    { events: businessData?.content ?? [], financial: financialData ?? [] },
+    t,
+    getName,
+    5
+  );
   if (recent.length === 0) return null;
   return (
     <div className="overflow-hidden rounded-[10px] border border-border bg-bg-elev shadow-sm">
@@ -1339,36 +1353,25 @@ function ActivityTeaser({
         <span className="grow" />
         <CardLink onClick={onViewActivity}>View activity →</CardLink>
       </div>
-      {recent.map((e, i) => {
-        const { glyph, tone } = glyphFor(e);
-        const s = ACTIVITY_TONE_STYLE[tone];
-        const sub = e.workOrder
-          ? e.workOrder.summary
-            ? `${e.workOrder.workOrderNumber} · ${e.workOrder.summary}`
-            : e.workOrder.workOrderNumber
-          : null;
+      {recent.map((item, i) => {
+        const s = ACTIVITY_TONE_STYLE[item.tone];
         return (
           <div
-            key={e.id}
+            key={item.id}
             className={`flex items-center gap-2.5 px-3.5 py-1.5 ${i < recent.length - 1 ? 'border-b border-border-soft' : ''}`}
           >
             <div
               className="flex size-[18px] shrink-0 items-center justify-center rounded text-[11px] font-bold"
               style={{ background: s.bg, color: s.fg }}
             >
-              {glyph}
+              {item.glyph}
             </div>
             <div className="flex min-w-0 flex-1 flex-wrap items-baseline gap-2">
-              <span className="text-[12.5px] font-medium text-fg-strong">
-                {resolveEventSummary(e, t, getName)}
-              </span>
-              {sub && <span className="text-[11px] text-fg-dim">· {sub}</span>}
+              <span className="text-[12.5px] font-medium text-fg-strong">{item.text}</span>
+              {item.obj && <span className="text-[11px] text-fg-dim">· {item.obj}</span>}
             </div>
-            <span
-              className="shrink-0 text-[11px] text-fg-dim"
-              title={formatExactTimestamp(e.timestamp)}
-            >
-              {formatTimestamp(e.timestamp)}
+            <span className="shrink-0 text-[11px] text-fg-dim" title={item.tsExact}>
+              {item.ts}
             </span>
           </div>
         );

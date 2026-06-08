@@ -14,6 +14,7 @@ export {
 export {
   activityApi,
   type ActivityCategory,
+  type ActivityClassification,
   type ActivityKind,
   type ActivityActor,
   type ActivityEvent,
@@ -217,6 +218,9 @@ export {
   quotesApi,
   paymentsApi,
   financialSummaryApi,
+  financialActivityApi,
+  type FinancialActivityEvent,
+  type FinancialActivityKind,
   InvoiceStatus,
   QuoteStatus,
   PaymentMethod,
