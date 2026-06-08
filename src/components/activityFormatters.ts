@@ -11,6 +11,7 @@ import type { ActivityEvent, ActivityKind } from '../api';
  */
 const KIND_TEMPLATE_KEYS: Record<ActivityKind, string> = {
   WORK_ORDER_CREATED: 'workOrders.activity.kind.workOrderCreated',
+  WORK_ORDER_COMPLETED: 'workOrders.activity.kind.workOrderCompleted',
   WORK_ORDER_UPDATED: 'workOrders.activity.kind.workOrderUpdated',
   WORK_ORDER_CANCELLED: 'workOrders.activity.kind.workOrderCancelled',
   WORK_ORDER_ARCHIVED: 'workOrders.activity.kind.workOrderArchived',
@@ -24,6 +25,7 @@ const KIND_TEMPLATE_KEYS: Record<ActivityKind, string> = {
   DISPATCH_ARRIVED: 'workOrders.activity.kind.dispatchArrived',
   DISPATCH_CHECKED_OUT: 'workOrders.activity.kind.dispatchCheckedOut',
   DISPATCH_CANCELLED: 'workOrders.activity.kind.dispatchCancelled',
+  DISPATCH_NO_SHOW: 'workOrders.activity.kind.dispatchNoShow',
   NOTE_ADDED: 'workOrders.activity.kind.noteAdded',
   NOTE_DELETED: 'workOrders.activity.kind.noteDeleted',
   QUOTE_SENT: 'workOrders.activity.kind.quoteSent',
@@ -49,6 +51,7 @@ export const FALLBACK_TEMPLATE_KEY = 'workOrders.activity.kind.unknown';
  */
 export const KIND_TO_ENTITY: Partial<Record<ActivityKind, string>> = {
   WORK_ORDER_CREATED: 'work_order',
+  WORK_ORDER_COMPLETED: 'work_order',
   WORK_ORDER_CANCELLED: 'work_order',
   WORK_ORDER_ARCHIVED: 'work_order',
   WORK_ORDER_UNARCHIVED: 'work_order',
@@ -143,12 +146,20 @@ export function getEventContext(event: ActivityEvent): string | null {
  *
  * Shared by both the per-WO rail (ActivityStream) and the location-scoped feed.
  */
+/**
+ * Past this length a field's before/after is free-text (a summary, note, or
+ * instruction) rather than an enum/date/code. Inlining "from … to …" for those
+ * blows the feed row out to multiple lines, so we drop the values and render a
+ * bare "{{field}} changed" — the backlinked object is the path to the full diff.
+ */
+const FIELD_DIFF_INLINE_MAX = 32;
+
 export function resolveEventSummary(
   event: ActivityEvent,
   t: (key: string, params?: Record<string, unknown>) => string,
   getName: (entityCode: string, plural?: boolean) => string
 ): string {
-  const templateKey = getEventTemplateKey(event.kind);
+  let templateKey = getEventTemplateKey(event.kind);
   const data = preFormatEventData(event);
   const entityCode = getEventEntityCode(event.kind);
   const entityFields = entityCode
@@ -156,6 +167,21 @@ export function resolveEventSummary(
     : {};
   if (typeof data.field === 'string' && data.field) {
     data.field = getFieldLabel(data.field, t, getName);
+  }
+  // WORK_ORDER_UPDATED is the one template that inlines the raw before/after.
+  // Keep the inline diff only when both values are present and short (enums,
+  // dates, codes); otherwise collapse to "{{field}} changed".
+  if (event.kind === 'WORK_ORDER_UPDATED') {
+    const from = data.fromValue ?? '';
+    const to = data.toValue ?? '';
+    const shortDiff =
+      from.length > 0 &&
+      to.length > 0 &&
+      from.length <= FIELD_DIFF_INLINE_MAX &&
+      to.length <= FIELD_DIFF_INLINE_MAX;
+    if (!shortDiff) {
+      templateKey = 'workOrders.activity.kind.workOrderUpdatedFieldOnly';
+    }
   }
   const rendered = t(templateKey, { ...data, ...entityFields });
   return rendered.includes('{{') ? t(FALLBACK_TEMPLATE_KEY) : rendered;

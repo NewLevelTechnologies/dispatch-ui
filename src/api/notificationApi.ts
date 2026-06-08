@@ -69,6 +69,7 @@ export interface UpdateNotificationPreferenceRequest {
 
 export interface NotificationLogsQueryParams {
   customerId?: string;
+  serviceLocationId?: string;
   entityType?: string;
   entityId?: string;
   status?: NotificationStatus;

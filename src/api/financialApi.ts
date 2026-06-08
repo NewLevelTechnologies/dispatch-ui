@@ -690,12 +690,51 @@ export const financialSummaryApi = {
   },
 };
 
+// ========== LOCATION FINANCIAL ACTIVITY ==========
+
+export type FinancialActivityKind = 'INVOICE_SENT' | 'INVOICE_PAID';
+
+/**
+ * A money milestone at a service location (invoice sent / paid). Standalone
+ * customer payments aren't here by design — INVOICE_PAID carries the location
+ * side. `workOrderId` (when present) groups the row under its work order; a
+ * null actor (or null userName) means a historical/system row → gear glyph.
+ * `amount` is a decimal string from the backend.
+ */
+export interface FinancialActivityEvent {
+  id: string;
+  kind: FinancialActivityKind;
+  invoiceId: string;
+  invoiceNumber: string;
+  workOrderId: string | null;
+  serviceLocationId: string;
+  amount: string;
+  actor: { userId: string; userName: string | null } | null;
+  timestamp: string;
+}
+
+export const financialActivityApi = {
+  /** Location-scoped financial milestones, newest-first. Fetched whole (no
+   * cursor); `limit` defaults to 100 server-side, max 500. */
+  getForLocation: async (
+    serviceLocationId: string,
+    limit?: number,
+  ): Promise<FinancialActivityEvent[]> => {
+    const response = await apiClient.get<FinancialActivityEvent[]>(
+      `/financial/locations/${serviceLocationId}/activity`,
+      { params: { limit } },
+    );
+    return response.data;
+  },
+};
+
 // Export combined API
 export const financialApi = {
   invoices: invoicesApi,
   quotes: quotesApi,
   payments: paymentsApi,
   summary: financialSummaryApi,
+  activity: financialActivityApi,
 };
 
 export default financialApi;

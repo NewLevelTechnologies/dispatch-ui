@@ -202,6 +202,16 @@ describe('ServiceLocationDetailPage', () => {
           },
         });
       }
+      // Activity-tab supplementary streams (financial milestones + comms logs);
+      // empty by default. Must precede the broader /financial/invoices branch.
+      if (url.includes('/financial/locations/')) {
+        return Promise.resolve({ data: [] });
+      }
+      if (url.includes('/notification-logs')) {
+        return Promise.resolve({
+          data: { content: [], totalElements: 0, totalPages: 0, number: 0, size: 20, first: true, last: true },
+        });
+      }
       // Order matters: the summary path is more specific than the list path.
       if (url.includes('/financial/invoices/summary')) {
         return Promise.resolve({ data: invoiceSummary });
