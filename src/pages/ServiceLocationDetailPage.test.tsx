@@ -225,6 +225,34 @@ describe('ServiceLocationDetailPage', () => {
           },
         });
       }
+      // Activity feed — both the location stream (Overview teaser + Activity
+      // tab) and the per-WO group-expansion feed. Must precede the generic
+      // /work-orders branch, which would otherwise return work-order rows.
+      if (url.includes('/work-orders') && url.includes('/activity')) {
+        return Promise.resolve({
+          data: {
+            content: [
+              {
+                id: 'act-1',
+                kind: 'WORK_ORDER_CREATED',
+                category: 'STATUS',
+                timestamp: '2026-05-01T10:00:00Z',
+                actor: { userId: 'u-1', userName: 'Test User' },
+                data: {},
+                workOrder: {
+                  id: 'wo-1',
+                  workOrderNumber: 'WO-1',
+                  summary: 'Test job',
+                  progressCategory: 'IN_PROGRESS',
+                  activityCount: 1,
+                },
+              },
+            ],
+            nextCursor: null,
+            hasMore: false,
+          },
+        });
+      }
       if (url.includes('/work-orders')) {
         return Promise.resolve({
           data: {

@@ -41,6 +41,7 @@ import {
   dispatchesApi,
   filesApi,
   locationFilesApi,
+  activityApi,
   FILE_MAX_BYTES,
   invoicesApi,
   InvoiceStatus,
@@ -68,6 +69,8 @@ import {
   type ListWorkOrdersParams,
 } from '../api';
 import { workOrdersListQueryOptions } from '../api/workOrdersListQuery';
+import { resolveEventSummary } from '../components/activityFormatters';
+import { ACTIVITY_TONE_STYLE, glyphFor } from '../lib/activityGlyph';
 import { EMPTY_DATE_RANGE, instantRangeForDays, type DateRange } from '../lib/dateRangePresets';
 import { FilterChipListbox, ChipListboxOption } from '../components/ui/FilterChipListbox';
 import { DateRangeChip } from '../components/ui/DateRangeChip';
@@ -82,7 +85,7 @@ import { extractApiError, showError, showInfo, showSuccess, showUndo } from '../
 import AppLayout from '../components/AppLayout';
 import EquipmentFormDialog from '../components/EquipmentFormDialog';
 import WorkOrderFormDialog from '../components/WorkOrderFormDialog';
-import NotificationLogsList from '../components/NotificationLogsList';
+import LocationActivityStream from '../components/LocationActivityStream';
 import LocationFilesTab from '../components/LocationFilesTab';
 import ServiceLocationContactDialog from '../components/ServiceLocationContactDialog';
 import NotificationPreferencesDialog from '../components/NotificationPreferencesDialog';
@@ -111,7 +114,6 @@ import { Tabs } from '../components/ui/Tabs';
 import type { ServiceLocationDetailDto, PremiseType, UpdateServiceLocationRequest } from '../api/customerApi';
 import {
   mockAttention,
-  mockActivityFeed,
   type MockTone,
 } from './serviceLocationDetailMocks';
 
@@ -342,11 +344,7 @@ export default function ServiceLocationDetailPage() {
           )}
 
           {activeTab === 'activity' && (
-            <Card title={t('serviceLocations.tabs.activity')} padding="none">
-              <div className="p-3.5">
-                <NotificationLogsList entityType="SERVICE_LOCATION" entityId={location.id} />
-              </div>
-            </Card>
+            <LocationActivityStream serviceLocationId={location.id} />
           )}
 
           <CloseFooter
@@ -882,7 +880,7 @@ function OverviewTab({
           <EquipmentSummaryCard equipment={equipment} onViewAll={onViewEquipment} />
           <SiteWorkOrdersCard location={location} onViewAll={onViewJobs} />
           <NotesCard location={location} canEdit={canEdit} />
-          <ActivityTeaser onViewActivity={onViewActivity} />
+          <ActivityTeaser serviceLocationId={location.id} onViewActivity={onViewActivity} />
         </div>
 
         {/* Right rail — reference / pre-arrival. (Tags live on the header
@@ -1312,68 +1310,70 @@ function techInitials(name: string): string {
   return ((parts[0]?.[0] ?? '') + (parts[1]?.[0] ?? '')).toUpperCase();
 }
 
-const ACTIVITY_GLYPH_STYLE: Record<MockTone, { bg: string; fg: string }> = {
-  info: { bg: 'var(--bg-active)', fg: 'var(--fg-muted)' },
-  success: { bg: 'color-mix(in oklch, var(--success-500) 14%, transparent)', fg: 'var(--success-500)' },
-  warning: { bg: 'color-mix(in oklch, var(--warning-500) 14%, transparent)', fg: 'var(--warning-fg)' },
-  accent: { bg: 'color-mix(in oklch, var(--accent-500) 14%, transparent)', fg: 'var(--accent-700)' },
-  neutral: { bg: 'var(--bg-active)', fg: 'var(--fg-muted)' },
-};
-
 // Activity teaser — the overview answers "what's the state of this site," not
 // "what happened over time." Activity is an audit trail, not knowledge, so it's
-// demoted to the single latest event one-liner; the full feed lives on the
-// Activity tab. (Still mock until a location-scoped operational feed exists.)
-// Bounded peek at the operational feed — the 3 most recent events, not the full
-// audit log. Activity is mostly disposable, so it doesn't earn a tall scrolling
-// card here; the chronological feed lives on the Activity tab. Don't grow this
-// past 3. Notes (knowledge) stays the prominent block above it.
-function ActivityTeaser({ onViewActivity }: { onViewActivity: () => void }) {
-  const recent = mockActivityFeed.slice(0, 3);
+// a bounded peek at the operational feed: the 3 most recent events, not the
+// full log. The chronological feed lives on the Activity tab — don't grow this
+// past 3. Notes (knowledge) stays the prominent block above it. Shares the
+// glyph/tone mapping + summary resolution with the Activity tab.
+function ActivityTeaser({
+  serviceLocationId,
+  onViewActivity,
+}: {
+  serviceLocationId: string;
+  onViewActivity: () => void;
+}) {
+  const { t } = useTranslation();
+  const { getName } = useGlossary();
+  const { data } = useQuery({
+    queryKey: ['location-activity-teaser', serviceLocationId],
+    queryFn: () => activityApi.listForLocation(serviceLocationId, { limit: 3 }),
+    enabled: !!serviceLocationId,
+  });
+  const recent = data?.content ?? [];
   if (recent.length === 0) return null;
   return (
     <div className="overflow-hidden rounded-[10px] border border-border bg-bg-elev shadow-sm">
       <div className="flex items-center gap-2 border-b border-border-soft px-3.5 py-2">
         <span className="text-[10px] font-semibold uppercase tracking-wider text-fg-dim">Recent activity</span>
-        <MockBadge />
         <span className="grow" />
         <CardLink onClick={onViewActivity}>View activity →</CardLink>
       </div>
       {recent.map((e, i) => {
-        const s = ACTIVITY_GLYPH_STYLE[e.tone];
+        const { glyph, tone } = glyphFor(e);
+        const s = ACTIVITY_TONE_STYLE[tone];
+        const sub = e.workOrder
+          ? e.workOrder.summary
+            ? `${e.workOrder.workOrderNumber} · ${e.workOrder.summary}`
+            : e.workOrder.workOrderNumber
+          : null;
         return (
           <div
-            key={e.at}
+            key={e.id}
             className={`flex items-center gap-2.5 px-3.5 py-1.5 ${i < recent.length - 1 ? 'border-b border-border-soft' : ''}`}
           >
             <div
               className="flex size-[18px] shrink-0 items-center justify-center rounded text-[11px] font-bold"
               style={{ background: s.bg, color: s.fg }}
             >
-              {e.glyph}
+              {glyph}
             </div>
             <div className="flex min-w-0 flex-1 flex-wrap items-baseline gap-2">
-              <span className="text-[12.5px] font-medium text-fg-strong">{e.text}</span>
-              <span className="text-[11px] text-fg-dim">· {e.sub}</span>
+              <span className="text-[12.5px] font-medium text-fg-strong">
+                {resolveEventSummary(e, t, getName)}
+              </span>
+              {sub && <span className="text-[11px] text-fg-dim">· {sub}</span>}
             </div>
-            <span className="shrink-0 text-[11px] text-fg-dim">{formatTimestamp(e.at)}</span>
+            <span
+              className="shrink-0 text-[11px] text-fg-dim"
+              title={formatExactTimestamp(e.timestamp)}
+            >
+              {formatTimestamp(e.timestamp)}
+            </span>
           </div>
         );
       })}
     </div>
-  );
-}
-
-// Small "MOCK" badge for cards backed entirely by placeholder data, so reviewers
-// can tell at a glance which sections are awaiting a backend.
-function MockBadge() {
-  return (
-    <span
-      title="Placeholder data — awaiting backend"
-      className="rounded bg-bg-active px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-fg-dim"
-    >
-      Mock
-    </span>
   );
 }
 

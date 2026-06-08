@@ -8,6 +8,7 @@ import {
 } from '../api';
 import { useGlossary } from '../contexts/GlossaryContext';
 import { formatExactTimestamp, formatTimestamp } from '../lib/formatTimestamp';
+import { getDayBucket } from '../lib/activityDayBucket';
 import { Text } from './catalyst/text';
 import {
   ChatBubbleLeftEllipsisIcon,
@@ -19,18 +20,13 @@ import {
 import {
   CATEGORY_ICON_KEY,
   getEventContext,
-  getEventEntityCode,
-  getEventTemplateKey,
-  getFieldLabel,
-  preFormatEventData,
+  resolveEventSummary,
 } from './activityFormatters';
 
 // 25 fits the rail's role as a side surface — top events answer the glance-case;
 // deeper history pages in invisibly via the IntersectionObserver sentinel. Backend
 // default is 50; we override deliberately to keep initial paint light.
 const PAGE_SIZE = 25;
-const DAY_MS = 24 * 3600 * 1000;
-const WEEK_MS = 7 * DAY_MS;
 
 interface Props {
   workOrderId: string;
@@ -196,38 +192,6 @@ export default function ActivityStream({ workOrderId }: Props) {
   );
 }
 
-interface DayBucket {
-  /** Stable key for grouping (e.g. "today", "yesterday", "older-2026-3-15"). */
-  key: string;
-  /** Human-readable label rendered in the day header. */
-  label: string;
-}
-
-function getDayBucket(iso: string, t: (key: string) => string): DayBucket {
-  const eventDate = new Date(iso);
-  const startOfDay = (date: Date) =>
-    new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
-  const todayStart = startOfDay(new Date());
-  const eventStart = startOfDay(eventDate);
-  const diff = todayStart - eventStart;
-
-  if (diff === 0) return { key: 'today', label: t('workOrders.activity.day.today') };
-  if (diff === DAY_MS) {
-    return { key: 'yesterday', label: t('workOrders.activity.day.yesterday') };
-  }
-  if (diff > 0 && diff < WEEK_MS) {
-    return { key: 'thisWeek', label: t('workOrders.activity.day.thisWeek') };
-  }
-  // Older — bucket per calendar day; label is the formatted date
-  const key = `older-${eventDate.getFullYear()}-${eventDate.getMonth()}-${eventDate.getDate()}`;
-  const label = eventDate.toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-  });
-  return { key, label };
-}
-
 function renderEventGroups(
   events: ActivityEvent[],
   t: (key: string, params?: Record<string, unknown>) => string
@@ -259,28 +223,7 @@ function DayHeader({ label }: { label: string }) {
 function ActivityRow({ event }: { event: ActivityEvent }) {
   const { t } = useTranslation();
   const { getName } = useGlossary();
-  const templateKey = getEventTemplateKey(event.kind);
-  const data = preFormatEventData(event);
-  // Resolve {{entity}} / {{entities}} placeholders in templates from the glossary
-  // so tenant renames ("Work Order" → "Job", "Dispatch" → "Service Call") render
-  // correctly in the activity feed.
-  const entityCode = getEventEntityCode(event.kind);
-  const entityFields = entityCode
-    ? { entity: getName(entityCode), entities: getName(entityCode, true) }
-    : {};
-  // Diff-style events ship a raw field key (e.g. `workOrderTypeId`); swap it
-  // for the user-facing label so CSRs read "Type" not the backend column name.
-  if (typeof data.field === 'string' && data.field) {
-    data.field = getFieldLabel(data.field, t, getName);
-  }
-  const rendered = t(templateKey, { ...data, ...entityFields });
-  // Defensive: if the backend sent an event with missing data fields, the i18n
-  // template renders raw "{{placeholder}}" tokens. Don't leak that to users —
-  // fall back to the unknown-activity label so the row reads as informational
-  // rather than broken.
-  const summary = rendered.includes('{{')
-    ? t('workOrders.activity.kind.unknown')
-    : rendered;
+  const summary = resolveEventSummary(event, t, getName);
   const rawActorName = event.actor?.userName?.trim();
   const isMeaningfulActor =
     !!rawActorName && rawActorName.toLowerCase() !== 'unknown';
