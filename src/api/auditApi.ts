@@ -86,6 +86,16 @@ export interface ServiceLocationAuditEntry {
   action: 'CREATE' | 'UPDATE' | 'DELETE';
   changes: AuditFieldChange[];
   timestamp: string;
+  /**
+   * True when this entry returns its field(s) to the value they held before a
+   * recent same-actor edit — a toggle-and-undo that nets to no change. The
+   * server detects these (cross-page and multi-field aware, within a tunable
+   * window); the undone edit is `revertsEntryId`. The UI folds the pair into a
+   * single "edited and reverted" row so net no-ops don't take two lines.
+   */
+  netNoOp?: boolean;
+  /** Id of the earlier entry this one reverts. Set iff `netNoOp` is true. */
+  revertsEntryId?: string | null;
 }
 
 export const auditApi = {

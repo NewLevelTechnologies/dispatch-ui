@@ -66,6 +66,8 @@ const auditEntry = (
     },
   ],
   timestamp: '2026-06-07T14:03:00Z',
+  netNoOp: false,
+  revertsEntryId: null,
   ...overrides,
 });
 
@@ -406,17 +408,19 @@ describe('LocationActivityStream', () => {
     expect(screen.queryByText(/Changed \d+ field/)).not.toBeInTheDocument();
   });
 
-  it('folds a same-actor toggle-and-undo into one reverted row', async () => {
+  it('folds a backend-flagged reversal (netNoOp) into one expandable row', async () => {
     mockFeeds(locPage([]), woPage([]), [
-      // Newest: the undo (Baba Yaba → Steve)
+      // The undo carries netNoOp + points at the edit it reverts.
       auditEntry({
         id: 'a-undo',
         timestamp: '2026-06-07T14:05:00Z',
+        netNoOp: true,
+        revertsEntryId: 'a-edit',
         changes: [
           { field: 'siteContactName', label: 'Site Contact Name', oldValue: 'Baba Yaba', newValue: 'Steve', sensitive: false },
         ],
       }),
-      // Older, two minutes earlier: the edit (Steve → Baba Yaba)
+      // The original edit — folded into the row above, not shown standalone.
       auditEntry({
         id: 'a-edit',
         timestamp: '2026-06-07T14:03:00Z',
@@ -432,8 +436,15 @@ describe('LocationActivityStream', () => {
     await waitFor(() => {
       expect(screen.getByText('Edited and reverted Site Contact Name')).toBeInTheDocument();
     });
-    // Collapsed to one row — the intermediate value isn't shown as a delta.
+    // One row, collapsed by default — neither step's delta is shown yet.
     expect(screen.queryByText('Baba Yaba')).not.toBeInTheDocument();
+
+    // Expanding reveals both steps (the edit and the undo).
+    await user.click(screen.getByRole('button', { expanded: false }));
+    await waitFor(() => {
+      expect(screen.getAllByText('Baba Yaba').length).toBeGreaterThan(0);
+    });
+    expect(screen.getAllByText('Steve').length).toBeGreaterThan(0);
   });
 
   it('shows only change rows under the Changes chip when audit is on', async () => {
