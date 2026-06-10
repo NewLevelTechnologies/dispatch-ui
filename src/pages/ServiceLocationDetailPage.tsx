@@ -28,6 +28,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { BellIcon as BellSolidIcon } from '@heroicons/react/24/solid';
 import {
+  agreementApi,
   customerApi,
   dispatchRegionApi,
   equipmentApi,
@@ -2602,8 +2603,6 @@ function ParentCustomerCard({ location }: { location: ServiceLocationDetailDto }
   // balance block consumes the FIN-2 financial-service reads
   // (customerOutstandingBalance + this site's open-invoice total/count); it
   // renders only once finance ships those fields and stays hidden until then.
-  // Agreement coverage below is MOCKED — there's no agreement service yet, but
-  // one is planned, so the line is kept and stubbed rather than cut.
   const { getName } = useGlossary();
   const termsDays = location.customerPaymentTermsDays;
 
@@ -2613,8 +2612,15 @@ function ParentCustomerCard({ location }: { location: ServiceLocationDetailDto }
   const hasFinance =
     typeof customerBalance === 'number' || typeof siteOpenAmount === 'number';
 
-  // MOCK — drop this stub once the agreements feature ships and rides the payload.
-  const agreement = { id: 'SA-018', name: 'Critical equipment monitoring', sla: '2h response · 4h on-site' };
+  // REAL coverage — agreements whose active coverage includes THIS location
+  // (reverse lookup: GET /work-orders/agreements?serviceLocationId=). Empty/404
+  // → no line. Defaults to CONTRACT, which is right for a "Billed to" card.
+  const { data: coveringAgreements } = useQuery({
+    queryKey: ['agreements', { serviceLocationId: location.id }],
+    queryFn: () => agreementApi.list({ serviceLocationId: location.id }),
+    enabled: Boolean(location.id),
+  });
+  const primaryAgreement = coveringAgreements?.[0];
 
   return (
     <Card
@@ -2656,12 +2662,22 @@ function ParentCustomerCard({ location }: { location: ServiceLocationDetailDto }
         </div>
       )}
 
-      {/* MOCK agreement coverage — kept pending the agreements feature. */}
-      <div className="mt-2 border-t border-dashed border-border-soft pt-2 text-[11.5px] text-fg-muted">
-        Agreement <span className="font-mono text-fg-strong">{agreement.id}</span> covers this site
-        <br />
-        <span className="text-fg">{agreement.name}</span> · {agreement.sla}
-      </div>
+      {primaryAgreement && (
+        <div className="mt-2 border-t border-border-soft pt-2 text-[11.5px] text-fg-muted">
+          Covered by{' '}
+          <Link
+            to={`/agreements/${primaryAgreement.id}`}
+            className="font-mono font-medium text-fg-strong hover:text-fg-accent"
+          >
+            {primaryAgreement.agreementNumber}
+          </Link>
+          {' · '}
+          <span className="text-fg">{primaryAgreement.name}</span>
+          {coveringAgreements && coveringAgreements.length > 1 && (
+            <span className="text-fg-dim"> · +{coveringAgreements.length - 1} more</span>
+          )}
+        </div>
+      )}
     </Card>
   );
 }

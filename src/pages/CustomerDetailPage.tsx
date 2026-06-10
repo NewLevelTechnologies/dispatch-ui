@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { useParams, useNavigate, useLocation, Link as RouterLink } from 'react-router-dom';
+import { useParams, useNavigate, useLocation, useSearchParams, Link as RouterLink } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import {
@@ -7,6 +7,7 @@ import {
   notificationApi,
   dispatchRegionApi,
   equipmentApi,
+  agreementApi,
   EquipmentStatus,
   type Equipment,
   type EquipmentSummary,
@@ -17,6 +18,7 @@ import AppLayout from '../components/AppLayout';
 import CustomerFormDialog from '../components/CustomerFormDialog';
 import WorkOrderFormDialog from '../components/WorkOrderFormDialog';
 import EquipmentFormDialog from '../components/EquipmentFormDialog';
+import CustomerAgreementsTab from '../components/CustomerAgreementsTab';
 import EquipmentThumbnail from '../components/EquipmentThumbnail';
 import AdditionalContactsList from '../components/AdditionalContactsList';
 import WorkOrdersList from '../components/WorkOrdersList';
@@ -47,7 +49,9 @@ import {
   EllipsisVerticalIcon,
 } from '@heroicons/react/24/outline';
 
-type TabId = 'overview' | 'work-orders' | 'financial' | 'equipment' | 'activity';
+type TabId = 'overview' | 'work-orders' | 'financial' | 'equipment' | 'agreements' | 'activity';
+
+const VALID_TAB_IDS: TabId[] = ['overview', 'work-orders', 'financial', 'equipment', 'agreements', 'activity'];
 
 export default function CustomerDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -55,7 +59,13 @@ export default function CustomerDetailPage() {
   const { key: routeKey } = useLocation();
   const { t } = useTranslation();
   const { getName } = useGlossary();
-  const [activeTab, setActiveTab] = useState<TabId>('overview');
+  const [searchParams] = useSearchParams();
+  // Honor a ?tab= deep link (e.g. the agreement detail page's back-link returns
+  // to the customer's Agreements tab). Falls back to overview for unknown values.
+  const tabParam = searchParams.get('tab');
+  const initialTab: TabId =
+    tabParam && (VALID_TAB_IDS as string[]).includes(tabParam) ? (tabParam as TabId) : 'overview';
+  const [activeTab, setActiveTab] = useState<TabId>(initialTab);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
 
   // Return to wherever we came from (could be the WO detail, service location, etc.).
@@ -88,6 +98,14 @@ export default function CustomerDetailPage() {
   const { data: workOrdersData } = useQuery(
     workOrdersListQueryOptions({ customerId: customer?.id ?? '' })
   );
+
+  // Service agreements for this customer — drives the Agreements tab count; the
+  // tab body shares this cache (same query key → one request).
+  const { data: agreementsData } = useQuery({
+    queryKey: ['agreements', { customerId: id }],
+    queryFn: () => agreementApi.list({ customerId: id! }),
+    enabled: !!id,
+  });
 
   // Equipment scoped to the customer (across all their service locations).
   const { data: equipmentPage, isLoading: equipmentLoading, error: equipmentError } = useQuery({
@@ -350,6 +368,7 @@ export default function CustomerDetailPage() {
     { id: 'work-orders', label: getName('work_order', true), count: workOrdersData?.totalElements ?? 0 },
     { id: 'financial', label: t('customers.tabs.financial'), count: undefined },
     { id: 'equipment', label: getName('equipment'), count: equipmentPage?.totalElements ?? 0 },
+    { id: 'agreements', label: getName('agreement', true), count: agreementsData?.length ?? 0 },
     { id: 'activity', label: t('customers.tabs.activity'), count: undefined },
   ];
   const tabs = isBillingOnly
@@ -526,6 +545,8 @@ export default function CustomerDetailPage() {
               )}
 
               {activeTab === 'equipment' && equipmentTabContent}
+
+              {activeTab === 'agreements' && <CustomerAgreementsTab customerId={customer.id} />}
 
               {activeTab === 'activity' && (
                 <div className="rounded-lg border border-zinc-200 p-3 dark:border-zinc-800">
@@ -805,6 +826,8 @@ export default function CustomerDetailPage() {
         )}
 
         {activeTab === 'equipment' && equipmentTabContent}
+
+        {activeTab === 'agreements' && <CustomerAgreementsTab customerId={customer.id} />}
 
         {activeTab === 'activity' && (
           <div className="rounded-lg border border-zinc-200 p-3 dark:border-zinc-800">

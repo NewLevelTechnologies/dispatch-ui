@@ -270,6 +270,8 @@ vi.mock('react-i18next', () => {
     'dashboard.stats.thisMonth': 'This month',
     'dashboard.stats.totalCustomers': 'Total customers',
     'dashboard.welcome': 'Welcome to Dispatch',
+    'entities.agreement': 'Agreement',
+    'entities.agreements': 'Agreements',
     'entities.customer': 'Customer',
     'entities.customers': 'Customers',
     'entities.dashboard': 'Dashboard',

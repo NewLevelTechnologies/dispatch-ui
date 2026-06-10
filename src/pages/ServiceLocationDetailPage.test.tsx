@@ -263,6 +263,28 @@ describe('ServiceLocationDetailPage', () => {
           },
         });
       }
+      // Agreements covering this location (reverse lookup). Must precede the
+      // generic /work-orders branch, which would otherwise return WO rows.
+      if (url.startsWith('/work-orders/agreements')) {
+        return Promise.resolve({
+          data: [
+            {
+              id: 'agr-1',
+              agreementNumber: 'SA-00042',
+              name: 'Quarterly PM — Retail',
+              status: 'ACTIVE',
+              kind: 'VISIT',
+              classification: 'CONTRACT',
+              customer: { id: 'customer-1', name: 'Test Customer' },
+              termStart: null,
+              termEnd: null,
+              autoRenew: false,
+              createdAt: '2026-01-01T00:00:00Z',
+              updatedAt: '2026-01-01T00:00:00Z',
+            },
+          ],
+        });
+      }
       if (url.includes('/work-orders')) {
         return Promise.resolve({
           data: {
@@ -547,6 +569,17 @@ describe('ServiceLocationDetailPage', () => {
     });
     const customerLink = screen.getByRole('link', { name: /open customer/i });
     expect(customerLink).toHaveAttribute('href', '/customers/customer-1');
+  });
+
+  it('shows the covering service agreement on the Billed to card', async () => {
+    mockApiResponses();
+    renderDetailPage();
+    await waitFor(() => {
+      expect(screen.getByText('Main Office')).toBeInTheDocument();
+    });
+    const agreementLink = await screen.findByRole('link', { name: 'SA-00042' });
+    expect(agreementLink).toHaveAttribute('href', '/agreements/agr-1');
+    expect(screen.getByText('Quarterly PM — Retail')).toBeInTheDocument();
   });
 
   // ── Overview content ──────────────────────────────────────────────────
