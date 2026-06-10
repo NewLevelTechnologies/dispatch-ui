@@ -388,6 +388,8 @@
     "welcome": "Welcome to Dispatch"
   },
   "entities": {
+    "agreement": "Agreement",
+    "agreements": "Agreements",
     "customer": "Customer",
     "customers": "Customers",
     "dashboard": "Dashboard",

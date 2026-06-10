@@ -136,6 +136,36 @@ export {
   type SortDirection
 } from './workOrderApi';
 
+// Service Agreement API (recurring scheduled work — work-order-service)
+export {
+  agreementApi,
+  type AgreementKind,
+  type AgreementClassification,
+  type AgreementStatus,
+  type CadenceUnit,
+  type BillingMode,
+  type CoverageSelectorMode,
+  type CoverageMembershipSource,
+  type AgreementVisitStatus,
+  type AgreementVisitsWhen,
+  type VisitScopeItem,
+  type VisitTemplateResponse,
+  type AgreementCustomerRef,
+  type AgreementResponse,
+  type AgreementSummaryResponse,
+  type CreateAgreementRequest,
+  type UpdateAgreementRequest,
+  type CreateVisitTemplateRequest,
+  type UpdateVisitTemplateRequest,
+  type CoverageMembership,
+  type CoverageResponse,
+  type UpdateCoverageSelectorRequest,
+  type AddCoverageLocationsRequest,
+  type AgreementVisitResponse,
+  type AgreementComplianceSummary,
+  type BillingScheduleResponse,
+} from './agreementApi';
+
 // Equipment APIs
 export {
   equipmentApi,

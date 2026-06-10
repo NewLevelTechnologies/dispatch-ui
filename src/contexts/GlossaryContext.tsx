@@ -21,6 +21,7 @@ import type { Glossary, GlossaryEntry } from '../api';
  * Exported for test mocking (DRY - single source of truth).
  */
 export const GLOSSARY_DEFAULTS: Record<string, GlossaryEntry> = {
+  agreement: { singular: 'Agreement', plural: 'Agreements' },
   customer: { singular: 'Customer', plural: 'Customers' },
   dispatch: { singular: 'Dispatch', plural: 'Dispatches' },
   division: { singular: 'Division', plural: 'Divisions' },
