@@ -46,6 +46,13 @@ export interface TenantSettings {
   enableOnlineBooking: boolean;
   enableSmsNotifications: boolean;
   enableEmailNotifications: boolean;
+  // Tenant-wide master switch for outbound customer/technician email & SMS.
+  // When false, notification-service suppresses every external send (logging
+  // each recipient as SUPPRESSED) — used to load real customer data and explore
+  // the app without contacting anyone. Defaults ON; backfilled for all tenants,
+  // so always present. The per-channel sms/email flags above are dormant and
+  // independent of this switch — don't wire them together.
+  enableExternalNotifications: boolean;
   // Tenant-wide AI feature switch. New optional field — absent on older
   // responses, so the UI treats undefined as off.
   enableAiFeatures?: boolean;
@@ -74,6 +81,7 @@ export interface UpdateTenantSettingsRequest {
   enableOnlineBooking?: boolean;
   enableSmsNotifications?: boolean;
   enableEmailNotifications?: boolean;
+  enableExternalNotifications?: boolean;
   enableAiFeatures?: boolean;
   defaultPremiseType?: PremiseType;
   glossary?: Glossary; // Glossary can be updated
