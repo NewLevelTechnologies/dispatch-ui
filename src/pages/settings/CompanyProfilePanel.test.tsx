@@ -37,6 +37,7 @@ const mockSettings = {
   enableOnlineBooking: true,
   enableSmsNotifications: false,
   enableEmailNotifications: true,
+  enableExternalNotifications: true,
   enableAiFeatures: true,
   defaultPremiseType: 'BUSINESS',
   glossary: {},
@@ -203,6 +204,43 @@ describe('CompanyProfilePanel', () => {
       expect.anything(),
       expect.not.objectContaining({ timezone: expect.anything() }),
     );
+  });
+
+  it('toggles external notifications, warns on OFF, and saves only that field', async () => {
+    const user = userEvent.setup();
+    vi.mocked(apiClient.put).mockResolvedValue({
+      data: { ...mockSettings, enableExternalNotifications: false },
+    });
+    renderWithProviders(<CompanyProfilePanel />);
+    await waitFor(() => expect(screen.getByText('Acme HVAC')).toBeInTheDocument());
+
+    // Notifications is the fifth (last) Edit button.
+    await user.click(editButtons()[4]);
+    await user.click(screen.getByRole('switch'));
+    // Flipping OFF surfaces the suppression warning before saving.
+    expect(screen.getByText(/will be suppressed/i)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /save changes/i }));
+
+    await waitFor(() => {
+      expect(apiClient.put).toHaveBeenCalledWith(
+        expect.stringContaining('/tenant'),
+        expect.objectContaining({ enableExternalNotifications: false }),
+      );
+    });
+    // Partial PUT — unrelated fields (e.g. the AI flag) aren't sent.
+    expect(apiClient.put).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.not.objectContaining({ enableAiFeatures: expect.anything() }),
+    );
+  });
+
+  it('surfaces a warning in view mode when external notifications are off', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({
+      data: { ...mockSettings, enableExternalNotifications: false },
+    });
+    renderWithProviders(<CompanyProfilePanel />);
+    await waitFor(() => expect(screen.getByText('Acme HVAC')).toBeInTheDocument());
+    expect(screen.getByText(/aren't receiving any notifications/i)).toBeInTheDocument();
   });
 
   it('shows loading state while fetching', () => {

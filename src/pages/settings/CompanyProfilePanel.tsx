@@ -125,6 +125,7 @@ export default function CompanyProfilePanel() {
           <OperatingCard settings={settings} canEdit={canEdit} />
           <BrandingCard settings={settings} canEdit={canEdit} />
           <AiFeaturesCard settings={settings} canEdit={canEdit} />
+          <NotificationsCard settings={settings} canEdit={canEdit} />
         </div>
       )}
     </>
@@ -545,6 +546,102 @@ function AiFeaturesCard({ settings, canEdit }: { settings: TenantSettings; canEd
       ) : (
         <div className="grid grid-cols-1 gap-x-6 gap-y-3.5 sm:grid-cols-2">
           <Kv label="AI features">{current ? 'Enabled' : 'Disabled'}</Kv>
+        </div>
+      )}
+    </EditableCard>
+  );
+}
+
+// ──────────────────────────────────────────────────────────────────
+// Card — Notifications (tenant-wide external email/SMS master switch)
+//
+// Single boolean ridden onto PUT /tenant-settings. When OFF, notification-
+// service suppresses every outbound email/SMS to customers and technicians
+// (in-app streams are unaffected) — the intended use is loading real customer
+// data while exploring the app without contacting anyone. Defaults ON; the
+// OFF state is surfaced loudly (a warning Callout) in both view and edit mode
+// since a silent suppression is a high-consequence, easy-to-forget state.
+// ──────────────────────────────────────────────────────────────────
+function NotificationsCard({ settings, canEdit }: { settings: TenantSettings; canEdit: boolean }) {
+  const queryClient = useQueryClient();
+  const [editing, setEditing] = useState(false);
+  const current = settings.enableExternalNotifications;
+  const [enabled, setEnabled] = useState(current);
+
+  useEffect(() => {
+    if (!editing) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setEnabled(current);
+    }
+  }, [current, editing]);
+
+  const dirty = enabled !== current;
+
+  const saveMutation = useMutation({
+    mutationFn: () => tenantSettingsApi.updateSettings({ enableExternalNotifications: enabled }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tenant-settings'] });
+      setEditing(false);
+      showSuccess('Notification settings saved');
+    },
+    onError: (err: unknown) => showError("Couldn't save changes", extractApiError(err)),
+  });
+
+  const handleCancel = () => {
+    setEnabled(current);
+    setEditing(false);
+  };
+
+  return (
+    <EditableCard
+      title="Notifications"
+      subtitle="Control whether the app sends email and SMS to your customers and technicians."
+      editing={editing}
+      onEdit={canEdit ? () => setEditing(true) : () => {}}
+      onCancel={handleCancel}
+      onSave={() => saveMutation.mutate()}
+      saving={saveMutation.isPending}
+      saveDisabled={!dirty || saveMutation.isPending}
+    >
+      {editing ? (
+        <div className="flex flex-col gap-3">
+          {/* Toggle-row scale mirrors the AI features card. */}
+          <div className="flex max-w-[460px] items-start justify-between gap-6">
+            <div className="min-w-0">
+              <div className="text-[13px] font-semibold text-fg-strong">
+                Send external notifications (email/SMS)
+              </div>
+              <div className="mt-0.5 text-[12px] text-fg-muted">
+                When off, customers and technicians won't receive any emails or texts. Use this
+                while exploring the app with real data.
+              </div>
+            </div>
+            <Switch
+              checked={enabled}
+              onChange={setEnabled}
+              disabled={!canEdit}
+              aria-label="Send external notifications"
+              className="mt-0.5 shrink-0"
+            />
+          </div>
+          {!enabled && (
+            <Callout kind="warning" className="max-w-[560px]">
+              All outbound email and SMS will be suppressed for every customer and technician.
+              In-app notifications are unaffected.
+            </Callout>
+          )}
+        </div>
+      ) : (
+        <div className="flex flex-col gap-3">
+          <div className="grid grid-cols-1 gap-x-6 gap-y-3.5 sm:grid-cols-2">
+            <Kv label="External notifications">{current ? 'Enabled' : 'Disabled'}</Kv>
+          </div>
+          {!current && (
+            <Callout kind="warning" className="max-w-[560px]">
+              External email and SMS are turned off — customers and technicians aren't receiving
+              any notifications.
+            </Callout>
+          )}
         </div>
       )}
     </EditableCard>
