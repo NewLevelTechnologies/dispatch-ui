@@ -415,6 +415,28 @@
   background: var(--bg-elev);
 }
 
+/* Live / escalation row tints — in-progress or on-site reads "live" (info);
+   an overdue visit or an unscheduled urgent job is the escalation signal
+   (warning). Opt-in via a row class so the detail-page tables keep the
+   at-a-glance signal the lists don't need. Declared BEFORE the hover rule so
+   hover still gives feedback on desktop; `urgent` (below) still wins over both.
+   On mobile the cells go transparent, so the row itself carries the wash for a
+   clean full-card tint (handled in the row-as-card block). */
+.dense-table tbody tr.row-live td { background: color-mix(in oklch, var(--info-500) 6%, var(--bg-elev)); }
+.dense-table tbody tr.row-warn td { background: color-mix(in oklch, var(--warning-500) 7%, var(--bg-elev)); }
+
+/* Section-band rows inside a dense table (e.g. equipment type groups:
+   "HVAC 3"). Opt the row out of cell + card styling so it reads as a band, not
+   data — the higher-specificity selector overrides the base td bg/padding on
+   desktop, and a mobile rule keeps it a full-width band instead of reflowing
+   into a card. */
+.dense-table tbody tr.dense-group-header td {
+  background: var(--bg-elev-2);
+  padding: 6px 14px;
+  border-top: 1px solid var(--border-soft);
+  border-bottom: 1px solid var(--border-soft);
+}
+
 /* Sticky-left first column when the card scrolls horizontally. Carries
    the row's primary identifier so the user always knows which row
    they're on even when scrolled past the right-edge columns. The thead
@@ -560,6 +582,43 @@
      stack inside the title slot. */
   .dense-table tbody tr:hover td { background: transparent; }
   .dense-table tbody tr:active { background: var(--bg-hover); }
+
+  /* Cells are transparent in the card layout, so the tint rides the row to
+     wash the whole card (incl. the grid gutters), not just the cell boxes. */
+  .dense-table tbody tr.row-live { background: color-mix(in oklch, var(--info-500) 6%, var(--bg-elev)); }
+  .dense-table tbody tr.row-warn { background: color-mix(in oklch, var(--warning-500) 7%, var(--bg-elev)); }
+
+  /* Keep group-header bands full-width instead of reflowing into a card. */
+  .dense-table tbody tr.dense-group-header { display: block; padding: 0; background: transparent; }
+}
+
+/* ── Activity timeline row ──────────────────────────────────────────
+   glyph | actor | event | time on desktop. On mobile the actor + time
+   columns squeezed the event into a sliver, so the row restructures: glyph +
+   event run full-width on line 1, and actor + time drop to a muted meta line
+   below (the day-group header already carries the date). Children are placed by
+   source order — glyph, actor, event, time. */
+.activity-row {
+  display: grid;
+  grid-template-columns: 22px 150px 1fr auto;
+  gap: 10px;
+  align-items: center;
+  padding: 9px 14px;
+}
+@media (max-width: 639px) {
+  .activity-row {
+    grid-template-columns: 22px 1fr auto;
+    grid-template-areas:
+      "glyph event event"
+      ".     actor time";
+    align-items: start;
+    column-gap: 10px;
+    row-gap: 3px;
+  }
+  .activity-row > :nth-child(1) { grid-area: glyph; }
+  .activity-row > :nth-child(2) { grid-area: actor; }
+  .activity-row > :nth-child(3) { grid-area: event; }
+  .activity-row > :nth-child(4) { grid-area: time; justify-self: end; }
 }
 
 /* ── Buttons ────────────────────────────────────────────────────── */
