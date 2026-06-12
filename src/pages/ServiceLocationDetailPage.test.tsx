@@ -872,16 +872,14 @@ describe('ServiceLocationDetailPage', () => {
 
       await waitFor(() => expect(screen.getByText('WO-1000')).toBeInTheDocument());
       expect(screen.queryByText('WO-1029')).not.toBeInTheDocument();
-      expect(screen.getByText('1 / 2')).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: 'Page 2' })).toBeInTheDocument();
 
-      await user.click(screen.getByRole('button', { name: 'Next' }));
+      await user.click(screen.getByRole('link', { name: 'Next page' }));
       await waitFor(() => expect(screen.getByText('WO-1029')).toBeInTheDocument());
       expect(screen.queryByText('WO-1000')).not.toBeInTheDocument();
-      expect(screen.getByText('2 / 2')).toBeInTheDocument();
 
-      await user.click(screen.getByRole('button', { name: 'Prev' }));
+      await user.click(screen.getByRole('link', { name: 'Previous page' }));
       await waitFor(() => expect(screen.getByText('WO-1000')).toBeInTheDocument());
-      expect(screen.getByText('1 / 2')).toBeInTheDocument();
     });
 
     const dispatchCallWith = (match: (params: Record<string, unknown>) => boolean) =>
@@ -1174,13 +1172,13 @@ describe('ServiceLocationDetailPage', () => {
 
       await waitFor(() => expect(screen.getByText('INV-2000')).toBeInTheDocument());
       expect(screen.queryByText('INV-2029')).not.toBeInTheDocument();
-      expect(screen.getByText('1 / 2')).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: 'Page 2' })).toBeInTheDocument();
 
-      await user.click(screen.getByRole('button', { name: 'Next' }));
+      await user.click(screen.getByRole('link', { name: 'Next page' }));
       await waitFor(() => expect(screen.getByText('INV-2029')).toBeInTheDocument());
       expect(screen.queryByText('INV-2000')).not.toBeInTheDocument();
 
-      await user.click(screen.getByRole('button', { name: 'Prev' }));
+      await user.click(screen.getByRole('link', { name: 'Previous page' }));
       await waitFor(() => expect(screen.getByText('INV-2000')).toBeInTheDocument());
     });
   });

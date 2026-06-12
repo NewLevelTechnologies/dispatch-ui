@@ -18,6 +18,8 @@ import { Button } from '../catalyst/button';
 import { DenseTable, DenseTHead, DenseRow, CellStack, CellTop, CellSub } from '../ui/DenseTable';
 import { Dropdown, DropdownButton, DropdownItem, DropdownLabel, DropdownMenu } from '../catalyst/dropdown';
 import { ErrorState } from '../ui/ErrorState';
+import { ListFooter } from '../ui/ListFooter';
+import { useUrlPage } from '../../hooks/useUrlPage';
 import EquipmentThumbnail from '../EquipmentThumbnail';
 import IconButton from '../IconButton';
 import { extractApiError } from '../../lib/toast';
@@ -62,10 +64,8 @@ export default function CustomerEquipmentTab({
   const { getName } = useGlossary();
   const [q, setQ] = useState('');
   const [filter, setFilter] = useState<EquipFilter>(null);
-  const [page, setPage] = useState(1);
   const deferredSearch = useDeferredValue(q.trim());
-
-  const resetPage = () => setPage(1);
+  const { page, pageHref, resetPage } = useUrlPage('eqPage');
 
   const listParams: ListEquipmentParams = {
     customerId,
@@ -261,24 +261,12 @@ export default function CustomerEquipmentTab({
                 </tbody>
               </DenseTable>
             </div>
-            <div className="flex items-center justify-between border-t border-border-soft bg-bg-elev-2 px-4 py-2.5 text-[11.5px] text-fg-muted">
-              <span>
-                {t('common.pagination.showing', { start: showingStart, end: showingEnd, total: total.toLocaleString() })}
-              </span>
-              {totalPages > 1 && (
-                <div className="flex items-center gap-2">
-                  <Button plain size="xxs" disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>
-                    Prev
-                  </Button>
-                  <span className="font-mono text-[11px] tabular-nums text-fg">
-                    {page} / {totalPages}
-                  </span>
-                  <Button plain size="xxs" disabled={page >= totalPages} onClick={() => setPage((p) => Math.min(totalPages, p + 1))}>
-                    Next
-                  </Button>
-                </div>
-              )}
-            </div>
+            <ListFooter
+              page={page}
+              totalPages={totalPages}
+              pageHref={pageHref}
+              left={t('common.pagination.showing', { start: showingStart, end: showingEnd, total: total.toLocaleString() })}
+            />
           </>
         )}
       </Card>

@@ -28,6 +28,8 @@ import { DenseTable, DenseTHead, DenseRow, CellStack, CellTop, CellSub } from '.
 import { AssignedUsersCell } from '../ui/AssignedUsersCell';
 import { FilterChipListbox, ChipListboxOption } from '../ui/FilterChipListbox';
 import { DateRangeChip } from '../ui/DateRangeChip';
+import { ListFooter } from '../ui/ListFooter';
+import { useUrlPage } from '../../hooks/useUrlPage';
 
 type PillTone = 'neutral' | 'info' | 'success' | 'warning';
 
@@ -107,7 +109,7 @@ export default function CustomerWorkOrdersTab({
   const [typeIds, setTypeIds] = useState<string[]>([]);
   const [dateRange, setDateRange] = useState<DateRange>(EMPTY_DATE_RANGE);
   const [search, setSearch] = useState('');
-  const [page, setPage] = useState(1);
+  const { page, pageHref, resetPage } = useUrlPage('jobsPage');
   const deferredSearch = useDeferredValue(search.trim());
 
   const { data: workOrderTypes } = useQuery({
@@ -146,7 +148,6 @@ export default function CustomerWorkOrdersTab({
   const showingStart = total === 0 ? 0 : (page - 1) * JOBS_PAGE_SIZE + 1;
   const showingEnd = Math.min(page * JOBS_PAGE_SIZE, total);
 
-  const resetPage = () => setPage(1);
   const clearFilters = () => {
     setStatusId('all');
     setTypeIds([]);
@@ -294,33 +295,16 @@ export default function CustomerWorkOrdersTab({
                 </tbody>
               </DenseTable>
             </div>
-            <div className="flex items-center justify-between border-t border-border-soft bg-bg-elev-2 px-4 py-2.5 text-[11.5px] text-fg-muted">
-              <span>
-                {t('common.pagination.showing', {
-                  start: showingStart,
-                  end: showingEnd,
-                  total: total.toLocaleString(),
-                })}
-              </span>
-              {totalPages > 1 && (
-                <div className="flex items-center gap-2">
-                  <Button plain size="xxs" disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>
-                    Prev
-                  </Button>
-                  <span className="font-mono text-[11px] tabular-nums text-fg">
-                    {page} / {totalPages}
-                  </span>
-                  <Button
-                    plain
-                    size="xxs"
-                    disabled={page >= totalPages}
-                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                  >
-                    Next
-                  </Button>
-                </div>
-              )}
-            </div>
+            <ListFooter
+              page={page}
+              totalPages={totalPages}
+              pageHref={pageHref}
+              left={t('common.pagination.showing', {
+                start: showingStart,
+                end: showingEnd,
+                total: total.toLocaleString(),
+              })}
+            />
           </>
         )}
       </Card>
