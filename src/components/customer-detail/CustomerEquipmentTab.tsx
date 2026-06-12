@@ -65,7 +65,7 @@ export default function CustomerEquipmentTab({
   const [q, setQ] = useState('');
   const [filter, setFilter] = useState<EquipFilter>(null);
   const deferredSearch = useDeferredValue(q.trim());
-  const { page, pageHref, resetPage } = useUrlPage('eqPage');
+  const { page, pageHref, resetPage } = useUrlPage('equipmentPage');
 
   const listParams: ListEquipmentParams = {
     customerId,

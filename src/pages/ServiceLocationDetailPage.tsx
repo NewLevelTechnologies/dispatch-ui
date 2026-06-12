@@ -81,6 +81,7 @@ import { useGlossary } from '../contexts/GlossaryContext';
 import { useHasCapability } from '../hooks/useCurrentUser';
 import { useMediaQuery } from '../hooks/useMediaQuery';
 import { useUrlPage } from '../hooks/useUrlPage';
+import { useUrlTab } from '../hooks/useUrlTab';
 import { formatPhone } from '../utils/formatPhone';
 import { formatTimestamp, formatExactTimestamp } from '../lib/formatTimestamp';
 import { TimeAgo } from '../components/TimeAgo';
@@ -124,6 +125,16 @@ import {
 } from './serviceLocationDetailMocks';
 
 type TabId = 'overview' | 'equipment' | 'jobs' | 'invoices' | 'dispatches' | 'contacts' | 'files' | 'activity';
+const LOCATION_TABS = [
+  'overview',
+  'equipment',
+  'jobs',
+  'invoices',
+  'dispatches',
+  'contacts',
+  'files',
+  'activity',
+] as const satisfies readonly TabId[];
 
 // ─────────────────────────────────────────────────────────────────────────
 // Smart back-link. Up-direction is dynamic — users land here from a work
@@ -163,7 +174,7 @@ export default function ServiceLocationDetailPage() {
   const { getName } = useGlossary();
   const queryClient = useQueryClient();
 
-  const [activeTab, setActiveTab] = useState<TabId>('overview');
+  const [activeTab, setActiveTab] = useUrlTab(LOCATION_TABS, 'overview');
   const [isEquipmentDialogOpen, setIsEquipmentDialogOpen] = useState(false);
   const [editingEquipment, setEditingEquipment] = useState<Equipment | null>(null);
   const [isNewWorkOrderOpen, setIsNewWorkOrderOpen] = useState(false);
@@ -3316,7 +3327,7 @@ function EquipmentTab({
   const { t } = useTranslation();
   const [q, setQ] = useState('');
   const [filter, setFilter] = useState<EquipFilter>(null);
-  const { page, pageHref, resetPage } = useUrlPage('eqPage');
+  const { page, pageHref, resetPage } = useUrlPage('equipmentPage');
   // Defer the search input so we don't fire a request per keystroke (same
   // pattern as the global Equipment page).
   const deferredSearch = useDeferredValue(q.trim());
@@ -3637,7 +3648,7 @@ function InvoicesTab({ location }: { location: ServiceLocationDetailDto }) {
   const [statusId, setStatusId] = useState('all');
   const [dateRange, setDateRange] = useState<DateRange>(EMPTY_DATE_RANGE);
   const [search, setSearch] = useState('');
-  const { page, pageHref, resetPage } = useUrlPage('invPage');
+  const { page, pageHref, resetPage } = useUrlPage('invoicesPage');
   const deferredSearch = useDeferredValue(search.trim());
 
   const statusParams = INVOICE_STATUS_FILTERS.find((s) => s.id === statusId)?.params ?? {};
@@ -4029,7 +4040,7 @@ function DispatchesTab({ location }: { location: ServiceLocationDetailDto }) {
   const [statusSel, setStatusSel] = useState<'all' | DispatchStatus>('all');
   const [dateRange, setDateRange] = useState<DateRange>(EMPTY_DATE_RANGE);
   const [search, setSearch] = useState('');
-  const { page, pageHref, resetPage } = useUrlPage('dispPage');
+  const { page, pageHref, resetPage } = useUrlPage('dispatchesPage');
   const deferredSearch = useDeferredValue(search.trim());
 
   // Shared filter slice — ANDs with the `when` partition on both queries.
@@ -4188,7 +4199,16 @@ function DispatchesTab({ location }: { location: ServiceLocationDetailDto }) {
               padding="none"
             >
               <DispatchesTable rows={past} onOpen={openWorkOrder} />
-              <ListFooter page={page} totalPages={totalPages} pageHref={pageHref} />
+              <ListFooter
+                page={page}
+                totalPages={totalPages}
+                pageHref={pageHref}
+                left={t('common.pagination.showing', {
+                  start: pastTotal === 0 ? 0 : (page - 1) * DISPATCHES_PAGE_SIZE + 1,
+                  end: Math.min(page * DISPATCHES_PAGE_SIZE, pastTotal),
+                  total: pastTotal.toLocaleString(),
+                })}
+              />
             </Card>
           )}
         </>

@@ -6,7 +6,7 @@
 // tabs reuse the existing list components inside the new shell (the mock stubs
 // them — they are not part of this design pass).
 import { useState } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { EllipsisVerticalIcon, PlusIcon } from '@heroicons/react/24/outline';
@@ -47,6 +47,7 @@ import CustomerWorkOrdersTab from './CustomerWorkOrdersTab';
 import CustomerContactsTab from './CustomerContactsTab';
 import { OrgMark } from './shared';
 import { formatDateShort } from './format';
+import { useUrlTab } from '../../hooks/useUrlTab';
 
 type TabId =
   | 'overview'
@@ -74,15 +75,10 @@ export default function MultiCustomerDetail({ customer }: { customer: Customer }
   const { getName } = useGlossary();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const [searchParams] = useSearchParams();
-
   const canEditCustomers = useHasCapability('EDIT_CUSTOMERS');
   const canAddServiceLocations = useHasCapability('ADD_SERVICE_LOCATIONS');
 
-  const tabParam = searchParams.get('tab');
-  const initialTab: TabId =
-    tabParam && (VALID_TABS as string[]).includes(tabParam) ? (tabParam as TabId) : 'overview';
-  const [activeTab, setActiveTab] = useState<TabId>(initialTab);
+  const [activeTab, setActiveTab] = useUrlTab(VALID_TABS, 'overview');
 
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isNewWorkOrderOpen, setIsNewWorkOrderOpen] = useState(false);

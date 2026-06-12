@@ -4,7 +4,8 @@ import { useLocation, useSearchParams } from 'react-router-dom';
 // URL-driven page state for in-tab lists, so they can use the Catalyst
 // `ListFooter` / pagination primitive (which is href-based) instead of a
 // hand-rolled Prev/Next. The page lives in a named search param (distinct per
-// surface, e.g. 'jobsPage' / 'eqPage', so sibling tabs don't collide); page 1
+// surface, named `<tabId>Page` e.g. 'jobsPage' / 'equipmentPage', so sibling
+// tabs don't collide); page 1
 // drops the param to keep the URL clean. `pageHref` preserves all other params
 // (filters, ?tab=, ?from=). `resetPage` is for filter/search changes.
 export function useUrlPage(key: string) {
