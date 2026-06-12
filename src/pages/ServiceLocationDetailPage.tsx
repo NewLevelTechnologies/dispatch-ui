@@ -79,6 +79,7 @@ import { DateRangeChip } from '../components/ui/DateRangeChip';
 import { roleColor } from '../utils/roleColor';
 import { useGlossary } from '../contexts/GlossaryContext';
 import { useHasCapability } from '../hooks/useCurrentUser';
+import { useMediaQuery } from '../hooks/useMediaQuery';
 import { formatPhone } from '../utils/formatPhone';
 import { formatTimestamp, formatExactTimestamp } from '../lib/formatTimestamp';
 import { TimeAgo } from '../components/TimeAgo';
@@ -498,17 +499,38 @@ function LocationHeader({
         </div>
       </div>
 
-      <div className="flex gap-1.5 max-sm:w-full max-sm:[&>*]:flex-1 sm:flex-shrink-0">
-        <Button outline size="xs" onClick={onNewJob}>
+      {/* Action cluster. On mobile this sits full-width on its own line below
+          the name and must never wrap: New Work Order + Schedule visit collapse
+          to icon-only (labels hide < sm), the kebab carries Close, and Edit
+          stays the one labeled primary, flexing to fill the row. Catalyst's
+          TouchTarget already gives each Button a 44px hit area on coarse
+          pointers; the kebab gets a wider mobile pad to match. */}
+      <div className="flex items-center gap-1.5 max-sm:w-full sm:flex-shrink-0">
+        <Button
+          outline
+          size="xs"
+          onClick={onNewJob}
+          aria-label={t('common.actions.new', { entity: getName('work_order') })}
+          title={t('common.actions.new', { entity: getName('work_order') })}
+        >
           <PlusIcon className="size-4" />
-          {t('common.actions.new', { entity: getName('work_order') })}
+          <span className="relative top-[0.5px] hidden sm:inline">
+            {t('common.actions.new', { entity: getName('work_order') })}
+          </span>
         </Button>
-        <Button outline size="xs" onClick={() => showInfo('Visit scheduling isn’t available yet')}>
-          Schedule visit
+        <Button
+          outline
+          size="xs"
+          onClick={() => showInfo('Visit scheduling isn’t available yet')}
+          aria-label="Schedule visit"
+          title="Schedule visit"
+        >
+          <CalendarDaysIcon className="size-4" />
+          <span className="relative top-[0.5px] hidden sm:inline">Schedule visit</span>
         </Button>
         {(canEdit || onClose) && (
           <Dropdown>
-            <DropdownButton as={IconButton} aria-label={t('common.moreOptions')}>
+            <DropdownButton as={IconButton} aria-label={t('common.moreOptions')} className="max-sm:p-2">
               <EllipsisVerticalIcon className="size-4" />
             </DropdownButton>
             <DropdownMenu anchor="bottom end">
@@ -526,7 +548,7 @@ function LocationHeader({
           </Dropdown>
         )}
         {canEdit && (
-          <Button color="accent" size="xs" onClick={() => setEditing(true)}>
+          <Button color="accent" size="xs" onClick={() => setEditing(true)} className="max-sm:flex-1">
             {t('common.edit')}
           </Button>
         )}
@@ -640,9 +662,10 @@ function LocationHeaderEdit({
         </Field>
       </div>
 
-      {/* Street + apt */}
-      <div className="mt-3 grid grid-cols-12 gap-2">
-        <Field className="col-span-8">
+      {/* Street + apt. Stacks on mobile (street then apt, each full-width);
+          8/4 split returns at sm. */}
+      <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-12">
+        <Field className="sm:col-span-8">
           <Label className="text-xs">
             {t('common.form.streetAddress')} *
             {location.address.validated && (
@@ -651,7 +674,7 @@ function LocationHeaderEdit({
           </Label>
           <Input value={streetAddress} onChange={(e) => setStreetAddress(e.target.value)} required />
         </Field>
-        <Field className="col-span-4">
+        <Field className="sm:col-span-4">
           <Label className="text-xs">{t('common.form.addressLine2')}</Label>
           <Input
             value={streetAddressLine2}
@@ -661,13 +684,16 @@ function LocationHeaderEdit({
         </Field>
       </div>
 
-      {/* City / state / zip / region */}
+      {/* City / state / zip / region. On mobile this stacks: City full-width,
+          State + Zip share a row (2-up), Region full-width — the 12-col grid is
+          kept and the per-field spans go responsive so the dense desktop layout
+          is untouched while State stops collapsing into a stepper-width box. */}
       <div className="mt-3 grid grid-cols-12 gap-2">
-        <Field className={hasRegions ? 'col-span-4' : 'col-span-6'}>
+        <Field className={hasRegions ? 'col-span-12 sm:col-span-4' : 'col-span-12 sm:col-span-6'}>
           <Label className="text-xs">{t('common.form.city')} *</Label>
           <Input value={city} onChange={(e) => setCity(e.target.value)} required />
         </Field>
-        <Field className="col-span-2">
+        <Field className="col-span-6 sm:col-span-2">
           <Label className="text-xs">{t('common.form.state')} *</Label>
           <Select value={state} onChange={(e) => setState(e.target.value)} required>
             <option value="">{t('common.form.select')}</option>
@@ -678,12 +704,12 @@ function LocationHeaderEdit({
             ))}
           </Select>
         </Field>
-        <Field className={hasRegions ? 'col-span-2' : 'col-span-4'}>
+        <Field className={hasRegions ? 'col-span-6 sm:col-span-2' : 'col-span-6 sm:col-span-4'}>
           <Label className="text-xs">{t('common.form.zipCode')} *</Label>
           <Input value={zipCode} onChange={(e) => setZipCode(e.target.value)} inputMode="numeric" required />
         </Field>
         {hasRegions && (
-          <Field className="col-span-4">
+          <Field className="col-span-12 sm:col-span-4">
             <Label className="text-xs">
               {getName('dispatch')} {t('entities.region')}
             </Label>
@@ -1165,6 +1191,10 @@ function SiteWorkOrdersCard({
   const sorted = [...items].sort((a, b) => Number(woIsOpen(b)) - Number(woIsOpen(a)));
   const openCount = items.filter(woIsOpen).length;
   const recentCount = items.length - openCount;
+  // < sm the column table clips (STATUS falls off the right edge), so swap to a
+  // stacked-card list. JS toggle rather than CSS so only one layout is in the
+  // DOM at a time (no duplicate rows for screen readers / tests).
+  const isDesktop = useMediaQuery('(min-width: 640px)');
 
   return (
     <Card
@@ -1195,7 +1225,7 @@ function SiteWorkOrdersCard({
         <div className="px-3.5 py-6 text-center text-[12px] text-fg-muted">
           {t('common.actions.noEntitiesYet', { entities: getName('work_order', true) })}
         </div>
-      ) : (
+      ) : isDesktop ? (
         <div className="overflow-x-auto">
           <table className="w-full border-collapse text-[12px]">
             <thead className="bg-bg-elev-2">
@@ -1220,8 +1250,78 @@ function SiteWorkOrdersCard({
             </tbody>
           </table>
         </div>
+      ) : (
+        // Mobile (< sm): stacked WO cards instead of the clipped column table.
+        <ul className="divide-y divide-border-soft">
+          {sorted.map((wo) => (
+            <WorkOrderCardMobile
+              key={wo.id}
+              wo={wo}
+              typeName={safeTypes.find((tp) => tp.id === wo.workOrderTypeId)?.name}
+            />
+          ))}
+        </ul>
       )}
     </Card>
+  );
+}
+
+// Row tint shared by both layouts: in-progress reads "live" (info); an
+// unscheduled elevated-priority job is the escalation signal (warning).
+// Cancelled rows stay untinted.
+function woRowTint(wo: WorkOrderSummary): string {
+  if (wo.lifecycleState === 'CANCELLED') return '';
+  if (wo.progressCategory === 'IN_PROGRESS') {
+    return 'bg-[color-mix(in_oklch,var(--info-500)_6%,var(--bg-elev))]';
+  }
+  const elevated = wo.priority === 'URGENT' || wo.priority === 'HIGH';
+  if (!wo.scheduledDate && elevated) {
+    return 'bg-[color-mix(in_oklch,var(--warning-500)_7%,var(--bg-elev))]';
+  }
+  return '';
+}
+
+// Title line shared by the desktop row and the mobile card — WO id (mono) +
+// type pill + elevated-priority chip. Identical markup in both layouts.
+function WoTitleLine({ wo, typeName }: { wo: WorkOrderSummary; typeName?: string }) {
+  const { t } = useTranslation();
+  const priority = wo.priority ?? 'NORMAL';
+  const elevated = priority === 'URGENT' || priority === 'HIGH';
+  return (
+    <div className="flex flex-wrap items-baseline gap-1.5">
+      <span className="font-mono text-[12px] font-bold text-fg-strong">
+        {wo.workOrderNumber || `#${wo.id.slice(0, 8)}`}
+      </span>
+      {typeName && (
+        <span className="rounded-[3px] border border-border-soft bg-bg-active px-1.5 text-[10px] font-semibold text-fg-muted">
+          {typeName}
+        </span>
+      )}
+      {elevated && (
+        <span
+          className="rounded-[3px] px-1.5 text-[9.5px] font-bold tracking-wider"
+          style={{
+            background: 'color-mix(in oklch, var(--danger-500) 14%, transparent)',
+            color: 'var(--danger-500)',
+          }}
+        >
+          {t(`workOrders.priority.${WO_PRIORITY_KEY[priority]}`).toUpperCase()}
+        </span>
+      )}
+    </div>
+  );
+}
+
+// Status / cancelled pill shared by both layouts.
+function WoStatusPill({ wo }: { wo: WorkOrderSummary }) {
+  const { t } = useTranslation();
+  if (wo.lifecycleState === 'CANCELLED') {
+    return <Pill tone="neutral">{t('workOrders.actions.cancelledBadge')}</Pill>;
+  }
+  return (
+    <Pill tone={WO_PROGRESS_TONE[wo.progressCategory]} dot>
+      {t(`workOrders.progress.${WO_PROGRESS_KEY[wo.progressCategory]}`)}
+    </Pill>
   );
 }
 
@@ -1233,47 +1333,14 @@ function WorkOrderRow({
   typeName?: string;
 }) {
   const navigate = useNavigate();
-  const { t } = useTranslation();
-  const priority = wo.priority ?? 'NORMAL';
-  const elevated = priority === 'URGENT' || priority === 'HIGH';
-  const cancelled = wo.lifecycleState === 'CANCELLED';
   const jobLabel = deriveJobLabel(wo, typeName);
-  // Row tint: in-progress reads "live" (info); an unscheduled elevated-priority
-  // job is the escalation signal (warning). Cancelled rows stay untinted.
-  const tint = cancelled
-    ? ''
-    : wo.progressCategory === 'IN_PROGRESS'
-      ? 'bg-[color-mix(in_oklch,var(--info-500)_6%,var(--bg-elev))]'
-      : !wo.scheduledDate && elevated
-        ? 'bg-[color-mix(in_oklch,var(--warning-500)_7%,var(--bg-elev))]'
-        : '';
   return (
     <tr
-      className={`cursor-pointer border-b border-border-soft hover:bg-bg-hover ${tint}`}
+      className={`cursor-pointer border-b border-border-soft hover:bg-bg-hover ${woRowTint(wo)}`}
       onClick={() => navigate(`/work-orders/${wo.id}`)}
     >
       <td className="px-3.5 py-2">
-        <div className="flex flex-wrap items-baseline gap-1.5">
-          <span className="font-mono text-[12px] font-bold text-fg-strong">
-            {wo.workOrderNumber || `#${wo.id.slice(0, 8)}`}
-          </span>
-          {typeName && (
-            <span className="rounded-[3px] border border-border-soft bg-bg-active px-1.5 text-[10px] font-semibold text-fg-muted">
-              {typeName}
-            </span>
-          )}
-          {elevated && (
-            <span
-              className="rounded-[3px] px-1.5 text-[9.5px] font-bold tracking-wider"
-              style={{
-                background: 'color-mix(in oklch, var(--danger-500) 14%, transparent)',
-                color: 'var(--danger-500)',
-              }}
-            >
-              {t(`workOrders.priority.${WO_PRIORITY_KEY[priority]}`).toUpperCase()}
-            </span>
-          )}
-        </div>
+        <WoTitleLine wo={wo} typeName={typeName} />
         {/* AI/derived summary as the .bot subline — subordinate to the WO id
             above it (10.5px), but --fg (not dim) since it's real content. */}
         <div className="mt-0.5 max-w-[420px] truncate text-[10.5px] text-fg" title={jobLabel}>
@@ -1291,19 +1358,81 @@ function WorkOrderRow({
         )}
       </td>
       <td className="px-3.5 py-2">
-        {cancelled ? (
-          <Pill tone="neutral">{t('workOrders.actions.cancelledBadge')}</Pill>
-        ) : (
-          <Pill tone={WO_PROGRESS_TONE[wo.progressCategory]} dot>
-            {t(`workOrders.progress.${WO_PROGRESS_KEY[wo.progressCategory]}`)}
-          </Pill>
-        )}
+        <WoStatusPill wo={wo} />
       </td>
       <td className="px-3.5 py-2">
         <AssignedUsersCell users={wo.assignedUsers} />
       </td>
       <td className="px-3.5 py-2 text-[11.5px] text-fg-muted">{formatWoDate(wo.scheduledDate)}</td>
     </tr>
+  );
+}
+
+// Mobile (< sm) presentation of a work order. The 5-column table can't fit, so
+// each WO becomes a stacked, full-width, tappable block: id + type + priority
+// lead line 1 with the status pill pinned right (never clipped), the summary on
+// line 2, and equipment · tech · scheduled fold into one wrapping muted meta
+// line. The whole block navigates to the WO.
+function WorkOrderCardMobile({ wo, typeName }: { wo: WorkOrderSummary; typeName?: string }) {
+  const navigate = useNavigate();
+  const jobLabel = deriveJobLabel(wo, typeName);
+  const go = () => navigate(`/work-orders/${wo.id}`);
+
+  // Render only the meta segments that exist, separated by · (mirrors the
+  // header meta pattern). Tech is omitted entirely when unassigned rather than
+  // showing a bare dash.
+  const meta: React.ReactNode[] = [];
+  if (wo.equip && wo.equip.count > 0) {
+    meta.push(<span key="equip">{wo.equip.label}</span>);
+  }
+  if (wo.assignedUsers && wo.assignedUsers.length > 0) {
+    meta.push(<AssignedUsersCell key="tech" users={wo.assignedUsers} />);
+  }
+  if (wo.scheduledDate) {
+    meta.push(
+      <span key="sched" className="inline-flex items-center gap-1">
+        <CalendarDaysIcon className="size-3.5" />
+        {formatWoDate(wo.scheduledDate)}
+      </span>
+    );
+  }
+
+  return (
+    <li className={woRowTint(wo)}>
+      <div
+        role="button"
+        tabIndex={0}
+        onClick={go}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            go();
+          }
+        }}
+        className="flex cursor-pointer flex-col gap-1 px-3.5 py-2.5 focus:outline-none focus-visible:bg-bg-hover active:bg-bg-hover"
+      >
+        {/* Line 1 — id + type + priority (left), status pill pinned right */}
+        <div className="flex items-start justify-between gap-2">
+          <WoTitleLine wo={wo} typeName={typeName} />
+          <div className="shrink-0">
+            <WoStatusPill wo={wo} />
+          </div>
+        </div>
+        {/* Line 2 — summary */}
+        <div className="text-[12px] text-fg">{jobLabel}</div>
+        {/* Line 3 — equipment · tech · scheduled (wrapping is fine here) */}
+        {meta.length > 0 && (
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-fg-muted">
+            {meta.map((node, i) => (
+              <span key={i} className="flex items-center gap-x-2">
+                {i > 0 && <span className="text-fg-dim">·</span>}
+                {node}
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+    </li>
   );
 }
 

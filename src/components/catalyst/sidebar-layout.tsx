@@ -62,8 +62,10 @@ export function SidebarLayout({
         {sidebar}
       </MobileSidebar>
 
-      {/* Navbar on mobile */}
-      <header className="flex items-center bg-bg border-b border-border px-4 lg:hidden">
+      {/* Navbar on mobile. `viewport-fit=cover` lets the page extend under the
+          status bar / notch, so pad the header by the top safe-area inset
+          (0 on devices without one) to keep the title clear of the clock. */}
+      <header className="flex items-center bg-bg border-b border-border px-4 pt-[env(safe-area-inset-top)] lg:hidden">
         <div className="py-2.5">
           <NavbarItem onClick={() => setShowSidebar(true)} aria-label="Open navigation">
             <OpenMenuIcon />
