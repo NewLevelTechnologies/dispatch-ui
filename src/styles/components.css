@@ -633,6 +633,12 @@
   gap: 2px;
   border-bottom: 1px solid var(--border);
   margin-bottom: 14px;
+  /* Contain the overflow to the strip on narrow viewports — the tabs are
+     nowrap, so without this the row overflows and the whole page pans
+     sideways. The cut-off trailing tab is the scroll affordance; the active
+     tab defaults to the first (leftmost), so it's always visible on load. */
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 .tab {
   all: unset;
