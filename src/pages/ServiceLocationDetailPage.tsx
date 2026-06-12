@@ -80,6 +80,8 @@ import { roleColor } from '../utils/roleColor';
 import { useGlossary } from '../contexts/GlossaryContext';
 import { useHasCapability } from '../hooks/useCurrentUser';
 import { useMediaQuery } from '../hooks/useMediaQuery';
+import { useUrlPage } from '../hooks/useUrlPage';
+import { useUrlTab } from '../hooks/useUrlTab';
 import { formatPhone } from '../utils/formatPhone';
 import { formatTimestamp, formatExactTimestamp } from '../lib/formatTimestamp';
 import { TimeAgo } from '../components/TimeAgo';
@@ -115,6 +117,7 @@ import { Pill } from '../components/ui/Pill';
 import { PhotoLightbox } from '../components/ui/PhotoLightbox';
 import { Callout } from '../components/ui/Callout';
 import { Tabs } from '../components/ui/Tabs';
+import { ListFooter } from '../components/ui/ListFooter';
 import type { ServiceLocationDetailDto, PremiseType, UpdateServiceLocationRequest } from '../api/customerApi';
 import {
   mockAttention,
@@ -122,6 +125,16 @@ import {
 } from './serviceLocationDetailMocks';
 
 type TabId = 'overview' | 'equipment' | 'jobs' | 'invoices' | 'dispatches' | 'contacts' | 'files' | 'activity';
+const LOCATION_TABS = [
+  'overview',
+  'equipment',
+  'jobs',
+  'invoices',
+  'dispatches',
+  'contacts',
+  'files',
+  'activity',
+] as const satisfies readonly TabId[];
 
 // ─────────────────────────────────────────────────────────────────────────
 // Smart back-link. Up-direction is dynamic — users land here from a work
@@ -161,7 +174,7 @@ export default function ServiceLocationDetailPage() {
   const { getName } = useGlossary();
   const queryClient = useQueryClient();
 
-  const [activeTab, setActiveTab] = useState<TabId>('overview');
+  const [activeTab, setActiveTab] = useUrlTab(LOCATION_TABS, 'overview');
   const [isEquipmentDialogOpen, setIsEquipmentDialogOpen] = useState(false);
   const [editingEquipment, setEditingEquipment] = useState<Equipment | null>(null);
   const [isNewWorkOrderOpen, setIsNewWorkOrderOpen] = useState(false);
@@ -3297,6 +3310,8 @@ function NotesCard({ location, canEdit }: { location: ServiceLocationDetailDto; 
 // ─────────────────────────────────────────────────────────────────────────
 type EquipFilter = 'open-wo' | 'warranty' | null;
 
+const EQUIPMENT_PAGE_SIZE = 25;
+
 function EquipmentTab({
   serviceLocationId,
   onAdd,
@@ -3312,6 +3327,7 @@ function EquipmentTab({
   const { t } = useTranslation();
   const [q, setQ] = useState('');
   const [filter, setFilter] = useState<EquipFilter>(null);
+  const { page, pageHref, resetPage } = useUrlPage('equipmentPage');
   // Defer the search input so we don't fire a request per keystroke (same
   // pattern as the global Equipment page).
   const deferredSearch = useDeferredValue(q.trim());
@@ -3322,7 +3338,8 @@ function EquipmentTab({
     search: deferredSearch || undefined,
     warrantyExpired: filter === 'warranty' ? true : undefined,
     hasOpenWorkOrder: filter === 'open-wo' ? true : undefined,
-    size: 100,
+    page: page - 1,
+    size: EQUIPMENT_PAGE_SIZE,
   };
   const { data, isLoading } = useQuery({
     queryKey: ['equipment', listParams],
@@ -3331,6 +3348,9 @@ function EquipmentTab({
   });
   const rows = useMemo(() => data?.content ?? [], [data]);
   const total = data?.totalElements ?? 0;
+  const totalPages = data?.totalPages ?? 0;
+  const showingStart = total === 0 ? 0 : (page - 1) * EQUIPMENT_PAGE_SIZE + 1;
+  const showingEnd = Math.min(page * EQUIPMENT_PAGE_SIZE, total);
 
   // Chip counts come from the server (size:1 → totalElements) so they survive
   // pagination. Independent of search and of the other chip.
@@ -3373,12 +3393,15 @@ function EquipmentTab({
           <MagnifyingGlassIcon className="size-3.5 text-fg-dim" />
           <input
             value={q}
-            onChange={(e) => setQ(e.target.value)}
+            onChange={(e) => {
+              setQ(e.target.value);
+              resetPage();
+            }}
             placeholder="Search by ID, make, model, serial…"
             className="min-w-0 flex-1 bg-transparent text-[12.5px] text-fg outline-none placeholder:text-fg-dim"
           />
           {q && (
-            <button onClick={() => setQ('')} className="px-1 text-[11px] text-fg-dim hover:text-fg-strong">
+            <button onClick={() => { setQ(''); resetPage(); }} className="px-1 text-[11px] text-fg-dim hover:text-fg-strong">
               ×
             </button>
           )}
@@ -3389,7 +3412,7 @@ function EquipmentTab({
           return (
             <button
               key={c.id}
-              onClick={() => setFilter(active ? null : c.id)}
+              onClick={() => { setFilter(active ? null : c.id); resetPage(); }}
               className={`inline-flex h-[30px] items-center gap-1.5 rounded-md border px-2.5 text-[12px] font-medium ${
                 active
                   ? 'border-[color-mix(in_oklch,var(--accent-500)_45%,var(--border))] bg-[color-mix(in_oklch,var(--accent-500)_9%,var(--bg-elev))] text-fg-accent'
@@ -3407,7 +3430,7 @@ function EquipmentTab({
         })}
 
         {filter && (
-          <Button plain size="xs" onClick={() => setFilter(null)}>
+          <Button plain size="xs" onClick={() => { setFilter(null); resetPage(); }}>
             Clear
           </Button>
         )}
@@ -3473,11 +3496,12 @@ function EquipmentTab({
             </DenseTable>
           </div>
         )}
-        <div className="flex items-center border-t border-border-soft bg-bg-elev-2 px-4 py-2.5 text-[11.5px] text-fg-muted">
-          <span>
-            Showing <strong className="text-fg-strong">{rows.length}</strong> of {total}
-          </span>
-        </div>
+        <ListFooter
+          page={page}
+          totalPages={totalPages}
+          pageHref={pageHref}
+          left={t('common.pagination.showing', { start: showingStart, end: showingEnd, total: total.toLocaleString() })}
+        />
       </Card>
     </div>
   );
@@ -3624,7 +3648,7 @@ function InvoicesTab({ location }: { location: ServiceLocationDetailDto }) {
   const [statusId, setStatusId] = useState('all');
   const [dateRange, setDateRange] = useState<DateRange>(EMPTY_DATE_RANGE);
   const [search, setSearch] = useState('');
-  const [page, setPage] = useState(1);
+  const { page, pageHref, resetPage } = useUrlPage('invoicesPage');
   const deferredSearch = useDeferredValue(search.trim());
 
   const statusParams = INVOICE_STATUS_FILTERS.find((s) => s.id === statusId)?.params ?? {};
@@ -3704,7 +3728,6 @@ function InvoicesTab({ location }: { location: ServiceLocationDetailDto }) {
   const showingStart = total === 0 ? 0 : (page - 1) * INVOICES_PAGE_SIZE + 1;
   const showingEnd = Math.min(page * INVOICES_PAGE_SIZE, total);
 
-  const resetPage = () => setPage(1);
   const clearFilters = () => {
     setStatusId('all');
     setDateRange(EMPTY_DATE_RANGE);
@@ -3861,28 +3884,16 @@ function InvoicesTab({ location }: { location: ServiceLocationDetailDto }) {
                 </tbody>
               </DenseTable>
             </div>
-            <div className="flex items-center justify-between border-t border-border-soft bg-bg-elev-2 px-4 py-2.5 text-[11.5px] text-fg-muted">
-              <span>
-                {t('common.pagination.showing', {
-                  start: showingStart,
-                  end: showingEnd,
-                  total: total.toLocaleString(),
-                })}
-              </span>
-              {totalPages > 1 && (
-                <div className="flex items-center gap-2">
-                  <Button plain size="xxs" disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>
-                    Prev
-                  </Button>
-                  <span className="font-mono text-[11px] tabular-nums text-fg">
-                    {page} / {totalPages}
-                  </span>
-                  <Button plain size="xxs" disabled={page >= totalPages} onClick={() => setPage((p) => Math.min(totalPages, p + 1))}>
-                    Next
-                  </Button>
-                </div>
-              )}
-            </div>
+            <ListFooter
+              page={page}
+              totalPages={totalPages}
+              pageHref={pageHref}
+              left={t('common.pagination.showing', {
+                start: showingStart,
+                end: showingEnd,
+                total: total.toLocaleString(),
+              })}
+            />
           </>
         )}
       </Card>
@@ -4029,7 +4040,7 @@ function DispatchesTab({ location }: { location: ServiceLocationDetailDto }) {
   const [statusSel, setStatusSel] = useState<'all' | DispatchStatus>('all');
   const [dateRange, setDateRange] = useState<DateRange>(EMPTY_DATE_RANGE);
   const [search, setSearch] = useState('');
-  const [page, setPage] = useState(1);
+  const { page, pageHref, resetPage } = useUrlPage('dispatchesPage');
   const deferredSearch = useDeferredValue(search.trim());
 
   // Shared filter slice — ANDs with the `when` partition on both queries.
@@ -4068,7 +4079,6 @@ function DispatchesTab({ location }: { location: ServiceLocationDetailDto }) {
   const openWorkOrder = (v: LocationDispatchResponse) => navigate(`/work-orders/${v.workOrderId}`);
 
   const filtersActive = statusSel !== 'all' || Boolean(dateRange.from || dateRange.to) || !!deferredSearch;
-  const resetPage = () => setPage(1);
   const clearFilters = () => {
     setStatusSel('all');
     setDateRange(EMPTY_DATE_RANGE);
@@ -4189,24 +4199,16 @@ function DispatchesTab({ location }: { location: ServiceLocationDetailDto }) {
               padding="none"
             >
               <DispatchesTable rows={past} onOpen={openWorkOrder} />
-              {totalPages > 1 && (
-                <div className="flex items-center justify-end gap-2 border-t border-border-soft bg-bg-elev-2 px-4 py-2.5 text-[11.5px] text-fg-muted">
-                  <Button plain size="xxs" disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>
-                    Prev
-                  </Button>
-                  <span className="font-mono text-[11px] tabular-nums text-fg">
-                    {page} / {totalPages}
-                  </span>
-                  <Button
-                    plain
-                    size="xxs"
-                    disabled={page >= totalPages}
-                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                  >
-                    Next
-                  </Button>
-                </div>
-              )}
+              <ListFooter
+                page={page}
+                totalPages={totalPages}
+                pageHref={pageHref}
+                left={t('common.pagination.showing', {
+                  start: pastTotal === 0 ? 0 : (page - 1) * DISPATCHES_PAGE_SIZE + 1,
+                  end: Math.min(page * DISPATCHES_PAGE_SIZE, pastTotal),
+                  total: pastTotal.toLocaleString(),
+                })}
+              />
             </Card>
           )}
         </>
@@ -4410,7 +4412,7 @@ function JobsTab({ location, onNewJob }: { location: ServiceLocationDetailDto; o
   const [typeIds, setTypeIds] = useState<string[]>([]);
   const [dateRange, setDateRange] = useState<DateRange>(EMPTY_DATE_RANGE);
   const [search, setSearch] = useState('');
-  const [page, setPage] = useState(1);
+  const { page, pageHref, resetPage } = useUrlPage('jobsPage');
   const deferredSearch = useDeferredValue(search.trim());
 
   const { data: workOrderTypes } = useQuery({
@@ -4453,7 +4455,6 @@ function JobsTab({ location, onNewJob }: { location: ServiceLocationDetailDto; o
   const showingStart = total === 0 ? 0 : (page - 1) * JOBS_PAGE_SIZE + 1;
   const showingEnd = Math.min(page * JOBS_PAGE_SIZE, total);
 
-  const resetPage = () => setPage(1);
   const clearFilters = () => {
     setStatusId('all');
     setTypeIds([]);
@@ -4599,28 +4600,16 @@ function JobsTab({ location, onNewJob }: { location: ServiceLocationDetailDto; o
                 </tbody>
               </DenseTable>
             </div>
-            <div className="flex items-center justify-between border-t border-border-soft bg-bg-elev-2 px-4 py-2.5 text-[11.5px] text-fg-muted">
-              <span>
-                {t('common.pagination.showing', {
-                  start: showingStart,
-                  end: showingEnd,
-                  total: total.toLocaleString(),
-                })}
-              </span>
-              {totalPages > 1 && (
-                <div className="flex items-center gap-2">
-                  <Button plain size="xxs" disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>
-                    Prev
-                  </Button>
-                  <span className="font-mono text-[11px] tabular-nums text-fg">
-                    {page} / {totalPages}
-                  </span>
-                  <Button plain size="xxs" disabled={page >= totalPages} onClick={() => setPage((p) => Math.min(totalPages, p + 1))}>
-                    Next
-                  </Button>
-                </div>
-              )}
-            </div>
+            <ListFooter
+              page={page}
+              totalPages={totalPages}
+              pageHref={pageHref}
+              left={t('common.pagination.showing', {
+                start: showingStart,
+                end: showingEnd,
+                total: total.toLocaleString(),
+              })}
+            />
           </>
         )}
       </Card>
