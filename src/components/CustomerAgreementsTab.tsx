@@ -1,4 +1,4 @@
-/* eslint-disable i18next/no-literal-string -- short operational column labels stay literal, same convention as the surrounding CustomerDetailPage tabs. */
+/* eslint-disable i18next/no-literal-string -- short operational column labels stay literal, same convention as the surrounding customer-detail tabs. */
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
@@ -6,22 +6,23 @@ import { useTranslation } from 'react-i18next';
 import { PlusIcon } from '@heroicons/react/24/outline';
 import { useGlossary } from '../contexts/GlossaryContext';
 import { agreementApi, type AgreementStatus, type AgreementSummaryResponse } from '../api';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './catalyst/table';
-import { Badge } from './catalyst/badge';
 import { Button } from './catalyst/button';
 import { Subheading } from './catalyst/heading';
+import { Card } from './catalyst/card';
+import { Pill } from './ui/Pill';
+import { DenseTable, DenseTHead, DenseRow, CellStack, CellTop, CellSub } from './ui/DenseTable';
 import { LoadingState } from './ui/LoadingState';
 import { ErrorState } from './ui/ErrorState';
 import { EmptyState } from './ui/EmptyState';
 import AgreementFormDialog from './AgreementFormDialog';
 import { extractApiError } from '../lib/toast';
 
-const STATUS_COLOR: Record<AgreementStatus, 'lime' | 'zinc' | 'amber' | 'rose'> = {
-  ACTIVE: 'lime',
-  DRAFT: 'zinc',
-  SUSPENDED: 'amber',
-  EXPIRED: 'zinc',
-  CANCELLED: 'rose',
+const STATUS_TONE: Record<AgreementStatus, 'success' | 'neutral' | 'warning' | 'danger'> = {
+  ACTIVE: 'success',
+  DRAFT: 'neutral',
+  SUSPENDED: 'warning',
+  EXPIRED: 'neutral',
+  CANCELLED: 'danger',
 };
 
 function formatDay(value?: string | null): string {
@@ -37,9 +38,9 @@ function termLabel(a: AgreementSummaryResponse): string {
   return `${formatDay(a.termStart)} → ${a.termEnd ? formatDay(a.termEnd) : 'Open-ended'}`;
 }
 
-// Lists a customer's service agreements (the customer's Agreements tab). Each
-// row opens the agreement detail page. Add creates a DRAFT and routes to it for
-// configuration.
+// Lists a customer's service agreements (the customer's Agreements tab). Dense
+// table; each row opens the agreement detail page. Add creates a DRAFT and
+// routes to it for configuration.
 export default function CustomerAgreementsTab({ customerId }: { customerId: string }) {
   const navigate = useNavigate();
   const { t } = useTranslation();
@@ -76,50 +77,50 @@ export default function CustomerAgreementsTab({ customerId }: { customerId: stri
     );
   } else {
     body = (
-      <Table dense className="[--gutter:theme(spacing.2)] text-sm">
-        <TableHead>
-          <TableRow>
-            <TableHeader>{getName('agreement')}</TableHeader>
-            <TableHeader>Status</TableHeader>
-            <TableHeader>Term</TableHeader>
-            <TableHeader>Auto-renew</TableHeader>
-          </TableRow>
-        </TableHead>
-        <TableBody>
+      <DenseTable>
+        <DenseTHead>
+          <tr>
+            <th>{getName('agreement')}</th>
+            <th>Status</th>
+            <th>Term</th>
+            <th>Auto-renew</th>
+          </tr>
+        </DenseTHead>
+        <tbody>
           {data.map((a) => (
-            <TableRow
-              key={a.id}
-              className="cursor-pointer"
-              onClick={() => navigate(`/agreements/${a.id}?from=customer`)}
-            >
-              <TableCell>
-                <div className="font-medium text-fg-strong">{a.name}</div>
-                <div className="font-mono text-[11px] text-fg-muted">{a.agreementNumber}</div>
-              </TableCell>
-              <TableCell>
-                <Badge color={STATUS_COLOR[a.status]}>
+            <DenseRow key={a.id} onClick={() => navigate(`/agreements/${a.id}?from=customer`)}>
+              <td>
+                <CellStack>
+                  <CellTop>{a.name}</CellTop>
+                  <CellSub>
+                    <span className="font-mono">{a.agreementNumber}</span>
+                  </CellSub>
+                </CellStack>
+              </td>
+              <td>
+                <Pill tone={STATUS_TONE[a.status]} dot>
                   {a.status.charAt(0) + a.status.slice(1).toLowerCase()}
-                </Badge>
-              </TableCell>
-              <TableCell className="text-fg-muted">{termLabel(a)}</TableCell>
-              <TableCell className="text-fg-muted">{a.autoRenew ? 'Yes' : 'No'}</TableCell>
-            </TableRow>
+                </Pill>
+              </td>
+              <td className="muted">{termLabel(a)}</td>
+              <td className="muted">{a.autoRenew ? 'Yes' : 'No'}</td>
+            </DenseRow>
           ))}
-        </TableBody>
-      </Table>
+        </tbody>
+      </DenseTable>
     );
   }
 
   return (
-    <div>
-      <div className="mb-3 flex items-center justify-between">
+    <div className="flex flex-col gap-2.5">
+      <div className="flex items-center justify-between">
         <Subheading>{getName('agreement', true)}</Subheading>
-        <Button plain onClick={() => setIsAddOpen(true)}>
+        <Button outline size="xs" onClick={() => setIsAddOpen(true)}>
           <PlusIcon className="size-4" />
           {t('common.actions.add', { entity: getName('agreement') })}
         </Button>
       </div>
-      {body}
+      <Card padding="none">{body}</Card>
       <AgreementFormDialog isOpen={isAddOpen} onClose={() => setIsAddOpen(false)} customerId={customerId} />
     </div>
   );
