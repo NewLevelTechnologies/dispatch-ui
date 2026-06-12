@@ -436,14 +436,6 @@ function ActorCell({ name, isPerson }: { name: string; isPerson: boolean }) {
   );
 }
 
-const ROW_GRID: React.CSSProperties = {
-  display: 'grid',
-  gridTemplateColumns: '22px 150px 1fr auto',
-  gap: 10,
-  alignItems: 'center',
-  padding: '9px 14px',
-};
-
 function EventCell({
   row,
   groupSuffix,
@@ -507,7 +499,7 @@ function ActivityRow({ row }: { row: SingleRow | AuditRowModel | FinancialRow })
   if (row.kind === 'audit') return <AuditRow row={row} />;
   return (
     <div style={{ borderBottom: '1px solid var(--border-soft)' }}>
-      <div style={ROW_GRID}>
+      <div className="activity-row">
         <ActGlyph glyph={row.glyph} tone={row.tone} />
         <ActorCell name={row.actor} isPerson={row.isPerson} />
         <EventCell row={row} />
@@ -535,7 +527,7 @@ function AuditRow({ row }: { row: AuditRowModel }) {
   return (
     <div style={{ borderBottom: '1px solid var(--border-soft)', background: 'var(--bg-sunken)' }}>
       <div
-        style={{ ...ROW_GRID, ...(reverted ? { cursor: 'pointer' } : null) }}
+        className={`activity-row${reverted ? ' cursor-pointer' : ''}`}
         {...(reverted
           ? {
               role: 'button',
@@ -674,7 +666,7 @@ function WorkOrderGroupRow({
             setExpanded((v) => !v);
           }
         }}
-        style={{ ...ROW_GRID, cursor: 'pointer' }}
+        className="activity-row cursor-pointer"
       >
         <ActGlyph glyph={row.glyph} tone={row.tone} />
         <ActorCell name={row.actor} isPerson={row.isPerson} />

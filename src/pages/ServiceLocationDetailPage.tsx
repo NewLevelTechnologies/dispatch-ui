@@ -100,6 +100,7 @@ import TagPicker from '../components/TagPicker';
 import { TagPill } from '../components/ui/TagPill';
 import { nextTagColor } from '../utils/tagColor';
 import IconButton from '../components/IconButton';
+import { DenseTable, DenseTHead, DenseRow } from '../components/ui/DenseTable';
 import { Card } from '../components/catalyst/card';
 import { Button } from '../components/catalyst/button';
 import { Input } from '../components/catalyst/input';
@@ -2175,14 +2176,37 @@ function LabelCombobox({
 function ContactBlock({
   contact,
   primary,
+  badge,
+  showAllPhones,
   actions,
+  actionsVisible,
 }: {
   contact: AdditionalContact;
   primary?: boolean;
+  // Optional pill rendered after the name (e.g. "Primary") — used by the
+  // mobile Contacts directory; the overview card omits it.
+  badge?: React.ReactNode;
+  // Render mobile + office as separate labeled tel: links instead of the single
+  // best-phone preview — the mobile Contacts directory's whole point is that
+  // every reachable number is visible and tappable.
+  showAllPhones?: boolean;
   actions?: React.ReactNode;
+  // Always show the actions (no hover-reveal) — touch devices have no hover.
+  actionsVisible?: boolean;
 }) {
   const { t } = useTranslation();
   const phone = contact.mobilePhone || contact.phone || null;
+  const telLine = (value: string, label: string) => (
+    <a
+      key={label}
+      href={`tel:${value.replace(/\D/g, '')}`}
+      className="mt-0.5 flex items-center gap-1 font-mono text-[12.5px] font-semibold text-fg-accent hover:underline"
+    >
+      <PhoneIcon className="size-3 shrink-0" />
+      {formatPhone(value)}
+      <span className="font-sans text-[11px] font-normal text-fg-dim">· {label}</span>
+    </a>
+  );
   return (
     <div className="group/contact">
       <div className="flex items-baseline gap-2">
@@ -2190,16 +2214,31 @@ function ContactBlock({
           <span className={`font-semibold text-fg-strong ${primary ? 'text-[13px]' : 'text-[12.5px]'}`}>
             {contact.name}
           </span>
+          {badge}
           {contact.role && <span className="text-[11px] text-fg-muted">· {contact.role}</span>}
         </div>
         {actions && (
-          <div className="flex shrink-0 items-center gap-1.5 opacity-0 transition-opacity group-hover/contact:opacity-100 focus-within:opacity-100">
+          <div
+            className={`flex shrink-0 items-center gap-1.5 transition-opacity ${
+              actionsVisible ? '' : 'opacity-0 group-hover/contact:opacity-100 focus-within:opacity-100'
+            }`}
+          >
             {actions}
           </div>
         )}
       </div>
 
-      {phone ? (
+      {showAllPhones ? (
+        <>
+          {contact.mobilePhone && telLine(contact.mobilePhone, 'mobile')}
+          {contact.phone && telLine(contact.phone, 'office')}
+          {!contact.mobilePhone && !contact.phone && !contact.email && (
+            <div className="mt-0.5 text-[11.5px]" style={{ color: 'var(--warning-fg)' }}>
+              {t('contacts.noContactInfo')}
+            </div>
+          )}
+        </>
+      ) : phone ? (
         <a
           href={`tel:${phone.replace(/\D/g, '')}`}
           className="mt-0.5 inline-flex items-center gap-1 font-mono text-[12.5px] font-semibold text-fg-accent hover:underline"
@@ -2474,6 +2513,12 @@ function ContactsTab({ location, canEdit }: { location: ServiceLocationDetailDto
   // Primary first, then additional in their existing (displayOrder) order.
   const rows = primary ? [primary, ...additional] : additional;
 
+  // Contacts is the one tab that doesn't become a DenseTable on mobile: phone
+  // numbers are the whole point and a stacked table would still bury them. Below
+  // sm we swap the directory table for ContactBlock cards (every number a
+  // tappable tel: link), reusing the overview's contact-card layout.
+  const isDesktop = useMediaQuery('(min-width: 640px)');
+
   // Per-contact notification prefs power the Notifications column. One query per
   // contact (keyed to match the dialog so the cache is shared); only runs while
   // this tab is mounted.
@@ -2506,7 +2551,7 @@ function ContactsTab({ location, canEdit }: { location: ServiceLocationDetailDto
     >
       {rows.length === 0 ? (
         <div className="px-3.5 py-10 text-center text-[12px] text-fg-muted">{t('contacts.noContacts')}</div>
-      ) : (
+      ) : isDesktop ? (
         <div className="overflow-x-auto">
           <table className="w-full border-collapse text-[12px]">
             <thead className="bg-bg-elev-2">
@@ -2623,6 +2668,63 @@ function ContactsTab({ location, canEdit }: { location: ServiceLocationDetailDto
               })}
             </tbody>
           </table>
+        </div>
+      ) : (
+        // Mobile: ContactBlock cards — name + Primary badge + role, every phone
+        // a tappable tel: link, actions always visible (touch has no hover).
+        <div className="divide-y divide-border-soft">
+          {rows.map((c) => (
+            <div key={c.id} className="px-3.5 py-3">
+              <ContactBlock
+                contact={c}
+                primary={c.isPrimary}
+                showAllPhones
+                actionsVisible
+                badge={c.isPrimary ? <Pill tone="info">Primary</Pill> : undefined}
+                actions={
+                  canEdit ? (
+                    <>
+                      <button
+                        onClick={() => setContactDialog({ open: true, contact: c })}
+                        title={t('common.edit')}
+                        aria-label={t('common.edit')}
+                        className="p-1 text-fg-dim hover:text-fg-strong"
+                      >
+                        <PencilIcon className="size-4" />
+                      </button>
+                      <NotifBell
+                        customerId={location.customerId}
+                        contactId={c.id}
+                        active={anyOnByContactId.get(c.id)}
+                        onClick={() => setNotifyContact(c)}
+                      />
+                      {!c.isPrimary && (
+                        <button
+                          onClick={() => makePrimaryMutation.mutate(c.id)}
+                          disabled={makePrimaryMutation.isPending}
+                          title={t('contacts.makePrimary')}
+                          aria-label={t('contacts.makePrimary')}
+                          className="p-1 text-fg-dim hover:text-fg-strong disabled:opacity-50"
+                        >
+                          <StarIcon className="size-4" />
+                        </button>
+                      )}
+                      {!c.isPrimary && (
+                        <button
+                          onClick={() => setContactToDelete(c)}
+                          title={t('common.delete')}
+                          aria-label={t('common.delete')}
+                          className="p-1 text-fg-dim hover:text-danger-500"
+                        >
+                          <TrashIcon className="size-4" />
+                        </button>
+                      )}
+                    </>
+                  ) : undefined
+                }
+              />
+            </div>
+          ))}
         </div>
       )}
 
@@ -3318,48 +3420,47 @@ function EquipmentTab({
       </div>
 
       <Card padding="none">
-        <div className="overflow-x-auto">
-          <table className="w-full border-collapse text-[12px]">
-            <thead className="bg-bg-elev-2">
-              <tr className="text-left text-[10px] font-semibold uppercase tracking-wider text-fg-muted">
-                {/* Capacity column omitted — it lives in attributes.capacity
-                    and nothing captures it yet, so it'd be empty for every row.
-                    Restore it once there's a capture path. */}
-                <th className="px-3.5 py-2 font-semibold">{getName('equipment')}</th>
-                <th className="px-3.5 py-2 font-semibold">Make / Model</th>
-                <th className="px-3.5 py-2 font-semibold">Location on site</th>
-                <th className="px-3.5 py-2 text-right font-semibold">Age</th>
-                <th className="px-3.5 py-2 font-semibold">Last service</th>
-                <th className="px-3.5 py-2 font-semibold">Next PM</th>
-                <th className="px-3.5 py-2 font-semibold">Warranty</th>
-                <th className="px-3.5 py-2 font-semibold">Status</th>
-                <th className="w-9 px-3.5 py-2" />
-              </tr>
-            </thead>
-            <tbody>
-              {isLoading ? (
+        {isLoading ? (
+          <div className="px-5 py-10 text-center text-[12px] text-fg-muted">
+            {t('common.actions.loading', { entities: getName('equipment', true) })}
+          </div>
+        ) : rows.length === 0 ? (
+          <div className="px-5 py-10 text-center">
+            <div className="text-[13px] font-semibold text-fg-strong">
+              {hasFilters
+                ? 'No equipment matches'
+                : t('common.actions.noEntitiesYet', { entities: getName('equipment', true) })}
+            </div>
+            <div className="mt-1 text-[12px] text-fg-muted">
+              {hasFilters ? 'Adjust your search or clear filters.' : 'Add equipment to get started.'}
+            </div>
+          </div>
+        ) : (
+          // DenseTable: dense columns on desktop, one card per unit < 640px
+          // (thumbnail + name/serial lead, kebab top-right, the rest stack as
+          // muted lines). Type bands survive via the dense-group-header class.
+          <div className="overflow-x-auto">
+            <DenseTable>
+              <DenseTHead>
                 <tr>
-                  <td colSpan={9} className="px-5 py-10 text-center text-[12px] text-fg-muted">
-                    {t('common.actions.loading', { entities: getName('equipment', true) })}
-                  </td>
+                  {/* Capacity column omitted — it lives in attributes.capacity
+                      and nothing captures it yet, so it'd be empty for every row.
+                      Restore it once there's a capture path. */}
+                  <th>{getName('equipment')}</th>
+                  <th>Make / Model</th>
+                  <th>Location on site</th>
+                  <th className="right">Age</th>
+                  <th>Last service</th>
+                  <th>Next PM</th>
+                  <th>Warranty</th>
+                  <th>Status</th>
+                  <th />
                 </tr>
-              ) : rows.length === 0 ? (
-                <tr>
-                  <td colSpan={9} className="px-5 py-10 text-center">
-                    <div className="text-[13px] font-semibold text-fg-strong">
-                      {hasFilters
-                        ? 'No equipment matches'
-                        : t('common.actions.noEntitiesYet', { entities: getName('equipment', true) })}
-                    </div>
-                    <div className="mt-1 text-[12px] text-fg-muted">
-                      {hasFilters ? 'Adjust your search or clear filters.' : 'Add equipment to get started.'}
-                    </div>
-                  </td>
-                </tr>
-              ) : (
-                Object.entries(grouped).flatMap(([type, items]) => [
-                  <tr key={`h-${type}`}>
-                    <td colSpan={9} className="border-y border-border-soft bg-bg-elev-2 px-3.5 py-1.5">
+              </DenseTHead>
+              <tbody>
+                {Object.entries(grouped).flatMap(([type, items]) => [
+                  <tr key={`h-${type}`} className="dense-group-header">
+                    <td colSpan={9}>
                       <span className="text-[10px] font-semibold uppercase tracking-wider text-fg-strong">{type}</span>
                       <span className="ml-2 font-mono text-[10.5px] tabular-nums text-fg-muted">{items.length}</span>
                     </td>
@@ -3367,11 +3468,11 @@ function EquipmentTab({
                   ...items.map((e) => (
                     <EquipmentRow key={e.id} e={e} onEdit={onEdit} onDelete={onDelete} />
                   )),
-                ])
-              )}
-            </tbody>
-          </table>
-        </div>
+                ])}
+              </tbody>
+            </DenseTable>
+          </div>
+        )}
         <div className="flex items-center border-t border-border-soft bg-bg-elev-2 px-4 py-2.5 text-[11.5px] text-fg-muted">
           <span>
             Showing <strong className="text-fg-strong">{rows.length}</strong> of {total}
@@ -3395,20 +3496,20 @@ function EquipmentRow({
   const { t } = useTranslation();
   const age = equipmentAgeYears(e.installDate);
   const warrantyExpired = isWarrantyExpired(e.warrantyExpiresAt);
-  // The only live state is an open work order; tint that row info. No
-  // flag/attention tint — equipment flagging was removed in the redesign.
-  const tint = e.hasOpenWorkOrder ? 'bg-[color-mix(in_oklch,var(--info-500)_6%,var(--bg-elev))]' : '';
 
   return (
-    <tr
-      className={`cursor-pointer border-b border-border-soft hover:bg-bg-hover ${tint}`}
+    <DenseRow
+      // The only live state is an open work order; tint that row info (preserved
+      // through the reflow). No flag/attention tint — equipment flagging was
+      // removed in the redesign.
+      className={e.hasOpenWorkOrder ? 'row-live' : undefined}
       onClick={(ev) => {
         const target = ev.target as HTMLElement;
         if (target.closest('[role="menu"]') || target.closest('button[aria-label]')) return;
         navigate(`/equipment/${e.id}`);
       }}
     >
-      <td className="px-3.5 py-2">
+      <td>
         <div className="flex items-center gap-2.5">
           <EquipmentThumbnail url={e.profileImageUrl} name={e.name} sizeClass="size-8" fit="contain" />
           <div className="min-w-0">
@@ -3419,24 +3520,24 @@ function EquipmentRow({
           </div>
         </div>
       </td>
-      <td className="px-3.5 py-2">
+      <td>
         <div className="text-[12px] text-fg">{e.make || '—'}</div>
         {e.model && <div className="text-[11px] text-fg-muted">{e.model}</div>}
       </td>
-      <td className="px-3.5 py-2 text-[11.5px] text-fg-muted">{e.locationOnSite || '—'}</td>
-      <td className="px-3.5 py-2 text-right font-mono text-[12px] font-semibold tabular-nums text-fg-strong">
+      <td className="text-[11.5px] text-fg-muted">{e.locationOnSite || '—'}</td>
+      <td className="right font-mono text-[12px] font-semibold tabular-nums text-fg-strong">
         {age === null ? <span className="text-fg-dim">—</span> : `${age}y`}
       </td>
-      <td className="px-3.5 py-2 text-[11.5px] text-fg-muted">
+      <td className="text-[11.5px] text-fg-muted">
         {e.lastServicedAt ? <TimeAgo iso={e.lastServicedAt} /> : '—'}
       </td>
       {/* Next PM has no backend source yet — unblocks with the agreement /
           recurring-visit work. */}
-      <td className="px-3.5 py-2 text-[11.5px] text-fg-dim">—</td>
-      <td className={`px-3.5 py-2 text-[11.5px] ${warrantyExpired ? 'text-fg-dim' : 'text-fg-muted'}`}>
+      <td className="text-[11.5px] text-fg-dim">—</td>
+      <td className={`text-[11.5px] ${warrantyExpired ? 'text-fg-dim' : 'text-fg-muted'}`}>
         {!e.warrantyExpiresAt ? '—' : warrantyExpired ? 'Expired' : `Thru ${formatWoDate(e.warrantyExpiresAt)}`}
       </td>
-      <td className="px-3.5 py-2">
+      <td>
         {e.hasOpenWorkOrder ? (
           <Pill tone="info" dot live>
             Open work order
@@ -3445,7 +3546,7 @@ function EquipmentRow({
           <span className="text-[11px] text-fg-dim">—</span>
         )}
       </td>
-      <td className="px-3.5 py-2 text-right">
+      <td className="text-right">
         <Dropdown>
           <DropdownButton as={IconButton} aria-label={t('common.moreOptions')}>
             <EllipsisVerticalIcon className="size-4" />
@@ -3463,7 +3564,7 @@ function EquipmentRow({
           </DropdownMenu>
         </Dropdown>
       </td>
-    </tr>
+    </DenseRow>
   );
 }
 
@@ -3725,20 +3826,22 @@ function InvoicesTab({ location }: { location: ServiceLocationDetailDto }) {
           </div>
         ) : (
           <>
+            {/* DenseTable: dense columns on desktop, one card per invoice
+                < 640px (INV# leads, Balance pins top-right, the rest stack). */}
             <div className="overflow-x-auto">
-              <table className="w-full border-collapse text-[12px]">
-                <thead className="bg-bg-elev-2">
-                  <tr className="text-left text-[10px] font-semibold uppercase tracking-wider text-fg-muted">
-                    <th className="px-3.5 py-2 font-semibold">{getName('invoice')}</th>
-                    <th className="px-3.5 py-2 font-semibold">For work</th>
-                    <th className="px-3.5 py-2 font-semibold">Bill to</th>
-                    <th className="px-3.5 py-2 font-semibold">Issued</th>
-                    <th className="px-3.5 py-2 font-semibold">Due</th>
-                    <th className="px-3.5 py-2 font-semibold">{t('workOrders.table.statusHeader')}</th>
-                    <th className="px-3.5 py-2 text-right font-semibold">Amount</th>
-                    <th className="px-3.5 py-2 text-right font-semibold">Balance</th>
+              <DenseTable>
+                <DenseTHead>
+                  <tr>
+                    <th>{getName('invoice')}</th>
+                    <th>For work</th>
+                    <th>Bill to</th>
+                    <th>Issued</th>
+                    <th>Due</th>
+                    <th>{t('workOrders.table.statusHeader')}</th>
+                    <th className="right">Amount</th>
+                    <th className="right">Balance</th>
                   </tr>
-                </thead>
+                </DenseTHead>
                 <tbody>
                   {rows.map((inv) => (
                     <InvoiceRow
@@ -3756,7 +3859,7 @@ function InvoicesTab({ location }: { location: ServiceLocationDetailDto }) {
                     />
                   ))}
                 </tbody>
-              </table>
+              </DenseTable>
             </div>
             <div className="flex items-center justify-between border-t border-border-soft bg-bg-elev-2 px-4 py-2.5 text-[11.5px] text-fg-muted">
               <span>
@@ -3814,14 +3917,14 @@ function InvoiceRow({
   const clickable = !!inv.workOrderId;
 
   return (
-    <tr
-      className={`border-b border-border-soft ${voided ? 'opacity-60' : ''} ${clickable ? 'cursor-pointer hover:bg-bg-hover' : ''}`}
-      onClick={() => clickable && onOpen(inv.workOrderId!)}
+    <DenseRow
+      className={voided ? 'opacity-60' : undefined}
+      onClick={clickable ? () => onOpen(inv.workOrderId!) : undefined}
     >
-      <td className="px-3.5 py-2">
+      <td>
         <span className="font-mono text-[12px] font-bold text-fg-strong">{inv.invoiceNumber}</span>
       </td>
-      <td className="px-3.5 py-2">
+      <td>
         <div className="font-mono text-[11px] text-fg-muted">{forJob}</div>
         {desc && (
           <div className="mt-0.5 max-w-[320px] truncate text-[10.5px] text-fg" title={desc}>
@@ -3833,10 +3936,10 @@ function InvoiceRow({
           override (warranty co + PAYER badge) is deferred — the Invoice DTO
           carries no payer field yet, so there's nothing to surface; wire the
           badge when payer lands on the invoice read model. */}
-      <td className="px-3.5 py-2 text-[11.5px] text-fg">{billTo}</td>
-      <td className="px-3.5 py-2 text-[11.5px] text-fg-muted">{formatTimestamp(inv.invoiceDate)}</td>
-      <td className="px-3.5 py-2 text-[11.5px] text-fg-muted">{formatTimestamp(inv.dueDate)}</td>
-      <td className="px-3.5 py-2">
+      <td className="text-[11.5px] text-fg">{billTo}</td>
+      <td className="text-[11.5px] text-fg-muted">{formatTimestamp(inv.invoiceDate)}</td>
+      <td className="text-[11.5px] text-fg-muted">{formatTimestamp(inv.dueDate)}</td>
+      <td>
         <Pill tone={overdue ? 'warning' : INVOICE_STATUS_TONE[inv.status]} dot>
           {overdue ? INVOICE_STATUS_LABEL.OVERDUE : INVOICE_STATUS_LABEL[inv.status]}
         </Pill>
@@ -3845,7 +3948,7 @@ function InvoiceRow({
           voided $100 doesn't scan as real AR (the row dimming alone leaves the
           bold amount pulling full weight). */}
       <td
-        className={`px-3.5 py-2 text-right font-mono text-[12px] tabular-nums ${
+        className={`right font-mono text-[12px] tabular-nums ${
           voided ? 'font-normal text-fg-muted line-through' : 'font-bold text-fg-strong'
         }`}
       >
@@ -3855,13 +3958,13 @@ function InvoiceRow({
           dim; voided rows have no receivable at all, so a dash (not $0.00,
           which would read as "paid off"). */}
       <td
-        className={`px-3.5 py-2 text-right font-mono text-[12px] tabular-nums ${
+        className={`right font-mono text-[12px] tabular-nums ${
           voided ? 'text-fg-dim' : balance > 0 ? 'font-semibold text-fg-strong' : 'text-fg-dim'
         }`}
       >
         {voided ? '—' : fmtMoney.format(balance)}
       </td>
-    </tr>
+    </DenseRow>
   );
 }
 
@@ -4122,23 +4225,26 @@ function DispatchesTable({
   const { getName } = useGlossary();
   const { t } = useTranslation();
   return (
+    // DenseTable: dense column layout on desktop, auto-stacks to one card per
+    // row < 640px (When leads the card, Status pins top-right, the rest stack
+    // as muted lines) — no bespoke mobile markup, consistent with the lists.
     <div className="overflow-x-auto">
-      <table className="w-full border-collapse text-[12px]">
-        <thead className="bg-bg-elev-2">
-          <tr className="text-left text-[10px] font-semibold uppercase tracking-wider text-fg-muted">
-            <th className="px-3.5 py-2 font-semibold">When</th>
-            <th className="px-3.5 py-2 font-semibold">Type</th>
-            <th className="px-3.5 py-2 font-semibold">{getName('work_order')}</th>
-            <th className="px-3.5 py-2 font-semibold">Tech</th>
-            <th className="px-3.5 py-2 font-semibold">{t('workOrders.table.statusHeader')}</th>
+      <DenseTable>
+        <DenseTHead>
+          <tr>
+            <th>When</th>
+            <th>Type</th>
+            <th>{getName('work_order')}</th>
+            <th>Tech</th>
+            <th>{t('workOrders.table.statusHeader')}</th>
           </tr>
-        </thead>
+        </DenseTHead>
         <tbody>
           {rows.map((v) => (
             <DispatchRow key={v.id} dispatch={v} onOpen={() => onOpen(v)} />
           ))}
         </tbody>
-      </table>
+      </DenseTable>
     </div>
   );
 }
@@ -4157,23 +4263,18 @@ function DispatchRow({
   const tone = overdue ? 'warning' : DISPATCH_STATUS_TONE[dispatch.status];
   const title = locationDispatchTitle(dispatch);
   const techName = dispatch.assignedUserName;
-
-  // Subtle row tint: in-progress = info (a tech is on site now); overdue = warning.
-  const tint = live
-    ? 'bg-[color-mix(in_oklch,var(--info-500)_6%,var(--bg-elev))]'
-    : overdue
-      ? 'bg-[color-mix(in_oklch,var(--warning-500)_7%,var(--bg-elev))]'
-      : '';
+  // Row tint preserved through the DenseTable reflow: in-progress = live (info),
+  // overdue = escalation (warning).
+  const tintClass = live ? 'row-live' : overdue ? 'row-warn' : undefined;
 
   return (
-    <tr
-      className={`cursor-pointer border-b border-border-soft hover:bg-bg-hover ${tint}`}
-      onClick={onOpen}
-    >
-      <td className="px-3.5 py-2 whitespace-nowrap text-[11.5px] text-fg">
+    <DenseRow onClick={onOpen} className={tintClass}>
+      {/* When leads (mobile card title). nowrap keeps the window on one line on
+          desktop; it wraps on the full-width mobile card. */}
+      <td className="whitespace-nowrap text-[11.5px] text-fg max-sm:whitespace-normal">
         {formatArrivalWindow(dispatch.arrivalWindowStart, dispatch.arrivalWindowEnd)}
       </td>
-      <td className="px-3.5 py-2">
+      <td>
         {dispatch.workOrderTypeName ? (
           <span className="rounded-[3px] border border-border-soft bg-bg-active px-1.5 text-[10px] font-semibold text-fg-muted">
             {dispatch.workOrderTypeName}
@@ -4182,7 +4283,7 @@ function DispatchRow({
           <span className="text-[11px] text-fg-dim">—</span>
         )}
       </td>
-      <td className="px-3.5 py-2">
+      <td>
         <div className="font-mono text-[11px] text-fg-muted">
           {dispatch.workOrderNumber}
         </div>
@@ -4192,15 +4293,16 @@ function DispatchRow({
           </div>
         )}
       </td>
-      <td className="px-3.5 py-2">
+      <td>
         <DispatchTechCell name={techName} live={live} muted={didntHappen} />
       </td>
-      <td className="px-3.5 py-2">
+      {/* Status — last cell → pins top-right on the mobile card, never clipped. */}
+      <td>
         <Pill tone={tone} dot live={live}>
           {overdue ? 'Overdue' : t(`workOrders.dispatches.status.${dispatch.status}`)}
         </Pill>
       </td>
-    </tr>
+    </DenseRow>
   );
 }
 
@@ -4254,6 +4356,49 @@ const JOB_STATUS_FILTERS: {
   { id: 'all', labelKey: 'workOrders.filters.all', params: {} },
 ];
 const JOBS_PAGE_SIZE = 25;
+
+// Jobs-tab row — the site's full work-order list, routed through DenseTable so
+// it stacks on mobile like the lists. (The Overview's Work-orders card keeps its
+// curated peek card instead.) Reuses the shared WoTitleLine / WoStatusPill so
+// the cell content matches the peek; the row tint maps to the DenseTable tint
+// classes via the same rule as woRowTint.
+function JobDenseRow({ wo, typeName }: { wo: WorkOrderSummary; typeName?: string }) {
+  const navigate = useNavigate();
+  const jobLabel = deriveJobLabel(wo, typeName);
+  const elevated = wo.priority === 'URGENT' || wo.priority === 'HIGH';
+  const tintClass =
+    wo.lifecycleState === 'CANCELLED'
+      ? undefined
+      : wo.progressCategory === 'IN_PROGRESS'
+        ? 'row-live'
+        : !wo.scheduledDate && elevated
+          ? 'row-warn'
+          : undefined;
+  return (
+    <DenseRow className={tintClass} onClick={() => navigate(`/work-orders/${wo.id}`)}>
+      <td>
+        <WoTitleLine wo={wo} typeName={typeName} />
+        <div className="mt-0.5 max-w-[420px] truncate text-[10.5px] text-fg" title={jobLabel}>
+          {jobLabel}
+        </div>
+      </td>
+      <td>
+        {wo.equip && wo.equip.count > 0 ? (
+          <span className="text-[11px] text-fg-muted">{wo.equip.label}</span>
+        ) : (
+          <span className="text-[11px] text-fg-dim">—</span>
+        )}
+      </td>
+      <td>
+        <WoStatusPill wo={wo} />
+      </td>
+      <td>
+        <AssignedUsersCell users={wo.assignedUsers} />
+      </td>
+      <td className="text-[11.5px] text-fg-muted">{formatWoDate(wo.scheduledDate)}</td>
+    </DenseRow>
+  );
+}
 
 function JobsTab({ location, onNewJob }: { location: ServiceLocationDetailDto; onNewJob: () => void }) {
   const { getName } = useGlossary();
@@ -4434,23 +4579,25 @@ function JobsTab({ location, onNewJob }: { location: ServiceLocationDetailDto; o
           </div>
         ) : (
           <>
+            {/* DenseTable: dense columns on desktop, one card per job < 640px
+                (WO# + type lead, Scheduled pins top-right, the rest stack). */}
             <div className="overflow-x-auto">
-              <table className="w-full border-collapse text-[12px]">
-                <thead className="bg-bg-elev-2">
-                  <tr className="text-left text-[10px] font-semibold uppercase tracking-wider text-fg-muted">
-                    <th className="px-3.5 py-2 font-semibold">{getName('work_order')}</th>
-                    <th className="px-3.5 py-2 font-semibold">{getName('equipment')}</th>
-                    <th className="px-3.5 py-2 font-semibold">{t('workOrders.table.statusHeader')}</th>
-                    <th className="px-3.5 py-2 font-semibold">{t('workOrders.table.assigned')}</th>
-                    <th className="px-3.5 py-2 font-semibold">{t('workOrders.table.scheduled')}</th>
+              <DenseTable>
+                <DenseTHead>
+                  <tr>
+                    <th>{getName('work_order')}</th>
+                    <th>{getName('equipment')}</th>
+                    <th>{t('workOrders.table.statusHeader')}</th>
+                    <th>{t('workOrders.table.assigned')}</th>
+                    <th>{t('workOrders.table.scheduled')}</th>
                   </tr>
-                </thead>
+                </DenseTHead>
                 <tbody>
                   {rows.map((wo) => (
-                    <WorkOrderRow key={wo.id} wo={wo} typeName={typeName(wo.workOrderTypeId)} />
+                    <JobDenseRow key={wo.id} wo={wo} typeName={typeName(wo.workOrderTypeId)} />
                   ))}
                 </tbody>
-              </table>
+              </DenseTable>
             </div>
             <div className="flex items-center justify-between border-t border-border-soft bg-bg-elev-2 px-4 py-2.5 text-[11.5px] text-fg-muted">
               <span>

@@ -777,7 +777,7 @@ describe('ServiceLocationDetailPage', () => {
     await waitFor(() => expect(activityTab).toHaveAttribute('aria-selected', 'true'));
   });
 
-  it('renders the contacts directory table on the Contacts tab', async () => {
+  it('renders the contacts directory on the Contacts tab', async () => {
     mockApiResponses();
     const user = userEvent.setup();
     renderDetailPage();
@@ -788,12 +788,14 @@ describe('ServiceLocationDetailPage', () => {
     await waitFor(() => expect(contactsTab).toHaveAttribute('aria-selected', 'true'));
 
     // The primary site contact shows in the directory, badged + with its phone.
+    // (jsdom reports no matchMedia match, so the tab renders its mobile
+    // ContactBlock cards rather than the desktop table — the content is the
+    // same; the phone is a tappable tel: link.)
     await waitFor(() => {
-      const table = screen.getByRole('table');
-      expect(within(table).getByText('John Doe')).toBeInTheDocument();
-      expect(within(table).getByText('Primary')).toBeInTheDocument();
-      expect(within(table).getByText('(555) 123-4567')).toBeInTheDocument();
+      expect(screen.getByText('John Doe')).toBeInTheDocument();
     });
+    expect(screen.getByText('Primary')).toBeInTheDocument();
+    expect(screen.getByText('(555) 123-4567')).toHaveAttribute('href', 'tel:5551234567');
     expect(screen.getByRole('button', { name: /add contact/i })).toBeInTheDocument();
   });
 
