@@ -224,13 +224,18 @@ export {
 export {
   filesApi,
   locationFilesApi,
+  equipmentFilesApi,
   FILE_MAX_BYTES,
   FILE_CAPTION_MAX_CHARS,
   FILE_CONTENT_TYPES,
+  VIDEO_CONTENT_TYPES,
+  VIDEO_MAX_BYTES,
   LOCATION_FILE_CATEGORIES,
   LOCATION_FILE_CATEGORY_LABELS,
   type FileContentType,
+  type VideoContentType,
   type FileKind,
+  type FileStatus,
   type FileCounts,
   type PagedFiles,
   type ListFilesParams,
@@ -239,6 +244,7 @@ export {
   type WorkOrderFile,
   type RequestFileUploadUrlResponse,
   type RequestLocationFileUploadUrlRequest,
+  type RequestEquipmentFileUploadUrlRequest,
   type PatchLocationFileRequest,
 } from './filesApi';
 

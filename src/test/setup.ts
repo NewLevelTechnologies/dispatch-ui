@@ -436,6 +436,7 @@ vi.mock('react-i18next', () => {
     'equipment.tabs.notes': 'Notes',
     'equipment.tabs.overview': 'Overview',
     'equipment.tabs.serviceHistory': 'Service History',
+    'equipment.tabs.videos': 'Videos',
     'equipment.table.category': 'Category',
     'equipment.table.componentOf': '{{entity}} of {{parent}}',
     'equipment.table.lastServiced': 'Last Serviced',

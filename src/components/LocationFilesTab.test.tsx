@@ -26,9 +26,11 @@ function filesPage<T>(content: T[], counts: FileCounts) {
 const woPhoto: WorkOrderFile = {
   id: 'wf-1',
   kind: 'PHOTO',
+  status: 'READY',
   fileName: 'RTU-3 before.jpg',
   url: 'https://s3/wf-1',
   thumbnailUrl: 'https://s3/wf-1-thumb',
+  durationSeconds: null,
   contentType: 'image/jpeg',
   sizeBytes: 2_400_000,
   widthPx: null,
@@ -70,6 +72,32 @@ const woDoc: WorkOrderFile = {
   contentType: 'application/pdf',
   sizeBytes: 146_000,
   createdAt: '2026-06-03T10:00:00Z',
+};
+
+const woVideo: WorkOrderFile = {
+  ...woPhoto,
+  id: 'wf-4',
+  kind: 'VIDEO',
+  status: 'READY',
+  fileName: 'compressor-leak.mov',
+  url: 'https://s3/wf-4',
+  thumbnailUrl: 'https://s3/wf-4-poster',
+  durationSeconds: 42,
+  contentType: 'video/quicktime',
+  equipmentId: 'eq-1',
+  equipmentName: 'RTU-3',
+  createdAt: '2026-06-06T10:00:00Z',
+};
+
+const woVideoProcessing: WorkOrderFile = {
+  ...woVideo,
+  id: 'wf-5',
+  status: 'PROCESSING',
+  fileName: 'transcoding.mov',
+  url: 'https://s3/wf-5',
+  thumbnailUrl: null,
+  durationSeconds: null,
+  createdAt: '2026-06-07T10:00:00Z',
 };
 
 const sitePhoto: LocationFile = {
@@ -117,11 +145,13 @@ function mockApi({
   const aggCounts: FileCounts = {
     all: agg.length,
     photos: agg.filter((f) => f.kind === 'PHOTO').length,
+    videos: agg.filter((f) => f.kind === 'VIDEO').length,
     documents: agg.filter((f) => f.kind === 'DOCUMENT').length,
   };
   const directCounts: FileCounts = {
     all: direct.length,
     photos: direct.filter((f) => f.kind === 'PHOTO').length,
+    videos: direct.filter((f) => f.kind === 'VIDEO').length,
     documents: direct.filter((f) => f.kind === 'DOCUMENT').length,
   };
   vi.mocked(apiClient.get).mockImplementation((url, config) => {
@@ -344,5 +374,67 @@ describe('LocationFilesTab', () => {
     await user.click(kebabs[0]); // job doc row (newest-first)
     expect(await screen.findByRole('menuitem', { name: 'View work order' })).toBeInTheDocument();
     expect(screen.queryByRole('menuitem', { name: 'Delete' })).not.toBeInTheDocument();
+  });
+
+  it('renders a Videos chip and a video tile with poster + duration badge', async () => {
+    mockApi({ agg: [woVideo] });
+    renderTab();
+    expect(await screen.findByRole('button', { name: /^Videos\s*1$/ })).toBeInTheDocument();
+
+    // Tile is labelled by the file name; carries the poster image and the
+    // mono duration pill (m:ss).
+    const tile = await screen.findByRole('button', { name: 'compressor-leak.mov' });
+    expect(within(tile).getByRole('img')).toHaveAttribute('src', 'https://s3/wf-4-poster');
+    expect(within(tile).getByText('0:42')).toBeInTheDocument();
+  });
+
+  it('skips the customer-service direct endpoint on the Videos filter, keeping counts stable', async () => {
+    // agg has 1 video; direct has the default 1 photo + 1 doc.
+    mockApi({ agg: [woVideo] });
+    renderTab();
+    const user = userEvent.setup();
+    await screen.findByText('compressor-leak.mov');
+
+    await user.click(screen.getByRole('button', { name: /^Videos\s*1$/ }));
+
+    // The work-order aggregate is queried for videos…
+    await waitFor(() => {
+      expect(apiClient.get).toHaveBeenCalledWith(
+        '/files',
+        expect.objectContaining({ params: expect.objectContaining({ kind: 'VIDEO' }) })
+      );
+    });
+    // …but the customer-service direct endpoint is NOT (it can't hold videos).
+    expect(apiClient.get).not.toHaveBeenCalledWith(
+      `/service-locations/${LOCATION_ID}/files`,
+      expect.objectContaining({ params: expect.objectContaining({ kind: 'VIDEO' }) })
+    );
+    // Anchor-wide chip counts stay put (direct counts are latched).
+    expect(screen.getByRole('button', { name: /^Photos\s*1$/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^Documents\s*1$/ })).toBeInTheDocument();
+  });
+
+  it('shows a processing placeholder for a transcoding video and blocks opening it', async () => {
+    mockApi({ agg: [woVideoProcessing] });
+    renderTab();
+    expect(await screen.findByText('Processing…')).toBeInTheDocument();
+    // Disabled until the poster lands; no duration badge yet.
+    const tile = screen.getByRole('button', { name: 'transcoding.mov (processing)' });
+    expect(tile).toBeDisabled();
+  });
+
+  it('opens an inline video player (paused on the poster) in the lightbox', async () => {
+    mockApi({ agg: [woVideo] });
+    renderTab();
+    const user = userEvent.setup();
+
+    await user.click(await screen.findByRole('button', { name: 'compressor-leak.mov' }));
+
+    const video = document.querySelector('video');
+    expect(video).toBeInTheDocument();
+    expect(video).toHaveAttribute('src', 'https://s3/wf-4');
+    expect(video).toHaveAttribute('poster', 'https://s3/wf-4-poster');
+    // No autoplay — starts on the poster.
+    expect(video).not.toHaveAttribute('autoplay');
   });
 });

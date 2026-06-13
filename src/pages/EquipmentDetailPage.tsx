@@ -30,6 +30,7 @@ import EquipmentFilterFormDialog from '../components/EquipmentFilterFormDialog';
 import EquipmentFormDialog from '../components/EquipmentFormDialog';
 import EquipmentImageUploadDialog from '../components/EquipmentImageUploadDialog';
 import EquipmentNotesSection from '../components/EquipmentNotesSection';
+import EquipmentVideosSection from '../components/EquipmentVideosSection';
 import EquipmentPhotoLightbox from '../components/EquipmentPhotoLightbox';
 import EquipmentThumbnail from '../components/EquipmentThumbnail';
 import WorkOrdersList from '../components/WorkOrdersList';
@@ -67,7 +68,7 @@ import { StarIcon as StarIconSolid } from '@heroicons/react/24/solid';
 import { formatFilterSize } from '../utils/formatFilterSize';
 import { TimeAgo } from '../components/TimeAgo';
 
-type TabId = 'overview' | 'notes' | 'photos' | 'filters' | 'service-history' | 'components';
+type TabId = 'overview' | 'notes' | 'photos' | 'videos' | 'filters' | 'service-history' | 'components';
 
 // Above this number of tenant filter sizes, the chip palette collapses to
 // the top N by sortOrder with a "Show all" toggle. Keeps the filters tab
@@ -414,6 +415,7 @@ export default function EquipmentDetailPage() {
     // operational surfaces.
     { id: 'notes', label: t('equipment.tabs.notes'), count: allNotes.length },
     { id: 'photos', label: t('equipment.tabs.photos'), count: images.length },
+    { id: 'videos', label: t('equipment.tabs.videos') },
     { id: 'filters', label: t('equipment.tabs.filters'), count: filters.length },
     {
       id: 'service-history',
@@ -950,6 +952,8 @@ export default function EquipmentDetailPage() {
               )}
             </div>
           )}
+
+          {activeTab === 'videos' && id && <EquipmentVideosSection equipmentId={id} />}
 
           {activeTab === 'filters' && (
             <div>
