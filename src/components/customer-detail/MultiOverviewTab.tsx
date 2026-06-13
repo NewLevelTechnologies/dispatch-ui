@@ -240,8 +240,8 @@ function LabelTiny({ children }: { children: React.ReactNode }) {
 
 // Billing & AR — terms / pricebook / tax ride the detail payload; the
 // outstanding headline + 5-bucket aging come from the FIN-1 summary (honest
-// "—" until it resolves).
-function BillingCard({ customer, ar }: { customer: Customer; ar?: CustomerArSummaryResponse }) {
+// "—" until it resolves). Exported for reuse by SingleCustomerDetail.
+export function BillingCard({ customer, ar }: { customer: Customer; ar?: CustomerArSummaryResponse }) {
   const termsLabel = customer.paymentTermsDays > 0 ? `Net ${customer.paymentTermsDays}` : '—';
   const buckets: { k: string; b: CustomerArSummaryResponse['current']; danger?: boolean }[] = ar
     ? [
@@ -553,11 +553,12 @@ function ContactCard({ customer, onViewAll }: { customer: Customer; onViewAll: (
   );
 }
 
-function AccountDetailsCard({ customer, ar }: { customer: Customer; ar?: CustomerArSummaryResponse }) {
+// Exported (+ `typeLabel`) for reuse by SingleCustomerDetail ("Single-site").
+export function AccountDetailsCard({ customer, ar, typeLabel = 'Multi-site' }: { customer: Customer; ar?: CustomerArSummaryResponse; typeLabel?: string }) {
   const { getName } = useGlossary();
   const rows: { k: string; v: React.ReactNode }[] = [
     { k: `${getName('customer')} ID`, v: <span className="font-mono">{customer.customerNumber || customer.id}</span> },
-    { k: 'Type', v: 'Multi-site' },
+    { k: 'Type', v: typeLabel },
   ];
   if (customer.industry) rows.push({ k: 'Industry', v: customer.industry });
   if (customer.accountManager) rows.push({ k: 'Acct manager', v: customer.accountManager.name });
