@@ -89,7 +89,7 @@ describe('ServiceLocationDetailPage', () => {
         return Promise.resolve({
           data: {
             content: [],
-            counts: { all: 0, photos: 0, documents: 0 },
+            counts: { all: 0, photos: 0, videos: 0, documents: 0 },
             totalElements: 0,
             totalPages: 0,
             number: 0,

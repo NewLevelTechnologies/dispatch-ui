@@ -2,7 +2,8 @@ import apiClient from './client';
 import type { Page } from './workOrderApi';
 
 // ─────────────────────────────────────────────────────────────────────────
-// Files — photos + documents anchored to locations, work orders, equipment.
+// Files — photos, videos, and documents anchored to locations, work orders,
+// equipment. (Videos are work-order-domain only — see FileKind below.)
 //
 // Two backends share one wire convention:
 //  · customer-service  → /service-locations/{id}/files (direct site uploads,
@@ -26,14 +27,29 @@ export const FILE_CONTENT_TYPES = [
 ] as const;
 export type FileContentType = (typeof FILE_CONTENT_TYPES)[number];
 
-// Derived server-side from contentType: images → PHOTO, PDFs → DOCUMENT.
-export type FileKind = 'PHOTO' | 'DOCUMENT';
+// Video uploads (work-order-domain routes only). iPhone .mov → video/quicktime,
+// Android → video/mp4. The PUT's Content-Type must match the declared type
+// exactly or S3 rejects the presigned upload with 403.
+export const VIDEO_CONTENT_TYPES = ['video/mp4', 'video/quicktime'] as const;
+export type VideoContentType = (typeof VIDEO_CONTENT_TYPES)[number];
+export const VIDEO_MAX_BYTES = 100 * 1024 * 1024; // 100 MB (vs 25 MB for photos/PDFs)
 
-/** Aggregate counts for the Files type filter (All / Photos / Documents).
+// Derived server-side from contentType: images → PHOTO, videos → VIDEO,
+// PDFs → DOCUMENT. Videos are work-order-domain only (born on a job / against
+// equipment); direct site uploads stay photos + PDFs.
+export type FileKind = 'PHOTO' | 'VIDEO' | 'DOCUMENT';
+
+// Transcode lifecycle. Photos/PDFs are always READY; a video sits at PROCESSING
+// (~30–60s, no poster yet) after confirm, then flips to READY — poll the list
+// while any tile is PROCESSING. FAILED videos are hidden from lists server-side.
+export type FileStatus = 'READY' | 'PROCESSING' | 'FAILED';
+
+/** Aggregate counts for the Files type filter (All / Photos / Videos / Documents).
  *  Always anchor-wide — independent of the list's `kind` filter. */
 export interface FileCounts {
   all: number;
   photos: number;
+  videos: number;
   documents: number;
 }
 
@@ -109,9 +125,15 @@ export interface LocationFile {
 export interface WorkOrderFile {
   id: string;
   kind: FileKind;
+  // PROCESSING videos appear in lists (poster pending); FAILED are hidden.
+  status: FileStatus;
   fileName: string;
+  // READY video = playable H.264 MP4 (every browser); else the original file.
   url: string;
+  // VIDEO: server-generated poster frame — null while PROCESSING.
   thumbnailUrl: string | null;
+  // VIDEO only — runtime in seconds for the m:ss duration badge; null otherwise.
+  durationSeconds: number | null;
   contentType: string;
   sizeBytes: number;
   widthPx: number | null;
@@ -169,6 +191,87 @@ export const filesApi = {
       params: { serviceLocationId, ...params },
     });
     return response.data;
+  },
+};
+
+// Shared direct-to-S3 PUT (fetch, not apiClient — no JWT on the presigned URL).
+// The Content-Type must match the upload-url request exactly (403 otherwise).
+async function putToS3(uploadUrl: string, contentType: string, file: File | Blob): Promise<void> {
+  const res = await fetch(uploadUrl, {
+    method: 'PUT',
+    headers: { 'Content-Type': contentType },
+    body: file,
+  });
+  if (!res.ok) throw new Error(`S3 upload failed with ${res.status}`);
+}
+
+export interface RequestEquipmentFileUploadUrlRequest {
+  contentType: string;
+  sizeBytes: number;
+  fileName: string;
+  caption?: string | null;
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// work-order-service — files anchored directly to an equipment record. Same
+// 3-step presigned flow; videos confirm as PROCESSING then transcode. (This is
+// the NEW /equipment/{id}/files route — distinct from equipmentApi's older
+// /equipment/{id}/images, which is photos-only and has no video/processing.)
+// ─────────────────────────────────────────────────────────────────────────
+export const equipmentFilesApi = {
+  list: async (
+    equipmentId: string,
+    params: ListFilesParams = {}
+  ): Promise<PagedFiles<WorkOrderFile>> => {
+    const response = await apiClient.get<PagedFiles<WorkOrderFile>>(
+      `/equipment/${equipmentId}/files`,
+      { params }
+    );
+    return response.data;
+  },
+
+  requestUploadUrl: async (
+    equipmentId: string,
+    request: RequestEquipmentFileUploadUrlRequest
+  ): Promise<RequestFileUploadUrlResponse> => {
+    const response = await apiClient.post<RequestFileUploadUrlResponse>(
+      `/equipment/${equipmentId}/files/upload-url`,
+      request
+    );
+    return response.data;
+  },
+
+  confirm: async (equipmentId: string, fileId: string): Promise<WorkOrderFile> => {
+    const response = await apiClient.post<WorkOrderFile>(
+      `/equipment/${equipmentId}/files/${fileId}/confirm`
+    );
+    return response.data;
+  },
+
+  /** Orchestrates the 3-step upload (request → PUT → confirm). */
+  upload: async (
+    equipmentId: string,
+    file: File,
+    options: {
+      caption?: string | null;
+      onProgress?: (stage: 'requesting' | 'uploading' | 'confirming') => void;
+    } = {}
+  ): Promise<WorkOrderFile> => {
+    options.onProgress?.('requesting');
+    const { fileId, uploadUrl } = await equipmentFilesApi.requestUploadUrl(equipmentId, {
+      contentType: file.type,
+      sizeBytes: file.size,
+      fileName: file.name,
+      caption: options.caption ?? null,
+    });
+    options.onProgress?.('uploading');
+    await putToS3(uploadUrl, file.type, file);
+    options.onProgress?.('confirming');
+    return equipmentFilesApi.confirm(equipmentId, fileId);
+  },
+
+  delete: async (equipmentId: string, fileId: string): Promise<void> => {
+    await apiClient.delete(`/equipment/${equipmentId}/files/${fileId}`);
   },
 };
 

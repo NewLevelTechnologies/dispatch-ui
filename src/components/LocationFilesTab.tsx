@@ -23,22 +23,27 @@ import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-q
 import * as Headless from '@headlessui/react';
 import {
   ArrowDownTrayIcon,
+  ArrowPathIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
   DocumentTextIcon,
   EllipsisVerticalIcon,
+  ExclamationTriangleIcon,
   PhotoIcon,
   PlusIcon,
   StarIcon,
   TrashIcon,
+  VideoCameraIcon,
   XMarkIcon,
 } from '@heroicons/react/24/outline';
-import { StarIcon as StarIconSolid } from '@heroicons/react/24/solid';
+import { PlayIcon, StarIcon as StarIconSolid } from '@heroicons/react/24/solid';
 import {
   filesApi,
   locationFilesApi,
   LOCATION_FILE_CATEGORY_LABELS,
+  type FileCounts,
   type FileKind,
+  type FileStatus,
   type LocationFile,
   type LocationFileCategory,
   type PagedFiles,
@@ -68,9 +73,13 @@ export interface SiteFile {
   origin: 'job' | 'site';
   id: string;
   kind: FileKind;
+  // VIDEO transcode lifecycle; always READY for photos/docs.
+  status: FileStatus;
   fileName: string;
   url: string;
   thumbnailUrl: string | null;
+  // VIDEO only — runtime seconds for the m:ss badge; null otherwise.
+  durationSeconds: number | null;
   sizeBytes: number;
   caption: string | null;
   uploadedByName: string | null;
@@ -91,9 +100,11 @@ function fromWorkOrderFile(f: WorkOrderFile): SiteFile {
     origin: 'job',
     id: f.id,
     kind: f.kind,
+    status: f.status,
     fileName: f.fileName,
     url: f.url,
     thumbnailUrl: f.thumbnailUrl,
+    durationSeconds: f.durationSeconds,
     sizeBytes: f.sizeBytes,
     caption: f.caption,
     uploadedByName: f.uploadedByName,
@@ -113,9 +124,12 @@ function fromLocationFile(f: LocationFile): SiteFile {
     origin: 'site',
     id: f.id,
     kind: f.kind,
+    // Direct site uploads are photos/PDFs only — never PROCESSING.
+    status: 'READY',
     fileName: f.fileName,
     url: f.url,
     thumbnailUrl: f.thumbnailUrl,
+    durationSeconds: null,
     sizeBytes: f.sizeBytes,
     caption: f.caption,
     uploadedByName: f.uploadedByName,
@@ -135,6 +149,13 @@ function formatBytes(n: number): string {
   return `${n} B`;
 }
 
+// Duration badge — m:ss (mono, e.g. "0:42"). Site clips are short, so an
+// hours field isn't worth the width; a long clip just reads "73:20".
+function formatVideoDuration(totalSeconds: number): string {
+  const s = Math.max(0, Math.round(totalSeconds));
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+}
+
 // Shared infinite-page helpers — the two sources page independently (1-indexed
 // `page` param; Spring's envelope rides back with 0-based `number` + `last`).
 function nextPageParam<T>(last: PagedFiles<T>): number | undefined {
@@ -152,8 +173,12 @@ export default function LocationFilesTab({
   const [type, setType] = useState<TypeFilter>('all');
   const [src, setSrc] = useState<SourceFilter>('all');
   const [uploadOpen, setUploadOpen] = useState(false);
-  // Index into the *filtered photos* array; null = closed.
-  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+  // The open lightbox: which collection (photos | videos) and the index into
+  // that filtered array. null = closed. Videos play inline; photos show as
+  // images — one viewer, branched on kind.
+  const [lightbox, setLightbox] = useState<{ collection: 'photos' | 'videos'; index: number } | null>(
+    null
+  );
 
   const kindParam = type === 'all' ? undefined : type;
 
@@ -167,15 +192,25 @@ export default function LocationFilesTab({
     initialPageParam: 1,
     getNextPageParam: nextPageParam,
     retry: 1,
+    // Videos confirm as PROCESSING (~30–60s) then flip to READY with a poster +
+    // playable url. No push channel — poll while any tile is still transcoding,
+    // and stop on its own once none remain. Only the aggregate carries videos.
+    refetchInterval: (query) =>
+      (query.state.data?.pages ?? []).some((p) => p.content.some((f) => f.status === 'PROCESSING'))
+        ? 4000
+        : false,
   });
 
-  // Direct site uploads (customer-service).
+  // Direct site uploads (customer-service). These are photos/PDF only — videos
+  // are never stored here, and the endpoint 400s on kind=VIDEO — so don't query
+  // it on the Videos filter (the work-order aggregate is the only video source).
   const directQuery = useInfiniteQuery({
     queryKey: ['location-files', locationId, 'direct', kindParam ?? 'all'] as const,
     queryFn: ({ pageParam }) =>
       locationFilesApi.list(locationId, { kind: kindParam, page: pageParam, limit: PAGE_LIMIT }),
     initialPageParam: 1,
     getNextPageParam: nextPageParam,
+    enabled: kindParam !== 'VIDEO',
   });
 
   const aggPages = useMemo(() => aggQuery.data?.pages ?? [], [aggQuery.data]);
@@ -185,10 +220,22 @@ export default function LocationFilesTab({
   // (independent of the kind/source filters, per the wire contract).
   const aggCounts = aggPages[0]?.counts;
   const directCounts = directPages[0]?.counts;
+  // Direct counts are anchor-wide (filter-independent). Latch the last seen
+  // value so disabling the direct query on the Videos filter doesn't drop the
+  // Photos/Documents/All totals.
+  const [latchedDirectCounts, setLatchedDirectCounts] = useState<FileCounts | undefined>(undefined);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- cache anchor-wide direct counts so they survive the Videos filter disabling the direct query
+    if (directCounts) setLatchedDirectCounts(directCounts);
+  }, [directCounts]);
+  const dCounts = directCounts ?? latchedDirectCounts;
   const counts = {
-    all: (aggCounts?.all ?? 0) + (directCounts?.all ?? 0),
-    photos: (aggCounts?.photos ?? 0) + (directCounts?.photos ?? 0),
-    documents: (aggCounts?.documents ?? 0) + (directCounts?.documents ?? 0),
+    all: (aggCounts?.all ?? 0) + (dCounts?.all ?? 0),
+    photos: (aggCounts?.photos ?? 0) + (dCounts?.photos ?? 0),
+    // Videos are work-order-domain only; the direct (customer-service) source
+    // never reports any, but guard the read in case its envelope omits the key.
+    videos: (aggCounts?.videos ?? 0) + (dCounts?.videos ?? 0),
+    documents: (aggCounts?.documents ?? 0) + (dCounts?.documents ?? 0),
   };
 
   // Merge → source-filter → newest-first. Type is already server-filtered.
@@ -211,6 +258,12 @@ export default function LocationFilesTab({
   }, [aggPages, directPages, src]);
 
   const photos = useMemo(() => merged.filter((f) => f.kind === 'PHOTO'), [merged]);
+  // FAILED videos are hidden server-side; filter defensively in case one slips
+  // through (a PROCESSING tile that errored between polls).
+  const videos = useMemo(
+    () => merged.filter((f) => f.kind === 'VIDEO' && f.status !== 'FAILED'),
+    [merged]
+  );
   const docs = useMemo(() => merged.filter((f) => f.kind === 'DOCUMENT'), [merged]);
 
   const isLoading = aggQuery.isLoading || directQuery.isLoading;
@@ -232,6 +285,7 @@ export default function LocationFilesTab({
   const typeChips: { id: TypeFilter; label: string; count: number }[] = [
     { id: 'all', label: 'All', count: counts.all },
     { id: 'PHOTO', label: 'Photos', count: counts.photos },
+    { id: 'VIDEO', label: 'Videos', count: counts.videos },
     { id: 'DOCUMENT', label: 'Documents', count: counts.documents },
   ];
   const srcLabels: Record<SourceFilter, string> = {
@@ -328,7 +382,7 @@ export default function LocationFilesTab({
             <div className="mt-1 text-[12px] text-fg-muted">
               {filtersActive
                 ? 'Adjust the filters, or upload a site document.'
-                : `Photos and documents from ${getName('work_order', true).toLowerCase()} land here automatically — or upload a site document directly.`}
+                : `Photos, videos, and documents from ${getName('work_order', true).toLowerCase()} land here automatically — or upload a site document directly.`}
             </div>
           </div>
         </Card>
@@ -348,7 +402,29 @@ export default function LocationFilesTab({
             >
               <div className="grid grid-cols-[repeat(auto-fill,minmax(132px,1fr))] gap-2.5 p-3">
                 {photos.map((f, i) => (
-                  <PhotoTile key={f.key} f={f} onOpen={() => setLightboxIndex(i)} />
+                  <PhotoTile key={f.key} f={f} onOpen={() => setLightbox({ collection: 'photos', index: i })} />
+                ))}
+              </div>
+            </Card>
+          )}
+
+          {/* Videos — same grid as photos, between photos and documents. Each
+              tile is a poster + play affordance + duration; PROCESSING tiles
+              show a spinner until the transcode lands a poster. */}
+          {videos.length > 0 && (
+            <Card
+              title={
+                <span className="flex items-center gap-1.5">
+                  <VideoCameraIcon className="size-3.5 text-fg-muted" />
+                  Videos
+                </span>
+              }
+              action={<span className="font-mono text-[11px] tabular-nums text-fg-muted">{videos.length}</span>}
+              padding="none"
+            >
+              <div className="grid grid-cols-[repeat(auto-fill,minmax(132px,1fr))] gap-2.5 p-3">
+                {videos.map((f, i) => (
+                  <VideoTile key={f.key} f={f} onOpen={() => setLightbox({ collection: 'videos', index: i })} />
                 ))}
               </div>
             </Card>
@@ -398,9 +474,9 @@ export default function LocationFilesTab({
       />
 
       <FileLightbox
-        photos={photos}
-        startIndex={lightboxIndex}
-        onClose={() => setLightboxIndex(null)}
+        media={lightbox?.collection === 'videos' ? videos : photos}
+        startIndex={lightbox?.index ?? null}
+        onClose={() => setLightbox(null)}
         locationId={locationId}
         canEdit={canEdit}
       />
@@ -442,6 +518,23 @@ function SourceChips({ f }: { f: SiteFile }) {
   );
 }
 
+// Caption / provenance-chip / date·uploader line shared by photo and video
+// tiles (the designer wants videos to read identically below the thumbnail).
+function TileMeta({ f }: { f: SiteFile }) {
+  return (
+    <div className="mt-1.5 min-w-0">
+      <div className="truncate text-[11.5px] font-medium text-fg-strong" title={f.fileName}>
+        {f.fileName}
+      </div>
+      <div className="mt-1"><SourceChips f={f} /></div>
+      <div className="mt-1 text-[10.5px] text-fg-dim">
+        {formatTimestamp(f.createdAt)}
+        {f.uploadedByName ? ` · ${f.uploadedByName}` : ''}
+      </div>
+    </div>
+  );
+}
+
 function PhotoTile({ f, onOpen }: { f: SiteFile; onOpen: () => void }) {
   return (
     <button type="button" onClick={onOpen} className="group min-w-0 text-left">
@@ -453,16 +546,64 @@ function PhotoTile({ f, onOpen }: { f: SiteFile; onOpen: () => void }) {
           className="size-full object-cover transition-opacity group-hover:opacity-85"
         />
       </div>
-      <div className="mt-1.5 min-w-0">
-        <div className="truncate text-[11.5px] font-medium text-fg-strong" title={f.fileName}>
-          {f.fileName}
-        </div>
-        <div className="mt-1"><SourceChips f={f} /></div>
-        <div className="mt-1 text-[10.5px] text-fg-dim">
-          {formatTimestamp(f.createdAt)}
-          {f.uploadedByName ? ` · ${f.uploadedByName}` : ''}
-        </div>
+      <TileMeta f={f} />
+    </button>
+  );
+}
+
+// Video tile — a photo-shaped poster carrying three "this is a video" signals:
+// the centered play button (primary), the duration pill (secondary), and the
+// poster itself. PROCESSING tiles show a spinner until the transcode lands a
+// poster + duration; we never decode the video bytes client-side to thumbnail.
+function VideoTile({ f, onOpen }: { f: SiteFile; onOpen: () => void }) {
+  const processing = f.status === 'PROCESSING';
+  return (
+    <button
+      type="button"
+      onClick={processing ? undefined : onOpen}
+      disabled={processing}
+      aria-label={processing ? `${f.fileName} (processing)` : f.fileName}
+      className="group min-w-0 text-left disabled:cursor-default"
+    >
+      <div className="relative aspect-[4/3] overflow-hidden rounded-md border border-border-soft bg-bg-active">
+        {processing ? (
+          <div className="flex size-full flex-col items-center justify-center gap-1.5 text-fg-muted">
+            <ArrowPathIcon className="size-5 animate-spin" />
+            <span className="text-[10.5px]">Processing…</span>
+          </div>
+        ) : f.thumbnailUrl ? (
+          <img
+            src={f.thumbnailUrl}
+            alt={f.caption ?? f.fileName}
+            loading="lazy"
+            className="size-full object-cover transition-opacity group-hover:opacity-85"
+          />
+        ) : (
+          // Defensive: a READY video always carries a poster, but show a
+          // neutral stand-in (never decode the clip client-side) if one's missing.
+          <div className="flex size-full items-center justify-center">
+            <VideoCameraIcon className="size-7 text-fg-dim" />
+          </div>
+        )}
+
+        {!processing && (
+          <>
+            {/* Play affordance — the primary video cue */}
+            <span className="pointer-events-none absolute inset-0 flex items-center justify-center">
+              <span className="flex size-9 items-center justify-center rounded-full bg-black/55 ring-1 ring-inset ring-white/25 backdrop-blur-[1px] transition group-hover:bg-black/70">
+                <PlayIcon className="size-4 translate-x-px text-white" />
+              </span>
+            </span>
+            {/* Duration badge — secondary cue + useful info (mono m:ss) */}
+            {f.durationSeconds != null && (
+              <span className="absolute bottom-1 right-1 rounded bg-black/75 px-1.5 py-0.5 font-mono text-[10px] font-medium tabular-nums text-white">
+                {formatVideoDuration(f.durationSeconds)}
+              </span>
+            )}
+          </>
+        )}
       </div>
+      <TileMeta f={f} />
     </button>
   );
 }
@@ -546,30 +687,31 @@ function DocRow({
 }
 
 // ─────────────────────────────────────────────────────────────────────────
-// Lightbox — read-first viewer over the filtered photo set. Site-uploaded
-// photos additionally get manage actions (set as site photo, delete); job /
-// equipment photos are managed on their own records, so the toolbar stays
-// view-only for them (the caption strip carries the provenance instead).
-// Built on Headless Dialog directly (dark edge-to-edge panel), same as
-// EquipmentPhotoLightbox.
+// Lightbox — read-first viewer over the filtered photo OR video set. Videos
+// play inline (no autoplay, starts on the poster); photos show as images.
+// Site-uploaded photos additionally get manage actions (set as site photo,
+// delete); job / equipment media are managed on their own records, so the
+// toolbar stays view-only for them (videos are always job-origin → never
+// manageable here). Built on Headless Dialog directly (dark edge-to-edge
+// panel), same as EquipmentPhotoLightbox.
 // ─────────────────────────────────────────────────────────────────────────
 function FileLightbox({
-  photos,
+  media,
   startIndex,
   onClose,
   locationId,
   canEdit,
 }: {
-  photos: SiteFile[];
+  media: SiteFile[];
   startIndex: number | null;
   onClose: () => void;
   locationId: string;
   canEdit: boolean;
 }) {
-  if (startIndex === null || photos.length === 0) return null;
+  if (startIndex === null || media.length === 0) return null;
   return (
     <LightboxInner
-      photos={photos}
+      media={media}
       startIndex={startIndex}
       onClose={onClose}
       locationId={locationId}
@@ -579,13 +721,13 @@ function FileLightbox({
 }
 
 function LightboxInner({
-  photos,
+  media,
   startIndex,
   onClose,
   locationId,
   canEdit,
 }: {
-  photos: SiteFile[];
+  media: SiteFile[];
   startIndex: number;
   onClose: () => void;
   locationId: string;
@@ -594,9 +736,9 @@ function LightboxInner({
   const queryClient = useQueryClient();
   const [index, setIndex] = useState(startIndex);
 
-  const total = photos.length;
+  const total = media.length;
   const safeIndex = Math.max(0, Math.min(index, total - 1));
-  const current = photos[safeIndex];
+  const current = media[safeIndex];
   const manageable = current.origin === 'site' && canEdit;
 
   const invalidate = () => {
@@ -730,11 +872,16 @@ function LightboxInner({
             </>
           )}
 
-          <img
-            src={current.url}
-            alt={current.caption ?? current.fileName}
-            className="max-h-full max-w-full select-none object-contain"
-          />
+          {current.kind === 'VIDEO' ? (
+            // key per file so the player + any error state reset on navigation.
+            <VideoPlayer key={current.id} file={current} />
+          ) : (
+            <img
+              src={current.url}
+              alt={current.caption ?? current.fileName}
+              className="max-h-full max-w-full select-none object-contain"
+            />
+          )}
 
           {/* Filename · provenance · position strip */}
           <div className="absolute inset-x-0 bottom-0 flex flex-col items-center gap-1.5 bg-gradient-to-t from-black/85 via-black/55 to-transparent px-4 pb-4 pt-10 text-center text-white">
@@ -761,5 +908,42 @@ function LightboxInner({
         </Headless.DialogPanel>
       </div>
     </Headless.Dialog>
+  );
+}
+
+// Inline player. No autoplay — starts paused on the poster. A READY video is a
+// cross-browser H.264 MP4, so the error state is purely defensive (an expired
+// presigned URL, a network drop) — fall back to a download if it won't load.
+function VideoPlayer({ file }: { file: SiteFile }) {
+  const [errored, setErrored] = useState(false);
+
+  if (errored) {
+    return (
+      <div className="flex flex-col items-center gap-3 px-6 text-center text-white">
+        <ExclamationTriangleIcon className="size-9 text-white/70" />
+        <div className="text-sm [text-shadow:0_1px_2px_rgb(0_0_0_/_60%)]">
+          This video couldn’t be loaded.
+        </div>
+        <a
+          href={file.url}
+          download={file.fileName}
+          className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5 text-sm text-white hover:bg-white/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-white"
+        >
+          <ArrowDownTrayIcon className="size-4" />
+          Download
+        </a>
+      </div>
+    );
+  }
+
+  return (
+    <video
+      src={file.url}
+      poster={file.thumbnailUrl ?? undefined}
+      controls
+      playsInline
+      onError={() => setErrored(true)}
+      className="max-h-full max-w-full object-contain"
+    />
   );
 }
