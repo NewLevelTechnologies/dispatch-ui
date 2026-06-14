@@ -46,11 +46,11 @@ describe('PRESETS', () => {
 
   it('Plumbing has the 5 spec-listed overrides', () => {
     const p = getPreset('plumbing');
-    expect(p.overrides.work_order).toEqual({ singular: 'Job', plural: 'Jobs' });
-    expect(p.overrides.technician).toEqual({ singular: 'Plumber', plural: 'Plumbers' });
-    expect(p.overrides.service_location).toEqual({ singular: 'Property', plural: 'Properties' });
-    expect(p.overrides.equipment).toEqual({ singular: 'Fixture', plural: 'Fixtures' });
-    expect(p.overrides.dispatch).toEqual({ singular: 'Service Call', plural: 'Service Calls' });
+    expect(p.overrides.work_order).toEqual({ singular: 'Job', plural: 'Jobs', abbreviation: 'JOB' });
+    expect(p.overrides.technician).toEqual({ singular: 'Plumber', plural: 'Plumbers', abbreviation: 'PLMB' });
+    expect(p.overrides.service_location).toEqual({ singular: 'Property', plural: 'Properties', abbreviation: 'PROP' });
+    expect(p.overrides.equipment).toEqual({ singular: 'Fixture', plural: 'Fixtures', abbreviation: 'FIX' });
+    expect(p.overrides.dispatch).toEqual({ singular: 'Service Call', plural: 'Service Calls', abbreviation: 'SC' });
   });
 
   // Two distinct entities sharing a name within one preset (e.g. Work
@@ -69,11 +69,69 @@ describe('PRESETS', () => {
   });
 });
 
+describe('preset abbreviations', () => {
+  const ABBR_RE = /^[A-Z0-9]{1,4}$/;
+
+  // Mirror of EntityCode.kt `defaultAbbreviation` (the BE source of truth).
+  // Used to prove a preset never seeds an abbreviation that collides with the
+  // default of an entity it does NOT override — which would drop the editor
+  // into a validation-error state the moment the preset is applied.
+  const DEFAULT_ABBR: Record<string, string> = {
+    customer: 'C',
+    payer: 'PAYR',
+    service_location: 'L',
+    work_order: 'WO',
+    technician: 'TECH',
+    dispatch: 'DISP',
+    dispatch_region: 'DR',
+    equipment: 'EQ',
+    invoice: 'INV',
+    quote: 'QTE',
+    division: 'DIV',
+    work_item: 'WI',
+    payment: 'PAY',
+    schedule: 'SCH',
+    route: 'RTE',
+    equipment_component: 'UNIT',
+    agreement: 'SA',
+  };
+
+  it('every override abbreviation is a valid 1–4 char code', () => {
+    for (const p of PRESETS) {
+      for (const [code, ov] of Object.entries(p.overrides)) {
+        expect(ABBR_RE.test(ov.abbreviation), `${p.id}.${code} = "${ov.abbreviation}"`).toBe(true);
+      }
+    }
+  });
+
+  it('only overrides entities that exist in the default registry', () => {
+    for (const p of PRESETS) {
+      for (const code of Object.keys(p.overrides)) {
+        expect(DEFAULT_ABBR[code], `${p.id} overrides unknown entity "${code}"`).toBeDefined();
+      }
+    }
+  });
+
+  it('applying any preset yields a collision-free set of abbreviations', () => {
+    for (const p of PRESETS) {
+      // Effective abbreviation per entity: preset override if present, else
+      // the system default the un-touched entity keeps.
+      const effective: Record<string, string> = { ...DEFAULT_ABBR };
+      for (const [code, ov] of Object.entries(p.overrides)) {
+        effective[code] = ov.abbreviation;
+      }
+      const values = Object.values(effective);
+      expect(new Set(values).size, `${p.id} produces colliding abbreviations`).toBe(values.length);
+    }
+  });
+});
+
 describe('entity grouping', () => {
-  it('has all 14 known entities mapped to a group', () => {
+  it('has all 15 known entities mapped to a group', () => {
     const keys = Object.keys(ENTITY_GROUP);
-    expect(keys).toHaveLength(14);
+    expect(keys).toHaveLength(15);
     expect(keys).toContain('equipment_component');
+    expect(keys).toContain('dispatch_region');
     expect(keys).not.toContain('user');
     expect(keys).not.toContain('role');
   });
