@@ -17,3 +17,10 @@ export function formatDateShort(d?: string | Date | null): string {
   if (Number.isNaN(date.getTime())) return '—';
   return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
 }
+
+// USD currency. `null`/`undefined` → "—" (not enriched). Decimal dollars on
+// the wire (per LOC-1 `balance`), so 0 is a meaningful "known zero".
+export function formatMoney(amount?: number | null): string {
+  if (amount == null) return '—';
+  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
+}

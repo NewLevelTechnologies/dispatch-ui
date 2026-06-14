@@ -9,6 +9,7 @@ import { useHasCapability } from '../hooks/useCurrentUser';
 import AppLayout from '../components/AppLayout';
 import CustomerFormDialog from '../components/CustomerFormDialog';
 import { formatPhone } from '../utils/formatPhone';
+import { titleCaseAddress } from '../utils/titleCaseAddress';
 import { extractApiError, showError } from '../lib/toast';
 import { Button } from '../components/catalyst/button';
 import { Dropdown, DropdownButton, DropdownItem, DropdownLabel, DropdownMenu } from '../components/catalyst/dropdown';
@@ -466,9 +467,9 @@ export default function CustomersPage() {
                           </td>
                           <td>
                             <CellStack>
-                              <CellTop>{customer.billingAddress.streetAddress}</CellTop>
+                              <CellTop>{titleCaseAddress(customer.billingAddress.streetAddress)}</CellTop>
                               <CellSub>
-                                {customer.billingAddress.city}, {customer.billingAddress.state} {customer.billingAddress.zipCode}
+                                {titleCaseAddress(customer.billingAddress.city)}, {customer.billingAddress.state} {customer.billingAddress.zipCode}
                               </CellSub>
                             </CellStack>
                           </td>

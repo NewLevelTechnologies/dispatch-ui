@@ -123,7 +123,12 @@ export interface AgreementSummaryResponse {
   status: AgreementStatus;
   termStart?: string | null;
   termEnd?: string | null;
-  autoRenew: boolean;
+  // The list/summary projection now serializes this (BE AGREEMENT-LIST-1),
+  // matching the detail GET /work-orders/agreements/{id}. Kept OPTIONAL as a
+  // deploy-window / stale-cache safeguard: consumers must treat `undefined` as
+  // "unknown" (render "—"), NOT as false, so a payload that predates the BE
+  // deploy never shows a misleading "No".
+  autoRenew?: boolean;
   createdAt: string;
   updatedAt: string;
 }

@@ -63,6 +63,20 @@ export const tagApi = {
   removeFromServiceLocation: async (locationId: string, tagId: string): Promise<void> => {
     await apiClient.delete(`/service-locations/${locationId}/tags/${tagId}`);
   },
+
+  // Customer-level tags — same idempotent-sync contract as the service-location
+  // variants (the library is shared). Tags also ride along on the customer
+  // detail payload's `tags[]` for read, so this is the write path (TAG-1).
+  setForCustomer: async (customerId: string, tagIds: string[]): Promise<TagSummary[]> => {
+    const response = await apiClient.put<TagSummary[]>(`/customers/${customerId}/tags`, { tagIds });
+    return response.data;
+  },
+
+  // Remove a single tag assignment from a customer (the tag stays in the
+  // tenant library).
+  removeFromCustomer: async (customerId: string, tagId: string): Promise<void> => {
+    await apiClient.delete(`/customers/${customerId}/tags/${tagId}`);
+  },
 };
 
 export default tagApi;

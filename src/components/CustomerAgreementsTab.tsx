@@ -103,7 +103,10 @@ export default function CustomerAgreementsTab({ customerId }: { customerId: stri
                 </Pill>
               </td>
               <td className="muted">{termLabel(a)}</td>
-              <td className="muted">{a.autoRenew ? 'Yes' : 'No'}</td>
+              {/* `autoRenew` is absent from the list payload today (see
+                  agreementApi BACKEND ask) — show "—" for unknown rather than a
+                  misleading "No". Lights up once the summary DTO carries it. */}
+              <td className="muted">{a.autoRenew == null ? '—' : a.autoRenew ? 'Yes' : 'No'}</td>
             </DenseRow>
           ))}
         </tbody>
