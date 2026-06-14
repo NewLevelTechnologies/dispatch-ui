@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { screen } from '@testing-library/react';
-import { renderWithProviders } from '../test/utils';
+import { screen, waitFor } from '@testing-library/react';
+import { renderWithProviders, userEvent } from '../test/utils';
 import PayersPage from './PayersPage';
 import apiClient from '../api/client';
 import type { CustomerListDto, CustomerListResponse } from '../api';
@@ -52,6 +52,21 @@ describe('PayersPage', () => {
     expect(apiClient.get).toHaveBeenCalledWith(
       '/customers/payers',
       expect.objectContaining({ params: expect.objectContaining({ page: 1 }) }),
+    );
+  });
+
+  it('re-queries with a server sort param when a column header is clicked', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({ data: pageResp([payerRow()]) });
+    renderWithProviders(<PayersPage />);
+    await screen.findByText('American Home Shield');
+
+    await userEvent.click(screen.getByRole('button', { name: /lifetime paid/i }));
+
+    await waitFor(() =>
+      expect(apiClient.get).toHaveBeenCalledWith(
+        '/customers/payers',
+        expect.objectContaining({ params: expect.objectContaining({ sort: 'lifetimePaid,desc' }) }),
+      ),
     );
   });
 

@@ -12,6 +12,7 @@ import { Button } from '../components/catalyst/button';
 import { PageHead } from '../components/ui/PageHead';
 import { Card, CardBody } from '../components/ui/Card';
 import { DenseTable, DenseTHead, DenseRow, CellStack, CellTop, CellSub } from '../components/ui/DenseTable';
+import { SortHeader, type SortDir, type SortState } from '../components/ui/SortHeader';
 import { ListToolbar, ListSearch } from '../components/ui/ListToolbar';
 import { ListFooter } from '../components/ui/ListFooter';
 import { LoadingState } from '../components/ui/LoadingState';
@@ -37,6 +38,21 @@ const money0 = (n: number) => '$' + Math.round(n).toLocaleString('en-US');
 const moneyK = (n: number) =>
   n >= 1000 ? '$' + Math.round(n / 1000).toLocaleString('en-US') + 'k' : '$' + Math.round(n);
 
+// BE-supported sort keys. Default is outstanding,desc (the bookkeeper triage
+// order) — represented as "no sort param" so we get the server default.
+const DEFAULT_SORT: SortState = { key: 'outstanding', dir: 'desc' };
+// Columns that read best most-first (amounts, counts, dates) default to desc on
+// first click; text columns (name, terms) default to asc.
+const DESC_FIRST = new Set(['outstanding', 'aged91', 'openInvoices', 'lifetimePaid', 'lastPayment', 'createdAt']);
+
+function parseSort(raw: string | null): SortState {
+  if (raw) {
+    const [key, dir] = raw.split(',');
+    if (key) return { key, dir: dir === 'asc' ? 'asc' : 'desc' };
+  }
+  return DEFAULT_SORT;
+}
+
 export default function PayersPage() {
   const navigate = useNavigate();
   const { t } = useTranslation();
@@ -45,6 +61,8 @@ export default function PayersPage() {
 
   const urlSearch = searchParams.get('search') ?? '';
   const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10));
+  const sortParam = searchParams.get('sort');
+  const currentSort = parseSort(sortParam);
   const [searchQuery, setSearchQuery] = useState(urlSearch);
   useEffect(() => {
     setSearchQuery(urlSearch);
@@ -66,10 +84,29 @@ export default function PayersPage() {
     return qs ? `?${qs}` : '?';
   };
 
+  // Toggle dir when re-clicking the active column, else the column's default
+  // dir. Writing the default (outstanding,desc) back into the URL is harmless —
+  // it equals the implicit default the BE applies when the param is absent.
+  const onSort = (key: string) => {
+    const dir: SortDir =
+      key === currentSort.key
+        ? currentSort.dir === 'asc'
+          ? 'desc'
+          : 'asc'
+        : DESC_FIRST.has(key)
+          ? 'desc'
+          : 'asc';
+    const next = new URLSearchParams(searchParams);
+    next.set('sort', `${key},${dir}`);
+    next.delete('page');
+    setSearchParams(next, { replace: false });
+  };
+
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ['payers', page, deferredSearch],
+    queryKey: ['payers', page, deferredSearch, sortParam],
     // Omit `sort` → BE default outstanding,desc (the bookkeeper triage order).
-    queryFn: () => customerApi.getPayers({ page, limit: PAGE_SIZE, search: deferredSearch || undefined }),
+    queryFn: () =>
+      customerApi.getPayers({ page, limit: PAGE_SIZE, search: deferredSearch || undefined, sort: sortParam || undefined }),
   });
 
   const payers = data?.content ?? [];
@@ -164,12 +201,12 @@ export default function PayersPage() {
                   <DenseTable>
                     <DenseTHead>
                       <tr>
-                        <th>{getName('payer')}</th>
-                        <th>{t('payers.table.terms')}</th>
-                        <th className="right">{t('payers.table.outstanding')}</th>
-                        <th className="right">{t('payers.table.openInvoices')}</th>
-                        <th className="right">{t('payers.table.lifetimePaid')}</th>
-                        <th>{t('payers.table.lastPayment')}</th>
+                        <SortHeader sortKey="name" label={getName('payer')} current={currentSort} onSort={onSort} />
+                        <SortHeader sortKey="terms" label={t('payers.table.terms')} current={currentSort} onSort={onSort} />
+                        <SortHeader sortKey="outstanding" label={t('payers.table.outstanding')} current={currentSort} onSort={onSort} align="right" />
+                        <SortHeader sortKey="openInvoices" label={t('payers.table.openInvoices')} current={currentSort} onSort={onSort} align="right" />
+                        <SortHeader sortKey="lifetimePaid" label={t('payers.table.lifetimePaid')} current={currentSort} onSort={onSort} align="right" />
+                        <SortHeader sortKey="lastPayment" label={t('payers.table.lastPayment')} current={currentSort} onSort={onSort} />
                       </tr>
                     </DenseTHead>
                     <tbody>
