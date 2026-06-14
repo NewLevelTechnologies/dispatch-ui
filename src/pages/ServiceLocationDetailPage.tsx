@@ -1479,8 +1479,8 @@ function ActivityTeaser({
     enabled: !!serviceLocationId,
   });
   const { data: financialData } = useQuery({
-    queryKey: ['location-financial-activity', serviceLocationId],
-    queryFn: () => financialActivityApi.getForLocation(serviceLocationId, 500),
+    queryKey: ['location-financial-activity-teaser', serviceLocationId],
+    queryFn: () => financialActivityApi.getForLocation(serviceLocationId, { limit: 500 }).then((p) => p.content),
     enabled: !!serviceLocationId,
   });
   const recent = buildRecentActivity(

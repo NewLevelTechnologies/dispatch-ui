@@ -53,7 +53,6 @@ const tsMs = (s: string) => new Date(s).getTime();
 // Bounded streams fetched whole (no cursor); request a generous cap so a busy
 // location's history isn't silently truncated below the paginated business feed.
 const AUDIT_LIMIT = 500;
-const FINANCIAL_LIMIT = 500;
 
 // Three merged streams: business (work-order-service, cursor-paginated, the
 // volume driver), financial (money milestones), and audit (location field
@@ -182,40 +181,32 @@ export default function LocationActivityStream({ serviceLocationId, customerId }
     enabled: !!scope.id && businessActive,
   });
 
-  // Stream 4 — financial milestones. Location: bounded fetch-whole (bare array).
-  // Customer: cursor-paginated (ACT-1), co-paginated with the business stream.
-  const {
-    data: financialWhole,
-    isLoading: financialWholeLoading,
-    error: financialWholeError,
-  } = useQuery({
-    queryKey: ['location-financial-activity', scope.id],
-    queryFn: () => financialActivityApi.getForLocation(scope.id, FINANCIAL_LIMIT),
-    enabled: !!scope.id && financialActive && isLocation,
-  });
+  // Stream 4 — financial milestones. Cursor-paginated for both scopes (same
+  // envelope), co-paginated with the business stream below.
   const {
     data: financialPages,
     fetchNextPage: fetchNextFinancial,
     hasNextPage: financialHasNext,
     isFetchingNextPage: financialFetchingNext,
-    isLoading: financialPageLoading,
-    error: financialPageError,
+    isLoading: financialLoading,
+    error: financialError,
   } = useInfiniteQuery({
-    queryKey: ['customer-financial-activity', scope.id],
-    queryFn: ({ pageParam }) =>
-      financialActivityApi.getForCustomer(scope.id, { cursor: pageParam, limit: PAGE_SIZE }),
+    queryKey: ['financial-activity', scope.type, scope.id],
+    queryFn: ({ pageParam }) => {
+      const params = { cursor: pageParam, limit: PAGE_SIZE };
+      return isLocation
+        ? financialActivityApi.getForLocation(scope.id, params)
+        : financialActivityApi.getForCustomer(scope.id, params);
+    },
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
-    enabled: !!scope.id && financialActive && !isLocation,
+    enabled: !!scope.id && financialActive,
   });
-
   const financialData = useMemo(
-    () => (isLocation ? financialWhole ?? [] : financialPages?.pages.flatMap((p) => p.content) ?? []),
-    [isLocation, financialWhole, financialPages],
+    () => financialPages?.pages.flatMap((p) => p.content) ?? [],
+    [financialPages],
   );
-  const financialHasMore = !isLocation && (financialHasNext ?? false);
-  const financialLoading = isLocation ? financialWholeLoading : financialPageLoading;
-  const financialError = isLocation ? financialWholeError : financialPageError;
+  const financialHasMore = financialHasNext ?? false;
 
   // Stream 2 — audit (location field edits, bounded).
   const {
@@ -230,21 +221,20 @@ export default function LocationActivityStream({ serviceLocationId, customerId }
 
   const events = useMemo(() => data?.pages.flatMap((p) => p.content) ?? [], [data]);
 
-  // Co-pagination frontier (customer scope only). Two independently-paginated
-  // cursor streams can be safely merged only down to the NEWEST of the still-
-  // undrained streams' oldest-loaded timestamps — past that, the other stream
-  // may hold un-loaded events that belong in between. Hold anything older back
-  // until the drained stream loads more (advanced below). Location scope fetches
-  // financial whole, so there's no frontier (boundary = -∞, nothing held).
+  // Co-pagination frontier. Two independently-paginated cursor streams can be
+  // safely merged only down to the NEWEST of the still-undrained streams'
+  // oldest-loaded timestamps — past that, the other stream may hold un-loaded
+  // events that belong in between. Hold anything older back until the drained
+  // stream loads more (advanced below). When both streams are fully loaded the
+  // boundary is -∞ and nothing is held.
   const businessActiveHasMore = businessActive && (hasNextPage ?? false);
   const financialActiveHasMore = financialActive && financialHasMore;
   const boundaryMs = useMemo(() => {
-    if (isLocation) return -Infinity;
     const undrained: number[] = [];
     if (businessActiveHasMore && events.length) undrained.push(tsMs(events[events.length - 1].timestamp));
     if (financialActiveHasMore && financialData.length) undrained.push(tsMs(financialData[financialData.length - 1].timestamp));
     return undrained.length ? Math.max(...undrained) : -Infinity;
-  }, [isLocation, businessActiveHasMore, financialActiveHasMore, events, financialData]);
+  }, [businessActiveHasMore, financialActiveHasMore, events, financialData]);
 
   // Merge the live streams onto one day-grouped, WO-collapsed timeline. Disabled
   // React Query hooks retain their last data, so gate each stream by its active
@@ -266,7 +256,7 @@ export default function LocationActivityStream({ serviceLocationId, customerId }
   // the DRAINED stream — the one whose oldest-loaded is newest (it defines the
   // frontier) — so the held-back tail of the other stream fills in correctly.
   const combinedHasNext = businessActiveHasMore || financialActiveHasMore;
-  const combinedFetching = isFetchingNextPage || (!isLocation && (financialFetchingNext ?? false));
+  const combinedFetching = isFetchingNextPage || (financialFetchingNext ?? false);
   const loadMore = useCallback(() => {
     if (combinedFetching) return;
     if (businessActiveHasMore && financialActiveHasMore) {

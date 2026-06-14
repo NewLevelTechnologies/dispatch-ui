@@ -127,3 +127,27 @@ describe('financialActivityApi.getForCustomer', () => {
     expect(out).toEqual({ content: [row], nextCursor: null, hasMore: false });
   });
 });
+
+describe('financialActivityApi.getForLocation', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  const row = { id: 'f1', kind: 'INVOICE_SENT', invoiceId: 'i1', invoiceNumber: 'INV-1', workOrderId: null, serviceLocationId: 'sl-1', amount: 50.0, actor: null, timestamp: '2026-06-14T15:00:00Z' };
+
+  it('GETs the cursor-paginated location financial stream and passes the envelope through', async () => {
+    const page = { content: [row], nextCursor: 'c1', hasMore: true };
+    vi.mocked(apiClient.get).mockResolvedValue({ data: page });
+    const out = await financialActivityApi.getForLocation('sl-1', { cursor: 'c0', limit: 50 });
+    expect(apiClient.get).toHaveBeenCalledWith('/financial/locations/sl-1/activity', {
+      params: { cursor: 'c0', limit: 50 },
+    });
+    expect(out).toEqual(page);
+  });
+
+  it('tolerates the pre-cursor bare-array shape by wrapping it as a final page', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({ data: [row] });
+    const out = await financialActivityApi.getForLocation('sl-1');
+    expect(out).toEqual({ content: [row], nextCursor: null, hasMore: false });
+  });
+});

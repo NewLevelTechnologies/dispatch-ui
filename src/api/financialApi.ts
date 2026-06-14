@@ -775,17 +775,21 @@ export interface FinancialActivityPage {
 }
 
 export const financialActivityApi = {
-  /** Location-scoped financial milestones, newest-first. Fetched whole (no
-   * cursor); `limit` defaults to 100 server-side, max 500. */
+  /** Location-scoped financial milestones, newest-first. Cursor-paginated
+   * (keyset, hole-free), same envelope as {@link getForCustomer}, so it
+   * co-paginates with the WO activity stream — pass `nextCursor` back as
+   * `cursor`. Defensive: tolerates the pre-cursor bare-array response during the
+   * backend deploy window (wraps it as a single final page). */
   getForLocation: async (
     serviceLocationId: string,
-    limit?: number,
-  ): Promise<FinancialActivityEvent[]> => {
-    const response = await apiClient.get<FinancialActivityEvent[]>(
+    params?: { cursor?: string; limit?: number },
+  ): Promise<FinancialActivityPage> => {
+    const response = await apiClient.get<FinancialActivityPage | FinancialActivityEvent[]>(
       `/financial/locations/${serviceLocationId}/activity`,
-      { params: { limit } },
+      { params },
     );
-    return response.data;
+    const data = response.data;
+    return Array.isArray(data) ? { content: data, nextCursor: null, hasMore: false } : data;
   },
 
   /** Customer-scoped financial milestones (ACT-1), newest-first. Same row shape
