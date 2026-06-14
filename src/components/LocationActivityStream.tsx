@@ -24,6 +24,7 @@ import {
   auditApi,
   financialActivityApi,
   type ActivityCategory,
+  type ListActivityParams,
 } from '../api';
 import { useGlossary } from '../contexts/GlossaryContext';
 import { useHasCapability } from '../hooks/useCurrentUser';
@@ -67,14 +68,29 @@ const CHIP_CATEGORY: Partial<Record<ChipId, ActivityCategory>> = {
 const BUSINESS_CHIPS: ChipId[] = ['all', 'job', 'visit', 'note'];
 const FINANCIAL_CHIPS: ChipId[] = ['all', 'invoice', 'payment'];
 
+// Scope-aware: the same merged feed powers the Location detail and the Customer
+// detail Activity tabs. Location scope adds the audit (field-edit) stream + the
+// "Changes" chip; customer scope has no audit source, so those are hidden. The
+// business (work-order) + financial streams work for both — the customer-scoped
+// endpoints return the identical row shape.
+export type ActivityStreamScope =
+  | { type: 'location'; id: string }
+  | { type: 'customer'; id: string };
+
 interface Props {
-  serviceLocationId: string;
+  // Pass exactly one. `customerId` selects the customer-scoped endpoints.
+  serviceLocationId?: string;
+  customerId?: string;
 }
 
-export default function LocationActivityStream({ serviceLocationId }: Props) {
+export default function LocationActivityStream({ serviceLocationId, customerId }: Props) {
   const { t } = useTranslation();
   const { getName } = useGlossary();
   const canViewAudit = useHasCapability('VIEW_AUDIT_LOGS');
+  const scope: ActivityStreamScope = customerId
+    ? { type: 'customer', id: customerId }
+    : { type: 'location', id: serviceLocationId ?? '' };
+  const isLocation = scope.type === 'location';
   const [chip, setChip] = useState<ChipId>('all');
   const [showChanges, setShowChanges] = useState(false);
 
@@ -82,8 +98,9 @@ export default function LocationActivityStream({ serviceLocationId }: Props) {
   const businessActive = BUSINESS_CHIPS.includes(chip);
   const financialActive = FINANCIAL_CHIPS.includes(chip);
   // Audit (location field edits) shows on the Changes chip, or interleaved on
-  // All once "Show all changes" is on. Gated by capability.
-  const auditActive = canViewAudit && (chip === 'change' || (chip === 'all' && showChanges));
+  // All once "Show all changes" is on. Gated by capability — and only at
+  // location scope (no customer-level audit stream).
+  const auditActive = canViewAudit && isLocation && (chip === 'change' || (chip === 'all' && showChanges));
 
   const businessCategory: ActivityCategory[] | undefined = CHIP_CATEGORY[chip]
     ? [CHIP_CATEGORY[chip]!]
@@ -131,7 +148,7 @@ export default function LocationActivityStream({ serviceLocationId }: Props) {
     { id: 'invoice', label: getName('invoice', true) },
     { id: 'payment', label: getName('payment', true) },
     { id: 'note', label: t('serviceLocations.activity.filter.notes') },
-    ...(canViewAudit
+    ...(canViewAudit && isLocation
       ? [{ id: 'change' as const, label: t('serviceLocations.activity.filter.changes') }]
       : []),
   ];
@@ -145,17 +162,21 @@ export default function LocationActivityStream({ serviceLocationId }: Props) {
     isLoading: businessLoading,
     error: businessError,
   } = useInfiniteQuery({
-    queryKey: ['location-activity', serviceLocationId, businessCategory ?? 'ALL', classification],
-    queryFn: ({ pageParam }) =>
-      activityApi.listForLocation(serviceLocationId, {
+    queryKey: [isLocation ? 'location-activity' : 'customer-activity', scope.id, businessCategory ?? 'ALL', classification],
+    queryFn: ({ pageParam }) => {
+      const params: ListActivityParams = {
         cursor: pageParam,
         limit: PAGE_SIZE,
         categories: businessCategory,
         classification,
-      }),
+      };
+      return isLocation
+        ? activityApi.listForLocation(scope.id, params)
+        : activityApi.listForCustomer(scope.id, params);
+    },
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
-    enabled: !!serviceLocationId && businessActive,
+    enabled: !!scope.id && businessActive,
   });
 
   // Stream 4 — financial milestones (bounded, fetch-whole).
@@ -164,9 +185,12 @@ export default function LocationActivityStream({ serviceLocationId }: Props) {
     isLoading: financialLoading,
     error: financialError,
   } = useQuery({
-    queryKey: ['location-financial-activity', serviceLocationId],
-    queryFn: () => financialActivityApi.getForLocation(serviceLocationId, FINANCIAL_LIMIT),
-    enabled: !!serviceLocationId && financialActive,
+    queryKey: [isLocation ? 'location-financial-activity' : 'customer-financial-activity', scope.id],
+    queryFn: () =>
+      isLocation
+        ? financialActivityApi.getForLocation(scope.id, FINANCIAL_LIMIT)
+        : financialActivityApi.getForCustomer(scope.id, FINANCIAL_LIMIT),
+    enabled: !!scope.id && financialActive,
   });
 
   // Stream 2 — audit (location field edits, bounded).
@@ -175,9 +199,9 @@ export default function LocationActivityStream({ serviceLocationId }: Props) {
     isLoading: auditLoading,
     error: auditError,
   } = useQuery({
-    queryKey: ['location-audit', serviceLocationId],
-    queryFn: () => auditApi.getServiceLocationChanges(serviceLocationId, AUDIT_LIMIT),
-    enabled: !!serviceLocationId && auditActive,
+    queryKey: ['location-audit', scope.id],
+    queryFn: () => auditApi.getServiceLocationChanges(scope.id, AUDIT_LIMIT),
+    enabled: !!scope.id && auditActive,
   });
 
   const events = useMemo(() => data?.pages.flatMap((p) => p.content) ?? [], [data]);

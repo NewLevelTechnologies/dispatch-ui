@@ -147,4 +147,14 @@ describe('agreementApi', () => {
     });
     expect(out).toEqual(summary);
   });
+
+  it('getVisitStatus GETs per-location PM status for the customer (LOC-1 P3)', async () => {
+    const rows = [{ serviceLocationId: 'sl-1', pmOverdue: true, nextVisitDue: '2026-07-15' }];
+    vi.mocked(apiClient.get).mockResolvedValue({ data: rows });
+    const out = await agreementApi.getVisitStatus('cust-1');
+    expect(apiClient.get).toHaveBeenCalledWith('/work-orders/agreements/visit-status', {
+      params: { customerId: 'cust-1' },
+    });
+    expect(out).toEqual(rows);
+  });
 });

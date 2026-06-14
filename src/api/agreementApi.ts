@@ -133,6 +133,18 @@ export interface AgreementSummaryResponse {
   updatedAt: string;
 }
 
+// Per-location PM visit status (LOC-1 Phase 3) — GET /work-orders/agreements/visit-status?customerId={id}.
+// A separate work-order-service call (NOT on the customer detail payload —
+// customer-service has no obligation data); the FE merges it into the locations
+// table by serviceLocationId. Only locations with a PM obligation appear;
+// absent → no PM (no "Visit overdue" chip). `nextVisitDue` is the next open PM
+// obligation window start (next PM due), not a booked appointment.
+export interface VisitStatusEntry {
+  serviceLocationId: string;
+  pmOverdue: boolean;
+  nextVisitDue: string | null; // ISO date yyyy-MM-dd
+}
+
 // Per-customer agreement rollup (AG-1) — GET /work-orders/agreements/summary?customerId={id}.
 // Scoped to the customer's ACTIVE agreements. Drives the AgreementsSummaryCard
 // (ARR + coverage) and the attention strip's overdue-visit rule. One call,
@@ -282,6 +294,16 @@ export const agreementApi = {
   getCustomerSummary: async (customerId: string): Promise<CustomerAgreementSummaryResponse> => {
     const response = await apiClient.get<CustomerAgreementSummaryResponse>(
       '/work-orders/agreements/summary',
+      { params: { customerId } },
+    );
+    return response.data;
+  },
+
+  // Per-location PM visit status for a customer (LOC-1 Phase 3). One call;
+  // merged into the locations table by serviceLocationId. See {@link VisitStatusEntry}.
+  getVisitStatus: async (customerId: string): Promise<VisitStatusEntry[]> => {
+    const response = await apiClient.get<VisitStatusEntry[]>(
+      '/work-orders/agreements/visit-status',
       { params: { customerId } },
     );
     return response.data;

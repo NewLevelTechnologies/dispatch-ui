@@ -757,7 +757,10 @@ export interface FinancialActivityEvent {
   invoiceId: string;
   invoiceNumber: string;
   workOrderId: string | null;
-  serviceLocationId: string;
+  // Non-null on the location feed; the customer feed (getForCustomer) may return
+  // null for a customer-level invoice with no site. Row rendering keys off
+  // workOrderId, not this, so null is safe.
+  serviceLocationId: string | null;
   amount: string;
   actor: { userId: string; userName: string | null } | null;
   timestamp: string;
@@ -772,6 +775,21 @@ export const financialActivityApi = {
   ): Promise<FinancialActivityEvent[]> => {
     const response = await apiClient.get<FinancialActivityEvent[]>(
       `/financial/locations/${serviceLocationId}/activity`,
+      { params: { limit } },
+    );
+    return response.data;
+  },
+
+  /** Customer-scoped financial milestones (ACT-1), newest-first. Same row shape
+   * as {@link getForLocation} (interleaved with the WO activity stream), except
+   * `serviceLocationId` may be null for customer-level invoices with no site.
+   * Fetched whole; `limit` defaults to 100 server-side, max 500. */
+  getForCustomer: async (
+    customerId: string,
+    limit?: number,
+  ): Promise<FinancialActivityEvent[]> => {
+    const response = await apiClient.get<FinancialActivityEvent[]>(
+      `/financial/customers/${customerId}/activity`,
       { params: { limit } },
     );
     return response.data;

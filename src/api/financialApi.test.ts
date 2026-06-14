@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { invoicesApi, quotesApi } from './financialApi';
+import { invoicesApi, quotesApi, financialActivityApi } from './financialApi';
 import apiClient from './client';
 
 vi.mock('./client');
@@ -101,5 +101,21 @@ describe('invoicesApi.getCustomerArSummary', () => {
     const out = await invoicesApi.getCustomerArSummary('cust-1');
     expect(apiClient.get).toHaveBeenCalledWith('/financial/customers/cust-1/ar-summary');
     expect(out).toEqual(summary);
+  });
+});
+
+describe('financialActivityApi.getForCustomer', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('GETs the customer financial-activity stream (ACT-1) with the limit', async () => {
+    const rows = [{ id: 'f1', kind: 'INVOICE_PAID', invoiceId: 'i1', invoiceNumber: 'INV-1', workOrderId: null, serviceLocationId: null, amount: '250.00', actor: null, timestamp: '2026-06-14T15:00:00Z' }];
+    vi.mocked(apiClient.get).mockResolvedValue({ data: rows });
+    const out = await financialActivityApi.getForCustomer('cust-1', 100);
+    expect(apiClient.get).toHaveBeenCalledWith('/financial/customers/cust-1/activity', {
+      params: { limit: 100 },
+    });
+    expect(out).toEqual(rows);
   });
 });

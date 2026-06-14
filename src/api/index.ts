@@ -154,6 +154,7 @@ export {
   type AgreementResponse,
   type AgreementSummaryResponse,
   type CustomerAgreementSummaryResponse,
+  type VisitStatusEntry,
   type CreateAgreementRequest,
   type UpdateAgreementRequest,
   type CreateVisitTemplateRequest,
