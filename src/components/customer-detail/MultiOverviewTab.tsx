@@ -1,8 +1,9 @@
 /* eslint-disable i18next/no-literal-string -- dense detail page; entity names go through getName()/t(), inline glyphs/separators/short operational labels stay literal to keep the markup readable (same convention as ServiceLocationDetailPage). */
 // MULTI customer Overview — the billing-hub view. Left rail = lookup surfaces
 // (Billing & AR · Locations preview · Agreements summary · Notes); right rail =
-// identity/reference (Contact · Account details). Tags + a full Activity feed
-// are deliberately absent until their backend reads exist (see BACKEND_ASKS).
+// identity/reference (Contact · Account details). Tags now live on the header
+// (CustomerHeaderTags); a full Activity feed is still absent until its backend
+// read exists (see BACKEND_ASKS ACT-1).
 //
 // Degrade-honestly contract: every surface that depends on the missing finance
 // layer (AR aging, outstanding, LTV, ARR, coverage %, per-location next-visit /
@@ -12,6 +13,7 @@
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import {
   ReceiptPercentIcon,
   MapPinIcon,
@@ -30,6 +32,7 @@ import {
 } from '../../api';
 import { useGlossary } from '../../contexts/GlossaryContext';
 import { formatPhone } from '../../utils/formatPhone';
+import { titleCaseAddress } from '../../utils/titleCaseAddress';
 import { Card } from '../catalyst/card';
 import { Button } from '../catalyst/button';
 import { Pill } from '../ui/Pill';
@@ -234,9 +237,15 @@ function LocationsPreviewCard({
   onViewAll: () => void;
 }) {
   const { getName } = useGlossary();
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const total = customer.serviceLocations.length;
   const top = customer.serviceLocations.slice(0, PREVIEW_LIMIT);
+  // Open-jobs teaser column lights up once the LOC-1 denorm is on the payload
+  // (full operational/financial columns live on the Locations tab).
+  const enriched = customer.serviceLocations.some(
+    (l) => l.hasOpenJobs !== undefined || l.openJobsCount !== undefined,
+  );
 
   return (
     <Card
@@ -260,26 +269,38 @@ function LocationsPreviewCard({
         <DenseTHead>
           <tr>
             <th>{getName('service_location')}</th>
-            <th>Region</th>
-            <th className="right">Equip</th>
+            <th>{getName('dispatch')} {t('entities.region')}</th>
+            {enriched && <th className="right">Open</th>}
+            <th className="right">{getName('equipment')}</th>
             <th>Status</th>
           </tr>
         </DenseTHead>
         <tbody>
           {top.map((l) => {
-            const region = regionMap[l.dispatchRegionId];
+            const region = l.dispatchRegionName ?? regionMap[l.dispatchRegionId];
             const equip = equipByLocation[l.id] ?? 0;
-            const street = [l.address.streetAddress, l.address.streetAddressLine2].filter(Boolean).join(' ');
-            const cityLine = [l.address.city, l.address.state].filter(Boolean).join(', ');
+            const street = titleCaseAddress(
+              [l.address.streetAddress, l.address.streetAddressLine2].filter(Boolean).join(' '),
+            );
+            const cityLine = [titleCaseAddress(l.address.city), l.address.state].filter(Boolean).join(', ');
             return (
               <DenseRow key={l.id} onClick={() => navigate(`/service-locations/${l.id}?from=customer`)}>
                 <td>
                   <CellStack>
-                    <CellTop>{l.locationName || 'Unnamed location'}</CellTop>
+                    <CellTop>{l.locationName || `Unnamed ${getName('service_location').toLowerCase()}`}</CellTop>
                     <CellSub>{[street, cityLine].filter(Boolean).join(' · ')}</CellSub>
                   </CellStack>
                 </td>
-                <td className="muted">{region ? <span className="font-mono">{region}</span> : '—'}</td>
+                <td className="muted">{region || '—'}</td>
+                {enriched && (
+                  <td className="right num strong">
+                    {l.openJobsCount && l.openJobsCount > 0 ? (
+                      l.openJobsCount
+                    ) : (
+                      <span className="text-fg-dim">—</span>
+                    )}
+                  </td>
+                )}
                 <td className="right num strong">{equip > 0 ? equip : <span className="text-fg-dim">—</span>}</td>
                 <td>
                   <Pill tone={l.status === 'ACTIVE' ? 'success' : 'neutral'} dot>
@@ -415,11 +436,14 @@ function ContactCard({ customer, onViewAll }: { customer: Customer; onViewAll: (
 }
 
 function AccountDetailsCard({ customer }: { customer: Customer }) {
+  const { getName } = useGlossary();
   const rows: { k: string; v: React.ReactNode }[] = [
-    { k: 'Customer ID', v: <span className="font-mono">{customer.customerNumber || customer.id}</span> },
+    { k: `${getName('customer')} ID`, v: <span className="font-mono">{customer.customerNumber || customer.id}</span> },
     { k: 'Type', v: 'Multi-site' },
-    { k: 'Terms', v: customer.paymentTermsDays > 0 ? `Net ${customer.paymentTermsDays}` : '—' },
   ];
+  if (customer.industry) rows.push({ k: 'Industry', v: customer.industry });
+  if (customer.accountManager) rows.push({ k: 'Acct manager', v: customer.accountManager.name });
+  rows.push({ k: 'Terms', v: customer.paymentTermsDays > 0 ? `Net ${customer.paymentTermsDays}` : '—' });
   if (customer.contractPricingTier) rows.push({ k: 'Pricebook', v: customer.contractPricingTier });
   rows.push({
     k: 'Tax exempt',

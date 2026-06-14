@@ -14,6 +14,7 @@ import {
   customerApi,
   equipmentApi,
   agreementApi,
+  invoicesApi,
   EquipmentStatus,
   type Customer,
   type CustomerStatus,
@@ -40,13 +41,16 @@ import EquipmentFormDialog from '../EquipmentFormDialog';
 import NotificationPreferencesDialog from '../NotificationPreferencesDialog';
 import NotificationLogsList from '../NotificationLogsList';
 import CustomerAgreementsTab from '../CustomerAgreementsTab';
+import CustomerHeaderTags from './CustomerHeaderTags';
 import MultiOverviewTab from './MultiOverviewTab';
 import MultiLocationsTab from './MultiLocationsTab';
 import CustomerEquipmentTab from './CustomerEquipmentTab';
+import CustomerInvoicesTab from './CustomerInvoicesTab';
 import CustomerWorkOrdersTab from './CustomerWorkOrdersTab';
 import CustomerContactsTab from './CustomerContactsTab';
 import { OrgMark } from './shared';
 import { formatDateShort } from './format';
+import { titleCaseAddress } from '../../utils/titleCaseAddress';
 import { useUrlTab } from '../../hooks/useUrlTab';
 
 type TabId =
@@ -99,6 +103,14 @@ export default function MultiCustomerDetail({ customer }: { customer: Customer }
   const { data: equipmentPage } = useQuery({
     queryKey: ['equipment', { customerId: customer.id }],
     queryFn: () => equipmentApi.list({ customerId: customer.id, status: EquipmentStatus.ACTIVE, size: 100 }),
+    enabled: !!customer.id,
+  });
+  // Invoice tab-count badge. Stable (customerId-only, unfiltered) so it shows the
+  // customer's total — distinct from the tab body's filtered/paged query. size:1
+  // keeps the payload minimal; we only read totalElements.
+  const { data: invoicesCount } = useQuery({
+    queryKey: ['invoices', 'customer-count', customer.id],
+    queryFn: () => invoicesApi.getAll({ customerId: customer.id, size: 1 }),
     enabled: !!customer.id,
   });
 
@@ -154,7 +166,7 @@ export default function MultiCustomerDetail({ customer }: { customer: Customer }
     { id: 'agreements', label: getName('agreement', true), count: agreementsData?.length },
     { id: 'equipment', label: getName('equipment', true), count: equipmentPage?.totalElements },
     { id: 'jobs', label: getName('work_order', true), count: workOrdersData?.totalElements },
-    { id: 'invoices', label: getName('invoice', true) },
+    { id: 'invoices', label: getName('invoice', true), count: invoicesCount?.totalElements },
     { id: 'contacts', label: 'Contacts', count: customer.additionalContacts.length },
     { id: 'activity', label: t('customers.tabs.activity') },
   ];
@@ -169,8 +181,9 @@ export default function MultiCustomerDetail({ customer }: { customer: Customer }
       })}
     </span>,
   );
-  const metro = [customer.billingAddress.city, customer.billingAddress.state].filter(Boolean).join(', ');
+  const metro = [titleCaseAddress(customer.billingAddress.city), customer.billingAddress.state].filter(Boolean).join(', ');
   if (metro) meta.push(<span key="metro">{metro}</span>);
+  if (customer.accountManager) meta.push(<span key="am">Acct mgr {customer.accountManager.name}</span>);
   meta.push(<span key="since">Since {formatDateShort(customer.createdAt)}</span>);
 
   return (
@@ -198,6 +211,11 @@ export default function MultiCustomerDetail({ customer }: { customer: Customer }
                 {customer.paymentTermsDays > 0 && (
                   <Pill tone="neutral">Net {customer.paymentTermsDays}</Pill>
                 )}
+                <CustomerHeaderTags
+                  customerId={customer.id}
+                  tags={customer.tags ?? []}
+                  canEdit={canEditCustomers}
+                />
               </div>
               <div className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[11.5px] text-fg-muted">
                 {meta.map((node, i) => (
@@ -289,12 +307,7 @@ export default function MultiCustomerDetail({ customer }: { customer: Customer }
             />
           )}
 
-          {activeTab === 'invoices' && (
-            <Callout kind="info">
-              {getName('invoice', true)} aren’t available on this page yet — they’ll land with the finance-service
-              summary read.
-            </Callout>
-          )}
+          {activeTab === 'invoices' && <CustomerInvoicesTab customerId={customer.id} />}
 
           {activeTab === 'contacts' && (
             <CustomerContactsTab

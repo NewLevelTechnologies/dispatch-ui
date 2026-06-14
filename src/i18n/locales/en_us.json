@@ -287,6 +287,8 @@
       "addEquipment": "Add Equipment",
       "addLocation": "Add Location",
       "addServiceLocation": "Add Service Location",
+      "accountManager": "Account Manager",
+      "accountManagerUnassigned": "Unassigned",
       "addServiceLocationDescription": "Add a new service location for this customer.",
       "balance": "Balance",
       "backToCustomers": "Back to Customers",
@@ -299,6 +301,7 @@
       "equipment": "Equipment",
       "equipmentCount": "Equipment: {{count}}",
       "errorLoading": "Error loading customer",
+      "industry": "Industry",
       "lastService": "Last Service",
       "lastServiceNever": "Last service: Never",
       "netTerms": "Net-{{days}}",
@@ -789,6 +792,7 @@
       "workOrder": "Work Order (Optional)"
     },
     "status": {
+      "all": "All",
       "cancelled": "Cancelled",
       "draft": "Draft",
       "overdue": "Overdue",

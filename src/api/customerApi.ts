@@ -68,6 +68,18 @@ export interface ServiceLocation {
   createdAt: string;
   updatedAt: string;
   version: number;
+  // Per-location enrichment, batched server-side onto the customer DETAIL
+  // payload's serviceLocations[] only — absent on create/update responses and
+  // the standalone location read, hence all optional (see LOC-1).
+  // `dispatchRegionName` is null on a region-cache miss; `balance` is open AR
+  // for THIS site in decimal dollars (0 = known zero). pmOverdue /
+  // nextScheduledAt are Phase 3.
+  dispatchRegionName?: string | null;
+  hasOpenJobs?: boolean;
+  openJobsCount?: number;
+  lastServiceAt?: string | null;
+  techOnSite?: boolean;
+  balance?: number;
 }
 
 export interface ServiceLocationSearchResult {
@@ -358,6 +370,13 @@ export interface Customer {
   // Structural shape (SINGLE / MULTI / BILLING_ONLY), computed-at-read on
   // the detail endpoint. Detail-page render density consumer.
   shape?: CustomerShape | null;
+  // Denormalized onto the detail (GET /customers/{id}) payload — see ID-1 /
+  // TAG-1. `accountManager.name` is resolved server-side from the user cache.
+  // Create/update responses echo the core record but leave these at defaults,
+  // so refetch the detail for the full picture.
+  accountManager?: { id: string; name: string } | null;
+  industry?: string | null;
+  tags?: TagSummary[];
   createdAt: string;
   updatedAt: string;
   version: number;
@@ -403,6 +422,11 @@ export interface CreateCustomerRequest {
   taxExempt?: boolean;
   taxExemptCertificate?: string | null;
   notes?: string | null;
+  // ID-1: account manager is an internal user — send the user id, the server
+  // resolves accountManager.name from the user cache. Industry is free text
+  // (≤100 chars).
+  accountManagerUserId?: string | null;
+  industry?: string | null;
 }
 
 export interface UpdateCustomerRequest {
@@ -417,6 +441,9 @@ export interface UpdateCustomerRequest {
   taxExemptCertificate?: string | null;
   notes?: string | null;
   status: CustomerStatus;
+  // ID-1 — see CreateCustomerRequest. Omit to leave unchanged.
+  accountManagerUserId?: string | null;
+  industry?: string | null;
 }
 
 export interface UpdateBillingAddressRequest {

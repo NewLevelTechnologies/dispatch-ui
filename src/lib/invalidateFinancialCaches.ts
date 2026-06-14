@@ -8,12 +8,16 @@ import type { QueryClient } from '@tanstack/react-query';
  *   - `['service-location', locId]`          — Location detail overview "Billed to" card
  *                                              (openInvoiceAmount/Count + customerOutstandingBalance
  *                                              ride the detail payload)
+ *   - `['invoices']`                         — global Invoices page list AND the customer detail
+ *                                              Invoices tab body (`['invoices','customer',…]`) +
+ *                                              tab-count badge (`['invoices','customer-count',…]`)
  *
  * Invoice/payment mutations (void, status change, send→SENT, create, record/
  * void payment) fire from work-order-scoped surfaces (the financial drawer,
- * the invoices/payments pages) that don't know the affected service location,
- * so these are invalidated by key PREFIX — every cached location refreshes,
- * same approach as the dispatch invalidations in DispatchesSection.
+ * the invoices/payments pages) that don't know the affected service location or
+ * customer, so these are invalidated by key PREFIX — every cached location /
+ * customer refreshes, same approach as the dispatch invalidations in
+ * DispatchesSection.
  *
  * Call ALONGSIDE the existing `['workOrderInvoices', woId]` / `['financialSummary',
  * woId]` invalidations, not instead of them.
@@ -22,4 +26,5 @@ export function invalidateLocationInvoiceCaches(queryClient: QueryClient): void 
   queryClient.invalidateQueries({ queryKey: ['location-invoices'] });
   queryClient.invalidateQueries({ queryKey: ['location-invoice-summary'] });
   queryClient.invalidateQueries({ queryKey: ['service-location'] });
+  queryClient.invalidateQueries({ queryKey: ['invoices'] });
 }

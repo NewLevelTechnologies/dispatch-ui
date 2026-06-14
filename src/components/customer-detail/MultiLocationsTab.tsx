@@ -1,10 +1,11 @@
 /* eslint-disable i18next/no-literal-string -- dense detail page; entity names go through getName()/t(), inline labels/separators stay literal to match ServiceLocationDetailPage. */
 // MULTI Locations tab — the dense table that proves the page scales to a
 // many-location customer. Toolbar (search + status chips + Add) → DenseTable →
-// count footer. Search + status are the axes available on the customer detail
-// payload's serviceLocations[]; the "Has open jobs" / "Visit overdue" chips
-// from the mock need per-location denorm flags (see BACKEND_ASKS LOC-1) and are
-// omitted until those land rather than shipped inert.
+// count footer. Search + status are always available; once the customer detail
+// payload carries per-location enrichment (LOC-1: hasOpenJobs / openJobsCount /
+// lastServiceAt / balance), the operational/financial columns and the "Has open
+// jobs" chip light up. They stay hidden (not inert) before that lands. The
+// "Visit overdue" chip needs pmOverdue and is still Phase 3.
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
@@ -24,6 +25,8 @@ import { Button } from '../catalyst/button';
 import { Input, InputGroup } from '../catalyst/input';
 import { Pill } from '../ui/Pill';
 import { DenseTable, DenseTHead, DenseRow, CellStack, CellTop, CellSub } from '../ui/DenseTable';
+import { titleCaseAddress } from '../../utils/titleCaseAddress';
+import { formatDateShort, formatMoney } from './format';
 
 type StatusFilter = ServiceLocation['status'];
 
@@ -47,6 +50,18 @@ export default function MultiLocationsTab({
   const navigate = useNavigate();
   const [q, setQ] = useState('');
   const [status, setStatus] = useState<StatusFilter | null>(null);
+  const [openJobsOnly, setOpenJobsOnly] = useState(false);
+
+  // The operational/financial columns + the "Has open jobs" chip only render
+  // once the detail payload carries the LOC-1 denorm. Detect it from any row so
+  // the table stays at its lean 5-column shape pre-deploy (honest, not inert).
+  const hasEnrichment = useMemo(
+    () =>
+      customer.serviceLocations.some(
+        (l) => l.hasOpenJobs !== undefined || l.openJobsCount !== undefined || l.balance !== undefined,
+      ),
+    [customer.serviceLocations],
+  );
 
   const { data: equipmentPage } = useQuery({
     queryKey: ['equipment', { customerId: customer.id }],
@@ -76,6 +91,7 @@ export default function MultiLocationsTab({
   const rows = useMemo(() => {
     let r = customer.serviceLocations;
     if (status) r = r.filter((l) => l.status === status);
+    if (openJobsOnly) r = r.filter((l) => l.hasOpenJobs);
     const needle = q.trim().toLowerCase();
     if (needle) {
       r = r.filter(
@@ -89,7 +105,7 @@ export default function MultiLocationsTab({
       );
     }
     return r;
-  }, [customer.serviceLocations, q, status]);
+  }, [customer.serviceLocations, q, status, openJobsOnly]);
 
   const total = customer.serviceLocations.length;
 
@@ -124,8 +140,29 @@ export default function MultiLocationsTab({
           );
         })}
 
-        {status && (
-          <Button plain size="xs" onClick={() => setStatus(null)}>
+        {hasEnrichment && (
+          <button
+            type="button"
+            onClick={() => setOpenJobsOnly((v) => !v)}
+            className={`inline-flex h-[30px] items-center rounded-md border px-2.5 text-[12px] font-medium ${
+              openJobsOnly
+                ? 'border-accent-500/45 bg-accent-500/10 text-fg-accent'
+                : 'border-border bg-bg-elev text-fg hover:bg-bg-hover'
+            }`}
+          >
+            Has open {getName('work_order', true).toLowerCase()}
+          </button>
+        )}
+
+        {(status || openJobsOnly) && (
+          <Button
+            plain
+            size="xs"
+            onClick={() => {
+              setStatus(null);
+              setOpenJobsOnly(false);
+            }}
+          >
             Clear
           </Button>
         )}
@@ -145,16 +182,19 @@ export default function MultiLocationsTab({
           <DenseTHead>
             <tr>
               <th>{getName('service_location')}</th>
-              <th>Region</th>
+              <th>{getName('dispatch')} {t('entities.region')}</th>
               <th>Status</th>
               <th>Primary contact</th>
-              <th className="right">Equip</th>
+              {hasEnrichment && <th className="right">Open</th>}
+              {hasEnrichment && <th>Last service</th>}
+              {hasEnrichment && <th className="right">Balance</th>}
+              <th className="right">{getName('equipment')}</th>
             </tr>
           </DenseTHead>
           <tbody>
             {rows.length === 0 ? (
               <tr>
-                <td colSpan={5} className="px-3.5 py-10 text-center">
+                <td colSpan={hasEnrichment ? 8 : 5} className="px-3.5 py-10 text-center">
                   <div className="text-[13px] font-semibold text-fg-strong">
                     No {getName('service_location', true).toLowerCase()} match your filters
                   </div>
@@ -163,19 +203,22 @@ export default function MultiLocationsTab({
               </tr>
             ) : (
               rows.map((l) => {
-                const region = regionMap[l.dispatchRegionId];
+                const region = l.dispatchRegionName ?? regionMap[l.dispatchRegionId];
                 const equip = equipByLocation[l.id] ?? 0;
-                const street = [l.address.streetAddress, l.address.streetAddressLine2].filter(Boolean).join(' ');
-                const cityLine = [l.address.city, l.address.state, l.address.zipCode].filter(Boolean).join(', ');
+                const street = titleCaseAddress(
+                  [l.address.streetAddress, l.address.streetAddressLine2].filter(Boolean).join(' '),
+                );
+                const stateZip = [l.address.state, l.address.zipCode].filter(Boolean).join(' ');
+                const cityLine = [titleCaseAddress(l.address.city), stateZip].filter(Boolean).join(', ');
                 return (
                   <DenseRow key={l.id} onClick={() => navigate(`/service-locations/${l.id}?from=customer`)}>
                     <td>
                       <CellStack>
-                        <CellTop>{l.locationName || 'Unnamed location'}</CellTop>
+                        <CellTop>{l.locationName || `Unnamed ${getName('service_location').toLowerCase()}`}</CellTop>
                         <CellSub>{[street, cityLine].filter(Boolean).join(' · ')}</CellSub>
                       </CellStack>
                     </td>
-                    <td className="muted">{region ? <span className="font-mono">{region}</span> : '—'}</td>
+                    <td className="muted">{region || '—'}</td>
                     <td>
                       <Pill tone={l.status === 'ACTIVE' ? 'success' : 'neutral'} dot>
                         {l.status === 'ACTIVE' ? 'Active' : l.status === 'CLOSED' ? 'Closed' : 'Inactive'}
@@ -191,6 +234,31 @@ export default function MultiLocationsTab({
                         '—'
                       )}
                     </td>
+                    {hasEnrichment && (
+                      <td className="right num strong">
+                        {l.openJobsCount && l.openJobsCount > 0 ? (
+                          l.openJobsCount
+                        ) : (
+                          <span className="text-fg-dim">—</span>
+                        )}
+                      </td>
+                    )}
+                    {hasEnrichment && (
+                      <td className="muted">
+                        {l.lastServiceAt ? formatDateShort(l.lastServiceAt) : <span className="text-fg-dim">—</span>}
+                      </td>
+                    )}
+                    {hasEnrichment && (
+                      <td className="right num">
+                        {l.balance == null ? (
+                          <span className="text-fg-dim">—</span>
+                        ) : l.balance > 0 ? (
+                          <span className="font-semibold text-fg-strong">{formatMoney(l.balance)}</span>
+                        ) : (
+                          <span className="text-fg-dim">$0</span>
+                        )}
+                      </td>
+                    )}
                     <td className="right num strong">
                       {equip > 0 ? equip : <span className="text-fg-dim">—</span>}
                     </td>

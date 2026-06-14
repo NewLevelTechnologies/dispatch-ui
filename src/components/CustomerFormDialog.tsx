@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { PatternFormat } from 'react-number-format';
-import { customerApi, dispatchRegionApi, type Customer, type CreateCustomerRequest, type CustomerType, type UpdateCustomerRequest } from '../api';
+import { customerApi, dispatchRegionApi, userApi, type Customer, type CreateCustomerRequest, type CustomerType, type UpdateCustomerRequest } from '../api';
 import { useGlossary } from '../contexts/GlossaryContext';
 import { Dialog, DialogActions, DialogBody, DialogDescription, DialogTitle } from './catalyst/dialog';
 import { Button } from './catalyst/button';
@@ -53,6 +53,8 @@ interface CreateFormData {
   contractPricingTier: string;
   taxExempt: boolean;
   taxExemptCertificate: string;
+  accountManagerUserId: string;
+  industry: string;
 }
 
 interface EditFormData {
@@ -74,6 +76,8 @@ interface EditFormData {
   taxExemptCertificate: string;
   notes: string;
   status: 'ACTIVE' | 'INACTIVE';
+  accountManagerUserId: string;
+  industry: string;
 }
 
 export default function CustomerFormDialog({ isOpen, onClose, customer }: CustomerFormDialogProps) {
@@ -93,6 +97,27 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
     queryFn: () => dispatchRegionApi.getAll(false),
     enabled: isOpen && !isEdit,
   });
+
+  // Internal users for the account-manager picker (ID-1). Only enabled users
+  // are assignable; sorted by display name. The current AM is initialized into
+  // form state from customer.accountManager so it stays selected even if the
+  // user falls outside the first page.
+  const { data: allUsers } = useQuery({
+    queryKey: ['users', 'all'],
+    queryFn: () => userApi.getAll(),
+    enabled: isOpen,
+  });
+  const accountManagerOptions = (() => {
+    const opts = (allUsers ?? [])
+      .filter((u) => u.enabled)
+      .map((u) => ({ id: u.id, name: `${u.firstName} ${u.lastName}`.trim() || u.email }));
+    // Keep the currently-assigned AM selectable even if they're disabled or
+    // beyond the first user page (getAll caps at 100).
+    if (customer?.accountManager && !opts.some((o) => o.id === customer.accountManager!.id)) {
+      opts.push({ id: customer.accountManager.id, name: customer.accountManager.name });
+    }
+    return opts.sort((a, b) => a.name.localeCompare(b.name));
+  })();
 
   // Determine if we should show the dropdown (only if 2+ regions)
   const showRegionDropdown = activeRegions && activeRegions.length > 1;
@@ -132,6 +157,8 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
     contractPricingTier: '',
     taxExempt: false,
     taxExemptCertificate: '',
+    accountManagerUserId: '',
+    industry: '',
   });
 
   const [editFormData, setEditFormData] = useState<EditFormData>({
@@ -153,6 +180,8 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
     taxExemptCertificate: '',
     notes: '',
     status: 'ACTIVE',
+    accountManagerUserId: '',
+    industry: '',
   });
 
   // Intentionally setting form state based on props in useEffect
@@ -189,6 +218,8 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
         taxExemptCertificate: customer.taxExemptCertificate || '',
         notes: customer.notes || '',
         status: customer.status,
+        accountManagerUserId: customer.accountManager?.id || '',
+        industry: customer.industry || '',
       });
     } else {
       setCreateFormData({
@@ -223,6 +254,8 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
         contractPricingTier: '',
         taxExempt: false,
         taxExemptCertificate: '',
+        accountManagerUserId: '',
+        industry: '',
       });
     }
   }, [customer, isOpen, defaultRegionId]);
@@ -283,6 +316,8 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
           taxExempt: createFormData.taxExempt,
           taxExemptCertificate: createFormData.taxExemptCertificate || null,
           notes: createFormData.notes || null,
+          accountManagerUserId: createFormData.accountManagerUserId || null,
+          industry: createFormData.industry || null,
         }
       : {
           name: createFormData.billingAddressSameAsService
@@ -313,6 +348,8 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
           taxExempt: createFormData.taxExempt,
           taxExemptCertificate: createFormData.taxExemptCertificate || null,
           notes: createFormData.notes || null,
+          accountManagerUserId: createFormData.accountManagerUserId || null,
+          industry: createFormData.industry || null,
         };
 
     createMutation.mutate(request);
@@ -335,6 +372,8 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
       taxExemptCertificate: editFormData.taxExemptCertificate || null,
       notes: editFormData.notes || null,
       status: editFormData.status,
+      accountManagerUserId: editFormData.accountManagerUserId || null,
+      industry: editFormData.industry || null,
     };
 
     // Check if billing address changed
@@ -871,6 +910,33 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
                 </button>
                 {showBusinessTerms && (
                   <div className="mt-2 space-y-2 pl-6">
+                    {/* Account Manager + Industry */}
+                    <div className="grid grid-cols-2 gap-2">
+                      <Field>
+                        <Label className="text-xs">{t('customers.detail.accountManager')}</Label>
+                        <Select
+                          name="accountManagerUserId"
+                          value={createFormData.accountManagerUserId}
+                          onChange={(e) => setCreateFormData((prev) => ({ ...prev, accountManagerUserId: e.target.value }))}
+                        >
+                          <option value="">{t('customers.detail.accountManagerUnassigned')}</option>
+                          {accountManagerOptions.map((u) => (
+                            <option key={u.id} value={u.id}>{u.name}</option>
+                          ))}
+                        </Select>
+                      </Field>
+                      <Field>
+                        <Label className="text-xs">{t('customers.detail.industry')}</Label>
+                        <Input
+                          name="industry"
+                          value={createFormData.industry}
+                          onChange={(e) => setCreateFormData((prev) => ({ ...prev, industry: e.target.value }))}
+                          maxLength={100}
+                          placeholder="e.g., Restaurant"
+                        />
+                      </Field>
+                    </div>
+
                     {/* Payment Terms + Contract Tier */}
                     <div className="grid grid-cols-2 gap-2">
                       <Field>
@@ -1122,6 +1188,33 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
                 </button>
                 {showBusinessTerms && (
                   <div className="mt-2 space-y-2 pl-6">
+                    {/* Account Manager + Industry */}
+                    <div className="grid grid-cols-2 gap-2">
+                      <Field>
+                        <Label className="text-xs">{t('customers.detail.accountManager')}</Label>
+                        <Select
+                          name="accountManagerUserId"
+                          value={editFormData.accountManagerUserId}
+                          onChange={(e) => setEditFormData((prev) => ({ ...prev, accountManagerUserId: e.target.value }))}
+                        >
+                          <option value="">{t('customers.detail.accountManagerUnassigned')}</option>
+                          {accountManagerOptions.map((u) => (
+                            <option key={u.id} value={u.id}>{u.name}</option>
+                          ))}
+                        </Select>
+                      </Field>
+                      <Field>
+                        <Label className="text-xs">{t('customers.detail.industry')}</Label>
+                        <Input
+                          name="industry"
+                          value={editFormData.industry}
+                          onChange={(e) => setEditFormData((prev) => ({ ...prev, industry: e.target.value }))}
+                          maxLength={100}
+                          placeholder="e.g., Restaurant"
+                        />
+                      </Field>
+                    </div>
+
                     {/* Payment Terms + Contract Tier */}
                     <div className="grid grid-cols-2 gap-2">
                       <Field>
