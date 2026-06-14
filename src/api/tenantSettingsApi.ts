@@ -7,6 +7,12 @@ import type { PremiseType } from './customerApi';
 export interface GlossaryEntry {
   singular: string;
   plural: string;
+  // Short code shown on chips/badges/columns and used as the prefix on
+  // generated entity numbers (e.g. WO-00001). 1–4 letters/digits, uppercased
+  // by the server. Optional on overrides — omit or send "" to keep the
+  // default prefix. Unique across entity types (incl. against the defaults of
+  // entities the tenant hasn't overridden).
+  abbreviation?: string;
 }
 
 export interface Glossary {

@@ -24,6 +24,7 @@ export const GLOSSARY_DEFAULTS: Record<string, GlossaryEntry> = {
   agreement: { singular: 'Agreement', plural: 'Agreements' },
   customer: { singular: 'Customer', plural: 'Customers' },
   dispatch: { singular: 'Dispatch', plural: 'Dispatches' },
+  dispatch_region: { singular: 'Dispatch Region', plural: 'Dispatch Regions' },
   division: { singular: 'Division', plural: 'Divisions' },
   equipment: { singular: 'Equipment', plural: 'Equipment' },
   equipment_component: { singular: 'Unit', plural: 'Units' },

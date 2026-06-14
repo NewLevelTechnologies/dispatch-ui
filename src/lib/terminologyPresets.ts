@@ -26,7 +26,13 @@ import {
   HomeModernIcon,
 } from '@heroicons/react/24/outline';
 
-export type PresetOverride = { singular: string; plural: string };
+// Each preset override carries an abbreviation too: renaming an entity should
+// also reseed the short code / number prefix (e.g. Work Order → Job ⇒ JOB-00001
+// instead of WO-00001). These are chosen to be valid (1–4 letters/digits) AND
+// collision-free against the default abbreviations of the entities a preset
+// does NOT touch — see the guard in terminologyPresets.test.ts. The user can
+// still hand-edit any of them after applying.
+export type PresetOverride = { singular: string; plural: string; abbreviation: string };
 
 export type PresetId =
   | 'hvac'
@@ -65,11 +71,11 @@ export const PRESETS: Preset[] = [
     blurb: 'Job-based vocabulary with fixtures instead of equipment.',
     Icon: WrenchIcon,
     overrides: {
-      work_order: { singular: 'Job', plural: 'Jobs' },
-      technician: { singular: 'Plumber', plural: 'Plumbers' },
-      service_location: { singular: 'Property', plural: 'Properties' },
-      equipment: { singular: 'Fixture', plural: 'Fixtures' },
-      dispatch: { singular: 'Service Call', plural: 'Service Calls' },
+      work_order: { singular: 'Job', plural: 'Jobs', abbreviation: 'JOB' },
+      technician: { singular: 'Plumber', plural: 'Plumbers', abbreviation: 'PLMB' },
+      service_location: { singular: 'Property', plural: 'Properties', abbreviation: 'PROP' },
+      equipment: { singular: 'Fixture', plural: 'Fixtures', abbreviation: 'FIX' },
+      dispatch: { singular: 'Service Call', plural: 'Service Calls', abbreviation: 'SC' },
     },
   },
   {
@@ -78,11 +84,11 @@ export const PRESETS: Preset[] = [
     blurb: 'Job-based vocabulary tuned for electrical contractors and panel work.',
     Icon: BoltIcon,
     overrides: {
-      work_order: { singular: 'Job', plural: 'Jobs' },
-      technician: { singular: 'Electrician', plural: 'Electricians' },
-      service_location: { singular: 'Site', plural: 'Sites' },
-      equipment: { singular: 'Panel', plural: 'Panels' },
-      dispatch: { singular: 'Service Call', plural: 'Service Calls' },
+      work_order: { singular: 'Job', plural: 'Jobs', abbreviation: 'JOB' },
+      technician: { singular: 'Electrician', plural: 'Electricians', abbreviation: 'ELEC' },
+      service_location: { singular: 'Site', plural: 'Sites', abbreviation: 'SITE' },
+      equipment: { singular: 'Panel', plural: 'Panels', abbreviation: 'PNL' },
+      dispatch: { singular: 'Service Call', plural: 'Service Calls', abbreviation: 'SC' },
     },
   },
   {
@@ -91,10 +97,10 @@ export const PRESETS: Preset[] = [
     blurb: 'Repair-centric vocabulary for whole-goods service shops.',
     Icon: WrenchScrewdriverIcon,
     overrides: {
-      work_order: { singular: 'Repair', plural: 'Repairs' },
-      service_location: { singular: 'Property', plural: 'Properties' },
-      equipment: { singular: 'Appliance', plural: 'Appliances' },
-      dispatch: { singular: 'Service Call', plural: 'Service Calls' },
+      work_order: { singular: 'Repair', plural: 'Repairs', abbreviation: 'REP' },
+      service_location: { singular: 'Property', plural: 'Properties', abbreviation: 'PROP' },
+      equipment: { singular: 'Appliance', plural: 'Appliances', abbreviation: 'APPL' },
+      dispatch: { singular: 'Service Call', plural: 'Service Calls', abbreviation: 'SC' },
     },
   },
   {
@@ -103,10 +109,10 @@ export const PRESETS: Preset[] = [
     blurb: 'Job-based work with crew visits for recurring outdoor service.',
     Icon: SunIcon,
     overrides: {
-      work_order: { singular: 'Job', plural: 'Jobs' },
-      technician: { singular: 'Crew Member', plural: 'Crew Members' },
-      service_location: { singular: 'Property', plural: 'Properties' },
-      dispatch: { singular: 'Visit', plural: 'Visits' },
+      work_order: { singular: 'Job', plural: 'Jobs', abbreviation: 'JOB' },
+      technician: { singular: 'Crew Member', plural: 'Crew Members', abbreviation: 'CREW' },
+      service_location: { singular: 'Property', plural: 'Properties', abbreviation: 'PROP' },
+      dispatch: { singular: 'Visit', plural: 'Visits', abbreviation: 'VST' },
     },
   },
   {
@@ -115,11 +121,11 @@ export const PRESETS: Preset[] = [
     blurb: 'Treatment-based vocabulary with account-style customer relationships.',
     Icon: BugAntIcon,
     overrides: {
-      customer: { singular: 'Account', plural: 'Accounts' },
-      work_order: { singular: 'Treatment', plural: 'Treatments' },
-      technician: { singular: 'Specialist', plural: 'Specialists' },
-      service_location: { singular: 'Property', plural: 'Properties' },
-      equipment: { singular: 'Bait Station', plural: 'Bait Stations' },
+      customer: { singular: 'Account', plural: 'Accounts', abbreviation: 'ACCT' },
+      work_order: { singular: 'Treatment', plural: 'Treatments', abbreviation: 'TRT' },
+      technician: { singular: 'Specialist', plural: 'Specialists', abbreviation: 'SPEC' },
+      service_location: { singular: 'Property', plural: 'Properties', abbreviation: 'PROP' },
+      equipment: { singular: 'Bait Station', plural: 'Bait Stations', abbreviation: 'BAIT' },
     },
   },
   {
@@ -128,10 +134,10 @@ export const PRESETS: Preset[] = [
     blurb: 'Cleaning-visit vocabulary for residential and commercial crews.',
     Icon: SparklesIcon,
     overrides: {
-      work_order: { singular: 'Cleaning', plural: 'Cleanings' },
-      technician: { singular: 'Cleaner', plural: 'Cleaners' },
-      service_location: { singular: 'Property', plural: 'Properties' },
-      dispatch: { singular: 'Visit', plural: 'Visits' },
+      work_order: { singular: 'Cleaning', plural: 'Cleanings', abbreviation: 'CLN' },
+      technician: { singular: 'Cleaner', plural: 'Cleaners', abbreviation: 'CLNR' },
+      service_location: { singular: 'Property', plural: 'Properties', abbreviation: 'PROP' },
+      dispatch: { singular: 'Visit', plural: 'Visits', abbreviation: 'VST' },
     },
   },
   {
@@ -140,11 +146,11 @@ export const PRESETS: Preset[] = [
     blurb: 'Ticket-based vocabulary for managed service providers and IT firms.',
     Icon: ComputerDesktopIcon,
     overrides: {
-      customer: { singular: 'Client', plural: 'Clients' },
-      work_order: { singular: 'Ticket', plural: 'Tickets' },
-      technician: { singular: 'Engineer', plural: 'Engineers' },
-      service_location: { singular: 'Site', plural: 'Sites' },
-      equipment: { singular: 'Device', plural: 'Devices' },
+      customer: { singular: 'Client', plural: 'Clients', abbreviation: 'CLT' },
+      work_order: { singular: 'Ticket', plural: 'Tickets', abbreviation: 'TKT' },
+      technician: { singular: 'Engineer', plural: 'Engineers', abbreviation: 'ENG' },
+      service_location: { singular: 'Site', plural: 'Sites', abbreviation: 'SITE' },
+      equipment: { singular: 'Device', plural: 'Devices', abbreviation: 'DEV' },
     },
   },
   {
@@ -153,10 +159,12 @@ export const PRESETS: Preset[] = [
     blurb: 'Maintenance-request vocabulary for in-house teams across a tenant-occupied property portfolio.',
     Icon: HomeModernIcon,
     overrides: {
-      work_order: { singular: 'Maintenance Request', plural: 'Maintenance Requests' },
-      technician: { singular: 'Maintenance Tech', plural: 'Maintenance Techs' },
-      service_location: { singular: 'Unit', plural: 'Units' },
-      equipment: { singular: 'Asset', plural: 'Assets' },
+      work_order: { singular: 'Maintenance Request', plural: 'Maintenance Requests', abbreviation: 'MR' },
+      technician: { singular: 'Maintenance Tech', plural: 'Maintenance Techs', abbreviation: 'MT' },
+      // "Unit" here is a rental unit — abbreviated UNT to avoid colliding with
+      // equipment_component, whose default abbreviation is UNIT.
+      service_location: { singular: 'Unit', plural: 'Units', abbreviation: 'UNT' },
+      equipment: { singular: 'Asset', plural: 'Assets', abbreviation: 'AST' },
     },
   },
 ];
@@ -217,6 +225,7 @@ export const ENTITY_GROUP: Record<string, GroupId> = {
   equipment: 'equipment',
   equipment_component: 'equipment',
   division: 'operations',
+  dispatch_region: 'operations',
   invoice: 'money',
   quote: 'money',
   payment: 'money',

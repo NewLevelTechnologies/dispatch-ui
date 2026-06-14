@@ -8,22 +8,23 @@ vi.mock('../../api/client');
 
 // Minimal entity catalog — covers all 6 groups so the layout exercises
 // every code path, plus the one wire-key mismatch (`equipment_component`
-// displays as "Unit").
+// displays as "Unit"). Default abbreviations are unique across the set so a
+// clean load has no validation errors.
 const mockEntities = [
-  { code: 'customer', defaultSingular: 'Customer', defaultPlural: 'Customers', description: 'Person or organization that pays for service' },
-  { code: 'service_location', defaultSingular: 'Service Location', defaultPlural: 'Service Locations', description: 'Where work is performed' },
-  { code: 'work_order', defaultSingular: 'Work Order', defaultPlural: 'Work Orders', description: 'A unit of work to perform' },
-  { code: 'work_item', defaultSingular: 'Work Item', defaultPlural: 'Work Items', description: 'Sub-item of a work order' },
-  { code: 'dispatch', defaultSingular: 'Dispatch', defaultPlural: 'Dispatches', description: 'A scheduled visit' },
-  { code: 'schedule', defaultSingular: 'Schedule', defaultPlural: 'Schedules', description: 'A planning calendar' },
-  { code: 'route', defaultSingular: 'Route', defaultPlural: 'Routes', description: 'A series of stops' },
-  { code: 'technician', defaultSingular: 'Technician', defaultPlural: 'Technicians', description: 'Service provider' },
-  { code: 'equipment', defaultSingular: 'Equipment', defaultPlural: 'Equipment', description: 'A serviceable asset' },
-  { code: 'equipment_component', defaultSingular: 'Unit', defaultPlural: 'Units', description: 'A part within equipment' },
-  { code: 'division', defaultSingular: 'Division', defaultPlural: 'Divisions', description: 'An operating unit' },
-  { code: 'invoice', defaultSingular: 'Invoice', defaultPlural: 'Invoices', description: 'A bill' },
-  { code: 'quote', defaultSingular: 'Quote', defaultPlural: 'Quotes', description: 'A price estimate' },
-  { code: 'payment', defaultSingular: 'Payment', defaultPlural: 'Payments', description: 'A received payment' },
+  { code: 'customer', defaultSingular: 'Customer', defaultPlural: 'Customers', description: 'Person or organization that pays for service', defaultAbbreviation: 'C' },
+  { code: 'service_location', defaultSingular: 'Service Location', defaultPlural: 'Service Locations', description: 'Where work is performed', defaultAbbreviation: 'L' },
+  { code: 'work_order', defaultSingular: 'Work Order', defaultPlural: 'Work Orders', description: 'A unit of work to perform', defaultAbbreviation: 'WO' },
+  { code: 'work_item', defaultSingular: 'Work Item', defaultPlural: 'Work Items', description: 'Sub-item of a work order', defaultAbbreviation: 'WI' },
+  { code: 'dispatch', defaultSingular: 'Dispatch', defaultPlural: 'Dispatches', description: 'A scheduled visit', defaultAbbreviation: 'D' },
+  { code: 'schedule', defaultSingular: 'Schedule', defaultPlural: 'Schedules', description: 'A planning calendar', defaultAbbreviation: 'S' },
+  { code: 'route', defaultSingular: 'Route', defaultPlural: 'Routes', description: 'A series of stops', defaultAbbreviation: 'R' },
+  { code: 'technician', defaultSingular: 'Technician', defaultPlural: 'Technicians', description: 'Service provider', defaultAbbreviation: 'T' },
+  { code: 'equipment', defaultSingular: 'Equipment', defaultPlural: 'Equipment', description: 'A serviceable asset', defaultAbbreviation: 'E' },
+  { code: 'equipment_component', defaultSingular: 'Unit', defaultPlural: 'Units', description: 'A part within equipment', defaultAbbreviation: 'U' },
+  { code: 'division', defaultSingular: 'Division', defaultPlural: 'Divisions', description: 'An operating unit', defaultAbbreviation: 'DV' },
+  { code: 'invoice', defaultSingular: 'Invoice', defaultPlural: 'Invoices', description: 'A bill', defaultAbbreviation: 'INV' },
+  { code: 'quote', defaultSingular: 'Quote', defaultPlural: 'Quotes', description: 'A price estimate', defaultAbbreviation: 'QT' },
+  { code: 'payment', defaultSingular: 'Payment', defaultPlural: 'Payments', description: 'A received payment', defaultAbbreviation: 'PMT' },
 ];
 
 const baseSettings = {
@@ -35,11 +36,11 @@ const baseSettings = {
   enableSmsNotifications: false,
   enableEmailNotifications: false,
   timezone: 'America/Los_Angeles',
-  glossary: {} as Record<string, { singular: string; plural: string }>,
+  glossary: {} as Record<string, { singular: string; plural: string; abbreviation?: string }>,
   updatedAt: '2026-05-26T10:30:00Z',
 };
 
-function setupApi(glossary: Record<string, { singular: string; plural: string }> = {}) {
+function setupApi(glossary: Record<string, { singular: string; plural: string; abbreviation?: string }> = {}) {
   vi.mocked(apiClient.get).mockImplementation((url: string) => {
     if (url.includes('/glossary/available')) return Promise.resolve({ data: mockEntities });
     return Promise.resolve({ data: { ...baseSettings, glossary } });
@@ -230,12 +231,14 @@ describe('TerminologyPanel', () => {
 
     await user.click(screen.getByRole('button', { name: /^apply preset$/i }));
 
-    // Fields are filled to plumbing values.
+    // Fields are filled to plumbing values — including the reseeded
+    // abbreviation (Work Order → Job ⇒ JOB).
     await waitFor(() => {
       expect(screen.getByDisplayValue('Job')).toBeInTheDocument();
       expect(screen.getByDisplayValue('Plumber')).toBeInTheDocument();
       expect(screen.getByDisplayValue('Property')).toBeInTheDocument();
       expect(screen.getByDisplayValue('Fixture')).toBeInTheDocument();
+      expect(screen.getByDisplayValue('JOB')).toBeInTheDocument();
     });
 
     // Footer flips to unsaved.
@@ -295,6 +298,112 @@ describe('TerminologyPanel', () => {
 
     await waitFor(() => {
       expect(screen.getByText(/Renaming entities does not affect existing records/i)).toBeInTheDocument();
+    });
+  });
+
+  // ─── Abbreviations ────────────────────────────────────────────────
+
+  it('renders the Abbreviation column with default placeholders, capped at 4 chars', async () => {
+    renderWithProviders(<TerminologyPanel />);
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('Work Order abbreviation')).toBeInTheDocument();
+    });
+    // Each abbreviation input shows the system default as its placeholder.
+    expect(screen.getByPlaceholderText('WO')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('INV')).toBeInTheDocument();
+    expect(screen.getByLabelText('Work Order abbreviation')).toHaveAttribute('maxlength', '4');
+  });
+
+  it('auto-uppercases a typed abbreviation', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<TerminologyPanel />);
+
+    await waitFor(() => expect(screen.getByLabelText('Work Order abbreviation')).toBeInTheDocument());
+
+    const input = screen.getByLabelText('Work Order abbreviation');
+    await user.type(input, 'job');
+    expect(input).toHaveValue('JOB');
+  });
+
+  it('blocks Save and shows an inline error for a bad abbreviation format', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<TerminologyPanel />);
+
+    await waitFor(() => expect(screen.getByLabelText('Work Order abbreviation')).toBeInTheDocument());
+
+    // "A.B" — a non-alphanumeric char fails the 1–4 letters/digits rule.
+    await user.type(screen.getByLabelText('Work Order abbreviation'), 'A.B');
+
+    expect(await screen.findByText(/Fix these abbreviations before saving/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /save changes/i })).toBeDisabled();
+  });
+
+  it('blocks Save when a custom abbreviation collides with another entity default', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<TerminologyPanel />);
+
+    await waitFor(() => expect(screen.getByLabelText('Customer abbreviation')).toBeInTheDocument());
+
+    // Customer → "INV" collides with Invoice's default abbreviation.
+    await user.type(screen.getByLabelText('Customer abbreviation'), 'INV');
+
+    expect(await screen.findByText(/used by more than one entity/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /save changes/i })).toBeDisabled();
+  });
+
+  it('backfills effective singular/plural when only the abbreviation is customized', async () => {
+    const user = userEvent.setup();
+    vi.mocked(apiClient.put).mockResolvedValue({
+      data: {
+        ...baseSettings,
+        glossary: { work_order: { singular: 'Work Order', plural: 'Work Orders', abbreviation: 'JOB' } },
+      },
+    });
+
+    renderWithProviders(<TerminologyPanel />);
+
+    await waitFor(() => expect(screen.getByLabelText('Work Order abbreviation')).toBeInTheDocument());
+
+    // Customize only the abbreviation. The wire entry must still carry a
+    // non-blank singular/plural (the effective defaults), per the BE rule.
+    await user.type(screen.getByLabelText('Work Order abbreviation'), 'JOB');
+    await user.click(screen.getByRole('button', { name: /save changes/i }));
+
+    await waitFor(() => {
+      expect(apiClient.put).toHaveBeenCalledWith(
+        expect.stringContaining('/tenant-settings'),
+        expect.objectContaining({
+          glossary: {
+            work_order: { singular: 'Work Order', plural: 'Work Orders', abbreviation: 'JOB' },
+          },
+        })
+      );
+    });
+  });
+
+  it('surfaces the backend duplicate-abbreviation 400 inline', async () => {
+    const user = userEvent.setup();
+    vi.mocked(apiClient.put).mockRejectedValue(
+      Object.assign(new Error('Duplicate glossary abbreviations'), {
+        response: {
+          data: {
+            error: 'Duplicate glossary abbreviations',
+            duplicates: { INV: ['invoice', 'quote'] },
+          },
+        },
+      })
+    );
+
+    renderWithProviders(<TerminologyPanel />);
+    await waitFor(() => expect(screen.getByLabelText('Work Order abbreviation')).toBeInTheDocument());
+
+    // Client-side valid + unique, so Save fires; the server still rejects it.
+    await user.type(screen.getByLabelText('Work Order abbreviation'), 'JOB');
+    await user.click(screen.getByRole('button', { name: /save changes/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/each used by more than one entity/i)).toBeInTheDocument();
     });
   });
 });

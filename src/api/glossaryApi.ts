@@ -6,6 +6,10 @@ export interface EntityInfo {
   defaultSingular: string;
   defaultPlural: string;
   description: string;
+  // System-default abbreviation (e.g. "WO", "INV", "C"). Always present on the
+  // available-entities response; the effective value falls back to this when a
+  // tenant hasn't overridden the abbreviation.
+  defaultAbbreviation: string;
 }
 
 export const glossaryApi = {
