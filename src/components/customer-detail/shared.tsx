@@ -21,6 +21,20 @@ export function OrgMark({ name }: { name: string }) {
   );
 }
 
+// The Payer entity glyph — a muted-gold square with a "$". Distinct from the
+// Customer accent square (OrgMark) and the Location pin so a BILLING_ONLY payer
+// reads as a financial counterparty at a glance.
+export function PayerMark() {
+  return (
+    <div
+      aria-hidden="true"
+      className="grid size-[52px] shrink-0 place-items-center rounded-[10px] bg-gradient-to-br from-amber-500 to-amber-700 text-[22px] font-bold text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.2),0_1px_2px_rgba(0,0,0,0.12)]"
+    >
+      $
+    </div>
+  );
+}
+
 // Card title with an optional leading icon. Pairs with the catalyst `Card`'s
 // `title` slot.
 export function CardTitle({ icon, children }: { icon?: ReactNode; children: ReactNode }) {

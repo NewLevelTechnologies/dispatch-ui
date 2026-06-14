@@ -22,8 +22,8 @@ vi.mock('../components/customer-detail/MultiCustomerDetail', () => ({
 vi.mock('../components/customer-detail/SingleCustomerDetail', () => ({
   default: () => <div>SINGLE VIEW</div>,
 }));
-vi.mock('./CustomerDetailLegacy', () => ({
-  default: () => <div>LEGACY VIEW</div>,
+vi.mock('../components/customer-detail/PayerDetail', () => ({
+  default: () => <div>PAYER VIEW</div>,
 }));
 
 const addr = (over: Partial<Address> = {}): Address => ({
@@ -106,16 +106,16 @@ describe('CustomerDetailPage (shape router)', () => {
     });
     render();
     await waitFor(() => expect(screen.getByText('SINGLE VIEW')).toBeInTheDocument());
-    expect(screen.queryByText('LEGACY VIEW')).not.toBeInTheDocument();
+    expect(screen.queryByText('PAYER VIEW')).not.toBeInTheDocument();
     expect(screen.queryByText('MULTI VIEW')).not.toBeInTheDocument();
   });
 
-  it('routes a billing-only customer to the legacy view', async () => {
+  it('routes a billing-only customer to the payer view', async () => {
     vi.mocked(apiClient.get).mockResolvedValue({
       data: customer({ type: 'BILLING_ONLY', serviceLocations: [] }),
     });
     render();
-    await waitFor(() => expect(screen.getByText('LEGACY VIEW')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('PAYER VIEW')).toBeInTheDocument());
     expect(screen.queryByText('MULTI VIEW')).not.toBeInTheDocument();
   });
 });
