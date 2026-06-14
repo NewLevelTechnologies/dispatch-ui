@@ -1912,6 +1912,16 @@ vi.mock('react-i18next', () => {
     'common.customer': 'Customer',
     'common.serviceLocation': 'Service location',
     'common.clear': 'Clear',
+    'payers.backToCustomers': '← {{entities}}',
+    'payers.search.placeholder': 'Search payers…',
+    'payers.table.dueOnReceipt': 'Due on receipt',
+    'payers.table.in91': '{{amount}} in 91+',
+    'payers.table.lastPayment': 'Last payment',
+    'payers.table.lifetimePaid': 'Lifetime paid',
+    'payers.table.net': 'Net {{days}}',
+    'payers.table.openInvoices': 'Open inv.',
+    'payers.table.outstanding': 'Outstanding',
+    'payers.table.terms': 'Terms',
   };
 
   return {
