@@ -259,6 +259,7 @@ export {
   financialActivityApi,
   type FinancialActivityEvent,
   type FinancialActivityKind,
+  type FinancialActivityPage,
   InvoiceStatus,
   QuoteStatus,
   PaymentMethod,
