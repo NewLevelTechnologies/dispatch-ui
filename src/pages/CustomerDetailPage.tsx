@@ -1,10 +1,10 @@
 // Customer detail — shape router. Fetches the customer once, then dispatches
 // on its structural CustomerShape:
 //   MULTI        → the redesigned MultiCustomerDetail (billing hub + locations)
-//   SINGLE       → legacy rendering (redesign pending)
-//   BILLING_ONLY → legacy rendering (Payer redesign pending)
-// As SINGLE and BILLING_ONLY get their redesigned variants, their branches move
-// off CustomerDetailLegacy and that file is eventually deleted.
+//   SINGLE       → the redesigned SingleCustomerDetail (one wallet + one site)
+//   BILLING_ONLY → legacy rendering (Payer redesign backend-blocked)
+// BILLING_ONLY is the last variant on CustomerDetailLegacy; once its Payer
+// redesign lands, that file is deleted.
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
@@ -16,6 +16,7 @@ import AppLayout from '../components/AppLayout';
 import { Callout } from '../components/ui/Callout';
 import { Button } from '../components/catalyst/button';
 import MultiCustomerDetail from '../components/customer-detail/MultiCustomerDetail';
+import SingleCustomerDetail from '../components/customer-detail/SingleCustomerDetail';
 import CustomerDetailLegacy from './CustomerDetailLegacy';
 
 export default function CustomerDetailPage() {
@@ -57,12 +58,12 @@ export default function CustomerDetailPage() {
     );
   }
 
-  if (resolveCustomerShape(customer) === 'MULTI') {
-    return <MultiCustomerDetail customer={customer} />;
-  }
+  const shape = resolveCustomerShape(customer);
+  if (shape === 'MULTI') return <MultiCustomerDetail customer={customer} />;
+  if (shape === 'SINGLE') return <SingleCustomerDetail customer={customer} />;
 
-  // SINGLE + BILLING_ONLY still render the legacy category-driven page. It
-  // refetches the same ['customers', id] key (served from cache — no extra
-  // request) and owns its own loading guard.
+  // BILLING_ONLY still renders the legacy category-driven page (Payer redesign
+  // pending). It refetches the same ['customers', id] key (served from cache —
+  // no extra request) and owns its own loading guard.
   return <CustomerDetailLegacy />;
 }

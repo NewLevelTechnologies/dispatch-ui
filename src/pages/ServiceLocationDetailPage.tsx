@@ -12,7 +12,6 @@ import {
   ClockIcon,
   EllipsisVerticalIcon,
   PlusIcon,
-  WrenchScrewdriverIcon,
   ChartBarIcon,
   UserIcon,
   ReceiptPercentIcon,
@@ -118,6 +117,7 @@ import { PhotoLightbox } from '../components/ui/PhotoLightbox';
 import { Callout } from '../components/ui/Callout';
 import { Tabs } from '../components/ui/Tabs';
 import { ListFooter } from '../components/ui/ListFooter';
+import { EquipmentSummaryCard } from '../components/detail/EquipmentSummaryCard';
 import type { ServiceLocationDetailDto, PremiseType, UpdateServiceLocationRequest } from '../api/customerApi';
 import {
   mockAttention,
@@ -1063,52 +1063,6 @@ function LivePulse() {
   );
 }
 
-function EquipmentSummaryCard({
-  equipment,
-  onViewAll,
-}: {
-  equipment: EquipmentSummary[];
-  onViewAll: () => void;
-}) {
-  const { getName } = useGlossary();
-
-  const byType = useMemo(() => {
-    const acc: Record<string, number> = {};
-    for (const e of equipment) {
-      const type = e.equipmentTypeName || 'Other';
-      acc[type] = (acc[type] || 0) + 1;
-    }
-    return acc;
-  }, [equipment]);
-
-  // Pure inventory rollup — count-by-type + "View all". No per-unit / open-WO
-  // line: a location's single open WO (and its equipment) already shows in the
-  // Work orders card directly below, so listing it here too was duplication.
-  // The equipment↔WO link lives in that card's Equipment column + the tab.
-  return (
-    <Card
-      title={<CardTitle icon={<WrenchScrewdriverIcon className="size-3.5" />}>{getName('equipment', true)}</CardTitle>}
-      action={<CardLink onClick={onViewAll}>View all {equipment.length} →</CardLink>}
-      padding="none"
-    >
-      {equipment.length === 0 ? (
-        <div className="px-3.5 py-6 text-center text-[12px] text-fg-muted">
-          {getName('equipment', true)} not recorded at this site yet.
-        </div>
-      ) : (
-        <div className="flex flex-wrap items-center gap-4 bg-bg-elev-2 px-3.5 py-2.5">
-          {Object.entries(byType).map(([type, n]) => (
-            <div key={type} className="flex items-center gap-1.5">
-              <span className="font-mono text-[12px] font-bold tabular-nums text-fg-strong">{n}</span>
-              <span className="text-[11.5px] text-fg-muted">{type}</span>
-            </div>
-          ))}
-        </div>
-      )}
-    </Card>
-  );
-}
-
 // Status / priority → display maps for the bespoke work-orders table. Kept
 // local to this dense page; the shared WorkOrdersList carries its own copies.
 const WO_PROGRESS_TONE: Record<ProgressCategory, MockTone> = {
@@ -1182,7 +1136,11 @@ function deriveJobLabel(wo: WorkOrderSummary, typeName?: string): string {
 // Equipment column, relevance-resolved Tech column, and the "Next scheduled"
 // header strip are part of the redesign but blocked on backend (WO-1 / WO-2 /
 // AG-2); their insertion points are marked below.
-function SiteWorkOrdersCard({
+// Exported for reuse on the SINGLE customer-detail page (one wallet, one site —
+// it inlines this location's operational cards). Impl stays here for now so its
+// module-private row/helper deps don't have to move; relocate to
+// components/detail/ when convenient (see project_customer_detail_redesign).
+export function SiteWorkOrdersCard({
   location,
   onViewAll,
 }: {
@@ -1666,7 +1624,8 @@ function SitePhotoBanner({ location, canEdit }: { location: ServiceLocationDetai
   );
 }
 
-function SiteInstructionsCard({ location, canEdit }: { location: ServiceLocationDetailDto; canEdit: boolean }) {
+// Exported for the SINGLE customer-detail page (shared site-instructions card).
+export function SiteInstructionsCard({ location, canEdit }: { location: ServiceLocationDetailDto; canEdit: boolean }) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const factsQueryKey = ['service-location-arrival-facts', location.id];
@@ -2337,7 +2296,8 @@ function useServiceLocationContacts(location: ServiceLocationDetailDto) {
 // dialog (never for the primary).
 const CARD_ADDITIONAL_CAP = 2;
 
-function SiteContactCard({
+// Exported for the SINGLE customer-detail page (shared site-contact card).
+export function SiteContactCard({
   location,
   canEdit,
   onViewAll,
@@ -4032,7 +3992,8 @@ const DISPATCHES_PAGE_SIZE = 25;
 // Upcoming card simply hides, so no per-section option scoping is needed.
 const DISPATCH_STATUS_OPTIONS: DispatchStatus[] = ['SCHEDULED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED', 'NO_SHOW'];
 
-function DispatchesTab({ location }: { location: ServiceLocationDetailDto }) {
+// Exported for the SINGLE customer-detail page (shared dispatches tab).
+export function DispatchesTab({ location }: { location: ServiceLocationDetailDto }) {
   const { getName } = useGlossary();
   const { t } = useTranslation();
   const navigate = useNavigate();

@@ -19,6 +19,9 @@ vi.mock('react-router-dom', async () => {
 vi.mock('../components/customer-detail/MultiCustomerDetail', () => ({
   default: () => <div>MULTI VIEW</div>,
 }));
+vi.mock('../components/customer-detail/SingleCustomerDetail', () => ({
+  default: () => <div>SINGLE VIEW</div>,
+}));
 vi.mock('./CustomerDetailLegacy', () => ({
   default: () => <div>LEGACY VIEW</div>,
 }));
@@ -97,12 +100,13 @@ describe('CustomerDetailPage (shape router)', () => {
     expect(screen.queryByText('LEGACY VIEW')).not.toBeInTheDocument();
   });
 
-  it('routes a single-site customer (billing == service) to the legacy view', async () => {
+  it('routes a single-site customer (billing == service) to the redesigned SINGLE view', async () => {
     vi.mocked(apiClient.get).mockResolvedValue({
       data: customer({ serviceLocations: [loc()] }),
     });
     render();
-    await waitFor(() => expect(screen.getByText('LEGACY VIEW')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('SINGLE VIEW')).toBeInTheDocument());
+    expect(screen.queryByText('LEGACY VIEW')).not.toBeInTheDocument();
     expect(screen.queryByText('MULTI VIEW')).not.toBeInTheDocument();
   });
 
