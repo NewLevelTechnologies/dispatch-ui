@@ -45,6 +45,7 @@ import { DenseTable, DenseTHead, DenseRow, CellStack, CellTop, CellSub } from '.
 import CustomerNotesCard from './CustomerNotesCard';
 import { CardTitle, CardLink } from './shared';
 import { formatDateShort, formatMoney } from './format';
+import { buildAttentionItems, daysUntil, type AttentionItem } from './attention';
 
 const PREVIEW_LIMIT = 8;
 
@@ -57,67 +58,6 @@ const PAYMENT_METHOD_LABEL: Record<ArPaymentMethod, string> = {
   WIRE_TRANSFER: 'Wire',
   OTHER: 'Other',
 };
-
-// Whole days from now to a YYYY-MM-DD (or ISO) date. App-runtime clock is fine.
-function daysUntil(dateStr: string): number | null {
-  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateStr);
-  const d = m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])) : new Date(dateStr);
-  if (Number.isNaN(d.getTime())) return null;
-  return Math.floor((d.getTime() - Date.now()) / (24 * 60 * 60 * 1000));
-}
-
-type AttentionItem = { key: string; title: string; sub: string; action: string; to: string };
-
-// Three rules, most-urgent first: AR 91+ past due (FIN-1), overdue PM visits
-// (AG-1), then agreement renewals within 30 days (from the agreements list's
-// termEnd). Quiet (unrendered) when nothing fires — healthy accounts get a
-// clean page, not a "nothing to do" stub. The summaries may be undefined while
-// their queries load; those rules simply don't fire until the data arrives.
-function buildAttentionItems(
-  agreements: AgreementSummaryResponse[],
-  ar: CustomerArSummaryResponse | undefined,
-  agreementSummary: CustomerAgreementSummaryResponse | undefined,
-  customerId: string,
-): AttentionItem[] {
-  const items: AttentionItem[] = [];
-
-  if (ar && ar.days91Plus.amount > 0) {
-    const n = ar.days91Plus.count;
-    items.push({
-      key: 'ar-91',
-      title: `${formatMoney(ar.days91Plus.amount)} ${n === 1 ? 'invoice' : 'invoices'} 91+ days past due`,
-      sub: ar.oldestPastDueInvoiceDate ? `oldest ${formatDateShort(ar.oldestPastDueInvoiceDate)}` : `${n} past due`,
-      action: 'View',
-      to: `/customers/${customerId}?tab=invoices`,
-    });
-  }
-
-  if (agreementSummary && agreementSummary.overdueVisitCount > 0) {
-    const n = agreementSummary.overdueVisitCount;
-    items.push({
-      key: 'overdue-visits',
-      title: `${n} ${n === 1 ? 'visit' : 'visits'} overdue`,
-      sub: 'PM obligations past due',
-      action: 'View',
-      to: `/customers/${customerId}?tab=agreements`,
-    });
-  }
-
-  for (const a of agreements) {
-    if (a.status !== 'ACTIVE' || !a.termEnd) continue;
-    const days = daysUntil(a.termEnd);
-    if (days != null && days > 0 && days < 30) {
-      items.push({
-        key: `renew-${a.id}`,
-        title: `${a.name} renews in ${days} ${days === 1 ? 'day' : 'days'}`,
-        sub: a.agreementNumber,
-        action: 'Review',
-        to: `/agreements/${a.id}?from=customer`,
-      });
-    }
-  }
-  return items;
-}
 
 export default function MultiOverviewTab({
   customer,
@@ -203,7 +143,7 @@ export default function MultiOverviewTab({
   );
 }
 
-function AttentionStrip({ items }: { items: AttentionItem[] }) {
+export function AttentionStrip({ items }: { items: AttentionItem[] }) {
   const navigate = useNavigate();
   return (
     <Card padding="none">

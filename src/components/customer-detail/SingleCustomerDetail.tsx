@@ -13,6 +13,8 @@ import { EllipsisVerticalIcon, PlusIcon } from '@heroicons/react/24/outline';
 import {
   customerApi,
   equipmentApi,
+  agreementApi,
+  invoicesApi,
   EquipmentStatus,
   type Customer,
   type CustomerStatus,
@@ -42,7 +44,10 @@ import LocationActivityStream from '../LocationActivityStream';
 import CustomerNotesCard from './CustomerNotesCard';
 import CustomerEquipmentTab from './CustomerEquipmentTab';
 import CustomerWorkOrdersTab from './CustomerWorkOrdersTab';
-import { BillingCard, AccountDetailsCard } from './MultiOverviewTab';
+import CustomerInvoicesTab from './CustomerInvoicesTab';
+import CustomerHeaderTags from './CustomerHeaderTags';
+import { BillingCard, AccountDetailsCard, AttentionStrip } from './MultiOverviewTab';
+import { buildAttentionItems } from './attention';
 import { EquipmentSummaryCard } from '../detail/EquipmentSummaryCard';
 import { SiteWorkOrdersCard, SiteInstructionsCard, SiteContactCard, DispatchesTab } from '../detail/locationCards';
 import { OrgMark } from './shared';
@@ -84,6 +89,32 @@ export default function SingleCustomerDetail({ customer }: { customer: Customer 
     enabled: !!locId,
   });
   const equipment: EquipmentSummary[] = equipmentPage?.content ?? [];
+
+  // FIN-1 / AG-1 — customer-level rollups, parallel on load. Drive the Billing &
+  // AR card, the LTV row, and the attention strip (AR-91+ / overdue-visit /
+  // renewal). A single-site customer still has AR + a PM agreement.
+  const { data: arSummary } = useQuery({
+    queryKey: ['customer-ar-summary', customer.id],
+    queryFn: () => invoicesApi.getCustomerArSummary(customer.id),
+    enabled: !!customer.id,
+  });
+  const { data: agreements = [] } = useQuery({
+    queryKey: ['agreements', { customerId: customer.id }],
+    queryFn: () => agreementApi.list({ customerId: customer.id }),
+    enabled: !!customer.id,
+  });
+  const { data: agreementSummary } = useQuery({
+    queryKey: ['agreement-customer-summary', customer.id],
+    queryFn: () => agreementApi.getCustomerSummary(customer.id),
+    enabled: !!customer.id,
+  });
+  // INV-1 tab-count badge — lean size:1 page, unfiltered customer total.
+  const { data: invoicesCount } = useQuery({
+    queryKey: ['invoices', 'customer-count', customer.id],
+    queryFn: () => invoicesApi.getAll({ customerId: customer.id, size: 1 }),
+    enabled: !!customer.id,
+  });
+  const attentionItems = buildAttentionItems(agreements, arSummary, agreementSummary, customer.id);
 
   const deleteEquipmentMutation = useMutation({
     mutationFn: (equipmentId: string) => equipmentApi.delete(equipmentId),
@@ -142,7 +173,7 @@ export default function SingleCustomerDetail({ customer }: { customer: Customer 
     { id: 'overview', label: t('customers.tabs.overview') },
     { id: 'equipment', label: getName('equipment', true), count: equipmentPage?.totalElements },
     { id: 'jobs', label: getName('work_order', true) },
-    { id: 'invoices', label: getName('invoice', true) },
+    { id: 'invoices', label: getName('invoice', true), count: invoicesCount?.totalElements },
     { id: 'dispatches', label: getName('dispatch', true) },
     { id: 'files', label: 'Files' },
     { id: 'activity', label: t('customers.tabs.activity') },
@@ -178,6 +209,11 @@ export default function SingleCustomerDetail({ customer }: { customer: Customer 
                 </Pill>
                 {customer.paymentTermsDays > 0 && <Pill tone="neutral">Net {customer.paymentTermsDays}</Pill>}
                 <Pill tone="neutral">{premiseLabel}</Pill>
+                <CustomerHeaderTags
+                  customerId={customer.id}
+                  tags={customer.tags ?? []}
+                  canEdit={canEditCustomers}
+                />
               </div>
               <div className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[11.5px] text-fg-muted">
                 {meta.map((node, i) => (
@@ -223,26 +259,30 @@ export default function SingleCustomerDetail({ customer }: { customer: Customer 
             <Tabs value={activeTab} onChange={(id) => setActiveTab(id as TabId)} tabs={tabs} />
           </div>
 
-          {activeTab === 'overview' &&
-            (locationLoading || !location ? (
-              <div className="px-3.5 py-10 text-center text-[12px] text-fg-muted">
-                {t('common.actions.loading', { entities: getName('service_location', true) })}
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1fr_340px]">
-                <div className="flex flex-col gap-3">
-                  <BillingCard customer={customer} />
-                  <EquipmentSummaryCard equipment={equipment} onViewAll={() => setActiveTab('equipment')} />
-                  <SiteWorkOrdersCard location={location} onViewAll={() => setActiveTab('jobs')} />
-                  <CustomerNotesCard customerId={customer.id} canEdit={canEditCustomers} />
+          {activeTab === 'overview' && (
+            <div className="flex flex-col gap-3">
+              {attentionItems.length > 0 && <AttentionStrip items={attentionItems} />}
+              {locationLoading || !location ? (
+                <div className="px-3.5 py-10 text-center text-[12px] text-fg-muted">
+                  {t('common.actions.loading', { entities: getName('service_location', true) })}
                 </div>
-                <div className="flex flex-col gap-3">
-                  <SiteInstructionsCard location={location} canEdit={canEditCustomers} />
-                  <SiteContactCard location={location} canEdit={canEditCustomers} onViewAll={() => setActiveTab('activity')} />
-                  <AccountDetailsCard customer={customer} typeLabel="Single-site" />
+              ) : (
+                <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1fr_340px]">
+                  <div className="flex flex-col gap-3">
+                    <BillingCard customer={customer} ar={arSummary} />
+                    <EquipmentSummaryCard equipment={equipment} onViewAll={() => setActiveTab('equipment')} />
+                    <SiteWorkOrdersCard location={location} onViewAll={() => setActiveTab('jobs')} />
+                    <CustomerNotesCard customerId={customer.id} canEdit={canEditCustomers} />
+                  </div>
+                  <div className="flex flex-col gap-3">
+                    <SiteInstructionsCard location={location} canEdit={canEditCustomers} />
+                    <SiteContactCard location={location} canEdit={canEditCustomers} onViewAll={() => setActiveTab('activity')} />
+                    <AccountDetailsCard customer={customer} ar={arSummary} typeLabel="Single-site" />
+                  </div>
                 </div>
-              </div>
-            ))}
+              )}
+            </div>
+          )}
 
           {activeTab === 'equipment' && (
             <CustomerEquipmentTab
@@ -261,11 +301,7 @@ export default function SingleCustomerDetail({ customer }: { customer: Customer 
             <CustomerWorkOrdersTab customerId={customer.id} canCreate onNewJob={() => setIsNewWorkOrderOpen(true)} />
           )}
 
-          {activeTab === 'invoices' && (
-            <Callout kind="info">
-              {getName('invoice', true)} aren’t available on this page yet — they’ll land with the finance-service summary read.
-            </Callout>
-          )}
+          {activeTab === 'invoices' && <CustomerInvoicesTab customerId={customer.id} />}
 
           {activeTab === 'dispatches' &&
             (location ? (

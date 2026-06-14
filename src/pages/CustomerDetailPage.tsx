@@ -1,10 +1,10 @@
 // Customer detail — shape router. Fetches the customer once, then dispatches
 // on its structural CustomerShape:
 //   MULTI        → the redesigned MultiCustomerDetail (billing hub + locations)
-//   SINGLE       → legacy rendering (redesign pending)
-//   BILLING_ONLY → legacy rendering (Payer redesign pending)
-// As SINGLE and BILLING_ONLY get their redesigned variants, their branches move
-// off CustomerDetailLegacy and that file is eventually deleted.
+//   SINGLE       → the redesigned SingleCustomerDetail (one wallet + one site)
+//   BILLING_ONLY → legacy rendering (Payer redesign backend-blocked)
+// BILLING_ONLY is the last variant on CustomerDetailLegacy; once its Payer
+// redesign lands, that file is deleted.
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
