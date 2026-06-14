@@ -109,13 +109,21 @@ describe('financialActivityApi.getForCustomer', () => {
     vi.clearAllMocks();
   });
 
-  it('GETs the customer financial-activity stream (ACT-1) with the limit', async () => {
-    const rows = [{ id: 'f1', kind: 'INVOICE_PAID', invoiceId: 'i1', invoiceNumber: 'INV-1', workOrderId: null, serviceLocationId: null, amount: '250.00', actor: null, timestamp: '2026-06-14T15:00:00Z' }];
-    vi.mocked(apiClient.get).mockResolvedValue({ data: rows });
-    const out = await financialActivityApi.getForCustomer('cust-1', 100);
+  const row = { id: 'f1', kind: 'INVOICE_PAID', invoiceId: 'i1', invoiceNumber: 'INV-1', workOrderId: null, serviceLocationId: null, amount: 250.0, actor: null, timestamp: '2026-06-14T15:00:00Z' };
+
+  it('GETs the cursor-paginated customer financial stream (ACT-1) and passes the envelope through', async () => {
+    const page = { content: [row], nextCursor: 'c1', hasMore: true };
+    vi.mocked(apiClient.get).mockResolvedValue({ data: page });
+    const out = await financialActivityApi.getForCustomer('cust-1', { cursor: 'c0', limit: 50 });
     expect(apiClient.get).toHaveBeenCalledWith('/financial/customers/cust-1/activity', {
-      params: { limit: 100 },
+      params: { cursor: 'c0', limit: 50 },
     });
-    expect(out).toEqual(rows);
+    expect(out).toEqual(page);
+  });
+
+  it('tolerates the pre-cursor bare-array shape (deploy window) by wrapping it as a final page', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({ data: [row] });
+    const out = await financialActivityApi.getForCustomer('cust-1');
+    expect(out).toEqual({ content: [row], nextCursor: null, hasMore: false });
   });
 });
