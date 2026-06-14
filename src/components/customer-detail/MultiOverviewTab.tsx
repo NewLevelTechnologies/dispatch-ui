@@ -5,11 +5,12 @@
 // (CustomerHeaderTags); a full Activity feed is still absent until its backend
 // read exists (see BACKEND_ASKS ACT-1).
 //
-// Degrade-honestly contract: every surface that depends on the missing finance
-// layer (AR aging, outstanding, LTV, ARR, coverage %, per-location next-visit /
-// open-jobs / balance) renders a real "—" / pending note rather than a faked
-// number. What IS on the customer detail payload (terms, tax, pricebook,
-// locations, equipment-by-location, agreements list, notes) is wired for real.
+// Finance/agreement rollups are wired off two sibling summary calls fired on
+// load — FIN-1 (GET /financial/customers/{id}/ar-summary: outstanding, aging,
+// LTV) and AG-1 (GET /work-orders/agreements/summary: ARR, coverage %, overdue
+// visits). Until each resolves (loading/error), the dependent surface keeps its
+// honest "—" / pending note rather than a faked number; per-location next-visit
+// is a separate work-order call wired on the Locations tab (LOC-1 Phase 3).
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
@@ -26,9 +27,13 @@ import {
   agreementApi,
   dispatchRegionApi,
   equipmentApi,
+  invoicesApi,
   EquipmentStatus,
   type Customer,
   type AgreementSummaryResponse,
+  type CustomerArSummaryResponse,
+  type CustomerAgreementSummaryResponse,
+  type ArPaymentMethod,
 } from '../../api';
 import { useGlossary } from '../../contexts/GlossaryContext';
 import { formatPhone } from '../../utils/formatPhone';
@@ -39,9 +44,19 @@ import { Pill } from '../ui/Pill';
 import { DenseTable, DenseTHead, DenseRow, CellStack, CellTop, CellSub } from '../ui/DenseTable';
 import CustomerNotesCard from './CustomerNotesCard';
 import { CardTitle, CardLink } from './shared';
-import { formatDateShort } from './format';
+import { formatDateShort, formatMoney } from './format';
 
 const PREVIEW_LIMIT = 8;
+
+const PAYMENT_METHOD_LABEL: Record<ArPaymentMethod, string> = {
+  CASH: 'Cash',
+  CHECK: 'Check',
+  CREDIT_CARD: 'Credit card',
+  DEBIT_CARD: 'Debit card',
+  ACH: 'ACH',
+  WIRE_TRANSFER: 'Wire',
+  OTHER: 'Other',
+};
 
 // Whole days from now to a YYYY-MM-DD (or ISO) date. App-runtime clock is fine.
 function daysUntil(dateStr: string): number | null {
@@ -53,14 +68,41 @@ function daysUntil(dateStr: string): number | null {
 
 type AttentionItem = { key: string; title: string; sub: string; action: string; to: string };
 
-// Only the agreement-renewal rule fires today — it's derivable from the
-// agreements list already loaded for the tab count (termEnd on each row). The
-// AR-aging (91+ bucket) and overdue-visit rules are part of the design but
-// blocked on the finance + scheduling denorm reads; their insertion point is
-// here. Quiet (unrendered) when nothing fires — healthy accounts get a clean
-// page, not a "nothing to do" stub.
-function buildAttentionItems(agreements: AgreementSummaryResponse[]): AttentionItem[] {
+// Three rules, most-urgent first: AR 91+ past due (FIN-1), overdue PM visits
+// (AG-1), then agreement renewals within 30 days (from the agreements list's
+// termEnd). Quiet (unrendered) when nothing fires — healthy accounts get a
+// clean page, not a "nothing to do" stub. The summaries may be undefined while
+// their queries load; those rules simply don't fire until the data arrives.
+function buildAttentionItems(
+  agreements: AgreementSummaryResponse[],
+  ar: CustomerArSummaryResponse | undefined,
+  agreementSummary: CustomerAgreementSummaryResponse | undefined,
+  customerId: string,
+): AttentionItem[] {
   const items: AttentionItem[] = [];
+
+  if (ar && ar.days91Plus.amount > 0) {
+    const n = ar.days91Plus.count;
+    items.push({
+      key: 'ar-91',
+      title: `${formatMoney(ar.days91Plus.amount)} ${n === 1 ? 'invoice' : 'invoices'} 91+ days past due`,
+      sub: ar.oldestPastDueInvoiceDate ? `oldest ${formatDateShort(ar.oldestPastDueInvoiceDate)}` : `${n} past due`,
+      action: 'View',
+      to: `/customers/${customerId}?tab=invoices`,
+    });
+  }
+
+  if (agreementSummary && agreementSummary.overdueVisitCount > 0) {
+    const n = agreementSummary.overdueVisitCount;
+    items.push({
+      key: 'overdue-visits',
+      title: `${n} ${n === 1 ? 'visit' : 'visits'} overdue`,
+      sub: 'PM obligations past due',
+      action: 'View',
+      to: `/customers/${customerId}?tab=agreements`,
+    });
+  }
+
   for (const a of agreements) {
     if (a.status !== 'ACTIVE' || !a.termEnd) continue;
     const days = daysUntil(a.termEnd);
@@ -105,6 +147,18 @@ export default function MultiOverviewTab({
     queryKey: ['dispatch-regions'],
     queryFn: () => dispatchRegionApi.getAll(true),
   });
+  // FIN-1 + AG-1 sibling summary calls — fired on load, in parallel with the
+  // detail. Each card degrades to its pending state until its query resolves.
+  const { data: arSummary } = useQuery({
+    queryKey: ['customer-ar-summary', customer.id],
+    queryFn: () => invoicesApi.getCustomerArSummary(customer.id),
+    enabled: !!customer.id,
+  });
+  const { data: agreementSummary } = useQuery({
+    queryKey: ['agreement-customer-summary', customer.id],
+    queryFn: () => agreementApi.getCustomerSummary(customer.id),
+    enabled: !!customer.id,
+  });
 
   const equipByLocation = useMemo(() => {
     const acc: Record<string, number> = {};
@@ -121,7 +175,7 @@ export default function MultiOverviewTab({
     return m;
   }, [regions]);
 
-  const attentionItems = buildAttentionItems(agreements);
+  const attentionItems = buildAttentionItems(agreements, arSummary, agreementSummary, customer.id);
 
   return (
     <div className="flex flex-col gap-3">
@@ -129,20 +183,20 @@ export default function MultiOverviewTab({
 
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1fr_340px]">
         <div className="flex flex-col gap-3">
-          <BillingCard customer={customer} />
+          <BillingCard customer={customer} ar={arSummary} />
           <LocationsPreviewCard
             customer={customer}
             regionMap={regionMap}
             equipByLocation={equipByLocation}
             onViewAll={onViewLocations}
           />
-          <AgreementsSummaryCard agreements={agreements} onViewAll={onViewAgreements} />
+          <AgreementsSummaryCard agreements={agreements} summary={agreementSummary} onViewAll={onViewAgreements} />
           <CustomerNotesCard customerId={customer.id} canEdit={canEdit} />
         </div>
 
         <div className="flex flex-col gap-3">
           <ContactCard customer={customer} onViewAll={onViewContacts} />
-          <AccountDetailsCard customer={customer} />
+          <AccountDetailsCard customer={customer} ar={arSummary} />
         </div>
       </div>
     </div>
@@ -184,19 +238,70 @@ function LabelTiny({ children }: { children: React.ReactNode }) {
   return <div className="label-tiny">{children}</div>;
 }
 
-// Billing & AR — terms / pricebook / tax are real on the payload; the
-// outstanding headline + aging buckets are blocked on the finance-service
-// summary read and render an honest pending state (see BACKEND_ASKS FIN-1).
-function BillingCard({ customer }: { customer: Customer }) {
+// Billing & AR — terms / pricebook / tax ride the detail payload; the
+// outstanding headline + 5-bucket aging come from the FIN-1 summary (honest
+// "—" until it resolves).
+function BillingCard({ customer, ar }: { customer: Customer; ar?: CustomerArSummaryResponse }) {
   const termsLabel = customer.paymentTermsDays > 0 ? `Net ${customer.paymentTermsDays}` : '—';
+  const buckets: { k: string; b: CustomerArSummaryResponse['current']; danger?: boolean }[] = ar
+    ? [
+        { k: 'Current', b: ar.current },
+        { k: '1–30', b: ar.days1To30 },
+        { k: '31–60', b: ar.days31To60 },
+        { k: '61–90', b: ar.days61To90 },
+        { k: '91+', b: ar.days91Plus, danger: true },
+      ]
+    : [];
   return (
     <Card title={<CardTitle icon={<ReceiptPercentIcon className="size-3.5" />}>Billing &amp; AR</CardTitle>} padding="none">
       <div className="p-3.5">
         <div>
           <LabelTiny>Outstanding balance</LabelTiny>
-          <div className="mt-0.5 font-mono text-[20px] font-bold tabular-nums text-fg-dim">—</div>
-          <div className="text-[11px] text-fg-muted">AR aging &amp; balance pending finance integration</div>
+          {ar ? (
+            <div
+              className="mt-0.5 font-mono text-[20px] font-bold tabular-nums"
+              style={{ color: ar.outstandingBalance > 0 ? 'var(--fg-strong)' : 'var(--fg-dim)' }}
+            >
+              {formatMoney(ar.outstandingBalance)}
+            </div>
+          ) : (
+            <>
+              <div className="mt-0.5 font-mono text-[20px] font-bold tabular-nums text-fg-dim">—</div>
+              <div className="text-[11px] text-fg-muted">AR aging &amp; balance loading…</div>
+            </>
+          )}
         </div>
+
+        {ar && (
+          <div className="mt-3 grid grid-cols-5 gap-1.5">
+            {buckets.map(({ k, b, danger }) => {
+              const hot = danger && b.amount > 0;
+              return (
+                <div
+                  key={k}
+                  className="rounded-md border border-border-soft px-1.5 py-1.5 text-center"
+                  style={hot ? { background: 'color-mix(in oklch, var(--danger-500) 8%, transparent)', borderColor: 'color-mix(in oklch, var(--danger-500) 30%, transparent)' } : undefined}
+                >
+                  <div className="text-[10px] font-semibold uppercase tracking-wide text-fg-muted">{k}</div>
+                  <div
+                    className="mt-0.5 font-mono text-[12px] font-bold tabular-nums"
+                    style={{ color: hot ? 'var(--danger-500)' : b.amount > 0 ? 'var(--fg-strong)' : 'var(--fg-dim)' }}
+                  >
+                    {formatMoney(b.amount)}
+                  </div>
+                  <div className="text-[10px] text-fg-dim">{b.count} inv</div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {ar && ar.days91Plus.count > 0 && ar.oldestPastDueInvoiceDate && (
+          <div className="mt-2 text-[11px]" style={{ color: 'var(--danger-500)' }}>
+            Oldest past due {formatDateShort(ar.oldestPastDueInvoiceDate)}
+          </div>
+        )}
+
         <div className="my-3.5 h-px bg-border-soft" />
         <div className="grid grid-cols-3 gap-5">
           <div>
@@ -316,14 +421,15 @@ function LocationsPreviewCard({
   );
 }
 
-// Condensed strategic summary — count + nearest renewal. ARR + coverage % are
-// part of the design but need the billing-schedule + coverage reads per
-// agreement (see BACKEND_ASKS AG-1); shown as a pending note, not faked.
+// Condensed strategic summary — active count + nearest renewal, plus ARR +
+// coverage % from the AG-1 summary (honest pending until that query resolves).
 function AgreementsSummaryCard({
   agreements,
+  summary,
   onViewAll,
 }: {
   agreements: AgreementSummaryResponse[];
+  summary?: CustomerAgreementSummaryResponse;
   onViewAll: () => void;
 }) {
   const { getName } = useGlossary();
@@ -360,7 +466,19 @@ function AgreementsSummaryCard({
                 </span>
               </div>
             </div>
-            <div className="text-right text-[11px] text-fg-muted">ARR &amp; coverage pending</div>
+            {summary ? (
+              <div className="text-right">
+                <div className="font-mono text-[15px] font-bold tabular-nums text-fg-strong">
+                  {formatMoney(summary.arr)}
+                  <span className="ml-0.5 text-[11px] font-medium text-fg-muted">/yr</span>
+                </div>
+                <div className="text-[11px] text-fg-muted">
+                  {summary.coveragePct}% covered · {summary.coveredLocations}/{summary.totalLocations} {getName('service_location', true).toLowerCase()}
+                </div>
+              </div>
+            ) : (
+              <div className="text-right text-[11px] text-fg-muted">ARR &amp; coverage loading…</div>
+            )}
           </div>
           {nextRenewal && (
             <button
@@ -435,7 +553,7 @@ function ContactCard({ customer, onViewAll }: { customer: Customer; onViewAll: (
   );
 }
 
-function AccountDetailsCard({ customer }: { customer: Customer }) {
+function AccountDetailsCard({ customer, ar }: { customer: Customer; ar?: CustomerArSummaryResponse }) {
   const { getName } = useGlossary();
   const rows: { k: string; v: React.ReactNode }[] = [
     { k: `${getName('customer')} ID`, v: <span className="font-mono">{customer.customerNumber || customer.id}</span> },
@@ -454,6 +572,9 @@ function AccountDetailsCard({ customer }: { customer: Customer }) {
       : 'No',
   });
   if (customer.requiresPurchaseOrder) rows.push({ k: 'PO', v: 'Required' });
+  // FIN-1: lifetime value (total received) + most-used payment method.
+  if (ar) rows.push({ k: 'Lifetime value', v: <span className="font-mono tabular-nums">{formatMoney(ar.lifetimeValue)}</span> });
+  if (ar?.mostUsedPaymentMethod) rows.push({ k: 'Top pay method', v: PAYMENT_METHOD_LABEL[ar.mostUsedPaymentMethod] });
   rows.push({ k: 'Since', v: formatDateShort(customer.createdAt) });
 
   return (

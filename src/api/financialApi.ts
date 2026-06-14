@@ -146,6 +146,45 @@ export interface LocationInvoiceSummaryResponse {
 }
 
 /**
+ * Customer-level AR rollup (FIN-1) — `GET /financial/customers/{id}/ar-summary`.
+ * Drives the customer detail Billing & AR card + the attention strip's AR rule.
+ * One cheap call, fired in parallel on page load. All money fields are decimal
+ * dollars; aging is by days past `dueDate` on open (SENT/OVERDUE) invoices.
+ *
+ *  - `outstandingBalance` = sum of all 5 buckets.
+ *  - Buckets are NAMED keys (not an array), each `{ amount, count }`. `current`
+ *    is not-yet-due (dueDate >= today); the rest are days past due.
+ *  - `oldestPastDue*` point at the oldest invoice in `days91Plus` (null if none).
+ *  - `lifetimeValue` = total received (non-void) payments.
+ *  - Empty customer → all zeros, `oldestPastDue*`/`mostUsedPaymentMethod` null.
+ */
+export interface ArAgingBucket {
+  amount: number;
+  count: number;
+}
+export type ArPaymentMethod =
+  | 'CASH'
+  | 'CHECK'
+  | 'CREDIT_CARD'
+  | 'DEBIT_CARD'
+  | 'ACH'
+  | 'WIRE_TRANSFER'
+  | 'OTHER';
+export interface CustomerArSummaryResponse {
+  outstandingBalance: number;
+  current: ArAgingBucket;
+  days1To30: ArAgingBucket;
+  days31To60: ArAgingBucket;
+  days61To90: ArAgingBucket;
+  days91Plus: ArAgingBucket;
+  oldestPastDueInvoiceId: string | null;
+  oldestPastDueInvoiceDate: string | null; // ISO date yyyy-MM-dd
+  lifetimeValue: number;
+  mostUsedPaymentMethod: ArPaymentMethod | null;
+  currency: string;
+}
+
+/**
  * Response from `POST /financial/{invoices,quotes}/{id}/send` (§4.3). The
  * server has stamped `lastSentAt` + `lastSentToEmails` on the row by the
  * time this returns — callers should invalidate the WO list query to pick
@@ -305,6 +344,17 @@ export const invoicesApi = {
     const response = await apiClient.get<LocationInvoiceSummaryResponse>(
       '/financial/invoices/summary',
       { params: { serviceLocationId } },
+    );
+    return response.data;
+  },
+
+  /**
+   * Customer-level AR rollup (FIN-1). One call, fired in parallel on the
+   * customer detail page load. See {@link CustomerArSummaryResponse}.
+   */
+  getCustomerArSummary: async (customerId: string): Promise<CustomerArSummaryResponse> => {
+    const response = await apiClient.get<CustomerArSummaryResponse>(
+      `/financial/customers/${customerId}/ar-summary`,
     );
     return response.data;
   },

@@ -11,6 +11,8 @@ import type { QueryClient } from '@tanstack/react-query';
  *   - `['invoices']`                         — global Invoices page list AND the customer detail
  *                                              Invoices tab body (`['invoices','customer',…]`) +
  *                                              tab-count badge (`['invoices','customer-count',…]`)
+ *   - `['customer-ar-summary', custId]`      — customer detail Billing & AR card + attention strip
+ *                                              (FIN-1 outstanding / aging / LTV rollup)
  *
  * Invoice/payment mutations (void, status change, send→SENT, create, record/
  * void payment) fire from work-order-scoped surfaces (the financial drawer,
@@ -27,4 +29,5 @@ export function invalidateLocationInvoiceCaches(queryClient: QueryClient): void 
   queryClient.invalidateQueries({ queryKey: ['location-invoice-summary'] });
   queryClient.invalidateQueries({ queryKey: ['service-location'] });
   queryClient.invalidateQueries({ queryKey: ['invoices'] });
+  queryClient.invalidateQueries({ queryKey: ['customer-ar-summary'] });
 }

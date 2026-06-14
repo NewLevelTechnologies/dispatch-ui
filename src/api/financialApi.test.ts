@@ -77,3 +77,29 @@ describe('quotesApi.send', () => {
     );
   });
 });
+
+describe('invoicesApi.getCustomerArSummary', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('GETs the customer AR summary (FIN-1) and returns it', async () => {
+    const summary = {
+      outstandingBalance: 385,
+      current: { amount: 100, count: 1 },
+      days1To30: { amount: 50, count: 1 },
+      days31To60: { amount: 25, count: 1 },
+      days61To90: { amount: 0, count: 0 },
+      days91Plus: { amount: 210, count: 2 },
+      oldestPastDueInvoiceId: 'inv-9',
+      oldestPastDueInvoiceDate: '2026-02-01',
+      lifetimeValue: 12500,
+      mostUsedPaymentMethod: 'CHECK',
+      currency: 'USD',
+    };
+    vi.mocked(apiClient.get).mockResolvedValue({ data: summary });
+    const out = await invoicesApi.getCustomerArSummary('cust-1');
+    expect(apiClient.get).toHaveBeenCalledWith('/financial/customers/cust-1/ar-summary');
+    expect(out).toEqual(summary);
+  });
+});
