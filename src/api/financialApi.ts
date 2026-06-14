@@ -146,6 +146,45 @@ export interface LocationInvoiceSummaryResponse {
 }
 
 /**
+ * Customer-level AR rollup (FIN-1) — `GET /financial/customers/{id}/ar-summary`.
+ * Drives the customer detail Billing & AR card + the attention strip's AR rule.
+ * One cheap call, fired in parallel on page load. All money fields are decimal
+ * dollars; aging is by days past `dueDate` on open (SENT/OVERDUE) invoices.
+ *
+ *  - `outstandingBalance` = sum of all 5 buckets.
+ *  - Buckets are NAMED keys (not an array), each `{ amount, count }`. `current`
+ *    is not-yet-due (dueDate >= today); the rest are days past due.
+ *  - `oldestPastDue*` point at the oldest invoice in `days91Plus` (null if none).
+ *  - `lifetimeValue` = total received (non-void) payments.
+ *  - Empty customer → all zeros, `oldestPastDue*`/`mostUsedPaymentMethod` null.
+ */
+export interface ArAgingBucket {
+  amount: number;
+  count: number;
+}
+export type ArPaymentMethod =
+  | 'CASH'
+  | 'CHECK'
+  | 'CREDIT_CARD'
+  | 'DEBIT_CARD'
+  | 'ACH'
+  | 'WIRE_TRANSFER'
+  | 'OTHER';
+export interface CustomerArSummaryResponse {
+  outstandingBalance: number;
+  current: ArAgingBucket;
+  days1To30: ArAgingBucket;
+  days31To60: ArAgingBucket;
+  days61To90: ArAgingBucket;
+  days91Plus: ArAgingBucket;
+  oldestPastDueInvoiceId: string | null;
+  oldestPastDueInvoiceDate: string | null; // ISO date yyyy-MM-dd
+  lifetimeValue: number;
+  mostUsedPaymentMethod: ArPaymentMethod | null;
+  currency: string;
+}
+
+/**
  * Response from `POST /financial/{invoices,quotes}/{id}/send` (§4.3). The
  * server has stamped `lastSentAt` + `lastSentToEmails` on the row by the
  * time this returns — callers should invalidate the WO list query to pick
@@ -305,6 +344,17 @@ export const invoicesApi = {
     const response = await apiClient.get<LocationInvoiceSummaryResponse>(
       '/financial/invoices/summary',
       { params: { serviceLocationId } },
+    );
+    return response.data;
+  },
+
+  /**
+   * Customer-level AR rollup (FIN-1). One call, fired in parallel on the
+   * customer detail page load. See {@link CustomerArSummaryResponse}.
+   */
+  getCustomerArSummary: async (customerId: string): Promise<CustomerArSummaryResponse> => {
+    const response = await apiClient.get<CustomerArSummaryResponse>(
+      `/financial/customers/${customerId}/ar-summary`,
     );
     return response.data;
   },
@@ -707,7 +757,10 @@ export interface FinancialActivityEvent {
   invoiceId: string;
   invoiceNumber: string;
   workOrderId: string | null;
-  serviceLocationId: string;
+  // Non-null on the location feed; the customer feed (getForCustomer) may return
+  // null for a customer-level invoice with no site. Row rendering keys off
+  // workOrderId, not this, so null is safe.
+  serviceLocationId: string | null;
   amount: string;
   actor: { userId: string; userName: string | null } | null;
   timestamp: string;
@@ -722,6 +775,21 @@ export const financialActivityApi = {
   ): Promise<FinancialActivityEvent[]> => {
     const response = await apiClient.get<FinancialActivityEvent[]>(
       `/financial/locations/${serviceLocationId}/activity`,
+      { params: { limit } },
+    );
+    return response.data;
+  },
+
+  /** Customer-scoped financial milestones (ACT-1), newest-first. Same row shape
+   * as {@link getForLocation} (interleaved with the WO activity stream), except
+   * `serviceLocationId` may be null for customer-level invoices with no site.
+   * Fetched whole; `limit` defaults to 100 server-side, max 500. */
+  getForCustomer: async (
+    customerId: string,
+    limit?: number,
+  ): Promise<FinancialActivityEvent[]> => {
+    const response = await apiClient.get<FinancialActivityEvent[]>(
+      `/financial/customers/${customerId}/activity`,
       { params: { limit } },
     );
     return response.data;

@@ -4,14 +4,17 @@
 // count footer. Search + status are always available; once the customer detail
 // payload carries per-location enrichment (LOC-1: hasOpenJobs / openJobsCount /
 // lastServiceAt / balance), the operational/financial columns and the "Has open
-// jobs" chip light up. They stay hidden (not inert) before that lands. The
-// "Visit overdue" chip needs pmOverdue and is still Phase 3.
+// jobs" chip light up. PM visit status (pmOverdue / nextVisitDue) is a separate
+// work-order call merged by serviceLocationId — it drives the "Next visit"
+// column + "Visit overdue" chip. Each surface stays hidden (not inert) until
+// its backing data is present.
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { MagnifyingGlassIcon, PlusIcon } from '@heroicons/react/24/outline';
 import {
+  agreementApi,
   dispatchRegionApi,
   equipmentApi,
   EquipmentStatus,
@@ -51,6 +54,7 @@ export default function MultiLocationsTab({
   const [q, setQ] = useState('');
   const [status, setStatus] = useState<StatusFilter | null>(null);
   const [openJobsOnly, setOpenJobsOnly] = useState(false);
+  const [visitOverdueOnly, setVisitOverdueOnly] = useState(false);
 
   // The operational/financial columns + the "Has open jobs" chip only render
   // once the detail payload carries the LOC-1 denorm. Detect it from any row so
@@ -72,6 +76,20 @@ export default function MultiLocationsTab({
     queryKey: ['dispatch-regions'],
     queryFn: () => dispatchRegionApi.getAll(true),
   });
+  // LOC-1 Phase 3 — per-location PM visit status (separate work-order call,
+  // merged by serviceLocationId). Only locations with a PM obligation appear.
+  const { data: visitStatus } = useQuery({
+    queryKey: ['agreement-visit-status', customer.id],
+    queryFn: () => agreementApi.getVisitStatus(customer.id),
+    enabled: !!customer.id,
+  });
+
+  const visitByLocation = useMemo(() => {
+    const m: Record<string, { pmOverdue: boolean; nextVisitDue: string | null }> = {};
+    for (const v of visitStatus ?? []) m[v.serviceLocationId] = { pmOverdue: v.pmOverdue, nextVisitDue: v.nextVisitDue };
+    return m;
+  }, [visitStatus]);
+  const hasVisitStatus = (visitStatus?.length ?? 0) > 0;
 
   const equipByLocation = useMemo(() => {
     const acc: Record<string, number> = {};
@@ -92,6 +110,7 @@ export default function MultiLocationsTab({
     let r = customer.serviceLocations;
     if (status) r = r.filter((l) => l.status === status);
     if (openJobsOnly) r = r.filter((l) => l.hasOpenJobs);
+    if (visitOverdueOnly) r = r.filter((l) => visitByLocation[l.id]?.pmOverdue);
     const needle = q.trim().toLowerCase();
     if (needle) {
       r = r.filter(
@@ -105,7 +124,7 @@ export default function MultiLocationsTab({
       );
     }
     return r;
-  }, [customer.serviceLocations, q, status, openJobsOnly]);
+  }, [customer.serviceLocations, q, status, openJobsOnly, visitOverdueOnly, visitByLocation]);
 
   const total = customer.serviceLocations.length;
 
@@ -154,13 +173,28 @@ export default function MultiLocationsTab({
           </button>
         )}
 
-        {(status || openJobsOnly) && (
+        {hasVisitStatus && (
+          <button
+            type="button"
+            onClick={() => setVisitOverdueOnly((v) => !v)}
+            className={`inline-flex h-[30px] items-center rounded-md border px-2.5 text-[12px] font-medium ${
+              visitOverdueOnly
+                ? 'border-accent-500/45 bg-accent-500/10 text-fg-accent'
+                : 'border-border bg-bg-elev text-fg hover:bg-bg-hover'
+            }`}
+          >
+            Visit overdue
+          </button>
+        )}
+
+        {(status || openJobsOnly || visitOverdueOnly) && (
           <Button
             plain
             size="xs"
             onClick={() => {
               setStatus(null);
               setOpenJobsOnly(false);
+              setVisitOverdueOnly(false);
             }}
           >
             Clear
@@ -178,6 +212,7 @@ export default function MultiLocationsTab({
       </div>
 
       <Card padding="none">
+        <div className="overflow-x-auto">
         <DenseTable>
           <DenseTHead>
             <tr>
@@ -187,6 +222,7 @@ export default function MultiLocationsTab({
               <th>Primary contact</th>
               {hasEnrichment && <th className="right">Open</th>}
               {hasEnrichment && <th>Last service</th>}
+              {hasVisitStatus && <th>Next visit</th>}
               {hasEnrichment && <th className="right">Balance</th>}
               <th className="right">{getName('equipment')}</th>
             </tr>
@@ -194,7 +230,7 @@ export default function MultiLocationsTab({
           <tbody>
             {rows.length === 0 ? (
               <tr>
-                <td colSpan={hasEnrichment ? 8 : 5} className="px-3.5 py-10 text-center">
+                <td colSpan={5 + (hasEnrichment ? 3 : 0) + (hasVisitStatus ? 1 : 0)} className="px-3.5 py-10 text-center">
                   <div className="text-[13px] font-semibold text-fg-strong">
                     No {getName('service_location', true).toLowerCase()} match your filters
                   </div>
@@ -205,6 +241,7 @@ export default function MultiLocationsTab({
               rows.map((l) => {
                 const region = l.dispatchRegionName ?? regionMap[l.dispatchRegionId];
                 const equip = equipByLocation[l.id] ?? 0;
+                const vs = visitByLocation[l.id];
                 const street = titleCaseAddress(
                   [l.address.streetAddress, l.address.streetAddressLine2].filter(Boolean).join(' '),
                 );
@@ -248,6 +285,21 @@ export default function MultiLocationsTab({
                         {l.lastServiceAt ? formatDateShort(l.lastServiceAt) : <span className="text-fg-dim">—</span>}
                       </td>
                     )}
+                    {hasVisitStatus && (
+                      <td className="muted">
+                        {!vs ? (
+                          <span className="text-fg-dim">—</span>
+                        ) : vs.pmOverdue ? (
+                          <span className="font-semibold" style={{ color: 'var(--danger-500)' }}>
+                            Overdue{vs.nextVisitDue ? ` · ${formatDateShort(vs.nextVisitDue)}` : ''}
+                          </span>
+                        ) : vs.nextVisitDue ? (
+                          formatDateShort(vs.nextVisitDue)
+                        ) : (
+                          <span className="text-fg-dim">—</span>
+                        )}
+                      </td>
+                    )}
                     {hasEnrichment && (
                       <td className="right num">
                         {l.balance == null ? (
@@ -268,6 +320,7 @@ export default function MultiLocationsTab({
             )}
           </tbody>
         </DenseTable>
+        </div>
         <div className="flex items-center border-t border-border-soft bg-bg-elev-2 px-4 py-2.5 text-[11.5px] text-fg-muted">
           Showing <strong className="mx-1 text-fg-strong">{rows.length}</strong> of {total}
         </div>

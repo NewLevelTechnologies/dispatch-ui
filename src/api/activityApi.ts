@@ -147,6 +147,30 @@ export const activityApi = {
     );
     return response.data;
   },
+
+  /**
+   * The customer-scoped work-order activity stream (ACT-1) — every meaningful
+   * event across all the customer's work orders. Identical row/page shape and
+   * query contract to {@link listForLocation}; the FE interleaves it with the
+   * customer financial-activity stream by timestamp. 404 = unknown customer.
+   */
+  listForCustomer: async (
+    customerId: string,
+    params?: ListActivityParams
+  ): Promise<LocationActivityPage> => {
+    const response = await apiClient.get<LocationActivityPage>(
+      `/work-orders/customers/${customerId}/activity`,
+      {
+        params: {
+          cursor: params?.cursor,
+          limit: params?.limit,
+          categories: params?.categories?.length ? params.categories.join(',') : undefined,
+          classification: params?.classification,
+        },
+      }
+    );
+    return response.data;
+  },
 };
 
 export default activityApi;

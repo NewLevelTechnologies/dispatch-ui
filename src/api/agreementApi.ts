@@ -133,6 +133,32 @@ export interface AgreementSummaryResponse {
   updatedAt: string;
 }
 
+// Per-location PM visit status (LOC-1 Phase 3) — GET /work-orders/agreements/visit-status?customerId={id}.
+// A separate work-order-service call (NOT on the customer detail payload —
+// customer-service has no obligation data); the FE merges it into the locations
+// table by serviceLocationId. Only locations with a PM obligation appear;
+// absent → no PM (no "Visit overdue" chip). `nextVisitDue` is the next open PM
+// obligation window start (next PM due), not a booked appointment.
+export interface VisitStatusEntry {
+  serviceLocationId: string;
+  pmOverdue: boolean;
+  nextVisitDue: string | null; // ISO date yyyy-MM-dd
+}
+
+// Per-customer agreement rollup (AG-1) — GET /work-orders/agreements/summary?customerId={id}.
+// Scoped to the customer's ACTIVE agreements. Drives the AgreementsSummaryCard
+// (ARR + coverage) and the attention strip's overdue-visit rule. One call,
+// fired in parallel on the customer detail page load.
+export interface CustomerAgreementSummaryResponse {
+  arr: number; // annualized active billing schedules, decimal dollars
+  activeAgreementCount: number;
+  coveredLocations: number; // distinct, across active agreements
+  totalLocations: number;
+  coveragePct: number; // PERCENT 0–100, 1 decimal (NOT a 0–1 ratio)
+  overdueVisitCount: number; // ATT-1
+  currency: string;
+}
+
 // Create body. New agreements are created status DRAFT — generation + billing
 // only run once PATCHed to ACTIVE (after coverage + visit templates are set).
 // v1 only creates kind VISIT / classification CONTRACT.
@@ -261,6 +287,25 @@ export const agreementApi = {
 
   getById: async (id: string): Promise<AgreementResponse> => {
     const response = await apiClient.get<AgreementResponse>(`/work-orders/agreements/${id}`);
+    return response.data;
+  },
+
+  // Per-customer agreement rollup (AG-1). See {@link CustomerAgreementSummaryResponse}.
+  getCustomerSummary: async (customerId: string): Promise<CustomerAgreementSummaryResponse> => {
+    const response = await apiClient.get<CustomerAgreementSummaryResponse>(
+      '/work-orders/agreements/summary',
+      { params: { customerId } },
+    );
+    return response.data;
+  },
+
+  // Per-location PM visit status for a customer (LOC-1 Phase 3). One call;
+  // merged into the locations table by serviceLocationId. See {@link VisitStatusEntry}.
+  getVisitStatus: async (customerId: string): Promise<VisitStatusEntry[]> => {
+    const response = await apiClient.get<VisitStatusEntry[]>(
+      '/work-orders/agreements/visit-status',
+      { params: { customerId } },
+    );
     return response.data;
   },
 

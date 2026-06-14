@@ -134,4 +134,27 @@ describe('agreementApi', () => {
     await agreementApi.removeCoverageLocation('a-1', 'sl-1');
     expect(apiClient.delete).toHaveBeenCalledWith('/work-orders/agreements/a-1/coverage/locations/sl-1');
   });
+
+  it('getCustomerSummary GETs the per-customer rollup (AG-1)', async () => {
+    const summary = {
+      arr: 2400, activeAgreementCount: 2, coveredLocations: 3,
+      totalLocations: 4, coveragePct: 75, overdueVisitCount: 3, currency: 'USD',
+    };
+    vi.mocked(apiClient.get).mockResolvedValue({ data: summary });
+    const out = await agreementApi.getCustomerSummary('cust-1');
+    expect(apiClient.get).toHaveBeenCalledWith('/work-orders/agreements/summary', {
+      params: { customerId: 'cust-1' },
+    });
+    expect(out).toEqual(summary);
+  });
+
+  it('getVisitStatus GETs per-location PM status for the customer (LOC-1 P3)', async () => {
+    const rows = [{ serviceLocationId: 'sl-1', pmOverdue: true, nextVisitDue: '2026-07-15' }];
+    vi.mocked(apiClient.get).mockResolvedValue({ data: rows });
+    const out = await agreementApi.getVisitStatus('cust-1');
+    expect(apiClient.get).toHaveBeenCalledWith('/work-orders/agreements/visit-status', {
+      params: { customerId: 'cust-1' },
+    });
+    expect(out).toEqual(rows);
+  });
 });

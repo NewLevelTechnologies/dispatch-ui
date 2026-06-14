@@ -39,7 +39,7 @@ import CustomerFormDialog from '../CustomerFormDialog';
 import WorkOrderFormDialog from '../WorkOrderFormDialog';
 import EquipmentFormDialog from '../EquipmentFormDialog';
 import NotificationPreferencesDialog from '../NotificationPreferencesDialog';
-import NotificationLogsList from '../NotificationLogsList';
+import CustomerActivityStream from './CustomerActivityStream';
 import CustomerAgreementsTab from '../CustomerAgreementsTab';
 import CustomerHeaderTags from './CustomerHeaderTags';
 import MultiOverviewTab from './MultiOverviewTab';
@@ -318,7 +318,7 @@ export default function MultiCustomerDetail({ customer }: { customer: Customer }
             />
           )}
 
-          {activeTab === 'activity' && <NotificationLogsList customerId={customer.id} />}
+          {activeTab === 'activity' && <CustomerActivityStream customerId={customer.id} />}
 
           {/* Lifecycle footer */}
           {canEditCustomers && (
