@@ -25,6 +25,7 @@ import { Card } from '../catalyst/card';
 import { Button } from '../catalyst/button';
 import { Pill } from '../ui/Pill';
 import { DenseTable, DenseTHead, DenseRow, CellStack, CellTop, CellSub } from '../ui/DenseTable';
+import { SortHeader, type SortState } from '../ui/SortHeader';
 import { AssignedUsersCell } from '../ui/AssignedUsersCell';
 import { FilterChipListbox, ChipListboxOption } from '../ui/FilterChipListbox';
 import { DateRangeChip } from '../ui/DateRangeChip';
@@ -109,8 +110,16 @@ export default function CustomerWorkOrdersTab({
   const [typeIds, setTypeIds] = useState<string[]>([]);
   const [dateRange, setDateRange] = useState<DateRange>(EMPTY_DATE_RANGE);
   const [search, setSearch] = useState('');
+  const [sort, setSort] = useState<SortState>({ key: 'scheduledDate', dir: 'desc' });
   const { page, pageHref, resetPage } = useUrlPage('jobsPage');
   const deferredSearch = useDeferredValue(search.trim());
+
+  // WO sort keys (scheduledDate / workOrderNumber) read newest-first → desc on
+  // first click; toggle on re-click.
+  const onSort = (key: string) => {
+    setSort((s) => (key === s.key ? { key, dir: s.dir === 'asc' ? 'desc' : 'asc' } : { key, dir: 'desc' }));
+    resetPage();
+  };
 
   const { data: workOrderTypes } = useQuery({
     queryKey: ['work-order-types'],
@@ -130,7 +139,7 @@ export default function CustomerWorkOrdersTab({
     q: deferredSearch || undefined,
     page: page - 1, // local state 1-based; backend Page 0-based
     size: JOBS_PAGE_SIZE,
-    sort: 'scheduledDate,desc',
+    sort: `${sort.key},${sort.dir}` as ListWorkOrdersParams['sort'],
   };
 
   // Prefix ['work-orders', …] so WO/dispatch mutations (which invalidate
@@ -281,11 +290,11 @@ export default function CustomerWorkOrdersTab({
               <DenseTable>
                 <DenseTHead>
                   <tr>
-                    <th>{getName('work_order')}</th>
+                    <SortHeader sortKey="workOrderNumber" label={getName('work_order')} current={sort} onSort={onSort} />
                     <th>{getName('equipment')}</th>
                     <th>{t('workOrders.table.statusHeader')}</th>
                     <th>{t('workOrders.table.assigned')}</th>
-                    <th>{t('workOrders.table.scheduled')}</th>
+                    <SortHeader sortKey="scheduledDate" label={t('workOrders.table.scheduled')} current={sort} onSort={onSort} />
                   </tr>
                 </DenseTHead>
                 <tbody>
