@@ -21,6 +21,7 @@ import { Card } from '../catalyst/card';
 import { Button } from '../catalyst/button';
 import { Pill } from '../ui/Pill';
 import { DenseTable, DenseTHead, DenseRow } from '../ui/DenseTable';
+import { SortHeader, type SortState } from '../ui/SortHeader';
 import { FilterChipListbox, ChipListboxOption } from '../ui/FilterChipListbox';
 import { ListFooter } from '../ui/ListFooter';
 import { useUrlPage } from '../../hooks/useUrlPage';
@@ -79,8 +80,19 @@ export default function CustomerInvoicesTab({ customerId }: { customerId: string
 
   const [statusId, setStatusId] = useState('all');
   const [search, setSearch] = useState('');
+  const [sort, setSort] = useState<SortState>({ key: 'invoiceDate', dir: 'desc' });
   const { page, pageHref, resetPage } = useUrlPage('invoicesPage');
   const deferredSearch = useDeferredValue(search.trim());
+
+  // Date/amount columns open desc (most-recent / biggest first); status asc.
+  const onSort = (key: string) => {
+    setSort((s) =>
+      key === s.key
+        ? { key, dir: s.dir === 'asc' ? 'desc' : 'asc' }
+        : { key, dir: key === 'status' ? 'asc' : 'desc' },
+    );
+    resetPage();
+  };
 
   const statusParams = INVOICE_STATUS_FILTERS.find((s) => s.id === statusId)?.params ?? {};
 
@@ -90,7 +102,7 @@ export default function CustomerInvoicesTab({ customerId }: { customerId: string
     q: deferredSearch || undefined,
     page: page - 1, // local state 1-based; backend Page 0-based
     size: INVOICES_PAGE_SIZE,
-    sort: 'invoiceDate,desc',
+    sort: `${sort.key},${sort.dir}` as ListInvoicesParams['sort'],
   };
 
   const { data, isLoading } = useQuery({
@@ -192,10 +204,10 @@ export default function CustomerInvoicesTab({ customerId }: { customerId: string
                 <DenseTHead>
                   <tr>
                     <th>{t('invoices.table.invoiceNumber')}</th>
-                    <th>{t('invoices.table.status')}</th>
-                    <th>{t('invoices.table.invoiceDate')}</th>
-                    <th>{t('invoices.table.dueDate')}</th>
-                    <th className="right">{t('invoices.table.totalAmount')}</th>
+                    <SortHeader sortKey="status" label={t('invoices.table.status')} current={sort} onSort={onSort} />
+                    <SortHeader sortKey="invoiceDate" label={t('invoices.table.invoiceDate')} current={sort} onSort={onSort} />
+                    <SortHeader sortKey="dueDate" label={t('invoices.table.dueDate')} current={sort} onSort={onSort} />
+                    <SortHeader sortKey="totalAmount" label={t('invoices.table.totalAmount')} current={sort} onSort={onSort} align="right" />
                     <th className="right">{t('invoices.table.balanceDue')}</th>
                   </tr>
                 </DenseTHead>

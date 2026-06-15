@@ -2,9 +2,9 @@
 // on its structural CustomerShape:
 //   MULTI        → the redesigned MultiCustomerDetail (billing hub + locations)
 //   SINGLE       → the redesigned SingleCustomerDetail (one wallet + one site)
-//   BILLING_ONLY → legacy rendering (Payer redesign backend-blocked)
-// BILLING_ONLY is the last variant on CustomerDetailLegacy; once its Payer
-// redesign lands, that file is deleted.
+//   BILLING_ONLY → the redesigned PayerDetail (financial counterparty, no sites)
+// All three shapes now render redesigned variants; CustomerDetailLegacy is no
+// longer reachable from the router and can be removed once nothing else imports it.
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
@@ -17,7 +17,7 @@ import { Callout } from '../components/ui/Callout';
 import { Button } from '../components/catalyst/button';
 import MultiCustomerDetail from '../components/customer-detail/MultiCustomerDetail';
 import SingleCustomerDetail from '../components/customer-detail/SingleCustomerDetail';
-import CustomerDetailLegacy from './CustomerDetailLegacy';
+import PayerDetail from '../components/customer-detail/PayerDetail';
 
 export default function CustomerDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -61,9 +61,5 @@ export default function CustomerDetailPage() {
   const shape = resolveCustomerShape(customer);
   if (shape === 'MULTI') return <MultiCustomerDetail customer={customer} />;
   if (shape === 'SINGLE') return <SingleCustomerDetail customer={customer} />;
-
-  // BILLING_ONLY still renders the legacy category-driven page (Payer redesign
-  // pending). It refetches the same ['customers', id] key (served from cache —
-  // no extra request) and owns its own loading guard.
-  return <CustomerDetailLegacy />;
+  return <PayerDetail customer={customer} />;
 }

@@ -886,6 +886,22 @@
       "unavailable": "Not available"
     }
   },
+  "payers": {
+    "backToCustomers": "← {{entities}}",
+    "search": {
+      "placeholder": "Search payers…"
+    },
+    "table": {
+      "dueOnReceipt": "Due on receipt",
+      "in91": "{{amount}} in 91+",
+      "lastPayment": "Last payment",
+      "lifetimePaid": "Lifetime paid",
+      "net": "Net {{days}}",
+      "openInvoices": "Open inv.",
+      "outstanding": "Outstanding",
+      "terms": "Terms"
+    }
+  },
   "payments": {
     "description": "Track customer payments and transactions",
     "search": {

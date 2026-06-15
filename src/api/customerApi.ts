@@ -157,6 +157,18 @@ export interface CustomerListDto {
   openJobsCount?: number;
   lastServiceAt?: string | null;
   tags?: TagSummary[];
+  // Per-row AR financials — the point of the Payers list (PAYERS-LIST-1). On
+  // every customer row, but only the payers list surfaces them. Sourced from
+  // customer-service's event mirror, so they can briefly lag the authoritative
+  // ar-summary on the detail page (fine for a list; same tradeoff as the
+  // open/aged chips). Optional — absent until the BE denorm is deployed.
+  openBalanceTotal?: number;
+  aged91Total?: number;
+  openInvoiceCount?: number;
+  lifetimePaid?: number;
+  lastPaymentAt?: string | null;
+  lastPaymentAmount?: number | null;
+  currency?: string;
 }
 
 // Chip counts envelope on list responses. Reflects the search-filtered set
@@ -519,6 +531,35 @@ export const customerApi = {
       if (v === undefined || v === '' || v === null) delete apiParams[key];
     }
     const response = await apiClient.get<CustomerListResponse>('/customers', {
+      params: apiParams,
+    });
+    return response.data;
+  },
+
+  // Payers list — BILLING_ONLY customers, enriched with the per-row AR
+  // financials (PAYERS-LIST-1: openBalanceTotal / aged91Total / openInvoiceCount
+  // / lifetimePaid / lastPaymentAt+Amount / currency). Same response shape as
+  // getAllPaginated. NOTE: this route's `page` is 1-indexed (default 1) — do NOT
+  // -1 it like /customers. Omit `sort` to get the bookkeeper default
+  // (outstanding,desc). Sort keys: outstanding | aged91 | openInvoices |
+  // lifetimePaid | lastPayment | name | terms | createdAt.
+  getPayers: async (params?: {
+    page?: number;     // 1-indexed
+    limit?: number;
+    search?: string;
+    sort?: string;     // "<key>,<asc|desc>"
+  }): Promise<CustomerListResponse> => {
+    const apiParams: Record<string, string | number | undefined> = {
+      page: params?.page ?? 1,
+      limit: params?.limit,
+      search: params?.search,
+      sort: params?.sort,
+    };
+    for (const key of Object.keys(apiParams)) {
+      const v = apiParams[key];
+      if (v === undefined || v === '') delete apiParams[key];
+    }
+    const response = await apiClient.get<CustomerListResponse>('/customers/payers', {
       params: apiParams,
     });
     return response.data;
