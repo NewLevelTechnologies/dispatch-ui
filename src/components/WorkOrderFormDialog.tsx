@@ -630,7 +630,7 @@ export default function WorkOrderFormDialog({ isOpen, onClose, workOrder, prefil
                     {/* Dispatch Region - Only show if 2+ regions */}
                     {showRegionDropdown && (
                       <Field>
-                        <Label className="text-xs">{getName('dispatch')} {t('entities.region')} *</Label>
+                        <Label className="text-xs">{getName('dispatch_region')} *</Label>
                         <Select
                           name="dispatchRegionId"
                           value={dispatchRegionId}

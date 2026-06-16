@@ -679,7 +679,7 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
                 {/* Dispatch Region - Only show dropdown if 2+ regions */}
                 {showRegionDropdown && (
                   <Field>
-                    <Label className="text-xs">{getName('dispatch')} {t('entities.region')} *</Label>
+                    <Label className="text-xs">{getName('dispatch_region')} *</Label>
                     <Select
                       name="dispatchRegionId"
                       value={createFormData.dispatchRegionId}

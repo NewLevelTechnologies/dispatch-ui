@@ -135,7 +135,7 @@ export default function SettingsLayout() {
     {
       label: t('settings.sections.dispatch', { dispatch: getName('dispatch') }),
       items: [
-        { label: `${getName('dispatch')} ${t('entities.regions')}`, to: '/settings/dispatch-regions' },
+        { label: getName('dispatch_region', true), to: '/settings/dispatch-regions' },
       ],
     },
     {

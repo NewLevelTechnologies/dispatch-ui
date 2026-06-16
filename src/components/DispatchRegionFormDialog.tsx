@@ -36,7 +36,7 @@ export default function DispatchRegionFormDialog({
   const { t } = useTranslation();
   const { getName } = useGlossary();
   const isEdit = Boolean(region);
-  const regionSingular = `${getName('dispatch')} ${t('entities.region')}`;
+  const regionSingular = getName('dispatch_region');
 
   const [name, setName] = useState('');
   const [abbreviation, setAbbreviation] = useState('');

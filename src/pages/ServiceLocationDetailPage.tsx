@@ -725,7 +725,7 @@ function LocationHeaderEdit({
         {hasRegions && (
           <Field className="col-span-12 sm:col-span-4">
             <Label className="text-xs">
-              {getName('dispatch')} {t('entities.region')}
+              {getName('dispatch_region')}
             </Label>
             <Select value={dispatchRegionId} onChange={(e) => setDispatchRegionId(e.target.value)}>
               {activeRegions!.map((region) => (

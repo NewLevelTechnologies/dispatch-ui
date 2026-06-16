@@ -303,7 +303,7 @@ export default function ServiceLocationFormDialog({ isOpen, onClose, serviceLoca
           {/* Dispatch Region */}
           {activeRegions && activeRegions.length > 0 && (
             <Field>
-              <Label className="text-xs">{getName('dispatch')} {t('entities.region')} *</Label>
+              <Label className="text-xs">{getName('dispatch_region')} *</Label>
               <Select
                 name="dispatchRegionId"
                 value={formData.dispatchRegionId}

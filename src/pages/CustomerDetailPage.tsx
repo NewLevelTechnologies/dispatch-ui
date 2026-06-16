@@ -3,8 +3,8 @@
 //   MULTI        → the redesigned MultiCustomerDetail (billing hub + locations)
 //   SINGLE       → the redesigned SingleCustomerDetail (one wallet + one site)
 //   BILLING_ONLY → the redesigned PayerDetail (financial counterparty, no sites)
-// All three shapes now render redesigned variants; CustomerDetailLegacy is no
-// longer reachable from the router and can be removed once nothing else imports it.
+// All three shapes render redesigned variants; the pre-redesign legacy page has
+// been removed.
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';

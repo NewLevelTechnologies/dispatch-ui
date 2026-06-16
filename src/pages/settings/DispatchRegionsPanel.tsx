@@ -54,8 +54,8 @@ export default function DispatchRegionsPanel() {
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
 
   const dispatchName = getName('dispatch');
-  const regionSingular = `${dispatchName} ${t('entities.region')}`;
-  const regionsPlural = `${dispatchName} ${t('entities.regions')}`;
+  const regionSingular = getName('dispatch_region');
+  const regionsPlural = getName('dispatch_region', true);
   const regionsNoun = regionsPlural.toLowerCase();
 
   const {
@@ -135,14 +135,14 @@ export default function DispatchRegionsPanel() {
     sorted.length > 0
       ? t('settings.dispatchRegions.subtitle', {
           count: sorted.length,
-          regions: t('entities.regions').toLowerCase(),
+          regions: regionsNoun,
         })
       : null;
 
   return (
     <>
       <PageHead
-        title={`${dispatchName} ${t('entities.regions')}`}
+        title={regionsPlural}
         sub={subtitle}
         actions={
           <Button color="accent" size="xs" onClick={() => setFormState({ region: null })}>
