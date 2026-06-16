@@ -217,7 +217,7 @@ export default function MultiLocationsTab({
           <DenseTHead>
             <tr>
               <th>{getName('service_location')}</th>
-              <th>{getName('dispatch')} {t('entities.region')}</th>
+              <th>{getName('dispatch_region')}</th>
               <th>Status</th>
               <th>Primary contact</th>
               {hasEnrichment && <th className="right">Open</th>}

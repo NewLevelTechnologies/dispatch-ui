@@ -360,7 +360,7 @@ export default function AddLocationPage() {
                 </Field>
                 {hasRegions && (
                   <Field size="xs" className="col-span-4">
-                    <Label size="xs" required>{getName('dispatch')} {t('entities.region')}</Label>
+                    <Label size="xs" required>{getName('dispatch_region')}</Label>
                     <Select
                       value={effectiveRegionId}
                       onChange={(e) => { setRegionTouched(true); set('dispatchRegionId', e.target.value); }}
