@@ -164,4 +164,23 @@ describe('AddLocationPage', () => {
     const contactName = screen.getByPlaceholderText('e.g., Maria Reyes') as HTMLInputElement;
     expect(contactName.value).toBe('');
   });
+
+  it('shows a customer picker (not the location form) when opened standalone', async () => {
+    const routes: RouteObject[] = [
+      { path: '/service-locations/new', element: <AddLocationPage /> },
+    ];
+    renderWithProviders(<AddLocationPage />, {
+      routes,
+      initialEntries: ['/service-locations/new'],
+    });
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: /add location/i, level: 1 })).toBeInTheDocument();
+    });
+
+    // Standalone (no customer fixed by the route): the CSR picks a customer
+    // first — the location form (street address) isn't rendered until one is
+    // chosen.
+    expect(screen.queryByPlaceholderText('1820 W McDowell Rd')).not.toBeInTheDocument();
+  });
 });

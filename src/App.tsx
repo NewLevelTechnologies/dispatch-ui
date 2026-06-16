@@ -11,6 +11,7 @@ import DashboardPage from './pages/DashboardPage';
 import CustomersPage from './pages/CustomersPage';
 import PayersPage from './pages/PayersPage';
 import CustomerDetailPage from './pages/CustomerDetailPage';
+import CustomerFormPage from './pages/CustomerFormPage';
 import AgreementDetailPage from './pages/AgreementDetailPage';
 import ServiceLocationsPage from './pages/ServiceLocationsPage';
 import ServiceLocationDetailPage from './pages/ServiceLocationDetailPage';
@@ -165,10 +166,12 @@ function App() {
       <Route path="/dashboard" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<DashboardPage />} />} />
       <Route path="/customers" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<CustomersPage />} />} />
       <Route path="/payers" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<PayersPage />} />} />
+      <Route path="/customers/new" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<CustomerFormPage />} />} />
       <Route path="/customers/:id" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<CustomerDetailPage />} />} />
       <Route path="/customers/:customerId/service-locations/new" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<AddLocationPage />} />} />
       <Route path="/agreements/:id" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<AgreementDetailPage />} />} />
       <Route path="/service-locations" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<ServiceLocationsPage />} />} />
+      <Route path="/service-locations/new" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<AddLocationPage />} />} />
       <Route path="/service-locations/:id" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<ServiceLocationDetailPage />} />} />
       <Route path="/work-orders" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<WorkOrdersPage />} />} />
       <Route path="/work-orders/:id" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<WorkOrderDetailPage />} />} />

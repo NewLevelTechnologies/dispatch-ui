@@ -6,6 +6,12 @@ import apiClient from '../api/client';
 
 vi.mock('../api/client');
 
+const navigateSpy = vi.fn();
+vi.mock('react-router-dom', async () => {
+  const actual = await vi.importActual<typeof import('react-router-dom')>('react-router-dom');
+  return { ...actual, useNavigate: () => navigateSpy };
+});
+
 const mockServiceLocationsResponse = {
   content: [
     {
@@ -191,7 +197,7 @@ describe('ServiceLocationsPage', () => {
     expect(searchInput).toHaveValue('warehouse');
   });
 
-  it('opens add dialog when add button is clicked', async () => {
+  it('navigates to the add-location form when add button is clicked', async () => {
     vi.mocked(apiClient.get).mockResolvedValue({ data: mockServiceLocationsResponse });
     const user = userEvent.setup();
 
@@ -201,13 +207,12 @@ describe('ServiceLocationsPage', () => {
       expect(screen.getByRole('heading', { name: 'Locations' })).toBeInTheDocument();
     });
 
+    // Create moved to the full-page form — Add now navigates, not a dialog.
     const addButton = screen.getByRole('button', { name: /add location/i });
     await user.click(addButton);
 
-    // Dialog should open (check for dialog content)
-    await waitFor(() => {
-      expect(screen.getByRole('dialog')).toBeInTheDocument();
-    });
+    expect(navigateSpy).toHaveBeenCalledWith('/service-locations/new');
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
   it('opens edit dialog when edit is clicked', async () => {
@@ -320,25 +325,33 @@ describe('ServiceLocationsPage', () => {
     expect(searchInput).toHaveValue('nonexistent location');
   });
 
-  it('closes dialog when handleCloseDialog is called', async () => {
-    vi.mocked(apiClient.get).mockResolvedValue({ data: mockServiceLocationsResponse });
+  it('closes the edit dialog after opening it', async () => {
+    // Add navigates now; the dialog is edit-only. Open it from the row's
+    // overflow menu, then confirm Cancel closes it.
+    vi.mocked(apiClient.get).mockImplementation((url) => {
+      if (typeof url === 'string' && url.startsWith('/service-locations/')) {
+        return Promise.resolve({ data: mockServiceLocationsResponse.content[0] });
+      }
+      if (url === '/service-locations') {
+        return Promise.resolve({ data: mockServiceLocationsResponse });
+      }
+      return Promise.resolve({ data: [] });
+    });
     const user = userEvent.setup();
 
     renderWithProviders(<ServiceLocationsPage />);
 
     await waitFor(() => {
-      expect(screen.getByRole('heading', { name: 'Locations' })).toBeInTheDocument();
+      expect(screen.getByText('Main Office')).toBeInTheDocument();
     });
 
-    // Open dialog
-    const addButton = screen.getByRole('button', { name: /add location/i });
-    await user.click(addButton);
+    await user.click(screen.getAllByLabelText(/more options/i)[0]);
+    await user.click(screen.getByRole('menuitem', { name: /edit/i }));
 
     await waitFor(() => {
       expect(screen.getByRole('dialog')).toBeInTheDocument();
     });
 
-    // Close dialog
     const cancelButton = screen.getByRole('button', { name: /cancel/i });
     await user.click(cancelButton);
 

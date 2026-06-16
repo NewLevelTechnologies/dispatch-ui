@@ -11,11 +11,13 @@ import {
   tenantSettingsApi,
   type PremiseType,
   type CreateServiceLocationRequest,
+  type CustomerSearchResult,
 } from '../api';
 import { useGlossary } from '../contexts/GlossaryContext';
 import { useHasCapability } from '../hooks/useCurrentUser';
 import { showError, showSuccess, extractApiError } from '../lib/toast';
 import AppLayout from '../components/AppLayout';
+import CustomerPicker from '../components/CustomerPicker';
 import { Card } from '../components/catalyst/card';
 import { Button } from '../components/catalyst/button';
 import { Field, Label } from '../components/catalyst/fieldset';
@@ -65,7 +67,7 @@ function initials(name: string): string {
 }
 
 export default function AddLocationPage() {
-  const { customerId } = useParams<{ customerId: string }>();
+  const { customerId: routeCustomerId } = useParams<{ customerId: string }>();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { t } = useTranslation();
@@ -74,10 +76,17 @@ export default function AddLocationPage() {
 
   const canAdd = useHasCapability('ADD_SERVICE_LOCATIONS');
 
+  // Reached two ways: customer-scoped (/customers/:customerId/service-locations/new,
+  // FK fixed by the route) or standalone from the global Locations list
+  // (/service-locations/new), where the CSR picks the customer first.
+  const standalone = !routeCustomerId;
+  const [pickedCustomer, setPickedCustomer] = useState<CustomerSearchResult | null>(null);
+  const effectiveCustomerId = routeCustomerId ?? pickedCustomer?.id ?? '';
+
   const { data: customer, isLoading: loadingCustomer, error: customerError } = useQuery({
-    queryKey: ['customers', customerId],
-    queryFn: () => customerApi.getById(customerId!),
-    enabled: !!customerId,
+    queryKey: ['customers', effectiveCustomerId],
+    queryFn: () => customerApi.getById(effectiveCustomerId),
+    enabled: !!effectiveCustomerId,
   });
 
   // Seeds the premise default + the "set in Company profile" hint.
@@ -149,7 +158,10 @@ export default function AddLocationPage() {
     errors.siteContactEmail = t('common.form.invalidEmail');
   const hasErrors = Object.keys(errors).length > 0;
 
-  const cancelHref = searchParams.get('from') === 'locations' ? '/service-locations' : `/customers/${customerId}`;
+  const cancelHref =
+    standalone || searchParams.get('from') === 'locations'
+      ? '/service-locations'
+      : `/customers/${routeCustomerId}`;
 
   // Name examples are persona-ordered by the tenant default premise: same two
   // examples (commercial label / homeowner's name), the likely one first.
@@ -178,14 +190,14 @@ export default function AddLocationPage() {
         siteContactPhone: form.siteContactPhone.trim() || null,
         siteContactEmail: form.siteContactEmail.trim() || null,
       };
-      return customerApi.addServiceLocation(customerId!, request);
+      return customerApi.addServiceLocation(effectiveCustomerId, request);
     },
     onSuccess: (created) => {
-      queryClient.invalidateQueries({ queryKey: ['customers', customerId] });
+      queryClient.invalidateQueries({ queryKey: ['customers', effectiveCustomerId] });
       queryClient.invalidateQueries({ queryKey: ['customers'] });
       queryClient.invalidateQueries({ queryKey: ['service-locations'] });
       showSuccess(t('common.form.successCreate', { entity: getName('service_location'), defaultValue: 'Location created' }));
-      navigate(`/service-locations/${created.id}?from=customer`);
+      navigate(`/service-locations/${created.id}?from=${standalone ? 'locations' : 'customer'}`);
     },
     onError: (err: unknown) =>
       showError(t('common.form.errorCreate', { entity: getName('service_location') }), extractApiError(err) ?? undefined),
@@ -199,6 +211,52 @@ export default function AddLocationPage() {
   };
 
   const submitting = createMutation.isPending;
+
+  if (!canAdd) {
+    return (
+      <AppLayout>
+        <div className="p-8">
+          <Callout kind="warning">{t('common.noPermission', { defaultValue: 'You don’t have permission to do that.' })}</Callout>
+          <Button className="mt-4" onClick={() => navigate(cancelHref)}>
+            {t('common.actions.backTo', { entities: getName('service_location', true) })}
+          </Button>
+        </div>
+      </AppLayout>
+    );
+  }
+
+  // Standalone entry (global Locations list), no customer chosen yet — show the
+  // picker; the location form appears once a customer is selected.
+  if (standalone && !effectiveCustomerId) {
+    return (
+      <AppLayout>
+        <div className="px-1 py-1">
+          <div className="mx-auto max-w-[680px]">
+            <Link
+              to="/service-locations"
+              className="mb-2.5 inline-flex items-center gap-1 text-[11.5px] text-fg-muted hover:text-fg-strong"
+            >
+              ← {getName('service_location', true)}
+            </Link>
+            <div className="mb-4">
+              <Heading level={1} size="page-md" className="m-0">
+                {t('common.actions.add', { entity: getName('service_location') })}
+              </Heading>
+              <Text size="sm" tone="muted" className="mt-1">
+                Pick the {getName('customer').toLowerCase()} this {getName('service_location').toLowerCase()} belongs to, then fill in the site.
+              </Text>
+            </div>
+            <Card title={getName('customer')}>
+              <Field size="xs">
+                <Label size="xs" required>{getName('customer')}</Label>
+                <CustomerPicker value={pickedCustomer} onChange={setPickedCustomer} />
+              </Field>
+            </Card>
+          </div>
+        </div>
+      </AppLayout>
+    );
+  }
 
   if (loadingCustomer) {
     return (
@@ -217,21 +275,8 @@ export default function AddLocationPage() {
           <Callout kind="danger">
             {t('common.actions.errorLoadingEntity', { entity: getName('customer') })}
           </Callout>
-          <Button className="mt-4" onClick={() => navigate('/customers')}>
+          <Button className="mt-4" onClick={() => navigate(standalone ? '/service-locations' : '/customers')}>
             {t('common.actions.backTo', { entities: getName('customer', true) })}
-          </Button>
-        </div>
-      </AppLayout>
-    );
-  }
-
-  if (!canAdd) {
-    return (
-      <AppLayout>
-        <div className="p-8">
-          <Callout kind="warning">{t('common.noPermission', { defaultValue: 'You don’t have permission to do that.' })}</Callout>
-          <Button className="mt-4" onClick={() => navigate(cancelHref)}>
-            ← {customer.name}
           </Button>
         </div>
       </AppLayout>
@@ -248,7 +293,7 @@ export default function AddLocationPage() {
             to={cancelHref}
             className="mb-2.5 inline-flex max-w-[600px] items-center gap-1 truncate text-[11.5px] text-fg-muted hover:text-fg-strong"
           >
-            ← {customer.name}
+            ← {standalone ? getName('service_location', true) : customer.name}
           </Link>
 
           <div className="mb-4">
