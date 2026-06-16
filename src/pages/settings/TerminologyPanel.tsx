@@ -15,6 +15,7 @@ import { showError, showSuccess, extractApiError } from '../../lib/toast';
 import {
   PRESETS,
   pluralize,
+  abbreviate,
   ENTITY_GROUP,
   GROUP_ORDER,
   type GroupId,
@@ -74,8 +75,14 @@ function serialize(form: FormState, defaults: Record<string, EntityInfo>): Gloss
       singular: s || d?.defaultSingular || code,
       plural: p || (s ? pluralize(s) : d?.defaultPlural) || `${code}s`,
     };
-    // Omit a blank abbreviation so the BE keeps the default prefix.
-    if (a) entry.abbreviation = a;
+    // Backfill a derived short code when the entity was renamed but the code
+    // left blank — mirrors the plural backfill so the saved prefix matches the
+    // hint shown in the field ("what you see is what's saved"). Renaming an
+    // entity reseeds its number prefix (Work Order → Job ⇒ JOB-00001), the same
+    // behavior the industry presets bake in. A row customized on plural/code
+    // only (blank singular) keeps the BE default prefix.
+    const abbr = a || (s ? abbreviate(s) : '');
+    if (abbr) entry.abbreviation = abbr;
     out[code] = entry;
   }
   return out;
@@ -151,7 +158,13 @@ function validateAbbreviations(
       // error first and keep it out of the uniqueness pass.
       continue;
     }
-    const effective = custom || (e.defaultAbbreviation ?? '').toUpperCase();
+    // Effective short code, in the same precedence serialize() saves it:
+    // explicit custom code → code derived from a custom name → system default.
+    const customSingular = (form[e.code]?.singular ?? '').trim();
+    const effective =
+      custom ||
+      (customSingular ? abbreviate(customSingular) : '') ||
+      (e.defaultAbbreviation ?? '').toUpperCase();
     if (!effective) continue;
     const list = byAbbr.get(effective) ?? [];
     list.push(e.code);
@@ -166,7 +179,12 @@ function validateAbbreviations(
     // default-only row in the group can't be edited away; the summary names
     // the clash so they understand what their custom value collided with.
     for (const c of codes) {
-      if ((form[c]?.abbreviation ?? '').trim() && !rowErrors[c]) {
+      // Flag a row the admin can actually fix: one contributing a custom code
+      // OR a custom name (whose derived code landed in this clash). A
+      // default-only row can't be edited away — the summary names the clash.
+      const contributes =
+        (form[c]?.abbreviation ?? '').trim() || (form[c]?.singular ?? '').trim();
+      if (contributes && !rowErrors[c]) {
         rowErrors[c] = 'duplicate';
       }
     }
@@ -768,6 +786,12 @@ function EntityRow({
   const pluralHint = value.singular.trim() && !value.plural
     ? pluralize(value.singular.trim())
     : entity.defaultPlural;
+  // Same idea for the short code: a typed name suggests a code (Job → JOB)
+  // until the admin types their own. Falls back to the system default. Kept in
+  // step with serialize(), which saves this derived value when left blank.
+  const abbrHint = value.singular.trim() && !value.abbreviation
+    ? abbreviate(value.singular.trim()) || entity.defaultAbbreviation
+    : entity.defaultAbbreviation;
   return (
     <div
       className={[
@@ -845,7 +869,7 @@ function EntityRow({
           name={`glossary-${entity.code}-abbreviation`}
           aria-label={`${entity.defaultSingular} abbreviation`}
           value={value.abbreviation}
-          placeholder={entity.defaultAbbreviation}
+          placeholder={abbrHint}
           maxLength={4}
           invalid={Boolean(abbrError)}
           disabled={disabled}

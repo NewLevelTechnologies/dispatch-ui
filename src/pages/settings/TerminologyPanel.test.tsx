@@ -120,6 +120,19 @@ describe('TerminologyPanel', () => {
     expect(screen.getByPlaceholderText('Properties')).toBeInTheDocument();
   });
 
+  it('abbreviation placeholder suggests a derived code as the user types the singular', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<TerminologyPanel />);
+
+    // Work Order's short-code field starts on its system default ("WO").
+    await waitFor(() => expect(screen.getByPlaceholderText('Work Order')).toBeInTheDocument());
+    expect(screen.getByLabelText('Work Order abbreviation')).toHaveAttribute('placeholder', 'WO');
+
+    // Renaming it to "Job" suggests "JOB" in the (still-blank) code field.
+    await user.type(screen.getByPlaceholderText('Work Order'), 'Job');
+    expect(screen.getByLabelText('Work Order abbreviation')).toHaveAttribute('placeholder', 'JOB');
+  });
+
   it('per-row reset clears the singular and plural for that row only', async () => {
     const user = userEvent.setup();
     setupApi({
@@ -165,7 +178,9 @@ describe('TerminologyPanel', () => {
       expect(apiClient.put).toHaveBeenCalledWith(
         expect.stringContaining('/tenant-settings'),
         expect.objectContaining({
-          glossary: { work_order: { singular: 'Job', plural: 'Jobs' } },
+          // The short code was left blank, so it is derived from the new name
+          // (Job → JOB) and saved alongside — mirrors the plural backfill.
+          glossary: { work_order: { singular: 'Job', plural: 'Jobs', abbreviation: 'JOB' } },
         })
       );
     });

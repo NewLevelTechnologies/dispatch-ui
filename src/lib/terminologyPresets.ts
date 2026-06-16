@@ -188,6 +188,25 @@ export function pluralize(s: string): string {
   return s + 's';
 }
 
+// Short-code suggestion from a display name — the number-prefix counterpart to
+// `pluralize`. Multi-word names use the initials (Work Order → WO); single
+// words use the first letters (Job → JOB). Always a valid 1–4 char code, or ''
+// on empty / punctuation-only input so the placeholder logic can fall back to
+// the system default. A guess, not gospel: the admin can override the field.
+export function abbreviate(s: string): string {
+  const words = s
+    .trim()
+    .split(/\s+/)
+    .map((w) => w.replace(/[^a-zA-Z0-9]/g, ''))
+    .filter(Boolean);
+  if (words.length === 0) return '';
+  const code =
+    words.length >= 2
+      ? words.map((w) => w[0]).join('') // initials: Work Order → WO
+      : words[0].slice(0, 3); // first letters: Job → JOB
+  return code.slice(0, 4).toUpperCase();
+}
+
 // Entity-code → group bucket. Used by the page to render six grouped
 // cards instead of one long flat list. The eyebrow labels live in i18n.
 // 'other' is a catch-all bucket for entity codes the backend returns that
