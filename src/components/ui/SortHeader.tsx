@@ -33,7 +33,12 @@ export function SortHeader({
       <button
         type="button"
         onClick={() => onSort(sortKey)}
-        className={`group inline-flex cursor-pointer items-center gap-1 ${align === 'right' ? 'flex-row-reverse' : ''} ${active ? 'text-fg' : 'hover:text-fg'}`}
+        // A <button> takes UA font defaults that override inheritance, so it
+        // would render in the body font (mixed-case) instead of the uppercase
+        // dense-table header style. Force-inherit the th's typography; color
+        // stays class-driven (muted default → fg on hover/active).
+        style={{ font: 'inherit', letterSpacing: 'inherit', textTransform: 'inherit' }}
+        className={`group inline-flex cursor-pointer items-center gap-1 ${align === 'right' ? 'flex-row-reverse' : ''} ${active ? 'text-fg' : 'text-fg-muted hover:text-fg'}`}
       >
         {label}
         <span
