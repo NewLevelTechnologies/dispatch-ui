@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { pluralize, PRESETS, getPreset, ENTITY_GROUP, GROUP_ORDER } from './terminologyPresets';
+import { pluralize, abbreviate, PRESETS, getPreset, ENTITY_GROUP, GROUP_ORDER } from './terminologyPresets';
 
 describe('pluralize', () => {
   it('returns empty for empty input', () => {
@@ -31,6 +31,40 @@ describe('pluralize', () => {
   it('does not pluralize mass nouns', () => {
     expect(pluralize('Equipment')).toBe('Equipment');
     expect(pluralize('Gear')).toBe('Gear');
+  });
+});
+
+describe('abbreviate', () => {
+  const ABBR_RE = /^[A-Z0-9]{1,4}$/;
+
+  it('returns empty for empty / punctuation-only input', () => {
+    expect(abbreviate('')).toBe('');
+    expect(abbreviate('   ')).toBe('');
+    expect(abbreviate('—/.')).toBe('');
+  });
+
+  it('takes the first letters of a single word', () => {
+    expect(abbreviate('Job')).toBe('JOB');
+    expect(abbreviate('Repair')).toBe('REP');
+    expect(abbreviate('Device')).toBe('DEV');
+  });
+
+  it('takes the initials of a multi-word name', () => {
+    expect(abbreviate('Work Order')).toBe('WO');
+    expect(abbreviate('Service Call')).toBe('SC');
+    expect(abbreviate('Maintenance Request')).toBe('MR');
+  });
+
+  it('uppercases and caps at four characters', () => {
+    expect(abbreviate('ticket')).toBe('TIC');
+    expect(abbreviate('A B C D E')).toBe('ABCD');
+  });
+
+  it('always yields a valid code (or empty) for trade-vocab names', () => {
+    for (const name of ['Job', 'Property', 'Service Call', 'Bait Station', 'IT', 'Crew Member']) {
+      const a = abbreviate(name);
+      expect(a === '' || ABBR_RE.test(a), `"${name}" → "${a}"`).toBe(true);
+    }
   });
 });
 
