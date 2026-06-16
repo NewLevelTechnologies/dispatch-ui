@@ -9,7 +9,7 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { EllipsisVerticalIcon, PlusIcon } from '@heroicons/react/24/outline';
+import { EllipsisVerticalIcon, PencilSquareIcon, PlusIcon } from '@heroicons/react/24/outline';
 import {
   customerApi,
   equipmentApi,
@@ -21,6 +21,7 @@ import {
   type Equipment,
   type EquipmentSummary,
   type UpdateCustomerRequest,
+  type PremiseType,
 } from '../../api';
 import { useGlossary } from '../../contexts/GlossaryContext';
 import { useHasCapability } from '../../hooks/useCurrentUser';
@@ -31,11 +32,11 @@ import { Heading } from '../catalyst/heading';
 import { Button } from '../catalyst/button';
 import { Dropdown, DropdownButton, DropdownItem, DropdownLabel, DropdownMenu } from '../catalyst/dropdown';
 import { Pill } from '../ui/Pill';
+import { ToggleGroup, ToggleGroupOption } from '../ui/ToggleGroup';
 import { Tabs } from '../ui/Tabs';
 import { Callout } from '../ui/Callout';
 import IconButton from '../IconButton';
 import ConfirmDialog from '../ConfirmDialog';
-import CustomerFormDialog from '../CustomerFormDialog';
 import WorkOrderFormDialog from '../WorkOrderFormDialog';
 import EquipmentFormDialog from '../EquipmentFormDialog';
 import NotificationPreferencesDialog from '../NotificationPreferencesDialog';
@@ -46,7 +47,7 @@ import CustomerEquipmentTab from './CustomerEquipmentTab';
 import CustomerWorkOrdersTab from './CustomerWorkOrdersTab';
 import CustomerInvoicesTab from './CustomerInvoicesTab';
 import CustomerHeaderTags from './CustomerHeaderTags';
-import { BillingCard, AccountDetailsCard, AttentionStrip } from './MultiOverviewTab';
+import { BillingCard, AccountDetailsCard, CustomerHeaderEdit, AttentionStrip } from './MultiOverviewTab';
 import { buildAttentionItems } from './attention';
 import { EquipmentSummaryCard } from '../detail/EquipmentSummaryCard';
 import { SiteWorkOrdersCard, SiteInstructionsCard, SiteContactCard, DispatchesTab } from '../detail/locationCards';
@@ -56,6 +57,73 @@ import { formatDateShort } from './format';
 type TabId = 'overview' | 'equipment' | 'jobs' | 'invoices' | 'dispatches' | 'files' | 'activity';
 const SINGLE_TABS: readonly TabId[] = ['overview', 'equipment', 'jobs', 'invoices', 'dispatches', 'files', 'activity'];
 
+// The single site's premise lives on the customer header as a pill. With edit
+// rights it flips to an inline toggle that writes straight through to the
+// location (PUT /service-locations/{id}) — premise is a per-location field, and
+// this is the one place it's editable from a customer page (customer-add-edit.md).
+function PremisePill({
+  locationId,
+  premise,
+  canEdit,
+}: {
+  locationId: string;
+  premise?: PremiseType | null;
+  canEdit: boolean;
+}) {
+  const queryClient = useQueryClient();
+  const [editing, setEditing] = useState(false);
+  const current: PremiseType = premise === 'RESIDENCE' ? 'RESIDENCE' : 'BUSINESS';
+  const label = current === 'RESIDENCE' ? 'Residence' : 'Business site';
+
+  const saveMutation = useMutation({
+    mutationFn: (next: PremiseType) => customerApi.updateServiceLocation(locationId, { premiseType: next }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['service-location', locationId] });
+      queryClient.invalidateQueries({ queryKey: ['customers'] });
+      queryClient.invalidateQueries({ queryKey: ['service-locations'] });
+      setEditing(false);
+      showSuccess('Premise updated');
+    },
+    onError: (err) => showError("Couldn't update premise", extractApiError(err) ?? undefined),
+  });
+
+  if (!canEdit || !locationId) return <Pill tone="neutral">{label}</Pill>;
+
+  if (editing) {
+    return (
+      <span className="inline-flex items-center gap-1.5">
+        <ToggleGroup
+          value={current}
+          onChange={(v) => (v === current ? setEditing(false) : saveMutation.mutate(v))}
+          aria-label="Premise type"
+        >
+          <ToggleGroupOption value="BUSINESS">Business</ToggleGroupOption>
+          <ToggleGroupOption value="RESIDENCE">Residence</ToggleGroupOption>
+        </ToggleGroup>
+        <button
+          type="button"
+          onClick={() => setEditing(false)}
+          disabled={saveMutation.isPending}
+          className="bg-transparent p-0 text-[11px] text-fg-muted hover:text-fg-strong"
+        >
+          Cancel
+        </button>
+      </span>
+    );
+  }
+
+  return (
+    <button type="button" onClick={() => setEditing(true)} title="Edit premise" className="bg-transparent p-0">
+      <Pill tone="neutral">
+        <span className="inline-flex items-center gap-1">
+          {label}
+          <PencilSquareIcon className="size-3 text-fg-dim" />
+        </span>
+      </Pill>
+    </button>
+  );
+}
+
 export default function SingleCustomerDetail({ customer }: { customer: Customer }) {
   const { t } = useTranslation();
   const { getName } = useGlossary();
@@ -64,7 +132,7 @@ export default function SingleCustomerDetail({ customer }: { customer: Customer 
   const canEditCustomers = useHasCapability('EDIT_CUSTOMERS');
   const [activeTab, setActiveTab] = useUrlTab(SINGLE_TABS, 'overview');
 
-  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [editingHeader, setEditingHeader] = useState(false);
   const [isNewWorkOrderOpen, setIsNewWorkOrderOpen] = useState(false);
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
   const [isEquipmentOpen, setIsEquipmentOpen] = useState(false);
@@ -167,7 +235,6 @@ export default function SingleCustomerDetail({ customer }: { customer: Customer 
     ? [addr.streetAddress, [addr.city, addr.state].filter(Boolean).join(', '), addr.zipCode].filter(Boolean).join(', ')
     : null;
   const premise = location?.premiseType ?? customer.serviceLocations[0]?.premiseType;
-  const premiseLabel = premise === 'RESIDENCE' ? 'Residence' : 'Business site';
 
   const tabs: { id: TabId; label: string; count?: number }[] = [
     { id: 'overview', label: t('customers.tabs.overview') },
@@ -196,7 +263,11 @@ export default function SingleCustomerDetail({ customer }: { customer: Customer 
           </Link>
 
           {/* Header — customer billing identity, with the single site's premise
-              pill (the one place a premise pill appears on a customer page). */}
+              pill (the one place a premise pill appears on a customer page).
+              Identity (name/phone/email) edits inline here; attributes in cards. */}
+          {editingHeader ? (
+            <CustomerHeaderEdit customer={customer} onDone={() => setEditingHeader(false)} />
+          ) : (
           <div className="mb-3 flex flex-col gap-3 rounded-[10px] border border-border bg-bg-elev px-4 py-3.5 shadow-sm sm:flex-row sm:items-center sm:gap-3.5">
             <OrgMark name={customer.name} />
             <div className="min-w-0 flex-1">
@@ -208,7 +279,7 @@ export default function SingleCustomerDetail({ customer }: { customer: Customer 
                   {customer.status === 'ACTIVE' ? t('common.active') : t('common.inactive')}
                 </Pill>
                 {customer.paymentTermsDays > 0 && <Pill tone="neutral">Net {customer.paymentTermsDays}</Pill>}
-                <Pill tone="neutral">{premiseLabel}</Pill>
+                <PremisePill locationId={locId} premise={premise} canEdit={canEditCustomers} />
                 <CustomerHeaderTags
                   customerId={customer.id}
                   tags={customer.tags ?? []}
@@ -248,12 +319,13 @@ export default function SingleCustomerDetail({ customer }: { customer: Customer 
                 </DropdownMenu>
               </Dropdown>
               {canEditCustomers && (
-                <Button color="accent" size="xs" onClick={() => setIsEditOpen(true)} className="max-sm:flex-1">
+                <Button color="accent" size="xs" onClick={() => setEditingHeader(true)} className="max-sm:flex-1">
                   {t('common.edit')}
                 </Button>
               )}
             </div>
           </div>
+          )}
 
           <div className="mb-3.5">
             <Tabs value={activeTab} onChange={(id) => setActiveTab(id as TabId)} tabs={tabs} />
@@ -277,7 +349,7 @@ export default function SingleCustomerDetail({ customer }: { customer: Customer 
                   <div className="flex flex-col gap-3">
                     <SiteInstructionsCard location={location} canEdit={canEditCustomers} />
                     <SiteContactCard location={location} canEdit={canEditCustomers} onViewAll={() => setActiveTab('activity')} />
-                    <AccountDetailsCard customer={customer} ar={arSummary} typeLabel="Single-site" />
+                    <AccountDetailsCard customer={customer} ar={arSummary} typeLabel="Single-site" canEdit={canEditCustomers} />
                   </div>
                 </div>
               )}
@@ -342,7 +414,6 @@ export default function SingleCustomerDetail({ customer }: { customer: Customer 
         </div>
       </div>
 
-      <CustomerFormDialog isOpen={isEditOpen} onClose={() => setIsEditOpen(false)} customer={customer} />
       <NotificationPreferencesDialog
         isOpen={isNotificationOpen}
         onClose={() => setIsNotificationOpen(false)}

@@ -35,14 +35,13 @@ import { Tabs } from '../ui/Tabs';
 import { Callout } from '../ui/Callout';
 import IconButton from '../IconButton';
 import ConfirmDialog from '../ConfirmDialog';
-import CustomerFormDialog from '../CustomerFormDialog';
 import WorkOrderFormDialog from '../WorkOrderFormDialog';
 import EquipmentFormDialog from '../EquipmentFormDialog';
 import NotificationPreferencesDialog from '../NotificationPreferencesDialog';
 import CustomerActivityStream from './CustomerActivityStream';
 import CustomerAgreementsTab from '../CustomerAgreementsTab';
 import CustomerHeaderTags from './CustomerHeaderTags';
-import MultiOverviewTab from './MultiOverviewTab';
+import MultiOverviewTab, { CustomerHeaderEdit } from './MultiOverviewTab';
 import MultiLocationsTab from './MultiLocationsTab';
 import CustomerEquipmentTab from './CustomerEquipmentTab';
 import CustomerInvoicesTab from './CustomerInvoicesTab';
@@ -84,7 +83,7 @@ export default function MultiCustomerDetail({ customer }: { customer: Customer }
 
   const [activeTab, setActiveTab] = useUrlTab(VALID_TABS, 'overview');
 
-  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [editingHeader, setEditingHeader] = useState(false);
   const [isNewWorkOrderOpen, setIsNewWorkOrderOpen] = useState(false);
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
   const [isEquipmentOpen, setIsEquipmentOpen] = useState(false);
@@ -197,7 +196,10 @@ export default function MultiCustomerDetail({ customer }: { customer: Customer }
             ← {t('common.actions.backTo', { entities: getName('customer', true) })}
           </Link>
 
-          {/* Header */}
+          {/* Header — identity (name/phone/email) edits inline here; attributes in cards */}
+          {editingHeader ? (
+            <CustomerHeaderEdit customer={customer} onDone={() => setEditingHeader(false)} />
+          ) : (
           <div className="mb-3 flex flex-col gap-3 rounded-[10px] border border-border bg-bg-elev px-4 py-3.5 shadow-sm sm:flex-row sm:items-center sm:gap-3.5">
             <OrgMark name={customer.name} />
             <div className="min-w-0 flex-1">
@@ -255,12 +257,13 @@ export default function MultiCustomerDetail({ customer }: { customer: Customer }
                 </DropdownMenu>
               </Dropdown>
               {canEditCustomers && (
-                <Button color="accent" size="xs" onClick={() => setIsEditOpen(true)} className="max-sm:flex-1">
+                <Button color="accent" size="xs" onClick={() => setEditingHeader(true)} className="max-sm:flex-1">
                   {t('common.edit')}
                 </Button>
               )}
             </div>
           </div>
+          )}
 
           <div className="mb-3.5">
             <Tabs value={activeTab} onChange={(id) => setActiveTab(id as TabId)} tabs={tabs} />
@@ -347,7 +350,6 @@ export default function MultiCustomerDetail({ customer }: { customer: Customer }
         </div>
       </div>
 
-      <CustomerFormDialog isOpen={isEditOpen} onClose={() => setIsEditOpen(false)} customer={customer} />
       <NotificationPreferencesDialog
         isOpen={isNotificationOpen}
         onClose={() => setIsNotificationOpen(false)}

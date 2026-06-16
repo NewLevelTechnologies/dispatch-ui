@@ -206,7 +206,7 @@ describe('CustomersPage', () => {
     });
   });
 
-  it('opens create dialog when add button is clicked', { timeout: 10000 }, async () => {
+  it('navigates to the add-customer page when the add button is clicked', { timeout: 10000 }, async () => {
     vi.mocked(apiClient.get).mockResolvedValue({ data: { ...mockCustomersListResponse, content: [], totalElements: 0, empty: true } });
     const user = userEvent.setup();
 
@@ -216,13 +216,14 @@ describe('CustomersPage', () => {
       expect(screen.getByText(/no customers yet/i)).toBeInTheDocument();
     });
 
-    // Empty state renders an extra Add Customer button alongside the header
-    // one — either opens the dialog, so just click the first.
+    // Create moved to a full-page form — Add now navigates rather than opening
+    // a dialog. The empty state renders an extra Add Customer button alongside
+    // the header one; either navigates, so just click the first.
     const addButton = screen.getAllByRole('button', { name: /add customer/i })[0];
     await user.click(addButton);
 
-    expect(screen.getByRole('dialog')).toBeInTheDocument();
-    expect(screen.getAllByText('Add Customer').length).toBeGreaterThan(0);
+    expect(navigateSpy).toHaveBeenCalledWith('/customers/new');
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
   // The redesigned row shows the location count as a sub line only when the
@@ -580,19 +581,23 @@ describe('CustomersPage', () => {
       await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
     });
 
-    it('closes the create dialog after opening it', async () => {
-      vi.mocked(apiClient.get).mockResolvedValue({
-        data: { ...mockCustomersListResponse, content: [], totalElements: 0, empty: true },
+    it('closes the edit dialog after opening it', async () => {
+      vi.mocked(apiClient.get).mockImplementation((url) => {
+        if (String(url).includes('/customers/1')) {
+          return Promise.resolve({ data: mockFullCustomers[0] });
+        }
+        return Promise.resolve({ data: mockCustomersListResponse });
       });
       const user = userEvent.setup();
       renderWithProviders(<CustomersPage />);
 
-      await waitFor(() =>
-        expect(screen.getByText(/no customers yet/i)).toBeInTheDocument()
-      );
+      await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
 
-      await user.click(screen.getAllByRole('button', { name: /add customer/i })[0]);
-      expect(screen.getByRole('dialog')).toBeInTheDocument();
+      // Create moved to a full-page form; the dialog is now edit-only. Open it
+      // from the row's overflow menu, then confirm Escape closes it.
+      await user.click(screen.getAllByRole('button', { name: /more options/i })[0]);
+      await user.click(screen.getByRole('menuitem', { name: /edit/i }));
+      await waitFor(() => expect(screen.getByRole('dialog')).toBeInTheDocument());
 
       await user.keyboard('{Escape}');
       await waitFor(() =>

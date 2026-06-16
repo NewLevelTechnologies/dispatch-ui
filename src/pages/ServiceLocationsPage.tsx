@@ -271,9 +271,9 @@ export default function ServiceLocationsPage() {
   });
 
   const handleAdd = () => {
-    setSelectedLocation(null);
-    setSelectedCustomerId(null);
-    setIsDialogOpen(true);
+    // Create moved to the full-page Add Location form (/service-locations/new),
+    // which picks the customer first. Edit-from-list still uses the dialog below.
+    navigate('/service-locations/new');
   };
 
   const handleEdit = async (locationId: string, customerId: string) => {

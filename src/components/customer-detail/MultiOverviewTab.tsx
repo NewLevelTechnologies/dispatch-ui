@@ -11,8 +11,8 @@
 // visits). Until each resolves (loading/error), the dependent surface keeps its
 // honest "—" / pending note rather than a faked number; per-location next-visit
 // is a separate work-order call wired on the Locations tab (LOC-1 Phase 3).
-import { useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useMemo, useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import {
   ReceiptPercentIcon,
@@ -24,21 +24,31 @@ import {
 } from '@heroicons/react/24/outline';
 import {
   agreementApi,
+  customerApi,
   dispatchRegionApi,
   equipmentApi,
   invoicesApi,
+  userApi,
   EquipmentStatus,
   type Customer,
   type AgreementSummaryResponse,
   type CustomerArSummaryResponse,
   type CustomerAgreementSummaryResponse,
   type ArPaymentMethod,
+  type UpdateCustomerRequest,
 } from '../../api';
+import { PatternFormat } from 'react-number-format';
 import { useGlossary } from '../../contexts/GlossaryContext';
+import { showError, showSuccess, extractApiError } from '../../lib/toast';
 import { formatPhone } from '../../utils/formatPhone';
 import { titleCaseAddress } from '../../utils/titleCaseAddress';
 import { Card } from '../catalyst/card';
 import { Button } from '../catalyst/button';
+import { Checkbox } from '../catalyst/checkbox';
+import { Field, Label } from '../catalyst/fieldset';
+import { Input } from '../catalyst/input';
+import { Select } from '../catalyst/select';
+import { US_STATES } from '../../constants/states';
 import { Pill } from '../ui/Pill';
 import { DenseTable, DenseTHead, DenseRow, CellStack, CellTop, CellSub } from '../ui/DenseTable';
 import CustomerNotesCard from './CustomerNotesCard';
@@ -135,7 +145,7 @@ export default function MultiOverviewTab({
 
         <div className="flex flex-col gap-3">
           <ContactCard customer={customer} onViewAll={onViewContacts} />
-          <AccountDetailsCard customer={customer} ar={arSummary} />
+          <AccountDetailsCard customer={customer} ar={arSummary} canEdit={canEdit} />
         </div>
       </div>
     </div>
@@ -491,9 +501,283 @@ function ContactCard({ customer, onViewAll }: { customer: Customer; onViewAll: (
   );
 }
 
-// Exported (+ `typeLabel`) for reuse by SingleCustomerDetail ("Single-site").
-export function AccountDetailsCard({ customer, ar, typeLabel = 'Multi-site' }: { customer: Customer; ar?: CustomerArSummaryResponse; typeLabel?: string }) {
+// Payment terms map to numeric `paymentTermsDays` on the wire; 0 = due on receipt.
+const PAYMENT_TERMS: { value: number; label: string }[] = [
+  { value: 0, label: 'Due on receipt' },
+  { value: 15, label: 'Net 15' },
+  { value: 30, label: 'Net 30' },
+  { value: 60, label: 'Net 60' },
+];
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+// Inline edit of the customer's IDENTITY — name, primary phone/email, and the
+// billing address — flipped in place from the page header, mirroring the
+// location header's inline-edit gesture exactly (accent-bordered card, full
+// width, Save/Cancel bottom-right). These live in exactly one editable surface
+// (this one); terms/tax/contacts edit in their own cards below.
+//
+// Billing-address autocomplete + live USPS re-verification are deferred (no
+// provider wired yet), so the address fields are plain inputs and we surface
+// the existing validated-address metadata as a read-only badge when present —
+// identical to the location header.
+export function CustomerHeaderEdit({ customer, onDone }: { customer: Customer; onDone: () => void }) {
   const { getName } = useGlossary();
+  const queryClient = useQueryClient();
+  const [name, setName] = useState(customer.name);
+  const [phone, setPhone] = useState(customer.phone ?? '');
+  const [email, setEmail] = useState(customer.email);
+  const [street, setStreet] = useState(customer.billingAddress.streetAddress ?? '');
+  const [line2, setLine2] = useState(customer.billingAddress.streetAddressLine2 ?? '');
+  const [city, setCity] = useState(customer.billingAddress.city ?? '');
+  const [state, setState] = useState(customer.billingAddress.state ?? '');
+  const [zip, setZip] = useState(customer.billingAddress.zipCode ?? '');
+
+  const canSave =
+    name.trim() !== '' &&
+    email.trim() !== '' &&
+    EMAIL_RE.test(email.trim()) &&
+    street.trim() !== '' &&
+    city.trim() !== '' &&
+    state.trim() !== '' &&
+    zip.trim() !== '';
+
+  const saveMutation = useMutation({
+    mutationFn: async () => {
+      // Identity — partial-safe full payload (echo the attribute fields the
+      // Account-details card owns so nothing is wiped).
+      const request: UpdateCustomerRequest = {
+        name: name.trim(),
+        email: email.trim(),
+        phone: phone.trim() || null,
+        type: customer.type,
+        paymentTermsDays: customer.paymentTermsDays,
+        requiresPurchaseOrder: customer.requiresPurchaseOrder,
+        contractPricingTier: customer.contractPricingTier ?? null,
+        taxExempt: customer.taxExempt,
+        taxExemptCertificate: customer.taxExemptCertificate ?? null,
+        notes: customer.notes ?? null,
+        status: customer.status,
+        accountManagerUserId: customer.accountManager?.id ?? null,
+        industry: customer.industry ?? null,
+      };
+      await customerApi.update(customer.id, request);
+
+      // Billing address rides a separate endpoint — only call it when moved.
+      const a = customer.billingAddress;
+      const addressChanged =
+        street !== a.streetAddress ||
+        line2 !== (a.streetAddressLine2 ?? '') ||
+        city !== a.city ||
+        state !== a.state ||
+        zip !== a.zipCode;
+      if (addressChanged) {
+        await customerApi.updateBillingAddress(customer.id, {
+          billingAddress: {
+            streetAddress: street.trim(),
+            streetAddressLine2: line2.trim() || null,
+            city: city.trim(),
+            state,
+            zipCode: zip.trim(),
+          },
+        });
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['customers', customer.id] });
+      queryClient.invalidateQueries({ queryKey: ['customers'] });
+      // WO detail/list responses embed the customer name + billing → refetch.
+      queryClient.invalidateQueries({ queryKey: ['work-orders'] });
+      queryClient.invalidateQueries({ queryKey: ['work-orders-list'] });
+      showSuccess('Customer updated');
+      onDone();
+    },
+    onError: (err) => showError("Couldn't save customer", extractApiError(err) ?? undefined),
+  });
+
+  const saving = saveMutation.isPending;
+
+  return (
+    <div className="mb-3 rounded-[10px] border border-accent-500/40 bg-bg-elev px-4 py-3.5 shadow-sm">
+      <div className="mb-3 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+        <span className="text-[13px] font-semibold text-fg-strong">Edit {getName('customer').toLowerCase()}</span>
+        <span className="text-[11.5px] text-fg-muted">· terms &amp; contacts edit in their own cards below</span>
+      </div>
+
+      {/* Identity — name / phone / email */}
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1.4fr_1fr_1fr]">
+        <Field>
+          <Label className="text-xs">{getName('customer')} name *</Label>
+          <Input value={name} onChange={(e) => setName(e.target.value)} required />
+        </Field>
+        <Field>
+          <Label className="text-xs">Phone</Label>
+          <PatternFormat
+            format="(###) ###-####"
+            mask="_"
+            customInput={Input}
+            type="tel"
+            value={phone}
+            onValueChange={(values) => setPhone(values.value)}
+          />
+        </Field>
+        <Field>
+          <Label className="text-xs">Email *</Label>
+          <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+        </Field>
+      </div>
+
+      {/* Billing address — street + apt */}
+      <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-12">
+        <Field className="sm:col-span-8">
+          <Label className="text-xs">
+            Billing address *
+            {customer.billingAddress.validated && (
+              <span className="ml-1.5 font-normal text-success-600">✓ USPS verified</span>
+            )}
+          </Label>
+          <Input value={street} onChange={(e) => setStreet(e.target.value)} required />
+        </Field>
+        <Field className="sm:col-span-4">
+          <Label className="text-xs">Apt / Ste</Label>
+          <Input value={line2} onChange={(e) => setLine2(e.target.value)} placeholder="Apt" />
+        </Field>
+      </div>
+
+      {/* City / state / zip */}
+      <div className="mt-3 grid grid-cols-12 gap-2">
+        <Field className="col-span-12 sm:col-span-6">
+          <Label className="text-xs">City *</Label>
+          <Input value={city} onChange={(e) => setCity(e.target.value)} required />
+        </Field>
+        <Field className="col-span-6 sm:col-span-2">
+          <Label className="text-xs">State *</Label>
+          <Select value={state} onChange={(e) => setState(e.target.value)} required>
+            <option value="">--</option>
+            {US_STATES.map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </Select>
+        </Field>
+        <Field className="col-span-6 sm:col-span-4">
+          <Label className="text-xs">ZIP *</Label>
+          <Input value={zip} onChange={(e) => setZip(e.target.value)} inputMode="numeric" required />
+        </Field>
+      </div>
+
+      <div className="mt-3.5 flex items-center justify-end gap-1.5">
+        <Button plain size="xs" onClick={onDone} disabled={saving}>
+          Cancel
+        </Button>
+        <Button color="accent" size="xs" onClick={() => saveMutation.mutate()} disabled={!canSave || saving}>
+          {saving ? 'Saving…' : 'Save changes'}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+interface AccountDraft {
+  industry: string;
+  accountManagerUserId: string;
+  contractPricingTier: string;
+  paymentTermsDays: number;
+  taxExempt: boolean;
+  taxExemptCertificate: string;
+}
+
+function seedAccountDraft(c: Customer): AccountDraft {
+  return {
+    industry: c.industry ?? '',
+    accountManagerUserId: c.accountManager?.id ?? '',
+    contractPricingTier: c.contractPricingTier ?? '',
+    paymentTermsDays: c.paymentTermsDays,
+    taxExempt: c.taxExempt,
+    taxExemptCertificate: c.taxExemptCertificate ?? '',
+  };
+}
+
+function isAccountDirty(d: AccountDraft, c: Customer): boolean {
+  const seed = seedAccountDraft(c);
+  return (
+    d.industry.trim() !== seed.industry ||
+    d.accountManagerUserId !== seed.accountManagerUserId ||
+    d.contractPricingTier.trim() !== seed.contractPricingTier ||
+    d.paymentTermsDays !== seed.paymentTermsDays ||
+    d.taxExempt !== seed.taxExempt ||
+    (d.taxExempt && d.taxExemptCertificate.trim() !== seed.taxExemptCertificate)
+  );
+}
+
+// Exported (+ `typeLabel`) for reuse by SingleCustomerDetail ("Single-site")
+// and PayerDetail ("Payer"). Editable in place (customer-add-edit.md): the
+// writable customer-level fields — account manager, industry, pricebook,
+// payment terms, tax-exempt + cert — flip into inputs with Save/Cancel inside
+// the card. Identity/finance-derived rows (ID, type, lifetime value, since)
+// stay read-only. Shared, so the editor lands on all three variants at once.
+export function AccountDetailsCard({
+  customer,
+  ar,
+  typeLabel = 'Multi-site',
+  canEdit = false,
+}: {
+  customer: Customer;
+  ar?: CustomerArSummaryResponse;
+  typeLabel?: string;
+  canEdit?: boolean;
+}) {
+  const { getName } = useGlossary();
+  const queryClient = useQueryClient();
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState<AccountDraft>(() => seedAccountDraft(customer));
+
+  // Account-manager picker source — only fetched once the card enters edit mode.
+  const { data: users } = useQuery({ queryKey: ['users'], queryFn: () => userApi.getAll(), enabled: editing });
+  const managerOptions = useMemo(
+    () =>
+      (users ?? [])
+        .map((u) => ({ id: u.id, name: `${u.firstName} ${u.lastName}`.trim() || u.email }))
+        .sort((a, b) => a.name.localeCompare(b.name)),
+    [users],
+  );
+
+  const startEdit = () => {
+    setDraft(seedAccountDraft(customer));
+    setEditing(true);
+  };
+
+  const saveMutation = useMutation({
+    mutationFn: () => {
+      const request: UpdateCustomerRequest = {
+        name: customer.name,
+        email: customer.email,
+        phone: customer.phone ?? null,
+        type: customer.type,
+        paymentTermsDays: draft.paymentTermsDays,
+        requiresPurchaseOrder: customer.requiresPurchaseOrder,
+        contractPricingTier: draft.contractPricingTier.trim() || null,
+        taxExempt: draft.taxExempt,
+        taxExemptCertificate: draft.taxExempt ? draft.taxExemptCertificate.trim() || null : null,
+        notes: customer.notes ?? null,
+        status: customer.status,
+        accountManagerUserId: draft.accountManagerUserId || null,
+        industry: draft.industry.trim() || null,
+      };
+      return customerApi.update(customer.id, request);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['customers', customer.id] });
+      queryClient.invalidateQueries({ queryKey: ['customers'] });
+      setEditing(false);
+      showSuccess('Account details updated');
+    },
+    onError: (err) => showError("Couldn't update account details", extractApiError(err) ?? undefined),
+  });
+
+  const dirty = isAccountDirty(draft, customer);
+
   const rows: { k: string; v: React.ReactNode }[] = [
     { k: `${getName('customer')} ID`, v: <span className="font-mono">{customer.customerNumber || customer.id}</span> },
     { k: 'Type', v: typeLabel },
@@ -517,16 +801,119 @@ export function AccountDetailsCard({ customer, ar, typeLabel = 'Multi-site' }: {
   rows.push({ k: 'Since', v: formatDateShort(customer.createdAt) });
 
   return (
-    <Card title="Account details" padding="none">
-      {rows.map((r, i) => (
-        <div
-          key={r.k}
-          className={`grid grid-cols-[94px_1fr] gap-2 px-3.5 py-1.5 text-[12px] ${i < rows.length - 1 ? 'border-b border-border-soft' : ''}`}
-        >
-          <span className="text-fg-muted">{r.k}</span>
-          <span className="font-medium text-fg-strong">{r.v}</span>
+    <Card
+      title="Account details"
+      padding="none"
+      action={
+        !editing && canEdit ? (
+          <Button outline size="xs" type="button" onClick={startEdit}>
+            Edit
+          </Button>
+        ) : undefined
+      }
+      footer={
+        editing ? (
+          <div className="flex items-center justify-end gap-1.5 rounded-b-[10px] border-t border-border-soft bg-bg-elev-2 px-3.5 py-2.5">
+            <Button plain size="xs" type="button" onClick={() => setEditing(false)} disabled={saveMutation.isPending}>
+              Cancel
+            </Button>
+            <Button
+              color="accent"
+              size="xs"
+              type="button"
+              onClick={() => saveMutation.mutate()}
+              disabled={!dirty || saveMutation.isPending}
+            >
+              {saveMutation.isPending ? 'Saving…' : 'Save changes'}
+            </Button>
+          </div>
+        ) : undefined
+      }
+    >
+      {editing ? (
+        <div className="space-y-2.5 p-3.5">
+          <div className="grid grid-cols-2 gap-2.5">
+            <Field size="xs">
+              <Label size="xs">Industry</Label>
+              <Input
+                size="xs"
+                value={draft.industry}
+                onChange={(e) => setDraft((d) => ({ ...d, industry: e.target.value }))}
+                placeholder="e.g., Restaurant"
+              />
+            </Field>
+            <Field size="xs">
+              <Label size="xs">Account manager</Label>
+              <Select
+                value={draft.accountManagerUserId}
+                onChange={(e) => setDraft((d) => ({ ...d, accountManagerUserId: e.target.value }))}
+              >
+                <option value="">Unassigned</option>
+                {managerOptions.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.name}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+          </div>
+          <div className="grid grid-cols-2 gap-2.5">
+            <Field size="xs">
+              <Label size="xs">Payment terms</Label>
+              <Select
+                value={String(draft.paymentTermsDays)}
+                onChange={(e) => setDraft((d) => ({ ...d, paymentTermsDays: Number(e.target.value) }))}
+              >
+                {PAYMENT_TERMS.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+            <Field size="xs">
+              <Label size="xs">Pricebook</Label>
+              <Input
+                size="xs"
+                value={draft.contractPricingTier}
+                onChange={(e) => setDraft((d) => ({ ...d, contractPricingTier: e.target.value }))}
+                placeholder="—"
+              />
+            </Field>
+          </div>
+          <div className="grid grid-cols-2 items-end gap-2.5">
+            <label className="flex h-9 cursor-pointer items-center gap-2">
+              <Checkbox
+                color="accent"
+                checked={draft.taxExempt}
+                onChange={(v) => setDraft((d) => ({ ...d, taxExempt: v }))}
+              />
+              <span className="text-[12.5px] text-fg-strong">Tax exempt</span>
+            </label>
+            {draft.taxExempt && (
+              <Field size="xs">
+                <Label size="xs">Exemption certificate #</Label>
+                <Input
+                  size="xs"
+                  value={draft.taxExemptCertificate}
+                  onChange={(e) => setDraft((d) => ({ ...d, taxExemptCertificate: e.target.value }))}
+                  placeholder="84-2200"
+                />
+              </Field>
+            )}
+          </div>
         </div>
-      ))}
+      ) : (
+        rows.map((r, i) => (
+          <div
+            key={r.k}
+            className={`grid grid-cols-[94px_1fr] gap-2 px-3.5 py-1.5 text-[12px] ${i < rows.length - 1 ? 'border-b border-border-soft' : ''}`}
+          >
+            <span className="text-fg-muted">{r.k}</span>
+            <span className="font-medium text-fg-strong">{r.v}</span>
+          </div>
+        ))
+      )}
     </Card>
   );
 }

@@ -37,14 +37,13 @@ import { Tabs } from '../ui/Tabs';
 import { Callout } from '../ui/Callout';
 import IconButton from '../IconButton';
 import ConfirmDialog from '../ConfirmDialog';
-import CustomerFormDialog from '../CustomerFormDialog';
 import NotificationPreferencesDialog from '../NotificationPreferencesDialog';
 import LocationActivityStream from '../LocationActivityStream';
 import CustomerNotesCard from './CustomerNotesCard';
 import CustomerInvoicesTab from './CustomerInvoicesTab';
 import CustomerContactsTab from './CustomerContactsTab';
 import CustomerHeaderTags from './CustomerHeaderTags';
-import { BillingCard, AccountDetailsCard, AttentionStrip } from './MultiOverviewTab';
+import { BillingCard, AccountDetailsCard, CustomerHeaderEdit, AttentionStrip } from './MultiOverviewTab';
 import { buildAttentionItems } from './attention';
 import { PayerMark, CardTitle } from './shared';
 import { formatDateShort, formatMoney } from './format';
@@ -60,7 +59,7 @@ export default function PayerDetail({ customer }: { customer: Customer }) {
   const canEditCustomers = useHasCapability('EDIT_CUSTOMERS');
   const [activeTab, setActiveTab] = useUrlTab(PAYER_TABS, 'overview');
 
-  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [editingHeader, setEditingHeader] = useState(false);
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
   const [lifecycleConfirm, setLifecycleConfirm] = useState(false);
 
@@ -130,7 +129,11 @@ export default function PayerDetail({ customer }: { customer: Customer }) {
             ← {t('common.actions.backTo', { entities: getName('customer', true) })}
           </Link>
 
-          {/* Header — payer billing identity, gold "$" mark + loud "Payer" pill. */}
+          {/* Header — payer billing identity (gold "$" mark + "Payer" pill).
+              Identity (name/phone/email) edits inline here; attributes in cards. */}
+          {editingHeader ? (
+            <CustomerHeaderEdit customer={customer} onDone={() => setEditingHeader(false)} />
+          ) : (
           <div className="mb-3 flex flex-col gap-3 rounded-[10px] border border-border bg-bg-elev px-4 py-3.5 shadow-sm sm:flex-row sm:items-center sm:gap-3.5">
             <PayerMark />
             <div className="min-w-0 flex-1">
@@ -167,12 +170,13 @@ export default function PayerDetail({ customer }: { customer: Customer }) {
                 </DropdownMenu>
               </Dropdown>
               {canEditCustomers && (
-                <Button color="accent" size="xs" onClick={() => setIsEditOpen(true)} className="max-sm:flex-1">
+                <Button color="accent" size="xs" onClick={() => setEditingHeader(true)} className="max-sm:flex-1">
                   {t('common.edit')}
                 </Button>
               )}
             </div>
           </div>
+          )}
 
           <div className="mb-3.5">
             <Tabs value={activeTab} onChange={(id) => setActiveTab(id as TabId)} tabs={tabs} />
@@ -188,7 +192,7 @@ export default function PayerDetail({ customer }: { customer: Customer }) {
                   <CustomerNotesCard customerId={customer.id} canEdit={canEditCustomers} />
                 </div>
                 <div className="flex flex-col gap-3">
-                  <AccountDetailsCard customer={customer} ar={arSummary} typeLabel="Payer" />
+                  <AccountDetailsCard customer={customer} ar={arSummary} typeLabel="Payer" canEdit={canEditCustomers} />
                 </div>
               </div>
             </div>
@@ -233,7 +237,6 @@ export default function PayerDetail({ customer }: { customer: Customer }) {
         </div>
       </div>
 
-      <CustomerFormDialog isOpen={isEditOpen} onClose={() => setIsEditOpen(false)} customer={customer} />
       <NotificationPreferencesDialog
         isOpen={isNotificationOpen}
         onClose={() => setIsNotificationOpen(false)}

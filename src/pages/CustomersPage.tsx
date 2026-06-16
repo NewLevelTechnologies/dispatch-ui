@@ -226,8 +226,9 @@ export default function CustomersPage() {
   });
 
   const handleAdd = () => {
-    setSelectedCustomer(null);
-    setIsDialogOpen(true);
+    // Create moved to a full-page form (/customers/new). Edit-from-list still
+    // uses the dialog below (being redesigned separately).
+    navigate('/customers/new');
   };
 
   const handleEdit = (customer: Customer) => {
