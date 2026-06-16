@@ -14,7 +14,6 @@
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { useTranslation } from 'react-i18next';
 import {
   ReceiptPercentIcon,
   MapPinIcon,
@@ -282,7 +281,6 @@ function LocationsPreviewCard({
   onViewAll: () => void;
 }) {
   const { getName } = useGlossary();
-  const { t } = useTranslation();
   const navigate = useNavigate();
   const total = customer.serviceLocations.length;
   const top = customer.serviceLocations.slice(0, PREVIEW_LIMIT);
@@ -314,7 +312,7 @@ function LocationsPreviewCard({
         <DenseTHead>
           <tr>
             <th>{getName('service_location')}</th>
-            <th>{getName('dispatch')} {t('entities.region')}</th>
+            <th>{getName('dispatch_region')}</th>
             {enriched && <th className="right">Open</th>}
             <th className="right">{getName('equipment')}</th>
             <th>Status</th>
