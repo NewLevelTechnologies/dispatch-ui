@@ -60,6 +60,19 @@ export const contactApi = {
     await apiClient.delete(`/customers/${customerId}/contacts/${contactId}`);
   },
 
+  // Atomically promote a customer contact to primary; the server demotes the
+  // current primary into the additional list. One call — no client-side swap.
+  // Mirrors makeServiceLocationContactPrimary.
+  makeCustomerContactPrimary: async (
+    customerId: string,
+    contactId: string
+  ): Promise<AdditionalContact> => {
+    const response = await apiClient.post<AdditionalContact>(
+      `/customers/${customerId}/contacts/${contactId}/make-primary`
+    );
+    return response.data;
+  },
+
   // Service Location-level contacts
   getServiceLocationContacts: async (locationId: string): Promise<AdditionalContact[]> => {
     const response = await apiClient.get<AdditionalContact[]>(`/service-locations/${locationId}/contacts`);
