@@ -3,13 +3,12 @@
 // Contacts tab's look, but over the CUSTOMER's own contact collection
 // (`customer.additionalContacts`) and its CRUD endpoints, which differ from the
 // service-location contact collection — so the look is reproduced rather than
-// the component reused. Add/edit/delete/notify reuse the existing customer
-// contact dialogs. (Customer contacts have no make-primary endpoint, so that
-// action is omitted; the Primary pill still renders.)
+// the component reused. Add/edit/delete/notify/make-primary reuse the existing
+// customer contact endpoints; the Primary pill marks the current primary.
 import { useMemo, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { PencilIcon, TrashIcon, BellIcon, UserIcon } from '@heroicons/react/24/outline';
+import { PencilIcon, TrashIcon, BellIcon, UserIcon, StarIcon } from '@heroicons/react/24/outline';
 import { contactApi, type AdditionalContact } from '../../api';
 import { formatPhone } from '../../utils/formatPhone';
 import { showError, showSuccess, extractApiError } from '../../lib/toast';
@@ -73,6 +72,15 @@ export default function CustomerContactsTab({
       showSuccess('Contact deleted');
     },
     onError: (err) => showError("Couldn't delete contact", extractApiError(err) ?? undefined),
+  });
+
+  const makePrimaryMutation = useMutation({
+    mutationFn: (contactId: string) => contactApi.makeCustomerContactPrimary(customerId, contactId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey });
+      showSuccess('Primary contact updated');
+    },
+    onError: (err) => showError("Couldn't set primary contact", extractApiError(err) ?? undefined),
   });
 
   return (
@@ -139,6 +147,17 @@ export default function CustomerContactsTab({
                   {canEdit && (
                     <td className="right">
                       <div className="flex items-center justify-end gap-2 text-fg-dim">
+                        {!c.isPrimary && (
+                          <button
+                            type="button"
+                            onClick={() => makePrimaryMutation.mutate(c.id)}
+                            disabled={makePrimaryMutation.isPending}
+                            title="Make primary"
+                            className="hover:text-fg-strong"
+                          >
+                            <StarIcon className="size-3.5" />
+                          </button>
+                        )}
                         <button
                           type="button"
                           onClick={() => setFormDialog({ open: true, contact: c })}

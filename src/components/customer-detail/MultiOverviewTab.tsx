@@ -22,10 +22,12 @@ import {
   PhoneIcon,
   EnvelopeIcon,
   PencilSquareIcon,
+  StarIcon,
 } from '@heroicons/react/24/outline';
 import {
   activityApi,
   agreementApi,
+  contactApi,
   customerApi,
   dispatchRegionApi,
   financialActivityApi,
@@ -548,18 +550,33 @@ function AgreementsSummaryCard({
   );
 }
 
-// Customer contacts — bill-to (the customer's own email/phone) + additional
-// contacts as normalized ContactBlocks (shared with the location Site-contact
-// card). Edit + Add only: customer contacts have no make-primary endpoint, so
-// that action is intentionally absent (vs. the location card, which has it).
+// Customer contacts — bill-to (the customer's own email/phone) + the contact
+// people as normalized ContactBlocks (shared with the location Site-contact
+// card): primary first with a badge, the rest with Make-primary + Edit on hover,
+// plus "+ Add". Mirrors the location card now that customer contacts support a
+// designated primary (CUST-CONTACT-PRIMARY-1).
 function ContactCard({ customer, onViewAll }: { customer: Customer; onViewAll: () => void }) {
+  const queryClient = useQueryClient();
   const [dialog, setDialog] = useState<{ open: boolean; contact: AdditionalContact | null }>({
     open: false,
     contact: null,
   });
-  const additional = customer.additionalContacts ?? [];
-  const shown = additional.slice(0, CONTACT_CARD_CAP);
-  const hidden = additional.length - shown.length;
+
+  const makePrimaryMutation = useMutation({
+    mutationFn: (contactId: string) => contactApi.makeCustomerContactPrimary(customer.id, contactId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['customers', customer.id] });
+      showSuccess('Primary contact updated');
+    },
+    onError: (err) => showError("Couldn't set primary contact", extractApiError(err) ?? undefined),
+  });
+
+  // Primary first, then by displayOrder — same order as the Contacts tab.
+  const ordered = [...(customer.additionalContacts ?? [])].sort(
+    (a, b) => Number(!!b.isPrimary) - Number(!!a.isPrimary) || a.displayOrder - b.displayOrder,
+  );
+  const shown = ordered.slice(0, CONTACT_CARD_CAP);
+  const hidden = ordered.length - shown.length;
   const hasBillTo = !!(customer.email || customer.phone);
 
   return (
@@ -599,26 +616,41 @@ function ContactCard({ customer, onViewAll }: { customer: Customer; onViewAll: (
               <ContactBlock
                 key={c.id}
                 contact={c}
+                primary={c.isPrimary}
+                badge={c.isPrimary ? <Pill tone="info">Primary</Pill> : undefined}
                 actions={
-                  <button
-                    type="button"
-                    onClick={() => setDialog({ open: true, contact: c })}
-                    title="Edit contact"
-                    className="bg-transparent p-0 text-fg-muted hover:text-fg-strong"
-                  >
-                    <PencilSquareIcon className="size-3.5" />
-                  </button>
+                  <>
+                    {!c.isPrimary && (
+                      <button
+                        type="button"
+                        onClick={() => makePrimaryMutation.mutate(c.id)}
+                        disabled={makePrimaryMutation.isPending}
+                        title="Make primary"
+                        className="bg-transparent p-0 text-fg-muted hover:text-fg-strong"
+                      >
+                        <StarIcon className="size-3.5" />
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => setDialog({ open: true, contact: c })}
+                      title="Edit contact"
+                      className="bg-transparent p-0 text-fg-muted hover:text-fg-strong"
+                    >
+                      <PencilSquareIcon className="size-3.5" />
+                    </button>
+                  </>
                 }
               />
             ))}
           </div>
         )}
 
-        {!hasBillTo && additional.length === 0 && (
+        {!hasBillTo && ordered.length === 0 && (
           <div className="text-[12px] text-fg-muted">No contacts on file.</div>
         )}
 
-        {hidden > 0 && <CardLink onClick={onViewAll}>View all {additional.length} →</CardLink>}
+        {hidden > 0 && <CardLink onClick={onViewAll}>View all {ordered.length} →</CardLink>}
       </div>
 
       <AdditionalContactFormDialog
