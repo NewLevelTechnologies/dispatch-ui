@@ -27,6 +27,7 @@ import { useGlossary } from '../../contexts/GlossaryContext';
 import { useHasCapability } from '../../hooks/useCurrentUser';
 import { useUrlTab } from '../../hooks/useUrlTab';
 import { showSuccess, showError, extractApiError } from '../../lib/toast';
+import { handleConcurrentEdit } from '../../lib/conflict';
 import AppLayout from '../AppLayout';
 import { Heading } from '../catalyst/heading';
 import { Button } from '../catalyst/button';
@@ -103,7 +104,10 @@ export default function PayerDetail({ customer }: { customer: Customer }) {
       setLifecycleConfirm(false);
       showSuccess(customer.status === 'ACTIVE' ? 'Payer deactivated' : 'Payer reactivated');
     },
-    onError: (err) => showError("Couldn't update payer", extractApiError(err) ?? undefined),
+    onError: (err) => {
+      if (handleConcurrentEdit(err, queryClient, ['customers'])) return;
+      showError("Couldn't update payer", extractApiError(err) ?? undefined);
+    },
   });
 
   const tabs: { id: TabId; label: string; count?: number }[] = [
@@ -192,7 +196,7 @@ export default function PayerDetail({ customer }: { customer: Customer }) {
                   <CustomerNotesCard customerId={customer.id} canEdit={canEditCustomers} />
                 </div>
                 <div className="flex flex-col gap-3">
-                  <AccountDetailsCard customer={customer} ar={arSummary} typeLabel="Payer" canEdit={canEditCustomers} />
+                  <AccountDetailsCard customer={customer} ar={arSummary} canEdit={canEditCustomers} />
                 </div>
               </div>
             </div>

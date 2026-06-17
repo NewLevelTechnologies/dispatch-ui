@@ -27,6 +27,7 @@ import { useGlossary } from '../../contexts/GlossaryContext';
 import { useHasCapability } from '../../hooks/useCurrentUser';
 import { useUrlTab } from '../../hooks/useUrlTab';
 import { showSuccess, showError, extractApiError } from '../../lib/toast';
+import { handleConcurrentEdit } from '../../lib/conflict';
 import AppLayout from '../AppLayout';
 import { Heading } from '../catalyst/heading';
 import { Button } from '../catalyst/button';
@@ -221,7 +222,10 @@ export default function SingleCustomerDetail({ customer }: { customer: Customer 
       setLifecycleConfirm(false);
       showSuccess(customer.status === 'ACTIVE' ? 'Customer deactivated' : 'Customer reactivated');
     },
-    onError: (err) => showError("Couldn't update customer", extractApiError(err) ?? undefined),
+    onError: (err) => {
+      if (handleConcurrentEdit(err, queryClient, ['customers'])) return;
+      showError("Couldn't update customer", extractApiError(err) ?? undefined);
+    },
   });
 
   const handleEditEquipment = async (item: EquipmentSummary) => {
@@ -349,7 +353,7 @@ export default function SingleCustomerDetail({ customer }: { customer: Customer 
                   <div className="flex flex-col gap-3">
                     <SiteInstructionsCard location={location} canEdit={canEditCustomers} />
                     <SiteContactCard location={location} canEdit={canEditCustomers} onViewAll={() => setActiveTab('activity')} />
-                    <AccountDetailsCard customer={customer} ar={arSummary} typeLabel="Single-site" canEdit={canEditCustomers} />
+                    <AccountDetailsCard customer={customer} ar={arSummary} canEdit={canEditCustomers} />
                   </div>
                 </div>
               )}

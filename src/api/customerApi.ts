@@ -486,6 +486,14 @@ export interface UpdateCustomerRequest {
   // ID-1 — see CreateCustomerRequest. Omit to leave unchanged.
   accountManagerUserId?: string | null;
   industry?: string | null;
+  // Combined billing-address edit — include to save identity + address in a
+  // single PUT, with no read-modify-write race against the dedicated
+  // /billing-address endpoint. Omit (or send null) to leave the address
+  // unchanged; existing identity-only payloads keep working. Send
+  // latitude/longitude from POST /customers/addresses/verify so the pin +
+  // timezone persist immediately; never send timeZone (derived server-side).
+  // The standalone updateBillingAddress() still exists for address-only edits.
+  billingAddress?: AddressInput | null;
 }
 
 export interface UpdateBillingAddressRequest {

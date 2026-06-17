@@ -21,6 +21,21 @@ export function extractApiError(err: unknown): string | undefined {
   return undefined;
 }
 
+// HTTP status off an axios-style error, if present.
+export function errorStatus(err: unknown): number | undefined {
+  if (err instanceof Error && 'response' in err) {
+    return (err as { response?: { status?: number } }).response?.status;
+  }
+  return undefined;
+}
+
+// True for a genuine concurrent-edit collision — the 409 the customer
+// endpoints now return (instead of a 500) when two requests modify the same
+// record at once.
+export function isConflict(err: unknown): boolean {
+  return errorStatus(err) === 409;
+}
+
 export function showSuccess(message: string, description?: string) {
   toast.success(message, description ? { description } : undefined);
 }

@@ -561,7 +561,7 @@ describe('CustomerFormDialog', () => {
   });
 
   describe('Edit mode billing address and type', () => {
-    it('persists billing-address edits via the dedicated endpoint', { timeout: 10000 }, async () => {
+    it('persists identity + billing-address edits in a single PUT', { timeout: 10000 }, async () => {
       const user = userEvent.setup();
       vi.mocked(apiClient.put).mockResolvedValue({ data: mockCustomer });
 
@@ -597,28 +597,25 @@ describe('CustomerFormDialog', () => {
 
       await user.click(screen.getByRole('button', { name: /update/i }));
 
+      // Identity AND the changed billing address ride one PUT to /customers/1 —
+      // no separate /billing-address round-trip (the race that produced).
       await waitFor(() => {
         expect(apiClient.put).toHaveBeenCalledWith('/customers/1', expect.objectContaining({
           email: 'new@example.com',
+          billingAddress: expect.objectContaining({
+            streetAddress: '999 New St',
+            streetAddressLine2: 'Apt 5',
+            city: 'Cambridge',
+            state: 'NY',
+            zipCode: '10001',
+          }),
         }));
       });
 
-      // Billing address changed → the component also hits the dedicated
-      // billing-address endpoint with a PUT.
-      await waitFor(() => {
-        expect(apiClient.put).toHaveBeenCalledWith(
-          '/customers/1/billing-address',
-          expect.objectContaining({
-            billingAddress: expect.objectContaining({
-              streetAddress: '999 New St',
-              streetAddressLine2: 'Apt 5',
-              city: 'Cambridge',
-              state: 'NY',
-              zipCode: '10001',
-            }),
-          })
-        );
-      });
+      expect(apiClient.put).not.toHaveBeenCalledWith(
+        '/customers/1/billing-address',
+        expect.anything()
+      );
     });
 
     it('toggling the type radio sends the new type', async () => {

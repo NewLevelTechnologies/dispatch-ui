@@ -26,6 +26,7 @@ import { workOrdersListQueryOptions } from '../../api/workOrdersListQuery';
 import { useGlossary } from '../../contexts/GlossaryContext';
 import { useHasCapability } from '../../hooks/useCurrentUser';
 import { showSuccess, showError, extractApiError } from '../../lib/toast';
+import { handleConcurrentEdit } from '../../lib/conflict';
 import AppLayout from '../AppLayout';
 import { Heading } from '../catalyst/heading';
 import { Button } from '../catalyst/button';
@@ -150,7 +151,10 @@ export default function MultiCustomerDetail({ customer }: { customer: Customer }
       setLifecycleConfirm(false);
       showSuccess(customer.status === 'ACTIVE' ? 'Customer deactivated' : 'Customer reactivated');
     },
-    onError: (err) => showError("Couldn't update customer", extractApiError(err) ?? undefined),
+    onError: (err) => {
+      if (handleConcurrentEdit(err, queryClient, ['customers'])) return;
+      showError("Couldn't update customer", extractApiError(err) ?? undefined);
+    },
   });
 
   const handleEditEquipment = async (item: EquipmentSummary) => {
