@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { PatternFormat } from 'react-number-format';
 import { customerApi, dispatchRegionApi, userApi, type Customer, type CreateCustomerRequest, type CustomerType, type UpdateCustomerRequest } from '../api';
 import { useGlossary } from '../contexts/GlossaryContext';
+import { handleConcurrentEdit } from '../lib/conflict';
 import { Dialog, DialogActions, DialogBody, DialogDescription, DialogTitle } from './catalyst/dialog';
 import { Button } from './catalyst/button';
 import { Checkbox, CheckboxField } from './catalyst/checkbox';
@@ -275,20 +276,15 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
   });
 
   const updateMutation = useMutation({
-    mutationFn: async ({ customerRequest, billingAddressRequest }: {
-      customerRequest: UpdateCustomerRequest;
-      billingAddressRequest?: { billingAddress: typeof editFormData.billingAddress }
-    }) => {
-      await customerApi.update(customer!.id, customerRequest);
-      if (billingAddressRequest) {
-        await customerApi.updateBillingAddress(customer!.id, billingAddressRequest);
-      }
-    },
+    // Identity + billing address ride a single PUT now (optional billingAddress
+    // on the request) — no read-modify-write race between two calls.
+    mutationFn: (request: UpdateCustomerRequest) => customerApi.update(customer!.id, request),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['customers'] });
       onClose();
     },
     onError: (error: unknown) => {
+      if (handleConcurrentEdit(error, queryClient, ['customers'])) return;
       const errorMessage = error instanceof Error && 'response' in error
         ? ((error as { response?: { data?: { message?: string } } }).response?.data?.message)
         : undefined;
@@ -358,6 +354,17 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
   const handleEditSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
+    // Fold the billing address into the same request, but only when it actually
+    // moved — omitting it leaves the stored address (and its coordinates)
+    // untouched server-side.
+    const billingAddressChanged = customer && (
+      editFormData.billingAddress.streetAddress !== customer.billingAddress.streetAddress ||
+      (editFormData.billingAddress.streetAddressLine2 || '') !== (customer.billingAddress.streetAddressLine2 || '') ||
+      editFormData.billingAddress.city !== customer.billingAddress.city ||
+      editFormData.billingAddress.state !== customer.billingAddress.state ||
+      editFormData.billingAddress.zipCode !== customer.billingAddress.zipCode
+    );
+
     const customerRequest: UpdateCustomerRequest = {
       name: editFormData.name,
       email: editFormData.email,
@@ -374,21 +381,20 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
       status: editFormData.status,
       accountManagerUserId: editFormData.accountManagerUserId || null,
       industry: editFormData.industry || null,
+      ...(billingAddressChanged
+        ? {
+            billingAddress: {
+              streetAddress: editFormData.billingAddress.streetAddress,
+              streetAddressLine2: editFormData.billingAddress.streetAddressLine2 || null,
+              city: editFormData.billingAddress.city,
+              state: editFormData.billingAddress.state,
+              zipCode: editFormData.billingAddress.zipCode,
+            },
+          }
+        : {}),
     };
 
-    // Check if billing address changed
-    const billingAddressChanged = customer && (
-      editFormData.billingAddress.streetAddress !== customer.billingAddress.streetAddress ||
-      (editFormData.billingAddress.streetAddressLine2 || '') !== (customer.billingAddress.streetAddressLine2 || '') ||
-      editFormData.billingAddress.city !== customer.billingAddress.city ||
-      editFormData.billingAddress.state !== customer.billingAddress.state ||
-      editFormData.billingAddress.zipCode !== customer.billingAddress.zipCode
-    );
-
-    updateMutation.mutate({
-      customerRequest,
-      billingAddressRequest: billingAddressChanged ? { billingAddress: editFormData.billingAddress } : undefined
-    });
+    updateMutation.mutate(customerRequest);
   };
 
   return (
