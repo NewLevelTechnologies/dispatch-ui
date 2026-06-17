@@ -12,12 +12,15 @@ import {
   type PremiseType,
   type CreateServiceLocationRequest,
   type CustomerSearchResult,
+  type AddressVerifyRequest,
 } from '../api';
 import { useGlossary } from '../contexts/GlossaryContext';
 import { useHasCapability } from '../hooks/useCurrentUser';
 import { showError, showSuccess, extractApiError } from '../lib/toast';
 import AppLayout from '../components/AppLayout';
 import CustomerPicker from '../components/CustomerPicker';
+import { AddressSuggestion } from '../components/AddressSuggestion';
+import { useAddressVerify } from '../hooks/useAddressVerify';
 import { Card } from '../components/catalyst/card';
 import { Button } from '../components/catalyst/button';
 import { Field, Label } from '../components/catalyst/fieldset';
@@ -134,6 +137,15 @@ export default function AddLocationPage() {
   // Seed region from the tenant default region once it arrives.
   const effectiveRegionId = regionTouched ? form.dispatchRegionId : (defaultRegion?.id ?? '');
 
+  const av = useAddressVerify();
+  const serviceReq: AddressVerifyRequest = {
+    streetAddress: form.streetAddress,
+    streetAddressLine2: form.streetAddressLine2 || null,
+    city: form.city,
+    state: form.state,
+    zipCode: form.zipCode,
+  };
+
   // Residence soft-prefill: a home's site contact is almost always the
   // homeowner, i.e. the location name. Mirror it into the contact-name field
   // only while that field is untouched — fully overridable, and never for a
@@ -185,6 +197,7 @@ export default function AddLocationPage() {
           city: form.city.trim(),
           state: form.state,
           zipCode: form.zipCode.trim(),
+          ...(av.coordsFor(serviceReq) ?? {}),
         },
         siteContactName: effectiveContactName.trim() || null,
         siteContactPhone: form.siteContactPhone.trim() || null,
@@ -350,7 +363,7 @@ export default function AddLocationPage() {
                     size="xs"
                     value={form.streetAddress}
                     onChange={(e) => set('streetAddress', e.target.value)}
-                    onBlur={() => mark('streetAddress')}
+                    onBlur={() => { mark('streetAddress'); av.run(serviceReq); }}
                     invalid={!!(touched.streetAddress && errors.streetAddress)}
                     placeholder="1820 W McDowell Rd"
                   />
@@ -370,7 +383,7 @@ export default function AddLocationPage() {
                     size="xs"
                     value={form.city}
                     onChange={(e) => set('city', e.target.value)}
-                    onBlur={() => mark('city')}
+                    onBlur={() => { mark('city'); av.run(serviceReq); }}
                     invalid={!!(touched.city && errors.city)}
                     placeholder="Phoenix"
                   />
@@ -381,7 +394,7 @@ export default function AddLocationPage() {
                   <Select
                     value={form.state}
                     onChange={(e) => set('state', e.target.value)}
-                    onBlur={() => mark('state')}
+                    onBlur={() => { mark('state'); av.run(serviceReq); }}
                     invalid={!!(touched.state && errors.state)}
                   >
                     <option value="">{t('common.form.select')}</option>
@@ -396,7 +409,7 @@ export default function AddLocationPage() {
                     size="xs"
                     value={form.zipCode}
                     onChange={(e) => set('zipCode', e.target.value)}
-                    onBlur={() => mark('zipCode')}
+                    onBlur={() => { mark('zipCode'); av.run(serviceReq); }}
                     invalid={!!(touched.zipCode && errors.zipCode)}
                     inputMode="numeric"
                     placeholder="85007"
@@ -422,6 +435,16 @@ export default function AddLocationPage() {
                   </Field>
                 )}
               </div>
+              <AddressSuggestion
+                verify={av}
+                typed={serviceReq}
+                onAccept={(a) => {
+                  set('streetAddress', a.streetAddress);
+                  set('city', a.city);
+                  set('state', a.state);
+                  set('zipCode', a.zipCode);
+                }}
+              />
             </Card>
 
             {/* Premise type — qualifies the address, so it follows it. */}
