@@ -264,6 +264,7 @@ export {
   type FinancialActivityKind,
   type FinancialActivityPage,
   InvoiceStatus,
+  InvoiceAgingBucket,
   QuoteStatus,
   PaymentMethod,
   type Invoice,

@@ -9,13 +9,16 @@
 import { useDeferredValue, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
+import { useSearchParams } from 'react-router-dom';
 import { MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import {
   invoicesApi,
   InvoiceStatus,
+  type InvoiceAgingBucket,
   type InvoiceListItemRow,
   type ListInvoicesParams,
 } from '../../api';
+import { INVOICE_AGING_FILTERS, INVOICE_AGING_PARAM, readAgingId } from './invoiceAgingNav';
 import { useGlossary } from '../../contexts/GlossaryContext';
 import { Card } from '../catalyst/card';
 import { Button } from '../catalyst/button';
@@ -84,6 +87,23 @@ export default function CustomerInvoicesTab({ customerId }: { customerId: string
   const { page, pageHref, resetPage } = useUrlPage('invoicesPage');
   const deferredSearch = useDeferredValue(search.trim());
 
+  // Aging filter is URL-driven (not local) so the overview Billing & AR boxes can
+  // deep-link straight to a bucket, and a refreshed/shared URL restores it.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const agingId = readAgingId(searchParams);
+  const setAging = (id: string) => {
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        if (id === 'all') next.delete(INVOICE_AGING_PARAM);
+        else next.set(INVOICE_AGING_PARAM, id);
+        next.delete('invoicesPage'); // filter change → back to page 1
+        return next;
+      },
+      { replace: true },
+    );
+  };
+
   // Date/amount columns open desc (most-recent / biggest first); status asc.
   const onSort = (key: string) => {
     setSort((s) =>
@@ -99,6 +119,7 @@ export default function CustomerInvoicesTab({ customerId }: { customerId: string
   const params: ListInvoicesParams = {
     customerId,
     ...statusParams,
+    agingBucket: agingId !== 'all' ? (agingId as InvoiceAgingBucket) : undefined,
     q: deferredSearch || undefined,
     page: page - 1, // local state 1-based; backend Page 0-based
     size: INVOICES_PAGE_SIZE,
@@ -113,13 +134,14 @@ export default function CustomerInvoicesTab({ customerId }: { customerId: string
   const total = data?.totalElements ?? 0;
   const totalPages = data?.totalPages ?? 0;
 
-  const filtersActive = statusId !== 'all' || !!deferredSearch;
+  const filtersActive = statusId !== 'all' || agingId !== 'all' || !!deferredSearch;
   const showingStart = total === 0 ? 0 : (page - 1) * INVOICES_PAGE_SIZE + 1;
   const showingEnd = Math.min(page * INVOICES_PAGE_SIZE, total);
 
   const clearFilters = () => {
     setStatusId('all');
     setSearch('');
+    setAging('all'); // also clears invoicesPage
     resetPage();
   };
 
@@ -163,6 +185,20 @@ export default function CustomerInvoicesTab({ customerId }: { customerId: string
           {INVOICE_STATUS_FILTERS.map((s) => (
             <ChipListboxOption key={s.id} value={s.id}>
               {t(s.labelKey)}
+            </ChipListboxOption>
+          ))}
+        </FilterChipListbox>
+
+        <FilterChipListbox
+          label="Aging"
+          ariaLabel="Aging"
+          value={agingId}
+          displayValue={INVOICE_AGING_FILTERS.find((a) => a.id === agingId)?.label ?? ''}
+          onChange={(id) => setAging(id as string)}
+        >
+          {INVOICE_AGING_FILTERS.map((a) => (
+            <ChipListboxOption key={a.id} value={a.id}>
+              {a.label}
             </ChipListboxOption>
           ))}
         </FilterChipListbox>

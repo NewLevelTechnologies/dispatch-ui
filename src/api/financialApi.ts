@@ -14,6 +14,23 @@ export const InvoiceStatus = {
   VOID: 'VOID',
 } as const;
 
+// Aging-bucket filter for GET /financial/invoices. Open invoices (SENT/OVERDUE)
+// bucketed by days past `dueDate` (today − dueDate, server clock), the SAME rule
+// as GET /financial/customers/{id}/ar-summary — so a bucket's filtered count
+// equals that customer's matching ar-summary bucket count. Due today/future =
+// CURRENT; 1–30 / 31–60 / 61–90 / 91+ are the overdue bands. The bucket already
+// implies open statuses, so don't combine with a conflicting `status` (e.g.
+// PAID) — that just returns empty.
+export type InvoiceAgingBucket = 'CURRENT' | 'DAYS_1_30' | 'DAYS_31_60' | 'DAYS_61_90' | 'DAYS_91_PLUS';
+
+export const InvoiceAgingBucket = {
+  CURRENT: 'CURRENT',
+  DAYS_1_30: 'DAYS_1_30',
+  DAYS_31_60: 'DAYS_31_60',
+  DAYS_61_90: 'DAYS_61_90',
+  DAYS_91_PLUS: 'DAYS_91_PLUS',
+} as const;
+
 export interface InvoiceLineItem {
   id: string;
   description: string;
@@ -286,6 +303,7 @@ export interface ListInvoicesParams {
   from?: string; // YYYY-MM-DD, invoiceDate >= from (inclusive)
   to?: string; // YYYY-MM-DD, invoiceDate <= to (inclusive — no +1-day trick)
   overdue?: boolean; // true = open + strictly past due
+  agingBucket?: InvoiceAgingBucket; // open invoices by days past dueDate; pairs with customerId. Don't also send a conflicting status.
   q?: string; // case-insensitive substring on invoiceNumber OR customerName
   page?: number; // 0-indexed
   size?: number; // server-clamped to 1..200
