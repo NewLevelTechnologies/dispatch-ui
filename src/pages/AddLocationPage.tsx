@@ -11,14 +11,13 @@ import {
   tenantSettingsApi,
   type PremiseType,
   type CreateServiceLocationRequest,
-  type CustomerSearchResult,
   type AddressVerifyRequest,
 } from '../api';
 import { useGlossary } from '../contexts/GlossaryContext';
 import { useHasCapability } from '../hooks/useCurrentUser';
 import { showError, showSuccess, extractApiError } from '../lib/toast';
 import AppLayout from '../components/AppLayout';
-import CustomerPicker from '../components/CustomerPicker';
+import LocationCustomerPicker, { type PickedCustomer } from '../components/LocationCustomerPicker';
 import { AddressSuggestion } from '../components/AddressSuggestion';
 import { useAddressVerify } from '../hooks/useAddressVerify';
 import { Card } from '../components/catalyst/card';
@@ -83,7 +82,7 @@ export default function AddLocationPage() {
   // FK fixed by the route) or standalone from the global Locations list
   // (/service-locations/new), where the CSR picks the customer first.
   const standalone = !routeCustomerId;
-  const [pickedCustomer, setPickedCustomer] = useState<CustomerSearchResult | null>(null);
+  const [pickedCustomer, setPickedCustomer] = useState<PickedCustomer | null>(null);
   const effectiveCustomerId = routeCustomerId ?? pickedCustomer?.id ?? '';
 
   const { data: customer, isLoading: loadingCustomer, error: customerError } = useQuery({
@@ -262,7 +261,7 @@ export default function AddLocationPage() {
             <Card title={getName('customer')}>
               <Field size="xs">
                 <Label size="xs" required>{getName('customer')}</Label>
-                <CustomerPicker value={pickedCustomer} onChange={setPickedCustomer} />
+                <LocationCustomerPicker value={pickedCustomer} onChange={setPickedCustomer} />
               </Field>
             </Card>
           </div>

@@ -31,6 +31,7 @@ import { Callout } from '../components/ui/Callout';
 import { ToggleGroup, ToggleGroupOption } from '../components/ui/ToggleGroup';
 import { US_STATES } from '../constants/states';
 import { AddressSuggestion } from '../components/AddressSuggestion';
+import { CustomerResultRow } from '../components/CustomerResultRow';
 import { useAddressVerify } from '../hooks/useAddressVerify';
 
 // Add Customer — creates a Customer + its FIRST service location atomically
@@ -390,12 +391,13 @@ export default function CustomerFormPage() {
                 <div className="mt-1 flex flex-col gap-1.5">
                   {dupes.map((d) => (
                     <div key={d.id} className="flex items-center gap-2">
-                      <span className="min-w-0 flex-1 truncate">
-                        <span className="font-semibold text-fg-strong">{d.name}</span>
-                        {d.customerNumber && (
-                          <span className="ml-1.5 font-mono text-[11px] text-fg-dim">{d.customerNumber}</span>
-                        )}
-                      </span>
+                      <div className="min-w-0 flex-1">
+                        <CustomerResultRow
+                          name={d.name}
+                          customerNumber={d.customerNumber}
+                          isPayer={d.type === 'BILLING_ONLY'}
+                        />
+                      </div>
                       <Button plain size="xs" onClick={() => navigate(`/customers/${d.id}`)}>
                         Use existing →
                       </Button>
