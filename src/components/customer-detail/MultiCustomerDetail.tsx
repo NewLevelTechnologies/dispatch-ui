@@ -172,6 +172,15 @@ export default function MultiCustomerDetail({ customer }: { customer: Customer }
 
   const meta: React.ReactNode[] = [];
   if (customer.customerNumber) meta.push(<span key="num" className="font-mono">{customer.customerNumber}</span>);
+  // Full billing address (street, city, state, ZIP) sits right after the ID —
+  // a multi-site customer is billed centrally, so the bill-to is the headline
+  // address, not a metro hint.
+  const billing = customer.billingAddress;
+  const billingLine = [
+    titleCaseAddress(billing.streetAddress),
+    [titleCaseAddress(billing.city), billing.state, billing.zipCode].filter(Boolean).join(' '),
+  ].filter(Boolean).join(', ');
+  if (billingLine) meta.push(<span key="addr">{billingLine}</span>);
   meta.push(
     <span key="locs">
       {t('common.entitiesCount', {
@@ -180,8 +189,6 @@ export default function MultiCustomerDetail({ customer }: { customer: Customer }
       })}
     </span>,
   );
-  const metro = [titleCaseAddress(customer.billingAddress.city), customer.billingAddress.state].filter(Boolean).join(', ');
-  if (metro) meta.push(<span key="metro">{metro}</span>);
   if (customer.accountManager) meta.push(<span key="am">Acct mgr {customer.accountManager.name}</span>);
   meta.push(<span key="since">Since {formatDateShort(customer.createdAt)}</span>);
 
