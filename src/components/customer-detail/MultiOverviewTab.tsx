@@ -36,6 +36,7 @@ import {
   type CustomerAgreementSummaryResponse,
   type ArPaymentMethod,
   type UpdateCustomerRequest,
+  type AddressVerifyRequest,
 } from '../../api';
 import { PatternFormat } from 'react-number-format';
 import { useGlossary } from '../../contexts/GlossaryContext';
@@ -49,6 +50,8 @@ import { Field, Label } from '../catalyst/fieldset';
 import { Input } from '../catalyst/input';
 import { Select } from '../catalyst/select';
 import { US_STATES } from '../../constants/states';
+import { useAddressVerify } from '../../hooks/useAddressVerify';
+import { AddressSuggestion } from '../AddressSuggestion';
 import { Pill } from '../ui/Pill';
 import { DenseTable, DenseTHead, DenseRow, CellStack, CellTop, CellSub } from '../ui/DenseTable';
 import CustomerNotesCard from './CustomerNotesCard';
@@ -533,6 +536,15 @@ export function CustomerHeaderEdit({ customer, onDone }: { customer: Customer; o
   const [state, setState] = useState(customer.billingAddress.state ?? '');
   const [zip, setZip] = useState(customer.billingAddress.zipCode ?? '');
 
+  const av = useAddressVerify();
+  const billingReq: AddressVerifyRequest = {
+    streetAddress: street,
+    streetAddressLine2: line2 || null,
+    city,
+    state,
+    zipCode: zip,
+  };
+
   const canSave =
     name.trim() !== '' &&
     email.trim() !== '' &&
@@ -579,6 +591,7 @@ export function CustomerHeaderEdit({ customer, onDone }: { customer: Customer; o
             city: city.trim(),
             state,
             zipCode: zip.trim(),
+            ...(av.coordsFor(billingReq) ?? {}),
           },
         });
       }
@@ -627,16 +640,11 @@ export function CustomerHeaderEdit({ customer, onDone }: { customer: Customer; o
         </Field>
       </div>
 
-      {/* Billing address — street + apt */}
+      {/* Billing address — street + apt (geocode-verified on blur) */}
       <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-12">
         <Field className="sm:col-span-8">
-          <Label className="text-xs">
-            Billing address *
-            {customer.billingAddress.validated && (
-              <span className="ml-1.5 font-normal text-success-600">✓ USPS verified</span>
-            )}
-          </Label>
-          <Input value={street} onChange={(e) => setStreet(e.target.value)} required />
+          <Label className="text-xs">Billing address *</Label>
+          <Input value={street} onChange={(e) => setStreet(e.target.value)} onBlur={() => av.run(billingReq)} required />
         </Field>
         <Field className="sm:col-span-4">
           <Label className="text-xs">Apt / Ste</Label>
@@ -648,11 +656,11 @@ export function CustomerHeaderEdit({ customer, onDone }: { customer: Customer; o
       <div className="mt-3 grid grid-cols-12 gap-2">
         <Field className="col-span-12 sm:col-span-6">
           <Label className="text-xs">City *</Label>
-          <Input value={city} onChange={(e) => setCity(e.target.value)} required />
+          <Input value={city} onChange={(e) => setCity(e.target.value)} onBlur={() => av.run(billingReq)} required />
         </Field>
         <Field className="col-span-6 sm:col-span-2">
           <Label className="text-xs">State *</Label>
-          <Select value={state} onChange={(e) => setState(e.target.value)} required>
+          <Select value={state} onChange={(e) => setState(e.target.value)} onBlur={() => av.run(billingReq)} required>
             <option value="">--</option>
             {US_STATES.map((s) => (
               <option key={s} value={s}>
@@ -663,9 +671,20 @@ export function CustomerHeaderEdit({ customer, onDone }: { customer: Customer; o
         </Field>
         <Field className="col-span-6 sm:col-span-4">
           <Label className="text-xs">ZIP *</Label>
-          <Input value={zip} onChange={(e) => setZip(e.target.value)} inputMode="numeric" required />
+          <Input value={zip} onChange={(e) => setZip(e.target.value)} onBlur={() => av.run(billingReq)} inputMode="numeric" required />
         </Field>
       </div>
+
+      <AddressSuggestion
+        verify={av}
+        typed={billingReq}
+        onAccept={(a) => {
+          setStreet(a.streetAddress);
+          setCity(a.city);
+          setState(a.state);
+          setZip(a.zipCode);
+        }}
+      />
 
       <div className="mt-3.5 flex items-center justify-end gap-1.5">
         <Button plain size="xs" onClick={onDone} disabled={saving}>

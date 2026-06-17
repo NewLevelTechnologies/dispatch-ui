@@ -13,6 +13,7 @@ import {
   type PremiseType,
   type CreateCustomerRequest,
   type CustomerSearchResult,
+  type AddressVerifyRequest,
 } from '../api';
 import { useGlossary } from '../contexts/GlossaryContext';
 import { useHasCapability } from '../hooks/useCurrentUser';
@@ -29,6 +30,8 @@ import { Text } from '../components/catalyst/text';
 import { Callout } from '../components/ui/Callout';
 import { ToggleGroup, ToggleGroupOption } from '../components/ui/ToggleGroup';
 import { US_STATES } from '../constants/states';
+import { AddressSuggestion } from '../components/AddressSuggestion';
+import { useAddressVerify } from '../hooks/useAddressVerify';
 
 // Add Customer — creates a Customer + its FIRST service location atomically
 // (one POST /customers with a nested serviceLocations[0]). The user never sees
@@ -83,6 +86,14 @@ const TERMS_OPTIONS: { value: number; label: string }[] = [
   { value: 30, label: 'Net 30' },
   { value: 60, label: 'Net 60' },
 ];
+
+const toVerifyReq = (a: Addr): AddressVerifyRequest => ({
+  streetAddress: a.street,
+  streetAddressLine2: a.line2 || null,
+  city: a.city,
+  state: a.state,
+  zipCode: a.zip,
+});
 
 const toApiAddress = (a: Addr) => ({
   streetAddress: a.street.trim(),
@@ -189,14 +200,25 @@ export default function CustomerFormPage() {
   }
   const hasErrors = Object.keys(errors).length > 0;
 
+  const serviceAv = useAddressVerify();
+  const billingAv = useAddressVerify();
+
   const createMutation = useMutation({
     mutationFn: () => {
-      const serviceAddress = toApiAddress(form.service);
+      // Attach the geocoded coords (if the address still matches what was
+      // verified) so the map pin + timezone land immediately.
+      const serviceAddress = {
+        ...toApiAddress(form.service),
+        ...(serviceAv.coordsFor(toVerifyReq(form.service)) ?? {}),
+      };
+      const billingAddress = form.sameBilling
+        ? serviceAddress
+        : { ...toApiAddress(form.billing), ...(billingAv.coordsFor(toVerifyReq(form.billing)) ?? {}) };
       const request: CreateCustomerRequest = {
         name: form.name.trim(),
         email: form.email.trim(),
         phone: form.phone.trim() || null,
-        billingAddress: form.sameBilling ? serviceAddress : toApiAddress(form.billing),
+        billingAddress,
         billingAddressSameAsService: form.sameBilling,
         serviceLocations: [
           {
@@ -393,6 +415,7 @@ export default function CustomerFormPage() {
                 touched={touched}
                 errors={errors}
                 mark={mark}
+                onBlurVerify={() => serviceAv.run(toVerifyReq(form.service))}
                 trailing={
                   hasRegions ? (
                     <Field size="xs" className="col-span-4">
@@ -417,6 +440,13 @@ export default function CustomerFormPage() {
                       </Select>
                     </Field>
                   ) : undefined
+                }
+              />
+              <AddressSuggestion
+                verify={serviceAv}
+                typed={toVerifyReq(form.service)}
+                onAccept={(a) =>
+                  set({ service: { ...form.service, street: a.streetAddress, city: a.city, state: a.state, zip: a.zipCode } })
                 }
               />
             </Card>
@@ -483,6 +513,14 @@ export default function CustomerFormPage() {
                     touched={touched}
                     errors={errors}
                     mark={mark}
+                    onBlurVerify={() => billingAv.run(toVerifyReq(form.billing))}
+                  />
+                  <AddressSuggestion
+                    verify={billingAv}
+                    typed={toVerifyReq(form.billing)}
+                    onAccept={(a) =>
+                      set({ billing: { ...form.billing, street: a.streetAddress, city: a.city, state: a.state, zip: a.zipCode } })
+                    }
                   />
                 </div>
               )}
@@ -598,6 +636,7 @@ function AddressBlock({
   errors,
   mark,
   trailing,
+  onBlurVerify,
 }: {
   value: Addr;
   onChange: (next: Addr) => void;
@@ -607,6 +646,7 @@ function AddressBlock({
   errors: Record<string, string>;
   mark: (key: string) => void;
   trailing?: ReactNode;
+  onBlurVerify?: () => void;
 }) {
   const { t } = useTranslation();
   const setField = (k: keyof Addr, v: string) => onChange({ ...value, [k]: v });
@@ -623,7 +663,7 @@ function AddressBlock({
             size="xs"
             value={value.street}
             onChange={(e) => setField('street', e.target.value)}
-            onBlur={() => mark(`${prefix}.street`)}
+            onBlur={() => { mark(`${prefix}.street`); onBlurVerify?.(); }}
             invalid={!!err('street')}
             placeholder="1820 W McDowell Rd"
           />
@@ -652,7 +692,7 @@ function AddressBlock({
             size="xs"
             value={value.city}
             onChange={(e) => setField('city', e.target.value)}
-            onBlur={() => mark(`${prefix}.city`)}
+            onBlur={() => { mark(`${prefix}.city`); onBlurVerify?.(); }}
             invalid={!!err('city')}
             placeholder="Phoenix"
           />
@@ -669,7 +709,7 @@ function AddressBlock({
           <Select
             value={value.state}
             onChange={(e) => setField('state', e.target.value)}
-            onBlur={() => mark(`${prefix}.state`)}
+            onBlur={() => { mark(`${prefix}.state`); onBlurVerify?.(); }}
             invalid={!!err('state')}
           >
             <option value="">{t('common.form.select')}</option>
@@ -688,7 +728,7 @@ function AddressBlock({
             size="xs"
             value={value.zip}
             onChange={(e) => setField('zip', e.target.value)}
-            onBlur={() => mark(`${prefix}.zip`)}
+            onBlur={() => { mark(`${prefix}.zip`); onBlurVerify?.(); }}
             invalid={!!err('zip')}
             inputMode="numeric"
             placeholder="85007"

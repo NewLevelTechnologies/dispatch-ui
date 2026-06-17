@@ -12,10 +12,52 @@ export interface Address {
   country?: string;
   latitude?: number | null;
   longitude?: number | null;
+  // IANA timezone id derived server-side from the coordinates (continental US
+  // only; null outside it, or before the async geocode completes).
+  timeZone?: string | null;
+  // DEPRECATED — USPS-era fields, no longer populated for new/edited addresses.
+  // Do NOT use as a quality/validity signal; the live signal is the
+  // /customers/addresses/verify `located` flag + presence of coordinates.
   validated?: boolean;
   validatedAt?: string | null;
   dpvConfirmation?: string | null;
   isBusiness?: boolean;
+}
+
+// Address payload accepted by the create/update endpoints. `latitude`/`longitude`
+// are optional — pass the coords from POST /customers/addresses/verify so the
+// map pin + timezone store immediately; omit them and the server geocodes
+// asynchronously after save (coords/timezone appear a moment later). Otherwise
+// the server stores exactly what you submit — no silent normalization.
+export interface AddressInput {
+  streetAddress: string;
+  streetAddressLine2?: string | null;
+  city: string;
+  state: string;
+  zipCode: string;
+  latitude?: number | null;
+  longitude?: number | null;
+}
+
+// POST /customers/addresses/verify — geocodes (free US Census) WITHOUT saving,
+// returning a standardized "did you mean?" single line + coords + timezone.
+// Always HTTP 200; `located: false` means "couldn't resolve it", not an error.
+export interface AddressVerifyRequest {
+  streetAddress: string;
+  streetAddressLine2?: string | null;
+  city: string;
+  state: string;
+  zipCode: string;
+}
+
+export interface AddressVerifyResponse {
+  located: boolean;
+  // Census-standardized single line for a "did you mean?" prompt, e.g.
+  // "123 MAIN ST, CHICAGO, IL, 60601". NOT broken into structured fields.
+  suggestedSingleLine: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  timeZone: string | null;
 }
 
 export interface AdditionalContact {
@@ -400,13 +442,7 @@ export interface CreateServiceLocationRequest {
   // Omitting premiseType lets the server seed from the tenant default
   // (tenantSettings.defaultPremiseType). Provide to override per-location.
   premiseType?: PremiseType;
-  address: {
-    streetAddress: string;
-    streetAddressLine2?: string | null;
-    city: string;
-    state: string;
-    zipCode: string;
-  };
+  address: AddressInput;
   siteContactName?: string | null;
   siteContactPhone?: string | null;
   siteContactEmail?: string | null;
@@ -419,13 +455,7 @@ export interface CreateCustomerRequest {
   email: string;
   phone?: string | null;
   type?: CustomerType;
-  billingAddress: {
-    streetAddress: string;
-    streetAddressLine2?: string | null;
-    city: string;
-    state: string;
-    zipCode: string;
-  };
+  billingAddress: AddressInput;
   serviceLocations: CreateServiceLocationRequest[];
   billingAddressSameAsService?: boolean;
   paymentTermsDays?: number;
@@ -459,13 +489,7 @@ export interface UpdateCustomerRequest {
 }
 
 export interface UpdateBillingAddressRequest {
-  billingAddress: {
-    streetAddress: string;
-    streetAddressLine2?: string | null;
-    city: string;
-    state: string;
-    zipCode: string;
-  };
+  billingAddress: AddressInput;
 }
 
 export interface UpdateServiceLocationRequest {
@@ -481,13 +505,7 @@ export interface UpdateServiceLocationRequest {
   status?: 'ACTIVE' | 'INACTIVE' | 'CLOSED';
 }
 
-export interface UpdateServiceLocationAddressRequest {
-  streetAddress: string;
-  streetAddressLine2?: string | null;
-  city: string;
-  state: string;
-  zipCode: string;
-}
+export type UpdateServiceLocationAddressRequest = AddressInput;
 
 export const customerApi = {
   // Paginated list (BREAKING: was getAll returning Customer[])
@@ -572,6 +590,13 @@ export const customerApi = {
 
   create: async (request: CreateCustomerRequest): Promise<Customer> => {
     const response = await apiClient.post<Customer>('/customers', request);
+    return response.data;
+  },
+
+  // Geocode-preview an address without saving — drives the "did you mean?"
+  // suggestion + captures coords/timezone to send on the subsequent save.
+  verifyAddress: async (request: AddressVerifyRequest): Promise<AddressVerifyResponse> => {
+    const response = await apiClient.post<AddressVerifyResponse>('/customers/addresses/verify', request);
     return response.data;
   },
 

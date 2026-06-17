@@ -81,6 +81,7 @@ import { useHasCapability } from '../hooks/useCurrentUser';
 import { useMediaQuery } from '../hooks/useMediaQuery';
 import { useUrlPage } from '../hooks/useUrlPage';
 import { useUrlTab } from '../hooks/useUrlTab';
+import { useAddressVerify } from '../hooks/useAddressVerify';
 import { formatPhone } from '../utils/formatPhone';
 import { formatTimestamp, formatExactTimestamp } from '../lib/formatTimestamp';
 import { TimeAgo } from '../components/TimeAgo';
@@ -111,6 +112,7 @@ import { Textarea } from '../components/catalyst/textarea';
 import { Heading } from '../components/catalyst/heading';
 import { ToggleGroup, ToggleGroupOption } from '../components/ui/ToggleGroup';
 import { US_STATES } from '../constants/states';
+import { AddressSuggestion } from '../components/AddressSuggestion';
 import { Dropdown, DropdownButton, DropdownItem, DropdownLabel, DropdownMenu } from '../components/catalyst/dropdown';
 import { Pill } from '../components/ui/Pill';
 import { PhotoLightbox } from '../components/ui/PhotoLightbox';
@@ -118,7 +120,7 @@ import { Callout } from '../components/ui/Callout';
 import { Tabs } from '../components/ui/Tabs';
 import { ListFooter } from '../components/ui/ListFooter';
 import { EquipmentSummaryCard } from '../components/detail/EquipmentSummaryCard';
-import type { ServiceLocationDetailDto, PremiseType, UpdateServiceLocationRequest } from '../api/customerApi';
+import type { ServiceLocationDetailDto, PremiseType, UpdateServiceLocationRequest, AddressVerifyRequest } from '../api/customerApi';
 import {
   mockAttention,
   type MockTone,
@@ -605,6 +607,15 @@ function LocationHeaderEdit({
     queryFn: () => dispatchRegionApi.getAll(false),
   });
 
+  const av = useAddressVerify();
+  const addrReq: AddressVerifyRequest = {
+    streetAddress,
+    streetAddressLine2: streetAddressLine2 || null,
+    city,
+    state,
+    zipCode,
+  };
+
   const canSave =
     streetAddress.trim() !== '' && city.trim() !== '' && state.trim() !== '' && zipCode.trim() !== '';
 
@@ -631,6 +642,7 @@ function LocationHeaderEdit({
           city,
           state,
           zipCode,
+          ...(av.coordsFor(addrReq) ?? {}),
         });
       }
     },
@@ -680,13 +692,8 @@ function LocationHeaderEdit({
           8/4 split returns at sm. */}
       <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-12">
         <Field className="sm:col-span-8">
-          <Label className="text-xs">
-            {t('common.form.streetAddress')} *
-            {location.address.validated && (
-              <span className="ml-1.5 font-normal text-success-600">✓ USPS verified</span>
-            )}
-          </Label>
-          <Input value={streetAddress} onChange={(e) => setStreetAddress(e.target.value)} required />
+          <Label className="text-xs">{t('common.form.streetAddress')} *</Label>
+          <Input value={streetAddress} onChange={(e) => setStreetAddress(e.target.value)} onBlur={() => av.run(addrReq)} required />
         </Field>
         <Field className="sm:col-span-4">
           <Label className="text-xs">{t('common.form.addressLine2')}</Label>
@@ -705,11 +712,11 @@ function LocationHeaderEdit({
       <div className="mt-3 grid grid-cols-12 gap-2">
         <Field className={hasRegions ? 'col-span-12 sm:col-span-4' : 'col-span-12 sm:col-span-6'}>
           <Label className="text-xs">{t('common.form.city')} *</Label>
-          <Input value={city} onChange={(e) => setCity(e.target.value)} required />
+          <Input value={city} onChange={(e) => setCity(e.target.value)} onBlur={() => av.run(addrReq)} required />
         </Field>
         <Field className="col-span-6 sm:col-span-2">
           <Label className="text-xs">{t('common.form.state')} *</Label>
-          <Select value={state} onChange={(e) => setState(e.target.value)} required>
+          <Select value={state} onChange={(e) => setState(e.target.value)} onBlur={() => av.run(addrReq)} required>
             <option value="">{t('common.form.select')}</option>
             {US_STATES.map((s) => (
               <option key={s} value={s}>
@@ -720,7 +727,7 @@ function LocationHeaderEdit({
         </Field>
         <Field className={hasRegions ? 'col-span-6 sm:col-span-2' : 'col-span-6 sm:col-span-4'}>
           <Label className="text-xs">{t('common.form.zipCode')} *</Label>
-          <Input value={zipCode} onChange={(e) => setZipCode(e.target.value)} inputMode="numeric" required />
+          <Input value={zipCode} onChange={(e) => setZipCode(e.target.value)} onBlur={() => av.run(addrReq)} inputMode="numeric" required />
         </Field>
         {hasRegions && (
           <Field className="col-span-12 sm:col-span-4">
@@ -737,6 +744,17 @@ function LocationHeaderEdit({
           </Field>
         )}
       </div>
+
+      <AddressSuggestion
+        verify={av}
+        typed={addrReq}
+        onAccept={(a) => {
+          setStreetAddress(a.streetAddress);
+          setCity(a.city);
+          setState(a.state);
+          setZipCode(a.zipCode);
+        }}
+      />
 
       <div className="mt-3.5 flex items-center justify-end gap-1.5">
         <Button plain size="xs" onClick={onDone} disabled={saving}>
