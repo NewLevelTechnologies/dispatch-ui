@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PhoneIcon } from '@heroicons/react/24/outline';
 import { formatPhone } from '../../utils/formatPhone';
+import { Pill } from '../ui/Pill';
 import type { AdditionalContact } from '../../api';
 
 // Normalized contact row — name · role, best-reach phone as the accent tel:
@@ -52,7 +53,11 @@ export function ContactBlock({
             {contact.name}
           </span>
           {badge}
-          {contact.role && <span className="text-[11px] text-fg-muted">· {contact.role}</span>}
+          {contact.role && (
+            <Pill tone="neutral" inline>
+              {contact.role}
+            </Pill>
+          )}
         </div>
         {actions && (
           <div

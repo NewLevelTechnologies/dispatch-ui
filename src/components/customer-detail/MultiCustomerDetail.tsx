@@ -50,6 +50,7 @@ import CustomerWorkOrdersTab from './CustomerWorkOrdersTab';
 import CustomerContactsTab from './CustomerContactsTab';
 import { OrgMark } from './shared';
 import { formatDateShort } from './format';
+import { formatPhone } from '../../utils/formatPhone';
 import { titleCaseAddress } from '../../utils/titleCaseAddress';
 import { useUrlTab } from '../../hooks/useUrlTab';
 
@@ -230,6 +231,24 @@ export default function MultiCustomerDetail({ customer }: { customer: Customer }
                   canEdit={canEditCustomers}
                 />
               </div>
+              {(customer.phone || customer.email) && (
+                <div className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-[11.5px]">
+                  {customer.phone && (
+                    <a
+                      href={`tel:${customer.phone.replace(/\D/g, '')}`}
+                      className="font-mono text-fg-accent hover:underline"
+                    >
+                      {formatPhone(customer.phone)}
+                    </a>
+                  )}
+                  {customer.phone && customer.email && <span className="text-fg-dim">·</span>}
+                  {customer.email && (
+                    <a href={`mailto:${customer.email}`} className="text-fg-accent hover:underline">
+                      {customer.email}
+                    </a>
+                  )}
+                </div>
+              )}
               <div className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[11.5px] text-fg-muted">
                 {meta.map((node, i) => (
                   <span key={i} className="flex items-center gap-x-2.5">

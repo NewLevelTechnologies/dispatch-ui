@@ -18,13 +18,11 @@ import {
   MagnifyingGlassIcon,
   PencilIcon,
   PhotoIcon,
-  BellIcon,
   TrashIcon,
   StarIcon,
   EyeIcon,
   EyeSlashIcon,
 } from '@heroicons/react/24/outline';
-import { BellIcon as BellSolidIcon } from '@heroicons/react/24/solid';
 import {
   agreementApi,
   customerApi,
@@ -93,6 +91,7 @@ import LocationActivityStream from '../components/LocationActivityStream';
 import LocationFilesTab from '../components/LocationFilesTab';
 import ServiceLocationContactDialog from '../components/ServiceLocationContactDialog';
 import { ContactBlock } from '../components/detail/ContactBlock';
+import NotifBell from '../components/detail/NotifBell';
 import NotificationPreferencesDialog from '../components/NotificationPreferencesDialog';
 import EquipmentThumbnail from '../components/EquipmentThumbnail';
 import ConfirmDialog from '../components/ConfirmDialog';
@@ -2681,36 +2680,6 @@ function PhoneCell({ value }: { value?: string | null }) {
 // enabled, outline/muted when none — so you can see at a glance who's wired up.
 // `active` lets a caller that already has the prefs (the Contacts tab) pass the
 // state in; otherwise the bell fetches its own (cache-shared with the dialog).
-function NotifBell({
-  customerId,
-  contactId,
-  onClick,
-  active,
-}: {
-  customerId: string;
-  contactId: string;
-  onClick: () => void;
-  active?: boolean;
-}) {
-  const { t } = useTranslation();
-  const { data } = useQuery({
-    queryKey: ['notification-preferences', 'contact', customerId, contactId],
-    queryFn: () => notificationApi.getContactPreferences(customerId, contactId),
-    enabled: active === undefined && !!customerId && !!contactId,
-  });
-  const on = active ?? (data ?? []).some((p) => p.optIn);
-  return (
-    <button
-      onClick={onClick}
-      title={t('notifications.preferences.tooltip')}
-      aria-label={t('notifications.preferences.tooltip')}
-      className={on ? 'text-fg-accent hover:text-fg-accent' : 'text-fg-dim hover:text-fg-strong'}
-    >
-      {on ? <BellSolidIcon className="size-3.5" /> : <BellIcon className="size-3.5" />}
-    </button>
-  );
-}
-
 // Whole-dollar formatter for the Billed-to glance figures — these are summary
 // balances, not invoice lines, so cents only add noise. Amounts arrive as
 // decimal dollars (matching financial-service elsewhere).

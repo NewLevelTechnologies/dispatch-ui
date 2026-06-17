@@ -19,8 +19,6 @@ import {
   MapPinIcon,
   ClipboardDocumentListIcon,
   UserIcon,
-  PhoneIcon,
-  EnvelopeIcon,
   PencilSquareIcon,
   StarIcon,
 } from '@heroicons/react/24/outline';
@@ -32,6 +30,7 @@ import {
   dispatchRegionApi,
   financialActivityApi,
   invoicesApi,
+  InvoiceAgingBucket,
   userApi,
   type Customer,
   type AgreementSummaryResponse,
@@ -47,7 +46,6 @@ import { useTranslation } from 'react-i18next';
 import { useGlossary } from '../../contexts/GlossaryContext';
 import { showError, showSuccess, extractApiError } from '../../lib/toast';
 import { handleConcurrentEdit } from '../../lib/conflict';
-import { formatPhone } from '../../utils/formatPhone';
 import { titleCaseAddress } from '../../utils/titleCaseAddress';
 import { Card } from '../catalyst/card';
 import { Button } from '../catalyst/button';
@@ -62,10 +60,14 @@ import { Pill } from '../ui/Pill';
 import { DenseTable, DenseTHead, DenseRow, CellStack, CellTop, CellSub } from '../ui/DenseTable';
 import CustomerNotesCard from './CustomerNotesCard';
 import { ContactBlock } from '../detail/ContactBlock';
-import AdditionalContactFormDialog from '../AdditionalContactFormDialog';
+import NotifBell from '../detail/NotifBell';
+import ContactFormDialog from '../ContactFormDialog';
+import NotificationPreferencesDialog from '../NotificationPreferencesDialog';
+import ConfirmDialog from '../ConfirmDialog';
 import { CardTitle, CardLink } from './shared';
 import { formatDateShort, formatMoney } from './format';
 import { buildAttentionItems, daysUntil, type AttentionItem } from './attention';
+import { useGoToInvoicesBucket } from './invoiceAgingNav';
 import { buildRecentActivity } from '../../lib/locationActivityRows';
 import { ACTIVITY_TONE_STYLE } from '../../lib/activityGlyph';
 
@@ -126,6 +128,7 @@ export default function MultiOverviewTab({
   }, [regions]);
 
   const attentionItems = buildAttentionItems(agreements, arSummary, agreementSummary, customer.id);
+  const goToBucket = useGoToInvoicesBucket();
 
   return (
     <div className="flex flex-col gap-3">
@@ -133,7 +136,7 @@ export default function MultiOverviewTab({
 
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1fr_340px]">
         <div className="flex flex-col gap-3">
-          <BillingCard customer={customer} ar={arSummary} />
+          <BillingCard customer={customer} ar={arSummary} onSelectAging={goToBucket} />
           <LocationsPreviewCard
             customer={customer}
             regionMap={regionMap}
@@ -145,7 +148,7 @@ export default function MultiOverviewTab({
         </div>
 
         <div className="flex flex-col gap-3">
-          <ContactCard customer={customer} onViewAll={onViewContacts} />
+          <ContactCard customer={customer} canEdit={canEdit} onViewAll={onViewContacts} />
           <AccountDetailsCard customer={customer} ar={arSummary} canEdit={canEdit} />
         </div>
       </div>
@@ -274,15 +277,30 @@ function bucketTint(tone: BucketTone, amount: number): { wrap?: React.CSSPropert
 // Billing & AR — terms / pricebook / tax ride the detail payload; the
 // outstanding headline + 5-bucket aging come from the FIN-1 summary (honest
 // "—" until it resolves). Exported for reuse by SingleCustomerDetail.
-export function BillingCard({ customer, ar }: { customer: Customer; ar?: CustomerArSummaryResponse }) {
+export function BillingCard({
+  customer,
+  ar,
+  onSelectAging,
+}: {
+  customer: Customer;
+  ar?: CustomerArSummaryResponse;
+  // Deep-link a bucket into the Invoices tab filtered to it. Omit to render the
+  // boxes as static (e.g. where there's no Invoices tab to jump to).
+  onSelectAging?: (bucket: InvoiceAgingBucket) => void;
+}) {
   const termsLabel = customer.paymentTermsDays > 0 ? `Net ${customer.paymentTermsDays}` : '—';
-  const buckets: { k: string; b: CustomerArSummaryResponse['current']; tone: BucketTone }[] = ar
+  const buckets: {
+    k: string;
+    b: CustomerArSummaryResponse['current'];
+    tone: BucketTone;
+    bucket: InvoiceAgingBucket;
+  }[] = ar
     ? [
-        { k: 'Current', b: ar.current, tone: 'neutral' },
-        { k: '1–30', b: ar.days1To30, tone: 'neutral' },
-        { k: '31–60', b: ar.days31To60, tone: 'info' },
-        { k: '61–90', b: ar.days61To90, tone: 'warning' },
-        { k: '91+', b: ar.days91Plus, tone: 'warning' },
+        { k: 'Current', b: ar.current, tone: 'neutral', bucket: InvoiceAgingBucket.CURRENT },
+        { k: '1–30', b: ar.days1To30, tone: 'neutral', bucket: InvoiceAgingBucket.DAYS_1_30 },
+        { k: '31–60', b: ar.days31To60, tone: 'info', bucket: InvoiceAgingBucket.DAYS_31_60 },
+        { k: '61–90', b: ar.days61To90, tone: 'warning', bucket: InvoiceAgingBucket.DAYS_61_90 },
+        { k: '91+', b: ar.days91Plus, tone: 'warning', bucket: InvoiceAgingBucket.DAYS_91_PLUS },
       ]
     : [];
   return (
@@ -309,18 +327,32 @@ export function BillingCard({ customer, ar }: { customer: Customer; ar?: Custome
           </div>
           {ar && (
             <div className="flex shrink-0 gap-1">
-              {buckets.map(({ k, b, tone }) => {
+              {buckets.map(({ k, b, tone, bucket }) => {
                 const tint = bucketTint(tone, b.amount);
-                return (
-                  <div
-                    key={k}
-                    className="min-w-[46px] rounded-md border border-border-soft px-1.5 py-1 text-center"
-                    style={tint.wrap}
-                  >
+                const clickable = !!onSelectAging && b.count > 0;
+                const cls = 'min-w-[46px] rounded-md border border-border-soft px-1.5 py-1 text-center';
+                const inner = (
+                  <>
                     <div className="text-[9px] font-semibold uppercase tracking-wide text-fg-muted">{k}</div>
                     <div className="mt-0.5 font-mono text-[11px] font-bold tabular-nums" style={{ color: tint.text }}>
                       {formatMoney(b.amount)}
                     </div>
+                  </>
+                );
+                return clickable ? (
+                  <button
+                    key={k}
+                    type="button"
+                    onClick={() => onSelectAging!(bucket)}
+                    title={`View ${k} invoices (${b.count})`}
+                    className={`${cls} cursor-pointer transition-colors hover:border-border`}
+                    style={tint.wrap}
+                  >
+                    {inner}
+                  </button>
+                ) : (
+                  <div key={k} className={cls} style={tint.wrap}>
+                    {inner}
                   </div>
                 );
               })}
@@ -550,17 +582,28 @@ function AgreementsSummaryCard({
   );
 }
 
-// Customer contacts — bill-to (the customer's own email/phone) + the contact
-// people as normalized ContactBlocks (shared with the location Site-contact
-// card): primary first with a badge, the rest with Make-primary + Edit on hover,
-// plus "+ Add". Mirrors the location card now that customer contacts support a
-// designated primary (CUST-CONTACT-PRIMARY-1).
-function ContactCard({ customer, onViewAll }: { customer: Customer; onViewAll: () => void }) {
+// Customer contacts — the contact PEOPLE only (the customer's own phone/email
+// now lives in the page header, same tier as the billing address). A pure mirror
+// of the location Site-contact card: designated primary on top with a badge, the
+// rest under "Additional" with Make-primary / Edit / notify on hover, plus
+// "+ Add" and a "View all" peek into the Contacts tab. "Bill-to" etc. read as a
+// role chip on the relevant person. Primary support: CUST-CONTACT-PRIMARY-1.
+function ContactCard({
+  customer,
+  canEdit,
+  onViewAll,
+}: {
+  customer: Customer;
+  canEdit: boolean;
+  onViewAll: () => void;
+}) {
   const queryClient = useQueryClient();
   const [dialog, setDialog] = useState<{ open: boolean; contact: AdditionalContact | null }>({
     open: false,
     contact: null,
   });
+  const [notifyContact, setNotifyContact] = useState<AdditionalContact | null>(null);
+  const [contactToDelete, setContactToDelete] = useState<AdditionalContact | null>(null);
 
   const makePrimaryMutation = useMutation({
     mutationFn: (contactId: string) => contactApi.makeCustomerContactPrimary(customer.id, contactId),
@@ -571,96 +614,155 @@ function ContactCard({ customer, onViewAll }: { customer: Customer; onViewAll: (
     onError: (err) => showError("Couldn't set primary contact", extractApiError(err) ?? undefined),
   });
 
-  // Primary first, then by displayOrder — same order as the Contacts tab.
-  const ordered = [...(customer.additionalContacts ?? [])].sort(
-    (a, b) => Number(!!b.isPrimary) - Number(!!a.isPrimary) || a.displayOrder - b.displayOrder,
+  const deleteMutation = useMutation({
+    mutationFn: (contactId: string) => contactApi.deleteCustomerContact(customer.id, contactId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['customers', customer.id] });
+      setContactToDelete(null);
+      showSuccess('Contact deleted');
+    },
+    onError: (err) => showError("Couldn't delete contact", extractApiError(err) ?? undefined),
+  });
+
+  const all = customer.additionalContacts ?? [];
+  const primary = all.find((c) => c.isPrimary) ?? null;
+  const additional = all
+    .filter((c) => c.id !== primary?.id)
+    .sort((a, b) => a.displayOrder - b.displayOrder);
+  const shown = additional.slice(0, CONTACT_CARD_CAP);
+  const hiddenCount = additional.length - shown.length;
+
+  // Notification bell — filled when the contact has any alert enabled. Shared
+  // with the location card; self-fetches its opt-in state.
+  const notifyButton = (c: AdditionalContact) => (
+    <NotifBell customerId={customer.id} contactId={c.id} onClick={() => setNotifyContact(c)} />
   );
-  const shown = ordered.slice(0, CONTACT_CARD_CAP);
-  const hidden = ordered.length - shown.length;
-  const hasBillTo = !!(customer.email || customer.phone);
 
   return (
     <Card
       title={<CardTitle icon={<UserIcon className="size-3.5" />}>Contacts</CardTitle>}
-      action={<CardLink onClick={() => setDialog({ open: true, contact: null })}>+ Add</CardLink>}
+      action={
+        canEdit && primary ? (
+          <CardLink onClick={() => setDialog({ open: true, contact: primary })}>Edit</CardLink>
+        ) : undefined
+      }
       padding="none"
     >
-      <div className="space-y-3 px-3.5 py-3">
-        {hasBillTo && (
-          <div>
-            <div className="text-[10px] font-semibold uppercase tracking-wide text-fg-dim">Bill-to</div>
-            {customer.phone && (
-              <a
-                href={`tel:${customer.phone.replace(/\D/g, '')}`}
-                className="mt-0.5 flex items-center gap-1.5 font-mono text-[12.5px] font-semibold text-fg-accent hover:underline"
-              >
-                <PhoneIcon className="size-3 shrink-0" />
-                {formatPhone(customer.phone)}
-              </a>
-            )}
-            {customer.email && (
-              <a
-                href={`mailto:${customer.email}`}
-                className="mt-0.5 flex items-center gap-1.5 text-[11px] text-fg-muted hover:text-fg-strong hover:underline"
-              >
-                <EnvelopeIcon className="size-3 shrink-0" />
-                <span className="break-all">{customer.email}</span>
-              </a>
+      {/* Primary */}
+      <div className="px-3.5 py-3">
+        {primary ? (
+          <ContactBlock
+            contact={primary}
+            primary
+            badge={<Pill tone="info">Primary</Pill>}
+            actions={canEdit ? notifyButton(primary) : undefined}
+          />
+        ) : (
+          <div className="flex items-center gap-2 text-[12px] text-fg-muted">
+            No contacts on file.
+            {canEdit && (
+              <CardLink onClick={() => setDialog({ open: true, contact: null })}>+ Add</CardLink>
             )}
           </div>
         )}
-
-        {shown.length > 0 && (
-          <div className={`space-y-2.5 ${hasBillTo ? 'border-t border-border-soft pt-2.5' : ''}`}>
-            {shown.map((c) => (
-              <ContactBlock
-                key={c.id}
-                contact={c}
-                primary={c.isPrimary}
-                badge={c.isPrimary ? <Pill tone="info">Primary</Pill> : undefined}
-                actions={
-                  <>
-                    {!c.isPrimary && (
-                      <button
-                        type="button"
-                        onClick={() => makePrimaryMutation.mutate(c.id)}
-                        disabled={makePrimaryMutation.isPending}
-                        title="Make primary"
-                        className="bg-transparent p-0 text-fg-muted hover:text-fg-strong"
-                      >
-                        <StarIcon className="size-3.5" />
-                      </button>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => setDialog({ open: true, contact: c })}
-                      title="Edit contact"
-                      className="bg-transparent p-0 text-fg-muted hover:text-fg-strong"
-                    >
-                      <PencilSquareIcon className="size-3.5" />
-                    </button>
-                  </>
-                }
-              />
-            ))}
-          </div>
-        )}
-
-        {!hasBillTo && ordered.length === 0 && (
-          <div className="text-[12px] text-fg-muted">No contacts on file.</div>
-        )}
-
-        {hidden > 0 && <CardLink onClick={onViewAll}>View all {ordered.length} →</CardLink>}
       </div>
 
-      <AdditionalContactFormDialog
+      {/* Additional — same block shape as the primary, divided rows, capped */}
+      {(additional.length > 0 || (canEdit && primary)) && (
+        <div className="border-t border-border-soft px-3.5 py-2.5">
+          <div className="mb-2 flex items-center justify-between">
+            <div className="text-[10px] font-semibold uppercase tracking-wider text-fg-muted">Additional</div>
+            {canEdit && (
+              <CardLink onClick={() => setDialog({ open: true, contact: null })}>+ Add</CardLink>
+            )}
+          </div>
+          {additional.length === 0 ? (
+            <div className="text-[11.5px] italic text-fg-dim">No additional contacts.</div>
+          ) : (
+            <div className="flex flex-col">
+              {shown.map((c) => (
+                <div
+                  key={c.id}
+                  className="border-t border-border-soft py-2.5 first:border-t-0 first:pt-0 last:pb-0"
+                >
+                  <ContactBlock
+                    contact={c}
+                    actions={
+                      canEdit ? (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => makePrimaryMutation.mutate(c.id)}
+                            disabled={makePrimaryMutation.isPending}
+                            title="Make primary"
+                            aria-label="Make primary"
+                            className="text-fg-dim hover:text-fg-strong disabled:opacity-50"
+                          >
+                            <StarIcon className="size-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setDialog({ open: true, contact: c })}
+                            title="Edit contact"
+                            aria-label="Edit contact"
+                            className="text-fg-dim hover:text-fg-strong"
+                          >
+                            <PencilSquareIcon className="size-3.5" />
+                          </button>
+                          {notifyButton(c)}
+                        </>
+                      ) : undefined
+                    }
+                  />
+                </div>
+              ))}
+            </div>
+          )}
+          {hiddenCount > 0 && (
+            <button
+              type="button"
+              onClick={onViewAll}
+              className="mt-2.5 block w-full border-t border-border-soft pt-2 text-left text-[11px] font-medium text-fg-accent hover:underline"
+            >
+              View all {all.length} →
+            </button>
+          )}
+        </div>
+      )}
+
+      <ContactFormDialog
         isOpen={dialog.open}
         onClose={() => setDialog({ open: false, contact: null })}
-        parentId={customer.id}
         parentType="customer"
-        customerId={customer.id}
+        parentId={customer.id}
         contact={dialog.contact}
         queryKey={['customers', customer.id]}
+        onRequestDelete={
+          dialog.contact && !dialog.contact.isPrimary
+            ? () => {
+                const target = dialog.contact;
+                setDialog({ open: false, contact: null });
+                setContactToDelete(target);
+              }
+            : undefined
+        }
+      />
+      <ConfirmDialog
+        isOpen={!!contactToDelete}
+        onClose={() => setContactToDelete(null)}
+        onConfirm={() => contactToDelete && deleteMutation.mutate(contactToDelete.id)}
+        title="Delete contact"
+        message={`Delete ${contactToDelete?.name ?? ''}?`}
+        confirmLabel="Delete"
+        isDestructive
+        isPending={deleteMutation.isPending}
+      />
+      <NotificationPreferencesDialog
+        isOpen={!!notifyContact}
+        onClose={() => setNotifyContact(null)}
+        customerId={customer.id}
+        contact={notifyContact}
+        contactName={notifyContact?.name || ''}
       />
     </Card>
   );

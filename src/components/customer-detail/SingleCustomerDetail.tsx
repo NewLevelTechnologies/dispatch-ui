@@ -50,10 +50,12 @@ import CustomerInvoicesTab from './CustomerInvoicesTab';
 import CustomerHeaderTags from './CustomerHeaderTags';
 import { BillingCard, AccountDetailsCard, CustomerHeaderEdit, AttentionStrip } from './MultiOverviewTab';
 import { buildAttentionItems } from './attention';
+import { useGoToInvoicesBucket } from './invoiceAgingNav';
 import { EquipmentSummaryCard } from '../detail/EquipmentSummaryCard';
 import { SiteWorkOrdersCard, SiteInstructionsCard, SiteContactCard, DispatchesTab } from '../detail/locationCards';
 import { OrgMark } from './shared';
 import { formatDateShort } from './format';
+import { formatPhone } from '../../utils/formatPhone';
 
 type TabId = 'overview' | 'equipment' | 'jobs' | 'invoices' | 'dispatches' | 'files' | 'activity';
 const SINGLE_TABS: readonly TabId[] = ['overview', 'equipment', 'jobs', 'invoices', 'dispatches', 'files', 'activity'];
@@ -132,6 +134,7 @@ export default function SingleCustomerDetail({ customer }: { customer: Customer 
 
   const canEditCustomers = useHasCapability('EDIT_CUSTOMERS');
   const [activeTab, setActiveTab] = useUrlTab(SINGLE_TABS, 'overview');
+  const goToBucket = useGoToInvoicesBucket();
 
   const [editingHeader, setEditingHeader] = useState(false);
   const [isNewWorkOrderOpen, setIsNewWorkOrderOpen] = useState(false);
@@ -290,6 +293,24 @@ export default function SingleCustomerDetail({ customer }: { customer: Customer 
                   canEdit={canEditCustomers}
                 />
               </div>
+              {(customer.phone || customer.email) && (
+                <div className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-[11.5px]">
+                  {customer.phone && (
+                    <a
+                      href={`tel:${customer.phone.replace(/\D/g, '')}`}
+                      className="font-mono text-fg-accent hover:underline"
+                    >
+                      {formatPhone(customer.phone)}
+                    </a>
+                  )}
+                  {customer.phone && customer.email && <span className="text-fg-dim">·</span>}
+                  {customer.email && (
+                    <a href={`mailto:${customer.email}`} className="text-fg-accent hover:underline">
+                      {customer.email}
+                    </a>
+                  )}
+                </div>
+              )}
               <div className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[11.5px] text-fg-muted">
                 {meta.map((node, i) => (
                   <span key={i} className="flex items-center gap-x-2.5">
@@ -345,7 +366,7 @@ export default function SingleCustomerDetail({ customer }: { customer: Customer 
               ) : (
                 <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1fr_340px]">
                   <div className="flex flex-col gap-3">
-                    <BillingCard customer={customer} ar={arSummary} />
+                    <BillingCard customer={customer} ar={arSummary} onSelectAging={goToBucket} />
                     <EquipmentSummaryCard equipment={equipment} onViewAll={() => setActiveTab('equipment')} />
                     <SiteWorkOrdersCard location={location} onViewAll={() => setActiveTab('jobs')} />
                     <CustomerNotesCard customerId={customer.id} canEdit={canEditCustomers} />

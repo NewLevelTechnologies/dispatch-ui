@@ -15,7 +15,7 @@ import { showError, showSuccess, extractApiError } from '../../lib/toast';
 import { Card } from '../catalyst/card';
 import { Pill } from '../ui/Pill';
 import { DenseTable, DenseTHead, DenseRow, CellStack, CellTop, CellSub } from '../ui/DenseTable';
-import AdditionalContactFormDialog from '../AdditionalContactFormDialog';
+import ContactFormDialog from '../ContactFormDialog';
 import NotificationPreferencesDialog from '../NotificationPreferencesDialog';
 import ConfirmDialog from '../ConfirmDialog';
 import { CardLink, CardTitle } from './shared';
@@ -192,12 +192,11 @@ export default function CustomerContactsTab({
         )}
       </Card>
 
-      <AdditionalContactFormDialog
+      <ContactFormDialog
         isOpen={formDialog.open}
         onClose={() => setFormDialog({ open: false, contact: null })}
-        parentId={customerId}
         parentType="customer"
-        customerId={customerId}
+        parentId={customerId}
         contact={formDialog.contact}
         queryKey={queryKey}
       />
