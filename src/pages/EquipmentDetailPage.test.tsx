@@ -936,31 +936,22 @@ describe('EquipmentDetailPage', () => {
       expect(screen.getByRole('heading', { name: 'Upstairs Furnace' })).toBeInTheDocument();
     });
 
-    expect(await screen.findByText(/recent work orders/i)).toBeInTheDocument();
-    // The WO row links to its detail page and surfaces the first work item
-    // description with a "+N more" indicator when the WO has additional items.
-    const woLink = screen.getByRole('link', { name: /WO-00010/i });
-    expect(woLink).toHaveAttribute('href', '/work-orders/wo-1');
+    // The peek surfaces the WO number, the first work item + a "+N more" hint.
+    expect(await screen.findByText('WO-00010')).toBeInTheDocument();
     expect(screen.getByText(/replace condenser coil/i)).toBeInTheDocument();
     expect(screen.getByText(/\+1 more/i)).toBeInTheDocument();
 
-    // "View all" jumps to the Service History tab.
+    // "View all" opens the Service history tab (its search box appears).
     await user.click(screen.getByRole('button', { name: /view all/i }));
-    await waitFor(() => {
-      expect(screen.queryByText(/recent work orders/i)).not.toBeInTheDocument();
-    });
+    expect(await screen.findByPlaceholderText(/search work orders/i)).toBeInTheDocument();
   });
 
-  it('renders the recent notes card on Overview from the embedded projection', async () => {
-    mockGetById.mockResolvedValue({
-      ...baseEquipment,
-      recentNotes: [
-        { id: 'n-1', body: 'Replaced compressor', authorUserId: 'u-1', authorName: 'Jane', createdAt: '2026-05-01T12:00:00Z', updatedAt: '2026-05-01T12:00:00Z' },
-        { id: 'n-2', body: 'Filter due', authorUserId: 'u-2', authorName: 'Bob', createdAt: '2026-04-20T09:00:00Z', updatedAt: '2026-04-20T09:00:00Z' },
-        { id: 'n-3', body: 'Loud rattle on startup', authorUserId: 'u-3', authorName: 'Sue', createdAt: '2026-04-10T09:00:00Z', updatedAt: '2026-04-10T09:00:00Z' },
-      ],
-      noteCount: 4,
-    });
+  it('renders the notes card on Overview from the notes list', async () => {
+    mockGetById.mockResolvedValue(baseEquipment);
+    mockNotesList.mockResolvedValue([
+      { id: 'n-1', body: 'Replaced compressor', authorUserId: 'u-1', authorName: 'Jane', pinned: false, createdAt: '2026-05-01T12:00:00Z', updatedAt: '2026-05-01T12:00:00Z' },
+      { id: 'n-2', body: 'Filter due', authorUserId: 'u-2', authorName: 'Bob', pinned: false, createdAt: '2026-04-20T09:00:00Z', updatedAt: '2026-04-20T09:00:00Z' },
+    ]);
     renderPage();
 
     await waitFor(() => {
@@ -969,44 +960,33 @@ describe('EquipmentDetailPage', () => {
 
     expect(await screen.findByText('Replaced compressor')).toBeInTheDocument();
     expect(screen.getByText('Filter due')).toBeInTheDocument();
-    expect(screen.getByText('Loud rattle on startup')).toBeInTheDocument();
   });
 
-  it('renders an empty Notes tab with the Add note affordance', async () => {
+  it('shows the notes card empty state with an Add affordance', async () => {
     mockGetById.mockResolvedValue(baseEquipment);
-    const user = userEvent.setup();
-    renderPage();
-
-    await waitFor(() => {
-      expect(screen.getByRole('heading', { name: 'Upstairs Furnace' })).toBeInTheDocument();
-    });
-    await user.click(screen.getByRole('tab', { name: /^notes/i }));
-
-    expect(await screen.findByText('Notes (0)')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /add note/i })).toBeInTheDocument();
-  });
-
-  it('renders the Notes tab with the full list and a count badge', async () => {
-    mockGetById.mockResolvedValue(baseEquipment);
-    mockNotesList.mockResolvedValue([
-      { id: 'n-1', body: 'Replaced compressor 2025-08-12', authorUserId: 'u-1', authorName: 'Jane Smith', createdAt: '2026-05-01T12:00:00Z', updatedAt: '2026-05-01T12:00:00Z' },
-      { id: 'n-2', body: 'Filter due in May', authorUserId: 'u-2', authorName: 'Bob', createdAt: '2026-04-20T09:00:00Z', updatedAt: '2026-04-20T09:00:00Z' },
-    ]);
-    const user = userEvent.setup();
+    mockNotesList.mockResolvedValue([]);
     renderPage();
 
     await waitFor(() => {
       expect(screen.getByRole('heading', { name: 'Upstairs Furnace' })).toBeInTheDocument();
     });
 
-    const notesTab = await screen.findByRole('tab', { name: /^notes\s*2$/i });
-    await user.click(notesTab);
+    // No sub-units here, so the only "+ Add" is the notes card's.
+    expect(await screen.findByText(/no notes yet/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^\+ add$/i })).toBeInTheDocument();
+  });
+
+  it('opens the note composer from the notes card', async () => {
+    mockGetById.mockResolvedValue(baseEquipment);
+    mockNotesList.mockResolvedValue([]);
+    const user = userEvent.setup();
+    renderPage();
 
     await waitFor(() => {
-      expect(screen.getByText('Notes (2)')).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: 'Upstairs Furnace' })).toBeInTheDocument();
     });
-    expect(screen.getByText('Replaced compressor 2025-08-12')).toBeInTheDocument();
-    expect(screen.getByText('Filter due in May')).toBeInTheDocument();
+    await user.click(await screen.findByRole('button', { name: /^\+ add$/i }));
+    expect(await screen.findByRole('dialog')).toBeInTheDocument();
   });
 
   it('surfaces a toast and stays in edit mode when PATCH fails', async () => {
@@ -1187,8 +1167,9 @@ describe('EquipmentDetailPage', () => {
     await waitFor(() => {
       expect(screen.getByText('Units')).toBeInTheDocument();
     });
-    // The Units card's "+ Add" action (distinct from the Notes "Add note" button).
-    await user.click(screen.getByRole('button', { name: /^\+ add$/i }));
+    // Both Units and Notes cards expose a "+ Add"; Units sits first in the left
+    // column, so its action is the first match.
+    await user.click((await screen.findAllByRole('button', { name: /^\+ add$/i }))[0]);
     expect(await screen.findByRole('dialog')).toBeInTheDocument();
   });
 

@@ -22,17 +22,14 @@ import {
   equipmentFiltersApi,
   equipmentFilesApi,
   equipmentImagesApi,
-  equipmentNotesApi,
   tenantFilterSizesApi,
   EquipmentStatus,
   EQUIPMENT_IMAGE_MAX_PER_EQUIPMENT,
   type EquipmentFilter,
   type EquipmentImage,
   type EquipmentSummary,
-  type ProgressCategory,
   type TenantFilterSize,
   type UpdateEquipmentRequest,
-  type WorkOrderSummary,
 } from '../api';
 import { workOrdersListQueryOptions } from '../api/workOrdersListQuery';
 import { useGlossary } from '../contexts/GlossaryContext';
@@ -54,6 +51,7 @@ import {
 import { Pill } from '../components/ui/Pill';
 import { Tabs } from '../components/ui/Tabs';
 import { Callout } from '../components/ui/Callout';
+import { DenseTable, DenseTHead, DenseRow } from '../components/ui/DenseTable';
 import IconButton from '../components/IconButton';
 import ConfirmDialog from '../components/ConfirmDialog';
 import EditableField from '../components/EditableField';
@@ -61,10 +59,10 @@ import EquipmentThumbnail from '../components/EquipmentThumbnail';
 import EquipmentFilterFormDialog from '../components/EquipmentFilterFormDialog';
 import EquipmentFormDialog from '../components/EquipmentFormDialog';
 import EquipmentImageUploadDialog from '../components/EquipmentImageUploadDialog';
-import EquipmentNotesSection from '../components/EquipmentNotesSection';
+import EquipmentNotesCard from '../components/EquipmentNotesCard';
+import EquipmentServiceHistoryTab from '../components/EquipmentServiceHistoryTab';
 import EquipmentVideosSection from '../components/EquipmentVideosSection';
 import EquipmentPhotoLightbox from '../components/EquipmentPhotoLightbox';
-import WorkOrdersList from '../components/WorkOrdersList';
 import WorkOrderFormDialog from '../components/WorkOrderFormDialog';
 // Card title + quiet "View all" affordance — reused from the customer-detail
 // chrome so equipment cards match the other redesigned detail pages exactly.
@@ -83,33 +81,14 @@ import {
 } from '@heroicons/react/24/outline';
 import { PlayIcon } from '@heroicons/react/24/solid';
 
-// Photos + Videos share one Media tab; the rest fold into overview cards.
-type TabId = 'overview' | 'service-history' | 'media' | 'notes';
-const EQUIPMENT_TABS: readonly TabId[] = ['overview', 'service-history', 'media', 'notes'];
+// Overview · Service history · Media. Notes/Filters/Units fold into overview
+// cards; an Activity tab is pending an equipment-scoped activity API.
+type TabId = 'overview' | 'service-history' | 'media';
+const EQUIPMENT_TABS: readonly TabId[] = ['overview', 'service-history', 'media'];
 
 // Above this many tenant filter sizes the quick-add palette collapses to the
 // top N by sortOrder with a "Show all" toggle — keeps the Filters card tight.
 const FILTER_SIZE_CHIP_COLLAPSED = 8;
-
-// WO progress → Pill tone (replaces the Catalyst Badge color map). Mirrors the
-// sky/blue/amber/lime intent of WorkOrdersList in the design-system tones.
-const PROGRESS_PILL: Record<ProgressCategory, 'neutral' | 'info' | 'accent' | 'warning' | 'success'> = {
-  NOT_STARTED: 'neutral',
-  AWAITING_SCHEDULE: 'info',
-  IN_PROGRESS: 'accent',
-  BLOCKED: 'warning',
-  COMPLETED: 'success',
-  CANCELLED: 'neutral',
-};
-
-const PROGRESS_TRANSLATION_KEYS: Record<ProgressCategory, string> = {
-  NOT_STARTED: 'notStarted',
-  AWAITING_SCHEDULE: 'awaitingSchedule',
-  IN_PROGRESS: 'inProgress',
-  BLOCKED: 'blocked',
-  COMPLETED: 'completed',
-  CANCELLED: 'cancelled',
-};
 
 // Date-only display for editable lifecycle fields (install / warranty expiry).
 function formatDate(iso: string | null | undefined): string {
@@ -226,14 +205,6 @@ export default function EquipmentDetailPage() {
     enabled: !!id,
   });
   const videos = (videosData?.content ?? []).filter((f) => f.status !== 'FAILED');
-
-  // Full notes list — backs the Notes tab (the "show all" target until the
-  // shared notes drawer lands). The overview card reads equipment.recentNotes.
-  const { data: allNotes = [] } = useQuery({
-    queryKey: ['equipment-notes', id],
-    queryFn: () => equipmentNotesApi.list(id!),
-    enabled: !!id,
-  });
 
   // Service history — WOs touching this unit. Shared cache with the rendered
   // WorkOrdersList so the peek, the tab count, and the live "Open work order"
@@ -387,7 +358,6 @@ export default function EquipmentDetailPage() {
     { id: 'overview', label: t('equipment.tabs.overview') },
     { id: 'service-history', label: t('equipment.tabs.serviceHistory'), count: serviceHistoryData?.totalElements ?? 0 },
     { id: 'media', label: t('equipment.tabs.media'), count: totalMedia },
-    { id: 'notes', label: t('equipment.tabs.notes'), count: allNotes.length },
   ];
 
   // ── Header meta line (render only populated items) ──
@@ -591,13 +561,16 @@ export default function EquipmentDetailPage() {
             <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1fr_340px]">
               {/* Left (wide) */}
               <div className="flex flex-col gap-3">
-                {/* Service history peek */}
+                {/* Service history peek — the 3 most recent visits; full table
+                    (with filters + paging) lives on the Service history tab. */}
                 <Card
-                  title={<CardTitle icon={<WrenchScrewdriverIcon className="size-3.5" />}>{t('common.recentEntities', { entities: getName('work_order', true) })}</CardTitle>}
+                  title={<CardTitle icon={<WrenchScrewdriverIcon className="size-3.5" />}>Service history</CardTitle>}
                   subtitle={equipment.lastServicedAt ? `Last serviced ${formatTimestamp(equipment.lastServicedAt)}` : undefined}
                   action={
                     (serviceHistoryData?.totalElements ?? 0) > 0 ? (
-                      <CardLink onClick={() => setActiveTab('service-history')}>{t('common.viewAll')}</CardLink>
+                      <CardLink onClick={() => setActiveTab('service-history')}>
+                        {t('common.viewAll')} {serviceHistoryData?.totalElements}
+                      </CardLink>
                     ) : undefined
                   }
                   padding="none"
@@ -607,11 +580,55 @@ export default function EquipmentDetailPage() {
                       {t('common.actions.noEntitiesYet', { entities: getName('work_order', true) })}
                     </div>
                   ) : (
-                    <ul className="divide-y divide-border-soft">
-                      {recentWorkOrders.map((wo) => (
-                        <ServiceHistoryRow key={wo.id} wo={wo} t={t} />
-                      ))}
-                    </ul>
+                    <div className="overflow-x-auto">
+                      <DenseTable>
+                        <DenseTHead>
+                          <tr>
+                            <th>Date</th>
+                            <th>Work order</th>
+                            <th>What was done</th>
+                            <th>Tech</th>
+                            <th className="right">Hours</th>
+                          </tr>
+                        </DenseTHead>
+                        <tbody>
+                          {recentWorkOrders.map((wo) => {
+                            const dateIso = wo.scheduledDate ?? wo.completedDate ?? wo.createdAt;
+                            const woNumber = wo.workOrderNumber ?? `#${wo.id.slice(0, 8)}`;
+                            const firstItem = wo.workItems[0];
+                            const extra = wo.workItemCount - 1;
+                            const techs = wo.assignedUsers ?? [];
+                            const live =
+                              wo.progressCategory === 'IN_PROGRESS' && wo.lifecycleState !== 'CANCELLED';
+                            return (
+                              <DenseRow
+                                key={wo.id}
+                                className={`cursor-pointer ${live ? 'bg-[color-mix(in_oklch,var(--info-500)_6%,var(--bg-elev))]' : ''}`}
+                                onClick={() => navigate(`/work-orders/${wo.id}`)}
+                              >
+                                <td className="whitespace-nowrap text-[11.5px] text-fg-muted">{formatTimestamp(dateIso)}</td>
+                                <td className="font-mono text-[11.5px] text-fg-accent">{woNumber}</td>
+                                <td>
+                                  <span className="text-[12px] text-fg">{firstItem?.description ?? '—'}</span>
+                                  {extra > 0 && <span className="ml-1 text-[11px] text-fg-dim">+{extra} more</span>}
+                                </td>
+                                <td className="text-[12px] text-fg">
+                                  {techs.length > 0 ? (
+                                    <>
+                                      {techs[0].name ?? 'Unassigned'}
+                                      {techs.length > 1 && <span className="text-fg-dim"> +{techs.length - 1}</span>}
+                                    </>
+                                  ) : (
+                                    <span className="text-fg-dim">—</span>
+                                  )}
+                                </td>
+                                <td className="right font-mono text-[12px] tabular-nums text-fg-dim">—</td>
+                              </DenseRow>
+                            );
+                          })}
+                        </tbody>
+                      </DenseTable>
+                    </div>
                   )}
                 </Card>
 
@@ -678,20 +695,8 @@ export default function EquipmentDetailPage() {
                   )}
                 </Card>
 
-                {/* Notes — capped card (composer + recent). EquipmentNotesSection
-                    brings its own "Notes (N)" heading + composer + "+N more"
-                    overflow, so the card carries no title of its own. Full list
-                    on the Notes tab. */}
-                <Card padding="none">
-                  <div className="px-3.5 py-3">
-                    <EquipmentNotesSection
-                      equipmentId={id!}
-                      recentNotes={equipment.recentNotes ?? []}
-                      noteCount={equipment.noteCount ?? 0}
-                      bare
-                    />
-                  </div>
-                </Card>
+                {/* Notes — same shape + UX as the customer/location notes cards. */}
+                <EquipmentNotesCard equipmentId={id!} />
 
                 {/* Description — conditional; inline-editable textarea. */}
                 {hasDescription && (
@@ -904,7 +909,10 @@ export default function EquipmentDetailPage() {
                             key={s.id}
                             type="button"
                             onClick={() => openCreateFromSize(s)}
-                            className="rounded-full border border-dashed border-border-strong px-2 py-0.5 font-mono text-[11px] font-semibold text-fg-accent hover:bg-bg-elev-2"
+                            // Inline font-size — a bare <button> otherwise picks up the
+                            // 13px global, overriding Tailwind's text-[11px].
+                            style={{ fontSize: '11px' }}
+                            className="rounded-full border border-dashed border-border-strong px-2 py-0.5 font-mono font-semibold text-fg-accent hover:bg-bg-elev-2"
                           >
                             + {formatFilterSize(s)}
                           </button>
@@ -923,7 +931,8 @@ export default function EquipmentDetailPage() {
                         <button
                           type="button"
                           onClick={openCreateFilter}
-                          className="rounded-full border border-border px-2 py-0.5 text-[11px] font-medium text-fg-muted hover:text-fg-strong"
+                          style={{ fontSize: '11px' }}
+                          className="rounded-full border border-border px-2 py-0.5 font-medium text-fg-muted hover:text-fg-strong"
                         >
                           Custom…
                         </button>
@@ -936,7 +945,7 @@ export default function EquipmentDetailPage() {
           )}
 
           {/* ── Service history tab ── */}
-          {activeTab === 'service-history' && id && <WorkOrdersList equipmentId={id} />}
+          {activeTab === 'service-history' && id && <EquipmentServiceHistoryTab equipmentId={id} />}
 
           {/* ── Media tab ── photos + videos together */}
           {activeTab === 'media' && (
@@ -1068,16 +1077,6 @@ export default function EquipmentDetailPage() {
             </div>
           )}
 
-          {/* ── Notes tab ── (show-all target until the shared notes drawer lands) */}
-          {activeTab === 'notes' && (
-            <EquipmentNotesSection
-              equipmentId={id!}
-              recentNotes={allNotes}
-              noteCount={allNotes.length}
-              bare
-            />
-          )}
-
           {/* Destructive footer — retire (not delete); preserves all records. */}
           <div className="mt-3.5">
             <Callout
@@ -1168,35 +1167,6 @@ export default function EquipmentDetailPage() {
 }
 
 // ── Sub-components ──
-
-/** One row in the Overview service-history peek: date · WO# · status · summary. */
-function ServiceHistoryRow({ wo, t }: { wo: WorkOrderSummary; t: (k: string, o?: Record<string, unknown>) => string }) {
-  const dateIso = wo.scheduledDate ?? wo.completedDate ?? wo.createdAt;
-  const woNumber = wo.workOrderNumber ?? `#${wo.id.slice(0, 8)}`;
-  const firstItem = wo.workItems[0];
-  const extraItems = wo.workItemCount - 1;
-  return (
-    <li>
-      <RouterLink to={`/work-orders/${wo.id}`} className="block px-3.5 py-2 hover:bg-bg-elev-2">
-        <div className="flex items-center gap-2 text-[12.5px]">
-          <span className="whitespace-nowrap text-[11px] text-fg-muted">{formatTimestamp(dateIso)}</span>
-          <span className="font-medium text-fg-strong">{woNumber}</span>
-          <Pill tone={PROGRESS_PILL[wo.progressCategory]} dot inline>
-            {t(`workOrders.progress.${PROGRESS_TRANSLATION_KEYS[wo.progressCategory]}`)}
-          </Pill>
-        </div>
-        {firstItem && (
-          <div className="mt-0.5 truncate text-[11px] text-fg-muted">
-            {firstItem.description}
-            {extraItems > 0 && (
-              <span className="ml-1 text-fg-dim">{t('workOrders.table.workItemsMore', { count: extraItems })}</span>
-            )}
-          </div>
-        )}
-      </RouterLink>
-    </li>
-  );
-}
 
 /** One row in the Units card: a direct sub-unit, linking to its detail page. */
 function UnitRow({ unit }: { unit: EquipmentSummary }) {
