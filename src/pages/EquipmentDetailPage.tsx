@@ -411,9 +411,12 @@ export default function EquipmentDetailPage() {
       `${serviceLocation.address.streetAddress}, ${serviceLocation.address.city}`
     : getName('service_location');
 
-  const filterChips = showAllFilterSizes
-    ? activeFilterSizes
-    : activeFilterSizes.slice(0, FILTER_SIZE_CHIP_COLLAPSED);
+  // Quick-add suggestions = tenant common sizes this unit doesn't already take.
+  const assignedSizes = new Set(filters.map((f) => formatFilterSize(f)));
+  const quickAddCandidates = activeFilterSizes.filter((s) => !assignedSizes.has(formatFilterSize(s)));
+  const quickAddChips = showAllFilterSizes
+    ? quickAddCandidates
+    : quickAddCandidates.slice(0, FILTER_SIZE_CHIP_COLLAPSED);
 
   const openCreateFilter = () => {
     setEditingFilter(null);
@@ -722,8 +725,14 @@ export default function EquipmentDetailPage() {
                         .join(', ')}
                     </div>
                   )}
-                  <div className="mt-2.5 rounded-[8px] bg-bg-elev-2 px-2.5 py-2">
-                    <div className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-fg-muted">
+                  <div
+                    className="mt-2.5 rounded-[8px] border px-2.5 py-2"
+                    style={{
+                      background: 'color-mix(in oklch, var(--accent-500) 8%, var(--bg-elev))',
+                      borderColor: 'color-mix(in oklch, var(--accent-500) 22%, var(--border))',
+                    }}
+                  >
+                    <div className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-fg-accent">
                       {t('equipment.form.locationOnSite')}
                     </div>
                     <div className="mt-0.5 text-[12.5px] text-fg-strong">
@@ -791,10 +800,20 @@ export default function EquipmentDetailPage() {
                     </FieldRow>
                   </FieldGrid>
 
-                  {/* Warranty — money-decision sub-block; always shown. */}
-                  <div className="mt-3 rounded-[8px] bg-bg-elev-2 p-2.5">
+                  {/* Warranty — money-decision sub-block; success-tinted when active. */}
+                  <div
+                    className="mt-3 rounded-[8px] p-2.5"
+                    style={{
+                      background: underWarranty
+                        ? 'color-mix(in oklch, var(--success-500) 7%, var(--bg-elev))'
+                        : 'var(--bg-elev-2)',
+                    }}
+                  >
                     <div className="flex items-center justify-between gap-2">
-                      <span className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-fg-muted">
+                      <span
+                        className="text-[10.5px] font-semibold uppercase tracking-[0.08em]"
+                        style={{ color: underWarranty ? 'var(--success-600, var(--success-500))' : 'var(--fg-muted)' }}
+                      >
                         Warranty
                       </span>
                       {hasWarranty && (
@@ -823,54 +842,32 @@ export default function EquipmentDetailPage() {
                   </div>
                 </Card>
 
-                {/* Filters — sizes this unit takes; quick-add from tenant sizes. */}
+                {/* Filters — the sizes this unit actually takes render as rows on
+                    top; "Quick add" below offers the tenant's common sizes (those
+                    not already assigned) as 1-click dashed chips + a custom entry. */}
                 {showFiltersCard && (
                   <Card
                     title={<CardTitle icon={<FunnelIcon className="size-3.5" />}>{t('equipment.tabs.filters')}</CardTitle>}
-                    action={<CardLink onClick={openCreateFilter}>+ {t('equipment.filters.addFilter')}</CardLink>}
                     padding="none"
                   >
-                    {activeFilterSizes.length > 0 && (
-                      <div className="flex flex-wrap items-center gap-1.5 border-b border-border-soft px-3.5 py-2.5">
-                        {filterChips.map((s) => (
-                          <button
-                            key={s.id}
-                            type="button"
-                            onClick={() => openCreateFromSize(s)}
-                            className="rounded-full border border-dashed border-border px-2 py-0.5 text-[11px] font-medium text-fg-muted hover:border-fg-dim hover:text-fg-strong"
-                          >
-                            {formatFilterSize(s)}
-                          </button>
-                        ))}
-                        {activeFilterSizes.length > FILTER_SIZE_CHIP_COLLAPSED && (
-                          <button
-                            type="button"
-                            onClick={() => setShowAllFilterSizes((v) => !v)}
-                            className="card-action"
-                          >
-                            {showAllFilterSizes
-                              ? t('equipment.filters.showFewer')
-                              : t('equipment.filters.showAll', { count: activeFilterSizes.length })}
-                          </button>
-                        )}
-                      </div>
-                    )}
                     {filtersLoading ? (
                       <div className="px-3.5 py-5 text-center text-[12px] text-fg-muted">
                         {t('equipment.filters.loading')}
                       </div>
-                    ) : filters.length === 0 ? (
-                      <div className="px-3.5 py-5 text-center text-[12px] text-fg-muted">
-                        {t('equipment.filters.empty')}
-                      </div>
-                    ) : (
+                    ) : filters.length > 0 ? (
                       <ul className="divide-y divide-border-soft">
                         {filters.map((f) => (
                           <li key={f.id} className="flex items-center gap-2 px-3.5 py-2">
-                            <span className="font-mono text-[12.5px] text-fg-strong">{formatFilterSize(f)}</span>
+                            <span className="font-mono text-[12.5px] font-bold text-fg-strong">{formatFilterSize(f)}</span>
                             {f.quantity > 1 && <span className="text-[11px] text-fg-muted">×{f.quantity}</span>}
                             {f.label && <span className="truncate text-[11px] text-fg-muted">{f.label}</span>}
-                            <div className="ml-auto -my-1.5">
+                            <span className="ml-auto" />
+                            {f.updatedAt && (
+                              <span className="whitespace-nowrap text-[10.5px] text-fg-dim">
+                                changed {formatTimestamp(f.updatedAt)}
+                              </span>
+                            )}
+                            <div className="-my-1.5">
                               <Dropdown>
                                 <DropdownButton as={IconButton} aria-label={t('common.moreOptions')}>
                                   <EllipsisVerticalIcon className="size-4" />
@@ -888,7 +885,48 @@ export default function EquipmentDetailPage() {
                           </li>
                         ))}
                       </ul>
+                    ) : (
+                      <div className="border-b border-border-soft px-3.5 pt-3 pb-1 text-[12px] text-fg-muted">
+                        {t('equipment.filters.empty')}
+                      </div>
                     )}
+
+                    {/* Quick add */}
+                    <div className="px-3.5 py-2.5">
+                      <div className="mb-1.5 text-[10.5px] font-semibold uppercase tracking-[0.08em] text-fg-muted">
+                        Quick add
+                      </div>
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        {quickAddChips.map((s) => (
+                          <button
+                            key={s.id}
+                            type="button"
+                            onClick={() => openCreateFromSize(s)}
+                            className="rounded-full border border-dashed border-border-strong px-2 py-0.5 font-mono text-[11px] font-semibold text-fg-accent hover:bg-bg-elev-2"
+                          >
+                            + {formatFilterSize(s)}
+                          </button>
+                        ))}
+                        {quickAddCandidates.length > FILTER_SIZE_CHIP_COLLAPSED && (
+                          <button
+                            type="button"
+                            onClick={() => setShowAllFilterSizes((v) => !v)}
+                            className="card-action"
+                          >
+                            {showAllFilterSizes
+                              ? t('equipment.filters.showFewer')
+                              : t('equipment.filters.showAll', { count: quickAddCandidates.length })}
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={openCreateFilter}
+                          className="rounded-full border border-border px-2 py-0.5 text-[11px] font-medium text-fg-muted hover:text-fg-strong"
+                        >
+                          Custom…
+                        </button>
+                      </div>
+                    </div>
                   </Card>
                 )}
               </div>

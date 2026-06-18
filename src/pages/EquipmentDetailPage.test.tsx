@@ -403,8 +403,8 @@ describe('EquipmentDetailPage', () => {
     });
     expect(screen.getByText('Filters')).toBeInTheDocument();
     expect(await screen.findByText(/no filters added yet/i)).toBeInTheDocument();
-    // Quick-add chip is rendered for the tenant size.
-    expect(screen.getByRole('button', { name: '16×20×1' })).toBeInTheDocument();
+    // Quick-add chip is rendered for the tenant size ("+ " prefix → substring match).
+    expect(screen.getByRole('button', { name: /16×20×1/ })).toBeInTheDocument();
   });
 
   it('renders the filter list in the Filters card', async () => {
@@ -420,6 +420,30 @@ describe('EquipmentDetailPage', () => {
 
     expect(await screen.findByText('20×25×1')).toBeInTheDocument();
     expect(screen.getByText('Return air')).toBeInTheDocument();
+  });
+
+  it('excludes already-assigned sizes from the quick-add chips and shows note + changed date', async () => {
+    mockGetById.mockResolvedValue(baseEquipment);
+    mockFiltersGetAll.mockResolvedValue([
+      { id: 'f-1', equipmentId: 'eq-1', lengthIn: 16, widthIn: 20, thicknessIn: 1, quantity: 2, label: 'MERV 11', updatedAt: '2026-05-01T12:00:00Z' },
+    ]);
+    mockFilterSizesGetAll.mockResolvedValue([
+      { id: 's-1', tenantId: 't', lengthIn: 16, widthIn: 20, thicknessIn: 1, sortOrder: 0, archivedAt: null, createdAt: '' }, // already assigned
+      { id: 's-2', tenantId: 't', lengthIn: 20, widthIn: 25, thicknessIn: 1, sortOrder: 1, archivedAt: null, createdAt: '' }, // suggestable
+    ]);
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Upstairs Furnace' })).toBeInTheDocument();
+    });
+
+    // Assigned row: size (no "+" prefix) + note + a "changed …" stamp.
+    expect(await screen.findByText('16×20×1')).toBeInTheDocument();
+    expect(screen.getByText('MERV 11')).toBeInTheDocument();
+    expect(screen.getByText(/changed/i)).toBeInTheDocument();
+    // Quick add suggests the unassigned size but not the already-assigned one.
+    expect(screen.getByRole('button', { name: /20×25×1/ })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /\+ 16×20×1/ })).not.toBeInTheDocument();
   });
 
   it('collapses the chip palette to 8 entries with a show-all toggle when there are more', async () => {
@@ -444,18 +468,19 @@ describe('EquipmentDetailPage', () => {
     );
 
     // Default view: 8 chips visible (index 0), 9th+ hidden until toggled.
-    await waitFor(() => expect(screen.getByText('10×20×1')).toBeInTheDocument());
-    expect(screen.queryByText('18×20×1')).not.toBeInTheDocument(); // index 8
-    expect(screen.queryByText('21×20×1')).not.toBeInTheDocument(); // index 11
+    // Chips carry a "+ " prefix, so match the size as a substring.
+    await waitFor(() => expect(screen.getByText(/10×20×1/)).toBeInTheDocument());
+    expect(screen.queryByText(/18×20×1/)).not.toBeInTheDocument(); // index 8
+    expect(screen.queryByText(/21×20×1/)).not.toBeInTheDocument(); // index 11
 
     // Click Show all → all 12 chips visible.
     await user.click(screen.getByRole('button', { name: /show all \(12\)/i }));
-    expect(screen.getByText('18×20×1')).toBeInTheDocument();
-    expect(screen.getByText('21×20×1')).toBeInTheDocument();
+    expect(screen.getByText(/18×20×1/)).toBeInTheDocument();
+    expect(screen.getByText(/21×20×1/)).toBeInTheDocument();
 
     // Show fewer collapses back to 8.
     await user.click(screen.getByRole('button', { name: /show fewer/i }));
-    expect(screen.queryByText('18×20×1')).not.toBeInTheDocument();
+    expect(screen.queryByText(/18×20×1/)).not.toBeInTheDocument();
   });
 
   it('renders quick-add chips and pre-fills dimensions when one is clicked', async () => {
@@ -470,7 +495,7 @@ describe('EquipmentDetailPage', () => {
       expect(screen.getByRole('heading', { name: 'Upstairs Furnace' })).toBeInTheDocument();
     });
 
-    const chip = await screen.findByRole('button', { name: '16×20×1' });
+    const chip = await screen.findByRole('button', { name: /16×20×1/ });
     await user.click(chip);
 
     // Dialog opens with dimensions pre-filled.
@@ -628,7 +653,7 @@ describe('EquipmentDetailPage', () => {
     });
   });
 
-  it('opens the Add Filter dialog from the Add Filter action', async () => {
+  it('opens the Add Filter dialog (empty) from the Custom… chip', async () => {
     mockGetById.mockResolvedValue(baseEquipment);
     // A tenant size makes the Filters card render even with no filters yet.
     mockFilterSizesGetAll.mockResolvedValue([
@@ -640,7 +665,7 @@ describe('EquipmentDetailPage', () => {
     await waitFor(() => {
       expect(screen.getByRole('heading', { name: 'Upstairs Furnace' })).toBeInTheDocument();
     });
-    await user.click(await screen.findByRole('button', { name: /add filter/i }));
+    await user.click(await screen.findByRole('button', { name: /custom/i }));
 
     const dialog = await screen.findByRole('dialog');
     expect(dialog).toBeInTheDocument();
