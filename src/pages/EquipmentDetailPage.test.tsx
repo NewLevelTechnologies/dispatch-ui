@@ -1028,4 +1028,92 @@ describe('EquipmentDetailPage', () => {
     });
     confirmSpy.mockRestore();
   });
+
+  it('edits a photo caption from the row menu', async () => {
+    mockGetById.mockResolvedValue(baseEquipment);
+    mockImagesList.mockResolvedValue([
+      {
+        id: 'img-1',
+        url: 'https://cdn.example.com/full-1.jpg',
+        thumbnailUrl: 'https://cdn.example.com/thumb-1.jpg',
+        contentType: 'image/jpeg',
+        sizeBytes: 100,
+        widthPx: 800,
+        heightPx: 600,
+        isProfile: false,
+        sortOrder: 0,
+        caption: 'Old caption',
+        uploadedBy: null,
+        uploadedByName: null,
+        createdAt: '',
+      },
+    ]);
+    mockImagePatch.mockResolvedValue({});
+    const promptSpy = vi.spyOn(window, 'prompt').mockReturnValue('Nameplate');
+    const user = userEvent.setup();
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Upstairs Furnace' })).toBeInTheDocument();
+    });
+    await user.click(screen.getByRole('tab', { name: /^photos/i }));
+
+    const moreButtons = await screen.findAllByRole('button', { name: /more options/i });
+    await user.click(moreButtons[1]);
+    await user.click(await screen.findByRole('menuitem', { name: /caption/i }));
+
+    await waitFor(() => {
+      expect(mockImagePatch).toHaveBeenCalledWith('eq-1', 'img-1', { caption: 'Nameplate' });
+    });
+    promptSpy.mockRestore();
+  });
+
+  it('opens the add sub-unit dialog from the Units card', async () => {
+    mockGetById.mockResolvedValue(baseEquipment);
+    mockGetDescendants.mockResolvedValue([
+      { id: 'comp-1', name: 'Compressor', parentId: 'eq-1', equipmentTypeName: null, equipmentCategoryName: null, make: null, model: null, serialNumber: null, locationOnSite: null },
+    ]);
+    const user = userEvent.setup();
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByText('Units')).toBeInTheDocument();
+    });
+    // The Units card's "+ Add" action (distinct from the Notes "Add note" button).
+    await user.click(screen.getByRole('button', { name: /^\+ add$/i }));
+    expect(await screen.findByRole('dialog')).toBeInTheDocument();
+  });
+
+  it('opens the new work order dialog from the header', async () => {
+    mockGetById.mockResolvedValue(baseEquipment);
+    const user = userEvent.setup();
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Upstairs Furnace' })).toBeInTheDocument();
+    });
+    await user.click(screen.getByRole('button', { name: /new work order/i }));
+    expect(await screen.findByRole('dialog')).toBeInTheDocument();
+  });
+
+  it('reactivates a retired unit from the footer', async () => {
+    mockGetById.mockResolvedValue({ ...baseEquipment, status: 'RETIRED' });
+    mockUpdate.mockResolvedValue({ ...baseEquipment, status: 'ACTIVE' });
+    const user = userEvent.setup();
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Upstairs Furnace' })).toBeInTheDocument();
+    });
+    // Retired units carry a status pill in the header.
+    expect(screen.getByText('Retired')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /^reactivate$/i }));
+    const dialog = await screen.findByRole('dialog');
+    await user.click(within(dialog).getByRole('button', { name: /^reactivate$/i }));
+
+    await waitFor(() => {
+      expect(mockUpdate).toHaveBeenCalledWith('eq-1', { status: 'ACTIVE' });
+    });
+  });
 });
