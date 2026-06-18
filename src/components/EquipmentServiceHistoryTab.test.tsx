@@ -4,12 +4,21 @@ import { renderWithProviders, userEvent } from '../test/utils';
 import EquipmentServiceHistoryTab from './EquipmentServiceHistoryTab';
 
 const mockGetAll = vi.fn();
+const mockTypesGetAll = vi.fn();
 
 vi.mock('../api/workOrderApi', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../api/workOrderApi')>();
   return {
     ...actual,
     workOrderApi: { ...actual.workOrderApi, getAll: (...a: unknown[]) => mockGetAll(...a) },
+  };
+});
+
+vi.mock('../api/workOrderConfigApi', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../api/workOrderConfigApi')>();
+  return {
+    ...actual,
+    workOrderTypesApi: { ...actual.workOrderTypesApi, getAll: () => mockTypesGetAll() },
   };
 });
 
@@ -44,6 +53,7 @@ describe('EquipmentServiceHistoryTab', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockGetAll.mockResolvedValue(pageOf([]));
+    mockTypesGetAll.mockResolvedValue([{ id: 't1', name: 'Maintenance', accentId: 'blue' }]);
   });
 
   it('shows the empty state', async () => {
@@ -51,16 +61,26 @@ describe('EquipmentServiceHistoryTab', () => {
     expect(await screen.findByText(/no work orders for this unit/i)).toBeInTheDocument();
   });
 
-  it('renders a row with tech, a "+N more" hint, an hours placeholder, and a status pill', async () => {
-    mockGetAll.mockResolvedValue(pageOf([wo()]));
+  it('renders a row with tech, a "+N more" hint, a resolved type, and a status pill', async () => {
+    mockGetAll.mockResolvedValue(pageOf([wo({ workOrderTypeId: 't1' })]));
     renderWithProviders(<EquipmentServiceHistoryTab equipmentId="eq-1" />);
     expect(await screen.findByText('WO-1')).toBeInTheDocument();
     expect(screen.getByText(/Replaced capacitor/)).toBeInTheDocument();
     expect(screen.getByText(/\+1 more/i)).toBeInTheDocument();
     expect(screen.getByText('Tariq')).toBeInTheDocument();
+    // Type id resolves to its name via the work-order-types query.
+    expect(screen.getByText('Maintenance')).toBeInTheDocument();
     expect(screen.getByText('Completed')).toBeInTheDocument();
     // Backend was scoped by equipment.
     expect(mockGetAll.mock.calls.some(([a]) => a?.equipmentId === 'eq-1')).toBe(true);
+  });
+
+  it('shows a dash in the Type column when the work order has no type', async () => {
+    mockGetAll.mockResolvedValue(pageOf([wo({ workOrderTypeId: null })]));
+    renderWithProviders(<EquipmentServiceHistoryTab equipmentId="eq-1" />);
+    expect(await screen.findByText('WO-1')).toBeInTheDocument();
+    // No matching type → no colored pill (the em-dash placeholder renders instead).
+    expect(screen.queryByText('Maintenance')).not.toBeInTheDocument();
   });
 
   it('feeds the search text into the query', async () => {

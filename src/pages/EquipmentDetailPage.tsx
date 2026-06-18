@@ -23,6 +23,7 @@ import {
   equipmentFilesApi,
   equipmentImagesApi,
   tenantFilterSizesApi,
+  workOrderTypesApi,
   EquipmentStatus,
   type EquipmentFilter,
   type EquipmentImage,
@@ -52,6 +53,7 @@ import { Tabs } from '../components/ui/Tabs';
 import { Callout } from '../components/ui/Callout';
 import { DenseTable, DenseTHead, DenseRow } from '../components/ui/DenseTable';
 import { AssignedUsersCell } from '../components/ui/AssignedUsersCell';
+import { WorkOrderTypePill } from '../components/ui/WorkOrderTypePill';
 import IconButton from '../components/IconButton';
 import ConfirmDialog from '../components/ConfirmDialog';
 import EditableField from '../components/EditableField';
@@ -62,7 +64,7 @@ import EquipmentMediaUploadDialog from '../components/EquipmentMediaUploadDialog
 import EquipmentNotesCard from '../components/EquipmentNotesCard';
 import EquipmentServiceHistoryTab from '../components/EquipmentServiceHistoryTab';
 import EquipmentVideosSection from '../components/EquipmentVideosSection';
-import EquipmentPhotoLightbox from '../components/EquipmentPhotoLightbox';
+import EquipmentMediaLightbox, { type MediaLightboxItem } from '../components/EquipmentMediaLightbox';
 import WorkOrderFormDialog from '../components/WorkOrderFormDialog';
 // Card title + quiet "View all" affordance — reused from the customer-detail
 // chrome so equipment cards match the other redesigned detail pages exactly.
@@ -210,6 +212,13 @@ export default function EquipmentDetailPage() {
   // WorkOrdersList so the peek, the tab count, and the live "Open work order"
   // pill all read off one fetch.
   const { data: serviceHistoryData } = useQuery(workOrdersListQueryOptions({ equipmentId: id ?? '' }));
+
+  // Work-order type id → name for the service-history peek's Type column.
+  const { data: woTypesData } = useQuery({
+    queryKey: ['work-order-types'],
+    queryFn: () => workOrderTypesApi.getAll(),
+  });
+  const safeWoTypes = Array.isArray(woTypesData) ? woTypesData : [];
 
   // Sub-units (Units card). Flat array; 2-level hierarchy means these are the
   // direct children. Skipped when this equipment is itself a sub-unit.
@@ -443,21 +452,35 @@ export default function EquipmentDetailPage() {
   // Profile photo leads the Media tab grid + the lightbox order.
   const orderedImages = profilePhoto ? [profilePhoto, ...galleryPhotos] : galleryPhotos;
   const MEDIA_PEEK_MAX = 4;
-  // Peek row = non-profile photos + videos.
+  // One combined gallery (photos then videos) feeds the lightbox so prev/next
+  // crosses every item. `videoIndexOffset` maps a video's position to its slot
+  // after the photos. The page + EquipmentVideosSection share the same
+  // ['equipment-files', id, 'VIDEO'] query, so the two video lists stay aligned.
+  const mediaItems: MediaLightboxItem[] = [
+    ...orderedImages.map((image) => ({ kind: 'image' as const, image })),
+    ...videos.map((video) => ({ kind: 'video' as const, video })),
+  ];
+  const videoIndexOffset = orderedImages.length;
+  // Peek row = non-profile photos + videos. Each tile carries its index into the
+  // combined gallery so a click opens the lightbox at the right item. Gallery
+  // photos follow the profile in `orderedImages`, hence the +1 offset.
+  const galleryIndexOffset = profilePhoto ? 1 : 0;
   const peekItems: MediaPeekItem[] = [
-    ...galleryPhotos.map((p) => ({
+    ...galleryPhotos.map((p, gi) => ({
       id: p.id,
       thumb: p.thumbnailUrl ?? p.url,
       alt: p.caption ?? equipment.name,
       label: p.caption ?? '',
+      mediaIndex: galleryIndexOffset + gi,
     })),
-    ...videos.map((v) => ({
+    ...videos.map((v, vi) => ({
       id: v.id,
       thumb: v.thumbnailUrl,
       alt: v.caption ?? v.fileName,
       label: v.caption ?? v.fileName,
       isVideo: true,
       durationSeconds: v.durationSeconds,
+      mediaIndex: videoIndexOffset + vi,
     })),
   ];
   const peekShown = peekItems.slice(0, MEDIA_PEEK_MAX);
@@ -587,8 +610,8 @@ export default function EquipmentDetailPage() {
                             <th>Date</th>
                             <th>Work order</th>
                             <th>Work</th>
+                            <th>Type</th>
                             <th>Tech</th>
-                            <th className="right">Hours</th>
                           </tr>
                         </DenseTHead>
                         <tbody>
@@ -601,6 +624,7 @@ export default function EquipmentDetailPage() {
                             // tab + SiteWorkOrdersCard lead with (declared on the payload,
                             // not yet on the type → cast, matching those call sites).
                             const aiSummary = (wo as { summary?: string | null }).summary?.trim();
+                            const woType = safeWoTypes.find((tp) => tp.id === wo.workOrderTypeId);
                             const live =
                               wo.progressCategory === 'IN_PROGRESS' && wo.lifecycleState !== 'CANCELLED';
                             return (
@@ -626,10 +650,14 @@ export default function EquipmentDetailPage() {
                                   )}
                                 </td>
                                 <td>
-                                  <AssignedUsersCell users={wo.assignedUsers} />
+                                  {woType ? (
+                                    <WorkOrderTypePill type={woType} />
+                                  ) : (
+                                    <span className="text-[11px] text-fg-dim">—</span>
+                                  )}
                                 </td>
-                                <td className="right">
-                                  <span className="font-mono text-[12px] tabular-nums text-fg-dim">—</span>
+                                <td>
+                                  <AssignedUsersCell users={wo.assignedUsers} />
                                 </td>
                               </DenseRow>
                             );
@@ -665,9 +693,11 @@ export default function EquipmentDetailPage() {
                     <p className="text-[12px] text-fg-muted">No photos or videos yet</p>
                   ) : (
                     <div className="flex gap-1.5 overflow-hidden">
+                      {/* Every tile opens the combined lightbox at its item —
+                          photos and videos arrow together from there. */}
                       {profilePhoto && (
                         <MediaPeekTile
-                          onClick={goToMedia}
+                          onClick={() => setLightboxIndex(0)}
                           thumb={profilePhoto.thumbnailUrl ?? profilePhoto.url}
                           alt={profilePhoto.caption ?? equipment.name}
                           label="Profile"
@@ -677,7 +707,7 @@ export default function EquipmentDetailPage() {
                       {peekShown.map((m, i) => (
                         <MediaPeekTile
                           key={m.id}
-                          onClick={goToMedia}
+                          onClick={() => setLightboxIndex(m.mediaIndex)}
                           thumb={m.thumb}
                           alt={m.alt}
                           label={m.label}
@@ -1062,7 +1092,15 @@ export default function EquipmentDetailPage() {
                     action={<span className="text-[11px] text-fg-dim">{videos.length}</span>}
                     padding="none"
                   >
-                    <div className="p-3">{id && <EquipmentVideosSection equipmentId={id} hideUpload />}</div>
+                    <div className="p-3">
+                      {id && (
+                        <EquipmentVideosSection
+                          equipmentId={id}
+                          hideUpload
+                          onOpenVideo={(i) => setLightboxIndex(videoIndexOffset + i)}
+                        />
+                      )}
+                    </div>
                   </Card>
                 </>
               )}
@@ -1113,9 +1151,9 @@ export default function EquipmentDetailPage() {
         defaultSetProfile={images.length === 0}
       />
 
-      <EquipmentPhotoLightbox
+      <EquipmentMediaLightbox
         equipmentId={id!}
-        images={orderedImages}
+        items={mediaItems}
         startIndex={lightboxIndex}
         onClose={() => setLightboxIndex(null)}
       />
@@ -1191,6 +1229,9 @@ interface MediaPeekItem {
   label: string;
   isVideo?: boolean;
   durationSeconds?: number | null;
+  // Position in the combined media gallery (photos then videos) → opens the
+  // lightbox at this item.
+  mediaIndex: number;
 }
 
 /**

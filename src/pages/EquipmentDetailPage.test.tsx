@@ -29,6 +29,7 @@ const mockGetServiceLocationById = vi.fn();
 const mockCustomerGetById = vi.fn();
 const mockFilesList = vi.fn();
 const mockFilesUpload = vi.fn();
+const mockWoTypesGetAll = vi.fn();
 const mockShowError = vi.fn();
 const mockShowSuccess = vi.fn();
 
@@ -113,6 +114,15 @@ vi.mock('../api/filesApi', async (importOriginal) => {
   };
 });
 
+// Work-order types resolve the service-history peek's Type column.
+vi.mock('../api/workOrderConfigApi', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../api/workOrderConfigApi')>();
+  return {
+    ...actual,
+    workOrderTypesApi: { ...actual.workOrderTypesApi, getAll: () => mockWoTypesGetAll() },
+  };
+});
+
 // Surface helpers are mocked so we can assert error/success toasts; extractApiError
 // stays real so the backend message still flows through to the toast description.
 vi.mock('../lib/toast', async (importOriginal) => {
@@ -166,6 +176,7 @@ describe('EquipmentDetailPage', () => {
       { id: 't-hvac', tenantId: 't', name: 'HVAC', sortOrder: 0, archivedAt: null, createdAt: '', updatedAt: '' },
       { id: 't-refrig', tenantId: 't', name: 'Refrigeration', sortOrder: 1, archivedAt: null, createdAt: '', updatedAt: '' },
     ]);
+    mockWoTypesGetAll.mockResolvedValue([]);
     mockCategoriesGetAll.mockResolvedValue([
       { id: 'c-furnace', tenantId: 't', equipmentTypeId: 't-hvac', name: 'Furnace', sortOrder: 0, archivedAt: null, createdAt: '', updatedAt: '' },
     ]);
@@ -798,6 +809,42 @@ describe('EquipmentDetailPage', () => {
     expect(screen.getByRole('button', { name: /^set as profile$/i })).toBeInTheDocument();
     const thumbs = screen.getAllByRole('img');
     expect(thumbs.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('opens the lightbox in place when an overview Media peek photo is clicked', async () => {
+    mockGetById.mockResolvedValue(baseEquipment);
+    mockImagesList.mockResolvedValue([
+      {
+        id: 'img-1',
+        url: 'https://cdn.example.com/full-1.jpg',
+        thumbnailUrl: 'https://cdn.example.com/thumb-1.jpg',
+        contentType: 'image/jpeg',
+        sizeBytes: 100,
+        widthPx: 800,
+        heightPx: 600,
+        isProfile: true,
+        sortOrder: 0,
+        caption: 'Nameplate',
+        uploadedBy: null,
+        uploadedByName: null,
+        createdAt: '',
+      },
+    ]);
+    const user = userEvent.setup();
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Upstairs Furnace' })).toBeInTheDocument();
+    });
+    // Overview is the default tab; the Media peek shows the profile photo tile.
+    await user.click(await screen.findByRole('button', { name: /nameplate/i }));
+
+    // The lightbox opens here (full-res image) rather than jumping to the Media tab.
+    await waitFor(() => {
+      expect(
+        document.querySelector('img[src="https://cdn.example.com/full-1.jpg"]')
+      ).toBeInTheDocument();
+    });
   });
 
   it('sets a non-profile image as profile by clicking the star toggle', async () => {
