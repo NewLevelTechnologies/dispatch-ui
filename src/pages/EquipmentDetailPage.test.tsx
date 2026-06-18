@@ -877,7 +877,7 @@ describe('EquipmentDetailPage', () => {
     confirmSpy.mockRestore();
   });
 
-  it('opens the upload dialog from the Add Photo button', async () => {
+  it('opens the media upload dialog from the Add media button', async () => {
     mockGetById.mockResolvedValue(baseEquipment);
     const user = userEvent.setup();
     renderPage();
@@ -886,15 +886,16 @@ describe('EquipmentDetailPage', () => {
       expect(screen.getByRole('heading', { name: 'Upstairs Furnace' })).toBeInTheDocument();
     });
     await user.click(screen.getByRole('tab', { name: /^media/i }));
-    // "Add photo" is now an item under the shared "Add media" dropdown.
+    // One "Add media" control — a single drop-zone dialog for photos + videos.
     await user.click(screen.getByRole('button', { name: /add media/i }));
-    await user.click(await screen.findByRole('menuitem', { name: /add photo/i }));
 
-    expect(await screen.findByRole('dialog')).toBeInTheDocument();
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText(/drag photos or videos here/i)).toBeInTheDocument();
   });
 
-  it('uploads a video through the shared Add media control', async () => {
+  it('uploads a video through the Add media dialog', async () => {
     mockGetById.mockResolvedValue(baseEquipment);
+    mockFilesUpload.mockResolvedValue({ id: 'vid-x', kind: 'VIDEO', status: 'READY' });
     const user = userEvent.setup();
     renderPage();
 
@@ -902,13 +903,16 @@ describe('EquipmentDetailPage', () => {
       expect(screen.getByRole('heading', { name: 'Upstairs Furnace' })).toBeInTheDocument();
     });
     await user.click(screen.getByRole('tab', { name: /^media/i }));
+    await user.click(screen.getByRole('button', { name: /add media/i }));
 
-    const fileInput = document.querySelector('input[accept*="video"]') as HTMLInputElement;
+    const dialog = await screen.findByRole('dialog');
+    const fileInput = dialog.querySelector('input[type="file"]') as HTMLInputElement;
     const file = new File(['x'], 'clip.mp4', { type: 'video/mp4' });
     await user.upload(fileInput, file);
+    await user.click(within(dialog).getByRole('button', { name: /^upload$/i }));
 
     await waitFor(() => {
-      expect(mockFilesUpload).toHaveBeenCalledWith('eq-1', file);
+      expect(mockFilesUpload).toHaveBeenCalledWith('eq-1', file, expect.objectContaining({ caption: null }));
     });
   });
 

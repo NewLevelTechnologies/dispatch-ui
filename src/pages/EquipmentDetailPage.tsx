@@ -10,7 +10,7 @@
 // Units / Filters / Notes are CONDITIONAL overview cards, not tabs (HVAC has
 // units + filters; a water heater doesn't). Photos + Videos live together on a
 // single Media tab, with a profile-photo-led media peek on the overview.
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import { useParams, useNavigate, useLocation, Link as RouterLink } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
@@ -24,9 +24,6 @@ import {
   equipmentImagesApi,
   tenantFilterSizesApi,
   EquipmentStatus,
-  EQUIPMENT_IMAGE_MAX_PER_EQUIPMENT,
-  VIDEO_CONTENT_TYPES,
-  VIDEO_MAX_BYTES,
   type EquipmentFilter,
   type EquipmentImage,
   type EquipmentSummary,
@@ -61,7 +58,7 @@ import EditableField from '../components/EditableField';
 import EquipmentThumbnail from '../components/EquipmentThumbnail';
 import EquipmentFilterFormDialog from '../components/EquipmentFilterFormDialog';
 import EquipmentFormDialog from '../components/EquipmentFormDialog';
-import EquipmentImageUploadDialog from '../components/EquipmentImageUploadDialog';
+import EquipmentMediaUploadDialog from '../components/EquipmentMediaUploadDialog';
 import EquipmentNotesCard from '../components/EquipmentNotesCard';
 import EquipmentServiceHistoryTab from '../components/EquipmentServiceHistoryTab';
 import EquipmentVideosSection from '../components/EquipmentVideosSection';
@@ -142,7 +139,7 @@ export default function EquipmentDetailPage() {
   const [prefilledSize, setPrefilledSize] = useState<
     { lengthIn: number; widthIn: number; thicknessIn: number } | null
   >(null);
-  const [isImageUploadOpen, setIsImageUploadOpen] = useState(false);
+  const [isMediaUploadOpen, setIsMediaUploadOpen] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [showAllFilterSizes, setShowAllFilterSizes] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
@@ -258,32 +255,6 @@ export default function EquipmentDetailPage() {
     onSuccess: imageInvalidate,
     onError: (err) => showError(t('equipment.images.errorDelete'), extractApiError(err)),
   });
-
-  // Video upload — driven by the shared "Add media" control. Shares the
-  // equipment-files cache with EquipmentVideosSection so its grid refreshes.
-  const videoInputRef = useRef<HTMLInputElement>(null);
-  const videoUploadMutation = useMutation({
-    mutationFn: (file: File) => equipmentFilesApi.upload(id!, file),
-    onSuccess: (file) => {
-      queryClient.invalidateQueries({ queryKey: ['equipment-files', id] });
-      showSuccess(file.status === 'PROCESSING' ? 'Video uploaded — processing' : 'Video uploaded');
-    },
-    onError: (err) => showError('Upload failed', extractApiError(err)),
-  });
-  const onPickVideo = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    e.target.value = ''; // allow re-picking the same file after an error
-    if (!file) return;
-    if (!(VIDEO_CONTENT_TYPES as readonly string[]).includes(file.type)) {
-      showError('Unsupported file', 'Pick an MP4 or QuickTime (.mov) video.');
-      return;
-    }
-    if (file.size > VIDEO_MAX_BYTES) {
-      showError('Video too large', 'The limit is 100 MB.');
-      return;
-    }
-    videoUploadMutation.mutate(file);
-  };
 
   // Retire / reactivate — flips status, preserving every related record. The
   // destructive-footer action (retire, not delete). Delete stays in the ⋯ menu.
@@ -446,7 +417,6 @@ export default function EquipmentDetailPage() {
   const handleDeleteImage = (img: EquipmentImage) => {
     if (window.confirm(t('equipment.images.deleteConfirm'))) deleteImageMutation.mutate(img.id);
   };
-  const imageLimitReached = images.length >= EQUIPMENT_IMAGE_MAX_PER_EQUIPMENT;
 
   const typeOptions = [
     { value: '', label: t('common.none') },
@@ -971,41 +941,10 @@ export default function EquipmentDetailPage() {
                   {images.length + videos.length} items · {images.length} photos · {videos.length} videos
                 </span>
                 <span className="flex-1" />
-                <input
-                  ref={videoInputRef}
-                  type="file"
-                  accept={VIDEO_CONTENT_TYPES.join(',')}
-                  className="hidden"
-                  onChange={onPickVideo}
-                />
-                <Dropdown>
-                  <DropdownButton as={Button} outline size="xs">
-                    <PlusIcon className="size-4" />
-                    Add media
-                  </DropdownButton>
-                  <DropdownMenu anchor="bottom end">
-                    <DropdownItem
-                      onClick={() => setIsImageUploadOpen(true)}
-                      disabled={imageLimitReached}
-                      title={
-                        imageLimitReached
-                          ? t('equipment.images.limitReached', {
-                              entity: getName('equipment'),
-                              max: EQUIPMENT_IMAGE_MAX_PER_EQUIPMENT,
-                            })
-                          : undefined
-                      }
-                    >
-                      <DropdownLabel>{t('equipment.images.addPhoto')}</DropdownLabel>
-                    </DropdownItem>
-                    <DropdownItem
-                      onClick={() => videoInputRef.current?.click()}
-                      disabled={videoUploadMutation.isPending}
-                    >
-                      <DropdownLabel>{videoUploadMutation.isPending ? 'Uploading…' : 'Add video'}</DropdownLabel>
-                    </DropdownItem>
-                  </DropdownMenu>
-                </Dropdown>
+                <Button outline size="xs" onClick={() => setIsMediaUploadOpen(true)}>
+                  <PlusIcon className="size-4" />
+                  Add media
+                </Button>
               </div>
 
               {imagesError ? (
@@ -1157,9 +1096,9 @@ export default function EquipmentDetailPage() {
         prefilledSize={prefilledSize}
       />
 
-      <EquipmentImageUploadDialog
-        isOpen={isImageUploadOpen}
-        onClose={() => setIsImageUploadOpen(false)}
+      <EquipmentMediaUploadDialog
+        isOpen={isMediaUploadOpen}
+        onClose={() => setIsMediaUploadOpen(false)}
         equipmentId={id!}
         defaultSetProfile={images.length === 0}
       />
