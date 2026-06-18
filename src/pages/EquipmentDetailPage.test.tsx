@@ -788,8 +788,10 @@ describe('EquipmentDetailPage', () => {
     const photosTab = await screen.findByRole('tab', { name: /^media\s*2$/i });
     await user.click(photosTab);
 
-    await waitFor(() => expect(screen.getByText('Nameplate')).toBeInTheDocument());
-    expect(screen.getByRole('button', { name: /^profile$/i })).toBeInTheDocument();
+    // The profile image is called out as the nameplate (label, not a toggle);
+    // the non-profile image keeps a "set as profile" control.
+    await waitFor(() => expect(screen.getAllByText(/nameplate/i).length).toBeGreaterThan(0));
+    expect(screen.queryByRole('button', { name: /^profile$/i })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: /^set as profile$/i })).toBeInTheDocument();
     const thumbs = screen.getAllByRole('img');
     expect(thumbs.length).toBeGreaterThanOrEqual(2);

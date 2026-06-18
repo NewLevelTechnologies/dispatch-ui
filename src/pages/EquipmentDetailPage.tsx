@@ -81,7 +81,7 @@ import {
   VideoCameraIcon,
   WrenchScrewdriverIcon,
 } from '@heroicons/react/24/outline';
-import { PlayIcon, StarIcon as StarIconSolid } from '@heroicons/react/24/solid';
+import { PlayIcon } from '@heroicons/react/24/solid';
 
 // Photos + Videos share one Media tab; the rest fold into overview cards.
 type TabId = 'overview' | 'service-history' | 'media' | 'notes';
@@ -473,6 +473,8 @@ export default function EquipmentDetailPage() {
   // nameplate + a few gallery thumbs (photos and video posters).
   const nameplate = images.find((img) => img.isProfile) ?? null;
   const galleryPhotos = images.filter((img) => !img.isProfile);
+  // Nameplate (the source of truth) leads the Media tab grid + the lightbox order.
+  const orderedImages = nameplate ? [nameplate, ...galleryPhotos] : galleryPhotos;
   const MEDIA_PEEK_MAX = 4;
   const peekItems: MediaPeekItem[] = [
     ...galleryPhotos.map((p) => ({
@@ -974,10 +976,14 @@ export default function EquipmentDetailPage() {
                 </div>
               ) : (
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-                  {images.map((img, i) => (
+                  {orderedImages.map((img, i) => (
                     <div
                       key={img.id}
-                      className="group relative overflow-hidden rounded-lg ring-1 ring-border"
+                      className={`group relative overflow-hidden rounded-lg ring-1 ${
+                        img.isProfile
+                          ? 'ring-[color-mix(in_oklch,var(--accent-500)_45%,var(--border))]'
+                          : 'ring-border'
+                      }`}
                     >
                       <button
                         type="button"
@@ -993,20 +999,25 @@ export default function EquipmentDetailPage() {
                         />
                       </button>
 
-                      <button
-                        type="button"
-                        onClick={() => handleSetProfileImage(img)}
-                        aria-label={img.isProfile ? t('equipment.images.profile') : t('equipment.images.setAsProfile')}
-                        aria-pressed={img.isProfile}
-                        title={img.isProfile ? t('equipment.images.profile') : t('equipment.images.setAsProfile')}
-                        className="absolute left-1 top-1 flex size-8 items-center justify-center rounded-full bg-bg-elev/80 backdrop-blur transition-colors hover:bg-bg-elev"
-                      >
-                        {img.isProfile ? (
-                          <StarIconSolid className="size-5 text-amber-500" />
-                        ) : (
+                      {img.isProfile ? (
+                        // The nameplate is the source of truth — call it out, no set-profile control.
+                        <span
+                          className="absolute left-1 top-1 rounded px-1.5 py-0.5 text-[8.5px] font-bold uppercase tracking-[0.04em] text-white"
+                          style={{ background: 'var(--accent-500)' }}
+                        >
+                          Nameplate
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => handleSetProfileImage(img)}
+                          aria-label={t('equipment.images.setAsProfile')}
+                          title={t('equipment.images.setAsProfile')}
+                          className="absolute left-1 top-1 flex size-8 items-center justify-center rounded-full bg-bg-elev/80 backdrop-blur transition-colors hover:bg-bg-elev"
+                        >
                           <StarIconOutline className="size-5 text-fg-muted hover:text-amber-500" />
-                        )}
-                      </button>
+                        </button>
+                      )}
 
                       <div className="absolute right-1 top-1">
                         <Dropdown>
@@ -1028,9 +1039,17 @@ export default function EquipmentDetailPage() {
                         </Dropdown>
                       </div>
 
-                      {img.caption && (
-                        <div className="border-t border-border bg-bg-elev px-2 py-1.5 text-xs text-fg-muted">
-                          <span className="line-clamp-1">{img.caption}</span>
+                      {/* Caption + by/when */}
+                      {(img.caption || img.uploadedByName || img.createdAt) && (
+                        <div className="border-t border-border bg-bg-elev px-2 py-1">
+                          {img.caption && (
+                            <div className="line-clamp-1 text-[11px] text-fg-strong">{img.caption}</div>
+                          )}
+                          {(img.uploadedByName || img.createdAt) && (
+                            <div className="truncate text-[10px] text-fg-muted">
+                              {[img.uploadedByName, formatTimestamp(img.createdAt)].filter(Boolean).join(' · ')}
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
@@ -1105,7 +1124,7 @@ export default function EquipmentDetailPage() {
 
       <EquipmentPhotoLightbox
         equipmentId={id!}
-        images={images}
+        images={orderedImages}
         startIndex={lightboxIndex}
         onClose={() => setLightboxIndex(null)}
       />
