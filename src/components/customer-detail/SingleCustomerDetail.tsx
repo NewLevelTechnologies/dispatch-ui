@@ -349,7 +349,7 @@ export default function SingleCustomerDetail({ customer }: { customer: Customer 
                   <div className="flex flex-col gap-3">
                     <SiteInstructionsCard location={location} canEdit={canEditCustomers} />
                     <SiteContactCard location={location} canEdit={canEditCustomers} onViewAll={() => setActiveTab('activity')} />
-                    <AccountDetailsCard customer={customer} ar={arSummary} typeLabel="Single-site" canEdit={canEditCustomers} />
+                    <AccountDetailsCard customer={customer} ar={arSummary} canEdit={canEditCustomers} />
                   </div>
                 </div>
               )}

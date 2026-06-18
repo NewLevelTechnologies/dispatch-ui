@@ -192,7 +192,7 @@ export default function PayerDetail({ customer }: { customer: Customer }) {
                   <CustomerNotesCard customerId={customer.id} canEdit={canEditCustomers} />
                 </div>
                 <div className="flex flex-col gap-3">
-                  <AccountDetailsCard customer={customer} ar={arSummary} typeLabel="Payer" canEdit={canEditCustomers} />
+                  <AccountDetailsCard customer={customer} ar={arSummary} canEdit={canEditCustomers} />
                 </div>
               </div>
             </div>

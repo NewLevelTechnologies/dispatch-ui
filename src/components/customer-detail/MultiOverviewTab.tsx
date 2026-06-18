@@ -21,15 +21,14 @@ import {
   UserIcon,
   PhoneIcon,
   EnvelopeIcon,
+  CheckCircleIcon,
 } from '@heroicons/react/24/outline';
 import {
   agreementApi,
   customerApi,
   dispatchRegionApi,
-  equipmentApi,
   invoicesApi,
   userApi,
-  EquipmentStatus,
   type Customer,
   type AgreementSummaryResponse,
   type CustomerArSummaryResponse,
@@ -90,11 +89,6 @@ export default function MultiOverviewTab({
     queryFn: () => agreementApi.list({ customerId: customer.id }),
     enabled: !!customer.id,
   });
-  const { data: equipmentPage } = useQuery({
-    queryKey: ['equipment', { customerId: customer.id }],
-    queryFn: () => equipmentApi.list({ customerId: customer.id, status: EquipmentStatus.ACTIVE, size: 100 }),
-    enabled: !!customer.id,
-  });
   const { data: regions } = useQuery({
     queryKey: ['dispatch-regions'],
     queryFn: () => dispatchRegionApi.getAll(true),
@@ -112,14 +106,6 @@ export default function MultiOverviewTab({
     enabled: !!customer.id,
   });
 
-  const equipByLocation = useMemo(() => {
-    const acc: Record<string, number> = {};
-    for (const e of equipmentPage?.content ?? []) {
-      if (e.serviceLocationId) acc[e.serviceLocationId] = (acc[e.serviceLocationId] ?? 0) + 1;
-    }
-    return acc;
-  }, [equipmentPage]);
-
   const regionMap = useMemo(() => {
     const list = (regions ?? []) as Array<{ id: string; name: string; abbreviation?: string | null }>;
     const m: Record<string, string> = {};
@@ -131,7 +117,7 @@ export default function MultiOverviewTab({
 
   return (
     <div className="flex flex-col gap-3">
-      {attentionItems.length > 0 && <AttentionStrip items={attentionItems} />}
+      <AttentionStrip items={attentionItems} />
 
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1fr_340px]">
         <div className="flex flex-col gap-3">
@@ -139,7 +125,6 @@ export default function MultiOverviewTab({
           <LocationsPreviewCard
             customer={customer}
             regionMap={regionMap}
-            equipByLocation={equipByLocation}
             onViewAll={onViewLocations}
           />
           <AgreementsSummaryCard agreements={agreements} summary={agreementSummary} onViewAll={onViewAgreements} />
@@ -165,6 +150,12 @@ export function AttentionStrip({ items }: { items: AttentionItem[] }) {
           {items.length}
         </span>
       </div>
+      {items.length === 0 && (
+        <div className="flex items-center gap-1.5 px-3.5 py-2 text-[11.5px] text-fg-muted">
+          <CheckCircleIcon className="size-3.5 text-success-500" />
+          Nothing needs attention right now.
+        </div>
+      )}
       {items.map((it, i) => (
         <div
           key={it.key}
@@ -190,63 +181,87 @@ function LabelTiny({ children }: { children: React.ReactNode }) {
   return <div className="label-tiny">{children}</div>;
 }
 
+// Aging buckets tint by severity only when populated — older = hotter (91+/61–90
+// amber, 31–60 info, current/1–30 neutral). $0 buckets stay flat/dim so a clean
+// AR reads calm.
+type BucketTone = 'neutral' | 'info' | 'warning';
+function bucketTint(tone: BucketTone, amount: number): { wrap?: React.CSSProperties; text: string } {
+  if (amount <= 0) return { text: 'var(--fg-dim)' };
+  if (tone === 'warning')
+    return {
+      wrap: {
+        background: 'color-mix(in oklch, var(--warning-500) 10%, transparent)',
+        borderColor: 'color-mix(in oklch, var(--warning-500) 35%, transparent)',
+      },
+      text: 'var(--warning-fg)',
+    };
+  if (tone === 'info')
+    return {
+      wrap: {
+        background: 'color-mix(in oklch, var(--info-500) 9%, transparent)',
+        borderColor: 'color-mix(in oklch, var(--info-500) 30%, transparent)',
+      },
+      text: 'var(--info-500)',
+    };
+  return { text: 'var(--fg-strong)' };
+}
+
 // Billing & AR — terms / pricebook / tax ride the detail payload; the
 // outstanding headline + 5-bucket aging come from the FIN-1 summary (honest
 // "—" until it resolves). Exported for reuse by SingleCustomerDetail.
 export function BillingCard({ customer, ar }: { customer: Customer; ar?: CustomerArSummaryResponse }) {
   const termsLabel = customer.paymentTermsDays > 0 ? `Net ${customer.paymentTermsDays}` : '—';
-  const buckets: { k: string; b: CustomerArSummaryResponse['current']; danger?: boolean }[] = ar
+  const buckets: { k: string; b: CustomerArSummaryResponse['current']; tone: BucketTone }[] = ar
     ? [
-        { k: 'Current', b: ar.current },
-        { k: '1–30', b: ar.days1To30 },
-        { k: '31–60', b: ar.days31To60 },
-        { k: '61–90', b: ar.days61To90 },
-        { k: '91+', b: ar.days91Plus, danger: true },
+        { k: 'Current', b: ar.current, tone: 'neutral' },
+        { k: '1–30', b: ar.days1To30, tone: 'neutral' },
+        { k: '31–60', b: ar.days31To60, tone: 'info' },
+        { k: '61–90', b: ar.days61To90, tone: 'warning' },
+        { k: '91+', b: ar.days91Plus, tone: 'warning' },
       ]
     : [];
   return (
     <Card title={<CardTitle icon={<ReceiptPercentIcon className="size-3.5" />}>Billing &amp; AR</CardTitle>} padding="none">
       <div className="p-3.5">
-        <div>
-          <LabelTiny>Outstanding balance</LabelTiny>
-          {ar ? (
-            <div
-              className="mt-0.5 font-mono text-[20px] font-bold tabular-nums"
-              style={{ color: ar.outstandingBalance > 0 ? 'var(--fg-strong)' : 'var(--fg-dim)' }}
-            >
-              {formatMoney(ar.outstandingBalance)}
+        {/* Outstanding balance + aging in one horizontal strip — balance left,
+            the 5 compact bucket cells right-aligned on the same band. */}
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <LabelTiny>Outstanding balance</LabelTiny>
+            {ar ? (
+              <div
+                className="mt-0.5 font-mono text-[20px] font-bold tabular-nums"
+                style={{ color: ar.outstandingBalance > 0 ? 'var(--fg-strong)' : 'var(--fg-dim)' }}
+              >
+                {formatMoney(ar.outstandingBalance)}
+              </div>
+            ) : (
+              <>
+                <div className="mt-0.5 font-mono text-[20px] font-bold tabular-nums text-fg-dim">—</div>
+                <div className="text-[11px] text-fg-muted">AR aging &amp; balance loading…</div>
+              </>
+            )}
+          </div>
+          {ar && (
+            <div className="flex shrink-0 gap-1">
+              {buckets.map(({ k, b, tone }) => {
+                const tint = bucketTint(tone, b.amount);
+                return (
+                  <div
+                    key={k}
+                    className="min-w-[46px] rounded-md border border-border-soft px-1.5 py-1 text-center"
+                    style={tint.wrap}
+                  >
+                    <div className="text-[9px] font-semibold uppercase tracking-wide text-fg-muted">{k}</div>
+                    <div className="mt-0.5 font-mono text-[11px] font-bold tabular-nums" style={{ color: tint.text }}>
+                      {formatMoney(b.amount)}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
-          ) : (
-            <>
-              <div className="mt-0.5 font-mono text-[20px] font-bold tabular-nums text-fg-dim">—</div>
-              <div className="text-[11px] text-fg-muted">AR aging &amp; balance loading…</div>
-            </>
           )}
         </div>
-
-        {ar && (
-          <div className="mt-3 grid grid-cols-5 gap-1.5">
-            {buckets.map(({ k, b, danger }) => {
-              const hot = danger && b.amount > 0;
-              return (
-                <div
-                  key={k}
-                  className="rounded-md border border-border-soft px-1.5 py-1.5 text-center"
-                  style={hot ? { background: 'color-mix(in oklch, var(--danger-500) 8%, transparent)', borderColor: 'color-mix(in oklch, var(--danger-500) 30%, transparent)' } : undefined}
-                >
-                  <div className="text-[10px] font-semibold uppercase tracking-wide text-fg-muted">{k}</div>
-                  <div
-                    className="mt-0.5 font-mono text-[12px] font-bold tabular-nums"
-                    style={{ color: hot ? 'var(--danger-500)' : b.amount > 0 ? 'var(--fg-strong)' : 'var(--fg-dim)' }}
-                  >
-                    {formatMoney(b.amount)}
-                  </div>
-                  <div className="text-[10px] text-fg-dim">{b.count} inv</div>
-                </div>
-              );
-            })}
-          </div>
-        )}
 
         {ar && ar.days91Plus.count > 0 && ar.oldestPastDueInvoiceDate && (
           <div className="mt-2 text-[11px]" style={{ color: 'var(--danger-500)' }}>
@@ -285,18 +300,27 @@ export function BillingCard({ customer, ar }: { customer: Customer; ar?: Custome
 function LocationsPreviewCard({
   customer,
   regionMap,
-  equipByLocation,
   onViewAll,
 }: {
   customer: Customer;
   regionMap: Record<string, string>;
-  equipByLocation: Record<string, number>;
   onViewAll: () => void;
 }) {
   const { getName } = useGlossary();
   const navigate = useNavigate();
   const total = customer.serviceLocations.length;
-  const top = customer.serviceLocations.slice(0, PREVIEW_LIMIT);
+  // Needs-attention first: locations with open jobs float up, then active before
+  // inactive/closed, then by name — capped at PREVIEW_LIMIT (not payload order).
+  const top = [...customer.serviceLocations]
+    .sort((a, b) => {
+      const ao = a.openJobsCount ?? (a.hasOpenJobs ? 1 : 0);
+      const bo = b.openJobsCount ?? (b.hasOpenJobs ? 1 : 0);
+      if (ao !== bo) return bo - ao;
+      const rank = (s: string) => (s === 'ACTIVE' ? 0 : s === 'INACTIVE' ? 1 : 2);
+      if (rank(a.status) !== rank(b.status)) return rank(a.status) - rank(b.status);
+      return (a.locationName || '').localeCompare(b.locationName || '');
+    })
+    .slice(0, PREVIEW_LIMIT);
   // Open-jobs teaser column lights up once the LOC-1 denorm is on the payload
   // (full operational/financial columns live on the Locations tab).
   const enriched = customer.serviceLocations.some(
@@ -327,14 +351,12 @@ function LocationsPreviewCard({
             <th>{getName('service_location')}</th>
             <th>{getName('dispatch_region')}</th>
             {enriched && <th className="right">Open</th>}
-            <th className="right">{getName('equipment')}</th>
             <th>Status</th>
           </tr>
         </DenseTHead>
         <tbody>
           {top.map((l) => {
             const region = l.dispatchRegionName ?? regionMap[l.dispatchRegionId];
-            const equip = equipByLocation[l.id] ?? 0;
             const street = titleCaseAddress(
               [l.address.streetAddress, l.address.streetAddressLine2].filter(Boolean).join(' '),
             );
@@ -357,7 +379,6 @@ function LocationsPreviewCard({
                     )}
                   </td>
                 )}
-                <td className="right num strong">{equip > 0 ? equip : <span className="text-fg-dim">—</span>}</td>
                 <td>
                   <Pill tone={l.status === 'ACTIVE' ? 'success' : 'neutral'} dot>
                     {l.status === 'ACTIVE' ? 'Active' : l.status === 'CLOSED' ? 'Closed' : 'Inactive'}
@@ -730,21 +751,19 @@ function isAccountDirty(d: AccountDraft, c: Customer): boolean {
   );
 }
 
-// Exported (+ `typeLabel`) for reuse by SingleCustomerDetail ("Single-site")
-// and PayerDetail ("Payer"). Editable in place (customer-add-edit.md): the
-// writable customer-level fields — account manager, industry, pricebook,
-// payment terms, tax-exempt + cert — flip into inputs with Save/Cancel inside
-// the card. Identity/finance-derived rows (ID, type, lifetime value, since)
-// stay read-only. Shared, so the editor lands on all three variants at once.
+// Shared by all three variants (customer-add-edit.md): the writable customer-
+// level fields — account manager, industry, pricebook, payment terms,
+// tax-exempt + cert — flip into inputs with Save/Cancel inside the card.
+// Identity/finance-derived rows (ID, lifetime value, since) stay read-only.
+// CustomerShape is a render signal, not a displayed customer "type", so there's
+// deliberately no Type row here.
 export function AccountDetailsCard({
   customer,
   ar,
-  typeLabel = 'Multi-site',
   canEdit = false,
 }: {
   customer: Customer;
   ar?: CustomerArSummaryResponse;
-  typeLabel?: string;
   canEdit?: boolean;
 }) {
   const { getName } = useGlossary();
@@ -799,7 +818,6 @@ export function AccountDetailsCard({
 
   const rows: { k: string; v: React.ReactNode }[] = [
     { k: `${getName('customer')} ID`, v: <span className="font-mono">{customer.customerNumber || customer.id}</span> },
-    { k: 'Type', v: typeLabel },
   ];
   if (customer.industry) rows.push({ k: 'Industry', v: customer.industry });
   if (customer.accountManager) rows.push({ k: 'Acct manager', v: customer.accountManager.name });
