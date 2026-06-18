@@ -800,6 +800,42 @@ describe('EquipmentDetailPage', () => {
     expect(thumbs.length).toBeGreaterThanOrEqual(2);
   });
 
+  it('opens the lightbox in place when an overview Media peek photo is clicked', async () => {
+    mockGetById.mockResolvedValue(baseEquipment);
+    mockImagesList.mockResolvedValue([
+      {
+        id: 'img-1',
+        url: 'https://cdn.example.com/full-1.jpg',
+        thumbnailUrl: 'https://cdn.example.com/thumb-1.jpg',
+        contentType: 'image/jpeg',
+        sizeBytes: 100,
+        widthPx: 800,
+        heightPx: 600,
+        isProfile: true,
+        sortOrder: 0,
+        caption: 'Nameplate',
+        uploadedBy: null,
+        uploadedByName: null,
+        createdAt: '',
+      },
+    ]);
+    const user = userEvent.setup();
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Upstairs Furnace' })).toBeInTheDocument();
+    });
+    // Overview is the default tab; the Media peek shows the profile photo tile.
+    await user.click(await screen.findByRole('button', { name: /nameplate/i }));
+
+    // The lightbox opens here (full-res image) rather than jumping to the Media tab.
+    await waitFor(() => {
+      expect(
+        document.querySelector('img[src="https://cdn.example.com/full-1.jpg"]')
+      ).toBeInTheDocument();
+    });
+  });
+
   it('sets a non-profile image as profile by clicking the star toggle', async () => {
     mockGetById.mockResolvedValue(baseEquipment);
     mockImagesList.mockResolvedValue([

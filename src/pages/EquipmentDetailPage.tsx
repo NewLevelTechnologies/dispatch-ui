@@ -62,7 +62,7 @@ import EquipmentMediaUploadDialog from '../components/EquipmentMediaUploadDialog
 import EquipmentNotesCard from '../components/EquipmentNotesCard';
 import EquipmentServiceHistoryTab from '../components/EquipmentServiceHistoryTab';
 import EquipmentVideosSection from '../components/EquipmentVideosSection';
-import EquipmentPhotoLightbox from '../components/EquipmentPhotoLightbox';
+import EquipmentMediaLightbox, { type MediaLightboxItem } from '../components/EquipmentMediaLightbox';
 import WorkOrderFormDialog from '../components/WorkOrderFormDialog';
 // Card title + quiet "View all" affordance — reused from the customer-detail
 // chrome so equipment cards match the other redesigned detail pages exactly.
@@ -443,21 +443,35 @@ export default function EquipmentDetailPage() {
   // Profile photo leads the Media tab grid + the lightbox order.
   const orderedImages = profilePhoto ? [profilePhoto, ...galleryPhotos] : galleryPhotos;
   const MEDIA_PEEK_MAX = 4;
-  // Peek row = non-profile photos + videos.
+  // One combined gallery (photos then videos) feeds the lightbox so prev/next
+  // crosses every item. `videoIndexOffset` maps a video's position to its slot
+  // after the photos. The page + EquipmentVideosSection share the same
+  // ['equipment-files', id, 'VIDEO'] query, so the two video lists stay aligned.
+  const mediaItems: MediaLightboxItem[] = [
+    ...orderedImages.map((image) => ({ kind: 'image' as const, image })),
+    ...videos.map((video) => ({ kind: 'video' as const, video })),
+  ];
+  const videoIndexOffset = orderedImages.length;
+  // Peek row = non-profile photos + videos. Each tile carries its index into the
+  // combined gallery so a click opens the lightbox at the right item. Gallery
+  // photos follow the profile in `orderedImages`, hence the +1 offset.
+  const galleryIndexOffset = profilePhoto ? 1 : 0;
   const peekItems: MediaPeekItem[] = [
-    ...galleryPhotos.map((p) => ({
+    ...galleryPhotos.map((p, gi) => ({
       id: p.id,
       thumb: p.thumbnailUrl ?? p.url,
       alt: p.caption ?? equipment.name,
       label: p.caption ?? '',
+      mediaIndex: galleryIndexOffset + gi,
     })),
-    ...videos.map((v) => ({
+    ...videos.map((v, vi) => ({
       id: v.id,
       thumb: v.thumbnailUrl,
       alt: v.caption ?? v.fileName,
       label: v.caption ?? v.fileName,
       isVideo: true,
       durationSeconds: v.durationSeconds,
+      mediaIndex: videoIndexOffset + vi,
     })),
   ];
   const peekShown = peekItems.slice(0, MEDIA_PEEK_MAX);
@@ -665,9 +679,11 @@ export default function EquipmentDetailPage() {
                     <p className="text-[12px] text-fg-muted">No photos or videos yet</p>
                   ) : (
                     <div className="flex gap-1.5 overflow-hidden">
+                      {/* Every tile opens the combined lightbox at its item —
+                          photos and videos arrow together from there. */}
                       {profilePhoto && (
                         <MediaPeekTile
-                          onClick={goToMedia}
+                          onClick={() => setLightboxIndex(0)}
                           thumb={profilePhoto.thumbnailUrl ?? profilePhoto.url}
                           alt={profilePhoto.caption ?? equipment.name}
                           label="Profile"
@@ -677,7 +693,7 @@ export default function EquipmentDetailPage() {
                       {peekShown.map((m, i) => (
                         <MediaPeekTile
                           key={m.id}
-                          onClick={goToMedia}
+                          onClick={() => setLightboxIndex(m.mediaIndex)}
                           thumb={m.thumb}
                           alt={m.alt}
                           label={m.label}
@@ -1062,7 +1078,15 @@ export default function EquipmentDetailPage() {
                     action={<span className="text-[11px] text-fg-dim">{videos.length}</span>}
                     padding="none"
                   >
-                    <div className="p-3">{id && <EquipmentVideosSection equipmentId={id} hideUpload />}</div>
+                    <div className="p-3">
+                      {id && (
+                        <EquipmentVideosSection
+                          equipmentId={id}
+                          hideUpload
+                          onOpenVideo={(i) => setLightboxIndex(videoIndexOffset + i)}
+                        />
+                      )}
+                    </div>
                   </Card>
                 </>
               )}
@@ -1113,9 +1137,9 @@ export default function EquipmentDetailPage() {
         defaultSetProfile={images.length === 0}
       />
 
-      <EquipmentPhotoLightbox
+      <EquipmentMediaLightbox
         equipmentId={id!}
-        images={orderedImages}
+        items={mediaItems}
         startIndex={lightboxIndex}
         onClose={() => setLightboxIndex(null)}
       />
@@ -1191,6 +1215,9 @@ interface MediaPeekItem {
   label: string;
   isVideo?: boolean;
   durationSeconds?: number | null;
+  // Position in the combined media gallery (photos then videos) → opens the
+  // lightbox at this item.
+  mediaIndex: number;
 }
 
 /**

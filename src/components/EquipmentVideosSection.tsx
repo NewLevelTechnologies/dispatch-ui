@@ -44,11 +44,17 @@ function formatDuration(totalSeconds: number): string {
 export default function EquipmentVideosSection({
   equipmentId,
   hideUpload = false,
+  onOpenVideo,
 }: {
   equipmentId: string;
   // The equipment Media tab provides a single shared "Add media" control, so it
   // hides this section's own upload button.
   hideUpload?: boolean;
+  // When provided (equipment Media tab), clicking a video delegates "open" to
+  // the parent's combined photo+video lightbox — receiving the video's index in
+  // this section's list — instead of opening this section's own video-only
+  // lightbox. Lets prev/next cross photos and videos.
+  onOpenVideo?: (index: number) => void;
 }) {
   const queryClient = useQueryClient();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -130,7 +136,7 @@ export default function EquipmentVideosSection({
             <VideoTile
               key={f.id}
               f={f}
-              onOpen={() => setLightboxIndex(i)}
+              onOpen={() => (onOpenVideo ? onOpenVideo(i) : setLightboxIndex(i))}
               onDelete={() => {
                 if (window.confirm(`Delete ${f.fileName}?`)) del.mutate(f.id);
               }}
@@ -140,7 +146,9 @@ export default function EquipmentVideosSection({
         </div>
       )}
 
-      {lightboxIndex !== null && videos.length > 0 && (
+      {/* Own video-only lightbox — only when the parent isn't handling opens
+          via its combined media lightbox. */}
+      {!onOpenVideo && lightboxIndex !== null && videos.length > 0 && (
         <VideoLightbox
           videos={videos}
           startIndex={lightboxIndex}
