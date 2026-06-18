@@ -1202,8 +1202,8 @@ describe('EquipmentDetailPage', () => {
     await waitFor(() => {
       expect(screen.getByRole('heading', { name: 'Upstairs Furnace' })).toBeInTheDocument();
     });
-    // Nameplate called out + the video thumb shows its duration overlay.
-    expect(await screen.findByText('Nameplate')).toBeInTheDocument();
+    // Nameplate called out (badge + label) + the video thumb shows its duration.
+    expect((await screen.findAllByText(/nameplate/i)).length).toBeGreaterThan(0);
     expect(await screen.findByText('0:45')).toBeInTheDocument();
 
     // "View all" jumps to the Media tab (2 photos + 1 video = 3).

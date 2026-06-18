@@ -446,16 +446,19 @@ export default function EquipmentDetailPage() {
   // Nameplate (the source of truth) leads the Media tab grid + the lightbox order.
   const orderedImages = nameplate ? [nameplate, ...galleryPhotos] : galleryPhotos;
   const MEDIA_PEEK_MAX = 4;
+  // Gallery = everything except the nameplate (photos + videos), for the peek row.
   const peekItems: MediaPeekItem[] = [
     ...galleryPhotos.map((p) => ({
       id: p.id,
       thumb: p.thumbnailUrl ?? p.url,
       alt: p.caption ?? equipment.name,
+      label: p.caption ?? '',
     })),
     ...videos.map((v) => ({
       id: v.id,
       thumb: v.thumbnailUrl,
       alt: v.caption ?? v.fileName,
+      label: v.caption ?? v.fileName,
       isVideo: true,
       durationSeconds: v.durationSeconds,
     })),
@@ -647,50 +650,46 @@ export default function EquipmentDetailPage() {
                   </Card>
                 )}
 
-                {/* Media peek — nameplate called out separately from the gallery
-                    (it's the source of truth), then a few photo/video thumbs. */}
+                {/* Media peek — wide nameplate hero (source of truth) + a row of
+                    uniform-height thumbs; "+N" overlays the last tile. Mirrors the
+                    Media tab grid. */}
                 <Card
                   title={<CardTitle icon={<PhotoIcon className="size-3.5" />}>{t('equipment.tabs.media')}</CardTitle>}
-                  action={totalMedia > 0 ? <CardLink onClick={goToMedia}>{t('common.viewAll')}</CardLink> : undefined}
+                  action={totalMedia > 0 ? <CardLink onClick={goToMedia}>{t('common.viewAll')} {totalMedia}</CardLink> : undefined}
                 >
                   {totalMedia === 0 ? (
                     <p className="text-[12px] text-fg-muted">No photos or videos yet</p>
                   ) : (
-                    <div className="flex items-start gap-3">
+                    <div
+                      className="grid items-stretch gap-1.5"
+                      style={{
+                        gridTemplateColumns: nameplate
+                          ? `1.4fr repeat(${Math.max(peekShown.length, 1)}, minmax(0,1fr))`
+                          : `repeat(${Math.max(peekShown.length, 1)}, minmax(0,1fr))`,
+                      }}
+                    >
                       {nameplate && (
-                        <button
-                          type="button"
+                        <MediaPeekTile
                           onClick={goToMedia}
-                          className="flex shrink-0 flex-col items-center gap-1"
-                          aria-label="Nameplate photo"
-                        >
-                          <MediaThumb
-                            thumb={nameplate.thumbnailUrl ?? nameplate.url}
-                            alt={nameplate.caption ?? equipment.name}
-                            size="lg"
-                            ring="accent"
-                          />
-                          <span className="text-[10px] font-medium uppercase tracking-wide text-fg-muted">
-                            Nameplate
-                          </span>
-                        </button>
+                          thumb={nameplate.thumbnailUrl ?? nameplate.url}
+                          alt={nameplate.caption ?? equipment.name}
+                          label="Nameplate"
+                          hero
+                        />
                       )}
-                      <div className="flex flex-wrap gap-1.5">
-                        {peekShown.map((m) => (
-                          <button key={m.id} type="button" onClick={goToMedia} aria-label={m.alt}>
-                            <MediaThumb thumb={m.thumb} alt={m.alt} isVideo={m.isVideo} durationSeconds={m.durationSeconds} />
-                          </button>
-                        ))}
-                        {peekOverflow > 0 && (
-                          <button
-                            type="button"
-                            onClick={goToMedia}
-                            className="flex size-12 shrink-0 items-center justify-center rounded-md bg-bg-elev-2 text-[12px] font-semibold text-fg-muted ring-1 ring-border hover:text-fg-strong"
-                          >
-                            +{peekOverflow}
-                          </button>
-                        )}
-                      </div>
+                      {peekShown.map((m, i) => (
+                        <MediaPeekTile
+                          key={m.id}
+                          onClick={goToMedia}
+                          thumb={m.thumb}
+                          alt={m.alt}
+                          label={m.label}
+                          isVideo={m.isVideo}
+                          durationSeconds={m.durationSeconds}
+                          square={!nameplate}
+                          overflow={i === peekShown.length - 1 ? peekOverflow : 0}
+                        />
+                      ))}
                     </div>
                   )}
                 </Card>
@@ -1196,60 +1195,91 @@ interface MediaPeekItem {
   id: string;
   thumb: string | null;
   alt: string;
+  label: string;
   isVideo?: boolean;
   durationSeconds?: number | null;
 }
 
 /**
- * A single media thumbnail for the overview peek — a photo or a video poster.
- * Videos carry a play badge and (when known) a duration overlay; the nameplate
- * uses the larger `lg` size + accent ring to read as the source-of-truth tile.
+ * One tile in the overview Media peek row. The nameplate (`hero`) is a wider
+ * accent-ringed source-of-truth tile (aspect-square, which anchors the row
+ * height); the gallery thumbs stretch to match it. Videos get a play badge +
+ * duration; a label rides a bottom gradient; `overflow` paints a "+N" cover on
+ * the last tile. `square` makes a tile self-size when there's no hero anchor.
  */
-function MediaThumb({
+function MediaPeekTile({
   thumb,
   alt,
+  label,
   isVideo = false,
   durationSeconds,
-  size = 'md',
-  ring = 'default',
+  hero = false,
+  square = false,
+  overflow = 0,
+  onClick,
 }: {
   thumb: string | null;
   alt: string;
+  label: string;
   isVideo?: boolean;
   durationSeconds?: number | null;
-  size?: 'md' | 'lg';
-  ring?: 'default' | 'accent';
+  hero?: boolean;
+  square?: boolean;
+  overflow?: number;
+  onClick: () => void;
 }) {
+  const showLabel = !overflow && (label || (isVideo && durationSeconds != null));
   return (
-    <div
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={alt}
       className={[
-        'relative shrink-0 overflow-hidden rounded-md bg-bg-elev-2 ring-1',
-        ring === 'accent' ? 'ring-accent-500' : 'ring-border',
-        size === 'lg' ? 'size-16' : 'size-12',
-      ].join(' ')}
+        'group relative block overflow-hidden rounded-md bg-bg-elev-2 ring-1',
+        hero ? 'ring-[color-mix(in_oklch,var(--accent-500)_45%,var(--border))]' : 'ring-border',
+        hero || square ? 'aspect-square' : '',
+      ]
+        .filter(Boolean)
+        .join(' ')}
     >
       {thumb ? (
-        <img src={thumb} alt={alt} loading="lazy" className="size-full object-cover" />
+        <img src={thumb} alt={alt} loading="lazy" className="absolute inset-0 size-full object-cover" />
       ) : (
-        <span className="flex size-full items-center justify-center text-fg-dim">
-          {isVideo ? <VideoCameraIcon className="size-5" /> : <PhotoIcon className="size-5" />}
+        <span className="absolute inset-0 grid place-items-center text-fg-dim">
+          {isVideo ? <VideoCameraIcon className="size-6" /> : <PhotoIcon className="size-6" />}
         </span>
       )}
-      {isVideo && (
-        <>
-          <span className="pointer-events-none absolute inset-0 flex items-center justify-center">
-            <span className="flex size-6 items-center justify-center rounded-full bg-black/55 ring-1 ring-inset ring-white/25">
-              <PlayIcon className="size-3 translate-x-px text-white" />
-            </span>
+
+      {isVideo && !overflow && (
+        <span className="pointer-events-none absolute inset-0 grid place-items-center">
+          <span className="grid size-7 place-items-center rounded-full bg-black/55 ring-1 ring-inset ring-white/25">
+            <PlayIcon className="size-3.5 translate-x-px text-white" />
           </span>
-          {durationSeconds != null && (
-            <span className="absolute bottom-0.5 right-0.5 rounded bg-black/75 px-1 py-px font-mono text-[9px] font-medium tabular-nums text-white">
-              {formatDuration(durationSeconds)}
-            </span>
-          )}
-        </>
+        </span>
       )}
-    </div>
+
+      {hero && (
+        <span
+          className="absolute left-1 top-1 rounded px-1.5 py-0.5 text-[8.5px] font-bold uppercase tracking-[0.04em] text-white"
+          style={{ background: 'var(--accent-500)' }}
+        >
+          Nameplate
+        </span>
+      )}
+
+      {overflow ? (
+        <span className="absolute inset-0 grid place-items-center bg-black/55 text-[15px] font-bold text-white">
+          +{overflow}
+        </span>
+      ) : showLabel ? (
+        <span className="absolute inset-x-0 bottom-0 flex items-center gap-1 bg-gradient-to-t from-black/65 to-transparent px-1.5 pb-1 pt-3 text-[9.5px] font-semibold text-white">
+          <span className="min-w-0 flex-1 truncate text-left">{label}</span>
+          {isVideo && durationSeconds != null && (
+            <span className="shrink-0 font-mono tabular-nums">{formatDuration(durationSeconds)}</span>
+          )}
+        </span>
+      ) : null}
+    </button>
   );
 }
 
