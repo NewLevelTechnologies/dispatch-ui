@@ -635,16 +635,22 @@ export default function EquipmentDetailPage() {
                                 className={`cursor-pointer ${live ? 'bg-[color-mix(in_oklch,var(--info-500)_6%,var(--bg-elev))]' : ''}`}
                                 onClick={() => navigate(`/work-orders/${wo.id}`)}
                               >
-                                <td className="whitespace-nowrap text-[11.5px] text-fg-muted">{formatTimestamp(dateIso)}</td>
-                                <td className="font-mono text-[11.5px] text-fg-accent">{woNumber}</td>
+                                <td className="whitespace-nowrap">
+                                  <span className="text-[11.5px] text-fg-muted">{formatTimestamp(dateIso)}</span>
+                                </td>
                                 <td>
-                                  <span className="text-[12px] text-fg">{firstItem?.description ?? '—'}</span>
+                                  <span className="font-mono text-[11.5px] text-fg-accent">{woNumber}</span>
+                                </td>
+                                <td>
+                                  <span className="text-[12px]">{firstItem?.description ?? '—'}</span>
                                   {extra > 0 && <span className="ml-1 text-[11px] text-fg-dim">+{extra} more</span>}
                                 </td>
                                 <td>
                                   <AssignedUsersCell users={wo.assignedUsers} />
                                 </td>
-                                <td className="right font-mono text-[12px] tabular-nums text-fg-dim">—</td>
+                                <td className="right">
+                                  <span className="font-mono text-[12px] tabular-nums text-fg-dim">—</span>
+                                </td>
                               </DenseRow>
                             );
                           })}

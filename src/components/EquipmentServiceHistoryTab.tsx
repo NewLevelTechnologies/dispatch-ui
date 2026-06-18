@@ -170,15 +170,23 @@ export default function EquipmentServiceHistoryTab({ equipmentId }: { equipmentI
                     className={`cursor-pointer ${rowTint(wo)}`}
                     onClick={() => navigate(`/work-orders/${wo.id}`)}
                   >
-                    <td className="whitespace-nowrap text-[11.5px] text-fg-muted">{formatTimestamp(dateIso)}</td>
-                    <td className="font-mono text-[11.5px] font-semibold text-fg-accent">{woNumber}</td>
-                    <td className="max-w-[360px] truncate text-[12px] text-fg" title={deriveJobLabel(wo)}>
+                    {/* Cell text colors live on spans — `.dense-table td` sets an
+                        unlayered color that would otherwise override td-level utilities. */}
+                    <td className="whitespace-nowrap">
+                      <span className="text-[11.5px] text-fg-muted">{formatTimestamp(dateIso)}</span>
+                    </td>
+                    <td>
+                      <span className="font-mono text-[11.5px] font-semibold text-fg-accent">{woNumber}</span>
+                    </td>
+                    <td className="max-w-[360px] truncate text-[12px]" title={deriveJobLabel(wo)}>
                       {deriveJobLabel(wo)}
                     </td>
                     <td>
                       <AssignedUsersCell users={wo.assignedUsers} />
                     </td>
-                    <td className="right font-mono text-[12px] tabular-nums text-fg-dim">—</td>
+                    <td className="right">
+                      <span className="font-mono text-[12px] tabular-nums text-fg-dim">—</span>
+                    </td>
                     <td>
                       {cancelled ? (
                         <Pill tone="neutral">Cancelled</Pill>
