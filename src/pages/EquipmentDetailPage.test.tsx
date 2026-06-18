@@ -28,6 +28,7 @@ const mockWorkOrdersGetAll = vi.fn();
 const mockGetServiceLocationById = vi.fn();
 const mockCustomerGetById = vi.fn();
 const mockFilesList = vi.fn();
+const mockFilesUpload = vi.fn();
 const mockShowError = vi.fn();
 const mockShowSuccess = vi.fn();
 
@@ -107,6 +108,7 @@ vi.mock('../api/filesApi', async (importOriginal) => {
     equipmentFilesApi: {
       ...actual.equipmentFilesApi,
       list: (...args: unknown[]) => mockFilesList(...args),
+      upload: (...args: unknown[]) => mockFilesUpload(...args),
     },
   };
 });
@@ -171,6 +173,7 @@ describe('EquipmentDetailPage', () => {
     mockFilterSizesGetAll.mockResolvedValue([]);
     mockImagesList.mockResolvedValue([]);
     mockFilesList.mockResolvedValue({ content: [] });
+    mockFilesUpload.mockResolvedValue({ id: 'v-1', status: 'READY' });
     mockNotesList.mockResolvedValue([]);
     mockWorkOrdersGetAll.mockResolvedValue({
       content: [],
@@ -788,9 +791,9 @@ describe('EquipmentDetailPage', () => {
     const photosTab = await screen.findByRole('tab', { name: /^media\s*2$/i });
     await user.click(photosTab);
 
-    // The profile image is called out as the nameplate (label, not a toggle);
+    // The profile image leads the gallery, marked "Profile" (label, not a toggle);
     // the non-profile image keeps a "set as profile" control.
-    await waitFor(() => expect(screen.getAllByText(/nameplate/i).length).toBeGreaterThan(0));
+    await waitFor(() => expect(screen.getAllByText(/^profile$/i).length).toBeGreaterThan(0));
     expect(screen.queryByRole('button', { name: /^profile$/i })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: /^set as profile$/i })).toBeInTheDocument();
     const thumbs = screen.getAllByRole('img');
@@ -874,7 +877,7 @@ describe('EquipmentDetailPage', () => {
     confirmSpy.mockRestore();
   });
 
-  it('opens the upload dialog from the Add Photo button', async () => {
+  it('opens the media upload dialog from the Add media button', async () => {
     mockGetById.mockResolvedValue(baseEquipment);
     const user = userEvent.setup();
     renderPage();
@@ -883,9 +886,34 @@ describe('EquipmentDetailPage', () => {
       expect(screen.getByRole('heading', { name: 'Upstairs Furnace' })).toBeInTheDocument();
     });
     await user.click(screen.getByRole('tab', { name: /^media/i }));
-    await user.click(screen.getByRole('button', { name: /add photo/i }));
+    // One "Add media" control — a single drop-zone dialog for photos + videos.
+    await user.click(screen.getByRole('button', { name: /add media/i }));
 
-    expect(await screen.findByRole('dialog')).toBeInTheDocument();
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText(/drag photos or videos here/i)).toBeInTheDocument();
+  });
+
+  it('uploads a video through the Add media dialog', async () => {
+    mockGetById.mockResolvedValue(baseEquipment);
+    mockFilesUpload.mockResolvedValue({ id: 'vid-x', kind: 'VIDEO', status: 'READY' });
+    const user = userEvent.setup();
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Upstairs Furnace' })).toBeInTheDocument();
+    });
+    await user.click(screen.getByRole('tab', { name: /^media/i }));
+    await user.click(screen.getByRole('button', { name: /add media/i }));
+
+    const dialog = await screen.findByRole('dialog');
+    const fileInput = dialog.querySelector('input[type="file"]') as HTMLInputElement;
+    const file = new File(['x'], 'clip.mp4', { type: 'video/mp4' });
+    await user.upload(fileInput, file);
+    await user.click(within(dialog).getByRole('button', { name: /^upload$/i }));
+
+    await waitFor(() => {
+      expect(mockFilesUpload).toHaveBeenCalledWith('eq-1', file, expect.objectContaining({ caption: null }));
+    });
   });
 
   it('always shows the service-history peek with an empty state when there is no history', async () => {
@@ -943,7 +971,7 @@ describe('EquipmentDetailPage', () => {
 
     // "View all" opens the Service history tab (its search box appears).
     await user.click(screen.getByRole('button', { name: /view all/i }));
-    expect(await screen.findByPlaceholderText(/search work orders/i)).toBeInTheDocument();
+    expect(await screen.findByPlaceholderText(/search work/i)).toBeInTheDocument();
   });
 
   it('renders the notes card on Overview from the notes list', async () => {
@@ -1202,8 +1230,8 @@ describe('EquipmentDetailPage', () => {
     await waitFor(() => {
       expect(screen.getByRole('heading', { name: 'Upstairs Furnace' })).toBeInTheDocument();
     });
-    // Nameplate called out (badge + label) + the video thumb shows its duration.
-    expect((await screen.findAllByText(/nameplate/i)).length).toBeGreaterThan(0);
+    // Profile photo called out (badge + label) + the video thumb shows its duration.
+    expect((await screen.findAllByText(/^profile$/i)).length).toBeGreaterThan(0);
     expect(await screen.findByText('0:45')).toBeInTheDocument();
 
     // "View all" jumps to the Media tab (2 photos + 1 video = 3).

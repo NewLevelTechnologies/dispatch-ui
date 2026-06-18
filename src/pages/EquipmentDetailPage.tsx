@@ -2,14 +2,14 @@
 // Equipment detail — the leaf entity (lives under a Location, under a Customer).
 // Redesigned onto the shared detail-page shell (header card → tab row → 2-col
 // overview → destructive footer) that Location / Customer / Agreement detail use,
-// so the four pages read as one design. Equipment-distinct intent: the nameplate
+// so the four pages read as one design. Equipment-distinct intent: the profile
 // photo is the source of truth, service history is the longitudinal marquee (no
 // derived "replace me" flag), warranty drives money decisions, and "Open work
 // order" is the only live status (derived from the WO list, not stored).
 //
 // Units / Filters / Notes are CONDITIONAL overview cards, not tabs (HVAC has
 // units + filters; a water heater doesn't). Photos + Videos live together on a
-// single Media tab, with a nameplate-called-out media peek on the overview.
+// single Media tab, with a profile-photo-led media peek on the overview.
 import { useState } from 'react';
 import { useParams, useNavigate, useLocation, Link as RouterLink } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -24,7 +24,6 @@ import {
   equipmentImagesApi,
   tenantFilterSizesApi,
   EquipmentStatus,
-  EQUIPMENT_IMAGE_MAX_PER_EQUIPMENT,
   type EquipmentFilter,
   type EquipmentImage,
   type EquipmentSummary,
@@ -52,13 +51,14 @@ import { Pill } from '../components/ui/Pill';
 import { Tabs } from '../components/ui/Tabs';
 import { Callout } from '../components/ui/Callout';
 import { DenseTable, DenseTHead, DenseRow } from '../components/ui/DenseTable';
+import { AssignedUsersCell } from '../components/ui/AssignedUsersCell';
 import IconButton from '../components/IconButton';
 import ConfirmDialog from '../components/ConfirmDialog';
 import EditableField from '../components/EditableField';
 import EquipmentThumbnail from '../components/EquipmentThumbnail';
 import EquipmentFilterFormDialog from '../components/EquipmentFilterFormDialog';
 import EquipmentFormDialog from '../components/EquipmentFormDialog';
-import EquipmentImageUploadDialog from '../components/EquipmentImageUploadDialog';
+import EquipmentMediaUploadDialog from '../components/EquipmentMediaUploadDialog';
 import EquipmentNotesCard from '../components/EquipmentNotesCard';
 import EquipmentServiceHistoryTab from '../components/EquipmentServiceHistoryTab';
 import EquipmentVideosSection from '../components/EquipmentVideosSection';
@@ -139,7 +139,7 @@ export default function EquipmentDetailPage() {
   const [prefilledSize, setPrefilledSize] = useState<
     { lengthIn: number; widthIn: number; thicknessIn: number } | null
   >(null);
-  const [isImageUploadOpen, setIsImageUploadOpen] = useState(false);
+  const [isMediaUploadOpen, setIsMediaUploadOpen] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [showAllFilterSizes, setShowAllFilterSizes] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
@@ -417,7 +417,6 @@ export default function EquipmentDetailPage() {
   const handleDeleteImage = (img: EquipmentImage) => {
     if (window.confirm(t('equipment.images.deleteConfirm'))) deleteImageMutation.mutate(img.id);
   };
-  const imageLimitReached = images.length >= EQUIPMENT_IMAGE_MAX_PER_EQUIPMENT;
 
   const typeOptions = [
     { value: '', label: t('common.none') },
@@ -438,15 +437,13 @@ export default function EquipmentDetailPage() {
   const units = descendants.filter((d) => !(d.parentId && descendantIds.has(d.parentId)));
   const showUnitsCard = !isSubUnit && units.length > 0;
 
-  // ── Media (peek + tab) ── The nameplate (profile photo) is the source of
-  // truth, so it's called out separately from the gallery. The peek shows the
-  // nameplate + a few gallery thumbs (photos and video posters).
-  const nameplate = images.find((img) => img.isProfile) ?? null;
+  // ── Media (peek + tab) ── The profile photo leads the gallery + the peek.
+  const profilePhoto = images.find((img) => img.isProfile) ?? null;
   const galleryPhotos = images.filter((img) => !img.isProfile);
-  // Nameplate (the source of truth) leads the Media tab grid + the lightbox order.
-  const orderedImages = nameplate ? [nameplate, ...galleryPhotos] : galleryPhotos;
+  // Profile photo leads the Media tab grid + the lightbox order.
+  const orderedImages = profilePhoto ? [profilePhoto, ...galleryPhotos] : galleryPhotos;
   const MEDIA_PEEK_MAX = 4;
-  // Gallery = everything except the nameplate (photos + videos), for the peek row.
+  // Peek row = non-profile photos + videos.
   const peekItems: MediaPeekItem[] = [
     ...galleryPhotos.map((p) => ({
       id: p.id,
@@ -589,7 +586,7 @@ export default function EquipmentDetailPage() {
                           <tr>
                             <th>Date</th>
                             <th>Work order</th>
-                            <th>What was done</th>
+                            <th>Work</th>
                             <th>Tech</th>
                             <th className="right">Hours</th>
                           </tr>
@@ -600,7 +597,10 @@ export default function EquipmentDetailPage() {
                             const woNumber = wo.workOrderNumber ?? `#${wo.id.slice(0, 8)}`;
                             const firstItem = wo.workItems[0];
                             const extra = wo.workItemCount - 1;
-                            const techs = wo.assignedUsers ?? [];
+                            // AI/derived blurb for the job — same field the service-history
+                            // tab + SiteWorkOrdersCard lead with (declared on the payload,
+                            // not yet on the type → cast, matching those call sites).
+                            const aiSummary = (wo as { summary?: string | null }).summary?.trim();
                             const live =
                               wo.progressCategory === 'IN_PROGRESS' && wo.lifecycleState !== 'CANCELLED';
                             return (
@@ -609,23 +609,28 @@ export default function EquipmentDetailPage() {
                                 className={`cursor-pointer ${live ? 'bg-[color-mix(in_oklch,var(--info-500)_6%,var(--bg-elev))]' : ''}`}
                                 onClick={() => navigate(`/work-orders/${wo.id}`)}
                               >
-                                <td className="whitespace-nowrap text-[11.5px] text-fg-muted">{formatTimestamp(dateIso)}</td>
-                                <td className="font-mono text-[11.5px] text-fg-accent">{woNumber}</td>
-                                <td>
-                                  <span className="text-[12px] text-fg">{firstItem?.description ?? '—'}</span>
-                                  {extra > 0 && <span className="ml-1 text-[11px] text-fg-dim">+{extra} more</span>}
+                                <td className="whitespace-nowrap">
+                                  <span className="text-[11.5px] text-fg-muted">{formatTimestamp(dateIso)}</span>
                                 </td>
-                                <td className="text-[12px] text-fg">
-                                  {techs.length > 0 ? (
+                                <td>
+                                  <span className="font-mono text-[11.5px] text-fg-accent">{woNumber}</span>
+                                </td>
+                                {/* Lead with the work order's AI/derived summary (wo.summary);
+                                    fall back to the first work item + "+N more" when absent. */}
+                                <td className="max-w-[340px] truncate text-[12px]" title={aiSummary || firstItem?.description || undefined}>
+                                  {aiSummary || (
                                     <>
-                                      {techs[0].name ?? 'Unassigned'}
-                                      {techs.length > 1 && <span className="text-fg-dim"> +{techs.length - 1}</span>}
+                                      {firstItem?.description ?? '—'}
+                                      {extra > 0 && <span className="ml-1 text-[11px] text-fg-dim">+{extra} more</span>}
                                     </>
-                                  ) : (
-                                    <span className="text-fg-dim">—</span>
                                   )}
                                 </td>
-                                <td className="right font-mono text-[12px] tabular-nums text-fg-dim">—</td>
+                                <td>
+                                  <AssignedUsersCell users={wo.assignedUsers} />
+                                </td>
+                                <td className="right">
+                                  <span className="font-mono text-[12px] tabular-nums text-fg-dim">—</span>
+                                </td>
                               </DenseRow>
                             );
                           })}
@@ -650,30 +655,22 @@ export default function EquipmentDetailPage() {
                   </Card>
                 )}
 
-                {/* Media peek — wide nameplate hero (source of truth) + a row of
-                    uniform-height thumbs; "+N" overlays the last tile. Mirrors the
-                    Media tab grid. */}
+                {/* Media peek — a compact single row of ~100px-tall thumbs (a glance);
+                    the full browsing gallery is the Media tab. "+N" overlays the last tile. */}
                 <Card
                   title={<CardTitle icon={<PhotoIcon className="size-3.5" />}>{t('equipment.tabs.media')}</CardTitle>}
-                  action={totalMedia > 0 ? <CardLink onClick={goToMedia}>{t('common.viewAll')} {totalMedia}</CardLink> : undefined}
+                  action={totalMedia > 0 ? <CardLink onClick={goToMedia}>{t('common.viewAll')} {totalMedia} →</CardLink> : undefined}
                 >
                   {totalMedia === 0 ? (
                     <p className="text-[12px] text-fg-muted">No photos or videos yet</p>
                   ) : (
-                    <div
-                      className="grid items-stretch gap-1.5"
-                      style={{
-                        gridTemplateColumns: nameplate
-                          ? `1.4fr repeat(${Math.max(peekShown.length, 1)}, minmax(0,1fr))`
-                          : `repeat(${Math.max(peekShown.length, 1)}, minmax(0,1fr))`,
-                      }}
-                    >
-                      {nameplate && (
+                    <div className="flex gap-1.5 overflow-hidden">
+                      {profilePhoto && (
                         <MediaPeekTile
                           onClick={goToMedia}
-                          thumb={nameplate.thumbnailUrl ?? nameplate.url}
-                          alt={nameplate.caption ?? equipment.name}
-                          label="Nameplate"
+                          thumb={profilePhoto.thumbnailUrl ?? profilePhoto.url}
+                          alt={profilePhoto.caption ?? equipment.name}
+                          label="Profile"
                           hero
                         />
                       )}
@@ -686,7 +683,6 @@ export default function EquipmentDetailPage() {
                           label={m.label}
                           isVideo={m.isVideo}
                           durationSeconds={m.durationSeconds}
-                          square={!nameplate}
                           overflow={i === peekShown.length - 1 ? peekOverflow : 0}
                         />
                       ))}
@@ -946,31 +942,20 @@ export default function EquipmentDetailPage() {
           {/* ── Service history tab ── */}
           {activeTab === 'service-history' && id && <EquipmentServiceHistoryTab equipmentId={id} />}
 
-          {/* ── Media tab ── photos + videos together */}
+          {/* ── Media tab ── Photos + Videos galleries */}
           {activeTab === 'media' && (
-            <div className="flex flex-col gap-5">
-              <section>
-                <div className="mb-2 flex items-center justify-between gap-2">
-                  <h3 className="text-[12px] font-semibold uppercase tracking-wide text-fg-muted">
-                    {t('equipment.tabs.photos')}
-                  </h3>
-                  <Button
-                    size="xs"
-                    onClick={() => setIsImageUploadOpen(true)}
-                    disabled={imageLimitReached}
-                    title={
-                      imageLimitReached
-                        ? t('equipment.images.limitReached', {
-                            entity: getName('equipment'),
-                            max: EQUIPMENT_IMAGE_MAX_PER_EQUIPMENT,
-                          })
-                        : undefined
-                    }
-                  >
-                    <PlusIcon className="size-4" />
-                    {t('equipment.images.addPhoto')}
-                  </Button>
-                </div>
+            <div className="flex flex-col gap-4">
+              {/* Header — counts + one shared "Add media" control */}
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-[12px] text-fg-muted">
+                  {images.length + videos.length} items · {images.length} photos · {videos.length} videos
+                </span>
+                <span className="flex-1" />
+                <Button outline size="xs" onClick={() => setIsMediaUploadOpen(true)}>
+                  <PlusIcon className="size-4" />
+                  Add media
+                </Button>
+              </div>
 
               {imagesError ? (
                 <Callout kind="danger">
@@ -978,101 +963,109 @@ export default function EquipmentDetailPage() {
                 </Callout>
               ) : imagesLoading ? (
                 <div className="px-3.5 py-10 text-center text-[12px] text-fg-muted">{t('equipment.images.loading')}</div>
-              ) : images.length === 0 ? (
-                <div className="rounded-[10px] border border-dashed border-border px-3.5 py-10 text-center text-[12px] text-fg-muted">
-                  {t('equipment.images.empty')}
-                </div>
               ) : (
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-                  {orderedImages.map((img, i) => (
-                    <div
-                      key={img.id}
-                      className={`group relative overflow-hidden rounded-lg ring-1 ${
-                        img.isProfile
-                          ? 'ring-[color-mix(in_oklch,var(--accent-500)_45%,var(--border))]'
-                          : 'ring-border'
-                      }`}
-                    >
-                      <button
-                        type="button"
-                        onClick={() => setLightboxIndex(i)}
-                        aria-label={t('equipment.images.openFullSize')}
-                        className="block aspect-square w-full bg-bg-elev-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-500"
+                <>
+                  {/* Photos gallery — profile photo first, marked "Profile". */}
+                  <Card
+                    title={<CardTitle>{t('equipment.tabs.photos')}</CardTitle>}
+                    action={<span className="text-[11px] text-fg-dim">{images.length}</span>}
+                    padding="none"
+                  >
+                    {images.length === 0 ? (
+                      <div className="px-3.5 py-10 text-center text-[12px] text-fg-muted">{t('equipment.images.empty')}</div>
+                    ) : (
+                      <div
+                        className="grid gap-3 p-3"
+                        style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))' }}
                       >
-                        <img
-                          src={img.thumbnailUrl ?? img.url}
-                          alt={img.caption ?? equipment.name}
-                          className="size-full object-cover transition-opacity group-hover:opacity-90"
-                          loading="lazy"
-                        />
-                      </button>
-
-                      {img.isProfile ? (
-                        // The nameplate is the source of truth — call it out, no set-profile control.
-                        <span
-                          className="absolute left-1 top-1 rounded px-1.5 py-0.5 text-[8.5px] font-bold uppercase tracking-[0.04em] text-white"
-                          style={{ background: 'var(--accent-500)' }}
-                        >
-                          Nameplate
-                        </span>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => handleSetProfileImage(img)}
-                          aria-label={t('equipment.images.setAsProfile')}
-                          title={t('equipment.images.setAsProfile')}
-                          className="absolute left-1 top-1 flex size-8 items-center justify-center rounded-full bg-bg-elev/80 backdrop-blur transition-colors hover:bg-bg-elev"
-                        >
-                          <StarIconOutline className="size-5 text-fg-muted hover:text-amber-500" />
-                        </button>
-                      )}
-
-                      <div className="absolute right-1 top-1">
-                        <Dropdown>
-                          <DropdownButton
-                            plain
-                            aria-label={t('common.moreOptions')}
-                            className="rounded-full bg-bg-elev/80 backdrop-blur"
+                        {orderedImages.map((img, i) => (
+                          <div
+                            key={img.id}
+                            className={`group relative overflow-hidden rounded-lg ring-1 ${
+                              img.isProfile
+                                ? 'ring-[color-mix(in_oklch,var(--accent-500)_45%,var(--border))]'
+                                : 'ring-border'
+                            }`}
                           >
-                            <EllipsisVerticalIcon className="size-5" />
-                          </DropdownButton>
-                          <DropdownMenu anchor="bottom end">
-                            <DropdownItem onClick={() => handleEditCaption(img)}>
-                              <DropdownLabel>{t('equipment.images.editCaption')}</DropdownLabel>
-                            </DropdownItem>
-                            <DropdownItem onClick={() => handleDeleteImage(img)}>
-                              <DropdownLabel>{t('common.delete')}</DropdownLabel>
-                            </DropdownItem>
-                          </DropdownMenu>
-                        </Dropdown>
-                      </div>
-
-                      {/* Caption + by/when */}
-                      {(img.caption || img.uploadedByName || img.createdAt) && (
-                        <div className="border-t border-border bg-bg-elev px-2 py-1">
-                          {img.caption && (
-                            <div className="line-clamp-1 text-[11px] text-fg-strong">{img.caption}</div>
-                          )}
-                          {(img.uploadedByName || img.createdAt) && (
-                            <div className="truncate text-[10px] text-fg-muted">
-                              {[img.uploadedByName, formatTimestamp(img.createdAt)].filter(Boolean).join(' · ')}
+                            <button
+                              type="button"
+                              onClick={() => setLightboxIndex(i)}
+                              aria-label={t('equipment.images.openFullSize')}
+                              className="block aspect-square w-full bg-bg-elev-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-500"
+                            >
+                              <img
+                                src={img.thumbnailUrl ?? img.url}
+                                alt={img.caption ?? equipment.name}
+                                className="size-full object-cover transition-opacity group-hover:opacity-90"
+                                loading="lazy"
+                              />
+                            </button>
+                            {img.isProfile ? (
+                              // The profile photo leads the gallery — labeled, no set-profile control.
+                              <span
+                                className="absolute left-1 top-1 rounded px-1.5 py-0.5 text-[8.5px] font-bold uppercase tracking-[0.04em] text-white"
+                                style={{ background: 'var(--accent-500)' }}
+                              >
+                                Profile
+                              </span>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => handleSetProfileImage(img)}
+                                aria-label={t('equipment.images.setAsProfile')}
+                                title={t('equipment.images.setAsProfile')}
+                                className="absolute left-1 top-1 flex size-8 items-center justify-center rounded-full bg-bg-elev/80 backdrop-blur transition-colors hover:bg-bg-elev"
+                              >
+                                <StarIconOutline className="size-5 text-fg-muted hover:text-amber-500" />
+                              </button>
+                            )}
+                            <div className="absolute right-1 top-1">
+                              <Dropdown>
+                                <DropdownButton
+                                  plain
+                                  aria-label={t('common.moreOptions')}
+                                  className="rounded-full bg-bg-elev/80 backdrop-blur"
+                                >
+                                  <EllipsisVerticalIcon className="size-5" />
+                                </DropdownButton>
+                                <DropdownMenu anchor="bottom end">
+                                  <DropdownItem onClick={() => handleEditCaption(img)}>
+                                    <DropdownLabel>{t('equipment.images.editCaption')}</DropdownLabel>
+                                  </DropdownItem>
+                                  <DropdownItem onClick={() => handleDeleteImage(img)}>
+                                    <DropdownLabel>{t('common.delete')}</DropdownLabel>
+                                  </DropdownItem>
+                                </DropdownMenu>
+                              </Dropdown>
                             </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-              </section>
+                            {(img.caption || img.uploadedByName || img.createdAt) && (
+                              <div className="border-t border-border bg-bg-elev px-2 py-1">
+                                {img.caption && (
+                                  <div className="line-clamp-1 text-[11px] text-fg-strong">{img.caption}</div>
+                                )}
+                                {(img.uploadedByName || img.createdAt) && (
+                                  <div className="truncate text-[10px] text-fg-muted">
+                                    {[img.uploadedByName, formatTimestamp(img.createdAt)].filter(Boolean).join(' · ')}
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </Card>
 
-              {/* Videos */}
-              <section>
-                <h3 className="mb-2 text-[12px] font-semibold uppercase tracking-wide text-fg-muted">
-                  {t('equipment.tabs.videos')}
-                </h3>
-                {id && <EquipmentVideosSection equipmentId={id} />}
-              </section>
+                  {/* Videos gallery */}
+                  <Card
+                    title={<CardTitle>{t('equipment.tabs.videos')}</CardTitle>}
+                    action={<span className="text-[11px] text-fg-dim">{videos.length}</span>}
+                    padding="none"
+                  >
+                    <div className="p-3">{id && <EquipmentVideosSection equipmentId={id} hideUpload />}</div>
+                  </Card>
+                </>
+              )}
             </div>
           )}
 
@@ -1113,9 +1106,9 @@ export default function EquipmentDetailPage() {
         prefilledSize={prefilledSize}
       />
 
-      <EquipmentImageUploadDialog
-        isOpen={isImageUploadOpen}
-        onClose={() => setIsImageUploadOpen(false)}
+      <EquipmentMediaUploadDialog
+        isOpen={isMediaUploadOpen}
+        onClose={() => setIsMediaUploadOpen(false)}
         equipmentId={id!}
         defaultSetProfile={images.length === 0}
       />
@@ -1201,12 +1194,17 @@ interface MediaPeekItem {
 }
 
 /**
- * One tile in the overview Media peek row. The nameplate (`hero`) is a wider
+ * One tile in the overview Media peek row. The profile photo (`hero`) is a wider
  * accent-ringed source-of-truth tile (aspect-square, which anchors the row
  * height); the gallery thumbs stretch to match it. Videos get a play badge +
  * duration; a label rides a bottom gradient; `overflow` paints a "+N" cover on
  * the last tile. `square` makes a tile self-size when there's no hero anchor.
  */
+// Compact peek tile — fixed 100px-tall thumbnail for the overview Media glance.
+// The lead/profile tile is a touch wider (and accent-ringed); the rest are
+// 100px squares. `object-cover` crops to fill (never distorts). Play badge,
+// duration, and label caption are kept but shrunk — big browsing belongs to
+// the Media tab.
 function MediaPeekTile({
   thumb,
   alt,
@@ -1214,7 +1212,6 @@ function MediaPeekTile({
   isVideo = false,
   durationSeconds,
   hero = false,
-  square = false,
   overflow = 0,
   onClick,
 }: {
@@ -1224,7 +1221,6 @@ function MediaPeekTile({
   isVideo?: boolean;
   durationSeconds?: number | null;
   hero?: boolean;
-  square?: boolean;
   overflow?: number;
   onClick: () => void;
 }) {
@@ -1235,44 +1231,41 @@ function MediaPeekTile({
       onClick={onClick}
       aria-label={alt}
       className={[
-        'group relative block overflow-hidden rounded-md bg-bg-elev-2 ring-1',
-        hero ? 'ring-[color-mix(in_oklch,var(--accent-500)_45%,var(--border))]' : 'ring-border',
-        hero || square ? 'aspect-square' : '',
-      ]
-        .filter(Boolean)
-        .join(' ')}
+        'group relative block h-[100px] shrink-0 overflow-hidden rounded-md bg-bg-elev-2 ring-1',
+        hero ? 'w-[128px] ring-[color-mix(in_oklch,var(--accent-500)_45%,var(--border))]' : 'w-[100px] ring-border',
+      ].join(' ')}
     >
       {thumb ? (
         <img src={thumb} alt={alt} loading="lazy" className="absolute inset-0 size-full object-cover" />
       ) : (
         <span className="absolute inset-0 grid place-items-center text-fg-dim">
-          {isVideo ? <VideoCameraIcon className="size-6" /> : <PhotoIcon className="size-6" />}
+          {isVideo ? <VideoCameraIcon className="size-5" /> : <PhotoIcon className="size-5" />}
         </span>
       )}
 
       {isVideo && !overflow && (
         <span className="pointer-events-none absolute inset-0 grid place-items-center">
-          <span className="grid size-7 place-items-center rounded-full bg-black/55 ring-1 ring-inset ring-white/25">
-            <PlayIcon className="size-3.5 translate-x-px text-white" />
+          <span className="grid size-6 place-items-center rounded-full bg-black/55 ring-1 ring-inset ring-white/25">
+            <PlayIcon className="size-3 translate-x-px text-white" />
           </span>
         </span>
       )}
 
       {hero && (
         <span
-          className="absolute left-1 top-1 rounded px-1.5 py-0.5 text-[8.5px] font-bold uppercase tracking-[0.04em] text-white"
+          className="absolute left-1 top-1 rounded px-1 py-0.5 text-[8px] font-bold uppercase tracking-[0.04em] text-white"
           style={{ background: 'var(--accent-500)' }}
         >
-          Nameplate
+          Profile
         </span>
       )}
 
       {overflow ? (
-        <span className="absolute inset-0 grid place-items-center bg-black/55 text-[15px] font-bold text-white">
+        <span className="absolute inset-0 grid place-items-center bg-black/55 text-[13px] font-bold text-white">
           +{overflow}
         </span>
       ) : showLabel ? (
-        <span className="absolute inset-x-0 bottom-0 flex items-center gap-1 bg-gradient-to-t from-black/65 to-transparent px-1.5 pb-1 pt-3 text-[9.5px] font-semibold text-white">
+        <span className="absolute inset-x-0 bottom-0 flex items-center gap-1 bg-gradient-to-t from-black/65 to-transparent px-1 pb-0.5 pt-2.5 text-[9px] font-semibold text-white">
           <span className="min-w-0 flex-1 truncate text-left">{label}</span>
           {isVideo && durationSeconds != null && (
             <span className="shrink-0 font-mono tabular-nums">{formatDuration(durationSeconds)}</span>

@@ -55,7 +55,7 @@ describe('EquipmentServiceHistoryTab', () => {
     mockGetAll.mockResolvedValue(pageOf([wo()]));
     renderWithProviders(<EquipmentServiceHistoryTab equipmentId="eq-1" />);
     expect(await screen.findByText('WO-1')).toBeInTheDocument();
-    expect(screen.getByText('Replaced capacitor')).toBeInTheDocument();
+    expect(screen.getByText(/Replaced capacitor/)).toBeInTheDocument();
     expect(screen.getByText(/\+1 more/i)).toBeInTheDocument();
     expect(screen.getByText('Tariq')).toBeInTheDocument();
     expect(screen.getByText('Completed')).toBeInTheDocument();
@@ -68,7 +68,7 @@ describe('EquipmentServiceHistoryTab', () => {
     const user = userEvent.setup();
     renderWithProviders(<EquipmentServiceHistoryTab equipmentId="eq-1" />);
     await screen.findByText('WO-1');
-    await user.type(screen.getByPlaceholderText(/search work orders/i), 'cap');
+    await user.type(screen.getByPlaceholderText(/search work/i), 'cap');
     await waitFor(() => {
       expect(mockGetAll.mock.calls.some(([a]) => a?.q === 'cap' && a?.equipmentId === 'eq-1')).toBe(true);
     });
@@ -79,7 +79,7 @@ describe('EquipmentServiceHistoryTab', () => {
     const user = userEvent.setup();
     renderWithProviders(<EquipmentServiceHistoryTab equipmentId="eq-1" />);
     await screen.findByText('WO-1');
-    const input = screen.getByPlaceholderText(/search work orders/i);
+    const input = screen.getByPlaceholderText(/search work/i);
     await user.type(input, 'cap');
     expect(input).toHaveValue('cap');
     await user.click(screen.getByRole('button', { name: /clear search/i }));
