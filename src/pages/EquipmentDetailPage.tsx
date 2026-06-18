@@ -8,9 +8,8 @@
 // order" is the only live status (derived from the WO list, not stored).
 //
 // Units / Filters / Notes are CONDITIONAL overview cards, not tabs (HVAC has
-// units + filters; a water heater doesn't). Photos / Videos stay as their own
-// tabs for now — they merge into a single Media tab + nameplate peek in the
-// next pass.
+// units + filters; a water heater doesn't). Photos + Videos live together on a
+// single Media tab, with a nameplate-called-out media peek on the overview.
 import { useState } from 'react';
 import { useParams, useNavigate, useLocation, Link as RouterLink } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -21,6 +20,7 @@ import {
   equipmentTypesApi,
   equipmentCategoriesApi,
   equipmentFiltersApi,
+  equipmentFilesApi,
   equipmentImagesApi,
   equipmentNotesApi,
   tenantFilterSizesApi,
@@ -74,16 +74,18 @@ import {
   EllipsisVerticalIcon,
   FunnelIcon,
   MapPinIcon,
+  PhotoIcon,
   PlusIcon,
   Square3Stack3DIcon,
   StarIcon as StarIconOutline,
+  VideoCameraIcon,
   WrenchScrewdriverIcon,
 } from '@heroicons/react/24/outline';
-import { StarIcon as StarIconSolid } from '@heroicons/react/24/solid';
+import { PlayIcon, StarIcon as StarIconSolid } from '@heroicons/react/24/solid';
 
-// Photos + Videos stay as tabs this pass; the rest fold into overview cards.
-type TabId = 'overview' | 'service-history' | 'photos' | 'videos' | 'notes';
-const EQUIPMENT_TABS: readonly TabId[] = ['overview', 'service-history', 'photos', 'videos', 'notes'];
+// Photos + Videos share one Media tab; the rest fold into overview cards.
+type TabId = 'overview' | 'service-history' | 'media' | 'notes';
+const EQUIPMENT_TABS: readonly TabId[] = ['overview', 'service-history', 'media', 'notes'];
 
 // Above this many tenant filter sizes the quick-add palette collapses to the
 // top N by sortOrder with a "Show all" toggle — keeps the Filters card tight.
@@ -136,6 +138,12 @@ function formatInstalled(iso: string | null | undefined): string | null {
   const m = now.getMonth() - d.getMonth();
   if (m < 0 || (m === 0 && now.getDate() < d.getDate())) years--;
   return `Installed ${monthYear}${years >= 1 ? ` (${years}y)` : ''}`;
+}
+
+// m:ss for a video's duration overlay (mirrors EquipmentVideosSection).
+function formatDuration(totalSeconds: number): string {
+  const s = Math.max(0, Math.round(totalSeconds));
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 }
 
 export default function EquipmentDetailPage() {
@@ -208,6 +216,16 @@ export default function EquipmentDetailPage() {
     queryFn: () => equipmentImagesApi.list(id!),
     enabled: !!id,
   });
+
+  // Videos — page-level read for the media peek + Media tab count. Shares the
+  // exact query key/fn EquipmentVideosSection uses, so the Media tab's own
+  // section reads from the same cache (no double fetch).
+  const { data: videosData } = useQuery({
+    queryKey: ['equipment-files', id, 'VIDEO'] as const,
+    queryFn: () => equipmentFilesApi.list(id!, { kind: 'VIDEO', limit: 50 }),
+    enabled: !!id,
+  });
+  const videos = (videosData?.content ?? []).filter((f) => f.status !== 'FAILED');
 
   // Full notes list — backs the Notes tab (the "show all" target until the
   // shared notes drawer lands). The overview card reads equipment.recentNotes.
@@ -363,12 +381,12 @@ export default function EquipmentDetailPage() {
     (wo) => wo.progressCategory !== 'COMPLETED' && wo.progressCategory !== 'CANCELLED'
   );
   const { has: hasWarranty, active: underWarranty } = warrantyState(equipment.warrantyExpiresAt);
+  const totalMedia = images.length + videos.length;
 
   const tabs: { id: TabId; label: string; count?: number }[] = [
     { id: 'overview', label: t('equipment.tabs.overview') },
     { id: 'service-history', label: t('equipment.tabs.serviceHistory'), count: serviceHistoryData?.totalElements ?? 0 },
-    { id: 'photos', label: t('equipment.tabs.photos'), count: images.length },
-    { id: 'videos', label: t('equipment.tabs.videos') },
+    { id: 'media', label: t('equipment.tabs.media'), count: totalMedia },
     { id: 'notes', label: t('equipment.tabs.notes'), count: allNotes.length },
   ];
 
@@ -446,6 +464,30 @@ export default function EquipmentDetailPage() {
   const descendantIds = new Set(descendants.map((d) => d.id));
   const units = descendants.filter((d) => !(d.parentId && descendantIds.has(d.parentId)));
   const showUnitsCard = !isSubUnit && units.length > 0;
+
+  // ── Media (peek + tab) ── The nameplate (profile photo) is the source of
+  // truth, so it's called out separately from the gallery. The peek shows the
+  // nameplate + a few gallery thumbs (photos and video posters).
+  const nameplate = images.find((img) => img.isProfile) ?? null;
+  const galleryPhotos = images.filter((img) => !img.isProfile);
+  const MEDIA_PEEK_MAX = 4;
+  const peekItems: MediaPeekItem[] = [
+    ...galleryPhotos.map((p) => ({
+      id: p.id,
+      thumb: p.thumbnailUrl ?? p.url,
+      alt: p.caption ?? equipment.name,
+    })),
+    ...videos.map((v) => ({
+      id: v.id,
+      thumb: v.thumbnailUrl,
+      alt: v.caption ?? v.fileName,
+      isVideo: true,
+      durationSeconds: v.durationSeconds,
+    })),
+  ];
+  const peekShown = peekItems.slice(0, MEDIA_PEEK_MAX);
+  const peekOverflow = peekItems.length - peekShown.length;
+  const goToMedia = () => setActiveTab('media');
 
   return (
     <AppLayout>
@@ -582,6 +624,54 @@ export default function EquipmentDetailPage() {
                     </ul>
                   </Card>
                 )}
+
+                {/* Media peek — nameplate called out separately from the gallery
+                    (it's the source of truth), then a few photo/video thumbs. */}
+                <Card
+                  title={<CardTitle icon={<PhotoIcon className="size-3.5" />}>{t('equipment.tabs.media')}</CardTitle>}
+                  action={totalMedia > 0 ? <CardLink onClick={goToMedia}>{t('common.viewAll')}</CardLink> : undefined}
+                >
+                  {totalMedia === 0 ? (
+                    <p className="text-[12px] text-fg-muted">No photos or videos yet</p>
+                  ) : (
+                    <div className="flex items-start gap-3">
+                      {nameplate && (
+                        <button
+                          type="button"
+                          onClick={goToMedia}
+                          className="flex shrink-0 flex-col items-center gap-1"
+                          aria-label="Nameplate photo"
+                        >
+                          <MediaThumb
+                            thumb={nameplate.thumbnailUrl ?? nameplate.url}
+                            alt={nameplate.caption ?? equipment.name}
+                            size="lg"
+                            ring="accent"
+                          />
+                          <span className="text-[10px] font-medium uppercase tracking-wide text-fg-muted">
+                            Nameplate
+                          </span>
+                        </button>
+                      )}
+                      <div className="flex flex-wrap gap-1.5">
+                        {peekShown.map((m) => (
+                          <button key={m.id} type="button" onClick={goToMedia} aria-label={m.alt}>
+                            <MediaThumb thumb={m.thumb} alt={m.alt} isVideo={m.isVideo} durationSeconds={m.durationSeconds} />
+                          </button>
+                        ))}
+                        {peekOverflow > 0 && (
+                          <button
+                            type="button"
+                            onClick={goToMedia}
+                            className="flex size-12 shrink-0 items-center justify-center rounded-md bg-bg-elev-2 text-[12px] font-semibold text-fg-muted ring-1 ring-border hover:text-fg-strong"
+                          >
+                            +{peekOverflow}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </Card>
 
                 {/* Notes — capped card (composer + recent). EquipmentNotesSection
                     brings its own "Notes (N)" heading + composer + "+N more"
@@ -808,27 +898,31 @@ export default function EquipmentDetailPage() {
           {/* ── Service history tab ── */}
           {activeTab === 'service-history' && id && <WorkOrdersList equipmentId={id} />}
 
-          {/* ── Photos tab ── (merges into Media next pass) */}
-          {activeTab === 'photos' && (
-            <div>
-              <div className="mb-3 flex items-center justify-end">
-                <Button
-                  size="xs"
-                  onClick={() => setIsImageUploadOpen(true)}
-                  disabled={imageLimitReached}
-                  title={
-                    imageLimitReached
-                      ? t('equipment.images.limitReached', {
-                          entity: getName('equipment'),
-                          max: EQUIPMENT_IMAGE_MAX_PER_EQUIPMENT,
-                        })
-                      : undefined
-                  }
-                >
-                  <PlusIcon className="size-4" />
-                  {t('equipment.images.addPhoto')}
-                </Button>
-              </div>
+          {/* ── Media tab ── photos + videos together */}
+          {activeTab === 'media' && (
+            <div className="flex flex-col gap-5">
+              <section>
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <h3 className="text-[12px] font-semibold uppercase tracking-wide text-fg-muted">
+                    {t('equipment.tabs.photos')}
+                  </h3>
+                  <Button
+                    size="xs"
+                    onClick={() => setIsImageUploadOpen(true)}
+                    disabled={imageLimitReached}
+                    title={
+                      imageLimitReached
+                        ? t('equipment.images.limitReached', {
+                            entity: getName('equipment'),
+                            max: EQUIPMENT_IMAGE_MAX_PER_EQUIPMENT,
+                          })
+                        : undefined
+                    }
+                  >
+                    <PlusIcon className="size-4" />
+                    {t('equipment.images.addPhoto')}
+                  </Button>
+                </div>
 
               {imagesError ? (
                 <Callout kind="danger">
@@ -905,11 +999,17 @@ export default function EquipmentDetailPage() {
                   ))}
                 </div>
               )}
+              </section>
+
+              {/* Videos */}
+              <section>
+                <h3 className="mb-2 text-[12px] font-semibold uppercase tracking-wide text-fg-muted">
+                  {t('equipment.tabs.videos')}
+                </h3>
+                {id && <EquipmentVideosSection equipmentId={id} />}
+              </section>
             </div>
           )}
-
-          {/* ── Videos tab ── (merges into Media next pass) */}
-          {activeTab === 'videos' && id && <EquipmentVideosSection equipmentId={id} />}
 
           {/* ── Notes tab ── (show-all target until the shared notes drawer lands) */}
           {activeTab === 'notes' && (
@@ -1062,6 +1162,67 @@ function UnitRow({ unit }: { unit: EquipmentSummary }) {
         <ChevronRightIcon className="size-4 shrink-0 text-fg-dim" />
       </RouterLink>
     </li>
+  );
+}
+
+interface MediaPeekItem {
+  id: string;
+  thumb: string | null;
+  alt: string;
+  isVideo?: boolean;
+  durationSeconds?: number | null;
+}
+
+/**
+ * A single media thumbnail for the overview peek — a photo or a video poster.
+ * Videos carry a play badge and (when known) a duration overlay; the nameplate
+ * uses the larger `lg` size + accent ring to read as the source-of-truth tile.
+ */
+function MediaThumb({
+  thumb,
+  alt,
+  isVideo = false,
+  durationSeconds,
+  size = 'md',
+  ring = 'default',
+}: {
+  thumb: string | null;
+  alt: string;
+  isVideo?: boolean;
+  durationSeconds?: number | null;
+  size?: 'md' | 'lg';
+  ring?: 'default' | 'accent';
+}) {
+  return (
+    <div
+      className={[
+        'relative shrink-0 overflow-hidden rounded-md bg-bg-elev-2 ring-1',
+        ring === 'accent' ? 'ring-accent-500' : 'ring-border',
+        size === 'lg' ? 'size-16' : 'size-12',
+      ].join(' ')}
+    >
+      {thumb ? (
+        <img src={thumb} alt={alt} loading="lazy" className="size-full object-cover" />
+      ) : (
+        <span className="flex size-full items-center justify-center text-fg-dim">
+          {isVideo ? <VideoCameraIcon className="size-5" /> : <PhotoIcon className="size-5" />}
+        </span>
+      )}
+      {isVideo && (
+        <>
+          <span className="pointer-events-none absolute inset-0 flex items-center justify-center">
+            <span className="flex size-6 items-center justify-center rounded-full bg-black/55 ring-1 ring-inset ring-white/25">
+              <PlayIcon className="size-3 translate-x-px text-white" />
+            </span>
+          </span>
+          {durationSeconds != null && (
+            <span className="absolute bottom-0.5 right-0.5 rounded bg-black/75 px-1 py-px font-mono text-[9px] font-medium tabular-nums text-white">
+              {formatDuration(durationSeconds)}
+            </span>
+          )}
+        </>
+      )}
+    </div>
   );
 }
 
