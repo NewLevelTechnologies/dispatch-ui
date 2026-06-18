@@ -675,23 +675,16 @@ export default function EquipmentDetailPage() {
                   </Card>
                 )}
 
-                {/* Media peek — wide profile-photo hero + a row of uniform-height
-                    thumbs; "+N" overlays the last tile. Mirrors the Media tab grid. */}
+                {/* Media peek — a compact single row of ~88px-tall thumbs (a glance);
+                    the full browsing gallery is the Media tab. "+N" overlays the last tile. */}
                 <Card
                   title={<CardTitle icon={<PhotoIcon className="size-3.5" />}>{t('equipment.tabs.media')}</CardTitle>}
-                  action={totalMedia > 0 ? <CardLink onClick={goToMedia}>{t('common.viewAll')} {totalMedia}</CardLink> : undefined}
+                  action={totalMedia > 0 ? <CardLink onClick={goToMedia}>{t('common.viewAll')} {totalMedia} →</CardLink> : undefined}
                 >
                   {totalMedia === 0 ? (
                     <p className="text-[12px] text-fg-muted">No photos or videos yet</p>
                   ) : (
-                    <div
-                      className="grid items-stretch gap-1.5"
-                      style={{
-                        gridTemplateColumns: profilePhoto
-                          ? `1.4fr repeat(${Math.max(peekShown.length, 1)}, minmax(0,1fr))`
-                          : `repeat(${Math.max(peekShown.length, 1)}, minmax(0,1fr))`,
-                      }}
-                    >
+                    <div className="flex gap-1.5 overflow-hidden">
                       {profilePhoto && (
                         <MediaPeekTile
                           onClick={goToMedia}
@@ -710,7 +703,6 @@ export default function EquipmentDetailPage() {
                           label={m.label}
                           isVideo={m.isVideo}
                           durationSeconds={m.durationSeconds}
-                          square={!profilePhoto}
                           overflow={i === peekShown.length - 1 ? peekOverflow : 0}
                         />
                       ))}
@@ -1259,6 +1251,10 @@ interface MediaPeekItem {
  * duration; a label rides a bottom gradient; `overflow` paints a "+N" cover on
  * the last tile. `square` makes a tile self-size when there's no hero anchor.
  */
+// Compact peek tile — fixed 88px-tall thumbnail for the overview Media glance.
+// The lead/profile tile is a touch wider (and accent-ringed); the rest are
+// 88px squares. Play badge, duration, and label caption are kept but shrunk —
+// big browsing belongs to the Media tab.
 function MediaPeekTile({
   thumb,
   alt,
@@ -1266,7 +1262,6 @@ function MediaPeekTile({
   isVideo = false,
   durationSeconds,
   hero = false,
-  square = false,
   overflow = 0,
   onClick,
 }: {
@@ -1276,7 +1271,6 @@ function MediaPeekTile({
   isVideo?: boolean;
   durationSeconds?: number | null;
   hero?: boolean;
-  square?: boolean;
   overflow?: number;
   onClick: () => void;
 }) {
@@ -1287,32 +1281,29 @@ function MediaPeekTile({
       onClick={onClick}
       aria-label={alt}
       className={[
-        'group relative block overflow-hidden rounded-md bg-bg-elev-2 ring-1',
-        hero ? 'ring-[color-mix(in_oklch,var(--accent-500)_45%,var(--border))]' : 'ring-border',
-        hero || square ? 'aspect-square' : '',
-      ]
-        .filter(Boolean)
-        .join(' ')}
+        'group relative block h-[88px] shrink-0 overflow-hidden rounded-md bg-bg-elev-2 ring-1',
+        hero ? 'w-[112px] ring-[color-mix(in_oklch,var(--accent-500)_45%,var(--border))]' : 'w-[88px] ring-border',
+      ].join(' ')}
     >
       {thumb ? (
         <img src={thumb} alt={alt} loading="lazy" className="absolute inset-0 size-full object-cover" />
       ) : (
         <span className="absolute inset-0 grid place-items-center text-fg-dim">
-          {isVideo ? <VideoCameraIcon className="size-6" /> : <PhotoIcon className="size-6" />}
+          {isVideo ? <VideoCameraIcon className="size-5" /> : <PhotoIcon className="size-5" />}
         </span>
       )}
 
       {isVideo && !overflow && (
         <span className="pointer-events-none absolute inset-0 grid place-items-center">
-          <span className="grid size-7 place-items-center rounded-full bg-black/55 ring-1 ring-inset ring-white/25">
-            <PlayIcon className="size-3.5 translate-x-px text-white" />
+          <span className="grid size-6 place-items-center rounded-full bg-black/55 ring-1 ring-inset ring-white/25">
+            <PlayIcon className="size-3 translate-x-px text-white" />
           </span>
         </span>
       )}
 
       {hero && (
         <span
-          className="absolute left-1 top-1 rounded px-1.5 py-0.5 text-[8.5px] font-bold uppercase tracking-[0.04em] text-white"
+          className="absolute left-1 top-1 rounded px-1 py-0.5 text-[8px] font-bold uppercase tracking-[0.04em] text-white"
           style={{ background: 'var(--accent-500)' }}
         >
           Profile
@@ -1320,11 +1311,11 @@ function MediaPeekTile({
       )}
 
       {overflow ? (
-        <span className="absolute inset-0 grid place-items-center bg-black/55 text-[15px] font-bold text-white">
+        <span className="absolute inset-0 grid place-items-center bg-black/55 text-[13px] font-bold text-white">
           +{overflow}
         </span>
       ) : showLabel ? (
-        <span className="absolute inset-x-0 bottom-0 flex items-center gap-1 bg-gradient-to-t from-black/65 to-transparent px-1.5 pb-1 pt-3 text-[9.5px] font-semibold text-white">
+        <span className="absolute inset-x-0 bottom-0 flex items-center gap-1 bg-gradient-to-t from-black/65 to-transparent px-1 pb-0.5 pt-2.5 text-[9px] font-semibold text-white">
           <span className="min-w-0 flex-1 truncate text-left">{label}</span>
           {isVideo && durationSeconds != null && (
             <span className="shrink-0 font-mono tabular-nums">{formatDuration(durationSeconds)}</span>
