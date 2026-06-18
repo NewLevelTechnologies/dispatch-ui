@@ -52,6 +52,7 @@ import { Pill } from '../components/ui/Pill';
 import { Tabs } from '../components/ui/Tabs';
 import { Callout } from '../components/ui/Callout';
 import { DenseTable, DenseTHead, DenseRow } from '../components/ui/DenseTable';
+import { AssignedUsersCell } from '../components/ui/AssignedUsersCell';
 import IconButton from '../components/IconButton';
 import ConfirmDialog from '../components/ConfirmDialog';
 import EditableField from '../components/EditableField';
@@ -600,7 +601,6 @@ export default function EquipmentDetailPage() {
                             const woNumber = wo.workOrderNumber ?? `#${wo.id.slice(0, 8)}`;
                             const firstItem = wo.workItems[0];
                             const extra = wo.workItemCount - 1;
-                            const techs = wo.assignedUsers ?? [];
                             const live =
                               wo.progressCategory === 'IN_PROGRESS' && wo.lifecycleState !== 'CANCELLED';
                             return (
@@ -615,15 +615,8 @@ export default function EquipmentDetailPage() {
                                   <span className="text-[12px] text-fg">{firstItem?.description ?? '—'}</span>
                                   {extra > 0 && <span className="ml-1 text-[11px] text-fg-dim">+{extra} more</span>}
                                 </td>
-                                <td className="text-[12px] text-fg">
-                                  {techs.length > 0 ? (
-                                    <>
-                                      {techs[0].name ?? 'Unassigned'}
-                                      {techs.length > 1 && <span className="text-fg-dim"> +{techs.length - 1}</span>}
-                                    </>
-                                  ) : (
-                                    <span className="text-fg-dim">—</span>
-                                  )}
+                                <td>
+                                  <AssignedUsersCell users={wo.assignedUsers} />
                                 </td>
                                 <td className="right font-mono text-[12px] tabular-nums text-fg-dim">—</td>
                               </DenseRow>
@@ -946,31 +939,32 @@ export default function EquipmentDetailPage() {
           {/* ── Service history tab ── */}
           {activeTab === 'service-history' && id && <EquipmentServiceHistoryTab equipmentId={id} />}
 
-          {/* ── Media tab ── photos + videos together */}
+          {/* ── Media tab ── nameplate callout, then Photos + Videos galleries */}
           {activeTab === 'media' && (
-            <div className="flex flex-col gap-5">
-              <section>
-                <div className="mb-2 flex items-center justify-between gap-2">
-                  <h3 className="text-[12px] font-semibold uppercase tracking-wide text-fg-muted">
-                    {t('equipment.tabs.photos')}
-                  </h3>
-                  <Button
-                    size="xs"
-                    onClick={() => setIsImageUploadOpen(true)}
-                    disabled={imageLimitReached}
-                    title={
-                      imageLimitReached
-                        ? t('equipment.images.limitReached', {
-                            entity: getName('equipment'),
-                            max: EQUIPMENT_IMAGE_MAX_PER_EQUIPMENT,
-                          })
-                        : undefined
-                    }
-                  >
-                    <PlusIcon className="size-4" />
-                    {t('equipment.images.addPhoto')}
-                  </Button>
-                </div>
+            <div className="flex flex-col gap-4">
+              {/* Header — counts + add */}
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-[12px] text-fg-muted">
+                  {images.length + videos.length} items · {images.length} photos · {videos.length} videos
+                </span>
+                <span className="flex-1" />
+                <Button
+                  size="xs"
+                  onClick={() => setIsImageUploadOpen(true)}
+                  disabled={imageLimitReached}
+                  title={
+                    imageLimitReached
+                      ? t('equipment.images.limitReached', {
+                          entity: getName('equipment'),
+                          max: EQUIPMENT_IMAGE_MAX_PER_EQUIPMENT,
+                        })
+                      : undefined
+                  }
+                >
+                  <PlusIcon className="size-4" />
+                  {t('equipment.images.addPhoto')}
+                </Button>
+              </div>
 
               {imagesError ? (
                 <Callout kind="danger">
@@ -978,101 +972,138 @@ export default function EquipmentDetailPage() {
                 </Callout>
               ) : imagesLoading ? (
                 <div className="px-3.5 py-10 text-center text-[12px] text-fg-muted">{t('equipment.images.loading')}</div>
-              ) : images.length === 0 ? (
-                <div className="rounded-[10px] border border-dashed border-border px-3.5 py-10 text-center text-[12px] text-fg-muted">
-                  {t('equipment.images.empty')}
-                </div>
               ) : (
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-                  {orderedImages.map((img, i) => (
-                    <div
-                      key={img.id}
-                      className={`group relative overflow-hidden rounded-lg ring-1 ${
-                        img.isProfile
-                          ? 'ring-[color-mix(in_oklch,var(--accent-500)_45%,var(--border))]'
-                          : 'ring-border'
-                      }`}
-                    >
-                      <button
-                        type="button"
-                        onClick={() => setLightboxIndex(i)}
-                        aria-label={t('equipment.images.openFullSize')}
-                        className="block aspect-square w-full bg-bg-elev-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-500"
-                      >
-                        <img
-                          src={img.thumbnailUrl ?? img.url}
-                          alt={img.caption ?? equipment.name}
-                          className="size-full object-cover transition-opacity group-hover:opacity-90"
-                          loading="lazy"
-                        />
-                      </button>
-
-                      {img.isProfile ? (
-                        // The nameplate is the source of truth — call it out, no set-profile control.
-                        <span
-                          className="absolute left-1 top-1 rounded px-1.5 py-0.5 text-[8.5px] font-bold uppercase tracking-[0.04em] text-white"
-                          style={{ background: 'var(--accent-500)' }}
-                        >
-                          Nameplate
-                        </span>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => handleSetProfileImage(img)}
-                          aria-label={t('equipment.images.setAsProfile')}
-                          title={t('equipment.images.setAsProfile')}
-                          className="absolute left-1 top-1 flex size-8 items-center justify-center rounded-full bg-bg-elev/80 backdrop-blur transition-colors hover:bg-bg-elev"
-                        >
-                          <StarIconOutline className="size-5 text-fg-muted hover:text-amber-500" />
-                        </button>
-                      )}
-
-                      <div className="absolute right-1 top-1">
-                        <Dropdown>
-                          <DropdownButton
-                            plain
-                            aria-label={t('common.moreOptions')}
-                            className="rounded-full bg-bg-elev/80 backdrop-blur"
-                          >
-                            <EllipsisVerticalIcon className="size-5" />
-                          </DropdownButton>
-                          <DropdownMenu anchor="bottom end">
-                            <DropdownItem onClick={() => handleEditCaption(img)}>
-                              <DropdownLabel>{t('equipment.images.editCaption')}</DropdownLabel>
-                            </DropdownItem>
-                            <DropdownItem onClick={() => handleDeleteImage(img)}>
-                              <DropdownLabel>{t('common.delete')}</DropdownLabel>
-                            </DropdownItem>
-                          </DropdownMenu>
-                        </Dropdown>
-                      </div>
-
-                      {/* Caption + by/when */}
-                      {(img.caption || img.uploadedByName || img.createdAt) && (
-                        <div className="border-t border-border bg-bg-elev px-2 py-1">
-                          {img.caption && (
-                            <div className="line-clamp-1 text-[11px] text-fg-strong">{img.caption}</div>
-                          )}
-                          {(img.uploadedByName || img.createdAt) && (
-                            <div className="truncate text-[10px] text-fg-muted">
-                              {[img.uploadedByName, formatTimestamp(img.createdAt)].filter(Boolean).join(' · ')}
-                            </div>
-                          )}
+                <>
+                  {/* Nameplate — source of truth, called out on its own. */}
+                  {nameplate && (
+                    <Card padding="none">
+                      <div className="p-3">
+                        <div className="mb-2 text-[10.5px] font-semibold uppercase tracking-[0.08em] text-fg-accent">
+                          Nameplate · source of truth
                         </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-              </section>
+                        <div className="grid items-center gap-3.5 sm:grid-cols-[160px_1fr]">
+                          <button
+                            type="button"
+                            onClick={() => setLightboxIndex(0)}
+                            aria-label={t('equipment.images.openFullSize')}
+                            className="relative block aspect-square overflow-hidden rounded-md bg-bg-elev-2 ring-1 ring-[color-mix(in_oklch,var(--accent-500)_45%,var(--border))] focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-500"
+                          >
+                            <img
+                              src={nameplate.thumbnailUrl ?? nameplate.url}
+                              alt={nameplate.caption ?? equipment.name}
+                              className="absolute inset-0 size-full object-cover"
+                              loading="lazy"
+                            />
+                            <span
+                              className="absolute left-1 top-1 rounded px-1.5 py-0.5 text-[8.5px] font-bold uppercase tracking-[0.04em] text-white"
+                              style={{ background: 'var(--accent-500)' }}
+                            >
+                              Nameplate
+                            </span>
+                          </button>
+                          <div className="text-[12px] leading-relaxed text-fg-muted">
+                            The data-plate photo techs shoot at install — the authority for model, serial, and warranty
+                            terms. The specs on this page are transcribed from it; open it to read the plate directly.
+                            {(nameplate.uploadedByName || nameplate.createdAt) && (
+                              <div className="mt-1.5 text-[11px] text-fg-dim">
+                                Added by {[nameplate.uploadedByName, formatTimestamp(nameplate.createdAt)].filter(Boolean).join(' · ')}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </Card>
+                  )}
 
-              {/* Videos */}
-              <section>
-                <h3 className="mb-2 text-[12px] font-semibold uppercase tracking-wide text-fg-muted">
-                  {t('equipment.tabs.videos')}
-                </h3>
-                {id && <EquipmentVideosSection equipmentId={id} />}
-              </section>
+                  {/* Photos gallery */}
+                  <Card
+                    title={<CardTitle>{t('equipment.tabs.photos')}</CardTitle>}
+                    action={<span className="text-[11px] text-fg-dim">{images.length}</span>}
+                    padding="none"
+                  >
+                    {images.length === 0 ? (
+                      <div className="px-3.5 py-10 text-center text-[12px] text-fg-muted">{t('equipment.images.empty')}</div>
+                    ) : galleryPhotos.length === 0 ? (
+                      <div className="px-3.5 py-6 text-center text-[12px] text-fg-muted">No other photos yet.</div>
+                    ) : (
+                      <div
+                        className="grid gap-3 p-3"
+                        style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))' }}
+                      >
+                        {galleryPhotos.map((img, gi) => {
+                          const lbIndex = nameplate ? gi + 1 : gi;
+                          return (
+                            <div key={img.id} className="group relative overflow-hidden rounded-lg ring-1 ring-border">
+                              <button
+                                type="button"
+                                onClick={() => setLightboxIndex(lbIndex)}
+                                aria-label={t('equipment.images.openFullSize')}
+                                className="block aspect-square w-full bg-bg-elev-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-500"
+                              >
+                                <img
+                                  src={img.thumbnailUrl ?? img.url}
+                                  alt={img.caption ?? equipment.name}
+                                  className="size-full object-cover transition-opacity group-hover:opacity-90"
+                                  loading="lazy"
+                                />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleSetProfileImage(img)}
+                                aria-label={t('equipment.images.setAsProfile')}
+                                title={t('equipment.images.setAsProfile')}
+                                className="absolute left-1 top-1 flex size-8 items-center justify-center rounded-full bg-bg-elev/80 backdrop-blur transition-colors hover:bg-bg-elev"
+                              >
+                                <StarIconOutline className="size-5 text-fg-muted hover:text-amber-500" />
+                              </button>
+                              <div className="absolute right-1 top-1">
+                                <Dropdown>
+                                  <DropdownButton
+                                    plain
+                                    aria-label={t('common.moreOptions')}
+                                    className="rounded-full bg-bg-elev/80 backdrop-blur"
+                                  >
+                                    <EllipsisVerticalIcon className="size-5" />
+                                  </DropdownButton>
+                                  <DropdownMenu anchor="bottom end">
+                                    <DropdownItem onClick={() => handleEditCaption(img)}>
+                                      <DropdownLabel>{t('equipment.images.editCaption')}</DropdownLabel>
+                                    </DropdownItem>
+                                    <DropdownItem onClick={() => handleDeleteImage(img)}>
+                                      <DropdownLabel>{t('common.delete')}</DropdownLabel>
+                                    </DropdownItem>
+                                  </DropdownMenu>
+                                </Dropdown>
+                              </div>
+                              {(img.caption || img.uploadedByName || img.createdAt) && (
+                                <div className="border-t border-border bg-bg-elev px-2 py-1">
+                                  {img.caption && (
+                                    <div className="line-clamp-1 text-[11px] text-fg-strong">{img.caption}</div>
+                                  )}
+                                  {(img.uploadedByName || img.createdAt) && (
+                                    <div className="truncate text-[10px] text-fg-muted">
+                                      {[img.uploadedByName, formatTimestamp(img.createdAt)].filter(Boolean).join(' · ')}
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </Card>
+
+                  {/* Videos gallery */}
+                  <Card
+                    title={<CardTitle>{t('equipment.tabs.videos')}</CardTitle>}
+                    action={<span className="text-[11px] text-fg-dim">{videos.length}</span>}
+                    padding="none"
+                  >
+                    <div className="p-3">{id && <EquipmentVideosSection equipmentId={id} />}</div>
+                  </Card>
+                </>
+              )}
             </div>
           )}
 
