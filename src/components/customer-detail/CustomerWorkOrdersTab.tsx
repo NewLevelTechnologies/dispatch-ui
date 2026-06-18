@@ -24,6 +24,7 @@ import { useGlossary } from '../../contexts/GlossaryContext';
 import { Card } from '../catalyst/card';
 import { Button } from '../catalyst/button';
 import { Pill } from '../ui/Pill';
+import { WorkOrderTypePill } from '../ui/WorkOrderTypePill';
 import { DenseTable, DenseTHead, DenseRow, CellStack, CellTop, CellSub } from '../ui/DenseTable';
 import { SortHeader, type SortState } from '../ui/SortHeader';
 import { AssignedUsersCell } from '../ui/AssignedUsersCell';
@@ -299,7 +300,12 @@ export default function CustomerWorkOrdersTab({
                 </DenseTHead>
                 <tbody>
                   {rows.map((wo) => (
-                    <JobDenseRow key={wo.id} wo={wo} typeName={typeName(wo.workOrderTypeId)} />
+                    <JobDenseRow
+                      key={wo.id}
+                      wo={wo}
+                      typeName={typeName(wo.workOrderTypeId)}
+                      typeAccentId={safeTypes.find((tp) => tp.id === wo.workOrderTypeId)?.accentId}
+                    />
                   ))}
                 </tbody>
               </DenseTable>
@@ -321,7 +327,15 @@ export default function CustomerWorkOrdersTab({
   );
 }
 
-function JobDenseRow({ wo, typeName }: { wo: WorkOrderSummary; typeName?: string }) {
+function JobDenseRow({
+  wo,
+  typeName,
+  typeAccentId,
+}: {
+  wo: WorkOrderSummary;
+  typeName?: string;
+  typeAccentId?: string | null;
+}) {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const priority = wo.priority ?? 'NORMAL';
@@ -345,11 +359,7 @@ function JobDenseRow({ wo, typeName }: { wo: WorkOrderSummary; typeName?: string
               <span className="font-mono font-bold text-fg-strong">
                 {wo.workOrderNumber || `#${wo.id.slice(0, 8)}`}
               </span>
-              {typeName && (
-                <span className="rounded-[3px] border border-border-soft bg-bg-active px-1.5 text-[10px] font-semibold text-fg-muted">
-                  {typeName}
-                </span>
-              )}
+              <WorkOrderTypePill type={{ name: typeName, accentId: typeAccentId }} />
               {elevated && (
                 <span
                   className="rounded-[3px] px-1.5 text-[9.5px] font-bold tracking-wide"

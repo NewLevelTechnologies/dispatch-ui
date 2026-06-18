@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { renderWithProviders, userEvent } from '../test/utils';
 import EquipmentMediaLightbox, { type MediaLightboxItem } from './EquipmentMediaLightbox';
 import type { EquipmentImage, WorkOrderFile } from '../api';
@@ -137,6 +137,106 @@ describe('EquipmentMediaLightbox', () => {
     await waitFor(() => {
       expect(mockFileDelete).toHaveBeenCalledWith('eq-1', 'v1');
     });
+  });
+
+  it('edits a photo caption via the images API', async () => {
+    mockImagePatch.mockResolvedValue({});
+    const user = userEvent.setup();
+    const withCaption: MediaLightboxItem[] = [{ kind: 'image', image: image({ id: 'p1', caption: 'Old' }) }];
+    renderWithProviders(
+      <EquipmentMediaLightbox equipmentId="eq-1" items={withCaption} startIndex={0} onClose={vi.fn()} />
+    );
+    await user.click(screen.getByRole('button', { name: 'Old' }));
+    const input = screen.getByRole('textbox');
+    await user.clear(input);
+    await user.type(input, 'New caption{Enter}');
+    await waitFor(() => {
+      expect(mockImagePatch).toHaveBeenCalledWith('eq-1', 'p1', { caption: 'New caption' });
+    });
+  });
+
+  it('deletes a photo via the images API', async () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    mockImageDelete.mockResolvedValue(undefined);
+    const user = userEvent.setup();
+    renderWithProviders(
+      <EquipmentMediaLightbox equipmentId="eq-1" items={items} startIndex={0} onClose={vi.fn()} />
+    );
+    await user.click(screen.getByRole('button', { name: /^delete$/i }));
+    await waitFor(() => expect(mockImageDelete).toHaveBeenCalledWith('eq-1', 'p1'));
+  });
+
+  it('shows a download fallback when a video fails to load', async () => {
+    renderWithProviders(
+      <EquipmentMediaLightbox equipmentId="eq-1" items={items} startIndex={2} onClose={vi.fn()} />
+    );
+    const videoEl = document.querySelector('video') as HTMLVideoElement;
+    fireEvent.error(videoEl);
+    expect(await screen.findByText(/couldn.t be loaded/i)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /download/i })).toBeInTheDocument();
+  });
+
+  it('edits a photo caption and saves it via the images API', async () => {
+    mockImagePatch.mockResolvedValue({});
+    const user = userEvent.setup();
+    const withCaption: MediaLightboxItem[] = [
+      { kind: 'image', image: image({ id: 'p1', url: 'https://cdn/p1.jpg', caption: 'Old' }) },
+    ];
+    renderWithProviders(
+      <EquipmentMediaLightbox equipmentId="eq-1" items={withCaption} startIndex={0} onClose={vi.fn()} />
+    );
+    await user.click(screen.getByRole('button', { name: 'Old' }));
+    const input = screen.getByRole('textbox');
+    await user.clear(input);
+    await user.type(input, 'New caption{Enter}');
+    await waitFor(() => {
+      expect(mockImagePatch).toHaveBeenCalledWith('eq-1', 'p1', { caption: 'New caption' });
+    });
+  });
+
+  it('shows a download fallback when a video fails to load', async () => {
+    const videoItems: MediaLightboxItem[] = [
+      { kind: 'video', video: video({ id: 'v1', url: 'https://cdn/v1.mp4', fileName: 'clip.mp4' }) },
+    ];
+    renderWithProviders(
+      <EquipmentMediaLightbox equipmentId="eq-1" items={videoItems} startIndex={0} onClose={vi.fn()} />
+    );
+    fireEvent.error(document.querySelector('video') as HTMLVideoElement);
+    expect(await screen.findByText(/couldn.t be loaded/i)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /download/i })).toHaveAttribute('href', 'https://cdn/v1.mp4');
+  });
+
+  it('navigates with the Prev button', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(
+      <EquipmentMediaLightbox equipmentId="eq-1" items={items} startIndex={1} onClose={vi.fn()} />
+    );
+    expect(document.querySelector('img[src="https://cdn/p2.jpg"]')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /^previous$/i }));
+    expect(document.querySelector('img[src="https://cdn/p1.jpg"]')).toBeInTheDocument();
+  });
+
+  it('navigates with the arrow keys', () => {
+    renderWithProviders(
+      <EquipmentMediaLightbox equipmentId="eq-1" items={items} startIndex={0} onClose={vi.fn()} />
+    );
+    expect(document.querySelector('img[src="https://cdn/p1.jpg"]')).toBeInTheDocument();
+    fireEvent.keyDown(window, { key: 'ArrowRight' });
+    expect(document.querySelector('img[src="https://cdn/p2.jpg"]')).toBeInTheDocument();
+    fireEvent.keyDown(window, { key: 'ArrowLeft' });
+    expect(document.querySelector('img[src="https://cdn/p1.jpg"]')).toBeInTheDocument();
+  });
+
+  it('cancels a caption edit on Escape without saving', async () => {
+    const user = userEvent.setup();
+    const withCaption: MediaLightboxItem[] = [{ kind: 'image', image: image({ id: 'p1', caption: 'Old' }) }];
+    renderWithProviders(
+      <EquipmentMediaLightbox equipmentId="eq-1" items={withCaption} startIndex={0} onClose={vi.fn()} />
+    );
+    await user.click(screen.getByRole('button', { name: 'Old' }));
+    await user.type(screen.getByRole('textbox'), ' edited{Escape}');
+    expect(mockImagePatch).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: 'Old' })).toBeInTheDocument();
   });
 
   it('hides every mutating action in readOnly mode', () => {

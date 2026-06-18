@@ -97,6 +97,7 @@ import EquipmentThumbnail from '../components/EquipmentThumbnail';
 import ConfirmDialog from '../components/ConfirmDialog';
 import NoteDialog from '../components/NoteDialog';
 import { AssignedUsersCell } from '../components/ui/AssignedUsersCell';
+import { WorkOrderTypePill } from '../components/ui/WorkOrderTypePill';
 import TagPicker from '../components/TagPicker';
 import { TagPill } from '../components/ui/TagPill';
 import { nextTagColor } from '../utils/tagColor';
@@ -1233,7 +1234,7 @@ export function SiteWorkOrdersCard({
                 <WorkOrderRow
                   key={wo.id}
                   wo={wo}
-                  typeName={safeTypes.find((tp) => tp.id === wo.workOrderTypeId)?.name}
+                  woType={safeTypes.find((tp) => tp.id === wo.workOrderTypeId)}
                 />
               ))}
             </tbody>
@@ -1246,7 +1247,7 @@ export function SiteWorkOrdersCard({
             <WorkOrderCardMobile
               key={wo.id}
               wo={wo}
-              typeName={safeTypes.find((tp) => tp.id === wo.workOrderTypeId)?.name}
+              woType={safeTypes.find((tp) => tp.id === wo.workOrderTypeId)}
             />
           ))}
         </ul>
@@ -1272,7 +1273,11 @@ function woRowTint(wo: WorkOrderSummary): string {
 
 // Title line shared by the desktop row and the mobile card — WO id (mono) +
 // type pill + elevated-priority chip. Identical markup in both layouts.
-function WoTitleLine({ wo, typeName }: { wo: WorkOrderSummary; typeName?: string }) {
+// Minimal work-order-type shape the rows pass down for the colored type pill +
+// the deriveJobLabel name fallback. A full WorkOrderType satisfies it.
+type WoTypeRef = { name: string; accentId?: string | null };
+
+function WoTitleLine({ wo, woType }: { wo: WorkOrderSummary; woType?: WoTypeRef }) {
   const { t } = useTranslation();
   const priority = wo.priority ?? 'NORMAL';
   const elevated = priority === 'URGENT' || priority === 'HIGH';
@@ -1281,11 +1286,7 @@ function WoTitleLine({ wo, typeName }: { wo: WorkOrderSummary; typeName?: string
       <span className="font-mono text-[12px] font-bold text-fg-strong">
         {wo.workOrderNumber || `#${wo.id.slice(0, 8)}`}
       </span>
-      {typeName && (
-        <span className="rounded-[3px] border border-border-soft bg-bg-active px-1.5 text-[10px] font-semibold text-fg-muted">
-          {typeName}
-        </span>
-      )}
+      <WorkOrderTypePill type={woType} />
       {elevated && (
         <span
           className="rounded-[3px] px-1.5 text-[9.5px] font-bold tracking-wider"
@@ -1316,20 +1317,20 @@ function WoStatusPill({ wo }: { wo: WorkOrderSummary }) {
 
 function WorkOrderRow({
   wo,
-  typeName,
+  woType,
 }: {
   wo: WorkOrderSummary;
-  typeName?: string;
+  woType?: WoTypeRef;
 }) {
   const navigate = useNavigate();
-  const jobLabel = deriveJobLabel(wo, typeName);
+  const jobLabel = deriveJobLabel(wo, woType?.name);
   return (
     <tr
       className={`cursor-pointer border-b border-border-soft hover:bg-bg-hover ${woRowTint(wo)}`}
       onClick={() => navigate(`/work-orders/${wo.id}`)}
     >
       <td className="px-3.5 py-2">
-        <WoTitleLine wo={wo} typeName={typeName} />
+        <WoTitleLine wo={wo} woType={woType} />
         {/* AI/derived summary as the .bot subline — subordinate to the WO id
             above it (10.5px), but --fg (not dim) since it's real content. */}
         <div className="mt-0.5 max-w-[420px] truncate text-[10.5px] text-fg" title={jobLabel}>
@@ -1362,9 +1363,9 @@ function WorkOrderRow({
 // lead line 1 with the status pill pinned right (never clipped), the summary on
 // line 2, and equipment · tech · scheduled fold into one wrapping muted meta
 // line. The whole block navigates to the WO.
-function WorkOrderCardMobile({ wo, typeName }: { wo: WorkOrderSummary; typeName?: string }) {
+function WorkOrderCardMobile({ wo, woType }: { wo: WorkOrderSummary; woType?: WoTypeRef }) {
   const navigate = useNavigate();
-  const jobLabel = deriveJobLabel(wo, typeName);
+  const jobLabel = deriveJobLabel(wo, woType?.name);
   const go = () => navigate(`/work-orders/${wo.id}`);
 
   // Render only the meta segments that exist, separated by · (mirrors the
@@ -1402,7 +1403,7 @@ function WorkOrderCardMobile({ wo, typeName }: { wo: WorkOrderSummary; typeName?
       >
         {/* Line 1 — id + type + priority (left), status pill pinned right */}
         <div className="flex items-start justify-between gap-2">
-          <WoTitleLine wo={wo} typeName={typeName} />
+          <WoTitleLine wo={wo} woType={woType} />
           <div className="shrink-0">
             <WoStatusPill wo={wo} />
           </div>
@@ -4212,9 +4213,9 @@ const JOBS_PAGE_SIZE = 25;
 // curated peek card instead.) Reuses the shared WoTitleLine / WoStatusPill so
 // the cell content matches the peek; the row tint maps to the DenseTable tint
 // classes via the same rule as woRowTint.
-function JobDenseRow({ wo, typeName }: { wo: WorkOrderSummary; typeName?: string }) {
+function JobDenseRow({ wo, woType }: { wo: WorkOrderSummary; woType?: WoTypeRef }) {
   const navigate = useNavigate();
-  const jobLabel = deriveJobLabel(wo, typeName);
+  const jobLabel = deriveJobLabel(wo, woType?.name);
   const elevated = wo.priority === 'URGENT' || wo.priority === 'HIGH';
   const tintClass =
     wo.lifecycleState === 'CANCELLED'
@@ -4227,7 +4228,7 @@ function JobDenseRow({ wo, typeName }: { wo: WorkOrderSummary; typeName?: string
   return (
     <DenseRow className={tintClass} onClick={() => navigate(`/work-orders/${wo.id}`)}>
       <td>
-        <WoTitleLine wo={wo} typeName={typeName} />
+        <WoTitleLine wo={wo} woType={woType} />
         <div className="mt-0.5 max-w-[420px] truncate text-[10.5px] text-fg" title={jobLabel}>
           {jobLabel}
         </div>
@@ -4443,7 +4444,7 @@ function JobsTab({ location, onNewJob }: { location: ServiceLocationDetailDto; o
                 </DenseTHead>
                 <tbody>
                   {rows.map((wo) => (
-                    <JobDenseRow key={wo.id} wo={wo} typeName={typeName(wo.workOrderTypeId)} />
+                    <JobDenseRow key={wo.id} wo={wo} woType={safeTypes.find((tp) => tp.id === wo.workOrderTypeId)} />
                   ))}
                 </tbody>
               </DenseTable>

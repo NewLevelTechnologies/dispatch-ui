@@ -120,16 +120,20 @@
 .pill.live .dot {
   box-shadow: 0 0 0 2.5px color-mix(in oklch, currentColor 22%, transparent);
 }
-.pill.info     { background: color-mix(in oklch, var(--info-500) 12%, var(--bg-elev)); color: var(--info-500); }
-.pill.success  { background: color-mix(in oklch, var(--success-500) 12%, var(--bg-elev)); color: var(--success-500); }
-.pill.warning  { background: color-mix(in oklch, var(--warning-500) 14%, var(--bg-elev)); color: var(--warning-fg); }
+/* Light-mode tone fills mix over `transparent` (not the opaque --bg-elev) so the
+   tint composites over whatever surface the pill sits on — warm header bands,
+   cards, rows. Mixing against --bg-elev (pure white in light mode) washed the
+   fill to grey on non-white surfaces. Dark mode is overridden below, untouched. */
+.pill.info     { background: color-mix(in oklch, var(--info-500) 12%, transparent); color: var(--info-500); }
+.pill.success  { background: color-mix(in oklch, var(--success-500) 12%, transparent); color: var(--success-500); }
+.pill.warning  { background: color-mix(in oklch, var(--warning-500) 14%, transparent); color: var(--warning-fg); }
 .theme-dark .pill.warning { color: var(--warning-500); }
-.pill.danger   { background: color-mix(in oklch, var(--danger-500) 12%, var(--bg-elev)); color: var(--danger-500); }
-.pill.accent   { background: color-mix(in oklch, var(--accent-500) 14%, var(--bg-elev)); color: var(--accent-700); }
+.pill.danger   { background: color-mix(in oklch, var(--danger-500) 12%, transparent); color: var(--danger-500); }
+.pill.accent   { background: color-mix(in oklch, var(--accent-500) 14%, transparent); color: var(--accent-700); }
 .theme-dark .pill.accent { color: var(--accent-300); }
-.pill.violet   { background: color-mix(in oklch, var(--violet-500) 12%, var(--bg-elev)); color: var(--violet-500); }
-.pill.teal     { background: color-mix(in oklch, var(--teal-500) 12%, var(--bg-elev)); color: var(--teal-500); }
-.pill.pink     { background: color-mix(in oklch, var(--pink-500) 12%, var(--bg-elev)); color: var(--pink-500); }
+.pill.violet   { background: color-mix(in oklch, var(--violet-500) 12%, transparent); color: var(--violet-500); }
+.pill.teal     { background: color-mix(in oklch, var(--teal-500) 12%, transparent); color: var(--teal-500); }
+.pill.pink     { background: color-mix(in oklch, var(--pink-500) 12%, transparent); color: var(--pink-500); }
 .pill.neutral  { background: var(--bg-active); color: var(--fg-muted); }
 
 /* Dark-mode pill contrast lift — heavier tint + brighter fg + visible border.
@@ -178,6 +182,23 @@
   background: oklch(31% 0.012 250);
   color: oklch(88% 0.008 250);
   border: 1px solid oklch(38% 0.014 250);
+}
+
+/* Work-order type chip — colored by the tenant's per-type accent, passed in via
+   the --wo-type-accent custom property (the color is dynamic per type, so it
+   can't be a static tone class like .pill.info). Dark mode lifts the tint and
+   brightens the text toward white so it reads vividly on the dark canvas. */
+.wo-type-pill {
+  /* transparent base so the tint composites over the actual surface (card, row,
+     etc.) — mixing against the opaque --bg-elev washed it to grey on cards. */
+  background: color-mix(in oklch, var(--wo-type-accent) 16%, transparent);
+  color: var(--wo-type-accent);
+  border: 1px solid transparent;
+}
+.theme-dark .wo-type-pill {
+  background: color-mix(in oklch, var(--wo-type-accent) 24%, var(--bg-elev));
+  color: color-mix(in oklch, var(--wo-type-accent) 58%, white);
+  border-color: color-mix(in oklch, var(--wo-type-accent) 32%, var(--bg-elev));
 }
 
 /* ── Role chip (dot + role name) ─────────────────────────────────

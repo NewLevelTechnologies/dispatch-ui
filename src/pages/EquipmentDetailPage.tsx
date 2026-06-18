@@ -23,6 +23,7 @@ import {
   equipmentFilesApi,
   equipmentImagesApi,
   tenantFilterSizesApi,
+  workOrderTypesApi,
   EquipmentStatus,
   type EquipmentFilter,
   type EquipmentImage,
@@ -52,6 +53,7 @@ import { Tabs } from '../components/ui/Tabs';
 import { Callout } from '../components/ui/Callout';
 import { DenseTable, DenseTHead, DenseRow } from '../components/ui/DenseTable';
 import { AssignedUsersCell } from '../components/ui/AssignedUsersCell';
+import { WorkOrderTypePill } from '../components/ui/WorkOrderTypePill';
 import IconButton from '../components/IconButton';
 import ConfirmDialog from '../components/ConfirmDialog';
 import EditableField from '../components/EditableField';
@@ -210,6 +212,13 @@ export default function EquipmentDetailPage() {
   // WorkOrdersList so the peek, the tab count, and the live "Open work order"
   // pill all read off one fetch.
   const { data: serviceHistoryData } = useQuery(workOrdersListQueryOptions({ equipmentId: id ?? '' }));
+
+  // Work-order type id → name for the service-history peek's Type column.
+  const { data: woTypesData } = useQuery({
+    queryKey: ['work-order-types'],
+    queryFn: () => workOrderTypesApi.getAll(),
+  });
+  const safeWoTypes = Array.isArray(woTypesData) ? woTypesData : [];
 
   // Sub-units (Units card). Flat array; 2-level hierarchy means these are the
   // direct children. Skipped when this equipment is itself a sub-unit.
@@ -601,8 +610,8 @@ export default function EquipmentDetailPage() {
                             <th>Date</th>
                             <th>Work order</th>
                             <th>Work</th>
+                            <th>Type</th>
                             <th>Tech</th>
-                            <th className="right">Hours</th>
                           </tr>
                         </DenseTHead>
                         <tbody>
@@ -615,6 +624,7 @@ export default function EquipmentDetailPage() {
                             // tab + SiteWorkOrdersCard lead with (declared on the payload,
                             // not yet on the type → cast, matching those call sites).
                             const aiSummary = (wo as { summary?: string | null }).summary?.trim();
+                            const woType = safeWoTypes.find((tp) => tp.id === wo.workOrderTypeId);
                             const live =
                               wo.progressCategory === 'IN_PROGRESS' && wo.lifecycleState !== 'CANCELLED';
                             return (
@@ -627,7 +637,7 @@ export default function EquipmentDetailPage() {
                                   <span className="text-[11.5px] text-fg-muted">{formatTimestamp(dateIso)}</span>
                                 </td>
                                 <td>
-                                  <span className="font-mono text-[11.5px] text-fg-accent">{woNumber}</span>
+                                  <span className="font-mono text-[11.5px] font-semibold text-fg-accent">{woNumber}</span>
                                 </td>
                                 {/* Lead with the work order's AI/derived summary (wo.summary);
                                     fall back to the first work item + "+N more" when absent. */}
@@ -640,10 +650,14 @@ export default function EquipmentDetailPage() {
                                   )}
                                 </td>
                                 <td>
-                                  <AssignedUsersCell users={wo.assignedUsers} />
+                                  {woType ? (
+                                    <WorkOrderTypePill type={woType} />
+                                  ) : (
+                                    <span className="text-[11px] text-fg-dim">—</span>
+                                  )}
                                 </td>
-                                <td className="right">
-                                  <span className="font-mono text-[12px] tabular-nums text-fg-dim">—</span>
+                                <td>
+                                  <AssignedUsersCell users={wo.assignedUsers} />
                                 </td>
                               </DenseRow>
                             );

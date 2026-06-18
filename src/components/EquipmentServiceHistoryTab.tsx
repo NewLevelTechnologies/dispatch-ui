@@ -3,18 +3,20 @@
 // → dense table → footer, newest-first, live row tinted. Models the
 // ServiceLocationDetailPage work-order list: AssignedUsersCell tech column,
 // progress-tone status pill, derived "what was done" summary, row tint. Tech
-// comes from the WO's assigned users; Hours isn't on the summary yet → "—".
+// comes from the WO's assigned users; Type is the resolved work-order type — it
+// characterizes each visit (PM vs repair) far better than labor hours would here.
 import { useDeferredValue, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { MagnifyingGlassIcon } from '@heroicons/react/24/outline';
-import { workOrderApi, type ProgressCategory, type WorkOrderSummary } from '../api';
+import { workOrderApi, workOrderTypesApi, type ProgressCategory, type WorkOrderSummary } from '../api';
 import { DenseTable, DenseTHead, DenseRow } from './ui/DenseTable';
 import { Pill } from './ui/Pill';
 import { AssignedUsersCell } from './ui/AssignedUsersCell';
 import { ListFooter } from './ui/ListFooter';
 import { useUrlPage } from '../hooks/useUrlPage';
 import { formatTimestamp } from '../lib/formatTimestamp';
+import { WorkOrderTypePill } from './ui/WorkOrderTypePill';
 
 const PAGE_SIZE = 25;
 
@@ -83,6 +85,13 @@ export default function EquipmentServiceHistoryTab({ equipmentId }: { equipmentI
         sort: 'scheduledDate,desc',
       }),
   });
+
+  // Resolve work-order type id → name for the Type column (cached app-wide).
+  const { data: typesData } = useQuery({
+    queryKey: ['work-order-types'],
+    queryFn: () => workOrderTypesApi.getAll(),
+  });
+  const safeTypes = Array.isArray(typesData) ? typesData : [];
 
   const rows = data?.content ?? [];
   const total = data?.totalElements ?? 0;
@@ -154,8 +163,8 @@ export default function EquipmentServiceHistoryTab({ equipmentId }: { equipmentI
                 <th>Date</th>
                 <th>Work order</th>
                 <th>Work</th>
+                <th>Type</th>
                 <th>Tech</th>
-                <th className="right">Hours</th>
                 <th>Status</th>
               </tr>
             </DenseTHead>
@@ -165,6 +174,7 @@ export default function EquipmentServiceHistoryTab({ equipmentId }: { equipmentI
                 const woNumber = wo.workOrderNumber ?? `#${wo.id.slice(0, 8)}`;
                 const progress = PROGRESS[wo.progressCategory];
                 const cancelled = wo.lifecycleState === 'CANCELLED';
+                const woType = safeTypes.find((tp) => tp.id === wo.workOrderTypeId);
                 return (
                   <DenseRow
                     key={wo.id}
@@ -183,10 +193,14 @@ export default function EquipmentServiceHistoryTab({ equipmentId }: { equipmentI
                       {deriveJobLabel(wo)}
                     </td>
                     <td>
-                      <AssignedUsersCell users={wo.assignedUsers} />
+                      {woType ? (
+                        <WorkOrderTypePill type={woType} />
+                      ) : (
+                        <span className="text-[11px] text-fg-dim">—</span>
+                      )}
                     </td>
-                    <td className="right">
-                      <span className="font-mono text-[12px] tabular-nums text-fg-dim">—</span>
+                    <td>
+                      <AssignedUsersCell users={wo.assignedUsers} />
                     </td>
                     <td>
                       {cancelled ? (
