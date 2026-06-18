@@ -943,7 +943,7 @@ describe('EquipmentDetailPage', () => {
 
     // "View all" opens the Service history tab (its search box appears).
     await user.click(screen.getByRole('button', { name: /view all/i }));
-    expect(await screen.findByPlaceholderText(/search work orders/i)).toBeInTheDocument();
+    expect(await screen.findByPlaceholderText(/search work/i)).toBeInTheDocument();
   });
 
   it('renders the notes card on Overview from the notes list', async () => {
