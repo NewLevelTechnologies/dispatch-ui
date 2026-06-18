@@ -637,7 +637,7 @@ export default function EquipmentDetailPage() {
                                   <span className="text-[11.5px] text-fg-muted">{formatTimestamp(dateIso)}</span>
                                 </td>
                                 <td>
-                                  <span className="font-mono text-[11.5px] font-semibold text-fg-accent">{woNumber}</span>
+                                  <span className="font-mono text-[11.5px] text-fg-accent">{woNumber}</span>
                                 </td>
                                 {/* Lead with the work order's AI/derived summary (wo.summary);
                                     fall back to the first work item + "+N more" when absent. */}

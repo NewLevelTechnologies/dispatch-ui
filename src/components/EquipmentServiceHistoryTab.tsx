@@ -187,7 +187,7 @@ export default function EquipmentServiceHistoryTab({ equipmentId }: { equipmentI
                       <span className="text-[11.5px] text-fg-muted">{formatTimestamp(dateIso)}</span>
                     </td>
                     <td>
-                      <span className="font-mono text-[11.5px] font-semibold text-fg-accent">{woNumber}</span>
+                      <span className="font-mono text-[11.5px] text-fg-accent">{woNumber}</span>
                     </td>
                     <td className="max-w-[360px] truncate text-[12px]" title={deriveJobLabel(wo)}>
                       {deriveJobLabel(wo)}
