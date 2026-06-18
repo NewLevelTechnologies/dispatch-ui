@@ -675,7 +675,7 @@ export default function EquipmentDetailPage() {
                   </Card>
                 )}
 
-                {/* Media peek — a compact single row of ~88px-tall thumbs (a glance);
+                {/* Media peek — a compact single row of ~100px-tall thumbs (a glance);
                     the full browsing gallery is the Media tab. "+N" overlays the last tile. */}
                 <Card
                   title={<CardTitle icon={<PhotoIcon className="size-3.5" />}>{t('equipment.tabs.media')}</CardTitle>}
@@ -1251,10 +1251,11 @@ interface MediaPeekItem {
  * duration; a label rides a bottom gradient; `overflow` paints a "+N" cover on
  * the last tile. `square` makes a tile self-size when there's no hero anchor.
  */
-// Compact peek tile — fixed 88px-tall thumbnail for the overview Media glance.
+// Compact peek tile — fixed 100px-tall thumbnail for the overview Media glance.
 // The lead/profile tile is a touch wider (and accent-ringed); the rest are
-// 88px squares. Play badge, duration, and label caption are kept but shrunk —
-// big browsing belongs to the Media tab.
+// 100px squares. `object-cover` crops to fill (never distorts). Play badge,
+// duration, and label caption are kept but shrunk — big browsing belongs to
+// the Media tab.
 function MediaPeekTile({
   thumb,
   alt,
@@ -1281,8 +1282,8 @@ function MediaPeekTile({
       onClick={onClick}
       aria-label={alt}
       className={[
-        'group relative block h-[88px] shrink-0 overflow-hidden rounded-md bg-bg-elev-2 ring-1',
-        hero ? 'w-[112px] ring-[color-mix(in_oklch,var(--accent-500)_45%,var(--border))]' : 'w-[88px] ring-border',
+        'group relative block h-[100px] shrink-0 overflow-hidden rounded-md bg-bg-elev-2 ring-1',
+        hero ? 'w-[128px] ring-[color-mix(in_oklch,var(--accent-500)_45%,var(--border))]' : 'w-[100px] ring-border',
       ].join(' ')}
     >
       {thumb ? (
