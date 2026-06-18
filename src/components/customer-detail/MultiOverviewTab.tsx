@@ -27,7 +27,6 @@ import {
   agreementApi,
   contactApi,
   customerApi,
-  dispatchRegionApi,
   financialActivityApi,
   invoicesApi,
   InvoiceAgingBucket,
@@ -103,10 +102,6 @@ export default function MultiOverviewTab({
     queryFn: () => agreementApi.list({ customerId: customer.id }),
     enabled: !!customer.id,
   });
-  const { data: regions } = useQuery({
-    queryKey: ['dispatch-regions'],
-    queryFn: () => dispatchRegionApi.getAll(true),
-  });
   // FIN-1 + AG-1 sibling summary calls — fired on load, in parallel with the
   // detail. Each card degrades to its pending state until its query resolves.
   const { data: arSummary } = useQuery({
@@ -120,13 +115,6 @@ export default function MultiOverviewTab({
     enabled: !!customer.id,
   });
 
-  const regionMap = useMemo(() => {
-    const list = (regions ?? []) as Array<{ id: string; name: string; abbreviation?: string | null }>;
-    const m: Record<string, string> = {};
-    for (const r of list) m[r.id] = r.abbreviation || r.name;
-    return m;
-  }, [regions]);
-
   const attentionItems = buildAttentionItems(agreements, arSummary, agreementSummary, customer.id);
   const goToBucket = useGoToInvoicesBucket();
 
@@ -136,13 +124,8 @@ export default function MultiOverviewTab({
 
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1fr_340px]">
         <div className="flex flex-col gap-3">
-          <BillingCard customer={customer} ar={arSummary} onSelectAging={goToBucket} />
-          <LocationsPreviewCard
-            customer={customer}
-            regionMap={regionMap}
-            onViewAll={onViewLocations}
-          />
-          <AgreementsSummaryCard agreements={agreements} summary={agreementSummary} onViewAll={onViewAgreements} />
+          <BillingCard customer={customer} ar={arSummary} canEdit={canEdit} onSelectAging={goToBucket} />
+          <LocationsPreviewCard customer={customer} onViewAll={onViewLocations} />
           <CustomerNotesCard customerId={customer.id} canEdit={canEdit} />
           <CustomerActivityTeaser customerId={customer.id} />
         </div>
@@ -150,6 +133,7 @@ export default function MultiOverviewTab({
         <div className="flex flex-col gap-3">
           <ContactCard customer={customer} canEdit={canEdit} onViewAll={onViewContacts} />
           <AccountDetailsCard customer={customer} ar={arSummary} canEdit={canEdit} />
+          <AgreementsSummaryCard agreements={agreements} summary={agreementSummary} onViewAll={onViewAgreements} />
         </div>
       </div>
     </div>
@@ -274,20 +258,94 @@ function bucketTint(tone: BucketTone, amount: number): { wrap?: React.CSSPropert
   return { text: 'var(--fg-strong)' };
 }
 
-// Billing & AR — terms / pricebook / tax ride the detail payload; the
-// outstanding headline + 5-bucket aging come from the FIN-1 summary (honest
-// "—" until it resolves). Exported for reuse by SingleCustomerDetail.
+// AR-relevant writable fields share Billing & AR with the balance (one home,
+// edit-where-you-read): payment terms, tax-exempt + cert, PO-required. Pricebook
+// is an operational/quoting detail — it lives in Account details, not here.
+interface BillingDraft {
+  paymentTermsDays: number;
+  taxExempt: boolean;
+  taxExemptCertificate: string;
+  requiresPurchaseOrder: boolean;
+}
+
+function seedBillingDraft(c: Customer): BillingDraft {
+  return {
+    paymentTermsDays: c.paymentTermsDays,
+    taxExempt: c.taxExempt,
+    taxExemptCertificate: c.taxExemptCertificate ?? '',
+    requiresPurchaseOrder: c.requiresPurchaseOrder,
+  };
+}
+
+function isBillingDirty(d: BillingDraft, c: Customer): boolean {
+  const s = seedBillingDraft(c);
+  return (
+    d.paymentTermsDays !== s.paymentTermsDays ||
+    d.taxExempt !== s.taxExempt ||
+    (d.taxExempt && d.taxExemptCertificate.trim() !== s.taxExemptCertificate) ||
+    d.requiresPurchaseOrder !== s.requiresPurchaseOrder
+  );
+}
+
+// Billing & AR — the financial headline: outstanding balance + the 5-bucket
+// aging strip (each box deep-links to that bucket on the Invoices tab) from the
+// FIN-1 summary (honest "—" until it resolves), plus the AR-relevant account
+// terms. Terms / tax-exempt / PO live here (not Account details) — they're AR
+// facts and edit where they're read. Exported for reuse by the other variants.
 export function BillingCard({
   customer,
   ar,
+  canEdit = false,
   onSelectAging,
 }: {
   customer: Customer;
   ar?: CustomerArSummaryResponse;
+  canEdit?: boolean;
   // Deep-link a bucket into the Invoices tab filtered to it. Omit to render the
   // boxes as static (e.g. where there's no Invoices tab to jump to).
   onSelectAging?: (bucket: InvoiceAgingBucket) => void;
 }) {
+  const queryClient = useQueryClient();
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState<BillingDraft>(() => seedBillingDraft(customer));
+
+  const startEdit = () => {
+    setDraft(seedBillingDraft(customer));
+    setEditing(true);
+  };
+
+  const saveMutation = useMutation({
+    mutationFn: () => {
+      const request: UpdateCustomerRequest = {
+        name: customer.name,
+        email: customer.email,
+        phone: customer.phone ?? null,
+        type: customer.type,
+        paymentTermsDays: draft.paymentTermsDays,
+        requiresPurchaseOrder: draft.requiresPurchaseOrder,
+        contractPricingTier: customer.contractPricingTier ?? null,
+        taxExempt: draft.taxExempt,
+        taxExemptCertificate: draft.taxExempt ? draft.taxExemptCertificate.trim() || null : null,
+        notes: customer.notes ?? null,
+        status: customer.status,
+        accountManagerUserId: customer.accountManager?.id ?? null,
+        industry: customer.industry ?? null,
+      };
+      return customerApi.update(customer.id, request);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['customers', customer.id] });
+      queryClient.invalidateQueries({ queryKey: ['customers'] });
+      setEditing(false);
+      showSuccess('Billing details updated');
+    },
+    onError: (err) => {
+      if (handleConcurrentEdit(err, queryClient, ['customers'])) return;
+      showError("Couldn't update billing details", extractApiError(err) ?? undefined);
+    },
+  });
+
+  const dirty = isBillingDirty(draft, customer);
   const termsLabel = customer.paymentTermsDays > 0 ? `Net ${customer.paymentTermsDays}` : '—';
   const buckets: {
     k: string;
@@ -304,7 +362,35 @@ export function BillingCard({
       ]
     : [];
   return (
-    <Card title={<CardTitle icon={<ReceiptPercentIcon className="size-3.5" />}>Billing &amp; AR</CardTitle>} padding="none">
+    <Card
+      title={<CardTitle icon={<ReceiptPercentIcon className="size-3.5" />}>Billing &amp; AR</CardTitle>}
+      padding="none"
+      action={
+        !editing && canEdit ? (
+          <Button outline size="xs" type="button" onClick={startEdit}>
+            Edit
+          </Button>
+        ) : undefined
+      }
+      footer={
+        editing ? (
+          <div className="flex items-center justify-end gap-1.5 rounded-b-[10px] border-t border-border-soft bg-bg-elev-2 px-3.5 py-2.5">
+            <Button plain size="xs" type="button" onClick={() => setEditing(false)} disabled={saveMutation.isPending}>
+              Cancel
+            </Button>
+            <Button
+              color="accent"
+              size="xs"
+              type="button"
+              onClick={() => saveMutation.mutate()}
+              disabled={!dirty || saveMutation.isPending}
+            >
+              {saveMutation.isPending ? 'Saving…' : 'Save changes'}
+            </Button>
+          </div>
+        ) : undefined
+      }
+    >
       <div className="p-3.5">
         {/* Outstanding balance + aging in one horizontal strip — balance left,
             the 5 compact bucket cells right-aligned on the same band. */}
@@ -367,28 +453,72 @@ export function BillingCard({
         )}
 
         <div className="my-3.5 h-px bg-border-soft" />
-        <div className="grid grid-cols-3 gap-5">
-          <div>
-            <LabelTiny>Terms</LabelTiny>
-            <div className="mt-0.5 text-[13px] font-semibold text-fg-strong">{termsLabel}</div>
-            {customer.requiresPurchaseOrder && <div className="text-[11px] text-fg-muted">PO required</div>}
-          </div>
-          <div>
-            <LabelTiny>Pricebook</LabelTiny>
-            <div className="mt-0.5 text-[13px] font-semibold text-fg-strong">
-              {customer.contractPricingTier || '—'}
+
+        {editing ? (
+          <div className="space-y-2.5">
+            <div className="grid grid-cols-2 items-end gap-2.5">
+              <Field size="xs">
+                <Label size="xs">Payment terms</Label>
+                <Select
+                  value={String(draft.paymentTermsDays)}
+                  onChange={(e) => setDraft((d) => ({ ...d, paymentTermsDays: Number(e.target.value) }))}
+                >
+                  {PAYMENT_TERMS.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+              <label className="flex h-9 cursor-pointer items-center gap-2">
+                <Checkbox
+                  color="accent"
+                  checked={draft.requiresPurchaseOrder}
+                  onChange={(v) => setDraft((d) => ({ ...d, requiresPurchaseOrder: v }))}
+                />
+                <span className="text-[12.5px] text-fg-strong">PO required</span>
+              </label>
+            </div>
+            <div className="grid grid-cols-2 items-end gap-2.5">
+              <label className="flex h-9 cursor-pointer items-center gap-2">
+                <Checkbox
+                  color="accent"
+                  checked={draft.taxExempt}
+                  onChange={(v) => setDraft((d) => ({ ...d, taxExempt: v }))}
+                />
+                <span className="text-[12.5px] text-fg-strong">Tax exempt</span>
+              </label>
+              {draft.taxExempt && (
+                <Field size="xs">
+                  <Label size="xs">Exemption certificate #</Label>
+                  <Input
+                    size="xs"
+                    value={draft.taxExemptCertificate}
+                    onChange={(e) => setDraft((d) => ({ ...d, taxExemptCertificate: e.target.value }))}
+                    placeholder="84-2200"
+                  />
+                </Field>
+              )}
             </div>
           </div>
-          <div>
-            <LabelTiny>Tax exempt</LabelTiny>
-            <div className="mt-0.5 text-[13px] font-semibold text-fg-strong">
-              {customer.taxExempt ? 'Yes' : 'No'}
+        ) : (
+          <div className="grid grid-cols-2 gap-5">
+            <div>
+              <LabelTiny>Terms</LabelTiny>
+              <div className="mt-0.5 text-[13px] font-semibold text-fg-strong">{termsLabel}</div>
+              {customer.requiresPurchaseOrder && <div className="text-[11px] text-fg-muted">PO required</div>}
             </div>
-            {customer.taxExempt && customer.taxExemptCertificate && (
-              <div className="font-mono text-[11px] text-fg-muted">{customer.taxExemptCertificate}</div>
-            )}
+            <div>
+              <LabelTiny>Tax exempt</LabelTiny>
+              <div className="mt-0.5 text-[13px] font-semibold text-fg-strong">
+                {customer.taxExempt ? 'Yes' : 'No'}
+              </div>
+              {customer.taxExempt && customer.taxExemptCertificate && (
+                <div className="font-mono text-[11px] text-fg-muted">{customer.taxExemptCertificate}</div>
+              )}
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </Card>
   );
@@ -396,11 +526,9 @@ export function BillingCard({
 
 function LocationsPreviewCard({
   customer,
-  regionMap,
   onViewAll,
 }: {
   customer: Customer;
-  regionMap: Record<string, string>;
   onViewAll: () => void;
 }) {
   const { getName } = useGlossary();
@@ -446,14 +574,13 @@ function LocationsPreviewCard({
         <DenseTHead>
           <tr>
             <th>{getName('service_location')}</th>
-            <th>{getName('dispatch_region')}</th>
-            {enriched && <th className="right">Open</th>}
+            <th>Last service</th>
+            {enriched && <th className="right">Open jobs</th>}
             <th>Status</th>
           </tr>
         </DenseTHead>
         <tbody>
           {top.map((l) => {
-            const region = l.dispatchRegionName ?? regionMap[l.dispatchRegionId];
             const street = titleCaseAddress(
               [l.address.streetAddress, l.address.streetAddressLine2].filter(Boolean).join(' '),
             );
@@ -466,7 +593,9 @@ function LocationsPreviewCard({
                     <CellSub>{[street, cityLine].filter(Boolean).join(' · ')}</CellSub>
                   </CellStack>
                 </td>
-                <td className="muted">{region || '—'}</td>
+                <td className="muted">
+                  {l.lastServiceAt ? formatDateShort(l.lastServiceAt) : <span className="text-fg-dim">—</span>}
+                </td>
                 {enriched && (
                   <td className="right num strong">
                     {l.openJobsCount && l.openJobsCount > 0 ? (
@@ -525,28 +654,27 @@ function AgreementsSummaryCard({
         </div>
       ) : (
         <div>
-          <div className="flex items-center justify-between gap-4 border-b border-border-soft px-3.5 py-2.5">
-            <div>
-              <LabelTiny>Active</LabelTiny>
-              <div className="mt-0.5 text-[15px] font-bold text-fg-strong">
-                {active.length}
-                <span className="ml-1 text-[12px] font-medium text-fg-muted">
-                  of {agreements.length} {getName('agreement', true).toLowerCase()}
-                </span>
-              </div>
+          {/* Restacked single-column for the 340px right rail: ARR headline,
+              active count as an eyebrow, coverage as a sub-line. */}
+          <div className="border-b border-border-soft px-3.5 py-2.5">
+            <div className="flex items-baseline justify-between gap-3">
+              <LabelTiny>Annual recurring</LabelTiny>
+              <span className="text-[11px] text-fg-muted">
+                {active.length} of {agreements.length} active
+              </span>
             </div>
             {summary ? (
-              <div className="text-right">
-                <div className="font-mono text-[15px] font-bold tabular-nums text-fg-strong">
+              <>
+                <div className="mt-0.5 font-mono text-[17px] font-bold tabular-nums text-fg-strong">
                   {formatMoney(summary.arr)}
                   <span className="ml-0.5 text-[11px] font-medium text-fg-muted">/yr</span>
                 </div>
                 <div className="text-[11px] text-fg-muted">
                   {summary.coveragePct}% covered · {summary.coveredLocations}/{summary.totalLocations} {getName('service_location', true).toLowerCase()}
                 </div>
-              </div>
+              </>
             ) : (
-              <div className="text-right text-[11px] text-fg-muted">ARR &amp; coverage loading…</div>
+              <div className="mt-0.5 text-[11px] text-fg-muted">ARR &amp; coverage loading…</div>
             )}
           </div>
           {nextRenewal && (
@@ -973,9 +1101,6 @@ interface AccountDraft {
   industry: string;
   accountManagerUserId: string;
   contractPricingTier: string;
-  paymentTermsDays: number;
-  taxExempt: boolean;
-  taxExemptCertificate: string;
 }
 
 function seedAccountDraft(c: Customer): AccountDraft {
@@ -983,9 +1108,6 @@ function seedAccountDraft(c: Customer): AccountDraft {
     industry: c.industry ?? '',
     accountManagerUserId: c.accountManager?.id ?? '',
     contractPricingTier: c.contractPricingTier ?? '',
-    paymentTermsDays: c.paymentTermsDays,
-    taxExempt: c.taxExempt,
-    taxExemptCertificate: c.taxExemptCertificate ?? '',
   };
 }
 
@@ -994,10 +1116,7 @@ function isAccountDirty(d: AccountDraft, c: Customer): boolean {
   return (
     d.industry.trim() !== seed.industry ||
     d.accountManagerUserId !== seed.accountManagerUserId ||
-    d.contractPricingTier.trim() !== seed.contractPricingTier ||
-    d.paymentTermsDays !== seed.paymentTermsDays ||
-    d.taxExempt !== seed.taxExempt ||
-    (d.taxExempt && d.taxExemptCertificate.trim() !== seed.taxExemptCertificate)
+    d.contractPricingTier.trim() !== seed.contractPricingTier
   );
 }
 
@@ -1043,11 +1162,12 @@ export function AccountDetailsCard({
         email: customer.email,
         phone: customer.phone ?? null,
         type: customer.type,
-        paymentTermsDays: draft.paymentTermsDays,
+        // Terms / tax-exempt / PO are edited in Billing & AR — preserve here.
+        paymentTermsDays: customer.paymentTermsDays,
         requiresPurchaseOrder: customer.requiresPurchaseOrder,
         contractPricingTier: draft.contractPricingTier.trim() || null,
-        taxExempt: draft.taxExempt,
-        taxExemptCertificate: draft.taxExempt ? draft.taxExemptCertificate.trim() || null : null,
+        taxExempt: customer.taxExempt,
+        taxExemptCertificate: customer.taxExemptCertificate ?? null,
         notes: customer.notes ?? null,
         status: customer.status,
         accountManagerUserId: draft.accountManagerUserId || null,
@@ -1074,17 +1194,8 @@ export function AccountDetailsCard({
   ];
   if (customer.industry) rows.push({ k: 'Industry', v: customer.industry });
   if (customer.accountManager) rows.push({ k: 'Acct manager', v: customer.accountManager.name });
-  rows.push({ k: 'Terms', v: customer.paymentTermsDays > 0 ? `Net ${customer.paymentTermsDays}` : '—' });
+  // Terms / tax-exempt / PO are AR facts — they live in Billing & AR, not here.
   if (customer.contractPricingTier) rows.push({ k: 'Pricebook', v: customer.contractPricingTier });
-  rows.push({
-    k: 'Tax exempt',
-    v: customer.taxExempt
-      ? customer.taxExemptCertificate
-        ? <span>Yes · <span className="font-mono text-fg-muted">{customer.taxExemptCertificate}</span></span>
-        : 'Yes'
-      : 'No',
-  });
-  if (customer.requiresPurchaseOrder) rows.push({ k: 'PO', v: 'Required' });
   // FIN-1: lifetime value (total received) + most-used payment method.
   if (ar) rows.push({ k: 'Lifetime value', v: <span className="font-mono tabular-nums">{formatMoney(ar.lifetimeValue)}</span> });
   if (ar?.mostUsedPaymentMethod) rows.push({ k: 'Top pay method', v: PAYMENT_METHOD_LABEL[ar.mostUsedPaymentMethod] });
@@ -1149,19 +1260,6 @@ export function AccountDetailsCard({
           </div>
           <div className="grid grid-cols-2 gap-2.5">
             <Field size="xs">
-              <Label size="xs">Payment terms</Label>
-              <Select
-                value={String(draft.paymentTermsDays)}
-                onChange={(e) => setDraft((d) => ({ ...d, paymentTermsDays: Number(e.target.value) }))}
-              >
-                {PAYMENT_TERMS.map((o) => (
-                  <option key={o.value} value={o.value}>
-                    {o.label}
-                  </option>
-                ))}
-              </Select>
-            </Field>
-            <Field size="xs">
               <Label size="xs">Pricebook</Label>
               <Input
                 size="xs"
@@ -1170,27 +1268,6 @@ export function AccountDetailsCard({
                 placeholder="—"
               />
             </Field>
-          </div>
-          <div className="grid grid-cols-2 items-end gap-2.5">
-            <label className="flex h-9 cursor-pointer items-center gap-2">
-              <Checkbox
-                color="accent"
-                checked={draft.taxExempt}
-                onChange={(v) => setDraft((d) => ({ ...d, taxExempt: v }))}
-              />
-              <span className="text-[12.5px] text-fg-strong">Tax exempt</span>
-            </label>
-            {draft.taxExempt && (
-              <Field size="xs">
-                <Label size="xs">Exemption certificate #</Label>
-                <Input
-                  size="xs"
-                  value={draft.taxExemptCertificate}
-                  onChange={(e) => setDraft((d) => ({ ...d, taxExemptCertificate: e.target.value }))}
-                  placeholder="84-2200"
-                />
-              </Field>
-            )}
           </div>
         </div>
       ) : (

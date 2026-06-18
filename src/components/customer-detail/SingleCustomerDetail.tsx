@@ -366,7 +366,7 @@ export default function SingleCustomerDetail({ customer }: { customer: Customer 
               ) : (
                 <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1fr_340px]">
                   <div className="flex flex-col gap-3">
-                    <BillingCard customer={customer} ar={arSummary} onSelectAging={goToBucket} />
+                    <BillingCard customer={customer} ar={arSummary} canEdit={canEditCustomers} onSelectAging={goToBucket} />
                     <EquipmentSummaryCard equipment={equipment} onViewAll={() => setActiveTab('equipment')} />
                     <SiteWorkOrdersCard location={location} onViewAll={() => setActiveTab('jobs')} />
                     <CustomerNotesCard customerId={customer.id} canEdit={canEditCustomers} />
