@@ -212,7 +212,7 @@ export default function PayerDetail({ customer }: { customer: Customer }) {
               {attentionItems.length > 0 && <AttentionStrip items={attentionItems} />}
               <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1fr_340px]">
                 <div className="flex flex-col gap-3">
-                  <BillingCard customer={customer} ar={arSummary} onSelectAging={goToBucket} />
+                  <BillingCard customer={customer} ar={arSummary} canEdit={canEditCustomers} onSelectAging={goToBucket} />
                   <LinkedWorkPendingCard onViewInvoices={() => setActiveTab('invoices')} />
                   <CustomerNotesCard customerId={customer.id} canEdit={canEditCustomers} />
                 </div>
