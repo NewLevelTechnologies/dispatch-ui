@@ -13,6 +13,7 @@ const makeNote = (overrides: Partial<EquipmentNote> = {}): EquipmentNote => ({
   body: 'A note body',
   authorUserId: 'user-1',
   authorName: 'Jane Smith',
+  pinned: false,
   createdAt: '2026-05-05T12:00:00Z',
   updatedAt: '2026-05-05T12:00:00Z',
   ...overrides,

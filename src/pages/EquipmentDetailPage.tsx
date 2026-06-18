@@ -8,9 +8,8 @@
 // order" is the only live status (derived from the WO list, not stored).
 //
 // Units / Filters / Notes are CONDITIONAL overview cards, not tabs (HVAC has
-// units + filters; a water heater doesn't). Photos / Videos stay as their own
-// tabs for now — they merge into a single Media tab + nameplate peek in the
-// next pass.
+// units + filters; a water heater doesn't). Photos + Videos live together on a
+// single Media tab, with a nameplate-called-out media peek on the overview.
 import { useState } from 'react';
 import { useParams, useNavigate, useLocation, Link as RouterLink } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -21,18 +20,16 @@ import {
   equipmentTypesApi,
   equipmentCategoriesApi,
   equipmentFiltersApi,
+  equipmentFilesApi,
   equipmentImagesApi,
-  equipmentNotesApi,
   tenantFilterSizesApi,
   EquipmentStatus,
   EQUIPMENT_IMAGE_MAX_PER_EQUIPMENT,
   type EquipmentFilter,
   type EquipmentImage,
   type EquipmentSummary,
-  type ProgressCategory,
   type TenantFilterSize,
   type UpdateEquipmentRequest,
-  type WorkOrderSummary,
 } from '../api';
 import { workOrdersListQueryOptions } from '../api/workOrdersListQuery';
 import { useGlossary } from '../contexts/GlossaryContext';
@@ -54,6 +51,7 @@ import {
 import { Pill } from '../components/ui/Pill';
 import { Tabs } from '../components/ui/Tabs';
 import { Callout } from '../components/ui/Callout';
+import { DenseTable, DenseTHead, DenseRow } from '../components/ui/DenseTable';
 import IconButton from '../components/IconButton';
 import ConfirmDialog from '../components/ConfirmDialog';
 import EditableField from '../components/EditableField';
@@ -61,10 +59,10 @@ import EquipmentThumbnail from '../components/EquipmentThumbnail';
 import EquipmentFilterFormDialog from '../components/EquipmentFilterFormDialog';
 import EquipmentFormDialog from '../components/EquipmentFormDialog';
 import EquipmentImageUploadDialog from '../components/EquipmentImageUploadDialog';
-import EquipmentNotesSection from '../components/EquipmentNotesSection';
+import EquipmentNotesCard from '../components/EquipmentNotesCard';
+import EquipmentServiceHistoryTab from '../components/EquipmentServiceHistoryTab';
 import EquipmentVideosSection from '../components/EquipmentVideosSection';
 import EquipmentPhotoLightbox from '../components/EquipmentPhotoLightbox';
-import WorkOrdersList from '../components/WorkOrdersList';
 import WorkOrderFormDialog from '../components/WorkOrderFormDialog';
 // Card title + quiet "View all" affordance — reused from the customer-detail
 // chrome so equipment cards match the other redesigned detail pages exactly.
@@ -74,40 +72,23 @@ import {
   EllipsisVerticalIcon,
   FunnelIcon,
   MapPinIcon,
+  PhotoIcon,
   PlusIcon,
   Square3Stack3DIcon,
   StarIcon as StarIconOutline,
+  VideoCameraIcon,
   WrenchScrewdriverIcon,
 } from '@heroicons/react/24/outline';
-import { StarIcon as StarIconSolid } from '@heroicons/react/24/solid';
+import { PlayIcon } from '@heroicons/react/24/solid';
 
-// Photos + Videos stay as tabs this pass; the rest fold into overview cards.
-type TabId = 'overview' | 'service-history' | 'photos' | 'videos' | 'notes';
-const EQUIPMENT_TABS: readonly TabId[] = ['overview', 'service-history', 'photos', 'videos', 'notes'];
+// Overview · Service history · Media. Notes/Filters/Units fold into overview
+// cards; an Activity tab is pending an equipment-scoped activity API.
+type TabId = 'overview' | 'service-history' | 'media';
+const EQUIPMENT_TABS: readonly TabId[] = ['overview', 'service-history', 'media'];
 
 // Above this many tenant filter sizes the quick-add palette collapses to the
 // top N by sortOrder with a "Show all" toggle — keeps the Filters card tight.
 const FILTER_SIZE_CHIP_COLLAPSED = 8;
-
-// WO progress → Pill tone (replaces the Catalyst Badge color map). Mirrors the
-// sky/blue/amber/lime intent of WorkOrdersList in the design-system tones.
-const PROGRESS_PILL: Record<ProgressCategory, 'neutral' | 'info' | 'accent' | 'warning' | 'success'> = {
-  NOT_STARTED: 'neutral',
-  AWAITING_SCHEDULE: 'info',
-  IN_PROGRESS: 'accent',
-  BLOCKED: 'warning',
-  COMPLETED: 'success',
-  CANCELLED: 'neutral',
-};
-
-const PROGRESS_TRANSLATION_KEYS: Record<ProgressCategory, string> = {
-  NOT_STARTED: 'notStarted',
-  AWAITING_SCHEDULE: 'awaitingSchedule',
-  IN_PROGRESS: 'inProgress',
-  BLOCKED: 'blocked',
-  COMPLETED: 'completed',
-  CANCELLED: 'cancelled',
-};
 
 // Date-only display for editable lifecycle fields (install / warranty expiry).
 function formatDate(iso: string | null | undefined): string {
@@ -136,6 +117,12 @@ function formatInstalled(iso: string | null | undefined): string | null {
   const m = now.getMonth() - d.getMonth();
   if (m < 0 || (m === 0 && now.getDate() < d.getDate())) years--;
   return `Installed ${monthYear}${years >= 1 ? ` (${years}y)` : ''}`;
+}
+
+// m:ss for a video's duration overlay (mirrors EquipmentVideosSection).
+function formatDuration(totalSeconds: number): string {
+  const s = Math.max(0, Math.round(totalSeconds));
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 }
 
 export default function EquipmentDetailPage() {
@@ -209,13 +196,15 @@ export default function EquipmentDetailPage() {
     enabled: !!id,
   });
 
-  // Full notes list — backs the Notes tab (the "show all" target until the
-  // shared notes drawer lands). The overview card reads equipment.recentNotes.
-  const { data: allNotes = [] } = useQuery({
-    queryKey: ['equipment-notes', id],
-    queryFn: () => equipmentNotesApi.list(id!),
+  // Videos — page-level read for the media peek + Media tab count. Shares the
+  // exact query key/fn EquipmentVideosSection uses, so the Media tab's own
+  // section reads from the same cache (no double fetch).
+  const { data: videosData } = useQuery({
+    queryKey: ['equipment-files', id, 'VIDEO'] as const,
+    queryFn: () => equipmentFilesApi.list(id!, { kind: 'VIDEO', limit: 50 }),
     enabled: !!id,
   });
+  const videos = (videosData?.content ?? []).filter((f) => f.status !== 'FAILED');
 
   // Service history — WOs touching this unit. Shared cache with the rendered
   // WorkOrdersList so the peek, the tab count, and the live "Open work order"
@@ -363,13 +352,12 @@ export default function EquipmentDetailPage() {
     (wo) => wo.progressCategory !== 'COMPLETED' && wo.progressCategory !== 'CANCELLED'
   );
   const { has: hasWarranty, active: underWarranty } = warrantyState(equipment.warrantyExpiresAt);
+  const totalMedia = images.length + videos.length;
 
   const tabs: { id: TabId; label: string; count?: number }[] = [
     { id: 'overview', label: t('equipment.tabs.overview') },
     { id: 'service-history', label: t('equipment.tabs.serviceHistory'), count: serviceHistoryData?.totalElements ?? 0 },
-    { id: 'photos', label: t('equipment.tabs.photos'), count: images.length },
-    { id: 'videos', label: t('equipment.tabs.videos') },
-    { id: 'notes', label: t('equipment.tabs.notes'), count: allNotes.length },
+    { id: 'media', label: t('equipment.tabs.media'), count: totalMedia },
   ];
 
   // ── Header meta line (render only populated items) ──
@@ -393,9 +381,12 @@ export default function EquipmentDetailPage() {
       `${serviceLocation.address.streetAddress}, ${serviceLocation.address.city}`
     : getName('service_location');
 
-  const filterChips = showAllFilterSizes
-    ? activeFilterSizes
-    : activeFilterSizes.slice(0, FILTER_SIZE_CHIP_COLLAPSED);
+  // Quick-add suggestions = tenant common sizes this unit doesn't already take.
+  const assignedSizes = new Set(filters.map((f) => formatFilterSize(f)));
+  const quickAddCandidates = activeFilterSizes.filter((s) => !assignedSizes.has(formatFilterSize(s)));
+  const quickAddChips = showAllFilterSizes
+    ? quickAddCandidates
+    : quickAddCandidates.slice(0, FILTER_SIZE_CHIP_COLLAPSED);
 
   const openCreateFilter = () => {
     setEditingFilter(null);
@@ -446,6 +437,35 @@ export default function EquipmentDetailPage() {
   const descendantIds = new Set(descendants.map((d) => d.id));
   const units = descendants.filter((d) => !(d.parentId && descendantIds.has(d.parentId)));
   const showUnitsCard = !isSubUnit && units.length > 0;
+
+  // ── Media (peek + tab) ── The nameplate (profile photo) is the source of
+  // truth, so it's called out separately from the gallery. The peek shows the
+  // nameplate + a few gallery thumbs (photos and video posters).
+  const nameplate = images.find((img) => img.isProfile) ?? null;
+  const galleryPhotos = images.filter((img) => !img.isProfile);
+  // Nameplate (the source of truth) leads the Media tab grid + the lightbox order.
+  const orderedImages = nameplate ? [nameplate, ...galleryPhotos] : galleryPhotos;
+  const MEDIA_PEEK_MAX = 4;
+  // Gallery = everything except the nameplate (photos + videos), for the peek row.
+  const peekItems: MediaPeekItem[] = [
+    ...galleryPhotos.map((p) => ({
+      id: p.id,
+      thumb: p.thumbnailUrl ?? p.url,
+      alt: p.caption ?? equipment.name,
+      label: p.caption ?? '',
+    })),
+    ...videos.map((v) => ({
+      id: v.id,
+      thumb: v.thumbnailUrl,
+      alt: v.caption ?? v.fileName,
+      label: v.caption ?? v.fileName,
+      isVideo: true,
+      durationSeconds: v.durationSeconds,
+    })),
+  ];
+  const peekShown = peekItems.slice(0, MEDIA_PEEK_MAX);
+  const peekOverflow = peekItems.length - peekShown.length;
+  const goToMedia = () => setActiveTab('media');
 
   return (
     <AppLayout>
@@ -544,13 +564,16 @@ export default function EquipmentDetailPage() {
             <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1fr_340px]">
               {/* Left (wide) */}
               <div className="flex flex-col gap-3">
-                {/* Service history peek */}
+                {/* Service history peek — the 3 most recent visits; full table
+                    (with filters + paging) lives on the Service history tab. */}
                 <Card
-                  title={<CardTitle icon={<WrenchScrewdriverIcon className="size-3.5" />}>{t('common.recentEntities', { entities: getName('work_order', true) })}</CardTitle>}
+                  title={<CardTitle icon={<WrenchScrewdriverIcon className="size-3.5" />}>Service history</CardTitle>}
                   subtitle={equipment.lastServicedAt ? `Last serviced ${formatTimestamp(equipment.lastServicedAt)}` : undefined}
                   action={
                     (serviceHistoryData?.totalElements ?? 0) > 0 ? (
-                      <CardLink onClick={() => setActiveTab('service-history')}>{t('common.viewAll')}</CardLink>
+                      <CardLink onClick={() => setActiveTab('service-history')}>
+                        {t('common.viewAll')} {serviceHistoryData?.totalElements}
+                      </CardLink>
                     ) : undefined
                   }
                   padding="none"
@@ -560,11 +583,55 @@ export default function EquipmentDetailPage() {
                       {t('common.actions.noEntitiesYet', { entities: getName('work_order', true) })}
                     </div>
                   ) : (
-                    <ul className="divide-y divide-border-soft">
-                      {recentWorkOrders.map((wo) => (
-                        <ServiceHistoryRow key={wo.id} wo={wo} t={t} />
-                      ))}
-                    </ul>
+                    <div className="overflow-x-auto">
+                      <DenseTable>
+                        <DenseTHead>
+                          <tr>
+                            <th>Date</th>
+                            <th>Work order</th>
+                            <th>What was done</th>
+                            <th>Tech</th>
+                            <th className="right">Hours</th>
+                          </tr>
+                        </DenseTHead>
+                        <tbody>
+                          {recentWorkOrders.map((wo) => {
+                            const dateIso = wo.scheduledDate ?? wo.completedDate ?? wo.createdAt;
+                            const woNumber = wo.workOrderNumber ?? `#${wo.id.slice(0, 8)}`;
+                            const firstItem = wo.workItems[0];
+                            const extra = wo.workItemCount - 1;
+                            const techs = wo.assignedUsers ?? [];
+                            const live =
+                              wo.progressCategory === 'IN_PROGRESS' && wo.lifecycleState !== 'CANCELLED';
+                            return (
+                              <DenseRow
+                                key={wo.id}
+                                className={`cursor-pointer ${live ? 'bg-[color-mix(in_oklch,var(--info-500)_6%,var(--bg-elev))]' : ''}`}
+                                onClick={() => navigate(`/work-orders/${wo.id}`)}
+                              >
+                                <td className="whitespace-nowrap text-[11.5px] text-fg-muted">{formatTimestamp(dateIso)}</td>
+                                <td className="font-mono text-[11.5px] text-fg-accent">{woNumber}</td>
+                                <td>
+                                  <span className="text-[12px] text-fg">{firstItem?.description ?? '—'}</span>
+                                  {extra > 0 && <span className="ml-1 text-[11px] text-fg-dim">+{extra} more</span>}
+                                </td>
+                                <td className="text-[12px] text-fg">
+                                  {techs.length > 0 ? (
+                                    <>
+                                      {techs[0].name ?? 'Unassigned'}
+                                      {techs.length > 1 && <span className="text-fg-dim"> +{techs.length - 1}</span>}
+                                    </>
+                                  ) : (
+                                    <span className="text-fg-dim">—</span>
+                                  )}
+                                </td>
+                                <td className="right font-mono text-[12px] tabular-nums text-fg-dim">—</td>
+                              </DenseRow>
+                            );
+                          })}
+                        </tbody>
+                      </DenseTable>
+                    </div>
                   )}
                 </Card>
 
@@ -583,20 +650,52 @@ export default function EquipmentDetailPage() {
                   </Card>
                 )}
 
-                {/* Notes — capped card (composer + recent). EquipmentNotesSection
-                    brings its own "Notes (N)" heading + composer + "+N more"
-                    overflow, so the card carries no title of its own. Full list
-                    on the Notes tab. */}
-                <Card padding="none">
-                  <div className="px-3.5 py-3">
-                    <EquipmentNotesSection
-                      equipmentId={id!}
-                      recentNotes={equipment.recentNotes ?? []}
-                      noteCount={equipment.noteCount ?? 0}
-                      bare
-                    />
-                  </div>
+                {/* Media peek — wide nameplate hero (source of truth) + a row of
+                    uniform-height thumbs; "+N" overlays the last tile. Mirrors the
+                    Media tab grid. */}
+                <Card
+                  title={<CardTitle icon={<PhotoIcon className="size-3.5" />}>{t('equipment.tabs.media')}</CardTitle>}
+                  action={totalMedia > 0 ? <CardLink onClick={goToMedia}>{t('common.viewAll')} {totalMedia}</CardLink> : undefined}
+                >
+                  {totalMedia === 0 ? (
+                    <p className="text-[12px] text-fg-muted">No photos or videos yet</p>
+                  ) : (
+                    <div
+                      className="grid items-stretch gap-1.5"
+                      style={{
+                        gridTemplateColumns: nameplate
+                          ? `1.4fr repeat(${Math.max(peekShown.length, 1)}, minmax(0,1fr))`
+                          : `repeat(${Math.max(peekShown.length, 1)}, minmax(0,1fr))`,
+                      }}
+                    >
+                      {nameplate && (
+                        <MediaPeekTile
+                          onClick={goToMedia}
+                          thumb={nameplate.thumbnailUrl ?? nameplate.url}
+                          alt={nameplate.caption ?? equipment.name}
+                          label="Nameplate"
+                          hero
+                        />
+                      )}
+                      {peekShown.map((m, i) => (
+                        <MediaPeekTile
+                          key={m.id}
+                          onClick={goToMedia}
+                          thumb={m.thumb}
+                          alt={m.alt}
+                          label={m.label}
+                          isVideo={m.isVideo}
+                          durationSeconds={m.durationSeconds}
+                          square={!nameplate}
+                          overflow={i === peekShown.length - 1 ? peekOverflow : 0}
+                        />
+                      ))}
+                    </div>
+                  )}
                 </Card>
+
+                {/* Notes — same shape + UX as the customer/location notes cards. */}
+                <EquipmentNotesCard equipmentId={id!} />
 
                 {/* Description — conditional; inline-editable textarea. */}
                 {hasDescription && (
@@ -632,8 +731,14 @@ export default function EquipmentDetailPage() {
                         .join(', ')}
                     </div>
                   )}
-                  <div className="mt-2.5 rounded-[8px] bg-bg-elev-2 px-2.5 py-2">
-                    <div className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-fg-muted">
+                  <div
+                    className="mt-2.5 rounded-[8px] border px-2.5 py-2"
+                    style={{
+                      background: 'color-mix(in oklch, var(--accent-500) 8%, var(--bg-elev))',
+                      borderColor: 'color-mix(in oklch, var(--accent-500) 22%, var(--border))',
+                    }}
+                  >
+                    <div className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-fg-accent">
                       {t('equipment.form.locationOnSite')}
                     </div>
                     <div className="mt-0.5 text-[12.5px] text-fg-strong">
@@ -701,10 +806,20 @@ export default function EquipmentDetailPage() {
                     </FieldRow>
                   </FieldGrid>
 
-                  {/* Warranty — money-decision sub-block; always shown. */}
-                  <div className="mt-3 rounded-[8px] bg-bg-elev-2 p-2.5">
+                  {/* Warranty — money-decision sub-block; success-tinted when active. */}
+                  <div
+                    className="mt-3 rounded-[8px] p-2.5"
+                    style={{
+                      background: underWarranty
+                        ? 'color-mix(in oklch, var(--success-500) 7%, var(--bg-elev))'
+                        : 'var(--bg-elev-2)',
+                    }}
+                  >
                     <div className="flex items-center justify-between gap-2">
-                      <span className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-fg-muted">
+                      <span
+                        className="text-[10.5px] font-semibold uppercase tracking-[0.08em]"
+                        style={{ color: underWarranty ? 'var(--success-600, var(--success-500))' : 'var(--fg-muted)' }}
+                      >
                         Warranty
                       </span>
                       {hasWarranty && (
@@ -733,54 +848,32 @@ export default function EquipmentDetailPage() {
                   </div>
                 </Card>
 
-                {/* Filters — sizes this unit takes; quick-add from tenant sizes. */}
+                {/* Filters — the sizes this unit actually takes render as rows on
+                    top; "Quick add" below offers the tenant's common sizes (those
+                    not already assigned) as 1-click dashed chips + a custom entry. */}
                 {showFiltersCard && (
                   <Card
                     title={<CardTitle icon={<FunnelIcon className="size-3.5" />}>{t('equipment.tabs.filters')}</CardTitle>}
-                    action={<CardLink onClick={openCreateFilter}>+ {t('equipment.filters.addFilter')}</CardLink>}
                     padding="none"
                   >
-                    {activeFilterSizes.length > 0 && (
-                      <div className="flex flex-wrap items-center gap-1.5 border-b border-border-soft px-3.5 py-2.5">
-                        {filterChips.map((s) => (
-                          <button
-                            key={s.id}
-                            type="button"
-                            onClick={() => openCreateFromSize(s)}
-                            className="rounded-full border border-dashed border-border px-2 py-0.5 text-[11px] font-medium text-fg-muted hover:border-fg-dim hover:text-fg-strong"
-                          >
-                            {formatFilterSize(s)}
-                          </button>
-                        ))}
-                        {activeFilterSizes.length > FILTER_SIZE_CHIP_COLLAPSED && (
-                          <button
-                            type="button"
-                            onClick={() => setShowAllFilterSizes((v) => !v)}
-                            className="card-action"
-                          >
-                            {showAllFilterSizes
-                              ? t('equipment.filters.showFewer')
-                              : t('equipment.filters.showAll', { count: activeFilterSizes.length })}
-                          </button>
-                        )}
-                      </div>
-                    )}
                     {filtersLoading ? (
                       <div className="px-3.5 py-5 text-center text-[12px] text-fg-muted">
                         {t('equipment.filters.loading')}
                       </div>
-                    ) : filters.length === 0 ? (
-                      <div className="px-3.5 py-5 text-center text-[12px] text-fg-muted">
-                        {t('equipment.filters.empty')}
-                      </div>
-                    ) : (
+                    ) : filters.length > 0 ? (
                       <ul className="divide-y divide-border-soft">
                         {filters.map((f) => (
                           <li key={f.id} className="flex items-center gap-2 px-3.5 py-2">
-                            <span className="font-mono text-[12.5px] text-fg-strong">{formatFilterSize(f)}</span>
+                            <span className="font-mono text-[12.5px] font-bold text-fg-strong">{formatFilterSize(f)}</span>
                             {f.quantity > 1 && <span className="text-[11px] text-fg-muted">×{f.quantity}</span>}
                             {f.label && <span className="truncate text-[11px] text-fg-muted">{f.label}</span>}
-                            <div className="ml-auto -my-1.5">
+                            <span className="ml-auto" />
+                            {f.updatedAt && (
+                              <span className="whitespace-nowrap text-[10.5px] text-fg-dim">
+                                changed {formatTimestamp(f.updatedAt)}
+                              </span>
+                            )}
+                            <div className="-my-1.5">
                               <Dropdown>
                                 <DropdownButton as={IconButton} aria-label={t('common.moreOptions')}>
                                   <EllipsisVerticalIcon className="size-4" />
@@ -798,7 +891,52 @@ export default function EquipmentDetailPage() {
                           </li>
                         ))}
                       </ul>
+                    ) : (
+                      <div className="border-b border-border-soft px-3.5 pt-3 pb-1 text-[12px] text-fg-muted">
+                        {t('equipment.filters.empty')}
+                      </div>
                     )}
+
+                    {/* Quick add */}
+                    <div className="px-3.5 py-2.5">
+                      <div className="mb-1.5 text-[10.5px] font-semibold uppercase tracking-[0.08em] text-fg-muted">
+                        Quick add
+                      </div>
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        {quickAddChips.map((s) => (
+                          <button
+                            key={s.id}
+                            type="button"
+                            onClick={() => openCreateFromSize(s)}
+                            // Inline font-size — a bare <button> otherwise picks up the
+                            // 13px global, overriding Tailwind's text-[11px].
+                            style={{ fontSize: '11px' }}
+                            className="rounded-full border border-dashed border-border-strong px-2 py-0.5 font-mono font-semibold text-fg-accent hover:bg-bg-elev-2"
+                          >
+                            + {formatFilterSize(s)}
+                          </button>
+                        ))}
+                        {quickAddCandidates.length > FILTER_SIZE_CHIP_COLLAPSED && (
+                          <button
+                            type="button"
+                            onClick={() => setShowAllFilterSizes((v) => !v)}
+                            className="card-action"
+                          >
+                            {showAllFilterSizes
+                              ? t('equipment.filters.showFewer')
+                              : t('equipment.filters.showAll', { count: quickAddCandidates.length })}
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={openCreateFilter}
+                          style={{ fontSize: '11px' }}
+                          className="rounded-full border border-border px-2 py-0.5 font-medium text-fg-muted hover:text-fg-strong"
+                        >
+                          Custom…
+                        </button>
+                      </div>
+                    </div>
                   </Card>
                 )}
               </div>
@@ -806,29 +944,33 @@ export default function EquipmentDetailPage() {
           )}
 
           {/* ── Service history tab ── */}
-          {activeTab === 'service-history' && id && <WorkOrdersList equipmentId={id} />}
+          {activeTab === 'service-history' && id && <EquipmentServiceHistoryTab equipmentId={id} />}
 
-          {/* ── Photos tab ── (merges into Media next pass) */}
-          {activeTab === 'photos' && (
-            <div>
-              <div className="mb-3 flex items-center justify-end">
-                <Button
-                  size="xs"
-                  onClick={() => setIsImageUploadOpen(true)}
-                  disabled={imageLimitReached}
-                  title={
-                    imageLimitReached
-                      ? t('equipment.images.limitReached', {
-                          entity: getName('equipment'),
-                          max: EQUIPMENT_IMAGE_MAX_PER_EQUIPMENT,
-                        })
-                      : undefined
-                  }
-                >
-                  <PlusIcon className="size-4" />
-                  {t('equipment.images.addPhoto')}
-                </Button>
-              </div>
+          {/* ── Media tab ── photos + videos together */}
+          {activeTab === 'media' && (
+            <div className="flex flex-col gap-5">
+              <section>
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <h3 className="text-[12px] font-semibold uppercase tracking-wide text-fg-muted">
+                    {t('equipment.tabs.photos')}
+                  </h3>
+                  <Button
+                    size="xs"
+                    onClick={() => setIsImageUploadOpen(true)}
+                    disabled={imageLimitReached}
+                    title={
+                      imageLimitReached
+                        ? t('equipment.images.limitReached', {
+                            entity: getName('equipment'),
+                            max: EQUIPMENT_IMAGE_MAX_PER_EQUIPMENT,
+                          })
+                        : undefined
+                    }
+                  >
+                    <PlusIcon className="size-4" />
+                    {t('equipment.images.addPhoto')}
+                  </Button>
+                </div>
 
               {imagesError ? (
                 <Callout kind="danger">
@@ -842,10 +984,14 @@ export default function EquipmentDetailPage() {
                 </div>
               ) : (
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-                  {images.map((img, i) => (
+                  {orderedImages.map((img, i) => (
                     <div
                       key={img.id}
-                      className="group relative overflow-hidden rounded-lg ring-1 ring-border"
+                      className={`group relative overflow-hidden rounded-lg ring-1 ${
+                        img.isProfile
+                          ? 'ring-[color-mix(in_oklch,var(--accent-500)_45%,var(--border))]'
+                          : 'ring-border'
+                      }`}
                     >
                       <button
                         type="button"
@@ -861,20 +1007,25 @@ export default function EquipmentDetailPage() {
                         />
                       </button>
 
-                      <button
-                        type="button"
-                        onClick={() => handleSetProfileImage(img)}
-                        aria-label={img.isProfile ? t('equipment.images.profile') : t('equipment.images.setAsProfile')}
-                        aria-pressed={img.isProfile}
-                        title={img.isProfile ? t('equipment.images.profile') : t('equipment.images.setAsProfile')}
-                        className="absolute left-1 top-1 flex size-8 items-center justify-center rounded-full bg-bg-elev/80 backdrop-blur transition-colors hover:bg-bg-elev"
-                      >
-                        {img.isProfile ? (
-                          <StarIconSolid className="size-5 text-amber-500" />
-                        ) : (
+                      {img.isProfile ? (
+                        // The nameplate is the source of truth — call it out, no set-profile control.
+                        <span
+                          className="absolute left-1 top-1 rounded px-1.5 py-0.5 text-[8.5px] font-bold uppercase tracking-[0.04em] text-white"
+                          style={{ background: 'var(--accent-500)' }}
+                        >
+                          Nameplate
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => handleSetProfileImage(img)}
+                          aria-label={t('equipment.images.setAsProfile')}
+                          title={t('equipment.images.setAsProfile')}
+                          className="absolute left-1 top-1 flex size-8 items-center justify-center rounded-full bg-bg-elev/80 backdrop-blur transition-colors hover:bg-bg-elev"
+                        >
                           <StarIconOutline className="size-5 text-fg-muted hover:text-amber-500" />
-                        )}
-                      </button>
+                        </button>
+                      )}
 
                       <div className="absolute right-1 top-1">
                         <Dropdown>
@@ -896,29 +1047,33 @@ export default function EquipmentDetailPage() {
                         </Dropdown>
                       </div>
 
-                      {img.caption && (
-                        <div className="border-t border-border bg-bg-elev px-2 py-1.5 text-xs text-fg-muted">
-                          <span className="line-clamp-1">{img.caption}</span>
+                      {/* Caption + by/when */}
+                      {(img.caption || img.uploadedByName || img.createdAt) && (
+                        <div className="border-t border-border bg-bg-elev px-2 py-1">
+                          {img.caption && (
+                            <div className="line-clamp-1 text-[11px] text-fg-strong">{img.caption}</div>
+                          )}
+                          {(img.uploadedByName || img.createdAt) && (
+                            <div className="truncate text-[10px] text-fg-muted">
+                              {[img.uploadedByName, formatTimestamp(img.createdAt)].filter(Boolean).join(' · ')}
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
                   ))}
                 </div>
               )}
+              </section>
+
+              {/* Videos */}
+              <section>
+                <h3 className="mb-2 text-[12px] font-semibold uppercase tracking-wide text-fg-muted">
+                  {t('equipment.tabs.videos')}
+                </h3>
+                {id && <EquipmentVideosSection equipmentId={id} />}
+              </section>
             </div>
-          )}
-
-          {/* ── Videos tab ── (merges into Media next pass) */}
-          {activeTab === 'videos' && id && <EquipmentVideosSection equipmentId={id} />}
-
-          {/* ── Notes tab ── (show-all target until the shared notes drawer lands) */}
-          {activeTab === 'notes' && (
-            <EquipmentNotesSection
-              equipmentId={id!}
-              recentNotes={allNotes}
-              noteCount={allNotes.length}
-              bare
-            />
           )}
 
           {/* Destructive footer — retire (not delete); preserves all records. */}
@@ -967,7 +1122,7 @@ export default function EquipmentDetailPage() {
 
       <EquipmentPhotoLightbox
         equipmentId={id!}
-        images={images}
+        images={orderedImages}
         startIndex={lightboxIndex}
         onClose={() => setLightboxIndex(null)}
       />
@@ -1012,35 +1167,6 @@ export default function EquipmentDetailPage() {
 
 // ── Sub-components ──
 
-/** One row in the Overview service-history peek: date · WO# · status · summary. */
-function ServiceHistoryRow({ wo, t }: { wo: WorkOrderSummary; t: (k: string, o?: Record<string, unknown>) => string }) {
-  const dateIso = wo.scheduledDate ?? wo.completedDate ?? wo.createdAt;
-  const woNumber = wo.workOrderNumber ?? `#${wo.id.slice(0, 8)}`;
-  const firstItem = wo.workItems[0];
-  const extraItems = wo.workItemCount - 1;
-  return (
-    <li>
-      <RouterLink to={`/work-orders/${wo.id}`} className="block px-3.5 py-2 hover:bg-bg-elev-2">
-        <div className="flex items-center gap-2 text-[12.5px]">
-          <span className="whitespace-nowrap text-[11px] text-fg-muted">{formatTimestamp(dateIso)}</span>
-          <span className="font-medium text-fg-strong">{woNumber}</span>
-          <Pill tone={PROGRESS_PILL[wo.progressCategory]} dot inline>
-            {t(`workOrders.progress.${PROGRESS_TRANSLATION_KEYS[wo.progressCategory]}`)}
-          </Pill>
-        </div>
-        {firstItem && (
-          <div className="mt-0.5 truncate text-[11px] text-fg-muted">
-            {firstItem.description}
-            {extraItems > 0 && (
-              <span className="ml-1 text-fg-dim">{t('workOrders.table.workItemsMore', { count: extraItems })}</span>
-            )}
-          </div>
-        )}
-      </RouterLink>
-    </li>
-  );
-}
-
 /** One row in the Units card: a direct sub-unit, linking to its detail page. */
 function UnitRow({ unit }: { unit: EquipmentSummary }) {
   const typeCategory =
@@ -1062,6 +1188,98 @@ function UnitRow({ unit }: { unit: EquipmentSummary }) {
         <ChevronRightIcon className="size-4 shrink-0 text-fg-dim" />
       </RouterLink>
     </li>
+  );
+}
+
+interface MediaPeekItem {
+  id: string;
+  thumb: string | null;
+  alt: string;
+  label: string;
+  isVideo?: boolean;
+  durationSeconds?: number | null;
+}
+
+/**
+ * One tile in the overview Media peek row. The nameplate (`hero`) is a wider
+ * accent-ringed source-of-truth tile (aspect-square, which anchors the row
+ * height); the gallery thumbs stretch to match it. Videos get a play badge +
+ * duration; a label rides a bottom gradient; `overflow` paints a "+N" cover on
+ * the last tile. `square` makes a tile self-size when there's no hero anchor.
+ */
+function MediaPeekTile({
+  thumb,
+  alt,
+  label,
+  isVideo = false,
+  durationSeconds,
+  hero = false,
+  square = false,
+  overflow = 0,
+  onClick,
+}: {
+  thumb: string | null;
+  alt: string;
+  label: string;
+  isVideo?: boolean;
+  durationSeconds?: number | null;
+  hero?: boolean;
+  square?: boolean;
+  overflow?: number;
+  onClick: () => void;
+}) {
+  const showLabel = !overflow && (label || (isVideo && durationSeconds != null));
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={alt}
+      className={[
+        'group relative block overflow-hidden rounded-md bg-bg-elev-2 ring-1',
+        hero ? 'ring-[color-mix(in_oklch,var(--accent-500)_45%,var(--border))]' : 'ring-border',
+        hero || square ? 'aspect-square' : '',
+      ]
+        .filter(Boolean)
+        .join(' ')}
+    >
+      {thumb ? (
+        <img src={thumb} alt={alt} loading="lazy" className="absolute inset-0 size-full object-cover" />
+      ) : (
+        <span className="absolute inset-0 grid place-items-center text-fg-dim">
+          {isVideo ? <VideoCameraIcon className="size-6" /> : <PhotoIcon className="size-6" />}
+        </span>
+      )}
+
+      {isVideo && !overflow && (
+        <span className="pointer-events-none absolute inset-0 grid place-items-center">
+          <span className="grid size-7 place-items-center rounded-full bg-black/55 ring-1 ring-inset ring-white/25">
+            <PlayIcon className="size-3.5 translate-x-px text-white" />
+          </span>
+        </span>
+      )}
+
+      {hero && (
+        <span
+          className="absolute left-1 top-1 rounded px-1.5 py-0.5 text-[8.5px] font-bold uppercase tracking-[0.04em] text-white"
+          style={{ background: 'var(--accent-500)' }}
+        >
+          Nameplate
+        </span>
+      )}
+
+      {overflow ? (
+        <span className="absolute inset-0 grid place-items-center bg-black/55 text-[15px] font-bold text-white">
+          +{overflow}
+        </span>
+      ) : showLabel ? (
+        <span className="absolute inset-x-0 bottom-0 flex items-center gap-1 bg-gradient-to-t from-black/65 to-transparent px-1.5 pb-1 pt-3 text-[9.5px] font-semibold text-white">
+          <span className="min-w-0 flex-1 truncate text-left">{label}</span>
+          {isVideo && durationSeconds != null && (
+            <span className="shrink-0 font-mono tabular-nums">{formatDuration(durationSeconds)}</span>
+          )}
+        </span>
+      ) : null}
+    </button>
   );
 }
 

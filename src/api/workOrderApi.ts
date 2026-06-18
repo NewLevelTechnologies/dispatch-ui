@@ -72,6 +72,8 @@ export interface WorkItemEquipmentSummary {
     body: string;
     authorUserId: string | null;
     authorName: string | null;
+    // Mirrors EquipmentNote (pinned-first; false until the pinning migration).
+    pinned: boolean;
     createdAt: string;
     updatedAt: string;
   }>;

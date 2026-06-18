@@ -712,6 +712,10 @@ export interface EquipmentNote {
   body: string;
   authorUserId: string | null;
   authorName: string | null;
+  // Server-maintained; pinned notes sort first. Returns false until the
+  // equipment-notes-pinning migration (063) ships — PATCH pinned is a no-op
+  // until then. Same shape as customer/location notes (NoteDto).
+  pinned: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -721,6 +725,15 @@ export interface EquipmentNote {
  *  authorUserId / authorName from the client. */
 export interface SaveEquipmentNoteRequest {
   body: string;
+  /** Optional — pin at creation. Defaults to false server-side. */
+  pinned?: boolean;
+}
+
+// PATCH is partial: send `body` to edit text, `pinned` to toggle the pin, or
+// both. Omit a field to leave it unchanged.
+export interface UpdateEquipmentNoteRequest {
+  body?: string;
+  pinned?: boolean;
 }
 
 export const equipmentNotesApi = {
@@ -745,7 +758,7 @@ export const equipmentNotesApi = {
   update: async (
     equipmentId: string,
     noteId: string,
-    request: SaveEquipmentNoteRequest
+    request: UpdateEquipmentNoteRequest
   ): Promise<EquipmentNote> => {
     const response = await apiClient.patch<EquipmentNote>(
       `/equipment/${equipmentId}/notes/${noteId}`,

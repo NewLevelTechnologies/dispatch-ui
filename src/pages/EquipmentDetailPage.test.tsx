@@ -27,6 +27,7 @@ const mockNotesDelete = vi.fn();
 const mockWorkOrdersGetAll = vi.fn();
 const mockGetServiceLocationById = vi.fn();
 const mockCustomerGetById = vi.fn();
+const mockFilesList = vi.fn();
 const mockShowError = vi.fn();
 const mockShowSuccess = vi.fn();
 
@@ -97,6 +98,19 @@ vi.mock('../api/customerApi', async (importOriginal) => {
   };
 });
 
+// Videos come from the files service (also used by EquipmentVideosSection on the
+// Media tab). Spread the original so the VIDEO_* constants stay intact.
+vi.mock('../api/filesApi', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../api/filesApi')>();
+  return {
+    ...actual,
+    equipmentFilesApi: {
+      ...actual.equipmentFilesApi,
+      list: (...args: unknown[]) => mockFilesList(...args),
+    },
+  };
+});
+
 // Surface helpers are mocked so we can assert error/success toasts; extractApiError
 // stays real so the backend message still flows through to the toast description.
 vi.mock('../lib/toast', async (importOriginal) => {
@@ -156,6 +170,7 @@ describe('EquipmentDetailPage', () => {
     mockFiltersGetAll.mockResolvedValue([]);
     mockFilterSizesGetAll.mockResolvedValue([]);
     mockImagesList.mockResolvedValue([]);
+    mockFilesList.mockResolvedValue({ content: [] });
     mockNotesList.mockResolvedValue([]);
     mockWorkOrdersGetAll.mockResolvedValue({
       content: [],
@@ -388,8 +403,8 @@ describe('EquipmentDetailPage', () => {
     });
     expect(screen.getByText('Filters')).toBeInTheDocument();
     expect(await screen.findByText(/no filters added yet/i)).toBeInTheDocument();
-    // Quick-add chip is rendered for the tenant size.
-    expect(screen.getByRole('button', { name: '16×20×1' })).toBeInTheDocument();
+    // Quick-add chip is rendered for the tenant size ("+ " prefix → substring match).
+    expect(screen.getByRole('button', { name: /16×20×1/ })).toBeInTheDocument();
   });
 
   it('renders the filter list in the Filters card', async () => {
@@ -405,6 +420,30 @@ describe('EquipmentDetailPage', () => {
 
     expect(await screen.findByText('20×25×1')).toBeInTheDocument();
     expect(screen.getByText('Return air')).toBeInTheDocument();
+  });
+
+  it('excludes already-assigned sizes from the quick-add chips and shows note + changed date', async () => {
+    mockGetById.mockResolvedValue(baseEquipment);
+    mockFiltersGetAll.mockResolvedValue([
+      { id: 'f-1', equipmentId: 'eq-1', lengthIn: 16, widthIn: 20, thicknessIn: 1, quantity: 2, label: 'MERV 11', updatedAt: '2026-05-01T12:00:00Z' },
+    ]);
+    mockFilterSizesGetAll.mockResolvedValue([
+      { id: 's-1', tenantId: 't', lengthIn: 16, widthIn: 20, thicknessIn: 1, sortOrder: 0, archivedAt: null, createdAt: '' }, // already assigned
+      { id: 's-2', tenantId: 't', lengthIn: 20, widthIn: 25, thicknessIn: 1, sortOrder: 1, archivedAt: null, createdAt: '' }, // suggestable
+    ]);
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Upstairs Furnace' })).toBeInTheDocument();
+    });
+
+    // Assigned row: size (no "+" prefix) + note + a "changed …" stamp.
+    expect(await screen.findByText('16×20×1')).toBeInTheDocument();
+    expect(screen.getByText('MERV 11')).toBeInTheDocument();
+    expect(screen.getByText(/changed/i)).toBeInTheDocument();
+    // Quick add suggests the unassigned size but not the already-assigned one.
+    expect(screen.getByRole('button', { name: /20×25×1/ })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /\+ 16×20×1/ })).not.toBeInTheDocument();
   });
 
   it('collapses the chip palette to 8 entries with a show-all toggle when there are more', async () => {
@@ -429,18 +468,19 @@ describe('EquipmentDetailPage', () => {
     );
 
     // Default view: 8 chips visible (index 0), 9th+ hidden until toggled.
-    await waitFor(() => expect(screen.getByText('10×20×1')).toBeInTheDocument());
-    expect(screen.queryByText('18×20×1')).not.toBeInTheDocument(); // index 8
-    expect(screen.queryByText('21×20×1')).not.toBeInTheDocument(); // index 11
+    // Chips carry a "+ " prefix, so match the size as a substring.
+    await waitFor(() => expect(screen.getByText(/10×20×1/)).toBeInTheDocument());
+    expect(screen.queryByText(/18×20×1/)).not.toBeInTheDocument(); // index 8
+    expect(screen.queryByText(/21×20×1/)).not.toBeInTheDocument(); // index 11
 
     // Click Show all → all 12 chips visible.
     await user.click(screen.getByRole('button', { name: /show all \(12\)/i }));
-    expect(screen.getByText('18×20×1')).toBeInTheDocument();
-    expect(screen.getByText('21×20×1')).toBeInTheDocument();
+    expect(screen.getByText(/18×20×1/)).toBeInTheDocument();
+    expect(screen.getByText(/21×20×1/)).toBeInTheDocument();
 
     // Show fewer collapses back to 8.
     await user.click(screen.getByRole('button', { name: /show fewer/i }));
-    expect(screen.queryByText('18×20×1')).not.toBeInTheDocument();
+    expect(screen.queryByText(/18×20×1/)).not.toBeInTheDocument();
   });
 
   it('renders quick-add chips and pre-fills dimensions when one is clicked', async () => {
@@ -455,7 +495,7 @@ describe('EquipmentDetailPage', () => {
       expect(screen.getByRole('heading', { name: 'Upstairs Furnace' })).toBeInTheDocument();
     });
 
-    const chip = await screen.findByRole('button', { name: '16×20×1' });
+    const chip = await screen.findByRole('button', { name: /16×20×1/ });
     await user.click(chip);
 
     // Dialog opens with dimensions pre-filled.
@@ -613,7 +653,7 @@ describe('EquipmentDetailPage', () => {
     });
   });
 
-  it('opens the Add Filter dialog from the Add Filter action', async () => {
+  it('opens the Add Filter dialog (empty) from the Custom… chip', async () => {
     mockGetById.mockResolvedValue(baseEquipment);
     // A tenant size makes the Filters card render even with no filters yet.
     mockFilterSizesGetAll.mockResolvedValue([
@@ -625,7 +665,7 @@ describe('EquipmentDetailPage', () => {
     await waitFor(() => {
       expect(screen.getByRole('heading', { name: 'Upstairs Furnace' })).toBeInTheDocument();
     });
-    await user.click(await screen.findByRole('button', { name: /add filter/i }));
+    await user.click(await screen.findByRole('button', { name: /custom/i }));
 
     const dialog = await screen.findByRole('dialog');
     expect(dialog).toBeInTheDocument();
@@ -698,7 +738,7 @@ describe('EquipmentDetailPage', () => {
     await waitFor(() => {
       expect(screen.getByRole('heading', { name: 'Upstairs Furnace' })).toBeInTheDocument();
     });
-    await user.click(screen.getByRole('tab', { name: /^photos/i }));
+    await user.click(screen.getByRole('tab', { name: /^media/i }));
     await waitFor(() => {
       expect(screen.getByText(/no photos added yet/i)).toBeInTheDocument();
     });
@@ -745,11 +785,13 @@ describe('EquipmentDetailPage', () => {
       expect(screen.getByRole('heading', { name: 'Upstairs Furnace' })).toBeInTheDocument();
     });
 
-    const photosTab = await screen.findByRole('tab', { name: /^photos\s*2$/i });
+    const photosTab = await screen.findByRole('tab', { name: /^media\s*2$/i });
     await user.click(photosTab);
 
-    await waitFor(() => expect(screen.getByText('Nameplate')).toBeInTheDocument());
-    expect(screen.getByRole('button', { name: /^profile$/i })).toBeInTheDocument();
+    // The profile image is called out as the nameplate (label, not a toggle);
+    // the non-profile image keeps a "set as profile" control.
+    await waitFor(() => expect(screen.getAllByText(/nameplate/i).length).toBeGreaterThan(0));
+    expect(screen.queryByRole('button', { name: /^profile$/i })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: /^set as profile$/i })).toBeInTheDocument();
     const thumbs = screen.getAllByRole('img');
     expect(thumbs.length).toBeGreaterThanOrEqual(2);
@@ -781,7 +823,7 @@ describe('EquipmentDetailPage', () => {
     await waitFor(() => {
       expect(screen.getByRole('heading', { name: 'Upstairs Furnace' })).toBeInTheDocument();
     });
-    await user.click(screen.getByRole('tab', { name: /^photos/i }));
+    await user.click(screen.getByRole('tab', { name: /^media/i }));
 
     const star = await screen.findByRole('button', { name: /set as profile/i });
     await user.click(star);
@@ -818,7 +860,7 @@ describe('EquipmentDetailPage', () => {
     await waitFor(() => {
       expect(screen.getByRole('heading', { name: 'Upstairs Furnace' })).toBeInTheDocument();
     });
-    await user.click(screen.getByRole('tab', { name: /^photos/i }));
+    await user.click(screen.getByRole('tab', { name: /^media/i }));
 
     // Header overflow appears first; the photo row's overflow is at index 1.
     const moreButtons = await screen.findAllByRole('button', { name: /more options/i });
@@ -840,7 +882,7 @@ describe('EquipmentDetailPage', () => {
     await waitFor(() => {
       expect(screen.getByRole('heading', { name: 'Upstairs Furnace' })).toBeInTheDocument();
     });
-    await user.click(screen.getByRole('tab', { name: /^photos/i }));
+    await user.click(screen.getByRole('tab', { name: /^media/i }));
     await user.click(screen.getByRole('button', { name: /add photo/i }));
 
     expect(await screen.findByRole('dialog')).toBeInTheDocument();
@@ -894,31 +936,22 @@ describe('EquipmentDetailPage', () => {
       expect(screen.getByRole('heading', { name: 'Upstairs Furnace' })).toBeInTheDocument();
     });
 
-    expect(await screen.findByText(/recent work orders/i)).toBeInTheDocument();
-    // The WO row links to its detail page and surfaces the first work item
-    // description with a "+N more" indicator when the WO has additional items.
-    const woLink = screen.getByRole('link', { name: /WO-00010/i });
-    expect(woLink).toHaveAttribute('href', '/work-orders/wo-1');
+    // The peek surfaces the WO number, the first work item + a "+N more" hint.
+    expect(await screen.findByText('WO-00010')).toBeInTheDocument();
     expect(screen.getByText(/replace condenser coil/i)).toBeInTheDocument();
     expect(screen.getByText(/\+1 more/i)).toBeInTheDocument();
 
-    // "View all" jumps to the Service History tab.
+    // "View all" opens the Service history tab (its search box appears).
     await user.click(screen.getByRole('button', { name: /view all/i }));
-    await waitFor(() => {
-      expect(screen.queryByText(/recent work orders/i)).not.toBeInTheDocument();
-    });
+    expect(await screen.findByPlaceholderText(/search work orders/i)).toBeInTheDocument();
   });
 
-  it('renders the recent notes card on Overview from the embedded projection', async () => {
-    mockGetById.mockResolvedValue({
-      ...baseEquipment,
-      recentNotes: [
-        { id: 'n-1', body: 'Replaced compressor', authorUserId: 'u-1', authorName: 'Jane', createdAt: '2026-05-01T12:00:00Z', updatedAt: '2026-05-01T12:00:00Z' },
-        { id: 'n-2', body: 'Filter due', authorUserId: 'u-2', authorName: 'Bob', createdAt: '2026-04-20T09:00:00Z', updatedAt: '2026-04-20T09:00:00Z' },
-        { id: 'n-3', body: 'Loud rattle on startup', authorUserId: 'u-3', authorName: 'Sue', createdAt: '2026-04-10T09:00:00Z', updatedAt: '2026-04-10T09:00:00Z' },
-      ],
-      noteCount: 4,
-    });
+  it('renders the notes card on Overview from the notes list', async () => {
+    mockGetById.mockResolvedValue(baseEquipment);
+    mockNotesList.mockResolvedValue([
+      { id: 'n-1', body: 'Replaced compressor', authorUserId: 'u-1', authorName: 'Jane', pinned: false, createdAt: '2026-05-01T12:00:00Z', updatedAt: '2026-05-01T12:00:00Z' },
+      { id: 'n-2', body: 'Filter due', authorUserId: 'u-2', authorName: 'Bob', pinned: false, createdAt: '2026-04-20T09:00:00Z', updatedAt: '2026-04-20T09:00:00Z' },
+    ]);
     renderPage();
 
     await waitFor(() => {
@@ -927,44 +960,33 @@ describe('EquipmentDetailPage', () => {
 
     expect(await screen.findByText('Replaced compressor')).toBeInTheDocument();
     expect(screen.getByText('Filter due')).toBeInTheDocument();
-    expect(screen.getByText('Loud rattle on startup')).toBeInTheDocument();
   });
 
-  it('renders an empty Notes tab with the Add note affordance', async () => {
+  it('shows the notes card empty state with an Add affordance', async () => {
     mockGetById.mockResolvedValue(baseEquipment);
-    const user = userEvent.setup();
-    renderPage();
-
-    await waitFor(() => {
-      expect(screen.getByRole('heading', { name: 'Upstairs Furnace' })).toBeInTheDocument();
-    });
-    await user.click(screen.getByRole('tab', { name: /^notes/i }));
-
-    expect(await screen.findByText('Notes (0)')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /add note/i })).toBeInTheDocument();
-  });
-
-  it('renders the Notes tab with the full list and a count badge', async () => {
-    mockGetById.mockResolvedValue(baseEquipment);
-    mockNotesList.mockResolvedValue([
-      { id: 'n-1', body: 'Replaced compressor 2025-08-12', authorUserId: 'u-1', authorName: 'Jane Smith', createdAt: '2026-05-01T12:00:00Z', updatedAt: '2026-05-01T12:00:00Z' },
-      { id: 'n-2', body: 'Filter due in May', authorUserId: 'u-2', authorName: 'Bob', createdAt: '2026-04-20T09:00:00Z', updatedAt: '2026-04-20T09:00:00Z' },
-    ]);
-    const user = userEvent.setup();
+    mockNotesList.mockResolvedValue([]);
     renderPage();
 
     await waitFor(() => {
       expect(screen.getByRole('heading', { name: 'Upstairs Furnace' })).toBeInTheDocument();
     });
 
-    const notesTab = await screen.findByRole('tab', { name: /^notes\s*2$/i });
-    await user.click(notesTab);
+    // No sub-units here, so the only "+ Add" is the notes card's.
+    expect(await screen.findByText(/no notes yet/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^\+ add$/i })).toBeInTheDocument();
+  });
+
+  it('opens the note composer from the notes card', async () => {
+    mockGetById.mockResolvedValue(baseEquipment);
+    mockNotesList.mockResolvedValue([]);
+    const user = userEvent.setup();
+    renderPage();
 
     await waitFor(() => {
-      expect(screen.getByText('Notes (2)')).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: 'Upstairs Furnace' })).toBeInTheDocument();
     });
-    expect(screen.getByText('Replaced compressor 2025-08-12')).toBeInTheDocument();
-    expect(screen.getByText('Filter due in May')).toBeInTheDocument();
+    await user.click(await screen.findByRole('button', { name: /^\+ add$/i }));
+    expect(await screen.findByRole('dialog')).toBeInTheDocument();
   });
 
   it('surfaces a toast and stays in edit mode when PATCH fails', async () => {
@@ -1056,7 +1078,7 @@ describe('EquipmentDetailPage', () => {
     await waitFor(() => {
       expect(screen.getByRole('heading', { name: 'Upstairs Furnace' })).toBeInTheDocument();
     });
-    await user.click(screen.getByRole('tab', { name: /^photos/i }));
+    await user.click(screen.getByRole('tab', { name: /^media/i }));
 
     const moreButtons = await screen.findAllByRole('button', { name: /more options/i });
     await user.click(moreButtons[1]);
@@ -1066,6 +1088,72 @@ describe('EquipmentDetailPage', () => {
       expect(mockImagePatch).toHaveBeenCalledWith('eq-1', 'img-1', { caption: 'Nameplate' });
     });
     promptSpy.mockRestore();
+  });
+
+  it('surfaces a toast when setting the profile image fails', async () => {
+    mockGetById.mockResolvedValue(baseEquipment);
+    mockImagesList.mockResolvedValue([
+      { id: 'img-1', url: 'u', thumbnailUrl: 't', contentType: 'image/jpeg', sizeBytes: 1, widthPx: 1, heightPx: 1, isProfile: false, sortOrder: 0, caption: null, uploadedBy: null, uploadedByName: null, createdAt: '' },
+    ]);
+    mockImagePatch.mockRejectedValue(
+      Object.assign(new Error('x'), { response: { data: { message: 'Cannot set profile' } } })
+    );
+    const user = userEvent.setup();
+    renderPage();
+
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Upstairs Furnace' })).toBeInTheDocument());
+    await user.click(screen.getByRole('tab', { name: /^media/i }));
+    await user.click(await screen.findByRole('button', { name: /set as profile/i }));
+
+    await waitFor(() => {
+      expect(mockShowError).toHaveBeenCalledWith(expect.any(String), 'Cannot set profile');
+    });
+  });
+
+  it('surfaces a toast when editing a caption fails', async () => {
+    mockGetById.mockResolvedValue(baseEquipment);
+    mockImagesList.mockResolvedValue([
+      { id: 'img-1', url: 'u', thumbnailUrl: 't', contentType: 'image/jpeg', sizeBytes: 1, widthPx: 1, heightPx: 1, isProfile: false, sortOrder: 0, caption: 'Old', uploadedBy: null, uploadedByName: null, createdAt: '' },
+    ]);
+    mockImagePatch.mockRejectedValue(
+      Object.assign(new Error('x'), { response: { data: { message: 'Bad caption' } } })
+    );
+    const promptSpy = vi.spyOn(window, 'prompt').mockReturnValue('New');
+    const user = userEvent.setup();
+    renderPage();
+
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Upstairs Furnace' })).toBeInTheDocument());
+    await user.click(screen.getByRole('tab', { name: /^media/i }));
+    await user.click((await screen.findAllByRole('button', { name: /more options/i }))[1]);
+    await user.click(await screen.findByRole('menuitem', { name: /caption/i }));
+
+    await waitFor(() => {
+      expect(mockShowError).toHaveBeenCalledWith(expect.any(String), 'Bad caption');
+    });
+    promptSpy.mockRestore();
+  });
+
+  it('surfaces a toast when deleting a photo fails', async () => {
+    mockGetById.mockResolvedValue(baseEquipment);
+    mockImagesList.mockResolvedValue([
+      { id: 'img-1', url: 'u', thumbnailUrl: 't', contentType: 'image/jpeg', sizeBytes: 1, widthPx: 1, heightPx: 1, isProfile: false, sortOrder: 0, caption: null, uploadedBy: null, uploadedByName: null, createdAt: '' },
+    ]);
+    mockImageDelete.mockRejectedValue(
+      Object.assign(new Error('x'), { response: { data: { message: 'Cannot delete' } } })
+    );
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const user = userEvent.setup();
+    renderPage();
+
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Upstairs Furnace' })).toBeInTheDocument());
+    await user.click(screen.getByRole('tab', { name: /^media/i }));
+    await user.click((await screen.findAllByRole('button', { name: /more options/i }))[1]);
+    await user.click(await screen.findByRole('menuitem', { name: /delete/i }));
+
+    await waitFor(() => {
+      expect(mockShowError).toHaveBeenCalledWith(expect.any(String), 'Cannot delete');
+    });
+    confirmSpy.mockRestore();
   });
 
   it('opens the add sub-unit dialog from the Units card', async () => {
@@ -1079,8 +1167,9 @@ describe('EquipmentDetailPage', () => {
     await waitFor(() => {
       expect(screen.getByText('Units')).toBeInTheDocument();
     });
-    // The Units card's "+ Add" action (distinct from the Notes "Add note" button).
-    await user.click(screen.getByRole('button', { name: /^\+ add$/i }));
+    // Both Units and Notes cards expose a "+ Add"; Units sits first in the left
+    // column, so its action is the first match.
+    await user.click((await screen.findAllByRole('button', { name: /^\+ add$/i }))[0]);
     expect(await screen.findByRole('dialog')).toBeInTheDocument();
   });
 
@@ -1094,6 +1183,48 @@ describe('EquipmentDetailPage', () => {
     });
     await user.click(screen.getByRole('button', { name: /new work order/i }));
     expect(await screen.findByRole('dialog')).toBeInTheDocument();
+  });
+
+  it('shows the media peek on overview with the nameplate called out and a video thumb', async () => {
+    mockGetById.mockResolvedValue(baseEquipment);
+    mockImagesList.mockResolvedValue([
+      { id: 'img-1', url: 'https://cdn/full-1.jpg', thumbnailUrl: 'https://cdn/thumb-1.jpg', contentType: 'image/jpeg', sizeBytes: 1, widthPx: 1, heightPx: 1, isProfile: true, sortOrder: 0, caption: 'Plate', uploadedBy: null, uploadedByName: null, createdAt: '' },
+      { id: 'img-2', url: 'https://cdn/full-2.jpg', thumbnailUrl: 'https://cdn/thumb-2.jpg', contentType: 'image/jpeg', sizeBytes: 1, widthPx: 1, heightPx: 1, isProfile: false, sortOrder: 1, caption: null, uploadedBy: null, uploadedByName: null, createdAt: '' },
+    ]);
+    mockFilesList.mockResolvedValue({
+      content: [
+        { id: 'vid-1', kind: 'VIDEO', status: 'READY', fileName: 'run.mp4', url: 'https://cdn/run.mp4', thumbnailUrl: 'https://cdn/poster.jpg', durationSeconds: 45, caption: null, isProfile: false, uploadedBy: null, uploadedByName: null, createdAt: '' },
+      ],
+    });
+    const user = userEvent.setup();
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Upstairs Furnace' })).toBeInTheDocument();
+    });
+    // Nameplate called out (badge + label) + the video thumb shows its duration.
+    expect((await screen.findAllByText(/nameplate/i)).length).toBeGreaterThan(0);
+    expect(await screen.findByText('0:45')).toBeInTheDocument();
+
+    // "View all" jumps to the Media tab (2 photos + 1 video = 3).
+    await user.click(screen.getByRole('button', { name: /view all/i }));
+    await waitFor(() => {
+      expect(screen.getByRole('tab', { name: /^media\s*3$/i })).toHaveAttribute('aria-selected', 'true');
+    });
+  });
+
+  it('shows both photos and videos sections on the Media tab', async () => {
+    mockGetById.mockResolvedValue(baseEquipment);
+    const user = userEvent.setup();
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Upstairs Furnace' })).toBeInTheDocument();
+    });
+    await user.click(screen.getByRole('tab', { name: /^media/i }));
+
+    expect(await screen.findByText(/no photos added yet/i)).toBeInTheDocument();
+    expect(screen.getByText(/no videos yet/i)).toBeInTheDocument();
   });
 
   it('reactivates a retired unit from the footer', async () => {
