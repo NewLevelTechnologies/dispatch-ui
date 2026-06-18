@@ -41,7 +41,15 @@ function formatDuration(totalSeconds: number): string {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 }
 
-export default function EquipmentVideosSection({ equipmentId }: { equipmentId: string }) {
+export default function EquipmentVideosSection({
+  equipmentId,
+  hideUpload = false,
+}: {
+  equipmentId: string;
+  // The equipment Media tab provides a single shared "Add media" control, so it
+  // hides this section's own upload button.
+  hideUpload?: boolean;
+}) {
   const queryClient = useQueryClient();
   const inputRef = useRef<HTMLInputElement>(null);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
@@ -92,13 +100,15 @@ export default function EquipmentVideosSection({ equipmentId }: { equipmentId: s
 
   return (
     <div>
-      <div className="mb-3 flex items-center justify-end">
-        <input ref={inputRef} type="file" accept={ACCEPT} className="hidden" onChange={onPick} />
-        <Button onClick={() => inputRef.current?.click()} disabled={upload.isPending}>
-          <PlusIcon className="size-4" />
-          {upload.isPending ? 'Uploading…' : 'Upload video'}
-        </Button>
-      </div>
+      {!hideUpload && (
+        <div className="mb-3 flex items-center justify-end">
+          <input ref={inputRef} type="file" accept={ACCEPT} className="hidden" onChange={onPick} />
+          <Button outline onClick={() => inputRef.current?.click()} disabled={upload.isPending}>
+            <PlusIcon className="size-4" />
+            {upload.isPending ? 'Uploading…' : 'Upload video'}
+          </Button>
+        </div>
+      )}
 
       {isError ? (
         <div className="rounded-lg bg-red-50 p-3 ring-1 ring-red-200 dark:bg-red-950/10 dark:ring-red-900/20">
@@ -115,7 +125,7 @@ export default function EquipmentVideosSection({ equipmentId }: { equipmentId: s
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+        <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))' }}>
           {videos.map((f, i) => (
             <VideoTile
               key={f.id}

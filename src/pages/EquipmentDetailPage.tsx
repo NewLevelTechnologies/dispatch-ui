@@ -2,15 +2,15 @@
 // Equipment detail — the leaf entity (lives under a Location, under a Customer).
 // Redesigned onto the shared detail-page shell (header card → tab row → 2-col
 // overview → destructive footer) that Location / Customer / Agreement detail use,
-// so the four pages read as one design. Equipment-distinct intent: the nameplate
+// so the four pages read as one design. Equipment-distinct intent: the profile
 // photo is the source of truth, service history is the longitudinal marquee (no
 // derived "replace me" flag), warranty drives money decisions, and "Open work
 // order" is the only live status (derived from the WO list, not stored).
 //
 // Units / Filters / Notes are CONDITIONAL overview cards, not tabs (HVAC has
 // units + filters; a water heater doesn't). Photos + Videos live together on a
-// single Media tab, with a nameplate-called-out media peek on the overview.
-import { useState } from 'react';
+// single Media tab, with a profile-photo-led media peek on the overview.
+import { useRef, useState } from 'react';
 import { useParams, useNavigate, useLocation, Link as RouterLink } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
@@ -25,6 +25,8 @@ import {
   tenantFilterSizesApi,
   EquipmentStatus,
   EQUIPMENT_IMAGE_MAX_PER_EQUIPMENT,
+  VIDEO_CONTENT_TYPES,
+  VIDEO_MAX_BYTES,
   type EquipmentFilter,
   type EquipmentImage,
   type EquipmentSummary,
@@ -257,6 +259,32 @@ export default function EquipmentDetailPage() {
     onError: (err) => showError(t('equipment.images.errorDelete'), extractApiError(err)),
   });
 
+  // Video upload — driven by the shared "Add media" control. Shares the
+  // equipment-files cache with EquipmentVideosSection so its grid refreshes.
+  const videoInputRef = useRef<HTMLInputElement>(null);
+  const videoUploadMutation = useMutation({
+    mutationFn: (file: File) => equipmentFilesApi.upload(id!, file),
+    onSuccess: (file) => {
+      queryClient.invalidateQueries({ queryKey: ['equipment-files', id] });
+      showSuccess(file.status === 'PROCESSING' ? 'Video uploaded — processing' : 'Video uploaded');
+    },
+    onError: (err) => showError('Upload failed', extractApiError(err)),
+  });
+  const onPickVideo = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ''; // allow re-picking the same file after an error
+    if (!file) return;
+    if (!(VIDEO_CONTENT_TYPES as readonly string[]).includes(file.type)) {
+      showError('Unsupported file', 'Pick an MP4 or QuickTime (.mov) video.');
+      return;
+    }
+    if (file.size > VIDEO_MAX_BYTES) {
+      showError('Video too large', 'The limit is 100 MB.');
+      return;
+    }
+    videoUploadMutation.mutate(file);
+  };
+
   // Retire / reactivate — flips status, preserving every related record. The
   // destructive-footer action (retire, not delete). Delete stays in the ⋯ menu.
   const retireMutation = useMutation({
@@ -439,15 +467,13 @@ export default function EquipmentDetailPage() {
   const units = descendants.filter((d) => !(d.parentId && descendantIds.has(d.parentId)));
   const showUnitsCard = !isSubUnit && units.length > 0;
 
-  // ── Media (peek + tab) ── The nameplate (profile photo) is the source of
-  // truth, so it's called out separately from the gallery. The peek shows the
-  // nameplate + a few gallery thumbs (photos and video posters).
-  const nameplate = images.find((img) => img.isProfile) ?? null;
+  // ── Media (peek + tab) ── The profile photo leads the gallery + the peek.
+  const profilePhoto = images.find((img) => img.isProfile) ?? null;
   const galleryPhotos = images.filter((img) => !img.isProfile);
-  // Nameplate (the source of truth) leads the Media tab grid + the lightbox order.
-  const orderedImages = nameplate ? [nameplate, ...galleryPhotos] : galleryPhotos;
+  // Profile photo leads the Media tab grid + the lightbox order.
+  const orderedImages = profilePhoto ? [profilePhoto, ...galleryPhotos] : galleryPhotos;
   const MEDIA_PEEK_MAX = 4;
-  // Gallery = everything except the nameplate (photos + videos), for the peek row.
+  // Peek row = non-profile photos + videos.
   const peekItems: MediaPeekItem[] = [
     ...galleryPhotos.map((p) => ({
       id: p.id,
@@ -643,9 +669,8 @@ export default function EquipmentDetailPage() {
                   </Card>
                 )}
 
-                {/* Media peek — wide nameplate hero (source of truth) + a row of
-                    uniform-height thumbs; "+N" overlays the last tile. Mirrors the
-                    Media tab grid. */}
+                {/* Media peek — wide profile-photo hero + a row of uniform-height
+                    thumbs; "+N" overlays the last tile. Mirrors the Media tab grid. */}
                 <Card
                   title={<CardTitle icon={<PhotoIcon className="size-3.5" />}>{t('equipment.tabs.media')}</CardTitle>}
                   action={totalMedia > 0 ? <CardLink onClick={goToMedia}>{t('common.viewAll')} {totalMedia}</CardLink> : undefined}
@@ -656,17 +681,17 @@ export default function EquipmentDetailPage() {
                     <div
                       className="grid items-stretch gap-1.5"
                       style={{
-                        gridTemplateColumns: nameplate
+                        gridTemplateColumns: profilePhoto
                           ? `1.4fr repeat(${Math.max(peekShown.length, 1)}, minmax(0,1fr))`
                           : `repeat(${Math.max(peekShown.length, 1)}, minmax(0,1fr))`,
                       }}
                     >
-                      {nameplate && (
+                      {profilePhoto && (
                         <MediaPeekTile
                           onClick={goToMedia}
-                          thumb={nameplate.thumbnailUrl ?? nameplate.url}
-                          alt={nameplate.caption ?? equipment.name}
-                          label="Nameplate"
+                          thumb={profilePhoto.thumbnailUrl ?? profilePhoto.url}
+                          alt={profilePhoto.caption ?? equipment.name}
+                          label="Profile"
                           hero
                         />
                       )}
@@ -679,7 +704,7 @@ export default function EquipmentDetailPage() {
                           label={m.label}
                           isVideo={m.isVideo}
                           durationSeconds={m.durationSeconds}
-                          square={!nameplate}
+                          square={!profilePhoto}
                           overflow={i === peekShown.length - 1 ? peekOverflow : 0}
                         />
                       ))}
@@ -939,31 +964,50 @@ export default function EquipmentDetailPage() {
           {/* ── Service history tab ── */}
           {activeTab === 'service-history' && id && <EquipmentServiceHistoryTab equipmentId={id} />}
 
-          {/* ── Media tab ── nameplate callout, then Photos + Videos galleries */}
+          {/* ── Media tab ── Photos + Videos galleries */}
           {activeTab === 'media' && (
             <div className="flex flex-col gap-4">
-              {/* Header — counts + add */}
+              {/* Header — counts + one shared "Add media" control */}
               <div className="flex flex-wrap items-center gap-2">
                 <span className="text-[12px] text-fg-muted">
                   {images.length + videos.length} items · {images.length} photos · {videos.length} videos
                 </span>
                 <span className="flex-1" />
-                <Button
-                  size="xs"
-                  onClick={() => setIsImageUploadOpen(true)}
-                  disabled={imageLimitReached}
-                  title={
-                    imageLimitReached
-                      ? t('equipment.images.limitReached', {
-                          entity: getName('equipment'),
-                          max: EQUIPMENT_IMAGE_MAX_PER_EQUIPMENT,
-                        })
-                      : undefined
-                  }
-                >
-                  <PlusIcon className="size-4" />
-                  {t('equipment.images.addPhoto')}
-                </Button>
+                <input
+                  ref={videoInputRef}
+                  type="file"
+                  accept={VIDEO_CONTENT_TYPES.join(',')}
+                  className="hidden"
+                  onChange={onPickVideo}
+                />
+                <Dropdown>
+                  <DropdownButton as={Button} outline size="xs">
+                    <PlusIcon className="size-4" />
+                    Add media
+                  </DropdownButton>
+                  <DropdownMenu anchor="bottom end">
+                    <DropdownItem
+                      onClick={() => setIsImageUploadOpen(true)}
+                      disabled={imageLimitReached}
+                      title={
+                        imageLimitReached
+                          ? t('equipment.images.limitReached', {
+                              entity: getName('equipment'),
+                              max: EQUIPMENT_IMAGE_MAX_PER_EQUIPMENT,
+                            })
+                          : undefined
+                      }
+                    >
+                      <DropdownLabel>{t('equipment.images.addPhoto')}</DropdownLabel>
+                    </DropdownItem>
+                    <DropdownItem
+                      onClick={() => videoInputRef.current?.click()}
+                      disabled={videoUploadMutation.isPending}
+                    >
+                      <DropdownLabel>{videoUploadMutation.isPending ? 'Uploading…' : 'Add video'}</DropdownLabel>
+                    </DropdownItem>
+                  </DropdownMenu>
+                </Dropdown>
               </div>
 
               {imagesError ? (
@@ -974,48 +1018,7 @@ export default function EquipmentDetailPage() {
                 <div className="px-3.5 py-10 text-center text-[12px] text-fg-muted">{t('equipment.images.loading')}</div>
               ) : (
                 <>
-                  {/* Nameplate — source of truth, called out on its own. */}
-                  {nameplate && (
-                    <Card padding="none">
-                      <div className="p-3">
-                        <div className="mb-2 text-[10.5px] font-semibold uppercase tracking-[0.08em] text-fg-accent">
-                          Nameplate · source of truth
-                        </div>
-                        <div className="grid items-center gap-3.5 sm:grid-cols-[160px_1fr]">
-                          <button
-                            type="button"
-                            onClick={() => setLightboxIndex(0)}
-                            aria-label={t('equipment.images.openFullSize')}
-                            className="relative block aspect-square overflow-hidden rounded-md bg-bg-elev-2 ring-1 ring-[color-mix(in_oklch,var(--accent-500)_45%,var(--border))] focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-500"
-                          >
-                            <img
-                              src={nameplate.thumbnailUrl ?? nameplate.url}
-                              alt={nameplate.caption ?? equipment.name}
-                              className="absolute inset-0 size-full object-cover"
-                              loading="lazy"
-                            />
-                            <span
-                              className="absolute left-1 top-1 rounded px-1.5 py-0.5 text-[8.5px] font-bold uppercase tracking-[0.04em] text-white"
-                              style={{ background: 'var(--accent-500)' }}
-                            >
-                              Nameplate
-                            </span>
-                          </button>
-                          <div className="text-[12px] leading-relaxed text-fg-muted">
-                            The data-plate photo techs shoot at install — the authority for model, serial, and warranty
-                            terms. The specs on this page are transcribed from it; open it to read the plate directly.
-                            {(nameplate.uploadedByName || nameplate.createdAt) && (
-                              <div className="mt-1.5 text-[11px] text-fg-dim">
-                                Added by {[nameplate.uploadedByName, formatTimestamp(nameplate.createdAt)].filter(Boolean).join(' · ')}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    </Card>
-                  )}
-
-                  {/* Photos gallery */}
+                  {/* Photos gallery — profile photo first, marked "Profile". */}
                   <Card
                     title={<CardTitle>{t('equipment.tabs.photos')}</CardTitle>}
                     action={<span className="text-[11px] text-fg-dim">{images.length}</span>}
@@ -1023,30 +1026,42 @@ export default function EquipmentDetailPage() {
                   >
                     {images.length === 0 ? (
                       <div className="px-3.5 py-10 text-center text-[12px] text-fg-muted">{t('equipment.images.empty')}</div>
-                    ) : galleryPhotos.length === 0 ? (
-                      <div className="px-3.5 py-6 text-center text-[12px] text-fg-muted">No other photos yet.</div>
                     ) : (
                       <div
                         className="grid gap-3 p-3"
                         style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))' }}
                       >
-                        {galleryPhotos.map((img, gi) => {
-                          const lbIndex = nameplate ? gi + 1 : gi;
-                          return (
-                            <div key={img.id} className="group relative overflow-hidden rounded-lg ring-1 ring-border">
-                              <button
-                                type="button"
-                                onClick={() => setLightboxIndex(lbIndex)}
-                                aria-label={t('equipment.images.openFullSize')}
-                                className="block aspect-square w-full bg-bg-elev-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-500"
+                        {orderedImages.map((img, i) => (
+                          <div
+                            key={img.id}
+                            className={`group relative overflow-hidden rounded-lg ring-1 ${
+                              img.isProfile
+                                ? 'ring-[color-mix(in_oklch,var(--accent-500)_45%,var(--border))]'
+                                : 'ring-border'
+                            }`}
+                          >
+                            <button
+                              type="button"
+                              onClick={() => setLightboxIndex(i)}
+                              aria-label={t('equipment.images.openFullSize')}
+                              className="block aspect-square w-full bg-bg-elev-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-500"
+                            >
+                              <img
+                                src={img.thumbnailUrl ?? img.url}
+                                alt={img.caption ?? equipment.name}
+                                className="size-full object-cover transition-opacity group-hover:opacity-90"
+                                loading="lazy"
+                              />
+                            </button>
+                            {img.isProfile ? (
+                              // The profile photo leads the gallery — labeled, no set-profile control.
+                              <span
+                                className="absolute left-1 top-1 rounded px-1.5 py-0.5 text-[8.5px] font-bold uppercase tracking-[0.04em] text-white"
+                                style={{ background: 'var(--accent-500)' }}
                               >
-                                <img
-                                  src={img.thumbnailUrl ?? img.url}
-                                  alt={img.caption ?? equipment.name}
-                                  className="size-full object-cover transition-opacity group-hover:opacity-90"
-                                  loading="lazy"
-                                />
-                              </button>
+                                Profile
+                              </span>
+                            ) : (
                               <button
                                 type="button"
                                 onClick={() => handleSetProfileImage(img)}
@@ -1056,40 +1071,40 @@ export default function EquipmentDetailPage() {
                               >
                                 <StarIconOutline className="size-5 text-fg-muted hover:text-amber-500" />
                               </button>
-                              <div className="absolute right-1 top-1">
-                                <Dropdown>
-                                  <DropdownButton
-                                    plain
-                                    aria-label={t('common.moreOptions')}
-                                    className="rounded-full bg-bg-elev/80 backdrop-blur"
-                                  >
-                                    <EllipsisVerticalIcon className="size-5" />
-                                  </DropdownButton>
-                                  <DropdownMenu anchor="bottom end">
-                                    <DropdownItem onClick={() => handleEditCaption(img)}>
-                                      <DropdownLabel>{t('equipment.images.editCaption')}</DropdownLabel>
-                                    </DropdownItem>
-                                    <DropdownItem onClick={() => handleDeleteImage(img)}>
-                                      <DropdownLabel>{t('common.delete')}</DropdownLabel>
-                                    </DropdownItem>
-                                  </DropdownMenu>
-                                </Dropdown>
-                              </div>
-                              {(img.caption || img.uploadedByName || img.createdAt) && (
-                                <div className="border-t border-border bg-bg-elev px-2 py-1">
-                                  {img.caption && (
-                                    <div className="line-clamp-1 text-[11px] text-fg-strong">{img.caption}</div>
-                                  )}
-                                  {(img.uploadedByName || img.createdAt) && (
-                                    <div className="truncate text-[10px] text-fg-muted">
-                                      {[img.uploadedByName, formatTimestamp(img.createdAt)].filter(Boolean).join(' · ')}
-                                    </div>
-                                  )}
-                                </div>
-                              )}
+                            )}
+                            <div className="absolute right-1 top-1">
+                              <Dropdown>
+                                <DropdownButton
+                                  plain
+                                  aria-label={t('common.moreOptions')}
+                                  className="rounded-full bg-bg-elev/80 backdrop-blur"
+                                >
+                                  <EllipsisVerticalIcon className="size-5" />
+                                </DropdownButton>
+                                <DropdownMenu anchor="bottom end">
+                                  <DropdownItem onClick={() => handleEditCaption(img)}>
+                                    <DropdownLabel>{t('equipment.images.editCaption')}</DropdownLabel>
+                                  </DropdownItem>
+                                  <DropdownItem onClick={() => handleDeleteImage(img)}>
+                                    <DropdownLabel>{t('common.delete')}</DropdownLabel>
+                                  </DropdownItem>
+                                </DropdownMenu>
+                              </Dropdown>
                             </div>
-                          );
-                        })}
+                            {(img.caption || img.uploadedByName || img.createdAt) && (
+                              <div className="border-t border-border bg-bg-elev px-2 py-1">
+                                {img.caption && (
+                                  <div className="line-clamp-1 text-[11px] text-fg-strong">{img.caption}</div>
+                                )}
+                                {(img.uploadedByName || img.createdAt) && (
+                                  <div className="truncate text-[10px] text-fg-muted">
+                                    {[img.uploadedByName, formatTimestamp(img.createdAt)].filter(Boolean).join(' · ')}
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        ))}
                       </div>
                     )}
                   </Card>
@@ -1100,7 +1115,7 @@ export default function EquipmentDetailPage() {
                     action={<span className="text-[11px] text-fg-dim">{videos.length}</span>}
                     padding="none"
                   >
-                    <div className="p-3">{id && <EquipmentVideosSection equipmentId={id} />}</div>
+                    <div className="p-3">{id && <EquipmentVideosSection equipmentId={id} hideUpload />}</div>
                   </Card>
                 </>
               )}
@@ -1232,7 +1247,7 @@ interface MediaPeekItem {
 }
 
 /**
- * One tile in the overview Media peek row. The nameplate (`hero`) is a wider
+ * One tile in the overview Media peek row. The profile photo (`hero`) is a wider
  * accent-ringed source-of-truth tile (aspect-square, which anchors the row
  * height); the gallery thumbs stretch to match it. Videos get a play badge +
  * duration; a label rides a bottom gradient; `overflow` paints a "+N" cover on
@@ -1294,7 +1309,7 @@ function MediaPeekTile({
           className="absolute left-1 top-1 rounded px-1.5 py-0.5 text-[8.5px] font-bold uppercase tracking-[0.04em] text-white"
           style={{ background: 'var(--accent-500)' }}
         >
-          Nameplate
+          Profile
         </span>
       )}
 
