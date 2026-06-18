@@ -586,7 +586,7 @@ export default function EquipmentDetailPage() {
                           <tr>
                             <th>Date</th>
                             <th>Work order</th>
-                            <th>What was done</th>
+                            <th>Work</th>
                             <th>Tech</th>
                             <th className="right">Hours</th>
                           </tr>
@@ -597,6 +597,10 @@ export default function EquipmentDetailPage() {
                             const woNumber = wo.workOrderNumber ?? `#${wo.id.slice(0, 8)}`;
                             const firstItem = wo.workItems[0];
                             const extra = wo.workItemCount - 1;
+                            // AI/derived blurb for the job — same field the service-history
+                            // tab + SiteWorkOrdersCard lead with (declared on the payload,
+                            // not yet on the type → cast, matching those call sites).
+                            const aiSummary = (wo as { summary?: string | null }).summary?.trim();
                             const live =
                               wo.progressCategory === 'IN_PROGRESS' && wo.lifecycleState !== 'CANCELLED';
                             return (
@@ -611,9 +615,15 @@ export default function EquipmentDetailPage() {
                                 <td>
                                   <span className="font-mono text-[11.5px] text-fg-accent">{woNumber}</span>
                                 </td>
-                                <td>
-                                  <span className="text-[12px]">{firstItem?.description ?? '—'}</span>
-                                  {extra > 0 && <span className="ml-1 text-[11px] text-fg-dim">+{extra} more</span>}
+                                {/* Lead with the work order's AI/derived summary (wo.summary);
+                                    fall back to the first work item + "+N more" when absent. */}
+                                <td className="max-w-[340px] truncate text-[12px]" title={aiSummary || firstItem?.description || undefined}>
+                                  {aiSummary || (
+                                    <>
+                                      {firstItem?.description ?? '—'}
+                                      {extra > 0 && <span className="ml-1 text-[11px] text-fg-dim">+{extra} more</span>}
+                                    </>
+                                  )}
                                 </td>
                                 <td>
                                   <AssignedUsersCell users={wo.assignedUsers} />

@@ -28,8 +28,9 @@ const PROGRESS: Record<ProgressCategory, { label: string; tone: 'neutral' | 'inf
   CANCELLED: { label: 'Cancelled', tone: 'neutral' },
 };
 
-// "What was done" — the WO's summary, else the first work item (+N more). Same
-// derivation the Location/Customer work-order lists use.
+// "Work" column — the WO's AI/derived summary (the incoming request), else the
+// first work item (+N more). Same derivation the Location/Customer work-order
+// lists use.
 function deriveJobLabel(wo: WorkOrderSummary): string {
   const summary = (wo as { summary?: string | null }).summary;
   if (summary) return summary;
@@ -152,7 +153,7 @@ export default function EquipmentServiceHistoryTab({ equipmentId }: { equipmentI
               <tr>
                 <th>Date</th>
                 <th>Work order</th>
-                <th>What was done</th>
+                <th>Work</th>
                 <th>Tech</th>
                 <th className="right">Hours</th>
                 <th>Status</th>
