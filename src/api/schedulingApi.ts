@@ -87,6 +87,9 @@ export interface LocationTechSummaryResponse {
 // user has synced into scheduling's local cache — render defensively.
 export interface DispatchBoardRow extends Dispatch {
   workOrderNumber: string | null;
+  // Resolve the type pill (color + label) from the WO-type catalog by this id —
+  // `workOrderTypeName` is published null today (latent gap), so don't rely on it.
+  workOrderTypeId: string | null;
   workOrderTypeName: string | null;
   workOrderSummary: string | null; // preferred row title (see dispatchRowTitle)
   customerId: string | null;
@@ -161,6 +164,9 @@ export interface LocationDispatchResponse {
   // this list entirely, so a row always carries its number. The rest are
   // nullable until the WO / user syncs.
   workOrderNumber: string;
+  // Resolve the type pill (color + label) from the WO-type catalog by this id —
+  // `workOrderTypeName` is published null today (latent gap), so don't rely on it.
+  workOrderTypeId: string | null;
   workOrderTypeName: string | null;
   workOrderSummary: string | null;
   assignedUserName: string | null;

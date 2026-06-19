@@ -13,7 +13,10 @@ this doc is only the gaps the detail-page work hit.
 
 ## Ask 1 — Caption update for equipment files (videos)
 
-**Status: small. The capability already exists on the sibling route.**
+**Status: RESOLVED.** Backend confirmed `PATCH /equipment/{id}/files/{fileId}` already
+exists (single media-agnostic caption column — videos patch identically to photos), so
+no backend change was needed. FE wired `equipmentFilesApi.patch` and made video captions
+editable in the media lightbox (branch `fix/equipment-video-caption-edit`).
 
 ### Why
 
@@ -42,9 +45,8 @@ Response: WorkOrderFile               // the updated file
 
 ### Acceptance
 
-- [ ] `PATCH /equipment/{id}/files/{fileId}` updates `caption`, returns the file.
-- [ ] UI wires `equipmentFilesApi.patch` and makes the video caption editable in the
-      lightbox (currently read-only).
+- [x] `PATCH /equipment/{id}/files/{fileId}` updates `caption`, returns the file. *(already existed)*
+- [x] UI wires `equipmentFilesApi.patch` and makes the video caption editable in the lightbox.
 
 ---
 
@@ -65,47 +67,23 @@ actually characterizes each visit (PM vs repair vs install). No backend change.
 
 ---
 
-## Ask 3 — Equipment-scoped activity feed (read endpoint)
+## Ask 3 — ~~Equipment-scoped activity feed~~ (withdrawn — not needed)
 
-**Status: events are partly specced already; the read endpoint is the gap.**
+**Dropped.** We decided an Activity tab on the equipment detail page isn't needed, so
+there's no ask for an equipment-scoped activity/audit read endpoint. (The image/WO-link
+events specced in the other docs still stand for their own surfaces; this was only the
+equipment-detail read endpoint, which we're not pursuing.)
 
-### Why
+---
 
-Every other detail page (Location, Customer, Work Order) has an Activity tab. The
-equipment detail page deliberately ships **without** one — there's a placeholder
-comment (`an Activity tab is pending an equipment-scoped activity API`) because there
-is no way to read the activity stream for a single piece of equipment.
+## Resolved — dispatch type pill (scheduling-service)
 
-The *events* largely exist or are already asked for: `EQUIPMENT_IMAGE_ADDED` /
-`_DELETED` / `EQUIPMENT_PROFILE_IMAGE_CHANGED` are specced in
-`EQUIPMENT_IMAGES_BACKEND_ASK.md` §9, and work-item `equipmentId` change/create
-events are in `EQUIPMENT_BACKEND_ASK.md` §3.8. What's missing is a **read endpoint
-scoped to an equipment id** that aggregates them.
-
-### Ask
-
-```
-GET /equipment/{id}/activity?page=0&size=25
-Response: Page<ActivityEvent>     // newest first
-```
-
-Should surface, for that equipment:
-- Work orders / work items that linked or unlinked this equipment.
-- Field edits on the equipment (make/model/serial/status/location-on-site/etc.).
-- Media changes (image added/deleted, profile changed; video added/deleted).
-- Filter add/edit/delete (once the Phase-2 filters sub-resource ships).
-
-Reuse the existing `ActivityEvent` shape the other activity feeds already return so
-the UI can reuse its activity-row rendering. If there's already a generic audit
-endpoint that can be filtered by entity type + id (e.g. `/audit/Equipment/{id}`),
-pointing the UI at that is just as good — the constraint is an equipment-scoped,
-paged, newest-first read.
-
-### Acceptance
-
-- [ ] Equipment-scoped, paged activity read endpoint returning `ActivityEvent[]`.
-- [ ] Covers WO-link, field-edit, media, and (later) filter events.
-- [ ] UI adds the Activity tab to the equipment detail page.
+The dispatch type pill (location dispatch rows + the dispatch board) rendered grey and
+unlabeled. Root cause: the row's `workOrderTypeName` is published `null` today (a latent
+gap). Backend now returns **`workOrderTypeId`** on `/dispatch/board/search` and
+`/locations/{id}/dispatches/paginated`, so the FE resolves the pill's color + label from
+the WO-type catalog (`GET /work-orders/config/types`) by that id — same as every other
+WO list. Wired on branch `fix/dispatch-type-pill-color`. No further backend work.
 
 ---
 

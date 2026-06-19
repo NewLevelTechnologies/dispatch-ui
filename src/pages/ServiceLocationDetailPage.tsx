@@ -4076,6 +4076,13 @@ function DispatchesTable({
 }) {
   const { getName } = useGlossary();
   const { t } = useTranslation();
+  // WO-type catalog (cached, shared key) → resolve the type pill's color + label
+  // by id; the row's workOrderTypeName is published null today.
+  const { data: workOrderTypes } = useQuery({
+    queryKey: ['work-order-types'],
+    queryFn: () => workOrderTypesApi.getAll(),
+  });
+  const safeTypes = Array.isArray(workOrderTypes) ? workOrderTypes : [];
   return (
     // DenseTable: dense column layout on desktop, auto-stacks to one card per
     // row < 640px (When leads the card, Status pins top-right, the rest stack
@@ -4093,7 +4100,12 @@ function DispatchesTable({
         </DenseTHead>
         <tbody>
           {rows.map((v) => (
-            <DispatchRow key={v.id} dispatch={v} onOpen={() => onOpen(v)} />
+            <DispatchRow
+              key={v.id}
+              dispatch={v}
+              woType={safeTypes.find((tp) => tp.id === v.workOrderTypeId)}
+              onOpen={() => onOpen(v)}
+            />
           ))}
         </tbody>
       </DenseTable>
@@ -4103,9 +4115,11 @@ function DispatchesTable({
 
 function DispatchRow({
   dispatch,
+  woType,
   onOpen,
 }: {
   dispatch: LocationDispatchResponse;
+  woType?: WoTypeRef;
   onOpen: () => void;
 }) {
   const { t } = useTranslation();
@@ -4127,10 +4141,8 @@ function DispatchRow({
         {formatArrivalWindow(dispatch.arrivalWindowStart, dispatch.arrivalWindowEnd)}
       </td>
       <td>
-        {dispatch.workOrderTypeName ? (
-          <span className="rounded-[3px] border border-border-soft bg-bg-active px-1.5 text-[10px] font-semibold text-fg-muted">
-            {dispatch.workOrderTypeName}
-          </span>
+        {woType ? (
+          <WorkOrderTypePill type={woType} />
         ) : (
           <span className="text-[11px] text-fg-dim">—</span>
         )}

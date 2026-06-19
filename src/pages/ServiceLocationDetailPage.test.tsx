@@ -139,6 +139,13 @@ describe('ServiceLocationDetailPage', () => {
       if (url.includes('/dispatch-regions')) {
         return Promise.resolve({ data: regions });
       }
+      // WO-type catalog (envelope shape — getAll() reads .workOrderTypes). Drives
+      // the type pills, which resolve color + label by id (WO rows + dispatch rows).
+      if (url === '/work-orders/config/types' || url.startsWith('/work-orders/config/types?')) {
+        return Promise.resolve({
+          data: { workOrderTypes: [{ id: 'wt-pm', name: 'Quarterly PM', accentId: 'green' }], colorsInUse: {} },
+        });
+      }
       if (url.startsWith('/work-orders/config/')) {
         return Promise.resolve({ data: [] });
       }
@@ -815,7 +822,10 @@ describe('ServiceLocationDetailPage', () => {
       createdAt: '2026-06-01T00:00:00Z',
       updatedAt: '2026-06-01T00:00:00Z',
       workOrderNumber: 'WO-5000',
-      workOrderTypeName: 'Quarterly PM',
+      // BE publishes workOrderTypeName null today; the pill resolves color + label
+      // from the WO-type catalog by workOrderTypeId.
+      workOrderTypeId: 'wt-pm',
+      workOrderTypeName: null,
       workOrderSummary: 'Replace compressor',
       assignedUserName: 'Jane Tech',
       ...over,
