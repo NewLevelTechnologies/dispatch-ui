@@ -356,7 +356,8 @@ function JobDenseRow({
         <CellStack>
           <CellTop>
             <span className="flex flex-wrap items-baseline gap-1.5">
-              <span className="font-mono font-bold text-fg-strong">
+              {/* Navigable identifier → accent link (the row routes to the WO detail). */}
+              <span className="font-mono font-bold text-fg-accent">
                 {wo.workOrderNumber || `#${wo.id.slice(0, 8)}`}
               </span>
               <WorkOrderTypePill type={{ name: typeName, accentId: typeAccentId }} />

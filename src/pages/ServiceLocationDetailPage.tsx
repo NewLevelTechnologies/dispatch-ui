@@ -1283,7 +1283,8 @@ function WoTitleLine({ wo, woType }: { wo: WorkOrderSummary; woType?: WoTypeRef 
   const elevated = priority === 'URGENT' || priority === 'HIGH';
   return (
     <div className="flex flex-wrap items-baseline gap-1.5">
-      <span className="font-mono text-[12px] font-bold text-fg-strong">
+      {/* Navigable identifier → accent link (the row routes to the WO detail). */}
+      <span className="font-mono text-[12px] font-bold text-fg-accent">
         {wo.workOrderNumber || `#${wo.id.slice(0, 8)}`}
       </span>
       <WorkOrderTypePill type={woType} />
