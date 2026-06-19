@@ -177,6 +177,13 @@ export interface PatchLocationFileRequest {
   isProfile?: boolean;
 }
 
+// Equipment file patch — caption only. The equipment files route exposes
+// PATCH /equipment/{id}/files/{fileId} with a single media-agnostic caption
+// column (videos patch identically to photos). Explicit null clears it.
+export interface PatchEquipmentFileRequest {
+  caption?: string | null;
+}
+
 // ─────────────────────────────────────────────────────────────────────────
 // work-order-service — the location aggregate read
 // ─────────────────────────────────────────────────────────────────────────
@@ -272,6 +279,20 @@ export const equipmentFilesApi = {
 
   delete: async (equipmentId: string, fileId: string): Promise<void> => {
     await apiClient.delete(`/equipment/${equipmentId}/files/${fileId}`);
+  },
+
+  /** Update a file's caption (max 200 chars). Same route + column for photos and
+   *  videos; explicit null clears it. */
+  patch: async (
+    equipmentId: string,
+    fileId: string,
+    request: PatchEquipmentFileRequest
+  ): Promise<WorkOrderFile> => {
+    const response = await apiClient.patch<WorkOrderFile>(
+      `/equipment/${equipmentId}/files/${fileId}`,
+      request
+    );
+    return response.data;
   },
 };
 

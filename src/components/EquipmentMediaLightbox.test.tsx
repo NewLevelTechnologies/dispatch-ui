@@ -7,6 +7,7 @@ import type { EquipmentImage, WorkOrderFile } from '../api';
 const mockImagePatch = vi.fn();
 const mockImageDelete = vi.fn();
 const mockFileDelete = vi.fn();
+const mockFilePatch = vi.fn();
 
 vi.mock('../api/equipmentApi', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../api/equipmentApi')>();
@@ -23,7 +24,11 @@ vi.mock('../api/filesApi', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../api/filesApi')>();
   return {
     ...actual,
-    equipmentFilesApi: { ...actual.equipmentFilesApi, delete: (...args: unknown[]) => mockFileDelete(...args) },
+    equipmentFilesApi: {
+      ...actual.equipmentFilesApi,
+      delete: (...args: unknown[]) => mockFileDelete(...args),
+      patch: (...args: unknown[]) => mockFilePatch(...args),
+    },
   };
 });
 
@@ -237,6 +242,24 @@ describe('EquipmentMediaLightbox', () => {
     await user.type(screen.getByRole('textbox'), ' edited{Escape}');
     expect(mockImagePatch).not.toHaveBeenCalled();
     expect(screen.getByRole('button', { name: 'Old' })).toBeInTheDocument();
+  });
+
+  it('edits a video caption and saves it via the files API', async () => {
+    mockFilePatch.mockResolvedValue({});
+    const user = userEvent.setup();
+    const withCaption: MediaLightboxItem[] = [
+      { kind: 'video', video: video({ id: 'v1', caption: 'Old clip' }) },
+    ];
+    renderWithProviders(
+      <EquipmentMediaLightbox equipmentId="eq-1" items={withCaption} startIndex={0} onClose={vi.fn()} />
+    );
+    await user.click(screen.getByRole('button', { name: 'Old clip' }));
+    const input = screen.getByRole('textbox');
+    await user.clear(input);
+    await user.type(input, 'New clip caption{Enter}');
+    await waitFor(() => {
+      expect(mockFilePatch).toHaveBeenCalledWith('eq-1', 'v1', { caption: 'New clip caption' });
+    });
   });
 
   it('hides every mutating action in readOnly mode', () => {

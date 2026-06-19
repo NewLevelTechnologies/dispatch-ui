@@ -18,7 +18,7 @@ import { equipmentImagesApi, equipmentFilesApi, type EquipmentImage, type WorkOr
 import { formatTimestamp } from '../lib/formatTimestamp';
 
 // A single viewer slot — either a photo (images API: profile + caption + delete)
-// or a video (files API: delete only; caption is read-only, no patch endpoint).
+// or a video (files API: caption + delete; no profile — a video can't be cover).
 export type MediaLightboxItem =
   | { kind: 'image'; image: EquipmentImage }
   | { kind: 'video'; video: WorkOrderFile };
@@ -39,7 +39,8 @@ interface Props {
  * Full-screen viewer for the equipment Media tab + overview peek — one gallery
  * over photos AND videos so the user can arrow across everything, not just one
  * media type. Photos render as images with the full manage toolbar (set cover /
- * caption / delete); videos render in a `<video>` player with delete only.
+ * caption / delete); videos render in a `<video>` player with caption + delete
+ * (no cover — a video can't be the profile image).
  *
  * Distinct from the shared EquipmentPhotoLightbox (image-only, used by the
  * work-order / location / quick-view surfaces) — this one is equipment-detail
@@ -149,6 +150,15 @@ function LightboxInner({ equipmentId, items, startIndex, onClose, readOnly }: In
     onError: (err) => surfaceError(err, 'equipment.images.errorUpdate'),
   });
 
+  // Videos share the same caption column via the files route — editable just
+  // like photos (PATCH /equipment/{id}/files/{fileId}).
+  const updateVideoCaptionMutation = useMutation({
+    mutationFn: ({ fileId, caption }: { fileId: string; caption: string | null }) =>
+      equipmentFilesApi.patch(equipmentId, fileId, { caption }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['equipment-files', equipmentId] }),
+    onError: (err) => surfaceError(err, 'equipment.images.errorUpdate'),
+  });
+
   const deleteImageMutation = useMutation({
     mutationFn: (imageId: string) => equipmentImagesApi.delete(equipmentId, imageId),
     onSuccess: () => {
@@ -178,27 +188,32 @@ function LightboxInner({ equipmentId, items, startIndex, onClose, readOnly }: In
     else deleteVideoMutation.mutate(current.video.id);
   };
 
+  // The caption being edited — the photo's or the video's own caption (not the
+  // video filename, which is only a display fallback).
+  const currentCaption = current.kind === 'image' ? current.image.caption : current.video.caption;
+
   const startCaptionEdit = () => {
-    if (readOnly || current.kind !== 'image') return;
-    setCaptionDraft(current.image.caption ?? '');
+    if (readOnly) return;
+    setCaptionDraft(currentCaption ?? '');
     setIsEditingCaption(true);
   };
 
   const commitCaption = () => {
-    if (current.kind !== 'image') return;
     const next = captionDraft.trim();
-    const prev = current.image.caption ?? '';
+    const prev = currentCaption ?? '';
     if (next === prev) {
       setIsEditingCaption(false);
       return;
     }
-    updateCaptionMutation.mutate({ imageId: current.image.id, caption: next === '' ? null : next });
+    const caption = next === '' ? null : next;
+    if (current.kind === 'image') updateCaptionMutation.mutate({ imageId: current.image.id, caption });
+    else updateVideoCaptionMutation.mutate({ fileId: current.video.id, caption });
     setIsEditingCaption(false);
   };
 
   const cancelCaption = () => {
     setIsEditingCaption(false);
-    if (current.kind === 'image') setCaptionDraft(current.image.caption ?? '');
+    setCaptionDraft(currentCaption ?? '');
   };
 
   const isImage = current.kind === 'image';
@@ -297,10 +312,10 @@ function LightboxInner({ equipmentId, items, startIndex, onClose, readOnly }: In
             <VideoPlayer key={current.video.id} file={current.video} />
           )}
 
-          {/* Caption + position strip. Photo captions are click-to-edit; video
-              captions are read-only (no files caption endpoint yet). */}
+          {/* Caption + position strip. Photo and video captions are both
+              click-to-edit (same caption column via their respective routes). */}
           <div className="absolute inset-x-0 bottom-0 flex flex-col items-center gap-1 bg-gradient-to-t from-black/85 via-black/55 to-transparent px-4 pb-4 pt-10 text-center text-white">
-            {isImage && isEditingCaption ? (
+            {isEditingCaption ? (
               <input
                 ref={captionInputRef}
                 type="text"
@@ -324,14 +339,13 @@ function LightboxInner({ equipmentId, items, startIndex, onClose, readOnly }: In
               <button
                 type="button"
                 onClick={startCaptionEdit}
-                disabled={readOnly || !isImage}
+                disabled={readOnly}
                 className="rounded px-2 py-0.5 text-sm text-white [text-shadow:0_1px_2px_rgb(0_0_0_/_60%)] hover:bg-white/10 disabled:cursor-default disabled:hover:bg-transparent"
               >
                 {caption}
               </button>
             ) : (
-              !readOnly &&
-              isImage && (
+              !readOnly && (
                 <button
                   type="button"
                   onClick={startCaptionEdit}
