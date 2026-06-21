@@ -39,6 +39,7 @@ import { Input } from '../../../components/catalyst/input';
 import ConfirmDialog from '../../../components/ConfirmDialog';
 import IconButton from '../../../components/IconButton';
 import { DragHandle } from '../../../components/settings/DragHandle';
+import CategoryFieldsDialog from '../../../components/settings/CategoryFieldsDialog';
 import { useGlossary } from '../../../contexts/GlossaryContext';
 import { Card, CardBody } from '../../../components/ui/Card';
 import { EmptyState } from '../../../components/ui/EmptyState';
@@ -80,6 +81,8 @@ export default function EquipmentTaxonomyPage() {
   const preSearchExpanded = useRef<Set<string> | null>(null);
   const [dialog, setDialog] = useState<DialogState>(null);
   const [pendingDelete, setPendingDelete] = useState<PendingDelete>(null);
+  // Per-category custom-fields manager (its own dialog).
+  const [fieldsCategory, setFieldsCategory] = useState<EquipmentCategory | null>(null);
 
   const {
     data: types,
@@ -373,6 +376,7 @@ export default function EquipmentTaxonomyPage() {
                 isFirstType={composedIndex === 0}
                 isLastType={composedIndex === composed.length - 1}
                 onRenameCategory={(c) => setDialog({ kind: 'editCategory', category: c })}
+                onManageFields={(c) => setFieldsCategory(c)}
                 onDeleteCategory={(c) => setPendingDelete({ kind: 'category', category: c })}
                 onReorderCategory={(from, to) => {
                   if (from === to) return;
@@ -446,6 +450,8 @@ export default function EquipmentTaxonomyPage() {
         isDestructive
         isPending={deleteTypeMutation.isPending || deleteCategoryMutation.isPending}
       />
+
+      <CategoryFieldsDialog category={fieldsCategory} onClose={() => setFieldsCategory(null)} />
     </>
   );
 }
@@ -467,6 +473,7 @@ interface TaxonomyBlockProps {
   isFirstType: boolean;
   isLastType: boolean;
   onRenameCategory: (c: EquipmentCategory) => void;
+  onManageFields: (c: EquipmentCategory) => void;
   onDeleteCategory: (c: EquipmentCategory) => void;
   onReorderCategory: (from: number, to: number) => void;
   onTypeDragStart: () => void;
@@ -490,6 +497,7 @@ function TaxonomyBlock({
   isFirstType,
   isLastType,
   onRenameCategory,
+  onManageFields,
   onDeleteCategory,
   onReorderCategory,
   onTypeDragStart,
@@ -695,6 +703,9 @@ function TaxonomyBlock({
                             </DropdownItem>
                             <DropdownDivider />
                           </span>
+                          <DropdownItem onClick={() => onManageFields(c)}>
+                            <DropdownLabel>{t('settings.equipmentTaxonomy.customFields')}</DropdownLabel>
+                          </DropdownItem>
                           <DropdownItem onClick={() => onRenameCategory(c)}>
                             <DropdownLabel>{t('common.actions.rename')}</DropdownLabel>
                           </DropdownItem>

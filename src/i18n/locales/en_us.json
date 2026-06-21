@@ -1345,6 +1345,7 @@
       "addType": "Add type",
       "clearSearch": "Clear search",
       "collapseAll": "Collapse all",
+      "customFields": "Custom fields",
       "delete": {
         "categoryMessage": "{{entity}} records using this category will lose their category assignment.",
         "categoryTitle": "Delete {{name}}?",
