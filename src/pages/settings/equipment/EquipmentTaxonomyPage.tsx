@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueries, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import {
   ChevronDownIcon,
+  ChevronRightIcon,
   EllipsisVerticalIcon,
   PlusIcon,
   Squares2X2Icon,
@@ -11,6 +12,7 @@ import {
 import {
   equipmentTypesApi,
   equipmentCategoriesApi,
+  equipmentCategoryFieldsApi,
   type EquipmentType,
   type EquipmentCategory,
 } from '../../../api';
@@ -119,6 +121,25 @@ export default function EquipmentTaxonomyPage() {
         ),
       }));
   }, [types, allCategories]);
+
+  // Per-category field counts for the at-a-glance "3 fields" / "No fields" cue
+  // (the zero case flags a category that still needs setup). Shares the cache
+  // key with the fields drawer, so adding a field updates the row live.
+  const categoryIds = useMemo(
+    () => composed.flatMap((tp) => tp.categories.map((c) => c.id)),
+    [composed]
+  );
+  const fieldCountQueries = useQueries({
+    queries: categoryIds.map((catId) => ({
+      queryKey: ['equipment-category-fields', catId],
+      queryFn: () => equipmentCategoryFieldsApi.getAll(catId),
+      staleTime: 30_000,
+    })),
+  });
+  const fieldCountFor = (categoryId: string): number | undefined => {
+    const i = categoryIds.indexOf(categoryId);
+    return i >= 0 ? fieldCountQueries[i]?.data?.length : undefined;
+  };
 
   // Filter by search. When categories match but the type doesn't, keep the
   // type with only the matching categories. Auto-expand any type whose
@@ -377,6 +398,7 @@ export default function EquipmentTaxonomyPage() {
                 isLastType={composedIndex === composed.length - 1}
                 onRenameCategory={(c) => setDialog({ kind: 'editCategory', category: c })}
                 onManageFields={(c) => setFieldsCategory(c)}
+                fieldCount={fieldCountFor}
                 onDeleteCategory={(c) => setPendingDelete({ kind: 'category', category: c })}
                 onReorderCategory={(from, to) => {
                   if (from === to) return;
@@ -474,6 +496,7 @@ interface TaxonomyBlockProps {
   isLastType: boolean;
   onRenameCategory: (c: EquipmentCategory) => void;
   onManageFields: (c: EquipmentCategory) => void;
+  fieldCount: (categoryId: string) => number | undefined;
   onDeleteCategory: (c: EquipmentCategory) => void;
   onReorderCategory: (from: number, to: number) => void;
   onTypeDragStart: () => void;
@@ -498,6 +521,7 @@ function TaxonomyBlock({
   isLastType,
   onRenameCategory,
   onManageFields,
+  fieldCount,
   onDeleteCategory,
   onReorderCategory,
   onTypeDragStart,
@@ -637,7 +661,17 @@ function TaxonomyBlock({
                 return (
                   <div
                     key={c.id}
+                    role="button"
+                    tabIndex={0}
                     draggable
+                    onClick={() => onManageFields(c)}
+                    onKeyDown={(e) => {
+                      if (e.currentTarget !== e.target) return;
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        onManageFields(c);
+                      }
+                    }}
                     onDragStart={(e) => {
                       e.stopPropagation();
                       e.dataTransfer.effectAllowed = 'move';
@@ -666,14 +700,15 @@ function TaxonomyBlock({
                       setCatDragOverIndex(null);
                     }}
                     className={[
-                      'grid grid-cols-[18px_1fr_26px] items-center gap-2.5 rounded-md px-2.5 py-2 hover:bg-bg-elev max-sm:grid-cols-[1fr_26px]',
+                      'grid cursor-pointer grid-cols-[18px_1fr_auto_26px] items-center gap-2.5 rounded-md px-2.5 py-2 hover:bg-bg-elev max-sm:grid-cols-[1fr_auto_26px]',
                       isCatDragging && 'opacity-50',
                       isCatDragOver && 'outline outline-2 outline-accent-500/40 outline-offset-[-2px]',
                     ]
                       .filter(Boolean)
                       .join(' ')}
                   >
-                    <span className="max-sm:hidden">
+                    {/* Drag handle reorders — clicking it must not open the drawer. */}
+                    <span className="max-sm:hidden" onClick={(e) => e.stopPropagation()}>
                       <DragHandle />
                     </span>
                     <span
@@ -682,7 +717,25 @@ function TaxonomyBlock({
                     >
                       {c.name}
                     </span>
-                    <span className="justify-self-end">
+                    {/* Field count — "No fields" (dim) flags a category still needing
+                        setup; the chevron makes the row read as openable. */}
+                    {(() => {
+                      const count = fieldCount(c.id);
+                      return (
+                        <span className="flex items-center gap-1 justify-self-end whitespace-nowrap text-[11.5px]">
+                          {count !== undefined && (
+                            <span className={count === 0 ? 'text-fg-dim' : 'text-fg-muted'}>
+                              {count === 0
+                                ? t('settings.equipmentTaxonomy.noFields')
+                                : t('settings.equipmentTaxonomy.fieldCount', { count })}
+                            </span>
+                          )}
+                          <ChevronRightIcon className="size-4 text-fg-dim" />
+                        </span>
+                      );
+                    })()}
+                    {/* Kebab owns rename/delete — not a drawer trigger. */}
+                    <span className="justify-self-end" onClick={(e) => e.stopPropagation()}>
                       <Dropdown>
                         <DropdownButton as={IconButton} aria-label={t('common.moreOptions')}>
                           <EllipsisVerticalIcon className="size-4" />
@@ -703,9 +756,6 @@ function TaxonomyBlock({
                             </DropdownItem>
                             <DropdownDivider />
                           </span>
-                          <DropdownItem onClick={() => onManageFields(c)}>
-                            <DropdownLabel>{t('settings.equipmentTaxonomy.customFields')}</DropdownLabel>
-                          </DropdownItem>
                           <DropdownItem onClick={() => onRenameCategory(c)}>
                             <DropdownLabel>{t('common.actions.rename')}</DropdownLabel>
                           </DropdownItem>

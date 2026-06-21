@@ -1345,7 +1345,6 @@
       "addType": "Add type",
       "clearSearch": "Clear search",
       "collapseAll": "Collapse all",
-      "customFields": "Custom fields",
       "delete": {
         "categoryMessage": "{{entity}} records using this category will lose their category assignment.",
         "categoryTitle": "Delete {{name}}?",
@@ -1371,7 +1370,10 @@
       "errorSaveCategory": "Failed to save category",
       "errorSaveType": "Failed to save {{entity, lowercase}} type",
       "expandAll": "Expand all",
+      "fieldCount_one": "{{count}} field",
+      "fieldCount_other": "{{count}} fields",
       "loading": "Loading {{entity, lowercase}} types…",
+      "noFields": "No fields",
       "searchPlaceholder": "Search types & categories…",
       "subtitle": "{{entity}} classifications used when adding {{entity, lowercase}} records. Drag to reorder — order shown is the order in dropdowns.",
       "title": "Types & Categories",

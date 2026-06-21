@@ -13,6 +13,7 @@ const mockCatsCreate = vi.fn();
 const mockCatsUpdate = vi.fn();
 const mockCatsDelete = vi.fn();
 const mockCatsReorder = vi.fn();
+const mockFieldsGetAll = vi.fn();
 
 vi.mock('../../../api/equipmentApi', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../../api/equipmentApi')>();
@@ -31,6 +32,13 @@ vi.mock('../../../api/equipmentApi', async (importOriginal) => {
       update: (...args: unknown[]) => mockCatsUpdate(...args),
       delete: (...args: unknown[]) => mockCatsDelete(...args),
       reorder: (...args: unknown[]) => mockCatsReorder(...args),
+    },
+    equipmentCategoryFieldsApi: {
+      getAll: (...args: unknown[]) => mockFieldsGetAll(...args),
+      create: vi.fn(),
+      update: vi.fn(),
+      delete: vi.fn(),
+      reorder: vi.fn(),
     },
   };
 });
@@ -70,6 +78,7 @@ const baseCategory = (id: string, name: string, typeId: string, sortOrder = 0) =
 describe('EquipmentTaxonomyPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockFieldsGetAll.mockResolvedValue([]);
   });
 
   it('renders page header with title and Add type CTA', async () => {
@@ -594,5 +603,40 @@ describe('EquipmentTaxonomyPage', () => {
         sortOrder: 1,
       });
     });
+  });
+
+  it('shows the field count on a category row and opens the fields drawer on row click', async () => {
+    mockTypesGetAll.mockResolvedValue([baseType('t-hvac', 'HVAC')]);
+    mockCatsGetAll.mockResolvedValue([baseCategory('c-rtu', 'Rooftop', 't-hvac')]);
+    mockFieldsGetAll.mockResolvedValue([
+      { id: 'f1', tenantId: 't', equipmentCategoryId: 'c-rtu', fieldKey: 'tonnage', label: 'Tonnage', dataType: 'NUMBER', options: null, required: false, helpText: null, sortOrder: 0, archivedAt: null, createdAt: '', updatedAt: '' },
+      { id: 'f2', tenantId: 't', equipmentCategoryId: 'c-rtu', fieldKey: 'refrigerant', label: 'Refrigerant', dataType: 'SELECT', options: ['R-410A'], required: false, helpText: null, sortOrder: 1, archivedAt: null, createdAt: '', updatedAt: '' },
+    ]);
+    const user = userEvent.setup();
+    renderWithProviders(<EquipmentTaxonomyPage />);
+
+    await waitFor(() => expect(screen.getByText('HVAC')).toBeInTheDocument());
+    await user.click(screen.getByText('HVAC')); // expand to reveal categories
+    await waitFor(() => expect(screen.getByText('Rooftop')).toBeInTheDocument());
+
+    // At-a-glance count on the row.
+    expect(await screen.findByText('2 fields')).toBeInTheDocument();
+
+    // Clicking the row (not the kebab) opens the fields drawer.
+    await user.click(screen.getByText('Rooftop'));
+    expect(await screen.findByText('Fields — Rooftop')).toBeInTheDocument();
+  });
+
+  it('flags a category with no fields', async () => {
+    mockTypesGetAll.mockResolvedValue([baseType('t-hvac', 'HVAC')]);
+    mockCatsGetAll.mockResolvedValue([baseCategory('c-rtu', 'Rooftop', 't-hvac')]);
+    mockFieldsGetAll.mockResolvedValue([]);
+    const user = userEvent.setup();
+    renderWithProviders(<EquipmentTaxonomyPage />);
+
+    await waitFor(() => expect(screen.getByText('HVAC')).toBeInTheDocument());
+    await user.click(screen.getByText('HVAC'));
+
+    expect(await screen.findByText('No fields')).toBeInTheDocument();
   });
 });
