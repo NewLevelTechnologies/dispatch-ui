@@ -76,6 +76,7 @@ import {
   EllipsisVerticalIcon,
   FunnelIcon,
   MapPinIcon,
+  PencilIcon,
   PhotoIcon,
   PlusIcon,
   Square3Stack3DIcon,
@@ -115,7 +116,6 @@ function warrantyState(iso: string | null | undefined): { has: boolean; active: 
 // section. Type/Category are NOT here — recategorization carries the spec-clearing
 // guard and stays in the full Edit form.
 interface IdentityDraft {
-  name: string;
   make: string;
   model: string;
   serialNumber: string;
@@ -126,12 +126,11 @@ interface IdentityDraft {
   warrantyDetails: string;
 }
 const EMPTY_IDENTITY: IdentityDraft = {
-  name: '', make: '', model: '', serialNumber: '', assetTag: '', installDate: '',
+  make: '', model: '', serialNumber: '', assetTag: '', installDate: '',
   warrantyExpiresAt: '', warrantyLaborExpiresAt: '', warrantyDetails: '',
 };
 function seedIdentity(eq: Equipment): IdentityDraft {
   return {
-    name: eq.name ?? '',
     make: eq.make ?? '',
     model: eq.model ?? '',
     serialNumber: eq.serialNumber ?? '',
@@ -141,20 +140,6 @@ function seedIdentity(eq: Equipment): IdentityDraft {
     warrantyLaborExpiresAt: eq.warrantyLaborExpiresAt ?? '',
     warrantyDetails: eq.warrantyDetails ?? '',
   };
-}
-
-// "Installed Mar 2020 (6y)" for the header meta line. Age in whole years; under
-// a year drops the age suffix. Returns null when there's no install date.
-function formatInstalled(iso: string | null | undefined): string | null {
-  if (!iso) return null;
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return null;
-  const monthYear = new Intl.DateTimeFormat('en-US', { month: 'short', year: 'numeric' }).format(d);
-  const now = new Date();
-  let years = now.getFullYear() - d.getFullYear();
-  const m = now.getMonth() - d.getMonth();
-  if (m < 0 || (m === 0 && now.getDate() < d.getDate())) years--;
-  return `Installed ${monthYear}${years >= 1 ? ` (${years}y)` : ''}`;
 }
 
 // m:ss for a video's duration overlay (mirrors EquipmentVideosSection).
@@ -186,6 +171,9 @@ export default function EquipmentDetailPage() {
   // mirroring the editing-state cards on Location/Customer detail.
   const [identityEditing, setIdentityEditing] = useState(false);
   const [identityDraft, setIdentityDraft] = useState<IdentityDraft>(EMPTY_IDENTITY);
+  // Header name — inline pencil edit (the canonical, only home for the name).
+  const [editingName, setEditingName] = useState(false);
+  const [nameDraft, setNameDraft] = useState('');
 
   const { data: equipment, isLoading, error } = useQuery({
     queryKey: ['equipment-detail', id],
@@ -345,7 +333,6 @@ export default function EquipmentDetailPage() {
   const identitySave = useMutation({
     mutationFn: () =>
       equipmentApi.update(id!, {
-        name: identityDraft.name.trim(),
         make: identityDraft.make.trim() || null,
         model: identityDraft.model.trim() || null,
         serialNumber: identityDraft.serialNumber.trim() || null,
@@ -367,6 +354,22 @@ export default function EquipmentDetailPage() {
   // Disable Save until something actually changed (mirrors Location/Customer dirty-tracking).
   const identityDirty =
     !!equipment && JSON.stringify(identityDraft) !== JSON.stringify(seedIdentity(equipment));
+
+  // Commit the header name edit. Name is required, so an empty draft just exits
+  // without a write; reuses the single-field PATCH (surfaces its own error).
+  const submitName = async () => {
+    const next = nameDraft.trim();
+    if (!next || next === equipment?.name) {
+      setEditingName(false);
+      return;
+    }
+    try {
+      await handleSaveField('name', next);
+      setEditingName(false);
+    } catch {
+      /* handleSaveField surfaced the error; stay in edit so the draft isn't lost. */
+    }
+  };
 
   if (isLoading) {
     return (
@@ -413,21 +416,6 @@ export default function EquipmentDetailPage() {
     { id: 'media', label: t('equipment.tabs.media'), count: totalMedia },
   ];
 
-  // ── Header meta line (render only populated items) ──
-  const makeModel =
-    equipment.make && equipment.model
-      ? (<span>{equipment.make} <span className="font-mono">{equipment.model}</span></span>)
-      : equipment.make
-        ? <span>{equipment.make}</span>
-        : equipment.model
-          ? <span className="font-mono">{equipment.model}</span>
-          : null;
-  const installed = formatInstalled(equipment.installDate);
-  const meta: React.ReactNode[] = [];
-  if (makeModel) meta.push(<span key="mm">{makeModel}</span>);
-  if (equipment.serialNumber) meta.push(<span key="sn">SN <span className="font-mono">{equipment.serialNumber}</span></span>);
-  if (installed) meta.push(<span key="inst">{installed}</span>);
-  if (equipment.locationOnSite) meta.push(<span key="site">{equipment.locationOnSite}</span>);
 
   const locationLabel = serviceLocation
     ? serviceLocation.locationName ||
@@ -534,7 +522,9 @@ export default function EquipmentDetailPage() {
             ← {locationLabel}
           </RouterLink>
 
-          {/* Header — photo + name + derived pills + meta + actions. */}
+          {/* Header — photo + inline-editable name + derived pills + actions.
+              Make/model/serial/installed live in the Identity card, on-site in
+              the Located-at card — none are duplicated here. */}
           <div className="mb-3 flex flex-col gap-3 rounded-[10px] border border-border bg-bg-elev px-4 py-3.5 shadow-sm sm:flex-row sm:items-center sm:gap-3.5">
             <EquipmentThumbnail
               url={equipment.profileImageUrl}
@@ -544,9 +534,37 @@ export default function EquipmentDetailPage() {
             />
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-2">
-                <Heading level={1} size="page-sm" className="m-0">
-                  {equipment.name}
-                </Heading>
+                {/* Name is the canonical title and the only place it's edited —
+                    pencil-on-hover inline edit (the Identity card no longer
+                    carries a name field). */}
+                {editingName ? (
+                  <Input
+                    autoFocus
+                    value={nameDraft}
+                    onChange={(e) => setNameDraft(e.target.value)}
+                    onBlur={submitName}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') { e.preventDefault(); void submitName(); }
+                      else if (e.key === 'Escape') { setEditingName(false); }
+                    }}
+                    aria-label={t('common.form.name')}
+                    className="max-w-[320px]"
+                  />
+                ) : (
+                  <span className="group/name inline-flex items-center gap-1">
+                    <Heading level={1} size="page-sm" className="m-0">
+                      {equipment.name}
+                    </Heading>
+                    <button
+                      type="button"
+                      onClick={() => { setNameDraft(equipment.name); setEditingName(true); }}
+                      aria-label="Edit name"
+                      className="rounded p-0.5 text-fg-muted opacity-0 transition-opacity hover:bg-zinc-100 group-hover/name:opacity-100 dark:hover:bg-white/5"
+                    >
+                      <PencilIcon className="size-3.5" />
+                    </button>
+                  </span>
+                )}
                 {isRetired && <Pill tone="neutral">{t('equipment.status.retired')}</Pill>}
                 {typeLabel && <Pill tone="neutral">{typeLabel}</Pill>}
                 {openWo && (
@@ -568,16 +586,6 @@ export default function EquipmentDetailPage() {
                   >
                     Part of {equipment.parentName}
                   </RouterLink>
-                </div>
-              )}
-              {meta.length > 0 && (
-                <div className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[11.5px] text-fg-muted">
-                  {meta.map((node, i) => (
-                    <span key={i} className="flex items-center gap-x-2.5">
-                      {i > 0 && <span className="text-fg-dim">·</span>}
-                      {node}
-                    </span>
-                  ))}
                 </div>
               )}
             </div>
@@ -829,17 +837,13 @@ export default function EquipmentDetailPage() {
                   onCancel={() => setIdentityEditing(false)}
                   onSave={() => identitySave.mutate()}
                   saving={identitySave.isPending}
-                  saveDisabled={!identityDirty || !identityDraft.name.trim()}
+                  saveDisabled={!identityDirty}
                 >
                   {identityEditing ? (
                     <div className="flex flex-col gap-2.5">
                       <div className="rounded-[7px] bg-bg-elev-2 px-2.5 py-1.5 text-[11px] text-fg-muted">
                         {[equipment.equipmentTypeName, equipment.equipmentCategoryName].filter(Boolean).join(' · ') || 'Unclassified'} — change type or category in the full editor.
                       </div>
-                      <Field size="xs">
-                        <Label size="xs">{t('common.form.name')}</Label>
-                        <Input size="xs" value={identityDraft.name} onChange={(e) => setId({ name: e.target.value })} aria-label={t('common.form.name')} />
-                      </Field>
                       <div className="grid grid-cols-2 gap-2.5">
                         <Field size="xs">
                           <Label size="xs">{t('equipment.form.make')}</Label>

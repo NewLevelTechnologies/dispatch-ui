@@ -300,7 +300,7 @@ describe('EquipmentDetailPage', () => {
       expect(mockUpdate).toHaveBeenCalledWith(
         'eq-1',
         expect.objectContaining({
-          name: 'Upstairs Furnace',
+          // Name is NOT in this payload — it's edited in the header now.
           make: 'Trane',
           model: 'XR-15',
           serialNumber: 'SN123',
@@ -324,6 +324,28 @@ describe('EquipmentDetailPage', () => {
     await user.click(screen.getByRole('button', { name: 'Edit' }));
     expect(screen.queryByRole('combobox', { name: /type/i })).not.toBeInTheDocument();
     expect(screen.queryByRole('combobox', { name: /category/i })).not.toBeInTheDocument();
+  });
+
+  it('inline-edits the name in the header via the pencil affordance', async () => {
+    mockGetById.mockResolvedValue(baseEquipment);
+    mockUpdate.mockResolvedValue(baseEquipment);
+    const user = userEvent.setup();
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Upstairs Furnace' })).toBeInTheDocument();
+    });
+
+    // Name is the canonical title and edits in place from the header (the
+    // Identity card no longer carries it).
+    await user.click(screen.getByRole('button', { name: /edit name/i }));
+    const nameInput = await screen.findByDisplayValue('Upstairs Furnace');
+    await user.clear(nameInput);
+    await user.type(nameInput, 'Rooftop Unit 9{Enter}');
+
+    await waitFor(() => {
+      expect(mockUpdate).toHaveBeenCalledWith('eq-1', { name: 'Rooftop Unit 9' });
+    });
   });
 
   it('renders service history work orders scoped by equipmentId', async () => {
