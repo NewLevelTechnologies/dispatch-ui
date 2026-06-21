@@ -57,22 +57,26 @@ export function CardLink({
   onClick,
   to,
   className,
+  ariaLabel,
 }: {
   children: ReactNode;
   onClick?: () => void;
   to?: string;
   className?: string;
+  // When several cards each expose a short "Edit" link, give them distinct
+  // accessible names so screen readers (and tests) can tell them apart.
+  ariaLabel?: string;
 }) {
   const cls = className ? `card-action ${className}` : 'card-action';
   if (to) {
     return (
-      <Link to={to} className={cls}>
+      <Link to={to} className={cls} aria-label={ariaLabel}>
         {children}
       </Link>
     );
   }
   return (
-    <button type="button" onClick={onClick} className={cls}>
+    <button type="button" onClick={onClick} className={cls} aria-label={ariaLabel}>
       {children}
     </button>
   );
