@@ -238,15 +238,15 @@ describe('EquipmentDetailPage', () => {
       expect(screen.getByRole('heading', { name: 'Upstairs Furnace' })).toBeInTheDocument();
     });
 
-    // Derived header pills: type (category) + warranty (future expiry → under
-    // warranty). "Under warranty" appears in both the header pill and the Specs
-    // warranty sub-block.
+    // Type/category pill + the derived warranty chip (future expiry → under
+    // warranty thru the parts date) in the header identity strip.
     expect(screen.getAllByText('Furnace').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('Under warranty').length).toBeGreaterThan(0);
-    // Identity values echo across the header meta line and the Specs card.
-    expect(screen.getAllByText('Carrier').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('AC-100').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('SN123').length).toBeGreaterThan(0);
+    expect(screen.getByText(/under warranty thru/i)).toBeInTheDocument();
+    // Identity facts live in the header strip (make/model/serial).
+    expect(screen.getByText(/Carrier/)).toBeInTheDocument();
+    expect(screen.getByText('AC-100')).toBeInTheDocument();
+    expect(screen.getByText('SN123')).toBeInTheDocument();
+    // On-site location stays in the Located-at card.
     expect(screen.getAllByText('Basement').length).toBeGreaterThan(0);
     // Description card (conditional, present here).
     expect(screen.getByText('Two-stage gas furnace')).toBeInTheDocument();
@@ -279,66 +279,21 @@ describe('EquipmentDetailPage', () => {
     expect(screen.queryByAltText(/profile image/i)).not.toBeInTheDocument();
   });
 
-  it('edits the Identity card in place and PATCHes the whole section', async () => {
+  it('puts identity in the header strip with no standalone Identity card, and a slim Warranty card', async () => {
     mockGetById.mockResolvedValue(baseEquipment);
-    mockUpdate.mockResolvedValue(baseEquipment);
-    const user = userEvent.setup();
     renderPage();
 
-    await waitFor(() => {
-      expect(screen.getByRole('heading', { name: 'Upstairs Furnace' })).toBeInTheDocument();
-    });
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Upstairs Furnace' })).toBeInTheDocument());
 
-    // Card-level edit: header "Edit" → fields become inputs → Save changes.
-    await user.click(screen.getByRole('button', { name: 'Edit' }));
-    const makeInput = await screen.findByDisplayValue('Carrier');
-    await user.clear(makeInput);
-    await user.type(makeInput, 'Trane');
-    const modelInput = screen.getByDisplayValue('AC-100');
-    await user.clear(modelInput);
-    await user.type(modelInput, 'XR-15');
-    await user.click(screen.getByRole('button', { name: /save changes/i }));
+    // Identity facts are read-only in the header strip (make/model/serial) —
+    // the tall Identity card is gone.
+    expect(screen.getByText('AC-100')).toBeInTheDocument();
+    expect(screen.getByText('SN123')).toBeInTheDocument();
+    expect(screen.queryByText('Identity')).not.toBeInTheDocument();
 
-    // One PATCH for the whole section — the edited fields plus the seeded rest
-    // (incl. warranty, which rides along; labor stays null with no backfill).
-    await waitFor(() => {
-      expect(mockUpdate).toHaveBeenCalledWith(
-        'eq-1',
-        expect.objectContaining({
-          // Name is NOT in this payload — it's edited in the header now.
-          make: 'Trane',
-          model: 'XR-15',
-          serialNumber: 'SN123',
-          assetTag: 'TAG-1',
-          warrantyExpiresAt: '2027-06-15',
-          warrantyLaborExpiresAt: null,
-          warrantyDetails: '5-year parts',
-        })
-      );
-    });
-  });
-
-  it('recategorizes inline via the Type → Category cascade (type change resets category)', async () => {
-    mockGetById.mockResolvedValue(baseEquipment);
-    mockUpdate.mockResolvedValue(baseEquipment);
-    const user = userEvent.setup();
-    renderPage();
-
-    await waitFor(() => expect(screen.getByText('HVAC')).toBeInTheDocument());
-
-    // Type/Category are now editable inline (was read-only). Changing the type
-    // cascades — it clears the category, which the section save sends as null.
-    await user.click(screen.getByRole('button', { name: 'Edit' }));
-    const typeSelect = await screen.findByRole('combobox', { name: /type/i });
-    await user.selectOptions(typeSelect, 't-refrig');
-    await user.click(screen.getByRole('button', { name: /save changes/i }));
-
-    await waitFor(() => {
-      expect(mockUpdate).toHaveBeenCalledWith(
-        'eq-1',
-        expect.objectContaining({ equipmentTypeId: 't-refrig', equipmentCategoryId: null })
-      );
-    });
+    // The slim Warranty card carries the dates; the header shows only the chip.
+    expect(screen.getByText('Parts covered through')).toBeInTheDocument();
+    expect(screen.getByText(/under warranty thru/i)).toBeInTheDocument();
   });
 
   it('inline-edits the name in the header via the pencil affordance', async () => {
@@ -946,8 +901,8 @@ describe('EquipmentDetailPage', () => {
     await waitFor(() => {
       expect(screen.getByRole('heading', { name: 'Upstairs Furnace' })).toBeInTheDocument();
     });
-    // Identity card present; service-history peek shows its empty state.
-    expect(screen.getByText('Identity')).toBeInTheDocument();
+    // Rail renders (slim Warranty card) and the service-history peek shows its empty state.
+    expect(screen.getByText('Warranty')).toBeInTheDocument();
     expect(screen.getByText(/no work orders yet/i)).toBeInTheDocument();
   });
 
@@ -1040,8 +995,11 @@ describe('EquipmentDetailPage', () => {
     expect(await screen.findByRole('dialog')).toBeInTheDocument();
   });
 
-  it('surfaces a toast and stays in edit mode when the Identity PATCH fails', async () => {
-    mockGetById.mockResolvedValue(baseEquipment);
+  it('surfaces a toast and stays in edit mode when the Specs PATCH fails', async () => {
+    mockGetById.mockResolvedValue({ ...baseEquipment, attributes: JSON.stringify({ btu_input: 80000 }) });
+    mockSpecFieldsGetAll.mockResolvedValue([
+      { id: 'sf1', tenantId: 't', equipmentCategoryId: 'c-furnace', fieldKey: 'btu_input', label: 'BTU Input', dataType: 'NUMBER', options: null, required: false, helpText: null, sortOrder: 0, archivedAt: null, createdAt: '', updatedAt: '' },
+    ]);
     mockUpdate.mockRejectedValue(
       Object.assign(new Error('boom'), {
         response: { data: { message: 'Validation failed' } },
@@ -1050,20 +1008,18 @@ describe('EquipmentDetailPage', () => {
     const user = userEvent.setup();
     renderPage();
 
-    await waitFor(() => {
-      expect(screen.getByRole('heading', { name: 'Upstairs Furnace' })).toBeInTheDocument();
-    });
+    await waitFor(() => expect(screen.getByText('BTU Input')).toBeInTheDocument());
 
+    // The Specs card is the only card-level inline editor now.
     await user.click(screen.getByRole('button', { name: 'Edit' }));
-    const makeInput = await screen.findByDisplayValue('Carrier');
-    await user.clear(makeInput);
-    await user.type(makeInput, 'Bad');
+    const input = await screen.findByDisplayValue('80000');
+    await user.clear(input);
+    await user.type(input, '90000');
     await user.click(screen.getByRole('button', { name: /save changes/i }));
 
     await waitFor(() => {
       expect(mockShowError).toHaveBeenCalledWith(expect.any(String), 'Validation failed');
     });
-    // Card stays in edit mode on error (Save is still present, draft not lost).
     expect(screen.getByRole('button', { name: /save changes/i })).toBeInTheDocument();
   });
 
@@ -1321,10 +1277,8 @@ describe('EquipmentDetailPage', () => {
     await waitFor(() => expect(screen.getByText('BTU Input')).toBeInTheDocument());
     expect(screen.getByText('80000')).toBeInTheDocument();
 
-    // Two card-level Edit buttons (Identity, then Specs) — the Specs one is second.
-    const editButtons = screen.getAllByRole('button', { name: 'Edit' });
-    expect(editButtons.length).toBe(2);
-    await user.click(editButtons[1]);
+    // The Specs card is the only card-level inline editor (Identity card removed).
+    await user.click(screen.getByRole('button', { name: 'Edit' }));
 
     const input = screen.getByDisplayValue('80000');
     await user.clear(input);

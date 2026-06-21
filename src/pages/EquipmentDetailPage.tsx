@@ -17,8 +17,6 @@ import { useTranslation } from 'react-i18next';
 import {
   customerApi,
   equipmentApi,
-  equipmentTypesApi,
-  equipmentCategoriesApi,
   equipmentCategoryFieldsApi,
   equipmentFiltersApi,
   equipmentFilesApi,
@@ -26,7 +24,6 @@ import {
   tenantFilterSizesApi,
   workOrderTypesApi,
   EquipmentStatus,
-  type Equipment,
   type EquipmentFilter,
   type EquipmentImage,
   type EquipmentSummary,
@@ -47,9 +44,7 @@ import { Card } from '../components/catalyst/card';
 import { EditableCard } from '../components/ui/EditableCard';
 import { Heading } from '../components/catalyst/heading';
 import { Button } from '../components/catalyst/button';
-import { Field, Label } from '../components/catalyst/fieldset';
 import { Input } from '../components/catalyst/input';
-import { Select } from '../components/catalyst/select';
 import {
   Dropdown,
   DropdownButton,
@@ -116,41 +111,18 @@ function warrantyState(iso: string | null | undefined): { has: boolean; active: 
   return { has: true, active: exp.getTime() >= new Date().getTime() };
 }
 
-// Card-level inline-edit draft for the Identity card (name + make/model/serial/
-// asset tag/installed + warranty). Mirrors the hand-rolled editing-state pattern
-// on Location/Customer detail: seed from the record, diff for dirty, PATCH the
-// section. Type/Category are NOT here — recategorization carries the spec-clearing
-// guard and stays in the full Edit form.
-interface IdentityDraft {
-  equipmentTypeId: string;
-  equipmentCategoryId: string;
-  make: string;
-  model: string;
-  serialNumber: string;
-  assetTag: string;
-  installDate: string;
-  warrantyExpiresAt: string;
-  warrantyLaborExpiresAt: string;
-  warrantyDetails: string;
-}
-const EMPTY_IDENTITY: IdentityDraft = {
-  equipmentTypeId: '', equipmentCategoryId: '',
-  make: '', model: '', serialNumber: '', assetTag: '', installDate: '',
-  warrantyExpiresAt: '', warrantyLaborExpiresAt: '', warrantyDetails: '',
-};
-function seedIdentity(eq: Equipment): IdentityDraft {
-  return {
-    equipmentTypeId: eq.equipmentTypeId ?? '',
-    equipmentCategoryId: eq.equipmentCategoryId ?? '',
-    make: eq.make ?? '',
-    model: eq.model ?? '',
-    serialNumber: eq.serialNumber ?? '',
-    assetTag: eq.assetTag ?? '',
-    installDate: eq.installDate ?? '',
-    warrantyExpiresAt: eq.warrantyExpiresAt ?? '',
-    warrantyLaborExpiresAt: eq.warrantyLaborExpiresAt ?? '',
-    warrantyDetails: eq.warrantyDetails ?? '',
-  };
+// "Installed Mar 2020 (6y)" for the header identity strip. Age in whole years;
+// under a year drops the suffix. Null when there's no install date.
+function formatInstalled(iso: string | null | undefined): string | null {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  const monthYear = new Intl.DateTimeFormat('en-US', { month: 'short', year: 'numeric' }).format(d);
+  const now = new Date();
+  let years = now.getFullYear() - d.getFullYear();
+  const m = now.getMonth() - d.getMonth();
+  if (m < 0 || (m === 0 && now.getDate() < d.getDate())) years--;
+  return `Installed ${monthYear}${years >= 1 ? ` (${years}y)` : ''}`;
 }
 
 // m:ss for a video's duration overlay (mirrors EquipmentVideosSection).
@@ -178,10 +150,6 @@ export default function EquipmentDetailPage() {
   const [showAllFilterSizes, setShowAllFilterSizes] = useState(false);
   const [isNewWorkOrderOpen, setIsNewWorkOrderOpen] = useState(false);
   const [retireConfirm, setRetireConfirm] = useState(false);
-  // Identity card — card-level inline edit (Edit → inputs → Save/Cancel → PATCH),
-  // mirroring the editing-state cards on Location/Customer detail.
-  const [identityEditing, setIdentityEditing] = useState(false);
-  const [identityDraft, setIdentityDraft] = useState<IdentityDraft>(EMPTY_IDENTITY);
   // Header name — inline pencil edit (the canonical, only home for the name).
   const [editingName, setEditingName] = useState(false);
   const [nameDraft, setNameDraft] = useState('');
@@ -190,20 +158,6 @@ export default function EquipmentDetailPage() {
     queryKey: ['equipment-detail', id],
     queryFn: () => equipmentApi.getById(id!),
     enabled: !!id,
-  });
-
-  // Type → Category cascade for inline recategorization in the Identity card.
-  // Fetched lazily (only while editing); shares cache keys with the Add/Edit form.
-  // Category options follow the *draft* type so the cascade updates live.
-  const { data: equipmentTypes = [] } = useQuery({
-    queryKey: ['equipment-types'],
-    queryFn: () => equipmentTypesApi.getAll(),
-    enabled: identityEditing,
-  });
-  const { data: editCategories = [] } = useQuery({
-    queryKey: ['equipment-categories', identityDraft.equipmentTypeId],
-    queryFn: () => equipmentCategoriesApi.getAll(identityDraft.equipmentTypeId || undefined),
-    enabled: identityEditing && Boolean(identityDraft.equipmentTypeId),
   });
 
   // Service location (Located-at card + back-link) and its customer (the card's
@@ -351,40 +305,6 @@ export default function EquipmentDetailPage() {
       throw err;
     }
   };
-
-  // Identity card section save — one PATCH for name + make/model/serial/asset
-  // tag/installed + warranty. Invalidate + toast + exit edit on success; stay in
-  // edit on error so the draft isn't lost (same as Location/Customer detail).
-  const identitySave = useMutation({
-    mutationFn: () =>
-      equipmentApi.update(id!, {
-        equipmentTypeId: identityDraft.equipmentTypeId || null,
-        equipmentCategoryId: identityDraft.equipmentCategoryId || null,
-        // Spec-clearing guard on category change (keep matching keys, drop the
-        // rest + inline warning) is deferred to backend ask #1 — there's no
-        // per-category spec-template registry yet, and `attributes` is unwritten/
-        // unread, so there are no specs to reconcile here today.
-        make: identityDraft.make.trim() || null,
-        model: identityDraft.model.trim() || null,
-        serialNumber: identityDraft.serialNumber.trim() || null,
-        assetTag: identityDraft.assetTag.trim() || null,
-        installDate: identityDraft.installDate || null,
-        warrantyExpiresAt: identityDraft.warrantyExpiresAt || null,
-        warrantyLaborExpiresAt: identityDraft.warrantyLaborExpiresAt || null,
-        warrantyDetails: identityDraft.warrantyDetails.trim() || null,
-      }),
-    onSuccess: () => {
-      invalidateEquipmentRelatedCaches();
-      setIdentityEditing(false);
-      showSuccess(t('common.form.successUpdate', { entity: getName('equipment'), defaultValue: 'Equipment updated' }));
-    },
-    onError: (err) =>
-      showError(t('common.form.errorUpdate', { entity: getName('equipment') }), extractApiError(err) ?? undefined),
-  });
-  const setId = (patch: Partial<IdentityDraft>) => setIdentityDraft((d) => ({ ...d, ...patch }));
-  // Disable Save until something actually changed (mirrors Location/Customer dirty-tracking).
-  const identityDirty =
-    !!equipment && JSON.stringify(identityDraft) !== JSON.stringify(seedIdentity(equipment));
 
   // Commit the header name edit. Name is required, so an empty draft just exits
   // without a write; reuses the single-field PATCH (surfaces its own error).
@@ -628,11 +548,6 @@ export default function EquipmentDetailPage() {
                     Open work order
                   </Pill>
                 )}
-                {hasWarranty && (
-                  <Pill tone={underWarranty ? 'success' : 'neutral'} dot>
-                    {underWarranty ? 'Under warranty' : 'Warranty expired'}
-                  </Pill>
-                )}
               </div>
               {isSubUnit && equipment.parentName && (
                 <div className="mt-1 text-[11.5px]">
@@ -644,6 +559,45 @@ export default function EquipmentDetailPage() {
                   </RouterLink>
                 </div>
               )}
+              {/* Identity strip — read-only metadata under the name (make/model/
+                  serial/asset/install + derived warranty chip). Edit via the ⋯
+                  "Advanced edit" form. Renders only populated items. */}
+              {(() => {
+                const items: React.ReactNode[] = [];
+                if (equipment.make || equipment.model) {
+                  items.push(
+                    <span>
+                      {equipment.make}
+                      {equipment.make && equipment.model ? ' ' : ''}
+                      {equipment.model && <span className="font-mono">{equipment.model}</span>}
+                    </span>
+                  );
+                }
+                if (equipment.serialNumber) {
+                  items.push(<span>SN <span className="font-mono">{equipment.serialNumber}</span></span>);
+                }
+                if (equipment.assetTag) items.push(<span>Asset {equipment.assetTag}</span>);
+                const installed = formatInstalled(equipment.installDate);
+                if (installed) items.push(<span>{installed}</span>);
+                if (items.length === 0 && !hasWarranty) return null;
+                return (
+                  <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11.5px] text-fg-muted">
+                    {items.map((node, i) => (
+                      <span key={i} className="flex items-center gap-x-2">
+                        {i > 0 && <span className="text-fg-dim">·</span>}
+                        {node}
+                      </span>
+                    ))}
+                    {hasWarranty && (
+                      <Pill tone={underWarranty ? 'success' : 'neutral'} dot>
+                        {underWarranty
+                          ? `Under warranty thru ${formatDate(equipment.warrantyExpiresAt)}`
+                          : 'Out of warranty'}
+                      </Pill>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
 
             <div className="flex items-center gap-1.5 max-sm:w-full sm:flex-shrink-0">
@@ -883,130 +837,16 @@ export default function EquipmentDetailPage() {
                     asset tag/installed + warranty). Type/Category are read-only
                     here: recategorizing carries the spec-clearing guard and
                     stays in the full Edit form. */}
-                <EditableCard
-                  title="Identity"
-                  editing={identityEditing}
-                  onEdit={() => {
-                    setIdentityDraft(seedIdentity(equipment));
-                    setIdentityEditing(true);
-                  }}
-                  onCancel={() => setIdentityEditing(false)}
-                  onSave={() => identitySave.mutate()}
-                  saving={identitySave.isPending}
-                  saveDisabled={!identityDirty}
-                >
-                  {identityEditing ? (
-                    <div className="flex flex-col gap-2.5">
-                      {/* Type → Category cascade — recategorize in place. */}
-                      <div className="grid grid-cols-2 gap-2.5">
-                        <Field size="xs">
-                          <Label size="xs">{t('equipment.form.type')}</Label>
-                          <Select
-                            value={identityDraft.equipmentTypeId}
-                            onChange={(e) => setId({ equipmentTypeId: e.target.value, equipmentCategoryId: '' })}
-                            aria-label={t('equipment.form.type')}
-                          >
-                            <option value="">{t('common.none')}</option>
-                            {equipmentTypes.map((ty) => (
-                              <option key={ty.id} value={ty.id}>{ty.name}</option>
-                            ))}
-                          </Select>
-                        </Field>
-                        <Field size="xs">
-                          <Label size="xs">{t('equipment.form.category')}</Label>
-                          <Select
-                            value={identityDraft.equipmentCategoryId}
-                            onChange={(e) => setId({ equipmentCategoryId: e.target.value })}
-                            disabled={!identityDraft.equipmentTypeId}
-                            aria-label={t('equipment.form.category')}
-                          >
-                            <option value="">{identityDraft.equipmentTypeId ? t('common.none') : 'Pick a type first'}</option>
-                            {editCategories.map((c) => (
-                              <option key={c.id} value={c.id}>{c.name}</option>
-                            ))}
-                          </Select>
-                        </Field>
-                      </div>
-                      <div className="grid grid-cols-2 gap-2.5">
-                        <Field size="xs">
-                          <Label size="xs">{t('equipment.form.make')}</Label>
-                          <Input size="xs" value={identityDraft.make} onChange={(e) => setId({ make: e.target.value })} />
-                        </Field>
-                        <Field size="xs">
-                          <Label size="xs">{t('equipment.form.model')}</Label>
-                          <Input size="xs" className="font-mono" value={identityDraft.model} onChange={(e) => setId({ model: e.target.value })} />
-                        </Field>
-                        <Field size="xs">
-                          <Label size="xs">{t('equipment.form.serialNumber')}</Label>
-                          <Input size="xs" className="font-mono" value={identityDraft.serialNumber} onChange={(e) => setId({ serialNumber: e.target.value })} />
-                        </Field>
-                        <Field size="xs">
-                          <Label size="xs">{t('equipment.form.assetTag')}</Label>
-                          <Input size="xs" className="font-mono" value={identityDraft.assetTag} onChange={(e) => setId({ assetTag: e.target.value })} />
-                        </Field>
-                      </div>
-                      <Field size="xs">
-                        <Label size="xs">{t('equipment.form.installDate')}</Label>
-                        <Input size="xs" type="date" value={identityDraft.installDate} onChange={(e) => setId({ installDate: e.target.value })} />
-                      </Field>
-                      <div className="grid grid-cols-2 gap-2.5">
-                        <Field size="xs">
-                          <Label size="xs">Parts covered through</Label>
-                          <Input size="xs" type="date" value={identityDraft.warrantyExpiresAt} onChange={(e) => setId({ warrantyExpiresAt: e.target.value })} />
-                        </Field>
-                        <Field size="xs">
-                          <Label size="xs">Labor covered through</Label>
-                          <Input size="xs" type="date" value={identityDraft.warrantyLaborExpiresAt} onChange={(e) => setId({ warrantyLaborExpiresAt: e.target.value })} />
-                        </Field>
-                      </div>
-                      <Field size="xs">
-                        <Label size="xs">{t('equipment.form.warrantyDetails')}</Label>
-                        <Input size="xs" value={identityDraft.warrantyDetails} onChange={(e) => setId({ warrantyDetails: e.target.value })} />
-                      </Field>
-                    </div>
-                  ) : (
-                    <>
-                      <FieldGrid>
-                        <FieldRow label={t('equipment.form.type')}>{equipment.equipmentTypeName || '—'}</FieldRow>
-                        <FieldRow label={t('equipment.form.category')}>{equipment.equipmentCategoryName || '—'}</FieldRow>
-                        <FieldRow label={t('equipment.form.make')}>{equipment.make || '—'}</FieldRow>
-                        <FieldRow label={t('equipment.form.model')}><span className="font-mono">{equipment.model || '—'}</span></FieldRow>
-                        <FieldRow label={t('equipment.form.serialNumber')}><span className="font-mono">{equipment.serialNumber || '—'}</span></FieldRow>
-                        <FieldRow label={t('equipment.form.assetTag')}><span className="font-mono">{equipment.assetTag || '—'}</span></FieldRow>
-                        <FieldRow label={t('equipment.form.installDate')}>{formatDate(equipment.installDate)}</FieldRow>
-                      </FieldGrid>
-
-                      {/* Warranty — money-decision sub-block; success-tinted when active. */}
-                      <div
-                        className="mt-3 rounded-[8px] p-2.5"
-                        style={{
-                          background: underWarranty
-                            ? 'color-mix(in oklch, var(--success-500) 7%, var(--bg-elev))'
-                            : 'var(--bg-elev-2)',
-                        }}
-                      >
-                        <div className="flex items-center justify-between gap-2">
-                          <span
-                            className="text-[10.5px] font-semibold uppercase tracking-[0.08em]"
-                            style={{ color: underWarranty ? 'var(--success-600, var(--success-500))' : 'var(--fg-muted)' }}
-                          >
-                            Warranty
-                          </span>
-                          {hasWarranty && (
-                            <Pill tone={underWarranty ? 'success' : 'neutral'} dot>
-                              {underWarranty ? 'Under warranty' : 'Warranty expired'}
-                            </Pill>
-                          )}
-                        </div>
-                        <FieldGrid className="mt-1.5">
-                          <FieldRow label="Parts covered through">{formatDate(equipment.warrantyExpiresAt)}</FieldRow>
-                          <FieldRow label="Labor covered through">{formatDate(equipment.warrantyLaborExpiresAt)}</FieldRow>
-                          <FieldRow label={t('equipment.form.warrantyDetails')}>{equipment.warrantyDetails || '—'}</FieldRow>
-                        </FieldGrid>
-                      </div>
-                    </>
-                  )}
-                </EditableCard>
+                {/* Warranty — slim read-only rail card (the header shows the
+                    derived chip). Parts/labor/details edit via the ⋯ "Advanced
+                    edit" form, alongside make/model/serial/install/type/category. */}
+                <Card title={<CardTitle>Warranty</CardTitle>}>
+                  <FieldGrid>
+                    <FieldRow label="Parts covered through">{formatDate(equipment.warrantyExpiresAt)}</FieldRow>
+                    <FieldRow label="Labor covered through">{formatDate(equipment.warrantyLaborExpiresAt)}</FieldRow>
+                    <FieldRow label={t('equipment.form.warrantyDetails')}>{equipment.warrantyDetails || '—'}</FieldRow>
+                  </FieldGrid>
+                </Card>
 
                 {/* Specs — the chosen category's custom fields + their values.
                     Card-level inline edit writes the full `attributes` object.
