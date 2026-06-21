@@ -39,7 +39,7 @@ import { Input } from '../../../components/catalyst/input';
 import ConfirmDialog from '../../../components/ConfirmDialog';
 import IconButton from '../../../components/IconButton';
 import { DragHandle } from '../../../components/settings/DragHandle';
-import CategoryFieldsDialog from '../../../components/settings/CategoryFieldsDialog';
+import CategoryFieldsDrawer from '../../../components/settings/CategoryFieldsDrawer';
 import { useGlossary } from '../../../contexts/GlossaryContext';
 import { Card, CardBody } from '../../../components/ui/Card';
 import { EmptyState } from '../../../components/ui/EmptyState';
@@ -451,7 +451,7 @@ export default function EquipmentTaxonomyPage() {
         isPending={deleteTypeMutation.isPending || deleteCategoryMutation.isPending}
       />
 
-      <CategoryFieldsDialog category={fieldsCategory} onClose={() => setFieldsCategory(null)} />
+      <CategoryFieldsDrawer category={fieldsCategory} onClose={() => setFieldsCategory(null)} />
     </>
   );
 }

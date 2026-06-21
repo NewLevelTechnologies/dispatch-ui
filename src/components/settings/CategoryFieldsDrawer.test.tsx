@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, fireEvent } from '@testing-library/react';
 import { renderWithProviders, userEvent } from '../../test/utils';
-import CategoryFieldsDialog from './CategoryFieldsDialog';
+import CategoryFieldsDrawer from './CategoryFieldsDrawer';
 import type { EquipmentCategory, EquipmentCategoryField, EquipmentFieldDataType } from '../../api';
 
 const mockGetAll = vi.fn();
@@ -64,19 +64,19 @@ const field = (
   ...extra,
 });
 
-const render = () => renderWithProviders(<CategoryFieldsDialog category={category} onClose={vi.fn()} />);
+const render = () => renderWithProviders(<CategoryFieldsDrawer category={category} onClose={vi.fn()} />);
 
-describe('CategoryFieldsDialog', () => {
+describe('CategoryFieldsDrawer', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockGetAll.mockResolvedValue([]);
-    mockCreate.mockResolvedValue(field('f-new', 'btu', 'BTU', 'NUMBER'));
+    mockCreate.mockResolvedValue(field('f-new', 'btu_rating', 'BTU Rating', 'NUMBER'));
     mockUpdate.mockResolvedValue(field('f1', 'btu', 'BTU', 'NUMBER'));
     mockDelete.mockResolvedValue(undefined);
     mockReorder.mockResolvedValue([]);
   });
 
-  it('lists the category fields with key, type, required, and options', async () => {
+  it('lists fields with the renamed type labels and options', async () => {
     mockGetAll.mockResolvedValue([
       field('f1', 'btu', 'BTU Rating', 'NUMBER', { required: true }),
       field('f2', 'refrigerant', 'Refrigerant', 'SELECT', { options: ['R-410A', 'R-22'] }),
@@ -84,7 +84,8 @@ describe('CategoryFieldsDialog', () => {
     render();
 
     await waitFor(() => expect(screen.getByText('BTU Rating')).toBeInTheDocument());
-    expect(screen.getByText('btu')).toBeInTheDocument();
+    expect(screen.getByText('Number')).toBeInTheDocument();
+    expect(screen.getByText('Dropdown')).toBeInTheDocument(); // SELECT renamed in the UI
     expect(screen.getByText('Required')).toBeInTheDocument();
     expect(screen.getByText('R-410A, R-22')).toBeInTheDocument();
   });
@@ -92,38 +93,39 @@ describe('CategoryFieldsDialog', () => {
   it('shows an empty state when the category has no fields', async () => {
     mockGetAll.mockResolvedValue([]);
     render();
-    expect(await screen.findByText(/no custom fields yet/i)).toBeInTheDocument();
+    expect(await screen.findByText(/no fields yet/i)).toBeInTheDocument();
   });
 
-  it('adds a field', async () => {
+  it('adds a field inline with a label-derived key', async () => {
     const user = userEvent.setup();
     render();
-    await screen.findByText(/no custom fields yet/i);
+    await screen.findByText(/no fields yet/i);
 
     await user.click(screen.getByRole('button', { name: /add field/i }));
-    await user.type(screen.getByPlaceholderText('btu_rating'), 'btu');
     await user.type(screen.getByPlaceholderText('BTU Rating'), 'BTU Rating');
-    await user.click(screen.getByRole('button', { name: /create/i }));
 
+    // Key auto-derives from the label, tucked under Advanced.
+    await user.click(screen.getByRole('button', { name: /advanced/i }));
+    expect(screen.getByDisplayValue('btu_rating')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /create/i }));
     await waitFor(() => {
       expect(mockCreate).toHaveBeenCalledWith(
         'cat-1',
-        expect.objectContaining({ fieldKey: 'btu', label: 'BTU Rating', dataType: 'TEXT', required: false })
+        expect.objectContaining({ fieldKey: 'btu_rating', label: 'BTU Rating', dataType: 'TEXT' })
       );
     });
   });
 
-  it('requires options for a SELECT field, then submits them', async () => {
+  it('requires options for a Dropdown field, then submits them', async () => {
     const user = userEvent.setup();
     render();
-    await screen.findByText(/no custom fields yet/i);
+    await screen.findByText(/no fields yet/i);
 
     await user.click(screen.getByRole('button', { name: /add field/i }));
-    await user.type(screen.getByPlaceholderText('btu_rating'), 'refrigerant');
     await user.type(screen.getByPlaceholderText('BTU Rating'), 'Refrigerant');
     await user.selectOptions(screen.getByRole('combobox'), 'SELECT');
 
-    // No options yet → blocked.
     await user.click(screen.getByRole('button', { name: /create/i }));
     expect(mockCreate).not.toHaveBeenCalled();
     expect(screen.getByText(/at least one option/i)).toBeInTheDocument();
@@ -138,7 +140,15 @@ describe('CategoryFieldsDialog', () => {
     });
   });
 
-  it('edits a field with the field key and data type locked', async () => {
+  it('offers the Currency type', async () => {
+    const user = userEvent.setup();
+    render();
+    await screen.findByText(/no fields yet/i);
+    await user.click(screen.getByRole('button', { name: /add field/i }));
+    expect(screen.getByRole('option', { name: 'Currency' })).toBeInTheDocument();
+  });
+
+  it('edits a field inline with the key and type locked', async () => {
     mockGetAll.mockResolvedValue([field('f1', 'btu', 'BTU', 'NUMBER')]);
     const user = userEvent.setup();
     render();
@@ -147,7 +157,11 @@ describe('CategoryFieldsDialog', () => {
     await user.click(screen.getByRole('button', { name: /more options/i }));
     await user.click(await screen.findByRole('menuitem', { name: /edit/i }));
 
+    // Type select is disabled; the key (under Advanced) is disabled too.
+    expect((screen.getByRole('combobox') as HTMLSelectElement).disabled).toBe(true);
+    await user.click(screen.getByRole('button', { name: /advanced/i }));
     expect((screen.getByDisplayValue('btu') as HTMLInputElement).disabled).toBe(true);
+
     const labelInput = screen.getByDisplayValue('BTU');
     await user.clear(labelInput);
     await user.type(labelInput, 'BTU Rating');
@@ -156,7 +170,6 @@ describe('CategoryFieldsDialog', () => {
     await waitFor(() => {
       expect(mockUpdate).toHaveBeenCalledWith('cat-1', 'f1', expect.objectContaining({ label: 'BTU Rating' }));
     });
-    // fieldKey is immutable — never sent in the update payload.
     expect(mockUpdate.mock.calls[0][2]).not.toHaveProperty('fieldKey');
   });
 
@@ -174,35 +187,7 @@ describe('CategoryFieldsDialog', () => {
     confirmSpy.mockRestore();
   });
 
-  it('rejects an invalid field key', async () => {
-    const user = userEvent.setup();
-    render();
-    await screen.findByText(/no custom fields yet/i);
-
-    await user.click(screen.getByRole('button', { name: /add field/i }));
-    await user.type(screen.getByPlaceholderText('btu_rating'), 'BAD KEY');
-    await user.type(screen.getByPlaceholderText('BTU Rating'), 'Bad');
-    await user.click(screen.getByRole('button', { name: /create/i }));
-
-    expect(mockCreate).not.toHaveBeenCalled();
-    expect(screen.getByText(/must be lower_snake_case/i)).toBeInTheDocument();
-  });
-
-  it('cancels the form and returns to the list', async () => {
-    const user = userEvent.setup();
-    render();
-    await screen.findByText(/no custom fields yet/i);
-
-    await user.click(screen.getByRole('button', { name: /add field/i }));
-    expect(screen.getByPlaceholderText('btu_rating')).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: /cancel/i }));
-
-    // Back on the list — the "Add field" affordance is shown again.
-    expect(screen.getByRole('button', { name: /add field/i })).toBeInTheDocument();
-    expect(screen.queryByPlaceholderText('btu_rating')).not.toBeInTheDocument();
-  });
-
-  it('reorders fields', async () => {
+  it('reorders fields from the row menu', async () => {
     mockGetAll.mockResolvedValue([
       field('f1', 'btu', 'BTU', 'NUMBER'),
       field('f2', 'tonnage', 'Tonnage', 'NUMBER', { sortOrder: 1 }),
@@ -211,10 +196,40 @@ describe('CategoryFieldsDialog', () => {
     render();
 
     await waitFor(() => expect(screen.getByText('BTU')).toBeInTheDocument());
-    // First row's kebab → Move down.
     await user.click(screen.getAllByRole('button', { name: /more options/i })[0]);
     await user.click(await screen.findByRole('menuitem', { name: /move down/i }));
 
     await waitFor(() => expect(mockReorder).toHaveBeenCalledWith('cat-1', ['f2', 'f1']));
+  });
+
+  it('reorders fields by dragging a row', async () => {
+    mockGetAll.mockResolvedValue([
+      field('f1', 'btu', 'BTU', 'NUMBER'),
+      field('f2', 'tonnage', 'Tonnage', 'NUMBER', { sortOrder: 1 }),
+    ]);
+    render();
+
+    await waitFor(() => expect(screen.getByText('BTU')).toBeInTheDocument());
+    const row1 = screen.getByText('BTU').closest('[draggable]')!;
+    const row2 = screen.getByText('Tonnage').closest('[draggable]')!;
+
+    fireEvent.dragStart(row1, { dataTransfer: { effectAllowed: '' } });
+    fireEvent.dragOver(row2, { dataTransfer: { dropEffect: '' } });
+    fireEvent.drop(row2, { dataTransfer: {} });
+
+    await waitFor(() => expect(mockReorder).toHaveBeenCalledWith('cat-1', ['f2', 'f1']));
+  });
+
+  it('cancels the inline editor', async () => {
+    const user = userEvent.setup();
+    render();
+    await screen.findByText(/no fields yet/i);
+
+    await user.click(screen.getByRole('button', { name: /add field/i }));
+    expect(screen.getByPlaceholderText('BTU Rating')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /cancel/i }));
+
+    expect(screen.getByRole('button', { name: /add field/i })).toBeInTheDocument();
+    expect(screen.queryByPlaceholderText('BTU Rating')).not.toBeInTheDocument();
   });
 });

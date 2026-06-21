@@ -388,7 +388,9 @@ export const equipmentCategoriesApi = {
 // Tenant-defined custom fields per category. Equipment instances capture values
 // for these in the existing `attributes` JSON string, keyed by `fieldKey`.
 
-export type EquipmentFieldDataType = 'TEXT' | 'NUMBER' | 'DATE' | 'BOOLEAN' | 'SELECT';
+// CURRENCY validates like NUMBER server-side (numeric); the FE owns symbol +
+// precision and stores a plain decimal in `attributes`.
+export type EquipmentFieldDataType = 'TEXT' | 'NUMBER' | 'CURRENCY' | 'DATE' | 'BOOLEAN' | 'SELECT';
 
 export interface EquipmentCategoryField {
   id: string;
