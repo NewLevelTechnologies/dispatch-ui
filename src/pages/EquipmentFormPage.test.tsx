@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, fireEvent } from '@testing-library/react';
 import type { RouteObject } from 'react-router-dom';
 import { renderWithProviders, userEvent } from '../test/utils';
 import EquipmentFormPage from './EquipmentFormPage';
@@ -74,6 +74,15 @@ function renderEdit(id = 'eq-9') {
   return renderWithProviders(<EquipmentFormPage />, { routes, initialEntries: [`/equipment/${id}/edit`] });
 }
 
+function renderStandaloneAdd() {
+  const routes: RouteObject[] = [
+    { path: '/equipment/new', element: <EquipmentFormPage /> },
+    // eslint-disable-next-line i18next/no-literal-string
+    { path: '*', element: <div>Elsewhere</div> },
+  ];
+  return renderWithProviders(<EquipmentFormPage />, { routes, initialEntries: ['/equipment/new'] });
+}
+
 describe('EquipmentFormPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -123,7 +132,7 @@ describe('EquipmentFormPage', () => {
 
   it('submits a create request with the classification + identity and navigates to the unit', async () => {
     const user = userEvent.setup();
-    const { router } = renderScopedAdd();
+    const { router, container } = renderScopedAdd();
     await waitFor(() => {
       expect(screen.getByRole('heading', { name: /add equipment/i, level: 1 })).toBeInTheDocument();
     });
@@ -134,6 +143,17 @@ describe('EquipmentFormPage', () => {
     await waitFor(() => expect(screen.getByRole('option', { name: 'Rooftop' })).toBeInTheDocument());
     await user.selectOptions(selects()[1], 'c-rtu');
     await user.type(screen.getByPlaceholderText(/RTU-3/), 'RTU-7');
+    // Fill the optional identity fields too (exercises their input handlers).
+    await user.type(screen.getByPlaceholderText('Carrier'), 'Trane');
+    await user.type(screen.getByPlaceholderText('50TC-A06'), 'XR-15');
+    await user.type(screen.getByPlaceholderText('A1142099'), 'SN-7');
+    await user.type(screen.getByPlaceholderText(/compressor 10yr/i), '10-year parts');
+    // Date inputs (installed, parts-thru, labor-thru) in DOM order — fireEvent
+    // is the reliable way to set a native date control.
+    const dateInputs = container.querySelectorAll('input[type="date"]');
+    fireEvent.change(dateInputs[0], { target: { value: '2020-03-01' } }); // installed
+    fireEvent.change(dateInputs[1], { target: { value: '2030-03-01' } }); // parts
+    fireEvent.change(dateInputs[2], { target: { value: '2022-03-01' } }); // labor
 
     await user.click(screen.getByRole('button', { name: /add equipment/i }));
 
@@ -144,6 +164,13 @@ describe('EquipmentFormPage', () => {
           serviceLocationId: 'loc-1',
           equipmentTypeId: 't-hvac',
           equipmentCategoryId: 'c-rtu',
+          make: 'Trane',
+          model: 'XR-15',
+          serialNumber: 'SN-7',
+          installDate: '2020-03-01',
+          warrantyExpiresAt: '2030-03-01',
+          warrantyLaborExpiresAt: '2022-03-01',
+          warrantyDetails: '10-year parts',
           parentId: null,
         })
       );
@@ -202,5 +229,64 @@ describe('EquipmentFormPage', () => {
       expect(mockUpdate).toHaveBeenCalledWith('eq-9', expect.objectContaining({ name: 'Rooftop Unit 9' }));
     });
     await waitFor(() => expect(router.state.location.pathname).toBe('/equipment/eq-9'));
+  });
+
+  it('renders the standalone add form with a location picker and requires a location', async () => {
+    const user = userEvent.setup();
+    renderStandaloneAdd();
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: /add equipment/i, level: 1 })).toBeInTheDocument();
+    });
+    // Standalone add (no location from the route) exposes the picker.
+    expect(screen.getByPlaceholderText(/search by customer/i)).toBeInTheDocument();
+
+    // No location chosen → the required picker blocks submit, nothing is created.
+    await user.click(screen.getByRole('button', { name: /add equipment/i }));
+    expect(mockCreate).not.toHaveBeenCalled();
+  });
+
+  it('re-parents in edit mode (Placement) and sends parentId', async () => {
+    mockGetById.mockResolvedValue({
+      id: 'eq-9',
+      name: 'Compressor',
+      serviceLocationId: 'loc-1',
+      status: 'ACTIVE',
+      equipmentTypeId: 't-hvac',
+      equipmentCategoryId: 'c-rtu',
+      parentId: null,
+      descendantCount: 0,
+    });
+    // Candidate parents at the same location (top-level, active, excludes self).
+    mockList.mockResolvedValue(
+      page([
+        { id: 'eq-sys', name: 'RTU-3', parentId: null, status: 'ACTIVE', equipmentTypeName: null, equipmentCategoryName: null, make: null, model: null, serialNumber: null, locationOnSite: null },
+      ])
+    );
+    const user = userEvent.setup();
+    renderEdit('eq-9');
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: /edit equipment/i, level: 1 })).toBeInTheDocument();
+    });
+    const parentOption = await screen.findByRole('option', { name: 'RTU-3' });
+    await user.selectOptions(parentOption.closest('select')!, 'eq-sys');
+    await user.click(screen.getByRole('button', { name: /edit equipment/i }));
+
+    await waitFor(() => {
+      expect(mockUpdate).toHaveBeenCalledWith('eq-9', expect.objectContaining({ parentId: 'eq-sys' }));
+    });
+  });
+
+  it('shows a loading state while the edit record loads', async () => {
+    mockGetById.mockReturnValue(new Promise(() => {}));
+    renderEdit('eq-9');
+    expect(await screen.findByText(/loading/i)).toBeInTheDocument();
+  });
+
+  it('shows an error state when the edit record fails to load', async () => {
+    mockGetById.mockRejectedValue(new Error('nope'));
+    renderEdit('eq-9');
+    expect(await screen.findByRole('button', { name: /back/i })).toBeInTheDocument();
   });
 });
