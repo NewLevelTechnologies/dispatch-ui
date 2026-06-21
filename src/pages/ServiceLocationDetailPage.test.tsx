@@ -1467,25 +1467,24 @@ describe('ServiceLocationDetailPage', () => {
       await waitFor(() => expect(screen.getByText(/no.*equipment.*yet/i)).toBeInTheDocument());
     });
 
-    it('opens the equipment form dialog in create mode when Add is clicked', async () => {
+    it('navigates to the scoped equipment add form when Add is clicked', async () => {
       mockApiResponses();
       const user = userEvent.setup();
-      renderDetailPage();
+      const { router } = renderDetailPage();
       await waitFor(() => expect(screen.getByText('Main Office')).toBeInTheDocument());
       await user.click(screen.getByRole('tab', { name: /equipment/i }));
       await user.click(await screen.findByRole('button', { name: /add equipment/i }));
 
-      await waitFor(() => expect(screen.getByRole('dialog')).toBeInTheDocument());
-      expect(screen.queryByLabelText(/customer/i)).not.toBeInTheDocument();
-      expect(screen.queryByLabelText(/^Location \*$/)).not.toBeInTheDocument();
-      expect(screen.getByLabelText(/^name/i)).toBeInTheDocument();
+      await waitFor(() =>
+        expect(router.state.location.pathname).toBe('/service-locations/location-1/equipment/new')
+      );
     });
 
-    it('opens the edit dialog with the full record when Edit is selected', async () => {
+    it('navigates to the equipment edit form when Edit is selected', async () => {
       const fullRecord = { ...equipmentList[0], serviceLocationId: 'location-1', status: 'ACTIVE', attributes: '{}' };
       mockApiResponses(mockLocation, [], [fullRecord]);
       const user = userEvent.setup();
-      renderDetailPage();
+      const { router } = renderDetailPage();
       await waitFor(() => expect(screen.getByText('Main Office')).toBeInTheDocument());
       await user.click(screen.getByRole('tab', { name: /equipment/i }));
       await waitFor(() => expect(screen.getByText('Upstairs Furnace')).toBeInTheDocument());
@@ -1495,7 +1494,7 @@ describe('ServiceLocationDetailPage', () => {
       await user.click(within(row).getByRole('button', { name: /more options/i }));
       await user.click(await screen.findByRole('menuitem', { name: /edit/i }));
 
-      await waitFor(() => expect(screen.getByRole('dialog')).toBeInTheDocument());
+      await waitFor(() => expect(router.state.location.pathname).toBe('/equipment/eq-1/edit'));
     });
 
     it('confirms before deleting and calls the delete endpoint', async () => {

@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { customerApi, type ServiceLocationSearchResult } from '../api';
 import { Field, Label } from './catalyst/fieldset';
 import { Input } from './catalyst/input';
+import { titleCaseAddress } from '../utils/titleCaseAddress';
 
 interface ServiceLocationPickerProps {
   value: ServiceLocationSearchResult | null;
@@ -115,7 +116,8 @@ export default function ServiceLocationPicker({
   const formatLocationDisplay = (location: ServiceLocationSearchResult) => {
     const { customerName, locationName, address } = location;
     const name = locationName || customerName;
-    return `${name} - ${address.streetAddress}, ${address.city}, ${address.state}`;
+    // State code is not run through titleCaseAddress (it would lower-case "GA").
+    return `${name} - ${titleCaseAddress(address.streetAddress)}, ${titleCaseAddress(address.city)}, ${address.state}`;
   };
 
   const displayValue = value ? formatLocationDisplay(value) : '';
@@ -165,7 +167,7 @@ export default function ServiceLocationPicker({
                       {location.locationName || location.customerName}
                     </div>
                     <div className="text-sm text-zinc-600 dark:text-zinc-400 group-hover:text-white">
-                      {location.address.streetAddress}, {location.address.city}, {location.address.state} {location.address.zipCode}
+                      {titleCaseAddress(location.address.streetAddress)}, {titleCaseAddress(location.address.city)}, {location.address.state} {location.address.zipCode}
                     </div>
                   </button>
                 ))}

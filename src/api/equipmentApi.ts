@@ -31,6 +31,10 @@ export interface Equipment {
   installDate?: string | null;
   lastServicedAt?: string | null;
   warrantyExpiresAt?: string | null;
+  // Labor coverage end date (ISO LocalDate or null), distinct from parts
+  // coverage above. No backfill — existing rows are null. Off EquipmentSummary
+  // (the list) intentionally.
+  warrantyLaborExpiresAt?: string | null;
   warrantyDetails?: string | null;
   status: EquipmentStatus;
   // Convenience: presigned URL of the profile image (the one with isProfile=true
@@ -133,6 +137,10 @@ export interface CreateEquipmentRequest {
   locationOnSite?: string | null;
   installDate?: string | null;
   warrantyExpiresAt?: string | null;
+  // Labor coverage end date (ISO LocalDate or null), distinct from parts
+  // coverage above. No backfill — existing rows are null. Off EquipmentSummary
+  // (the list) intentionally.
+  warrantyLaborExpiresAt?: string | null;
   warrantyDetails?: string | null;
   status?: EquipmentStatus;
   profileImageUrl?: string | null;
@@ -154,6 +162,10 @@ export interface UpdateEquipmentRequest {
   locationOnSite?: string | null;
   installDate?: string | null;
   warrantyExpiresAt?: string | null;
+  // Labor coverage end date (ISO LocalDate or null), distinct from parts
+  // coverage above. No backfill — existing rows are null. Off EquipmentSummary
+  // (the list) intentionally.
+  warrantyLaborExpiresAt?: string | null;
   warrantyDetails?: string | null;
   status?: EquipmentStatus;
   profileImageUrl?: string | null;
