@@ -19,6 +19,7 @@ import {
   equipmentApi,
   equipmentTypesApi,
   equipmentCategoriesApi,
+  equipmentCategoryFieldsApi,
   equipmentFiltersApi,
   equipmentFilesApi,
   equipmentImagesApi,
@@ -39,6 +40,8 @@ import { showSuccess, showError, extractApiError } from '../lib/toast';
 import { formatTimestamp } from '../lib/formatTimestamp';
 import { formatFilterSize } from '../utils/formatFilterSize';
 import { titleCaseAddress } from '../utils/titleCaseAddress';
+import { parseAttributes, buildAttributes, formatSpecValue } from '../utils/equipmentAttributes';
+import { SpecFieldInput } from '../components/EquipmentSpecFields';
 import AppLayout from '../components/AppLayout';
 import { Card } from '../components/catalyst/card';
 import { EditableCard } from '../components/ui/EditableCard';
@@ -398,6 +401,31 @@ export default function EquipmentDetailPage() {
       /* handleSaveField surfaced the error; stay in edit so the draft isn't lost. */
     }
   };
+
+  // ── Specs — the category's custom fields, card-level inline edit (PATCH the
+  // full `attributes` object). Shares the cache key with the form + settings. ──
+  const { data: specFields = [] } = useQuery({
+    queryKey: ['equipment-category-fields', equipment?.equipmentCategoryId ?? ''],
+    queryFn: () => equipmentCategoryFieldsApi.getAll(equipment!.equipmentCategoryId!),
+    enabled: Boolean(equipment?.equipmentCategoryId),
+  });
+  const [specEditing, setSpecEditing] = useState(false);
+  const [specDraft, setSpecDraft] = useState<Record<string, string>>({});
+  const specValuesView = parseAttributes(equipment?.attributes);
+  const specSave = useMutation({
+    mutationFn: () => equipmentApi.update(id!, { attributes: buildAttributes(specFields, specDraft) }),
+    onSuccess: () => {
+      invalidateEquipmentRelatedCaches();
+      setSpecEditing(false);
+      showSuccess(t('common.form.successUpdate', { entity: getName('equipment'), defaultValue: 'Equipment updated' }));
+    },
+    onError: (err) =>
+      showError(t('common.form.errorUpdate', { entity: getName('equipment') }), extractApiError(err) ?? undefined),
+  });
+  const specDirty = specEditing && JSON.stringify(specDraft) !== JSON.stringify(specValuesView);
+  const specRequiredMissing = specFields.some(
+    (f) => f.required && f.dataType !== 'BOOLEAN' && !(specDraft[f.fieldKey] ?? '').trim()
+  );
 
   if (isLoading) {
     return (
@@ -817,7 +845,7 @@ export default function EquipmentDetailPage() {
                 <Card title={<CardTitle icon={<MapPinIcon className="size-3.5" />}>Located at</CardTitle>}>
                   <RouterLink
                     to={`/service-locations/${equipment.serviceLocationId}`}
-                    className="text-[13px] font-semibold text-fg-strong hover:text-fg-accent"
+                    className="text-[13px] font-semibold text-fg-accent hover:underline"
                   >
                     {locationLabel}
                   </RouterLink>
@@ -979,6 +1007,45 @@ export default function EquipmentDetailPage() {
                     </>
                   )}
                 </EditableCard>
+
+                {/* Specs — the chosen category's custom fields + their values.
+                    Card-level inline edit writes the full `attributes` object.
+                    Hidden when the category defines no fields. */}
+                {specFields.length > 0 && (
+                  <EditableCard
+                    title="Specs"
+                    editing={specEditing}
+                    onEdit={() => {
+                      setSpecDraft(parseAttributes(equipment.attributes));
+                      setSpecEditing(true);
+                    }}
+                    onCancel={() => setSpecEditing(false)}
+                    onSave={() => specSave.mutate()}
+                    saving={specSave.isPending}
+                    saveDisabled={!specDirty || specRequiredMissing}
+                  >
+                    {specEditing ? (
+                      <div className="flex flex-col gap-2.5">
+                        {specFields.map((f) => (
+                          <SpecFieldInput
+                            key={f.id}
+                            field={f}
+                            value={specDraft[f.fieldKey] ?? ''}
+                            onChange={(v) => setSpecDraft((d) => ({ ...d, [f.fieldKey]: v }))}
+                          />
+                        ))}
+                      </div>
+                    ) : (
+                      <FieldGrid>
+                        {specFields.map((f) => (
+                          <FieldRow key={f.id} label={f.label}>
+                            {formatSpecValue(f, specValuesView[f.fieldKey])}
+                          </FieldRow>
+                        ))}
+                      </FieldGrid>
+                    )}
+                  </EditableCard>
+                )}
 
                 {/* Filters — the sizes this unit actually takes render as rows on
                     top; "Quick add" below offers the tenant's common sizes (those
