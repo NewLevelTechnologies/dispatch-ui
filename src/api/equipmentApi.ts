@@ -384,6 +384,103 @@ export const equipmentCategoriesApi = {
   },
 };
 
+// ========== EQUIPMENT CATEGORY CUSTOM FIELDS ==========
+// Tenant-defined custom fields per category. Equipment instances capture values
+// for these in the existing `attributes` JSON string, keyed by `fieldKey`.
+
+// CURRENCY validates like NUMBER server-side (numeric); the FE owns symbol +
+// precision and stores a plain decimal in `attributes`.
+export type EquipmentFieldDataType = 'TEXT' | 'NUMBER' | 'CURRENCY' | 'DATE' | 'BOOLEAN' | 'SELECT';
+
+export interface EquipmentCategoryField {
+  id: string;
+  tenantId: string;
+  equipmentCategoryId: string;
+  fieldKey: string;
+  label: string;
+  dataType: EquipmentFieldDataType;
+  // Only meaningful (and required) for SELECT; null otherwise.
+  options: string[] | null;
+  required: boolean;
+  helpText: string | null;
+  sortOrder: number;
+  archivedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateEquipmentCategoryFieldRequest {
+  // Immutable after create; lower_snake_case (^[a-z][a-z0-9_]{0,63}$). Storage key.
+  fieldKey: string;
+  label: string;
+  // Immutable after create.
+  dataType: EquipmentFieldDataType;
+  // Required for SELECT (non-empty, no blanks/dupes); must be null/omitted otherwise.
+  options?: string[] | null;
+  required?: boolean;
+  helpText?: string | null;
+  sortOrder?: number;
+}
+
+// `fieldKey` and `dataType` are immutable — only these may change. Omitted = unchanged.
+export interface UpdateEquipmentCategoryFieldRequest {
+  label?: string;
+  options?: string[] | null;
+  required?: boolean;
+  helpText?: string | null;
+  sortOrder?: number;
+}
+
+const categoryFieldsBase = (categoryId: string) =>
+  `/equipment/config/categories/${categoryId}/fields`;
+
+export const equipmentCategoryFieldsApi = {
+  // Active (non-archived) fields, ordered.
+  getAll: async (categoryId: string): Promise<EquipmentCategoryField[]> => {
+    const response = await apiClient.get<EquipmentCategoryField[]>(categoryFieldsBase(categoryId));
+    return response.data;
+  },
+
+  create: async (
+    categoryId: string,
+    request: CreateEquipmentCategoryFieldRequest
+  ): Promise<EquipmentCategoryField> => {
+    const response = await apiClient.post<EquipmentCategoryField>(
+      categoryFieldsBase(categoryId),
+      request
+    );
+    return response.data;
+  },
+
+  update: async (
+    categoryId: string,
+    fieldId: string,
+    request: UpdateEquipmentCategoryFieldRequest
+  ): Promise<EquipmentCategoryField> => {
+    const response = await apiClient.patch<EquipmentCategoryField>(
+      `${categoryFieldsBase(categoryId)}/${fieldId}`,
+      request
+    );
+    return response.data;
+  },
+
+  // Archives (soft-delete). Stored values on equipment are preserved.
+  delete: async (categoryId: string, fieldId: string): Promise<void> => {
+    await apiClient.delete(`${categoryFieldsBase(categoryId)}/${fieldId}`);
+  },
+
+  reorder: async (
+    categoryId: string,
+    orderedIds: string[]
+  ): Promise<EquipmentCategoryField[]> => {
+    const response = await apiClient.post<EquipmentCategoryField[]>(
+      `${categoryFieldsBase(categoryId)}/reorder`,
+      orderedIds
+    );
+    return response.data;
+  },
+};
+
 // ========== EQUIPMENT FILTERS ==========
 // Per-equipment filter sub-resource. Sized in inches.
 
