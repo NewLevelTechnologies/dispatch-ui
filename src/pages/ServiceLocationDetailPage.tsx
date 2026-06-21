@@ -56,7 +56,6 @@ import {
   type NoteDto,
   type ArrivalFactDto,
   EquipmentStatus,
-  type Equipment,
   type EquipmentSummary,
   type ServiceLocationSearchResult,
   type ProgressCategory,
@@ -85,7 +84,6 @@ import { TimeAgo } from '../components/TimeAgo';
 import { titleCaseAddress } from '../utils/titleCaseAddress';
 import { extractApiError, showError, showInfo, showSuccess, showUndo } from '../lib/toast';
 import AppLayout from '../components/AppLayout';
-import EquipmentFormDialog from '../components/EquipmentFormDialog';
 import WorkOrderFormDialog from '../components/WorkOrderFormDialog';
 import LocationActivityStream from '../components/LocationActivityStream';
 import LocationFilesTab from '../components/LocationFilesTab';
@@ -177,8 +175,6 @@ export default function ServiceLocationDetailPage() {
   const queryClient = useQueryClient();
 
   const [activeTab, setActiveTab] = useUrlTab(LOCATION_TABS, 'overview');
-  const [isEquipmentDialogOpen, setIsEquipmentDialogOpen] = useState(false);
-  const [editingEquipment, setEditingEquipment] = useState<Equipment | null>(null);
   const [isNewWorkOrderOpen, setIsNewWorkOrderOpen] = useState(false);
   const [confirmClose, setConfirmClose] = useState(false);
 
@@ -242,10 +238,8 @@ export default function ServiceLocationDetailPage() {
     onError: (err) => showError(t('common.form.errorDelete', { entity: getName('equipment') }), extractApiError(err) ?? undefined),
   });
 
-  const handleEditEquipment = async (item: EquipmentSummary) => {
-    const full = await equipmentApi.getById(item.id);
-    setEditingEquipment(full);
-    setIsEquipmentDialogOpen(true);
+  const handleEditEquipment = (item: EquipmentSummary) => {
+    navigate(`/equipment/${item.id}/edit`);
   };
 
   const handleDeleteEquipment = (item: EquipmentSummary) => {
@@ -342,10 +336,7 @@ export default function ServiceLocationDetailPage() {
           {activeTab === 'equipment' && (
             <EquipmentTab
               serviceLocationId={location.id}
-              onAdd={() => {
-                setEditingEquipment(null);
-                setIsEquipmentDialogOpen(true);
-              }}
+              onAdd={() => navigate(`/service-locations/${location.id}/equipment/new`)}
               onEdit={handleEditEquipment}
               onDelete={handleDeleteEquipment}
             />
@@ -377,16 +368,6 @@ export default function ServiceLocationDetailPage() {
           />
         </div>
       </div>
-
-      <EquipmentFormDialog
-        isOpen={isEquipmentDialogOpen}
-        onClose={() => {
-          setIsEquipmentDialogOpen(false);
-          setEditingEquipment(null);
-        }}
-        equipment={editingEquipment}
-        lockedServiceLocationId={location.id}
-      />
 
       <WorkOrderFormDialog
         isOpen={isNewWorkOrderOpen}

@@ -1,5 +1,5 @@
 import { useState, useDeferredValue } from 'react';
-import { Link as RouterLink, useSearchParams } from 'react-router-dom';
+import { Link as RouterLink, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { EllipsisVerticalIcon } from '@heroicons/react/24/outline';
@@ -9,13 +9,11 @@ import {
   equipmentTypesApi,
   equipmentCategoriesApi,
   EquipmentStatus,
-  type Equipment,
   type EquipmentSummary,
   type EquipmentSortField,
   type EquipmentSortDirection,
 } from '../api';
 import AppLayout from '../components/AppLayout';
-import EquipmentFormDialog from '../components/EquipmentFormDialog';
 import EquipmentThumbnail from '../components/EquipmentThumbnail';
 import { titleCaseAddress } from '../utils/titleCaseAddress';
 import { Button } from '../components/catalyst/button';
@@ -38,9 +36,8 @@ export default function EquipmentPage() {
   const queryClient = useQueryClient();
   const { t } = useTranslation();
   const { getName } = useGlossary();
+  const navigate = useNavigate();
 
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [selectedEquipment, setSelectedEquipment] = useState<Equipment | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState<string>('');
   const [categoryFilter, setCategoryFilter] = useState<string>('');
@@ -118,15 +115,11 @@ export default function EquipmentPage() {
   });
 
   const handleAdd = () => {
-    setSelectedEquipment(null);
-    setIsDialogOpen(true);
+    navigate('/equipment/new');
   };
 
-  const handleEdit = async (item: EquipmentSummary) => {
-    // Fetch the full record so the dialog has all fields (description, install date, etc.)
-    const full = await equipmentApi.getById(item.id);
-    setSelectedEquipment(full);
-    setIsDialogOpen(true);
+  const handleEdit = (item: EquipmentSummary) => {
+    navigate(`/equipment/${item.id}/edit`);
   };
 
   const handleDelete = (item: EquipmentSummary) => {
@@ -418,15 +411,6 @@ export default function EquipmentPage() {
           </Card>
         )}
       </div>
-
-      <EquipmentFormDialog
-        isOpen={isDialogOpen}
-        onClose={() => {
-          setIsDialogOpen(false);
-          setSelectedEquipment(null);
-        }}
-        equipment={selectedEquipment}
-      />
     </AppLayout>
   );
 }

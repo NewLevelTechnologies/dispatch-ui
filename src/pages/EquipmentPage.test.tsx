@@ -203,11 +203,11 @@ describe('EquipmentPage', () => {
     });
   });
 
-  it('opens create dialog when add button is clicked', async () => {
+  it('navigates to the add form when add button is clicked', async () => {
     mockEquipmentList.mockResolvedValue(page([]));
     const user = userEvent.setup();
 
-    renderWithProviders(<EquipmentPage />);
+    const { router } = renderWithProviders(<EquipmentPage />);
 
     await waitFor(() => {
       expect(screen.getByRole('button', { name: /add equipment/i })).toBeInTheDocument();
@@ -215,24 +215,16 @@ describe('EquipmentPage', () => {
 
     await user.click(screen.getByRole('button', { name: /add equipment/i }));
 
-    expect(screen.getByRole('dialog')).toBeInTheDocument();
-    expect(screen.getByLabelText(/^name/i)).toBeInTheDocument();
+    await waitFor(() => expect(router.state.location.pathname).toBe('/equipment/new'));
   });
 
-  it('opens edit dialog with full record fetched by id', async () => {
+  it('navigates to the edit form from the row menu', async () => {
     mockEquipmentList.mockResolvedValue(
       page([summary('1', 'Upstairs Furnace', { make: 'Carrier' })])
     );
-    mockEquipmentGetById.mockResolvedValue({
-      id: '1',
-      name: 'Upstairs Furnace',
-      serviceLocationId: 'sl-1',
-      status: 'ACTIVE',
-      make: 'Carrier',
-    });
     const user = userEvent.setup();
 
-    renderWithProviders(<EquipmentPage />);
+    const { router } = renderWithProviders(<EquipmentPage />);
 
     await waitFor(() => {
       expect(screen.getByText('Upstairs Furnace')).toBeInTheDocument();
@@ -244,10 +236,7 @@ describe('EquipmentPage', () => {
     const editButton = await screen.findByRole('menuitem', { name: /edit/i });
     await user.click(editButton);
 
-    await waitFor(() => {
-      expect(mockEquipmentGetById).toHaveBeenCalledWith('1');
-    });
-    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    await waitFor(() => expect(router.state.location.pathname).toBe('/equipment/1/edit'));
   });
 
   it('calls delete when confirmed', async () => {
@@ -474,22 +463,4 @@ describe('EquipmentPage', () => {
     });
   });
 
-  it('closes the form dialog on cancel', async () => {
-    mockEquipmentList.mockResolvedValue(page([]));
-    const user = userEvent.setup();
-
-    renderWithProviders(<EquipmentPage />);
-
-    await waitFor(() => {
-      expect(screen.getByRole('button', { name: /add equipment/i })).toBeInTheDocument();
-    });
-
-    await user.click(screen.getByRole('button', { name: /add equipment/i }));
-    expect(screen.getByRole('dialog')).toBeInTheDocument();
-
-    await user.click(screen.getByRole('button', { name: /cancel/i }));
-    await waitFor(() => {
-      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-    });
-  });
 });

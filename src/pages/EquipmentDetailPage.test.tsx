@@ -274,9 +274,9 @@ describe('EquipmentDetailPage', () => {
     expect(screen.queryByAltText(/profile image/i)).not.toBeInTheDocument();
   });
 
-  it('inline-edits the make field via PATCH', async () => {
+  it('edits the Identity card in place and PATCHes the whole section', async () => {
     mockGetById.mockResolvedValue(baseEquipment);
-    mockUpdate.mockResolvedValue({ ...baseEquipment, make: 'Trane' });
+    mockUpdate.mockResolvedValue(baseEquipment);
     const user = userEvent.setup();
     renderPage();
 
@@ -284,37 +284,46 @@ describe('EquipmentDetailPage', () => {
       expect(screen.getByRole('heading', { name: 'Upstairs Furnace' })).toBeInTheDocument();
     });
 
-    await user.click(screen.getByRole('button', { name: /^make$/i }));
-    const input = await screen.findByRole('textbox', { name: /^make$/i });
-    await user.clear(input);
-    await user.type(input, 'Trane');
-    input.blur();
+    // Card-level edit: header "Edit" → fields become inputs → Save changes.
+    await user.click(screen.getByRole('button', { name: 'Edit' }));
+    const makeInput = await screen.findByDisplayValue('Carrier');
+    await user.clear(makeInput);
+    await user.type(makeInput, 'Trane');
+    const modelInput = screen.getByDisplayValue('AC-100');
+    await user.clear(modelInput);
+    await user.type(modelInput, 'XR-15');
+    await user.click(screen.getByRole('button', { name: /save changes/i }));
 
+    // One PATCH for the whole section — the edited fields plus the seeded rest
+    // (incl. warranty, which rides along; labor stays null with no backfill).
     await waitFor(() => {
-      expect(mockUpdate).toHaveBeenCalledWith('eq-1', { make: 'Trane' });
+      expect(mockUpdate).toHaveBeenCalledWith(
+        'eq-1',
+        expect.objectContaining({
+          name: 'Upstairs Furnace',
+          make: 'Trane',
+          model: 'XR-15',
+          serialNumber: 'SN123',
+          assetTag: 'TAG-1',
+          warrantyExpiresAt: '2027-06-15',
+          warrantyLaborExpiresAt: null,
+          warrantyDetails: '5-year parts',
+        })
+      );
     });
   });
 
-  it('clears category when type changes', async () => {
+  it('does not inline-edit Type or Category (recategorize lives in the full editor)', async () => {
     mockGetById.mockResolvedValue(baseEquipment);
-    mockUpdate.mockResolvedValue({ ...baseEquipment, equipmentTypeId: 't-refrig' });
     const user = userEvent.setup();
     renderPage();
 
-    await waitFor(() => {
-      expect(screen.getByText('HVAC')).toBeInTheDocument();
-    });
+    await waitFor(() => expect(screen.getByText('HVAC')).toBeInTheDocument());
 
-    await user.click(screen.getByRole('button', { name: /^type$/i }));
-    const select = await screen.findByRole('combobox', { name: /^type$/i });
-    await user.selectOptions(select, 't-refrig');
-
-    await waitFor(() => {
-      expect(mockUpdate).toHaveBeenCalledWith('eq-1', {
-        equipmentTypeId: 't-refrig',
-        equipmentCategoryId: null,
-      });
-    });
+    // Enter Identity edit — Type/Category are shown read-only, no select appears.
+    await user.click(screen.getByRole('button', { name: 'Edit' }));
+    expect(screen.queryByRole('combobox', { name: /type/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('combobox', { name: /category/i })).not.toBeInTheDocument();
   });
 
   it('renders service history work orders scoped by equipmentId', async () => {
@@ -548,7 +557,7 @@ describe('EquipmentDetailPage', () => {
     confirmSpy.mockRestore();
   });
 
-  it('inline-edits a sweep of text fields (model, serial, asset tag, location on site, description)', async () => {
+  it('inline-edits the single-field cards (on-site, description) per-field', async () => {
     mockGetById.mockResolvedValue(baseEquipment);
     mockUpdate.mockResolvedValue(baseEquipment);
     const user = userEvent.setup();
@@ -556,33 +565,8 @@ describe('EquipmentDetailPage', () => {
 
     await waitFor(() => expect(screen.getByRole('heading', { name: 'Upstairs Furnace' })).toBeInTheDocument());
 
-    await user.click(screen.getByRole('button', { name: /^model$/i }));
-    const modelInput = await screen.findByRole('textbox', { name: /^model$/i });
-    await user.clear(modelInput);
-    await user.type(modelInput, 'AC-200');
-    modelInput.blur();
-    await waitFor(() => {
-      expect(mockUpdate).toHaveBeenCalledWith('eq-1', { model: 'AC-200' });
-    });
-
-    await user.click(screen.getByRole('button', { name: /serial number/i }));
-    const serialInput = await screen.findByRole('textbox', { name: /serial number/i });
-    await user.clear(serialInput);
-    await user.type(serialInput, 'SN999');
-    serialInput.blur();
-    await waitFor(() => {
-      expect(mockUpdate).toHaveBeenCalledWith('eq-1', { serialNumber: 'SN999' });
-    });
-
-    await user.click(screen.getByRole('button', { name: /asset tag/i }));
-    const tagInput = await screen.findByRole('textbox', { name: /asset tag/i });
-    await user.clear(tagInput);
-    await user.type(tagInput, 'TAG-9');
-    tagInput.blur();
-    await waitFor(() => {
-      expect(mockUpdate).toHaveBeenCalledWith('eq-1', { assetTag: 'TAG-9' });
-    });
-
+    // On-site + description stay per-field click-to-edit (single-field cards) —
+    // the multi-field Identity card is the only one that went card-level.
     await user.click(screen.getByRole('button', { name: /location on site/i }));
     const locInput = await screen.findByRole('textbox', { name: /location on site/i });
     await user.clear(locInput);
@@ -599,51 +583,6 @@ describe('EquipmentDetailPage', () => {
     descInput.blur();
     await waitFor(() => {
       expect(mockUpdate).toHaveBeenCalledWith('eq-1', { description: 'Updated note' });
-    });
-  });
-
-  it('inline-edits warranty expiry and details', async () => {
-    mockGetById.mockResolvedValue(baseEquipment);
-    mockUpdate.mockResolvedValue(baseEquipment);
-    const user = userEvent.setup();
-    renderPage();
-
-    await waitFor(() => {
-      expect(screen.getByRole('heading', { name: 'Upstairs Furnace' })).toBeInTheDocument();
-    });
-
-    await user.click(screen.getByRole('button', { name: /warranty expires/i }));
-    const warrInput = await screen.findByRole('textbox', { name: /warranty expires/i });
-    await user.clear(warrInput);
-    await user.type(warrInput, '2030-01-01');
-    warrInput.blur();
-    await waitFor(() => {
-      expect(mockUpdate).toHaveBeenCalledWith('eq-1', { warrantyExpiresAt: '2030-01-01' });
-    });
-
-    await user.click(screen.getByRole('button', { name: /warranty details/i }));
-    const detailsInput = await screen.findByRole('textbox', { name: /warranty details/i });
-    await user.clear(detailsInput);
-    await user.type(detailsInput, '10-year compressor');
-    detailsInput.blur();
-    await waitFor(() => {
-      expect(mockUpdate).toHaveBeenCalledWith('eq-1', { warrantyDetails: '10-year compressor' });
-    });
-  });
-
-  it('clears the category via the inline select', async () => {
-    mockGetById.mockResolvedValue(baseEquipment);
-    mockUpdate.mockResolvedValue(baseEquipment);
-    const user = userEvent.setup();
-    renderPage();
-
-    await waitFor(() => expect(screen.getAllByText('Furnace').length).toBeGreaterThan(0));
-
-    await user.click(screen.getByRole('button', { name: /^category/i }));
-    const categorySelect = await screen.findByRole('combobox', { name: /^category/i });
-    await user.selectOptions(categorySelect, '');
-    await waitFor(() => {
-      expect(mockUpdate).toHaveBeenCalledWith('eq-1', { equipmentCategoryId: null });
     });
   });
 
@@ -970,8 +909,8 @@ describe('EquipmentDetailPage', () => {
     await waitFor(() => {
       expect(screen.getByRole('heading', { name: 'Upstairs Furnace' })).toBeInTheDocument();
     });
-    // Specs card present; service-history peek shows its empty state.
-    expect(screen.getByText('Specs')).toBeInTheDocument();
+    // Identity card present; service-history peek shows its empty state.
+    expect(screen.getByText('Identity')).toBeInTheDocument();
     expect(screen.getByText(/no work orders yet/i)).toBeInTheDocument();
   });
 
@@ -1064,7 +1003,7 @@ describe('EquipmentDetailPage', () => {
     expect(await screen.findByRole('dialog')).toBeInTheDocument();
   });
 
-  it('surfaces a toast and stays in edit mode when PATCH fails', async () => {
+  it('surfaces a toast and stays in edit mode when the Identity PATCH fails', async () => {
     mockGetById.mockResolvedValue(baseEquipment);
     mockUpdate.mockRejectedValue(
       Object.assign(new Error('boom'), {
@@ -1078,30 +1017,33 @@ describe('EquipmentDetailPage', () => {
       expect(screen.getByRole('heading', { name: 'Upstairs Furnace' })).toBeInTheDocument();
     });
 
-    await user.click(screen.getByRole('button', { name: /^make$/i }));
-    const input = await screen.findByRole('textbox', { name: /^make$/i });
-    await user.clear(input);
-    await user.type(input, 'Bad');
-    input.blur();
+    await user.click(screen.getByRole('button', { name: 'Edit' }));
+    const makeInput = await screen.findByDisplayValue('Carrier');
+    await user.clear(makeInput);
+    await user.type(makeInput, 'Bad');
+    await user.click(screen.getByRole('button', { name: /save changes/i }));
 
     await waitFor(() => {
       expect(mockShowError).toHaveBeenCalledWith(expect.any(String), 'Validation failed');
     });
-    // Field still in edit mode (input is still the active surface).
-    expect(screen.queryByRole('textbox', { name: /^make$/i })).toBeInTheDocument();
+    // Card stays in edit mode on error (Save is still present, draft not lost).
+    expect(screen.getByRole('button', { name: /save changes/i })).toBeInTheDocument();
   });
 
-  it('opens the edit dialog from the header Edit button', async () => {
+  it('navigates to the full editor from the ⋯ Advanced edit action', async () => {
     mockGetById.mockResolvedValue(baseEquipment);
     const user = userEvent.setup();
-    renderPage();
+    const { router } = renderPage();
 
     await waitFor(() => {
       expect(screen.getByRole('heading', { name: 'Upstairs Furnace' })).toBeInTheDocument();
     });
 
-    await user.click(screen.getByRole('button', { name: /^edit$/i }));
-    expect(await screen.findByRole('dialog')).toBeInTheDocument();
+    // The prominent header Edit button moved into the ⋯ menu as "Advanced edit"
+    // (the doc's fallback for recategorize/reassign); inline cards are primary.
+    await user.click(screen.getAllByRole('button', { name: /more options/i })[0]);
+    await user.click(await screen.findByRole('menuitem', { name: /advanced edit/i }));
+    await waitFor(() => expect(router.state.location.pathname).toBe('/equipment/eq-1/edit'));
   });
 
   it('deletes the equipment from the header overflow and navigates back', async () => {
@@ -1231,13 +1173,13 @@ describe('EquipmentDetailPage', () => {
     confirmSpy.mockRestore();
   });
 
-  it('opens the add sub-unit dialog from the Units card', async () => {
+  it('navigates to the scoped add form with ?parent from the Units card', async () => {
     mockGetById.mockResolvedValue(baseEquipment);
     mockGetDescendants.mockResolvedValue([
       { id: 'comp-1', name: 'Compressor', parentId: 'eq-1', equipmentTypeName: null, equipmentCategoryName: null, make: null, model: null, serialNumber: null, locationOnSite: null },
     ]);
     const user = userEvent.setup();
-    renderPage();
+    const { router } = renderPage();
 
     await waitFor(() => {
       expect(screen.getByText('Units')).toBeInTheDocument();
@@ -1245,7 +1187,11 @@ describe('EquipmentDetailPage', () => {
     // Both Units and Notes cards expose a "+ Add"; Units sits first in the left
     // column, so its action is the first match.
     await user.click((await screen.findAllByRole('button', { name: /^\+ add$/i }))[0]);
-    expect(await screen.findByRole('dialog')).toBeInTheDocument();
+    await waitFor(() => {
+      // baseEquipment.serviceLocationId === 'loc-1'; the unit becomes the parent.
+      expect(router.state.location.pathname).toBe('/service-locations/loc-1/equipment/new');
+      expect(router.state.location.search).toContain('parent=eq-1');
+    });
   });
 
   it('opens the new work order dialog from the header', async () => {

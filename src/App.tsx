@@ -19,6 +19,7 @@ import WorkOrdersPage from './pages/WorkOrdersPage';
 import WorkOrderDetailPage from './pages/WorkOrderDetailPage';
 import EquipmentPage from './pages/EquipmentPage';
 import EquipmentDetailPage from './pages/EquipmentDetailPage';
+import EquipmentFormPage from './pages/EquipmentFormPage';
 import ReportsPage from './pages/ReportsPage';
 import ReportDetailPage from './pages/ReportDetailPage';
 import PartsInventoryPage from './pages/PartsInventoryPage';
@@ -173,10 +174,13 @@ function App() {
       <Route path="/service-locations" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<ServiceLocationsPage />} />} />
       <Route path="/service-locations/new" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<AddLocationPage />} />} />
       <Route path="/service-locations/:id" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<ServiceLocationDetailPage />} />} />
+      <Route path="/service-locations/:locId/equipment/new" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<EquipmentFormPage />} />} />
       <Route path="/work-orders" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<WorkOrdersPage />} />} />
       <Route path="/work-orders/:id" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<WorkOrderDetailPage />} />} />
       <Route path="/equipment" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<EquipmentPage />} />} />
+      <Route path="/equipment/new" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<EquipmentFormPage />} />} />
       <Route path="/equipment/:id" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<EquipmentDetailPage />} />} />
+      <Route path="/equipment/:id/edit" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<EquipmentFormPage />} />} />
       <Route path="/reports" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<ReportsPage />} />} />
       <Route path="/reports/:slug" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<ReportDetailPage />} />} />
       <Route path="/parts-inventory" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<PartsInventoryPage />} />} />
