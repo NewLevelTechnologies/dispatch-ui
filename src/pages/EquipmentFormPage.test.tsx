@@ -10,6 +10,7 @@ const mockCreate = vi.fn();
 const mockUpdate = vi.fn();
 const mockTypesGetAll = vi.fn();
 const mockCategoriesGetAll = vi.fn();
+const mockFieldsGetAll = vi.fn();
 const mockGetServiceLocationById = vi.fn();
 
 vi.mock('../api/equipmentApi', async (importOriginal) => {
@@ -24,6 +25,7 @@ vi.mock('../api/equipmentApi', async (importOriginal) => {
     },
     equipmentTypesApi: { getAll: (...args: unknown[]) => mockTypesGetAll(...args) },
     equipmentCategoriesApi: { getAll: (...args: unknown[]) => mockCategoriesGetAll(...args) },
+    equipmentCategoryFieldsApi: { getAll: (...args: unknown[]) => mockFieldsGetAll(...args) },
   };
 });
 
@@ -90,6 +92,7 @@ describe('EquipmentFormPage', () => {
     mockCategoriesGetAll.mockResolvedValue([rtuCategory]);
     mockGetServiceLocationById.mockResolvedValue(headquarters);
     mockList.mockResolvedValue(page([]));
+    mockFieldsGetAll.mockResolvedValue([]);
     mockCreate.mockResolvedValue({ id: 'eq-new' });
     mockUpdate.mockResolvedValue({ id: 'eq-9' });
   });
@@ -288,5 +291,45 @@ describe('EquipmentFormPage', () => {
     mockGetById.mockRejectedValue(new Error('nope'));
     renderEdit('eq-9');
     expect(await screen.findByRole('button', { name: /back/i })).toBeInTheDocument();
+  });
+
+  it('renders the category spec fields and writes their values into attributes', async () => {
+    const specField = (id: string, fieldKey: string, label: string, dataType: string, opts: Record<string, unknown> = {}) => ({
+      id, tenantId: 't', equipmentCategoryId: 'c-rtu', fieldKey, label, dataType,
+      options: null, required: false, helpText: null, sortOrder: 0, archivedAt: null, createdAt: '', updatedAt: '', ...opts,
+    });
+    mockFieldsGetAll.mockResolvedValue([
+      specField('f-num', 'tonnage', 'Tonnage', 'NUMBER'),
+      specField('f-cur', 'install_cost', 'Install Cost', 'CURRENCY'),
+      specField('f-date', 'installed_on', 'Installed On', 'DATE'),
+      specField('f-bool', 'under_warranty', 'Under Warranty', 'BOOLEAN'),
+      specField('f-sel', 'refrigerant', 'Refrigerant', 'SELECT', { options: ['R-410A', 'R-22'] }),
+      specField('f-text', 'notes', 'Notes', 'TEXT'),
+    ]);
+    const user = userEvent.setup();
+    renderScopedAdd();
+    await waitFor(() => expect(screen.getByRole('heading', { name: /add equipment/i, level: 1 })).toBeInTheDocument());
+
+    const selects = () => screen.getAllByRole('combobox');
+    await screen.findByRole('option', { name: 'HVAC' });
+    await user.selectOptions(selects()[0], 't-hvac');
+    await waitFor(() => expect(screen.getByRole('option', { name: 'Rooftop' })).toBeInTheDocument());
+    await user.selectOptions(selects()[1], 'c-rtu');
+
+    // The Specs section renders the category's typed fields.
+    expect(await screen.findByLabelText('Tonnage')).toBeInTheDocument();
+    expect(screen.getByLabelText('Install Cost')).toBeInTheDocument();
+    expect(screen.getByLabelText('Refrigerant')).toBeInTheDocument();
+
+    await user.type(screen.getByPlaceholderText(/RTU-3/), 'RTU-9');
+    await user.type(screen.getByLabelText('Tonnage'), '5');
+    await user.selectOptions(screen.getByLabelText('Refrigerant'), 'R-410A');
+    await user.click(screen.getByLabelText('Under Warranty'));
+
+    await user.click(screen.getByRole('button', { name: /add equipment/i }));
+
+    await waitFor(() => expect(mockCreate).toHaveBeenCalled());
+    const attrs = JSON.parse((mockCreate.mock.calls[0][0] as { attributes: string }).attributes);
+    expect(attrs).toMatchObject({ tonnage: 5, refrigerant: 'R-410A', under_warranty: true });
   });
 });

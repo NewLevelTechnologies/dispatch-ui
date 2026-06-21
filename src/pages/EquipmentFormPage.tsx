@@ -8,6 +8,7 @@ import {
   equipmentApi,
   equipmentTypesApi,
   equipmentCategoriesApi,
+  equipmentCategoryFieldsApi,
   type CreateEquipmentRequest,
   type UpdateEquipmentRequest,
   type ServiceLocationSearchResult,
@@ -24,6 +25,8 @@ import { Select } from '../components/catalyst/select';
 import { Heading } from '../components/catalyst/heading';
 import { Text } from '../components/catalyst/text';
 import { Callout } from '../components/ui/Callout';
+import { SpecFieldInput } from '../components/EquipmentSpecFields';
+import { parseAttributes, buildAttributes } from '../utils/equipmentAttributes';
 
 // Add / Edit Equipment — full-page form. The redesigned sibling of Add
 // Location / Add Customer (same max-w-[680px], section cards, gated
@@ -38,11 +41,9 @@ import { Callout } from '../components/ui/Callout';
 //   • /equipment/new                            standalone add (location picker)
 //   • /equipment/:id/edit                        edit
 //
-// Departures from claude_designs/screen-add-equipment.jsx, all backend-gated
-// (asks tracked separately):
-//   • Specs card (category-driven spec template) is NOT built — no backend
-//     spec-template registry, and `attributes` is write-only today (nothing
-//     renders it). The Type→Category cascade still ships; specs do not.
+// Notes:
+//   • Specs card renders the chosen category's custom fields (tenant registry)
+//     as typed inputs and writes their values into the `attributes` JSON.
 //   • Warranty is a single expiry date + details (backend has one date), not
 //     the mock's parts/labor split.
 //   • Placement (edit) re-parents (parentId is patchable) but Location is
@@ -94,6 +95,9 @@ export default function EquipmentFormPage() {
   const [form, setForm] = useState<FormState>(blankForm);
   const [hydrated, setHydrated] = useState(false);
   const [touched, setTouched] = useState<Record<string, boolean>>({});
+  // Spec values for the chosen category's custom fields (keyed by fieldKey).
+  const [specValues, setSpecValues] = useState<Record<string, string>>({});
+  const setSpec = (key: string, value: string) => setSpecValues((s) => ({ ...s, [key]: value }));
 
   // ===== Edit: load the record (separate key so the includeDescendants
   // projection doesn't pollute the detail page's cache) =====
@@ -125,6 +129,7 @@ export default function EquipmentFormPage() {
         warrantyDetails: equipment.warrantyDetails ?? '',
         parentId: equipment.parentId ?? '',
       });
+      setSpecValues(parseAttributes(equipment.attributes));
       setHydrated(true);
     }
   }, [isEdit, equipment, hydrated]);
@@ -154,6 +159,13 @@ export default function EquipmentFormPage() {
     queryKey: ['equipment-categories', form.equipmentTypeId],
     queryFn: () => equipmentCategoriesApi.getAll(form.equipmentTypeId || undefined),
     enabled: Boolean(form.equipmentTypeId),
+  });
+  // Custom fields ("Specs") for the chosen category — shares the cache key with
+  // the settings drawer + the detail page.
+  const { data: specFields = [] } = useQuery({
+    queryKey: ['equipment-category-fields', form.equipmentCategoryId],
+    queryFn: () => equipmentCategoryFieldsApi.getAll(form.equipmentCategoryId),
+    enabled: Boolean(form.equipmentCategoryId),
   });
 
   // ===== Re-parent options (edit): active units at the same location, top-level
@@ -189,7 +201,17 @@ export default function EquipmentFormPage() {
   // trap the user on a type that has none configured yet.
   if (categories.length > 0 && !form.equipmentCategoryId) errors.equipmentCategoryId = 'Required';
   if (standalone && !pickedLocation) errors.serviceLocationId = 'Required';
+  // Required spec fields (booleans always have a value).
+  for (const f of specFields) {
+    if (!f.required || f.dataType === 'BOOLEAN') continue;
+    const raw = specValues[f.fieldKey];
+    if (raw == null || raw.trim() === '') errors[`spec:${f.fieldKey}`] = 'Required';
+  }
   const hasErrors = Object.keys(errors).length > 0;
+  // Edit-mode cue: switching category replaces the spec set; pre-existing values
+  // that don't map to the new category won't be saved.
+  const categoryChanged =
+    isEdit && Boolean(equipment?.attributes) && form.equipmentCategoryId !== (equipment?.equipmentCategoryId ?? '');
 
   const locationLabel =
     serviceLocation?.locationName || serviceLocation?.customerName || getName('service_location');
@@ -223,6 +245,9 @@ export default function EquipmentFormPage() {
         warrantyExpiresAt: form.warrantyExpiresAt || null,
         warrantyLaborExpiresAt: form.warrantyLaborExpiresAt || null,
         warrantyDetails: form.warrantyDetails.trim() || null,
+        // Send the full attributes object only when the category defines fields
+        // (a PATCH without attributes is never validated server-side).
+        ...(specFields.length > 0 ? { attributes: buildAttributes(specFields, specValues) } : {}),
       };
       if (isEdit && equipment) {
         const payload: UpdateEquipmentRequest = {
@@ -267,7 +292,13 @@ export default function EquipmentFormPage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    setTouched({ name: true, equipmentTypeId: true, equipmentCategoryId: true, serviceLocationId: true });
+    setTouched({
+      name: true,
+      equipmentTypeId: true,
+      equipmentCategoryId: true,
+      serviceLocationId: true,
+      ...Object.fromEntries(specFields.map((f) => [`spec:${f.fieldKey}`, true])),
+    });
     if (hasErrors) return;
     saveMutation.mutate();
   };
@@ -398,6 +429,29 @@ export default function EquipmentFormPage() {
                 </Field>
               </div>
             </Card>
+
+            {/* Specs — the chosen category's custom fields (from the tenant
+                registry). Renders only once a category with fields is picked. */}
+            {form.equipmentCategoryId && specFields.length > 0 && (
+              <Card title="Specs" subtitle="Category-specific details." className="mb-3.5">
+                {categoryChanged && (
+                  <Text size="xs" className="mb-2.5 text-warning-fg">
+                    Changing the category replaces these fields — values that don’t apply to the new category won’t be saved.
+                  </Text>
+                )}
+                <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+                  {specFields.map((f) => (
+                    <SpecFieldInput
+                      key={f.id}
+                      field={f}
+                      value={specValues[f.fieldKey] ?? ''}
+                      onChange={(v) => setSpec(f.fieldKey, v)}
+                      error={touched[`spec:${f.fieldKey}`] && errors[`spec:${f.fieldKey}`]}
+                    />
+                  ))}
+                </div>
+              </Card>
+            )}
 
             {/* Identity */}
             <Card title="Identity" className="mb-3.5">

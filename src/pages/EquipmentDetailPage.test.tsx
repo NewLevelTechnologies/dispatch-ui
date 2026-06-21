@@ -11,6 +11,7 @@ const mockUpdate = vi.fn();
 const mockDelete = vi.fn();
 const mockTypesGetAll = vi.fn();
 const mockCategoriesGetAll = vi.fn();
+const mockSpecFieldsGetAll = vi.fn();
 const mockFiltersGetAll = vi.fn();
 const mockFilterCreate = vi.fn();
 const mockFilterUpdate = vi.fn();
@@ -48,6 +49,9 @@ vi.mock('../api/equipmentApi', async (importOriginal) => {
     },
     equipmentCategoriesApi: {
       getAll: (...args: unknown[]) => mockCategoriesGetAll(...args),
+    },
+    equipmentCategoryFieldsApi: {
+      getAll: (...args: unknown[]) => mockSpecFieldsGetAll(...args),
     },
     equipmentFiltersApi: {
       getAll: (...args: unknown[]) => mockFiltersGetAll(...args),
@@ -180,6 +184,7 @@ describe('EquipmentDetailPage', () => {
     mockCategoriesGetAll.mockResolvedValue([
       { id: 'c-furnace', tenantId: 't', equipmentTypeId: 't-hvac', name: 'Furnace', sortOrder: 0, archivedAt: null, createdAt: '', updatedAt: '' },
     ]);
+    mockSpecFieldsGetAll.mockResolvedValue([]);
     mockFiltersGetAll.mockResolvedValue([]);
     mockFilterSizesGetAll.mockResolvedValue([]);
     mockImagesList.mockResolvedValue([]);
@@ -1299,5 +1304,35 @@ describe('EquipmentDetailPage', () => {
     await waitFor(() => {
       expect(mockUpdate).toHaveBeenCalledWith('eq-1', { status: 'ACTIVE' });
     });
+  });
+
+  it('renders the category Specs and saves edits into attributes', async () => {
+    mockGetById.mockResolvedValue({ ...baseEquipment, attributes: JSON.stringify({ btu_input: 80000 }) });
+    mockSpecFieldsGetAll.mockResolvedValue([
+      { id: 'sf1', tenantId: 't', equipmentCategoryId: 'c-furnace', fieldKey: 'btu_input', label: 'BTU Input', dataType: 'NUMBER', options: null, required: false, helpText: null, sortOrder: 0, archivedAt: null, createdAt: '', updatedAt: '' },
+    ]);
+    mockUpdate.mockResolvedValue(baseEquipment);
+    const user = userEvent.setup();
+    renderPage();
+
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Upstairs Furnace' })).toBeInTheDocument());
+
+    // Read mode: the spec field + its stored value show in the Specs card.
+    await waitFor(() => expect(screen.getByText('BTU Input')).toBeInTheDocument());
+    expect(screen.getByText('80000')).toBeInTheDocument();
+
+    // Two card-level Edit buttons (Identity, then Specs) — the Specs one is second.
+    const editButtons = screen.getAllByRole('button', { name: 'Edit' });
+    expect(editButtons.length).toBe(2);
+    await user.click(editButtons[1]);
+
+    const input = screen.getByDisplayValue('80000');
+    await user.clear(input);
+    await user.type(input, '90000');
+    await user.click(screen.getByRole('button', { name: /save changes/i }));
+
+    await waitFor(() => expect(mockUpdate).toHaveBeenCalled());
+    const req = mockUpdate.mock.calls[0][1] as { attributes: string };
+    expect(JSON.parse(req.attributes)).toMatchObject({ btu_input: 90000 });
   });
 });
