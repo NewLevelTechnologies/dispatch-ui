@@ -313,17 +313,27 @@ describe('EquipmentDetailPage', () => {
     });
   });
 
-  it('does not inline-edit Type or Category (recategorize lives in the full editor)', async () => {
+  it('recategorizes inline via the Type → Category cascade (type change resets category)', async () => {
     mockGetById.mockResolvedValue(baseEquipment);
+    mockUpdate.mockResolvedValue(baseEquipment);
     const user = userEvent.setup();
     renderPage();
 
     await waitFor(() => expect(screen.getByText('HVAC')).toBeInTheDocument());
 
-    // Enter Identity edit — Type/Category are shown read-only, no select appears.
+    // Type/Category are now editable inline (was read-only). Changing the type
+    // cascades — it clears the category, which the section save sends as null.
     await user.click(screen.getByRole('button', { name: 'Edit' }));
-    expect(screen.queryByRole('combobox', { name: /type/i })).not.toBeInTheDocument();
-    expect(screen.queryByRole('combobox', { name: /category/i })).not.toBeInTheDocument();
+    const typeSelect = await screen.findByRole('combobox', { name: /type/i });
+    await user.selectOptions(typeSelect, 't-refrig');
+    await user.click(screen.getByRole('button', { name: /save changes/i }));
+
+    await waitFor(() => {
+      expect(mockUpdate).toHaveBeenCalledWith(
+        'eq-1',
+        expect.objectContaining({ equipmentTypeId: 't-refrig', equipmentCategoryId: null })
+      );
+    });
   });
 
   it('inline-edits the name in the header via the pencil affordance', async () => {

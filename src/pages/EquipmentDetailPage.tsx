@@ -17,6 +17,8 @@ import { useTranslation } from 'react-i18next';
 import {
   customerApi,
   equipmentApi,
+  equipmentTypesApi,
+  equipmentCategoriesApi,
   equipmentFiltersApi,
   equipmentFilesApi,
   equipmentImagesApi,
@@ -44,6 +46,7 @@ import { Heading } from '../components/catalyst/heading';
 import { Button } from '../components/catalyst/button';
 import { Field, Label } from '../components/catalyst/fieldset';
 import { Input } from '../components/catalyst/input';
+import { Select } from '../components/catalyst/select';
 import {
   Dropdown,
   DropdownButton,
@@ -116,6 +119,8 @@ function warrantyState(iso: string | null | undefined): { has: boolean; active: 
 // section. Type/Category are NOT here — recategorization carries the spec-clearing
 // guard and stays in the full Edit form.
 interface IdentityDraft {
+  equipmentTypeId: string;
+  equipmentCategoryId: string;
   make: string;
   model: string;
   serialNumber: string;
@@ -126,11 +131,14 @@ interface IdentityDraft {
   warrantyDetails: string;
 }
 const EMPTY_IDENTITY: IdentityDraft = {
+  equipmentTypeId: '', equipmentCategoryId: '',
   make: '', model: '', serialNumber: '', assetTag: '', installDate: '',
   warrantyExpiresAt: '', warrantyLaborExpiresAt: '', warrantyDetails: '',
 };
 function seedIdentity(eq: Equipment): IdentityDraft {
   return {
+    equipmentTypeId: eq.equipmentTypeId ?? '',
+    equipmentCategoryId: eq.equipmentCategoryId ?? '',
     make: eq.make ?? '',
     model: eq.model ?? '',
     serialNumber: eq.serialNumber ?? '',
@@ -179,6 +187,20 @@ export default function EquipmentDetailPage() {
     queryKey: ['equipment-detail', id],
     queryFn: () => equipmentApi.getById(id!),
     enabled: !!id,
+  });
+
+  // Type → Category cascade for inline recategorization in the Identity card.
+  // Fetched lazily (only while editing); shares cache keys with the Add/Edit form.
+  // Category options follow the *draft* type so the cascade updates live.
+  const { data: equipmentTypes = [] } = useQuery({
+    queryKey: ['equipment-types'],
+    queryFn: () => equipmentTypesApi.getAll(),
+    enabled: identityEditing,
+  });
+  const { data: editCategories = [] } = useQuery({
+    queryKey: ['equipment-categories', identityDraft.equipmentTypeId],
+    queryFn: () => equipmentCategoriesApi.getAll(identityDraft.equipmentTypeId || undefined),
+    enabled: identityEditing && Boolean(identityDraft.equipmentTypeId),
   });
 
   // Service location (Located-at card + back-link) and its customer (the card's
@@ -333,6 +355,12 @@ export default function EquipmentDetailPage() {
   const identitySave = useMutation({
     mutationFn: () =>
       equipmentApi.update(id!, {
+        equipmentTypeId: identityDraft.equipmentTypeId || null,
+        equipmentCategoryId: identityDraft.equipmentCategoryId || null,
+        // Spec-clearing guard on category change (keep matching keys, drop the
+        // rest + inline warning) is deferred to backend ask #1 — there's no
+        // per-category spec-template registry yet, and `attributes` is unwritten/
+        // unread, so there are no specs to reconcile here today.
         make: identityDraft.make.trim() || null,
         model: identityDraft.model.trim() || null,
         serialNumber: identityDraft.serialNumber.trim() || null,
@@ -841,8 +869,35 @@ export default function EquipmentDetailPage() {
                 >
                   {identityEditing ? (
                     <div className="flex flex-col gap-2.5">
-                      <div className="rounded-[7px] bg-bg-elev-2 px-2.5 py-1.5 text-[11px] text-fg-muted">
-                        {[equipment.equipmentTypeName, equipment.equipmentCategoryName].filter(Boolean).join(' · ') || 'Unclassified'} — change type or category in the full editor.
+                      {/* Type → Category cascade — recategorize in place. */}
+                      <div className="grid grid-cols-2 gap-2.5">
+                        <Field size="xs">
+                          <Label size="xs">{t('equipment.form.type')}</Label>
+                          <Select
+                            value={identityDraft.equipmentTypeId}
+                            onChange={(e) => setId({ equipmentTypeId: e.target.value, equipmentCategoryId: '' })}
+                            aria-label={t('equipment.form.type')}
+                          >
+                            <option value="">{t('common.none')}</option>
+                            {equipmentTypes.map((ty) => (
+                              <option key={ty.id} value={ty.id}>{ty.name}</option>
+                            ))}
+                          </Select>
+                        </Field>
+                        <Field size="xs">
+                          <Label size="xs">{t('equipment.form.category')}</Label>
+                          <Select
+                            value={identityDraft.equipmentCategoryId}
+                            onChange={(e) => setId({ equipmentCategoryId: e.target.value })}
+                            disabled={!identityDraft.equipmentTypeId}
+                            aria-label={t('equipment.form.category')}
+                          >
+                            <option value="">{identityDraft.equipmentTypeId ? t('common.none') : 'Pick a type first'}</option>
+                            {editCategories.map((c) => (
+                              <option key={c.id} value={c.id}>{c.name}</option>
+                            ))}
+                          </Select>
+                        </Field>
                       </div>
                       <div className="grid grid-cols-2 gap-2.5">
                         <Field size="xs">
