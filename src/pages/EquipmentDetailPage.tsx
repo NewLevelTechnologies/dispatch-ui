@@ -17,6 +17,8 @@ import { useTranslation } from 'react-i18next';
 import {
   customerApi,
   equipmentApi,
+  equipmentTypesApi,
+  equipmentCategoriesApi,
   equipmentCategoryFieldsApi,
   equipmentFiltersApi,
   equipmentFilesApi,
@@ -24,6 +26,7 @@ import {
   tenantFilterSizesApi,
   workOrderTypesApi,
   EquipmentStatus,
+  type Equipment,
   type EquipmentFilter,
   type EquipmentImage,
   type EquipmentSummary,
@@ -41,10 +44,11 @@ import { parseAttributes, buildAttributes, formatSpecValue } from '../utils/equi
 import { SpecFieldInput } from '../components/EquipmentSpecFields';
 import AppLayout from '../components/AppLayout';
 import { Card } from '../components/catalyst/card';
-import { EditableCard } from '../components/ui/EditableCard';
 import { Heading } from '../components/catalyst/heading';
 import { Button } from '../components/catalyst/button';
+import { Field, Label } from '../components/catalyst/fieldset';
 import { Input } from '../components/catalyst/input';
+import { Select } from '../components/catalyst/select';
 import {
   Dropdown,
   DropdownButton,
@@ -77,7 +81,6 @@ import {
   EllipsisVerticalIcon,
   FunnelIcon,
   MapPinIcon,
-  PencilIcon,
   PhotoIcon,
   PlusIcon,
   Square3Stack3DIcon,
@@ -96,12 +99,6 @@ const EQUIPMENT_TABS: readonly TabId[] = ['overview', 'service-history', 'media'
 // top N by sortOrder with a "Show all" toggle — keeps the Filters card tight.
 const FILTER_SIZE_CHIP_COLLAPSED = 8;
 
-// Date-only display for editable lifecycle fields (install / warranty expiry).
-function formatDate(iso: string | null | undefined): string {
-  if (!iso) return '—';
-  return new Date(iso).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
-}
-
 // Warranty coverage from the expiry date. Module-scope (not the render body) so
 // the clock read stays out of the component's pure path — same as formatInstalled.
 function warrantyState(iso: string | null | undefined): { has: boolean; active: boolean } {
@@ -111,18 +108,69 @@ function warrantyState(iso: string | null | undefined): { has: boolean; active: 
   return { has: true, active: exp.getTime() >= new Date().getTime() };
 }
 
-// "Installed Mar 2020 (6y)" for the header identity strip. Age in whole years;
-// under a year drops the suffix. Null when there's no install date.
+// Header identity inline-edit draft — everything shown in the header strip +
+// pills: name, type/category (cascading), make/model/serial/asset/install.
+// Warranty lives in its own card. Type/Category edit here too; changing category
+// runs the spec-carry guard inline (see the header edit block).
+interface IdentityDraft {
+  name: string;
+  equipmentTypeId: string;
+  equipmentCategoryId: string;
+  make: string;
+  model: string;
+  serialNumber: string;
+  assetTag: string;
+  installDate: string;
+}
+function seedIdentity(eq: Equipment): IdentityDraft {
+  return {
+    name: eq.name ?? '',
+    equipmentTypeId: eq.equipmentTypeId ?? '',
+    equipmentCategoryId: eq.equipmentCategoryId ?? '',
+    make: eq.make ?? '',
+    model: eq.model ?? '',
+    serialNumber: eq.serialNumber ?? '',
+    assetTag: eq.assetTag ?? '',
+    installDate: eq.installDate ?? '',
+  };
+}
+
+// Warranty card inline-edit draft.
+interface WarrantyDraft {
+  warrantyExpiresAt: string;
+  warrantyLaborExpiresAt: string;
+  warrantyDetails: string;
+}
+function seedWarranty(eq: Equipment): WarrantyDraft {
+  // Slice to yyyy-MM-dd so the values seat in <input type="date"> regardless of
+  // whether the API hands back a date or a full ISO datetime.
+  return {
+    warrantyExpiresAt: (eq.warrantyExpiresAt ?? '').slice(0, 10),
+    warrantyLaborExpiresAt: (eq.warrantyLaborExpiresAt ?? '').slice(0, 10),
+    warrantyDetails: eq.warrantyDetails ?? '',
+  };
+}
+
+// "Installed Mar 2020 (6 years)" for the header identity strip. Age in whole
+// years; under a year drops the suffix. Null when there's no install date.
 function formatInstalled(iso: string | null | undefined): string | null {
   if (!iso) return null;
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return null;
-  const monthYear = new Intl.DateTimeFormat('en-US', { month: 'short', year: 'numeric' }).format(d);
+  const my = new Intl.DateTimeFormat('en-US', { month: 'short', year: 'numeric' }).format(d);
   const now = new Date();
   let years = now.getFullYear() - d.getFullYear();
   const m = now.getMonth() - d.getMonth();
   if (m < 0 || (m === 0 && now.getDate() < d.getDate())) years--;
-  return `Installed ${monthYear}${years >= 1 ? ` (${years}y)` : ''}`;
+  return `Installed ${my}${years >= 1 ? ` (${years} ${years === 1 ? 'year' : 'years'})` : ''}`;
+}
+
+// "Mar 2030" — compact month/year for the Specs Installed row + warranty lines.
+function monthYear(iso: string | null | undefined): string | null {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  return new Intl.DateTimeFormat('en-US', { month: 'short', year: 'numeric' }).format(d);
 }
 
 // m:ss for a video's duration overlay (mirrors EquipmentVideosSection).
@@ -150,14 +198,40 @@ export default function EquipmentDetailPage() {
   const [showAllFilterSizes, setShowAllFilterSizes] = useState(false);
   const [isNewWorkOrderOpen, setIsNewWorkOrderOpen] = useState(false);
   const [retireConfirm, setRetireConfirm] = useState(false);
-  // Header name — inline pencil edit (the canonical, only home for the name).
-  const [editingName, setEditingName] = useState(false);
-  const [nameDraft, setNameDraft] = useState('');
+  // Header identity — a visible "Edit" flips the header into an inline edit block
+  // (name + type/category cascade + make/model/serial/asset/install). Warranty is
+  // its own card. Draft is null until editing starts.
+  const [identityEditing, setIdentityEditing] = useState(false);
+  const [identityDraft, setIdentityDraft] = useState<IdentityDraft | null>(null);
+  const [warrantyEditing, setWarrantyEditing] = useState(false);
+  const [warrantyDraft, setWarrantyDraft] = useState<WarrantyDraft | null>(null);
+  // On-site location — inline edit in the Located-at card (explicit Edit link).
+  const [editOnSite, setEditOnSite] = useState(false);
+  const [onSiteDraft, setOnSiteDraft] = useState('');
+  const [savingOnSite, setSavingOnSite] = useState(false);
 
   const { data: equipment, isLoading, error } = useQuery({
     queryKey: ['equipment-detail', id],
     queryFn: () => equipmentApi.getById(id!),
     enabled: !!id,
+  });
+
+  // Type → Category cascade + the draft category's fields (for the inline
+  // spec-carry guard). Fetched only while editing the header identity.
+  const { data: equipmentTypes = [] } = useQuery({
+    queryKey: ['equipment-types'],
+    queryFn: () => equipmentTypesApi.getAll(),
+    enabled: identityEditing,
+  });
+  const { data: editCategories = [] } = useQuery({
+    queryKey: ['equipment-categories', identityDraft?.equipmentTypeId ?? ''],
+    queryFn: () => equipmentCategoriesApi.getAll(identityDraft?.equipmentTypeId || undefined),
+    enabled: identityEditing && Boolean(identityDraft?.equipmentTypeId),
+  });
+  const { data: draftCategoryFields = [] } = useQuery({
+    queryKey: ['equipment-category-fields', identityDraft?.equipmentCategoryId ?? ''],
+    queryFn: () => equipmentCategoryFieldsApi.getAll(identityDraft!.equipmentCategoryId),
+    enabled: identityEditing && Boolean(identityDraft?.equipmentCategoryId),
   });
 
   // Service location (Located-at card + back-link) and its customer (the card's
@@ -306,21 +380,77 @@ export default function EquipmentDetailPage() {
     }
   };
 
-  // Commit the header name edit. Name is required, so an empty draft just exits
-  // without a write; reuses the single-field PATCH (surfaces its own error).
-  const submitName = async () => {
-    const next = nameDraft.trim();
-    if (!next || next === equipment?.name) {
-      setEditingName(false);
-      return;
-    }
-    try {
-      await handleSaveField('name', next);
-      setEditingName(false);
-    } catch {
-      /* handleSaveField surfaced the error; stay in edit so the draft isn't lost. */
-    }
+  // ── Header identity inline edit ──
+  const setId = (patch: Partial<IdentityDraft>) =>
+    setIdentityDraft((d) => (d ? { ...d, ...patch } : d));
+  const beginIdentityEdit = () => {
+    setIdentityDraft(seedIdentity(equipment!));
+    setIdentityEditing(true);
   };
+  // PATCH name/type/category/make/model/serial/asset/install. Attributes are NOT
+  // sent here: the Specs card serializes only the current category's keys, so
+  // stale specs drop on its next save; sending attributes on a category change
+  // could trip the new category's required-field validation.
+  const identitySave = useMutation({
+    mutationFn: () => {
+      const d = identityDraft!;
+      return equipmentApi.update(id!, {
+        name: d.name.trim(),
+        equipmentTypeId: d.equipmentTypeId || null,
+        equipmentCategoryId: d.equipmentCategoryId || null,
+        make: d.make.trim() || null,
+        model: d.model.trim() || null,
+        serialNumber: d.serialNumber.trim() || null,
+        assetTag: d.assetTag.trim() || null,
+        installDate: d.installDate || null,
+      });
+    },
+    onSuccess: () => {
+      invalidateEquipmentRelatedCaches();
+      setIdentityEditing(false);
+      showSuccess(t('common.form.successUpdate', { entity: getName('equipment'), defaultValue: 'Equipment updated' }));
+    },
+    onError: (err) =>
+      showError(t('common.form.errorUpdate', { entity: getName('equipment') }), extractApiError(err) ?? undefined),
+  });
+  const identityDirty =
+    !!identityDraft && !!equipment && JSON.stringify(identityDraft) !== JSON.stringify(seedIdentity(equipment));
+  // Inline spec-carry guard: when the draft category differs from the saved one,
+  // existing spec keys that aren't in the new category's field set fall away
+  // (kept keys carry; the drop happens on the next Specs save).
+  const identityCategoryChanged =
+    !!identityDraft && !!equipment && identityDraft.equipmentCategoryId !== (equipment.equipmentCategoryId ?? '');
+  const droppedSpecKeys = identityCategoryChanged
+    ? Object.keys(parseAttributes(equipment?.attributes)).filter(
+        (k) => !draftCategoryFields.some((f) => f.fieldKey === k)
+      )
+    : [];
+
+  // ── Warranty card inline edit ──
+  const warrantySave = useMutation({
+    mutationFn: () => {
+      const d = warrantyDraft!;
+      return equipmentApi.update(id!, {
+        warrantyExpiresAt: d.warrantyExpiresAt || null,
+        warrantyLaborExpiresAt: d.warrantyLaborExpiresAt || null,
+        warrantyDetails: d.warrantyDetails.trim() || null,
+      });
+    },
+    onSuccess: () => {
+      invalidateEquipmentRelatedCaches();
+      setWarrantyEditing(false);
+      showSuccess(t('common.form.successUpdate', { entity: getName('equipment'), defaultValue: 'Equipment updated' }));
+    },
+    onError: (err) =>
+      showError(t('common.form.errorUpdate', { entity: getName('equipment') }), extractApiError(err) ?? undefined),
+  });
+  const setW = (patch: Partial<WarrantyDraft>) => setWarrantyDraft((d) => (d ? { ...d, ...patch } : d));
+  const beginWarrantyEdit = () => {
+    setWarrantyDraft(seedWarranty(equipment!));
+    setWarrantyEditing(true);
+  };
+  const warrantyDirty =
+    !!warrantyDraft && !!equipment && JSON.stringify(warrantyDraft) !== JSON.stringify(seedWarranty(equipment));
 
   // ── Specs — the category's custom fields, card-level inline edit (PATCH the
   // full `attributes` object). Shares the cache key with the form + settings. ──
@@ -377,13 +507,15 @@ export default function EquipmentDetailPage() {
   const isRetired = equipment.status === EquipmentStatus.RETIRED;
 
   // ── Derived header state ──
-  const typeLabel = equipment.equipmentCategoryName || equipment.equipmentTypeName || null;
+  // Single classification pill = Type · Category (the hierarchy), per the mock.
+  const typeLabel = [equipment.equipmentTypeName, equipment.equipmentCategoryName].filter(Boolean).join(' · ') || null;
   // "Open work order" — the only live status, derived from the WO list (any WO
   // that isn't completed/cancelled). Not a stored equipment field.
   const openWo = (serviceHistoryData?.content ?? []).find(
     (wo) => wo.progressCategory !== 'COMPLETED' && wo.progressCategory !== 'CANCELLED'
   );
   const { has: hasWarranty, active: underWarranty } = warrantyState(equipment.warrantyExpiresAt);
+  const laborWarranty = warrantyState(equipment.warrantyLaborExpiresAt);
   const totalMedia = images.length + videos.length;
 
   const tabs: { id: TabId; label: string; count?: number }[] = [
@@ -498,137 +630,217 @@ export default function EquipmentDetailPage() {
             ← {locationLabel}
           </RouterLink>
 
-          {/* Header — photo + inline-editable name + derived pills + actions.
-              Make/model/serial/installed live in the Identity card, on-site in
-              the Located-at card — none are duplicated here. */}
-          <div className="mb-3 flex flex-col gap-3 rounded-[10px] border border-border bg-bg-elev px-4 py-3.5 shadow-sm sm:flex-row sm:items-center sm:gap-3.5">
-            <EquipmentThumbnail
-              url={equipment.profileImageUrl}
-              name={t('equipment.detail.profileImageAlt', { name: equipment.name })}
-              sizeClass="size-[52px]"
-              fit="contain"
-            />
-            <div className="min-w-0 flex-1">
-              <div className="flex flex-wrap items-center gap-2">
-                {/* Name is the canonical title and the only place it's edited —
-                    pencil-on-hover inline edit (the Identity card no longer
-                    carries a name field). */}
-                {editingName ? (
-                  <Input
-                    autoFocus
-                    value={nameDraft}
-                    onChange={(e) => setNameDraft(e.target.value)}
-                    onBlur={submitName}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') { e.preventDefault(); void submitName(); }
-                      else if (e.key === 'Escape') { setEditingName(false); }
-                    }}
-                    aria-label={t('common.form.name')}
-                    className="max-w-[320px]"
+          {/* Header — identity lives here (name + type/category pills + a
+              read-only strip of make/model/serial/asset/install + derived
+              warranty chip). A visible "Edit" flips it into an inline edit block
+              (edit-where-you-see-it, like Location/Customer). "Advanced edit" in
+              the ⋯ is an optional convenience, not the only path. */}
+          <div className="mb-3 rounded-[10px] border border-border bg-bg-elev px-4 py-3.5 shadow-sm">
+            {identityEditing && identityDraft ? (
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  if (identityDraft.name.trim()) identitySave.mutate();
+                }}
+              >
+                {/* Tight 2-line layout (matches the mock): thumbnail · name · actions
+                    on the first line; type/category/make/model/serial/installed in one
+                    horizontal field row on the second. */}
+                <div className="flex items-start gap-3.5">
+                  <EquipmentThumbnail
+                    url={equipment.profileImageUrl}
+                    name={t('equipment.detail.profileImageAlt', { name: equipment.name })}
+                    sizeClass="size-[52px]"
+                    fit="contain"
                   />
-                ) : (
-                  <span className="group/name inline-flex items-center gap-1">
+                  <div className="min-w-0 flex-1">
+                    <div className="mb-1 text-[10.5px] font-semibold uppercase tracking-[0.08em] text-fg-muted">
+                      Edit equipment
+                    </div>
+                    <Input
+                      autoFocus
+                      aria-label={t('common.form.name')}
+                      placeholder={t('common.form.name')}
+                      value={identityDraft.name}
+                      onChange={(e) => setId({ name: e.target.value })}
+                      className="[&_input]:!text-[15px] [&_input]:!font-semibold"
+                    />
+                    <div className="mt-2 flex flex-wrap items-end gap-2">
+                      <Field size="xs" className="w-[7rem]">
+                        <Label size="xs">{t('equipment.form.type')}</Label>
+                        <Select
+                          value={identityDraft.equipmentTypeId}
+                          onChange={(e) => setId({ equipmentTypeId: e.target.value, equipmentCategoryId: '' })}
+                          aria-label={t('equipment.form.type')}
+                        >
+                          <option value="">{t('common.none')}</option>
+                          {equipmentTypes.map((ty) => (
+                            <option key={ty.id} value={ty.id}>{ty.name}</option>
+                          ))}
+                        </Select>
+                      </Field>
+                      <Field size="xs" className="w-[8.5rem]">
+                        <Label size="xs">{t('equipment.form.category')}</Label>
+                        <Select
+                          value={identityDraft.equipmentCategoryId}
+                          onChange={(e) => setId({ equipmentCategoryId: e.target.value })}
+                          disabled={!identityDraft.equipmentTypeId}
+                          aria-label={t('equipment.form.category')}
+                        >
+                          <option value="">{identityDraft.equipmentTypeId ? t('common.none') : 'Pick a type first'}</option>
+                          {editCategories.map((c) => (
+                            <option key={c.id} value={c.id}>{c.name}</option>
+                          ))}
+                        </Select>
+                      </Field>
+                      <Field size="xs" className="w-[7.5rem]">
+                        <Label size="xs">{t('equipment.form.make')}</Label>
+                        <Input size="xs" value={identityDraft.make} onChange={(e) => setId({ make: e.target.value })} />
+                      </Field>
+                      <Field size="xs" className="w-[7.5rem]">
+                        <Label size="xs">{t('equipment.form.model')}</Label>
+                        <Input size="xs" value={identityDraft.model} onChange={(e) => setId({ model: e.target.value })} />
+                      </Field>
+                      <Field size="xs" className="w-[8rem]">
+                        <Label size="xs">{t('equipment.form.serialNumber')}</Label>
+                        <Input size="xs" className="font-mono" value={identityDraft.serialNumber} onChange={(e) => setId({ serialNumber: e.target.value })} />
+                      </Field>
+                      <Field size="xs" className="w-[9rem]">
+                        <Label size="xs">{t('equipment.form.installDate')}</Label>
+                        <Input size="xs" type="date" value={identityDraft.installDate} onChange={(e) => setId({ installDate: e.target.value })} />
+                      </Field>
+                    </div>
+                    {/* Inline spec-carry guard on category change. */}
+                    {identityCategoryChanged && droppedSpecKeys.length > 0 && (
+                      <div
+                        className="mt-2.5 rounded-[7px] px-2.5 py-2 text-[11.5px] text-warning-fg"
+                        style={{
+                          background: 'color-mix(in oklch, var(--warning-500) 9%, var(--bg-elev))',
+                          border: '1px solid color-mix(in oklch, var(--warning-500) 35%, var(--border))',
+                        }}
+                      >
+                        Changing the category clears {droppedSpecKeys.length} spec value
+                        {droppedSpecKeys.length === 1 ? '' : 's'} that don’t apply to the new category; matching fields are kept.
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex shrink-0 items-center gap-1.5">
+                    <Button plain size="xs" type="button" onClick={() => setIdentityEditing(false)} disabled={identitySave.isPending}>
+                      {t('common.cancel')}
+                    </Button>
+                    <Button
+                      color="accent"
+                      size="xs"
+                      type="submit"
+                      disabled={!identityDirty || !identityDraft.name.trim() || identitySave.isPending}
+                    >
+                      {identitySave.isPending ? t('common.saving') : t('common.update')}
+                    </Button>
+                  </div>
+                </div>
+              </form>
+            ) : (
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-3.5">
+                <EquipmentThumbnail
+                  url={equipment.profileImageUrl}
+                  name={t('equipment.detail.profileImageAlt', { name: equipment.name })}
+                  sizeClass="size-[52px]"
+                  fit="contain"
+                />
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
                     <Heading level={1} size="page-sm" className="m-0">
                       {equipment.name}
                     </Heading>
-                    <button
-                      type="button"
-                      onClick={() => { setNameDraft(equipment.name); setEditingName(true); }}
-                      aria-label="Edit name"
-                      className="rounded p-0.5 text-fg-muted opacity-0 transition-opacity hover:bg-zinc-100 group-hover/name:opacity-100 dark:hover:bg-white/5"
-                    >
-                      <PencilIcon className="size-3.5" />
-                    </button>
-                  </span>
-                )}
-                {isRetired && <Pill tone="neutral">{t('equipment.status.retired')}</Pill>}
-                {typeLabel && <Pill tone="neutral">{typeLabel}</Pill>}
-                {openWo && (
-                  <Pill tone="info" dot live>
-                    Open work order
-                  </Pill>
-                )}
-              </div>
-              {isSubUnit && equipment.parentName && (
-                <div className="mt-1 text-[11.5px]">
-                  <RouterLink
-                    to={`/equipment/${equipment.parentId}`}
-                    className="text-fg-accent hover:underline"
-                  >
-                    Part of {equipment.parentName}
-                  </RouterLink>
-                </div>
-              )}
-              {/* Identity strip — read-only metadata under the name (make/model/
-                  serial/asset/install + derived warranty chip). Edit via the ⋯
-                  "Advanced edit" form. Renders only populated items. */}
-              {(() => {
-                const items: React.ReactNode[] = [];
-                if (equipment.make || equipment.model) {
-                  items.push(
-                    <span>
-                      {equipment.make}
-                      {equipment.make && equipment.model ? ' ' : ''}
-                      {equipment.model && <span className="font-mono">{equipment.model}</span>}
-                    </span>
-                  );
-                }
-                if (equipment.serialNumber) {
-                  items.push(<span>SN <span className="font-mono">{equipment.serialNumber}</span></span>);
-                }
-                if (equipment.assetTag) items.push(<span>Asset {equipment.assetTag}</span>);
-                const installed = formatInstalled(equipment.installDate);
-                if (installed) items.push(<span>{installed}</span>);
-                if (items.length === 0 && !hasWarranty) return null;
-                return (
-                  <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11.5px] text-fg-muted">
-                    {items.map((node, i) => (
-                      <span key={i} className="flex items-center gap-x-2">
-                        {i > 0 && <span className="text-fg-dim">·</span>}
-                        {node}
-                      </span>
-                    ))}
+                    {isRetired && <Pill tone="neutral">{t('equipment.status.retired')}</Pill>}
+                    {typeLabel && <Pill tone="neutral">{typeLabel}</Pill>}
+                    {openWo && (
+                      <Pill tone="info" dot live>
+                        Open work order
+                      </Pill>
+                    )}
                     {hasWarranty && (
                       <Pill tone={underWarranty ? 'success' : 'neutral'} dot>
-                        {underWarranty
-                          ? `Under warranty thru ${formatDate(equipment.warrantyExpiresAt)}`
-                          : 'Out of warranty'}
+                        {underWarranty ? 'Under warranty' : 'Warranty expired'}
                       </Pill>
                     )}
                   </div>
-                );
-              })()}
-            </div>
+                  {isSubUnit && equipment.parentName && (
+                    <div className="mt-1 text-[11.5px]">
+                      <RouterLink
+                        to={`/equipment/${equipment.parentId}`}
+                        className="text-fg-accent hover:underline"
+                      >
+                        Part of {equipment.parentName}
+                      </RouterLink>
+                    </div>
+                  )}
+                  {/* Identity strip — read-only meta line (make/model · serial ·
+                      installed · on-site). Edit via the header "Edit". Renders
+                      only populated items. */}
+                  {(() => {
+                    const items: React.ReactNode[] = [];
+                    if (equipment.make || equipment.model) {
+                      items.push(
+                        <span>
+                          {equipment.make}
+                          {equipment.make && equipment.model ? ' ' : ''}
+                          {equipment.model}
+                        </span>
+                      );
+                    }
+                    if (equipment.serialNumber) {
+                      items.push(<span>SN <span className="font-mono">{equipment.serialNumber}</span></span>);
+                    }
+                    const installed = formatInstalled(equipment.installDate);
+                    if (installed) items.push(<span>{installed}</span>);
+                    if (equipment.locationOnSite) items.push(<span>{equipment.locationOnSite}</span>);
+                    if (items.length === 0) return null;
+                    return (
+                      <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11.5px] text-fg-muted">
+                        {items.map((node, i) => (
+                          <span key={i} className="flex items-center gap-x-2">
+                            {i > 0 && <span className="text-fg-dim">·</span>}
+                            {node}
+                          </span>
+                        ))}
+                      </div>
+                    );
+                  })()}
+                </div>
 
-            <div className="flex items-center gap-1.5 max-sm:w-full sm:flex-shrink-0">
-              <Button
-                outline
-                size="xs"
-                onClick={() => setIsNewWorkOrderOpen(true)}
-                aria-label={t('common.actions.new', { entity: getName('work_order') })}
-              >
-                <PlusIcon className="size-4" />
-                <span className="relative top-[0.5px] hidden sm:inline">
-                  {t('common.actions.new', { entity: getName('work_order') })}
-                </span>
-              </Button>
-              <Dropdown>
-                <DropdownButton as={IconButton} aria-label={t('common.moreOptions')} className="max-sm:p-2">
-                  <EllipsisVerticalIcon className="size-4" />
-                </DropdownButton>
-                <DropdownMenu anchor="bottom end">
-                  {/* Full form is the fallback for recategorize / reassign /
-                      bulk changes — the common-case edits happen inline on the
-                      cards below. */}
-                  <DropdownItem onClick={() => navigate(`/equipment/${id}/edit`)}>
-                    <DropdownLabel>Advanced edit</DropdownLabel>
-                  </DropdownItem>
-                  <DropdownItem onClick={handleDeleteEquipment}>
-                    <DropdownLabel>{t('common.delete')}</DropdownLabel>
-                  </DropdownItem>
-                </DropdownMenu>
-              </Dropdown>
-            </div>
+                <div className="flex items-center gap-1.5 max-sm:w-full sm:flex-shrink-0">
+                  <Button
+                    outline
+                    size="xs"
+                    onClick={() => setIsNewWorkOrderOpen(true)}
+                    aria-label={t('common.actions.new', { entity: getName('work_order') })}
+                  >
+                    <PlusIcon className="size-4" />
+                    <span className="relative top-[0.5px] hidden sm:inline">
+                      {t('common.actions.new', { entity: getName('work_order') })}
+                    </span>
+                  </Button>
+                  <Button outline size="xs" onClick={beginIdentityEdit} aria-label="Edit equipment details">
+                    {t('common.edit')}
+                  </Button>
+                  <Dropdown>
+                    <DropdownButton as={IconButton} aria-label={t('common.moreOptions')} className="max-sm:p-2">
+                      <EllipsisVerticalIcon className="size-4" />
+                    </DropdownButton>
+                    <DropdownMenu anchor="bottom end">
+                      {/* Optional convenience — change several things at once. */}
+                      <DropdownItem onClick={() => navigate(`/equipment/${id}/edit`)}>
+                        <DropdownLabel>Advanced edit</DropdownLabel>
+                      </DropdownItem>
+                      <DropdownItem onClick={handleDeleteEquipment}>
+                        <DropdownLabel>{t('common.delete')}</DropdownLabel>
+                      </DropdownItem>
+                    </DropdownMenu>
+                  </Dropdown>
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="mb-3.5">
@@ -739,7 +951,9 @@ export default function EquipmentDetailPage() {
                   </Card>
                 )}
 
-                {/* Media peek — a compact single row of ~100px-tall thumbs (a glance);
+                {/* Media peek — a single row that fills the column: a 1.4fr profile
+                    tile + four 1fr gallery squares (CSS grid, like the mock). Tiles
+                    are fluid (~110px square at the standard rail), not fixed thumbs;
                     the full browsing gallery is the Media tab. "+N" overlays the last tile. */}
                 <Card
                   title={<CardTitle icon={<PhotoIcon className="size-3.5" />}>{t('equipment.tabs.media')}</CardTitle>}
@@ -748,7 +962,10 @@ export default function EquipmentDetailPage() {
                   {totalMedia === 0 ? (
                     <p className="text-[12px] text-fg-muted">No photos or videos yet</p>
                   ) : (
-                    <div className="flex gap-1.5 overflow-hidden">
+                    <div
+                      className="grid gap-1.5"
+                      style={{ gridTemplateColumns: profilePhoto ? '1.4fr repeat(4, 1fr)' : 'repeat(5, 1fr)' }}
+                    >
                       {/* Every tile opens the combined lightbox at its item —
                           photos and videos arrow together from there. */}
                       {profilePhoto && (
@@ -820,72 +1037,220 @@ export default function EquipmentDetailPage() {
                       borderColor: 'color-mix(in oklch, var(--accent-500) 22%, var(--border))',
                     }}
                   >
-                    <div className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-fg-accent">
-                      {t('equipment.form.locationOnSite')}
+                    <div className="flex items-baseline justify-between gap-2">
+                      <div className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-fg-accent">
+                        {t('equipment.form.locationOnSite')}
+                      </div>
+                      {!editOnSite && (
+                        <CardLink
+                          ariaLabel="Edit on-site location"
+                          onClick={() => {
+                            setOnSiteDraft(equipment.locationOnSite ?? '');
+                            setEditOnSite(true);
+                          }}
+                        >
+                          {t('common.edit')}
+                        </CardLink>
+                      )}
                     </div>
-                    <div className="mt-0.5 text-[12.5px] text-fg-strong">
-                      <EditableField
-                        value={equipment.locationOnSite ?? ''}
-                        onSave={(v) => handleSaveField('locationOnSite', v || null)}
-                        ariaLabel={t('equipment.form.locationOnSite')}
-                      />
-                    </div>
+                    {editOnSite ? (
+                      <div className="mt-1.5 flex items-center gap-1.5">
+                        <Input
+                          size="xs"
+                          autoFocus
+                          value={onSiteDraft}
+                          onChange={(e) => setOnSiteDraft(e.target.value)}
+                          aria-label={t('equipment.form.locationOnSite')}
+                        />
+                        <Button plain size="xs" type="button" onClick={() => setEditOnSite(false)} disabled={savingOnSite}>
+                          {t('common.cancel')}
+                        </Button>
+                        <Button
+                          color="accent"
+                          size="xs"
+                          type="button"
+                          disabled={savingOnSite}
+                          onClick={async () => {
+                            setSavingOnSite(true);
+                            try {
+                              await handleSaveField('locationOnSite', onSiteDraft.trim() || null);
+                              setEditOnSite(false);
+                            } catch {
+                              /* handleSaveField surfaced the error; stay in edit. */
+                            } finally {
+                              setSavingOnSite(false);
+                            }
+                          }}
+                        >
+                          {savingOnSite ? t('common.saving') : t('common.update')}
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="mt-0.5 text-[12.5px] text-fg-strong">{equipment.locationOnSite || '—'}</div>
+                    )}
                   </div>
                 </Card>
 
-                {/* Identity — card-level inline edit (name + make/model/serial/
-                    asset tag/installed + warranty). Type/Category are read-only
-                    here: recategorizing carries the spec-clearing guard and
-                    stays in the full Edit form. */}
-                {/* Warranty — slim read-only rail card (the header shows the
-                    derived chip). Parts/labor/details edit via the ⋯ "Advanced
-                    edit" form, alongside make/model/serial/install/type/category. */}
-                <Card title={<CardTitle>Warranty</CardTitle>}>
-                  <FieldGrid>
-                    <FieldRow label="Parts covered through">{formatDate(equipment.warrantyExpiresAt)}</FieldRow>
-                    <FieldRow label="Labor covered through">{formatDate(equipment.warrantyLaborExpiresAt)}</FieldRow>
-                    <FieldRow label={t('equipment.form.warrantyDetails')}>{equipment.warrantyDetails || '—'}</FieldRow>
-                  </FieldGrid>
-                </Card>
-
-                {/* Specs — the chosen category's custom fields + their values.
-                    Card-level inline edit writes the full `attributes` object.
-                    Hidden when the category defines no fields. */}
-                {specFields.length > 0 && (
-                  <EditableCard
-                    title="Specs"
-                    editing={specEditing}
-                    onEdit={() => {
-                      setSpecDraft(parseAttributes(equipment.attributes));
-                      setSpecEditing(true);
-                    }}
-                    onCancel={() => setSpecEditing(false)}
-                    onSave={() => specSave.mutate()}
-                    saving={specSave.isPending}
-                    saveDisabled={!specDirty || specRequiredMissing}
-                  >
-                    {specEditing ? (
-                      <div className="flex flex-col gap-2.5">
-                        {specFields.map((f) => (
-                          <SpecFieldInput
-                            key={f.id}
-                            field={f}
-                            value={specDraft[f.fieldKey] ?? ''}
-                            onChange={(v) => setSpecDraft((d) => ({ ...d, [f.fieldKey]: v }))}
-                          />
-                        ))}
+                {/* Specs — the category's custom fields (tonnage, refrigerant,
+                    voltage, …) + the warranty sub-block. Identity (make/model/serial)
+                    and install/age live in the header strip, not here (dedup). The
+                    custom-field *values* edit via this card's "Edit"; warranty edits
+                    inline in its tinted sub-block. The card always renders so warranty
+                    has a home even when the category defines no custom fields. */}
+                <Card
+                  title={<CardTitle>Specs</CardTitle>}
+                  action={
+                    specFields.length > 0 && !specEditing ? (
+                      <CardLink
+                        ariaLabel="Edit specs"
+                        onClick={() => {
+                          setSpecDraft(parseAttributes(equipment.attributes));
+                          setSpecEditing(true);
+                        }}
+                      >
+                        {t('common.edit')}
+                      </CardLink>
+                    ) : undefined
+                  }
+                  footer={
+                    specEditing ? (
+                      <div className="flex items-center justify-end gap-1.5 rounded-b-[10px] border-t border-border-soft bg-bg-elev-2 px-3.5 py-2.5">
+                        <Button plain size="xs" type="button" onClick={() => setSpecEditing(false)} disabled={specSave.isPending}>
+                          {t('common.cancel')}
+                        </Button>
+                        <Button
+                          color="accent"
+                          size="xs"
+                          type="button"
+                          onClick={() => specSave.mutate()}
+                          disabled={!specDirty || specRequiredMissing}
+                        >
+                          {specSave.isPending ? t('common.saving') : t('common.update')}
+                        </Button>
                       </div>
-                    ) : (
-                      <FieldGrid>
-                        {specFields.map((f) => (
-                          <FieldRow key={f.id} label={f.label}>
-                            {formatSpecValue(f, specValuesView[f.fieldKey])}
-                          </FieldRow>
-                        ))}
-                      </FieldGrid>
-                    )}
-                  </EditableCard>
-                )}
+                    ) : undefined
+                  }
+                >
+                  {specEditing ? (
+                    /* Edit mode owns the custom-field *values* only — identity +
+                       install live in the header, warranty in its own sub-block. */
+                    <div className="flex flex-col gap-2.5">
+                      {specFields.map((f) => (
+                        <SpecFieldInput
+                          key={f.id}
+                          field={f}
+                          value={specDraft[f.fieldKey] ?? ''}
+                          onChange={(v) => setSpecDraft((d) => ({ ...d, [f.fieldKey]: v }))}
+                        />
+                      ))}
+                    </div>
+                  ) : (
+                    <>
+                      {specFields.length > 0 && (
+                        <FieldGrid>
+                          {specFields.map((f) => (
+                            <FieldRow key={f.id} label={f.label}>
+                              {formatSpecValue(f, specValuesView[f.fieldKey])}
+                            </FieldRow>
+                          ))}
+                        </FieldGrid>
+                      )}
+
+                      {/* Warranty — drives money decisions, so it lives in the
+                          reference table with its own inline edit. Success-tinted
+                          while parts are covered; neutral once expired. */}
+                      <div
+                        className="mt-3 rounded-[8px] px-3 py-2.5"
+                        style={
+                          underWarranty
+                            ? {
+                                background: 'color-mix(in oklch, var(--success-500) 7%, var(--bg-elev))',
+                                border: '1px solid color-mix(in oklch, var(--success-500) 22%, var(--border))',
+                              }
+                            : { background: 'var(--bg-elev-2)', border: '1px solid var(--border-soft)' }
+                        }
+                      >
+                        <div className="flex items-baseline justify-between gap-2">
+                          <div
+                            className="text-[10.5px] font-semibold uppercase tracking-[0.08em]"
+                            style={{ color: underWarranty ? 'var(--success-600)' : 'var(--fg-muted)' }}
+                          >
+                            Warranty
+                          </div>
+                          {!warrantyEditing && (
+                            <CardLink ariaLabel="Edit warranty" onClick={beginWarrantyEdit}>
+                              {t('common.edit')}
+                            </CardLink>
+                          )}
+                        </div>
+
+                        {warrantyEditing && warrantyDraft ? (
+                          <div className="mt-2 flex flex-col gap-2">
+                            <Field>
+                              <Label>Parts covered through</Label>
+                              <Input
+                                type="date"
+                                value={warrantyDraft.warrantyExpiresAt}
+                                onChange={(e) => setW({ warrantyExpiresAt: e.target.value })}
+                              />
+                            </Field>
+                            <Field>
+                              <Label>Labor covered through</Label>
+                              <Input
+                                type="date"
+                                value={warrantyDraft.warrantyLaborExpiresAt}
+                                onChange={(e) => setW({ warrantyLaborExpiresAt: e.target.value })}
+                              />
+                            </Field>
+                            <Field>
+                              <Label>{t('equipment.form.warrantyDetails')}</Label>
+                              <Input
+                                value={warrantyDraft.warrantyDetails}
+                                onChange={(e) => setW({ warrantyDetails: e.target.value })}
+                              />
+                            </Field>
+                            <div className="flex items-center justify-end gap-1.5">
+                              <Button
+                                plain
+                                size="xs"
+                                type="button"
+                                onClick={() => setWarrantyEditing(false)}
+                                disabled={warrantySave.isPending}
+                              >
+                                {t('common.cancel')}
+                              </Button>
+                              <Button
+                                color="accent"
+                                size="xs"
+                                type="button"
+                                onClick={() => warrantySave.mutate()}
+                                disabled={!warrantyDirty}
+                              >
+                                {warrantySave.isPending ? t('common.saving') : t('common.update')}
+                              </Button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="mt-1">
+                            <div className="text-[12px] text-fg-strong">
+                              {hasWarranty
+                                ? `Parts ${underWarranty ? 'thru' : 'expired'} ${monthYear(equipment.warrantyExpiresAt)}`
+                                : 'Parts —'}
+                            </div>
+                            {laborWarranty.has && (
+                              <div className="text-[12px] text-fg-muted">
+                                {`Labor ${laborWarranty.active ? 'thru' : 'expired'} ${monthYear(equipment.warrantyLaborExpiresAt)}`}
+                              </div>
+                            )}
+                            {equipment.warrantyDetails && (
+                              <div className="mt-1 text-[11px] text-fg-muted">{equipment.warrantyDetails}</div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </>
+                  )}
+                </Card>
 
                 {/* Filters — the sizes this unit actually takes render as rows on
                     top; "Quick add" below offers the tenant's common sizes (those
@@ -1234,17 +1599,14 @@ interface MediaPeekItem {
 }
 
 /**
- * One tile in the overview Media peek row. The profile photo (`hero`) is a wider
- * accent-ringed source-of-truth tile (aspect-square, which anchors the row
- * height); the gallery thumbs stretch to match it. Videos get a play badge +
+ * One tile in the overview Media peek row. Each tile is `aspect-square w-full`,
+ * so it fills its grid track — the profile photo (`hero`) sits in the wider
+ * 1.4fr track and is accent-ringed; the gallery thumbs fill the 1fr tracks.
+ * `object-cover` crops to fill (never distorts). Videos get a play badge +
  * duration; a label rides a bottom gradient; `overflow` paints a "+N" cover on
- * the last tile. `square` makes a tile self-size when there's no hero anchor.
+ * the last tile. Play badge, duration, and label caption are kept but shrunk —
+ * big browsing belongs to the Media tab.
  */
-// Compact peek tile — fixed 100px-tall thumbnail for the overview Media glance.
-// The lead/profile tile is a touch wider (and accent-ringed); the rest are
-// 100px squares. `object-cover` crops to fill (never distorts). Play badge,
-// duration, and label caption are kept but shrunk — big browsing belongs to
-// the Media tab.
 function MediaPeekTile({
   thumb,
   alt,
@@ -1271,8 +1633,8 @@ function MediaPeekTile({
       onClick={onClick}
       aria-label={alt}
       className={[
-        'group relative block h-[100px] shrink-0 overflow-hidden rounded-md bg-bg-elev-2 ring-1',
-        hero ? 'w-[128px] ring-[color-mix(in_oklch,var(--accent-500)_45%,var(--border))]' : 'w-[100px] ring-border',
+        'group relative block aspect-square w-full overflow-hidden rounded-md bg-bg-elev-2 ring-1',
+        hero ? 'ring-[color-mix(in_oklch,var(--accent-500)_45%,var(--border))]' : 'ring-border',
       ].join(' ')}
     >
       {thumb ? (

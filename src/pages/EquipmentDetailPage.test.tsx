@@ -238,15 +238,15 @@ describe('EquipmentDetailPage', () => {
       expect(screen.getByRole('heading', { name: 'Upstairs Furnace' })).toBeInTheDocument();
     });
 
-    // Type/category pill + the derived warranty chip (future expiry → under
-    // warranty thru the parts date) in the header identity strip.
-    expect(screen.getAllByText('Furnace').length).toBeGreaterThan(0);
-    expect(screen.getByText(/under warranty thru/i)).toBeInTheDocument();
-    // Identity facts live in the header strip (make/model/serial).
-    expect(screen.getByText(/Carrier/)).toBeInTheDocument();
-    expect(screen.getByText('AC-100')).toBeInTheDocument();
+    // Combined Type · Category pill + the warranty status chip (future expiry →
+    // "Under warranty", status only — not the raw date).
+    expect(screen.getByText(/HVAC.*Furnace/)).toBeInTheDocument();
+    expect(screen.getByText(/under warranty/i)).toBeInTheDocument();
+    // Identity facts live in the header strip: make+model in one span (proportional),
+    // serial in its own mono span.
+    expect(screen.getByText(/Carrier\s+AC-100/)).toBeInTheDocument();
     expect(screen.getByText('SN123')).toBeInTheDocument();
-    // On-site location stays in the Located-at card.
+    // On-site location appears (header strip + Located-at card).
     expect(screen.getAllByText('Basement').length).toBeGreaterThan(0);
     // Description card (conditional, present here).
     expect(screen.getByText('Two-stage gas furnace')).toBeInTheDocument();
@@ -279,24 +279,26 @@ describe('EquipmentDetailPage', () => {
     expect(screen.queryByAltText(/profile image/i)).not.toBeInTheDocument();
   });
 
-  it('puts identity in the header strip with no standalone Identity card, and a slim Warranty card', async () => {
+  it('keeps identity in the header strip (deduped from Specs) and nests warranty in the Specs card', async () => {
     mockGetById.mockResolvedValue(baseEquipment);
     renderPage();
 
     await waitFor(() => expect(screen.getByRole('heading', { name: 'Upstairs Furnace' })).toBeInTheDocument());
 
-    // Identity facts are read-only in the header strip (make/model/serial) —
-    // the tall Identity card is gone.
-    expect(screen.getByText('AC-100')).toBeInTheDocument();
-    expect(screen.getByText('SN123')).toBeInTheDocument();
+    // Make/Model/Serial live once, in the header strip — the tall Identity card is
+    // gone and they are NOT duplicated into the Specs card.
+    expect(screen.getByText(/Carrier\s+AC-100/)).toBeInTheDocument();
+    expect(screen.getAllByText('SN123')).toHaveLength(1);
     expect(screen.queryByText('Identity')).not.toBeInTheDocument();
 
-    // The slim Warranty card carries the dates; the header shows only the chip.
-    expect(screen.getByText('Parts covered through')).toBeInTheDocument();
-    expect(screen.getByText(/under warranty thru/i)).toBeInTheDocument();
+    // Warranty is a derived block inside the Specs card (no raw date rows); the
+    // header carries only the status chip.
+    expect(screen.getByText(/parts thru jun 2027/i)).toBeInTheDocument();
+    expect(screen.getByText('5-year parts')).toBeInTheDocument();
+    expect(screen.getByText(/under warranty/i)).toBeInTheDocument();
   });
 
-  it('inline-edits the name in the header via the pencil affordance', async () => {
+  it('inline-edits identity from the header via the visible Edit affordance', async () => {
     mockGetById.mockResolvedValue(baseEquipment);
     mockUpdate.mockResolvedValue(baseEquipment);
     const user = userEvent.setup();
@@ -306,15 +308,15 @@ describe('EquipmentDetailPage', () => {
       expect(screen.getByRole('heading', { name: 'Upstairs Furnace' })).toBeInTheDocument();
     });
 
-    // Name is the canonical title and edits in place from the header (the
-    // Identity card no longer carries it).
-    await user.click(screen.getByRole('button', { name: /edit name/i }));
+    // The header's visible "Edit" opens an inline block editing name + type/category
+    // + make/model/serial/install together (one PATCH, not per-field).
+    await user.click(screen.getByRole('button', { name: /edit equipment details/i }));
     const nameInput = await screen.findByDisplayValue('Upstairs Furnace');
     await user.clear(nameInput);
     await user.type(nameInput, 'Rooftop Unit 9{Enter}');
 
     await waitFor(() => {
-      expect(mockUpdate).toHaveBeenCalledWith('eq-1', { name: 'Rooftop Unit 9' });
+      expect(mockUpdate).toHaveBeenCalledWith('eq-1', expect.objectContaining({ name: 'Rooftop Unit 9' }));
     });
   });
 
@@ -549,7 +551,7 @@ describe('EquipmentDetailPage', () => {
     confirmSpy.mockRestore();
   });
 
-  it('inline-edits the single-field cards (on-site, description) per-field', async () => {
+  it('inline-edits the single-field cards (on-site, description)', async () => {
     mockGetById.mockResolvedValue(baseEquipment);
     mockUpdate.mockResolvedValue(baseEquipment);
     const user = userEvent.setup();
@@ -557,13 +559,13 @@ describe('EquipmentDetailPage', () => {
 
     await waitFor(() => expect(screen.getByRole('heading', { name: 'Upstairs Furnace' })).toBeInTheDocument());
 
-    // On-site + description stay per-field click-to-edit (single-field cards) —
-    // the multi-field Identity card is the only one that went card-level.
-    await user.click(screen.getByRole('button', { name: /location on site/i }));
+    // On-site uses the Located-at card's explicit "Edit" link → input → Save
+    // (matches the mock); description stays click-to-edit (EditableField).
+    await user.click(screen.getByRole('button', { name: /edit on-site location/i }));
     const locInput = await screen.findByRole('textbox', { name: /location on site/i });
     await user.clear(locInput);
     await user.type(locInput, 'Roof');
-    locInput.blur();
+    await user.click(screen.getByRole('button', { name: /^update$/i }));
     await waitFor(() => {
       expect(mockUpdate).toHaveBeenCalledWith('eq-1', { locationOnSite: 'Roof' });
     });
@@ -575,6 +577,32 @@ describe('EquipmentDetailPage', () => {
     descInput.blur();
     await waitFor(() => {
       expect(mockUpdate).toHaveBeenCalledWith('eq-1', { description: 'Updated note' });
+    });
+  });
+
+  it('inline-edits warranty (parts/labor/details) from its Specs sub-block', async () => {
+    mockGetById.mockResolvedValue(baseEquipment);
+    mockUpdate.mockResolvedValue(baseEquipment);
+    const user = userEvent.setup();
+    renderPage();
+
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Upstairs Furnace' })).toBeInTheDocument());
+
+    // Read mode shows the derived coverage; "Edit warranty" opens the inputs.
+    expect(screen.getByText(/parts thru jun 2027/i)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /edit warranty/i }));
+
+    // Details seed from the stored value; editing + Update PATCHes the trio.
+    const detailsInput = await screen.findByDisplayValue('5-year parts');
+    await user.clear(detailsInput);
+    await user.type(detailsInput, 'Parts only');
+    await user.click(screen.getByRole('button', { name: /^update$/i }));
+
+    await waitFor(() => {
+      expect(mockUpdate).toHaveBeenCalledWith(
+        'eq-1',
+        expect.objectContaining({ warrantyExpiresAt: '2027-06-15', warrantyDetails: 'Parts only' })
+      );
     });
   });
 
@@ -1010,17 +1038,17 @@ describe('EquipmentDetailPage', () => {
 
     await waitFor(() => expect(screen.getByText('BTU Input')).toBeInTheDocument());
 
-    // The Specs card is the only card-level inline editor now.
-    await user.click(screen.getByRole('button', { name: 'Edit' }));
+    // Edit the category custom-field values via the Specs card's "Edit specs".
+    await user.click(screen.getByRole('button', { name: /edit specs/i }));
     const input = await screen.findByDisplayValue('80000');
     await user.clear(input);
     await user.type(input, '90000');
-    await user.click(screen.getByRole('button', { name: /save changes/i }));
+    await user.click(screen.getByRole('button', { name: /^update$/i }));
 
     await waitFor(() => {
       expect(mockShowError).toHaveBeenCalledWith(expect.any(String), 'Validation failed');
     });
-    expect(screen.getByRole('button', { name: /save changes/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^update$/i })).toBeInTheDocument();
   });
 
   it('navigates to the full editor from the ⋯ Advanced edit action', async () => {
@@ -1277,13 +1305,13 @@ describe('EquipmentDetailPage', () => {
     await waitFor(() => expect(screen.getByText('BTU Input')).toBeInTheDocument());
     expect(screen.getByText('80000')).toBeInTheDocument();
 
-    // The Specs card is the only card-level inline editor (Identity card removed).
-    await user.click(screen.getByRole('button', { name: 'Edit' }));
+    // Edit the category custom-field values via the Specs card's "Edit specs".
+    await user.click(screen.getByRole('button', { name: /edit specs/i }));
 
     const input = screen.getByDisplayValue('80000');
     await user.clear(input);
     await user.type(input, '90000');
-    await user.click(screen.getByRole('button', { name: /save changes/i }));
+    await user.click(screen.getByRole('button', { name: /^update$/i }));
 
     await waitFor(() => expect(mockUpdate).toHaveBeenCalled());
     const req = mockUpdate.mock.calls[0][1] as { attributes: string };
