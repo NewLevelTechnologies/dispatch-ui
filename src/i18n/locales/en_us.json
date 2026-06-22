@@ -590,6 +590,7 @@
       "profile": "Profile",
       "removeFromBatch": "Remove from batch",
       "rowDone": "Uploaded",
+      "setAsNameplate": "Set as nameplate",
       "setAsProfile": "Set as profile",
       "stageConfirming": "Processing…",
       "stageRequesting": "Preparing upload…",
@@ -597,6 +598,7 @@
       "titleAdd": "Add Photo",
       "titleEditCaption": "Edit Caption",
       "tooLarge": "File is {{size}} MB; the maximum is {{max}} MB.",
+      "unsetNameplate": "Remove nameplate",
       "unsupportedType": "Only JPEG, PNG, and WEBP are supported. HEIC photos must be converted before upload.",
       "uploadCount": "Upload {{count}} photos"
     },

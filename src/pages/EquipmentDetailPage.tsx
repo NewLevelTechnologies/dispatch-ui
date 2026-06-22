@@ -325,6 +325,16 @@ export default function EquipmentDetailPage() {
     onSuccess: imageInvalidate,
     onError: (err) => showError(t('equipment.images.errorUpdate'), extractApiError(err)),
   });
+  // Nameplate role — settable AND clearable (a wrongly-tagged photo must be
+  // fixable, and an equipment can legitimately have no nameplate shot). Setting
+  // it true server-side clears any other nameplate (one image per role);
+  // independent of isProfile.
+  const setNameplateImageMutation = useMutation({
+    mutationFn: ({ imageId, value }: { imageId: string; value: boolean }) =>
+      equipmentImagesApi.patch(id!, imageId, { isNameplate: value }),
+    onSuccess: imageInvalidate,
+    onError: (err) => showError(t('equipment.images.errorUpdate'), extractApiError(err)),
+  });
   const updateCaptionMutation = useMutation({
     mutationFn: ({ imageId, caption }: { imageId: string; caption: string | null }) =>
       equipmentImagesApi.patch(id!, imageId, { caption }),
@@ -557,6 +567,9 @@ export default function EquipmentDetailPage() {
   const handleSetProfileImage = (img: EquipmentImage) => {
     if (!img.isProfile) setProfileImageMutation.mutate(img.id);
   };
+  const handleToggleNameplate = (img: EquipmentImage) => {
+    setNameplateImageMutation.mutate({ imageId: img.id, value: !img.isNameplate });
+  };
   const handleEditCaption = (img: EquipmentImage) => {
     const next = window.prompt(t('equipment.images.newCaption'), img.caption ?? '');
     if (next === null) return;
@@ -599,6 +612,7 @@ export default function EquipmentDetailPage() {
       thumb: p.thumbnailUrl ?? p.url,
       alt: p.caption ?? equipment.name,
       label: p.caption ?? '',
+      isNameplate: p.isNameplate,
       mediaIndex: galleryIndexOffset + gi,
     })),
     ...videos.map((v, vi) => ({
@@ -978,6 +992,7 @@ export default function EquipmentDetailPage() {
                           thumb={profilePhoto.thumbnailUrl ?? profilePhoto.url}
                           alt={profilePhoto.caption ?? equipment.name}
                           label="Profile"
+                          isNameplate={profilePhoto.isNameplate}
                           hero
                         />
                       )}
@@ -988,6 +1003,7 @@ export default function EquipmentDetailPage() {
                           thumb={m.thumb}
                           alt={m.alt}
                           label={m.label}
+                          isNameplate={m.isNameplate}
                           isVideo={m.isVideo}
                           durationSeconds={m.durationSeconds}
                           overflow={i === peekShown.length - 1 ? peekOverflow : 0}
@@ -1409,26 +1425,47 @@ export default function EquipmentDetailPage() {
                                 loading="lazy"
                               />
                             </button>
-                            {img.isProfile ? (
-                              // The profile photo leads the gallery — labeled, no set-profile control.
-                              <span
-                                className="absolute left-1 top-1 rounded px-1.5 py-0.5 text-[8.5px] font-bold uppercase tracking-[0.04em] text-white"
-                                style={{ background: 'var(--accent-500)' }}
-                              >
-                                Profile
-                              </span>
-                            ) : (
-                              <button
-                                type="button"
-                                onClick={() => handleSetProfileImage(img)}
-                                aria-label={t('equipment.images.setAsProfile')}
-                                title={t('equipment.images.setAsProfile')}
-                                className="absolute left-1 top-1 flex size-8 items-center justify-center rounded-full bg-bg-elev/80 backdrop-blur transition-colors hover:bg-bg-elev"
-                              >
-                                <StarIconOutline className="size-5 text-fg-muted hover:text-amber-500" />
-                              </button>
+                            {/* Top-left is labels only — the role badge(s). Profile and
+                                Nameplate are independent flags, so both can show side by
+                                side (wrap if the tile is narrow). Always visible; the
+                                actions live top-right. */}
+                            {(img.isProfile || img.isNameplate) && (
+                              <div className="absolute left-1 top-1 flex flex-wrap items-start gap-1">
+                                {img.isProfile && (
+                                  <span
+                                    className="rounded px-1.5 py-0.5 text-[8.5px] font-bold uppercase tracking-[0.04em] text-white"
+                                    style={{ background: 'var(--accent-500)' }}
+                                  >
+                                    Profile
+                                  </span>
+                                )}
+                                {img.isNameplate && (
+                                  <span
+                                    className="rounded px-1.5 py-0.5 text-[8.5px] font-bold uppercase tracking-[0.04em] text-white"
+                                    style={{ background: 'var(--accent-500)' }}
+                                  >
+                                    Nameplate
+                                  </span>
+                                )}
+                              </div>
                             )}
-                            <div className="absolute right-1 top-1">
+                            {/* Top-right: actions, clustered + hover/focus-reveal so they
+                                don't clutter the tile at rest (the role badges stay put,
+                                top-left). The set-profile star is the action only — shown
+                                on non-profile tiles; the PROFILE badge already conveys the
+                                set state, so no star there. Set-as-nameplate is in the kebab. */}
+                            <div className="absolute right-1 top-1 flex items-center gap-1 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100">
+                              {!img.isProfile && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleSetProfileImage(img)}
+                                  aria-label={t('equipment.images.setAsProfile')}
+                                  title={t('equipment.images.setAsProfile')}
+                                  className="flex size-8 items-center justify-center rounded-full bg-bg-elev/80 backdrop-blur transition-colors hover:bg-bg-elev"
+                                >
+                                  <StarIconOutline className="size-5 text-fg-muted hover:text-amber-500" />
+                                </button>
+                              )}
                               <Dropdown>
                                 <DropdownButton
                                   plain
@@ -1438,6 +1475,13 @@ export default function EquipmentDetailPage() {
                                   <EllipsisVerticalIcon className="size-5" />
                                 </DropdownButton>
                                 <DropdownMenu anchor="bottom end">
+                                  <DropdownItem onClick={() => handleToggleNameplate(img)}>
+                                    <DropdownLabel>
+                                      {img.isNameplate
+                                        ? t('equipment.images.unsetNameplate')
+                                        : t('equipment.images.setAsNameplate')}
+                                    </DropdownLabel>
+                                  </DropdownItem>
                                   <DropdownItem onClick={() => handleEditCaption(img)}>
                                     <DropdownLabel>{t('equipment.images.editCaption')}</DropdownLabel>
                                   </DropdownItem>
@@ -1625,6 +1669,7 @@ interface MediaPeekItem {
   thumb: string | null;
   alt: string;
   label: string;
+  isNameplate?: boolean;
   isVideo?: boolean;
   durationSeconds?: number | null;
   // Position in the combined media gallery (photos then videos) → opens the
@@ -1645,6 +1690,7 @@ function MediaPeekTile({
   thumb,
   alt,
   label,
+  isNameplate = false,
   isVideo = false,
   durationSeconds,
   hero = false,
@@ -1654,6 +1700,7 @@ function MediaPeekTile({
   thumb: string | null;
   alt: string;
   label: string;
+  isNameplate?: boolean;
   isVideo?: boolean;
   durationSeconds?: number | null;
   hero?: boolean;
@@ -1687,12 +1734,26 @@ function MediaPeekTile({
         </span>
       )}
 
-      {hero && (
-        <span
-          className="absolute left-1 top-1 rounded px-1 py-0.5 text-[8px] font-bold uppercase tracking-[0.04em] text-white"
-          style={{ background: 'var(--accent-500)' }}
-        >
-          Profile
+      {/* Role badges, top-left — Profile (the hero tile) and/or Nameplate; both
+          can show (independent flags), wrapping if the tile is tight. */}
+      {(hero || isNameplate) && !overflow && (
+        <span className="absolute left-1 top-1 flex flex-wrap gap-0.5">
+          {hero && (
+            <span
+              className="rounded px-1 py-0.5 text-[8px] font-bold uppercase tracking-[0.04em] text-white"
+              style={{ background: 'var(--accent-500)' }}
+            >
+              Profile
+            </span>
+          )}
+          {isNameplate && (
+            <span
+              className="rounded px-1 py-0.5 text-[8px] font-bold uppercase tracking-[0.04em] text-white"
+              style={{ background: 'var(--accent-500)' }}
+            >
+              Nameplate
+            </span>
+          )}
         </span>
       )}
 
