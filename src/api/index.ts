@@ -195,6 +195,7 @@ export {
   type EquipmentSummary,
   type CreateEquipmentRequest,
   type UpdateEquipmentRequest,
+  type NameplateExtractionResponse,
   type ListEquipmentParams,
   type EquipmentSortField,
   type EquipmentSortDirection,

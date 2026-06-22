@@ -1,4 +1,5 @@
 /* eslint-disable i18next/no-literal-string -- spec field labels come from the tenant field definitions; only "$" and "Select…" are literal. Shared by the equipment form + detail Specs surfaces. */
+import type { ReactNode } from 'react';
 import { Checkbox, CheckboxField } from './catalyst/checkbox';
 import { Field, Label } from './catalyst/fieldset';
 import { Input } from './catalyst/input';
@@ -14,18 +15,21 @@ export function SpecFieldInput({
   value,
   onChange,
   error,
+  badge,
 }: {
   field: EquipmentCategoryField;
   value: string;
   onChange: (v: string) => void;
   error?: string | false;
+  // Optional marker rendered after the label (e.g. the nameplate "READ" badge).
+  badge?: ReactNode;
 }) {
   if (field.dataType === 'BOOLEAN') {
     return (
       <div>
         <CheckboxField>
           <Checkbox checked={value === 'true'} onChange={(c) => onChange(c ? 'true' : '')} />
-          <Label size="xs">{field.label}</Label>
+          <Label size="xs">{field.label}{badge}</Label>
         </CheckboxField>
         {field.helpText && <Text size="xs" tone="muted" className="mt-1">{field.helpText}</Text>}
       </div>
@@ -36,6 +40,7 @@ export function SpecFieldInput({
       <Label size="xs">
         {field.label}
         {field.required && <span className="text-fg-dim"> *</span>}
+        {badge}
       </Label>
       {field.dataType === 'SELECT' ? (
         <Select value={value} onChange={(e) => onChange(e.target.value)} invalid={!!error}>

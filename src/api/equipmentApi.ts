@@ -210,6 +210,17 @@ function cleanParams(params?: ListEquipmentParams): Record<string, string | numb
   return out;
 }
 
+// Nameplate OCR result — suggested values only; nothing is saved. Type/Category
+// are never returned (not on a data plate). `attributes` is a free-form spec map
+// (fieldKey → value) merged into the equipment's attributes on save.
+export interface NameplateExtractionResponse {
+  make: string | null;
+  model: string | null;
+  serialNumber: string | null;
+  attributes: Record<string, string> | null;
+  warnings: string[] | null;
+}
+
 export const equipmentApi = {
   list: async (params?: ListEquipmentParams): Promise<Page<EquipmentSummary>> => {
     const response = await apiClient.get<Page<EquipmentSummary>>('/equipment', {
@@ -239,6 +250,25 @@ export const equipmentApi = {
 
   create: async (request: CreateEquipmentRequest): Promise<Equipment> => {
     const response = await apiClient.post<Equipment>('/equipment', request);
+    return response.data;
+  },
+
+  /**
+   * Nameplate OCR — suggests make/model/serial + spec attributes from a photo
+   * of the data plate. Equipment-less and stateless (tenant from JWT; nothing
+   * saved), so it works on the Add form *before* a record exists; the form
+   * keeps the File and uploads it as durable media after create. All response
+   * fields are nullable. Errors: 403 AI features off (hide the hero), 400 bad
+   * file, 502 model unreachable — callers fall back to manual entry.
+   */
+  extractNameplate: async (file: File): Promise<NameplateExtractionResponse> => {
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await apiClient.post<NameplateExtractionResponse>(
+      '/equipment/nameplate-extraction',
+      formData,
+      { headers: { 'Content-Type': 'multipart/form-data' } }
+    );
     return response.data;
   },
 
@@ -691,6 +721,9 @@ export interface EquipmentImage {
   thumbnailWidthPx: number | null;
   thumbnailHeightPx: number | null;
   isProfile: boolean;
+  // The data-plate shot — the unit's source-of-truth photo. At most one per
+  // equipment (setting it server-side clears any other). Independent of isProfile.
+  isNameplate: boolean;
   sortOrder: number;
   caption: string | null;
   uploadedBy: string | null;
@@ -712,6 +745,9 @@ export interface RequestImageUploadUrlResponse {
 
 export interface UpdateEquipmentImageRequest {
   isProfile?: boolean;
+  // Mark/unmark as the nameplate. Setting true auto-clears any other image's
+  // flag for the equipment (one nameplate per unit).
+  isNameplate?: boolean;
   caption?: string | null;
   sortOrder?: number;
 }

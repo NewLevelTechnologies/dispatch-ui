@@ -6,17 +6,23 @@ import { useTranslation } from 'react-i18next';
 import {
   customerApi,
   equipmentApi,
+  equipmentImagesApi,
   equipmentTypesApi,
   equipmentCategoriesApi,
   equipmentCategoryFieldsApi,
+  tenantSettingsApi,
+  EQUIPMENT_IMAGE_CONTENT_TYPES,
+  EQUIPMENT_IMAGE_MAX_BYTES,
   type CreateEquipmentRequest,
   type UpdateEquipmentRequest,
+  type NameplateExtractionResponse,
   type ServiceLocationSearchResult,
 } from '../api';
 import { useGlossary } from '../contexts/GlossaryContext';
 import { showError, showSuccess, extractApiError } from '../lib/toast';
 import AppLayout from '../components/AppLayout';
 import ServiceLocationPicker from '../components/ServiceLocationPicker';
+import { EquipmentNameplateHero } from '../components/EquipmentNameplateHero';
 import { Card } from '../components/catalyst/card';
 import { Button } from '../components/catalyst/button';
 import { Field, Label } from '../components/catalyst/fieldset';
@@ -26,7 +32,23 @@ import { Heading } from '../components/catalyst/heading';
 import { Text } from '../components/catalyst/text';
 import { Callout } from '../components/ui/Callout';
 import { SpecFieldInput } from '../components/EquipmentSpecFields';
-import { parseAttributes, buildAttributes } from '../utils/equipmentAttributes';
+import { parseAttributes, buildAttributes, matchOption } from '../utils/equipmentAttributes';
+
+// Nameplate review markers. READ = OCR filled it (accent); VERIFY = OCR is
+// error-prone here, confirm it (amber). Cleared the moment the field is edited.
+type NameplateMark = 'read' | 'verify';
+function NameplateBadge({ kind }: { kind: NameplateMark }) {
+  const text = kind === 'read' ? 'READ' : 'VERIFY';
+  const cls =
+    kind === 'read'
+      ? 'bg-accent-500/15 text-fg-accent'
+      : 'bg-warning-500/20 text-warning-fg';
+  return (
+    <span className={`ml-1.5 inline-block rounded-[3px] px-1 py-px align-middle text-[9px] font-bold tracking-[0.04em] ${cls}`}>
+      {text}
+    </span>
+  );
+}
 
 // Add / Edit Equipment — full-page form. The redesigned sibling of Add
 // Location / Add Customer (same max-w-[680px], section cards, gated
@@ -56,6 +78,7 @@ interface FormState {
   model: string;
   serialNumber: string;
   installDate: string;
+  locationOnSite: string;
   equipmentTypeId: string;
   equipmentCategoryId: string;
   warrantyExpiresAt: string;
@@ -70,6 +93,7 @@ const blankForm: FormState = {
   model: '',
   serialNumber: '',
   installDate: '',
+  locationOnSite: '',
   equipmentTypeId: '',
   equipmentCategoryId: '',
   warrantyExpiresAt: '',
@@ -99,6 +123,37 @@ export default function EquipmentFormPage() {
   const [specValues, setSpecValues] = useState<Record<string, string>>({});
   const setSpec = (key: string, value: string) => setSpecValues((s) => ({ ...s, [key]: value }));
 
+  // ===== Nameplate OCR (add mode, AI-gated) =====
+  // The photo is kept client-side and uploaded as durable media after create.
+  const [nameplateFile, setNameplateFile] = useState<File | null>(null);
+  const [nameplateState, setNameplateState] = useState<'idle' | 'reading' | 'done'>('idle');
+  const [nameplateError, setNameplateError] = useState<string | null>(null);
+  const [nameplateWarnings, setNameplateWarnings] = useState<string[]>([]);
+  // Raw OCR'd spec map, retained across category changes. The plate may report
+  // specs (refrigerant, voltage…) before a category is chosen — we hold them and
+  // re-apply once the category's field list is known (snapping selects to options).
+  const [nameplateAttrs, setNameplateAttrs] = useState<Record<string, string>>({});
+  // field key ('make' | 'model' | 'serialNumber' | `spec:${fieldKey}`) → marker
+  const [nameplateMarks, setNameplateMarks] = useState<Record<string, NameplateMark>>({});
+  // Backstop for a 403 racing past the settings gate (AI turned off mid-session).
+  const [nameplateForceHidden, setNameplateForceHidden] = useState(false);
+  const clearMark = (key: string) =>
+    setNameplateMarks((m) => {
+      if (!m[key]) return m;
+      const next = { ...m };
+      delete next[key];
+      return next;
+    });
+
+  // AI Features gate — the hero only exists in add mode when the tenant enables
+  // AI. Shares the settings cache key with the Company Profile panel.
+  const { data: tenantSettings } = useQuery({
+    queryKey: ['tenant-settings'],
+    queryFn: () => tenantSettingsApi.getSettings(),
+    enabled: !isEdit,
+  });
+  const showNameplateHero = !isEdit && tenantSettings?.enableAiFeatures === true && !nameplateForceHidden;
+
   // ===== Edit: load the record (separate key so the includeDescendants
   // projection doesn't pollute the detail page's cache) =====
   const {
@@ -121,6 +176,7 @@ export default function EquipmentFormPage() {
         model: equipment.model ?? '',
         serialNumber: equipment.serialNumber ?? '',
         installDate: equipment.installDate ?? '',
+        locationOnSite: equipment.locationOnSite ?? '',
         equipmentTypeId: equipment.equipmentTypeId ?? '',
         equipmentCategoryId: equipment.equipmentCategoryId ?? '',
         warrantyExpiresAt: equipment.warrantyExpiresAt ?? '',
@@ -232,13 +288,123 @@ export default function EquipmentFormPage() {
         ? getName('equipment', true)
         : locationLabel;
 
+  // Apply an OCR result: fill make/model/serial now (serial → VERIFY since OCR
+  // fumbles it; the rest → READ), and retain the spec map for the reconcile
+  // effect below — the spec fields may not exist until a category is chosen.
+  const applyNameplate = (res: NameplateExtractionResponse) => {
+    setForm((f) => ({
+      ...f,
+      make: res.make ?? f.make,
+      model: res.model ?? f.model,
+      serialNumber: res.serialNumber ?? f.serialNumber,
+    }));
+    setNameplateAttrs(res.attributes ?? {});
+    const marks: Record<string, NameplateMark> = {};
+    if (res.make) marks.make = 'read';
+    if (res.model) marks.model = 'read';
+    if (res.serialNumber) marks.serialNumber = 'verify';
+    setNameplateMarks(marks);
+    setNameplateWarnings(res.warnings ?? []);
+  };
+
+  // Reconcile retained OCR specs against the chosen category's field list. Runs
+  // when the field set arrives or changes (category pick / switch), filling only
+  // still-empty fields so it never clobbers a manual edit; SELECT reads snap to
+  // a matching option ("R410A" → "R-410A"). This is what lets a spec the plate
+  // reported before category selection land in the right field afterward. The
+  // functional updater reads the latest values, so no extra deps / no clobber.
+  useEffect(() => {
+    if (specFields.length === 0 || Object.keys(nameplateAttrs).length === 0) return;
+    // Derive spec prefill from the category field list once it loads; runs only
+    // on field-set / OCR-result change, and the updater reads the latest values
+    // so it converges (no cascading loop).
+    /* eslint-disable-next-line react-hooks/set-state-in-effect */
+    setSpecValues((prev) => {
+      let changed = false;
+      const next = { ...prev };
+      for (const f of specFields) {
+        const raw = nameplateAttrs[f.fieldKey];
+        if (raw == null || raw === '') continue;
+        if ((prev[f.fieldKey] ?? '') !== '') continue; // never overwrite an edit
+        const value = f.dataType === 'SELECT' ? matchOption(raw, f.options) : raw;
+        if (!value) continue;
+        next[f.fieldKey] = value;
+        changed = true;
+      }
+      return changed ? next : prev;
+    });
+  }, [specFields, nameplateAttrs]);
+
+  // A spec field shows the nameplate READ badge while its value still equals what
+  // the plate read (snapped for selects); editing the field diverges it and the
+  // badge clears on its own — no stored per-field marker needed.
+  const specNameplateMark = (fieldKey: string): NameplateMark | undefined => {
+    const raw = nameplateAttrs[fieldKey];
+    if (raw == null || raw === '') return undefined;
+    const field = specFields.find((f) => f.fieldKey === fieldKey);
+    if (!field) return undefined;
+    const ocrValue = field.dataType === 'SELECT' ? matchOption(raw, field.options) : raw;
+    return ocrValue != null && (specValues[fieldKey] ?? '') === ocrValue ? 'read' : undefined;
+  };
+
+  const extractMutation = useMutation({
+    mutationFn: (file: File) => equipmentApi.extractNameplate(file),
+    onSuccess: (res) => {
+      applyNameplate(res);
+      setNameplateState('done');
+    },
+    onError: (err: unknown) => {
+      const status =
+        err && typeof err === 'object' && 'response' in err
+          ? (err as { response?: { status?: number } }).response?.status
+          : undefined;
+      if (status === 403) {
+        // AI turned off at the tenant — pull the hero, keep manual entry.
+        setNameplateForceHidden(true);
+        setNameplateState('idle');
+        return;
+      }
+      setNameplateState('idle');
+      setNameplateError(extractApiError(err) ?? 'Could not read the nameplate — enter the details manually.');
+    },
+  });
+
+  // Validate client-side (HEIC from the photo library 400s server-side until the
+  // transcode lands), then read.
+  const pickNameplate = (file: File) => {
+    setNameplateError(null);
+    if (!(EQUIPMENT_IMAGE_CONTENT_TYPES as readonly string[]).includes(file.type)) {
+      setNameplateError(
+        'Use a JPEG, PNG, or WebP photo. (iPhone HEIC isn’t supported yet — take the photo with the camera, or convert it first.)'
+      );
+      return;
+    }
+    if (file.size > EQUIPMENT_IMAGE_MAX_BYTES) {
+      setNameplateError('That photo is over 25 MB — use a smaller one.');
+      return;
+    }
+    setNameplateFile(file);
+    setNameplateState('reading');
+    extractMutation.mutate(file);
+  };
+
+  const resetNameplate = () => {
+    setNameplateFile(null);
+    setNameplateState('idle');
+    setNameplateError(null);
+    setNameplateWarnings([]);
+    setNameplateMarks({});
+    setNameplateAttrs({});
+  };
+
   const saveMutation = useMutation({
-    mutationFn: () => {
+    mutationFn: async () => {
       const base = {
         name: form.name.trim(),
         make: form.make.trim() || null,
         model: form.model.trim() || null,
         serialNumber: form.serialNumber.trim() || null,
+        locationOnSite: form.locationOnSite.trim() || null,
         equipmentTypeId: form.equipmentTypeId || null,
         equipmentCategoryId: form.equipmentCategoryId || null,
         installDate: form.installDate || null,
@@ -263,7 +429,19 @@ export default function EquipmentFormPage() {
         serviceLocationId: effectiveServiceLocationId!,
         parentId: addParentId ?? null,
       };
-      return equipmentApi.create(payload);
+      const created = await equipmentApi.create(payload);
+      // The nameplate photo is the durable record — attach it once the unit
+      // exists, then flag it as the source-of-truth shot. Non-fatal: a failed
+      // upload/flag must not lose the created record.
+      if (nameplateFile) {
+        try {
+          const img = await equipmentImagesApi.upload(created.id, nameplateFile, { caption: 'Nameplate' });
+          await equipmentImagesApi.patch(created.id, img.id, { isNameplate: true });
+        } catch {
+          /* record stands; the photo just didn't attach */
+        }
+      }
+      return created;
     },
     onSuccess: (saved) => {
       queryClient.invalidateQueries({ queryKey: ['equipment'] });
@@ -368,6 +546,18 @@ export default function EquipmentFormPage() {
           </div>
 
           <form onSubmit={handleSubmit}>
+            {/* Nameplate OCR hero — add mode's primary fill path, AI-gated.
+                Cleanly omitted (no placeholder) when AI Features are off. */}
+            {showNameplateHero && (
+              <EquipmentNameplateHero
+                state={nameplateState}
+                error={nameplateError}
+                warnings={nameplateWarnings}
+                onPick={pickNameplate}
+                onReset={resetNameplate}
+              />
+            )}
+
             {/* Location — standalone add only (scoped/edit carry it in the header). */}
             {standalone && (
               <Card title={getName('service_location')} className="mb-3.5">
@@ -430,6 +620,63 @@ export default function EquipmentFormPage() {
               </div>
             </Card>
 
+            {/* Identity — before Specs: Name is the one required field here, and
+                after a scan the VERIFY/READ markers live here, so it sits directly
+                under the nameplate banner that says "verify these". */}
+            <Card title="Identity" className="mb-3.5">
+              {/* Name + on-site paired: the tech is standing at the unit during
+                  intake, so the "where on the premises" is fresh in mind. */}
+              <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+                <Field size="xs">
+                  <Label size="xs" required>{t('common.form.name')}</Label>
+                  <Input
+                    size="xs"
+                    value={form.name}
+                    onChange={(e) => set('name', e.target.value)}
+                    onBlur={() => mark('name')}
+                    invalid={!!(touched.name && errors.name)}
+                    placeholder="RTU-3, Walk-in freezer…"
+                  />
+                  {touched.name && errors.name && (
+                    <Text size="xs" className="mt-1 text-danger-500">{errors.name}</Text>
+                  )}
+                </Field>
+                <Field size="xs">
+                  <Label size="xs">{t('equipment.form.locationOnSite')}</Label>
+                  <Input
+                    size="xs"
+                    value={form.locationOnSite}
+                    onChange={(e) => set('locationOnSite', e.target.value)}
+                    placeholder="Roof · SE quadrant, Basement…"
+                  />
+                </Field>
+              </div>
+              <div className="mt-2.5 grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+                <Field size="xs">
+                  <Label size="xs">{t('equipment.form.make')}{nameplateMarks.make && <NameplateBadge kind={nameplateMarks.make} />}</Label>
+                  <Input size="xs" value={form.make} onChange={(e) => { set('make', e.target.value); clearMark('make'); }} placeholder="Carrier" />
+                </Field>
+                <Field size="xs">
+                  <Label size="xs">{t('equipment.form.model')}{nameplateMarks.model && <NameplateBadge kind={nameplateMarks.model} />}</Label>
+                  <Input size="xs" className="font-mono" value={form.model} onChange={(e) => { set('model', e.target.value); clearMark('model'); }} placeholder="50TC-A06" />
+                </Field>
+                <Field size="xs">
+                  <Label size="xs">{t('equipment.form.serialNumber')}{nameplateMarks.serialNumber && <NameplateBadge kind={nameplateMarks.serialNumber} />}</Label>
+                  <Input
+                    size="xs"
+                    className={nameplateMarks.serialNumber === 'verify' ? 'font-mono [&_input]:!border-warning-500' : 'font-mono'}
+                    value={form.serialNumber}
+                    onChange={(e) => { set('serialNumber', e.target.value); clearMark('serialNumber'); }}
+                    placeholder="A1142099"
+                  />
+                </Field>
+                <Field size="xs">
+                  <Label size="xs">{t('equipment.form.installDate')}</Label>
+                  <Input size="xs" type="date" value={form.installDate} onChange={(e) => set('installDate', e.target.value)} />
+                </Field>
+              </div>
+            </Card>
+
             {/* Specs — the chosen category's custom fields (from the tenant
                 registry). Renders only once a category with fields is picked. */}
             {form.equipmentCategoryId && specFields.length > 0 && (
@@ -440,54 +687,22 @@ export default function EquipmentFormPage() {
                   </Text>
                 )}
                 <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
-                  {specFields.map((f) => (
-                    <SpecFieldInput
-                      key={f.id}
-                      field={f}
-                      value={specValues[f.fieldKey] ?? ''}
-                      onChange={(v) => setSpec(f.fieldKey, v)}
-                      error={touched[`spec:${f.fieldKey}`] && errors[`spec:${f.fieldKey}`]}
-                    />
-                  ))}
+                  {specFields.map((f) => {
+                    const mark = specNameplateMark(f.fieldKey);
+                    return (
+                      <SpecFieldInput
+                        key={f.id}
+                        field={f}
+                        value={specValues[f.fieldKey] ?? ''}
+                        onChange={(v) => setSpec(f.fieldKey, v)}
+                        error={touched[`spec:${f.fieldKey}`] && errors[`spec:${f.fieldKey}`]}
+                        badge={mark && <NameplateBadge kind={mark} />}
+                      />
+                    );
+                  })}
                 </div>
               </Card>
             )}
-
-            {/* Identity */}
-            <Card title="Identity" className="mb-3.5">
-              <Field size="xs">
-                <Label size="xs" required>{t('common.form.name')}</Label>
-                <Input
-                  size="xs"
-                  value={form.name}
-                  onChange={(e) => set('name', e.target.value)}
-                  onBlur={() => mark('name')}
-                  invalid={!!(touched.name && errors.name)}
-                  placeholder="RTU-3, Walk-in freezer…"
-                />
-                {touched.name && errors.name && (
-                  <Text size="xs" className="mt-1 text-danger-500">{errors.name}</Text>
-                )}
-              </Field>
-              <div className="mt-2.5 grid grid-cols-1 gap-2.5 sm:grid-cols-2">
-                <Field size="xs">
-                  <Label size="xs">{t('equipment.form.make')}</Label>
-                  <Input size="xs" value={form.make} onChange={(e) => set('make', e.target.value)} placeholder="Carrier" />
-                </Field>
-                <Field size="xs">
-                  <Label size="xs">{t('equipment.form.model')}</Label>
-                  <Input size="xs" className="font-mono" value={form.model} onChange={(e) => set('model', e.target.value)} placeholder="50TC-A06" />
-                </Field>
-                <Field size="xs">
-                  <Label size="xs">{t('equipment.form.serialNumber')}</Label>
-                  <Input size="xs" className="font-mono" value={form.serialNumber} onChange={(e) => set('serialNumber', e.target.value)} placeholder="A1142099" />
-                </Field>
-                <Field size="xs">
-                  <Label size="xs">{t('equipment.form.installDate')}</Label>
-                  <Input size="xs" type="date" value={form.installDate} onChange={(e) => set('installDate', e.target.value)} />
-                </Field>
-              </div>
-            </Card>
 
             {/* Placement — edit only. Re-parent works; relocation is backend-gated. */}
             {isEdit && (
