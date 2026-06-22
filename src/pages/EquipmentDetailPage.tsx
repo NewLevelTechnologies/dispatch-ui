@@ -772,9 +772,15 @@ export default function EquipmentDetailPage() {
                       </RouterLink>
                     </div>
                   )}
-                  {/* Identity strip — read-only meta line (make/model · serial ·
-                      installed · on-site). Edit via the header "Edit". Renders
-                      only populated items. */}
+                  {/* Identity strip — read-only meta line of universal facts only
+                      (make/model · serial · installed). "Location on site" is NOT
+                      here — it lives in the Located-at card. Edit via the header
+                      "Edit". Renders only populated items.
+
+                      The "·" is a trailing separator glued to the END of each
+                      non-last fact (inside its own non-wrapping flex span), so when
+                      the row wraps a fact always leads with its own text — never an
+                      orphaned bullet at the start of a line. */}
                   {(() => {
                     const items: React.ReactNode[] = [];
                     if (equipment.make || equipment.model) {
@@ -791,14 +797,15 @@ export default function EquipmentDetailPage() {
                     }
                     const installed = formatInstalled(equipment.installDate);
                     if (installed) items.push(<span>{installed}</span>);
-                    if (equipment.locationOnSite) items.push(<span>{equipment.locationOnSite}</span>);
                     if (items.length === 0) return null;
                     return (
                       <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11.5px] text-fg-muted">
                         {items.map((node, i) => (
                           <span key={i} className="flex items-center gap-x-2">
-                            {i > 0 && <span className="text-fg-dim">·</span>}
                             {node}
+                            {i < items.length - 1 && (
+                              <span className="text-fg-dim" aria-hidden="true">·</span>
+                            )}
                           </span>
                         ))}
                       </div>
