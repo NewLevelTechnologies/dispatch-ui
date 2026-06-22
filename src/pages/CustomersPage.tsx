@@ -469,8 +469,8 @@ export default function CustomersPage() {
                           </td>
                           <td>
                             <CellStack>
+                              {/* No inline label — a street address is self-identifying by format. */}
                               <CellTop>
-                                <span className="dt-inline-label">{t('customers.table.billingAddress')}: </span>
                                 {titleCaseAddress(customer.billingAddress.streetAddress)}
                               </CellTop>
                               <CellSub>

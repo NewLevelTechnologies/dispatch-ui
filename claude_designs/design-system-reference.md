@@ -614,6 +614,24 @@ Thin wrappers around `<table>` that apply the `.dense-table` CSS class. 12 px te
 
 Cell helpers via className: `right` (text-align), `num` (tabular-nums), `strong` (`fg-strong` semibold), `muted` (11 px `fg-muted`).
 
+**Mobile labeled-stack (`<640px`).** The row-as-card reflow drops the `<thead>`, so a stacked value that lived under a column header can lose its meaning (a lone `2`, `Florida`, `$50.00`). Give it the header back as an inline label — but **only when it'd be ambiguous on its own**. The test is ambiguity, not "every cell":
+
+- **Label it** when bare is unidentifiable: `Region: Florida`, `Balance: $50.00` (two bare `$50.00` lines are meaningless without `Amount` / `Balance`).
+- **Leave it bare** when self-identifying by format: status `Pill`s, a formatted phone, an email (the `@` says email), a full address. The headline/identity cell (name, a location's address) is always bare.
+- Multiple of the same kind **are** ambiguous → label each (`Mobile` / `Office` / `After hours` for three phone numbers).
+- Short values inline (`Make / Model: Simons · Rager`); only break to a second line for genuinely long values (AI summaries, notes).
+
+Mechanics — all CSS-only, mobile-gated, desktop unchanged:
+
+| Hook | Use |
+| --- | --- |
+| `<td data-label="Balance">` | Renders the cell as `Balance: $250` on the mobile card. |
+| `<span className="dt-inline-label">Contact: </span>` | Same idea inside a multi-line `CellStack` (a `::before` can't sit inline on a flex-column stack — prefix the first line). |
+| `dt-inline-value` (on the `<td>`) | Keep a short value (and its `·`-joined parts) on the label's line instead of stacking them beneath it; omit for long values that should wrap. |
+| `dt-empty` (on the `<td>`) | Drop a cell whose value is just `—` (kept on desktop for column alignment, omitted from the card). |
+| `dt-mobile-hide` (on the `<td>`) | Drop a low-value column from the card entirely. |
+| `<DenseTable className="dense-stack">` | Table has no kebab/actions column → the last cell is data; stack it full-width instead of floating it to the top-right corner. |
+
 **Diverges from Catalyst `table.tsx`** because Catalyst's table padding is sized for marketing-style admin dashboards. CSRs see 25–30 rows at a glance here, not 8.
 
 ### PageHead — `ui/PageHead.tsx`
@@ -1337,7 +1355,7 @@ The admin web app is **desktop-first, responsive down**. Field techs use a separ
 
 **Per-page-type expectations:**
 
-- **List pages** — `DenseTable` already handles row-as-card at `<640px`. `ListToolbar` chips wrap; `ListSearch` becomes full-width. Sticky-left first column at `<1024px`. No additional work needed for new list pages — use the primitives correctly and responsive is free.
+- **List pages** — `DenseTable` already handles row-as-card at `<640px`. `ListToolbar` chips wrap; `ListSearch` becomes full-width. Sticky-left first column at `<1024px`. The reflow itself is free, but it drops the `<thead>` — so any cell that would be ambiguous without its column header needs a `data-label` (see the labeled-stack rules under §2 DenseTable). Self-identifying cells (pills, phone, email, address) stay bare.
 - **Detail pages** — header card stacks: avatar + title above, action buttons full-width below. Metadata line wraps. Section cards inherit single-column.
 - **Form pages** — fields go single-column under `640px`. Sticky footer stays pinned. Card padding tightens to `p-3` (down from `p-3.5`).
 - **Settings pages** — same as detail. Settings sidebar nav collapses to a top tab strip or hamburger on `<1024px`.
@@ -1351,6 +1369,7 @@ A few primitives ship their own 640 px reflow so consumer pages don't add breakp
 
 - **`DataRow`** — three-column grid (label / value / action) at ≥640 px. Below, reflows vertically: label becomes an uppercase eyebrow above the value, action drops to its own full-width row underneath.
 - **`Callout`** — single row (icon / body / action) at ≥640 px. Below, the action drops to its own full-width row below the body and the icon top-aligns with the title row (so it doesn't appear orphaned against the taller stacked content).
+- **`DenseTable`** — rows collapse to one card per row at `<640px` (`<thead>` hidden, first cell = title, last cell = kebab corner). The reflow is automatic; relabeling stacked cells that would be ambiguous without their header is opt-in per `<td>` — see the labeled-stack rules under §2 DenseTable.
 
 **Touch targets:**
 

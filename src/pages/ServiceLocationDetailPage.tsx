@@ -3135,7 +3135,7 @@ function EquipmentRow({
           </div>
         </div>
       </td>
-      <td className={clsx(!e.make && !e.model && 'dt-empty')} data-label="Make / Model">
+      <td className={clsx('dt-inline-value', !e.make && !e.model && 'dt-empty')} data-label="Make / Model">
         <div className="text-[12px] text-fg">{e.make || '—'}</div>
         {e.model && <div className="text-[11px] text-fg-muted">{e.model}</div>}
       </td>

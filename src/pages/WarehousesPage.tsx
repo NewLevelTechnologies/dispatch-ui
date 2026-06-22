@@ -236,7 +236,8 @@ export default function WarehousesPage() {
                         {item.city && item.state ? `${titleCaseAddress(item.city)}, ${item.state}` : '-'}
                       </td>
                       <td className={clsx(!item.managerName && 'dt-empty')} data-label={t('equipment.table.manager')}>{item.managerName || '-'}</td>
-                      <td className={clsx(!item.phone && 'dt-empty')} data-label={t('common.form.phone')}>{item.phone || '-'}</td>
+                      {/* No data-label — a formatted phone is self-identifying by format. */}
+                      <td className={clsx(!item.phone && 'dt-empty')}>{item.phone || '-'}</td>
                       <td>{getStatusBadge(item.status)}</td>
                       <td>
                         <Dropdown>

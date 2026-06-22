@@ -129,7 +129,8 @@ export default function CustomerContactsTab({
                   <td className={clsx(!c.mobilePhone && 'dt-empty')} data-label={t('common.form.mobilePhone', { defaultValue: 'Mobile' })}><PhoneCell value={c.mobilePhone} /></td>
                   <td className={clsx(!c.phone && 'dt-empty')} data-label="Office"><PhoneCell value={c.phone} /></td>
                   <td className={clsx(!c.afterHoursPhone && 'dt-empty')} data-label="After hours"><PhoneCell value={c.afterHoursPhone} /></td>
-                  <td className={clsx('muted', !c.email && 'dt-empty')} data-label={t('common.form.email')}>
+                  {/* No data-label — an "x@y.com" is self-identifying (the @ says email). */}
+                  <td className={clsx('muted', !c.email && 'dt-empty')}>
                     {c.email ? (
                       <a href={`mailto:${c.email}`} className="text-[11.5px] text-fg-muted hover:text-fg-strong hover:underline">
                         {c.email}

@@ -644,6 +644,26 @@
     grid-row: auto;
     justify-self: stretch;
   }
+
+  /* `dt-inline-value`: keep a SHORT value on the label's line instead of
+     dropping it (and each of its parts) to its own row. Opt-in — a cell whose
+     value is split across block children (e.g. make over model) otherwise
+     breaks the label onto its own line and stacks the parts beneath it, burning
+     three lines for two words. Omit for genuinely long values (AI summaries,
+     notes) that should wrap on their own line below the label. */
+  .dense-table tbody td.dt-inline-value {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    column-gap: 0.35em;
+    row-gap: 2px;
+  }
+  /* "·" between multiple value parts so they don't run together (make · model). */
+  .dense-table tbody td.dt-inline-value > *:not(:first-child)::before {
+    content: "·";
+    margin-right: 0.35em;
+    color: var(--fg-dim);
+  }
 }
 
 /* dt-inline-label only earns its label treatment in the stacked card; hidden
