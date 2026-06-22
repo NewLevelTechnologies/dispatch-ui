@@ -10,6 +10,7 @@ import {
   ExclamationTriangleIcon,
   PlusIcon,
   StarIcon as StarIconOutline,
+  TagIcon,
   TrashIcon,
   XMarkIcon,
 } from '@heroicons/react/24/outline';
@@ -143,6 +144,16 @@ function LightboxInner({ equipmentId, items, startIndex, onClose, readOnly }: In
     onError: (err) => surfaceError(err, 'equipment.images.errorUpdate'),
   });
 
+  // Nameplate is a toggle here (unlike profile, which only sets) — the full
+  // view is the natural place to confirm "this is the data plate" or undo a
+  // mistag. Setting true clears any other nameplate server-side.
+  const setNameplateMutation = useMutation({
+    mutationFn: ({ imageId, value }: { imageId: string; value: boolean }) =>
+      equipmentImagesApi.patch(equipmentId, imageId, { isNameplate: value }),
+    onSuccess: invalidateImagesAndProjections,
+    onError: (err) => surfaceError(err, 'equipment.images.errorUpdate'),
+  });
+
   const updateCaptionMutation = useMutation({
     mutationFn: ({ imageId, caption }: { imageId: string; caption: string | null }) =>
       equipmentImagesApi.patch(equipmentId, imageId, { caption }),
@@ -180,6 +191,11 @@ function LightboxInner({ equipmentId, items, startIndex, onClose, readOnly }: In
   const handleSetProfile = () => {
     if (current.kind !== 'image' || current.image.isProfile) return;
     setProfileMutation.mutate(current.image.id);
+  };
+
+  const handleToggleNameplate = () => {
+    if (current.kind !== 'image') return;
+    setNameplateMutation.mutate({ imageId: current.image.id, value: !current.image.isNameplate });
   };
 
   const handleDelete = () => {
@@ -253,6 +269,25 @@ function LightboxInner({ equipmentId, items, startIndex, onClose, readOnly }: In
                       {t('equipment.images.setAsProfile')}
                     </button>
                   ))}
+                {/* Nameplate — a toggle (set/remove), since the full view is where
+                    you confirm the data plate or undo a mistag. */}
+                {isImage && (
+                  <button
+                    type="button"
+                    onClick={handleToggleNameplate}
+                    disabled={setNameplateMutation.isPending}
+                    className={
+                      current.image.isNameplate
+                        ? 'inline-flex items-center gap-1.5 rounded-full bg-accent-500/25 px-3 py-1.5 text-sm font-medium text-white ring-1 ring-inset ring-accent-400/40 hover:bg-accent-500/35 focus:outline-none focus-visible:ring-2 focus-visible:ring-white disabled:cursor-not-allowed disabled:opacity-50'
+                        : 'inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5 text-sm text-white hover:bg-white/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-white disabled:cursor-not-allowed disabled:opacity-50'
+                    }
+                  >
+                    <TagIcon className="size-4" />
+                    {current.image.isNameplate
+                      ? t('equipment.images.unsetNameplate')
+                      : t('equipment.images.setAsNameplate')}
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={handleDelete}
