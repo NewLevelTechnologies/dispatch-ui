@@ -40,7 +40,7 @@ import IconButton from '../IconButton';
 import ConfirmDialog from '../ConfirmDialog';
 import NotificationPreferencesDialog from '../NotificationPreferencesDialog';
 import LocationActivityStream from '../LocationActivityStream';
-import CustomerNotesCard from './CustomerNotesCard';
+import NotesCard from '../NotesCard';
 import CustomerInvoicesTab from './CustomerInvoicesTab';
 import CustomerContactsTab from './CustomerContactsTab';
 import CustomerHeaderTags from './CustomerHeaderTags';
@@ -214,7 +214,7 @@ export default function PayerDetail({ customer }: { customer: Customer }) {
                 <div className="flex flex-col gap-3">
                   <BillingCard customer={customer} ar={arSummary} canEdit={canEditCustomers} onSelectAging={goToBucket} />
                   <LinkedWorkPendingCard onViewInvoices={() => setActiveTab('invoices')} />
-                  <CustomerNotesCard customerId={customer.id} canEdit={canEditCustomers} />
+                  <NotesCard entityType="customer" entityId={customer.id} canEdit={canEditCustomers} />
                 </div>
                 <div className="flex flex-col gap-3">
                   <AccountDetailsCard customer={customer} ar={arSummary} canEdit={canEditCustomers} />
