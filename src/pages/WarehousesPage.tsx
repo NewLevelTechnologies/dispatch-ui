@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import clsx from 'clsx';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { PatternFormat } from 'react-number-format';
@@ -228,11 +229,14 @@ export default function WarehousesPage() {
                   {filteredWarehouses.map((item) => (
                     <DenseRow key={item.id}>
                       <td className="strong">{item.name}</td>
-                      <td>
+                      <td
+                        className={clsx(!(item.city && item.state) && 'dt-empty')}
+                        data-label={t('equipment.table.location')}
+                      >
                         {item.city && item.state ? `${titleCaseAddress(item.city)}, ${item.state}` : '-'}
                       </td>
-                      <td>{item.managerName || '-'}</td>
-                      <td>{item.phone || '-'}</td>
+                      <td className={clsx(!item.managerName && 'dt-empty')} data-label={t('equipment.table.manager')}>{item.managerName || '-'}</td>
+                      <td className={clsx(!item.phone && 'dt-empty')} data-label={t('common.form.phone')}>{item.phone || '-'}</td>
                       <td>{getStatusBadge(item.status)}</td>
                       <td>
                         <Dropdown>

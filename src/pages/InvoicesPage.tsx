@@ -1,4 +1,5 @@
 import { useState, useDeferredValue } from 'react';
+import clsx from 'clsx';
 import { useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
@@ -405,13 +406,16 @@ export default function InvoicesPage() {
                       <td>
                         <span className="id-mono text-fg-muted">{invoice.invoiceNumber}</span>
                       </td>
-                      <td className="strong">{invoice.customerName ?? invoice.customerId}</td>
-                      <td>{formatDate(invoice.invoiceDate)}</td>
-                      <td>{formatDate(invoice.dueDate)}</td>
-                      <td className={voided ? 'right num text-fg-muted line-through' : 'right num strong'}>
+                      <td className="strong" data-label={t('invoices.table.customer')}>{invoice.customerName ?? invoice.customerId}</td>
+                      <td data-label={t('invoices.table.invoiceDate')}>{formatDate(invoice.invoiceDate)}</td>
+                      <td data-label={t('invoices.table.dueDate')}>{formatDate(invoice.dueDate)}</td>
+                      <td
+                        className={voided ? 'right num text-fg-muted line-through' : 'right num strong'}
+                        data-label={t('invoices.table.totalAmount')}
+                      >
                         {formatCurrency(invoice.totalAmount)}
                       </td>
-                      <td className="right num">
+                      <td className={clsx('right num', voided && 'dt-empty')} data-label={t('invoices.table.balanceDue')}>
                         {voided ? (
                           <span className="text-fg-dim">—</span>
                         ) : invoice.balanceDue > 0 ? (

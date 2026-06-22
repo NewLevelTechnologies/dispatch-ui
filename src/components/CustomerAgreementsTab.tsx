@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
+import clsx from 'clsx';
 import { PlusIcon } from '@heroicons/react/24/outline';
 import { useGlossary } from '../contexts/GlossaryContext';
 import { agreementApi, type AgreementStatus, type AgreementSummaryResponse } from '../api';
@@ -77,7 +78,7 @@ export default function CustomerAgreementsTab({ customerId }: { customerId: stri
     );
   } else {
     body = (
-      <DenseTable>
+      <DenseTable className="dense-stack">
         <DenseTHead>
           <tr>
             <th>{getName('agreement')}</th>
@@ -102,11 +103,13 @@ export default function CustomerAgreementsTab({ customerId }: { customerId: stri
                   {a.status.charAt(0) + a.status.slice(1).toLowerCase()}
                 </Pill>
               </td>
-              <td className="muted">{termLabel(a)}</td>
+              <td className="muted" data-label="Term">{termLabel(a)}</td>
               {/* `autoRenew` is absent from the list payload today (see
                   agreementApi BACKEND ask) — show "—" for unknown rather than a
                   misleading "No". Lights up once the summary DTO carries it. */}
-              <td className="muted">{a.autoRenew == null ? '—' : a.autoRenew ? 'Yes' : 'No'}</td>
+              <td className={clsx('muted', a.autoRenew == null && 'dt-empty')} data-label="Auto-renew">
+                {a.autoRenew == null ? '—' : a.autoRenew ? 'Yes' : 'No'}
+              </td>
             </DenseRow>
           ))}
         </tbody>

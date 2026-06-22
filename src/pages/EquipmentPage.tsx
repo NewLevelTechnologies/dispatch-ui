@@ -1,4 +1,5 @@
 import { useState, useDeferredValue } from 'react';
+import clsx from 'clsx';
 import { Link as RouterLink, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
@@ -352,14 +353,17 @@ export default function EquipmentPage() {
                           </CellStack>
                         </div>
                       </td>
-                      <td>
+                      <td className={clsx(!item.serviceLocationId && 'dt-empty')}>
                         {item.serviceLocationId ? (
                           <RouterLink
                             to={`/service-locations/${item.serviceLocationId}`}
                             className="block hover:text-accent-500"
                           >
                             <CellStack>
-                              <CellTop>{item.serviceLocationName || formatAddress(item) || '-'}</CellTop>
+                              <CellTop>
+                                <span className="dt-inline-label">{getName('service_location')}: </span>
+                                {item.serviceLocationName || formatAddress(item) || '-'}
+                              </CellTop>
                               <CellSub>
                                 {[
                                   item.serviceLocationName ? formatAddress(item) : null,
@@ -372,10 +376,10 @@ export default function EquipmentPage() {
                           <span className="muted">-</span>
                         )}
                       </td>
-                      <td>{formatTypeCategory(item)}</td>
-                      <td>{formatMakeModel(item)}</td>
-                      <td>{item.serialNumber || '-'}</td>
-                      <td>{item.locationOnSite || '-'}</td>
+                      <td className={clsx(formatTypeCategory(item) === '-' && 'dt-empty')} data-label={t('equipment.table.type')}>{formatTypeCategory(item)}</td>
+                      <td className={clsx(formatMakeModel(item) === '-' && 'dt-empty')} data-label={t('equipment.table.makeModel')}>{formatMakeModel(item)}</td>
+                      <td className={clsx(!item.serialNumber && 'dt-empty')} data-label={t('equipment.form.serialNumber')}>{item.serialNumber || '-'}</td>
+                      <td className={clsx(!item.locationOnSite && 'dt-empty')} data-label={t('equipment.form.locationOnSite')}>{item.locationOnSite || '-'}</td>
                       <td>{getStatusBadge(item.status)}</td>
                       <td>
                         <Dropdown>

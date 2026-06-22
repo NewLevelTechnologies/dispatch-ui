@@ -1,4 +1,5 @@
 import { useDeferredValue, useEffect, useMemo, useState } from 'react';
+import clsx from 'clsx';
 import { useSearchParams, Link as RouterLink } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
@@ -727,6 +728,7 @@ export default function WorkOrdersPage() {
                         <td>
                           <CellStack>
                             <CellTop>
+                              <span className="dt-inline-label">{getName('service_location')}: </span>
                               {workOrder.serviceLocation?.locationName || workOrder.customer?.name || '-'}
                             </CellTop>
                             <CellSub>
@@ -745,13 +747,16 @@ export default function WorkOrdersPage() {
                             </CellSub>
                           </CellStack>
                         </td>
-                        <td>
+                        <td data-label={t('workOrders.table.work')}>
                           <WorkItemsCell
                             items={workOrder.workItems}
                             totalCount={workOrder.workItemCount}
                           />
                         </td>
-                        <td>
+                        <td
+                          className={clsx(!activeTypes.find((tp) => tp.id === workOrder.workOrderTypeId) && 'dt-empty')}
+                          data-label={t('workOrders.table.type')}
+                        >
                           {activeTypes.find((tp) => tp.id === workOrder.workOrderTypeId)?.name ?? '—'}
                         </td>
                         <td>
@@ -775,10 +780,16 @@ export default function WorkOrdersPage() {
                             {t(`workOrders.priority.${PRIORITY_TRANSLATION_KEYS[workOrder.priority ?? 'NORMAL']}`)}
                           </Pill>
                         </td>
-                        <td>
+                        <td
+                          className={clsx(!(workOrder.assignedUsers && workOrder.assignedUsers.length > 0) && 'dt-empty')}
+                          data-label={t('workOrders.table.assigned')}
+                        >
                           <AssignedUsersCell users={workOrder.assignedUsers} />
                         </td>
-                        <td>
+                        <td
+                          className={clsx(!workOrder.scheduledDate && 'dt-empty')}
+                          data-label={t('workOrders.table.scheduled')}
+                        >
                           {formatDate(workOrder.scheduledDate)}
                         </td>
                         <td>

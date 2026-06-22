@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import clsx from 'clsx';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { useGlossary } from '../contexts/GlossaryContext';
@@ -240,7 +241,7 @@ export default function PaymentsPage() {
         ) : (
           <Card>
             <CardBody flush>
-              <DenseTable>
+              <DenseTable className="dense-stack">
                 <DenseTHead>
                   <tr>
                     <th>{t('payments.table.paymentNumber')}</th>
@@ -256,12 +257,12 @@ export default function PaymentsPage() {
                   {filteredPayments.map((payment) => (
                     <DenseRow key={payment.id}>
                       <td><span className="id-mono text-fg-muted">{payment.paymentNumber}</span></td>
-                      <td className="strong">{getCustomerName(payment.customerId)}</td>
-                      <td><span className="id-mono text-fg-muted">{getInvoiceNumber(payment.invoiceId)}</span></td>
-                      <td>{formatDate(payment.paymentDate)}</td>
-                      <td className="right num strong">{formatCurrency(payment.amount)}</td>
+                      <td className="strong" data-label={t('payments.table.customer')}>{getCustomerName(payment.customerId)}</td>
+                      <td data-label={t('payments.table.invoice')}><span className="id-mono text-fg-muted">{getInvoiceNumber(payment.invoiceId)}</span></td>
+                      <td data-label={t('payments.table.paymentDate')}>{formatDate(payment.paymentDate)}</td>
+                      <td className="right num strong" data-label={t('payments.table.amount')}>{formatCurrency(payment.amount)}</td>
                       <td>{getPaymentMethodBadge(payment.paymentMethod)}</td>
-                      <td className="muted">{payment.referenceNumber || '-'}</td>
+                      <td className={clsx('muted', !payment.referenceNumber && 'dt-empty')} data-label={t('payments.table.reference')}>{payment.referenceNumber || '-'}</td>
                     </DenseRow>
                   ))}
                 </tbody>

@@ -8,6 +8,7 @@
 // confirmation; this renders + delegates via callbacks.
 import { useDeferredValue, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
+import clsx from 'clsx';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { EllipsisVerticalIcon, MagnifyingGlassIcon, PlusIcon } from '@heroicons/react/24/outline';
@@ -218,14 +219,17 @@ export default function CustomerEquipmentTab({
                           <span className="font-medium">{item.name}</span>
                         </Link>
                       </td>
-                      <td className="muted">
+                      <td className={clsx('muted', !item.serviceLocationId && 'dt-empty')}>
                         {item.serviceLocationId ? (
                           <Link
                             to={`/service-locations/${item.serviceLocationId}?from=customer`}
                             className="hover:text-fg-accent hover:underline"
                           >
                             <CellStack>
-                              <CellTop>{item.serviceLocationName || locationAddress(item) || '—'}</CellTop>
+                              <CellTop>
+                                <span className="dt-inline-label">{getName('service_location')}: </span>
+                                {item.serviceLocationName || locationAddress(item) || '—'}
+                              </CellTop>
                               {item.serviceLocationName && locationAddress(item) && (
                                 <CellSub>{locationAddress(item)}</CellSub>
                               )}
@@ -235,10 +239,10 @@ export default function CustomerEquipmentTab({
                           '—'
                         )}
                       </td>
-                      <td className="muted">{typeCategory(item)}</td>
-                      <td className="muted">{makeModel(item)}</td>
-                      <td className="muted">{item.serialNumber || '—'}</td>
-                      <td className="muted">{item.locationOnSite || '—'}</td>
+                      <td className={clsx('muted', typeCategory(item) === '—' && 'dt-empty')} data-label={t('equipment.table.type')}>{typeCategory(item)}</td>
+                      <td className={clsx('muted', makeModel(item) === '—' && 'dt-empty')} data-label={t('equipment.table.makeModel')}>{makeModel(item)}</td>
+                      <td className={clsx('muted', !item.serialNumber && 'dt-empty')} data-label={t('equipment.form.serialNumber')}>{item.serialNumber || '—'}</td>
+                      <td className={clsx('muted', !item.locationOnSite && 'dt-empty')} data-label={t('equipment.form.locationOnSite')}>{item.locationOnSite || '—'}</td>
                       <td className="right">
                         {canEdit && (
                           <Dropdown>

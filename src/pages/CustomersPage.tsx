@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, useDeferredValue } from 'react';
+import clsx from 'clsx';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
@@ -468,7 +469,10 @@ export default function CustomersPage() {
                           </td>
                           <td>
                             <CellStack>
-                              <CellTop>{titleCaseAddress(customer.billingAddress.streetAddress)}</CellTop>
+                              <CellTop>
+                                <span className="dt-inline-label">{t('customers.table.billingAddress')}: </span>
+                                {titleCaseAddress(customer.billingAddress.streetAddress)}
+                              </CellTop>
                               <CellSub>
                                 {titleCaseAddress(customer.billingAddress.city)}, {customer.billingAddress.state} {customer.billingAddress.zipCode}
                               </CellSub>
@@ -477,6 +481,7 @@ export default function CustomersPage() {
                           <td>
                             <CellStack>
                               <CellTop>
+                                <span className="dt-inline-label">{t('customers.table.contact')}: </span>
                                 {customer.phone ? (
                                   <a
                                     href={`tel:${customer.phone}`}
@@ -500,7 +505,10 @@ export default function CustomersPage() {
                               </CellSub>
                             </CellStack>
                           </td>
-                          <td>
+                          <td
+                            className={clsx(!(customer.openJobsCount && customer.openJobsCount > 0) && 'dt-empty')}
+                            data-label={t('customers.table.openJobs')}
+                          >
                             {customer.openJobsCount && customer.openJobsCount > 0 ? (
                               <Pill tone="info" dot>
                                 {t('customers.table.jobsCount', { count: customer.openJobsCount })}
@@ -509,7 +517,10 @@ export default function CustomersPage() {
                               <span className="text-fg-dim">—</span>
                             )}
                           </td>
-                          <td>
+                          <td
+                            className={clsx(!(customer.tags && customer.tags.length > 0) && 'dt-empty')}
+                            data-label={t('customers.table.tags')}
+                          >
                             <TagList tags={customer.tags} />
                           </td>
                           <td className="right">

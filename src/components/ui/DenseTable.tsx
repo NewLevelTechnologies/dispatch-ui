@@ -25,6 +25,19 @@
 // drag handle, checkbox, expand caret — put it INSIDE the first content
 // cell as a flex sibling, not in its own column. A separate first-column
 // cell will hijack the title slot on mobile.
+//
+// Labeled-stack mode — for detail tables with NO kebab column, where a
+// bare value reads as ambiguous once the <thead> is gone on mobile:
+//   • <td data-label="Balance">  → stacks as "Balance: $250" on mobile.
+//   • For a CellStack value, prefix its first line with
+//     <span className="dt-inline-label">Contact: </span> instead (a ::before
+//     can't sit inline on a flex-column stack).
+//   • dt-mobile-hide  → drop a column from the card (low value on a phone).
+//   • dt-empty        → drop a cell whose value is just "—" (kept on desktop
+//                       for column alignment, omitted from the card).
+//   • <DenseTable className="dense-stack"> → the LAST cell is data, not a
+//     kebab; stack it full-width instead of floating it to the corner.
+// (All of the above are CSS-only — see styles/components.css.)
 // ─────────────────────────────────────────────────────────────────
 import type { HTMLAttributes, KeyboardEvent, MouseEvent, ReactNode } from 'react';
 import clsx from 'clsx';

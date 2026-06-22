@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import clsx from 'clsx';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { EllipsisVerticalIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
@@ -235,9 +236,9 @@ export default function PartsInventoryPage() {
                   {filteredParts.map((item) => (
                     <DenseRow key={item.id}>
                       <td><span className="id-mono text-fg-muted">{item.partNumber}</span></td>
-                      <td className="strong">{item.partName}</td>
-                      <td>{item.warehouseName || item.warehouseId}</td>
-                      <td className="right num">
+                      <td className="strong" data-label={t('equipment.table.partName')}>{item.partName}</td>
+                      <td data-label={t('equipment.table.warehouse')}>{item.warehouseName || item.warehouseId}</td>
+                      <td className="right num" data-label={t('equipment.table.quantity')}>
                         <span className={item.needsReorder ? 'font-semibold text-danger-500' : 'strong'}>
                           {item.quantityOnHand}
                         </span>
@@ -245,8 +246,8 @@ export default function PartsInventoryPage() {
                           <Pill tone="danger" dot className="ml-2">{t('equipment.lowStock')}</Pill>
                         )}
                       </td>
-                      <td className="right num">{item.reorderPoint}</td>
-                      <td className="right num strong">{formatCurrency(item.unitCost)}</td>
+                      <td className="right num" data-label={t('equipment.table.reorderPoint')}>{item.reorderPoint}</td>
+                      <td className={clsx('right num strong', item.unitCost === undefined && 'dt-empty')} data-label={t('equipment.table.unitCost')}>{formatCurrency(item.unitCost)}</td>
                       <td>
                         <Dropdown>
                           <DropdownButton as={IconButton} aria-label={t('common.moreOptions')}>

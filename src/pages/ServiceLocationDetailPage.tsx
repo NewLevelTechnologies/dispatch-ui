@@ -98,6 +98,7 @@ import TagPicker from '../components/TagPicker';
 import { TagPill } from '../components/ui/TagPill';
 import { nextTagColor } from '../utils/tagColor';
 import IconButton from '../components/IconButton';
+import clsx from 'clsx';
 import { DenseTable, DenseTHead, DenseRow } from '../components/ui/DenseTable';
 import { Card } from '../components/catalyst/card';
 import { Button } from '../components/catalyst/button';
@@ -3134,24 +3135,32 @@ function EquipmentRow({
           </div>
         </div>
       </td>
-      <td>
+      <td className={clsx(!e.make && !e.model && 'dt-empty')} data-label="Make / Model">
         <div className="text-[12px] text-fg">{e.make || '—'}</div>
         {e.model && <div className="text-[11px] text-fg-muted">{e.model}</div>}
       </td>
-      <td className="text-[11.5px] text-fg-muted">{e.locationOnSite || '—'}</td>
-      <td className="right font-mono text-[12px] font-semibold tabular-nums text-fg-strong">
+      <td className={clsx('text-[11.5px] text-fg-muted', !e.locationOnSite && 'dt-empty')} data-label="Location on site">
+        {e.locationOnSite || '—'}
+      </td>
+      <td
+        className={clsx('right font-mono text-[12px] font-semibold tabular-nums text-fg-strong', age === null && 'dt-empty')}
+        data-label="Age"
+      >
         {age === null ? <span className="text-fg-dim">—</span> : `${age}y`}
       </td>
-      <td className="text-[11.5px] text-fg-muted">
+      <td className={clsx('text-[11.5px] text-fg-muted', !e.lastServicedAt && 'dt-empty')} data-label="Last service">
         {e.lastServicedAt ? <TimeAgo iso={e.lastServicedAt} /> : '—'}
       </td>
       {/* Next PM has no backend source yet — unblocks with the agreement /
-          recurring-visit work. */}
-      <td className="text-[11.5px] text-fg-dim">—</td>
-      <td className={`text-[11.5px] ${warrantyExpired ? 'text-fg-dim' : 'text-fg-muted'}`}>
+          recurring-visit work. Always "—", so it's dropped from the mobile card. */}
+      <td className="text-[11.5px] text-fg-dim dt-empty" data-label="Next PM">—</td>
+      <td
+        className={clsx('text-[11.5px]', warrantyExpired ? 'text-fg-dim' : 'text-fg-muted', !e.warrantyExpiresAt && 'dt-empty')}
+        data-label="Warranty"
+      >
         {!e.warrantyExpiresAt ? '—' : warrantyExpired ? 'Expired' : `Thru ${formatWoDate(e.warrantyExpiresAt)}`}
       </td>
-      <td>
+      <td className={clsx(!e.hasOpenWorkOrder && 'dt-empty')}>
         {e.hasOpenWorkOrder ? (
           <Pill tone="info" dot live>
             Open work order
@@ -3442,7 +3451,7 @@ function InvoicesTab({ location }: { location: ServiceLocationDetailDto }) {
             {/* DenseTable: dense columns on desktop, one card per invoice
                 < 640px (INV# leads, Balance pins top-right, the rest stack). */}
             <div className="overflow-x-auto">
-              <DenseTable>
+              <DenseTable className="dense-stack">
                 <DenseTHead>
                   <tr>
                     <th>{getName('invoice')}</th>
@@ -3525,7 +3534,7 @@ function InvoiceRow({
       <td>
         <span className="font-mono text-[12px] font-bold text-fg-strong">{inv.invoiceNumber}</span>
       </td>
-      <td>
+      <td className={clsx(!inv.workOrderId && 'dt-empty')} data-label="For work">
         <div className="font-mono text-[11px] text-fg-muted">{forJob}</div>
         {desc && (
           <div className="mt-0.5 max-w-[320px] truncate text-[10.5px] text-fg" title={desc}>
@@ -3537,9 +3546,9 @@ function InvoiceRow({
           override (warranty co + PAYER badge) is deferred — the Invoice DTO
           carries no payer field yet, so there's nothing to surface; wire the
           badge when payer lands on the invoice read model. */}
-      <td className="text-[11.5px] text-fg">{billTo}</td>
-      <td className="text-[11.5px] text-fg-muted">{formatTimestamp(inv.invoiceDate)}</td>
-      <td className="text-[11.5px] text-fg-muted">{formatTimestamp(inv.dueDate)}</td>
+      <td className="text-[11.5px] text-fg" data-label="Bill to">{billTo}</td>
+      <td className="text-[11.5px] text-fg-muted" data-label="Issued">{formatTimestamp(inv.invoiceDate)}</td>
+      <td className="text-[11.5px] text-fg-muted" data-label="Due">{formatTimestamp(inv.dueDate)}</td>
       <td>
         <Pill tone={overdue ? 'warning' : INVOICE_STATUS_TONE[inv.status]} dot>
           {overdue ? INVOICE_STATUS_LABEL.OVERDUE : INVOICE_STATUS_LABEL[inv.status]}
@@ -3552,16 +3561,19 @@ function InvoiceRow({
         className={`right font-mono text-[12px] tabular-nums ${
           voided ? 'font-normal text-fg-muted line-through' : 'font-bold text-fg-strong'
         }`}
+        data-label="Amount"
       >
         {fmtMoney.format(invMoney(inv.totalAmount))}
       </td>
       {/* What's still owed — the actionable number for a CSR. Settled rows go
           dim; voided rows have no receivable at all, so a dash (not $0.00,
-          which would read as "paid off"). */}
+          which would read as "paid off") — and the line drops off the mobile card. */}
       <td
-        className={`right font-mono text-[12px] tabular-nums ${
-          voided ? 'text-fg-dim' : balance > 0 ? 'font-semibold text-fg-strong' : 'text-fg-dim'
-        }`}
+        className={clsx(
+          'right font-mono text-[12px] tabular-nums',
+          voided ? 'text-fg-dim dt-empty' : balance > 0 ? 'font-semibold text-fg-strong' : 'text-fg-dim',
+        )}
+        data-label="Balance"
       >
         {voided ? '—' : fmtMoney.format(balance)}
       </td>
@@ -3864,6 +3876,7 @@ function DispatchRow({
   onOpen: () => void;
 }) {
   const { t } = useTranslation();
+  const { getName } = useGlossary();
   const overdue = dispatchIsOverdue(dispatch);
   const live = dispatch.status === 'IN_PROGRESS';
   const didntHappen = dispatch.status === 'CANCELLED' || dispatch.status === 'NO_SHOW';
@@ -3881,14 +3894,14 @@ function DispatchRow({
       <td className="whitespace-nowrap text-[11.5px] text-fg max-sm:whitespace-normal">
         {formatArrivalWindow(dispatch.arrivalWindowStart, dispatch.arrivalWindowEnd)}
       </td>
-      <td>
+      <td className={clsx(!woType && 'dt-empty')} data-label="Type">
         {woType ? (
           <WorkOrderTypePill type={woType} />
         ) : (
           <span className="text-[11px] text-fg-dim">—</span>
         )}
       </td>
-      <td>
+      <td data-label={getName('work_order')}>
         <div className="font-mono text-[11px] text-fg-muted">
           {dispatch.workOrderNumber}
         </div>
@@ -3898,7 +3911,7 @@ function DispatchRow({
           </div>
         )}
       </td>
-      <td>
+      <td data-label="Tech">
         <DispatchTechCell name={techName} live={live} muted={didntHappen} />
       </td>
       {/* Status — last cell → pins top-right on the mobile card, never clipped. */}
@@ -3969,6 +3982,8 @@ const JOBS_PAGE_SIZE = 25;
 // classes via the same rule as woRowTint.
 function JobDenseRow({ wo, woType }: { wo: WorkOrderSummary; woType?: WoTypeRef }) {
   const navigate = useNavigate();
+  const { t } = useTranslation();
+  const { getName } = useGlossary();
   const jobLabel = deriveJobLabel(wo, woType?.name);
   const elevated = wo.priority === 'URGENT' || wo.priority === 'HIGH';
   const tintClass =
@@ -3987,7 +4002,7 @@ function JobDenseRow({ wo, woType }: { wo: WorkOrderSummary; woType?: WoTypeRef 
           {jobLabel}
         </div>
       </td>
-      <td>
+      <td className={clsx(!(wo.equip && wo.equip.count > 0) && 'dt-empty')} data-label={getName('equipment')}>
         {wo.equip && wo.equip.count > 0 ? (
           <span className="text-[11px] text-fg-muted">{wo.equip.label}</span>
         ) : (
@@ -3997,10 +4012,15 @@ function JobDenseRow({ wo, woType }: { wo: WorkOrderSummary; woType?: WoTypeRef 
       <td>
         <WoStatusPill wo={wo} />
       </td>
-      <td>
+      <td className={clsx(!wo.assignedUsers?.length && 'dt-empty')} data-label={t('workOrders.table.assigned')}>
         <AssignedUsersCell users={wo.assignedUsers} />
       </td>
-      <td className="text-[11.5px] text-fg-muted">{formatWoDate(wo.scheduledDate)}</td>
+      <td
+        className={clsx('text-[11.5px] text-fg-muted', !wo.scheduledDate && 'dt-empty')}
+        data-label={t('workOrders.table.scheduled')}
+      >
+        {formatWoDate(wo.scheduledDate)}
+      </td>
     </DenseRow>
   );
 }
@@ -4186,7 +4206,7 @@ function JobsTab({ location, onNewJob }: { location: ServiceLocationDetailDto; o
             {/* DenseTable: dense columns on desktop, one card per job < 640px
                 (WO# + type lead, Scheduled pins top-right, the rest stack). */}
             <div className="overflow-x-auto">
-              <DenseTable>
+              <DenseTable className="dense-stack">
                 <DenseTHead>
                   <tr>
                     <th>{getName('work_order')}</th>
