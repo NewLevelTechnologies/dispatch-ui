@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, useDeferredValue } from 'react';
+import clsx from 'clsx';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
@@ -553,7 +554,10 @@ export default function ServiceLocationsPage() {
                               </CellStack>
                             </div>
                           </td>
-                          <td>
+                          <td
+                            className={clsx(!location.dispatchRegionName && 'dt-empty')}
+                            data-label={t('serviceLocations.table.region')}
+                          >
                             {location.dispatchRegionName ? (
                               <span className="text-[11.5px] text-fg-muted">
                                 {location.dispatchRegionName}
@@ -565,7 +569,7 @@ export default function ServiceLocationsPage() {
                           <td>
                             <StatusIndicator status={statusKey} />
                           </td>
-                          <td>
+                          <td data-label={t('serviceLocations.table.lastService')}>
                             {location.lastServiceAt ? (
                               <TimeAgo iso={location.lastServiceAt} className="text-[11.5px] text-fg-muted" />
                             ) : (
@@ -574,12 +578,20 @@ export default function ServiceLocationsPage() {
                               </span>
                             )}
                           </td>
-                          <td>
+                          <td className={clsx(!(location.siteContactName || location.siteContactPhone) && 'dt-empty')}>
                             {location.siteContactName || location.siteContactPhone ? (
                               <CellStack>
-                                {location.siteContactName && <CellTop>{location.siteContactName}</CellTop>}
+                                {location.siteContactName ? (
+                                  <CellTop>
+                                    <span className="dt-inline-label">{t('serviceLocations.table.contact')}: </span>
+                                    {location.siteContactName}
+                                  </CellTop>
+                                ) : null}
                                 {location.siteContactPhone && (
                                   <CellSub>
+                                    {!location.siteContactName && (
+                                      <span className="dt-inline-label">{t('serviceLocations.table.contact')}: </span>
+                                    )}
                                     <a
                                       href={`tel:${location.siteContactPhone}`}
                                       onClick={(e) => e.stopPropagation()}
@@ -594,7 +606,10 @@ export default function ServiceLocationsPage() {
                               <span className="text-fg-dim">—</span>
                             )}
                           </td>
-                          <td>
+                          <td
+                            className={clsx(!(location.tags && location.tags.length > 0) && 'dt-empty')}
+                            data-label={t('serviceLocations.table.tags')}
+                          >
                             <TagList tags={location.tags} />
                           </td>
                           <td className="right">

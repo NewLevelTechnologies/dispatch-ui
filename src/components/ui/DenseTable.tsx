@@ -25,6 +25,32 @@
 // drag handle, checkbox, expand caret — put it INSIDE the first content
 // cell as a flex sibling, not in its own column. A separate first-column
 // cell will hijack the title slot on mobile.
+//
+// Labeled-stack mode — once <thead> is gone on mobile, a stacked value that
+// lived under a column header can lose its meaning ("2", "Florida", "$50.00").
+// Give it the header back as an inline label — but ONLY when it'd be ambiguous
+// on its own. The test is AMBIGUITY, not "every cell":
+//   • Label it when bare is unidentifiable: "Region: Florida", "Balance: $50.00"
+//     (two identical $50.00 lines are meaningless without Amount/Balance).
+//   • Leave it BARE when self-identifying by format: status pills, a formatted
+//     phone, an email (the @ says email), a full address. The headline/identity
+//     cell (name, and a location's address) is always bare.
+//   • Multiple of the same kind ARE ambiguous → label each (Mobile / Office /
+//     After hours for three phone numbers).
+//   • Short values inline ("Make / Model: Simons · Rager"); only break to a
+//     second line for genuinely long values (AI summaries, notes).
+// Mechanics (all CSS-only — see styles/components.css):
+//   • <td data-label="Balance">  → stacks as "Balance: $250".
+//   • For a CellStack value, prefix its first line with
+//     <span className="dt-inline-label">Contact: </span> instead (a ::before
+//     can't sit inline on a flex-column stack).
+//   • dt-inline-value → keep a SHORT value (and its parts) on the label's line
+//     instead of stacking them beneath it; omit for long values that should wrap.
+//   • dt-mobile-hide  → drop a column from the card (low value on a phone).
+//   • dt-empty        → drop a cell whose value is just "—" (kept on desktop
+//                       for column alignment, omitted from the card).
+//   • <DenseTable className="dense-stack"> → the LAST cell is data, not a
+//     kebab; stack it full-width instead of floating it to the corner.
 // ─────────────────────────────────────────────────────────────────
 import type { HTMLAttributes, KeyboardEvent, MouseEvent, ReactNode } from 'react';
 import clsx from 'clsx';

@@ -273,10 +273,10 @@ export default function QuotesPage() {
                   {filteredQuotes.map((quote) => (
                     <DenseRow key={quote.id}>
                       <td><span className="id-mono text-fg-muted">{quote.quoteNumber}</span></td>
-                      <td className="strong">{getCustomerName(quote.customerId)}</td>
-                      <td>{formatDate(quote.quoteDate)}</td>
-                      <td>{formatDate(quote.expirationDate)}</td>
-                      <td className="right num strong">{formatCurrency(quote.totalAmount)}</td>
+                      <td className="strong" data-label={t('quotes.table.customer')}>{getCustomerName(quote.customerId)}</td>
+                      <td data-label={t('quotes.table.quoteDate')}>{formatDate(quote.quoteDate)}</td>
+                      <td data-label={t('quotes.table.expirationDate')}>{formatDate(quote.expirationDate)}</td>
+                      <td className="right num strong" data-label={t('quotes.table.totalAmount')}>{formatCurrency(quote.totalAmount)}</td>
                       <td>{getStatusBadge(quote.status)}</td>
                       <td>
                         <Button

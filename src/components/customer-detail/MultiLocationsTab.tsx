@@ -12,6 +12,7 @@ import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
+import clsx from 'clsx';
 import { MagnifyingGlassIcon, PlusIcon } from '@heroicons/react/24/outline';
 import {
   agreementApi,
@@ -255,16 +256,19 @@ export default function MultiLocationsTab({
                         <CellSub>{[street, cityLine].filter(Boolean).join(' · ')}</CellSub>
                       </CellStack>
                     </td>
-                    <td className="muted">{region || '—'}</td>
+                    <td className="muted dt-mobile-hide">{region || '—'}</td>
                     <td>
                       <Pill tone={l.status === 'ACTIVE' ? 'success' : 'neutral'} dot>
                         {l.status === 'ACTIVE' ? 'Active' : l.status === 'CLOSED' ? 'Closed' : 'Inactive'}
                       </Pill>
                     </td>
-                    <td className="muted">
+                    <td className={clsx('muted', !l.siteContactName && 'dt-empty')}>
                       {l.siteContactName ? (
                         <CellStack>
-                          <CellTop>{l.siteContactName}</CellTop>
+                          <CellTop>
+                            <span className="dt-inline-label">Contact: </span>
+                            {l.siteContactName}
+                          </CellTop>
                           {l.siteContactPhone && <CellSub>{formatPhone(l.siteContactPhone)}</CellSub>}
                         </CellStack>
                       ) : (
@@ -272,7 +276,7 @@ export default function MultiLocationsTab({
                       )}
                     </td>
                     {hasEnrichment && (
-                      <td className="right num strong">
+                      <td className="right num strong dt-mobile-hide">
                         {l.openJobsCount && l.openJobsCount > 0 ? (
                           l.openJobsCount
                         ) : (
@@ -281,12 +285,12 @@ export default function MultiLocationsTab({
                       </td>
                     )}
                     {hasEnrichment && (
-                      <td className="muted">
+                      <td className={clsx('muted', !l.lastServiceAt && 'dt-empty')} data-label="Last service">
                         {l.lastServiceAt ? formatDateShort(l.lastServiceAt) : <span className="text-fg-dim">—</span>}
                       </td>
                     )}
                     {hasVisitStatus && (
-                      <td className="muted">
+                      <td className="muted dt-mobile-hide">
                         {!vs ? (
                           <span className="text-fg-dim">—</span>
                         ) : vs.pmOverdue ? (
@@ -301,7 +305,7 @@ export default function MultiLocationsTab({
                       </td>
                     )}
                     {hasEnrichment && (
-                      <td className="right num">
+                      <td className={clsx('right num', l.balance == null && 'dt-empty')} data-label="Balance">
                         {l.balance == null ? (
                           <span className="text-fg-dim">—</span>
                         ) : l.balance > 0 ? (
@@ -311,8 +315,17 @@ export default function MultiLocationsTab({
                         )}
                       </td>
                     )}
-                    <td className="right num strong">
-                      {equip > 0 ? equip : <span className="text-fg-dim">—</span>}
+                    <td className={clsx('right num strong', equip === 0 && 'dt-empty')}>
+                      {equip > 0 ? (
+                        <>
+                          {equip}
+                          <span className="ml-1 hidden text-[10px] font-medium text-fg-muted max-sm:inline">
+                            {getName('equipment')}
+                          </span>
+                        </>
+                      ) : (
+                        <span className="text-fg-dim">—</span>
+                      )}
                     </td>
                   </DenseRow>
                 );

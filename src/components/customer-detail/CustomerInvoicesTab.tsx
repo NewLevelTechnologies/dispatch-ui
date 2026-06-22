@@ -236,7 +236,7 @@ export default function CustomerInvoicesTab({ customerId }: { customerId: string
         ) : (
           <>
             <div className="overflow-x-auto">
-              <DenseTable>
+              <DenseTable className="dense-stack">
                 <DenseTHead>
                   <tr>
                     <th>{t('invoices.table.invoiceNumber')}</th>
@@ -256,10 +256,10 @@ export default function CustomerInvoicesTab({ customerId }: { customerId: string
                       <td>
                         <StatusPill row={inv} />
                       </td>
-                      <td className="muted">{formatDateShort(inv.invoiceDate)}</td>
-                      <td className="muted">{formatDateShort(inv.dueDate)}</td>
-                      <td className="right num strong">{formatMoney(inv.totalAmount)}</td>
-                      <td className="right num">
+                      <td className="muted" data-label={t('invoices.table.invoiceDate')}>{formatDateShort(inv.invoiceDate)}</td>
+                      <td className="muted" data-label={t('invoices.table.dueDate')}>{formatDateShort(inv.dueDate)}</td>
+                      <td className="right num strong" data-label={t('invoices.table.totalAmount')}>{formatMoney(inv.totalAmount)}</td>
+                      <td className="right num" data-label={t('invoices.table.balanceDue')}>
                         {inv.balanceDue > 0 ? (
                           <span className="font-semibold text-fg-strong">{formatMoney(inv.balanceDue)}</span>
                         ) : (

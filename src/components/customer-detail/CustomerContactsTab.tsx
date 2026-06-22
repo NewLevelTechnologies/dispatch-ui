@@ -6,6 +6,7 @@
 // the component reused. Add/edit/delete/notify/make-primary reuse the existing
 // customer contact endpoints; the Primary pill marks the current primary.
 import { useMemo, useState } from 'react';
+import clsx from 'clsx';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { PencilIcon, TrashIcon, BellIcon, UserIcon, StarIcon } from '@heroicons/react/24/outline';
@@ -124,11 +125,12 @@ export default function CustomerContactsTab({
                       {c.role && <CellSub>{c.role}</CellSub>}
                     </CellStack>
                   </td>
-                  <td className="muted">{c.role || <Dash />}</td>
-                  <td><PhoneCell value={c.mobilePhone} /></td>
-                  <td><PhoneCell value={c.phone} /></td>
-                  <td><PhoneCell value={c.afterHoursPhone} /></td>
-                  <td className="muted">
+                  <td className={clsx('muted', !c.role && 'dt-empty')} data-label={t('common.form.role')}>{c.role || <Dash />}</td>
+                  <td className={clsx(!c.mobilePhone && 'dt-empty')} data-label={t('common.form.mobilePhone', { defaultValue: 'Mobile' })}><PhoneCell value={c.mobilePhone} /></td>
+                  <td className={clsx(!c.phone && 'dt-empty')} data-label="Office"><PhoneCell value={c.phone} /></td>
+                  <td className={clsx(!c.afterHoursPhone && 'dt-empty')} data-label="After hours"><PhoneCell value={c.afterHoursPhone} /></td>
+                  {/* No data-label — an "x@y.com" is self-identifying (the @ says email). */}
+                  <td className={clsx('muted', !c.email && 'dt-empty')}>
                     {c.email ? (
                       <a href={`mailto:${c.email}`} className="text-[11.5px] text-fg-muted hover:text-fg-strong hover:underline">
                         {c.email}
@@ -137,7 +139,7 @@ export default function CustomerContactsTab({
                       <Dash />
                     )}
                   </td>
-                  <td className="muted max-w-[200px]">
+                  <td className={clsx('muted max-w-[200px]', !c.notes && 'dt-empty')} data-label={t('common.form.notes')}>
                     {c.notes ? (
                       <span className="block truncate" title={c.notes}>{c.notes}</span>
                     ) : (

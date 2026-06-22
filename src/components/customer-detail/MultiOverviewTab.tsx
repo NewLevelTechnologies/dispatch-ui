@@ -42,6 +42,7 @@ import {
 } from '../../api';
 import { PatternFormat } from 'react-number-format';
 import { useTranslation } from 'react-i18next';
+import clsx from 'clsx';
 import { useGlossary } from '../../contexts/GlossaryContext';
 import { showError, showSuccess, extractApiError } from '../../lib/toast';
 import { handleConcurrentEdit } from '../../lib/conflict';
@@ -394,7 +395,7 @@ export function BillingCard({
       <div className="p-3.5">
         {/* Outstanding balance + aging in one horizontal strip — balance left,
             the 5 compact bucket cells right-aligned on the same band. */}
-        <div className="flex items-start justify-between gap-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
           <div>
             <LabelTiny>Outstanding balance</LabelTiny>
             {ar ? (
@@ -412,11 +413,11 @@ export function BillingCard({
             )}
           </div>
           {ar && (
-            <div className="flex shrink-0 gap-1">
+            <div className="grid grid-cols-5 gap-1 sm:flex sm:shrink-0">
               {buckets.map(({ k, b, tone, bucket }) => {
                 const tint = bucketTint(tone, b.amount);
                 const clickable = !!onSelectAging && b.count > 0;
-                const cls = 'min-w-[46px] rounded-md border border-border-soft px-1.5 py-1 text-center';
+                const cls = 'min-w-0 rounded-md border border-border-soft px-1.5 py-1 text-center sm:min-w-[46px]';
                 const inner = (
                   <>
                     <div className="text-[9px] font-semibold uppercase tracking-wide text-fg-muted">{k}</div>
@@ -593,11 +594,14 @@ function LocationsPreviewCard({
                     <CellSub>{[street, cityLine].filter(Boolean).join(' · ')}</CellSub>
                   </CellStack>
                 </td>
-                <td className="muted">
+                <td className={clsx('muted', !l.lastServiceAt && 'dt-empty')} data-label="Last service">
                   {l.lastServiceAt ? formatDateShort(l.lastServiceAt) : <span className="text-fg-dim">—</span>}
                 </td>
                 {enriched && (
-                  <td className="right num strong">
+                  <td
+                    className={clsx('right num strong', !(l.openJobsCount && l.openJobsCount > 0) && 'dt-empty')}
+                    data-label="Open jobs"
+                  >
                     {l.openJobsCount && l.openJobsCount > 0 ? (
                       l.openJobsCount
                     ) : (

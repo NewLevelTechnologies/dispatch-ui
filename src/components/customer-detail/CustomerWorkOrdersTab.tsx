@@ -8,6 +8,7 @@
 // component with the Location page's copy during the SINGLE extraction pass.)
 import { useDeferredValue, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import clsx from 'clsx';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { MagnifyingGlassIcon, PlusIcon } from '@heroicons/react/24/outline';
@@ -288,7 +289,7 @@ export default function CustomerWorkOrdersTab({
         ) : (
           <>
             <div className="overflow-x-auto">
-              <DenseTable>
+              <DenseTable className="dense-stack">
                 <DenseTHead>
                   <tr>
                     <SortHeader sortKey="workOrderNumber" label={getName('work_order')} current={sort} onSort={onSort} />
@@ -337,6 +338,7 @@ function JobDenseRow({
   typeAccentId?: string | null;
 }) {
   const { t } = useTranslation();
+  const { getName } = useGlossary();
   const navigate = useNavigate();
   const priority = wo.priority ?? 'NORMAL';
   const elevated = priority === 'URGENT' || priority === 'HIGH';
@@ -377,7 +379,7 @@ function JobDenseRow({
           <CellSub>{jobLabel}</CellSub>
         </CellStack>
       </td>
-      <td className="muted">
+      <td className={clsx('muted', !(wo.equip && wo.equip.count > 0) && 'dt-empty')} data-label={getName('equipment')}>
         {wo.equip && wo.equip.count > 0 ? wo.equip.label : <span className="text-fg-dim">—</span>}
       </td>
       <td>
@@ -389,10 +391,10 @@ function JobDenseRow({
           </Pill>
         )}
       </td>
-      <td>
+      <td className={clsx(!wo.assignedUsers?.length && 'dt-empty')} data-label={t('workOrders.table.assigned')}>
         <AssignedUsersCell users={wo.assignedUsers} />
       </td>
-      <td className="muted">{formatWoDate(wo.scheduledDate)}</td>
+      <td className={clsx('muted', !wo.scheduledDate && 'dt-empty')} data-label={t('workOrders.table.scheduled')}>{formatWoDate(wo.scheduledDate)}</td>
     </DenseRow>
   );
 }

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import clsx from 'clsx';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
@@ -429,12 +430,15 @@ export default function RolesPage() {
                             )}
                           </div>
                         </td>
-                        <td>
+                        <td
+                          className={clsx(!role.description && 'dt-empty')}
+                          data-label={t('roles.table.description')}
+                        >
                           <span className="line-clamp-1 text-[12px] text-fg-muted">
                             {role.description || '—'}
                           </span>
                         </td>
-                        <td className="right">
+                        <td className="right" data-label={t('entities.users')}>
                           <span
                             className={
                               userCount > 0
@@ -445,7 +449,7 @@ export default function RolesPage() {
                             {userCount}
                           </span>
                         </td>
-                        <td className="right">
+                        <td className="right" data-label={t('roles.table.capabilities')}>
                           <div className="flex items-center justify-end gap-1.5">
                             <span className="font-mono text-[11px] text-fg-dim tabular-nums">
                               {pct}%
@@ -470,7 +474,7 @@ export default function RolesPage() {
                             </Pill>
                           )}
                         </td>
-                        <td>
+                        <td data-label={t('roles.table.lastModified')}>
                           <span className="text-[11.5px] text-fg-muted">
                             {formatDate(role.updatedAt)}
                           </span>

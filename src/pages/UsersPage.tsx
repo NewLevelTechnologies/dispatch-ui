@@ -1,4 +1,5 @@
 import { useEffect, useState, useDeferredValue } from 'react';
+import clsx from 'clsx';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
@@ -442,7 +443,10 @@ export default function UsersPage() {
                             </CellStack>
                           </div>
                         </td>
-                        <td>
+                        <td
+                          className={clsx(!(user.roles && user.roles.length > 0) && 'dt-empty')}
+                          data-label={t('common.form.role')}
+                        >
                           {user.roles && user.roles.length > 0 ? (
                             (() => {
                               const ordered = sortRolesBySeniority(user.roles);

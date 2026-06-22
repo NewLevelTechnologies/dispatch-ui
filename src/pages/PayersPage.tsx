@@ -1,4 +1,5 @@
 import { useEffect, useState, useDeferredValue } from 'react';
+import clsx from 'clsx';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
@@ -198,7 +199,7 @@ export default function PayersPage() {
             ) : (
               <>
                 <div className="overflow-x-auto">
-                  <DenseTable>
+                  <DenseTable className="dense-stack">
                     <DenseTHead>
                       <tr>
                         <SortHeader sortKey="name" label={getName('payer')} current={currentSort} onSort={onSort} />
@@ -232,8 +233,11 @@ export default function PayersPage() {
                                 </CellStack>
                               </div>
                             </td>
-                            <td className="muted">{termsLabel(p.paymentTermsDays)}</td>
-                            <td className="right">
+                            <td className="muted" data-label={t('payers.table.terms')}>{termsLabel(p.paymentTermsDays)}</td>
+                            <td
+                              className={clsx('right', !(p.openBalanceTotal && p.openBalanceTotal > 0) && 'dt-empty')}
+                              data-label={t('payers.table.outstanding')}
+                            >
                               {p.openBalanceTotal && p.openBalanceTotal > 0 ? (
                                 <div className="flex flex-col items-end">
                                   <span
@@ -252,20 +256,29 @@ export default function PayersPage() {
                                 <span className="text-fg-dim">—</span>
                               )}
                             </td>
-                            <td className="right num">
+                            <td
+                              className={clsx('right num', !(p.openInvoiceCount && p.openInvoiceCount > 0) && 'dt-empty')}
+                              data-label={t('payers.table.openInvoices')}
+                            >
                               {p.openInvoiceCount && p.openInvoiceCount > 0 ? (
                                 p.openInvoiceCount
                               ) : (
                                 <span className="text-fg-dim">—</span>
                               )}
                             </td>
-                            <td className="right num muted">
+                            <td
+                              className={clsx('right num muted', p.lifetimePaid == null && 'dt-empty')}
+                              data-label={t('payers.table.lifetimePaid')}
+                            >
                               {p.lifetimePaid != null ? moneyK(p.lifetimePaid) : <span className="text-fg-dim">—</span>}
                             </td>
-                            <td className="muted">
+                            <td className={clsx('muted', !p.lastPaymentAt && 'dt-empty')}>
                               {p.lastPaymentAt ? (
                                 <CellStack>
-                                  <CellTop>{formatTimestamp(p.lastPaymentAt)}</CellTop>
+                                  <CellTop>
+                                    <span className="dt-inline-label">{t('payers.table.lastPayment')}: </span>
+                                    {formatTimestamp(p.lastPaymentAt)}
+                                  </CellTop>
                                   {p.lastPaymentAmount != null && (
                                     <CellSub>
                                       <span className="font-mono">{money0(p.lastPaymentAmount)}</span>
