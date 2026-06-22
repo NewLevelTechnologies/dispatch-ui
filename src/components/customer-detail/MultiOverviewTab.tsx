@@ -57,7 +57,7 @@ import { useAddressVerify } from '../../hooks/useAddressVerify';
 import { AddressSuggestion } from '../AddressSuggestion';
 import { Pill } from '../ui/Pill';
 import { DenseTable, DenseTHead, DenseRow, CellStack, CellTop, CellSub } from '../ui/DenseTable';
-import CustomerNotesCard from './CustomerNotesCard';
+import NotesCard from '../NotesCard';
 import { ContactBlock } from '../detail/ContactBlock';
 import NotifBell from '../detail/NotifBell';
 import ContactFormDialog from '../ContactFormDialog';
@@ -126,7 +126,7 @@ export default function MultiOverviewTab({
         <div className="flex flex-col gap-3">
           <BillingCard customer={customer} ar={arSummary} canEdit={canEdit} onSelectAging={goToBucket} />
           <LocationsPreviewCard customer={customer} onViewAll={onViewLocations} />
-          <CustomerNotesCard customerId={customer.id} canEdit={canEdit} />
+          <NotesCard entityType="customer" entityId={customer.id} canEdit={canEdit} />
           <CustomerActivityTeaser customerId={customer.id} />
         </div>
 

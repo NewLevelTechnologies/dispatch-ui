@@ -68,7 +68,7 @@ import EditableField from '../components/EditableField';
 import EquipmentThumbnail from '../components/EquipmentThumbnail';
 import EquipmentFilterFormDialog from '../components/EquipmentFilterFormDialog';
 import EquipmentMediaUploadDialog from '../components/EquipmentMediaUploadDialog';
-import EquipmentNotesCard from '../components/EquipmentNotesCard';
+import NotesCard from '../components/NotesCard';
 import EquipmentServiceHistoryTab from '../components/EquipmentServiceHistoryTab';
 import EquipmentVideosSection from '../components/EquipmentVideosSection';
 import EquipmentMediaLightbox, { type MediaLightboxItem } from '../components/EquipmentMediaLightbox';
@@ -990,8 +990,8 @@ export default function EquipmentDetailPage() {
                   )}
                 </Card>
 
-                {/* Notes — same shape + UX as the customer/location notes cards. */}
-                <EquipmentNotesCard equipmentId={id!} />
+                {/* Notes — shared NotesCard (pinned + 3 recent, "Show all" drawer). */}
+                <NotesCard entityType="equipment" entityId={id!} />
 
                 {/* Description — conditional; inline-editable textarea. */}
                 {hasDescription && (

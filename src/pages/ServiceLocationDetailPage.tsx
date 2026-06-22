@@ -32,7 +32,6 @@ import {
   workOrderTypesApi,
   contactApi,
   notificationApi,
-  noteApi,
   arrivalFactApi,
   tagApi,
   dispatchesApi,
@@ -53,7 +52,6 @@ import {
   type Tag,
   NotificationChannel,
   type NotificationPreferenceDto,
-  type NoteDto,
   type ArrivalFactDto,
   EquipmentStatus,
   type EquipmentSummary,
@@ -93,7 +91,7 @@ import NotifBell from '../components/detail/NotifBell';
 import NotificationPreferencesDialog from '../components/NotificationPreferencesDialog';
 import EquipmentThumbnail from '../components/EquipmentThumbnail';
 import ConfirmDialog from '../components/ConfirmDialog';
-import NoteDialog from '../components/NoteDialog';
+import NotesCard from '../components/NotesCard';
 import { AssignedUsersCell } from '../components/ui/AssignedUsersCell';
 import { WorkOrderTypePill } from '../components/ui/WorkOrderTypePill';
 import TagPicker from '../components/TagPicker';
@@ -920,7 +918,12 @@ function OverviewTab({
         <div className="flex flex-col gap-3">
           <EquipmentSummaryCard equipment={equipment} onViewAll={onViewEquipment} />
           <SiteWorkOrdersCard location={location} onViewAll={onViewJobs} />
-          <NotesCard location={location} canEdit={canEdit} />
+          <NotesCard
+            entityType="service_location"
+            entityId={location.id}
+            canEdit={canEdit}
+            initialData={location.notes ?? undefined}
+          />
           <ActivityTeaser serviceLocationId={location.id} onViewActivity={onViewActivity} />
         </div>
 
@@ -2885,249 +2888,6 @@ function HeaderTags({ location, canEdit }: { location: ServiceLocationDetailDto;
         )}
       </span>
     </>
-  );
-}
-
-// Thumbtack glyph — heroicons has no pushpin. `solid` fills it for the
-// "pinned" affordance (active state); outline is the "Pin" action.
-function PinIcon({ className, solid }: { className?: string; solid?: boolean }) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      fill={solid ? 'currentColor' : 'none'}
-      stroke="currentColor"
-      strokeWidth={1.8}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className={className}
-      aria-hidden
-    >
-      <path d="M9 4h6M9.5 4l-.5 6L6.5 13h11L15 10l-.5-6M12 13v7" />
-    </svg>
-  );
-}
-
-// Notes — durable site knowledge (roof access, billing quirks, equipment
-// history). Pinned-first ("must-know" amber treatment); the rest reverse-chron.
-// Ordering is server-side; the detail payload seeds first paint, then the
-// /notes endpoint is the live source for add/edit/pin/delete.
-function NotesCard({ location, canEdit }: { location: ServiceLocationDetailDto; canEdit: boolean }) {
-  const { t } = useTranslation();
-  const queryClient = useQueryClient();
-  const notesQueryKey = ['service-location-notes', location.id];
-
-  const { data } = useQuery({
-    queryKey: notesQueryKey,
-    queryFn: () => noteApi.listForServiceLocation(location.id),
-    enabled: !!location.id,
-    // First paint from the detail payload (same data, already pinned-first).
-    initialData: location.notes ?? undefined,
-  });
-  const notes = Array.isArray(data) ? data : [];
-  const pinnedCount = notes.filter((n) => n.pinned).length;
-
-  const [dialog, setDialog] = useState<{ open: boolean; note: NoteDto | null }>({ open: false, note: null });
-  const [noteToDelete, setNoteToDelete] = useState<NoteDto | null>(null);
-
-  const invalidate = () => {
-    queryClient.invalidateQueries({ queryKey: notesQueryKey });
-    // The detail payload also carries notes (first-paint copy) — refresh it.
-    queryClient.invalidateQueries({ queryKey: ['service-location', location.id] });
-  };
-
-  const createMutation = useMutation({
-    mutationFn: (vars: { body: string; pinned: boolean }) => noteApi.createForServiceLocation(location.id, vars),
-    onSuccess: () => {
-      invalidate();
-      setDialog({ open: false, note: null });
-    },
-    onError: (err: unknown) =>
-      showError(t('common.form.errorCreate', { entity: t('notes.entity') }), extractApiError(err) ?? undefined),
-  });
-
-  const editMutation = useMutation({
-    mutationFn: (vars: { id: string; body: string; pinned: boolean }) =>
-      noteApi.update(vars.id, { body: vars.body, pinned: vars.pinned }),
-    onSuccess: () => {
-      invalidate();
-      setDialog({ open: false, note: null });
-    },
-    onError: (err: unknown) =>
-      showError(t('common.form.errorUpdate', { entity: t('notes.entity') }), extractApiError(err) ?? undefined),
-  });
-
-  // Pin/unpin is a partial PATCH (pinned only) — separate from the dialog so a
-  // row toggle doesn't tie up the dialog's saving state.
-  const pinMutation = useMutation({
-    mutationFn: (note: NoteDto) => noteApi.update(note.id, { pinned: !note.pinned }),
-    onSuccess: invalidate,
-    onError: (err: unknown) =>
-      showError(t('common.form.errorUpdate', { entity: t('notes.entity') }), extractApiError(err) ?? undefined),
-  });
-
-  const deleteMutation = useMutation({
-    mutationFn: (id: string) => noteApi.delete(id),
-    onSuccess: () => {
-      invalidate();
-      setNoteToDelete(null);
-    },
-    onError: (err: unknown) =>
-      showError(t('common.form.errorDelete', { entity: t('notes.entity') }), extractApiError(err) ?? undefined),
-  });
-
-  const handleSave = (values: { body: string; pinned: boolean }) => {
-    if (dialog.note) editMutation.mutate({ id: dialog.note.id, ...values });
-    else createMutation.mutate(values);
-  };
-
-  return (
-    <Card
-      title={
-        <CardTitle>
-          {t('notes.title')}
-          {pinnedCount > 0 && (
-            <span className="text-[10px] font-medium text-fg-muted">
-              · {t('notes.pinnedCount', { count: pinnedCount })}
-            </span>
-          )}
-        </CardTitle>
-      }
-      action={
-        canEdit ? <CardLink onClick={() => setDialog({ open: true, note: null })}>+ Add</CardLink> : undefined
-      }
-      padding="none"
-    >
-      {/* Card body — 12px pad, 9px between note blocks (matches the design mock). */}
-      <div style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 9 }}>
-        {notes.length === 0 ? (
-          <div className="text-[12px] text-fg-muted">{t('notes.empty')}</div>
-        ) : (
-          notes.map((note) => {
-            // Meta line reads "[Pinned ·] {author} · {time} · edited" — one dim
-            // run, with the pinned glyph + prefix leading in the amber hue and
-            // the timestamp carrying its own exact-time hover via <TimeAgo>.
-            const edited = !!note.updatedAt && note.updatedAt !== note.createdAt;
-            return (
-              <div
-                key={note.id}
-                className="group/note"
-                style={{
-                  position: 'relative',
-                  padding: '9px 11px',
-                  borderRadius: 'var(--r-sm)',
-                  // Inline var() styles (not utility classes): a width-only
-                  // border has no rendered style under Tailwind v4, so the rail
-                  // would vanish. The mock uses the same inline treatment.
-                  background: note.pinned
-                    ? 'color-mix(in oklch, var(--warning-500) 9%, var(--bg-elev))'
-                    : 'var(--bg-elev-2)',
-                  borderLeft: '3px solid ' + (note.pinned ? 'var(--warning-500)' : 'var(--border-strong)'),
-                }}
-              >
-                {/* Body — content, full --fg, line breaks preserved. */}
-                <div
-                  style={{
-                    fontSize: 12,
-                    lineHeight: 1.5,
-                    color: 'var(--fg)',
-                    whiteSpace: 'pre-wrap',
-                    overflowWrap: 'anywhere',
-                    paddingRight: canEdit ? 52 : 0,
-                  }}
-                >
-                  {note.body}
-                </div>
-
-                {/* Meta — author · time · (edited); pinned leads with the glyph. */}
-                <div
-                  style={{
-                    marginTop: 3,
-                    display: 'flex',
-                    alignItems: 'center',
-                    flexWrap: 'wrap',
-                    gap: 4,
-                    fontSize: 10.5,
-                    color: 'var(--fg-dim)',
-                  }}
-                >
-                  {note.pinned && (
-                    <span
-                      style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: 3,
-                        fontWeight: 600,
-                        color: 'var(--warning-fg)',
-                      }}
-                    >
-                      <PinIcon className="size-3" solid />
-                      {t('notes.pinnedPrefix')} ·
-                    </span>
-                  )}
-                  {note.authorName && <span>{note.authorName}</span>}
-                  {note.authorName && <span aria-hidden>·</span>}
-                  <TimeAgo iso={note.createdAt} />
-                  {edited && <span aria-hidden>·</span>}
-                  {edited && <span>{t('notes.edited')}</span>}
-                </div>
-
-                {/* Hover actions — float top-right, same idiom as the contact rows. */}
-                {canEdit && (
-                  <div
-                    className="opacity-0 transition-opacity group-hover/note:opacity-100 focus-within:opacity-100"
-                    style={{ position: 'absolute', top: 7, right: 9, display: 'flex', alignItems: 'center', gap: 6 }}
-                  >
-                    <button
-                      onClick={() => pinMutation.mutate(note)}
-                      disabled={pinMutation.isPending}
-                      title={note.pinned ? t('notes.actions.unpin') : t('notes.actions.pin')}
-                      aria-label={note.pinned ? t('notes.actions.unpin') : t('notes.actions.pin')}
-                      className={`disabled:opacity-50 ${note.pinned ? 'text-[var(--warning-fg)] hover:opacity-80' : 'text-fg-dim hover:text-fg-strong'}`}
-                    >
-                      <PinIcon className="size-3.5" solid={note.pinned} />
-                    </button>
-                    <button
-                      onClick={() => setDialog({ open: true, note })}
-                      aria-label={t('common.edit')}
-                      title={t('common.edit')}
-                      className="text-fg-dim hover:text-fg-strong"
-                    >
-                      <PencilIcon className="size-3.5" />
-                    </button>
-                    <button
-                      onClick={() => setNoteToDelete(note)}
-                      aria-label={t('common.delete')}
-                      title={t('common.delete')}
-                      className="text-fg-dim hover:text-danger-500"
-                    >
-                      <TrashIcon className="size-3.5" />
-                    </button>
-                  </div>
-                )}
-              </div>
-            );
-          })
-        )}
-      </div>
-
-      <NoteDialog
-        isOpen={dialog.open}
-        onClose={() => setDialog({ open: false, note: null })}
-        note={dialog.note}
-        onSave={handleSave}
-        saving={createMutation.isPending || editMutation.isPending}
-      />
-      <ConfirmDialog
-        isOpen={!!noteToDelete}
-        onClose={() => setNoteToDelete(null)}
-        onConfirm={() => noteToDelete && deleteMutation.mutate(noteToDelete.id)}
-        title={t('notes.delete.title')}
-        message={t('notes.delete.message')}
-        confirmLabel={t('common.delete')}
-        isDestructive
-        isPending={deleteMutation.isPending}
-      />
-    </Card>
   );
 }
 

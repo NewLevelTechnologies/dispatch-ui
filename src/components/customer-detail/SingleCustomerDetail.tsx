@@ -43,7 +43,7 @@ import EquipmentFormDialog from '../EquipmentFormDialog';
 import NotificationPreferencesDialog from '../NotificationPreferencesDialog';
 import LocationFilesTab from '../LocationFilesTab';
 import LocationActivityStream from '../LocationActivityStream';
-import CustomerNotesCard from './CustomerNotesCard';
+import NotesCard from '../NotesCard';
 import CustomerEquipmentTab from './CustomerEquipmentTab';
 import CustomerWorkOrdersTab from './CustomerWorkOrdersTab';
 import CustomerInvoicesTab from './CustomerInvoicesTab';
@@ -56,6 +56,7 @@ import { SiteWorkOrdersCard, SiteInstructionsCard, SiteContactCard, DispatchesTa
 import { OrgMark } from './shared';
 import { formatDateShort } from './format';
 import { formatPhone } from '../../utils/formatPhone';
+import { titleCaseAddress } from '../../utils/titleCaseAddress';
 
 type TabId = 'overview' | 'equipment' | 'jobs' | 'invoices' | 'dispatches' | 'files' | 'activity';
 const SINGLE_TABS: readonly TabId[] = ['overview', 'equipment', 'jobs', 'invoices', 'dispatches', 'files', 'activity'];
@@ -239,7 +240,7 @@ export default function SingleCustomerDetail({ customer }: { customer: Customer 
 
   const addr = customer.serviceLocations[0]?.address;
   const headerAddress = addr
-    ? [addr.streetAddress, [addr.city, addr.state].filter(Boolean).join(', '), addr.zipCode].filter(Boolean).join(', ')
+    ? [titleCaseAddress(addr.streetAddress), [titleCaseAddress(addr.city), addr.state].filter(Boolean).join(', '), addr.zipCode].filter(Boolean).join(', ')
     : null;
   const premise = location?.premiseType ?? customer.serviceLocations[0]?.premiseType;
 
@@ -369,7 +370,7 @@ export default function SingleCustomerDetail({ customer }: { customer: Customer 
                     <BillingCard customer={customer} ar={arSummary} canEdit={canEditCustomers} onSelectAging={goToBucket} />
                     <EquipmentSummaryCard equipment={equipment} onViewAll={() => setActiveTab('equipment')} />
                     <SiteWorkOrdersCard location={location} onViewAll={() => setActiveTab('jobs')} />
-                    <CustomerNotesCard customerId={customer.id} canEdit={canEditCustomers} />
+                    <NotesCard entityType="customer" entityId={customer.id} canEdit={canEditCustomers} />
                   </div>
                   <div className="flex flex-col gap-3">
                     <SiteInstructionsCard location={location} canEdit={canEditCustomers} />

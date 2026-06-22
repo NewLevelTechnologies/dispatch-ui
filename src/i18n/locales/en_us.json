@@ -782,6 +782,8 @@
       "unpin": "Unpin"
     },
     "add": "Add note",
+    "addPlaceholder": "Add a note…",
+    "allLabel": "All notes",
     "bodyLabel": "Note",
     "bodyRequired": "Note can't be empty.",
     "delete": {
@@ -792,10 +794,15 @@
     "edited": "edited",
     "empty": "No notes yet.",
     "entity": "note",
+    "loadMore": "Load {{count}} more",
+    "matchesLabel": "Matches",
+    "noMatch": "No notes match “{{query}}”.",
     "pin": "Pin this note",
     "pinDescription": "Pinned notes stay at the top of the list.",
     "pinnedCount": "{{count}} pinned",
     "pinnedPrefix": "Pinned",
+    "searchPlaceholder": "Search notes",
+    "showAll": "Show all {{count}}",
     "title": "Notes"
   },
   "notifications": {
