@@ -198,6 +198,10 @@ export default function EquipmentDetailPage() {
   const [showAllFilterSizes, setShowAllFilterSizes] = useState(false);
   const [isNewWorkOrderOpen, setIsNewWorkOrderOpen] = useState(false);
   const [retireConfirm, setRetireConfirm] = useState(false);
+  // Destructive confirms — Catalyst ConfirmDialog, never the native window.confirm.
+  const [equipmentDeleteConfirm, setEquipmentDeleteConfirm] = useState(false);
+  const [filterToDelete, setFilterToDelete] = useState<EquipmentFilter | null>(null);
+  const [imageToDelete, setImageToDelete] = useState<EquipmentImage | null>(null);
   // Header identity — a visible "Edit" flips the header into an inline edit block
   // (name + type/category cascade + make/model/serial/asset/install). Warranty is
   // its own card. Draft is null until editing starts.
@@ -359,10 +363,7 @@ export default function EquipmentDetailPage() {
   });
 
   const handleDeleteEquipment = () => {
-    if (!equipment) return;
-    if (window.confirm(t('common.actions.deleteConfirm', { name: equipment.name }))) {
-      deleteEquipmentMutation.mutate();
-    }
+    if (equipment) setEquipmentDeleteConfirm(true);
   };
 
   // Single-field PATCH for every inline EditableField. The field stays in edit
@@ -552,9 +553,7 @@ export default function EquipmentDetailPage() {
     setPrefilledSize(null);
     setIsFilterDialogOpen(true);
   };
-  const handleDeleteFilter = (f: EquipmentFilter) => {
-    if (window.confirm(t('equipment.filters.deleteConfirm'))) deleteFilterMutation.mutate(f.id);
-  };
+  const handleDeleteFilter = (f: EquipmentFilter) => setFilterToDelete(f);
   const handleSetProfileImage = (img: EquipmentImage) => {
     if (!img.isProfile) setProfileImageMutation.mutate(img.id);
   };
@@ -563,9 +562,7 @@ export default function EquipmentDetailPage() {
     if (next === null) return;
     updateCaptionMutation.mutate({ imageId: img.id, caption: next.trim() || null });
   };
-  const handleDeleteImage = (img: EquipmentImage) => {
-    if (window.confirm(t('equipment.images.deleteConfirm'))) deleteImageMutation.mutate(img.id);
-  };
+  const handleDeleteImage = (img: EquipmentImage) => setImageToDelete(img);
 
   const recentWorkOrders = (serviceHistoryData?.content ?? []).slice(0, 3);
   const showFiltersCard = filters.length > 0 || activeFilterSizes.length > 0;
@@ -1020,11 +1017,8 @@ export default function EquipmentDetailPage() {
                   >
                     {locationLabel}
                   </RouterLink>
-                  {locationCustomer && (
-                    <div className="mt-0.5 text-[11.5px] text-fg-muted">{locationCustomer.name}</div>
-                  )}
                   {serviceLocation && (
-                    <div className="text-[11.5px] text-fg-muted">
+                    <div className="mt-0.5 text-[11.5px] text-fg-muted">
                       {[titleCaseAddress(serviceLocation.address.streetAddress), titleCaseAddress(serviceLocation.address.city), serviceLocation.address.state]
                         .filter(Boolean)
                         .join(', ')}
@@ -1555,6 +1549,39 @@ export default function EquipmentDetailPage() {
         confirmLabel={isRetired ? 'Reactivate' : 'Retire'}
         isDestructive={!isRetired}
         isPending={retireMutation.isPending}
+      />
+
+      <ConfirmDialog
+        isOpen={equipmentDeleteConfirm}
+        onClose={() => setEquipmentDeleteConfirm(false)}
+        onConfirm={() => deleteEquipmentMutation.mutate()}
+        title="Delete equipment?"
+        message={t('common.actions.deleteConfirm', { name: equipment.name })}
+        confirmLabel={t('common.delete')}
+        isDestructive
+        isPending={deleteEquipmentMutation.isPending}
+      />
+
+      <ConfirmDialog
+        isOpen={!!filterToDelete}
+        onClose={() => setFilterToDelete(null)}
+        onConfirm={() => filterToDelete && deleteFilterMutation.mutate(filterToDelete.id)}
+        title="Delete filter?"
+        message="Removes this filter size from the unit."
+        confirmLabel={t('common.delete')}
+        isDestructive
+        isPending={deleteFilterMutation.isPending}
+      />
+
+      <ConfirmDialog
+        isOpen={!!imageToDelete}
+        onClose={() => setImageToDelete(null)}
+        onConfirm={() => imageToDelete && deleteImageMutation.mutate(imageToDelete.id)}
+        title="Delete photo?"
+        message="Removes this photo from the unit's media."
+        confirmLabel={t('common.delete')}
+        isDestructive
+        isPending={deleteImageMutation.isPending}
       />
     </AppLayout>
   );

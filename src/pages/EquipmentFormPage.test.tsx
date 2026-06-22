@@ -12,6 +12,10 @@ const mockTypesGetAll = vi.fn();
 const mockCategoriesGetAll = vi.fn();
 const mockFieldsGetAll = vi.fn();
 const mockGetServiceLocationById = vi.fn();
+const mockExtract = vi.fn();
+const mockImageUpload = vi.fn();
+const mockImagePatch = vi.fn();
+const mockGetSettings = vi.fn();
 
 vi.mock('../api/equipmentApi', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../api/equipmentApi')>();
@@ -22,10 +26,24 @@ vi.mock('../api/equipmentApi', async (importOriginal) => {
       getById: (...args: unknown[]) => mockGetById(...args),
       create: (...args: unknown[]) => mockCreate(...args),
       update: (...args: unknown[]) => mockUpdate(...args),
+      extractNameplate: (...args: unknown[]) => mockExtract(...args),
+    },
+    equipmentImagesApi: {
+      ...actual.equipmentImagesApi,
+      upload: (...args: unknown[]) => mockImageUpload(...args),
+      patch: (...args: unknown[]) => mockImagePatch(...args),
     },
     equipmentTypesApi: { getAll: (...args: unknown[]) => mockTypesGetAll(...args) },
     equipmentCategoriesApi: { getAll: (...args: unknown[]) => mockCategoriesGetAll(...args) },
     equipmentCategoryFieldsApi: { getAll: (...args: unknown[]) => mockFieldsGetAll(...args) },
+  };
+});
+
+vi.mock('../api/tenantSettingsApi', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../api/tenantSettingsApi')>();
+  return {
+    ...actual,
+    tenantSettingsApi: { ...actual.tenantSettingsApi, getSettings: (...args: unknown[]) => mockGetSettings(...args) },
   };
 });
 
@@ -95,6 +113,10 @@ describe('EquipmentFormPage', () => {
     mockFieldsGetAll.mockResolvedValue([]);
     mockCreate.mockResolvedValue({ id: 'eq-new' });
     mockUpdate.mockResolvedValue({ id: 'eq-9' });
+    mockImageUpload.mockResolvedValue({ id: 'img-1' });
+    mockImagePatch.mockResolvedValue({ id: 'img-1', isNameplate: true });
+    // AI off by default — the nameplate hero is opt-in per tenant.
+    mockGetSettings.mockResolvedValue({ enableAiFeatures: false });
   });
 
   it('renders scoped-add header with the location context and cascades category off type', async () => {
@@ -331,5 +353,148 @@ describe('EquipmentFormPage', () => {
     await waitFor(() => expect(mockCreate).toHaveBeenCalled());
     const attrs = JSON.parse((mockCreate.mock.calls[0][0] as { attributes: string }).attributes);
     expect(attrs).toMatchObject({ tonnage: 5, refrigerant: 'R-410A', under_warranty: true });
+  });
+
+  // ===== Nameplate OCR (add-mode hero) =====
+  const jpeg = (name = 'plate.jpg') => new File(['x'], name, { type: 'image/jpeg' });
+  const fileInputOf = (container: HTMLElement) => container.querySelector('input[type="file"]') as HTMLInputElement;
+
+  it('omits the nameplate hero when AI features are off', async () => {
+    renderScopedAdd();
+    await waitFor(() => expect(screen.getByRole('heading', { name: /add equipment/i, level: 1 })).toBeInTheDocument());
+    expect(screen.queryByText(/auto-fill from the nameplate/i)).not.toBeInTheDocument();
+  });
+
+  it('omits the nameplate hero in edit mode even when AI is on', async () => {
+    mockGetSettings.mockResolvedValue({ enableAiFeatures: true });
+    mockGetById.mockResolvedValue({ id: 'eq-9', name: 'RTU-9', serviceLocationId: 'loc-1', status: 'ACTIVE' });
+    renderEdit('eq-9');
+    await waitFor(() => expect(screen.getByRole('heading', { name: /edit equipment/i, level: 1 })).toBeInTheDocument());
+    expect(screen.queryByText(/auto-fill from the nameplate/i)).not.toBeInTheDocument();
+  });
+
+  it('reads a nameplate, pre-fills identity with READ/VERIFY markers + warnings, and clears a marker on edit', async () => {
+    mockGetSettings.mockResolvedValue({ enableAiFeatures: true });
+    mockExtract.mockResolvedValue({
+      make: 'Carrier', model: '50TC-A06', serialNumber: 'A1142099',
+      attributes: { tonnage: '5' }, warnings: ['serial last digit unclear from glare'],
+    });
+    const user = userEvent.setup();
+    const { container } = renderScopedAdd();
+    await waitFor(() => expect(screen.getByText(/auto-fill from the nameplate/i)).toBeInTheDocument());
+
+    fireEvent.change(fileInputOf(container), { target: { files: [jpeg()] } });
+
+    await waitFor(() => expect(mockExtract).toHaveBeenCalled());
+    expect(await screen.findByText(/filled from the nameplate/i)).toBeInTheDocument();
+    expect(screen.getByText(/serial last digit unclear/i)).toBeInTheDocument();
+
+    expect((screen.getByPlaceholderText('Carrier') as HTMLInputElement).value).toBe('Carrier');
+    expect((screen.getByPlaceholderText('50TC-A06') as HTMLInputElement).value).toBe('50TC-A06');
+    expect((screen.getByPlaceholderText('A1142099') as HTMLInputElement).value).toBe('A1142099');
+    expect(screen.getAllByText('READ').length).toBeGreaterThan(0);
+    expect(screen.getByText('VERIFY')).toBeInTheDocument();
+
+    // Editing the serial clears its VERIFY marker (review-then-trust).
+    await user.type(screen.getByPlaceholderText('A1142099'), 'X');
+    await waitFor(() => expect(screen.queryByText('VERIFY')).not.toBeInTheDocument());
+  });
+
+  it('rejects a non-image (HEIC) file client-side without calling the API', async () => {
+    mockGetSettings.mockResolvedValue({ enableAiFeatures: true });
+    const { container } = renderScopedAdd();
+    await waitFor(() => expect(screen.getByText(/auto-fill from the nameplate/i)).toBeInTheDocument());
+    fireEvent.change(fileInputOf(container), { target: { files: [new File(['x'], 'plate.heic', { type: 'image/heic' })] } });
+    expect(await screen.findByText(/jpeg, png, or webp/i)).toBeInTheDocument();
+    expect(mockExtract).not.toHaveBeenCalled();
+  });
+
+  it('hides the hero when extraction returns 403 (AI disabled mid-session)', async () => {
+    mockGetSettings.mockResolvedValue({ enableAiFeatures: true });
+    mockExtract.mockRejectedValue(Object.assign(new Error('forbidden'), { response: { status: 403 } }));
+    const { container } = renderScopedAdd();
+    await waitFor(() => expect(screen.getByText(/auto-fill from the nameplate/i)).toBeInTheDocument());
+    fireEvent.change(fileInputOf(container), { target: { files: [jpeg()] } });
+    await waitFor(() => expect(screen.queryByText(/auto-fill from the nameplate/i)).not.toBeInTheDocument());
+  });
+
+  it('falls back to manual entry with a message when extraction errors (502)', async () => {
+    mockGetSettings.mockResolvedValue({ enableAiFeatures: true });
+    mockExtract.mockRejectedValue(Object.assign(new Error('down'), { response: { status: 502, data: { message: 'model unreachable' } } }));
+    const { container } = renderScopedAdd();
+    await waitFor(() => expect(screen.getByText(/auto-fill from the nameplate/i)).toBeInTheDocument());
+    fireEvent.change(fileInputOf(container), { target: { files: [jpeg()] } });
+    // Hero stays (idle) and surfaces the error; manual entry still works.
+    expect(await screen.findByText(/model unreachable/i)).toBeInTheDocument();
+    expect(screen.getByText(/auto-fill from the nameplate/i)).toBeInTheDocument();
+  });
+
+  it('lets the tech replace the photo (resets the hero to idle)', async () => {
+    mockGetSettings.mockResolvedValue({ enableAiFeatures: true });
+    mockExtract.mockResolvedValue({ make: 'Carrier', model: null, serialNumber: null, attributes: null, warnings: null });
+    const user = userEvent.setup();
+    const { container } = renderScopedAdd();
+    await waitFor(() => expect(screen.getByText(/auto-fill from the nameplate/i)).toBeInTheDocument());
+    fireEvent.change(fileInputOf(container), { target: { files: [jpeg()] } });
+    expect(await screen.findByText(/filled from the nameplate/i)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /replace photo/i }));
+    expect(await screen.findByText(/auto-fill from the nameplate/i)).toBeInTheDocument();
+  });
+
+  it('uploads the nameplate photo to the created unit on save', async () => {
+    mockGetSettings.mockResolvedValue({ enableAiFeatures: true });
+    mockExtract.mockResolvedValue({ make: 'Carrier', model: null, serialNumber: null, attributes: null, warnings: null });
+    const user = userEvent.setup();
+    const { container } = renderScopedAdd();
+    await waitFor(() => expect(screen.getByText(/auto-fill from the nameplate/i)).toBeInTheDocument());
+
+    const file = jpeg();
+    fireEvent.change(fileInputOf(container), { target: { files: [file] } });
+    await waitFor(() => expect(mockExtract).toHaveBeenCalled());
+
+    const selects = () => screen.getAllByRole('combobox');
+    await screen.findByRole('option', { name: 'HVAC' });
+    await user.selectOptions(selects()[0], 't-hvac');
+    await waitFor(() => expect(screen.getByRole('option', { name: 'Rooftop' })).toBeInTheDocument());
+    await user.selectOptions(selects()[1], 'c-rtu');
+    await user.type(screen.getByPlaceholderText(/RTU-3/), 'RTU-7');
+    await user.click(screen.getByRole('button', { name: /add equipment/i }));
+
+    await waitFor(() => expect(mockCreate).toHaveBeenCalled());
+    await waitFor(() => expect(mockImageUpload).toHaveBeenCalledWith('eq-new', file, { caption: 'Nameplate' }));
+    // The uploaded shot is flagged as the unit's nameplate (source of truth).
+    await waitFor(() => expect(mockImagePatch).toHaveBeenCalledWith('eq-new', 'img-1', { isNameplate: true }));
+  });
+
+  it('retains an OCR spec read and snaps it onto the category SELECT once chosen', async () => {
+    mockGetSettings.mockResolvedValue({ enableAiFeatures: true });
+    // The plate reports R410A *before* a category (and its spec list) is known.
+    mockExtract.mockResolvedValue({
+      make: null, model: null, serialNumber: null, attributes: { refrigerant: 'R410A TXV INSTALLED' }, warnings: null,
+    });
+    mockFieldsGetAll.mockResolvedValue([
+      { id: 'f-sel', tenantId: 't', equipmentCategoryId: 'c-rtu', fieldKey: 'refrigerant', label: 'Refrigerant', dataType: 'SELECT',
+        options: ['R-410A', 'R-454B', 'R-22'], required: false, helpText: null, sortOrder: 0, archivedAt: null, createdAt: '', updatedAt: '' },
+    ]);
+    const user = userEvent.setup();
+    const { container } = renderScopedAdd();
+    await waitFor(() => expect(screen.getByText(/auto-fill from the nameplate/i)).toBeInTheDocument());
+
+    // Read the plate first — no category yet, so the spec field doesn't exist.
+    fireEvent.change(fileInputOf(container), { target: { files: [jpeg()] } });
+    await waitFor(() => expect(mockExtract).toHaveBeenCalled());
+    expect(screen.queryByLabelText('Refrigerant')).not.toBeInTheDocument();
+
+    // Now choose the category → the retained read snaps onto the select option.
+    const selects = () => screen.getAllByRole('combobox');
+    await screen.findByRole('option', { name: 'HVAC' });
+    await user.selectOptions(selects()[0], 't-hvac');
+    await waitFor(() => expect(screen.getByRole('option', { name: 'Rooftop' })).toBeInTheDocument());
+    await user.selectOptions(selects()[1], 'c-rtu');
+
+    // Once it snaps, the label carries a READ badge ("Refrigerant READ"), so match loosely.
+    const refrigerant = (await screen.findByLabelText(/Refrigerant/)) as HTMLSelectElement;
+    await waitFor(() => expect(refrigerant.value).toBe('R-410A'));
+    expect(screen.getByText('READ')).toBeInTheDocument();
   });
 });

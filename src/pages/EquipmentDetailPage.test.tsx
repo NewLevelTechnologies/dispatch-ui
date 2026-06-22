@@ -250,9 +250,9 @@ describe('EquipmentDetailPage', () => {
     expect(screen.getAllByText('Basement').length).toBeGreaterThan(0);
     // Description card (conditional, present here).
     expect(screen.getByText('Two-stage gas furnace')).toBeInTheDocument();
-    // Located-at card resolves the location + customer (separate async queries).
+    // Located-at card shows the service location name (customer name is not
+    // repeated here — it's redundant with the location).
     expect(await screen.findByText('Main Office')).toBeInTheDocument();
-    expect(await screen.findByText('Acme Corp')).toBeInTheDocument();
   });
 
   it('renders the profile image when present, placeholder otherwise', async () => {
@@ -529,7 +529,6 @@ describe('EquipmentDetailPage', () => {
       { id: 'f-1', equipmentId: 'eq-1', lengthIn: 20, widthIn: 25, thicknessIn: 1, quantity: 1, label: null },
     ]);
     mockFilterDelete.mockResolvedValue(undefined);
-    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
     const user = userEvent.setup();
 
     renderPage();
@@ -541,14 +540,12 @@ describe('EquipmentDetailPage', () => {
 
     // Header carries its own overflow (Delete equipment); the filter row menu is the second match.
     await user.click(screen.getAllByRole('button', { name: /more options/i })[1]);
-    const deleteItem = await screen.findByRole('menuitem', { name: /delete/i });
-    await user.click(deleteItem);
+    await user.click(await screen.findByRole('menuitem', { name: /delete/i }));
+    // Confirm in the Catalyst dialog — no native window.confirm.
+    const dialog = await screen.findByRole('dialog');
+    await user.click(within(dialog).getByRole('button', { name: /^delete$/i }));
 
-    await waitFor(() => {
-      expect(confirmSpy).toHaveBeenCalled();
-      expect(mockFilterDelete).toHaveBeenCalledWith('eq-1', 'f-1');
-    });
-    confirmSpy.mockRestore();
+    await waitFor(() => expect(mockFilterDelete).toHaveBeenCalledWith('eq-1', 'f-1'));
   });
 
   it('inline-edits the single-field cards (on-site, description)', async () => {
@@ -680,7 +677,6 @@ describe('EquipmentDetailPage', () => {
         response: { data: { message: 'Filter is referenced by an open work order.' } },
       })
     );
-    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
     const user = userEvent.setup();
     renderPage();
 
@@ -690,8 +686,9 @@ describe('EquipmentDetailPage', () => {
     await waitFor(() => expect(screen.getByText('20×25×1')).toBeInTheDocument());
 
     await user.click(screen.getAllByRole('button', { name: /more options/i })[1]);
-    const deleteItem = await screen.findByRole('menuitem', { name: /delete/i });
-    await user.click(deleteItem);
+    await user.click(await screen.findByRole('menuitem', { name: /delete/i }));
+    const dialog = await screen.findByRole('dialog');
+    await user.click(within(dialog).getByRole('button', { name: /^delete$/i }));
 
     await waitFor(() => {
       // Backend message flows through extractApiError into the toast description.
@@ -700,7 +697,6 @@ describe('EquipmentDetailPage', () => {
         'Filter is referenced by an open work order.'
       );
     });
-    confirmSpy.mockRestore();
   });
 
   it('renders empty state on the photos tab when no photos exist', async () => {
@@ -862,7 +858,6 @@ describe('EquipmentDetailPage', () => {
       },
     ]);
     mockImageDelete.mockResolvedValue(undefined);
-    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
     const user = userEvent.setup();
     renderPage();
 
@@ -874,13 +869,13 @@ describe('EquipmentDetailPage', () => {
     // Header overflow appears first; the photo row's overflow is at index 1.
     const moreButtons = await screen.findAllByRole('button', { name: /more options/i });
     await user.click(moreButtons[1]);
-    const deleteItem = await screen.findByRole('menuitem', { name: /delete/i });
-    await user.click(deleteItem);
+    await user.click(await screen.findByRole('menuitem', { name: /delete/i }));
+    const dialog = await screen.findByRole('dialog');
+    await user.click(within(dialog).getByRole('button', { name: /^delete$/i }));
 
     await waitFor(() => {
       expect(mockImageDelete).toHaveBeenCalledWith('eq-1', 'img-1');
     });
-    confirmSpy.mockRestore();
   });
 
   it('opens the media upload dialog from the Add media button', async () => {
@@ -1070,7 +1065,6 @@ describe('EquipmentDetailPage', () => {
   it('deletes the equipment from the header overflow and navigates back', async () => {
     mockGetById.mockResolvedValue(baseEquipment);
     mockDelete.mockResolvedValue(undefined);
-    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
     const user = userEvent.setup();
     renderPage();
 
@@ -1080,13 +1074,13 @@ describe('EquipmentDetailPage', () => {
 
     // Header overflow is the first ⋯ button on the page (no row-level overflow on Overview).
     await user.click(screen.getAllByRole('button', { name: /more options/i })[0]);
-    const deleteItem = await screen.findByRole('menuitem', { name: /delete/i });
-    await user.click(deleteItem);
+    await user.click(await screen.findByRole('menuitem', { name: /delete/i }));
+    const dialog = await screen.findByRole('dialog');
+    await user.click(within(dialog).getByRole('button', { name: /^delete$/i }));
 
     await waitFor(() => {
       expect(mockDelete).toHaveBeenCalledWith('eq-1');
     });
-    confirmSpy.mockRestore();
   });
 
   it('edits a photo caption from the row menu', async () => {
@@ -1179,7 +1173,6 @@ describe('EquipmentDetailPage', () => {
     mockImageDelete.mockRejectedValue(
       Object.assign(new Error('x'), { response: { data: { message: 'Cannot delete' } } })
     );
-    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
     const user = userEvent.setup();
     renderPage();
 
@@ -1187,11 +1180,12 @@ describe('EquipmentDetailPage', () => {
     await user.click(screen.getByRole('tab', { name: /^media/i }));
     await user.click((await screen.findAllByRole('button', { name: /more options/i }))[1]);
     await user.click(await screen.findByRole('menuitem', { name: /delete/i }));
+    const dialog = await screen.findByRole('dialog');
+    await user.click(within(dialog).getByRole('button', { name: /^delete$/i }));
 
     await waitFor(() => {
       expect(mockShowError).toHaveBeenCalledWith(expect.any(String), 'Cannot delete');
     });
-    confirmSpy.mockRestore();
   });
 
   it('navigates to the scoped add form with ?parent from the Units card', async () => {

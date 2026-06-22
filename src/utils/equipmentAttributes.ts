@@ -43,6 +43,28 @@ export function buildAttributes(
   return JSON.stringify(attrs);
 }
 
+// Snap an OCR-read free-text value onto one of a SELECT field's options,
+// tolerating case / punctuation / whitespace ("R410A" → "R-410A") and trailing
+// noise the OCR picks up ("R410A TXV INSTALLED" → "R-410A"). Returns the matching
+// option, or null when nothing fits (caller keeps the raw read for later).
+export function matchOption(raw: string, options: string[] | null | undefined): string | null {
+  if (!raw || !options || options.length === 0) return null;
+  const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
+  const target = norm(raw);
+  if (!target) return null;
+  const exact = options.find((o) => norm(o) === target);
+  if (exact) return exact;
+  // OCR often appends noise — accept an option the read contains (or vice-versa);
+  // prefer the longest such option so "R-410A" beats a stray short match.
+  const partial = options
+    .filter((o) => {
+      const n = norm(o);
+      return n.length > 1 && (target.includes(n) || n.includes(target));
+    })
+    .sort((a, b) => norm(b).length - norm(a).length)[0];
+  return partial ?? null;
+}
+
 const usd = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
 
 // Read-mode display for a stored spec value (the string form from parseAttributes).

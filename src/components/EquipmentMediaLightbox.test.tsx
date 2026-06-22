@@ -45,6 +45,7 @@ const image = (o: Partial<EquipmentImage> = {}): EquipmentImage => ({
   thumbnailWidthPx: 1,
   thumbnailHeightPx: 1,
   isProfile: false,
+  isNameplate: false,
   sortOrder: 0,
   caption: null,
   uploadedBy: null,

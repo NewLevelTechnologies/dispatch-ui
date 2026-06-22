@@ -16,6 +16,7 @@ const makeImage = (overrides: Partial<EquipmentImage> = {}): EquipmentImage => (
   thumbnailWidthPx: null,
   thumbnailHeightPx: null,
   isProfile: false,
+  isNameplate: false,
   sortOrder: 0,
   caption: null,
   uploadedBy: null,
