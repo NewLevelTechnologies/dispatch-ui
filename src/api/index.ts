@@ -142,6 +142,7 @@ export {
 // Service Agreement API (recurring scheduled work — work-order-service)
 export {
   agreementApi,
+  agreementNotesApi,
   type AgreementKind,
   type AgreementClassification,
   type AgreementStatus,

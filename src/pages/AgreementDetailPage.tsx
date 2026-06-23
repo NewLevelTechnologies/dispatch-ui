@@ -44,6 +44,7 @@ import { useAgreementSchedule } from './agreement/useAgreementSchedule';
 import { useAgreementBilling, type EnrichedInstallment, type InstallmentDisplayStatus } from './agreement/useAgreementBilling';
 import AgreementInvoicesTab from './agreement/AgreementInvoicesTab';
 import AgreementFilesTab from './agreement/AgreementFilesTab';
+import NotesCard from '../components/NotesCard';
 import {
   agreementBillingQueryOptions,
   agreementComplianceQueryOptions,
@@ -616,7 +617,7 @@ function OverviewTab({
           <ScopeCard agreementId={agreement.id} templates={agreement.visitTemplates} />
           <TermCard agreement={agreement} onEdit={onEdit} />
           <CustomerCard agreement={agreement} />
-          <NotesCard agreement={agreement} onEdit={onEdit} />
+          <NotesCard entityType="agreement" entityId={agreement.id} />
         </div>
       </div>
     </div>
@@ -1048,18 +1049,6 @@ function CustomerCard({ agreement }: { agreement: AgreementResponse }) {
       <div className="mt-1.5 text-[11.5px] text-fg-muted">
         See the customer page for the full agreement portfolio and AR rollup.
       </div>
-    </Card>
-  );
-}
-
-function NotesCard({ agreement, onEdit }: { agreement: AgreementResponse; onEdit: () => void }) {
-  return (
-    <Card title="Notes" action={<CardLink onClick={onEdit}>Edit</CardLink>}>
-      {agreement.notes ? (
-        <div className="whitespace-pre-wrap text-[12px] leading-relaxed text-fg">{agreement.notes}</div>
-      ) : (
-        <div className="text-[12px] italic text-fg-dim">No notes.</div>
-      )}
     </Card>
   );
 }

@@ -13,7 +13,7 @@ import { useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { noteApi, equipmentNotesApi, type NoteDto } from '../api';
+import { noteApi, equipmentNotesApi, agreementNotesApi, type NoteDto } from '../api';
 import { Card } from './catalyst/card';
 import { CardTitle, CardLink } from './customer-detail/shared';
 import { NoteRow } from './NoteRow';
@@ -22,7 +22,7 @@ import NoteDialog from './NoteDialog';
 import ConfirmDialog from './ConfirmDialog';
 import { showError, showSuccess, extractApiError } from '../lib/toast';
 
-export type NoteEntityType = 'customer' | 'service_location' | 'equipment';
+export type NoteEntityType = 'customer' | 'service_location' | 'equipment' | 'agreement';
 
 // All pinned notes always show; this caps the unpinned tail in the card. Beyond
 // it, the drawer carries the rest.
@@ -52,6 +52,15 @@ function getBinding(entityType: NoteEntityType, id: string): NotesBinding {
         create: (values) => equipmentNotesApi.create(id, values),
         update: (noteId, values) => equipmentNotesApi.update(id, noteId, values),
         remove: (noteId) => equipmentNotesApi.delete(id, noteId),
+      };
+    case 'agreement':
+      return {
+        queryKey: ['agreement-notes', id],
+        extraInvalidateKeys: [['agreement', id]],
+        list: () => agreementNotesApi.list(id),
+        create: (values) => agreementNotesApi.create(id, values),
+        update: (noteId, values) => agreementNotesApi.update(id, noteId, values),
+        remove: (noteId) => agreementNotesApi.delete(id, noteId),
       };
     case 'customer':
       return {

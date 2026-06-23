@@ -3,7 +3,7 @@ import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderWithProviders } from '../test/utils';
 import AgreementDetailPage from './AgreementDetailPage';
-import { agreementApi, customerApi, dispatchesApi, invoicesApi, agreementFilesApi } from '../api';
+import { agreementApi, customerApi, dispatchesApi, invoicesApi, agreementFilesApi, agreementNotesApi } from '../api';
 
 vi.mock('../api', () => ({
   agreementApi: {
@@ -21,6 +21,7 @@ vi.mock('../api', () => ({
   dispatchesApi: { listForWorkOrder: vi.fn() },
   invoicesApi: { getAll: vi.fn() },
   agreementFilesApi: { list: vi.fn(), upload: vi.fn(), delete: vi.fn(), patch: vi.fn() },
+  agreementNotesApi: { list: vi.fn(), create: vi.fn(), update: vi.fn(), delete: vi.fn() },
   // Const enum object — the billing/invoice surfaces build status→tone maps off it.
   InvoiceStatus: {
     DRAFT: 'DRAFT',
@@ -130,6 +131,8 @@ describe('AgreementDetailPage', () => {
       last: true,
       counts: { all: 0, photos: 0, videos: 0, documents: 0 },
     });
+    // Notes card → empty by default.
+    vi.mocked(agreementNotesApi.list).mockResolvedValue([]);
   });
 
   it('renders the header (name, number, customer) and the tab row', async () => {

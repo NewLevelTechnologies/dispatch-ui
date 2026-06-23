@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { agreementApi } from './agreementApi';
+import { agreementApi, agreementNotesApi } from './agreementApi';
 import apiClient from './client';
 
 vi.mock('./client');
@@ -110,6 +110,30 @@ describe('agreementApi', () => {
     expect(apiClient.get).toHaveBeenCalledWith(
       '/work-orders/agreements/a-1/billing-schedule/installments',
     );
+  });
+
+  describe('agreementNotesApi', () => {
+    it('list GETs the agreement notes', async () => {
+      await agreementNotesApi.list('a-1');
+      expect(apiClient.get).toHaveBeenCalledWith('/work-orders/agreements/a-1/notes');
+    });
+    it('create POSTs a note', async () => {
+      await agreementNotesApi.create('a-1', { body: 'Renewal called', pinned: true });
+      expect(apiClient.post).toHaveBeenCalledWith('/work-orders/agreements/a-1/notes', {
+        body: 'Renewal called',
+        pinned: true,
+      });
+    });
+    it('update PATCHes a note', async () => {
+      await agreementNotesApi.update('a-1', 'n-1', { pinned: false });
+      expect(apiClient.patch).toHaveBeenCalledWith('/work-orders/agreements/a-1/notes/n-1', {
+        pinned: false,
+      });
+    });
+    it('delete DELETEs a note', async () => {
+      await agreementNotesApi.delete('a-1', 'n-1');
+      expect(apiClient.delete).toHaveBeenCalledWith('/work-orders/agreements/a-1/notes/n-1');
+    });
   });
 
   it('create POSTs to /work-orders/agreements', async () => {
