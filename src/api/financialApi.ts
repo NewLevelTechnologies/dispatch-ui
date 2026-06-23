@@ -251,6 +251,11 @@ export interface InvoiceListItemRow {
   customerName: string | null;
   serviceLocationId: string | null;
   workOrderId: string | null;
+  // Agreement billing linkage (migration 032). Present on installment invoices
+  // minted from an agreement's schedule; null on ad-hoc invoices. Join the
+  // installment schedule to invoices on periodKey == billingPeriodKey.
+  agreementId: string | null;
+  billingPeriodKey: string | null;
   invoiceDate: string;
   dueDate: string;
   totalAmount: number;
@@ -299,6 +304,7 @@ export type InvoiceSortField =
 export interface ListInvoicesParams {
   customerId?: string;
   serviceLocationId?: string;
+  agreementId?: string; // installment invoices for one agreement (migration 032)
   status?: InvoiceStatus;
   from?: string; // YYYY-MM-DD, invoiceDate >= from (inclusive)
   to?: string; // YYYY-MM-DD, invoiceDate <= to (inclusive — no +1-day trick)

@@ -169,6 +169,9 @@ export {
   type AgreementVisitResponse,
   type AgreementComplianceSummary,
   type BillingScheduleResponse,
+  type UpsertBillingScheduleRequest,
+  type BillingInstallmentResponse,
+  type BillingInstallmentStatus,
 } from './agreementApi';
 
 // Equipment APIs

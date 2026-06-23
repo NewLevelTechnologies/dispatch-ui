@@ -28,6 +28,7 @@ import ConfirmDialog from '../components/ConfirmDialog';
 import IconButton from '../components/IconButton';
 import AgreementFormDialog from '../components/AgreementFormDialog';
 import VisitTemplateFormDialog from '../components/VisitTemplateFormDialog';
+import BillingSetupDialog from '../components/BillingSetupDialog';
 import { Card } from '../components/catalyst/card';
 import { DataRow } from '../components/catalyst/data-row';
 import { Button } from '../components/catalyst/button';
@@ -39,6 +40,8 @@ import { EmptyState } from '../components/ui/EmptyState';
 import AgreementCoverageTab from './agreement/AgreementCoverageTab';
 import AgreementScheduleTab from './agreement/AgreementScheduleTab';
 import { useAgreementSchedule } from './agreement/useAgreementSchedule';
+import { useAgreementBilling, type EnrichedInstallment, type InstallmentDisplayStatus } from './agreement/useAgreementBilling';
+import AgreementInvoicesTab from './agreement/AgreementInvoicesTab';
 import {
   agreementBillingQueryOptions,
   agreementComplianceQueryOptions,
@@ -46,9 +49,9 @@ import {
   agreementLocationsQueryOptions,
   computeArr,
   cadenceLabel,
-  cadenceAbbr,
   formatCurrency,
   formatDay,
+  formatDayNoYear,
   daysUntil,
   periodsPerYear,
   type LocationMap,
@@ -95,6 +98,12 @@ const STATUS_TONE: Record<AgreementStatus, 'success' | 'neutral' | 'warning' | '
 
 function titleCase(s: string): string {
   return s.charAt(0) + s.slice(1).toLowerCase();
+}
+
+// Periods/yr for the "N × $amount" billing sub-line — clean cadences are
+// whole, odd intervals (e.g. every 5 weeks) get one decimal.
+function formatCount(n: number): string {
+  return Number.isInteger(n) ? String(n) : n.toFixed(1);
 }
 
 export default function AgreementDetailPage() {
@@ -227,12 +236,7 @@ export default function AgreementDetailPage() {
             <AgreementScheduleTab agreementId={agreement.id} locationMap={locationMap} />
           )}
 
-          {activeTab === 'invoices' && (
-            <TabStub
-              label={getName('invoice', true)}
-              detail="Agreement invoices are billed on the schedule's own clock by financial-service. Listing them here is pending a small backend add (an agreementId filter on invoice search)."
-            />
-          )}
+          {activeTab === 'invoices' && <AgreementInvoicesTab agreementId={agreement.id} />}
           {activeTab === 'documents' && (
             <TabStub label="Documents" detail="Contract attachments for agreements aren't wired to a backend yet." />
           )}
@@ -304,6 +308,40 @@ function AgreementMark() {
   );
 }
 
+// One right-aligned metric in the header "this term" strip. `first` suppresses
+// the leading divider so only the gaps between stats get one.
+function HeaderStat({
+  first,
+  label,
+  value,
+  sub,
+  extra,
+  valueClassName,
+}: {
+  first?: boolean;
+  label: string;
+  value: React.ReactNode;
+  sub: string;
+  extra?: React.ReactNode;
+  valueClassName?: string;
+}) {
+  return (
+    <div className="flex items-start gap-4">
+      {!first && <div className="w-px self-stretch bg-border" />}
+      <div className="text-right sm:min-w-[112px]">
+        <div className="text-[10px] font-semibold uppercase tracking-wider text-fg-muted">{label}</div>
+        <div
+          className={`mt-0.5 font-mono text-[18px] font-bold leading-none tabular-nums tracking-tight ${valueClassName ?? 'text-fg-strong'}`}
+        >
+          {value}
+        </div>
+        <div className="text-[10.5px] text-fg-muted">{sub}</div>
+        {extra}
+      </div>
+    </div>
+  );
+}
+
 function AgreementHeader({
   agreement,
   onEdit,
@@ -315,6 +353,7 @@ function AgreementHeader({
 }) {
   const { data: billing } = useQuery(agreementBillingQueryOptions(agreement.id));
   const { data: compliance } = useQuery(agreementComplianceQueryOptions(agreement.id));
+  const { nextInvoice } = useAgreementBilling(agreement.id);
 
   const arr = billing ? computeArr(billing) : undefined;
 
@@ -333,19 +372,7 @@ function AgreementHeader({
       </span>,
     );
   }
-  if (billing) {
-    meta.push(
-      <span key="arr">
-        {arr != null ? (
-          <>
-            <strong className="font-semibold text-fg-strong">{formatCurrency(arr)}</strong>/yr
-          </>
-        ) : (
-          <strong className="font-semibold text-fg-strong">Per visit</strong>
-        )}
-      </span>,
-    );
-  }
+  // Contract value moved out of this meta line into the "this term" strip below.
   if (agreement.termEnd && agreement.autoRenew) {
     meta.push(
       <span key="renews">
@@ -383,22 +410,61 @@ function AgreementHeader({
         </div>
       </div>
 
-      {compliance && (
-        <div className="shrink-0 text-right sm:min-w-[132px]">
-          <div className="text-[10px] font-semibold uppercase tracking-wider text-fg-muted">This term</div>
-          <div className="mt-0.5 font-mono text-[18px] font-bold leading-none tabular-nums tracking-tight text-fg-strong">
-            {compliance.visitsFulfilled}
-            <span className="font-medium text-fg-dim"> / {compliance.visitsTotal}</span>
-          </div>
-          <div className="text-[10.5px] text-fg-muted">
-            visits complete
-            {compliance.visitsTotal > 0 &&
-              ` · ${Math.round((compliance.visitsFulfilled / compliance.visitsTotal) * 100)}%`}
-          </div>
-          {compliance.visitsOverdue + compliance.visitsMissed > 0 && (
-            <div className="text-[10.5px] font-semibold text-warning-fg">
-              {compliance.visitsOverdue + compliance.visitsMissed} behind schedule
-            </div>
+      {(compliance || billing || nextInvoice) && (
+        <div className="flex shrink-0 flex-wrap items-start justify-end gap-x-4 gap-y-2">
+          {compliance && (
+            <HeaderStat
+              first
+              label="This term"
+              value={
+                <>
+                  {compliance.visitsFulfilled}
+                  <span className="font-medium text-fg-dim"> / {compliance.visitsTotal}</span>
+                </>
+              }
+              sub={`visits complete${
+                compliance.visitsTotal > 0
+                  ? ` · ${Math.round((compliance.visitsFulfilled / compliance.visitsTotal) * 100)}%`
+                  : ''
+              }`}
+              extra={
+                compliance.visitsOverdue + compliance.visitsMissed > 0 ? (
+                  <div className="text-[10.5px] font-semibold text-warning-fg">
+                    {compliance.visitsOverdue + compliance.visitsMissed} behind schedule
+                  </div>
+                ) : undefined
+              }
+            />
+          )}
+          {billing && (
+            <HeaderStat
+              first={!compliance}
+              label="Contract value"
+              value={
+                arr != null ? (
+                  <>
+                    {formatCurrency(arr)}
+                    <span className="font-medium text-fg-dim">/yr</span>
+                  </>
+                ) : (
+                  'Per visit'
+                )
+              }
+              sub={`Billed ${cadenceLabel(billing.cadenceUnit, billing.cadenceInterval).toLowerCase()}${
+                arr != null
+                  ? ` · ${formatCount(periodsPerYear(billing.cadenceUnit, billing.cadenceInterval))} × ${formatCurrency(billing.amount)}`
+                  : ''
+              }`}
+            />
+          )}
+          {nextInvoice && (
+            <HeaderStat
+              first={!compliance && !billing}
+              label="Next invoice"
+              valueClassName="text-fg-accent"
+              value={formatCurrency(nextInvoice.amount)}
+              sub={`${formatDayNoYear(nextInvoice.dueDate)} · ${nextInvoice.n} of ${nextInvoice.of}`}
+            />
           )}
         </div>
       )}
@@ -535,7 +601,7 @@ function OverviewTab({
             onViewCoverage={onViewCoverage}
           />
           <NextVisitsCard scheduled={scheduled} onViewSchedule={onViewSchedule} />
-          <FinancialSnapshotCard agreementId={agreement.id} />
+          <FinancialSnapshotCard agreement={agreement} />
         </div>
         <div className="flex flex-col gap-3">
           <ScopeCard agreementId={agreement.id} templates={agreement.visitTemplates} />
@@ -658,53 +724,155 @@ function NextVisitsCard({
   );
 }
 
-function FinancialSnapshotCard({ agreementId }: { agreementId: string }) {
-  const { data: billing, isLoading } = useQuery(agreementBillingQueryOptions(agreementId));
+// Money summary only this pass — contract value · cadence · active + Edit.
+// Plan provenance, collection method, recognized/deferred, installment schedule
+// and member pricing are deliberately omitted: those backends don't exist yet.
+function FinancialSnapshotCard({ agreement }: { agreement: AgreementResponse }) {
+  const { data: billing, isLoading } = useQuery(agreementBillingQueryOptions(agreement.id));
+  const { installments, nextInvoice } = useAgreementBilling(agreement.id);
+  const [setupOpen, setSetupOpen] = useState(false);
 
-  if (!isLoading && !billing) {
-    return (
-      <Card title={<CardTitle icon={<ReceiptPercentIcon className="size-3.5" />}>Financials</CardTitle>}>
-        <div className="text-[12px] text-fg-muted">No billing schedule set up yet.</div>
-      </Card>
-    );
-  }
-  if (!billing) {
-    return (
-      <Card title={<CardTitle icon={<ReceiptPercentIcon className="size-3.5" />}>Financials</CardTitle>}>
-        <div className="text-[12px] text-fg-muted">Loading…</div>
-      </Card>
-    );
-  }
+  const arr = billing ? computeArr(billing) : null;
+  const perYear = billing ? periodsPerYear(billing.cadenceUnit, billing.cadenceInterval) : 0;
 
-  const arr = computeArr(billing);
   return (
-    <Card
-      padding="none"
-      title={<CardTitle icon={<ReceiptPercentIcon className="size-3.5" />}>Financials</CardTitle>}
-    >
-      <div className="grid grid-cols-3">
-        <FinCell
-          k="Annual value"
-          v={arr != null ? formatCurrency(arr) : 'Per visit'}
-          sub={`${cadenceLabel(billing.cadenceUnit, billing.cadenceInterval)} billing`}
-        />
-        <FinCell
-          k="Per period"
-          v={formatCurrency(billing.amount)}
-          sub={`/ ${cadenceAbbr(billing.cadenceUnit)}`}
-        />
-        <FinCell k="Invoice terms" v={`Net ${billing.netDays}`} sub="from period start" last />
-      </div>
-    </Card>
+    <>
+      <Card
+        padding={billing ? 'none' : undefined}
+        title={<CardTitle icon={<ReceiptPercentIcon className="size-3.5" />}>Financials</CardTitle>}
+        action={billing ? <CardLink onClick={() => setSetupOpen(true)}>Edit</CardLink> : undefined}
+      >
+        {isLoading ? (
+          <div className="text-[12px] text-fg-muted">Loading…</div>
+        ) : !billing ? (
+          <EmptyState
+            icon={<ReceiptPercentIcon className="size-9 text-fg-dim" />}
+            title="No billing set up"
+            description="Set the contract value and how it's invoiced. Installments generate automatically and flow into the Invoices tab."
+            action={
+              <Button color="accent" size="xs" onClick={() => setSetupOpen(true)}>
+                Set up billing
+              </Button>
+            }
+          />
+        ) : (
+          <>
+            <div className="grid grid-cols-3 border-b border-border-soft">
+              <FinCell k="Contract value" v={arr != null ? `${formatCurrency(arr)}/yr` : 'Per visit'} />
+              <FinCell
+                k="Cadence"
+                v={cadenceLabel(billing.cadenceUnit, billing.cadenceInterval)}
+                sub={arr != null ? `${formatCount(perYear)} × ${formatCurrency(billing.amount)}` : undefined}
+                mono={false}
+              />
+              <FinCell
+                k="Next invoice"
+                v={nextInvoice ? formatCurrency(nextInvoice.amount) : '—'}
+                sub={nextInvoice ? `${formatDayNoYear(nextInvoice.dueDate)} · ${nextInvoice.n} of ${nextInvoice.of}` : undefined}
+                accent={!!nextInvoice}
+                last
+              />
+            </div>
+            {installments.length > 0 && <InstallmentSchedule installments={installments} />}
+            <div className="flex items-center gap-2 px-3.5 py-2">
+              {billing.active ? (
+                <Pill tone="success" dot>Active</Pill>
+              ) : (
+                <Pill tone="neutral" dot>Inactive</Pill>
+              )}
+              <span className="text-[11.5px] text-fg-muted">Net {billing.netDays} terms</span>
+            </div>
+          </>
+        )}
+      </Card>
+      <BillingSetupDialog
+        isOpen={setupOpen}
+        onClose={() => setSetupOpen(false)}
+        agreementId={agreement.id}
+        billing={billing ?? undefined}
+        defaultAnchorDate={agreement.termStart}
+      />
+    </>
   );
 }
 
-function FinCell({ k, v, sub, last }: { k: string; v: string; sub: string; last?: boolean }) {
+function FinCell({
+  k,
+  v,
+  sub,
+  last,
+  mono = true,
+  accent,
+}: {
+  k: string;
+  v: string;
+  sub?: string;
+  last?: boolean;
+  mono?: boolean;
+  accent?: boolean;
+}) {
   return (
     <div className={`px-3.5 py-2.5 ${last ? '' : 'border-r border-border-soft'}`}>
       <div className="text-[10px] font-semibold uppercase tracking-wider text-fg-muted">{k}</div>
-      <div className="mt-0.5 font-mono text-[16px] font-bold tabular-nums tracking-tight text-fg-strong">{v}</div>
-      <div className="text-[11px] text-fg-muted">{sub}</div>
+      <div
+        className={`mt-0.5 text-[16px] font-bold tracking-tight ${accent ? 'text-fg-accent' : 'text-fg-strong'} ${mono ? 'font-mono tabular-nums' : ''}`}
+      >
+        {v}
+      </div>
+      {sub && <div className="text-[11px] tabular-nums text-fg-muted">{sub}</div>}
+    </div>
+  );
+}
+
+// Status dot for an installment row. Paid/Overdue/Billed come from the joined
+// invoice; Next/Scheduled from the plan (Next = the upcoming SCHEDULED row).
+function installmentPill(status: InstallmentDisplayStatus) {
+  switch (status) {
+    case 'PAID':
+      return <Pill tone="success" dot>Paid</Pill>;
+    case 'OVERDUE':
+      return <Pill tone="danger" dot>Overdue</Pill>;
+    case 'BILLED':
+      return <Pill tone="info" dot>Billed</Pill>;
+    case 'NEXT':
+      return <Pill tone="accent" dot>Next</Pill>;
+    default:
+      return <Pill tone="neutral" dot>Scheduled</Pill>;
+  }
+}
+
+// Full-term installment plan with real Paid/Billed dots overlaid from invoices.
+// Capped for sidebar density; "Show all" expands in place.
+function InstallmentSchedule({ installments }: { installments: EnrichedInstallment[] }) {
+  const [showAll, setShowAll] = useState(false);
+  const CAP = 6;
+  const rows = showAll ? installments : installments.slice(0, CAP);
+  return (
+    <div className="border-b border-border-soft px-3.5 py-2.5">
+      <div className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-fg-muted">
+        Installment schedule
+      </div>
+      <div className="flex flex-col">
+        {rows.map((it, i) => (
+          <div
+            key={it.periodKey}
+            className={`flex items-center gap-2.5 py-1.5 ${i > 0 ? 'border-t border-border-soft' : ''}`}
+          >
+            <span className="w-4 shrink-0 text-[11px] tabular-nums text-fg-dim">{it.sequence}</span>
+            <span className="shrink-0 text-[12px] text-fg">{formatDay(it.dueDate)}</span>
+            <span className="shrink-0 text-[12px] font-semibold tabular-nums text-fg-strong">
+              {formatCurrency(it.amount)}
+            </span>
+            <span className="grow" />
+            {installmentPill(it.displayStatus)}
+          </div>
+        ))}
+      </div>
+      {installments.length > CAP && (
+        <button onClick={() => setShowAll((s) => !s)} className="card-action mt-1.5">
+          {showAll ? 'Show less' : `Show all ${installments.length}`}
+        </button>
+      )}
     </div>
   );
 }
