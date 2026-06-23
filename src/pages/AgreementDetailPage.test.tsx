@@ -173,7 +173,10 @@ describe('AgreementDetailPage', () => {
     vi.mocked(agreementApi.getCompliance).mockResolvedValue({
       agreementId: 'a-1',
       visitsFulfilled: 12,
-      visitsTotal: 16,
+      // visitsTotal (generated-so-far) is NOT the denominator; the header uses
+      // visitsExpectedThisTerm (the term total). Make them differ to prove it.
+      visitsTotal: 99,
+      visitsExpectedThisTerm: 16,
       visitsOverdue: 2,
       visitsMissed: 0,
     });
@@ -183,6 +186,24 @@ describe('AgreementDetailPage', () => {
     expect((await screen.findAllByText('$108,000')).length).toBeGreaterThan(0);
     expect(screen.getByText('This term')).toBeInTheDocument();
     expect(screen.getByText(/2 behind schedule/)).toBeInTheDocument();
+    // Denominator = visitsExpectedThisTerm (16), not visitsTotal (99).
+    expect(screen.getByText('16')).toBeInTheDocument();
+    expect(screen.queryByText('99')).not.toBeInTheDocument();
+  });
+
+  it('renders "This term" without a denominator for an open-ended agreement', async () => {
+    vi.mocked(agreementApi.getCompliance).mockResolvedValue({
+      agreementId: 'a-1',
+      visitsFulfilled: 3,
+      visitsTotal: 3,
+      visitsExpectedThisTerm: null, // open-ended → no bounded term
+      visitsOverdue: 0,
+      visitsMissed: 0,
+    });
+    renderPage();
+    await screen.findByText('This term');
+    // Sub is "work orders complete" with no "· %" suffix (no term denominator).
+    expect(screen.getByText('work orders complete')).toBeInTheDocument();
   });
 
   it('renders the configured billing surfaces (installment schedule + next invoice)', async () => {

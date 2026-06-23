@@ -433,18 +433,24 @@ function AgreementHeader({
               first
               label="This term"
               value={
+                // Denominator = visitsExpectedThisTerm (the full-term total); null
+                // on open-ended agreements → show the fulfilled count alone. The
                 // inline-flex + gap keeps the slash off the numerals (a tight
                 // bold-mono "0 / 6" otherwise reads as struck-through); the slash
                 // itself is non-bold + dim so it recedes.
                 <span className="inline-flex items-baseline gap-1">
                   {compliance.visitsFulfilled}
-                  <span className="font-normal text-fg-dim">/</span>
-                  <span className="font-medium text-fg-dim">{compliance.visitsTotal}</span>
+                  {compliance.visitsExpectedThisTerm != null && (
+                    <>
+                      <span className="font-normal text-fg-dim">/</span>
+                      <span className="font-medium text-fg-dim">{compliance.visitsExpectedThisTerm}</span>
+                    </>
+                  )}
                 </span>
               }
               sub={`${getName('work_order', true).toLowerCase()} complete${
-                compliance.visitsTotal > 0
-                  ? ` · ${Math.round((compliance.visitsFulfilled / compliance.visitsTotal) * 100)}%`
+                compliance.visitsExpectedThisTerm != null && compliance.visitsExpectedThisTerm > 0
+                  ? ` · ${Math.round((compliance.visitsFulfilled / compliance.visitsExpectedThisTerm) * 100)}%`
                   : ''
               }`}
               extra={
