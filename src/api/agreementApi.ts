@@ -295,6 +295,19 @@ export interface BillingInstallmentResponse {
   status: BillingInstallmentStatus;
 }
 
+// ---- Revenue recognition (billed ≠ earned) ---------------------------------
+// Point-in-time computed (not stored) — safe to refetch anytime. `contractValue`
+// null means no billing schedule is set (caller renders the empty state, never
+// $0). Recognized accrues as visits/work orders complete; deferred is the
+// unearned remainder.
+export interface RevenueRecognitionResponse {
+  contractValue: number | null;
+  recognizedToDate: number;
+  deferred: number;
+  visitsFulfilled: number;
+  visitsTotal: number;
+}
+
 export const agreementApi = {
   // List — `classification` defaults to CONTRACT (the commercial-agreements
   // list). `customerId` scopes to one customer's Agreements tab.
@@ -476,6 +489,15 @@ export const agreementApi = {
   getInstallments: async (id: string): Promise<BillingInstallmentResponse[]> => {
     const response = await apiClient.get<BillingInstallmentResponse[]>(
       `/work-orders/agreements/${id}/billing-schedule/installments`,
+    );
+    return response.data;
+  },
+
+  // Recognized-to-date vs. deferred (point-in-time). contractValue null = no
+  // billing set up.
+  getRevenueRecognition: async (id: string): Promise<RevenueRecognitionResponse> => {
+    const response = await apiClient.get<RevenueRecognitionResponse>(
+      `/work-orders/agreements/${id}/revenue-recognition`,
     );
     return response.data;
   },

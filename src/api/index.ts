@@ -173,6 +173,7 @@ export {
   type UpsertBillingScheduleRequest,
   type BillingInstallmentResponse,
   type BillingInstallmentStatus,
+  type RevenueRecognitionResponse,
 } from './agreementApi';
 
 // Equipment APIs
