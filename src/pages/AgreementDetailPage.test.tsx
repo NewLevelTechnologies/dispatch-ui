@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { renderWithProviders } from '../test/utils';
 import AgreementDetailPage from './AgreementDetailPage';
 import { agreementApi, customerApi, dispatchesApi, invoicesApi } from '../api';
@@ -150,5 +151,52 @@ describe('AgreementDetailPage', () => {
     expect((await screen.findAllByText('$108,000')).length).toBeGreaterThan(0);
     expect(screen.getByText('This term')).toBeInTheDocument();
     expect(screen.getByText(/2 behind schedule/)).toBeInTheDocument();
+  });
+
+  it('renders the configured billing surfaces (installment schedule + next invoice)', async () => {
+    vi.mocked(agreementApi.getBillingSchedule).mockResolvedValue({
+      agreementId: 'a-1',
+      amount: 27000,
+      cadenceUnit: 'QUARTER',
+      cadenceInterval: 1,
+      anchorDate: '2024-09-01',
+      netDays: 30,
+      billingMode: 'FIXED_SCHEDULE',
+      active: true,
+    });
+    // 8 installments (> the 6-row cap) so the "Show all" toggle renders.
+    vi.mocked(agreementApi.getInstallments).mockResolvedValue(
+      Array.from({ length: 8 }, (_, i) => ({
+        sequence: i + 1,
+        periodKey: `2026-P${i + 1}`,
+        periodStart: '2026-07-01',
+        periodEnd: '2026-09-30',
+        dueDate: `2026-0${(i % 9) + 1}-15`,
+        amount: 27000,
+        status: i === 0 ? ('INVOICED' as const) : ('SCHEDULED' as const),
+      })),
+    );
+    vi.mocked(invoicesApi.getAll).mockResolvedValue({
+      content: [
+        {
+          id: 'inv-1', invoiceNumber: 'INV-9001', status: 'PAID', customerId: 'c-1', customerName: 'Iverson',
+          serviceLocationId: null, workOrderId: null, agreementId: 'a-1', billingPeriodKey: '2026-P1',
+          invoiceDate: '2026-09-01', dueDate: '2026-09-30', totalAmount: 27000, amountPaid: 27000,
+          balanceDue: 0, overdue: false, lastSentAt: null, createdAt: '', updatedAt: '',
+        },
+      ],
+      page: 0, size: 200, totalElements: 1, totalPages: 1, first: true, last: true,
+    });
+    renderPage();
+
+    expect(await screen.findByText('Installment schedule')).toBeInTheDocument();
+    // P1 invoice is paid → Paid dot; P2 is the earliest scheduled → Next dot.
+    expect(screen.getByText('Paid')).toBeInTheDocument();
+    expect(screen.getByText('Next')).toBeInTheDocument();
+    // Next-invoice metric appears in both the header strip and the money summary.
+    expect(screen.getAllByText('Next invoice').length).toBeGreaterThan(0);
+    // Schedule is capped at 6 rows; expanding reveals the rest.
+    await userEvent.setup().click(screen.getByText('Show all 8'));
+    expect(screen.getByText('Show less')).toBeInTheDocument();
   });
 });
