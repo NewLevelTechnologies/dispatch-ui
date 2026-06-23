@@ -9,7 +9,6 @@ import { Button } from './catalyst/button';
 import { Checkbox, CheckboxField } from './catalyst/checkbox';
 import { Description, Field, FieldGroup, Fieldset, Label } from './catalyst/fieldset';
 import { Input } from './catalyst/input';
-import { Textarea } from './catalyst/textarea';
 import { extractApiError, showSuccess } from '../lib/toast';
 
 interface AgreementFormDialogProps {
@@ -37,7 +36,6 @@ export default function AgreementFormDialog({ isOpen, onClose, agreement, custom
   const [autoRenew, setAutoRenew] = useState(false);
   const [renewalTermMonths, setRenewalTermMonths] = useState('');
   const [renewalAlertDays, setRenewalAlertDays] = useState('');
-  const [notes, setNotes] = useState('');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   /* eslint-disable react-hooks/set-state-in-effect -- form initialization on open */
@@ -50,7 +48,6 @@ export default function AgreementFormDialog({ isOpen, onClose, agreement, custom
     setAutoRenew(agreement?.autoRenew ?? false);
     setRenewalTermMonths(agreement?.renewalTermMonths != null ? String(agreement.renewalTermMonths) : '');
     setRenewalAlertDays(agreement?.renewalAlertDays != null ? String(agreement.renewalAlertDays) : '');
-    setNotes(agreement?.notes ?? '');
   }, [isOpen, agreement]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
@@ -66,7 +63,6 @@ export default function AgreementFormDialog({ isOpen, onClose, agreement, custom
         autoRenew,
         renewalTermMonths: autoRenew && renewalTermMonths ? Number(renewalTermMonths) : null,
         renewalAlertDays: autoRenew && renewalAlertDays ? Number(renewalAlertDays) : null,
-        notes: notes.trim() || null,
       }),
     onSuccess: (created) => {
       queryClient.invalidateQueries({ queryKey: ['agreements'] });
@@ -109,7 +105,6 @@ export default function AgreementFormDialog({ isOpen, onClose, agreement, custom
         termEnd: termEnd || null,
         renewalTermMonths: autoRenew && renewalTermMonths ? Number(renewalTermMonths) : null,
         renewalAlertDays: autoRenew && renewalAlertDays ? Number(renewalAlertDays) : null,
-        notes: notes.trim() || null,
       });
     } else {
       createMutation.mutate();
@@ -198,17 +193,6 @@ export default function AgreementFormDialog({ isOpen, onClose, agreement, custom
                   </Field>
                 </div>
               )}
-
-              <Field size="xs">
-                <Label size="xs">{t('common.form.notes', { defaultValue: 'Notes' })}</Label>
-                <Textarea
-                  name="notes"
-                  rows={4}
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  maxLength={10000}
-                />
-              </Field>
             </FieldGroup>
           </Fieldset>
         </DialogBody>

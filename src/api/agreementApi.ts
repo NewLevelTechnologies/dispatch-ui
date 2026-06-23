@@ -12,6 +12,7 @@
 //
 // Field names below are the exact wire names from the response DTOs.
 import apiClient from './client';
+import type { CreateNoteRequest, NoteDto, UpdateNoteRequest } from './noteApi';
 
 // ---- Enums (string unions matching the BE) ----------------------------------
 
@@ -477,6 +478,33 @@ export const agreementApi = {
       `/work-orders/agreements/${id}/billing-schedule/installments`,
     );
     return response.data;
+  },
+};
+
+// ---- Notes (nested under the agreement; same NoteDto shape as customer/
+// location/equipment notes, so the shared NotesCard binds to it directly). ----
+export const AGREEMENT_NOTE_BODY_MAX_CHARS = 4000;
+
+export const agreementNotesApi = {
+  // Pinned-first, then newest (server-ordered).
+  list: async (agreementId: string): Promise<NoteDto[]> => {
+    const response = await apiClient.get<NoteDto[]>(`/work-orders/agreements/${agreementId}/notes`);
+    return response.data;
+  },
+  // Author auto-captured from the JWT — never send it from the client.
+  create: async (agreementId: string, request: CreateNoteRequest): Promise<NoteDto> => {
+    const response = await apiClient.post<NoteDto>(`/work-orders/agreements/${agreementId}/notes`, request);
+    return response.data;
+  },
+  update: async (agreementId: string, noteId: string, request: UpdateNoteRequest): Promise<NoteDto> => {
+    const response = await apiClient.patch<NoteDto>(
+      `/work-orders/agreements/${agreementId}/notes/${noteId}`,
+      request,
+    );
+    return response.data;
+  },
+  delete: async (agreementId: string, noteId: string): Promise<void> => {
+    await apiClient.delete(`/work-orders/agreements/${agreementId}/notes/${noteId}`);
   },
 };
 
