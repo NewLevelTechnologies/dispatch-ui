@@ -71,9 +71,11 @@ export default function AgreementScheduleTab({
                   onClick={() => navigate(`/work-orders/${v.workOrderId}?from=agreement&agreementId=${agreementId}`)}
                 >
                   <td>
-                    <span className="id-mono font-semibold text-fg-strong">
-                      {v.workOrderNumber ?? `WO ${v.workOrderId.slice(0, 8)}`}
-                    </span>
+                    {v.workOrderNumber ? (
+                      <span className="id-mono font-semibold text-fg-accent">{v.workOrderNumber}</span>
+                    ) : (
+                      <span className="text-fg-muted">…</span>
+                    )}
                   </td>
                   <td>
                     <CellStack>

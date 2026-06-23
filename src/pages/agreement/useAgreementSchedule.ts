@@ -7,7 +7,7 @@
 // file satisfies react-refresh's "only export components" rule.
 import { useMemo } from 'react';
 import { useQuery, useQueries } from '@tanstack/react-query';
-import { dispatchesApi, type DispatchBoardRow, type AgreementVisitResponse } from '../../api';
+import { dispatchesApi, workOrderApi, type DispatchBoardRow, type AgreementVisitResponse } from '../../api';
 import { agreementVisitsQueryOptions, locationLabel, type LocationMap } from './agreementShared';
 
 export interface ScheduledVisit {
@@ -71,6 +71,22 @@ export function useAgreementSchedule(agreementId: string, locationMap: LocationM
     })),
   });
 
+  // The visit feed gives us only the WO's id, so the real generated number
+  // (WO-2026-…) lives on the WO itself — and on its dispatch only once it's
+  // scheduled. Fetch the WO to surface the number even before scheduling,
+  // rather than falling back to a meaningless UUID slice. Shares the WO detail
+  // cache key (['work-orders', id]) so an already-viewed WO costs nothing.
+  // (Could be dropped if the visit feed denormalized workOrderNumber.)
+  const workOrderQueries = useQueries({
+    queries: materialized.map((v) => ({
+      queryKey: ['work-orders', v.workOrderId] as const,
+      queryFn: () => workOrderApi.getById(v.workOrderId!),
+      enabled: Boolean(v.workOrderId),
+      staleTime: 60 * 1000,
+      retry: 1,
+    })),
+  });
+
   const scheduled: ScheduledVisit[] = useMemo(() => {
     const list = materialized.map((v, i) => {
       const dispatch = chooseDispatch(dispatchQueries[i]?.data ?? []);
@@ -80,7 +96,7 @@ export function useAgreementSchedule(agreementId: string, locationMap: LocationM
         label: v.visitTemplateLabel,
         status: v.status,
         workOrderId: v.workOrderId!,
-        workOrderNumber: dispatch?.workOrderNumber ?? null,
+        workOrderNumber: workOrderQueries[i]?.data?.workOrderNumber ?? dispatch?.workOrderNumber ?? null,
         locName: loc.name,
         locSub: loc.sub,
         date: dispatch?.arrivalWindowStart ?? null,
@@ -91,7 +107,7 @@ export function useAgreementSchedule(agreementId: string, locationMap: LocationM
     });
     // Soonest first; rows without a booked date sink to the bottom.
     return list.sort((a, b) => (a.date ?? '~').localeCompare(b.date ?? '~'));
-  }, [materialized, dispatchQueries, locationMap]);
+  }, [materialized, dispatchQueries, workOrderQueries, locationMap]);
 
   const upcomingPeriods: UpcomingPeriod[] = useMemo(() => {
     const expected = rows.filter((r) => !r.workOrderId);

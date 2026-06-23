@@ -91,9 +91,13 @@ describe('agreementShared helpers', () => {
 
   it('locationLabel resolves a hit and falls back on a miss', () => {
     const map: LocationMap = new Map([
-      ['sl-1', { id: 'sl-1', locationName: 'Retail #001', address: { city: 'Scottsdale', state: 'AZ' } } as unknown as ServiceLocation],
+      ['sl-1', { id: 'sl-1', locationName: 'Retail #001', address: { streetAddress: '123 MAIN ST', city: 'SCOTTSDALE', state: 'AZ', zipCode: '85251' } } as unknown as ServiceLocation],
+      ['sl-2', { id: 'sl-2', address: { streetAddress: '99 OAK AVE NE', city: 'ATLANTA', state: 'GA', zipCode: '30306' } } as unknown as ServiceLocation],
     ]);
-    expect(locationLabel(map, 'sl-1')).toEqual({ name: 'Retail #001', sub: 'Scottsdale, AZ' });
+    // Named location: name on top, full title-cased address as the sub.
+    expect(locationLabel(map, 'sl-1')).toEqual({ name: 'Retail #001', sub: '123 Main St · Scottsdale, AZ 85251' });
+    // Unnamed: street leads (and is dropped from the sub to avoid repetition); directionals stay upper.
+    expect(locationLabel(map, 'sl-2')).toEqual({ name: '99 Oak Ave NE', sub: 'Atlanta, GA 30306' });
     expect(locationLabel(map, 'missing-id').name).toContain('Location');
     expect(locationLabel(undefined, 'sl-1').name).toContain('Location');
   });
