@@ -112,6 +112,11 @@ describe('agreementApi', () => {
     );
   });
 
+  it('getRevenueRecognition hits /revenue-recognition', async () => {
+    await agreementApi.getRevenueRecognition('a-1');
+    expect(apiClient.get).toHaveBeenCalledWith('/work-orders/agreements/a-1/revenue-recognition');
+  });
+
   describe('agreementNotesApi', () => {
     it('list GETs the agreement notes', async () => {
       await agreementNotesApi.list('a-1');

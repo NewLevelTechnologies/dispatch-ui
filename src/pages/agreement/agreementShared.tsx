@@ -59,6 +59,18 @@ export function agreementBillingQueryOptions(id: string) {
   };
 }
 
+// Recognized/deferred — point-in-time, so a short staleTime; 404 (no billing)
+// is deterministic, so retry:false and the card hides the row.
+export function agreementRevenueQueryOptions(id: string) {
+  return {
+    queryKey: ['agreement', id, 'revenue-recognition'] as const,
+    queryFn: () => agreementApi.getRevenueRecognition(id),
+    enabled: Boolean(id),
+    retry: false,
+    staleTime: 60 * 1000,
+  };
+}
+
 // One customer-scoped location list → id→location Map (memoized via select, so
 // it's shared by the Coverage + Schedule tabs). customerId comes from
 // AgreementResponse.customer.id.

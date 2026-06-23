@@ -47,6 +47,7 @@ import AgreementFilesTab from './agreement/AgreementFilesTab';
 import NotesCard from '../components/NotesCard';
 import {
   agreementBillingQueryOptions,
+  agreementRevenueQueryOptions,
   agreementComplianceQueryOptions,
   agreementCoverageQueryOptions,
   agreementLocationsQueryOptions,
@@ -118,7 +119,9 @@ export default function AgreementDetailPage() {
   const queryClient = useQueryClient();
 
   const [activeTab, setActiveTab] = useState<TabId>('overview');
-  const [isEditOpen, setIsEditOpen] = useState(false);
+  // Scoped edit dialog: 'identity' (header → name) vs 'term' (Term card →
+  // dates/renewal). Billing has its own dialog. null = closed.
+  const [editSection, setEditSection] = useState<'identity' | 'term' | null>(null);
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [confirmNoRenew, setConfirmNoRenew] = useState(false);
   const [confirmActivate, setConfirmActivate] = useState(false);
@@ -217,7 +220,7 @@ export default function AgreementDetailPage() {
 
           <AgreementHeader
             agreement={agreement}
-            onEdit={() => setIsEditOpen(true)}
+            onEdit={() => setEditSection('identity')}
             onActivate={() => setConfirmActivate(true)}
           />
 
@@ -230,7 +233,7 @@ export default function AgreementDetailPage() {
               agreement={agreement}
               locationMap={locationMap}
               customerLocationCount={customerLocationCount}
-              onEdit={() => setIsEditOpen(true)}
+              onEdit={() => setEditSection('term')}
               onActivate={() => setConfirmActivate(true)}
               onViewSchedule={() => setActiveTab('schedule')}
               onViewCoverage={() => setActiveTab('coverage')}
@@ -265,8 +268,9 @@ export default function AgreementDetailPage() {
       </div>
 
       <AgreementFormDialog
-        isOpen={isEditOpen}
-        onClose={() => setIsEditOpen(false)}
+        isOpen={editSection !== null}
+        section={editSection ?? undefined}
+        onClose={() => setEditSection(null)}
         agreement={agreement}
       />
 
@@ -429,10 +433,14 @@ function AgreementHeader({
               first
               label="This term"
               value={
-                <>
+                // inline-flex + gap keeps the slash off the numerals (a tight
+                // bold-mono "0 / 6" otherwise reads as struck-through); the slash
+                // itself is non-bold + dim so it recedes.
+                <span className="inline-flex items-baseline gap-1">
                   {compliance.visitsFulfilled}
-                  <span className="font-medium text-fg-dim"> / {compliance.visitsTotal}</span>
-                </>
+                  <span className="font-normal text-fg-dim">/</span>
+                  <span className="font-medium text-fg-dim">{compliance.visitsTotal}</span>
+                </span>
               }
               sub={`${getName('work_order', true).toLowerCase()} complete${
                 compliance.visitsTotal > 0
@@ -739,17 +747,26 @@ function NextVisitsCard({
   );
 }
 
-// Money summary only this pass — contract value · cadence · active + Edit.
-// Plan provenance, collection method, recognized/deferred, installment schedule
-// and member pricing are deliberately omitted: those backends don't exist yet.
+// Money summary · recognized/deferred · installment schedule · active + Edit.
+// Plan provenance, collection method, and member pricing remain omitted — those
+// backends don't exist yet.
 function FinancialSnapshotCard({ agreement }: { agreement: AgreementResponse }) {
   const { getName } = useGlossary();
   const { data: billing, isLoading } = useQuery(agreementBillingQueryOptions(agreement.id));
   const { installments, nextInvoice } = useAgreementBilling(agreement.id);
+  // Recognized/deferred — point-in-time. contractValue null = no billing → hide
+  // the row (never show $0).
+  const { data: revenue } = useQuery(agreementRevenueQueryOptions(agreement.id));
   const [setupOpen, setSetupOpen] = useState(false);
 
   const arr = billing ? computeArr(billing) : null;
   const perYear = billing ? periodsPerYear(billing.cadenceUnit, billing.cadenceInterval) : 0;
+  // Recognized fills the bar; deferred is the remaining track (the two halves
+  // sum to contract value). Guard a 0 contract value against divide-by-zero.
+  const recognizedPct =
+    revenue && revenue.contractValue
+      ? Math.min(100, Math.max(0, Math.round((revenue.recognizedToDate / revenue.contractValue) * 100)))
+      : 0;
 
   return (
     <>
@@ -789,6 +806,47 @@ function FinancialSnapshotCard({ agreement }: { agreement: AgreementResponse }) 
                 last
               />
             </div>
+            {/* Billed ≠ earned — recognized accrues as work orders complete;
+                recognized + deferred = contract value, shown as one two-part bar
+                anchored to the same "N of M complete" the header trusts. */}
+            {revenue != null && revenue.contractValue != null && (
+              <div className="border-b border-border-soft px-3.5 py-3">
+                <div className="mb-2 flex items-baseline gap-2">
+                  <span className="text-[10px] font-semibold uppercase tracking-wider text-fg-muted">
+                    Revenue recognition
+                  </span>
+                  <span className="grow" />
+                  <span className="text-[11px] text-fg-muted">
+                    {revenue.visitsFulfilled} of {revenue.visitsTotal} {getName('work_order', true).toLowerCase()} complete
+                  </span>
+                </div>
+                <div className="mb-2.5 flex h-[7px] overflow-hidden rounded bg-bg-active">
+                  <div className="bg-success-500" style={{ width: `${recognizedPct}%` }} />
+                </div>
+                <div className="flex flex-wrap gap-x-7 gap-y-2">
+                  <div className="flex flex-col gap-0.5">
+                    <div className="flex items-center gap-1.5">
+                      <span className="size-2 rounded-[2px] bg-success-500" />
+                      <span className="text-[10px] font-semibold uppercase tracking-wider text-fg-muted">Recognized to date</span>
+                    </div>
+                    <div className="font-mono text-[16px] font-bold tabular-nums text-fg-strong">
+                      {formatCurrency(revenue.recognizedToDate)}
+                    </div>
+                    <div className="text-[11px] text-fg-muted">earned as {getName('work_order', true).toLowerCase()} complete</div>
+                  </div>
+                  <div className="flex flex-col gap-0.5">
+                    <div className="flex items-center gap-1.5">
+                      <span className="size-2 rounded-[2px] border border-border-strong bg-bg-active" />
+                      <span className="text-[10px] font-semibold uppercase tracking-wider text-fg-muted">Deferred</span>
+                    </div>
+                    <div className="font-mono text-[16px] font-bold tabular-nums text-fg-strong">
+                      {formatCurrency(revenue.deferred)}
+                    </div>
+                    <div className="text-[11px] text-fg-muted">billed/scheduled, not yet earned</div>
+                  </div>
+                </div>
+              </div>
+            )}
             {installments.length > 0 && <InstallmentSchedule installments={installments} />}
             <div className="flex items-center gap-2 px-3.5 py-2">
               {billing.active ? (

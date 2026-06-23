@@ -13,6 +13,7 @@ vi.mock('../api', () => ({
     getCompliance: vi.fn(),
     getBillingSchedule: vi.fn(),
     getInstallments: vi.fn(),
+    getRevenueRecognition: vi.fn(),
     update: vi.fn(),
     cancel: vi.fn(),
     list: vi.fn(),
@@ -109,6 +110,8 @@ describe('AgreementDetailPage', () => {
     // Pending-merge endpoints — default to 404 (rejected).
     vi.mocked(agreementApi.getCompliance).mockRejectedValue(new Error('404'));
     vi.mocked(agreementApi.getBillingSchedule).mockRejectedValue(new Error('404'));
+    // Revenue recognition defaults to no billing (rejected → row hidden).
+    vi.mocked(agreementApi.getRevenueRecognition).mockRejectedValue(new Error('404'));
     // Billing installments + invoices default to empty (no schedule).
     vi.mocked(agreementApi.getInstallments).mockResolvedValue([]);
     vi.mocked(invoicesApi.getAll).mockResolvedValue({
@@ -216,6 +219,13 @@ describe('AgreementDetailPage', () => {
       ],
       page: 0, size: 200, totalElements: 1, totalPages: 1, first: true, last: true,
     });
+    vi.mocked(agreementApi.getRevenueRecognition).mockResolvedValue({
+      contractValue: 108000,
+      recognizedToDate: 27000,
+      deferred: 81000,
+      visitsFulfilled: 1,
+      visitsTotal: 4,
+    });
     renderPage();
 
     expect(await screen.findByText('Installment schedule')).toBeInTheDocument();
@@ -224,8 +234,33 @@ describe('AgreementDetailPage', () => {
     expect(screen.getByText('Next')).toBeInTheDocument();
     // Next-invoice metric appears in both the header strip and the money summary.
     expect(screen.getAllByText('Next invoice').length).toBeGreaterThan(0);
+    // Revenue-recognition block (contractValue non-null) renders.
+    expect(screen.getByText('Recognized to date')).toBeInTheDocument();
+    expect(screen.getByText('Deferred')).toBeInTheDocument();
+    expect(screen.getByText('$81,000')).toBeInTheDocument();
     // Schedule is capped at 6 rows; expanding reveals the rest.
     await userEvent.setup().click(screen.getByText('Show all 8'));
     expect(screen.getByText('Show less')).toBeInTheDocument();
+  });
+
+  it('hides recognized/deferred when no billing (contractValue null)', async () => {
+    vi.mocked(agreementApi.getBillingSchedule).mockResolvedValue({
+      agreementId: 'a-1', amount: 27000, cadenceUnit: 'QUARTER', cadenceInterval: 1,
+      anchorDate: '2024-09-01', netDays: 30, billingMode: 'FIXED_SCHEDULE', active: true,
+    });
+    vi.mocked(agreementApi.getRevenueRecognition).mockResolvedValue({
+      contractValue: null,
+      recognizedToDate: 0,
+      deferred: 0,
+      visitsFulfilled: 0,
+      visitsTotal: 0,
+    });
+    renderPage();
+
+    // Configured Financials card is up (footer shows net terms), but with
+    // contractValue null the recognized/deferred row stays hidden.
+    await screen.findByText(/Net 30 terms/i);
+    expect(screen.queryByText('Recognized to date')).not.toBeInTheDocument();
+    expect(screen.queryByText('Deferred')).not.toBeInTheDocument();
   });
 });

@@ -17,18 +17,25 @@ interface AgreementFormDialogProps {
   // Edit mode — pass the agreement. Create mode — pass customerId instead.
   agreement?: AgreementResponse;
   customerId?: string;
+  // Edit-where-you-see-it: scope the edit to the card that opened it. 'identity'
+  // (header) edits the name; 'term' (Term card) edits term dates + renewal.
+  // Omitted on create → the full form. Ignored in create mode.
+  section?: 'identity' | 'term';
 }
 
 // Dual create/edit. Create lands a DRAFT (kind VISIT / classification CONTRACT —
 // the only v1 values) and routes to its detail page so the user can configure
-// visit templates + coverage and then activate. Edit covers the core record
-// fields a CSR adjusts.
-export default function AgreementFormDialog({ isOpen, onClose, agreement, customerId }: AgreementFormDialogProps) {
+// visit templates + coverage and then activate. Edits are scoped to the card
+// they open from (see `section`) so no two Edit buttons open the same fields.
+export default function AgreementFormDialog({ isOpen, onClose, agreement, customerId, section }: AgreementFormDialogProps) {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const { t } = useTranslation();
   const { getName } = useGlossary();
   const isEdit = Boolean(agreement);
+  // Create shows the whole form; edit shows only the opening card's fields.
+  const showIdentity = !isEdit || section === 'identity';
+  const showTerm = !isEdit || section === 'term';
 
   const [name, setName] = useState('');
   const [termStart, setTermStart] = useState('');
@@ -89,34 +96,42 @@ export default function AgreementFormDialog({ isOpen, onClose, agreement, custom
 
   const isSaving = createMutation.isPending || updateMutation.isPending;
   const trimmedName = name.trim();
-  const canSubmit = trimmedName.length > 0 && !isSaving;
+  // Name is required wherever it's shown (create + identity edit), not on the
+  // term-only edit.
+  const canSubmit = (!showIdentity || trimmedName.length > 0) && !isSaving;
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
-    if (!trimmedName) return;
-    if (isEdit) {
-      // Full edit form — send every field explicitly. Empty optional → null
-      // (clear); a value → set. renewal* clear when auto-renew is off.
+    if (showIdentity && !trimmedName) return;
+    if (!isEdit) {
+      createMutation.mutate();
+      return;
+    }
+    // Scoped edit — PATCH only the opening card's fields (partial update; omitted
+    // keys stay unchanged). renewal* clear when auto-renew is off.
+    if (section === 'identity') {
+      updateMutation.mutate({ name: trimmedName });
+    } else {
       updateMutation.mutate({
-        name: trimmedName,
         autoRenew,
         termStart: termStart || null,
         termEnd: termEnd || null,
         renewalTermMonths: autoRenew && renewalTermMonths ? Number(renewalTermMonths) : null,
         renewalAlertDays: autoRenew && renewalAlertDays ? Number(renewalAlertDays) : null,
       });
-    } else {
-      createMutation.mutate();
     }
   };
+
+  const editTitle =
+    section === 'term'
+      ? t('agreements.editTerm', { defaultValue: 'Edit term' })
+      : t('agreements.editName', { defaultValue: 'Edit name' });
 
   return (
     <Dialog open={isOpen} onClose={onClose} size="lg">
       <DialogTitle>
-        {isEdit
-          ? t('common.actions.edit', { entity: getName('agreement'), defaultValue: `Edit ${getName('agreement')}` })
-          : t('common.actions.add', { entity: getName('agreement') })}
+        {isEdit ? editTitle : t('common.actions.add', { entity: getName('agreement') })}
       </DialogTitle>
       <DialogDescription>
         {isEdit
@@ -137,37 +152,43 @@ export default function AgreementFormDialog({ isOpen, onClose, agreement, custom
           )}
           <Fieldset>
             <FieldGroup className="!space-y-3">
-              <Field size="xs">
-                <Label size="xs" required>{t('common.form.name', { defaultValue: 'Name' })}</Label>
-                <Input
-                  size="xs"
-                  name="name"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  maxLength={255}
-                  required
-                  autoFocus
-                />
-              </Field>
-
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
+              {showIdentity && (
                 <Field size="xs">
-                  <Label size="xs">{t('common.form.termStart', { defaultValue: 'Term start' })}</Label>
-                  <Input size="xs" type="date" name="termStart" value={termStart} onChange={(e) => setTermStart(e.target.value)} />
+                  <Label size="xs" required>{t('common.form.name', { defaultValue: 'Name' })}</Label>
+                  <Input
+                    size="xs"
+                    name="name"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    maxLength={255}
+                    required
+                    autoFocus
+                  />
                 </Field>
-                <Field size="xs">
-                  <Label size="xs">{t('common.form.termEnd', { defaultValue: 'Term end' })}</Label>
-                  <Input size="xs" type="date" name="termEnd" value={termEnd} onChange={(e) => setTermEnd(e.target.value)} />
-                </Field>
-              </div>
+              )}
 
-              <CheckboxField>
-                <Checkbox color="accent" checked={autoRenew} onChange={setAutoRenew} />
-                <Label>{t('common.form.autoRenew', { defaultValue: 'Auto-renew at term' })}</Label>
-                <Description>{t('common.form.autoRenewHint', { defaultValue: 'Renews automatically unless cancelled before term end.' })}</Description>
-              </CheckboxField>
+              {showTerm && (
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
+                  <Field size="xs">
+                    <Label size="xs">{t('common.form.termStart', { defaultValue: 'Term start' })}</Label>
+                    <Input size="xs" type="date" name="termStart" value={termStart} onChange={(e) => setTermStart(e.target.value)} autoFocus={!showIdentity} />
+                  </Field>
+                  <Field size="xs">
+                    <Label size="xs">{t('common.form.termEnd', { defaultValue: 'Term end' })}</Label>
+                    <Input size="xs" type="date" name="termEnd" value={termEnd} onChange={(e) => setTermEnd(e.target.value)} />
+                  </Field>
+                </div>
+              )}
 
-              {autoRenew && (
+              {showTerm && (
+                <CheckboxField>
+                  <Checkbox color="accent" checked={autoRenew} onChange={setAutoRenew} />
+                  <Label>{t('common.form.autoRenew', { defaultValue: 'Auto-renew at term' })}</Label>
+                  <Description>{t('common.form.autoRenewHint', { defaultValue: 'Renews automatically unless cancelled before term end.' })}</Description>
+                </CheckboxField>
+              )}
+
+              {showTerm && autoRenew && (
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
                   <Field size="xs">
                     <Label size="xs">{t('common.form.renewalTerm', { defaultValue: 'Renewal term (months)' })}</Label>
