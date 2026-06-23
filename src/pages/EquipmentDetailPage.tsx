@@ -71,6 +71,7 @@ import EquipmentMediaUploadDialog from '../components/EquipmentMediaUploadDialog
 import NotesCard from '../components/NotesCard';
 import EquipmentServiceHistoryTab from '../components/EquipmentServiceHistoryTab';
 import EquipmentVideosSection from '../components/EquipmentVideosSection';
+import EquipmentDocumentsSection from '../components/EquipmentDocumentsSection';
 import EquipmentMediaLightbox, { type MediaLightboxItem } from '../components/EquipmentMediaLightbox';
 import WorkOrderFormDialog from '../components/WorkOrderFormDialog';
 // Card title + quiet "View all" affordance — reused from the customer-detail
@@ -279,6 +280,15 @@ export default function EquipmentDetailPage() {
     enabled: !!id,
   });
   const videos = (videosData?.content ?? []).filter((f) => f.status !== 'FAILED');
+
+  // Documents — manuals/spec sheets/warranties (kind DOCUMENT). Page-level read
+  // for the Files-tab count; EquipmentDocumentsSection shares the same query key.
+  const { data: documentsData } = useQuery({
+    queryKey: ['equipment-files', id, 'DOCUMENT'] as const,
+    queryFn: () => equipmentFilesApi.list(id!, { kind: 'DOCUMENT', limit: 100 }),
+    enabled: !!id,
+  });
+  const documents = documentsData?.content ?? [];
 
   // Service history — WOs touching this unit. Shared cache with the rendered
   // WorkOrdersList so the peek, the tab count, and the live "Open work order"
@@ -528,11 +538,12 @@ export default function EquipmentDetailPage() {
   const { has: hasWarranty, active: underWarranty } = warrantyState(equipment.warrantyExpiresAt);
   const laborWarranty = warrantyState(equipment.warrantyLaborExpiresAt);
   const totalMedia = images.length + videos.length;
+  const totalFiles = totalMedia + documents.length;
 
   const tabs: { id: TabId; label: string; count?: number }[] = [
     { id: 'overview', label: t('equipment.tabs.overview') },
     { id: 'service-history', label: t('equipment.tabs.serviceHistory'), count: serviceHistoryData?.totalElements ?? 0 },
-    { id: 'media', label: t('equipment.tabs.media'), count: totalMedia },
+    { id: 'media', label: t('equipment.tabs.files'), count: totalFiles },
   ];
 
 
@@ -1370,15 +1381,15 @@ export default function EquipmentDetailPage() {
           {/* ── Media tab ── Photos + Videos galleries */}
           {activeTab === 'media' && (
             <div className="flex flex-col gap-4">
-              {/* Header — counts + one shared "Add media" control */}
+              {/* Header — counts + one shared "Add files" control */}
               <div className="flex flex-wrap items-center gap-2">
                 <span className="text-[12px] text-fg-muted">
-                  {images.length + videos.length} items · {images.length} photos · {videos.length} videos
+                  {totalFiles} items · {images.length} photos · {videos.length} videos · {documents.length} docs
                 </span>
                 <span className="flex-1" />
                 <Button outline size="xs" onClick={() => setIsMediaUploadOpen(true)}>
                   <PlusIcon className="size-4" />
-                  Add media
+                  Add files
                 </Button>
               </div>
 
@@ -1524,6 +1535,15 @@ export default function EquipmentDetailPage() {
                         />
                       )}
                     </div>
+                  </Card>
+
+                  {/* Documents — manuals, spec sheets, warranties */}
+                  <Card
+                    title={<CardTitle>Documents</CardTitle>}
+                    action={<span className="text-[11px] text-fg-dim">{documents.length}</span>}
+                    padding="none"
+                  >
+                    <div className="p-3">{id && <EquipmentDocumentsSection equipmentId={id} />}</div>
                   </Card>
                 </>
               )}

@@ -437,6 +437,7 @@ vi.mock('react-i18next', () => {
     'equipment.status.active': 'Active',
     'equipment.status.all': 'All',
     'equipment.status.retired': 'Retired',
+    'equipment.tabs.files': 'Files',
     'equipment.tabs.filters': 'Filters',
     'equipment.tabs.media': 'Media',
     'equipment.tabs.notes': 'Notes',
