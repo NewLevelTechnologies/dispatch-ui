@@ -18,6 +18,7 @@ import {
 import {
   agreementApi,
   agreementFilesApi,
+  invoicesApi,
   type AgreementResponse,
   type AgreementStatus,
   type VisitTemplateResponse,
@@ -141,6 +142,14 @@ export default function AgreementDetailPage() {
     select: (p) => p.counts.all,
   });
 
+  // Invoices tab badge — lean size-1 page for the count.
+  const { data: invoiceCount } = useQuery({
+    queryKey: ['invoices', 'agreement', id, 'count'] as const,
+    queryFn: () => invoicesApi.getAll({ agreementId: id!, size: 1 }),
+    enabled: !!id,
+    select: (p) => p.totalElements,
+  });
+
   const customerId = agreement?.customer.id ?? '';
   const { data: locationMap } = useQuery(agreementLocationsQueryOptions(customerId));
 
@@ -205,7 +214,7 @@ export default function AgreementDetailPage() {
     { id: 'overview', label: 'Overview' },
     { id: 'coverage', label: 'Coverage', count: agreement.coverageLocationCount },
     { id: 'schedule', label: 'Schedule' },
-    { id: 'invoices', label: getName('invoice', true) },
+    { id: 'invoices', label: getName('invoice', true), count: invoiceCount },
     { id: 'documents', label: 'Documents', count: documentCount },
     { id: 'activity', label: 'Activity' },
   ];
@@ -823,7 +832,9 @@ function FinancialSnapshotCard({ agreement }: { agreement: AgreementResponse }) 
                   </span>
                   <span className="grow" />
                   <span className="text-[11px] text-fg-muted">
-                    {revenue.visitsFulfilled} of {revenue.visitsTotal} {getName('work_order', true).toLowerCase()} complete
+                    {`${revenue.visitsFulfilled}${
+                      revenue.visitsExpectedThisTerm != null ? ` of ${revenue.visitsExpectedThisTerm}` : ''
+                    } ${getName('work_order', true).toLowerCase()} complete`}
                   </span>
                 </div>
                 <div className="mb-2.5 flex h-[7px] overflow-hidden rounded bg-bg-active">

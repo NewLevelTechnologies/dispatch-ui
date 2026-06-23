@@ -245,7 +245,7 @@ describe('AgreementDetailPage', () => {
       recognizedToDate: 27000,
       deferred: 81000,
       visitsFulfilled: 1,
-      visitsTotal: 4,
+      visitsExpectedThisTerm: 4,
     });
     renderPage();
 
@@ -274,7 +274,7 @@ describe('AgreementDetailPage', () => {
       recognizedToDate: 0,
       deferred: 0,
       visitsFulfilled: 0,
-      visitsTotal: 0,
+      visitsExpectedThisTerm: null,
     });
     renderPage();
 

@@ -311,7 +311,9 @@ export interface RevenueRecognitionResponse {
   recognizedToDate: number;
   deferred: number;
   visitsFulfilled: number;
-  visitsTotal: number;
+  // Term total (the "X of Y" denominator); matches /compliance's
+  // visitsExpectedThisTerm so the two cards agree. Null for open-ended terms.
+  visitsExpectedThisTerm: number | null;
 }
 
 export const agreementApi = {
