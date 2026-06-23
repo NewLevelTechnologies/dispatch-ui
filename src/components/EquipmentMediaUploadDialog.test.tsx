@@ -48,7 +48,7 @@ describe('EquipmentMediaUploadDialog', () => {
     renderWithProviders(<EquipmentMediaUploadDialog isOpen={true} onClose={vi.fn()} equipmentId="eq-1" />);
     await waitFor(() => expect(screen.getByRole('dialog')).toBeInTheDocument());
 
-    expect(screen.getByText(/drag photos or videos here/i)).toBeInTheDocument();
+    expect(screen.getByText(/drag photos, videos, or documents here/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /^upload$/i })).toBeDisabled();
   });
 
@@ -69,13 +69,26 @@ describe('EquipmentMediaUploadDialog', () => {
   it('rejects an unsupported file but keeps the valid ones', async () => {
     renderWithProviders(<EquipmentMediaUploadDialog isOpen={true} onClose={vi.fn()} equipmentId="eq-1" />);
     const input = screen.getByLabelText(/choose files/i) as HTMLInputElement;
+    // GIF is off the allowlist (images/video/PDF/Office/text) → rejected; PDF is now accepted.
     fireEvent.change(input, {
-      target: { files: [new File(['x'], 'notes.pdf', { type: 'application/pdf' }), jpeg('ok.jpg')] },
+      target: { files: [new File(['x'], 'logo.gif', { type: 'image/gif' }), jpeg('ok.jpg')] },
     });
 
-    expect(screen.getByText(/notes\.pdf/)).toBeInTheDocument();
+    expect(screen.getByText(/logo\.gif/)).toBeInTheDocument();
     expect(screen.getByText(/unsupported type/i)).toBeInTheDocument();
     expect(screen.getByText('ok.jpg')).toBeInTheDocument();
+  });
+
+  it('queues a document (PDF) and labels it', async () => {
+    renderWithProviders(<EquipmentMediaUploadDialog isOpen={true} onClose={vi.fn()} equipmentId="eq-1" />);
+    const input = screen.getByLabelText(/choose files/i) as HTMLInputElement;
+    fireEvent.change(input, {
+      target: { files: [new File(['x'], 'manual.pdf', { type: 'application/pdf' })] },
+    });
+
+    expect(screen.getByText('manual.pdf')).toBeInTheDocument();
+    expect(screen.getByText('Document')).toBeInTheDocument();
+    expect(screen.queryByText(/unsupported type/i)).not.toBeInTheDocument();
   });
 
   it('routes each file to its API — photo to images, video to files', async () => {

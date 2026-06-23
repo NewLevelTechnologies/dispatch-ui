@@ -707,7 +707,7 @@ describe('EquipmentDetailPage', () => {
     await waitFor(() => {
       expect(screen.getByRole('heading', { name: 'Upstairs Furnace' })).toBeInTheDocument();
     });
-    await user.click(screen.getByRole('tab', { name: /^media/i }));
+    await user.click(screen.getByRole('tab', { name: /^files/i }));
     await waitFor(() => {
       expect(screen.getByText(/no photos added yet/i)).toBeInTheDocument();
     });
@@ -754,7 +754,7 @@ describe('EquipmentDetailPage', () => {
       expect(screen.getByRole('heading', { name: 'Upstairs Furnace' })).toBeInTheDocument();
     });
 
-    const photosTab = await screen.findByRole('tab', { name: /^media\s*2$/i });
+    const photosTab = await screen.findByRole('tab', { name: /^files\s*2$/i });
     await user.click(photosTab);
 
     // The profile image leads the gallery, marked "Profile" (label, not a toggle);
@@ -828,7 +828,7 @@ describe('EquipmentDetailPage', () => {
     await waitFor(() => {
       expect(screen.getByRole('heading', { name: 'Upstairs Furnace' })).toBeInTheDocument();
     });
-    await user.click(screen.getByRole('tab', { name: /^media/i }));
+    await user.click(screen.getByRole('tab', { name: /^files/i }));
 
     const star = await screen.findByRole('button', { name: /set as profile/i });
     await user.click(star);
@@ -864,7 +864,7 @@ describe('EquipmentDetailPage', () => {
     await waitFor(() => {
       expect(screen.getByRole('heading', { name: 'Upstairs Furnace' })).toBeInTheDocument();
     });
-    await user.click(screen.getByRole('tab', { name: /^media/i }));
+    await user.click(screen.getByRole('tab', { name: /^files/i }));
 
     // Header overflow appears first; the photo row's overflow is at index 1.
     const moreButtons = await screen.findAllByRole('button', { name: /more options/i });
@@ -886,12 +886,12 @@ describe('EquipmentDetailPage', () => {
     await waitFor(() => {
       expect(screen.getByRole('heading', { name: 'Upstairs Furnace' })).toBeInTheDocument();
     });
-    await user.click(screen.getByRole('tab', { name: /^media/i }));
-    // One "Add media" control — a single drop-zone dialog for photos + videos.
-    await user.click(screen.getByRole('button', { name: /add media/i }));
+    await user.click(screen.getByRole('tab', { name: /^files/i }));
+    // One "Add files" control — a single drop-zone dialog for photos, videos, and docs.
+    await user.click(screen.getByRole('button', { name: /add files/i }));
 
     const dialog = await screen.findByRole('dialog');
-    expect(within(dialog).getByText(/drag photos or videos here/i)).toBeInTheDocument();
+    expect(within(dialog).getByText(/drag photos, videos, or documents here/i)).toBeInTheDocument();
   });
 
   it('uploads a video through the Add media dialog', async () => {
@@ -903,8 +903,8 @@ describe('EquipmentDetailPage', () => {
     await waitFor(() => {
       expect(screen.getByRole('heading', { name: 'Upstairs Furnace' })).toBeInTheDocument();
     });
-    await user.click(screen.getByRole('tab', { name: /^media/i }));
-    await user.click(screen.getByRole('button', { name: /add media/i }));
+    await user.click(screen.getByRole('tab', { name: /^files/i }));
+    await user.click(screen.getByRole('button', { name: /add files/i }));
 
     const dialog = await screen.findByRole('dialog');
     const fileInput = dialog.querySelector('input[type="file"]') as HTMLInputElement;
@@ -1110,7 +1110,7 @@ describe('EquipmentDetailPage', () => {
     await waitFor(() => {
       expect(screen.getByRole('heading', { name: 'Upstairs Furnace' })).toBeInTheDocument();
     });
-    await user.click(screen.getByRole('tab', { name: /^media/i }));
+    await user.click(screen.getByRole('tab', { name: /^files/i }));
 
     const moreButtons = await screen.findAllByRole('button', { name: /more options/i });
     await user.click(moreButtons[1]);
@@ -1134,7 +1134,7 @@ describe('EquipmentDetailPage', () => {
     renderPage();
 
     await waitFor(() => expect(screen.getByRole('heading', { name: 'Upstairs Furnace' })).toBeInTheDocument());
-    await user.click(screen.getByRole('tab', { name: /^media/i }));
+    await user.click(screen.getByRole('tab', { name: /^files/i }));
     await user.click(await screen.findByRole('button', { name: /set as profile/i }));
 
     await waitFor(() => {
@@ -1155,7 +1155,7 @@ describe('EquipmentDetailPage', () => {
     renderPage();
 
     await waitFor(() => expect(screen.getByRole('heading', { name: 'Upstairs Furnace' })).toBeInTheDocument());
-    await user.click(screen.getByRole('tab', { name: /^media/i }));
+    await user.click(screen.getByRole('tab', { name: /^files/i }));
     await user.click((await screen.findAllByRole('button', { name: /more options/i }))[1]);
     await user.click(await screen.findByRole('menuitem', { name: /caption/i }));
 
@@ -1177,7 +1177,7 @@ describe('EquipmentDetailPage', () => {
     renderPage();
 
     await waitFor(() => expect(screen.getByRole('heading', { name: 'Upstairs Furnace' })).toBeInTheDocument());
-    await user.click(screen.getByRole('tab', { name: /^media/i }));
+    await user.click(screen.getByRole('tab', { name: /^files/i }));
     await user.click((await screen.findAllByRole('button', { name: /more options/i }))[1]);
     await user.click(await screen.findByRole('menuitem', { name: /delete/i }));
     const dialog = await screen.findByRole('dialog');
@@ -1227,11 +1227,17 @@ describe('EquipmentDetailPage', () => {
       { id: 'img-1', url: 'https://cdn/full-1.jpg', thumbnailUrl: 'https://cdn/thumb-1.jpg', contentType: 'image/jpeg', sizeBytes: 1, widthPx: 1, heightPx: 1, isProfile: true, sortOrder: 0, caption: 'Plate', uploadedBy: null, uploadedByName: null, createdAt: '' },
       { id: 'img-2', url: 'https://cdn/full-2.jpg', thumbnailUrl: 'https://cdn/thumb-2.jpg', contentType: 'image/jpeg', sizeBytes: 1, widthPx: 1, heightPx: 1, isProfile: false, sortOrder: 1, caption: null, uploadedBy: null, uploadedByName: null, createdAt: '' },
     ]);
-    mockFilesList.mockResolvedValue({
-      content: [
-        { id: 'vid-1', kind: 'VIDEO', status: 'READY', fileName: 'run.mp4', url: 'https://cdn/run.mp4', thumbnailUrl: 'https://cdn/poster.jpg', durationSeconds: 45, caption: null, isProfile: false, uploadedBy: null, uploadedByName: null, createdAt: '' },
-      ],
-    });
+    // Kind-aware: videos for the VIDEO query, none for the DOCUMENT query.
+    mockFilesList.mockImplementation((_id: string, params?: { kind?: string }) =>
+      Promise.resolve({
+        content:
+          params?.kind === 'VIDEO'
+            ? [
+                { id: 'vid-1', kind: 'VIDEO', status: 'READY', fileName: 'run.mp4', url: 'https://cdn/run.mp4', thumbnailUrl: 'https://cdn/poster.jpg', durationSeconds: 45, caption: null, isProfile: false, uploadedBy: null, uploadedByName: null, createdAt: '' },
+              ]
+            : [],
+      }),
+    );
     const user = userEvent.setup();
     renderPage();
 
@@ -1245,7 +1251,7 @@ describe('EquipmentDetailPage', () => {
     // "View all" jumps to the Media tab (2 photos + 1 video = 3).
     await user.click(screen.getByRole('button', { name: /view all/i }));
     await waitFor(() => {
-      expect(screen.getByRole('tab', { name: /^media\s*3$/i })).toHaveAttribute('aria-selected', 'true');
+      expect(screen.getByRole('tab', { name: /^files\s*3$/i })).toHaveAttribute('aria-selected', 'true');
     });
   });
 
@@ -1257,7 +1263,7 @@ describe('EquipmentDetailPage', () => {
     await waitFor(() => {
       expect(screen.getByRole('heading', { name: 'Upstairs Furnace' })).toBeInTheDocument();
     });
-    await user.click(screen.getByRole('tab', { name: /^media/i }));
+    await user.click(screen.getByRole('tab', { name: /^files/i }));
 
     expect(await screen.findByText(/no photos added yet/i)).toBeInTheDocument();
     expect(screen.getByText(/no videos yet/i)).toBeInTheDocument();

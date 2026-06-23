@@ -10,13 +10,15 @@ import type React from 'react';
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { PhotoIcon, VideoCameraIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import { DocumentTextIcon, PhotoIcon, VideoCameraIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import {
   equipmentImagesApi,
   equipmentFilesApi,
   EQUIPMENT_IMAGE_CONTENT_TYPES,
   EQUIPMENT_IMAGE_MAX_BYTES,
   EQUIPMENT_IMAGE_CAPTION_MAX_CHARS,
+  FILE_MAX_BYTES,
+  OFFICE_DOC_CONTENT_TYPES,
   VIDEO_CONTENT_TYPES,
   VIDEO_MAX_BYTES,
 } from '../api';
@@ -37,7 +39,7 @@ interface Props {
   defaultSetProfile?: boolean;
 }
 
-type MediaKind = 'image' | 'video';
+type MediaKind = 'image' | 'video' | 'document';
 type UploadStage = 'requesting' | 'uploading' | 'confirming';
 type RowStatus = 'queued' | 'in-progress' | 'done' | 'failed';
 
@@ -54,7 +56,23 @@ interface QueuedFile {
 
 const IMAGE_TYPES = EQUIPMENT_IMAGE_CONTENT_TYPES as readonly string[];
 const VIDEO_TYPES = VIDEO_CONTENT_TYPES as readonly string[];
-const ACCEPT = [...EQUIPMENT_IMAGE_CONTENT_TYPES, ...VIDEO_CONTENT_TYPES].join(',');
+// Documents: PDF + Office/text (manuals, spec sheets, warranties). Same files
+// API + 25 MB cap as videos go to, but classify server-side as kind DOCUMENT.
+const DOC_TYPES = ['application/pdf', ...OFFICE_DOC_CONTENT_TYPES] as readonly string[];
+const ACCEPT = [
+  ...EQUIPMENT_IMAGE_CONTENT_TYPES,
+  ...VIDEO_CONTENT_TYPES,
+  ...DOC_TYPES,
+  // Extensions help OS pickers that filter Office docs poorly by MIME.
+  '.txt',
+  '.csv',
+  '.doc',
+  '.docx',
+  '.xls',
+  '.xlsx',
+  '.ppt',
+  '.pptx',
+].join(',');
 
 let nextLocalId = 0;
 const makeLocalId = () => `f-${++nextLocalId}`;
@@ -62,13 +80,16 @@ const makeLocalId = () => `f-${++nextLocalId}`;
 function fileKind(file: File): MediaKind | null {
   if (IMAGE_TYPES.includes(file.type)) return 'image';
   if (VIDEO_TYPES.includes(file.type)) return 'video';
+  if (DOC_TYPES.includes(file.type)) return 'document';
   return null;
 }
 
 function validateFile(file: File): { kind: MediaKind } | { error: string } {
   const kind = fileKind(file);
-  if (!kind) return { error: 'Unsupported type — JPEG/PNG/WebP photos or MP4/MOV videos' };
-  const max = kind === 'video' ? VIDEO_MAX_BYTES : EQUIPMENT_IMAGE_MAX_BYTES;
+  if (!kind) {
+    return { error: 'Unsupported type — JPEG/PNG/WebP photos, MP4/MOV videos, or PDF/Office/text docs' };
+  }
+  const max = kind === 'video' ? VIDEO_MAX_BYTES : kind === 'document' ? FILE_MAX_BYTES : EQUIPMENT_IMAGE_MAX_BYTES;
   if (file.size > max) {
     return { error: `Too large (${(file.size / 1024 / 1024).toFixed(1)} MB) — max ${Math.round(max / 1024 / 1024)} MB` };
   }
@@ -192,7 +213,8 @@ export default function EquipmentMediaUploadDialog({
       updateRow(row.id, { status: 'in-progress', stage: 'requesting', errorMessage: undefined });
       try {
         const caption = row.caption.trim() || null;
-        if (row.kind === 'video') {
+        if (row.kind !== 'image') {
+          // Videos + documents both live on the equipment-files API.
           await equipmentFilesApi.upload(equipmentId, row.file, {
             caption,
             onProgress: (s) => updateRow(row.id, { stage: s }),
@@ -243,10 +265,10 @@ export default function EquipmentMediaUploadDialog({
 
   return (
     <Dialog open={isOpen} onClose={isUploading ? () => undefined : onClose} size="2xl">
-      <DialogTitle>Add media</DialogTitle>
+      <DialogTitle>Add files</DialogTitle>
       <DialogDescription>
-        Add photos and videos for this unit — JPEG/PNG/WebP up to 25 MB, MP4/MOV up to 100 MB. The
-        first photo becomes the profile image.
+        Add photos, videos, and documents (manuals, spec sheets) for this unit — photos/PDF/Office up to
+        25 MB, video up to 100 MB. The first photo becomes the profile image.
       </DialogDescription>
       <form onSubmit={handleSubmit}>
         <DialogBody>
@@ -273,7 +295,7 @@ export default function EquipmentMediaUploadDialog({
           >
             <PhotoIcon className="mx-auto size-8 text-zinc-400 dark:text-zinc-500" />
             <p className="mt-2 text-sm text-zinc-700 dark:text-zinc-300">
-              {isDragOver ? 'Drop to add' : 'Drag photos or videos here, or'}
+              {isDragOver ? 'Drop to add' : 'Drag photos, videos, or documents here, or'}
             </p>
             {!isDragOver && (
               <label className="mt-2 inline-block">
@@ -309,8 +331,10 @@ export default function EquipmentMediaUploadDialog({
                   <div className="flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-md bg-zinc-100 dark:bg-zinc-900">
                     {row.kind === 'image' ? (
                       <img src={URL.createObjectURL(row.file)} alt={row.file.name} className="size-full object-cover" />
-                    ) : (
+                    ) : row.kind === 'video' ? (
                       <VideoCameraIcon className="size-6 text-zinc-400 dark:text-zinc-500" />
+                    ) : (
+                      <DocumentTextIcon className="size-6 text-zinc-400 dark:text-zinc-500" />
                     )}
                   </div>
 
@@ -345,7 +369,7 @@ export default function EquipmentMediaUploadDialog({
                     )}
                   </div>
 
-                  {/* Cover selection — photos only; videos can't be the profile image. */}
+                  {/* Cover selection — photos only; videos/documents can't be the profile image. */}
                   {row.kind === 'image' ? (
                     <label className="flex shrink-0 cursor-pointer items-center gap-1.5 text-xs text-zinc-700 dark:text-zinc-300">
                       <input
@@ -360,7 +384,9 @@ export default function EquipmentMediaUploadDialog({
                       Cover
                     </label>
                   ) : (
-                    <span className="shrink-0 text-xs text-zinc-400 dark:text-zinc-600">Video</span>
+                    <span className="shrink-0 text-xs text-zinc-400 dark:text-zinc-600">
+                      {row.kind === 'video' ? 'Video' : 'Document'}
+                    </span>
                   )}
 
                   <IconButton
