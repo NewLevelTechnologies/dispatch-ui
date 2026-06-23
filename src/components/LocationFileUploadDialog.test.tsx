@@ -63,11 +63,12 @@ describe('LocationFileUploadDialog', () => {
     Object.defineProperty(big, 'size', { value: 26 * 1024 * 1024 });
     fireEvent.change(input, {
       target: {
-        files: [new File(['x'], 'notes.txt', { type: 'text/plain' }), big, jpeg('ok.jpg')],
+        // GIF is not on the allowlist (jpeg/png/webp/pdf + Office/text) → rejected.
+        files: [new File(['x'], 'logo.gif', { type: 'image/gif' }), big, jpeg('ok.jpg')],
       },
     });
 
-    expect(screen.getByText(/notes\.txt/)).toBeInTheDocument();
+    expect(screen.getByText(/logo\.gif/)).toBeInTheDocument();
     expect(screen.getByText(/unsupported type/i)).toBeInTheDocument();
     expect(screen.getByText(/too large/i)).toBeInTheDocument();
     expect(screen.getByText('ok.jpg')).toBeInTheDocument();
@@ -163,7 +164,7 @@ describe('LocationFileUploadDialog', () => {
     const dropZone = screen.getByTestId('file-upload-drop-zone');
     fireEvent.drop(dropZone, {
       dataTransfer: {
-        files: [jpeg('dropped.jpg'), new File(['x'], 'notes.txt', { type: 'text/plain' })],
+        files: [jpeg('dropped.jpg'), new File(['x'], 'logo.gif', { type: 'image/gif' })],
         types: ['Files'],
       },
     });

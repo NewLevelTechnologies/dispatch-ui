@@ -1,45 +1,41 @@
-/* eslint-disable i18next/no-literal-string -- dense upload dialog paired with LocationFilesTab; short operational labels stay literal (same convention as the location detail page). */
-// Direct site-upload dialog for the location Files tab. Modeled on
-// EquipmentImageUploadDialog: queue files via drop zone or picker, per-row
-// caption + optional category, then run the 3-step presigned upload
-// sequentially with per-row progress. Failures keep the dialog open with the
-// row-level error; successes invalidate the ['location-files'] caches.
+/* eslint-disable i18next/no-literal-string -- dense upload dialog paired with AgreementFilesTab; short operational labels stay literal (same convention as the agreement detail page). */
+// Upload dialog for the agreement Documents tab. Modeled on
+// LocationFileUploadDialog: queue files via drop zone or picker, per-row
+// caption, then run the 3-step presigned upload sequentially with per-row
+// progress. Documents only — PDF, Office/text docs, and image scans (the
+// backend's non-video allowlist), 25 MB cap; no video (agreements hold
+// paperwork, not media). Failures keep the dialog open with the row-level
+// error; successes invalidate ['agreement-files'].
 import type React from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { DocumentTextIcon, PaperClipIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import {
-  locationFilesApi,
+  agreementFilesApi,
   FILE_CAPTION_MAX_CHARS,
   FILE_CONTENT_TYPES,
   FILE_MAX_BYTES,
   OFFICE_DOC_CONTENT_TYPES,
-  LOCATION_FILE_CATEGORIES,
-  LOCATION_FILE_CATEGORY_LABELS,
-  type LocationFileCategory,
 } from '../api';
 import { Dialog, DialogActions, DialogBody, DialogDescription, DialogTitle } from './catalyst/dialog';
 import { Button } from './catalyst/button';
 import { Input } from './catalyst/input';
-import { Select } from './catalyst/select';
 import IconButton from './IconButton';
 
 interface Props {
   isOpen: boolean;
   onClose: () => void;
-  locationId: string;
+  agreementId: string;
 }
 
 type UploadStage = 'requesting' | 'uploading' | 'confirming';
 type RowStatus = 'queued' | 'in-progress' | 'done' | 'failed';
 
 interface QueuedFile {
-  // Local-only id for React keys — not the server file id.
   id: string;
   file: File;
   caption: string;
-  category: LocationFileCategory | '';
   status: RowStatus;
   stage?: UploadStage;
   errorMessage?: string;
@@ -65,7 +61,7 @@ const makeLocalId = () => `f-${++nextLocalId}`;
 
 function validateFile(file: File): string | null {
   if (!ALLOWED_TYPES.includes(file.type)) {
-    return 'Unsupported type — PDF, Office/text docs (Word, Excel, PowerPoint, TXT, CSV), or image';
+    return 'Unsupported type — PDF, Office/text docs (Word, Excel, PowerPoint, TXT, CSV), or image scan';
   }
   if (file.size > FILE_MAX_BYTES) {
     return `Too large (${(file.size / 1024 / 1024).toFixed(1)} MB) — max ${Math.round(FILE_MAX_BYTES / 1024 / 1024)} MB`;
@@ -73,7 +69,7 @@ function validateFile(file: File): string | null {
   return null;
 }
 
-export default function LocationFileUploadDialog({ isOpen, onClose, locationId }: Props) {
+export default function AgreementFileUploadDialog({ isOpen, onClose, agreementId }: Props) {
   const queryClient = useQueryClient();
   const { t } = useTranslation();
 
@@ -82,11 +78,9 @@ export default function LocationFileUploadDialog({ isOpen, onClose, locationId }
   const [isUploading, setIsUploading] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  // Drag-enter/-leave fire per child; counter keeps the highlight stable
-  // until the cursor leaves the outer drop region.
   const dragCounter = useRef(0);
 
-  /* eslint-disable react-hooks/set-state-in-effect -- reset transient dialog state on open (same pattern as EquipmentImageUploadDialog) */
+  /* eslint-disable react-hooks/set-state-in-effect -- reset transient dialog state on open (same pattern as LocationFileUploadDialog) */
   useEffect(() => {
     if (!isOpen) return;
     setRows([]);
@@ -108,7 +102,7 @@ export default function LocationFileUploadDialog({ isOpen, onClose, locationId }
         rejected.push(`${file.name}: ${err}`);
         continue;
       }
-      accepted.push({ id: makeLocalId(), file, caption: '', category: '', status: 'queued' });
+      accepted.push({ id: makeLocalId(), file, caption: '', status: 'queued' });
     }
     if (rejected.length > 0) setTopLevelError(rejected.join('\n'));
     if (accepted.length > 0) setRows((prev) => [...prev, ...accepted]);
@@ -144,9 +138,8 @@ export default function LocationFileUploadDialog({ isOpen, onClose, locationId }
     if (e.dataTransfer.files?.length) addFiles(Array.from(e.dataTransfer.files));
   };
 
-  const updateRow = (id: string, patch: Partial<QueuedFile>) => {
+  const updateRow = (id: string, patch: Partial<QueuedFile>) =>
     setRows((prev) => prev.map((r) => (r.id === id ? { ...r, ...patch } : r)));
-  };
   const removeRow = (id: string) => setRows((prev) => prev.filter((r) => r.id !== id));
 
   const queuedRows = useMemo(() => rows.filter((r) => r.status === 'queued'), [rows]);
@@ -160,16 +153,12 @@ export default function LocationFileUploadDialog({ isOpen, onClose, locationId }
     }
     setIsUploading(true);
 
-    // Sequential — cleaner per-row progress, and the API serializes the
-    // upload-url + confirm hits anyway. Track failures locally (the setState
-    // updates haven't flushed by the time the loop ends).
     let anyFailures = false;
     for (const row of queuedRows) {
       updateRow(row.id, { status: 'in-progress', stage: 'requesting', errorMessage: undefined });
       try {
-        await locationFilesApi.upload(locationId, row.file, {
+        await agreementFilesApi.upload(agreementId, row.file, {
           caption: row.caption.trim() || null,
-          category: row.category || null,
           onProgress: (s) => updateRow(row.id, { stage: s }),
         });
         updateRow(row.id, { status: 'done', stage: undefined });
@@ -186,9 +175,7 @@ export default function LocationFileUploadDialog({ isOpen, onClose, locationId }
     }
 
     setIsUploading(false);
-    // Lists, counts, and the tab badge all key off this prefix.
-    queryClient.invalidateQueries({ queryKey: ['location-files', locationId] });
-
+    queryClient.invalidateQueries({ queryKey: ['agreement-files', agreementId] });
     if (!anyFailures) onClose();
   };
 
@@ -203,10 +190,10 @@ export default function LocationFileUploadDialog({ isOpen, onClose, locationId }
 
   return (
     <Dialog open={isOpen} onClose={isUploading ? () => undefined : onClose} size="2xl">
-      <DialogTitle>Upload site files</DialogTitle>
+      <DialogTitle>Upload documents</DialogTitle>
       <DialogDescription>
-        Files upload straight to this location’s record — photos, PDFs, and Office/text docs up to 25 MB.
-        Job photos don’t need uploading here; they arrive with the work order.
+        Attach the signed contract, COIs, and other paperwork to this agreement — PDF, Word, Excel,
+        PowerPoint, text, or image scan, up to 25 MB each.
       </DialogDescription>
       <form onSubmit={handleSubmit}>
         <DialogBody>
@@ -244,7 +231,6 @@ export default function LocationFileUploadDialog({ isOpen, onClose, locationId }
                   multiple
                   onChange={(e) => {
                     if (e.target.files?.length) addFiles(Array.from(e.target.files));
-                    // Reset so re-selecting the same file fires onChange again.
                     e.target.value = '';
                   }}
                   disabled={isUploading}
@@ -268,11 +254,7 @@ export default function LocationFileUploadDialog({ isOpen, onClose, locationId }
                 <li key={row.id} className="flex items-center gap-3 p-3">
                   <div className="flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-md bg-zinc-100 dark:bg-zinc-900">
                     {row.file.type.startsWith('image/') ? (
-                      <img
-                        src={URL.createObjectURL(row.file)}
-                        alt={row.file.name}
-                        className="size-full object-cover"
-                      />
+                      <img src={URL.createObjectURL(row.file)} alt={row.file.name} className="size-full object-cover" />
                     ) : (
                       <DocumentTextIcon className="size-6 text-zinc-400 dark:text-zinc-500" />
                     )}
@@ -280,50 +262,25 @@ export default function LocationFileUploadDialog({ isOpen, onClose, locationId }
 
                   <div className="min-w-0 flex-1 space-y-1">
                     <div className="flex items-center gap-2">
-                      <span className="truncate text-sm font-medium text-zinc-800 dark:text-zinc-200">
-                        {row.file.name}
-                      </span>
+                      <span className="truncate text-sm font-medium text-zinc-800 dark:text-zinc-200">{row.file.name}</span>
                       <span className="shrink-0 text-xs text-zinc-500 dark:text-zinc-500">
                         {(row.file.size / 1024 / 1024).toFixed(1)} MB
                       </span>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <Input
-                        name={`caption-${row.id}`}
-                        value={row.caption}
-                        onChange={(e) =>
-                          updateRow(row.id, { caption: e.target.value.slice(0, FILE_CAPTION_MAX_CHARS) })
-                        }
-                        placeholder="Caption (optional)"
-                        disabled={isUploading || row.status !== 'queued'}
-                        maxLength={FILE_CAPTION_MAX_CHARS}
-                        aria-label="Caption"
-                        className="flex-1"
-                      />
-                      <Select
-                        name={`category-${row.id}`}
-                        value={row.category}
-                        onChange={(e) =>
-                          updateRow(row.id, { category: e.target.value as LocationFileCategory | '' })
-                        }
-                        disabled={isUploading || row.status !== 'queued'}
-                        aria-label="Category"
-                        className="w-36 shrink-0"
-                      >
-                        <option value="">No category</option>
-                        {LOCATION_FILE_CATEGORIES.map((c) => (
-                          <option key={c} value={c}>
-                            {LOCATION_FILE_CATEGORY_LABELS[c]}
-                          </option>
-                        ))}
-                      </Select>
-                    </div>
+                    <Input
+                      name={`caption-${row.id}`}
+                      value={row.caption}
+                      onChange={(e) => updateRow(row.id, { caption: e.target.value.slice(0, FILE_CAPTION_MAX_CHARS) })}
+                      placeholder="Caption (optional)"
+                      disabled={isUploading || row.status !== 'queued'}
+                      maxLength={FILE_CAPTION_MAX_CHARS}
+                      aria-label="Caption"
+                      className="w-full"
+                    />
                     {row.status === 'in-progress' && (
                       <p className="text-xs text-zinc-600 dark:text-zinc-400">{stageLabel(row.stage)}</p>
                     )}
-                    {row.status === 'done' && (
-                      <p className="text-xs text-lime-700 dark:text-lime-400">Uploaded</p>
-                    )}
+                    {row.status === 'done' && <p className="text-xs text-lime-700 dark:text-lime-400">Uploaded</p>}
                     {row.status === 'failed' && row.errorMessage && (
                       <p className="text-xs text-red-700 dark:text-red-400">{row.errorMessage}</p>
                     )}
@@ -347,11 +304,7 @@ export default function LocationFileUploadDialog({ isOpen, onClose, locationId }
             {t('common.cancel')}
           </Button>
           <Button type="submit" disabled={isUploading || queuedRows.length === 0}>
-            {isUploading
-              ? 'Uploading…'
-              : queuedRows.length > 1
-                ? `Upload ${queuedRows.length} files`
-                : 'Upload'}
+            {isUploading ? 'Uploading…' : queuedRows.length > 1 ? `Upload ${queuedRows.length} files` : 'Upload'}
           </Button>
         </DialogActions>
       </form>

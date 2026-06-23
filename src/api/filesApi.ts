@@ -27,6 +27,22 @@ export const FILE_CONTENT_TYPES = [
 ] as const;
 export type FileContentType = (typeof FILE_CONTENT_TYPES)[number];
 
+// Office + text/CSV document types both file stores accept on top of
+// images/PDF. All classify server-side as kind DOCUMENT and come back as
+// downloads (Content-Disposition: attachment) — never inline previews. Send
+// the exact MIME as the upload-url contentType (the S3 PUT must match it).
+export const OFFICE_DOC_CONTENT_TYPES = [
+  'text/plain',
+  'text/csv',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'application/vnd.ms-powerpoint',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+] as const;
+export type OfficeDocContentType = (typeof OFFICE_DOC_CONTENT_TYPES)[number];
+
 // Video uploads (work-order-domain routes only). iPhone .mov → video/quicktime,
 // Android → video/mp4. The PUT's Content-Type must match the declared type
 // exactly or S3 rejects the presigned upload with 403.
@@ -148,6 +164,9 @@ export interface WorkOrderFile {
   // Subject: the asset the file depicts/documents.
   equipmentId: string | null;
   equipmentName: string | null;
+  // Anchor for agreement-attached files (contracts, COIs). Null on job/equipment
+  // files; agreement files are listed only by agreementId (see agreementFilesApi).
+  agreementId: string | null;
   // Equipment profile image flag (equipment-anchored images only).
   isProfile: boolean;
   uploadedBy: string | null;
@@ -290,6 +309,83 @@ export const equipmentFilesApi = {
   ): Promise<WorkOrderFile> => {
     const response = await apiClient.patch<WorkOrderFile>(
       `/equipment/${equipmentId}/files/${fileId}`,
+      request
+    );
+    return response.data;
+  },
+};
+
+// ─────────────────────────────────────────────────────────────────────────
+// work-order-service — files attached directly to an agreement record
+// (contracts, COIs, photos/videos). Same 3-step presigned flow as equipment
+// files, at /work-orders/agreements/{id}/files. Listed only by agreementId —
+// an agreement spans many locations, so these intentionally don't appear in
+// the location Files aggregate.
+// ─────────────────────────────────────────────────────────────────────────
+export const agreementFilesApi = {
+  list: async (
+    agreementId: string,
+    params: ListFilesParams = {}
+  ): Promise<PagedFiles<WorkOrderFile>> => {
+    const response = await apiClient.get<PagedFiles<WorkOrderFile>>(
+      `/work-orders/agreements/${agreementId}/files`,
+      { params }
+    );
+    return response.data;
+  },
+
+  requestUploadUrl: async (
+    agreementId: string,
+    request: RequestEquipmentFileUploadUrlRequest
+  ): Promise<RequestFileUploadUrlResponse> => {
+    const response = await apiClient.post<RequestFileUploadUrlResponse>(
+      `/work-orders/agreements/${agreementId}/files/upload-url`,
+      request
+    );
+    return response.data;
+  },
+
+  confirm: async (agreementId: string, fileId: string): Promise<WorkOrderFile> => {
+    const response = await apiClient.post<WorkOrderFile>(
+      `/work-orders/agreements/${agreementId}/files/${fileId}/confirm`
+    );
+    return response.data;
+  },
+
+  /** Orchestrates the 3-step upload (request → PUT → confirm). */
+  upload: async (
+    agreementId: string,
+    file: File,
+    options: {
+      caption?: string | null;
+      onProgress?: (stage: 'requesting' | 'uploading' | 'confirming') => void;
+    } = {}
+  ): Promise<WorkOrderFile> => {
+    options.onProgress?.('requesting');
+    const { fileId, uploadUrl } = await agreementFilesApi.requestUploadUrl(agreementId, {
+      contentType: file.type,
+      sizeBytes: file.size,
+      fileName: file.name,
+      caption: options.caption ?? null,
+    });
+    options.onProgress?.('uploading');
+    await putToS3(uploadUrl, file.type, file);
+    options.onProgress?.('confirming');
+    return agreementFilesApi.confirm(agreementId, fileId);
+  },
+
+  delete: async (agreementId: string, fileId: string): Promise<void> => {
+    await apiClient.delete(`/work-orders/agreements/${agreementId}/files/${fileId}`);
+  },
+
+  /** Update a file's caption (max 200 chars); explicit null clears it. */
+  patch: async (
+    agreementId: string,
+    fileId: string,
+    request: PatchEquipmentFileRequest
+  ): Promise<WorkOrderFile> => {
+    const response = await apiClient.patch<WorkOrderFile>(
+      `/work-orders/agreements/${agreementId}/files/${fileId}`,
       request
     );
     return response.data;
