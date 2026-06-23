@@ -19,6 +19,7 @@ import { Pill } from '../../components/ui/Pill';
 import { LoadingState } from '../../components/ui/LoadingState';
 import { ErrorState } from '../../components/ui/ErrorState';
 import { EmptyState } from '../../components/ui/EmptyState';
+import { useGlossary } from '../../contexts/GlossaryContext';
 import {
   DenseTable,
   DenseTHead,
@@ -60,6 +61,8 @@ export default function AgreementCoverageTab({
   locationMap: LocationMap | undefined;
 }) {
   const queryClient = useQueryClient();
+  const { getName } = useGlossary();
+  const locPlural = getName('service_location', true).toLowerCase();
   const [isAddOpen, setIsAddOpen] = useState(false);
 
   const { data: coverage, isLoading, isError, refetch } = useQuery(
@@ -77,9 +80,9 @@ export default function AgreementCoverageTab({
       agreementApi.removeCoverageLocation(agreementId, serviceLocationId),
     onSuccess: () => {
       invalidateCoverage();
-      showSuccess('Location removed from coverage');
+      showSuccess(`${getName('service_location')} removed from coverage`);
     },
-    onError: (err) => showError("Couldn't remove location", extractApiError(err) ?? undefined),
+    onError: (err) => showError(`Couldn't remove ${getName('service_location').toLowerCase()}`, extractApiError(err) ?? undefined),
   });
 
   if (isLoading) return <LoadingState label="Loading coverage…" />;
@@ -94,7 +97,9 @@ export default function AgreementCoverageTab({
 
   const coveredIds = new Set(coverage.memberships.map((m) => m.serviceLocationId));
   const ruleText =
-    coverage.selectorMode === 'TAG' ? 'Locations matched by tag rule' : 'Manually selected locations';
+    coverage.selectorMode === 'TAG'
+      ? `${getName('service_location', true)} matched by tag rule`
+      : `Manually selected ${locPlural}`;
 
   return (
     <div className="flex flex-col gap-3.5">
@@ -105,7 +110,7 @@ export default function AgreementCoverageTab({
       >
         <div className="grid grid-cols-2 border-b border-border-soft">
           <div className="border-r border-border-soft px-3.5 py-2.5">
-            <div className="text-[10px] font-semibold uppercase tracking-wider text-fg-muted">Locations</div>
+            <div className="text-[10px] font-semibold uppercase tracking-wider text-fg-muted">{getName('service_location', true)}</div>
             <div className="mt-0.5 text-[18px] font-bold leading-none tracking-tight text-fg-strong">
               <span className="font-mono tabular-nums">{coverage.locationCount}</span>
               {customerLocationCount != null && (
@@ -120,13 +125,13 @@ export default function AgreementCoverageTab({
               {coverage.selectorMode === 'TAG' ? 'Tag-driven' : 'Static list'}
             </div>
             <div className="mt-1 text-[11px] text-fg-muted">
-              {coverage.autoAdd ? 'Auto-extends to newly-matched locations' : 'Fixed — no auto-add'}
+              {coverage.autoAdd ? `Auto-extends to newly-matched ${locPlural}` : 'Fixed — no auto-add'}
             </div>
           </div>
         </div>
         {coverage.autoAdd && (
           <div className="px-3.5 py-2 text-[11.5px] text-fg-muted">
-            <span className="font-semibold text-fg-accent">Auto-extends ·</span> newly-tagged locations join
+            <span className="font-semibold text-fg-accent">Auto-extends ·</span> newly-tagged {locPlural} join
             at the next cycle.
           </div>
         )}
@@ -135,22 +140,22 @@ export default function AgreementCoverageTab({
       {/* Resolved membership with provenance */}
       <Card
         padding="none"
-        title="Covered locations"
+        title={`Covered ${locPlural}`}
         subtitle={`${coverage.memberships.length} of ${coverage.locationCount}`}
-        action={<Button outline size="xxs" onClick={() => setIsAddOpen(true)}>Add locations</Button>}
+        action={<Button outline size="xxs" onClick={() => setIsAddOpen(true)}>{`Add ${locPlural}`}</Button>}
       >
         {coverage.memberships.length === 0 ? (
           <EmptyState
             compact
-            title="No covered locations"
-            description="Add locations to start generating visits."
-            action={<Button outline size="xxs" onClick={() => setIsAddOpen(true)}>Add locations</Button>}
+            title={`No covered ${locPlural}`}
+            description={`Add ${locPlural} to start generating ${getName('work_order', true).toLowerCase()}.`}
+            action={<Button outline size="xxs" onClick={() => setIsAddOpen(true)}>{`Add ${locPlural}`}</Button>}
           />
         ) : (
           <DenseTable>
             <DenseTHead>
               <tr>
-                <th>Location</th>
+                <th>{getName('service_location')}</th>
                 <th>Covered since</th>
                 <th>How</th>
                 <th style={{ width: 44 }}></th>
@@ -214,6 +219,8 @@ function AddCoverageDialog({
   coveredIds: Set<string>;
   onAdded: () => void;
 }) {
+  const { getName } = useGlossary();
+  const locPlural = getName('service_location', true).toLowerCase();
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [q, setQ] = useState('');
 
@@ -243,10 +250,10 @@ function AddCoverageDialog({
       agreementApi.addCoverageLocations(agreementId, { serviceLocationIds: [...selected] }),
     onSuccess: () => {
       onAdded();
-      showSuccess(`${selected.size} ${selected.size === 1 ? 'location' : 'locations'} added to coverage`);
+      showSuccess(`${selected.size} ${getName('service_location', selected.size !== 1).toLowerCase()} added to coverage`);
       onClose();
     },
-    onError: (err) => showError("Couldn't add locations", extractApiError(err) ?? undefined),
+    onError: (err) => showError(`Couldn't add ${locPlural}`, extractApiError(err) ?? undefined),
   });
 
   const toggle = (id: string) =>
@@ -259,19 +266,20 @@ function AddCoverageDialog({
 
   return (
     <Dialog open={isOpen} onClose={onClose} size="lg">
-      <DialogTitle>Add locations to coverage</DialogTitle>
+      <DialogTitle>Add {locPlural} to coverage</DialogTitle>
       <DialogDescription>
-        Pick from this customer&rsquo;s locations. Covered locations generate visits on the agreement&rsquo;s cadence.
+        Pick from this {getName('customer').toLowerCase()}&rsquo;s {locPlural}. Covered {locPlural} generate{' '}
+        {getName('work_order', true).toLowerCase()} on the {getName('agreement').toLowerCase()}&rsquo;s cadence.
       </DialogDescription>
       <DialogBody>
         <InputGroup>
           <MagnifyingGlassIcon data-slot="icon" />
-          <Input type="search" placeholder="Search locations…" value={q} onChange={(e) => setQ(e.target.value)} />
+          <Input type="search" placeholder={`Search ${locPlural}…`} value={q} onChange={(e) => setQ(e.target.value)} />
         </InputGroup>
         <div className="mt-3 max-h-[320px] overflow-y-auto rounded-lg border border-border">
           {available.length === 0 ? (
             <div className="px-3.5 py-6 text-center text-[12px] text-fg-muted">
-              {locationMap ? 'No locations left to add.' : 'Loading locations…'}
+              {locationMap ? `No ${locPlural} left to add.` : `Loading ${locPlural}…`}
             </div>
           ) : (
             available.map((l, i) => {

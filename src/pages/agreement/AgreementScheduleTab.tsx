@@ -19,6 +19,7 @@ import {
   CellSub,
 } from '../../components/ui/DenseTable';
 import { EmptyState } from '../../components/ui/EmptyState';
+import { useGlossary } from '../../contexts/GlossaryContext';
 import { formatWindow, type LocationMap } from './agreementShared';
 import { CardTitle } from './agreementCards';
 import { useAgreementSchedule, type ScheduledVisit } from './useAgreementSchedule';
@@ -40,24 +41,26 @@ export default function AgreementScheduleTab({
   locationMap: LocationMap | undefined;
 }) {
   const navigate = useNavigate();
+  const { getName } = useGlossary();
   const { scheduled, upcomingPeriods } = useAgreementSchedule(agreementId, locationMap);
+  const woPlural = getName('work_order', true).toLowerCase();
 
   return (
     <div className="flex flex-col gap-3.5">
       {/* Tier 1 — materialized work orders */}
       <Card
         padding="none"
-        title={<CardTitle icon={<CalendarDaysIcon className="size-3.5" />}>Scheduled visits</CardTitle>}
-        subtitle={`${scheduled.length} work orders on the board`}
+        title={<CardTitle icon={<CalendarDaysIcon className="size-3.5" />}>Scheduled {woPlural}</CardTitle>}
+        subtitle={`${scheduled.length} ${woPlural} on the board`}
       >
         {scheduled.length === 0 ? (
-          <EmptyState compact title="No visits on the board yet" description="Obligations materialize into work orders ~45 days before their window." />
+          <EmptyState compact title={`No ${woPlural} on the board yet`} description={`Obligations materialize into ${woPlural} ~45 days before their window.`} />
         ) : (
           <DenseTable>
             <DenseTHead>
               <tr>
-                <th>Work order</th>
-                <th>Location</th>
+                <th>{getName('work_order')}</th>
+                <th>{getName('service_location')}</th>
                 <th>Date</th>
                 <th>Tech</th>
                 <th>Status</th>
@@ -117,8 +120,8 @@ export default function AgreementScheduleTab({
         subtitle="Obligations materialize ~45 days before each window"
       >
         <div className="border-b border-border-soft bg-bg-elev-2 px-3.5 py-2 text-[11.5px] text-fg-muted">
-          These visits are committed by the agreement but become work orders only as their window
-          approaches — so the board isn&rsquo;t flooded with a year of future jobs.
+          Committed by the {getName('agreement').toLowerCase()}, these generate into {woPlural} only as their
+          window approaches — so the board isn&rsquo;t flooded with a year of future jobs.
         </div>
         {upcomingPeriods.length === 0 ? (
           <EmptyState compact title="No upcoming obligations" />
@@ -131,7 +134,7 @@ export default function AgreementScheduleTab({
               >
                 <div className="text-[12.5px] font-semibold text-fg-strong">{p.periodKey}</div>
                 <div className="text-[12px] text-fg">
-                  {p.count} {p.count === 1 ? 'visit' : 'visits'} · {formatWindow(p.windowStart, p.windowEnd)}
+                  {p.count} {getName('work_order', p.count !== 1).toLowerCase()} · {formatWindow(p.windowStart, p.windowEnd)}
                 </div>
                 <span className="rounded bg-bg-active px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-fg-muted">
                   Scheduled later
