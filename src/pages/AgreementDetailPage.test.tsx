@@ -3,7 +3,7 @@ import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderWithProviders } from '../test/utils';
 import AgreementDetailPage from './AgreementDetailPage';
-import { agreementApi, customerApi, dispatchesApi, invoicesApi } from '../api';
+import { agreementApi, customerApi, dispatchesApi, invoicesApi, agreementFilesApi } from '../api';
 
 vi.mock('../api', () => ({
   agreementApi: {
@@ -20,6 +20,7 @@ vi.mock('../api', () => ({
   customerApi: { getServiceLocations: vi.fn() },
   dispatchesApi: { listForWorkOrder: vi.fn() },
   invoicesApi: { getAll: vi.fn() },
+  agreementFilesApi: { list: vi.fn(), upload: vi.fn(), delete: vi.fn(), patch: vi.fn() },
   // Const enum object — the billing/invoice surfaces build status→tone maps off it.
   InvoiceStatus: {
     DRAFT: 'DRAFT',
@@ -29,6 +30,20 @@ vi.mock('../api', () => ({
     CANCELLED: 'CANCELLED',
     VOID: 'VOID',
   },
+  // Module-level constants the agreement file dialog/tab read at import time.
+  FILE_CONTENT_TYPES: ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'],
+  OFFICE_DOC_CONTENT_TYPES: [
+    'text/plain',
+    'text/csv',
+    'application/msword',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'application/vnd.ms-excel',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'application/vnd.ms-powerpoint',
+    'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  ],
+  FILE_MAX_BYTES: 25 * 1024 * 1024,
+  FILE_CAPTION_MAX_CHARS: 200,
 }));
 
 const agreement = {
@@ -103,6 +118,17 @@ describe('AgreementDetailPage', () => {
       totalPages: 0,
       first: true,
       last: true,
+    });
+    // Documents tab + badge default to empty.
+    vi.mocked(agreementFilesApi.list).mockResolvedValue({
+      content: [],
+      number: 0,
+      size: 100,
+      totalElements: 0,
+      totalPages: 0,
+      first: true,
+      last: true,
+      counts: { all: 0, photos: 0, videos: 0, documents: 0 },
     });
   });
 

@@ -17,6 +17,7 @@ import {
 } from '@heroicons/react/24/outline';
 import {
   agreementApi,
+  agreementFilesApi,
   type AgreementResponse,
   type AgreementStatus,
   type VisitTemplateResponse,
@@ -42,6 +43,7 @@ import AgreementScheduleTab from './agreement/AgreementScheduleTab';
 import { useAgreementSchedule } from './agreement/useAgreementSchedule';
 import { useAgreementBilling, type EnrichedInstallment, type InstallmentDisplayStatus } from './agreement/useAgreementBilling';
 import AgreementInvoicesTab from './agreement/AgreementInvoicesTab';
+import AgreementFilesTab from './agreement/AgreementFilesTab';
 import {
   agreementBillingQueryOptions,
   agreementComplianceQueryOptions,
@@ -125,6 +127,15 @@ export default function AgreementDetailPage() {
     enabled: !!id,
   });
 
+  // Documents tab badge — lean limit-1 page for the count. Shares the
+  // ['agreement-files', id] prefix so upload/delete in the tab refresh it.
+  const { data: documentCount } = useQuery({
+    queryKey: ['agreement-files', id, 'count'] as const,
+    queryFn: () => agreementFilesApi.list(id!, { limit: 1 }),
+    enabled: !!id,
+    select: (p) => p.counts.all,
+  });
+
   const customerId = agreement?.customer.id ?? '';
   const { data: locationMap } = useQuery(agreementLocationsQueryOptions(customerId));
 
@@ -190,7 +201,7 @@ export default function AgreementDetailPage() {
     { id: 'coverage', label: 'Coverage', count: agreement.coverageLocationCount },
     { id: 'schedule', label: 'Schedule' },
     { id: 'invoices', label: getName('invoice', true) },
-    { id: 'documents', label: 'Documents' },
+    { id: 'documents', label: 'Documents', count: documentCount },
     { id: 'activity', label: 'Activity' },
   ];
 
@@ -237,9 +248,7 @@ export default function AgreementDetailPage() {
           )}
 
           {activeTab === 'invoices' && <AgreementInvoicesTab agreementId={agreement.id} />}
-          {activeTab === 'documents' && (
-            <TabStub label="Documents" detail="Contract attachments for agreements aren't wired to a backend yet." />
-          )}
+          {activeTab === 'documents' && <AgreementFilesTab agreementId={agreement.id} />}
           {activeTab === 'activity' && (
             <TabStub label="Activity" detail="An agreement-scoped activity feed isn't available from the backend yet." />
           )}

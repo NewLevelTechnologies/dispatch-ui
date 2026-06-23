@@ -43,6 +43,7 @@ const woPhoto: WorkOrderFile = {
   workItemId: null,
   equipmentId: null,
   equipmentName: null,
+  agreementId: null,
   isProfile: false,
   uploadedBy: null,
   uploadedByName: 'D. Park',

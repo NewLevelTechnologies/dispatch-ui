@@ -74,6 +74,7 @@ const video = (o: Partial<WorkOrderFile> = {}): WorkOrderFile => ({
   workItemId: null,
   equipmentId: 'eq-1',
   equipmentName: null,
+  agreementId: null,
   isProfile: false,
   uploadedBy: null,
   uploadedByName: null,
