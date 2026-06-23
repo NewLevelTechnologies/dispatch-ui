@@ -66,15 +66,16 @@ type TabId = 'overview' | 'coverage' | 'schedule' | 'invoices' | 'documents' | '
 // ── Smart back-link (same ?from= pattern as ServiceLocationDetailPage) ───────
 function useBackContext(agreement: AgreementResponse): { label: string; href: string } {
   const [params] = useSearchParams();
+  const { getName } = useGlossary();
   const from = (params.get('from') || '').toLowerCase();
-  if (from === 'agreements') return { label: 'All agreements', href: '/agreements' };
+  if (from === 'agreements') return { label: `All ${getName('agreement', true).toLowerCase()}`, href: '/agreements' };
   if (from === 'search') {
     const q = params.get('q');
     return { label: q ? `Search results · “${q}”` : 'Search results', href: '/search' };
   }
-  // 'customer' and default both resolve to the parent customer's Agreements tab.
+  // 'customer' and default both resolve to the parent customer's agreements tab.
   return {
-    label: `${agreement.customer.name} · Agreements`,
+    label: `${agreement.customer.name} · ${getName('agreement', true)}`,
     href: `/customers/${agreement.customer.id}?tab=agreements`,
   };
 }
@@ -145,16 +146,16 @@ export default function AgreementDetailPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['agreement', id] });
       queryClient.invalidateQueries({ queryKey: ['agreements'] });
-      showSuccess('Agreement cancelled');
+      showSuccess(`${getName('agreement')} cancelled`);
     },
-    onError: (err) => showError("Couldn't cancel agreement", extractApiError(err) ?? undefined),
+    onError: (err) => showError(`Couldn't cancel ${getName('agreement').toLowerCase()}`, extractApiError(err) ?? undefined),
   });
 
   const noRenewMutation = useMutation({
     mutationFn: () => agreementApi.update(id!, { autoRenew: false }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['agreement', id] });
-      showSuccess('Auto-renew turned off — agreement will expire at term');
+      showSuccess(`Auto-renew turned off — ${getName('agreement').toLowerCase()} will expire at term`);
     },
     onError: (err) => showError("Couldn't update auto-renew", extractApiError(err) ?? undefined),
   });
@@ -164,9 +165,9 @@ export default function AgreementDetailPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['agreement', id] });
       queryClient.invalidateQueries({ queryKey: ['agreements'] });
-      showSuccess('Agreement activated — visits will begin generating');
+      showSuccess(`${getName('agreement')} activated — ${getName('work_order', true).toLowerCase()} will begin generating`);
     },
-    onError: (err) => showError("Couldn't activate agreement", extractApiError(err) ?? undefined),
+    onError: (err) => showError(`Couldn't activate ${getName('agreement').toLowerCase()}`, extractApiError(err) ?? undefined),
   });
 
   if (isLoading) {
@@ -251,7 +252,7 @@ export default function AgreementDetailPage() {
           {activeTab === 'invoices' && <AgreementInvoicesTab agreementId={agreement.id} />}
           {activeTab === 'documents' && <AgreementFilesTab agreementId={agreement.id} />}
           {activeTab === 'activity' && (
-            <TabStub label="Activity" detail="An agreement-scoped activity feed isn't available from the backend yet." />
+            <TabStub label="Activity" detail={`An ${getName('agreement').toLowerCase()}-scoped activity feed isn't available from the backend yet.`} />
           )}
 
           <EndAgreementFooter
@@ -274,7 +275,7 @@ export default function AgreementDetailPage() {
         onClose={() => setConfirmActivate(false)}
         onConfirm={() => activateMutation.mutate()}
         title={`Activate ${agreement.agreementNumber}?`}
-        message="Generation begins for active agreements — work orders will start materializing for covered locations on each visit template's cadence. Make sure coverage + visit templates are set first."
+        message={`Generation begins for active ${getName('agreement', true).toLowerCase()} — ${getName('work_order', true).toLowerCase()} will start materializing for covered ${getName('service_location', true).toLowerCase()} on each ${getName('work_order').toLowerCase()} template's cadence. Make sure coverage + ${getName('work_order').toLowerCase()} templates are set first.`}
         confirmLabel="Activate"
         isPending={activateMutation.isPending}
       />
@@ -284,8 +285,8 @@ export default function AgreementDetailPage() {
         onClose={() => setConfirmCancel(false)}
         onConfirm={() => cancelMutation.mutate()}
         title={`Cancel ${agreement.agreementNumber}?`}
-        message="Terminates the agreement mid-term (prorated refund handled per the contract). Visit and invoice history are preserved. New visits stop generating."
-        confirmLabel="Cancel agreement"
+        message={`Terminates the ${getName('agreement').toLowerCase()} mid-term (prorated refund handled per the contract). ${getName('work_order')} and invoice history are preserved. New ${getName('work_order', true).toLowerCase()} stop generating.`}
+        confirmLabel={`Cancel ${getName('agreement').toLowerCase()}`}
         isDestructive
         isPending={cancelMutation.isPending}
       />
@@ -295,7 +296,7 @@ export default function AgreementDetailPage() {
         onClose={() => setConfirmNoRenew(false)}
         onConfirm={() => noRenewMutation.mutate()}
         title="Turn off auto-renew?"
-        message={`The agreement will run to ${agreement.termEnd ? formatDay(agreement.termEnd) : 'the end of its term'} and then expire with no further action. No money moves now.`}
+        message={`The ${getName('agreement').toLowerCase()} will run to ${agreement.termEnd ? formatDay(agreement.termEnd) : 'the end of its term'} and then expire with no further action. No money moves now.`}
         confirmLabel="Don't renew"
         isPending={noRenewMutation.isPending}
       />
@@ -361,6 +362,7 @@ function AgreementHeader({
   onEdit: () => void;
   onActivate: () => void;
 }) {
+  const { getName } = useGlossary();
   const { data: billing } = useQuery(agreementBillingQueryOptions(agreement.id));
   const { data: compliance } = useQuery(agreementComplianceQueryOptions(agreement.id));
   const { nextInvoice } = useAgreementBilling(agreement.id);
@@ -408,7 +410,7 @@ function AgreementHeader({
               Auto-renew{agreement.renewalTermMonths ? ` · ${agreement.renewalTermMonths} mo` : ''}
             </Pill>
           )}
-          {agreement.kind === 'VISIT' && <Pill tone="neutral">Visit-based</Pill>}
+          {agreement.kind === 'VISIT' && <Pill tone="neutral">{getName('work_order')}-based</Pill>}
         </div>
         <div className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[11.5px] text-fg-muted">
           {meta.map((node, i) => (
@@ -432,7 +434,7 @@ function AgreementHeader({
                   <span className="font-medium text-fg-dim"> / {compliance.visitsTotal}</span>
                 </>
               }
-              sub={`visits complete${
+              sub={`${getName('work_order', true).toLowerCase()} complete${
                 compliance.visitsTotal > 0
                   ? ` · ${Math.round((compliance.visitsFulfilled / compliance.visitsTotal) * 100)}%`
                   : ''
@@ -457,7 +459,7 @@ function AgreementHeader({
                     <span className="font-medium text-fg-dim">/yr</span>
                   </>
                 ) : (
-                  'Per visit'
+                  `Per ${getName('work_order').toLowerCase()}`
                 )
               }
               sub={`Billed ${cadenceLabel(billing.cadenceUnit, billing.cadenceInterval).toLowerCase()}${
@@ -511,6 +513,7 @@ function OverviewTab({
   onViewSchedule: () => void;
   onViewCoverage: () => void;
 }) {
+  const { getName } = useGlossary();
   const { data: compliance } = useQuery(agreementComplianceQueryOptions(agreement.id));
   const { scheduled } = useAgreementSchedule(agreement.id, locationMap);
 
@@ -535,8 +538,8 @@ function OverviewTab({
     attention.push({
       key: 'behind',
       severity: 'warning',
-      title: `${compliance.visitsOverdue} ${compliance.visitsOverdue === 1 ? 'visit' : 'visits'} behind schedule`,
-      sub: 'Past the scheduling window without a completed visit',
+      title: `${compliance.visitsOverdue} ${getName('work_order', compliance.visitsOverdue !== 1).toLowerCase()} behind schedule`,
+      sub: `Past the scheduling window without a completed ${getName('work_order').toLowerCase()}`,
       action: 'Schedule',
       onAction: onViewSchedule,
     });
@@ -547,7 +550,7 @@ function OverviewTab({
       {isDraft && (
         <Callout
           kind="accent"
-          title="Draft — not generating visits yet"
+          title={`Draft — not generating ${getName('work_order', true).toLowerCase()} yet`}
           action={
             <Button size="xs" onClick={onActivate} disabled={!readyToActivate}>
               Activate
@@ -556,12 +559,12 @@ function OverviewTab({
         >
           <ul className="flex flex-col gap-0.5 text-[12px]">
             <li className={hasTemplates ? 'text-fg-muted' : 'text-fg'}>
-              {hasTemplates ? '✓' : '○'} Visit template{hasTemplates ? ' set' : ' needed — add one in the Scope card →'}
+              {hasTemplates ? '✓' : '○'} {getName('work_order')} template{hasTemplates ? ' set' : ' needed — add one in the Scope card →'}
             </li>
             <li className={hasCoverage ? 'text-fg-muted' : 'text-fg'}>
               {hasCoverage
                 ? `✓ Coverage set (${agreement.coverageLocationCount})`
-                : '○ Coverage needed — add locations in the Coverage tab →'}
+                : `○ Coverage needed — add ${getName('service_location', true).toLowerCase()} in the Coverage tab →`}
             </li>
           </ul>
         </Callout>
@@ -633,6 +636,7 @@ function CoverageSummaryCard({
   customerLocationCount: number | undefined;
   onViewCoverage: () => void;
 }) {
+  const { getName } = useGlossary();
   const { data: coverage } = useQuery(agreementCoverageQueryOptions(agreement.id));
   // Visits/yr generated across all covered locations, summed over templates.
   const visitsPerYear = useMemo(() => {
@@ -651,7 +655,7 @@ function CoverageSummaryCard({
     >
       <div className="grid grid-cols-2 border-b border-border-soft">
         <div className="border-r border-border-soft px-3.5 py-2.5">
-          <div className="text-[10px] font-semibold uppercase tracking-wider text-fg-muted">Locations</div>
+          <div className="text-[10px] font-semibold uppercase tracking-wider text-fg-muted">{getName('service_location', true)}</div>
           <div className="mt-0.5 text-[18px] font-bold leading-none tracking-tight text-fg-strong">
             <span className="font-mono tabular-nums">{agreement.coverageLocationCount}</span>
             {customerLocationCount != null && (
@@ -661,7 +665,7 @@ function CoverageSummaryCard({
           <div className="mt-1 text-[11px] text-fg-muted">covered</div>
         </div>
         <div className="px-3.5 py-2.5">
-          <div className="text-[10px] font-semibold uppercase tracking-wider text-fg-muted">Visits / yr</div>
+          <div className="text-[10px] font-semibold uppercase tracking-wider text-fg-muted">{getName('work_order', true)} / yr</div>
           <div className="mt-0.5 text-[18px] font-bold leading-none tracking-tight text-fg-strong">
             <span className="font-mono tabular-nums">{visitsPerYear}</span>
           </div>
@@ -672,7 +676,7 @@ function CoverageSummaryCard({
       </div>
       {coverage?.autoAdd && (
         <div className="px-3.5 py-2 text-[11.5px] text-fg-muted">
-          <span className="font-semibold text-fg-accent">Auto-extends ·</span> newly-matched locations join at the
+          <span className="font-semibold text-fg-accent">Auto-extends ·</span> newly-matched {getName('service_location', true).toLowerCase()} join at the
           next cycle.
         </div>
       )}
@@ -687,15 +691,16 @@ function NextVisitsCard({
   scheduled: ReturnType<typeof useAgreementSchedule>['scheduled'];
   onViewSchedule: () => void;
 }) {
+  const { getName } = useGlossary();
   const rows = scheduled.slice(0, 3);
   return (
     <Card
       padding="none"
-      title={<CardTitle icon={<CalendarDaysIcon className="size-3.5" />}>Next scheduled visits</CardTitle>}
+      title={<CardTitle icon={<CalendarDaysIcon className="size-3.5" />}>Next scheduled {getName('work_order', true).toLowerCase()}</CardTitle>}
       action={<CardLink onClick={onViewSchedule}>View schedule →</CardLink>}
     >
       {rows.length === 0 ? (
-        <EmptyState compact title="No visits on the board" description="Visits appear here once obligations materialize into work orders." />
+        <EmptyState compact title={`No ${getName('work_order', true).toLowerCase()} on the board`} description={`${getName('work_order', true)} appear here once their obligations materialize, ~45 days before each window.`} />
       ) : (
         <div>
           {rows.map((v, i) => (
@@ -738,6 +743,7 @@ function NextVisitsCard({
 // Plan provenance, collection method, recognized/deferred, installment schedule
 // and member pricing are deliberately omitted: those backends don't exist yet.
 function FinancialSnapshotCard({ agreement }: { agreement: AgreementResponse }) {
+  const { getName } = useGlossary();
   const { data: billing, isLoading } = useQuery(agreementBillingQueryOptions(agreement.id));
   const { installments, nextInvoice } = useAgreementBilling(agreement.id);
   const [setupOpen, setSetupOpen] = useState(false);
@@ -768,7 +774,7 @@ function FinancialSnapshotCard({ agreement }: { agreement: AgreementResponse }) 
         ) : (
           <>
             <div className="grid grid-cols-3 border-b border-border-soft">
-              <FinCell k="Contract value" v={arr != null ? `${formatCurrency(arr)}/yr` : 'Per visit'} />
+              <FinCell k="Contract value" v={arr != null ? `${formatCurrency(arr)}/yr` : `Per ${getName('work_order').toLowerCase()}`} />
               <FinCell
                 k="Cadence"
                 v={cadenceLabel(billing.cadenceUnit, billing.cadenceInterval)}
@@ -891,19 +897,21 @@ function InstallmentSchedule({ installments }: { installments: EnrichedInstallme
 // mock's plain-English Included/Excluded/SLA prose has no backing data).
 // Editable: add / edit / delete the recurrence rules that drive generation.
 function ScopeCard({ agreementId, templates }: { agreementId: string; templates: VisitTemplateResponse[] }) {
+  const { getName } = useGlossary();
   const queryClient = useQueryClient();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<VisitTemplateResponse | null>(null);
   const [deleting, setDeleting] = useState<VisitTemplateResponse | null>(null);
+  const woName = getName('work_order').toLowerCase();
 
   const deleteMutation = useMutation({
     mutationFn: (templateId: string) => agreementApi.deleteVisitTemplate(agreementId, templateId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['agreement', agreementId] });
       setDeleting(null);
-      showSuccess('Visit template removed');
+      showSuccess(`${getName('work_order')} template removed`);
     },
-    onError: (err) => showError("Couldn't remove visit template", extractApiError(err) ?? undefined),
+    onError: (err) => showError(`Couldn't remove ${woName} template`, extractApiError(err) ?? undefined),
   });
 
   const openAdd = () => {
@@ -919,15 +927,15 @@ function ScopeCard({ agreementId, templates }: { agreementId: string; templates:
     <Card
       padding="none"
       title={<CardTitle icon={<BriefcaseIcon className="size-3.5" />}>Scope</CardTitle>}
-      action={<CardLink onClick={openAdd}>+ Add visit</CardLink>}
+      action={<CardLink onClick={openAdd}>+ Add {woName}</CardLink>}
     >
       {templates.length === 0 ? (
         <div className="px-3.5 py-3">
           <EmptyState
             compact
-            title="No visit templates"
-            description="Add a recurrence to start generating visits."
-            action={<Button outline size="xxs" onClick={openAdd}>Add visit template</Button>}
+            title={`No ${woName} templates`}
+            description={`Add a recurrence to start generating ${getName('work_order', true).toLowerCase()}.`}
+            action={<Button outline size="xxs" onClick={openAdd}>{`Add ${woName} template`}</Button>}
           />
         </div>
       ) : (
@@ -941,17 +949,17 @@ function ScopeCard({ agreementId, templates }: { agreementId: string; templates:
                 <div className="text-[12.5px] font-semibold text-fg-strong">{tpl.label}</div>
                 <div className="flex shrink-0 items-center gap-1">
                   <span className="text-[11px] text-fg-muted">{cadenceLabel(tpl.cadenceUnit, tpl.cadenceInterval)}</span>
-                  <IconButton aria-label="Edit visit template" onClick={() => openEdit(tpl)}>
+                  <IconButton aria-label={`Edit ${woName} template`} onClick={() => openEdit(tpl)}>
                     <PencilIcon className="size-3.5" />
                   </IconButton>
-                  <IconButton aria-label="Remove visit template" onClick={() => setDeleting(tpl)}>
+                  <IconButton aria-label={`Remove ${woName} template`} onClick={() => setDeleting(tpl)}>
                     <TrashIcon className="size-3.5" />
                   </IconButton>
                 </div>
               </div>
               <div className="mt-0.5 text-[11px] text-fg-muted">
                 {tpl.windowDays}-day window
-                {tpl.estDurationMinutes ? ` · ~${formatDuration(tpl.estDurationMinutes)} / visit` : ''}
+                {tpl.estDurationMinutes ? ` · ~${formatDuration(tpl.estDurationMinutes)} / ${woName}` : ''}
               </div>
               {tpl.scopeItems.length > 0 && (
                 <ul className="mt-1.5 flex flex-col gap-1">
@@ -982,7 +990,7 @@ function ScopeCard({ agreementId, templates }: { agreementId: string; templates:
         onClose={() => setDeleting(null)}
         onConfirm={() => deleting && deleteMutation.mutate(deleting.id)}
         title={deleting ? `Remove “${deleting.label}”?` : ''}
-        message="Stops generating future visits from this template. Already-materialized work orders are unaffected."
+        message={`Stops generating future ${getName('work_order', true).toLowerCase()} from this template. Any already created are unaffected.`}
         confirmLabel="Remove"
         isDestructive
         isPending={deleteMutation.isPending}
@@ -1040,14 +1048,15 @@ function TermCard({ agreement, onEdit }: { agreement: AgreementResponse; onEdit:
 }
 
 function CustomerCard({ agreement }: { agreement: AgreementResponse }) {
+  const { getName } = useGlossary();
   return (
     <Card
-      title={<CardTitle icon={<UserIcon className="size-3.5" />}>Customer</CardTitle>}
-      action={<CardLink to={`/customers/${agreement.customer.id}`}>Open customer →</CardLink>}
+      title={<CardTitle icon={<UserIcon className="size-3.5" />}>{getName('customer')}</CardTitle>}
+      action={<CardLink to={`/customers/${agreement.customer.id}`}>Open {getName('customer').toLowerCase()} →</CardLink>}
     >
       <div className="text-[13px] font-semibold text-fg-strong">{agreement.customer.name}</div>
       <div className="mt-1.5 text-[11.5px] text-fg-muted">
-        See the customer page for the full agreement portfolio and AR rollup.
+        See the {getName('customer').toLowerCase()} page for the full {getName('agreement').toLowerCase()} portfolio and AR rollup.
       </div>
     </Card>
   );
@@ -1065,6 +1074,7 @@ function EndAgreementFooter({
   onCancel: () => void;
   onNoRenew: () => void;
 }) {
+  const { getName } = useGlossary();
   return (
     <div className="mt-3.5 flex flex-col gap-3 rounded-[12px] border border-border bg-bg-elev px-4 py-3 sm:flex-row sm:items-center">
       <div className="flex-1">
@@ -1073,7 +1083,7 @@ function EndAgreementFooter({
         </div>
         <div className="mt-0.5 text-[11.5px] text-fg-muted">
           Cancel terminates mid-term. Don&rsquo;t-renew lets it expire at term with no further action. Both preserve
-          visit + invoice history.
+          {' '}{getName('work_order').toLowerCase()} + invoice history.
         </div>
       </div>
       <div className="flex gap-1.5">
@@ -1087,7 +1097,7 @@ function EndAgreementFooter({
           Don&rsquo;t renew at term
         </Button>
         <Button outline="red" size="xxs" disabled={disabled} onClick={onCancel}>
-          Cancel agreement
+          {`Cancel ${getName('agreement').toLowerCase()}`}
         </Button>
       </div>
     </div>
