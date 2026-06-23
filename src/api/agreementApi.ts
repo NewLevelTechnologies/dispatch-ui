@@ -248,17 +248,50 @@ export interface AgreementComplianceSummary {
   visitsMissed: number; // hard-stamped missed
 }
 
-// ---- Billing schedule (PR4 — pending merge; 404 if none set or not deployed) -
+// ---- Billing schedule (agreements PR4 — merged; 404 only when none set) ------
 
 export interface BillingScheduleResponse {
   agreementId: string;
-  amount: number;
+  amount: number; // per-period installment amount (ARR = amount × periods/yr)
   cadenceUnit: CadenceUnit;
   cadenceInterval: number;
   anchorDate: string;
   netDays: number; // invoice due = period start + netDays
   billingMode: BillingMode;
   active: boolean;
+}
+
+// PUT upsert body — replaces the whole schedule (create or update). Fields map
+// 1:1 to the read shape minus agreementId. `billingMode` is FIXED_SCHEDULE in
+// practice (PER_VISIT exists in the enum but isn't implemented). Saving an
+// active schedule starts the installment engine (mints agreement_billing_periods
+// → real invoices in financial-service).
+export interface UpsertBillingScheduleRequest {
+  amount: number;
+  cadenceUnit: CadenceUnit;
+  cadenceInterval: number;
+  anchorDate: string; // YYYY-MM-DD
+  netDays: number;
+  billingMode: BillingMode;
+  active: boolean;
+}
+
+// ---- Installment schedule (the full-term billing plan) ----------------------
+
+export type BillingInstallmentStatus = 'SCHEDULED' | 'INVOICED';
+
+// One installment in the deterministic full-term schedule. Same cadence math the
+// daily sweep uses, so it doesn't drift; `status` is INVOICED only once the
+// period has actually been minted. "Paid" is NOT here — it's a financial-service
+// concept; join to invoices on periodKey ⇿ invoice.billingPeriodKey.
+export interface BillingInstallmentResponse {
+  sequence: number; // 1-based "n of N"
+  periodKey: string; // join key to invoice.billingPeriodKey
+  periodStart: string;
+  periodEnd: string;
+  dueDate: string;
+  amount: number;
+  status: BillingInstallmentStatus;
 }
 
 export const agreementApi = {
@@ -416,10 +449,32 @@ export const agreementApi = {
     return response.data;
   },
 
-  // PENDING MERGE (PR4) — 404 when not deployed OR when no schedule is set.
+  // 404 only when no schedule is set on the agreement (callers degrade to the
+  // empty state, never an error).
   getBillingSchedule: async (id: string): Promise<BillingScheduleResponse> => {
     const response = await apiClient.get<BillingScheduleResponse>(
       `/work-orders/agreements/${id}/billing-schedule`,
+    );
+    return response.data;
+  },
+
+  // Create or replace the agreement's billing schedule. An active schedule
+  // begins generating installment invoices on the backend's daily sweep.
+  upsertBillingSchedule: async (
+    id: string,
+    request: UpsertBillingScheduleRequest,
+  ): Promise<BillingScheduleResponse> => {
+    const response = await apiClient.put<BillingScheduleResponse>(
+      `/work-orders/agreements/${id}/billing-schedule`,
+      request,
+    );
+    return response.data;
+  },
+
+  // Full-term installment schedule (ordered by date). [] = no billing set up.
+  getInstallments: async (id: string): Promise<BillingInstallmentResponse[]> => {
+    const response = await apiClient.get<BillingInstallmentResponse[]>(
+      `/work-orders/agreements/${id}/billing-schedule/installments`,
     );
     return response.data;
   },

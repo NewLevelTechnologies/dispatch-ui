@@ -91,6 +91,27 @@ describe('agreementApi', () => {
     expect(apiClient.get).toHaveBeenCalledWith('/work-orders/agreements/a-1/billing-schedule');
   });
 
+  it('upsertBillingSchedule PUTs the schedule to /billing-schedule', async () => {
+    const body = {
+      amount: 300,
+      cadenceUnit: 'QUARTER' as const,
+      cadenceInterval: 1,
+      anchorDate: '2026-07-01',
+      netDays: 30,
+      billingMode: 'FIXED_SCHEDULE' as const,
+      active: true,
+    };
+    await agreementApi.upsertBillingSchedule('a-1', body);
+    expect(apiClient.put).toHaveBeenCalledWith('/work-orders/agreements/a-1/billing-schedule', body);
+  });
+
+  it('getInstallments hits /billing-schedule/installments', async () => {
+    await agreementApi.getInstallments('a-1');
+    expect(apiClient.get).toHaveBeenCalledWith(
+      '/work-orders/agreements/a-1/billing-schedule/installments',
+    );
+  });
+
   it('create POSTs to /work-orders/agreements', async () => {
     const body = { customerId: 'c-1', name: 'Q PM', kind: 'VISIT' as const, classification: 'CONTRACT' as const };
     await agreementApi.create(body);

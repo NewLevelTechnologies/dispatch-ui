@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
 import { renderWithProviders } from '../test/utils';
 import AgreementDetailPage from './AgreementDetailPage';
-import { agreementApi, customerApi, dispatchesApi } from '../api';
+import { agreementApi, customerApi, dispatchesApi, invoicesApi } from '../api';
 
 vi.mock('../api', () => ({
   agreementApi: {
@@ -11,12 +11,23 @@ vi.mock('../api', () => ({
     getVisits: vi.fn(),
     getCompliance: vi.fn(),
     getBillingSchedule: vi.fn(),
+    getInstallments: vi.fn(),
     update: vi.fn(),
     cancel: vi.fn(),
     list: vi.fn(),
   },
   customerApi: { getServiceLocations: vi.fn() },
   dispatchesApi: { listForWorkOrder: vi.fn() },
+  invoicesApi: { getAll: vi.fn() },
+  // Const enum object — the billing/invoice surfaces build status→tone maps off it.
+  InvoiceStatus: {
+    DRAFT: 'DRAFT',
+    SENT: 'SENT',
+    PAID: 'PAID',
+    OVERDUE: 'OVERDUE',
+    CANCELLED: 'CANCELLED',
+    VOID: 'VOID',
+  },
 }));
 
 const agreement = {
@@ -81,6 +92,17 @@ describe('AgreementDetailPage', () => {
     // Pending-merge endpoints — default to 404 (rejected).
     vi.mocked(agreementApi.getCompliance).mockRejectedValue(new Error('404'));
     vi.mocked(agreementApi.getBillingSchedule).mockRejectedValue(new Error('404'));
+    // Billing installments + invoices default to empty (no schedule).
+    vi.mocked(agreementApi.getInstallments).mockResolvedValue([]);
+    vi.mocked(invoicesApi.getAll).mockResolvedValue({
+      content: [],
+      page: 0,
+      size: 25,
+      totalElements: 0,
+      totalPages: 0,
+      first: true,
+      last: true,
+    });
   });
 
   it('renders the header (name, number, customer) and the tab row', async () => {

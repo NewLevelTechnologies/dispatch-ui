@@ -27,6 +27,8 @@ const row = (over: Partial<InvoiceListPage['content'][number]>): InvoiceListPage
   customerName: 'Acme',
   serviceLocationId: null,
   workOrderId: null,
+  agreementId: null,
+  billingPeriodKey: null,
   invoiceDate: '2026-05-01',
   dueDate: '2026-05-31',
   totalAmount: 1250,

@@ -11,6 +11,7 @@ import {
   type CadenceUnit,
   type AgreementVisitsWhen,
 } from '../../api';
+import { titleCaseAddress } from '../../utils/titleCaseAddress';
 
 // id → location, for resolving the bare serviceLocationId on coverage + visit
 // rows to a human label without an N+1 storm. One customer-scoped list call.
@@ -158,11 +159,21 @@ export function daysUntil(value?: string | null): number | null {
 }
 
 // Resolve a serviceLocationId to a display label, tolerating a not-yet-loaded
-// map or a membership that outlived a deleted location.
+// map or a membership that outlived a deleted location. `sub` is the full
+// address, title-cased (DB stores it uppercase) — same shape as the canonical
+// location list: "<street> · <city>, ST <zip>".
 export function locationLabel(map: LocationMap | undefined, id: string): { name: string; sub: string } {
   const loc = map?.get(id);
   if (!loc) return { name: `Location ${id.slice(0, 8)}`, sub: '' };
-  const name = loc.locationName || loc.address?.streetAddress || `Location ${id.slice(0, 8)}`;
-  const sub = [loc.address?.city, loc.address?.state].filter(Boolean).join(', ');
-  return { name, sub };
+  const a = loc.address;
+  const street = titleCaseAddress([a?.streetAddress, a?.streetAddressLine2].filter(Boolean).join(' '));
+  // State code stays as-is (titleCaseAddress would lower-case "GA").
+  const cityLine = [titleCaseAddress(a?.city), [a?.state, a?.zipCode].filter(Boolean).join(' ')]
+    .filter(Boolean)
+    .join(', ');
+  if (loc.locationName) {
+    return { name: loc.locationName, sub: [street, cityLine].filter(Boolean).join(' · ') };
+  }
+  // No name → lead with the street; drop it from the sub so it isn't repeated.
+  return { name: street || `Location ${id.slice(0, 8)}`, sub: cityLine };
 }
