@@ -244,7 +244,13 @@ export interface AgreementVisitResponse {
 export interface AgreementComplianceSummary {
   agreementId: string;
   visitsFulfilled: number; // obligations completed
-  visitsTotal: number; // non-waived obligations (the "12 of 16" denominator)
+  // Obligations generated so far — reads LOW mid-term; NOT the "X / Y"
+  // denominator. Use visitsExpectedThisTerm for the term total.
+  visitsTotal: number;
+  // The full-term expected total (the "X / Y" denominator + % base). Null for
+  // open-ended agreements (no bounded term) → render X alone, no denominator.
+  // For a full-year term this equals the Coverage "/yr" projection.
+  visitsExpectedThisTerm: number | null;
   visitsOverdue: number; // past window, not fulfilled/waived
   visitsMissed: number; // hard-stamped missed
 }
