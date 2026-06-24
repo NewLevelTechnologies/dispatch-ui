@@ -47,8 +47,9 @@ import NotesCard from '../NotesCard';
 import CustomerEquipmentTab from './CustomerEquipmentTab';
 import CustomerWorkOrdersTab from './CustomerWorkOrdersTab';
 import CustomerInvoicesTab from './CustomerInvoicesTab';
+import CustomerAgreementsTab from '../CustomerAgreementsTab';
 import CustomerHeaderTags from './CustomerHeaderTags';
-import { BillingCard, AccountDetailsCard, CustomerHeaderEdit, AttentionStrip } from './MultiOverviewTab';
+import { BillingCard, AccountDetailsCard, CustomerHeaderEdit, AttentionStrip, AgreementsSummaryCard } from './MultiOverviewTab';
 import { buildAttentionItems } from './attention';
 import { useGoToInvoicesBucket } from './invoiceAgingNav';
 import { EquipmentSummaryCard } from '../detail/EquipmentSummaryCard';
@@ -58,8 +59,8 @@ import { formatDateShort } from './format';
 import { formatPhone } from '../../utils/formatPhone';
 import { titleCaseAddress } from '../../utils/titleCaseAddress';
 
-type TabId = 'overview' | 'equipment' | 'jobs' | 'invoices' | 'dispatches' | 'files' | 'activity';
-const SINGLE_TABS: readonly TabId[] = ['overview', 'equipment', 'jobs', 'invoices', 'dispatches', 'files', 'activity'];
+type TabId = 'overview' | 'equipment' | 'jobs' | 'agreements' | 'invoices' | 'dispatches' | 'files' | 'activity';
+const SINGLE_TABS: readonly TabId[] = ['overview', 'equipment', 'jobs', 'agreements', 'invoices', 'dispatches', 'files', 'activity'];
 
 // The single site's premise lives on the customer header as a pill. With edit
 // rights it flips to an inline toggle that writes straight through to the
@@ -248,6 +249,7 @@ export default function SingleCustomerDetail({ customer }: { customer: Customer 
     { id: 'overview', label: t('customers.tabs.overview') },
     { id: 'equipment', label: getName('equipment', true), count: equipmentPage?.totalElements },
     { id: 'jobs', label: getName('work_order', true) },
+    { id: 'agreements', label: getName('agreement', true), count: agreements.length },
     { id: 'invoices', label: getName('invoice', true), count: invoicesCount?.totalElements },
     { id: 'dispatches', label: getName('dispatch', true) },
     { id: 'files', label: 'Files' },
@@ -376,6 +378,8 @@ export default function SingleCustomerDetail({ customer }: { customer: Customer 
                     <SiteInstructionsCard location={location} canEdit={canEditCustomers} />
                     <SiteContactCard location={location} canEdit={canEditCustomers} onViewAll={() => setActiveTab('activity')} />
                     <AccountDetailsCard customer={customer} ar={arSummary} canEdit={canEditCustomers} />
+                    {/* Recurring revenue rollup — same right-rail card as MULTI. */}
+                    <AgreementsSummaryCard agreements={agreements} summary={agreementSummary} onViewAll={() => setActiveTab('agreements')} />
                   </div>
                 </div>
               )}
@@ -398,6 +402,8 @@ export default function SingleCustomerDetail({ customer }: { customer: Customer 
           {activeTab === 'jobs' && (
             <CustomerWorkOrdersTab customerId={customer.id} canCreate onNewJob={() => setIsNewWorkOrderOpen(true)} />
           )}
+
+          {activeTab === 'agreements' && <CustomerAgreementsTab customerId={customer.id} />}
 
           {activeTab === 'invoices' && <CustomerInvoicesTab customerId={customer.id} />}
 
