@@ -73,7 +73,7 @@ describe('AgreementPlanFormDialog', () => {
 
     await user.clear(nameInput);
     await user.type(nameInput, 'Comfort Club — Premium');
-    await user.click(within(dialog).getByRole('button', { name: /^save$/i }));
+    await user.click(within(dialog).getByRole('button', { name: /save changes/i }));
 
     await waitFor(() =>
       expect(apiClient.patch).toHaveBeenCalledWith(
