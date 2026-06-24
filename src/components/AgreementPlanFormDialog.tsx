@@ -187,29 +187,34 @@ export default function AgreementPlanFormDialog({ isOpen, onClose, plan }: Agree
               {/* Billing defaults (pre-fill only) */}
               <div>
                 <SectionLabel>Billing defaults · pre-fill only</SectionLabel>
-                <div className="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4">
-                  <Field size="xs">
+                <div className="mt-2 flex flex-wrap items-end gap-4">
+                  <Field size="xs" className="w-40">
                     <Label size="xs">Amount / period</Label>
                     <InputGroup>
                       <CurrencyDollarIcon data-slot="icon" />
-                      <Input size="xs" type="number" min={0} step="0.01" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="300" className="tabular-nums" />
+                      <Input size="xs" type="number" min={0} step="0.01" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0.00" className="tabular-nums" />
                     </InputGroup>
                   </Field>
+                  {/* One phrase — "Every [n] [unit]", unit pluralizes with n. */}
                   <Field size="xs">
-                    <Label size="xs">Every</Label>
-                    <Input size="xs" type="number" min={1} value={cadenceInterval} onChange={(e) => setCadenceInterval(e.target.value)} />
+                    <Label size="xs">Billing frequency</Label>
+                    <div className="flex items-center gap-2">
+                      <span className="shrink-0 text-[12.5px] text-fg-muted">Every</span>
+                      <div className="w-14 shrink-0">
+                        <Input size="xs" type="number" min={1} value={cadenceInterval} onChange={(e) => setCadenceInterval(e.target.value)} className="text-center tabular-nums" aria-label="Billing interval" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <Select value={cadenceUnit} onChange={(e) => setCadenceUnit(e.target.value as CadenceUnit)} aria-label="Billing cadence">
+                          {CADENCE_UNITS.map((u) => (
+                            <option key={u} value={u}>{cadenceUnitLabel(u, Number(cadenceInterval) || 1)}</option>
+                          ))}
+                        </Select>
+                      </div>
+                    </div>
                   </Field>
-                  <Field size="xs">
-                    <Label size="xs">Cadence</Label>
-                    <Select value={cadenceUnit} onChange={(e) => setCadenceUnit(e.target.value as CadenceUnit)}>
-                      {CADENCE_UNITS.map((u) => (
-                        <option key={u} value={u}>{cadenceUnitLabel(u, Number(cadenceInterval) || 1)}</option>
-                      ))}
-                    </Select>
-                  </Field>
-                  <Field size="xs">
+                  <Field size="xs" className="w-24">
                     <Label size="xs">Net days</Label>
-                    <Input size="xs" type="number" min={0} value={netDays} onChange={(e) => setNetDays(e.target.value)} />
+                    <Input size="xs" type="number" min={0} value={netDays} onChange={(e) => setNetDays(e.target.value)} className="tabular-nums" />
                   </Field>
                 </div>
               </div>
@@ -218,27 +223,28 @@ export default function AgreementPlanFormDialog({ isOpen, onClose, plan }: Agree
               <div>
                 <SectionLabel>Term defaults · pre-fill only</SectionLabel>
                 <div className="mt-2 flex flex-wrap items-end gap-4">
-                  <Field size="xs" className="w-32">
+                  <Field size="xs" className="w-40">
                     <Label size="xs">Term length (months)</Label>
-                    <Input size="xs" type="number" min={1} value={termMonths} onChange={(e) => setTermMonths(e.target.value)} placeholder="12" />
+                    <Input size="xs" type="number" min={1} value={termMonths} onChange={(e) => setTermMonths(e.target.value)} placeholder="12" className="tabular-nums" />
                   </Field>
                   <div className="flex items-center gap-2 pb-1.5">
                     <Switch checked={autoRenew} onChange={setAutoRenew} aria-label="Auto-renew" />
                     <span className="text-[12.5px] text-fg-strong">Auto-renew</span>
                   </div>
-                  {autoRenew && (
-                    <>
-                      <Field size="xs" className="w-32">
-                        <Label size="xs">Renewal term (months)</Label>
-                        <Input size="xs" type="number" min={1} value={renewalTermMonths} onChange={(e) => setRenewalTermMonths(e.target.value)} placeholder="12" />
-                      </Field>
-                      <Field size="xs" className="w-32">
-                        <Label size="xs">Renewal alert (days)</Label>
-                        <Input size="xs" type="number" min={0} value={renewalAlertDays} onChange={(e) => setRenewalAlertDays(e.target.value)} placeholder="90" />
-                      </Field>
-                    </>
-                  )}
                 </div>
+                {/* Progressive disclosure — contained panel, only when auto-renew is on. */}
+                {autoRenew && (
+                  <div className="mt-3 flex flex-wrap items-end gap-4 rounded-lg border border-border-soft bg-bg-elev-2 p-3">
+                    <Field size="xs" className="w-40">
+                      <Label size="xs">Renewal term (months)</Label>
+                      <Input size="xs" type="number" min={1} value={renewalTermMonths} onChange={(e) => setRenewalTermMonths(e.target.value)} placeholder="12" className="tabular-nums" />
+                    </Field>
+                    <Field size="xs" className="w-44">
+                      <Label size="xs">Renewal alert (days before)</Label>
+                      <Input size="xs" type="number" min={0} value={renewalAlertDays} onChange={(e) => setRenewalAlertDays(e.target.value)} placeholder="60" className="tabular-nums" />
+                    </Field>
+                  </div>
+                )}
               </div>
 
               {/* Member benefits (snapshotted at sale) */}
@@ -247,25 +253,28 @@ export default function AgreementPlanFormDialog({ isOpen, onClose, plan }: Agree
                 <Description size="xs" className="mt-1">
                   Stated entitlements, not auto-applied discounts. A human applies them at billing time.
                 </Description>
-                <div className="mt-2 flex flex-wrap items-end gap-x-4 gap-y-3">
+                <div className="mt-2 flex flex-wrap items-end gap-4">
                   <Field size="xs" className="w-36">
-                    <Label size="xs">PM visits covered</Label>
+                    <Label size="xs">{`PM ${getName('work_order', true).toLowerCase()} covered`}</Label>
                     {/* Blank = not specified (null), distinct from 0 — neutral placeholder. */}
-                    <Input size="xs" type="number" min={0} value={coveredPmVisits} onChange={(e) => setCoveredPmVisits(e.target.value)} placeholder="Any" />
+                    <Input size="xs" type="number" min={0} value={coveredPmVisits} onChange={(e) => setCoveredPmVisits(e.target.value)} placeholder="Any" className="tabular-nums" />
                   </Field>
                   <Field size="xs" className="w-32">
                     <Label size="xs">Labor discount %</Label>
-                    <Input size="xs" type="number" min={0} max={100} step="0.01" value={laborDiscountPct} onChange={(e) => setLaborDiscountPct(e.target.value)} placeholder="0" />
+                    <Input size="xs" type="number" min={0} max={100} step="0.01" value={laborDiscountPct} onChange={(e) => setLaborDiscountPct(e.target.value)} placeholder="0" className="tabular-nums" />
                   </Field>
                   <Field size="xs" className="w-32">
                     <Label size="xs">Parts discount %</Label>
-                    <Input size="xs" type="number" min={0} max={100} step="0.01" value={partsDiscountPct} onChange={(e) => setPartsDiscountPct(e.target.value)} placeholder="0" />
+                    <Input size="xs" type="number" min={0} max={100} step="0.01" value={partsDiscountPct} onChange={(e) => setPartsDiscountPct(e.target.value)} placeholder="0" className="tabular-nums" />
                   </Field>
-                  <div className="flex items-center gap-2 pb-1.5">
+                </div>
+                {/* Boolean inclusions on their own row below the inputs. */}
+                <div className="mt-3 flex flex-wrap items-center gap-x-6 gap-y-2">
+                  <div className="flex items-center gap-2">
                     <Switch checked={tripFeeWaived} onChange={setTripFeeWaived} aria-label="Trip fee waived" />
                     <span className="text-[12.5px] text-fg-strong">Trip fee waived</span>
                   </div>
-                  <div className="flex items-center gap-2 pb-1.5">
+                  <div className="flex items-center gap-2">
                     <Switch checked={priorityDispatch} onChange={setPriorityDispatch} aria-label="Priority dispatch" />
                     <span className="text-[12.5px] text-fg-strong">Priority dispatch</span>
                   </div>
