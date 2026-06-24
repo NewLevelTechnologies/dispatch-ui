@@ -45,6 +45,7 @@ import {
 } from '../lib/locationActivityRows';
 import { resolveEventSummary } from './activityFormatters';
 import { roleColor } from '../utils/roleColor';
+import { LoadingState } from './ui/LoadingState';
 
 const PAGE_SIZE = 50;
 // ISO-8601 instants at differing precision don't compare correctly as strings
@@ -355,13 +356,7 @@ export default function LocationActivityStream({ serviceLocationId, customerId }
 
       <div className="card">
         <div className="card-body flush">
-          {isLoading && (
-            <div style={{ padding: '24px 20px', textAlign: 'center' }}>
-              <span className="text-sm" style={{ color: 'var(--fg-muted)' }}>
-                {t('serviceLocations.activity.loading')}
-              </span>
-            </div>
-          )}
+          {isLoading && <LoadingState label={t('serviceLocations.activity.loading')} />}
           {error && (
             <div style={{ padding: '24px 20px', textAlign: 'center' }}>
               <span className="text-sm text-danger-500">

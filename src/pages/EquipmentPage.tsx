@@ -20,6 +20,7 @@ import { titleCaseAddress } from '../utils/titleCaseAddress';
 import { Button } from '../components/catalyst/button';
 import { PageHead } from '../components/ui/PageHead';
 import { Card, CardBody } from '../components/ui/Card';
+import { LoadingState } from '../components/ui/LoadingState';
 import { Pill } from '../components/ui/Pill';
 import { ViewTabs } from '../components/ui/Tabs';
 import {
@@ -283,10 +284,8 @@ export default function EquipmentPage() {
 
         {isLoading ? (
           <Card>
-            <CardBody>
-              <p className="text-center text-[12.5px] text-fg-muted">
-                {t('common.actions.loading', { entities: getName('equipment', true) })}
-              </p>
+            <CardBody flush>
+              <LoadingState label={t('common.actions.loading', { entities: getName('equipment', true) })} />
             </CardBody>
           </Card>
         ) : equipment.length === 0 ? (

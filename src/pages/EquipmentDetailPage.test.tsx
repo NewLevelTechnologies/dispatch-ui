@@ -216,10 +216,10 @@ describe('EquipmentDetailPage', () => {
     mockCustomerGetById.mockResolvedValue({ id: 'c-1', name: 'Acme Corp' });
   });
 
-  it('shows loading state while equipment loads', () => {
+  it('shows loading state while equipment loads', async () => {
     mockGetById.mockImplementation(() => new Promise(() => {}));
     renderPage();
-    expect(screen.getByText(/loading equipment/i)).toBeInTheDocument();
+    expect(await screen.findByText(/loading equipment/i)).toBeInTheDocument();
   });
 
   it('shows error state when fetch fails', async () => {

@@ -9,6 +9,7 @@ import { Button } from '../components/catalyst/button';
 import { Input } from '../components/catalyst/input';
 import { PageHead } from '../components/ui/PageHead';
 import { Card, CardBody } from '../components/ui/Card';
+import { LoadingState } from '../components/ui/LoadingState';
 import { Pill } from '../components/ui/Pill';
 import {
   DenseTable, DenseTHead, DenseRow,
@@ -65,7 +66,7 @@ export default function PaymentsPage() {
   const { data: customers = [] } = useQuery({
     queryKey: ['payment-form-customers'],
     queryFn: async () => {
-      const page = await customerApi.getAllPaginated({ limit: 200, status: ['ACTIVE'] });
+      const page = await customerApi.getAllPaginated({ size: 200, status: ['ACTIVE'] });
       return page.content;
     },
   });
@@ -224,10 +225,8 @@ export default function PaymentsPage() {
 
         {paymentsLoading ? (
           <Card>
-            <CardBody>
-              <p className="text-center text-[12.5px] text-fg-muted">
-                {t('common.actions.loading', { entities: getName('payment', true) })}
-              </p>
+            <CardBody flush>
+              <LoadingState label={t('common.actions.loading', { entities: getName('payment', true) })} />
             </CardBody>
           </Card>
         ) : filteredPayments.length === 0 ? (

@@ -14,6 +14,7 @@ import { DenseTable, DenseTHead, DenseRow } from './ui/DenseTable';
 import { Pill } from './ui/Pill';
 import { AssignedUsersCell } from './ui/AssignedUsersCell';
 import { ListFooter } from './ui/ListFooter';
+import { LoadingState } from './ui/LoadingState';
 import { useUrlPage } from '../hooks/useUrlPage';
 import { formatTimestamp } from '../lib/formatTimestamp';
 import { WorkOrderTypePill } from './ui/WorkOrderTypePill';
@@ -150,7 +151,7 @@ export default function EquipmentServiceHistoryTab({ equipmentId }: { equipmentI
           Couldn’t load service history.
         </div>
       ) : isLoading ? (
-        <div className="px-3.5 py-10 text-center text-[12px] text-fg-muted">Loading…</div>
+        <LoadingState />
       ) : rows.length === 0 ? (
         <div className="rounded-[10px] border border-dashed border-border px-3.5 py-10 text-center text-[12px] text-fg-muted">
           No work orders for this unit.

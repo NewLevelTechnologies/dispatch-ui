@@ -32,6 +32,7 @@ import { AssignedUsersCell } from '../ui/AssignedUsersCell';
 import { FilterChipListbox, ChipListboxOption } from '../ui/FilterChipListbox';
 import { DateRangeChip } from '../ui/DateRangeChip';
 import { ListFooter } from '../ui/ListFooter';
+import { LoadingState } from '../ui/LoadingState';
 import { useUrlPage } from '../../hooks/useUrlPage';
 
 type PillTone = 'neutral' | 'info' | 'success' | 'warning';
@@ -265,9 +266,7 @@ export default function CustomerWorkOrdersTab({
 
       <Card padding="none">
         {isLoading ? (
-          <div className="px-3.5 py-10 text-center text-[12px] text-fg-muted">
-            {t('common.actions.loading', { entities: getName('work_order', true) })}
-          </div>
+          <LoadingState label={t('common.actions.loading', { entities: getName('work_order', true) })} />
         ) : rows.length === 0 ? (
           <div className="px-5 py-10 text-center">
             <div className="text-[13px] font-semibold text-fg-strong">

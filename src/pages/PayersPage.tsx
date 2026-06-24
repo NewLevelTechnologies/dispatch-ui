@@ -107,7 +107,7 @@ export default function PayersPage() {
     queryKey: ['payers', page, deferredSearch, sortParam],
     // Omit `sort` → BE default outstanding,desc (the bookkeeper triage order).
     queryFn: () =>
-      customerApi.getPayers({ page, limit: PAGE_SIZE, search: deferredSearch || undefined, sort: sortParam || undefined }),
+      customerApi.getPayers({ page, size: PAGE_SIZE, search: deferredSearch || undefined, sort: sortParam || undefined }),
   });
 
   const payers = data?.content ?? [];

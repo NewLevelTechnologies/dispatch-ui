@@ -11,6 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '.
 import { Badge } from '../components/catalyst/badge';
 import { Dropdown, DropdownButton, DropdownItem, DropdownLabel, DropdownMenu } from '../components/catalyst/dropdown';
 import IconButton from '../components/IconButton';
+import { LoadingState } from '../components/ui/LoadingState';
 import { Dialog, DialogActions, DialogBody, DialogDescription, DialogTitle } from '../components/catalyst/dialog';
 import { Field, FieldGroup, Fieldset, Label } from '../components/catalyst/fieldset';
 import { Input, InputGroup } from '../components/catalyst/input';
@@ -239,10 +240,8 @@ export default function DispatchesPage() {
       )}
 
       {isLoading ? (
-        <div className="mt-4 text-center">
-          <p className="text-sm text-zinc-600 dark:text-zinc-400">
-            {t('common.actions.loading', { entities: getName('dispatch', true) })}
-          </p>
+        <div className="mt-4">
+          <LoadingState label={t('common.actions.loading', { entities: getName('dispatch', true) })} />
         </div>
       ) : safeDispatches.length === 0 ? (
         <div className="mt-4 rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700 p-4">

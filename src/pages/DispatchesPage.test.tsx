@@ -69,12 +69,12 @@ describe('DispatchesPage', () => {
     });
   });
 
-  it('displays loading state', () => {
+  it('displays loading state', async () => {
     mockDispatchesGetAll.mockImplementation(() => new Promise(() => {}));
 
     renderWithProviders(<DispatchesPage />);
 
-    expect(screen.getByText('Loading dispatches...')).toBeInTheDocument();
+    expect(await screen.findByText('Loading dispatches...')).toBeInTheDocument();
   });
 
   it('displays dispatches in a table', async () => {

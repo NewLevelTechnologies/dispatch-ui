@@ -77,12 +77,12 @@ describe('RecurringOrdersPage', () => {
     });
   });
 
-  it('displays loading state', () => {
+  it('displays loading state', async () => {
     mockRecurringOrdersGetAll.mockImplementation(() => new Promise(() => {}));
 
     renderWithProviders(<RecurringOrdersPage />);
 
-    expect(screen.getByText('Loading recurring orders...')).toBeInTheDocument();
+    expect(await screen.findByText('Loading recurring orders...')).toBeInTheDocument();
   });
 
   it('displays recurring orders in a table', async () => {

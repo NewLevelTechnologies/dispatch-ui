@@ -19,6 +19,7 @@ import {
 } from '../../api';
 import { useHasCapability } from '../../hooks/useCurrentUser';
 import { PageHead } from '../../components/ui/PageHead';
+import { LoadingState } from '../../components/ui/LoadingState';
 import { EditableCard } from '../../components/ui/EditableCard';
 import { Card } from '../../components/catalyst/card';
 import ConfirmDialog from '../../components/ConfirmDialog';
@@ -121,7 +122,7 @@ export default function CompanyProfilePanel() {
             {extractApiError(error) ?? (error as Error).message}
           </Callout>
         ) : (
-          <Text tone="muted">Loading settings…</Text>
+          <LoadingState label="Loading settings…" />
         )
       ) : (
         <div className="flex max-w-[920px] flex-col gap-3.5">

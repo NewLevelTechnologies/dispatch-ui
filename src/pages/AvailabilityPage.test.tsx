@@ -54,12 +54,12 @@ describe('AvailabilityPage', () => {
     });
   });
 
-  it('displays loading state', () => {
+  it('displays loading state', async () => {
     mockAvailabilityGetAll.mockImplementation(() => new Promise(() => {}));
 
     renderWithProviders(<AvailabilityPage />);
 
-    expect(screen.getByText('Loading availability...')).toBeInTheDocument();
+    expect(await screen.findByText('Loading availability...')).toBeInTheDocument();
   });
 
   it('displays availability in a table', async () => {

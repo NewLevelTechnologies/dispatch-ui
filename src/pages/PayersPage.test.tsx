@@ -51,7 +51,7 @@ describe('PayersPage', () => {
     expect(screen.getByText('$285k')).toBeInTheDocument(); // lifetime, compact
     expect(apiClient.get).toHaveBeenCalledWith(
       '/customers/payers',
-      expect.objectContaining({ params: expect.objectContaining({ page: 1 }) }),
+      expect.objectContaining({ params: expect.objectContaining({ page: 0 }) }),
     );
   });
 

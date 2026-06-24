@@ -9,6 +9,7 @@ import { titleCaseAddress } from '../utils/titleCaseAddress';
 import { Button } from '../components/catalyst/button';
 import { PageHead } from '../components/ui/PageHead';
 import { Card, CardBody } from '../components/ui/Card';
+import { LoadingState } from '../components/ui/LoadingState';
 import { Pill } from '../components/ui/Pill';
 import {
   DenseTable, DenseTHead, DenseRow,
@@ -189,10 +190,8 @@ export default function WarehousesPage() {
 
         {isLoading ? (
           <Card>
-            <CardBody>
-              <p className="text-center text-[12.5px] text-fg-muted">
-                {t('common.actions.loading', { entities: t('equipment.entities.warehouses') })}
-              </p>
+            <CardBody flush>
+              <LoadingState label={t('common.actions.loading', { entities: t('equipment.entities.warehouses') })} />
             </CardBody>
           </Card>
         ) : safeWarehouses.length === 0 ? (

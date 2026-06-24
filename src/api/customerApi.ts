@@ -519,7 +519,7 @@ export const customerApi = {
   // Paginated list (BREAKING: was getAll returning Customer[])
   getAllPaginated: async (params?: {
     page?: number;     // 1-indexed for UI, converted to 0-indexed for API
-    limit?: number;
+    size?: number;
     // Status is multi-value — caller passes the array of selected statuses
     // from the StatusPickerChip. Serialized as a single comma-separated
     // value on the wire (?status=ACTIVE,INACTIVE) to match the BE contract.
@@ -536,7 +536,7 @@ export const customerApi = {
   }): Promise<CustomerListResponse> => {
     const apiParams: Record<string, string | number | boolean | undefined> = {
       page: params?.page ? params.page - 1 : 0,  // Convert to 0-indexed
-      limit: params?.limit,
+      size: params?.size,
       status:
         params?.status && params.status.length > 0
           ? params.status.join(',')
@@ -565,19 +565,19 @@ export const customerApi = {
   // Payers list — BILLING_ONLY customers, enriched with the per-row AR
   // financials (PAYERS-LIST-1: openBalanceTotal / aged91Total / openInvoiceCount
   // / lifetimePaid / lastPaymentAt+Amount / currency). Same response shape as
-  // getAllPaginated. NOTE: this route's `page` is 1-indexed (default 1) — do NOT
-  // -1 it like /customers. Omit `sort` to get the bookkeeper default
-  // (outstanding,desc). Sort keys: outstanding | aged91 | openInvoices |
+  // getAllPaginated. `page` is 1-indexed for UI, converted to 0-indexed for the
+  // API (same convention as /customers). Omit `sort` to get the bookkeeper
+  // default (outstanding,desc). Sort keys: outstanding | aged91 | openInvoices |
   // lifetimePaid | lastPayment | name | terms | createdAt.
   getPayers: async (params?: {
-    page?: number;     // 1-indexed
-    limit?: number;
+    page?: number;     // 1-indexed for UI, converted to 0-indexed for API
+    size?: number;
     search?: string;
     sort?: string;     // "<key>,<asc|desc>"
   }): Promise<CustomerListResponse> => {
     const apiParams: Record<string, string | number | undefined> = {
-      page: params?.page ?? 1,
-      limit: params?.limit,
+      page: params?.page ? params.page - 1 : 0,  // Convert to 0-indexed
+      size: params?.size,
       search: params?.search,
       sort: params?.sort,
     };
@@ -689,7 +689,7 @@ export const customerApi = {
   // New paginated service locations list
   getAllServiceLocationsPaginated: async (params?: {
     page?: number;     // 1-indexed for UI
-    limit?: number;
+    size?: number;
     // Status is multi-value — caller passes the array from StatusPickerChip
     // (e.g. ['ACTIVE', 'INACTIVE']). Serialized comma-separated on the wire.
     status?: Array<'ACTIVE' | 'INACTIVE' | 'CLOSED'>;
@@ -710,7 +710,7 @@ export const customerApi = {
   }): Promise<ServiceLocationListResponse> => {
     const apiParams: Record<string, string | number | boolean | undefined> = {
       page: params?.page ? params.page - 1 : 0,  // Convert to 0-indexed
-      limit: params?.limit,
+      size: params?.size,
       status:
         params?.status && params.status.length > 0
           ? params.status.join(',')

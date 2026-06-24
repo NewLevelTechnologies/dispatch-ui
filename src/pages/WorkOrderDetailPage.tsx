@@ -41,6 +41,7 @@ import { formatExactTimestamp, formatTimestamp } from '../lib/formatTimestamp';
 import { TimeAgo } from '../components/TimeAgo';
 import { Heading } from '../components/catalyst/heading';
 import { Text } from '../components/catalyst/text';
+import { LoadingState } from '../components/ui/LoadingState';
 import { Button } from '../components/catalyst/button';
 import { Badge } from '../components/catalyst/badge';
 import {
@@ -544,9 +545,7 @@ export default function WorkOrderDetailPage() {
   if (isLoading) {
     return (
       <AppLayout>
-        <div className="p-8 text-center">
-          <Text>{t('common.actions.loading', { entities: getName('work_order', true) })}</Text>
-        </div>
+        <LoadingState label={t('common.actions.loading', { entities: getName('work_order', true) })} />
       </AppLayout>
     );
   }

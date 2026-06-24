@@ -27,6 +27,7 @@ import { DenseTable, DenseTHead, DenseRow } from '../ui/DenseTable';
 import { SortHeader, type SortState } from '../ui/SortHeader';
 import { FilterChipListbox, ChipListboxOption } from '../ui/FilterChipListbox';
 import { ListFooter } from '../ui/ListFooter';
+import { LoadingState } from '../ui/LoadingState';
 import { useUrlPage } from '../../hooks/useUrlPage';
 import { formatDateShort, formatMoney } from './format';
 
@@ -212,9 +213,7 @@ export default function CustomerInvoicesTab({ customerId }: { customerId: string
 
       <Card padding="none">
         {isLoading ? (
-          <div className="px-3.5 py-10 text-center text-[12px] text-fg-muted">
-            {t('common.actions.loading', { entities: getName('invoice', true) })}
-          </div>
+          <LoadingState label={t('common.actions.loading', { entities: getName('invoice', true) })} />
         ) : rows.length === 0 ? (
           <div className="px-5 py-10 text-center">
             <div className="text-[13px] font-semibold text-fg-strong">

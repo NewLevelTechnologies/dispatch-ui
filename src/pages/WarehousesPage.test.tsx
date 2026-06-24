@@ -60,12 +60,12 @@ describe('WarehousesPage', () => {
     });
   });
 
-  it('displays loading state', () => {
+  it('displays loading state', async () => {
     mockGetAll.mockImplementation(() => new Promise(() => {}));
 
     renderWithProviders(<WarehousesPage />);
 
-    expect(screen.getByText('Loading warehouses...')).toBeInTheDocument();
+    expect(await screen.findByText('Loading warehouses...')).toBeInTheDocument();
   });
 
   it('displays warehouses in a table', async () => {
@@ -73,10 +73,8 @@ describe('WarehousesPage', () => {
 
     renderWithProviders(<WarehousesPage />);
 
-    // Wait for data to load - just check that we're past loading state
-    await waitFor(() => {
-      expect(screen.queryByText('Loading warehouses...')).not.toBeInTheDocument();
-    });
+    // Wait for data to load
+    await screen.findByText('Main Warehouse');
 
     // Verify warehouse names are displayed
     expect(screen.getByText('Main Warehouse')).toBeInTheDocument();
@@ -143,9 +141,7 @@ describe('WarehousesPage', () => {
 
     renderWithProviders(<WarehousesPage />);
 
-    await waitFor(() => {
-      expect(screen.queryByText('Loading warehouses...')).not.toBeInTheDocument();
-    });
+    await screen.findByText('Main Warehouse');
 
     // Check that warehouse names are displayed
     expect(screen.getByText('Main Warehouse')).toBeInTheDocument();
@@ -160,9 +156,7 @@ describe('WarehousesPage', () => {
 
     renderWithProviders(<WarehousesPage />);
 
-    await waitFor(() => {
-      expect(screen.queryByText('Loading warehouses...')).not.toBeInTheDocument();
-    });
+    await screen.findAllByRole('button', { name: /more options/i });
 
     const dropdownButtons = screen.getAllByRole('button', { name: /more options/i });
     await user.click(dropdownButtons[0]);
@@ -210,9 +204,7 @@ describe('WarehousesPage', () => {
 
     renderWithProviders(<WarehousesPage />);
 
-    await waitFor(() => {
-      expect(screen.queryByText('Loading warehouses...')).not.toBeInTheDocument();
-    });
+    await screen.findAllByRole('button', { name: /more options/i });
 
     const dropdownButtons = screen.getAllByRole('button', { name: /more options/i });
     await user.click(dropdownButtons[0]);
@@ -407,9 +399,7 @@ describe('WarehousesPage', () => {
 
     renderWithProviders(<WarehousesPage />);
 
-    await waitFor(() => {
-      expect(screen.queryByText('Loading warehouses...')).not.toBeInTheDocument();
-    });
+    await screen.findAllByRole('button', { name: /more options/i });
 
     const dropdownButtons = screen.getAllByRole('button', { name: /more options/i });
     await user.click(dropdownButtons[0]);

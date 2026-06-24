@@ -58,6 +58,7 @@ import { Dropdown, DropdownButton, DropdownItem, DropdownLabel, DropdownMenu } f
 import { FilterChipListbox, ChipListboxOption } from './ui/FilterChipListbox';
 import { Pill } from './ui/Pill';
 import { Callout } from './ui/Callout';
+import { LoadingState } from './ui/LoadingState';
 import IconButton from './IconButton';
 import LocationFileUploadDialog from './LocationFileUploadDialog';
 
@@ -371,7 +372,7 @@ export default function LocationFilesTab({
 
       {isLoading ? (
         <Card padding="none">
-          <div className="px-3.5 py-6 text-center text-[12px] text-fg-muted">Loading files…</div>
+          <LoadingState label="Loading files…" />
         </Card>
       ) : merged.length === 0 ? (
         <Card padding="none">

@@ -552,7 +552,9 @@ describe('CustomersPage', () => {
       await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
 
       await user.click(screen.getByRole('button', { name: /openBalance/i }));
-      await user.click(screen.getByRole('button', { name: /openJobs/i }));
+      // Scope to the filter chip's aria-label — the Open Jobs column now also
+      // renders a sortable header button whose label matches /openJobs/i.
+      await user.click(screen.getByRole('button', { name: /filter\.openJobs/i }));
       await user.click(screen.getByRole('button', { name: /\.aged/i }));
 
       // Each toggle pushes an axios query param the next fetch must carry.
