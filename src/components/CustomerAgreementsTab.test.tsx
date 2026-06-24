@@ -6,8 +6,10 @@ import { agreementApi } from '../api';
 
 vi.mock('../api', () => ({
   agreementApi: { list: vi.fn(), create: vi.fn() },
-  // The create form fetches active plans for its sell-from-plan picker.
-  agreementPlanApi: { getAll: vi.fn().mockResolvedValue([]) },
+  // The create form fetches active plans (paginated) for its sell-from-plan picker.
+  agreementPlanApi: {
+    getAll: vi.fn().mockResolvedValue({ content: [], totalElements: 0, totalPages: 0, number: 0, size: 200 }),
+  },
 }));
 
 const agreements = [

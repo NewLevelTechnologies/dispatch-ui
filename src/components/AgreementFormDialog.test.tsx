@@ -23,7 +23,9 @@ const plan = {
 describe('AgreementFormDialog — sell from a plan', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(agreementPlanApi.getAll).mockResolvedValue([plan] as never);
+    vi.mocked(agreementPlanApi.getAll).mockResolvedValue({
+      content: [plan], totalElements: 1, totalPages: 1, number: 0, size: 200,
+    } as never);
     vi.mocked(agreementApi.create).mockResolvedValue({ id: 'a-9' } as never);
   });
 

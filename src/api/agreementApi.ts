@@ -406,6 +406,27 @@ export interface UpdateAgreementPlanRequest {
   benefits?: MemberBenefits;
 }
 
+// Spring Page envelope from GET /agreement-plans. Drive the pager off
+// totalPages/totalElements/number — not content.length.
+export interface AgreementPlanPage {
+  content: AgreementPlanResponse[];
+  totalElements: number;
+  totalPages: number;
+  number: number; // zero-based current page
+  size: number;
+}
+
+// All optional. `active`: true = active/sellable only, false = archived only,
+// OMIT = all. `sortBy` is whitelisted server-side (unknown → name). size ≤ 200.
+export interface ListAgreementPlansParams {
+  search?: string;
+  active?: boolean;
+  sortBy?: 'name' | 'createdAt' | 'updatedAt' | 'defaultAmount';
+  sortDir?: 'asc' | 'desc';
+  page?: number; // zero-based
+  size?: number;
+}
+
 export const agreementApi = {
   // List — `classification` defaults to CONTRACT (the commercial-agreements
   // list). `customerId` scopes to one customer's Agreements tab.
@@ -606,10 +627,11 @@ export const agreementApi = {
 // unless includeInactive. Used by the plan-management settings surface and the
 // sell-from-plan create flow.
 export const agreementPlanApi = {
-  getAll: async (includeInactive = false): Promise<AgreementPlanResponse[]> => {
-    const response = await apiClient.get<AgreementPlanResponse[]>('/work-orders/agreement-plans', {
-      params: includeInactive ? { includeInactive: true } : undefined,
-    });
+  // Paginated + searchable + sortable. Pass active:undefined to show all
+  // (management table); active:true for the sell-from-plan picker. Axios drops
+  // undefined params, so omitting active really omits it.
+  getAll: async (params?: ListAgreementPlansParams): Promise<AgreementPlanPage> => {
+    const response = await apiClient.get<AgreementPlanPage>('/work-orders/agreement-plans', { params });
     return response.data;
   },
   getById: async (id: string): Promise<AgreementPlanResponse> => {
