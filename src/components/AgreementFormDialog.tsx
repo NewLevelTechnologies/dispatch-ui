@@ -66,12 +66,14 @@ export default function AgreementFormDialog({ isOpen, onClose, agreement, custom
   const [planTermMonths, setPlanTermMonths] = useState<number | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  // Active plans to sell from (create only). Shares the panel's cache key.
-  const { data: activePlans } = useQuery({
-    queryKey: ['agreement-plans', false],
-    queryFn: () => agreementPlanApi.getAll(false),
+  // Active plans to sell from (create only). size 200 = the server cap; a
+  // dropdown of active plans realistically stays well under that in v1.
+  const { data: plansPage } = useQuery({
+    queryKey: ['agreement-plans', { active: true, size: 200 }],
+    queryFn: () => agreementPlanApi.getAll({ active: true, size: 200, sortBy: 'name', sortDir: 'asc' }),
     enabled: isOpen && !isEdit,
   });
+  const activePlans = plansPage?.content;
 
   /* eslint-disable react-hooks/set-state-in-effect -- form initialization on open */
   useEffect(() => {

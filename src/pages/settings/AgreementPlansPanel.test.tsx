@@ -31,7 +31,10 @@ const mockPlans = [
 describe('AgreementPlansPanel', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(apiClient.get).mockResolvedValue({ data: mockPlans } as never);
+    // GET /agreement-plans now returns a Spring Page envelope.
+    vi.mocked(apiClient.get).mockResolvedValue({
+      data: { content: mockPlans, totalElements: mockPlans.length, totalPages: 1, number: 0, size: 25 },
+    } as never);
   });
 
   it('lists plans with billing defaults, a benefits summary, and status', async () => {
@@ -69,6 +72,37 @@ describe('AgreementPlansPanel', () => {
 
     await waitFor(() =>
       expect(apiClient.delete).toHaveBeenCalledWith(expect.stringContaining('/agreement-plans/p-1')),
+    );
+  });
+
+  it('sends search, active, sort, and paging params to the server', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<AgreementPlansPanel />);
+    await waitFor(() => expect(screen.getByText('Comfort Club — Residential')).toBeInTheDocument());
+
+    // Initial load: active-only (archived hidden), sorted by name asc, page 0.
+    expect(apiClient.get).toHaveBeenCalledWith(
+      '/work-orders/agreement-plans',
+      expect.objectContaining({
+        params: expect.objectContaining({ active: true, sortBy: 'name', sortDir: 'asc', page: 0, size: 25 }),
+      }),
+    );
+
+    await user.type(screen.getByPlaceholderText(/search plans/i), 'comfort');
+    await waitFor(() =>
+      expect(apiClient.get).toHaveBeenCalledWith(
+        '/work-orders/agreement-plans',
+        expect.objectContaining({ params: expect.objectContaining({ search: 'comfort', page: 0 }) }),
+      ),
+    );
+
+    // "Show archived" omits the active filter (show all).
+    await user.click(screen.getByRole('switch', { name: /show archived/i }));
+    await waitFor(() =>
+      expect(apiClient.get).toHaveBeenCalledWith(
+        '/work-orders/agreement-plans',
+        expect.objectContaining({ params: expect.objectContaining({ active: undefined }) }),
+      ),
     );
   });
 });

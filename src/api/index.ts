@@ -177,6 +177,8 @@ export {
   type RevenueRecognitionResponse,
   type MemberBenefits,
   type AgreementPlanResponse,
+  type AgreementPlanPage,
+  type ListAgreementPlansParams,
   type CreateAgreementPlanRequest,
   type UpdateAgreementPlanRequest,
 } from './agreementApi';
