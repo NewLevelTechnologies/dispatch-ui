@@ -13,6 +13,7 @@
 // Field names below are the exact wire names from the response DTOs.
 import apiClient from './client';
 import type { CreateNoteRequest, NoteDto, UpdateNoteRequest } from './noteApi';
+import type { RecognitionBasis } from './tenantSettingsApi';
 
 // ---- Enums (string unions matching the BE) ----------------------------------
 
@@ -307,11 +308,19 @@ export interface BillingInstallmentResponse {
 // $0). Recognized accrues as visits/work orders complete; deferred is the
 // unearned remainder.
 export interface RevenueRecognitionResponse {
+  // The basis the backend actually computed with (mirrors the tenant's
+  // revenueRecognitionBasis setting). The UI anchors its labels to THIS, not
+  // the setting, so the block always describes the numbers it's showing:
+  // STRAIGHT_LINE → time-elapsed ("ratably over the term", no visit count);
+  // PER_VISIT → "X of N work orders complete". Absent ⇒ STRAIGHT_LINE.
+  basis: RecognitionBasis;
   contractValue: number | null;
   recognizedToDate: number;
   deferred: number;
   visitsFulfilled: number;
-  visitsTotal: number;
+  // Term total (the "X of Y" denominator); matches /compliance's
+  // visitsExpectedThisTerm so the two cards agree. Null for open-ended terms.
+  visitsExpectedThisTerm: number | null;
 }
 
 export const agreementApi = {

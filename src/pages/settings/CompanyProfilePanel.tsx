@@ -15,13 +15,17 @@ import {
   type TenantSettings,
   type UpdateTenantSettingsRequest,
   type PremiseType,
+  type RecognitionBasis,
 } from '../../api';
 import { useHasCapability } from '../../hooks/useCurrentUser';
 import { PageHead } from '../../components/ui/PageHead';
 import { EditableCard } from '../../components/ui/EditableCard';
+import { Card } from '../../components/catalyst/card';
+import ConfirmDialog from '../../components/ConfirmDialog';
 import { Callout } from '../../components/ui/Callout';
 import { ToggleGroup, ToggleGroupOption } from '../../components/ui/ToggleGroup';
 import { PremiseMark } from '../../components/ui/PremiseMark';
+import { Dialog, DialogTitle, DialogDescription, DialogBody, DialogActions } from '../../components/catalyst/dialog';
 import { Field, Label, Description } from '../../components/catalyst/fieldset';
 import { Switch } from '../../components/catalyst/switch';
 import { Input } from '../../components/catalyst/input';
@@ -124,8 +128,7 @@ export default function CompanyProfilePanel() {
           <IdentityCard settings={settings} canEdit={canEdit} />
           <OperatingCard settings={settings} canEdit={canEdit} />
           <BrandingCard settings={settings} canEdit={canEdit} />
-          <AiFeaturesCard settings={settings} canEdit={canEdit} />
-          <NotificationsCard settings={settings} canEdit={canEdit} />
+          <PreferencesCard settings={settings} canEdit={canEdit} />
         </div>
       )}
     </>
@@ -480,171 +483,214 @@ function OperatingCard({ settings, canEdit }: { settings: TenantSettings; canEdi
 }
 
 // ──────────────────────────────────────────────────────────────────
-// Card — AI features (tenant-wide enablement toggle)
+// Card — Features & preferences (single-switch settings, consolidated)
+//
+// Three app-wide booleans — Revenue recognition, AI features, Notifications —
+// each used to be its own full EditableCard spending ~110px (header +
+// paragraph + labeled value + Edit) to show one on/off word. Here they're rows
+// that flip in place and persist immediately (optimistic, rolled back on
+// error) — no Edit→Save ceremony for a boolean. Revenue recognition reveals a
+// "Configure basis →" affordance only when ON (straight-line / per-visit
+// dialog); turning Notifications OFF confirms first (it silences all comms).
+// As more app-wide booleans appear, add rows here rather than minting cards.
 // ──────────────────────────────────────────────────────────────────
-function AiFeaturesCard({ settings, canEdit }: { settings: TenantSettings; canEdit: boolean }) {
+const RECOGNITION_BASIS_LABEL: Record<RecognitionBasis, string> = {
+  STRAIGHT_LINE: 'Straight-line',
+  PER_VISIT: 'Per-visit',
+};
+
+function PreferencesCard({ settings, canEdit }: { settings: TenantSettings; canEdit: boolean }) {
   const queryClient = useQueryClient();
-  const [editing, setEditing] = useState(false);
-  // Absent on older responses — treat undefined as off.
-  const current = settings.enableAiFeatures ?? false;
-  const [enabled, setEnabled] = useState(current);
+  const [basisOpen, setBasisOpen] = useState(false);
+  // Turning off ALL outbound email/SMS is the one destructive toggle here, so
+  // it confirms before flipping (the other two flip silently). This isn't the
+  // Edit→Save ceremony the consolidation removed — it's a guard on a
+  // high-consequence, easy-to-forget state.
+  const [confirmNotifOff, setConfirmNotifOff] = useState(false);
 
-  useEffect(() => {
-    if (!editing) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setEnabled(current);
-    }
-  }, [current, editing]);
+  // Absent on older responses — undefined ⇒ off / straight-line.
+  const recognitionOn = settings.revenueRecognitionEnabled ?? false;
+  const aiOn = settings.enableAiFeatures ?? false;
+  const notificationsOn = settings.enableExternalNotifications;
+  const basis = settings.revenueRecognitionBasis ?? 'STRAIGHT_LINE';
 
-  const dirty = enabled !== current;
-
-  const saveMutation = useMutation({
-    mutationFn: () => tenantSettingsApi.updateSettings({ enableAiFeatures: enabled }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tenant-settings'] });
-      setEditing(false);
-      showSuccess('AI features saved');
+  // Flip in place: optimistically patch the cached settings so the switch moves
+  // instantly, persist, then roll back + toast on failure. One mutation serves
+  // every row — each call sends only the field it changed (partial PUT).
+  const save = useMutation({
+    mutationFn: (payload: UpdateTenantSettingsRequest) => tenantSettingsApi.updateSettings(payload),
+    onMutate: async (payload) => {
+      await queryClient.cancelQueries({ queryKey: ['tenant-settings'] });
+      const previous = queryClient.getQueryData<TenantSettings>(['tenant-settings']);
+      queryClient.setQueryData<TenantSettings>(['tenant-settings'], (old) =>
+        old ? { ...old, ...payload } : old,
+      );
+      return { previous };
     },
-    onError: (err: unknown) => showError("Couldn't save changes", extractApiError(err)),
+    onError: (err: unknown, _payload, context) => {
+      if (context?.previous) queryClient.setQueryData(['tenant-settings'], context.previous);
+      showError("Couldn't save changes", extractApiError(err));
+    },
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ['tenant-settings'] }),
   });
 
-  const handleCancel = () => {
-    setEnabled(current);
-    setEditing(false);
-  };
-
   return (
-    <EditableCard
-      title="AI features"
-      subtitle="Turn on AI-assisted tools across the app — smarter summaries, suggestions, and automation."
-      editing={editing}
-      onEdit={canEdit ? () => setEditing(true) : () => {}}
-      onCancel={handleCancel}
-      onSave={() => saveMutation.mutate()}
-      saving={saveMutation.isPending}
-      saveDisabled={!dirty || saveMutation.isPending}
-    >
-      {editing ? (
-        // Canonical settings toggle-row scale (matches the destructive-footer /
-        // DataRow pattern): label 13px/600, description 12px/muted, control on
-        // the right — deliberately a clear step below the card header.
-        <div className="flex max-w-[460px] items-start justify-between gap-6">
-          <div className="min-w-0">
-            <div className="text-[13px] font-semibold text-fg-strong">Enable AI features</div>
-            <div className="mt-0.5 text-[12px] text-fg-muted">
-              Allow the app to use AI for summaries, suggestions, and automation.
-            </div>
-          </div>
-          <Switch
-            checked={enabled}
-            onChange={setEnabled}
+    <>
+      <Card
+        title="Features & preferences"
+        subtitle="App-wide on/off settings. Flip in place; configure the ones with sub-options."
+        padding="none"
+      >
+        <div>
+          <ToggleRow
+            label="Revenue recognition"
+            help="Accrual reporting on agreements — recognized vs. deferred. Off for cash-basis."
+            checked={recognitionOn}
             disabled={!canEdit}
-            aria-label="Enable AI features"
-            className="mt-0.5 shrink-0"
+            onChange={(next) => save.mutate({ revenueRecognitionEnabled: next })}
+            configure={
+              recognitionOn
+                ? { label: `Configure basis · ${RECOGNITION_BASIS_LABEL[basis]}`, onClick: () => setBasisOpen(true) }
+                : undefined
+            }
           />
+          <ToggleRow
+            label="AI features"
+            help="AI-assisted summaries, suggestions, and automation across the app."
+            checked={aiOn}
+            disabled={!canEdit}
+            onChange={(next) => save.mutate({ enableAiFeatures: next })}
+          />
+          <ToggleRow
+            label="Notifications"
+            help="Email & SMS to your customers and technicians."
+            checked={notificationsOn}
+            disabled={!canEdit}
+            onChange={(next) => {
+              // ON flips immediately; OFF (suppress all comms) confirms first.
+              if (next) save.mutate({ enableExternalNotifications: true });
+              else setConfirmNotifOff(true);
+            }}
+            last
+          />
+          {!notificationsOn && (
+            <div className="px-4 pb-3.5">
+              <Callout kind="warning" className="max-w-[560px]">
+                External email & SMS are off — customers and technicians aren't receiving any
+                notifications. In-app streams are unaffected.
+              </Callout>
+            </div>
+          )}
         </div>
-      ) : (
-        <div className="grid grid-cols-1 gap-x-6 gap-y-3.5 sm:grid-cols-2">
-          <Kv label="AI features">{current ? 'Enabled' : 'Disabled'}</Kv>
-        </div>
-      )}
-    </EditableCard>
+      </Card>
+
+      <RecognitionBasisDialog
+        isOpen={basisOpen}
+        onClose={() => setBasisOpen(false)}
+        current={basis}
+        onSave={(next) => {
+          if (next !== basis) save.mutate({ revenueRecognitionBasis: next });
+          setBasisOpen(false);
+        }}
+      />
+
+      <ConfirmDialog
+        isOpen={confirmNotifOff}
+        onClose={() => setConfirmNotifOff(false)}
+        onConfirm={() => save.mutate({ enableExternalNotifications: false })}
+        title="Turn off external notifications?"
+        message="All outbound email and SMS to customers and technicians will be suppressed until you turn this back on. In-app notifications are unaffected."
+        confirmLabel="Turn off"
+        isDestructive
+      />
+    </>
   );
 }
 
-// ──────────────────────────────────────────────────────────────────
-// Card — Notifications (tenant-wide external email/SMS master switch)
-//
-// Single boolean ridden onto PUT /tenant-settings. When OFF, notification-
-// service suppresses every outbound email/SMS to customers and technicians
-// (in-app streams are unaffected) — the intended use is loading real customer
-// data while exploring the app without contacting anyone. Defaults ON; the
-// OFF state is surfaced loudly (a warning Callout) in both view and edit mode
-// since a silent suppression is a high-consequence, easy-to-forget state.
-// ──────────────────────────────────────────────────────────────────
-function NotificationsCard({ settings, canEdit }: { settings: TenantSettings; canEdit: boolean }) {
-  const queryClient = useQueryClient();
-  const [editing, setEditing] = useState(false);
-  const current = settings.enableExternalNotifications;
-  const [enabled, setEnabled] = useState(current);
+// One preference row: label + one-line help on the left, an optional
+// "Configure →" link, switch on the right. The switch is a real Catalyst
+// control (keyboard-toggleable, focus ring). Help is deliberately one line —
+// fuller copy lives behind Configure, not inline.
+function ToggleRow({
+  label,
+  help,
+  checked,
+  disabled,
+  onChange,
+  configure,
+  last,
+}: {
+  label: string;
+  help: string;
+  checked: boolean;
+  disabled?: boolean;
+  onChange: (next: boolean) => void;
+  configure?: { label: string; onClick: () => void };
+  last?: boolean;
+}) {
+  return (
+    <div className={`flex items-center gap-3.5 px-4 py-3 ${last ? '' : 'border-b border-border-soft'}`}>
+      <div className="min-w-0 flex-1">
+        <div className="text-[13px] font-semibold text-fg-strong">{label}</div>
+        <div className="mt-0.5 text-[12px] leading-snug text-fg-muted">{help}</div>
+      </div>
+      {configure && (
+        <Button plain size="xs" type="button" onClick={configure.onClick} className="shrink-0 whitespace-nowrap">
+          {`${configure.label} →`}
+        </Button>
+      )}
+      <Switch checked={checked} onChange={onChange} disabled={disabled} aria-label={label} className="shrink-0" />
+    </div>
+  );
+}
 
+// Sub-choice for Revenue recognition's "Configure basis" — straight-line vs.
+// per-visit. Lives in a dialog so the basis never clutters the row until the
+// tenant has opted into recognition and wants to change the policy.
+function RecognitionBasisDialog({
+  isOpen,
+  onClose,
+  current,
+  onSave,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  current: RecognitionBasis;
+  onSave: (next: RecognitionBasis) => void;
+}) {
+  const [basis, setBasis] = useState<RecognitionBasis>(current);
   useEffect(() => {
-    if (!editing) {
+    if (isOpen) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
-      setEnabled(current);
+      setBasis(current);
     }
-  }, [current, editing]);
-
-  const dirty = enabled !== current;
-
-  const saveMutation = useMutation({
-    mutationFn: () => tenantSettingsApi.updateSettings({ enableExternalNotifications: enabled }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tenant-settings'] });
-      setEditing(false);
-      showSuccess('Notification settings saved');
-    },
-    onError: (err: unknown) => showError("Couldn't save changes", extractApiError(err)),
-  });
-
-  const handleCancel = () => {
-    setEnabled(current);
-    setEditing(false);
-  };
+  }, [isOpen, current]);
 
   return (
-    <EditableCard
-      title="Notifications"
-      subtitle="Control whether the app sends email and SMS to your customers and technicians."
-      editing={editing}
-      onEdit={canEdit ? () => setEditing(true) : () => {}}
-      onCancel={handleCancel}
-      onSave={() => saveMutation.mutate()}
-      saving={saveMutation.isPending}
-      saveDisabled={!dirty || saveMutation.isPending}
-    >
-      {editing ? (
-        <div className="flex flex-col gap-3">
-          {/* Toggle-row scale mirrors the AI features card. */}
-          <div className="flex max-w-[460px] items-start justify-between gap-6">
-            <div className="min-w-0">
-              <div className="text-[13px] font-semibold text-fg-strong">
-                Send external notifications (email/SMS)
-              </div>
-              <div className="mt-0.5 text-[12px] text-fg-muted">
-                When off, customers and technicians won't receive any emails or texts. Use this
-                while exploring the app with real data.
-              </div>
-            </div>
-            <Switch
-              checked={enabled}
-              onChange={setEnabled}
-              disabled={!canEdit}
-              aria-label="Send external notifications"
-              className="mt-0.5 shrink-0"
-            />
-          </div>
-          {!enabled && (
-            <Callout kind="warning" className="max-w-[560px]">
-              All outbound email and SMS will be suppressed for every customer and technician.
-              In-app notifications are unaffected.
-            </Callout>
-          )}
-        </div>
-      ) : (
-        <div className="flex flex-col gap-3">
-          <div className="grid grid-cols-1 gap-x-6 gap-y-3.5 sm:grid-cols-2">
-            <Kv label="External notifications">{current ? 'Enabled' : 'Disabled'}</Kv>
-          </div>
-          {!current && (
-            <Callout kind="warning" className="max-w-[560px]">
-              External email and SMS are turned off — customers and technicians aren't receiving
-              any notifications.
-            </Callout>
-          )}
-        </div>
-      )}
-    </EditableCard>
+    <Dialog open={isOpen} onClose={onClose} size="lg">
+      <DialogTitle>Revenue recognition basis</DialogTitle>
+      <DialogDescription>
+        How an agreement's contract value is earned over its term. An accounting-policy choice —
+        your bookkeeper sets it.
+      </DialogDescription>
+      <DialogBody>
+        <Field size="xs">
+          <Label size="xs">Basis</Label>
+          <ToggleGroup<RecognitionBasis> value={basis} onChange={setBasis} aria-label="Revenue recognition basis" className="mt-1">
+            <ToggleGroupOption value="STRAIGHT_LINE">Straight-line</ToggleGroupOption>
+            <ToggleGroupOption value="PER_VISIT">Per-visit</ToggleGroupOption>
+          </ToggleGroup>
+          <Description size="xs">
+            Straight-line earns the contract value evenly across the term (stand-ready coverage).
+            Per-visit earns it per completed work order (prepaid discrete visits).
+          </Description>
+        </Field>
+      </DialogBody>
+      <DialogActions>
+        <Button plain onClick={onClose}>Cancel</Button>
+        <Button color="dark" onClick={() => onSave(basis)}>Save</Button>
+      </DialogActions>
+    </Dialog>
   );
 }
 

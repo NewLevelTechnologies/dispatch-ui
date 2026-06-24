@@ -364,6 +364,7 @@ export {
   type UploadLogoResponse,
   type Glossary,
   type GlossaryEntry,
+  type RecognitionBasis,
 } from './tenantSettingsApi';
 
 // Glossary API

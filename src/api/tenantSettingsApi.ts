@@ -19,6 +19,12 @@ export interface Glossary {
   [entityCode: string]: GlossaryEntry;
 }
 
+// How an agreement's contract value is recognized as revenue. STRAIGHT_LINE
+// (default) earns ratably over the term; PER_VISIT earns per completed work
+// order. The tenant's bookkeeper sets this as an accounting-policy choice;
+// the backend reads it to compute, the FE mirrors it for the block's labels.
+export type RecognitionBasis = 'STRAIGHT_LINE' | 'PER_VISIT';
+
 export interface TenantSettings {
   tenantId: string;
   companyName: string;
@@ -65,6 +71,16 @@ export interface TenantSettings {
   // Tenant-wide default applied to new service locations created without an
   // explicit premise. Always present; server defaults to 'BUSINESS'.
   defaultPremiseType: PremiseType;
+  // Revenue recognition (accrual reporting) — see RecognitionBasis. New
+  // optional fields; absent on older/cached responses, so the UI treats
+  // undefined as off / straight-line (fail-safe, matches enableAiFeatures).
+  //   • revenueRecognitionEnabled — display gate ONLY (FE reads this to show
+  //     or hide the agreement recognition block; default off). The backend
+  //     computes for everyone regardless, so toggling is instant — no backfill.
+  //   • revenueRecognitionBasis — the basis the backend computes with (FE
+  //     mirrors it for the block's anchor/labels); server defaults STRAIGHT_LINE.
+  revenueRecognitionEnabled?: boolean;
+  revenueRecognitionBasis?: RecognitionBasis;
   glossary?: Glossary; // Glossary is part of tenant settings
   updatedAt: string;
 }
@@ -90,6 +106,10 @@ export interface UpdateTenantSettingsRequest {
   enableExternalNotifications?: boolean;
   enableAiFeatures?: boolean;
   defaultPremiseType?: PremiseType;
+  // Partial-update semantics — omit to leave unchanged. Basis is case-insensitive
+  // on the wire but we always send the canonical uppercase union value.
+  revenueRecognitionEnabled?: boolean;
+  revenueRecognitionBasis?: RecognitionBasis;
   glossary?: Glossary; // Glossary can be updated
 }
 

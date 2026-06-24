@@ -18,6 +18,8 @@ import {
 import {
   agreementApi,
   agreementFilesApi,
+  invoicesApi,
+  tenantSettingsApi,
   type AgreementResponse,
   type AgreementStatus,
   type VisitTemplateResponse,
@@ -141,6 +143,14 @@ export default function AgreementDetailPage() {
     select: (p) => p.counts.all,
   });
 
+  // Invoices tab badge — lean size-1 page for the count.
+  const { data: invoiceCount } = useQuery({
+    queryKey: ['invoices', 'agreement', id, 'count'] as const,
+    queryFn: () => invoicesApi.getAll({ agreementId: id!, size: 1 }),
+    enabled: !!id,
+    select: (p) => p.totalElements,
+  });
+
   const customerId = agreement?.customer.id ?? '';
   const { data: locationMap } = useQuery(agreementLocationsQueryOptions(customerId));
 
@@ -205,7 +215,7 @@ export default function AgreementDetailPage() {
     { id: 'overview', label: 'Overview' },
     { id: 'coverage', label: 'Coverage', count: agreement.coverageLocationCount },
     { id: 'schedule', label: 'Schedule' },
-    { id: 'invoices', label: getName('invoice', true) },
+    { id: 'invoices', label: getName('invoice', true), count: invoiceCount },
     { id: 'documents', label: 'Documents', count: documentCount },
     { id: 'activity', label: 'Activity' },
   ];
@@ -631,7 +641,7 @@ function OverviewTab({
           <FinancialSnapshotCard agreement={agreement} />
         </div>
         <div className="flex flex-col gap-3">
-          <ScopeCard agreementId={agreement.id} templates={agreement.visitTemplates} />
+          <ScopeCard agreementId={agreement.id} templates={agreement.visitTemplates} termStart={agreement.termStart ?? undefined} />
           <TermCard agreement={agreement} onEdit={onEdit} />
           <CustomerCard agreement={agreement} />
           <NotesCard entityType="agreement" entityId={agreement.id} />
@@ -763,12 +773,26 @@ function FinancialSnapshotCard({ agreement }: { agreement: AgreementResponse }) 
   // Recognized/deferred — point-in-time. contractValue null = no billing → hide
   // the row (never show $0).
   const { data: revenue } = useQuery(agreementRevenueQueryOptions(agreement.id));
+  // Display gate: the recognition block is accrual-reporting content most
+  // (cash-basis) shops never want. Backend computes for everyone; this flag
+  // only decides whether we render the block. Default off; absent ⇒ off.
+  const { data: tenantSettings } = useQuery({
+    queryKey: ['tenant-settings'],
+    queryFn: () => tenantSettingsApi.getSettings(),
+  });
+  const recognitionEnabled = tenantSettings?.revenueRecognitionEnabled ?? false;
+  // Anchor follows the basis the backend actually computed with, never the
+  // setting — so the labels always describe the numbers on screen. Absent ⇒
+  // straight-line (the BE default / fail-safe).
+  const perVisitBasis = revenue?.basis === 'PER_VISIT';
   const [setupOpen, setSetupOpen] = useState(false);
 
   const arr = billing ? computeArr(billing) : null;
   const perYear = billing ? periodsPerYear(billing.cadenceUnit, billing.cadenceInterval) : 0;
   // Recognized fills the bar; deferred is the remaining track (the two halves
-  // sum to contract value). Guard a 0 contract value against divide-by-zero.
+  // sum to contract value). The ratio resolves to term-elapsed (straight-line)
+  // or visits-done÷expected (per-visit) by construction of recognizedToDate, so
+  // one formula serves both anchors. Guard a 0 contract value against div-by-0.
   const recognizedPct =
     revenue && revenue.contractValue
       ? Math.min(100, Math.max(0, Math.round((revenue.recognizedToDate / revenue.contractValue) * 100)))
@@ -812,10 +836,12 @@ function FinancialSnapshotCard({ agreement }: { agreement: AgreementResponse }) 
                 last
               />
             </div>
-            {/* Billed ≠ earned — recognized accrues as work orders complete;
-                recognized + deferred = contract value, shown as one two-part bar
-                anchored to the same "N of M complete" the header trusts. */}
-            {revenue != null && revenue.contractValue != null && (
+            {/* Billed ≠ earned — recognized + deferred = contract value, shown as
+                one two-part bar. Accrual-reporting content: gated on the tenant
+                flag (absent, not greyed, when off). The anchor follows the basis
+                the BE computed with — per-visit shows "X of N complete"; straight-
+                line earns ratably over the term and shows no visit count. */}
+            {recognitionEnabled && revenue != null && revenue.contractValue != null && (
               <div className="border-b border-border-soft px-3.5 py-3">
                 <div className="mb-2 flex items-baseline gap-2">
                   <span className="text-[10px] font-semibold uppercase tracking-wider text-fg-muted">
@@ -823,7 +849,11 @@ function FinancialSnapshotCard({ agreement }: { agreement: AgreementResponse }) 
                   </span>
                   <span className="grow" />
                   <span className="text-[11px] text-fg-muted">
-                    {revenue.visitsFulfilled} of {revenue.visitsTotal} {getName('work_order', true).toLowerCase()} complete
+                    {perVisitBasis
+                      ? `${revenue.visitsFulfilled}${
+                          revenue.visitsExpectedThisTerm != null ? ` of ${revenue.visitsExpectedThisTerm}` : ''
+                        } ${getName('work_order', true).toLowerCase()} complete`
+                      : 'recognized ratably over the term'}
                   </span>
                 </div>
                 <div className="mb-2.5 flex h-[7px] overflow-hidden rounded bg-bg-active">
@@ -838,7 +868,11 @@ function FinancialSnapshotCard({ agreement }: { agreement: AgreementResponse }) 
                     <div className="font-mono text-[16px] font-bold tabular-nums text-fg-strong">
                       {formatCurrency(revenue.recognizedToDate)}
                     </div>
-                    <div className="text-[11px] text-fg-muted">earned as {getName('work_order', true).toLowerCase()} complete</div>
+                    <div className="text-[11px] text-fg-muted">
+                      {perVisitBasis
+                        ? `earned as ${getName('work_order', true).toLowerCase()} complete`
+                        : 'earned ratably over the term'}
+                    </div>
                   </div>
                   <div className="flex flex-col gap-0.5">
                     <div className="flex items-center gap-1.5">
@@ -960,7 +994,7 @@ function InstallmentSchedule({ installments }: { installments: EnrichedInstallme
 // The page's marquee — rebuilt on the real visit templates + scope items (the
 // mock's plain-English Included/Excluded/SLA prose has no backing data).
 // Editable: add / edit / delete the recurrence rules that drive generation.
-function ScopeCard({ agreementId, templates }: { agreementId: string; templates: VisitTemplateResponse[] }) {
+function ScopeCard({ agreementId, templates, termStart }: { agreementId: string; templates: VisitTemplateResponse[]; termStart?: string }) {
   const { getName } = useGlossary();
   const queryClient = useQueryClient();
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -1048,6 +1082,7 @@ function ScopeCard({ agreementId, templates }: { agreementId: string; templates:
         onClose={() => setDialogOpen(false)}
         agreementId={agreementId}
         template={editing ?? undefined}
+        termStart={termStart}
       />
       <ConfirmDialog
         isOpen={deleting !== null}
