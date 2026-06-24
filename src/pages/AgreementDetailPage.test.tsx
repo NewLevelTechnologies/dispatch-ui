@@ -3,7 +3,7 @@ import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderWithProviders } from '../test/utils';
 import AgreementDetailPage from './AgreementDetailPage';
-import { agreementApi, customerApi, dispatchesApi, invoicesApi, agreementFilesApi, agreementNotesApi } from '../api';
+import { agreementApi, customerApi, dispatchesApi, invoicesApi, agreementFilesApi, agreementNotesApi, tenantSettingsApi, type TenantSettings } from '../api';
 
 vi.mock('../api', () => ({
   agreementApi: {
@@ -23,6 +23,8 @@ vi.mock('../api', () => ({
   invoicesApi: { getAll: vi.fn() },
   agreementFilesApi: { list: vi.fn(), upload: vi.fn(), delete: vi.fn(), patch: vi.fn() },
   agreementNotesApi: { list: vi.fn(), create: vi.fn(), update: vi.fn(), delete: vi.fn() },
+  // Recognition block is gated on this tenant flag — the page reads getSettings.
+  tenantSettingsApi: { getSettings: vi.fn() },
   // Const enum object — the billing/invoice surfaces build status→tone maps off it.
   InvoiceStatus: {
     DRAFT: 'DRAFT',
@@ -136,6 +138,12 @@ describe('AgreementDetailPage', () => {
     });
     // Notes card → empty by default.
     vi.mocked(agreementNotesApi.list).mockResolvedValue([]);
+    // Recognition gate OFF by default — the common (cash-basis) case, so the
+    // block stays hidden unless a test opts the tenant in.
+    vi.mocked(tenantSettingsApi.getSettings).mockResolvedValue({
+      revenueRecognitionEnabled: false,
+      revenueRecognitionBasis: 'STRAIGHT_LINE',
+    } as unknown as TenantSettings);
   });
 
   it('renders the header (name, number, customer) and the tab row', async () => {
@@ -240,7 +248,14 @@ describe('AgreementDetailPage', () => {
       ],
       page: 0, size: 200, totalElements: 1, totalPages: 1, first: true, last: true,
     });
+    // Recognition gate ON + per-visit basis → the block renders, anchored to
+    // the work-order count.
+    vi.mocked(tenantSettingsApi.getSettings).mockResolvedValue({
+      revenueRecognitionEnabled: true,
+      revenueRecognitionBasis: 'PER_VISIT',
+    } as unknown as TenantSettings);
     vi.mocked(agreementApi.getRevenueRecognition).mockResolvedValue({
+      basis: 'PER_VISIT',
       contractValue: 108000,
       recognizedToDate: 27000,
       deferred: 81000,
@@ -259,17 +274,25 @@ describe('AgreementDetailPage', () => {
     expect(screen.getByText('Recognized to date')).toBeInTheDocument();
     expect(screen.getByText('Deferred')).toBeInTheDocument();
     expect(screen.getByText('$81,000')).toBeInTheDocument();
+    // Per-visit basis → anchor shows the work-order completion count.
+    expect(screen.getByText('1 of 4 work orders complete')).toBeInTheDocument();
     // Schedule is capped at 6 rows; expanding reveals the rest.
     await userEvent.setup().click(screen.getByText('Show all 8'));
     expect(screen.getByText('Show less')).toBeInTheDocument();
   });
 
   it('hides recognized/deferred when no billing (contractValue null)', async () => {
+    // Gate ON so the only reason the block is hidden is the null contract value.
+    vi.mocked(tenantSettingsApi.getSettings).mockResolvedValue({
+      revenueRecognitionEnabled: true,
+      revenueRecognitionBasis: 'STRAIGHT_LINE',
+    } as unknown as TenantSettings);
     vi.mocked(agreementApi.getBillingSchedule).mockResolvedValue({
       agreementId: 'a-1', amount: 27000, cadenceUnit: 'QUARTER', cadenceInterval: 1,
       anchorDate: '2024-09-01', netDays: 30, billingMode: 'FIXED_SCHEDULE', active: true,
     });
     vi.mocked(agreementApi.getRevenueRecognition).mockResolvedValue({
+      basis: 'STRAIGHT_LINE',
       contractValue: null,
       recognizedToDate: 0,
       deferred: 0,
@@ -283,5 +306,53 @@ describe('AgreementDetailPage', () => {
     await screen.findByText(/Net 30 terms/i);
     expect(screen.queryByText('Recognized to date')).not.toBeInTheDocument();
     expect(screen.queryByText('Deferred')).not.toBeInTheDocument();
+  });
+
+  it('hides the recognition block when the tenant flag is off (even with billing)', async () => {
+    // Gate stays OFF (the beforeEach default) — accrual content is opt-in.
+    vi.mocked(agreementApi.getBillingSchedule).mockResolvedValue({
+      agreementId: 'a-1', amount: 27000, cadenceUnit: 'QUARTER', cadenceInterval: 1,
+      anchorDate: '2024-09-01', netDays: 30, billingMode: 'FIXED_SCHEDULE', active: true,
+    });
+    vi.mocked(agreementApi.getRevenueRecognition).mockResolvedValue({
+      basis: 'PER_VISIT',
+      contractValue: 108000,
+      recognizedToDate: 27000,
+      deferred: 81000,
+      visitsFulfilled: 1,
+      visitsExpectedThisTerm: 4,
+    });
+    renderPage();
+
+    // Billing is configured (net terms render) but recognition is suppressed.
+    await screen.findByText(/Net 30 terms/i);
+    expect(screen.queryByText('Recognized to date')).not.toBeInTheDocument();
+    expect(screen.queryByText(/work orders complete/)).not.toBeInTheDocument();
+  });
+
+  it('anchors the recognition block to time elapsed under straight-line basis', async () => {
+    vi.mocked(tenantSettingsApi.getSettings).mockResolvedValue({
+      revenueRecognitionEnabled: true,
+      revenueRecognitionBasis: 'STRAIGHT_LINE',
+    } as unknown as TenantSettings);
+    vi.mocked(agreementApi.getBillingSchedule).mockResolvedValue({
+      agreementId: 'a-1', amount: 27000, cadenceUnit: 'QUARTER', cadenceInterval: 1,
+      anchorDate: '2024-09-01', netDays: 30, billingMode: 'FIXED_SCHEDULE', active: true,
+    });
+    vi.mocked(agreementApi.getRevenueRecognition).mockResolvedValue({
+      basis: 'STRAIGHT_LINE',
+      contractValue: 108000,
+      recognizedToDate: 54000,
+      deferred: 54000,
+      visitsFulfilled: 1,
+      visitsExpectedThisTerm: 4,
+    });
+    renderPage();
+
+    expect(await screen.findByText('Recognized to date')).toBeInTheDocument();
+    // Straight-line → ratable copy, never a visit count (compliance is 404 here,
+    // so no "work orders complete" can leak in from the header either).
+    expect(screen.getByText('recognized ratably over the term')).toBeInTheDocument();
+    expect(screen.queryByText(/work orders complete/)).not.toBeInTheDocument();
   });
 });

@@ -50,8 +50,9 @@ const mockSettingsWithLogo = {
   logoThumbnailUrl: 'https://x/acme-logo-thumb.png',
 };
 
-// Identity is the first card, Operating second, Branding third — each has its
-// own Edit button, so scope clicks by index.
+// Card order (each has its own Edit button, so scope clicks by index):
+//   [0] Identity  [1] Operating  [2] Revenue recognition  [3] Branding
+//   [4] AI features  [5] Notifications
 const editButtons = () => screen.getAllByRole('button', { name: /^(edit|complete identity)$/i });
 
 describe('CompanyProfilePanel', () => {
@@ -180,6 +181,51 @@ describe('CompanyProfilePanel', () => {
     );
   });
 
+  it('shows revenue recognition Off by default', async () => {
+    renderWithProviders(<CompanyProfilePanel />);
+    await waitFor(() => expect(screen.getByText('Acme HVAC')).toBeInTheDocument());
+    // mockSettings carries no recognition fields → treated as off.
+    expect(screen.getByText('Off')).toBeInTheDocument();
+  });
+
+  it('shows the configured basis in view mode when recognition is on', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({
+      data: { ...mockSettings, revenueRecognitionEnabled: true, revenueRecognitionBasis: 'STRAIGHT_LINE' },
+    });
+    renderWithProviders(<CompanyProfilePanel />);
+    await waitFor(() => expect(screen.getByText('Acme HVAC')).toBeInTheDocument());
+    expect(screen.getByText('On · Straight-line')).toBeInTheDocument();
+  });
+
+  it('enables revenue recognition with a per-visit basis and saves only those fields', async () => {
+    const user = userEvent.setup();
+    vi.mocked(apiClient.put).mockResolvedValue({
+      data: { ...mockSettings, revenueRecognitionEnabled: true, revenueRecognitionBasis: 'PER_VISIT' },
+    });
+    renderWithProviders(<CompanyProfilePanel />);
+    await waitFor(() => expect(screen.getByText('Acme HVAC')).toBeInTheDocument());
+
+    // Revenue recognition is the third Edit button.
+    await user.click(editButtons()[2]);
+    // Basis is hidden until recognition is switched on (progressive disclosure).
+    expect(screen.queryByRole('radio', { name: /per-visit/i })).not.toBeInTheDocument();
+    await user.click(screen.getByRole('switch'));
+    await user.click(screen.getByRole('radio', { name: /per-visit/i }));
+    await user.click(screen.getByRole('button', { name: /save changes/i }));
+
+    await waitFor(() => {
+      expect(apiClient.put).toHaveBeenCalledWith(
+        expect.stringContaining('/tenant'),
+        expect.objectContaining({ revenueRecognitionEnabled: true, revenueRecognitionBasis: 'PER_VISIT' }),
+      );
+    });
+    // Partial PUT — unrelated fields aren't sent.
+    expect(apiClient.put).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.not.objectContaining({ timezone: expect.anything() }),
+    );
+  });
+
   it('toggles AI features and saves only that field', async () => {
     const user = userEvent.setup();
     vi.mocked(apiClient.put).mockResolvedValue({
@@ -188,8 +234,8 @@ describe('CompanyProfilePanel', () => {
     renderWithProviders(<CompanyProfilePanel />);
     await waitFor(() => expect(screen.getByText('Acme HVAC')).toBeInTheDocument());
 
-    // AI features is the fourth (last) Edit button.
-    await user.click(editButtons()[3]);
+    // AI features is the fifth Edit button.
+    await user.click(editButtons()[4]);
     await user.click(screen.getByRole('switch'));
     await user.click(screen.getByRole('button', { name: /save changes/i }));
 
@@ -214,8 +260,8 @@ describe('CompanyProfilePanel', () => {
     renderWithProviders(<CompanyProfilePanel />);
     await waitFor(() => expect(screen.getByText('Acme HVAC')).toBeInTheDocument());
 
-    // Notifications is the fifth (last) Edit button.
-    await user.click(editButtons()[4]);
+    // Notifications is the sixth (last) Edit button.
+    await user.click(editButtons()[5]);
     await user.click(screen.getByRole('switch'));
     // Flipping OFF surfaces the suppression warning before saving.
     expect(screen.getByText(/will be suppressed/i)).toBeInTheDocument();
@@ -269,8 +315,8 @@ describe('CompanyProfilePanel', () => {
     renderWithProviders(<CompanyProfilePanel />);
     await waitFor(() => expect(screen.getByText('Acme HVAC')).toBeInTheDocument());
 
-    // Branding is the third Edit button.
-    await user.click(editButtons()[2]);
+    // Branding is the fourth Edit button.
+    await user.click(editButtons()[3]);
     const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
     const goodFile = new File(['x'], 'logo.png', { type: 'image/png' });
     await user.upload(fileInput, goodFile);
@@ -284,7 +330,7 @@ describe('CompanyProfilePanel', () => {
     renderWithProviders(<CompanyProfilePanel />);
     await waitFor(() => expect(screen.getByText('Acme HVAC')).toBeInTheDocument());
 
-    await user.click(editButtons()[2]);
+    await user.click(editButtons()[3]);
     const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
     const bigFile = new File(['x'.repeat(2 * 1024 * 1024)], 'logo.png', { type: 'image/png' });
     await user.upload(fileInput, bigFile);
@@ -298,7 +344,7 @@ describe('CompanyProfilePanel', () => {
     renderWithProviders(<CompanyProfilePanel />);
     await waitFor(() => expect(screen.getByText('Acme HVAC')).toBeInTheDocument());
 
-    await user.click(editButtons()[2]);
+    await user.click(editButtons()[3]);
     expect(screen.queryByRole('button', { name: /^remove$/i })).not.toBeInTheDocument();
   });
 
@@ -311,7 +357,7 @@ describe('CompanyProfilePanel', () => {
     renderWithProviders(<CompanyProfilePanel />);
     await waitFor(() => expect(screen.getByText('Acme HVAC')).toBeInTheDocument());
 
-    await user.click(editButtons()[2]);
+    await user.click(editButtons()[3]);
     await user.click(screen.getByRole('button', { name: /^remove$/i }));
     expect(screen.getByText(/logo will be removed/i)).toBeInTheDocument();
 
@@ -329,7 +375,7 @@ describe('CompanyProfilePanel', () => {
     renderWithProviders(<CompanyProfilePanel />);
     await waitFor(() => expect(screen.getByText('Acme HVAC')).toBeInTheDocument());
 
-    await user.click(editButtons()[2]);
+    await user.click(editButtons()[3]);
     await user.click(screen.getByRole('button', { name: /^remove$/i }));
     expect(screen.getByText(/logo will be removed/i)).toBeInTheDocument();
 

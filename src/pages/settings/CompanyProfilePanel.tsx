@@ -15,6 +15,7 @@ import {
   type TenantSettings,
   type UpdateTenantSettingsRequest,
   type PremiseType,
+  type RecognitionBasis,
 } from '../../api';
 import { useHasCapability } from '../../hooks/useCurrentUser';
 import { PageHead } from '../../components/ui/PageHead';
@@ -123,6 +124,7 @@ export default function CompanyProfilePanel() {
         <div className="flex max-w-[920px] flex-col gap-3.5">
           <IdentityCard settings={settings} canEdit={canEdit} />
           <OperatingCard settings={settings} canEdit={canEdit} />
+          <RevenueRecognitionCard settings={settings} canEdit={canEdit} />
           <BrandingCard settings={settings} canEdit={canEdit} />
           <AiFeaturesCard settings={settings} canEdit={canEdit} />
           <NotificationsCard settings={settings} canEdit={canEdit} />
@@ -472,6 +474,110 @@ function OperatingCard({ settings, canEdit }: { settings: TenantSettings; canEdi
               <PremiseMark premise={settings.defaultPremiseType} />
               {settings.defaultPremiseType === 'BUSINESS' ? 'Business' : 'Residence'}
             </span>
+          </Kv>
+        </div>
+      )}
+    </EditableCard>
+  );
+}
+
+// ──────────────────────────────────────────────────────────────────
+// Card — Revenue recognition (accrual reporting gate + basis)
+// ──────────────────────────────────────────────────────────────────
+const RECOGNITION_BASIS_LABEL: Record<RecognitionBasis, string> = {
+  STRAIGHT_LINE: 'Straight-line',
+  PER_VISIT: 'Per-visit',
+};
+
+function RevenueRecognitionCard({ settings, canEdit }: { settings: TenantSettings; canEdit: boolean }) {
+  const queryClient = useQueryClient();
+  const [editing, setEditing] = useState(false);
+  // Absent on older responses — treat undefined as off / straight-line.
+  const currentEnabled = settings.revenueRecognitionEnabled ?? false;
+  const currentBasis = settings.revenueRecognitionBasis ?? 'STRAIGHT_LINE';
+  const [enabled, setEnabled] = useState(currentEnabled);
+  const [basis, setBasis] = useState<RecognitionBasis>(currentBasis);
+
+  useEffect(() => {
+    if (!editing) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setEnabled(currentEnabled);
+      setBasis(currentBasis);
+    }
+  }, [currentEnabled, currentBasis, editing]);
+
+  const dirty = enabled !== currentEnabled || basis !== currentBasis;
+
+  const saveMutation = useMutation({
+    // Partial PUT — send only what changed.
+    mutationFn: () => {
+      const payload: UpdateTenantSettingsRequest = {};
+      if (enabled !== currentEnabled) payload.revenueRecognitionEnabled = enabled;
+      if (basis !== currentBasis) payload.revenueRecognitionBasis = basis;
+      return tenantSettingsApi.updateSettings(payload);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tenant-settings'] });
+      setEditing(false);
+      showSuccess('Revenue recognition saved');
+    },
+    onError: (err: unknown) => showError("Couldn't save changes", extractApiError(err)),
+  });
+
+  const handleCancel = () => {
+    setEnabled(currentEnabled);
+    setBasis(currentBasis);
+    setEditing(false);
+  };
+
+  return (
+    <EditableCard
+      title="Revenue recognition"
+      subtitle="Accrual reporting for service agreements — show contract value as it's earned (recognized) vs. unearned (deferred). A management/reporting metric, not your posted books. Leave off for cash-basis accounting."
+      editing={editing}
+      onEdit={canEdit ? () => setEditing(true) : () => {}}
+      onCancel={handleCancel}
+      onSave={() => saveMutation.mutate()}
+      saving={saveMutation.isPending}
+      saveDisabled={!dirty || saveMutation.isPending}
+    >
+      {editing ? (
+        <div className="flex max-w-[460px] flex-col gap-4">
+          {/* Canonical settings toggle-row scale (matches AI features). */}
+          <div className="flex items-start justify-between gap-6">
+            <div className="min-w-0">
+              <div className="text-[13px] font-semibold text-fg-strong">Show recognized / deferred revenue</div>
+              <div className="mt-0.5 text-[12px] text-fg-muted">
+                Adds a recognition breakdown to each service agreement. Off by default — most shops run cash-basis.
+              </div>
+            </div>
+            <Switch
+              checked={enabled}
+              onChange={setEnabled}
+              disabled={!canEdit}
+              aria-label="Show recognized / deferred revenue"
+              className="mt-0.5 shrink-0"
+            />
+          </div>
+          {/* Basis only matters once it's shown — reveal on enable so the
+              bookkeeper sets both in one edit. */}
+          {enabled && (
+            <Field size="xs">
+              <Label size="xs">Recognition basis</Label>
+              <ToggleGroup<RecognitionBasis> value={basis} onChange={setBasis} aria-label="Revenue recognition basis" className="mt-1">
+                <ToggleGroupOption value="STRAIGHT_LINE">Straight-line</ToggleGroupOption>
+                <ToggleGroupOption value="PER_VISIT">Per-visit</ToggleGroupOption>
+              </ToggleGroup>
+              <Description size="xs">
+                Straight-line earns the contract value evenly across the term (stand-ready coverage). Per-visit earns it per completed work order (prepaid discrete visits). An accounting-policy choice — your bookkeeper sets it.
+              </Description>
+            </Field>
+          )}
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 gap-x-6 gap-y-3.5 sm:grid-cols-2">
+          <Kv label="Revenue recognition">
+            {currentEnabled ? `On · ${RECOGNITION_BASIS_LABEL[currentBasis]}` : 'Off'}
           </Kv>
         </div>
       )}

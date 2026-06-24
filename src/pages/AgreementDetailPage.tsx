@@ -19,6 +19,7 @@ import {
   agreementApi,
   agreementFilesApi,
   invoicesApi,
+  tenantSettingsApi,
   type AgreementResponse,
   type AgreementStatus,
   type VisitTemplateResponse,
@@ -772,12 +773,26 @@ function FinancialSnapshotCard({ agreement }: { agreement: AgreementResponse }) 
   // Recognized/deferred — point-in-time. contractValue null = no billing → hide
   // the row (never show $0).
   const { data: revenue } = useQuery(agreementRevenueQueryOptions(agreement.id));
+  // Display gate: the recognition block is accrual-reporting content most
+  // (cash-basis) shops never want. Backend computes for everyone; this flag
+  // only decides whether we render the block. Default off; absent ⇒ off.
+  const { data: tenantSettings } = useQuery({
+    queryKey: ['tenant-settings'],
+    queryFn: () => tenantSettingsApi.getSettings(),
+  });
+  const recognitionEnabled = tenantSettings?.revenueRecognitionEnabled ?? false;
+  // Anchor follows the basis the backend actually computed with, never the
+  // setting — so the labels always describe the numbers on screen. Absent ⇒
+  // straight-line (the BE default / fail-safe).
+  const perVisitBasis = revenue?.basis === 'PER_VISIT';
   const [setupOpen, setSetupOpen] = useState(false);
 
   const arr = billing ? computeArr(billing) : null;
   const perYear = billing ? periodsPerYear(billing.cadenceUnit, billing.cadenceInterval) : 0;
   // Recognized fills the bar; deferred is the remaining track (the two halves
-  // sum to contract value). Guard a 0 contract value against divide-by-zero.
+  // sum to contract value). The ratio resolves to term-elapsed (straight-line)
+  // or visits-done÷expected (per-visit) by construction of recognizedToDate, so
+  // one formula serves both anchors. Guard a 0 contract value against div-by-0.
   const recognizedPct =
     revenue && revenue.contractValue
       ? Math.min(100, Math.max(0, Math.round((revenue.recognizedToDate / revenue.contractValue) * 100)))
@@ -821,10 +836,12 @@ function FinancialSnapshotCard({ agreement }: { agreement: AgreementResponse }) 
                 last
               />
             </div>
-            {/* Billed ≠ earned — recognized accrues as work orders complete;
-                recognized + deferred = contract value, shown as one two-part bar
-                anchored to the same "N of M complete" the header trusts. */}
-            {revenue != null && revenue.contractValue != null && (
+            {/* Billed ≠ earned — recognized + deferred = contract value, shown as
+                one two-part bar. Accrual-reporting content: gated on the tenant
+                flag (absent, not greyed, when off). The anchor follows the basis
+                the BE computed with — per-visit shows "X of N complete"; straight-
+                line earns ratably over the term and shows no visit count. */}
+            {recognitionEnabled && revenue != null && revenue.contractValue != null && (
               <div className="border-b border-border-soft px-3.5 py-3">
                 <div className="mb-2 flex items-baseline gap-2">
                   <span className="text-[10px] font-semibold uppercase tracking-wider text-fg-muted">
@@ -832,9 +849,11 @@ function FinancialSnapshotCard({ agreement }: { agreement: AgreementResponse }) 
                   </span>
                   <span className="grow" />
                   <span className="text-[11px] text-fg-muted">
-                    {`${revenue.visitsFulfilled}${
-                      revenue.visitsExpectedThisTerm != null ? ` of ${revenue.visitsExpectedThisTerm}` : ''
-                    } ${getName('work_order', true).toLowerCase()} complete`}
+                    {perVisitBasis
+                      ? `${revenue.visitsFulfilled}${
+                          revenue.visitsExpectedThisTerm != null ? ` of ${revenue.visitsExpectedThisTerm}` : ''
+                        } ${getName('work_order', true).toLowerCase()} complete`
+                      : 'recognized ratably over the term'}
                   </span>
                 </div>
                 <div className="mb-2.5 flex h-[7px] overflow-hidden rounded bg-bg-active">
@@ -849,7 +868,11 @@ function FinancialSnapshotCard({ agreement }: { agreement: AgreementResponse }) 
                     <div className="font-mono text-[16px] font-bold tabular-nums text-fg-strong">
                       {formatCurrency(revenue.recognizedToDate)}
                     </div>
-                    <div className="text-[11px] text-fg-muted">earned as {getName('work_order', true).toLowerCase()} complete</div>
+                    <div className="text-[11px] text-fg-muted">
+                      {perVisitBasis
+                        ? `earned as ${getName('work_order', true).toLowerCase()} complete`
+                        : 'earned ratably over the term'}
+                    </div>
                   </div>
                   <div className="flex flex-col gap-0.5">
                     <div className="flex items-center gap-1.5">
