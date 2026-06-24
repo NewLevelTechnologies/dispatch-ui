@@ -37,7 +37,7 @@ describe('AgreementPlansPanel', () => {
   it('lists plans with billing defaults, a benefits summary, and status', async () => {
     renderWithProviders(<AgreementPlansPanel />);
     await waitFor(() => expect(screen.getByText('Comfort Club — Residential')).toBeInTheDocument());
-    expect(screen.getByText('$300.00 · Quarterly')).toBeInTheDocument();
+    expect(screen.getByText('$1,200/yr · quarterly')).toBeInTheDocument();
     expect(screen.getByText('2 PM · trip waived · 15% labor · 10% parts · priority')).toBeInTheDocument();
     expect(screen.getByText('Active')).toBeInTheDocument();
     // Archived plan shows greyed with no billing default.

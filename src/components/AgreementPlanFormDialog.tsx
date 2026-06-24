@@ -1,6 +1,7 @@
 /* eslint-disable i18next/no-literal-string -- dense settings admin form; entity names go through getName(), "Plan" + field/benefit labels stay literal (no glossary key for plan; same convention as CompanyProfilePanel). */
 import { useEffect, useState, type FormEvent } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { CurrencyDollarIcon, LockClosedIcon } from '@heroicons/react/24/outline';
 import {
   agreementPlanApi,
   type AgreementPlanResponse,
@@ -11,7 +12,7 @@ import { useGlossary } from '../contexts/GlossaryContext';
 import { Dialog, DialogActions, DialogBody, DialogDescription, DialogTitle } from './catalyst/dialog';
 import { Button } from './catalyst/button';
 import { Field, FieldGroup, Fieldset, Label, Description } from './catalyst/fieldset';
-import { Input } from './catalyst/input';
+import { Input, InputGroup } from './catalyst/input';
 import { Select } from './catalyst/select';
 import { Switch } from './catalyst/switch';
 import { extractApiError, showSuccess } from '../lib/toast';
@@ -24,6 +25,13 @@ interface AgreementPlanFormDialogProps {
 
 const CADENCE_UNITS: CadenceUnit[] = ['WEEK', 'MONTH', 'QUARTER', 'YEAR'];
 const CLASSIFICATIONS: AgreementClassification[] = ['CONTRACT', 'INTERNAL'];
+
+// "Quarter" / "Quarters" — pluralized by the interval so "Every [n] [unit]"
+// reads as one phrase (matches the visit-template form).
+const cadenceUnitLabel = (u: CadenceUnit, interval: number): string => {
+  const singular = u.charAt(0) + u.slice(1).toLowerCase();
+  return interval === 1 ? singular : `${singular}s`;
+};
 
 // number-string → number | null (blank/invalid = null, so the BE takes its default).
 const num = (v: string): number | null => {
@@ -167,9 +175,12 @@ export default function AgreementPlanFormDialog({ isOpen, onClose, plan }: Agree
                 </Field>
                 <Field size="xs">
                   <Label size="xs">Type</Label>
-                  <Select value="VISIT" disabled aria-label="Plan type (locked to Visit)">
-                    <option value="VISIT">{`${getName('work_order')}-based`}</option>
-                  </Select>
+                  {/* Locked to VISIT for v1 — shown as informational, not a
+                      greyed dropdown, so it reads as "fixed" not "broken". */}
+                  <div className="flex h-8 items-center gap-1.5 rounded-lg border border-border bg-bg-active px-2.5 text-[12.5px] text-fg-muted" aria-label="Plan type (locked)">
+                    <LockClosedIcon className="size-3.5 text-fg-dim" />
+                    {`${getName('work_order')}-based`}
+                  </div>
                 </Field>
               </div>
 
@@ -179,7 +190,10 @@ export default function AgreementPlanFormDialog({ isOpen, onClose, plan }: Agree
                 <div className="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4">
                   <Field size="xs">
                     <Label size="xs">Amount / period</Label>
-                    <Input size="xs" type="number" min={0} step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0.00" />
+                    <InputGroup>
+                      <CurrencyDollarIcon data-slot="icon" />
+                      <Input size="xs" type="number" min={0} step="0.01" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="300" className="tabular-nums" />
+                    </InputGroup>
                   </Field>
                   <Field size="xs">
                     <Label size="xs">Every</Label>
@@ -189,7 +203,7 @@ export default function AgreementPlanFormDialog({ isOpen, onClose, plan }: Agree
                     <Label size="xs">Cadence</Label>
                     <Select value={cadenceUnit} onChange={(e) => setCadenceUnit(e.target.value as CadenceUnit)}>
                       {CADENCE_UNITS.map((u) => (
-                        <option key={u} value={u}>{u.charAt(0) + u.slice(1).toLowerCase()}</option>
+                        <option key={u} value={u}>{cadenceUnitLabel(u, Number(cadenceInterval) || 1)}</option>
                       ))}
                     </Select>
                   </Field>
@@ -236,7 +250,8 @@ export default function AgreementPlanFormDialog({ isOpen, onClose, plan }: Agree
                 <div className="mt-2 flex flex-wrap items-end gap-x-4 gap-y-3">
                   <Field size="xs" className="w-36">
                     <Label size="xs">PM visits covered</Label>
-                    <Input size="xs" type="number" min={0} value={coveredPmVisits} onChange={(e) => setCoveredPmVisits(e.target.value)} placeholder="0" />
+                    {/* Blank = not specified (null), distinct from 0 — neutral placeholder. */}
+                    <Input size="xs" type="number" min={0} value={coveredPmVisits} onChange={(e) => setCoveredPmVisits(e.target.value)} placeholder="Any" />
                   </Field>
                   <Field size="xs" className="w-32">
                     <Label size="xs">Labor discount %</Label>
@@ -264,7 +279,7 @@ export default function AgreementPlanFormDialog({ isOpen, onClose, plan }: Agree
             Cancel
           </Button>
           <Button type="submit" color="accent" disabled={!canSubmit}>
-            {isSaving ? 'Saving…' : isEdit ? 'Save' : 'Add plan'}
+            {isSaving ? 'Saving…' : isEdit ? 'Save changes' : 'Add plan'}
           </Button>
         </DialogActions>
       </form>

@@ -25,21 +25,37 @@ import AgreementPlanFormDialog from '../../components/AgreementPlanFormDialog';
 import { showSuccess, showError, extractApiError } from '../../lib/toast';
 
 const CADENCE_ADVERB: Record<CadenceUnit, string> = {
-  WEEK: 'Weekly',
-  MONTH: 'Monthly',
-  QUARTER: 'Quarterly',
-  YEAR: 'Annually',
+  WEEK: 'weekly',
+  MONTH: 'monthly',
+  QUARTER: 'quarterly',
+  YEAR: 'annually',
 };
+const PERIODS_PER_YEAR: Record<CadenceUnit, number> = { WEEK: 52, MONTH: 12, QUARTER: 4, YEAR: 1 };
 
-const money = (n: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(n);
+const money = (n: number) =>
+  new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    maximumFractionDigits: Number.isInteger(n) ? 0 : 2,
+  }).format(n);
 
+// "$1,200/yr · quarterly" — annualize the per-period amount (ARR framing) when a
+// cadence is set, else show the raw amount / cadence alone.
 function defaultsLabel(p: AgreementPlanResponse): string {
-  const amt = p.defaultAmount != null ? money(p.defaultAmount) : null;
   const cadence = p.defaultCadenceUnit
     ? p.defaultCadenceInterval === 1
       ? CADENCE_ADVERB[p.defaultCadenceUnit]
       : `every ${p.defaultCadenceInterval} ${p.defaultCadenceUnit.toLowerCase()}s`
     : null;
+  let amt: string | null = null;
+  if (p.defaultAmount != null) {
+    if (p.defaultCadenceUnit) {
+      const perYear = PERIODS_PER_YEAR[p.defaultCadenceUnit] / (p.defaultCadenceInterval || 1);
+      amt = `${money(p.defaultAmount * perYear)}/yr`;
+    } else {
+      amt = money(p.defaultAmount);
+    }
+  }
   return [amt, cadence].filter(Boolean).join(' · ') || '—';
 }
 
@@ -119,7 +135,7 @@ export default function AgreementPlansPanel() {
         <Text tone="muted">Loading plans…</Text>
       ) : rows.length === 0 ? (
         <Card>
-          <CardBody>
+          <CardBody flush>
             <EmptyState
               title="No plans yet"
               description={`Create a plan to sell ${getName('agreement', true).toLowerCase()} from a reusable template — member benefits snapshot onto each sale.`}
@@ -147,8 +163,9 @@ export default function AgreementPlansPanel() {
                     <DenseRow key={plan.id} className={!plan.active ? 'opacity-55' : undefined}>
                       <td className="strong">
                         <div className="text-fg-strong">{plan.name}</div>
+                        {/* Classification only — every v1 plan is work-order-based, so that's a dead label. */}
                         <div className="text-[11px] text-fg-muted">
-                          {plan.classification === 'CONTRACT' ? 'Contract' : 'Internal'} · {getName('work_order')}-based
+                          {plan.classification === 'CONTRACT' ? 'Contract' : 'Internal'}
                         </div>
                       </td>
                       <td className="muted tabular-nums">{defaultsLabel(plan)}</td>

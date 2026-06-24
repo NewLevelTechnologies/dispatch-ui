@@ -1,15 +1,31 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { useGlossary } from '../contexts/GlossaryContext';
-import { agreementApi, type AgreementResponse, type UpdateAgreementRequest } from '../api';
+import {
+  agreementApi,
+  agreementPlanApi,
+  type AgreementResponse,
+  type AgreementClassification,
+  type UpdateAgreementRequest,
+} from '../api';
 import { Dialog, DialogActions, DialogBody, DialogDescription, DialogTitle } from './catalyst/dialog';
 import { Button } from './catalyst/button';
 import { Checkbox, CheckboxField } from './catalyst/checkbox';
 import { Description, Field, FieldGroup, Fieldset, Label } from './catalyst/fieldset';
 import { Input } from './catalyst/input';
+import { Select } from './catalyst/select';
 import { extractApiError, showSuccess } from '../lib/toast';
+
+// term length is a plan default (months); the form uses explicit dates, so a
+// chosen plan derives termEnd from the start the user picks.
+function addMonths(isoDate: string, months: number): string {
+  const d = new Date(`${isoDate}T00:00:00`);
+  if (Number.isNaN(d.getTime())) return '';
+  d.setMonth(d.getMonth() + months);
+  return d.toISOString().slice(0, 10);
+}
 
 interface AgreementFormDialogProps {
   isOpen: boolean;
@@ -43,7 +59,19 @@ export default function AgreementFormDialog({ isOpen, onClose, agreement, custom
   const [autoRenew, setAutoRenew] = useState(false);
   const [renewalTermMonths, setRenewalTermMonths] = useState('');
   const [renewalAlertDays, setRenewalAlertDays] = useState('');
+  // Sell-from-plan (create only). '' = Custom (bespoke). classification rides
+  // from the plan (or CONTRACT). planTermMonths derives termEnd from termStart.
+  const [planId, setPlanId] = useState('');
+  const [classification, setClassification] = useState<AgreementClassification>('CONTRACT');
+  const [planTermMonths, setPlanTermMonths] = useState<number | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  // Active plans to sell from (create only). Shares the panel's cache key.
+  const { data: activePlans } = useQuery({
+    queryKey: ['agreement-plans', false],
+    queryFn: () => agreementPlanApi.getAll(false),
+    enabled: isOpen && !isEdit,
+  });
 
   /* eslint-disable react-hooks/set-state-in-effect -- form initialization on open */
   useEffect(() => {
@@ -55,8 +83,36 @@ export default function AgreementFormDialog({ isOpen, onClose, agreement, custom
     setAutoRenew(agreement?.autoRenew ?? false);
     setRenewalTermMonths(agreement?.renewalTermMonths != null ? String(agreement.renewalTermMonths) : '');
     setRenewalAlertDays(agreement?.renewalAlertDays != null ? String(agreement.renewalAlertDays) : '');
+    setPlanId(agreement?.planId ?? '');
+    setClassification(agreement?.classification ?? 'CONTRACT');
+    setPlanTermMonths(null);
   }, [isOpen, agreement]);
   /* eslint-enable react-hooks/set-state-in-effect */
+
+  // Choose a plan → pre-fill term + renewal + classification (all overridable);
+  // benefits + billing defaults aren't shown here (benefits snapshot server-side
+  // from planId; billing defaults pre-fill the later billing-setup step).
+  const handlePlanChange = (id: string) => {
+    setPlanId(id);
+    const plan = activePlans?.find((p) => p.id === id);
+    if (!plan) {
+      setClassification('CONTRACT');
+      setPlanTermMonths(null);
+      return;
+    }
+    setClassification(plan.classification);
+    setAutoRenew(plan.defaultAutoRenew);
+    setRenewalTermMonths(plan.defaultRenewalTermMonths != null ? String(plan.defaultRenewalTermMonths) : '');
+    setRenewalAlertDays(plan.defaultRenewalAlertDays != null ? String(plan.defaultRenewalAlertDays) : '');
+    setPlanTermMonths(plan.defaultTermMonths ?? null);
+    if (termStart && plan.defaultTermMonths != null) setTermEnd(addMonths(termStart, plan.defaultTermMonths));
+  };
+
+  // Picking a start date re-derives the end from the plan's term length.
+  const handleTermStartChange = (value: string) => {
+    setTermStart(value);
+    if (value && planTermMonths != null) setTermEnd(addMonths(value, planTermMonths));
+  };
 
   const createMutation = useMutation({
     mutationFn: () =>
@@ -64,12 +120,14 @@ export default function AgreementFormDialog({ isOpen, onClose, agreement, custom
         customerId: customerId!,
         name: name.trim(),
         kind: 'VISIT',
-        classification: 'CONTRACT',
+        classification,
         termStart: termStart || null,
         termEnd: termEnd || null,
         autoRenew,
         renewalTermMonths: autoRenew && renewalTermMonths ? Number(renewalTermMonths) : null,
         renewalAlertDays: autoRenew && renewalAlertDays ? Number(renewalAlertDays) : null,
+        // Provenance; omit benefits so the BE snapshots the plan's. '' = bespoke.
+        planId: planId || null,
       }),
     onSuccess: (created) => {
       queryClient.invalidateQueries({ queryKey: ['agreements'] });
@@ -152,6 +210,23 @@ export default function AgreementFormDialog({ isOpen, onClose, agreement, custom
           )}
           <Fieldset>
             <FieldGroup className="!space-y-3">
+              {!isEdit && (activePlans?.length ?? 0) > 0 && (
+                <Field size="xs">
+                  <Label size="xs">{t('agreements.plan', { defaultValue: 'Plan' })}</Label>
+                  <Select value={planId} onChange={(e) => handlePlanChange(e.target.value)}>
+                    <option value="">{t('agreements.planCustom', { defaultValue: 'Custom (no plan)' })}</option>
+                    {activePlans!.map((p) => (
+                      <option key={p.id} value={p.id}>{p.name}</option>
+                    ))}
+                  </Select>
+                  <Description size="xs">
+                    {t('agreements.planHint', {
+                      defaultValue: "Pre-fills the term from the plan (overridable). The plan's member benefits apply to this sale.",
+                    })}
+                  </Description>
+                </Field>
+              )}
+
               {showIdentity && (
                 <Field size="xs">
                   <Label size="xs" required>{t('common.form.name', { defaultValue: 'Name' })}</Label>
@@ -171,7 +246,7 @@ export default function AgreementFormDialog({ isOpen, onClose, agreement, custom
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
                   <Field size="xs">
                     <Label size="xs">{t('common.form.termStart', { defaultValue: 'Term start' })}</Label>
-                    <Input size="xs" type="date" name="termStart" value={termStart} onChange={(e) => setTermStart(e.target.value)} autoFocus={!showIdentity} />
+                    <Input size="xs" type="date" name="termStart" value={termStart} onChange={(e) => handleTermStartChange(e.target.value)} autoFocus={!showIdentity} />
                   </Field>
                   <Field size="xs">
                     <Label size="xs">{t('common.form.termEnd', { defaultValue: 'Term end' })}</Label>
