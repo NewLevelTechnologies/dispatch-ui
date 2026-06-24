@@ -64,6 +64,12 @@ const colors = {
     '[--switch-bg-ring:var(--color-black)]/15 [--switch-bg:white] dark:[--switch-bg-ring:transparent]',
     '[--switch-shadow:var(--color-black)]/10 [--switch-ring:transparent] [--switch:var(--color-zinc-950)]',
   ],
+  // Brand on-state — follows the warm/cool accent token at runtime (mirrors the
+  // accent <Button>). This is the app default so every toggle reads the same.
+  accent: [
+    '[--switch-bg-ring:var(--color-accent-700)]/90 [--switch-bg:var(--color-accent-500)] dark:[--switch-bg-ring:transparent]',
+    '[--switch:white] [--switch-ring:var(--color-accent-700)]/90 [--switch-shadow:var(--color-accent-700)]/20',
+  ],
   red: [
     '[--switch-bg-ring:var(--color-red-700)]/90 [--switch-bg:var(--color-red-600)] dark:[--switch-bg-ring:transparent]',
     '[--switch:white] [--switch-ring:var(--color-red-700)]/90 [--switch-shadow:var(--color-red-900)]/20',
@@ -137,7 +143,7 @@ const colors = {
 type Color = keyof typeof colors
 
 export function Switch({
-  color = 'dark/zinc',
+  color = 'accent',
   className,
   ...props
 }: {

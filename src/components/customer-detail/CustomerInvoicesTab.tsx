@@ -248,26 +248,42 @@ export default function CustomerInvoicesTab({ customerId }: { customerId: string
                   </tr>
                 </DenseTHead>
                 <tbody>
-                  {rows.map((inv) => (
+                  {rows.map((inv) => {
+                    // Void/cancelled rows are de-emphasized like InvoicesPage /
+                    // the agreement AR tab: muted number, struck total, dashed
+                    // balance (not $0.00, which reads as "paid off").
+                    const voided =
+                      inv.status === InvoiceStatus.VOID || inv.status === InvoiceStatus.CANCELLED;
+                    return (
                     <DenseRow key={inv.id}>
                       <td>
-                        <span className="font-mono font-bold text-fg-strong">{inv.invoiceNumber}</span>
+                        <span className={voided ? 'font-mono text-fg-muted' : 'font-mono font-bold text-fg-strong'}>
+                          {inv.invoiceNumber}
+                        </span>
                       </td>
                       <td>
                         <StatusPill row={inv} />
                       </td>
                       <td className="muted" data-label={t('invoices.table.invoiceDate')}>{formatDateShort(inv.invoiceDate)}</td>
                       <td className="muted" data-label={t('invoices.table.dueDate')}>{formatDateShort(inv.dueDate)}</td>
-                      <td className="right num strong" data-label={t('invoices.table.totalAmount')}>{formatMoney(inv.totalAmount)}</td>
-                      <td className="right num" data-label={t('invoices.table.balanceDue')}>
-                        {inv.balanceDue > 0 ? (
+                      <td
+                        className={voided ? 'right num text-fg-muted line-through' : 'right num strong'}
+                        data-label={t('invoices.table.totalAmount')}
+                      >
+                        {formatMoney(inv.totalAmount)}
+                      </td>
+                      <td className={`right num${voided ? ' dt-empty' : ''}`} data-label={t('invoices.table.balanceDue')}>
+                        {voided ? (
+                          <span className="text-fg-dim">—</span>
+                        ) : inv.balanceDue > 0 ? (
                           <span className="font-semibold text-fg-strong">{formatMoney(inv.balanceDue)}</span>
                         ) : (
                           <span className="text-fg-dim">{formatMoney(0)}</span>
                         )}
                       </td>
                     </DenseRow>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </DenseTable>
             </div>

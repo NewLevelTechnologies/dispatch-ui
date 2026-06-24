@@ -50,9 +50,10 @@ const mockSettingsWithLogo = {
   logoThumbnailUrl: 'https://x/acme-logo-thumb.png',
 };
 
-// Card order (each has its own Edit button, so scope clicks by index):
-//   [0] Identity  [1] Operating  [2] Revenue recognition  [3] Branding
-//   [4] AI features  [5] Notifications
+// Editable cards (each has its own Edit button, so scope clicks by index):
+//   [0] Identity  [1] Operating  [2] Branding
+// The "Features & preferences" card is flip-in-place (no Edit button) and isn't
+// in this list — its toggles are targeted by switch aria-label.
 const editButtons = () => screen.getAllByRole('button', { name: /^(edit|complete identity)$/i });
 
 describe('CompanyProfilePanel', () => {
@@ -181,52 +182,64 @@ describe('CompanyProfilePanel', () => {
     );
   });
 
-  it('shows revenue recognition Off by default', async () => {
+  // ── Features & preferences card (consolidated flip-in-place toggles) ──
+
+  it('shows the revenue-recognition toggle Off by default with no Configure link', async () => {
     renderWithProviders(<CompanyProfilePanel />);
     await waitFor(() => expect(screen.getByText('Acme HVAC')).toBeInTheDocument());
     // mockSettings carries no recognition fields → treated as off.
-    expect(screen.getByText('Off')).toBeInTheDocument();
+    expect(screen.getByRole('switch', { name: /revenue recognition/i })).not.toBeChecked();
+    expect(screen.queryByText(/configure basis/i)).not.toBeInTheDocument();
   });
 
-  it('shows the configured basis in view mode when recognition is on', async () => {
-    vi.mocked(apiClient.get).mockResolvedValue({
-      data: { ...mockSettings, revenueRecognitionEnabled: true, revenueRecognitionBasis: 'STRAIGHT_LINE' },
-    });
-    renderWithProviders(<CompanyProfilePanel />);
-    await waitFor(() => expect(screen.getByText('Acme HVAC')).toBeInTheDocument());
-    expect(screen.getByText('On · Straight-line')).toBeInTheDocument();
-  });
-
-  it('enables revenue recognition with a per-visit basis and saves only those fields', async () => {
+  it('flips revenue recognition on in place and persists immediately (no Edit→Save)', async () => {
     const user = userEvent.setup();
     vi.mocked(apiClient.put).mockResolvedValue({
-      data: { ...mockSettings, revenueRecognitionEnabled: true, revenueRecognitionBasis: 'PER_VISIT' },
+      data: { ...mockSettings, revenueRecognitionEnabled: true },
     });
     renderWithProviders(<CompanyProfilePanel />);
     await waitFor(() => expect(screen.getByText('Acme HVAC')).toBeInTheDocument());
 
-    // Revenue recognition is the third Edit button.
-    await user.click(editButtons()[2]);
-    // Basis is hidden until recognition is switched on (progressive disclosure).
-    expect(screen.queryByRole('radio', { name: /per-visit/i })).not.toBeInTheDocument();
-    await user.click(screen.getByRole('switch'));
-    await user.click(screen.getByRole('radio', { name: /per-visit/i }));
-    await user.click(screen.getByRole('button', { name: /save changes/i }));
+    await user.click(screen.getByRole('switch', { name: /revenue recognition/i }));
 
     await waitFor(() => {
       expect(apiClient.put).toHaveBeenCalledWith(
         expect.stringContaining('/tenant'),
-        expect.objectContaining({ revenueRecognitionEnabled: true, revenueRecognitionBasis: 'PER_VISIT' }),
+        expect.objectContaining({ revenueRecognitionEnabled: true }),
       );
     });
-    // Partial PUT — unrelated fields aren't sent.
+    // Partial PUT — only the flipped field.
     expect(apiClient.put).toHaveBeenCalledWith(
       expect.anything(),
       expect.not.objectContaining({ timezone: expect.anything() }),
     );
   });
 
-  it('toggles AI features and saves only that field', async () => {
+  it('configures the recognition basis from a dialog when recognition is on', async () => {
+    const user = userEvent.setup();
+    vi.mocked(apiClient.get).mockResolvedValue({
+      data: { ...mockSettings, revenueRecognitionEnabled: true, revenueRecognitionBasis: 'STRAIGHT_LINE' },
+    });
+    vi.mocked(apiClient.put).mockResolvedValue({
+      data: { ...mockSettings, revenueRecognitionEnabled: true, revenueRecognitionBasis: 'PER_VISIT' },
+    });
+    renderWithProviders(<CompanyProfilePanel />);
+    await waitFor(() => expect(screen.getByText('Acme HVAC')).toBeInTheDocument());
+
+    // The link surfaces the active basis and opens the basis dialog.
+    await user.click(screen.getByRole('button', { name: /configure basis/i }));
+    await user.click(screen.getByRole('radio', { name: /per-visit/i }));
+    await user.click(screen.getByRole('button', { name: /^save$/i }));
+
+    await waitFor(() => {
+      expect(apiClient.put).toHaveBeenCalledWith(
+        expect.stringContaining('/tenant'),
+        expect.objectContaining({ revenueRecognitionBasis: 'PER_VISIT' }),
+      );
+    });
+  });
+
+  it('flips AI features in place and persists only that field', async () => {
     const user = userEvent.setup();
     vi.mocked(apiClient.put).mockResolvedValue({
       data: { ...mockSettings, enableAiFeatures: false },
@@ -234,10 +247,8 @@ describe('CompanyProfilePanel', () => {
     renderWithProviders(<CompanyProfilePanel />);
     await waitFor(() => expect(screen.getByText('Acme HVAC')).toBeInTheDocument());
 
-    // AI features is the fifth Edit button.
-    await user.click(editButtons()[4]);
-    await user.click(screen.getByRole('switch'));
-    await user.click(screen.getByRole('button', { name: /save changes/i }));
+    // Default mock has AI on → clicking flips it off.
+    await user.click(screen.getByRole('switch', { name: /ai features/i }));
 
     await waitFor(() => {
       expect(apiClient.put).toHaveBeenCalledWith(
@@ -245,14 +256,13 @@ describe('CompanyProfilePanel', () => {
         expect.objectContaining({ enableAiFeatures: false }),
       );
     });
-    // Partial PUT — unrelated fields aren't sent.
     expect(apiClient.put).toHaveBeenCalledWith(
       expect.anything(),
       expect.not.objectContaining({ timezone: expect.anything() }),
     );
   });
 
-  it('toggles external notifications, warns on OFF, and saves only that field', async () => {
+  it('confirms before turning external notifications OFF, then persists', async () => {
     const user = userEvent.setup();
     vi.mocked(apiClient.put).mockResolvedValue({
       data: { ...mockSettings, enableExternalNotifications: false },
@@ -260,12 +270,13 @@ describe('CompanyProfilePanel', () => {
     renderWithProviders(<CompanyProfilePanel />);
     await waitFor(() => expect(screen.getByText('Acme HVAC')).toBeInTheDocument());
 
-    // Notifications is the sixth (last) Edit button.
-    await user.click(editButtons()[5]);
-    await user.click(screen.getByRole('switch'));
-    // Flipping OFF surfaces the suppression warning before saving.
-    expect(screen.getByText(/will be suppressed/i)).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: /save changes/i }));
+    // Default mock has notifications on → flipping off opens a confirm first.
+    await user.click(screen.getByRole('switch', { name: /^notifications$/i }));
+    expect(screen.getByText(/turn off external notifications\?/i)).toBeInTheDocument();
+    // Nothing persists until confirmed.
+    expect(apiClient.put).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole('button', { name: /^turn off$/i }));
 
     await waitFor(() => {
       expect(apiClient.put).toHaveBeenCalledWith(
@@ -273,11 +284,28 @@ describe('CompanyProfilePanel', () => {
         expect.objectContaining({ enableExternalNotifications: false }),
       );
     });
-    // Partial PUT — unrelated fields (e.g. the AI flag) aren't sent.
-    expect(apiClient.put).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.not.objectContaining({ enableAiFeatures: expect.anything() }),
-    );
+  });
+
+  it('turns external notifications ON in place without a confirm', async () => {
+    const user = userEvent.setup();
+    vi.mocked(apiClient.get).mockResolvedValue({
+      data: { ...mockSettings, enableExternalNotifications: false },
+    });
+    vi.mocked(apiClient.put).mockResolvedValue({
+      data: { ...mockSettings, enableExternalNotifications: true },
+    });
+    renderWithProviders(<CompanyProfilePanel />);
+    await waitFor(() => expect(screen.getByText('Acme HVAC')).toBeInTheDocument());
+
+    await user.click(screen.getByRole('switch', { name: /^notifications$/i }));
+
+    await waitFor(() => {
+      expect(apiClient.put).toHaveBeenCalledWith(
+        expect.stringContaining('/tenant'),
+        expect.objectContaining({ enableExternalNotifications: true }),
+      );
+    });
+    expect(screen.queryByText(/turn off external notifications\?/i)).not.toBeInTheDocument();
   });
 
   it('surfaces a warning in view mode when external notifications are off', async () => {
@@ -315,8 +343,8 @@ describe('CompanyProfilePanel', () => {
     renderWithProviders(<CompanyProfilePanel />);
     await waitFor(() => expect(screen.getByText('Acme HVAC')).toBeInTheDocument());
 
-    // Branding is the fourth Edit button.
-    await user.click(editButtons()[3]);
+    // Branding is the third Edit button.
+    await user.click(editButtons()[2]);
     const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
     const goodFile = new File(['x'], 'logo.png', { type: 'image/png' });
     await user.upload(fileInput, goodFile);
@@ -330,7 +358,7 @@ describe('CompanyProfilePanel', () => {
     renderWithProviders(<CompanyProfilePanel />);
     await waitFor(() => expect(screen.getByText('Acme HVAC')).toBeInTheDocument());
 
-    await user.click(editButtons()[3]);
+    await user.click(editButtons()[2]);
     const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
     const bigFile = new File(['x'.repeat(2 * 1024 * 1024)], 'logo.png', { type: 'image/png' });
     await user.upload(fileInput, bigFile);
@@ -344,7 +372,7 @@ describe('CompanyProfilePanel', () => {
     renderWithProviders(<CompanyProfilePanel />);
     await waitFor(() => expect(screen.getByText('Acme HVAC')).toBeInTheDocument());
 
-    await user.click(editButtons()[3]);
+    await user.click(editButtons()[2]);
     expect(screen.queryByRole('button', { name: /^remove$/i })).not.toBeInTheDocument();
   });
 
@@ -357,7 +385,7 @@ describe('CompanyProfilePanel', () => {
     renderWithProviders(<CompanyProfilePanel />);
     await waitFor(() => expect(screen.getByText('Acme HVAC')).toBeInTheDocument());
 
-    await user.click(editButtons()[3]);
+    await user.click(editButtons()[2]);
     await user.click(screen.getByRole('button', { name: /^remove$/i }));
     expect(screen.getByText(/logo will be removed/i)).toBeInTheDocument();
 
@@ -375,7 +403,7 @@ describe('CompanyProfilePanel', () => {
     renderWithProviders(<CompanyProfilePanel />);
     await waitFor(() => expect(screen.getByText('Acme HVAC')).toBeInTheDocument());
 
-    await user.click(editButtons()[3]);
+    await user.click(editButtons()[2]);
     await user.click(screen.getByRole('button', { name: /^remove$/i }));
     expect(screen.getByText(/logo will be removed/i)).toBeInTheDocument();
 
