@@ -962,6 +962,7 @@ function FinancialSnapshotCard({ agreement }: { agreement: AgreementResponse }) 
         agreementId={agreement.id}
         billing={billing ?? undefined}
         defaultAnchorDate={agreement.termStart}
+        plan={plan}
       />
     </>
   );

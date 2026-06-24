@@ -4,6 +4,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { CalendarDaysIcon, CurrencyDollarIcon } from '@heroicons/react/24/outline';
 import {
   agreementApi,
+  type AgreementPlanResponse,
   type BillingMode,
   type BillingScheduleResponse,
   type CadenceUnit,
@@ -25,6 +26,12 @@ interface BillingSetupDialogProps {
   billing?: BillingScheduleResponse;
   /** Sensible default for the anchor date in create mode (usually term start). */
   defaultAnchorDate?: string | null;
+  /**
+   * Plan the agreement was sold from (if any). In create mode its billing
+   * *defaults* pre-fill the form — amount/cadence/net-days — all overridable.
+   * Defaults only; the schedule itself is still written via this dialog's PUT.
+   */
+  plan?: AgreementPlanResponse | null;
 }
 
 const CADENCE_UNITS: CadenceUnit[] = ['WEEK', 'MONTH', 'QUARTER', 'YEAR'];
@@ -39,6 +46,7 @@ export default function BillingSetupDialog({
   agreementId,
   billing,
   defaultAnchorDate,
+  plan,
 }: BillingSetupDialogProps) {
   const queryClient = useQueryClient();
   const isEdit = Boolean(billing);
@@ -56,14 +64,27 @@ export default function BillingSetupDialog({
   useEffect(() => {
     if (!isOpen) return;
     setErrorMessage(null);
-    setAmount(billing?.amount != null ? String(billing.amount) : '');
-    setCadenceUnit(billing?.cadenceUnit ?? 'QUARTER');
-    setCadenceInterval(billing?.cadenceInterval != null ? String(billing.cadenceInterval) : '1');
-    setAnchorDate(billing?.anchorDate ?? defaultAnchorDate ?? '');
-    setNetDays(billing?.netDays != null ? String(billing.netDays) : '30');
-    setBillingMode(billing?.billingMode ?? 'FIXED_SCHEDULE');
-    setActive(billing?.active ?? true);
-  }, [isOpen, billing, defaultAnchorDate]);
+    if (billing) {
+      // Edit — prefill from the existing schedule.
+      setAmount(billing.amount != null ? String(billing.amount) : '');
+      setCadenceUnit(billing.cadenceUnit ?? 'QUARTER');
+      setCadenceInterval(billing.cadenceInterval != null ? String(billing.cadenceInterval) : '1');
+      setAnchorDate(billing.anchorDate ?? defaultAnchorDate ?? '');
+      setNetDays(billing.netDays != null ? String(billing.netDays) : '30');
+      setBillingMode(billing.billingMode ?? 'FIXED_SCHEDULE');
+      setActive(billing.active ?? true);
+    } else {
+      // Create — prefill from the plan's billing defaults when sold from a plan
+      // (defaults only; all overridable). No plan ⇒ blank/standard defaults.
+      setAmount(plan?.defaultAmount != null ? String(plan.defaultAmount) : '');
+      setCadenceUnit(plan?.defaultCadenceUnit ?? 'QUARTER');
+      setCadenceInterval(plan?.defaultCadenceInterval != null ? String(plan.defaultCadenceInterval) : '1');
+      setAnchorDate(defaultAnchorDate ?? '');
+      setNetDays(plan?.defaultNetDays != null ? String(plan.defaultNetDays) : '30');
+      setBillingMode(plan?.defaultBillingMode ?? 'FIXED_SCHEDULE');
+      setActive(true);
+    }
+  }, [isOpen, billing, defaultAnchorDate, plan]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
   const amountNum = Number(amount);
@@ -111,6 +132,11 @@ export default function BillingSetupDialog({
       </DialogDescription>
       <form onSubmit={handleSubmit}>
         <DialogBody>
+          {!isEdit && plan && (
+            <div className="mb-3 rounded-md bg-accent-500/10 px-2.5 py-1.5 text-[11.5px] text-fg-accent ring-1 ring-accent-500/20">
+              Pre-filled from {plan.name} — adjust as needed.
+            </div>
+          )}
           {errorMessage && (
             <div role="alert" className="mb-4 rounded-lg bg-danger-100 p-3 text-[12.5px] text-danger-500 ring-1 ring-danger-500/20">
               {errorMessage}

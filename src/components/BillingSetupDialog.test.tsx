@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderWithProviders, screen, waitFor, userEvent } from '../test/utils';
 import BillingSetupDialog from './BillingSetupDialog';
 import apiClient from '../api/client';
+import type { AgreementPlanResponse } from '../api';
 
 vi.mock('../api/client');
 
@@ -76,6 +77,33 @@ describe('BillingSetupDialog', () => {
     // Quarterly × $300 → derived ARR $1,200/yr, plus the preview footnote.
     expect(await screen.findByText('$1,200')).toBeInTheDocument();
     expect(screen.getByText(/Preview — actual invoices appear/i)).toBeInTheDocument();
+  });
+
+  it('prefills billing defaults from the plan in create mode (overridable)', async () => {
+    const user = userEvent.setup();
+    const plan: AgreementPlanResponse = {
+      id: 'p-1', name: 'Comfort Club — Residential', kind: 'VISIT', classification: 'CONTRACT',
+      defaultAmount: 1200, defaultCadenceUnit: 'YEAR', defaultCadenceInterval: 1, defaultNetDays: 15,
+      defaultBillingMode: 'FIXED_SCHEDULE', defaultTermMonths: 12, defaultAutoRenew: true,
+      defaultRenewalTermMonths: 12, defaultRenewalAlertDays: 60, benefits: {}, active: true, createdAt: '', updatedAt: '',
+    };
+    renderWithProviders(
+      <BillingSetupDialog isOpen onClose={() => {}} agreementId="a-1" defaultAnchorDate="2026-07-01" plan={plan} />,
+    );
+
+    // Provenance banner + the plan's billing defaults pre-filled.
+    expect(screen.getByText(/Pre-filled from Comfort Club/i)).toBeInTheDocument();
+    expect(screen.getByDisplayValue('1200')).toBeInTheDocument(); // amount
+    expect(screen.getByDisplayValue('15')).toBeInTheDocument(); // net days
+
+    // Still overridable + still writes via the same PUT.
+    await user.click(screen.getByRole('button', { name: /save billing/i }));
+    await waitFor(() =>
+      expect(apiClient.put).toHaveBeenCalledWith(
+        '/work-orders/agreements/a-1/billing-schedule',
+        expect.objectContaining({ amount: 1200, cadenceUnit: 'YEAR', netDays: 15 }),
+      ),
+    );
   });
 
   it('prefills from an existing schedule in edit mode', () => {
