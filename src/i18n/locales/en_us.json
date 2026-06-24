@@ -37,6 +37,7 @@
       "removeFilter": "Remove {{name}} filter",
       "rename": "Rename",
       "rowsPerPage": "Rows per page",
+      "sortBy": "Sort by {{field}}",
       "title": "Actions",
       "tryAdjustingFilters": "Try clearing or adjusting filters.",
       "tryAgain": "Try again"

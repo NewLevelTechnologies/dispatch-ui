@@ -96,6 +96,7 @@ vi.mock('react-i18next', () => {
     'common.actions.open': 'Open {{entities}}',
     'common.actions.removeFilter': 'Remove {{name}} filter',
     'common.actions.rename': 'Rename',
+    'common.actions.sortBy': 'Sort by {{field}}',
     'common.actions.tryAdjustingFilters': 'Try clearing or adjusting filters.',
     'common.actions.tryAgain': 'Try again',
     'common.actions.title': 'Actions',

@@ -17,6 +17,7 @@ import { Pill } from '../components/ui/Pill';
 import { RoleChip } from '../components/RoleChip';
 import { Card, CardBody } from '../components/ui/Card';
 import { DenseTable, DenseTHead, DenseRow, CellStack, CellTop, CellSub } from '../components/ui/DenseTable';
+import { SortHeader, type SortDir, type SortState } from '../components/ui/SortHeader';
 import { ListToolbar, ListSearch } from '../components/ui/ListToolbar';
 import { ListFooter } from '../components/ui/ListFooter';
 import { FilterChipListbox, ChipListboxOption } from '../components/ui/FilterChipListbox';
@@ -70,6 +71,21 @@ function readInvitation(raw: string | null): InvitationValue {
   return INVITATION_VALUES.includes(raw as InvitationStatus) ? (raw as InvitationStatus) : '';
 }
 
+// Server-sortable columns (ALLOWED_USER_SORT_FIELDS: lastName, firstName,
+// email, createdAt, status, enabled). Default lastName,asc — represented as
+// "no sort param" so the BE applies its own default. Role is multi-valued and
+// not server-sortable, so its column stays a plain header.
+const DEFAULT_SORT: SortState = { key: 'lastName', dir: 'asc' };
+const DESC_FIRST = new Set<string>(['createdAt']);
+
+function parseSort(raw: string | null): SortState {
+  if (raw) {
+    const [key, dir] = raw.split(',');
+    if (key) return { key, dir: dir === 'asc' ? 'asc' : 'desc' };
+  }
+  return DEFAULT_SORT;
+}
+
 export default function UsersPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -83,6 +99,8 @@ export default function UsersPage() {
   const statusFilter = readStatus(searchParams.get('status'));
   const roleFilter = searchParams.get('role') ?? '';
   const invitationFilter = readInvitation(searchParams.get('invitation'));
+  const sortParam = searchParams.get('sort');
+  const currentSort = parseSort(sortParam);
 
   // Local input mirrors the URL but lets typing feel instant.
   const [searchQuery, setSearchQuery] = useState(urlSearch);
@@ -109,6 +127,7 @@ export default function UsersPage() {
       statusFilter,
       roleFilter,
       invitationFilter,
+      sortParam,
     ],
     queryFn: () =>
       userApi.searchUsers({
@@ -123,6 +142,7 @@ export default function UsersPage() {
               : undefined,
         roleId: roleFilter ? [roleFilter] : undefined,
         invitationStatus: invitationFilter ? [invitationFilter] : undefined,
+        sort: sortParam || undefined,
       }),
   });
 
@@ -188,6 +208,24 @@ export default function UsersPage() {
     else next.set('page', String(target));
     const qs = next.toString();
     return qs ? `?${qs}` : '?';
+  };
+
+  // Toggle dir when re-clicking the active column, else the column's default
+  // dir. Resets to page 1. Writing the default (lastName,asc) back is harmless —
+  // it equals the implicit default the BE applies when the param is absent.
+  const onSort = (key: string) => {
+    const dir: SortDir =
+      key === currentSort.key
+        ? currentSort.dir === 'asc'
+          ? 'desc'
+          : 'asc'
+        : DESC_FIRST.has(key)
+          ? 'desc'
+          : 'asc';
+    const next = new URLSearchParams(searchParams);
+    next.set('sort', `${key},${dir}`);
+    next.delete('page');
+    setSearchParams(next, { replace: false });
   };
 
   const disableMutation = useMutation({
@@ -405,9 +443,9 @@ export default function UsersPage() {
                 <DenseTable>
                 <DenseTHead>
                   <tr>
-                    <th>{t('common.form.name')}</th>
+                    <SortHeader sortKey="lastName" label={t('common.form.name')} current={currentSort} onSort={onSort} />
                     <th>{t('common.form.role')}</th>
-                    <th>{t('common.form.status')}</th>
+                    <SortHeader sortKey="enabled" label={t('common.form.status')} current={currentSort} onSort={onSort} />
                     <th style={{ width: 40 }}></th>
                   </tr>
                 </DenseTHead>
