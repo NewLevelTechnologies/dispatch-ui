@@ -107,6 +107,11 @@ export default function AgreementInvoicesTab({ agreementId }: { agreementId: str
                   return (
                   <DenseRow key={inv.id}>
                     <td>
+                      {/* Plain identifier, NOT accent: accent text is reserved for
+                          links that navigate to another page (cf. the Schedule
+                          tab's WO number → /work-orders/:id). Invoices have no
+                          detail route yet — switch to `id-mono font-semibold
+                          text-fg-accent` and make the row navigate once one lands. */}
                       <span className={voided ? 'font-mono text-fg-muted' : 'font-mono font-bold text-fg-strong'}>
                         {inv.invoiceNumber}
                       </span>
