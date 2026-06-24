@@ -3,7 +3,7 @@ import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderWithProviders } from '../test/utils';
 import AgreementDetailPage from './AgreementDetailPage';
-import { agreementApi, customerApi, dispatchesApi, invoicesApi, agreementFilesApi, agreementNotesApi, tenantSettingsApi, type TenantSettings } from '../api';
+import { agreementApi, agreementPlanApi, customerApi, dispatchesApi, invoicesApi, agreementFilesApi, agreementNotesApi, tenantSettingsApi, type TenantSettings, type AgreementPlanResponse } from '../api';
 
 vi.mock('../api', () => ({
   agreementApi: {
@@ -18,6 +18,7 @@ vi.mock('../api', () => ({
     cancel: vi.fn(),
     list: vi.fn(),
   },
+  agreementPlanApi: { getById: vi.fn(), getAll: vi.fn(), create: vi.fn(), update: vi.fn(), delete: vi.fn() },
   customerApi: { getServiceLocations: vi.fn() },
   dispatchesApi: { listForWorkOrder: vi.fn() },
   invoicesApi: { getAll: vi.fn() },
@@ -354,5 +355,38 @@ describe('AgreementDetailPage', () => {
     // so no "work orders complete" can leak in from the header either).
     expect(screen.getByText('recognized ratably over the term')).toBeInTheDocument();
     expect(screen.queryByText(/work orders complete/)).not.toBeInTheDocument();
+  });
+
+  it('renders the plan chip and member benefits on the Financials card', async () => {
+    vi.mocked(agreementApi.getById).mockResolvedValue({
+      ...agreement,
+      planId: 'plan-1',
+      benefits: {
+        coveredPmVisits: 2,
+        tripFeeWaived: true,
+        laborDiscountPct: 15,
+        partsDiscountPct: 10,
+        priorityDispatch: true,
+      },
+    });
+    vi.mocked(agreementPlanApi.getById).mockResolvedValue({
+      id: 'plan-1',
+      name: 'Comfort Club — Residential',
+    } as unknown as AgreementPlanResponse);
+    // Benefits/plan render in the configured (billing) branch.
+    vi.mocked(agreementApi.getBillingSchedule).mockResolvedValue({
+      agreementId: 'a-1', amount: 27000, cadenceUnit: 'QUARTER', cadenceInterval: 1,
+      anchorDate: '2024-09-01', netDays: 30, billingMode: 'FIXED_SCHEDULE', active: true,
+    });
+    renderPage();
+
+    // Included-term chips (count pluralized; percents; inclusions).
+    expect(await screen.findByText('2 PM visits included')).toBeInTheDocument();
+    expect(screen.getByText('Trip fee waived')).toBeInTheDocument();
+    expect(screen.getByText('15% off labor')).toBeInTheDocument();
+    expect(screen.getByText('10% off parts')).toBeInTheDocument();
+    expect(screen.getByText('Priority dispatch')).toBeInTheDocument();
+    // Plan provenance chip (resolved name).
+    expect(screen.getByText('Comfort Club — Residential')).toBeInTheDocument();
   });
 });

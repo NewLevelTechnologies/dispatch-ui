@@ -14,14 +14,17 @@ import {
   ArrowPathRoundedSquareIcon,
   PencilIcon,
   TrashIcon,
+  CheckIcon,
 } from '@heroicons/react/24/outline';
 import {
   agreementApi,
   agreementFilesApi,
+  agreementPlanApi,
   invoicesApi,
   tenantSettingsApi,
   type AgreementResponse,
   type AgreementStatus,
+  type MemberBenefits,
   type VisitTemplateResponse,
 } from '../api';
 import { useGlossary } from '../contexts/GlossaryContext';
@@ -766,6 +769,22 @@ function NextVisitsCard({
 // Money summary · recognized/deferred · installment schedule · active + Edit.
 // Plan provenance, collection method, and member pricing remain omitted — those
 // backends don't exist yet.
+// Member benefits → short "included term" phrases (framed as inclusions, not
+// applied discounts). coveredPmVisits is a count; percents are 0–100; the
+// booleans are inclusions. "PM visit" is the industry term (kept literal).
+function memberBenefitItems(b?: MemberBenefits | null): string[] {
+  if (!b) return [];
+  const items: string[] = [];
+  if (b.coveredPmVisits != null && b.coveredPmVisits > 0) {
+    items.push(`${b.coveredPmVisits} PM visit${b.coveredPmVisits === 1 ? '' : 's'} included`);
+  }
+  if (b.tripFeeWaived) items.push('Trip fee waived');
+  if (b.laborDiscountPct != null && b.laborDiscountPct > 0) items.push(`${b.laborDiscountPct}% off labor`);
+  if (b.partsDiscountPct != null && b.partsDiscountPct > 0) items.push(`${b.partsDiscountPct}% off parts`);
+  if (b.priorityDispatch) items.push('Priority dispatch');
+  return items;
+}
+
 function FinancialSnapshotCard({ agreement }: { agreement: AgreementResponse }) {
   const { getName } = useGlossary();
   const { data: billing, isLoading } = useQuery(agreementBillingQueryOptions(agreement.id));
@@ -798,6 +817,16 @@ function FinancialSnapshotCard({ agreement }: { agreement: AgreementResponse }) 
       ? Math.min(100, Math.max(0, Math.round((revenue.recognizedToDate / revenue.contractValue) * 100)))
       : 0;
 
+  // Plan provenance — resolve the plan name for the chip (null planId = bespoke,
+  // not sold from a plan). Member benefits render as included-term chips.
+  const { data: plan } = useQuery({
+    queryKey: ['agreement-plan', agreement.planId],
+    queryFn: () => agreementPlanApi.getById(agreement.planId!),
+    enabled: !!agreement.planId,
+    staleTime: 5 * 60 * 1000,
+  });
+  const benefitItems = memberBenefitItems(agreement.benefits);
+
   return (
     <>
       <Card
@@ -820,6 +849,12 @@ function FinancialSnapshotCard({ agreement }: { agreement: AgreementResponse }) 
           />
         ) : (
           <>
+            {plan && (
+              <div className="flex items-center gap-1.5 border-b border-border-soft px-3.5 py-2">
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-fg-muted">Plan</span>
+                <Pill tone="accent">{plan.name}</Pill>
+              </div>
+            )}
             <div className="grid grid-cols-3 border-b border-border-soft">
               <FinCell k="Contract value" v={arr != null ? `${formatCurrency(arr)}/yr` : `Per ${getName('work_order').toLowerCase()}`} />
               <FinCell
@@ -884,6 +919,22 @@ function FinancialSnapshotCard({ agreement }: { agreement: AgreementResponse }) 
                     </div>
                     <div className="text-[11px] text-fg-muted">billed/scheduled, not yet earned</div>
                   </div>
+                </div>
+              </div>
+            )}
+            {benefitItems.length > 0 && (
+              <div className="border-b border-border-soft px-3.5 py-3">
+                <div className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-fg-muted">Included</div>
+                <div className="flex flex-wrap gap-1.5">
+                  {benefitItems.map((item) => (
+                    <span
+                      key={item}
+                      className="inline-flex items-center gap-1 rounded-md bg-success-500/10 px-1.5 py-0.5 text-[11.5px] font-medium text-fg-strong ring-1 ring-success-500/25"
+                    >
+                      <CheckIcon className="size-3 shrink-0 text-success-500" />
+                      {item}
+                    </span>
+                  ))}
                 </div>
               </div>
             )}
