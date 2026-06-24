@@ -139,6 +139,14 @@ export default function SettingsLayout() {
       ],
     },
     {
+      // Section label uses the agreement glossary term; the "Plans" item label is
+      // a fixed static string (no glossary key for plan yet — see agreement-plans.md).
+      label: getName('agreement', true),
+      items: [
+        { label: t('settings.nav.plans'), to: '/settings/agreement-plans' },
+      ],
+    },
+    {
       label: t('settings.sections.workOrders', { workOrders: getName('work_order', true) }),
       items: [
         { label: t('settings.nav.types'), to: '/settings/work-orders/types' },

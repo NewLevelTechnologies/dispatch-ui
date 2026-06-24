@@ -44,6 +44,7 @@ import TerminologyPanel from './pages/settings/TerminologyPanel';
 import NotificationTemplatesPanel from './pages/settings/NotificationTemplatesPanel';
 import NotificationTemplateEditPage from './pages/settings/NotificationTemplateEditPage';
 import DispatchRegionsPanel from './pages/settings/DispatchRegionsPanel';
+import AgreementPlansPanel from './pages/settings/AgreementPlansPanel';
 import WorkOrderTypesPanel from './pages/settings/work-orders/WorkOrderTypesPanel';
 import DivisionsPanel from './pages/settings/work-orders/DivisionsPanel';
 import ItemStatusesPanel from './pages/settings/work-orders/ItemStatusesPanel';
@@ -205,6 +206,7 @@ function App() {
         <Route path="notifications/:id" element={<NotificationTemplateEditPage />} />
         <Route path="notification-templates" element={<Navigate to="/settings/notifications" replace />} />
         <Route path="dispatch-regions" element={<DispatchRegionsPanel />} />
+        <Route path="agreement-plans" element={<AgreementPlansPanel />} />
         <Route path="work-orders/types" element={<WorkOrderTypesPanel />} />
         <Route path="work-orders/divisions" element={<DivisionsPanel />} />
         <Route path="work-orders/item-statuses" element={<ItemStatusesPanel />} />

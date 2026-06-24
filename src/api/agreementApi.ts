@@ -92,6 +92,18 @@ export interface AgreementCustomerRef {
   name: string;
 }
 
+// Member benefits — the included terms an agreement (or plan) is sold under.
+// Framed as INCLUDED TERMS, not applied discounts. `coveredPmVisits` is a COUNT
+// ("2 PM visits included"); the percents are 0–100; booleans default false.
+// One shape shared by plans and agreements (BE: MemberBenefitsDto).
+export interface MemberBenefits {
+  coveredPmVisits?: number | null;
+  tripFeeWaived?: boolean;
+  laborDiscountPct?: number | null;
+  partsDiscountPct?: number | null;
+  priorityDispatch?: boolean;
+}
+
 export interface AgreementResponse {
   id: string;
   agreementNumber: string; // human id, e.g. "SA-00042"
@@ -107,6 +119,11 @@ export interface AgreementResponse {
   renewalTermMonths?: number | null;
   renewalAlertDays?: number | null;
   notes?: string | null;
+  // Plan provenance (null = bespoke, not sold from a plan) + the member-benefits
+  // snapshot the agreement was sold under. BE always sends `benefits`; kept
+  // optional here as a stale-cache safeguard (treat undefined as no benefits).
+  planId?: string | null;
+  benefits?: MemberBenefits;
   coverageLocationCount: number; // the "covered" number
   visitTemplates: VisitTemplateResponse[];
   createdAt: string;
@@ -175,6 +192,10 @@ export interface CreateAgreementRequest {
   renewalTermMonths?: number | null;
   renewalAlertDays?: number | null;
   notes?: string | null;
+  // Sell from a plan: set planId to record provenance. Omit `benefits` to
+  // snapshot the plan's benefits; send it to override the benefits per-sale.
+  planId?: string | null;
+  benefits?: MemberBenefits | null;
 }
 
 // PATCH body. Tri-state nullable fields (termStart, termEnd, renewalTermMonths,
@@ -190,6 +211,9 @@ export interface UpdateAgreementRequest {
   renewalTermMonths?: number | null;
   renewalAlertDays?: number | null;
   notes?: string | null;
+  // Whole-object replace of the member benefits when provided; omit to leave
+  // them unchanged.
+  benefits?: MemberBenefits | null;
 }
 
 // ---- Coverage ---------------------------------------------------------------
@@ -321,6 +345,65 @@ export interface RevenueRecognitionResponse {
   // Term total (the "X of Y" denominator); matches /compliance's
   // visitsExpectedThisTerm so the two cards agree. Null for open-ended terms.
   visitsExpectedThisTerm: number | null;
+}
+
+// ---- Plans (tenant-defined templates a sale defaults/overrides from) --------
+// Live under /work-orders/agreement-plans. A plan carries the default term,
+// billing, and member benefits; selling from one pre-fills the create form and
+// stamps the agreement's planId for provenance.
+export interface AgreementPlanResponse {
+  id: string;
+  name: string;
+  kind: AgreementKind;
+  classification: AgreementClassification;
+  defaultAmount?: number | null;
+  defaultCadenceUnit?: CadenceUnit | null;
+  defaultCadenceInterval: number;
+  defaultNetDays: number;
+  defaultBillingMode: BillingMode;
+  defaultTermMonths?: number | null;
+  defaultAutoRenew: boolean;
+  defaultRenewalTermMonths?: number | null;
+  defaultRenewalAlertDays?: number | null;
+  benefits: MemberBenefits;
+  active: boolean; // false = archived (DELETE archives; PATCH active:true restores)
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateAgreementPlanRequest {
+  name: string;
+  kind?: AgreementKind;
+  classification?: AgreementClassification;
+  defaultAmount?: number | null;
+  defaultCadenceUnit?: CadenceUnit | null;
+  defaultCadenceInterval?: number;
+  defaultNetDays?: number;
+  defaultBillingMode?: BillingMode;
+  defaultTermMonths?: number | null;
+  defaultAutoRenew?: boolean;
+  defaultRenewalTermMonths?: number | null;
+  defaultRenewalAlertDays?: number | null;
+  benefits?: MemberBenefits;
+}
+
+// PATCH any field; `benefits` replaces the whole object when sent. `active`
+// toggles archive/restore.
+export interface UpdateAgreementPlanRequest {
+  name?: string;
+  kind?: AgreementKind;
+  classification?: AgreementClassification;
+  defaultAmount?: number | null;
+  defaultCadenceUnit?: CadenceUnit | null;
+  defaultCadenceInterval?: number;
+  defaultNetDays?: number;
+  defaultBillingMode?: BillingMode;
+  defaultTermMonths?: number | null;
+  defaultAutoRenew?: boolean;
+  defaultRenewalTermMonths?: number | null;
+  defaultRenewalAlertDays?: number | null;
+  active?: boolean;
+  benefits?: MemberBenefits;
 }
 
 export const agreementApi = {
@@ -515,6 +598,35 @@ export const agreementApi = {
       `/work-orders/agreements/${id}/revenue-recognition`,
     );
     return response.data;
+  },
+};
+
+// ---- Plans CRUD -------------------------------------------------------------
+// Tenant-defined plan templates. DELETE archives (soft); list is active-only
+// unless includeInactive. Used by the plan-management settings surface and the
+// sell-from-plan create flow.
+export const agreementPlanApi = {
+  getAll: async (includeInactive = false): Promise<AgreementPlanResponse[]> => {
+    const response = await apiClient.get<AgreementPlanResponse[]>('/work-orders/agreement-plans', {
+      params: includeInactive ? { includeInactive: true } : undefined,
+    });
+    return response.data;
+  },
+  getById: async (id: string): Promise<AgreementPlanResponse> => {
+    const response = await apiClient.get<AgreementPlanResponse>(`/work-orders/agreement-plans/${id}`);
+    return response.data;
+  },
+  create: async (request: CreateAgreementPlanRequest): Promise<AgreementPlanResponse> => {
+    const response = await apiClient.post<AgreementPlanResponse>('/work-orders/agreement-plans', request);
+    return response.data;
+  },
+  update: async (id: string, request: UpdateAgreementPlanRequest): Promise<AgreementPlanResponse> => {
+    const response = await apiClient.patch<AgreementPlanResponse>(`/work-orders/agreement-plans/${id}`, request);
+    return response.data;
+  },
+  // Archives the plan (soft delete). Existing agreements keep their snapshot.
+  delete: async (id: string): Promise<void> => {
+    await apiClient.delete(`/work-orders/agreement-plans/${id}`);
   },
 };
 

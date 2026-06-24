@@ -143,6 +143,7 @@ export {
 export {
   agreementApi,
   agreementNotesApi,
+  agreementPlanApi,
   type AgreementKind,
   type AgreementClassification,
   type AgreementStatus,
@@ -174,6 +175,10 @@ export {
   type BillingInstallmentResponse,
   type BillingInstallmentStatus,
   type RevenueRecognitionResponse,
+  type MemberBenefits,
+  type AgreementPlanResponse,
+  type CreateAgreementPlanRequest,
+  type UpdateAgreementPlanRequest,
 } from './agreementApi';
 
 // Equipment APIs

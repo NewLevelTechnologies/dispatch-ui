@@ -1291,6 +1291,7 @@ vi.mock('react-i18next', () => {
     'settings.nav.general': 'General',
     'settings.nav.itemStatuses': 'Item Statuses',
     'settings.nav.notificationTemplates': 'Notification Templates',
+    'settings.nav.plans': 'Plans',
     'settings.nav.statusWorkflows': 'Status Workflows',
     'settings.nav.terminology': 'Terminology',
     'settings.nav.types': 'Types',
