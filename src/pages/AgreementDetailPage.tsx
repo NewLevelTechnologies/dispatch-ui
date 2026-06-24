@@ -771,12 +771,18 @@ function NextVisitsCard({
 // backends don't exist yet.
 // Member benefits → short "included term" phrases (framed as inclusions, not
 // applied discounts). coveredPmVisits is a count; percents are 0–100; the
-// booleans are inclusions. "PM visit" is the industry term (kept literal).
-function memberBenefitItems(b?: MemberBenefits | null): string[] {
+// booleans are inclusions. "visit" reads through the work_order glossary term
+// (caller passes the singular/plural so this stays a pure helper).
+function memberBenefitItems(
+  b: MemberBenefits | undefined | null,
+  woSingular: string,
+  woPlural: string,
+): string[] {
   if (!b) return [];
   const items: string[] = [];
   if (b.coveredPmVisits != null && b.coveredPmVisits > 0) {
-    items.push(`${b.coveredPmVisits} PM visit${b.coveredPmVisits === 1 ? '' : 's'} included`);
+    const wo = (b.coveredPmVisits === 1 ? woSingular : woPlural).toLowerCase();
+    items.push(`${b.coveredPmVisits} PM ${wo} included`);
   }
   if (b.tripFeeWaived) items.push('Trip fee waived');
   if (b.laborDiscountPct != null && b.laborDiscountPct > 0) items.push(`${b.laborDiscountPct}% off labor`);
@@ -825,7 +831,7 @@ function FinancialSnapshotCard({ agreement }: { agreement: AgreementResponse }) 
     enabled: !!agreement.planId,
     staleTime: 5 * 60 * 1000,
   });
-  const benefitItems = memberBenefitItems(agreement.benefits);
+  const benefitItems = memberBenefitItems(agreement.benefits, getName('work_order'), getName('work_order', true));
 
   return (
     <>

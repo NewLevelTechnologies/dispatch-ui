@@ -380,8 +380,8 @@ describe('AgreementDetailPage', () => {
     });
     renderPage();
 
-    // Included-term chips (count pluralized; percents; inclusions).
-    expect(await screen.findByText('2 PM visits included')).toBeInTheDocument();
+    // Included-term chips — "visit" reads through the work_order glossary term.
+    expect(await screen.findByText('2 PM work orders included')).toBeInTheDocument();
     expect(screen.getByText('Trip fee waived')).toBeInTheDocument();
     expect(screen.getByText('15% off labor')).toBeInTheDocument();
     expect(screen.getByText('10% off parts')).toBeInTheDocument();
