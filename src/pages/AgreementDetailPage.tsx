@@ -641,7 +641,7 @@ function OverviewTab({
           <FinancialSnapshotCard agreement={agreement} />
         </div>
         <div className="flex flex-col gap-3">
-          <ScopeCard agreementId={agreement.id} templates={agreement.visitTemplates} />
+          <ScopeCard agreementId={agreement.id} templates={agreement.visitTemplates} termStart={agreement.termStart ?? undefined} />
           <TermCard agreement={agreement} onEdit={onEdit} />
           <CustomerCard agreement={agreement} />
           <NotesCard entityType="agreement" entityId={agreement.id} />
@@ -994,7 +994,7 @@ function InstallmentSchedule({ installments }: { installments: EnrichedInstallme
 // The page's marquee — rebuilt on the real visit templates + scope items (the
 // mock's plain-English Included/Excluded/SLA prose has no backing data).
 // Editable: add / edit / delete the recurrence rules that drive generation.
-function ScopeCard({ agreementId, templates }: { agreementId: string; templates: VisitTemplateResponse[] }) {
+function ScopeCard({ agreementId, templates, termStart }: { agreementId: string; templates: VisitTemplateResponse[]; termStart?: string }) {
   const { getName } = useGlossary();
   const queryClient = useQueryClient();
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -1082,6 +1082,7 @@ function ScopeCard({ agreementId, templates }: { agreementId: string; templates:
         onClose={() => setDialogOpen(false)}
         agreementId={agreementId}
         template={editing ?? undefined}
+        termStart={termStart}
       />
       <ConfirmDialog
         isOpen={deleting !== null}
