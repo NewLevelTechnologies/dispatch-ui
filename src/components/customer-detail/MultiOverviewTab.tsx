@@ -625,7 +625,10 @@ function LocationsPreviewCard({
 
 // Condensed strategic summary — active count + nearest renewal, plus ARR +
 // coverage % from the AG-1 summary (honest pending until that query resolves).
-function AgreementsSummaryCard({
+// Exported so the SINGLE-shape detail reuses the exact same right-rail rollup
+// (ARR + active count + next renewal). The coverage line auto-hides for a
+// single location (nothing to roll up), so it reads identically on both shapes.
+export function AgreementsSummaryCard({
   agreements,
   summary,
   onViewAll,
@@ -673,9 +676,13 @@ function AgreementsSummaryCard({
                   {formatMoney(summary.arr)}
                   <span className="ml-0.5 text-[11px] font-medium text-fg-muted">/yr</span>
                 </div>
-                <div className="text-[11px] text-fg-muted">
-                  {summary.coveragePct}% covered · {summary.coveredLocations}/{summary.totalLocations} {getName('service_location', true).toLowerCase()}
-                </div>
+                {/* Coverage rollup only makes sense across multiple locations;
+                    a single-site customer has nothing to roll up. */}
+                {summary.totalLocations > 1 && (
+                  <div className="text-[11px] text-fg-muted">
+                    {summary.coveragePct}% covered · {summary.coveredLocations}/{summary.totalLocations} {getName('service_location', true).toLowerCase()}
+                  </div>
+                )}
               </>
             ) : (
               <div className="mt-0.5 text-[11px] text-fg-muted">ARR &amp; coverage loading…</div>
