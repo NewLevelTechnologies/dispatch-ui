@@ -106,14 +106,14 @@ describe('WorkOrdersPage', () => {
     expect(screen.getByRole('button', { name: /create work order/i })).toBeInTheDocument();
   });
 
-  it('displays loading state while fetching work orders', () => {
+  it('displays loading state while fetching work orders', async () => {
     vi.mocked(apiClient.get).mockImplementation(
       () => new Promise(() => {}) // Never resolves
     );
 
     renderWithProviders(<WorkOrdersPage />);
 
-    expect(screen.getByText('Loading work orders...')).toBeInTheDocument();
+    expect(await screen.findByText('Loading work orders...')).toBeInTheDocument();
   });
 
   it('displays work orders in a table', async () => {

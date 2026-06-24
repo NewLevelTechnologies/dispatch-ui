@@ -31,6 +31,7 @@ import { Dialog, DialogActions, DialogBody, DialogTitle } from '../../components
 import { Textarea } from '../../components/catalyst/textarea';
 import { Dropdown, DropdownButton, DropdownItem, DropdownLabel, DropdownMenu } from '../../components/catalyst/dropdown';
 import IconButton from '../../components/IconButton';
+import { LoadingState } from '../../components/ui/LoadingState';
 import AgreementFileUploadDialog from '../../components/AgreementFileUploadDialog';
 
 const PAGE_LIMIT = 100;
@@ -83,7 +84,7 @@ export default function AgreementFilesTab({ agreementId }: { agreementId: string
 
       {query.isLoading ? (
         <Card padding="none">
-          <div className="px-3.5 py-6 text-center text-[12px] text-fg-muted">Loading documents…</div>
+          <LoadingState label="Loading documents…" />
         </Card>
       ) : files.length === 0 ? (
         <Card padding="none">

@@ -156,10 +156,10 @@ describe('WorkOrderDetailPage', () => {
     });
   };
 
-  it('displays loading state', () => {
+  it('displays loading state', async () => {
     vi.mocked(apiClient.get).mockImplementation(() => new Promise(() => {}));
     renderPage();
-    expect(screen.getByText(/loading/i)).toBeInTheDocument();
+    expect(await screen.findByText(/loading/i)).toBeInTheDocument();
   });
 
   it('displays error state when work order is not found', async () => {

@@ -36,6 +36,7 @@ import { Pill } from '../ui/Pill';
 import { ToggleGroup, ToggleGroupOption } from '../ui/ToggleGroup';
 import { Tabs } from '../ui/Tabs';
 import { Callout } from '../ui/Callout';
+import { LoadingState } from '../ui/LoadingState';
 import IconButton from '../IconButton';
 import ConfirmDialog from '../ConfirmDialog';
 import WorkOrderFormDialog from '../WorkOrderFormDialog';
@@ -363,9 +364,7 @@ export default function SingleCustomerDetail({ customer }: { customer: Customer 
             <div className="flex flex-col gap-3">
               {attentionItems.length > 0 && <AttentionStrip items={attentionItems} />}
               {locationLoading || !location ? (
-                <div className="px-3.5 py-10 text-center text-[12px] text-fg-muted">
-                  {t('common.actions.loading', { entities: getName('service_location', true) })}
-                </div>
+                <LoadingState label={t('common.actions.loading', { entities: getName('service_location', true) })} />
               ) : (
                 <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1fr_340px]">
                   <div className="flex flex-col gap-3">
@@ -411,9 +410,7 @@ export default function SingleCustomerDetail({ customer }: { customer: Customer 
             (location ? (
               <DispatchesTab location={location} />
             ) : (
-              <div className="px-3.5 py-10 text-center text-[12px] text-fg-muted">
-                {t('common.actions.loading', { entities: getName('dispatch', true) })}
-              </div>
+              <LoadingState label={t('common.actions.loading', { entities: getName('dispatch', true) })} />
             ))}
 
           {activeTab === 'files' && locId && <LocationFilesTab locationId={locId} canEdit={canEditCustomers} />}

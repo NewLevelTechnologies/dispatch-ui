@@ -14,6 +14,7 @@ import { resolveCustomerShape } from '../lib/customerShape';
 import { useGlossary } from '../contexts/GlossaryContext';
 import AppLayout from '../components/AppLayout';
 import { Callout } from '../components/ui/Callout';
+import { LoadingState } from '../components/ui/LoadingState';
 import { Button } from '../components/catalyst/button';
 import MultiCustomerDetail from '../components/customer-detail/MultiCustomerDetail';
 import SingleCustomerDetail from '../components/customer-detail/SingleCustomerDetail';
@@ -34,9 +35,7 @@ export default function CustomerDetailPage() {
   if (isLoading) {
     return (
       <AppLayout>
-        <div className="p-8 text-center text-[12.5px] text-fg-muted">
-          {t('common.actions.loadingEntity', { entity: getName('customer') })}
-        </div>
+        <LoadingState label={t('common.actions.loadingEntity', { entity: getName('customer') })} />
       </AppLayout>
     );
   }

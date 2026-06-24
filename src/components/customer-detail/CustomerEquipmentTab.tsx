@@ -19,6 +19,7 @@ import { Button } from '../catalyst/button';
 import { DenseTable, DenseTHead, DenseRow, CellStack, CellTop, CellSub } from '../ui/DenseTable';
 import { Dropdown, DropdownButton, DropdownItem, DropdownLabel, DropdownMenu } from '../catalyst/dropdown';
 import { ErrorState } from '../ui/ErrorState';
+import { LoadingState } from '../ui/LoadingState';
 import { ListFooter } from '../ui/ListFooter';
 import { useUrlPage } from '../../hooks/useUrlPage';
 import EquipmentThumbnail from '../EquipmentThumbnail';
@@ -174,9 +175,7 @@ export default function CustomerEquipmentTab({
 
       <Card padding="none">
         {isLoading ? (
-          <div className="px-5 py-10 text-center text-[12px] text-fg-muted">
-            {t('common.actions.loading', { entities: getName('equipment', true) })}
-          </div>
+          <LoadingState label={t('common.actions.loading', { entities: getName('equipment', true) })} />
         ) : error ? (
           <ErrorState
             title={t('common.actions.couldNotLoad', { entities: getName('equipment', true), defaultValue: `Couldn't load ${getName('equipment', true)}` })}

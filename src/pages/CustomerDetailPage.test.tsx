@@ -79,10 +79,10 @@ describe('CustomerDetailPage (shape router)', () => {
     vi.clearAllMocks();
   });
 
-  it('shows a loading state while the customer loads', () => {
+  it('shows a loading state while the customer loads', async () => {
     vi.mocked(apiClient.get).mockImplementation(() => new Promise(() => {}));
     render();
-    expect(screen.getByText(/loading/i)).toBeInTheDocument();
+    expect(await screen.findByText(/loading/i)).toBeInTheDocument();
   });
 
   it('shows an error state when the fetch fails', async () => {

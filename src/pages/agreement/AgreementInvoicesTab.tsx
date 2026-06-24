@@ -17,6 +17,7 @@ import { Card } from '../../components/catalyst/card';
 import { Pill } from '../../components/ui/Pill';
 import { DenseTable, DenseTHead, DenseRow } from '../../components/ui/DenseTable';
 import { ListFooter } from '../../components/ui/ListFooter';
+import { LoadingState } from '../../components/ui/LoadingState';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { useUrlPage } from '../../hooks/useUrlPage';
 import { formatDateShort, formatMoney } from '../../components/customer-detail/format';
@@ -73,9 +74,7 @@ export default function AgreementInvoicesTab({ agreementId }: { agreementId: str
   return (
     <Card padding="none">
       {isLoading ? (
-        <div className="px-3.5 py-10 text-center text-[12px] text-fg-muted">
-          {t('common.actions.loading', { entities: getName('invoice', true) })}
-        </div>
+        <LoadingState label={t('common.actions.loading', { entities: getName('invoice', true) })} />
       ) : rows.length === 0 ? (
         <EmptyState
           title={`No ${getName('invoice', true).toLowerCase()} yet`}

@@ -116,6 +116,7 @@ import { PhotoLightbox } from '../components/ui/PhotoLightbox';
 import { Callout } from '../components/ui/Callout';
 import { Tabs } from '../components/ui/Tabs';
 import { ListFooter } from '../components/ui/ListFooter';
+import { LoadingState } from '../components/ui/LoadingState';
 import { EquipmentSummaryCard } from '../components/detail/EquipmentSummaryCard';
 import type { ServiceLocationDetailDto, PremiseType, UpdateServiceLocationRequest, AddressVerifyRequest } from '../api/customerApi';
 import {
@@ -261,9 +262,7 @@ export default function ServiceLocationDetailPage() {
   if (isLoading) {
     return (
       <AppLayout>
-        <div className="p-8 text-center text-[12.5px] text-fg-muted">
-          {t('common.actions.loading', { entities: getName('service_location', true) })}
-        </div>
+        <LoadingState label={t('common.actions.loading', { entities: getName('service_location', true) })} />
       </AppLayout>
     );
   }
@@ -1193,9 +1192,7 @@ export function SiteWorkOrdersCard({
           on AG-2 (forward proactive/agreement visits); renders here, above the
           table, when a future visit beyond the open WOs exists. */}
       {isLoading ? (
-        <div className="px-3.5 py-6 text-center text-[12px] text-fg-muted">
-          {t('common.actions.loading', { entities: getName('work_order', true) })}
-        </div>
+        <LoadingState label={t('common.actions.loading', { entities: getName('work_order', true) })} />
       ) : items.length === 0 ? (
         <div className="px-3.5 py-6 text-center text-[12px] text-fg-muted">
           {t('common.actions.noEntitiesYet', { entities: getName('work_order', true) })}
@@ -3035,9 +3032,7 @@ function EquipmentTab({
 
       <Card padding="none">
         {isLoading ? (
-          <div className="px-5 py-10 text-center text-[12px] text-fg-muted">
-            {t('common.actions.loading', { entities: getName('equipment', true) })}
-          </div>
+          <LoadingState label={t('common.actions.loading', { entities: getName('equipment', true) })} />
         ) : rows.length === 0 ? (
           <div className="px-5 py-10 text-center">
             <div className="text-[13px] font-semibold text-fg-strong">
@@ -3425,9 +3420,7 @@ function InvoicesTab({ location }: { location: ServiceLocationDetailDto }) {
         padding="none"
       >
         {isLoading ? (
-          <div className="px-3.5 py-6 text-center text-[12px] text-fg-muted">
-            {t('common.actions.loading', { entities: getName('invoice', true) })}
-          </div>
+          <LoadingState label={t('common.actions.loading', { entities: getName('invoice', true) })} />
         ) : rows.length === 0 ? (
           <div className="px-3.5 py-10 text-center">
             <div className="text-[13px] font-semibold text-fg-strong">
@@ -3755,9 +3748,7 @@ export function DispatchesTab({ location }: { location: ServiceLocationDetailDto
 
       {isLoading ? (
         <Card padding="none">
-          <div className="px-3.5 py-6 text-center text-[12px] text-fg-muted">
-            {t('common.actions.loading', { entities: getName('dispatch', true) })}
-          </div>
+          <LoadingState label={t('common.actions.loading', { entities: getName('dispatch', true) })} />
         </Card>
       ) : upcoming.length === 0 && pastTotal === 0 ? (
         <Card padding="none">
@@ -4182,9 +4173,7 @@ function JobsTab({ location, onNewJob }: { location: ServiceLocationDetailDto; o
 
       <Card padding="none">
         {isLoading ? (
-          <div className="px-3.5 py-10 text-center text-[12px] text-fg-muted">
-            {t('common.actions.loading', { entities: getName('work_order', true) })}
-          </div>
+          <LoadingState label={t('common.actions.loading', { entities: getName('work_order', true) })} />
         ) : rows.length === 0 ? (
           <div className="px-5 py-10 text-center">
             <div className="text-[13px] font-semibold text-fg-strong">

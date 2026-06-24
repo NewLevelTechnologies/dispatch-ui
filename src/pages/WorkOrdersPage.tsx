@@ -35,6 +35,7 @@ import IconButton from '../components/IconButton';
 import { DateRangeChip } from '../components/ui/DateRangeChip';
 import { PageHead } from '../components/ui/PageHead';
 import { Card, CardBody } from '../components/ui/Card';
+import { LoadingState } from '../components/ui/LoadingState';
 import { Pill } from '../components/ui/Pill';
 import { ViewTabs } from '../components/ui/Tabs';
 import {
@@ -639,10 +640,8 @@ export default function WorkOrdersPage() {
 
         {isLoading && (
           <Card>
-            <CardBody>
-              <p className="text-[12.5px] text-fg-muted text-center">
-                {t('common.actions.loading', { entities: getName('work_order', true) })}
-              </p>
+            <CardBody flush>
+              <LoadingState label={t('common.actions.loading', { entities: getName('work_order', true) })} />
             </CardBody>
           </Card>
         )}

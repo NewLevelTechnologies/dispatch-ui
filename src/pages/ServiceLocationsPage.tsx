@@ -32,6 +32,7 @@ import { FilterChipRow, FilterChip } from '../components/ui/FilterChipRow';
 import {
   DenseTable, DenseTHead, DenseRow, CellStack, CellTop, CellSub,
 } from '../components/ui/DenseTable';
+import { SortHeader, type SortDir, type SortState } from '../components/ui/SortHeader';
 import { Dropdown, DropdownButton, DropdownItem, DropdownLabel, DropdownMenu } from '../components/catalyst/dropdown';
 import IconButton from '../components/IconButton';
 import { FilterChipListbox, ChipListboxOption } from '../components/ui/FilterChipListbox';
@@ -80,6 +81,22 @@ function formatTagDisplayValue(
   return t('common.selectedCount', { count: ids.length });
 }
 
+// Server-sortable columns (see FE_HANDOFF_list_sort_pagination). Default is
+// customerName,asc — represented as "no sort param" so the BE applies its own
+// default (which groups a customer's locations together).
+const DEFAULT_SORT: SortState = { key: 'customerName', dir: 'asc' };
+// Date columns read best most-recent-first on the first click; text columns
+// default to asc.
+const DESC_FIRST = new Set(['lastServiceAt']);
+
+function parseSort(raw: string | null): SortState {
+  if (raw) {
+    const [key, dir] = raw.split(',');
+    if (key) return { key, dir: dir === 'asc' ? 'asc' : 'desc' };
+  }
+  return DEFAULT_SORT;
+}
+
 export default function ServiceLocationsPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -104,6 +121,8 @@ export default function ServiceLocationsPage() {
   // Tag filter ids — URL writes repeated `?tag=uuid`; API serializes to
   // comma-separated `?tags=uuid1,uuid2` on the wire.
   const tagIds = useMemo(() => searchParams.getAll('tag'), [searchParams]);
+  const sortParam = searchParams.get('sort');
+  const currentSort = parseSort(sortParam);
 
   const [searchQuery, setSearchQuery] = useState(urlSearch);
   useEffect(() => {
@@ -205,6 +224,24 @@ export default function ServiceLocationsPage() {
     return qs ? `?${qs}` : '?';
   };
 
+  // Toggle dir when re-clicking the active column, else the column's default
+  // dir. Resets to page 1. Writing the default (customerName,asc) back is
+  // harmless — it equals the implicit default the BE applies when absent.
+  const onSort = (key: string) => {
+    const dir: SortDir =
+      key === currentSort.key
+        ? currentSort.dir === 'asc'
+          ? 'desc'
+          : 'asc'
+        : DESC_FIRST.has(key)
+          ? 'desc'
+          : 'asc';
+    const next = new URLSearchParams(searchParams);
+    next.set('sort', `${key},${dir}`);
+    next.delete('page');
+    setSearchParams(next, { replace: false });
+  };
+
   const apiStatuses = useMemo<Array<'ACTIVE' | 'INACTIVE' | 'CLOSED'> | undefined>(() => {
     if (statuses.length === STATUS_KEYS.length) return undefined;
     return statuses.map((s) => s.toUpperCase() as 'ACTIVE' | 'INACTIVE' | 'CLOSED');
@@ -227,10 +264,11 @@ export default function ServiceLocationsPage() {
       openJobsFilter,
       overdueFilter,
       tagIds,
+      sortParam,
     ],
     queryFn: () => customerApi.getAllServiceLocationsPaginated({
       page,
-      limit: PAGE_SIZE,
+      size: PAGE_SIZE,
       search: deferredSearch || undefined,
       dispatchRegionId: regionId || undefined,
       status: apiStatuses,
@@ -239,6 +277,7 @@ export default function ServiceLocationsPage() {
       hasOpenJobs: openJobsFilter || undefined,
       pmOverdue: overdueFilter || undefined,
       tagIds: tagIds.length > 0 ? tagIds : undefined,
+      sort: sortParam || undefined,
     }),
   });
 
@@ -497,10 +536,10 @@ export default function ServiceLocationsPage() {
                 <DenseTable>
                   <DenseTHead>
                     <tr>
-                      <th>{getName('service_location')}</th>
+                      <SortHeader sortKey="customerName" label={getName('service_location')} current={currentSort} onSort={onSort} />
                       <th>{t('serviceLocations.table.region')}</th>
-                      <th>{t('common.form.status')}</th>
-                      <th>{t('serviceLocations.table.lastService')}</th>
+                      <SortHeader sortKey="status" label={t('common.form.status')} current={currentSort} onSort={onSort} />
+                      <SortHeader sortKey="lastServiceAt" label={t('serviceLocations.table.lastService')} current={currentSort} onSort={onSort} />
                       <th>{t('serviceLocations.table.contact')}</th>
                       <th>{t('serviceLocations.table.tags')}</th>
                       <th style={{ width: 40 }}></th>

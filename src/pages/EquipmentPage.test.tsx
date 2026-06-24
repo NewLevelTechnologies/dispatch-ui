@@ -91,12 +91,12 @@ describe('EquipmentPage', () => {
     });
   });
 
-  it('displays loading state', () => {
+  it('displays loading state', async () => {
     mockEquipmentList.mockImplementation(() => new Promise(() => {}));
 
     renderWithProviders(<EquipmentPage />);
 
-    expect(screen.getByText('Loading equipment...')).toBeInTheDocument();
+    expect(await screen.findByText('Loading equipment...')).toBeInTheDocument();
   });
 
   it('displays equipment in a table', async () => {

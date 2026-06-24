@@ -317,10 +317,11 @@ describe('CompanyProfilePanel', () => {
     expect(screen.getByText(/aren't receiving any notifications/i)).toBeInTheDocument();
   });
 
-  it('shows loading state while fetching', () => {
+  it('shows loading state while fetching', async () => {
     vi.mocked(apiClient.get).mockImplementation(() => new Promise(() => {}));
     renderWithProviders(<CompanyProfilePanel />);
-    expect(screen.getByText(/loading settings/i)).toBeInTheDocument();
+    // LoadingState has a 250 ms delay before becoming visible.
+    expect(await screen.findByText(/loading settings/i)).toBeInTheDocument();
   });
 
   it('surfaces the API error message on load failure', async () => {

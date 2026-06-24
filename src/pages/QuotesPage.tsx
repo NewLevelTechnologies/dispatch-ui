@@ -11,6 +11,7 @@ import { Select } from '../components/catalyst/select';
 import { Textarea } from '../components/catalyst/textarea';
 import { PageHead } from '../components/ui/PageHead';
 import { Card, CardBody } from '../components/ui/Card';
+import { LoadingState } from '../components/ui/LoadingState';
 import { Pill } from '../components/ui/Pill';
 import {
   DenseTable, DenseTHead, DenseRow,
@@ -58,7 +59,7 @@ export default function QuotesPage() {
   const { data: customers = [] } = useQuery({
     queryKey: ['quote-form-customers'],
     queryFn: async () => {
-      const page = await customerApi.getAllPaginated({ limit: 200, status: ['ACTIVE'] });
+      const page = await customerApi.getAllPaginated({ size: 200, status: ['ACTIVE'] });
       return page.content;
     },
   });
@@ -240,10 +241,8 @@ export default function QuotesPage() {
 
         {quotesLoading ? (
           <Card>
-            <CardBody>
-              <p className="text-center text-[12.5px] text-fg-muted">
-                {t('common.actions.loading', { entities: getName('quote', true) })}
-              </p>
+            <CardBody flush>
+              <LoadingState label={t('common.actions.loading', { entities: getName('quote', true) })} />
             </CardBody>
           </Card>
         ) : filteredQuotes.length === 0 ? (

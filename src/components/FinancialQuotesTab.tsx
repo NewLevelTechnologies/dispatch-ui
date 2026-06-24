@@ -35,6 +35,7 @@ import {
   TableRow,
 } from './catalyst/table';
 import { Text } from './catalyst/text';
+import { LoadingState } from './ui/LoadingState';
 
 interface Props {
   workOrderId: string;
@@ -303,13 +304,11 @@ export default function FinancialQuotesTab({
 
   if (isLoading) {
     return (
-      <div className="py-8 text-center">
-        <Text className="!text-sm !text-zinc-500">
-          {t('workOrders.financialDrawer.quotesTab.loading', {
-            entities: quotesLabel,
-          })}
-        </Text>
-      </div>
+      <LoadingState
+        label={t('workOrders.financialDrawer.quotesTab.loading', {
+          entities: quotesLabel,
+        })}
+      />
     );
   }
 

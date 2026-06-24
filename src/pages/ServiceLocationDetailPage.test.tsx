@@ -421,10 +421,10 @@ describe('ServiceLocationDetailPage', () => {
   });
 
   // ── States ────────────────────────────────────────────────────────────
-  it('displays loading state', () => {
+  it('displays loading state', async () => {
     vi.mocked(apiClient.get).mockImplementation(() => new Promise(() => {}));
     renderDetailPage();
-    expect(screen.getByText(/loading location/i)).toBeInTheDocument();
+    expect(await screen.findByText(/loading location/i)).toBeInTheDocument();
   });
 
   it('displays error state when fetch fails', async () => {

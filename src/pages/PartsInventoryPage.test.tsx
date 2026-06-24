@@ -77,12 +77,12 @@ describe('PartsInventoryPage', () => {
     });
   });
 
-  it('displays loading state', () => {
+  it('displays loading state', async () => {
     mockPartsGetAll.mockImplementation(() => new Promise(() => {}));
 
     renderWithProviders(<PartsInventoryPage />);
 
-    expect(screen.getByText('Loading parts...')).toBeInTheDocument();
+    expect(await screen.findByText('Loading parts...')).toBeInTheDocument();
   });
 
   it('displays parts in a table', async () => {

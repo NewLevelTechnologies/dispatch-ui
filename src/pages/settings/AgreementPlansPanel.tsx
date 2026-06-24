@@ -24,6 +24,7 @@ import { DenseTable, DenseTHead, DenseRow } from '../../components/ui/DenseTable
 import { SortHeader, type SortState } from '../../components/ui/SortHeader';
 import { ListFooter } from '../../components/ui/ListFooter';
 import { EmptyState } from '../../components/ui/EmptyState';
+import { LoadingState } from '../../components/ui/LoadingState';
 import { Pill } from '../../components/ui/Pill';
 import { Callout } from '../../components/ui/Callout';
 import { Button } from '../../components/catalyst/button';
@@ -208,7 +209,7 @@ export default function AgreementPlansPanel() {
           <Card>
             <CardBody flush>
               {isLoading ? (
-                <div className="px-3.5 py-10 text-center text-[12px] text-fg-muted">Loading plans…</div>
+                <LoadingState label="Loading plans…" />
               ) : rows.length === 0 ? (
                 <EmptyState
                   title={deferredSearch ? 'No matching plans' : 'No plans yet'}

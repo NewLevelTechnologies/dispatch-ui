@@ -51,7 +51,7 @@ export default function LocationCustomerPicker({
 
   const { data, isLoading } = useQuery({
     queryKey: ['customers', 'location-picker', debounced],
-    queryFn: () => customerApi.getAllPaginated({ search: debounced, limit: 8 }),
+    queryFn: () => customerApi.getAllPaginated({ search: debounced, size: 8 }),
     enabled: open && debounced.length >= 2,
     staleTime: 30_000,
   });

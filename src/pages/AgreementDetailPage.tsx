@@ -43,6 +43,7 @@ import { Pill } from '../components/ui/Pill';
 import { Callout } from '../components/ui/Callout';
 import { Tabs } from '../components/ui/Tabs';
 import { EmptyState } from '../components/ui/EmptyState';
+import { LoadingState } from '../components/ui/LoadingState';
 import AgreementCoverageTab from './agreement/AgreementCoverageTab';
 import AgreementScheduleTab from './agreement/AgreementScheduleTab';
 import { useAgreementSchedule } from './agreement/useAgreementSchedule';
@@ -189,9 +190,7 @@ export default function AgreementDetailPage() {
   if (isLoading) {
     return (
       <AppLayout>
-        <div className="p-8 text-center text-[12.5px] text-fg-muted">
-          {t('common.actions.loading', { entities: getName('agreement', true) })}
-        </div>
+        <LoadingState label={t('common.actions.loading', { entities: getName('agreement', true) })} />
       </AppLayout>
     );
   }
@@ -841,7 +840,7 @@ function FinancialSnapshotCard({ agreement }: { agreement: AgreementResponse }) 
         action={billing ? <CardLink onClick={() => setSetupOpen(true)}>Edit</CardLink> : undefined}
       >
         {isLoading ? (
-          <div className="text-[12px] text-fg-muted">Loading…</div>
+          <LoadingState />
         ) : !billing ? (
           <EmptyState
             icon={<ReceiptPercentIcon className="size-9 text-fg-dim" />}

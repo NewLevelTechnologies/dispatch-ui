@@ -59,6 +59,7 @@ import {
 import { Pill } from '../components/ui/Pill';
 import { Tabs } from '../components/ui/Tabs';
 import { Callout } from '../components/ui/Callout';
+import { LoadingState } from '../components/ui/LoadingState';
 import { DenseTable, DenseTHead, DenseRow } from '../components/ui/DenseTable';
 import { AssignedUsersCell } from '../components/ui/AssignedUsersCell';
 import { WorkOrderTypePill } from '../components/ui/WorkOrderTypePill';
@@ -501,9 +502,7 @@ export default function EquipmentDetailPage() {
   if (isLoading) {
     return (
       <AppLayout>
-        <div className="px-3.5 py-10 text-center text-[12px] text-fg-muted">
-          {t('common.actions.loadingEntity', { entity: getName('equipment') })}
-        </div>
+        <LoadingState label={t('common.actions.loadingEntity', { entity: getName('equipment') })} />
       </AppLayout>
     );
   }
