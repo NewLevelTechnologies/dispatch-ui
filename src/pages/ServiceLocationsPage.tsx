@@ -81,10 +81,12 @@ function formatTagDisplayValue(
   return t('common.selectedCount', { count: ids.length });
 }
 
-// Server-sortable columns (see FE_HANDOFF_list_sort_pagination). Default is
-// customerName,asc — represented as "no sort param" so the BE applies its own
-// default (which groups a customer's locations together).
-const DEFAULT_SORT: SortState = { key: 'customerName', dir: 'asc' };
+// Server-sortable columns (see FE_HANDOFF_list_sort_pagination). The identity
+// column shows the location name, so it sorts by locationName, and that's the
+// default. Note: the BE's no-param default is customerName,asc — which no
+// visible column represents — so we always send the sort explicitly (below)
+// instead of omitting it, keeping the active arrow honest about the order.
+const DEFAULT_SORT: SortState = { key: 'locationName', dir: 'asc' };
 // Date columns read best most-recent-first on the first click; text columns
 // default to asc.
 const DESC_FIRST = new Set(['lastServiceAt']);
@@ -277,7 +279,10 @@ export default function ServiceLocationsPage() {
       hasOpenJobs: openJobsFilter || undefined,
       pmOverdue: overdueFilter || undefined,
       tagIds: tagIds.length > 0 ? tagIds : undefined,
-      sort: sortParam || undefined,
+      // Always send the sort (not `sortParam || undefined`): the default
+      // locationName,asc must be explicit because the BE's no-param default is
+      // customerName,asc, which no visible column represents.
+      sort: `${currentSort.key},${currentSort.dir}`,
     }),
   });
 
@@ -536,7 +541,7 @@ export default function ServiceLocationsPage() {
                 <DenseTable>
                   <DenseTHead>
                     <tr>
-                      <SortHeader sortKey="customerName" label={getName('service_location')} current={currentSort} onSort={onSort} />
+                      <SortHeader sortKey="locationName" label={getName('service_location')} current={currentSort} onSort={onSort} />
                       <th>{t('serviceLocations.table.region')}</th>
                       <SortHeader sortKey="status" label={t('common.form.status')} current={currentSort} onSort={onSort} />
                       <SortHeader sortKey="lastServiceAt" label={t('serviceLocations.table.lastService')} current={currentSort} onSort={onSort} />
