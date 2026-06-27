@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, fireEvent } from '@testing-library/react';
 import type { RouteObject } from 'react-router-dom';
 import { renderWithProviders, userEvent } from '../test/utils';
 import PayerFormPage from './PayerFormPage';
@@ -98,5 +98,135 @@ describe('PayerFormPage', () => {
         expect.objectContaining({ name: 'Linda Chen', role: 'Accounts Payable' })
       );
     });
+  });
+
+  it('includes the remit-to address and advanced fields in the create payload', async () => {
+    vi.mocked(apiClient.post).mockResolvedValue({ data: { id: 'new-payer-1' } });
+    renderAddPayer();
+    await waitFor(() => screen.getByRole('heading', { name: /add payer/i, level: 1 }));
+
+    fireEvent.change(screen.getByPlaceholderText('American Home Shield'), { target: { value: 'Acme Warranty Co' } });
+    // Remit-to address (each field's onChange + setRemit).
+    fireEvent.change(screen.getByPlaceholderText('889 Ridge Lake Blvd'), { target: { value: '1 Warranty Way' } });
+    fireEvent.change(screen.getByPlaceholderText('Memphis'), { target: { value: 'Chicago' } });
+    fireEvent.change(screen.getByDisplayValue('Select...'), { target: { value: 'IL' } });
+    fireEvent.change(screen.getByPlaceholderText('38120'), { target: { value: '60601' } });
+    // Payment terms select.
+    fireEvent.change(screen.getByDisplayValue('Net 30'), { target: { value: '60' } });
+    // Advanced section: toggle open, change invoice delivery + billing notes.
+    fireEvent.click(screen.getByRole('button', { name: /advanced/i }));
+    fireEvent.change(screen.getByDisplayValue('Email'), { target: { value: 'EDI' } });
+    fireEvent.change(screen.getByPlaceholderText(/Pre-approval auth/i), { target: { value: 'Cap $480' } });
+
+    fireEvent.click(screen.getByRole('button', { name: /add payer/i }));
+
+    await waitFor(() =>
+      expect(apiClient.post).toHaveBeenCalledWith(
+        '/customers',
+        expect.objectContaining({
+          name: 'Acme Warranty Co',
+          type: 'BILLING_ONLY',
+          paymentTermsDays: 60,
+          invoiceDeliveryMethod: 'EDI',
+          notes: 'Cap $480',
+          billingAddress: { streetAddress: '1 Warranty Way', city: 'Chicago', state: 'IL', zipCode: '60601' },
+        })
+      )
+    );
+  });
+
+  it('chains an Escalation contact when the escalation name is filled', async () => {
+    vi.mocked(apiClient.post).mockImplementation((url: string) =>
+      Promise.resolve({ data: url === '/customers' ? { id: 'p-2' } : {} })
+    );
+    renderAddPayer();
+    await waitFor(() => screen.getByRole('heading', { name: /add payer/i, level: 1 }));
+
+    fireEvent.change(screen.getByPlaceholderText('American Home Shield'), { target: { value: 'Acme' } });
+    fireEvent.click(screen.getByRole('button', { name: /advanced/i }));
+    fireEvent.change(screen.getByPlaceholderText('R. Pratt · Network Mgr'), { target: { value: 'Rae Pratt' } });
+    fireEvent.change(screen.getByPlaceholderText('escalations@payer.com'), { target: { value: 'esc@acme.com' } });
+
+    fireEvent.click(screen.getByRole('button', { name: /add payer/i }));
+
+    await waitFor(() =>
+      expect(apiClient.post).toHaveBeenCalledWith(
+        '/customers/p-2/contacts',
+        expect.objectContaining({ name: 'Rae Pratt', role: 'Escalation', email: 'esc@acme.com' })
+      )
+    );
+  });
+
+  it('shows the duplicate guard on a name match and dismisses it', async () => {
+    vi.mocked(apiClient.get).mockImplementation((url: string) => {
+      if (url.startsWith('/customers/payers/search'))
+        return Promise.resolve({ data: { content: [{ id: 'dup-1', name: 'Acme Warranty Co', customerNumber: 'C-1' }] } });
+      if (url.startsWith('/users')) return Promise.resolve({ data: { content: [] } });
+      return Promise.reject(new Error(`Unknown endpoint: ${url}`));
+    });
+    renderAddPayer();
+    await waitFor(() => screen.getByRole('heading', { name: /add payer/i, level: 1 }));
+
+    fireEvent.change(screen.getByPlaceholderText('American Home Shield'), { target: { value: 'Acme' } });
+
+    // Debounced (250ms) payer-name search surfaces the match.
+    expect(await screen.findByText(/already exists/i, undefined, { timeout: 3000 })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /not a duplicate/i }));
+    await waitFor(() => expect(screen.queryByText(/already exists/i)).not.toBeInTheDocument());
+  });
+
+  it('flags an invalid AP email on blur', async () => {
+    renderAddPayer();
+    await waitFor(() => screen.getByRole('heading', { name: /add payer/i, level: 1 }));
+
+    // The error surfaces on blur (touched). Submit is moot here — the type=email
+    // field's native constraint validation blocks the form before our JS runs.
+    const apEmail = screen.getByPlaceholderText('claims-ap@payer.com');
+    fireEvent.change(apEmail, { target: { value: 'not-an-email' } });
+    fireEvent.blur(apEmail);
+
+    expect(await screen.findByText(/invalid email/i)).toBeInTheDocument();
+    expect(apiClient.post).not.toHaveBeenCalled();
+  });
+
+  it('stays on the form (does not navigate) when create fails', async () => {
+    vi.mocked(apiClient.post).mockRejectedValue(new Error('boom'));
+    renderAddPayer();
+    await waitFor(() => screen.getByRole('heading', { name: /add payer/i, level: 1 }));
+
+    fireEvent.change(screen.getByPlaceholderText('American Home Shield'), { target: { value: 'Acme' } });
+    fireEvent.click(screen.getByRole('button', { name: /add payer/i }));
+
+    await waitFor(() => expect(apiClient.post).toHaveBeenCalled());
+    expect(screen.queryByText('Payer detail')).not.toBeInTheDocument();
+  });
+
+  it('attaches the chosen account manager to the create payload', async () => {
+    vi.mocked(apiClient.get).mockImplementation((url: string) => {
+      if (url.startsWith('/users/assignable'))
+        return Promise.resolve({
+          data: { content: [{ id: 'u-7', firstName: 'Marco', lastName: 'Castillo', email: 'm@co.com' }] },
+        });
+      if (url.startsWith('/customers/payers/search')) return Promise.resolve({ data: { content: [] } });
+      return Promise.reject(new Error(`Unknown endpoint: ${url}`));
+    });
+    vi.mocked(apiClient.post).mockResolvedValue({ data: { id: 'p-3' } });
+    renderAddPayer();
+    await waitFor(() => screen.getByRole('heading', { name: /add payer/i, level: 1 }));
+
+    fireEvent.change(screen.getByPlaceholderText('American Home Shield'), { target: { value: 'Acme' } });
+    fireEvent.click(screen.getByRole('button', { name: /advanced/i }));
+    // Open the account-manager picker (fetches on focus) and select a user.
+    fireEvent.focus(screen.getByPlaceholderText('Search users…'));
+    fireEvent.click(await screen.findByText('Marco Castillo', undefined, { timeout: 3000 }));
+
+    fireEvent.click(screen.getByRole('button', { name: /add payer/i }));
+
+    await waitFor(() =>
+      expect(apiClient.post).toHaveBeenCalledWith(
+        '/customers',
+        expect.objectContaining({ accountManagerUserId: 'u-7' })
+      )
+    );
   });
 });
