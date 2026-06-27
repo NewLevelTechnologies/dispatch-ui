@@ -161,11 +161,13 @@ describe('preset abbreviations', () => {
 });
 
 describe('entity grouping', () => {
-  it('has all 15 known entities mapped to a group', () => {
+  it('has all 17 known entities mapped to a group', () => {
     const keys = Object.keys(ENTITY_GROUP);
-    expect(keys).toHaveLength(15);
+    expect(keys).toHaveLength(17);
     expect(keys).toContain('equipment_component');
     expect(keys).toContain('dispatch_region');
+    expect(keys).toContain('payer');
+    expect(keys).toContain('agreement');
     expect(keys).not.toContain('user');
     expect(keys).not.toContain('role');
   });
