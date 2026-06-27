@@ -338,7 +338,7 @@
     "subtitle": {
       "totalActive": "{{total}} total · {{active}} active"
     },
-    "viewPayers": "View {{entities, lowercase}} →",
+    "entityToggleAria": "Switch between customers and payers",
     "form": {
       "accessInstructionsOptional": "Access Instructions (optional)",
       "accessInstructionsPlaceholder": "e.g., Use back entrance, gate code 1234",
@@ -864,11 +864,11 @@
     }
   },
   "payers": {
-    "backToCustomers": "← {{entities}}",
     "filter": {
       "aged": "91+ aged",
       "clearFilters": "Clear filters",
-      "openBalance": "Open balance"
+      "openBalance": "Open balance",
+      "tags": "Tags"
     },
     "search": {
       "placeholder": "Search payers…"

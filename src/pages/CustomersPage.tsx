@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, useDeferredValue } from 'react';
 import clsx from 'clsx';
-import { useNavigate, useSearchParams, Link } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { EllipsisVerticalIcon, UserGroupIcon } from '@heroicons/react/24/outline';
@@ -16,6 +16,8 @@ import { Button } from '../components/catalyst/button';
 import { Dropdown, DropdownButton, DropdownItem, DropdownLabel, DropdownMenu } from '../components/catalyst/dropdown';
 import IconButton from '../components/IconButton';
 import { PageHead } from '../components/ui/PageHead';
+import { EntityToggle } from '../components/ui/EntityToggle';
+import { formatTagDisplayValue } from '../lib/tagDisplay';
 import { Card, CardBody } from '../components/ui/Card';
 import { Pill } from '../components/ui/Pill';
 import { TagPill } from '../components/ui/TagPill';
@@ -54,20 +56,6 @@ function readStatuses(params: URLSearchParams): CustomerStatusKey[] {
 
 function readBool(raw: string | null): boolean {
   return raw === 'true' || raw === '1';
-}
-
-// Tag chip display: name for 1, "name1, name2" for 2, "N selected" for 3+.
-// Same pattern as WorkOrdersPage's multi-select filter chips.
-function formatTagDisplayValue(
-  ids: string[],
-  list: { id: string; name: string }[],
-  t: (key: string, opts?: Record<string, unknown>) => string
-): string | null {
-  if (ids.length === 0) return null;
-  const lookup = (id: string) => list.find((x) => x.id === id)?.name ?? id;
-  if (ids.length === 1) return lookup(ids[0]);
-  if (ids.length === 2) return ids.map(lookup).join(', ');
-  return t('common.selectedCount', { count: ids.length });
 }
 
 // Server-sortable columns (see FE_HANDOFF_list_sort_pagination). Default is
@@ -298,15 +286,8 @@ export default function CustomersPage() {
     if (typeof headerActive === 'number') {
       parts.push(`${headerActive.toLocaleString()} ${t('common.active').toLowerCase()}`);
     }
-    return (
-      <>
-        {parts.join(' · ')}
-        {' · '}
-        <Link to="/payers" className="text-fg-accent hover:underline">
-          {t('customers.viewPayers', { entities: getName('payer', true) })}
-        </Link>
-      </>
-    );
+    // Payers reachable via the EntityToggle eyebrow now, not a cross-link.
+    return parts.join(' · ');
   })();
 
   // Whether the current view diverges from the defaults (search, non-active
@@ -331,6 +312,15 @@ export default function CustomersPage() {
     <AppLayout>
       <div>
         <PageHead
+          eyebrow={
+            <EntityToggle
+              ariaLabel={t('customers.entityToggleAria')}
+              items={[
+                { label: getName('customer', true), to: '/customers' },
+                { label: getName('payer', true), to: '/payers' },
+              ]}
+            />
+          }
           title={getName('customer', true)}
           sub={subtitle}
           actions={

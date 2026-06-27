@@ -15,11 +15,14 @@ import { Heading } from '../catalyst/heading';
 import { Text } from '../catalyst/text';
 
 export function PageHead({
-  title, sub, actions,
+  title, sub, actions, eyebrow,
 }: {
   title: ReactNode;
   sub?: ReactNode;
   actions?: ReactNode;
+  // Optional row rendered above the title — e.g. an EntityToggle that swaps
+  // between peer list routes (Customers ⇄ Payers).
+  eyebrow?: ReactNode;
 }) {
   // Mobile (<sm): the title block stacks above the actions row so long
   // action labels never get crushed mid-word against a cramped header.
@@ -29,6 +32,7 @@ export function PageHead({
   return (
     <div className="mb-4 flex flex-col items-start gap-3 sm:flex-row sm:items-end sm:justify-between">
       <div className="min-w-0">
+        {eyebrow && <div className="mb-2">{eyebrow}</div>}
         <Heading level={1} size="page-lg" className="m-0">{title}</Heading>
         {sub && <Text size="sm" tone="muted" className="mt-0.5">{sub}</Text>}
       </div>
