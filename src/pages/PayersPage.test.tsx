@@ -70,6 +70,27 @@ describe('PayersPage', () => {
     );
   });
 
+  it('re-queries with ?openBalance when the open-balance chip is toggled', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({
+      data: { ...pageResp([payerRow()]), counts: { total: 1, openBalance: 7, aged: 3 } },
+    });
+    renderWithProviders(<PayersPage />);
+    await screen.findByText('American Home Shield');
+
+    // Badge counts come off the response envelope (counts.openBalance / counts.aged).
+    expect(screen.getByText('7')).toBeInTheDocument();
+    expect(screen.getByText('3')).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: /open balance/i }));
+
+    await waitFor(() =>
+      expect(apiClient.get).toHaveBeenCalledWith(
+        '/customers/payers',
+        expect.objectContaining({ params: expect.objectContaining({ openBalance: true }) }),
+      ),
+    );
+  });
+
   it('shows the empty state when there are no payers', async () => {
     vi.mocked(apiClient.get).mockResolvedValue({ data: pageResp([]) });
     renderWithProviders(<PayersPage />);
