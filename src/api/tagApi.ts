@@ -13,10 +13,19 @@ import type { TagColor } from '../utils/tagColor';
 //
 // `color` is a fixed 8-value enum (see TagColor), not a hex string — map it to
 // a pill tone with `tagPillTone()` from utils/tagColor.
+//
+// Tags carry a `scope` so each picker shows a tight vocabulary (one shared tag
+// system, scoped lists): GENERAL for customers + service locations, PAYER for
+// billing-only payers. Assignment is enforced server-side (wrong scope → 400),
+// so always pass the surface's scope to getAll/create. (List-row TagSummary
+// stays scope-less — you don't need it to render a chip.)
+export type TagScope = 'GENERAL' | 'PAYER';
+
 export interface Tag {
   id: string;
   name: string;
   color: string;
+  scope: TagScope;
   archivedAt: string | null;
   createdAt: string;
   updatedAt: string;
@@ -25,16 +34,22 @@ export interface Tag {
 export interface CreateTagRequest {
   name: string;
   color: TagColor;
+  // Defaults to GENERAL server-side if omitted, but each surface passes its own
+  // scope so the GENERAL/PAYER vocabularies don't merge into one pool.
+  scope?: TagScope;
 }
 
 export const tagApi = {
   getAll: async (params?: {
     q?: string;
     includeArchived?: boolean;
+    // Omit to list every scope (e.g. a future tag-management screen).
+    scope?: TagScope;
   }): Promise<Tag[]> => {
     const apiParams: Record<string, string | boolean | undefined> = {
       q: params?.q,
       includeArchived: params?.includeArchived || undefined,
+      scope: params?.scope,
     };
     for (const key of Object.keys(apiParams)) {
       const v = apiParams[key];

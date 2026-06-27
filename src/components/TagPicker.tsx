@@ -1,11 +1,17 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { tagApi, type Tag } from '../api';
+import { tagApi, type Tag, type TagScope } from '../api';
 import { TagPill } from './ui/TagPill';
 import { Input } from './catalyst/input';
 
 interface Props {
+  /**
+   * Vocabulary this picker draws from / creates into — GENERAL for customers +
+   * service locations, PAYER for billing-only payers. Keeps the lists tight and
+   * matches the server-side assignment scope (wrong scope → 400).
+   */
+  scope: TagScope;
   /** Tag ids already applied to the record. */
   appliedTagIds: string[];
   /** An existing tag was chosen from the list. */
@@ -42,7 +48,7 @@ type Option = { kind: 'applied'; tag: Tag } | { kind: 'apply'; tag: Tag } | { ki
  * '{text}'" row). The tenant tag library is small (<50, hard cap 200) so it's
  * loaded once and filtered client-side.
  */
-export default function TagPicker({ appliedTagIds, onApply, onCreate, onRemove, onClose, canCreate, busy }: Props) {
+export default function TagPicker({ scope, appliedTagIds, onApply, onCreate, onRemove, onClose, canCreate, busy }: Props) {
   const { t } = useTranslation();
   const [query, setQuery] = useState('');
   // -1 = "no explicit choice yet" — resolved to the default index below.
@@ -51,8 +57,9 @@ export default function TagPicker({ appliedTagIds, onApply, onCreate, onRemove, 
   const inputRef = useRef<HTMLInputElement>(null);
 
   const { data: tags } = useQuery({
-    queryKey: ['tags'],
-    queryFn: () => tagApi.getAll(),
+    // Scope in the key so the GENERAL and PAYER pick-lists cache separately.
+    queryKey: ['tags', scope],
+    queryFn: () => tagApi.getAll({ scope }),
     staleTime: 60_000,
   });
 

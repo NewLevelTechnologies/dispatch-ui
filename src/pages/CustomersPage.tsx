@@ -204,8 +204,8 @@ export default function CustomersPage() {
   // Tag list for the filter picker. Tenants typically have <50 tags (hard cap
   // 200), so a single load + client-side filtering in the picker is fine.
   const { data: tags } = useQuery({
-    queryKey: ['tags'],
-    queryFn: () => tagApi.getAll(),
+    queryKey: ['tags', 'GENERAL'],
+    queryFn: () => tagApi.getAll({ scope: 'GENERAL' }),
   });
 
   const { data, isLoading, error, refetch } = useQuery({

@@ -149,8 +149,8 @@ export default function PayersPage() {
   // Tag list for the "type" filter picker. Tenant-wide tag set (same source as
   // the customers list); tenants typically have <50 tags so no paging needed.
   const { data: tags } = useQuery({
-    queryKey: ['tags'],
-    queryFn: () => tagApi.getAll(),
+    queryKey: ['tags', 'PAYER'],
+    queryFn: () => tagApi.getAll({ scope: 'PAYER' }),
   });
 
   const { data, isLoading, error, refetch } = useQuery({
