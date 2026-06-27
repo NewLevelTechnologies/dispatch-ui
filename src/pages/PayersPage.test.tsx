@@ -91,12 +91,37 @@ describe('PayersPage', () => {
     );
   });
 
+  it('renders row tags and re-queries with ?tags when a tag is picked', async () => {
+    const tag = { id: 'tag-warranty', name: 'Warranty', color: 'INFO' };
+    vi.mocked(apiClient.get).mockImplementation((url) => {
+      if (url === '/customers/tags') return Promise.resolve({ data: [tag] });
+      return Promise.resolve({ data: pageResp([payerRow({ tags: [tag] })]) });
+    });
+    renderWithProviders(<PayersPage />);
+    await screen.findByText('American Home Shield');
+
+    // Tags are the payer "subtype" — chip renders in the row subline.
+    expect(screen.getAllByText('Warranty').length).toBeGreaterThan(0);
+
+    // Open the Tags filter and select the tag → server-side ?tags filter.
+    await userEvent.click(screen.getByRole('button', { name: 'Tags' }));
+    await userEvent.click(await screen.findByRole('option', { name: /warranty/i }));
+
+    await waitFor(() =>
+      expect(apiClient.get).toHaveBeenCalledWith(
+        '/customers/payers',
+        expect.objectContaining({ params: expect.objectContaining({ tags: 'tag-warranty' }) }),
+      ),
+    );
+  });
+
   it('shows the empty state when there are no payers', async () => {
     vi.mocked(apiClient.get).mockResolvedValue({ data: pageResp([]) });
     renderWithProviders(<PayersPage />);
 
-    // Title renders (glossary plural) and no payer row appears.
-    expect(await screen.findByText('Payers')).toBeInTheDocument();
+    // Title renders (glossary plural) and no payer row appears. Target the
+    // heading specifically — "Payers" also appears in the Customers/Payers toggle.
+    expect(await screen.findByRole('heading', { name: 'Payers' })).toBeInTheDocument();
     expect(screen.queryByText('American Home Shield')).not.toBeInTheDocument();
   });
 });

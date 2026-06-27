@@ -1,21 +1,26 @@
-import { useEffect, useState, useDeferredValue } from 'react';
+import { useEffect, useState, useDeferredValue, useMemo } from 'react';
 import clsx from 'clsx';
-import { useNavigate, useSearchParams, Link } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { BanknotesIcon } from '@heroicons/react/24/outline';
-import { customerApi } from '../api';
+import { customerApi, tagApi } from '../api';
 import { useGlossary } from '../contexts/GlossaryContext';
 import AppLayout from '../components/AppLayout';
 import { formatTimestamp } from '../lib/formatTimestamp';
+import { formatTagDisplayValue } from '../lib/tagDisplay';
 import { extractApiError } from '../lib/toast';
 import { Button } from '../components/catalyst/button';
 import { PageHead } from '../components/ui/PageHead';
+import { EntityToggle } from '../components/ui/EntityToggle';
 import { Card, CardBody } from '../components/ui/Card';
+import { Pill } from '../components/ui/Pill';
+import { TagPill } from '../components/ui/TagPill';
 import { DenseTable, DenseTHead, DenseRow, CellStack, CellTop, CellSub } from '../components/ui/DenseTable';
 import { SortHeader, type SortDir, type SortState } from '../components/ui/SortHeader';
 import { ListToolbar, ListSearch } from '../components/ui/ListToolbar';
 import { FilterChipRow, FilterChip } from '../components/ui/FilterChipRow';
+import { FilterChipListbox, ChipListboxOption } from '../components/ui/FilterChipListbox';
 import { ListFooter } from '../components/ui/ListFooter';
 import { LoadingState } from '../components/ui/LoadingState';
 import { EmptyState } from '../components/ui/EmptyState';
@@ -33,10 +38,13 @@ import { PayerMark } from '../components/customer-detail/shared';
 // same contract as the main customers list. openJobs is meaningless for
 // billing-only payers, so it's not offered.
 //
-// Still deferred (need BE params on /customers/payers — see BACKEND_ASKS): the
-// Status picker, and payer subtype (name subline + Type filter — needs a subtype
-// field on the model). Client-side filtering a paged list would be wrong, so
-// those wait for the server params.
+// Payer "subtype" is modeled as tags (PAYERS-LIST-1), not a dedicated enum: tags
+// render in the name subline and the Tags filter (?tags=, OR semantics) is the
+// "type" filter. Tags come from the tenant-wide tag set, same as the customers
+// list — no curated payer-type subset (would need BE tag grouping; deferred).
+//
+// Still deferred (needs a BE param): the Status picker. Client-side filtering a
+// paged list would be wrong, so it waits for the server param.
 const PAGE_SIZE = 50;
 
 function readBool(raw: string | null): boolean {
@@ -74,6 +82,10 @@ export default function PayersPage() {
   const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10));
   const openBalanceFilter = readBool(searchParams.get('openBalance'));
   const agedFilter = readBool(searchParams.get('agedBalance'));
+  // Tag ("type") filter ids — URL writes repeated `?tag=uuid` params; the API
+  // serializes to comma-separated `?tags=` on the wire. getAll() returns a fresh
+  // array each call, so memoize to keep the query key stable across renders.
+  const tagIds = useMemo(() => searchParams.getAll('tag'), [searchParams]);
   const sortParam = searchParams.get('sort');
   const currentSort = parseSort(sortParam);
   const [searchQuery, setSearchQuery] = useState(urlSearch);
@@ -94,6 +106,14 @@ export default function PayersPage() {
     const next = new URLSearchParams(searchParams);
     if (value) next.set(param, 'true');
     else next.delete(param);
+    next.delete('page');
+    setSearchParams(next, { replace: false });
+  };
+  // Tag filter: rewrite the repeated `?tag=` params and reset to page 1.
+  const updateTags = (ids: string[]) => {
+    const next = new URLSearchParams(searchParams);
+    next.delete('tag');
+    for (const id of ids) next.append('tag', id);
     next.delete('page');
     setSearchParams(next, { replace: false });
   };
@@ -123,8 +143,15 @@ export default function PayersPage() {
     setSearchParams(next, { replace: false });
   };
 
+  // Tag list for the "type" filter picker. Tenant-wide tag set (same source as
+  // the customers list); tenants typically have <50 tags so no paging needed.
+  const { data: tags } = useQuery({
+    queryKey: ['tags'],
+    queryFn: () => tagApi.getAll(),
+  });
+
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ['payers', page, deferredSearch, sortParam, openBalanceFilter, agedFilter],
+    queryKey: ['payers', page, deferredSearch, sortParam, openBalanceFilter, agedFilter, tagIds],
     // Omit `sort` → BE default outstanding,desc (the bookkeeper triage order).
     queryFn: () =>
       customerApi.getPayers({
@@ -134,6 +161,7 @@ export default function PayersPage() {
         sort: sortParam || undefined,
         hasOpenBalance: openBalanceFilter || undefined,
         hasAgedBalance: agedFilter || undefined,
+        tagIds: tagIds.length > 0 ? tagIds : undefined,
       }),
   });
 
@@ -153,18 +181,11 @@ export default function PayersPage() {
     if (typeof headerActive === 'number') {
       parts.push(`${headerActive.toLocaleString()} ${t('common.active').toLowerCase()}`);
     }
-    return (
-      <>
-        {parts.join(' · ')}
-        {' · '}
-        <Link to="/customers" className="text-fg-accent hover:underline">
-          {t('payers.backToCustomers', { entities: getName('customer', true) })}
-        </Link>
-      </>
-    );
+    // Customers reachable via the EntityToggle eyebrow now, not a cross-link.
+    return parts.join(' · ');
   })();
 
-  const hasFilters = Boolean(deferredSearch || openBalanceFilter || agedFilter);
+  const hasFilters = Boolean(deferredSearch || openBalanceFilter || agedFilter || tagIds.length > 0);
   const clearFilters = () => {
     setSearchQuery('');
     setSearchParams(new URLSearchParams(), { replace: false });
@@ -176,7 +197,19 @@ export default function PayersPage() {
   return (
     <AppLayout>
       <div>
-        <PageHead title={getName('payer', true)} sub={subtitle} />
+        <PageHead
+          eyebrow={
+            <EntityToggle
+              ariaLabel={t('customers.entityToggleAria')}
+              items={[
+                { label: getName('customer', true), to: '/customers' },
+                { label: getName('payer', true), to: '/payers' },
+              ]}
+            />
+          }
+          title={getName('payer', true)}
+          sub={subtitle}
+        />
 
         <ListToolbar
           search={
@@ -190,6 +223,23 @@ export default function PayersPage() {
             />
           }
         >
+          {(tags?.length ?? 0) > 0 && (
+            <FilterChipListbox
+              multiple
+              label={t('payers.filter.tags')}
+              ariaLabel={t('payers.filter.tags')}
+              value={tagIds}
+              displayValue={formatTagDisplayValue(tagIds, tags ?? [], t)}
+              onChange={(ids) => updateTags(ids)}
+              onClear={() => updateTags([])}
+            >
+              {(tags ?? []).map((tag) => (
+                <ChipListboxOption key={tag.id} value={tag.id}>
+                  <TagPill color={tag.color} name={tag.name} className="w-full" />
+                </ChipListboxOption>
+              ))}
+            </FilterChipListbox>
+          )}
           <FilterChipRow>
             <FilterChip
               label={t('payers.filter.openBalance')}
@@ -271,6 +321,18 @@ export default function PayersPage() {
                                     <span className="font-semibold text-fg-strong">{p.name}</span>
                                   </CellTop>
                                   <CellSub>
+                                    {/* Tags are the payer "subtype" — chips lead the
+                                        subline, then the account number for identity. */}
+                                    {p.tags && p.tags.length > 0 && (
+                                      <span className="mr-1.5 inline-flex flex-wrap items-center gap-1 align-middle">
+                                        {p.tags.slice(0, 2).map((tag) => (
+                                          <TagPill key={tag.id} color={tag.color} name={tag.name} className="max-w-[120px]" />
+                                        ))}
+                                        {p.tags.length > 2 && (
+                                          <Pill tone="neutral">{`+${p.tags.length - 2}`}</Pill>
+                                        )}
+                                      </span>
+                                    )}
                                     <span className="font-mono">{p.customerNumber || p.id}</span>
                                   </CellSub>
                                 </CellStack>
