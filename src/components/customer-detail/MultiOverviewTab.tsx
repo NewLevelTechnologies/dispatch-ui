@@ -727,7 +727,7 @@ export function AgreementsSummaryCard({
 // rest under "Additional" with Make-primary / Edit / notify on hover, plus
 // "+ Add" and a "View all" peek into the Contacts tab. "Bill-to" etc. read as a
 // role chip on the relevant person. Primary support: CUST-CONTACT-PRIMARY-1.
-function ContactCard({
+export function ContactCard({
   customer,
   canEdit,
   onViewAll,

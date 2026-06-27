@@ -44,7 +44,7 @@ import NotesCard from '../NotesCard';
 import CustomerInvoicesTab from './CustomerInvoicesTab';
 import CustomerContactsTab from './CustomerContactsTab';
 import CustomerHeaderTags from './CustomerHeaderTags';
-import { BillingCard, AccountDetailsCard, CustomerHeaderEdit, AttentionStrip } from './MultiOverviewTab';
+import { BillingCard, AccountDetailsCard, CustomerHeaderEdit, AttentionStrip, ContactCard } from './MultiOverviewTab';
 import { buildAttentionItems } from './attention';
 import { useGoToInvoicesBucket } from './invoiceAgingNav';
 import { PayerMark, CardTitle } from './shared';
@@ -217,6 +217,7 @@ export default function PayerDetail({ customer }: { customer: Customer }) {
                   <NotesCard entityType="customer" entityId={customer.id} canEdit={canEditCustomers} />
                 </div>
                 <div className="flex flex-col gap-3">
+                  <ContactCard customer={customer} canEdit={canEditCustomers} onViewAll={() => setActiveTab('contacts')} />
                   <AccountDetailsCard customer={customer} ar={arSummary} canEdit={canEditCustomers} />
                 </div>
               </div>
