@@ -235,6 +235,8 @@ export const GROUP_ORDER: GroupId[] = [
 export const ENTITY_GROUP: Record<string, GroupId> = {
   customer: 'customer',
   service_location: 'customer',
+  payer: 'customer',
+  agreement: 'work',
   work_order: 'work',
   work_item: 'work',
   dispatch: 'work',
