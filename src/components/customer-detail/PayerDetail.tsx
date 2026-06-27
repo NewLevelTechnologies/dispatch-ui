@@ -50,6 +50,7 @@ import { useGoToInvoicesBucket } from './invoiceAgingNav';
 import { PayerMark, CardTitle } from './shared';
 import { formatDateShort, formatMoney } from './format';
 import { formatPhone } from '../../utils/formatPhone';
+import { titleCaseAddress } from '../../utils/titleCaseAddress';
 
 type TabId = 'overview' | 'invoices' | 'contacts' | 'activity';
 const PAYER_TABS: readonly TabId[] = ['overview', 'invoices', 'contacts', 'activity'];
@@ -122,6 +123,18 @@ export default function PayerDetail({ customer }: { customer: Customer }) {
 
   const meta: React.ReactNode[] = [];
   if (customer.customerNumber) meta.push(<span key="num" className="font-mono">{customer.customerNumber}</span>);
+  // Remit-to (billing) address right after the ID — same placement as the MULTI
+  // customer header. Payers may have no remit-to (EDI-only), so guard and omit.
+  const billing = customer.billingAddress;
+  const billingLine = billing
+    ? [
+        titleCaseAddress(billing.streetAddress),
+        [titleCaseAddress(billing.city), billing.state, billing.zipCode].filter(Boolean).join(' '),
+      ]
+        .filter(Boolean)
+        .join(', ')
+    : '';
+  if (billingLine) meta.push(<span key="addr">{billingLine}</span>);
   if (arSummary) meta.push(<span key="ltv">{formatMoney(arSummary.lifetimeValue)} lifetime</span>);
   meta.push(<span key="since">Since {formatDateShort(customer.createdAt)}</span>);
 

@@ -399,6 +399,9 @@ export type CustomerCategory = 'RESIDENTIAL' | 'COMMERCIAL' | 'BILLING_ONLY';
 // detail-page render density only.
 export type CustomerShape = 'SINGLE' | 'MULTI' | 'BILLING_ONLY';
 export type CustomerStatus = 'ACTIVE' | 'INACTIVE';
+// How a customer (typically a payer) wants invoices delivered. Echoed back on
+// the customer object; settable on create/update.
+export type InvoiceDeliveryMethod = 'EMAIL' | 'EDI' | 'MAIL';
 
 export interface Customer {
   id: string;
@@ -413,6 +416,7 @@ export interface Customer {
   paymentTermsDays: number;
   requiresPurchaseOrder: boolean;
   contractPricingTier?: string | null;
+  invoiceDeliveryMethod?: InvoiceDeliveryMethod | null;
   taxExempt: boolean;
   taxExemptCertificate?: string | null;
   notes?: string | null;
@@ -452,15 +456,20 @@ export interface CreateServiceLocationRequest {
 
 export interface CreateCustomerRequest {
   name: string;
-  email: string;
+  // Optional on the wire: only `name` is required. STANDARD customers send it;
+  // a payer (BILLING_ONLY) may have no customer-level email.
+  email?: string | null;
   phone?: string | null;
   type?: CustomerType;
-  billingAddress: AddressInput;
+  // Optional: omit entirely for a payer with no remit-to address (the backend
+  // stores it empty, no error). Required in practice for STANDARD customers.
+  billingAddress?: AddressInput | null;
   serviceLocations: CreateServiceLocationRequest[];
   billingAddressSameAsService?: boolean;
   paymentTermsDays?: number;
   requiresPurchaseOrder?: boolean;
   contractPricingTier?: string | null;
+  invoiceDeliveryMethod?: InvoiceDeliveryMethod;
   taxExempt?: boolean;
   taxExemptCertificate?: string | null;
   notes?: string | null;
@@ -479,6 +488,7 @@ export interface UpdateCustomerRequest {
   paymentTermsDays: number;
   requiresPurchaseOrder: boolean;
   contractPricingTier?: string | null;
+  invoiceDeliveryMethod?: InvoiceDeliveryMethod;
   taxExempt: boolean;
   taxExemptCertificate?: string | null;
   notes?: string | null;
@@ -693,6 +703,16 @@ export const customerApi = {
   }): Promise<CustomerSearchResponse> => {
     const response = await apiClient.get<CustomerSearchResponse>('/customers/search', {
       params,
+    });
+    return response.data;
+  },
+
+  // Name-only dedupe for the Add Payer form — scoped to BILLING_ONLY customers.
+  // Same response shape as search(); no address matching (payers share no
+  // location/address space).
+  searchPayers: async (q: string): Promise<CustomerSearchResponse> => {
+    const response = await apiClient.get<CustomerSearchResponse>('/customers/payers/search', {
+      params: { q },
     });
     return response.data;
   },

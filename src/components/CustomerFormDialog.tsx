@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { PatternFormat } from 'react-number-format';
-import { customerApi, dispatchRegionApi, userApi, type Customer, type CreateCustomerRequest, type CustomerType, type UpdateCustomerRequest } from '../api';
+import { customerApi, dispatchRegionApi, type Customer, type CreateCustomerRequest, type CustomerType, type UpdateCustomerRequest } from '../api';
+import AccountManagerPicker, { type AccountManagerValue } from './AccountManagerPicker';
 import { useGlossary } from '../contexts/GlossaryContext';
 import { handleConcurrentEdit } from '../lib/conflict';
 import { Dialog, DialogActions, DialogBody, DialogDescription, DialogTitle } from './catalyst/dialog';
@@ -54,7 +55,7 @@ interface CreateFormData {
   contractPricingTier: string;
   taxExempt: boolean;
   taxExemptCertificate: string;
-  accountManagerUserId: string;
+  accountManager: AccountManagerValue | null;
   industry: string;
 }
 
@@ -77,7 +78,7 @@ interface EditFormData {
   taxExemptCertificate: string;
   notes: string;
   status: 'ACTIVE' | 'INACTIVE';
-  accountManagerUserId: string;
+  accountManager: AccountManagerValue | null;
   industry: string;
 }
 
@@ -99,26 +100,6 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
     enabled: isOpen && !isEdit,
   });
 
-  // Internal users for the account-manager picker (ID-1). Only enabled users
-  // are assignable; sorted by display name. The current AM is initialized into
-  // form state from customer.accountManager so it stays selected even if the
-  // user falls outside the first page.
-  const { data: allUsers } = useQuery({
-    queryKey: ['users', 'all'],
-    queryFn: () => userApi.getAll(),
-    enabled: isOpen,
-  });
-  const accountManagerOptions = (() => {
-    const opts = (allUsers ?? [])
-      .filter((u) => u.enabled)
-      .map((u) => ({ id: u.id, name: `${u.firstName} ${u.lastName}`.trim() || u.email }));
-    // Keep the currently-assigned AM selectable even if they're disabled or
-    // beyond the first user page (getAll caps at 100).
-    if (customer?.accountManager && !opts.some((o) => o.id === customer.accountManager!.id)) {
-      opts.push({ id: customer.accountManager.id, name: customer.accountManager.name });
-    }
-    return opts.sort((a, b) => a.name.localeCompare(b.name));
-  })();
 
   // Determine if we should show the dropdown (only if 2+ regions)
   const showRegionDropdown = activeRegions && activeRegions.length > 1;
@@ -158,7 +139,7 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
     contractPricingTier: '',
     taxExempt: false,
     taxExemptCertificate: '',
-    accountManagerUserId: '',
+    accountManager: null,
     industry: '',
   });
 
@@ -181,7 +162,7 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
     taxExemptCertificate: '',
     notes: '',
     status: 'ACTIVE',
-    accountManagerUserId: '',
+    accountManager: null,
     industry: '',
   });
 
@@ -219,7 +200,7 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
         taxExemptCertificate: customer.taxExemptCertificate || '',
         notes: customer.notes || '',
         status: customer.status,
-        accountManagerUserId: customer.accountManager?.id || '',
+        accountManager: customer.accountManager ?? null,
         industry: customer.industry || '',
       });
     } else {
@@ -255,7 +236,7 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
         contractPricingTier: '',
         taxExempt: false,
         taxExemptCertificate: '',
-        accountManagerUserId: '',
+        accountManager: null,
         industry: '',
       });
     }
@@ -312,7 +293,7 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
           taxExempt: createFormData.taxExempt,
           taxExemptCertificate: createFormData.taxExemptCertificate || null,
           notes: createFormData.notes || null,
-          accountManagerUserId: createFormData.accountManagerUserId || null,
+          accountManagerUserId: createFormData.accountManager?.id ?? null,
           industry: createFormData.industry || null,
         }
       : {
@@ -344,7 +325,7 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
           taxExempt: createFormData.taxExempt,
           taxExemptCertificate: createFormData.taxExemptCertificate || null,
           notes: createFormData.notes || null,
-          accountManagerUserId: createFormData.accountManagerUserId || null,
+          accountManagerUserId: createFormData.accountManager?.id ?? null,
           industry: createFormData.industry || null,
         };
 
@@ -379,7 +360,7 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
       taxExemptCertificate: editFormData.taxExemptCertificate || null,
       notes: editFormData.notes || null,
       status: editFormData.status,
-      accountManagerUserId: editFormData.accountManagerUserId || null,
+      accountManagerUserId: editFormData.accountManager?.id ?? null,
       industry: editFormData.industry || null,
       ...(billingAddressChanged
         ? {
@@ -920,16 +901,10 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
                     <div className="grid grid-cols-2 gap-2">
                       <Field>
                         <Label className="text-xs">{t('customers.detail.accountManager')}</Label>
-                        <Select
-                          name="accountManagerUserId"
-                          value={createFormData.accountManagerUserId}
-                          onChange={(e) => setCreateFormData((prev) => ({ ...prev, accountManagerUserId: e.target.value }))}
-                        >
-                          <option value="">{t('customers.detail.accountManagerUnassigned')}</option>
-                          {accountManagerOptions.map((u) => (
-                            <option key={u.id} value={u.id}>{u.name}</option>
-                          ))}
-                        </Select>
+                        <AccountManagerPicker
+                          value={createFormData.accountManager}
+                          onChange={(u) => setCreateFormData((prev) => ({ ...prev, accountManager: u }))}
+                        />
                       </Field>
                       <Field>
                         <Label className="text-xs">{t('customers.detail.industry')}</Label>
@@ -1198,16 +1173,10 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
                     <div className="grid grid-cols-2 gap-2">
                       <Field>
                         <Label className="text-xs">{t('customers.detail.accountManager')}</Label>
-                        <Select
-                          name="accountManagerUserId"
-                          value={editFormData.accountManagerUserId}
-                          onChange={(e) => setEditFormData((prev) => ({ ...prev, accountManagerUserId: e.target.value }))}
-                        >
-                          <option value="">{t('customers.detail.accountManagerUnassigned')}</option>
-                          {accountManagerOptions.map((u) => (
-                            <option key={u.id} value={u.id}>{u.name}</option>
-                          ))}
-                        </Select>
+                        <AccountManagerPicker
+                          value={editFormData.accountManager}
+                          onChange={(u) => setEditFormData((prev) => ({ ...prev, accountManager: u }))}
+                        />
                       </Field>
                       <Field>
                         <Label className="text-xs">{t('customers.detail.industry')}</Label>

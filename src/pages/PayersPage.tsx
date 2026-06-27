@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { BanknotesIcon } from '@heroicons/react/24/outline';
 import { customerApi, tagApi } from '../api';
 import { useGlossary } from '../contexts/GlossaryContext';
+import { useHasCapability } from '../hooks/useCurrentUser';
 import AppLayout from '../components/AppLayout';
 import { formatTimestamp } from '../lib/formatTimestamp';
 import { formatTagDisplayValue } from '../lib/tagDisplay';
@@ -77,6 +78,8 @@ export default function PayersPage() {
   const { t } = useTranslation();
   const { getName } = useGlossary();
   const [searchParams, setSearchParams] = useSearchParams();
+  // Payers are customers — gate the Add button on the customer capability.
+  const canAddPayers = useHasCapability('ADD_CUSTOMERS');
 
   const urlSearch = searchParams.get('search') ?? '';
   const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10));
@@ -209,6 +212,13 @@ export default function PayersPage() {
           }
           title={getName('payer', true)}
           sub={subtitle}
+          actions={
+            canAddPayers ? (
+              <Button color="accent" onClick={() => navigate('/payers/new')}>
+                {t('common.actions.add', { entity: getName('payer') })}
+              </Button>
+            ) : null
+          }
         />
 
         <ListToolbar
