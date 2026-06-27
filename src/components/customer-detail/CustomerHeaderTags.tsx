@@ -14,7 +14,7 @@
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { tagApi, type Tag, type TagSummary } from '../../api';
+import { tagApi, type Tag, type TagScope, type TagSummary } from '../../api';
 import { showError, showUndo, extractApiError } from '../../lib/toast';
 import { nextTagColor } from '../../utils/tagColor';
 import TagPicker from '../TagPicker';
@@ -26,10 +26,13 @@ export default function CustomerHeaderTags({
   customerId,
   tags,
   canEdit,
+  // Regular customers use the GENERAL vocabulary; PayerDetail passes 'PAYER'.
+  scope = 'GENERAL',
 }: {
   customerId: string;
   tags: TagSummary[];
   canEdit: boolean;
+  scope?: TagScope;
 }) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
@@ -69,7 +72,7 @@ export default function CustomerHeaderTags({
   // refresh the tenant library so it shows in future pickers.
   const createMutation = useMutation({
     mutationFn: async (name: string) => {
-      const created = await tagApi.create({ name, color: nextTagColor(tags.length) });
+      const created = await tagApi.create({ name, color: nextTagColor(tags.length), scope });
       await tagApi.setForCustomer(customerId, [...tagIds, created.id]);
       return created;
     },
@@ -125,6 +128,7 @@ export default function CustomerHeaderTags({
         {picking && (
           <div className="absolute top-full left-0 z-50 mt-1.5 w-64">
             <TagPicker
+              scope={scope}
               appliedTagIds={tagIds}
               onApply={(tag: Tag) => applyMutation.mutate([...tagIds, tag.id])}
               onCreate={(name) => createMutation.mutate(name)}

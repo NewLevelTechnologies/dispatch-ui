@@ -141,8 +141,8 @@ export default function ServiceLocationsPage() {
   // Tenant tag list — typically <50 tags, so a single load + client-side
   // filtering in the picker is fine. Shared cache key with CustomersPage.
   const { data: tags } = useQuery({
-    queryKey: ['tags'],
-    queryFn: () => tagApi.getAll(),
+    queryKey: ['tags', 'GENERAL'],
+    queryFn: () => tagApi.getAll({ scope: 'GENERAL' }),
   });
 
   const canAddServiceLocations = useHasCapability('ADD_SERVICE_LOCATIONS');

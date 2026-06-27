@@ -9,8 +9,8 @@ import type { Tag } from '../api';
 vi.mock('../api/client');
 
 const TAGS: Tag[] = [
-  { id: '1', name: 'VIP', color: 'ACCENT_1', archivedAt: null, createdAt: '', updatedAt: '' },
-  { id: '2', name: 'Roof access', color: 'WARNING', archivedAt: null, createdAt: '', updatedAt: '' },
+  { id: '1', name: 'VIP', color: 'ACCENT_1', scope: 'GENERAL', archivedAt: null, createdAt: '', updatedAt: '' },
+  { id: '2', name: 'Roof access', color: 'WARNING', scope: 'GENERAL', archivedAt: null, createdAt: '', updatedAt: '' },
 ];
 
 function setup(props: Partial<React.ComponentProps<typeof TagPicker>> = {}) {
@@ -19,6 +19,7 @@ function setup(props: Partial<React.ComponentProps<typeof TagPicker>> = {}) {
   const onClose = vi.fn();
   renderWithProviders(
     <TagPicker
+      scope="GENERAL"
       appliedTagIds={[]}
       onApply={onApply}
       onCreate={onCreate}
@@ -40,6 +41,15 @@ describe('TagPicker', () => {
     setup();
     expect(await screen.findByText('VIP')).toBeInTheDocument();
     expect(screen.getByText('Roof access')).toBeInTheDocument();
+  });
+
+  it('fetches the tag library scoped to the given scope', async () => {
+    setup({ scope: 'PAYER' });
+    await screen.findByText('VIP');
+    expect(apiClient.get).toHaveBeenCalledWith(
+      '/customers/tags',
+      expect.objectContaining({ params: expect.objectContaining({ scope: 'PAYER' }) })
+    );
   });
 
   it('filters options by the typed query', async () => {

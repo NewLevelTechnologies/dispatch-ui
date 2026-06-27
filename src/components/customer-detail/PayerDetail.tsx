@@ -166,7 +166,7 @@ export default function PayerDetail({ customer }: { customer: Customer }) {
                   {customer.status === 'ACTIVE' ? t('common.active') : t('common.inactive')}
                 </Pill>
                 {customer.paymentTermsDays > 0 && <Pill tone="neutral">Net {customer.paymentTermsDays}</Pill>}
-                <CustomerHeaderTags customerId={customer.id} tags={customer.tags ?? []} canEdit={canEditCustomers} />
+                <CustomerHeaderTags customerId={customer.id} tags={customer.tags ?? []} canEdit={canEditCustomers} scope="PAYER" />
               </div>
               {(customer.phone || customer.email) && (
                 <div className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-[11.5px]">

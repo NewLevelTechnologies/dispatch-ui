@@ -2817,7 +2817,7 @@ function HeaderTags({ location, canEdit }: { location: ServiceLocationDetailDto;
   // refresh the tenant library so it shows in future pickers.
   const createMutation = useMutation({
     mutationFn: async (name: string) => {
-      const created = await tagApi.create({ name, color: nextTagColor(tags.length) });
+      const created = await tagApi.create({ name, color: nextTagColor(tags.length), scope: 'GENERAL' });
       await tagApi.setForServiceLocation(location.id, [...tagIds, created.id]);
       return created;
     },
@@ -2874,6 +2874,7 @@ function HeaderTags({ location, canEdit }: { location: ServiceLocationDetailDto;
         {picking && (
           <div className="absolute top-full left-0 z-50 mt-1.5 w-64">
             <TagPicker
+              scope="GENERAL"
               appliedTagIds={tagIds}
               onApply={(tag: Tag) => applyMutation.mutate([...tagIds, tag.id])}
               onCreate={(name) => createMutation.mutate(name)}

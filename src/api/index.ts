@@ -423,7 +423,7 @@ export {
 } from './dispatchRegionApi';
 
 // Tag API (tenant tag library + customer / service-location assignment)
-export { tagApi, type Tag, type CreateTagRequest } from './tagApi';
+export { tagApi, type Tag, type TagScope, type CreateTagRequest } from './tagApi';
 export { type TagColor } from '../utils/tagColor';
 
 // Approvals API (workflow engine approval requests)
