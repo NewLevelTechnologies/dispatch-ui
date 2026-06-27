@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderWithProviders } from '../test/utils';
 import AccountManagerPicker from './AccountManagerPicker';
@@ -52,8 +52,10 @@ describe('AccountManagerPicker', () => {
     renderWithProviders(<AccountManagerPicker value={null} onChange={vi.fn()} />);
 
     await userEvent.click(screen.getByRole('textbox'));
-    // Composed name shows (firstName + lastName), not the bare email.
-    expect(await screen.findByText('Ada Lovelace')).toBeInTheDocument();
+    // Composed name shows (firstName + lastName), not the bare email. Generous
+    // timeout: a 300ms debounce + fetch can exceed the 1000ms default on a
+    // loaded machine.
+    expect(await screen.findByText('Ada Lovelace', undefined, { timeout: 4000 })).toBeInTheDocument();
   });
 
   it('searches on type and calls onChange with the picked user', async () => {
@@ -70,15 +72,20 @@ describe('AccountManagerPicker', () => {
     const onChange = vi.fn();
     renderWithProviders(<AccountManagerPicker value={null} onChange={onChange} />);
 
-    await userEvent.type(screen.getByRole('textbox'), 'mar');
-    const option = await screen.findByText('Marco Castillo');
+    // Set the query atomically rather than char-by-char: userEvent.type races
+    // the focus-fetch re-renders against the controlled input, so only the last
+    // keystroke survived (q ended up "r"). fireEvent.change fires one onChange.
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'mar' } });
+    const option = await screen.findByText('Marco Castillo', undefined, { timeout: 4000 });
     await userEvent.click(option);
 
     expect(onChange).toHaveBeenCalledWith({ id: 'u-9', name: 'Marco Castillo' });
-    await waitFor(() =>
-      expect(apiClient.get).toHaveBeenCalledWith('/users/assignable', expect.objectContaining({
-        params: expect.objectContaining({ q: 'mar' }),
-      }))
+    await waitFor(
+      () =>
+        expect(apiClient.get).toHaveBeenCalledWith('/users/assignable', expect.objectContaining({
+          params: expect.objectContaining({ q: 'mar' }),
+        })),
+      { timeout: 4000 }
     );
   });
 });
