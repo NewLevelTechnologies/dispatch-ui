@@ -581,6 +581,11 @@ export const customerApi = {
     // billing-only payers, so it's not offered here.
     hasOpenBalance?: boolean;
     hasAgedBalance?: boolean;
+    // Tag UUIDs — OR semantics within the param (matches any listed tag),
+    // serialized comma-separated. This is the payer "type" filter: subtype is
+    // modeled as tags, not a dedicated enum (PAYERS-LIST-1). Malformed UUIDs
+    // return 400 from the BE.
+    tagIds?: string[];
   }): Promise<CustomerListResponse> => {
     const apiParams: Record<string, string | number | boolean | undefined> = {
       page: params?.page ? params.page - 1 : 0,  // Convert to 0-indexed
@@ -589,6 +594,10 @@ export const customerApi = {
       sort: params?.sort,
       openBalance: params?.hasOpenBalance || undefined,
       agedBalance: params?.hasAgedBalance || undefined,
+      tags:
+        params?.tagIds && params.tagIds.length > 0
+          ? params.tagIds.join(',')
+          : undefined,
     };
     for (const key of Object.keys(apiParams)) {
       const v = apiParams[key];
