@@ -14,8 +14,8 @@ import { Button } from '../components/catalyst/button';
 import { PageHead } from '../components/ui/PageHead';
 import { EntityToggle } from '../components/ui/EntityToggle';
 import { Card, CardBody } from '../components/ui/Card';
-import { Pill } from '../components/ui/Pill';
 import { TagPill } from '../components/ui/TagPill';
+import { TagList } from '../components/ui/TagList';
 import { DenseTable, DenseTHead, DenseRow, CellStack, CellTop, CellSub } from '../components/ui/DenseTable';
 import { SortHeader, type SortDir, type SortState } from '../components/ui/SortHeader';
 import { ListToolbar, ListSearch } from '../components/ui/ListToolbar';
@@ -301,6 +301,7 @@ export default function PayersPage() {
                         <SortHeader sortKey="openInvoices" label={t('payers.table.openInvoices')} current={currentSort} onSort={onSort} align="right" />
                         <SortHeader sortKey="lifetimePaid" label={t('payers.table.lifetimePaid')} current={currentSort} onSort={onSort} align="right" />
                         <SortHeader sortKey="lastPayment" label={t('payers.table.lastPayment')} current={currentSort} onSort={onSort} />
+                        <th>{t('payers.table.tags')}</th>
                       </tr>
                     </DenseTHead>
                     <tbody>
@@ -321,18 +322,6 @@ export default function PayersPage() {
                                     <span className="font-semibold text-fg-strong">{p.name}</span>
                                   </CellTop>
                                   <CellSub>
-                                    {/* Tags are the payer "subtype" — chips lead the
-                                        subline, then the account number for identity. */}
-                                    {p.tags && p.tags.length > 0 && (
-                                      <span className="mr-1.5 inline-flex flex-wrap items-center gap-1 align-middle">
-                                        {p.tags.slice(0, 2).map((tag) => (
-                                          <TagPill key={tag.id} color={tag.color} name={tag.name} className="max-w-[120px]" />
-                                        ))}
-                                        {p.tags.length > 2 && (
-                                          <Pill tone="neutral">{`+${p.tags.length - 2}`}</Pill>
-                                        )}
-                                      </span>
-                                    )}
                                     <span className="font-mono">{p.customerNumber || p.id}</span>
                                   </CellSub>
                                 </CellStack>
@@ -393,6 +382,12 @@ export default function PayersPage() {
                               ) : (
                                 <span className="text-fg-dim">—</span>
                               )}
+                            </td>
+                            <td
+                              className={clsx(!(p.tags && p.tags.length > 0) && 'dt-empty')}
+                              data-label={t('payers.table.tags')}
+                            >
+                              <TagList tags={p.tags} />
                             </td>
                           </DenseRow>
                         );

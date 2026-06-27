@@ -4,7 +4,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { EllipsisVerticalIcon, UserGroupIcon } from '@heroicons/react/24/outline';
-import { customerApi, tagApi, type Customer, type TagSummary } from '../api';
+import { customerApi, tagApi, type Customer } from '../api';
 import { useGlossary } from '../contexts/GlossaryContext';
 import { useHasCapability } from '../hooks/useCurrentUser';
 import AppLayout from '../components/AppLayout';
@@ -21,6 +21,7 @@ import { formatTagDisplayValue } from '../lib/tagDisplay';
 import { Card, CardBody } from '../components/ui/Card';
 import { Pill } from '../components/ui/Pill';
 import { TagPill } from '../components/ui/TagPill';
+import { TagList } from '../components/ui/TagList';
 import { FilterChipRow, FilterChip } from '../components/ui/FilterChipRow';
 import { FilterChipListbox, ChipListboxOption } from '../components/ui/FilterChipListbox';
 import { StatusPickerChip } from '../components/ui/StatusPickerChip';
@@ -615,26 +616,5 @@ export default function CustomersPage() {
         customer={selectedCustomer}
       />
     </AppLayout>
-  );
-}
-
-// Up to two tags visible + "+N" overflow. Color from tag.color isn't surfaced
-// here — uniform muted treatment keeps the row scannable; per-tag color shows
-// in the tag editor where it's actionable.
-function TagList({ tags }: { tags?: TagSummary[] }) {
-  if (!tags || tags.length === 0) return <span className="text-fg-dim">—</span>;
-  const visible = tags.slice(0, 2);
-  const overflow = tags.slice(2);
-  return (
-    <div className="flex flex-wrap gap-1">
-      {visible.map((tag) => (
-        <TagPill key={tag.id} color={tag.color} name={tag.name} className="max-w-[140px]" />
-      ))}
-      {overflow.length > 0 && (
-        <span title={overflow.map((tag) => tag.name).join(', ')}>
-          <Pill tone="neutral">+{overflow.length}</Pill>
-        </span>
-      )}
-    </div>
   );
 }

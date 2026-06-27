@@ -1940,6 +1940,7 @@ vi.mock('react-i18next', () => {
     'payers.table.net': 'Net {{days}}',
     'payers.table.openInvoices': 'Open inv.',
     'payers.table.outstanding': 'Outstanding',
+    'payers.table.tags': 'Tags',
     'payers.table.terms': 'Terms',
   };
 

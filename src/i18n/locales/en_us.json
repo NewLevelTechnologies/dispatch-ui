@@ -881,6 +881,7 @@
       "net": "Net {{days}}",
       "openInvoices": "Open inv.",
       "outstanding": "Outstanding",
+      "tags": "Tags",
       "terms": "Terms"
     }
   },
