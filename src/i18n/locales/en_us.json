@@ -865,6 +865,11 @@
   },
   "payers": {
     "backToCustomers": "← {{entities}}",
+    "filter": {
+      "aged": "91+ aged",
+      "clearFilters": "Clear filters",
+      "openBalance": "Open balance"
+    },
     "search": {
       "placeholder": "Search payers…"
     },

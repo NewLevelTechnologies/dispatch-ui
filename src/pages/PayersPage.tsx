@@ -15,6 +15,7 @@ import { Card, CardBody } from '../components/ui/Card';
 import { DenseTable, DenseTHead, DenseRow, CellStack, CellTop, CellSub } from '../components/ui/DenseTable';
 import { SortHeader, type SortDir, type SortState } from '../components/ui/SortHeader';
 import { ListToolbar, ListSearch } from '../components/ui/ListToolbar';
+import { FilterChipRow, FilterChip } from '../components/ui/FilterChipRow';
 import { ListFooter } from '../components/ui/ListFooter';
 import { LoadingState } from '../components/ui/LoadingState';
 import { EmptyState } from '../components/ui/EmptyState';
@@ -27,11 +28,20 @@ import { PayerMark } from '../components/customer-detail/shared';
 // financial columns from the PAYERS-LIST-1 denorm. Row → /customers/:id, which
 // the shape router resolves to PayerDetail.
 //
-// v1 deferred (need BE params on /customers/payers — see BACKEND_ASKS): the
-// Status picker + Has-open-balance / 91+-aged filter chips, and payer subtype
-// (name subline + Type filter). Client-side filtering a paged list would be
-// wrong, so those wait for the server params.
+// Filter chips: open-balance / 91+-aged, server-side (?openBalance / ?agedBalance),
+// with badge counts off the response envelope (counts.openBalance / counts.aged) —
+// same contract as the main customers list. openJobs is meaningless for
+// billing-only payers, so it's not offered.
+//
+// Still deferred (need BE params on /customers/payers — see BACKEND_ASKS): the
+// Status picker, and payer subtype (name subline + Type filter — needs a subtype
+// field on the model). Client-side filtering a paged list would be wrong, so
+// those wait for the server params.
 const PAGE_SIZE = 50;
+
+function readBool(raw: string | null): boolean {
+  return raw === 'true' || raw === '1';
+}
 
 // AR figures read as whole dollars on a scan line (no cents); lifetime is a big
 // rough number → compact "$Nk".
@@ -62,6 +72,8 @@ export default function PayersPage() {
 
   const urlSearch = searchParams.get('search') ?? '';
   const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10));
+  const openBalanceFilter = readBool(searchParams.get('openBalance'));
+  const agedFilter = readBool(searchParams.get('agedBalance'));
   const sortParam = searchParams.get('sort');
   const currentSort = parseSort(sortParam);
   const [searchQuery, setSearchQuery] = useState(urlSearch);
@@ -76,6 +88,14 @@ export default function PayersPage() {
     else next.delete('search');
     next.delete('page');
     setSearchParams(next, { replace: true });
+  };
+  // Boolean chip toggle: write/clear the param and reset to page 1.
+  const toggleFilter = (param: 'openBalance' | 'agedBalance', value: boolean) => {
+    const next = new URLSearchParams(searchParams);
+    if (value) next.set(param, 'true');
+    else next.delete(param);
+    next.delete('page');
+    setSearchParams(next, { replace: false });
   };
   const pageHref = (target: number): string => {
     const next = new URLSearchParams(searchParams);
@@ -104,10 +124,17 @@ export default function PayersPage() {
   };
 
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ['payers', page, deferredSearch, sortParam],
+    queryKey: ['payers', page, deferredSearch, sortParam, openBalanceFilter, agedFilter],
     // Omit `sort` → BE default outstanding,desc (the bookkeeper triage order).
     queryFn: () =>
-      customerApi.getPayers({ page, size: PAGE_SIZE, search: deferredSearch || undefined, sort: sortParam || undefined }),
+      customerApi.getPayers({
+        page,
+        size: PAGE_SIZE,
+        search: deferredSearch || undefined,
+        sort: sortParam || undefined,
+        hasOpenBalance: openBalanceFilter || undefined,
+        hasAgedBalance: agedFilter || undefined,
+      }),
   });
 
   const payers = data?.content ?? [];
@@ -137,7 +164,7 @@ export default function PayersPage() {
     );
   })();
 
-  const hasFilters = Boolean(deferredSearch);
+  const hasFilters = Boolean(deferredSearch || openBalanceFilter || agedFilter);
   const clearFilters = () => {
     setSearchQuery('');
     setSearchParams(new URLSearchParams(), { replace: false });
@@ -162,7 +189,23 @@ export default function PayersPage() {
               }}
             />
           }
-        />
+        >
+          <FilterChipRow>
+            <FilterChip
+              label={t('payers.filter.openBalance')}
+              count={counts?.openBalance}
+              active={openBalanceFilter}
+              onToggle={() => toggleFilter('openBalance', !openBalanceFilter)}
+            />
+            <FilterChip
+              label={t('payers.filter.aged')}
+              count={counts?.aged}
+              tone="warning"
+              active={agedFilter}
+              onToggle={() => toggleFilter('agedBalance', !agedFilter)}
+            />
+          </FilterChipRow>
+        </ListToolbar>
 
         <Card>
           <CardBody flush>
@@ -186,7 +229,7 @@ export default function PayersPage() {
                   description={t('common.actions.tryAdjustingFilters')}
                   action={
                     <Button outline onClick={clearFilters}>
-                      {t('users.filter.clearFilters')}
+                      {t('payers.filter.clearFilters')}
                     </Button>
                   }
                 />

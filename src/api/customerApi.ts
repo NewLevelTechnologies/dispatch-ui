@@ -574,12 +574,21 @@ export const customerApi = {
     size?: number;
     search?: string;
     sort?: string;     // "<key>,<asc|desc>"
+    // Boolean triage filters — combine (AND) with search and each other.
+    // openBalance = ≥1 SENT/OVERDUE invoice; agedBalance = ≥1 open invoice
+    // 91+ days past due. Chip badge counts come back on the response envelope
+    // (counts.openBalance / counts.aged). openJobs is meaningless for
+    // billing-only payers, so it's not offered here.
+    hasOpenBalance?: boolean;
+    hasAgedBalance?: boolean;
   }): Promise<CustomerListResponse> => {
-    const apiParams: Record<string, string | number | undefined> = {
+    const apiParams: Record<string, string | number | boolean | undefined> = {
       page: params?.page ? params.page - 1 : 0,  // Convert to 0-indexed
       size: params?.size,
       search: params?.search,
       sort: params?.sort,
+      openBalance: params?.hasOpenBalance || undefined,
+      agedBalance: params?.hasAgedBalance || undefined,
     };
     for (const key of Object.keys(apiParams)) {
       const v = apiParams[key];
