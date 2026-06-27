@@ -7,6 +7,12 @@
     "signInPrompt": "Sign in to your account"
   },
   "common": {
+    "accountManagerPicker": {
+      "noResults": "No users match \"{{query}}\".",
+      "noUsers": "No users found.",
+      "placeholder": "Search users…",
+      "searching": "Searching…"
+    },
     "customerPicker": {
       "noResults": "No {{entities, lowercase}} match \"{{query}}\".",
       "placeholder": "Search {{entities, lowercase}}…",

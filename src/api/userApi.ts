@@ -183,6 +183,17 @@ export interface PageEnvelope<T> {
   counts?: UserPageCounts | null;
 }
 
+// Lightweight user shape returned by GET /users/assignable — the account-manager
+// picker only needs id/name/email.
+export interface AssignableUser {
+  id: string;
+  // /users/assignable returns the full UserResponse — the display name is
+  // firstName + lastName (both required on a user), NOT a combined `name` field.
+  firstName: string;
+  lastName: string;
+  email: string;
+}
+
 export interface UserPageCounts {
   disabled: number;
   // INVITED + INVITATION_EXPIRED combined — what the subtitle pill needs.
@@ -271,6 +282,17 @@ export const userApi = {
 
   getById: async (id: string): Promise<User> => {
     const response = await apiClient.get<User>(`/users/${id}`);
+    return response.data;
+  },
+
+  // Account-manager picker source. Server-side name/email typeahead, gated by
+  // VIEW_CUSTOMERS (not VIEW_USERS) so customer editors can assign without
+  // user-admin rights. Returns all enabled users (no eligibility model yet).
+  // Use this for the AccountManagerPicker — NOT getAll(), which caps at 100.
+  getAssignable: async (q: string): Promise<PageEnvelope<AssignableUser>> => {
+    const response = await apiClient.get<PageEnvelope<AssignableUser>>('/users/assignable', {
+      params: { q: q || undefined, size: 20 },
+    });
     return response.data;
   },
 

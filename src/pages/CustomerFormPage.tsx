@@ -1,5 +1,5 @@
 /* eslint-disable i18next/no-literal-string -- dense v1.5 visual form; entity names + major strings go through getName()/t(), but inline glyphs, separators, and short operational labels are kept as literals to keep the form markup readable (same convention as UserFormPage / AddLocationPage). */
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
@@ -9,7 +9,6 @@ import {
   customerApi,
   dispatchRegionApi,
   tenantSettingsApi,
-  userApi,
   type PremiseType,
   type CreateCustomerRequest,
   type CustomerSearchResult,
@@ -28,6 +27,7 @@ import { Select } from '../components/catalyst/select';
 import { Heading } from '../components/catalyst/heading';
 import { Text } from '../components/catalyst/text';
 import { Callout } from '../components/ui/Callout';
+import AccountManagerPicker, { type AccountManagerValue } from '../components/AccountManagerPicker';
 import { ToggleGroup, ToggleGroupOption } from '../components/ui/ToggleGroup';
 import { US_STATES } from '../constants/states';
 import { AddressSuggestion } from '../components/AddressSuggestion';
@@ -76,7 +76,7 @@ interface FormShape {
   paymentTermsDays: number;
   taxExempt: boolean;
   taxCert: string;
-  accountManagerUserId: string;
+  accountManager: AccountManagerValue | null;
 }
 
 // Payment terms map to a number of days on the wire (paymentTermsDays);
@@ -128,17 +128,6 @@ export default function CustomerFormPage() {
   });
   const hasRegions = !!activeRegions && activeRegions.length > 0;
 
-  // Account-manager picker source (office staff onboarding a commercial account
-  // assigns it at intake; CSRs on a panic call leave it Unassigned).
-  const { data: users } = useQuery({ queryKey: ['users'], queryFn: () => userApi.getAll() });
-  const managerOptions = useMemo(
-    () =>
-      (users ?? [])
-        .map((u) => ({ id: u.id, name: `${u.firstName} ${u.lastName}`.trim() || u.email }))
-        .sort((a, b) => a.name.localeCompare(b.name)),
-    [users]
-  );
-
   const [form, setForm] = useState<FormShape>({
     name: '',
     phone: '',
@@ -151,7 +140,7 @@ export default function CustomerFormPage() {
     paymentTermsDays: 30,
     taxExempt: false,
     taxCert: '',
-    accountManagerUserId: '',
+    accountManager: null,
   });
   // Track whether the user has touched premise/region so async defaults can
   // seed them without clobbering a deliberate choice.
@@ -234,7 +223,7 @@ export default function CustomerFormPage() {
         paymentTermsDays: form.paymentTermsDays,
         taxExempt: form.taxExempt,
         taxExemptCertificate: form.taxExempt ? form.taxCert.trim() || null : null,
-        accountManagerUserId: form.accountManagerUserId || null,
+        accountManagerUserId: form.accountManager?.id ?? null,
       };
       return customerApi.create(request);
     },
@@ -563,17 +552,10 @@ export default function CustomerFormPage() {
                     </Field>
                     <Field size="xs">
                       <Label size="xs">Account manager</Label>
-                      <Select
-                        value={form.accountManagerUserId}
-                        onChange={(e) => set({ accountManagerUserId: e.target.value })}
-                      >
-                        <option value="">Unassigned</option>
-                        {managerOptions.map((m) => (
-                          <option key={m.id} value={m.id}>
-                            {m.name}
-                          </option>
-                        ))}
-                      </Select>
+                      <AccountManagerPicker
+                        value={form.accountManager}
+                        onChange={(u) => set({ accountManager: u })}
+                      />
                     </Field>
                   </div>
                   <div className="mt-2.5 grid grid-cols-1 items-end gap-2.5 sm:grid-cols-2">

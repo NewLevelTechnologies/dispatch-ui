@@ -30,7 +30,6 @@ import {
   financialActivityApi,
   invoicesApi,
   InvoiceAgingBucket,
-  userApi,
   type Customer,
   type AgreementSummaryResponse,
   type CustomerArSummaryResponse,
@@ -53,6 +52,7 @@ import { Checkbox } from '../catalyst/checkbox';
 import { Field, Label } from '../catalyst/fieldset';
 import { Input } from '../catalyst/input';
 import { Select } from '../catalyst/select';
+import AccountManagerPicker, { type AccountManagerValue } from '../AccountManagerPicker';
 import { US_STATES } from '../../constants/states';
 import { useAddressVerify } from '../../hooks/useAddressVerify';
 import { AddressSuggestion } from '../AddressSuggestion';
@@ -1110,14 +1110,14 @@ export function CustomerHeaderEdit({ customer, onDone }: { customer: Customer; o
 
 interface AccountDraft {
   industry: string;
-  accountManagerUserId: string;
+  accountManager: AccountManagerValue | null;
   contractPricingTier: string;
 }
 
 function seedAccountDraft(c: Customer): AccountDraft {
   return {
     industry: c.industry ?? '',
-    accountManagerUserId: c.accountManager?.id ?? '',
+    accountManager: c.accountManager ?? null,
     contractPricingTier: c.contractPricingTier ?? '',
   };
 }
@@ -1126,7 +1126,7 @@ function isAccountDirty(d: AccountDraft, c: Customer): boolean {
   const seed = seedAccountDraft(c);
   return (
     d.industry.trim() !== seed.industry ||
-    d.accountManagerUserId !== seed.accountManagerUserId ||
+    (d.accountManager?.id ?? null) !== (seed.accountManager?.id ?? null) ||
     d.contractPricingTier.trim() !== seed.contractPricingTier
   );
 }
@@ -1151,16 +1151,6 @@ export function AccountDetailsCard({
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<AccountDraft>(() => seedAccountDraft(customer));
 
-  // Account-manager picker source — only fetched once the card enters edit mode.
-  const { data: users } = useQuery({ queryKey: ['users'], queryFn: () => userApi.getAll(), enabled: editing });
-  const managerOptions = useMemo(
-    () =>
-      (users ?? [])
-        .map((u) => ({ id: u.id, name: `${u.firstName} ${u.lastName}`.trim() || u.email }))
-        .sort((a, b) => a.name.localeCompare(b.name)),
-    [users],
-  );
-
   const startEdit = () => {
     setDraft(seedAccountDraft(customer));
     setEditing(true);
@@ -1181,7 +1171,7 @@ export function AccountDetailsCard({
         taxExemptCertificate: customer.taxExemptCertificate ?? null,
         notes: customer.notes ?? null,
         status: customer.status,
-        accountManagerUserId: draft.accountManagerUserId || null,
+        accountManagerUserId: draft.accountManager?.id ?? null,
         industry: draft.industry.trim() || null,
       };
       return customerApi.update(customer.id, request);
@@ -1256,17 +1246,10 @@ export function AccountDetailsCard({
             </Field>
             <Field size="xs">
               <Label size="xs">Account manager</Label>
-              <Select
-                value={draft.accountManagerUserId}
-                onChange={(e) => setDraft((d) => ({ ...d, accountManagerUserId: e.target.value }))}
-              >
-                <option value="">Unassigned</option>
-                {managerOptions.map((m) => (
-                  <option key={m.id} value={m.id}>
-                    {m.name}
-                  </option>
-                ))}
-              </Select>
+              <AccountManagerPicker
+                value={draft.accountManager}
+                onChange={(u) => setDraft((d) => ({ ...d, accountManager: u }))}
+              />
             </Field>
           </div>
           <div className="grid grid-cols-2 gap-2.5">

@@ -10,6 +10,7 @@ import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
 import CustomersPage from './pages/CustomersPage';
 import PayersPage from './pages/PayersPage';
+import PayerFormPage from './pages/PayerFormPage';
 import CustomerDetailPage from './pages/CustomerDetailPage';
 import CustomerFormPage from './pages/CustomerFormPage';
 import AgreementDetailPage from './pages/AgreementDetailPage';
@@ -168,6 +169,7 @@ function App() {
       <Route path="/dashboard" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<DashboardPage />} />} />
       <Route path="/customers" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<CustomersPage />} />} />
       <Route path="/payers" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<PayersPage />} />} />
+      <Route path="/payers/new" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<PayerFormPage />} />} />
       <Route path="/customers/new" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<CustomerFormPage />} />} />
       <Route path="/customers/:id" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<CustomerDetailPage />} />} />
       <Route path="/customers/:customerId/service-locations/new" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<AddLocationPage />} />} />

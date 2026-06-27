@@ -1558,6 +1558,10 @@ vi.mock('react-i18next', () => {
       'A bill-to {{entity, lowercase}} is required.',
     'workOrders.financialDrawer.invoiceDialog.datesRequired':
       'Both dates are required.',
+    'common.accountManagerPicker.noResults': 'No users match "{{query}}".',
+    'common.accountManagerPicker.noUsers': 'No users found.',
+    'common.accountManagerPicker.placeholder': 'Search users…',
+    'common.accountManagerPicker.searching': 'Searching…',
     'common.customerPicker.noResults': 'No {{entities, lowercase}} match "{{query}}".',
     'common.customerPicker.placeholder': 'Search {{entities, lowercase}}…',
     'common.customerPicker.searching': 'Searching…',
