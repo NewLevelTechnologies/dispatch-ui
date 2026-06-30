@@ -58,6 +58,19 @@ export const noteApi = {
     return response.data;
   },
 
+  // Work-order (job) notes — job-scoped, same NoteDto shape as the others.
+  // Backend lands this parent per the WO cluster handoff
+  // (GET/POST /work-orders/:id/notes); until then the list 404s and the
+  // shared NotesCard degrades to its empty state.
+  listForWorkOrder: async (workOrderId: string): Promise<NoteDto[]> => {
+    const response = await apiClient.get<NoteDto[]>(`/work-orders/${workOrderId}/notes`);
+    return response.data;
+  },
+  createForWorkOrder: async (workOrderId: string, request: CreateNoteRequest): Promise<NoteDto> => {
+    const response = await apiClient.post<NoteDto>(`/work-orders/${workOrderId}/notes`, request);
+    return response.data;
+  },
+
   // Parent-agnostic mutations on a single note.
   update: async (noteId: string, request: UpdateNoteRequest): Promise<NoteDto> => {
     const response = await apiClient.patch<NoteDto>(`/notes/${noteId}`, request);

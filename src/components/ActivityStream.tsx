@@ -220,7 +220,7 @@ function DayHeader({ label }: { label: string }) {
   );
 }
 
-function ActivityRow({ event }: { event: ActivityEvent }) {
+export function ActivityRow({ event }: { event: ActivityEvent }) {
   const { t } = useTranslation();
   const { getName } = useGlossary();
   const summary = resolveEventSummary(event, t, getName);

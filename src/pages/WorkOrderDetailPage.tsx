@@ -3,10 +3,12 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import {
+  customerApi,
   dispatchesApi,
   equipmentApi,
   financialSummaryApi,
   invoicesApi,
+  quotesApi,
   workOrderApi,
   workOrderTypesApi,
   divisionsApi,
@@ -16,6 +18,7 @@ import {
   type Dispatch,
   type Equipment,
   type ProgressCategory,
+  type ServiceLocationDetailDto,
   type UpdateWorkOrderRequest,
   type WorkItemResponse,
   type WorkOrderFinancialSummary,
@@ -24,6 +27,7 @@ import {
 import { useGlossary } from '../contexts/GlossaryContext';
 import ActivityButton from '../components/ActivityButton';
 import ActivityDrawer from '../components/ActivityDrawer';
+import ActivityStream from '../components/ActivityStream';
 import AppLayout from '../components/AppLayout';
 import AssignTechnicianDialog from '../components/AssignTechnicianDialog';
 import DispatchDetailDrawer from '../components/DispatchDetailDrawer';
@@ -31,19 +35,27 @@ import DispatchesSection from '../components/DispatchesSection';
 import EditableField from '../components/EditableField';
 import EquipmentFormDialog from '../components/EquipmentFormDialog';
 import EquipmentQuickViewDrawer from '../components/EquipmentQuickViewDrawer';
-import FinancialDrawer, { type FinancialTab } from '../components/FinancialDrawer';
+import FinancialInvoicesTab from '../components/FinancialInvoicesTab';
+import FinancialQuotesTab from '../components/FinancialQuotesTab';
 import WorkItemFormDialog from '../components/WorkItemFormDialog';
 import WorkItemsTable from '../components/WorkItemsTable';
 import WorkOrderFormDialog from '../components/WorkOrderFormDialog';
 import WorkOrderApprovalsCallout from '../features/work-orders/WorkOrderApprovalsCallout';
+import WorkOrderOverview from '../features/work-orders/WorkOrderOverview';
 import { formatPhone } from '../utils/formatPhone';
+import { titleCaseAddress } from '../utils/titleCaseAddress';
+import { roleAccent } from '../utils/roleColor';
 import { formatExactTimestamp, formatTimestamp } from '../lib/formatTimestamp';
 import { TimeAgo } from '../components/TimeAgo';
 import { Heading } from '../components/catalyst/heading';
 import { Text } from '../components/catalyst/text';
 import { LoadingState } from '../components/ui/LoadingState';
+import { EmptyState } from '../components/ui/EmptyState';
+import { Tabs } from '../components/ui/Tabs';
+import { Pill, Tag } from '../components/ui/Pill';
+import { Card } from '../components/catalyst/card';
+import { CardTitle } from '../components/customer-detail/shared';
 import { Button } from '../components/catalyst/button';
-import { Badge } from '../components/catalyst/badge';
 import {
   Dropdown,
   DropdownButton,
@@ -57,24 +69,26 @@ import {
   DescriptionTerm,
   DescriptionDetails,
 } from '../components/catalyst/description-list';
-import { Link as CatLink } from '../components/catalyst/link';
+import { useUrlTab } from '../hooks/useUrlTab';
 import {
-  ArrowDownIcon,
   ArrowLeftIcon,
-  ArrowUpIcon,
-  CalendarIcon,
   EllipsisHorizontalIcon,
-  ExclamationTriangleIcon,
+  MapIcon,
   PencilIcon,
+  PhoneIcon,
+  PlusIcon,
 } from '@heroicons/react/24/outline';
 
-const PROGRESS_COLORS: Record<ProgressCategory, 'zinc' | 'sky' | 'blue' | 'amber' | 'lime'> = {
-  NOT_STARTED: 'zinc',
-  AWAITING_SCHEDULE: 'sky',
-  IN_PROGRESS: 'blue',
-  BLOCKED: 'amber',
-  COMPLETED: 'lime',
-  CANCELLED: 'zinc',
+type PillTone = 'neutral' | 'info' | 'success' | 'warning' | 'danger' | 'accent' | 'violet';
+
+// progressCategory → header status-pill tone. Shares the work-item peek grammar.
+const PROGRESS_PILL_TONE: Record<ProgressCategory, PillTone> = {
+  NOT_STARTED: 'neutral',
+  AWAITING_SCHEDULE: 'info',
+  IN_PROGRESS: 'violet',
+  BLOCKED: 'warning',
+  COMPLETED: 'success',
+  CANCELLED: 'neutral',
 };
 
 const PROGRESS_TRANSLATION_KEYS: Record<ProgressCategory, string> = {
@@ -86,36 +100,14 @@ const PROGRESS_TRANSLATION_KEYS: Record<ProgressCategory, string> = {
   CANCELLED: 'cancelled',
 };
 
-// Priority is rendered as a header chip ONLY when the user has explicitly
-// set a non-default value. NORMAL is the implicit default — showing it adds
-// zero information and dilutes status visually. LOW, HIGH, and URGENT each
-// carry real signal (someone made a deliberate choice) so they earn a chip.
-// To set priority from the default state, CSRs go through the Edit WO dialog
-// (canonical surface); the inline chip is a click-to-change shortcut for
-// already-non-default WOs.
-//
-// Visual grammar (deliberately distinct from status pills):
-//   status pill    = sentence case, no icon, categorical color (sky/lime/zinc/...)
-//   priority chip  = ALL CAPS + tracking-wider, leading icon, heat scale
-//
-// Heat scale runs cold→hot: zinc (LOW, "this can wait") → amber (HIGH) → rose
-// (URGENT). LOW shares Badge shape with HIGH/URGENT but uses zinc to stay
-// calm — present without demanding attention.
-//
-// Future EMERGENCY tier (reservation, not deliverable) extends along the same
-// axis: color goes ...→rose→red; icon escalates ExclamationTriangle→stronger
-// (FireIcon or BoltIcon). Don't add the tier until a real customer ask earns
-// it — the URGENT slot already serves "gas leak / flooding / no-heat-winter"
-// in current shop usage.
-const PRIORITY_CHIP_CONFIG: Partial<
-  Record<
-    WorkOrderPriority,
-    { color: 'zinc' | 'amber' | 'rose'; Icon: typeof ArrowUpIcon; labelKey: string }
-  >
-> = {
-  LOW: { color: 'zinc', Icon: ArrowDownIcon, labelKey: 'low' },
-  HIGH: { color: 'amber', Icon: ArrowUpIcon, labelKey: 'high' },
-  URGENT: { color: 'rose', Icon: ExclamationTriangleIcon, labelKey: 'urgent' },
+// Priority is a header Pill toned by heat: Urgent=danger, High=warning,
+// Normal/Low=neutral (Low present but calm). On active WOs it's click-to-change
+// (matches the work-item status pill pattern); frozen WOs render it read-only.
+const PRIORITY_PILL: Record<WorkOrderPriority, { tone: PillTone; dot: boolean; labelKey: string }> = {
+  LOW: { tone: 'neutral', dot: false, labelKey: 'low' },
+  NORMAL: { tone: 'neutral', dot: false, labelKey: 'normal' },
+  HIGH: { tone: 'warning', dot: true, labelKey: 'high' },
+  URGENT: { tone: 'danger', dot: true, labelKey: 'urgent' },
 };
 
 const PRIORITY_TRANSLATION_KEYS: Record<WorkOrderPriority, string> = {
@@ -124,6 +116,14 @@ const PRIORITY_TRANSLATION_KEYS: Record<WorkOrderPriority, string> = {
   HIGH: 'high',
   URGENT: 'urgent',
 };
+
+const TAB_IDS = ['overview', 'items', 'trips', 'estimate', 'purchasing', 'files', 'activity'] as const;
+type WorkOrderTab = (typeof TAB_IDS)[number];
+
+const currencyFormatter = new Intl.NumberFormat('en-US', {
+  style: 'currency',
+  currency: 'USD',
+});
 
 function formatDate(iso: string | null | undefined): string {
   if (!iso) return '-';
@@ -134,52 +134,6 @@ function formatDate(iso: string | null | undefined): string {
   });
 }
 
-// Header ETA chip needs a compact same-day window format ("Fri 8–10 AM") so
-// the chip stays a single short string. Cross-date windows are rare for service
-// commitments; we degrade gracefully to date+time on each side when they happen.
-const ETA_DATE = new Intl.DateTimeFormat('en-US', {
-  weekday: 'short',
-  month: 'short',
-  day: 'numeric',
-});
-const ETA_TIME = new Intl.DateTimeFormat('en-US', {
-  hour: 'numeric',
-  minute: '2-digit',
-});
-function formatEtaWindow(startIso: string, endIso: string): string {
-  const start = new Date(startIso);
-  const end = new Date(endIso);
-  const sameDay =
-    start.getFullYear() === end.getFullYear() &&
-    start.getMonth() === end.getMonth() &&
-    start.getDate() === end.getDate();
-  if (sameDay) {
-    return `${ETA_DATE.format(start)} ${ETA_TIME.format(start)}–${ETA_TIME.format(end)}`;
-  }
-  return `${ETA_DATE.format(start)} ${ETA_TIME.format(start)} – ${ETA_DATE.format(end)} ${ETA_TIME.format(end)}`;
-}
-
-const currencyFormatter = new Intl.NumberFormat('en-US', {
-  style: 'currency',
-  currency: 'USD',
-});
-
-// Compact money formatter for header chips: $847, $9.8K, $1.2M.
-// Full precision lives in the title tooltip and inside the financial drawer;
-// chips are for scanning, not auditing (Phase 7 design §5.1).
-function formatCompactCurrency(amount: number): string {
-  const abs = Math.abs(amount);
-  if (abs < 1000) return `$${Math.round(amount)}`;
-  if (abs < 1_000_000) {
-    const k = amount / 1000;
-    const rounded = Math.round(k * 10) / 10;
-    return `$${rounded % 1 === 0 ? rounded.toFixed(0) : rounded.toFixed(1)}K`;
-  }
-  const m = amount / 1_000_000;
-  const rounded = Math.round(m * 10) / 10;
-  return `$${rounded % 1 === 0 ? rounded.toFixed(0) : rounded.toFixed(1)}M`;
-}
-
 export default function WorkOrderDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -188,39 +142,7 @@ export default function WorkOrderDetailPage() {
   const { getName } = useGlossary();
   const [copied, setCopied] = useState<'phone' | 'address' | null>(null);
   const [activityDrawerOpen, setActivityDrawerOpen] = useState(false);
-  const [financialDrawerOpen, setFinancialDrawerOpen] = useState(false);
-  const [financialDrawerInitialTab, setFinancialDrawerInitialTab] =
-    useState<FinancialTab>('invoices');
-  // Monotonic counters — each increment signals the matching tab to
-  // auto-open its create dialog. Used by the chip-row [+ Invoice] /
-  // [+ Quote] ghosts so a single click both opens the drawer at the
-  // tab AND opens the create dialog (one CSR-visible action, one
-  // click).
-  const [invoiceCreateSignal, setInvoiceCreateSignal] = useState(0);
-  const [quoteCreateSignal, setQuoteCreateSignal] = useState(0);
-
-  // Open the financial drawer at the matching tab. Used by derived chips
-  // ($ quoted, $ invoiced, Bal) — explicitly resets BOTH create signals
-  // so a stale value from a previous ghost click can't trigger a create
-  // dialog to reopen on this navigation.
-  const openFinancialDrawer = (tab: FinancialTab) => {
-    setFinancialDrawerInitialTab(tab);
-    setInvoiceCreateSignal(0);
-    setQuoteCreateSignal(0);
-    setFinancialDrawerOpen(true);
-  };
-
-  const openFinancialDrawerForInvoiceCreate = () => {
-    setFinancialDrawerInitialTab('invoices');
-    setInvoiceCreateSignal((n) => n + 1);
-    setFinancialDrawerOpen(true);
-  };
-
-  const openFinancialDrawerForQuoteCreate = () => {
-    setFinancialDrawerInitialTab('quotes');
-    setQuoteCreateSignal((n) => n + 1);
-    setFinancialDrawerOpen(true);
-  };
+  const [tab, setTab] = useUrlTab<WorkOrderTab>(TAB_IDS, 'overview');
   const [workItemDialogOpen, setWorkItemDialogOpen] = useState(false);
   const [editingWorkItem, setEditingWorkItem] = useState<WorkItemResponse | null>(null);
   const [editWorkOrderDialogOpen, setEditWorkOrderDialogOpen] = useState(false);
@@ -305,7 +227,6 @@ export default function WorkOrderDetailPage() {
       alert(msg || t('common.form.errorUpdate', { entity: getName('work_item') }));
     }
   };
-
 
   const deleteWorkItemMutation = useMutation({
     mutationFn: ({ workItemId }: { workItemId: string }) =>
@@ -454,24 +375,35 @@ export default function WorkOrderDetailPage() {
     enabled: !!id,
   });
 
-  // Phase 7 §6 ask #1 — live financial rollup from financial-service.
-  // Fires in parallel with the WO query (per backend handoff). Endpoint
-  // always returns 200 with zero totals when the WO has no activity OR
-  // doesn't exist (RLS) — treat zeros as "nothing to show," not as error.
+  // Full service-location record — premise, gate/arrival facts, access notes,
+  // pinned site note for the Overview Location card. Same endpoint + cache key
+  // as the (shipped) Location detail page, so it's frequently warm.
+  const serviceLocationId = workOrder?.serviceLocationId || workOrder?.serviceLocation?.id;
+  const { data: locationDetail } = useQuery<ServiceLocationDetailDto>({
+    queryKey: ['service-location', serviceLocationId],
+    queryFn: () => customerApi.getServiceLocationById(serviceLocationId!),
+    enabled: !!serviceLocationId,
+  });
+
+  // Live financial rollup (financial-service). Feeds the Overview Money card.
+  // Always 200 with zero totals when there's no activity — treat zeros as
+  // "nothing to show," not an error.
   const { data: financialSummary } = useQuery<WorkOrderFinancialSummary>({
     queryKey: ['financialSummary', id],
     queryFn: () => financialSummaryApi.getByWorkOrder(id!),
     enabled: !!id,
   });
 
-  // §5.2 Bal color signal — rose when ANY invoice on the WO is OVERDUE.
-  // The drawer's Invoices tab already keys on ['workOrderInvoices', id]
-  // so subscribing here just reads its cache when the drawer has been
-  // opened, or fetches when it hasn't. Cheap; one round-trip on first
-  // page load.
-  const { data: invoicesForOverdue = [] } = useQuery({
+  // Document counts for the Quotes & invoices tab badge. Reuse the same query
+  // keys the financial tabs use so they dedupe.
+  const { data: invoicesForCount = [] } = useQuery({
     queryKey: ['workOrderInvoices', id],
     queryFn: () => invoicesApi.getByWorkOrder(id!),
+    enabled: !!id,
+  });
+  const { data: quotesForCount = [] } = useQuery({
+    queryKey: ['workOrderQuotes', id],
+    queryFn: () => quotesApi.getByWorkOrder(id!),
     enabled: !!id,
   });
 
@@ -516,8 +448,7 @@ export default function WorkOrderDetailPage() {
   const workflowTransitions = activeWorkflow?.transitions ?? [];
 
   // Same query key as DispatchesSection — React Query dedupes the actual fetch.
-  // Read here so the header ETA can derive from the next non-cancelled dispatch.
-  // WO-scoped read returns a plain array (listForWorkOrder tolerates both shapes).
+  // Read here so the Overview trip strip + attention can derive from dispatches.
   const { data: dispatches = [] } = useQuery({
     queryKey: ['dispatches', { workOrderId: id }],
     queryFn: () => dispatchesApi.listForWorkOrder(id!),
@@ -574,95 +505,187 @@ export default function WorkOrderDetailPage() {
 
   const isCancelled = workOrder.lifecycleState === 'CANCELLED';
   const isArchived = !!workOrder.archivedAt;
+  const frozen = isCancelled || isArchived;
   const priority = workOrder.priority ?? 'NORMAL';
 
   const woDisplayNumber = workOrder.workOrderNumber || `#${workOrder.id.slice(0, 8)}`;
 
+  // Location-led H1: site name when known, else the WO number.
+  const headerTitle = location?.locationName || woDisplayNumber;
+
+  // Premise tag (Residence / Business) from the full location record.
+  const premiseLabel = locationDetail
+    ? locationDetail.premiseType === 'RESIDENCE'
+      ? t('workOrders.detail.premiseResidence')
+      : t('workOrders.detail.premiseBusiness')
+    : null;
+
+  // WO type → name + accent dot color; division → name (Tag).
+  const woType = (workOrderTypes ?? []).find((wt) => wt.id === workOrder.workOrderTypeId);
+  const woDivision = (divisions ?? []).find((d) => d.id === workOrder.divisionId);
+
+  // Job essence: backend `summary` (on the wire; FE type lags — read via cast),
+  // else the first work item + "+N more". Mirrors deriveJobLabel on the
+  // Location detail page.
+  const summary = (workOrder as { summary?: string | null }).summary;
+  const firstItem = workOrder.workItems?.[0]?.description;
+  const moreItems = Math.max(0, (workOrder.workItemCount ?? 0) - 1);
+  const essence = summary || (firstItem ? (moreItems > 0 ? `${firstItem} +${moreItems} more` : firstItem) : null);
+
+  // Resolve a dispatch's tech display name from the WO's distinct assigned users.
+  const techName = (userId: string) =>
+    workOrder.assignedUsers?.find((u) => u.userId === userId)?.name ?? undefined;
+
+  const sitePhone = location?.siteContactPhone || customer?.phone;
+  // DB stores addresses uppercase — title-case street + city for display
+  // (state code stays as-is); keep a raw query string for the maps link.
+  const addr = location?.address;
+  const displayAddress = addr
+    ? `${titleCaseAddress(addr.streetAddress)}, ${titleCaseAddress(addr.city)}, ${addr.state} ${addr.zipCode}`
+    : '';
+  const mapsQuery = addr
+    ? `${addr.streetAddress}, ${addr.city}, ${addr.state} ${addr.zipCode}`
+    : '';
+
+  const handleAddWorkItem = () => {
+    setTab('items');
+    setEditingWorkItem(null);
+    setWorkItemDialogOpen(true);
+  };
+
+  const openFinancialTab = () => setTab('estimate');
+
+  const tabItems: { id: WorkOrderTab; label: string; count?: number }[] = [
+    { id: 'overview', label: t('workOrders.detail.tabs.overview') },
+    { id: 'items', label: getName('work_item', true), count: workOrder.workItemCount ?? workOrder.workItems?.length ?? 0 },
+    { id: 'trips', label: getName('dispatch', true), count: dispatches.filter((d) => d.status !== 'CANCELLED').length },
+    {
+      id: 'estimate',
+      label: t('workOrders.detail.tabs.documents'),
+      count: invoicesForCount.length + quotesForCount.length,
+    },
+    { id: 'purchasing', label: t('workOrders.detail.tabs.purchasing') },
+    { id: 'files', label: t('workOrders.detail.tabs.files') },
+    { id: 'activity', label: t('workOrders.detail.tabs.activity') },
+  ];
+
   return (
     <AppLayout>
-      {/* Multi-column independent scroll on lg+ — header is a fixed row, each
-          column scrolls in its own viewport. AppLayout uses min-h-svh so we have
-          to compute the page height explicitly (7rem ≈ AppLayout's chrome on lg+:
-          p-2 + p-10 + main pt-2/pb-2). Below lg, fall back to natural document
-          flow with a non-sticky header (mobile redesign is queued; the sticky
-          treatment was getting in the way more than helping). */}
-      <div className="flex flex-col lg:h-[calc(100svh-7rem)] lg:overflow-hidden">
-        {/* Header — static block below lg, layout-row on lg+ where the parent
-            has overflow-hidden and the body grid scrolls per-column. */}
-        <div className="border-b border-zinc-950/10 bg-white px-4 py-3 dark:border-white/10 dark:bg-zinc-900 lg:shrink-0">
-          {/* Back link */}
-          <div className="mb-2">
-            <Button plain onClick={() => navigate('/work-orders')}>
-              <ArrowLeftIcon className="size-4" />
-              {t('common.actions.backTo', { entities: getName('work_order', true) })}
-            </Button>
-          </div>
+      <div className="mx-auto max-w-[1240px]">
+        {/* Smart back */}
+        <Button plain onClick={() => navigate('/work-orders')} className="mb-2">
+          <ArrowLeftIcon className="size-4" />
+          {t('common.actions.backTo', { entities: getName('work_order', true) })}
+        </Button>
 
-          {/* Row 1 — identity & state on the left, action cluster on the
-              right. Priority pill is click-to-edit (matches the work-item
-              status pill pattern). The action cluster (Activity / Edit /
-              overflow) lives on the right edge of this row instead of in its
-              own row — three small buttons don't earn a dedicated strip. */}
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-            <Heading className="!text-lg">{woDisplayNumber}</Heading>
-            <Badge color={PROGRESS_COLORS[workOrder.progressCategory]}>
-              {t(`workOrders.progress.${PROGRESS_TRANSLATION_KEYS[workOrder.progressCategory]}`)}
-            </Badge>
-            {isCancelled && (
-              <Badge color="zinc">{t('workOrders.actions.cancelledBadge')}</Badge>
-            )}
-            {isArchived && (
-              <Badge color="zinc">{t('workOrders.actions.archived')}</Badge>
-            )}
-            {(() => {
-              // Non-default priority chip: silent for NORMAL, present in
-              // distinct grammar when LOW/HIGH/URGENT. See the
-              // PRIORITY_CHIP_CONFIG comment above for the reasoning.
-              // Cancelled/archived WOs render the chip read-only (no
-              // dropdown); active WOs wrap it in a dropdown so a CSR can
-              // change it without leaving the page.
-              const cfg = PRIORITY_CHIP_CONFIG[priority];
-              if (!cfg) return null;
-              const { color, Icon, labelKey } = cfg;
-              const label = t(`workOrders.priority.${labelKey}`).toUpperCase();
-              const badge = (
-                <Badge color={color} className="tracking-wider">
-                  <Icon className="size-3" />
-                  {label}
-                </Badge>
-              );
-              if (isCancelled || isArchived) return badge;
-              return (
-                <Dropdown>
-                  <DropdownButton
-                    as="button"
-                    type="button"
-                    className="cursor-pointer rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
-                    aria-label={t('workOrders.form.priority')}
-                  >
-                    {badge}
-                  </DropdownButton>
-                  <DropdownMenu anchor="bottom start">
-                    {(['LOW', 'NORMAL', 'HIGH', 'URGENT'] as WorkOrderPriority[])
-                      .filter((p) => p !== priority)
-                      .map((p) => (
-                        <DropdownItem
-                          key={p}
-                          onClick={() => handleSaveWorkOrderField('priority', p)}
-                        >
-                          <DropdownLabel>
-                            {t(`workOrders.priority.${PRIORITY_TRANSLATION_KEYS[p]}`)}
-                          </DropdownLabel>
-                        </DropdownItem>
-                      ))}
-                  </DropdownMenu>
-                </Dropdown>
-              );
-            })()}
-            <Text className="!text-sm !text-zinc-500" title={formatExactTimestamp(workOrder.updatedAt)}>
-              {t('workOrders.detail.lastUpdated', { time: formatTimestamp(workOrder.updatedAt) })}
-            </Text>
-            <div className="ml-auto flex items-center gap-2">
+        {/* Header — location-led identity + classification + actions. */}
+        <div className="rounded-[10px] border border-border bg-bg-elev px-4 py-3.5">
+          <div className="flex flex-wrap items-start gap-x-3 gap-y-2">
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
+                <Heading level={1} size="page-sm" className="m-0">{headerTitle}</Heading>
+                {premiseLabel && <Tag>{premiseLabel}</Tag>}
+                {/* Priority — click-to-change on active WOs, read-only when frozen. */}
+                {(() => {
+                  const cfg = PRIORITY_PILL[priority];
+                  const pill = (
+                    <Pill tone={cfg.tone} dot={cfg.dot}>
+                      {t(`workOrders.priority.${cfg.labelKey}`)}
+                    </Pill>
+                  );
+                  if (frozen) return pill;
+                  return (
+                    <Dropdown>
+                      <DropdownButton
+                        as="button"
+                        type="button"
+                        className="cursor-pointer rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-500"
+                        aria-label={t('workOrders.form.priority')}
+                      >
+                        {pill}
+                      </DropdownButton>
+                      <DropdownMenu anchor="bottom start">
+                        {(['LOW', 'NORMAL', 'HIGH', 'URGENT'] as WorkOrderPriority[])
+                          .filter((p) => p !== priority)
+                          .map((p) => (
+                            <DropdownItem key={p} onClick={() => handleSaveWorkOrderField('priority', p)}>
+                              <DropdownLabel>{t(`workOrders.priority.${PRIORITY_TRANSLATION_KEYS[p]}`)}</DropdownLabel>
+                            </DropdownItem>
+                          ))}
+                      </DropdownMenu>
+                    </Dropdown>
+                  );
+                })()}
+                <Pill tone={PROGRESS_PILL_TONE[workOrder.progressCategory]} dot>
+                  {t(`workOrders.progress.${PROGRESS_TRANSLATION_KEYS[workOrder.progressCategory]}`)}
+                </Pill>
+                {isCancelled && <Pill tone="neutral">{t('workOrders.actions.cancelledBadge')}</Pill>}
+                {isArchived && <Pill tone="neutral">{t('workOrders.actions.archived')}</Pill>}
+                {woDivision && <Tag>{woDivision.name}</Tag>}
+                {woType && (
+                  <span className="inline-flex items-center gap-1.5 rounded-full border border-border px-2 py-0.5 text-[11.5px] font-semibold text-fg-strong">
+                    <span
+                      className="size-[7px] rounded-full"
+                      style={{ background: roleAccent(woType.accentId, woType.name) }}
+                    />
+                    {woType.name}
+                  </span>
+                )}
+              </div>
+
+              {/* Meta line — render only populated items. */}
+              <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11.5px] text-fg-muted">
+                {displayAddress && <span className="font-medium text-fg-strong">{displayAddress}</span>}
+                {displayAddress && <span className="text-fg-dim">·</span>}
+                <span className="font-mono">{woDisplayNumber}</span>
+                {essence && (
+                  <>
+                    <span className="text-fg-dim">·</span>
+                    <span className="text-fg-strong">{essence}</span>
+                  </>
+                )}
+                <span className="text-fg-dim">·</span>
+                <span title={formatExactTimestamp(workOrder.createdAt)}>
+                  {t('workOrders.detail.openedAt', { time: formatDate(workOrder.createdAt) })}
+                </span>
+                {workOrder.customerOrderNumber && (
+                  <>
+                    <span className="text-fg-dim">·</span>
+                    <span>
+                      {t('workOrders.form.customerOrderNumber')} <span className="font-mono text-fg-strong">{workOrder.customerOrderNumber}</span>
+                    </span>
+                  </>
+                )}
+                <span className="text-fg-dim">·</span>
+                <span title={formatExactTimestamp(workOrder.updatedAt)}>
+                  {t('workOrders.detail.lastUpdated', { time: formatTimestamp(workOrder.updatedAt) })}
+                </span>
+              </div>
+            </div>
+
+            {/* Action cluster */}
+            <div className="flex flex-shrink-0 flex-wrap items-center gap-1.5">
+              {sitePhone && (
+                <Button outline onClick={() => handleCopy('phone', formatPhone(sitePhone) || sitePhone)}>
+                  <PhoneIcon data-slot="icon" />
+                  {copied === 'phone' ? t('workOrders.detail.copied') : t('workOrders.detail.callSite')}
+                </Button>
+              )}
+              {mapsQuery && (
+                <Button
+                  outline
+                  onClick={() =>
+                    window.open(
+                      `https://maps.google.com/?q=${encodeURIComponent(mapsQuery)}`,
+                      '_blank',
+                      'noopener',
+                    )
+                  }
+                >
+                  <MapIcon data-slot="icon" />
+                  {t('workOrders.detail.directions')}
+                </Button>
+              )}
               <ActivityButton
                 workOrderId={workOrder.id}
                 drawerOpen={activityDrawerOpen}
@@ -671,16 +694,15 @@ export default function WorkOrderDetailPage() {
               <Button
                 outline
                 onClick={() => setEditWorkOrderDialogOpen(true)}
-                disabled={isCancelled || isArchived}
-                className="border-border text-fg-strong hover:bg-bg-hover dark:border-border dark:text-fg-strong dark:hover:bg-bg-hover"
-                title={
-                  isCancelled || isArchived
-                    ? t('workOrders.detail.frozen')
-                    : undefined
-                }
+                disabled={frozen}
+                title={frozen ? t('workOrders.detail.frozen') : undefined}
               >
                 <PencilIcon data-slot="icon" />
                 {t('common.edit')}
+              </Button>
+              <Button color="accent" onClick={handleAddWorkItem} disabled={frozen}>
+                <PlusIcon data-slot="icon" />
+                {`${t('common.add')} ${getName('work_item').toLowerCase()}`}
               </Button>
               <Dropdown>
                 <DropdownButton as={IconButton} aria-label={t('common.moreOptions')}>
@@ -700,547 +722,125 @@ export default function WorkOrderDetailPage() {
               </Dropdown>
             </div>
           </div>
-
-          {/* Row 2 — B2B context + ETA. Customer name is a thin breadcrumb;
-              the operational location identity (name + address + site
-              contact) lives in the Service Location card on the left strip,
-              not here. ETA is read-only display: a WO can have multiple
-              dispatches and each commits a customer-facing arrival WINDOW
-              (e.g. "Fri 8–10 AM") rather than a single point. The chip
-              prefers the next non-cancelled dispatch's window as the
-              authoritative "when is this happening" answer. Falls back to
-              workOrder.scheduledDate (editable via Edit WO dialog) when no
-              dispatches exist yet — that's the planning-stage ETA before
-              anyone is actually assigned, and is intentionally date-only. */}
-          <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-zinc-600 dark:text-zinc-400">
-            {customer && (
-              // Permanent affordance: darker than the surrounding muted row
-              // text + medium weight + always-on subtle underline so it reads
-              // as "this is a link" sitting next to non-link text like the ETA
-              // chip. Hover brightens the underline.
-              <CatLink
-                href={`/customers/${customer.id}`}
-                className="font-medium text-zinc-950 underline decoration-zinc-300 underline-offset-2 hover:decoration-zinc-700 dark:text-white dark:decoration-zinc-600 dark:hover:decoration-zinc-300"
-              >
-                {customer.name}
-              </CatLink>
-            )}
-            {(() => {
-              const nextDispatch = [...dispatches]
-                .filter((d) => d.status !== 'CANCELLED')
-                .sort(
-                  (a, b) =>
-                    new Date(a.arrivalWindowStart).getTime() -
-                    new Date(b.arrivalWindowStart).getTime()
-                )[0];
-              const etaText = nextDispatch
-                ? formatEtaWindow(
-                    nextDispatch.arrivalWindowStart,
-                    nextDispatch.arrivalWindowEnd
-                  )
-                : workOrder.scheduledDate
-                  ? formatDate(workOrder.scheduledDate)
-                  : null;
-              return (
-                <span className="inline-flex items-center gap-1">
-                  <CalendarIcon className="size-4" />
-                  <span>
-                    {etaText
-                      ? t('workOrders.detail.eta', { date: etaText })
-                      : t('workOrders.detail.notScheduled')}
-                  </span>
-                </span>
-              );
-            })()}
-          </div>
-
-          {/* Row 3 — money chips (Phase 7 §5).
-              §5.3 reveal logic (post-drawer-shell): the row is the canonical
-              financial entry surface, not just a display.
-                Active WO  → row always renders. NTE on the left (set or
-                             ghost); right cluster is either live derived
-                             chips (when summary non-zero) or a typed ghost
-                             cluster ("+ Invoice") that opens the drawer at
-                             the matching tab.
-                Frozen WO  → row renders only when there's something to
-                             show (NTE set OR non-zero summary). No ghost
-                             affordances — cancelled/archived WOs can't
-                             invoice.
-              §5.2 Bal color: zinc default; amber when invoiced > 0 AND
-              paid = 0. Rose-on-OVERDUE waits on ask #2.
-              BigDecimal handling: amounts arrive as strings (see
-              WorkOrderFinancialSummary). parseFloat is fine for display
-              decisions (formatter and >0 checks); never use parseFloat
-              output for write-side arithmetic.
-              Click routing (§3.2):
-                $ quoted    → drawer, Quotes tab (7b)
-                $ invoiced  → drawer, Invoices tab
-                $ paid      → plain text, no click (§5.1 — payments live
-                              inside invoice expansions, no tab to route
-                              to)
-                Bal         → drawer, Invoices tab
-                [+ Quote]   → drawer, Quotes tab (7b)
-                [+ Invoice] → drawer, Invoices tab */}
-          {(() => {
-            const hasNte = workOrder.notToExceed != null;
-            const quotedAmt = financialSummary?.quoted
-              ? parseFloat(financialSummary.quoted) || 0
-              : 0;
-            const invoicedAmt = financialSummary
-              ? parseFloat(financialSummary.invoiced) || 0
-              : 0;
-            const paidAmt = financialSummary
-              ? parseFloat(financialSummary.paid) || 0
-              : 0;
-            const balanceAmt = financialSummary
-              ? parseFloat(financialSummary.balance) || 0
-              : 0;
-            const hasDerivedActivity =
-              quotedAmt > 0 || invoicedAmt > 0 || paidAmt > 0 || balanceAmt > 0;
-            const frozen = isCancelled || isArchived;
-
-            // Frozen WOs: only render the row when there's something
-            // worth showing. Active WOs always render — the typed ghost
-            // cluster fills the row's bootstrap role.
-            if (frozen && !hasNte && !hasDerivedActivity) return null;
-
-            const showNteSlot = hasNte || !frozen;
-            // Both ghosts are bootstrap-only — they retire once the
-            // matching entity has activity on the WO. After that, the
-            // CSR is already going through the drawer for status /
-            // related-record reasons, and the in-drawer + New CTA is
-            // the natural next click.
-            //
-            // Exception worth flagging: a CSR sometimes needs a follow
-            // -up quote (or invoice) on a WO that already has activity
-            // — that path remains 3 clicks (chip → tab → +New). If real
-            // CSR feedback shows that's a friction point on a specific
-            // entity, revisit per-entity.
-            const showQuoteGhost = !frozen && quotedAmt === 0;
-            const showInvoiceGhost = !frozen && invoicedAmt === 0;
-            const showTypedGhosts = showQuoteGhost || showInvoiceGhost;
-            // §5.2 Bal palette:
-            //   rose  → any invoice on the WO is OVERDUE (highest signal)
-            //   amber → invoiced > 0 and paid = 0 (outstanding, not late yet)
-            //   zinc  → balance is 0 OR partial-pay with nothing overdue
-            // Rose takes priority over amber — once an invoice is late,
-            // that's the headline state regardless of partial payments.
-            const hasOverdueInvoice = invoicesForOverdue.some(
-              (inv) => inv.status === 'OVERDUE',
-            );
-            const balPalette = hasOverdueInvoice
-              ? 'rose'
-              : invoicedAmt > 0 && paidAmt === 0
-                ? 'amber'
-                : 'zinc';
-            const balClasses =
-              balPalette === 'rose'
-                ? 'bg-rose-50 text-rose-900 dark:bg-rose-500/10 dark:text-rose-300'
-                : balPalette === 'amber'
-                  ? 'bg-amber-50 text-amber-900 dark:bg-amber-500/10 dark:text-amber-300'
-                  : 'bg-zinc-100 text-zinc-700 dark:bg-white/5 dark:text-zinc-300';
-            // Shared chip-button affordance: hover ring + pointer cursor.
-            // Catalyst Button is too heavy for inline chips; a plain
-            // <button> with the chip surface styling keeps the visual
-            // density while staying accessible.
-            const chipButtonClass =
-              'inline-flex cursor-pointer items-center gap-1 rounded-md px-1.5 py-0.5 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500';
-
-            const nteValueChip = (num: number) => (
-              <span
-                className="inline-flex items-center gap-1 rounded-md bg-zinc-100 px-1.5 py-0.5 text-zinc-700 dark:bg-white/5 dark:text-zinc-300"
-                title={currencyFormatter.format(num)}
-              >
-                <span className="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-                  {t('workOrders.detail.money.nte')}
-                </span>
-                <span className="font-medium tabular-nums">
-                  {formatCompactCurrency(num)}
-                </span>
-              </span>
-            );
-
-            return (
-              <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
-                {showNteSlot &&
-                  (frozen
-                    ? nteValueChip(workOrder.notToExceed as number)
-                    : (
-                      <EditableField
-                        value={
-                          workOrder.notToExceed != null
-                            ? String(workOrder.notToExceed)
-                            : ''
-                        }
-                        onSave={async (raw) => {
-                          const trimmed = raw.trim().replace(/[$,\s]/g, '');
-                          if (trimmed === '') {
-                            await handleSaveWorkOrderField('notToExceed', null);
-                            return;
-                          }
-                          const num = Number(trimmed);
-                          if (!Number.isFinite(num) || num < 0) {
-                            alert(t('workOrders.form.notToExceedInvalid'));
-                            throw new Error('invalid NTE');
-                          }
-                          await handleSaveWorkOrderField('notToExceed', num);
-                        }}
-                        placeholder={t('workOrders.form.notToExceedPlaceholder')}
-                        ariaLabel={t('workOrders.form.notToExceed')}
-                        inputClassName="!w-32"
-                        renderDisplay={(v) => {
-                          if (!v) {
-                            return (
-                              <span className="inline-flex items-center gap-1 rounded-md border border-dashed border-zinc-300 px-1.5 py-0.5 text-zinc-500 dark:border-zinc-600 dark:text-zinc-400">
-                                + {t('workOrders.detail.setNte')}
-                              </span>
-                            );
-                          }
-                          return nteValueChip(Number(v));
-                        }}
-                      />
-                    ))}
-
-                {showNteSlot && (hasDerivedActivity || showTypedGhosts) && (
-                  <span
-                    className="inline-block h-4 w-px bg-zinc-300 dark:bg-zinc-600"
-                    aria-hidden="true"
-                  />
-                )}
-
-                {hasDerivedActivity && (
-                  <>
-                    {quotedAmt > 0 && (
-                      <>
-                        <button
-                          type="button"
-                          onClick={() => openFinancialDrawer('quotes')}
-                          title={currencyFormatter.format(quotedAmt)}
-                          aria-label={getName('quote', true)}
-                          className={`${chipButtonClass} bg-zinc-100 text-zinc-700 hover:bg-zinc-200 dark:bg-white/5 dark:text-zinc-300 dark:hover:bg-white/10`}
-                        >
-                          <span className="font-medium tabular-nums">
-                            {formatCompactCurrency(quotedAmt)}
-                          </span>
-                          <span className="text-xs text-zinc-500 dark:text-zinc-400">
-                            {t('workOrders.detail.money.quoted')}
-                          </span>
-                        </button>
-                        <span
-                          className="text-zinc-300 dark:text-zinc-600"
-                          aria-hidden="true"
-                        >
-                          ·
-                        </span>
-                      </>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => openFinancialDrawer('invoices')}
-                      title={currencyFormatter.format(invoicedAmt)}
-                      aria-label={getName('invoice', true)}
-                      className={`${chipButtonClass} bg-zinc-100 text-zinc-700 hover:bg-zinc-200 dark:bg-white/5 dark:text-zinc-300 dark:hover:bg-white/10`}
-                    >
-                      <span className="font-medium tabular-nums">
-                        {formatCompactCurrency(invoicedAmt)}
-                      </span>
-                      <span className="text-xs text-zinc-500 dark:text-zinc-400">
-                        {t('workOrders.detail.money.invoiced')}
-                      </span>
-                    </button>
-                    <span
-                      className="text-zinc-300 dark:text-zinc-600"
-                      aria-hidden="true"
-                    >
-                      ·
-                    </span>
-                    {/* $ paid is plain text, not a button (§3.2 / §5.1).
-                        Payments live inside invoice row expansions in the
-                        drawer (§3.3 fold), so there's no single tab to
-                        route this chip to. Demoted to display preserves
-                        the reconciled-story at-a-glance number without
-                        promising a click target that doesn't exist. */}
-                    <span
-                      className="inline-flex items-center gap-1 px-1.5 py-0.5 text-zinc-700 dark:text-zinc-300"
-                      title={currencyFormatter.format(paidAmt)}
-                    >
-                      <span className="font-medium tabular-nums">
-                        {formatCompactCurrency(paidAmt)}
-                      </span>
-                      <span className="text-xs text-zinc-500 dark:text-zinc-400">
-                        {t('workOrders.detail.money.paid')}
-                      </span>
-                    </span>
-                    <span
-                      className="text-zinc-300 dark:text-zinc-600"
-                      aria-hidden="true"
-                    >
-                      ·
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => openFinancialDrawer('invoices')}
-                      title={currencyFormatter.format(balanceAmt)}
-                      aria-label={t('workOrders.detail.money.balance')}
-                      className={`${chipButtonClass} ${balClasses} ${
-                        balPalette === 'rose'
-                          ? 'hover:bg-rose-100 dark:hover:bg-rose-500/20'
-                          : balPalette === 'amber'
-                            ? 'hover:bg-amber-100 dark:hover:bg-amber-500/20'
-                            : 'hover:bg-zinc-200 dark:hover:bg-white/10'
-                      }`}
-                    >
-                      <span className="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-                        {t('workOrders.detail.money.balanceShort')}
-                      </span>
-                      <span className="font-medium tabular-nums">
-                        {formatCompactCurrency(balanceAmt)}
-                      </span>
-                    </button>
-                  </>
-                )}
-
-                {hasDerivedActivity && showTypedGhosts && (
-                  // Separate the "data" cluster (live derived chips) from
-                  // the "actions" cluster (create ghosts) with a vertical
-                  // bar — matches the NTE-vs-data divider so the row reads
-                  // as three groups: identity · data · actions.
-                  <span
-                    className="inline-block h-4 w-px bg-zinc-300 dark:bg-zinc-600"
-                    aria-hidden="true"
-                  />
-                )}
-
-                {showTypedGhosts && (
-                  // Typed ghost create-entry. [+ Quote] always visible on
-                  // active WOs (additional-work-needs-quoting flow).
-                  // [+ Invoice] retires once any invoice exists (§5.3 +
-                  // CSR feedback).
-                  <>
-                    {showQuoteGhost && (
-                      <button
-                        type="button"
-                        onClick={openFinancialDrawerForQuoteCreate}
-                        aria-label={getName('quote', true)}
-                        className="inline-flex cursor-pointer items-center gap-1 rounded-md border border-dashed border-zinc-300 px-1.5 py-0.5 text-zinc-500 transition hover:border-zinc-400 hover:text-zinc-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:border-zinc-600 dark:text-zinc-400 dark:hover:border-zinc-500 dark:hover:text-zinc-200"
-                      >
-                        + {getName('quote')}
-                      </button>
-                    )}
-                    {showQuoteGhost && showInvoiceGhost && (
-                      <span
-                        className="text-zinc-300 dark:text-zinc-600"
-                        aria-hidden="true"
-                      >
-                        ·
-                      </span>
-                    )}
-                    {showInvoiceGhost && (
-                      <button
-                        type="button"
-                        onClick={openFinancialDrawerForInvoiceCreate}
-                        aria-label={getName('invoice', true)}
-                        className="inline-flex cursor-pointer items-center gap-1 rounded-md border border-dashed border-zinc-300 px-1.5 py-0.5 text-zinc-500 transition hover:border-zinc-400 hover:text-zinc-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:border-zinc-600 dark:text-zinc-400 dark:hover:border-zinc-500 dark:hover:text-zinc-200"
-                      >
-                        + {getName('invoice')}
-                      </button>
-                    )}
-                  </>
-                )}
-              </div>
-            );
-          })()}
         </div>
 
-        {/* Approval callout — self-contained per workflow approval engine spec.
-            Renders only when this WO has at least one pending approval. */}
-        <div className="px-4 pt-3">
+        {/* Approval callout — renders only when this WO has a pending approval. */}
+        <div className="mt-3">
           <WorkOrderApprovalsCallout workOrderId={workOrder.id} />
         </div>
 
-        {/* Body grid (§5d — right rail removed; activity is in a drawer):
-            - <lg: stacked, document-level scroll
-            - lg+: 2-col (left strip + main); each column owns its scroll. */}
-        <div className="p-4 lg:grid lg:grid-cols-[260px_1fr] lg:gap-6 lg:flex-1 lg:min-h-0 lg:overflow-hidden">
-          <aside className="flex flex-col gap-6 lg:min-h-0 lg:overflow-y-auto">
-            {/* Service Location card. Location identity belongs here, not
-                in the header — bold name + multi-line address gives the
-                "where is this work happening?" answer at a glance. Site
-                contact (name + phone + email) lives in the same card so
-                location-scoped contact data clusters together. Click the
-                card body to navigate to the dedicated location page;
-                phone/email use click-to-copy and mailto. */}
-            {location && (
-              <Card title={getName('service_location')}>
-                <CatLink
-                  href={`/service-locations/${location.id}`}
-                  className="-m-1 block cursor-pointer rounded-md p-1 hover:bg-zinc-100 dark:hover:bg-white/5"
-                >
-                  {location.locationName && (
-                    <div className="font-medium text-zinc-950 dark:text-white">
-                      {location.locationName}
-                    </div>
-                  )}
-                  <div className="text-sm text-zinc-700 dark:text-zinc-300">
-                    {location.address.streetAddress}
-                  </div>
-                  <div className="text-sm text-zinc-700 dark:text-zinc-300">
-                    {`${location.address.city}, ${location.address.state} ${location.address.zipCode}`}
-                  </div>
-                </CatLink>
+        {/* Tab row */}
+        <div className="mt-3">
+          <Tabs value={tab} onChange={(id) => setTab(id as WorkOrderTab)} tabs={tabItems} />
+        </div>
 
-                {(() => {
-                  // Strict fallback: site contact wins when ANY site field is
-                  // populated. Otherwise, surface the customer-level contact
-                  // (name + phone + email) so CSRs always have an actionable
-                  // number/email instead of a blank section. The label
-                  // ("Site Contact" vs "Customer Contact") makes the source
-                  // explicit so the CSR knows whether they're calling the
-                  // on-site person or the account holder.
-                  const hasSiteContact =
-                    !!location.siteContactName ||
-                    !!location.siteContactPhone ||
-                    !!location.siteContactEmail;
-                  const hasCustomerContact =
-                    !!customer && (!!customer.phone || !!customer.email);
-                  if (!hasSiteContact && !hasCustomerContact) return null;
+        {/* Tab bodies */}
+        <div className="mt-4">
+          {tab === 'overview' && (
+            <WorkOrderOverview
+              workOrder={workOrder}
+              location={locationDetail}
+              financialSummary={financialSummary}
+              dispatches={dispatches}
+              techName={techName}
+              onOpenTab={(t2) => setTab(t2 as WorkOrderTab)}
+              onAddWorkItem={handleAddWorkItem}
+              onOpenFinancial={openFinancialTab}
+              onSelectDispatch={(d) => setSelectedDispatch(d)}
+              extraRail={
+                <Card title={<CardTitle>{t('workOrders.detail.info', { entity: getName('work_order') })}</CardTitle>} padding="none">
+                  <div className="px-3.5 py-3">
+                    <DescriptionList>
+                      <DescriptionTerm>{t('workOrders.detail.created')}</DescriptionTerm>
+                      <DescriptionDetails><TimeAgo iso={workOrder.createdAt} /></DescriptionDetails>
 
-                  const label = hasSiteContact
-                    ? t('workOrders.detail.siteContact')
-                    : t('workOrders.detail.customerContact');
-                  const contactName = hasSiteContact
-                    ? location.siteContactName
-                    : customer?.name;
-                  const contactPhone = hasSiteContact
-                    ? location.siteContactPhone
-                    : customer?.phone;
-                  const contactEmail = hasSiteContact
-                    ? location.siteContactEmail
-                    : customer?.email;
+                      <DescriptionTerm>{t('workOrders.form.customerOrderNumber')}</DescriptionTerm>
+                      <DescriptionDetails>
+                        <EditableField
+                          value={workOrder.customerOrderNumber ?? ''}
+                          onSave={(v) => handleSaveWorkOrderField('customerOrderNumber', v || undefined)}
+                          disabled={frozen}
+                          placeholder={t('workOrders.form.customerOrderNumberPlaceholder')}
+                          ariaLabel={t('workOrders.form.customerOrderNumber')}
+                          className="font-mono"
+                        />
+                      </DescriptionDetails>
 
-                  return (
-                    <div className="mt-3 border-t border-zinc-200 pt-3 dark:border-zinc-800">
-                      <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-                        {label}
-                      </div>
-                      {contactName && (
-                        <div className="text-sm text-zinc-950 dark:text-white">
-                          {contactName}
-                        </div>
-                      )}
-                      {contactPhone && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const phone = contactPhone || '';
-                            handleCopy('phone', formatPhone(phone) || phone);
+                      <DescriptionTerm>{t('workOrders.form.notToExceed')}</DescriptionTerm>
+                      <DescriptionDetails>
+                        <EditableField
+                          value={workOrder.notToExceed != null ? String(workOrder.notToExceed) : ''}
+                          onSave={async (raw) => {
+                            const trimmed = raw.trim().replace(/[$,\s]/g, '');
+                            if (trimmed === '') {
+                              await handleSaveWorkOrderField('notToExceed', null);
+                              return;
+                            }
+                            const n = Number(trimmed);
+                            if (!Number.isFinite(n) || n < 0) {
+                              alert(t('workOrders.form.notToExceedInvalid'));
+                              throw new Error('invalid NTE');
+                            }
+                            await handleSaveWorkOrderField('notToExceed', n);
                           }}
-                          className="block text-left text-sm text-zinc-700 hover:text-zinc-950 dark:text-zinc-300 dark:hover:text-white"
-                          title={t('workOrders.detail.copyPhone')}
-                        >
-                          {copied === 'phone' ? '✓ ' : ''}
-                          {formatPhone(contactPhone)}
-                        </button>
+                          disabled={frozen}
+                          placeholder={t('workOrders.form.notToExceedPlaceholder')}
+                          ariaLabel={t('workOrders.form.notToExceed')}
+                          renderDisplay={(v) => (v ? currencyFormatter.format(Number(v)) : '-')}
+                        />
+                      </DescriptionDetails>
+
+                      <DescriptionTerm>{getName('division')}</DescriptionTerm>
+                      <DescriptionDetails>
+                        <EditableField
+                          as="select"
+                          value={workOrder.divisionId ?? ''}
+                          options={[
+                            { value: '', label: t('workOrders.form.divisionPlaceholder') },
+                            ...((divisions ?? []).filter((d) => d.isActive).map((d) => ({ value: d.id, label: d.name }))),
+                          ]}
+                          onSave={(v) => handleSaveWorkOrderField('divisionId', v || null)}
+                          disabled={frozen}
+                          ariaLabel={getName('division')}
+                        />
+                      </DescriptionDetails>
+
+                      <DescriptionTerm>{t('workOrders.form.type')}</DescriptionTerm>
+                      <DescriptionDetails>
+                        <EditableField
+                          as="select"
+                          value={workOrder.workOrderTypeId ?? ''}
+                          options={[
+                            { value: '', label: t('workOrders.form.typePlaceholder') },
+                            ...((workOrderTypes ?? []).filter((wt) => wt.isActive).map((wt) => ({ value: wt.id, label: wt.name }))),
+                          ]}
+                          onSave={(v) => handleSaveWorkOrderField('workOrderTypeId', v || null)}
+                          disabled={frozen}
+                          ariaLabel={t('workOrders.form.type')}
+                        />
+                      </DescriptionDetails>
+
+                      {workOrder.completedDate && (
+                        <>
+                          <DescriptionTerm>{t('workOrders.detail.completed')}</DescriptionTerm>
+                          <DescriptionDetails><TimeAgo iso={workOrder.completedDate} /></DescriptionDetails>
+                        </>
                       )}
-                      {contactEmail && (
-                        <a
-                          href={`mailto:${contactEmail}`}
-                          className="block text-sm text-zinc-700 hover:text-zinc-950 dark:text-zinc-300 dark:hover:text-white"
-                        >
-                          {contactEmail}
-                        </a>
-                      )}
-                    </div>
-                  );
-                })()}
-              </Card>
-            )}
+                    </DescriptionList>
+                  </div>
+                </Card>
+              }
+            />
+          )}
 
-            <Card title={t('workOrders.detail.info', { entity: getName('work_order') })}>
-              <DescriptionList>
-                <DescriptionTerm>{t('workOrders.detail.created')}</DescriptionTerm>
-                <DescriptionDetails><TimeAgo iso={workOrder.createdAt} /></DescriptionDetails>
-
-                <DescriptionTerm>{t('workOrders.form.customerOrderNumber')}</DescriptionTerm>
-                <DescriptionDetails>
-                  <EditableField
-                    value={workOrder.customerOrderNumber ?? ''}
-                    onSave={(v) => handleSaveWorkOrderField('customerOrderNumber', v || undefined)}
-                    disabled={isCancelled || isArchived}
-                    placeholder={t('workOrders.form.customerOrderNumberPlaceholder')}
-                    ariaLabel={t('workOrders.form.customerOrderNumber')}
-                    className="font-mono"
-                  />
-                </DescriptionDetails>
-
-                {/* NTE moved to header chip row (Phase 7 §5.4 single-surface
-                    migration). Wiring preserved verbatim — same EditableField,
-                    same handleSaveWorkOrderField('notToExceed', ...) path. */}
-
-                <DescriptionTerm>{getName('division')}</DescriptionTerm>
-                <DescriptionDetails>
-                  <EditableField
-                    as="select"
-                    value={workOrder.divisionId ?? ''}
-                    options={[
-                      { value: '', label: t('workOrders.form.divisionPlaceholder') },
-                      ...((divisions ?? [])
-                        .filter((d) => d.isActive)
-                        .map((d) => ({ value: d.id, label: d.name }))),
-                    ]}
-                    onSave={(v) => handleSaveWorkOrderField('divisionId', v || null)}
-                    disabled={isCancelled || isArchived}
-                    ariaLabel={getName('division')}
-                  />
-                </DescriptionDetails>
-
-                <DescriptionTerm>{t('workOrders.form.type')}</DescriptionTerm>
-                <DescriptionDetails>
-                  <EditableField
-                    as="select"
-                    value={workOrder.workOrderTypeId ?? ''}
-                    options={[
-                      { value: '', label: t('workOrders.form.typePlaceholder') },
-                      ...((workOrderTypes ?? [])
-                        .filter((t) => t.isActive)
-                        .map((t) => ({ value: t.id, label: t.name }))),
-                    ]}
-                    onSave={(v) => handleSaveWorkOrderField('workOrderTypeId', v || null)}
-                    disabled={isCancelled || isArchived}
-                    ariaLabel={t('workOrders.form.type')}
-                  />
-                </DescriptionDetails>
-
-                {/* Priority and Scheduled Date moved to the header — see
-                    Row 1 (priority pill) and Row 3 (ETA chip) above. The
-                    card row used to render them but the header is the
-                    glanceable surface and CSRs were seeing the same fact
-                    twice. Inline-edit lives in the header now. */}
-
-                {workOrder.completedDate && (
-                  <>
-                    <DescriptionTerm>{t('workOrders.detail.completed')}</DescriptionTerm>
-                    <DescriptionDetails><TimeAgo iso={workOrder.completedDate} /></DescriptionDetails>
-                  </>
-                )}
-              </DescriptionList>
-            </Card>
-          </aside>
-
-          {/* Main canvas — work items sit above dispatches because work items
-              are the substance of the WO ("what's wrong with my service?" is
-              the highest-volume CSR question on inbound calls), while the
-              sticky header's primary ETA already answers "who's coming next?"
-              without scrolling. Both sections render read-only when the WO is
-              frozen. */}
-          <main className="mt-6 lg:mt-0 lg:min-h-0 lg:overflow-y-auto">
+          {tab === 'items' && (
             <WorkItemsTable
               workOrderId={workOrder.id}
               workItems={workOrder.workItems ?? []}
               statuses={workItemStatuses}
               transitions={workflowTransitions}
               enforceWorkflow={workflowConfig?.enforcementMode === 'STRICT'}
-              readOnly={isCancelled || isArchived}
+              readOnly={frozen}
               onAdd={() => {
                 setEditingWorkItem(null);
                 setWorkItemDialogOpen(true);
@@ -1256,9 +856,12 @@ export default function WorkOrderDetailPage() {
               onSelectSubUnit={handleSelectSubUnit}
               onAddSubUnit={handleAddSubUnit}
             />
+          )}
+
+          {tab === 'trips' && (
             <DispatchesSection
               workOrderId={workOrder.id}
-              readOnly={isCancelled || isArchived}
+              readOnly={frozen}
               onAssign={() => {
                 setEditingDispatch(null);
                 setAssignDispatchDialogOpen(true);
@@ -1269,39 +872,60 @@ export default function WorkOrderDetailPage() {
               }}
               onSelect={(d) => setSelectedDispatch(d)}
             />
-          </main>
+          )}
+
+          {tab === 'estimate' && (
+            <div className="flex flex-col gap-4">
+              <FinancialInvoicesTab
+                workOrderId={workOrder.id}
+                workOrderNumber={woDisplayNumber}
+                customerId={customer?.id ?? workOrder.customerId ?? ''}
+                customerName={customer?.name ?? ''}
+              />
+              <FinancialQuotesTab
+                workOrderId={workOrder.id}
+                workOrderNumber={woDisplayNumber}
+                customerId={customer?.id ?? workOrder.customerId ?? ''}
+                customerName={customer?.name ?? ''}
+              />
+            </div>
+          )}
+
+          {tab === 'purchasing' && (
+            <Card>
+              <EmptyState
+                compact
+                title={t('workOrders.detail.tabs.purchasing')}
+                description={t('common.comingSoon')}
+              />
+            </Card>
+          )}
+
+          {tab === 'files' && (
+            <Card>
+              <EmptyState
+                compact
+                title={t('workOrders.detail.tabs.files')}
+                description={t('common.comingSoon')}
+              />
+            </Card>
+          )}
+
+          {tab === 'activity' && (
+            <Card>
+              <ActivityStream workOrderId={workOrder.id} />
+            </Card>
+          )}
         </div>
       </div>
 
-      {/* Activity drawer (§5d) — single page-level entry point for both reading
-          activity and writing notes. Composer at top autofocuses on open;
-          stream below virtualizes its history. ActiveDispatchesWidget lives
-          elsewhere once phase 6 ships. */}
+      {/* Activity drawer — page-level note/activity composer (N shortcut). Kept
+          alongside the Activity tab until the work_order notes endpoint lands
+          and the shared NotesCard fully replaces the composer. */}
       <ActivityDrawer
         open={activityDrawerOpen}
         onClose={() => setActivityDrawerOpen(false)}
         workOrderId={workOrder.id}
-      />
-
-      {/* Financial drawer (§3) — opened from chip-row clicks. Single mount;
-          `initialTab` controls which tab is active on each open. Tab content
-          is stubbed in this branch ("Coming soon") and fills in as backend
-          asks #2–#6 land. */}
-      <FinancialDrawer
-        open={financialDrawerOpen}
-        onClose={() => setFinancialDrawerOpen(false)}
-        workOrderId={workOrder.id}
-        workOrderNumber={woDisplayNumber}
-        // Prefer the enriched `customer.id` over the root `customerId`.
-        // The detail endpoint reliably populates the nested object; the
-        // root field is typed as required but has been observed missing
-        // in production responses for some WOs. Fall back either way so
-        // we never silently submit `customerId: undefined`.
-        customerId={customer?.id ?? workOrder.customerId ?? ''}
-        customerName={customer?.name ?? ''}
-        initialTab={financialDrawerInitialTab}
-        openInvoiceCreateSignal={invoiceCreateSignal}
-        openQuoteCreateSignal={quoteCreateSignal}
       />
 
       {/* Dispatch detail drawer — row body click opens this with the
@@ -1310,7 +934,7 @@ export default function WorkOrderDetailPage() {
           mode. Delete fires the dispatches mutation directly. */}
       <DispatchDetailDrawer
         dispatch={selectedDispatch}
-        readOnly={isCancelled || isArchived}
+        readOnly={frozen}
         onClose={() => setSelectedDispatch(null)}
         onEdit={(d) => {
           setSelectedDispatch(null);
@@ -1346,7 +970,7 @@ export default function WorkOrderDetailPage() {
         workOrderId={workOrder.id}
         serviceLocationId={workOrder.serviceLocationId || workOrder.serviceLocation?.id}
         workItem={editingWorkItem}
-        readOnly={isCancelled || isArchived}
+        readOnly={frozen}
       />
 
       <WorkOrderFormDialog
@@ -1403,25 +1027,11 @@ export default function WorkOrderDetailPage() {
 
       {/* Equipment quickview drawer — slides in from the right when a
           sub-unit chip is clicked. Manages its own internal stack for
-          drawer-over-drawer recursion. The drawer doesn't expose "+ Add
-          unit" because adding from a sub-unit would create depth-2
-          equipment (product rule restricts to 2 levels deep); creation
-          happens only from the WO row's primary equipment chip row. */}
+          drawer-over-drawer recursion. */}
       <EquipmentQuickViewDrawer
         initialEquipment={drawerEquipment}
         onClose={() => setDrawerEquipment(null)}
       />
     </AppLayout>
-  );
-}
-
-function Card({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <section className="rounded-lg border border-zinc-950/10 bg-white p-4 dark:border-white/10 dark:bg-zinc-900">
-      <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-        {title}
-      </h2>
-      {children}
-    </section>
   );
 }
