@@ -84,7 +84,13 @@ export interface WorkItemResponse {
   id: string;
   statusId: string | null;
   statusCategory: ProgressCategory;
+  // The customer's complaint captured at intake.
   description: string;
+  // The tech's on-site assessment — distinct from `description`. Null/blank
+  // until a tech assesses (render the "Not yet diagnosed…" empty state).
+  // Optional on the FE type so existing work-item mocks/projections don't
+  // need backfilling; treat undefined the same as null.
+  diagnosis?: string | null;
   equipmentId: string | null;
   equipment: WorkItemEquipmentSummary | null;
   createdAt: string;
@@ -223,13 +229,17 @@ export interface CreateWorkItemRequest {
   description: string;
   statusId?: string;
   equipmentId?: string | null;
+  // Tech's on-site assessment (≤5000). Usually empty at create.
+  diagnosis?: string;
 }
 
-// equipmentId uses JsonNullable semantics: omit = no change, null = clear, value = set.
+// equipmentId + diagnosis use JsonNullable semantics: omit = no change,
+// null = clear, value = set.
 export interface UpdateWorkItemRequest {
   description?: string;
   statusId?: string;
   equipmentId?: string | null;
+  diagnosis?: string | null;
 }
 
 export interface CreateWorkOrderRequest {

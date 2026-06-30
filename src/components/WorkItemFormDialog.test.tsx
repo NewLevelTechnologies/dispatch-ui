@@ -72,7 +72,7 @@ describe('WorkItemFormDialog', () => {
     await waitFor(() => {
       expect(screen.getAllByText('Edit Work Item').length).toBeGreaterThan(0);
     });
-    expect(screen.getByRole('textbox')).toHaveValue('Replace filter');
+    expect(screen.getByLabelText(/description/i)).toHaveValue('Replace filter');
   });
 
   it('POSTs to /work-orders/:id/work-items on create', async () => {
@@ -85,7 +85,7 @@ describe('WorkItemFormDialog', () => {
       <WorkItemFormDialog isOpen={true} onClose={onClose} workOrderId="wo-1" />
     );
 
-    await user.type(screen.getByRole('textbox'), 'New job');
+    await user.type(screen.getByLabelText(/description/i), 'New job');
     await user.click(screen.getByRole('button', { name: /create/i }));
 
     await waitFor(() => {
@@ -114,7 +114,7 @@ describe('WorkItemFormDialog', () => {
       />
     );
 
-    const textarea = screen.getByRole('textbox');
+    const textarea = screen.getByLabelText(/description/i);
     await user.clear(textarea);
     await user.type(textarea, 'Replace filter and check coils');
     await user.click(screen.getByRole('button', { name: /update/i }));
@@ -140,7 +140,7 @@ describe('WorkItemFormDialog', () => {
       <WorkItemFormDialog isOpen={true} onClose={vi.fn()} workOrderId="wo-1" />
     );
 
-    const textarea = screen.getByRole('textbox');
+    const textarea = screen.getByLabelText(/description/i);
     await user.type(textarea, '   ');
     // Native required validation may fire; submit programmatically to verify
     // our explicit alert path runs even when the browser would have allowed it.
@@ -209,7 +209,7 @@ describe('WorkItemFormDialog', () => {
       />
     );
     await waitFor(() => {
-      expect(screen.getByRole('textbox')).toBeDisabled();
+      expect(screen.getByLabelText(/description/i)).toBeDisabled();
     });
     expect(screen.getByRole('button', { name: /close/i })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /update/i })).not.toBeInTheDocument();

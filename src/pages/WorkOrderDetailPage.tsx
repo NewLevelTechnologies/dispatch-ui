@@ -42,6 +42,7 @@ import WorkItemsTable from '../components/WorkItemsTable';
 import WorkOrderFormDialog from '../components/WorkOrderFormDialog';
 import WorkOrderApprovalsCallout from '../features/work-orders/WorkOrderApprovalsCallout';
 import WorkOrderOverview from '../features/work-orders/WorkOrderOverview';
+import WorkOrderFilesTab from '../components/WorkOrderFilesTab';
 import { formatPhone } from '../utils/formatPhone';
 import { titleCaseAddress } from '../utils/titleCaseAddress';
 import { roleAccent } from '../utils/roleColor';
@@ -902,13 +903,7 @@ export default function WorkOrderDetailPage() {
           )}
 
           {tab === 'files' && (
-            <Card>
-              <EmptyState
-                compact
-                title={t('workOrders.detail.tabs.files')}
-                description={t('common.comingSoon')}
-              />
-            </Card>
+            <WorkOrderFilesTab workOrderId={workOrder.id} dispatches={dispatches} readOnly={frozen} />
           )}
 
           {tab === 'activity' && (

@@ -408,10 +408,27 @@ function WorkItemDetailSections({
   onAddSubUnit,
   onSaveEquipmentField,
 }: DetailSectionsProps) {
+  const { t } = useTranslation();
   const equipment = workItem.equipment;
+  const diagnosis = workItem.diagnosis?.trim();
 
   return (
     <div className="space-y-3">
+      {/* Diagnosis — the tech's on-site assessment (distinct from the
+          customer's complaint in `description`). Edited via the work-item
+          dialog; shown here read-only with an empty state. */}
+      <div>
+        <div className="text-[11px] font-semibold uppercase tracking-wide text-fg-muted">
+          {t('workOrders.workItems.diagnosis')}
+        </div>
+        {diagnosis ? (
+          <p className="mt-0.5 whitespace-pre-wrap text-[12.5px] text-fg-strong">{diagnosis}</p>
+        ) : (
+          <p className="mt-0.5 text-[12.5px] italic text-fg-muted">
+            {t('workOrders.workItems.notDiagnosed')}
+          </p>
+        )}
+      </div>
       <EquipmentBlock
         equipment={equipment}
         workItem={workItem}

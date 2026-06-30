@@ -33,11 +33,12 @@ interface Props {
 
 interface FormState {
   description: string;
+  diagnosis: string;
   statusId: string;
   equipment: EquipmentSummary | null;
 }
 
-const EMPTY_FORM: FormState = { description: '', statusId: '', equipment: null };
+const EMPTY_FORM: FormState = { description: '', diagnosis: '', statusId: '', equipment: null };
 
 /**
  * Create / edit a single work item from the WO detail page.
@@ -73,6 +74,7 @@ export default function WorkItemFormDialog({
     if (workItem) {
       setFormData({
         description: workItem.description,
+        diagnosis: workItem.diagnosis ?? '',
         statusId: workItem.statusId ?? '',
         equipment: workItem.equipment ?? null,
       });
@@ -105,6 +107,7 @@ export default function WorkItemFormDialog({
         description: formData.description.trim(),
         statusId: formData.statusId || undefined,
         equipmentId: formData.equipment?.id ?? null,
+        diagnosis: formData.diagnosis.trim() || undefined,
       }),
     onSuccess,
     onError: (err) => onError(err, 'common.form.errorCreate'),
@@ -117,10 +120,14 @@ export default function WorkItemFormDialog({
       // linked previously would emit a spurious "cleared" activity event.
       const previousId = workItem?.equipment?.id ?? null;
       const nextId = formData.equipment?.id ?? null;
+      // diagnosis is tri-state: only send when changed; empty → null to clear.
+      const prevDiagnosis = workItem?.diagnosis ?? '';
+      const nextDiagnosis = formData.diagnosis.trim();
       return workOrderApi.updateWorkItem(workOrderId, workItem!.id, {
         description: formData.description.trim(),
         statusId: formData.statusId || undefined,
         ...(previousId !== nextId ? { equipmentId: nextId } : {}),
+        ...(prevDiagnosis !== nextDiagnosis ? { diagnosis: nextDiagnosis || null } : {}),
       });
     },
     onSuccess,
@@ -168,6 +175,19 @@ export default function WorkItemFormDialog({
                   rows={4}
                   required
                   autoFocus
+                  disabled={readOnly}
+                />
+              </Field>
+              <Field>
+                <Label>{t('workOrders.workItems.diagnosis')}</Label>
+                <Textarea
+                  name="diagnosis"
+                  value={formData.diagnosis}
+                  onChange={(e) =>
+                    setFormData((prev) => ({ ...prev, diagnosis: e.target.value }))
+                  }
+                  rows={3}
+                  placeholder={t('workOrders.workItems.diagnosisPlaceholder')}
                   disabled={readOnly}
                 />
               </Field>

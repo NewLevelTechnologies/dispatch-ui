@@ -161,6 +161,13 @@ export interface WorkOrderFile {
   workOrderId: string | null;
   workOrderNumber: string | null;
   workItemId: string | null;
+  // Capture event: the dispatch (visit / "trip") the file was captured on.
+  // Null for non-trip captures. Soft key — tolerate an id matching no current
+  // dispatch (group it under "Other", don't crash). Drives per-trip media
+  // counts client-side (no stored count). Optional on the FE type so existing
+  // location/equipment/agreement file mocks don't need backfilling; treat
+  // undefined the same as null.
+  dispatchId?: string | null;
   // Subject: the asset the file depicts/documents.
   equipmentId: string | null;
   equipmentName: string | null;
@@ -309,6 +316,99 @@ export const equipmentFilesApi = {
   ): Promise<WorkOrderFile> => {
     const response = await apiClient.patch<WorkOrderFile>(
       `/equipment/${equipmentId}/files/${fileId}`,
+      request
+    );
+    return response.data;
+  },
+};
+
+// ─────────────────────────────────────────────────────────────────────────
+// work-order-service — files born on a work order (the WO Files tab read).
+// Same 3-step presigned flow as equipment files, at /work-orders/{id}/files.
+// Upload + patch additionally carry `dispatchId` (the capture-visit / "trip"
+// anchor) so per-trip media counts derive client-side from the graph.
+// ─────────────────────────────────────────────────────────────────────────
+export interface RequestWorkOrderFileUploadUrlRequest {
+  contentType: string;
+  sizeBytes: number;
+  fileName: string;
+  caption?: string | null;
+  // Tag the upload to the visit it was captured on. Optional.
+  dispatchId?: string | null;
+}
+
+// PATCH semantics: omitted key = unchanged; explicit null clears.
+// `dispatchId` is tri-state (omit / null / set) to retag a file's visit.
+export interface PatchWorkOrderFileRequest {
+  caption?: string | null;
+  dispatchId?: string | null;
+}
+
+export const workOrderFilesApi = {
+  list: async (
+    workOrderId: string,
+    params: ListFilesParams = {}
+  ): Promise<PagedFiles<WorkOrderFile>> => {
+    const response = await apiClient.get<PagedFiles<WorkOrderFile>>(
+      `/work-orders/${workOrderId}/files`,
+      { params }
+    );
+    return response.data;
+  },
+
+  requestUploadUrl: async (
+    workOrderId: string,
+    request: RequestWorkOrderFileUploadUrlRequest
+  ): Promise<RequestFileUploadUrlResponse> => {
+    const response = await apiClient.post<RequestFileUploadUrlResponse>(
+      `/work-orders/${workOrderId}/files/upload-url`,
+      request
+    );
+    return response.data;
+  },
+
+  confirm: async (workOrderId: string, fileId: string): Promise<WorkOrderFile> => {
+    const response = await apiClient.post<WorkOrderFile>(
+      `/work-orders/${workOrderId}/files/${fileId}/confirm`
+    );
+    return response.data;
+  },
+
+  /** Orchestrates the 3-step upload (request → PUT → confirm). */
+  upload: async (
+    workOrderId: string,
+    file: File,
+    options: {
+      caption?: string | null;
+      dispatchId?: string | null;
+      onProgress?: (stage: 'requesting' | 'uploading' | 'confirming') => void;
+    } = {}
+  ): Promise<WorkOrderFile> => {
+    options.onProgress?.('requesting');
+    const { fileId, uploadUrl } = await workOrderFilesApi.requestUploadUrl(workOrderId, {
+      contentType: file.type,
+      sizeBytes: file.size,
+      fileName: file.name,
+      caption: options.caption ?? null,
+      dispatchId: options.dispatchId ?? null,
+    });
+    options.onProgress?.('uploading');
+    await putToS3(uploadUrl, file.type, file);
+    options.onProgress?.('confirming');
+    return workOrderFilesApi.confirm(workOrderId, fileId);
+  },
+
+  delete: async (workOrderId: string, fileId: string): Promise<void> => {
+    await apiClient.delete(`/work-orders/${workOrderId}/files/${fileId}`);
+  },
+
+  patch: async (
+    workOrderId: string,
+    fileId: string,
+    request: PatchWorkOrderFileRequest
+  ): Promise<WorkOrderFile> => {
+    const response = await apiClient.patch<WorkOrderFile>(
+      `/work-orders/${workOrderId}/files/${fileId}`,
       request
     );
     return response.data;
