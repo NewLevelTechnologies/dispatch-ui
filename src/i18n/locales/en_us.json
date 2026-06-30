@@ -2136,10 +2136,14 @@
     "detail": {
       "actionPending": "Available in a future phase",
       "addNote": "Add Note",
+      "callSite": "Call site",
       "completed": "Completed",
+      "copied": "Copied",
       "copyAddress": "Click to copy address",
       "copyPhone": "Click to copy phone",
       "created": "Created",
+      "directions": "Directions",
+      "openedAt": "Opened {{time}}",
       "customerContact": "Customer Contact",
       "duplicate": "Duplicate",
       "eta": "ETA {{date}}",
@@ -2158,8 +2162,34 @@
         "placeholder": "{{label}}: —",
         "quoted": "quoted"
       },
+      "overview": {
+        "access": "Access",
+        "attachEquipment": "Attach equipment on site",
+        "billsTo": "Bills to",
+        "call": "Call",
+        "collected": "Collected",
+        "docsLink": "{{invoices}} & {{quotes, lowercase}} →",
+        "money": "Money",
+        "needsAttention": "Needs attention",
+        "openLocation": "Open {{entity, lowercase}} →",
+        "pinned": "Pinned",
+        "profile": "Profile →",
+        "recentActivity": "Recent activity",
+        "scheduleTrip": "+ Schedule →",
+        "tripCounts": "{{done}} done · {{inFlight}} in flight · {{scheduled}} scheduled",
+        "viewAll": "View all →"
+      },
+      "premiseBusiness": "Business",
+      "premiseResidence": "Residence",
       "print": "Print",
-      "setNte": "Set NTE"
+      "setNte": "Set NTE",
+      "tabs": {
+        "activity": "Activity",
+        "documents": "Quotes & invoices",
+        "files": "Files",
+        "overview": "Overview",
+        "purchasing": "Purchasing"
+      }
     },
     "financialDrawer": {
       "comingSoon": "Coming soon",

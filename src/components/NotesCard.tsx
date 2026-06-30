@@ -22,7 +22,7 @@ import NoteDialog from './NoteDialog';
 import ConfirmDialog from './ConfirmDialog';
 import { showError, showSuccess, extractApiError } from '../lib/toast';
 
-export type NoteEntityType = 'customer' | 'service_location' | 'equipment' | 'agreement';
+export type NoteEntityType = 'customer' | 'service_location' | 'equipment' | 'agreement' | 'work_order';
 
 // All pinned notes always show; this caps the unpinned tail in the card. Beyond
 // it, the drawer carries the rest.
@@ -77,6 +77,15 @@ function getBinding(entityType: NoteEntityType, id: string): NotesBinding {
         extraInvalidateKeys: [['service-location', id]],
         list: () => noteApi.listForServiceLocation(id),
         create: (values) => noteApi.createForServiceLocation(id, values),
+        update: (noteId, values) => noteApi.update(noteId, values),
+        remove: (noteId) => noteApi.delete(noteId),
+      };
+    case 'work_order':
+      return {
+        queryKey: ['work-order-notes', id],
+        extraInvalidateKeys: [['work-orders', id]],
+        list: () => noteApi.listForWorkOrder(id),
+        create: (values) => noteApi.createForWorkOrder(id, values),
         update: (noteId, values) => noteApi.update(noteId, values),
         remove: (noteId) => noteApi.delete(noteId),
       };
