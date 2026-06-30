@@ -162,21 +162,29 @@ describe('WorkOrdersPage', () => {
     });
   });
 
-  it('opens create dialog when create button is clicked', async () => {
+  it('navigates to the New Job page when the create button is clicked', async () => {
     vi.mocked(apiClient.get).mockResolvedValue({ data: pageOf([]) });
     const user = userEvent.setup();
 
-    renderWithProviders(<WorkOrdersPage />);
+    /* eslint-disable i18next/no-literal-string -- test-only placeholder route */
+    renderWithProviders(<WorkOrdersPage />, {
+      routes: [
+        { path: '/work-orders', element: <WorkOrdersPage /> },
+        { path: '/work-orders/new', element: <div>New Job Page</div> },
+      ],
+      initialPath: '/work-orders',
+    });
+    /* eslint-enable i18next/no-literal-string */
 
     await waitFor(() => {
       expect(screen.getByText('No work orders found')).toBeInTheDocument();
     });
 
-    const createButton = screen.getByRole('button', { name: /create work order/i });
-    await user.click(createButton);
+    // Create now routes to the dedicated New Job intake page (the dialog is
+    // retained for edit only).
+    await user.click(screen.getByRole('button', { name: /create work order/i }));
 
-    expect(screen.getByRole('dialog')).toBeInTheDocument();
-    expect(screen.getAllByText('Create Work Order').length).toBeGreaterThan(0);
+    expect(await screen.findByText('New Job Page')).toBeInTheDocument();
   });
 
   it('formats scheduled dates correctly', async () => {

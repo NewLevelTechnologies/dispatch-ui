@@ -1,6 +1,6 @@
 import { useDeferredValue, useEffect, useMemo, useState } from 'react';
 import clsx from 'clsx';
-import { useSearchParams, Link as RouterLink } from 'react-router-dom';
+import { useSearchParams, Link as RouterLink, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { EllipsisVerticalIcon } from '@heroicons/react/24/outline';
@@ -120,6 +120,7 @@ function isCancelled(wo: WorkOrderSummary): boolean {
 
 export default function WorkOrdersPage() {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const { t } = useTranslation();
   const { getName } = useGlossary();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -310,9 +311,10 @@ export default function WorkOrdersPage() {
     },
   });
 
+  // Create now lives on the dedicated New Job page (multi-work-item intake);
+  // the dialog is retained for EDIT only (opened from the row menu / detail).
   const handleAdd = () => {
-    setSelectedWorkOrder(null);
-    setIsFormOpen(true);
+    navigate('/work-orders/new');
   };
 
   const handleEdit = (workOrder: WorkOrderSummary) => {

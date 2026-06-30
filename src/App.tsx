@@ -18,6 +18,7 @@ import ServiceLocationsPage from './pages/ServiceLocationsPage';
 import ServiceLocationDetailPage from './pages/ServiceLocationDetailPage';
 import WorkOrdersPage from './pages/WorkOrdersPage';
 import WorkOrderDetailPage from './pages/WorkOrderDetailPage';
+import WorkOrderFormPage from './pages/WorkOrderFormPage';
 import EquipmentPage from './pages/EquipmentPage';
 import EquipmentDetailPage from './pages/EquipmentDetailPage';
 import EquipmentFormPage from './pages/EquipmentFormPage';
@@ -179,6 +180,8 @@ function App() {
       <Route path="/service-locations/:id" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<ServiceLocationDetailPage />} />} />
       <Route path="/service-locations/:locId/equipment/new" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<EquipmentFormPage />} />} />
       <Route path="/work-orders" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<WorkOrdersPage />} />} />
+      {/* /new MUST precede /:id or the param route captures "new". */}
+      <Route path="/work-orders/new" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<WorkOrderFormPage />} />} />
       <Route path="/work-orders/:id" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<WorkOrderDetailPage />} />} />
       <Route path="/equipment" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<EquipmentPage />} />} />
       <Route path="/equipment/new" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<EquipmentFormPage />} />} />

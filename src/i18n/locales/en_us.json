@@ -124,6 +124,7 @@
       "stateHelper": "CA",
       "status": "Status",
       "streetAddress": "Street Address",
+      "successCreate": "{{entity}} created",
       "taxExempt": "Tax Exempt",
       "taxExemptCertificate": "Tax Exempt Certificate",
       "titleCreate": "{{action}} {{entity}}",
@@ -2486,6 +2487,20 @@
       "selectServiceLocation": "Please select a {{entity, lowercase}}",
       "type": "Type",
       "typePlaceholder": "Unassigned"
+    },
+    "intake": {
+      "checklistCreated": "{{entity}} created",
+      "checklistRouted": "Opens its detail page to schedule & dispatch",
+      "complaint": "Complaint",
+      "complaintPlaceholder": "What did the customer report? (in their words)",
+      "complaintRequired": "Add at least one {{entity, lowercase}}.",
+      "detailsHeading": "{{entity}} details",
+      "footerNote": "Creates the {{entity}} with its {{items}} in one step.",
+      "payerNote": "The {{entity}} (payer) comes from the location you pick. Brand-new caller?",
+      "selectType": "Pick a {{entity, lowercase}} type.",
+      "subtitle": "Pick a {{location}}, classify the job, and capture one or more {{items}}.",
+      "summaryEmpty": "Pick a {{entity}} to see the job summary.",
+      "summaryHeading": "{{entity}} summary"
     },
     "priority": {
       "high": "High",
