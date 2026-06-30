@@ -13,7 +13,14 @@ import { useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { noteApi, equipmentNotesApi, agreementNotesApi, type NoteDto } from '../api';
+import {
+  noteApi,
+  notesApi,
+  equipmentNotesApi,
+  agreementNotesApi,
+  type NoteDto,
+  type WorkOrderNote,
+} from '../api';
 import { Card } from './catalyst/card';
 import { CardTitle, CardLink } from './customer-detail/shared';
 import { NoteRow } from './NoteRow';
@@ -40,6 +47,20 @@ interface NotesBinding {
   create: (values: { body: string; pinned: boolean }) => Promise<NoteDto>;
   update: (noteId: string, values: { body?: string; pinned?: boolean }) => Promise<NoteDto>;
   remove: (noteId: string) => Promise<void>;
+}
+
+// Work-order notes ship a slightly different DTO (createdByUserName vs the
+// shared authorName); both now carry `pinned`. Adapt to the shared NoteDto so
+// the card stays parent-agnostic.
+function woNoteToDto(w: WorkOrderNote): NoteDto {
+  return {
+    id: w.id,
+    body: w.body,
+    pinned: w.pinned,
+    authorName: w.createdByUserName,
+    createdAt: w.createdAt,
+    updatedAt: w.updatedAt,
+  };
 }
 
 function getBinding(entityType: NoteEntityType, id: string): NotesBinding {
@@ -81,13 +102,16 @@ function getBinding(entityType: NoteEntityType, id: string): NotesBinding {
         remove: (noteId) => noteApi.delete(noteId),
       };
     case 'work_order':
+      // WO notes are work-order-scoped (PATCH/DELETE under /work-orders/{id}/
+      // notes/{noteId}), distinct from the parent-agnostic /notes/{id} route
+      // customer/location use. Adapt WorkOrderNote → NoteDto.
       return {
         queryKey: ['work-order-notes', id],
         extraInvalidateKeys: [['work-orders', id]],
-        list: () => noteApi.listForWorkOrder(id),
-        create: (values) => noteApi.createForWorkOrder(id, values),
-        update: (noteId, values) => noteApi.update(noteId, values),
-        remove: (noteId) => noteApi.delete(noteId),
+        list: () => notesApi.list(id).then((notes) => notes.map(woNoteToDto)),
+        create: (values) => notesApi.create(id, values).then(woNoteToDto),
+        update: (noteId, values) => notesApi.update(id, noteId, values).then(woNoteToDto),
+        remove: (noteId) => notesApi.delete(id, noteId),
       };
   }
 }

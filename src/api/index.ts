@@ -250,6 +250,7 @@ export {
   filesApi,
   locationFilesApi,
   equipmentFilesApi,
+  workOrderFilesApi,
   agreementFilesApi,
   FILE_MAX_BYTES,
   FILE_CAPTION_MAX_CHARS,
@@ -272,7 +273,9 @@ export {
   type RequestFileUploadUrlResponse,
   type RequestLocationFileUploadUrlRequest,
   type RequestEquipmentFileUploadUrlRequest,
+  type RequestWorkOrderFileUploadUrlRequest,
   type PatchLocationFileRequest,
+  type PatchWorkOrderFileRequest,
 } from './filesApi';
 
 // Financial APIs
