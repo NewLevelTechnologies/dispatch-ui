@@ -31,14 +31,14 @@ import ActivityStream from '../components/ActivityStream';
 import AppLayout from '../components/AppLayout';
 import AssignTechnicianDialog from '../components/AssignTechnicianDialog';
 import DispatchDetailDrawer from '../components/DispatchDetailDrawer';
-import DispatchesSection from '../components/DispatchesSection';
+import DispatchesTab from '../components/DispatchesTab';
 import EditableField from '../components/EditableField';
 import EquipmentFormDialog from '../components/EquipmentFormDialog';
 import EquipmentQuickViewDrawer from '../components/EquipmentQuickViewDrawer';
 import FinancialInvoicesTab from '../components/FinancialInvoicesTab';
 import FinancialQuotesTab from '../components/FinancialQuotesTab';
 import WorkItemFormDialog from '../components/WorkItemFormDialog';
-import WorkItemsTable from '../components/WorkItemsTable';
+import WorkItemsTab from '../components/WorkItemsTab';
 import WorkOrderFormDialog from '../components/WorkOrderFormDialog';
 import WorkOrderApprovalsCallout from '../features/work-orders/WorkOrderApprovalsCallout';
 import WorkOrderOverview from '../features/work-orders/WorkOrderOverview';
@@ -79,6 +79,7 @@ import {
   PhoneIcon,
   PlusIcon,
 } from '@heroicons/react/24/outline';
+import { PremiseMark } from '../components/ui/PremiseMark';
 
 type PillTone = 'neutral' | 'info' | 'success' | 'warning' | 'danger' | 'accent' | 'violet';
 
@@ -533,10 +534,6 @@ export default function WorkOrderDetailPage() {
   const moreItems = Math.max(0, (workOrder.workItemCount ?? 0) - 1);
   const essence = summary || (firstItem ? (moreItems > 0 ? `${firstItem} +${moreItems} more` : firstItem) : null);
 
-  // Resolve a dispatch's tech display name from the WO's distinct assigned users.
-  const techName = (userId: string) =>
-    workOrder.assignedUsers?.find((u) => u.userId === userId)?.name ?? undefined;
-
   const sitePhone = location?.siteContactPhone || customer?.phone;
   // DB stores addresses uppercase — title-case street + city for display
   // (state code stays as-is); keep a raw query string for the maps link.
@@ -582,6 +579,17 @@ export default function WorkOrderDetailPage() {
         {/* Header — location-led identity + classification + actions. */}
         <div className="rounded-[10px] border border-border bg-bg-elev px-4 py-3.5">
           <div className="flex flex-wrap items-start gap-x-3 gap-y-2">
+            {/* Location-led mark — premise glyph (house/building) carries
+                what/where; a priority ring rides on top only when elevated
+                (Urgent = danger, High = warning). Matches the Location detail
+                header; renders once the location detail (premiseType) loads. */}
+            {locationDetail && (
+              <PremiseMark
+                premise={locationDetail.premiseType}
+                size="lg"
+                ring={priority === 'URGENT' ? 'danger' : priority === 'HIGH' ? 'warning' : undefined}
+              />
+            )}
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
                 <Heading level={1} size="page-sm" className="m-0">{headerTitle}</Heading>
@@ -743,7 +751,6 @@ export default function WorkOrderDetailPage() {
               location={locationDetail}
               financialSummary={financialSummary}
               dispatches={dispatches}
-              techName={techName}
               onOpenTab={(t2) => setTab(t2 as WorkOrderTab)}
               onAddWorkItem={handleAddWorkItem}
               onOpenFinancial={openFinancialTab}
@@ -835,17 +842,14 @@ export default function WorkOrderDetailPage() {
           )}
 
           {tab === 'items' && (
-            <WorkItemsTable
+            <WorkItemsTab
               workOrderId={workOrder.id}
+              serviceLocationId={workOrder.serviceLocationId || workOrder.serviceLocation?.id}
               workItems={workOrder.workItems ?? []}
               statuses={workItemStatuses}
               transitions={workflowTransitions}
               enforceWorkflow={workflowConfig?.enforcementMode === 'STRICT'}
               readOnly={frozen}
-              onAdd={() => {
-                setEditingWorkItem(null);
-                setWorkItemDialogOpen(true);
-              }}
               onEdit={(wi) => {
                 setEditingWorkItem(wi);
                 setWorkItemDialogOpen(true);
@@ -860,8 +864,9 @@ export default function WorkOrderDetailPage() {
           )}
 
           {tab === 'trips' && (
-            <DispatchesSection
+            <DispatchesTab
               workOrderId={workOrder.id}
+              dispatches={dispatches}
               readOnly={frozen}
               onAssign={() => {
                 setEditingDispatch(null);

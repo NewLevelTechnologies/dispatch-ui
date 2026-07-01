@@ -17,6 +17,13 @@ const custCreate = vi.fn();
 const noteUpdate = vi.fn();
 const noteDelete = vi.fn();
 
+// Work-order notes go through the separate notesApi client (WorkOrderNote shape,
+// work-order-scoped update/delete). The card adapts it to NoteDto via woNoteToDto.
+const woList = vi.fn();
+const woCreate = vi.fn();
+const woUpdate = vi.fn();
+const woDelete = vi.fn();
+
 const mockShowError = vi.fn();
 
 vi.mock('../api/equipmentApi', async (importOriginal) => {
@@ -47,6 +54,19 @@ vi.mock('../api/noteApi', async (importOriginal) => {
   };
 });
 
+vi.mock('../api/notesApi', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../api/notesApi')>();
+  return {
+    ...actual,
+    notesApi: {
+      list: (...a: unknown[]) => woList(...a),
+      create: (...a: unknown[]) => woCreate(...a),
+      update: (...a: unknown[]) => woUpdate(...a),
+      delete: (...a: unknown[]) => woDelete(...a),
+    },
+  };
+});
+
 vi.mock('../lib/toast', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../lib/toast')>();
   return { ...actual, showError: (...a: unknown[]) => mockShowError(...a), showSuccess: vi.fn() };
@@ -60,6 +80,20 @@ const note = (o: Record<string, unknown> = {}) => ({
   authorUserId: 'u-1',
   authorName: 'Jane',
   pinned: false,
+  createdAt: '2026-05-01T12:00:00Z',
+  updatedAt: '2026-05-01T12:00:00Z',
+  ...o,
+});
+
+// WorkOrderNote shape (distinct from NoteDto — createdByUserName vs authorName,
+// no pinned on the legacy shape but the upgraded endpoint carries it).
+const woNote = (o: Record<string, unknown> = {}) => ({
+  id: 'won-1',
+  workOrderId: 'wo-1',
+  body: 'WO note body',
+  pinned: false,
+  createdByUserId: 'u-1',
+  createdByUserName: 'Dan',
   createdAt: '2026-05-01T12:00:00Z',
   updatedAt: '2026-05-01T12:00:00Z',
   ...o,
@@ -155,6 +189,60 @@ describe('NotesCard', () => {
     await user.click(deleteButtons[deleteButtons.length - 1]);
     await waitFor(() => {
       expect(noteDelete).toHaveBeenCalledWith('n-1');
+    });
+  });
+
+  // Work-order binding — adapts WorkOrderNote → NoteDto and routes writes to the
+  // work-order-scoped notesApi (distinct from the flat /notes/{id} path).
+  it('lists work-order notes, adapting the WorkOrderNote shape', async () => {
+    woList.mockResolvedValue([woNote({ body: 'Two kids in home', pinned: true })]);
+    renderWithProviders(<NotesCard entityType="work_order" entityId="wo-1" />);
+    expect(await screen.findByText('Two kids in home')).toBeInTheDocument();
+    expect(screen.getByText(/pinned ·/i)).toBeInTheDocument();
+  });
+
+  it('adds a work-order note via the composer', async () => {
+    woList.mockResolvedValue([]);
+    woCreate.mockResolvedValue(woNote());
+    const user = userEvent.setup();
+    renderWithProviders(<NotesCard entityType="work_order" entityId="wo-1" />);
+    await user.click(await screen.findByRole('button', { name: /^\+ add$/i }));
+    const dialog = await screen.findByRole('dialog');
+    await user.type(within(dialog).getByRole('textbox'), 'New WO note');
+    await user.click(within(dialog).getByRole('button', { name: /^save$/i }));
+    await waitFor(() => {
+      expect(woCreate).toHaveBeenCalledWith('wo-1', { body: 'New WO note', pinned: false });
+    });
+  });
+
+  it('edits a work-order note (work-order-scoped update)', async () => {
+    woList.mockResolvedValue([woNote()]);
+    woUpdate.mockResolvedValue(woNote());
+    const user = userEvent.setup();
+    renderWithProviders(<NotesCard entityType="work_order" entityId="wo-1" />);
+    await screen.findByText('WO note body');
+    await user.click(screen.getByRole('button', { name: /^edit$/i }));
+    const dialog = await screen.findByRole('dialog');
+    const textbox = within(dialog).getByRole('textbox');
+    await user.clear(textbox);
+    await user.type(textbox, 'Edited WO note');
+    await user.click(within(dialog).getByRole('button', { name: /^save$/i }));
+    await waitFor(() => {
+      expect(woUpdate).toHaveBeenCalledWith('wo-1', 'won-1', { body: 'Edited WO note', pinned: false });
+    });
+  });
+
+  it('deletes a work-order note (work-order-scoped delete)', async () => {
+    woList.mockResolvedValue([woNote()]);
+    woDelete.mockResolvedValue(undefined);
+    const user = userEvent.setup();
+    renderWithProviders(<NotesCard entityType="work_order" entityId="wo-1" />);
+    await screen.findByText('WO note body');
+    await user.click(screen.getByRole('button', { name: /^delete$/i }));
+    const deleteButtons = await screen.findAllByRole('button', { name: /^delete$/i });
+    await user.click(deleteButtons[deleteButtons.length - 1]);
+    await waitFor(() => {
+      expect(woDelete).toHaveBeenCalledWith('wo-1', 'won-1');
     });
   });
 
