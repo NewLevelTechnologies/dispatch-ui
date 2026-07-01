@@ -1,10 +1,17 @@
 import { expect, afterEach, vi } from 'vitest';
-import { cleanup } from '@testing-library/react';
+import { cleanup, configure } from '@testing-library/react';
 import * as matchers from '@testing-library/jest-dom/matchers';
 import { mockAnimationsApi } from 'jsdom-testing-mocks';
 
 // Mock animations API for Headless UI
 mockAnimationsApi();
+
+// Give async utilities (waitFor / findBy*) headroom beyond the 1000ms default.
+// Heavy data-driven pages (e.g. the location/work-order detail screens fire
+// several parallel queries) can render past 1s on a loaded CI runner; the tight
+// default makes those assertions flaky under load. Correctness is unchanged —
+// only how long we wait before giving up.
+configure({ asyncUtilTimeout: 5000 });
 
 // Extend Vitest's expect with jest-dom matchers
 expect.extend(matchers);
