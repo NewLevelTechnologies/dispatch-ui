@@ -1,9 +1,8 @@
 import { useState } from 'react';
 import { Link as RouterLink } from 'react-router-dom';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import {
-  equipmentApi,
   equipmentFiltersApi,
   equipmentImagesApi,
   EquipmentStatus,
@@ -49,6 +48,7 @@ import EditableField from './EditableField';
 import EquipmentImageUploadDialog from './EquipmentImageUploadDialog';
 import EquipmentPhotoLightbox from './EquipmentPhotoLightbox';
 import WorkItemStatusPill from './WorkItemStatusPill';
+import { useSaveEquipmentField } from './useSaveEquipmentField';
 
 interface Props {
   workOrderId: string;
@@ -120,7 +120,7 @@ export default function WorkItemsTable({
 }: Props) {
   const { t } = useTranslation();
   const { getName } = useGlossary();
-  const queryClient = useQueryClient();
+  const handleSaveEquipmentField = useSaveEquipmentField();
 
   // Independent expansion state per row — multiple rows may be expanded at the
   // same time (CSRs comparing two items). Resets on navigation; not persisted.
@@ -135,52 +135,6 @@ export default function WorkItemsTable({
       }
       return next;
     });
-  };
-
-  // Equipment summaries are embedded on workItems[].equipment in WO responses,
-  // so single-field PATCHes have to refresh both work-order query prefixes
-  // (single detail and paginated lists). Mirrors the helper on
-  // EquipmentDetailPage so cross-surface edits stay coherent.
-  const invalidateEquipmentRelatedCaches = (equipmentId: string) => {
-    queryClient.invalidateQueries({ queryKey: ['equipment-detail', equipmentId] });
-    queryClient.invalidateQueries({ queryKey: ['equipment'] });
-    queryClient.invalidateQueries({ queryKey: ['work-orders'] });
-    queryClient.invalidateQueries({ queryKey: ['work-orders-list'] });
-  };
-
-  const updateEquipmentMutation = useMutation({
-    mutationFn: ({
-      equipmentId,
-      data,
-    }: {
-      equipmentId: string;
-      data: UpdateEquipmentRequest;
-    }) => equipmentApi.update(equipmentId, data),
-    onSuccess: (_data, vars) => invalidateEquipmentRelatedCaches(vars.equipmentId),
-  });
-
-  // Single-field equipment PATCH used by every EditableField in the expanded
-  // equipment block. Throws on failure so the field stays in edit mode and the
-  // user can retry / Esc to cancel — same pattern as EquipmentDetailPage and
-  // WorkOrderDetailPage.
-  const handleSaveEquipmentField = async <K extends keyof UpdateEquipmentRequest>(
-    equipmentId: string,
-    field: K,
-    next: UpdateEquipmentRequest[K]
-  ) => {
-    try {
-      await updateEquipmentMutation.mutateAsync({
-        equipmentId,
-        data: { [field]: next } as UpdateEquipmentRequest,
-      });
-    } catch (err) {
-      const msg =
-        err instanceof Error && 'response' in err
-          ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
-          : undefined;
-      alert(msg || t('common.form.errorUpdate', { entity: getName('equipment') }));
-      throw err;
-    }
   };
 
   // "+ Work Item" lives next to the table head per §5d. Only renders when the
@@ -398,7 +352,7 @@ interface DetailSectionsProps {
  * land. The "Updated" footer is OUTSIDE the equipment block — it's the work
  * item's timestamp, not the equipment's.
  */
-function WorkItemDetailSections({
+export function WorkItemDetailSections({
   workItem,
   readOnly,
   onEdit,

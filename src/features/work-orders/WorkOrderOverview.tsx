@@ -33,6 +33,7 @@ import {
   type WorkItemResponse,
   type WorkOrderFinancialSummary,
   type Dispatch,
+  type DispatchBoardRow,
   type DispatchStatus,
   type ServiceLocationDetailDto,
   type ProgressCategory,
@@ -114,13 +115,14 @@ interface AttentionItem {
 
 function deriveAttention(args: {
   workOrder: WorkOrder;
-  dispatches: Dispatch[];
+  dispatches: DispatchBoardRow[];
   summary?: WorkOrderFinancialSummary;
-  techName: (userId: string) => string | undefined;
   onOpenTab: (tab: string) => void;
   onOpenFinancial: (tab: 'invoices' | 'quotes') => void;
+  t: (key: string, opts?: Record<string, unknown>) => string;
+  getName: (code: string, plural?: boolean) => string;
 }): AttentionItem[] {
-  const { workOrder, dispatches, summary, techName, onOpenTab, onOpenFinancial } = args;
+  const { workOrder, dispatches, summary, onOpenTab, onOpenFinancial, t, getName } = args;
   const items: AttentionItem[] = [];
 
   const live = dispatches.find((d) => d.status === 'IN_PROGRESS');
@@ -128,9 +130,9 @@ function deriveAttention(args: {
     items.push({
       key: 'live',
       severity: 'live',
-      title: `${firstNameLastInitial(techName(live.assignedUserId))} on site`,
+      title: t('workOrders.detail.overview.attnLive', { name: firstNameLastInitial(live.assignedUserName) }),
       sub: formatWindow(live.arrivalWindowStart, live.arrivalWindowEnd),
-      actionLabel: 'View trip',
+      actionLabel: t('workOrders.detail.overview.view', { entity: getName('dispatch') }),
       onAction: () => onOpenTab('trips'),
     });
   }
@@ -140,9 +142,9 @@ function deriveAttention(args: {
     items.push({
       key: 'blocked',
       severity: 'warning',
-      title: 'Blocked',
+      title: t('workOrders.progress.blocked'),
       sub: blocked.description,
-      actionLabel: 'View',
+      actionLabel: t('workOrders.detail.overview.view', { entity: getName('work_item') }),
       onAction: () => onOpenTab('items'),
     });
   }
@@ -153,9 +155,12 @@ function deriveAttention(args: {
     items.push({
       key: 'money',
       severity: 'money',
-      title: `Balance due · ${money(balance)}`,
-      sub: paid > 0 ? `${money(paid)} collected` : 'Quote approved',
-      actionLabel: 'View invoices',
+      title: t('workOrders.detail.overview.balanceDue', { amount: money(balance) }),
+      sub:
+        paid > 0
+          ? t('workOrders.detail.overview.collectedAmount', { amount: money(paid) })
+          : t('workOrders.detail.overview.quoteApproved', { entity: getName('quote') }),
+      actionLabel: t('workOrders.detail.overview.view', { entity: getName('invoice', true) }),
       onAction: () => onOpenFinancial('invoices'),
     });
   }
@@ -282,12 +287,10 @@ function WorkItemPeekRow({ wi, last, onClick }: { wi: WorkItemResponse; last: bo
 // Horizontal-scroll so many trips slide rather than crush.
 function TripStrip({
   dispatches,
-  techName,
   onOpenTrips,
   onSelect,
 }: {
-  dispatches: Dispatch[];
-  techName: (userId: string) => string | undefined;
+  dispatches: DispatchBoardRow[];
   onOpenTrips: () => void;
   onSelect: (d: Dispatch) => void;
 }) {
@@ -324,7 +327,7 @@ function TripStrip({
           </div>
           <div className="flex items-stretch gap-2 overflow-x-auto pb-0.5">
             {ordered.map((d) => (
-              <TripCell key={d.id} d={d} techName={techName} onSelect={onSelect} />
+              <TripCell key={d.id} d={d} onSelect={onSelect} />
             ))}
           </div>
         </>
@@ -335,17 +338,15 @@ function TripStrip({
 
 function TripCell({
   d,
-  techName,
   onSelect,
 }: {
-  d: Dispatch;
-  techName: (userId: string) => string | undefined;
+  d: DispatchBoardRow;
   onSelect: (d: Dispatch) => void;
 }) {
   const p = DISPATCH_PRESENTATION[d.status];
   const accent =
     d.status === 'COMPLETED' ? 'var(--success-500)' : p.live ? 'var(--violet-500)' : 'var(--info-500)';
-  const name = techName(d.assignedUserId);
+  const name = d.assignedUserName;
   return (
     <button
       type="button"
@@ -597,8 +598,7 @@ export interface WorkOrderOverviewProps {
   workOrder: WorkOrder;
   location?: ServiceLocationDetailDto;
   financialSummary?: WorkOrderFinancialSummary;
-  dispatches: Dispatch[];
-  techName: (userId: string) => string | undefined;
+  dispatches: DispatchBoardRow[];
   onOpenTab: (tab: string) => void;
   onAddWorkItem: () => void;
   onOpenFinancial: (tab: 'invoices' | 'quotes') => void;
@@ -613,20 +613,22 @@ export default function WorkOrderOverview({
   location,
   financialSummary,
   dispatches,
-  techName,
   onOpenTab,
   onAddWorkItem,
   onOpenFinancial,
   onSelectDispatch,
   extraRail,
 }: WorkOrderOverviewProps) {
+  const { t } = useTranslation();
+  const { getName } = useGlossary();
   const attention = deriveAttention({
     workOrder,
     dispatches,
     summary: financialSummary,
-    techName,
     onOpenTab,
     onOpenFinancial,
+    t,
+    getName,
   });
   const customerContact = workOrder.customer
     ? { name: workOrder.customer.name, phone: workOrder.customer.phone, email: workOrder.customer.email }
@@ -641,7 +643,6 @@ export default function WorkOrderOverview({
           <WorkItemsPeek workOrder={workOrder} onAdd={onAddWorkItem} onOpenItems={() => onOpenTab('items')} />
           <TripStrip
             dispatches={dispatches}
-            techName={techName}
             onOpenTrips={() => onOpenTab('trips')}
             onSelect={onSelectDispatch}
           />
