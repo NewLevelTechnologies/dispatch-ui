@@ -133,6 +133,15 @@ describe('WorkItemsTab', () => {
     expect(screen.getByLabelText(/complaint/i)).toBeInTheDocument();
   });
 
+  it('closes the inline composer on cancel', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<WorkItemsTab {...baseProps} serviceLocationId="loc-1" workItems={[]} />);
+    await user.click(screen.getByRole('button', { name: /add work item/i }));
+    expect(screen.getByLabelText(/complaint/i)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /cancel/i }));
+    expect(screen.queryByLabelText(/complaint/i)).not.toBeInTheDocument();
+  });
+
   it('fires onEdit and onDelete from the row menu', async () => {
     const onEdit = vi.fn();
     const onDelete = vi.fn();

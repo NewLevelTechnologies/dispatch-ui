@@ -120,6 +120,56 @@ describe('DispatchesTab', () => {
     expect(screen.queryByRole('button', { name: /reschedule/i })).not.toBeInTheDocument();
   });
 
+  it('derives photo/video counts + thumbnails from files by dispatchId', async () => {
+    const woFile = (over: Record<string, unknown>) => ({
+      id: 'm-x',
+      kind: 'PHOTO',
+      status: 'READY',
+      fileName: 'p.jpg',
+      url: 'https://x/p.jpg',
+      thumbnailUrl: 'https://x/t.jpg',
+      durationSeconds: null,
+      contentType: 'image/jpeg',
+      sizeBytes: 1,
+      widthPx: null,
+      heightPx: null,
+      thumbnailWidthPx: null,
+      thumbnailHeightPx: null,
+      caption: null,
+      workOrderId: 'wo-1',
+      workOrderNumber: null,
+      workItemId: null,
+      dispatchId: 'd-1',
+      equipmentId: null,
+      equipmentName: null,
+      agreementId: null,
+      isProfile: false,
+      uploadedBy: null,
+      uploadedByName: null,
+      createdAt: 'x',
+      ...over,
+    });
+    vi.mocked(apiClient.get).mockResolvedValue({
+      data: {
+        content: [
+          woFile({ id: 'm-1', kind: 'PHOTO' }),
+          woFile({ id: 'm-2', kind: 'VIDEO', durationSeconds: 18 }),
+        ],
+        totalElements: 2,
+        totalPages: 1,
+        number: 0,
+        size: 100,
+        first: true,
+        last: true,
+        numberOfElements: 2,
+        empty: false,
+      },
+    });
+    renderTab([row({ id: 'd-1', status: 'COMPLETED' })]);
+    expect(await screen.findByText(/1 photos/i)).toBeInTheDocument();
+    expect(await screen.findByText(/1 video/i)).toBeInTheDocument();
+  });
+
   it('calls onSelect when a dispatch card is clicked', async () => {
     const onSelect = vi.fn();
     const user = userEvent.setup();

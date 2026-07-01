@@ -812,8 +812,12 @@ describe('ServiceLocationDetailPage', () => {
       id: 'd-1',
       workOrderId: 'wo-1',
       assignedUserId: 'u-1',
-      arrivalWindowStart: '2026-07-01T15:00:00Z',
-      arrivalWindowEnd: '2026-07-01T17:00:00Z',
+      // Relative to now so this default dispatch is always genuinely "upcoming"
+      // (the mock buckets by `arrivalWindowStart >= Date.now()`). A fixed date
+      // here rots into the past as the calendar advances and silently drops the
+      // dispatch out of the Upcoming section.
+      arrivalWindowStart: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+      arrivalWindowEnd: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000 + 2 * 60 * 60 * 1000).toISOString(),
       estimatedDuration: 120,
       status: 'SCHEDULED',
       arrivedAt: null,

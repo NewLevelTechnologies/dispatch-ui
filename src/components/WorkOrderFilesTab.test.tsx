@@ -1,9 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { screen } from '@testing-library/react';
+import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { renderWithProviders, userEvent } from '../test/utils';
 import WorkOrderFilesTab from './WorkOrderFilesTab';
 import apiClient from '../api/client';
-import type { Dispatch, FileCounts, WorkOrderFile } from '../api';
+import { workOrderFilesApi, type Dispatch, type FileCounts, type WorkOrderFile } from '../api';
 
 vi.mock('../api/client');
 
@@ -190,5 +190,110 @@ describe('WorkOrderFilesTab', () => {
     mockApi({ error: true });
     renderTab();
     expect(await screen.findByText(/couldn't load files/i)).toBeInTheDocument();
+  });
+
+  it('filters to a single kind via the type chips', async () => {
+    const user = userEvent.setup();
+    mockApi();
+    renderTab();
+    // The document is present under the "All" filter.
+    await screen.findByText('RTU-12 quote.pdf');
+    // Clicking Photos re-queries with kind=PHOTO; the mock returns photos only.
+    await user.click(screen.getByRole('button', { name: /^Photos\s*2$/ }));
+    await waitFor(() => expect(screen.queryByText('RTU-12 quote.pdf')).not.toBeInTheDocument());
+    expect(screen.getByText('RTU-3 before.jpg')).toBeInTheDocument();
+    expect(screen.queryByText('compressor-leak.mov')).not.toBeInTheDocument();
+  });
+
+  it('opens the lightbox from a tile, pages through the visual set, and closes', async () => {
+    const user = userEvent.setup();
+    mockApi();
+    renderTab();
+    // Visuals are newest-first: equipVideo (06-06), tripPhoto (06-05), equipPhoto
+    // (06-04). Opening the trip photo lands on index 1 → "2 / 3".
+    await user.click((await screen.findByText('RTU-3 before.jpg')).closest('button')!);
+    expect(await screen.findByRole('button', { name: /close/i })).toBeInTheDocument();
+    expect(screen.getByText(/2 \/ 3/)).toBeInTheDocument();
+
+    // Next advances to the last item and disables itself at the end.
+    await user.click(screen.getByRole('button', { name: /next/i }));
+    expect(screen.getByText(/3 \/ 3/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /next/i })).toBeDisabled();
+
+    // Arrow-key navigation is wired on the window.
+    fireEvent.keyDown(window, { key: 'ArrowLeft' });
+    expect(await screen.findByText(/2 \/ 3/)).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /close/i }));
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: /close/i })).not.toBeInTheDocument(),
+    );
+  });
+
+  it('surfaces the download fallback when a lightbox video fails to play', async () => {
+    const user = userEvent.setup();
+    mockApi();
+    renderTab();
+    await user.click((await screen.findByText('compressor-leak.mov')).closest('button')!);
+    const video = document.querySelector('video');
+    expect(video).not.toBeNull();
+    fireEvent.error(video!);
+    expect(await screen.findByText(/couldn.t be loaded/i)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /download/i })).toBeInTheDocument();
+  });
+
+  it('deletes a document via the row menu and confirmation', async () => {
+    const user = userEvent.setup();
+    mockApi();
+    const deleteSpy = vi.spyOn(workOrderFilesApi, 'delete').mockResolvedValue(undefined);
+    renderTab();
+    await screen.findByText('RTU-12 quote.pdf');
+
+    // The row menu's wrapper stops row-open propagation, so this is isolated.
+    await user.click(screen.getByRole('button', { name: /file actions/i }));
+    await user.click(await screen.findByRole('menuitem', { name: /delete/i }));
+
+    expect(await screen.findByText('Delete RTU-12 quote.pdf?')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /^delete$/i }));
+    await waitFor(() => expect(deleteSpy).toHaveBeenCalledWith(WO_ID, 'wf-4'));
+  });
+
+  it('hides the doc-row Delete action when read-only', async () => {
+    const user = userEvent.setup();
+    mockApi();
+    renderTab({ readOnly: true });
+    await screen.findByText('RTU-12 quote.pdf');
+    await user.click(screen.getByRole('button', { name: /file actions/i }));
+    expect(await screen.findByRole('menuitem', { name: /open/i })).toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: /delete/i })).not.toBeInTheDocument();
+  });
+
+  it('loads another page when the server reports more files', async () => {
+    const user = userEvent.setup();
+    const counts: FileCounts = { all: 2, photos: 2, videos: 0, documents: 0 };
+    const page1 = { ...filesPage([tripPhoto], counts), last: false, totalElements: 2, totalPages: 2 };
+    const page2 = {
+      ...filesPage([equipPhoto], counts),
+      number: 1,
+      first: false,
+      last: true,
+      totalElements: 2,
+      totalPages: 2,
+    };
+    let call = 0;
+    vi.mocked(apiClient.get).mockImplementation((url) => {
+      if (url === `/work-orders/${WO_ID}/files`) {
+        call += 1;
+        return Promise.resolve({ data: call === 1 ? page1 : page2 });
+      }
+      return Promise.reject(new Error(`Unknown endpoint: ${url}`));
+    });
+    renderTab();
+
+    expect(await screen.findByText('RTU-3 before.jpg')).toBeInTheDocument();
+    expect(screen.queryByText('RTU-3 nameplate.jpg')).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /load more/i }));
+    expect(await screen.findByText('RTU-3 nameplate.jpg')).toBeInTheDocument();
   });
 });
