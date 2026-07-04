@@ -354,11 +354,14 @@ function TripCell({
   const accent =
     d.status === 'COMPLETED' ? 'var(--success-500)' : p.live ? 'var(--violet-500)' : 'var(--info-500)';
   const name = d.assignedUserName;
+  // Cap the cell width so a lone dispatch stays card-sized + left-aligned
+  // rather than stretching full-width like a banner; several cells share the
+  // row and scroll (mock: flex 1 1 200px, max-width 320).
   return (
     <button
       type="button"
       onClick={() => onSelect(d)}
-      className="min-w-0 shrink-0 grow basis-[186px] cursor-pointer rounded-sm border border-border p-2.5 text-left hover:bg-bg-hover"
+      className="min-w-0 shrink-0 grow basis-[200px] max-w-[320px] cursor-pointer rounded-sm border border-border p-2.5 text-left hover:bg-bg-hover"
       style={{
         borderLeft: `3px solid ${accent}`,
         background: p.live ? 'color-mix(in oklch, var(--violet-500) 6%, var(--bg-elev))' : 'var(--bg-elev)',
