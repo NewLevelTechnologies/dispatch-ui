@@ -345,6 +345,7 @@ export {
   dispatchRowTitle,
   type Dispatch,
   type DispatchStatus,
+  type DispatchLifecycle,
   type DispatchBoardRow,
   type DispatchBoardPage,
   type DispatchSortField,

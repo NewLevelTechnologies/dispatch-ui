@@ -3591,6 +3591,7 @@ function InvoiceRow({
 // ─────────────────────────────────────────────────────────────────────────
 const DISPATCH_STATUS_TONE: Record<DispatchStatus, 'info' | 'success' | 'neutral' | 'warning'> = {
   SCHEDULED: 'info',
+  EN_ROUTE: 'info',
   IN_PROGRESS: 'success',
   COMPLETED: 'neutral',
   CANCELLED: 'neutral',

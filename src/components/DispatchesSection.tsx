@@ -30,6 +30,7 @@ import {
 
 const STATUS_BADGE: Record<DispatchStatus, 'sky' | 'blue' | 'lime' | 'zinc' | 'amber'> = {
   SCHEDULED: 'sky',
+  EN_ROUTE: 'blue',
   IN_PROGRESS: 'blue',
   COMPLETED: 'lime',
   CANCELLED: 'zinc',

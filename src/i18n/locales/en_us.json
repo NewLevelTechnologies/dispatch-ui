@@ -2403,9 +2403,10 @@
         "call": "Call",
         "captured": "Captured this visit",
         "completeVisit": "Complete visit",
+        "markEnRoute": "Mark en route",
         "markOnSite": "Mark on site",
         "notes": "Notes",
-        "notifications": "Notification history",
+        "notifications": "Customer notifications",
         "notificationsEmpty": "No notifications sent yet.",
         "notificationsError": "Couldn't load notification history.",
         "notificationsLoading": "Loading notifications...",
@@ -2441,7 +2442,7 @@
       "onSiteSince": "On site since {{time}}",
       "overdue": "Overdue",
       "past": "Past ({{count}})",
-      "liveSelfReported": "On site — self-reported (no live location)",
+      "liveSelfReported": "No live location — showing self-reported status",
       "onSite": "On site",
       "photoCount": "{{count}} photos",
       "reschedule": "Reschedule",
@@ -2451,6 +2452,7 @@
       "status": {
         "CANCELLED": "Cancelled",
         "COMPLETED": "Completed",
+        "EN_ROUTE": "En route",
         "IN_PROGRESS": "In Progress",
         "NO_SHOW": "No-show",
         "SCHEDULED": "Scheduled"

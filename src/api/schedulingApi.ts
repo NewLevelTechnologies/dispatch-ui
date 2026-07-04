@@ -5,7 +5,19 @@ import apiClient from './client';
 
 // NO_SHOW is a terminal outcome (tech/customer didn't show) added with the
 // dispatch-board API. The FE renders it; it is not (yet) a status the UI sets.
-export type DispatchStatus = 'SCHEDULED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED' | 'NO_SHOW';
+export type DispatchStatus = 'SCHEDULED' | 'EN_ROUTE' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED' | 'NO_SHOW';
+
+// Visit lifecycle — 5 nullable milestone timestamps, each null until reached.
+// Returned nested on the by-id dispatch read (not the board list projection);
+// drives the trip drawer's visit timeline. `arrived`/`departed` mirror the
+// top-level arrivedAt/departedAt. Per FE_HANDOFF_trip_lifecycle.md.
+export interface DispatchLifecycle {
+  scheduled: string | null;
+  notified: string | null;
+  enroute: string | null;
+  arrived: string | null;
+  departed: string | null;
+}
 
 // Per WORK_ORDER_DETAIL_DESIGN.md / PHASE_6_FINAL_PLAN.md: dispatches commit a
 // customer-facing arrival WINDOW (e.g. "Tue 8–10 AM") rather than a single
@@ -25,6 +37,11 @@ export interface Dispatch {
   notes: string | null;
   createdAt: string;
   updatedAt: string;
+  // Per-visit label ("Diagnosis", "Repair · WI-01") + lifecycle milestone
+  // timestamps. Present on the by-id read; absent (undefined) on the board
+  // list projection — render defensively.
+  label?: string | null;
+  lifecycle?: DispatchLifecycle | null;
 }
 
 export interface CreateDispatchRequest {

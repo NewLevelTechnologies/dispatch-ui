@@ -9,6 +9,7 @@ const mockUserGetAll = vi.fn();
 const mockGetNotificationLogs = vi.fn();
 const mockFilesList = vi.fn();
 const mockDispatchUpdate = vi.fn();
+const mockGetById = vi.fn();
 
 vi.mock('../api/userApi', () => ({
   userApi: { getAll: (...args: unknown[]) => mockUserGetAll(...args) },
@@ -35,7 +36,11 @@ vi.mock('../api/schedulingApi', async () => {
   const actual = await vi.importActual<typeof import('../api/schedulingApi')>('../api/schedulingApi');
   return {
     ...actual,
-    dispatchesApi: { ...actual.dispatchesApi, update: (...args: unknown[]) => mockDispatchUpdate(...args) },
+    dispatchesApi: {
+      ...actual.dispatchesApi,
+      update: (...args: unknown[]) => mockDispatchUpdate(...args),
+      getById: (...args: unknown[]) => mockGetById(...args),
+    },
   };
 });
 
@@ -121,8 +126,10 @@ const photoFile = (over: Partial<WorkOrderFile> = {}): WorkOrderFile =>
     ...over,
   }) as WorkOrderFile;
 
-const renderDrawer = (dispatch: Dispatch | null, props: Partial<React.ComponentProps<typeof DispatchDetailDrawer>> = {}) =>
-  renderWithProviders(
+const renderDrawer = (dispatch: Dispatch | null, props: Partial<React.ComponentProps<typeof DispatchDetailDrawer>> = {}) => {
+  // The by-id read backs lifecycle/label — echo the dispatch under test.
+  if (dispatch) mockGetById.mockResolvedValue(dispatch);
+  return renderWithProviders(
     <DispatchDetailDrawer
       dispatch={dispatch}
       dispatches={props.dispatches ?? (dispatch ? [dispatch] : [])}
@@ -132,6 +139,7 @@ const renderDrawer = (dispatch: Dispatch | null, props: Partial<React.ComponentP
       onDelete={props.onDelete ?? vi.fn()}
     />,
   );
+};
 
 describe('DispatchDetailDrawer', () => {
   beforeEach(() => {
@@ -140,6 +148,7 @@ describe('DispatchDetailDrawer', () => {
     mockGetNotificationLogs.mockResolvedValue(emptyLogsPage);
     mockFilesList.mockResolvedValue(filesPage([]));
     mockDispatchUpdate.mockResolvedValue(mockDispatch({ status: 'IN_PROGRESS' }));
+    mockGetById.mockResolvedValue(mockDispatch());
   });
 
   it('renders nothing when dispatch is null', () => {
@@ -207,7 +216,8 @@ describe('DispatchDetailDrawer', () => {
       ],
     });
     renderDrawer(mockDispatch());
-    expect(await screen.findByText('DELIVERED')).toBeInTheDocument();
+    // Status enum renders title-cased (DELIVERED → Delivered).
+    expect(await screen.findByText('Delivered')).toBeInTheDocument();
   });
 
   it('renders the notes section only when notes are present', async () => {
@@ -220,7 +230,7 @@ describe('DispatchDetailDrawer', () => {
     expect(screen.queryByText('Customer prefers AM')).not.toBeInTheDocument();
   });
 
-  it('SCHEDULED footer: Reassign/Reschedule open edit; Mark on site transitions to IN_PROGRESS', async () => {
+  it('SCHEDULED footer: Reassign opens edit; Mark en route transitions to EN_ROUTE', async () => {
     const onEdit = vi.fn();
     const onClose = vi.fn();
     const user = userEvent.setup();
@@ -229,9 +239,17 @@ describe('DispatchDetailDrawer', () => {
     await user.click(await screen.findByRole('button', { name: /reassign/i }));
     expect(onEdit).toHaveBeenCalledWith(expect.objectContaining({ id: 'd1' }));
 
-    await user.click(screen.getByRole('button', { name: /mark on site/i }));
-    await waitFor(() => expect(mockDispatchUpdate).toHaveBeenCalledWith('d1', { status: 'IN_PROGRESS' }));
+    await user.click(screen.getByRole('button', { name: /mark en route/i }));
+    await waitFor(() => expect(mockDispatchUpdate).toHaveBeenCalledWith('d1', { status: 'EN_ROUTE' }));
     await waitFor(() => expect(onClose).toHaveBeenCalled());
+  });
+
+  it('EN_ROUTE footer: Mark on site transitions to IN_PROGRESS', async () => {
+    const user = userEvent.setup();
+    renderDrawer(mockDispatch({ status: 'EN_ROUTE' }));
+    await user.click(await screen.findByRole('button', { name: /mark on site/i }));
+    await waitFor(() => expect(mockDispatchUpdate).toHaveBeenCalledWith('d1', { status: 'IN_PROGRESS' }));
+    expect(screen.queryByRole('button', { name: /mark en route/i })).not.toBeInTheDocument();
   });
 
   it('IN_PROGRESS footer: Complete visit transitions to COMPLETED (no Mark on site)', async () => {
@@ -240,6 +258,25 @@ describe('DispatchDetailDrawer', () => {
     await user.click(await screen.findByRole('button', { name: /complete visit/i }));
     await waitFor(() => expect(mockDispatchUpdate).toHaveBeenCalledWith('d1', { status: 'COMPLETED' }));
     expect(screen.queryByRole('button', { name: /mark on site/i })).not.toBeInTheDocument();
+  });
+
+  it('renders the timeline from the by-id lifecycle (only unreached steps show —)', async () => {
+    renderDrawer(
+      mockDispatch({
+        status: 'IN_PROGRESS',
+        arrivedAt: '2099-05-15T14:31:00Z',
+        lifecycle: {
+          scheduled: '2099-05-14T15:48:00Z',
+          notified: '2099-05-14T16:02:00Z',
+          enroute: '2099-05-15T14:12:00Z',
+          arrived: '2099-05-15T14:31:00Z',
+          departed: null,
+        },
+      }),
+    );
+    // Scheduled/notified/enroute/arrived reached → only Departed shows the dash.
+    expect(await screen.findByText('En route')).toBeInTheDocument();
+    await waitFor(() => expect(screen.getAllByText('—')).toHaveLength(1));
   });
 
   it('COMPLETED footer: shows completed time + Delete, no transitions', async () => {
@@ -259,7 +296,7 @@ describe('DispatchDetailDrawer', () => {
     renderDrawer(mockDispatch(), { readOnly: true });
     await screen.findByText('Jason Smith');
     expect(screen.queryByRole('button', { name: /reassign/i })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /mark on site/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /mark en route/i })).not.toBeInTheDocument();
   });
 
   it('invokes onClose when the X button is clicked', async () => {

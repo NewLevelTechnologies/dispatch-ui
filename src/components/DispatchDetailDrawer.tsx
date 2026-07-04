@@ -17,6 +17,7 @@ import {
   userApi,
   workOrderFilesApi,
   type Dispatch,
+  type DispatchLifecycle,
   type DispatchStatus,
   type User,
   type WorkOrderFile,
@@ -26,13 +27,15 @@ import { Avatar } from './ui/Avatar';
 import { Pill, Tag } from './ui/Pill';
 import { Button } from './catalyst/button';
 import { SlideOver } from './catalyst/slideover';
+import { formatPhone } from '../utils/formatPhone';
 
 type PillTone = 'neutral' | 'info' | 'success' | 'warning' | 'danger' | 'accent' | 'violet';
 
-// Status → { tone, live, accent }. IN_PROGRESS is the live/on-site state (no
-// separate en-route status, no GPS signal — see the graceful-degradation note).
+// Status → { tone, live, accent }. EN_ROUTE + IN_PROGRESS are both "live"
+// (violet); the drawer leads with self-reported status (no GPS/ETA bar).
 const PRESENTATION: Record<DispatchStatus, { tone: PillTone; live?: boolean; accent: string }> = {
   SCHEDULED: { tone: 'info', accent: 'var(--info-500)' },
+  EN_ROUTE: { tone: 'violet', live: true, accent: 'var(--violet-500)' },
   IN_PROGRESS: { tone: 'violet', live: true, accent: 'var(--violet-500)' },
   COMPLETED: { tone: 'success', accent: 'var(--success-500)' },
   NO_SHOW: { tone: 'warning', accent: 'var(--warning-500)' },
@@ -47,21 +50,11 @@ const NOTIF_TONE: Record<NotificationStatus, PillTone> = {
   FAILED: 'danger',
 };
 
-const DATE_TIME = new Intl.DateTimeFormat('en-US', {
-  weekday: 'short',
-  month: 'short',
-  day: 'numeric',
-  hour: 'numeric',
-  minute: '2-digit',
-});
+const MONTH_DAY = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' });
 const TIME_ONLY = new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit' });
-const DATE_ONLY = new Intl.DateTimeFormat('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-const STEP_TS = new Intl.DateTimeFormat('en-US', {
-  month: 'short',
-  day: 'numeric',
-  hour: 'numeric',
-  minute: '2-digit',
-});
+// "May 10 · 7:27 PM" — no weekday, middot separator (matches the mock).
+const stamp = (iso: string): string => `${MONTH_DAY.format(new Date(iso))} · ${TIME_ONLY.format(new Date(iso))}`;
+const titleCase = (s: string): string => s.charAt(0) + s.slice(1).toLowerCase();
 
 function formatWindow(startIso: string, endIso: string): string {
   const start = new Date(startIso);
@@ -70,8 +63,8 @@ function formatWindow(startIso: string, endIso: string): string {
     start.getFullYear() === end.getFullYear() &&
     start.getMonth() === end.getMonth() &&
     start.getDate() === end.getDate();
-  if (sameDay) return `${DATE_ONLY.format(start)} · ${TIME_ONLY.format(start)}–${TIME_ONLY.format(end)}`;
-  return `${DATE_TIME.format(start)} – ${DATE_TIME.format(end)}`;
+  if (sameDay) return `${MONTH_DAY.format(start)} · ${TIME_ONLY.format(start)} – ${TIME_ONLY.format(end)}`;
+  return `${stamp(startIso)} – ${stamp(endIso)}`;
 }
 
 interface Props {
@@ -91,12 +84,12 @@ interface Props {
  * Right-edge drawer for a single dispatch (visit). Redesign of the legacy
  * contact-only drawer per `claude_designs/screen-wo-trip-drawer.jsx`:
  * status-aware header · tech + call/text · visit timeline · captured media ·
- * notification history · state-aware footer transitions.
+ * customer notifications · state-aware footer transitions.
  *
- * Degraded (backend-deferred, see the WO cluster asks): work-items addressed
- * per visit (`trip.addressedItemIds`), payment collected (`trip.collected`),
- * and the live ETA/progress bar (no GPS signal) are omitted; the "En route"
- * timeline step stays hollow until a dispatch en-route timestamp exists.
+ * Consumes the trip-lifecycle backend (FE_HANDOFF_trip_lifecycle.md): the
+ * timeline + header label read from the by-id `lifecycle`/`label`, transitions
+ * step SCHEDULED → EN_ROUTE → IN_PROGRESS → COMPLETED. Still deferred: per-visit
+ * addressed work-items, collected payment, and the live ETA bar (no GPS signal).
  */
 export default function DispatchDetailDrawer({
   dispatch,
@@ -142,8 +135,15 @@ function DispatchDetailContent({
   const { t } = useTranslation();
   const { getName } = useGlossary();
   const queryClient = useQueryClient();
-  const p = PRESENTATION[dispatch.status];
-  const done = dispatch.status === 'COMPLETED';
+
+  // The board row lacks lifecycle/label — fetch the by-id read for those.
+  const { data: detail } = useQuery({
+    queryKey: ['dispatch', dispatch.id],
+    queryFn: () => dispatchesApi.getById(dispatch.id),
+  });
+  const full = detail ?? dispatch;
+  const p = PRESENTATION[full.status];
+  const done = full.status === 'COMPLETED';
 
   // Trip sequence — 1-indexed by arrival, across non-cancelled visits.
   const seq = useMemo(() => {
@@ -154,10 +154,8 @@ function DispatchDetailContent({
     return i >= 0 ? i + 1 : null;
   }, [dispatches, dispatch.id]);
 
-  // React Query dedupes against the tab's ['users'] key — cached in the common
-  // case (drawer opens from a card that already resolved the tech name).
   const { data: users = [] } = useQuery({ queryKey: ['users'], queryFn: () => userApi.getAll() });
-  const tech: User | undefined = users.find((u) => u.id === dispatch.assignedUserId);
+  const tech: User | undefined = users.find((u) => u.id === full.assignedUserId);
   const techName = tech ? `${tech.firstName} ${tech.lastName}`.trim() || tech.email : '—';
   const techDigits = tech?.phoneNumber?.replace(/\D/g, '') ?? '';
 
@@ -172,9 +170,8 @@ function DispatchDetailContent({
       }),
   });
   const notifications = useMemo<NotificationLogDto[]>(() => notifPage?.content ?? [], [notifPage]);
-  // "Customer notified" timeline step derives from the earliest send (no stored
-  // notified-at on the dispatch yet).
-  const notifiedAt = useMemo(() => {
+  // Fallback "notified" timestamp when the lifecycle field isn't populated yet.
+  const notifiedFallback = useMemo(() => {
     const ts = notifications
       .map((n) => n.sentAt ?? n.createdAt)
       .filter(Boolean)
@@ -182,8 +179,7 @@ function DispatchDetailContent({
     return ts.length ? new Date(Math.min(...ts)).toISOString() : null;
   }, [notifications]);
 
-  // Captured this visit — media keyed by dispatchId (same source + query key as
-  // DispatchesTab so it dedupes). Photos + videos only.
+  // Captured this visit — media keyed by dispatchId (same source + key as the tab).
   const { data: filesPage } = useQuery({
     queryKey: ['work-order-files', dispatch.workOrderId, 'dispatch-media'],
     queryFn: () => workOrderFilesApi.list(dispatch.workOrderId, { limit: 100 }),
@@ -196,10 +192,29 @@ function DispatchDetailContent({
     [filesPage, dispatch.id],
   );
 
+  // Visit-timeline steps, read from lifecycle (falls back to the top-level /
+  // notification data when the by-id lifecycle isn't loaded/populated yet).
+  const lc: DispatchLifecycle = full.lifecycle ?? {
+    scheduled: full.createdAt,
+    notified: null,
+    enroute: null,
+    arrived: full.arrivedAt,
+    departed: full.departedAt,
+  };
+  const steps = [
+    { label: t('workOrders.dispatches.drawer.timelineScheduled'), at: lc.scheduled },
+    { label: t('workOrders.dispatches.drawer.timelineNotified'), at: lc.notified ?? notifiedFallback },
+    { label: t('workOrders.dispatches.drawer.timelineEnRoute'), at: lc.enroute },
+    { label: t('workOrders.dispatches.drawer.timelineArrived'), at: lc.arrived },
+    { label: t('workOrders.dispatches.drawer.timelineDeparted'), at: lc.departed },
+  ];
+  const lastReached = steps.reduce((max, s, i) => (s.at ? i : max), -1);
+
   const statusMutation = useMutation({
     mutationFn: (status: DispatchStatus) => dispatchesApi.update(dispatch.id, { status }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['dispatches'] });
+      queryClient.invalidateQueries({ queryKey: ['dispatch', dispatch.id] });
       queryClient.invalidateQueries({ queryKey: ['work-order-activity', dispatch.workOrderId] });
       onClose();
     },
@@ -211,6 +226,18 @@ function DispatchDetailContent({
       alert(msg || t('workOrders.dispatches.drawer.statusError', { entity: getName('dispatch') }));
     },
   });
+
+  // State-aware primary transition: Scheduled → En route → On site → Complete.
+  const primary =
+    full.status === 'SCHEDULED'
+      ? { label: t('workOrders.dispatches.drawer.markEnRoute'), next: 'EN_ROUTE' as DispatchStatus }
+      : full.status === 'EN_ROUTE'
+        ? { label: t('workOrders.dispatches.drawer.markOnSite'), next: 'IN_PROGRESS' as DispatchStatus }
+        : full.status === 'IN_PROGRESS'
+          ? { label: t('workOrders.dispatches.drawer.completeVisit'), next: 'COMPLETED' as DispatchStatus }
+          : null;
+
+  const windowStr = formatWindow(full.arrivalWindowStart, full.arrivalWindowEnd);
 
   return (
     <>
@@ -235,13 +262,13 @@ function DispatchDetailContent({
               {seq ? `${getName('dispatch')} ${seq}` : getName('dispatch')}
             </span>
             <Pill tone={p.tone} dot live={p.live}>
-              {dispatch.status === 'IN_PROGRESS'
+              {full.status === 'IN_PROGRESS'
                 ? t('workOrders.dispatches.onSite')
-                : t(`workOrders.dispatches.status.${dispatch.status}`)}
+                : t(`workOrders.dispatches.status.${full.status}`)}
             </Pill>
           </div>
           <span className="mt-0.5 block text-[12px] text-fg-muted">
-            {formatWindow(dispatch.arrivalWindowStart, dispatch.arrivalWindowEnd)}
+            {full.label ? `${full.label} · ${windowStr}` : windowStr}
           </span>
         </div>
         <Button plain onClick={onClose} aria-label={t('common.close')}>
@@ -250,16 +277,14 @@ function DispatchDetailContent({
       </div>
 
       <div className="flex-1 overflow-y-auto">
-        {/* 2 · Tech — avatar + call/text. Live ETA/progress bar is omitted (no
-            GPS signal); a live visit surfaces the self-reported status instead. */}
-        <Section title={t('workOrders.dispatches.drawer.assignedTech')}>
+        {/* 2 · Tech — name + role + call/text. Live visits show self-reported
+            status (no ETA/progress bar — no GPS signal). */}
+        <div className="border-b border-border-soft px-4 py-3">
           <div className="flex items-center gap-2.5">
             <Avatar name={techName} size="md" />
             <div className="min-w-0 grow">
               <div className="text-[13px] font-semibold text-fg-strong">{techName}</div>
-              {tech?.phoneNumber && (
-                <div className="font-mono text-[12px] text-fg-muted">{tech.phoneNumber}</div>
-              )}
+              <div className="text-[11px] text-fg-muted">{t('workOrders.dispatches.drawer.assignedTech')}</div>
             </div>
             {techDigits && (
               <>
@@ -283,27 +308,31 @@ function DispatchDetailContent({
               {t('workOrders.dispatches.liveSelfReported')}
             </div>
           )}
-        </Section>
+        </div>
 
-        {/* 3 · Visit timeline — reached steps filled/green; unreached hollow.
-            Scheduled/Notified/Arrived/Departed from live data; En route hollow
-            until a dispatch en-route timestamp lands. */}
+        {/* 3 · Visit timeline — connector runs green to the furthest-reached
+            milestone; a passed-but-unstamped step (e.g. skipped En route) shows
+            as a hollow dot on the green line, not a broken chain. */}
         <Section title={t('workOrders.dispatches.drawer.timeline')}>
-          <TimelineStep label={t('workOrders.dispatches.drawer.timelineScheduled')} at={dispatch.createdAt} first />
-          <TimelineStep label={t('workOrders.dispatches.drawer.timelineNotified')} at={notifiedAt} />
-          <TimelineStep label={t('workOrders.dispatches.drawer.timelineEnRoute')} at={null} />
-          <TimelineStep
-            label={t('workOrders.dispatches.drawer.timelineArrived')}
-            at={dispatch.arrivedAt}
-            live={p.live && !dispatch.departedAt}
-          />
-          <TimelineStep label={t('workOrders.dispatches.drawer.timelineDeparted')} at={dispatch.departedAt} last />
+          {steps.map((s, i) => (
+            <TimelineStep
+              key={s.label}
+              label={s.label}
+              at={s.at}
+              reached={!!s.at}
+              active={!!p.live && i === lastReached}
+              topDone={i > 0 && i <= lastReached}
+              bottomDone={i < lastReached}
+              first={i === 0}
+              last={i === steps.length - 1}
+            />
+          ))}
         </Section>
 
         {/* 4 · Visit notes */}
-        {dispatch.notes && (
+        {full.notes && (
           <Section title={t('workOrders.dispatches.drawer.notes')}>
-            <p className="whitespace-pre-wrap text-[12.5px] leading-relaxed text-fg">{dispatch.notes}</p>
+            <p className="whitespace-pre-wrap text-[12.5px] leading-relaxed text-fg">{full.notes}</p>
           </Section>
         )}
 
@@ -344,16 +373,21 @@ function DispatchDetailContent({
                 <div className="min-w-0 grow">
                   <div className="flex items-baseline gap-1.5">
                     <Pill tone={NOTIF_TONE[log.status]} dot>
-                      {log.status}
+                      {titleCase(log.status)}
                     </Pill>
                     <span className="truncate text-[10.5px] text-fg-dim">
-                      {log.recipientPhone || log.recipientEmail || log.recipientName}
+                      {log.recipientPhone
+                        ? formatPhone(log.recipientPhone)
+                        : log.recipientEmail || log.recipientName}
                     </span>
                     <span className="grow" />
                     <span className="whitespace-nowrap text-[10.5px] text-fg-dim">
-                      {DATE_TIME.format(new Date(log.sentAt ?? log.createdAt))}
+                      {stamp(log.sentAt ?? log.createdAt)}
                     </span>
                   </div>
+                  {log.subject && (
+                    <div className="mt-0.5 text-[11.5px] leading-snug text-fg-muted">{log.subject}</div>
+                  )}
                 </div>
               </div>
             ))}
@@ -366,8 +400,8 @@ function DispatchDetailContent({
         {done ? (
           <>
             <span className="text-[11.5px] text-fg-muted">
-              {dispatch.departedAt
-                ? t('workOrders.dispatches.completedAt', { time: DATE_TIME.format(new Date(dispatch.departedAt)) })
+              {full.departedAt
+                ? t('workOrders.dispatches.completedAt', { time: stamp(full.departedAt) })
                 : t('workOrders.dispatches.status.COMPLETED')}
             </span>
             <span className="grow" />
@@ -383,19 +417,19 @@ function DispatchDetailContent({
               <Button plain onClick={() => onEdit(dispatch)}>
                 {t('workOrders.dispatches.drawer.reassign')}
               </Button>
-              {!p.live && (
+              {full.status === 'SCHEDULED' && (
                 <Button plain onClick={() => onEdit(dispatch)}>
                   {t('workOrders.dispatches.reschedule')}
                 </Button>
               )}
               <span className="grow" />
-              {p.live ? (
-                <Button color="accent" disabled={statusMutation.isPending} onClick={() => statusMutation.mutate('COMPLETED')}>
-                  {t('workOrders.dispatches.drawer.completeVisit')}
-                </Button>
-              ) : (
-                <Button color="accent" disabled={statusMutation.isPending} onClick={() => statusMutation.mutate('IN_PROGRESS')}>
-                  {t('workOrders.dispatches.drawer.markOnSite')}
+              {primary && (
+                <Button
+                  color="accent"
+                  disabled={statusMutation.isPending}
+                  onClick={() => statusMutation.mutate(primary.next)}
+                >
+                  {primary.label}
                 </Button>
               )}
             </>
@@ -428,50 +462,57 @@ function Section({
   );
 }
 
-// Vertical timeline row: filled dot + timestamp when reached, hollow + "—"
-// when not; violet pulse on the active (live) step.
+// Vertical timeline row. The connector (top/bottom halves) is green up to the
+// furthest-reached milestone; the dot is filled green when this milestone has a
+// timestamp, violet+pulse when it's the active (live) step, hollow otherwise.
 function TimelineStep({
   label,
   at,
+  reached,
+  active,
+  topDone,
+  bottomDone,
   first,
   last,
-  live,
 }: {
   label: string;
   at: string | null;
-  first?: boolean;
-  last?: boolean;
-  live?: boolean;
+  reached: boolean;
+  active: boolean;
+  topDone: boolean;
+  bottomDone: boolean;
+  first: boolean;
+  last: boolean;
 }) {
-  const reached = !!at;
-  const color = live ? 'var(--violet-500)' : reached ? 'var(--success-500)' : 'var(--border-strong)';
+  const dotColor = active ? 'var(--violet-500)' : reached ? 'var(--success-500)' : 'var(--border-strong)';
+  const filled = reached || active;
   return (
     <div className="flex items-stretch gap-2.5">
       <div className="flex w-3 shrink-0 flex-col items-center">
-        <div className="h-1.5 w-0.5" style={{ background: first ? 'transparent' : reached ? 'var(--success-500)' : 'var(--border)' }} />
+        <div className="h-1.5 w-0.5" style={{ background: first ? 'transparent' : topDone ? 'var(--success-500)' : 'var(--border)' }} />
         <span
           className="size-2.5 shrink-0 rounded-full"
           style={{
-            background: reached || live ? color : 'var(--bg-elev)',
-            border: `2px solid ${color}`,
-            animation: live ? 'pulse 1.8s ease-in-out infinite' : 'none',
+            background: filled ? dotColor : 'var(--bg-elev)',
+            border: `2px solid ${dotColor}`,
+            animation: active ? 'pulse 1.8s ease-in-out infinite' : 'none',
           }}
         />
-        <div className="w-0.5 flex-1" style={{ background: last ? 'transparent' : reached ? 'var(--success-500)' : 'var(--border)' }} />
+        <div className="w-0.5 flex-1" style={{ background: last ? 'transparent' : bottomDone ? 'var(--success-500)' : 'var(--border)' }} />
       </div>
       <div className="flex grow items-baseline gap-2 pb-2.5 pt-px">
         <span
           className="whitespace-nowrap text-[12.5px]"
-          style={{ fontWeight: reached || live ? 600 : 400, color: reached || live ? 'var(--fg-strong)' : 'var(--fg-dim)' }}
+          style={{ fontWeight: reached || active ? 600 : 400, color: reached || active ? 'var(--fg-strong)' : 'var(--fg-dim)' }}
         >
           {label}
         </span>
         <span className="grow" />
         <span
-          className="whitespace-nowrap font-mono text-[11.5px] tabular-nums"
-          style={{ color: live ? 'var(--violet-500)' : reached ? 'var(--fg-muted)' : 'var(--fg-dim)' }}
+          className="whitespace-nowrap text-[11.5px]"
+          style={{ color: active ? 'var(--violet-500)' : reached ? 'var(--fg-muted)' : 'var(--fg-dim)' }}
         >
-          {at ? STEP_TS.format(new Date(at)) : '—'}
+          {at ? stamp(at) : '—'}
         </span>
       </div>
     </div>

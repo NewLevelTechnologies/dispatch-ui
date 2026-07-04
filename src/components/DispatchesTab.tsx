@@ -30,11 +30,15 @@ type PillTone = 'neutral' | 'info' | 'success' | 'warning' | 'danger' | 'accent'
 
 const PRESENTATION: Record<DispatchStatus, { tone: PillTone; live?: boolean }> = {
   SCHEDULED: { tone: 'info' },
+  EN_ROUTE: { tone: 'violet', live: true },
   IN_PROGRESS: { tone: 'violet', live: true },
   COMPLETED: { tone: 'success' },
   NO_SHOW: { tone: 'warning' },
   CANCELLED: { tone: 'neutral' },
 };
+
+// En route + on site are both "live now" (drive live-first ordering + the live card).
+const isLive = (s: DispatchStatus) => s === 'EN_ROUTE' || s === 'IN_PROGRESS';
 
 const ETA_DATE = new Intl.DateTimeFormat('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
 const ETA_TIME = new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit' });
@@ -74,7 +78,7 @@ export default function DispatchesTab({ workOrderId, dispatches, readOnly = fals
     () =>
       [...visible].sort((a, b) => {
         const rank = (d: DispatchBoardRow) =>
-          d.status === 'IN_PROGRESS' ? 0 : d.status === 'COMPLETED' ? 2 : 1;
+          isLive(d.status) ? 0 : d.status === 'COMPLETED' ? 2 : 1;
         const ra = rank(a);
         const rb = rank(b);
         if (ra !== rb) return ra - rb;
@@ -118,7 +122,7 @@ export default function DispatchesTab({ workOrderId, dispatches, readOnly = fals
         </div>
       ) : (
         ordered.map((d) =>
-          d.status === 'IN_PROGRESS' ? (
+          isLive(d.status) ? (
             <LiveDispatchCard
               key={d.id}
               d={d}
