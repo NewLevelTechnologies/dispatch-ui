@@ -19,7 +19,9 @@ import {
   type Dispatch,
   type DispatchLifecycle,
   type DispatchStatus,
+  type ProgressCategory,
   type User,
+  type WorkItemResponse,
   type WorkOrderFile,
 } from '../api';
 import { useGlossary } from '../contexts/GlossaryContext';
@@ -50,6 +52,16 @@ const NOTIF_TONE: Record<NotificationStatus, PillTone> = {
   FAILED: 'danger',
 };
 
+// Work-item statusCategory → Pill tone (shared grammar with the overview peek).
+const PROGRESS_TONE: Record<ProgressCategory, PillTone> = {
+  NOT_STARTED: 'neutral',
+  AWAITING_SCHEDULE: 'info',
+  IN_PROGRESS: 'violet',
+  BLOCKED: 'warning',
+  COMPLETED: 'success',
+  CANCELLED: 'neutral',
+};
+
 const MONTH_DAY = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' });
 const TIME_ONLY = new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit' });
 // "May 10 · 7:27 PM" — no weekday, middot separator (matches the mock).
@@ -74,10 +86,15 @@ interface Props {
   /** The work order's dispatches, used to derive this visit's sequence number
    *  (Trip 1 = earliest arrival). Optional; the badge degrades without it. */
   dispatches?: Dispatch[];
+  /** The work order's work items, used to resolve this visit's
+   *  addressedWorkItemIds → complaint + status. Optional. */
+  workItems?: WorkItemResponse[];
   readOnly?: boolean;
   onClose: () => void;
   onEdit: (dispatch: Dispatch) => void;
   onDelete: (dispatch: Dispatch) => void;
+  /** Link out from an addressed work item (opens the Work items tab). */
+  onViewWorkItems?: () => void;
 }
 
 /**
@@ -94,10 +111,12 @@ interface Props {
 export default function DispatchDetailDrawer({
   dispatch,
   dispatches,
+  workItems,
   readOnly = false,
   onClose,
   onEdit,
   onDelete,
+  onViewWorkItems,
 }: Props) {
   return (
     <SlideOver open={dispatch !== null} onClose={onClose} className="!max-w-[480px]">
@@ -105,10 +124,12 @@ export default function DispatchDetailDrawer({
         <DispatchDetailContent
           dispatch={dispatch}
           dispatches={dispatches}
+          workItems={workItems}
           readOnly={readOnly}
           onClose={onClose}
           onEdit={onEdit}
           onDelete={onDelete}
+          onViewWorkItems={onViewWorkItems}
         />
       )}
     </SlideOver>
@@ -118,19 +139,23 @@ export default function DispatchDetailDrawer({
 interface ContentProps {
   dispatch: Dispatch;
   dispatches?: Dispatch[];
+  workItems?: WorkItemResponse[];
   readOnly: boolean;
   onClose: () => void;
   onEdit: (dispatch: Dispatch) => void;
   onDelete: (dispatch: Dispatch) => void;
+  onViewWorkItems?: () => void;
 }
 
 function DispatchDetailContent({
   dispatch,
   dispatches,
+  workItems,
   readOnly,
   onClose,
   onEdit,
   onDelete,
+  onViewWorkItems,
 }: ContentProps) {
   const { t } = useTranslation();
   const { getName } = useGlossary();
@@ -237,6 +262,13 @@ function DispatchDetailContent({
           ? { label: t('workOrders.dispatches.drawer.completeVisit'), next: 'COMPLETED' as DispatchStatus }
           : null;
 
+  // Work addressed — resolve the visit's ids against the WO's items. Empty =
+  // unscoped (covers the whole WO), so the section hides.
+  const addressed = (full.addressedWorkItemIds ?? []).map((id) => ({
+    id,
+    wi: (workItems ?? []).find((w) => w.id === id),
+  }));
+
   const windowStr = formatWindow(full.arrivalWindowStart, full.arrivalWindowEnd);
 
   return (
@@ -329,7 +361,48 @@ function DispatchDetailContent({
           ))}
         </Section>
 
-        {/* 4 · Visit notes */}
+        {/* 4 · Work addressed — items this visit covers (empty = whole WO) */}
+        {addressed.length > 0 && (
+          <Section title={t('workOrders.dispatches.drawer.workAddressed')} count={addressed.length}>
+            <div className="flex flex-col gap-1.5">
+              {addressed.map(({ id, wi }) => {
+                const inner = (
+                  <>
+                    <div className="min-w-0 grow">
+                      <div className="truncate text-[12.5px] font-medium text-fg-strong">
+                        {wi ? wi.description : id}
+                      </div>
+                      {wi?.equipment && (
+                        <div className="truncate text-[10.5px] text-fg-dim">{wi.equipment.name}</div>
+                      )}
+                    </div>
+                    {wi && (
+                      <Pill tone={PROGRESS_TONE[wi.statusCategory]} dot>
+                        {wi.statusCategory.replace(/_/g, ' ').toLowerCase()}
+                      </Pill>
+                    )}
+                  </>
+                );
+                return onViewWorkItems ? (
+                  <button
+                    key={id}
+                    type="button"
+                    onClick={onViewWorkItems}
+                    className="flex items-center gap-2 rounded-sm border border-border-soft bg-bg px-2.5 py-2 text-left hover:bg-bg-hover"
+                  >
+                    {inner}
+                  </button>
+                ) : (
+                  <div key={id} className="flex items-center gap-2 rounded-sm border border-border-soft bg-bg px-2.5 py-2">
+                    {inner}
+                  </div>
+                );
+              })}
+            </div>
+          </Section>
+        )}
+
+        {/* 5 · Visit notes */}
         {full.notes && (
           <Section title={t('workOrders.dispatches.drawer.notes')}>
             <p className="whitespace-pre-wrap text-[12.5px] leading-relaxed text-fg">{full.notes}</p>

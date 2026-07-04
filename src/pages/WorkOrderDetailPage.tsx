@@ -935,8 +935,13 @@ export default function WorkOrderDetailPage() {
       <DispatchDetailDrawer
         dispatch={selectedDispatch}
         dispatches={dispatches}
+        workItems={workOrder.workItems ?? []}
         readOnly={frozen}
         onClose={() => setSelectedDispatch(null)}
+        onViewWorkItems={() => {
+          setSelectedDispatch(null);
+          setTab('items');
+        }}
         onEdit={(d) => {
           setSelectedDispatch(null);
           setEditingDispatch(d);

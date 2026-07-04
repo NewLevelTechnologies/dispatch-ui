@@ -42,6 +42,10 @@ export interface Dispatch {
   // list projection — render defensively.
   label?: string | null;
   lifecycle?: DispatchLifecycle | null;
+  // Work items this visit addresses (cross-service ids → work-order-service).
+  // Empty/absent = unscoped (the visit covers the whole work order); a populated
+  // list is the specific items. Never an auto-expanded snapshot.
+  addressedWorkItemIds?: string[];
 }
 
 export interface CreateDispatchRequest {

@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
 import { renderWithProviders, userEvent } from '../test/utils';
 import DispatchDetailDrawer from './DispatchDetailDrawer';
-import type { Dispatch, DispatchStatus, User, WorkOrderFile } from '../api';
+import type { Dispatch, DispatchStatus, User, WorkItemResponse, WorkOrderFile } from '../api';
 import type { NotificationLogDto } from '../api/notificationApi';
 
 const mockUserGetAll = vi.fn();
@@ -133,10 +133,12 @@ const renderDrawer = (dispatch: Dispatch | null, props: Partial<React.ComponentP
     <DispatchDetailDrawer
       dispatch={dispatch}
       dispatches={props.dispatches ?? (dispatch ? [dispatch] : [])}
+      workItems={props.workItems}
       readOnly={props.readOnly}
       onClose={props.onClose ?? vi.fn()}
       onEdit={props.onEdit ?? vi.fn()}
       onDelete={props.onDelete ?? vi.fn()}
+      onViewWorkItems={props.onViewWorkItems}
     />,
   );
 };
@@ -297,6 +299,34 @@ describe('DispatchDetailDrawer', () => {
     await screen.findByText('Jason Smith');
     expect(screen.queryByRole('button', { name: /reassign/i })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /mark en route/i })).not.toBeInTheDocument();
+  });
+
+  it('lists the work items this visit addresses and links out', async () => {
+    const onViewWorkItems = vi.fn();
+    const user = userEvent.setup();
+    const workItems = [
+      {
+        id: 'wi-1',
+        statusId: null,
+        statusCategory: 'IN_PROGRESS',
+        description: 'No cooling — upstairs condenser',
+        equipmentId: null,
+        equipment: null,
+        createdAt: '2099-05-01T00:00:00Z',
+        updatedAt: '2099-05-01T00:00:00Z',
+      },
+    ] as unknown as WorkItemResponse[];
+    renderDrawer(mockDispatch({ addressedWorkItemIds: ['wi-1'] }), { workItems, onViewWorkItems });
+
+    expect(await screen.findByText('Work addressed')).toBeInTheDocument();
+    await user.click(await screen.findByText('No cooling — upstairs condenser'));
+    expect(onViewWorkItems).toHaveBeenCalled();
+  });
+
+  it('hides Work addressed when the visit is unscoped (no addressed items)', async () => {
+    renderDrawer(mockDispatch());
+    await screen.findByText('Jason Smith');
+    expect(screen.queryByText('Work addressed')).not.toBeInTheDocument();
   });
 
   it('invokes onClose when the X button is clicked', async () => {
