@@ -2,11 +2,14 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
 import { renderWithProviders, userEvent } from '../test/utils';
 import DispatchDetailDrawer from './DispatchDetailDrawer';
-import type { Dispatch, DispatchStatus, User } from '../api';
+import type { Dispatch, DispatchStatus, User, WorkOrderFile } from '../api';
 import type { NotificationLogDto } from '../api/notificationApi';
 
 const mockUserGetAll = vi.fn();
 const mockGetNotificationLogs = vi.fn();
+const mockFilesList = vi.fn();
+const mockDispatchUpdate = vi.fn();
+const mockGetById = vi.fn();
 
 vi.mock('../api/userApi', () => ({
   userApi: { getAll: (...args: unknown[]) => mockUserGetAll(...args) },
@@ -14,15 +17,29 @@ vi.mock('../api/userApi', () => ({
 }));
 
 vi.mock('../api/notificationApi', async () => {
-  // Keep the type exports + constants flowing through; only mock the API.
-  const actual = await vi.importActual<typeof import('../api/notificationApi')>(
-    '../api/notificationApi'
-  );
+  const actual = await vi.importActual<typeof import('../api/notificationApi')>('../api/notificationApi');
   return {
     ...actual,
-    notificationApi: {
-      getNotificationLogs: (...args: unknown[]) =>
-        mockGetNotificationLogs(...args),
+    notificationApi: { getNotificationLogs: (...args: unknown[]) => mockGetNotificationLogs(...args) },
+  };
+});
+
+vi.mock('../api/filesApi', async () => {
+  const actual = await vi.importActual<typeof import('../api/filesApi')>('../api/filesApi');
+  return {
+    ...actual,
+    workOrderFilesApi: { ...actual.workOrderFilesApi, list: (...args: unknown[]) => mockFilesList(...args) },
+  };
+});
+
+vi.mock('../api/schedulingApi', async () => {
+  const actual = await vi.importActual<typeof import('../api/schedulingApi')>('../api/schedulingApi');
+  return {
+    ...actual,
+    dispatchesApi: {
+      ...actual.dispatchesApi,
+      update: (...args: unknown[]) => mockDispatchUpdate(...args),
+      getById: (...args: unknown[]) => mockGetById(...args),
     },
   };
 });
@@ -58,23 +75,70 @@ const mockDispatch = (overrides: Partial<Dispatch> = {}): Dispatch => ({
 
 const emptyLogsPage = {
   content: [] as NotificationLogDto[],
-  pageable: {
-    pageNumber: 0,
-    pageSize: 25,
-    sort: { sorted: true, unsorted: false, empty: false },
-    offset: 0,
-    paged: true,
-    unpaged: false,
-  },
   totalElements: 0,
   totalPages: 0,
   last: true,
   size: 25,
   number: 0,
-  sort: { sorted: true, unsorted: false, empty: false },
   numberOfElements: 0,
   first: true,
   empty: true,
+};
+
+const filesPage = (content: WorkOrderFile[] = []) => ({
+  content,
+  counts: { all: content.length, photos: 0, videos: 0, documents: 0 },
+  totalElements: content.length,
+  totalPages: content.length ? 1 : 0,
+  number: 0,
+  size: 100,
+  first: true,
+  last: true,
+});
+
+const photoFile = (over: Partial<WorkOrderFile> = {}): WorkOrderFile =>
+  ({
+    id: 'm1',
+    kind: 'PHOTO',
+    status: 'READY',
+    fileName: 'before.jpg',
+    url: 'https://s3/1',
+    thumbnailUrl: 'https://s3/1t',
+    durationSeconds: null,
+    contentType: 'image/jpeg',
+    sizeBytes: 1,
+    widthPx: null,
+    heightPx: null,
+    thumbnailWidthPx: null,
+    thumbnailHeightPx: null,
+    caption: null,
+    workOrderId: 'wo-1',
+    workOrderNumber: null,
+    workItemId: null,
+    dispatchId: 'd1',
+    equipmentId: null,
+    equipmentName: null,
+    agreementId: null,
+    isProfile: false,
+    uploadedBy: null,
+    uploadedByName: null,
+    createdAt: '2099-05-15T15:00:00Z',
+    ...over,
+  }) as WorkOrderFile;
+
+const renderDrawer = (dispatch: Dispatch | null, props: Partial<React.ComponentProps<typeof DispatchDetailDrawer>> = {}) => {
+  // The by-id read backs lifecycle/label — echo the dispatch under test.
+  if (dispatch) mockGetById.mockResolvedValue(dispatch);
+  return renderWithProviders(
+    <DispatchDetailDrawer
+      dispatch={dispatch}
+      dispatches={props.dispatches ?? (dispatch ? [dispatch] : [])}
+      readOnly={props.readOnly}
+      onClose={props.onClose ?? vi.fn()}
+      onEdit={props.onEdit ?? vi.fn()}
+      onDelete={props.onDelete ?? vi.fn()}
+    />,
+  );
 };
 
 describe('DispatchDetailDrawer', () => {
@@ -82,111 +146,52 @@ describe('DispatchDetailDrawer', () => {
     vi.clearAllMocks();
     mockUserGetAll.mockResolvedValue([mockUser('u1', 'Jason', 'Smith')]);
     mockGetNotificationLogs.mockResolvedValue(emptyLogsPage);
+    mockFilesList.mockResolvedValue(filesPage([]));
+    mockDispatchUpdate.mockResolvedValue(mockDispatch({ status: 'IN_PROGRESS' }));
+    mockGetById.mockResolvedValue(mockDispatch());
   });
 
   it('renders nothing when dispatch is null', () => {
-    renderWithProviders(
-      <DispatchDetailDrawer
-        dispatch={null}
-        onClose={vi.fn()}
-        onEdit={vi.fn()}
-        onDelete={vi.fn()}
-      />
-    );
-
+    renderDrawer(null);
     expect(screen.queryByText('Jason Smith')).not.toBeInTheDocument();
-    expect(screen.queryByText(/lifecycle/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/visit timeline/i)).not.toBeInTheDocument();
   });
 
-  it('renders the tech name and status badge when a dispatch is open', async () => {
-    renderWithProviders(
-      <DispatchDetailDrawer
-        dispatch={mockDispatch()}
-        onClose={vi.fn()}
-        onEdit={vi.fn()}
-        onDelete={vi.fn()}
-      />
+  it('renders the sequence header, status, and tech with Call/Text', async () => {
+    renderDrawer(mockDispatch());
+    // seq derives from the dispatches prop (this is the only visit → Dispatch 1).
+    expect(await screen.findByText('Dispatch 1')).toBeInTheDocument();
+    expect(await screen.findByText('Jason Smith')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /call/i })).toHaveAttribute('href', 'tel:5551234');
+    expect(screen.getByRole('link', { name: /text/i })).toHaveAttribute('href', 'sms:5551234');
+  });
+
+  it('renders the visit timeline with reached and hollow steps', async () => {
+    renderDrawer(mockDispatch());
+    expect(await screen.findByText('Visit timeline')).toBeInTheDocument();
+    expect(screen.getByText('Customer notified')).toBeInTheDocument();
+    expect(screen.getByText('En route')).toBeInTheDocument();
+    expect(screen.getByText('Arrived on site')).toBeInTheDocument();
+    // En route (never), Arrived, Departed all hollow for a fresh SCHEDULED visit.
+    expect(screen.getAllByText('—').length).toBeGreaterThanOrEqual(3);
+  });
+
+  it('derives "captured this visit" media from files keyed by dispatchId', async () => {
+    mockFilesList.mockResolvedValue(filesPage([photoFile()]));
+    renderDrawer(mockDispatch());
+    expect(await screen.findByText('Captured this visit')).toBeInTheDocument();
+    expect(screen.getByAltText('before.jpg')).toBeInTheDocument();
+  });
+
+  it('renders the notifications empty state and scopes the query to the dispatch', async () => {
+    renderDrawer(mockDispatch());
+    await waitFor(() => expect(screen.getByText(/no notifications sent yet/i)).toBeInTheDocument());
+    expect(mockGetNotificationLogs).toHaveBeenCalledWith(
+      expect.objectContaining({ entityType: 'DISPATCH', entityId: 'd1' }),
     );
-
-    await waitFor(() => {
-      expect(screen.getByText('Jason Smith')).toBeInTheDocument();
-    });
-    expect(screen.getByText('Scheduled')).toBeInTheDocument();
   });
 
-  it('renders the lifecycle audit fields', async () => {
-    renderWithProviders(
-      <DispatchDetailDrawer
-        dispatch={mockDispatch({
-          status: 'COMPLETED',
-          arrivedAt: '2099-05-15T14:05:00Z',
-          departedAt: '2099-05-15T15:30:00Z',
-        })}
-        onClose={vi.fn()}
-        onEdit={vi.fn()}
-        onDelete={vi.fn()}
-      />
-    );
-
-    await waitFor(() => {
-      expect(screen.getByText(/arrival window/i)).toBeInTheDocument();
-    });
-    expect(screen.getByText(/^arrived$/i)).toBeInTheDocument();
-    expect(screen.getByText(/^departed$/i)).toBeInTheDocument();
-    expect(screen.getByText(/^created$/i)).toBeInTheDocument();
-  });
-
-  it('renders em-dash for missing arrival / departure timestamps', async () => {
-    renderWithProviders(
-      <DispatchDetailDrawer
-        dispatch={mockDispatch({ status: 'SCHEDULED' })}
-        onClose={vi.fn()}
-        onEdit={vi.fn()}
-        onDelete={vi.fn()}
-      />
-    );
-
-    await waitFor(() => {
-      expect(screen.getByText(/^arrived$/i)).toBeInTheDocument();
-    });
-    // Arrived + Departed should both render em-dashes for an un-departed
-    // SCHEDULED dispatch.
-    expect(screen.getAllByText('—').length).toBeGreaterThanOrEqual(2);
-  });
-
-  it('shows the contact section with phone when tech has one', async () => {
-    renderWithProviders(
-      <DispatchDetailDrawer
-        dispatch={mockDispatch()}
-        onClose={vi.fn()}
-        onEdit={vi.fn()}
-        onDelete={vi.fn()}
-      />
-    );
-
-    await waitFor(() => {
-      expect(screen.getByText('555-1234')).toBeInTheDocument();
-    });
-  });
-
-  it('renders the notifications empty state when no logs', async () => {
-    renderWithProviders(
-      <DispatchDetailDrawer
-        dispatch={mockDispatch()}
-        onClose={vi.fn()}
-        onEdit={vi.fn()}
-        onDelete={vi.fn()}
-      />
-    );
-
-    await waitFor(() => {
-      expect(
-        screen.getByText(/no notifications sent yet/i)
-      ).toBeInTheDocument();
-    });
-  });
-
-  it('renders notification log rows when logs are present', async () => {
+  it('renders notification log rows when present', async () => {
     mockGetNotificationLogs.mockResolvedValue({
       ...emptyLogsPage,
       empty: false,
@@ -210,149 +215,95 @@ describe('DispatchDetailDrawer', () => {
         } satisfies NotificationLogDto,
       ],
     });
-
-    renderWithProviders(
-      <DispatchDetailDrawer
-        dispatch={mockDispatch()}
-        onClose={vi.fn()}
-        onEdit={vi.fn()}
-        onDelete={vi.fn()}
-      />
-    );
-
-    await waitFor(() => {
-      expect(screen.getByText('SMS')).toBeInTheDocument();
-    });
-    expect(screen.getByText('DELIVERED')).toBeInTheDocument();
-    // Recipient phone is shown when present.
-    expect(screen.getAllByText('555-1234').length).toBeGreaterThanOrEqual(1);
+    renderDrawer(mockDispatch());
+    // Status enum renders title-cased (DELIVERED → Delivered).
+    expect(await screen.findByText('Delivered')).toBeInTheDocument();
   });
 
-  it('queries notification logs scoped to this dispatch', async () => {
-    renderWithProviders(
-      <DispatchDetailDrawer
-        dispatch={mockDispatch()}
-        onClose={vi.fn()}
-        onEdit={vi.fn()}
-        onDelete={vi.fn()}
-      />
-    );
+  it('renders the notes section only when notes are present', async () => {
+    const { unmount } = renderDrawer(mockDispatch({ notes: 'Customer prefers AM' }));
+    expect(await screen.findByText('Customer prefers AM')).toBeInTheDocument();
+    unmount();
 
-    await waitFor(() => {
-      expect(mockGetNotificationLogs).toHaveBeenCalledWith(
-        expect.objectContaining({ entityType: 'DISPATCH', entityId: 'd1' })
-      );
-    });
+    renderDrawer(mockDispatch({ notes: null }));
+    await screen.findByText('Jason Smith');
+    expect(screen.queryByText('Customer prefers AM')).not.toBeInTheDocument();
   });
 
-  it('renders the notes section when dispatch.notes is present', async () => {
-    renderWithProviders(
-      <DispatchDetailDrawer
-        dispatch={mockDispatch({ notes: 'Customer prefers AM' })}
-        onClose={vi.fn()}
-        onEdit={vi.fn()}
-        onDelete={vi.fn()}
-      />
-    );
-
-    await waitFor(() => {
-      expect(screen.getByText('Customer prefers AM')).toBeInTheDocument();
-    });
-  });
-
-  it('omits the notes section when dispatch.notes is null', async () => {
-    renderWithProviders(
-      <DispatchDetailDrawer
-        dispatch={mockDispatch({ notes: null })}
-        onClose={vi.fn()}
-        onEdit={vi.fn()}
-        onDelete={vi.fn()}
-      />
-    );
-
-    await waitFor(() => {
-      expect(screen.getByText('Jason Smith')).toBeInTheDocument();
-    });
-    // No "Notes" section heading should render.
-    expect(screen.queryByText(/^notes$/i)).not.toBeInTheDocument();
-  });
-
-  it('invokes onEdit with the dispatch when the Edit footer button is clicked', async () => {
+  it('SCHEDULED footer: Reassign opens edit; Mark en route transitions to EN_ROUTE', async () => {
     const onEdit = vi.fn();
+    const onClose = vi.fn();
     const user = userEvent.setup();
+    renderDrawer(mockDispatch(), { onEdit, onClose });
 
-    renderWithProviders(
-      <DispatchDetailDrawer
-        dispatch={mockDispatch()}
-        onClose={vi.fn()}
-        onEdit={onEdit}
-        onDelete={vi.fn()}
-      />
-    );
+    await user.click(await screen.findByRole('button', { name: /reassign/i }));
+    expect(onEdit).toHaveBeenCalledWith(expect.objectContaining({ id: 'd1' }));
 
-    const editBtn = await screen.findByRole('button', { name: /^edit$/i });
-    await user.click(editBtn);
-
-    expect(onEdit).toHaveBeenCalledTimes(1);
-    expect(onEdit.mock.calls[0][0].id).toBe('d1');
+    await user.click(screen.getByRole('button', { name: /mark en route/i }));
+    await waitFor(() => expect(mockDispatchUpdate).toHaveBeenCalledWith('d1', { status: 'EN_ROUTE' }));
+    await waitFor(() => expect(onClose).toHaveBeenCalled());
   });
 
-  it('invokes onDelete with the dispatch when the Delete footer button is clicked', async () => {
+  it('EN_ROUTE footer: Mark on site transitions to IN_PROGRESS', async () => {
+    const user = userEvent.setup();
+    renderDrawer(mockDispatch({ status: 'EN_ROUTE' }));
+    await user.click(await screen.findByRole('button', { name: /mark on site/i }));
+    await waitFor(() => expect(mockDispatchUpdate).toHaveBeenCalledWith('d1', { status: 'IN_PROGRESS' }));
+    expect(screen.queryByRole('button', { name: /mark en route/i })).not.toBeInTheDocument();
+  });
+
+  it('IN_PROGRESS footer: Complete visit transitions to COMPLETED (no Mark on site)', async () => {
+    const user = userEvent.setup();
+    renderDrawer(mockDispatch({ status: 'IN_PROGRESS' }));
+    await user.click(await screen.findByRole('button', { name: /complete visit/i }));
+    await waitFor(() => expect(mockDispatchUpdate).toHaveBeenCalledWith('d1', { status: 'COMPLETED' }));
+    expect(screen.queryByRole('button', { name: /mark on site/i })).not.toBeInTheDocument();
+  });
+
+  it('renders the timeline from the by-id lifecycle (only unreached steps show —)', async () => {
+    renderDrawer(
+      mockDispatch({
+        status: 'IN_PROGRESS',
+        arrivedAt: '2099-05-15T14:31:00Z',
+        lifecycle: {
+          scheduled: '2099-05-14T15:48:00Z',
+          notified: '2099-05-14T16:02:00Z',
+          enroute: '2099-05-15T14:12:00Z',
+          arrived: '2099-05-15T14:31:00Z',
+          departed: null,
+        },
+      }),
+    );
+    // Scheduled/notified/enroute/arrived reached → only Departed shows the dash.
+    expect(await screen.findByText('En route')).toBeInTheDocument();
+    await waitFor(() => expect(screen.getAllByText('—')).toHaveLength(1));
+  });
+
+  it('COMPLETED footer: shows completed time + Delete, no transitions', async () => {
     const onDelete = vi.fn();
     const user = userEvent.setup();
-
-    renderWithProviders(
-      <DispatchDetailDrawer
-        dispatch={mockDispatch()}
-        onClose={vi.fn()}
-        onEdit={vi.fn()}
-        onDelete={onDelete}
-      />
+    renderDrawer(
+      mockDispatch({ status: 'COMPLETED', arrivedAt: '2099-05-15T14:05:00Z', departedAt: '2099-05-15T15:30:00Z' }),
+      { onDelete },
     );
-
-    const deleteBtn = await screen.findByRole('button', { name: /^delete$/i });
-    await user.click(deleteBtn);
-
-    expect(onDelete).toHaveBeenCalledTimes(1);
-    expect(onDelete.mock.calls[0][0].id).toBe('d1');
+    await user.click(await screen.findByRole('button', { name: /^delete$/i }));
+    expect(onDelete).toHaveBeenCalledWith(expect.objectContaining({ id: 'd1' }));
+    expect(screen.queryByRole('button', { name: /mark on site/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /complete visit/i })).not.toBeInTheDocument();
   });
 
-  it('hides the footer Edit/Delete actions in read-only mode', async () => {
-    renderWithProviders(
-      <DispatchDetailDrawer
-        dispatch={mockDispatch()}
-        readOnly
-        onClose={vi.fn()}
-        onEdit={vi.fn()}
-        onDelete={vi.fn()}
-      />
-    );
-
-    await waitFor(() => {
-      expect(screen.getByText('Jason Smith')).toBeInTheDocument();
-    });
-    expect(screen.queryByRole('button', { name: /^edit$/i })).not.toBeInTheDocument();
-    expect(
-      screen.queryByRole('button', { name: /^delete$/i })
-    ).not.toBeInTheDocument();
+  it('hides all footer actions in read-only mode', async () => {
+    renderDrawer(mockDispatch(), { readOnly: true });
+    await screen.findByText('Jason Smith');
+    expect(screen.queryByRole('button', { name: /reassign/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /mark en route/i })).not.toBeInTheDocument();
   });
 
   it('invokes onClose when the X button is clicked', async () => {
     const onClose = vi.fn();
     const user = userEvent.setup();
-
-    renderWithProviders(
-      <DispatchDetailDrawer
-        dispatch={mockDispatch()}
-        onClose={onClose}
-        onEdit={vi.fn()}
-        onDelete={vi.fn()}
-      />
-    );
-
-    const closeBtn = await screen.findByRole('button', { name: /close/i });
-    await user.click(closeBtn);
-
+    renderDrawer(mockDispatch(), { onClose });
+    await user.click(await screen.findByRole('button', { name: /close/i }));
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 });

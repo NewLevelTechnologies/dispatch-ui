@@ -74,11 +74,15 @@ const PROGRESS_TONE: Record<ProgressCategory, PillTone> = {
 // GPS signal, so the strip leads with self-reported status, never a fake ETA.
 const DISPATCH_PRESENTATION: Record<DispatchStatus, { tone: PillTone; label: string; live?: boolean }> = {
   SCHEDULED: { tone: 'info', label: 'Scheduled' },
+  EN_ROUTE: { tone: 'violet', label: 'En route', live: true },
   IN_PROGRESS: { tone: 'violet', label: 'On site', live: true },
   COMPLETED: { tone: 'success', label: 'Completed' },
   NO_SHOW: { tone: 'warning', label: 'No show' },
   CANCELLED: { tone: 'neutral', label: 'Cancelled' },
 };
+
+// En route + on site both count as "live now".
+const isLiveDispatch = (s: DispatchStatus) => s === 'EN_ROUTE' || s === 'IN_PROGRESS';
 
 // ── Same-day arrival window: "Fri 8–10 AM"; cross-date degrades to both sides.
 const ETA_DATE = new Intl.DateTimeFormat('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
@@ -125,7 +129,7 @@ function deriveAttention(args: {
   const { workOrder, dispatches, summary, onOpenTab, onOpenFinancial, t, getName } = args;
   const items: AttentionItem[] = [];
 
-  const live = dispatches.find((d) => d.status === 'IN_PROGRESS');
+  const live = dispatches.find((d) => isLiveDispatch(d.status));
   if (live) {
     items.push({
       key: 'live',
@@ -298,7 +302,7 @@ function TripStrip({
   const { getName } = useGlossary();
   const visible = dispatches.filter((d) => d.status !== 'CANCELLED');
   const ordered = [...visible].sort((a, b) => {
-    const rank = (d: Dispatch) => (d.status === 'IN_PROGRESS' ? 0 : d.status === 'COMPLETED' ? 2 : 1);
+    const rank = (d: Dispatch) => (isLiveDispatch(d.status) ? 0 : d.status === 'COMPLETED' ? 2 : 1);
     const ra = rank(a);
     const rb = rank(b);
     if (ra !== rb) return ra - rb;
@@ -308,7 +312,7 @@ function TripStrip({
   });
 
   const done = visible.filter((d) => d.status === 'COMPLETED').length;
-  const inFlight = visible.filter((d) => d.status === 'IN_PROGRESS').length;
+  const inFlight = visible.filter((d) => isLiveDispatch(d.status)).length;
   const scheduled = visible.filter((d) => d.status === 'SCHEDULED').length;
 
   return (
@@ -354,11 +358,14 @@ function TripCell({
   const accent =
     d.status === 'COMPLETED' ? 'var(--success-500)' : p.live ? 'var(--violet-500)' : 'var(--info-500)';
   const name = d.assignedUserName;
+  // Cap the cell width so a lone dispatch stays card-sized + left-aligned
+  // rather than stretching full-width like a banner; several cells share the
+  // row and scroll (mock: flex 1 1 200px, max-width 320).
   return (
     <button
       type="button"
       onClick={() => onSelect(d)}
-      className="min-w-0 shrink-0 grow basis-[186px] cursor-pointer rounded-sm border border-border p-2.5 text-left hover:bg-bg-hover"
+      className="min-w-0 shrink-0 grow basis-[200px] max-w-[320px] cursor-pointer rounded-sm border border-border p-2.5 text-left hover:bg-bg-hover"
       style={{
         borderLeft: `3px solid ${accent}`,
         background: p.live ? 'color-mix(in oklch, var(--violet-500) 6%, var(--bg-elev))' : 'var(--bg-elev)',

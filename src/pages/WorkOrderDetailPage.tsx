@@ -934,6 +934,7 @@ export default function WorkOrderDetailPage() {
           mode. Delete fires the dispatches mutation directly. */}
       <DispatchDetailDrawer
         dispatch={selectedDispatch}
+        dispatches={dispatches}
         readOnly={frozen}
         onClose={() => setSelectedDispatch(null)}
         onEdit={(d) => {
