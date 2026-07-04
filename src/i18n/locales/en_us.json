@@ -2418,7 +2418,8 @@
         "timelineDeparted": "Departed",
         "timelineEnRoute": "En route",
         "timelineNotified": "Customer notified",
-        "timelineScheduled": "Scheduled"
+        "timelineScheduled": "Scheduled",
+        "workAddressed": "Work addressed"
       },
       "editTitle": "Edit dispatch",
       "empty": "No {{entity, lowercase}} assigned yet.",
