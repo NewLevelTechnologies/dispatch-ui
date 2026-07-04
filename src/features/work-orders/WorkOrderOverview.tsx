@@ -314,23 +314,30 @@ function TripStrip({
   return (
     <Card
       title={<CardTitle icon={<TruckIcon className="size-3.5" />}>{getName('dispatch', true)}</CardTitle>}
-      action={<CardLink onClick={onOpenTrips}>{t('workOrders.detail.overview.scheduleTrip')}</CardLink>}
+      action={
+        visible.length > 0 ? (
+          // Designer places the done/in-flight/scheduled count inline on the
+          // header row, just left of the schedule action (not a body line).
+          <div className="flex items-center gap-2 text-[11px] text-fg-muted">
+            <span>{t('workOrders.detail.overview.tripCounts', { done, inFlight, scheduled })}</span>
+            <span aria-hidden>·</span>
+            <CardLink onClick={onOpenTrips}>{t('workOrders.detail.overview.scheduleTrip')}</CardLink>
+          </div>
+        ) : (
+          <CardLink onClick={onOpenTrips}>{t('workOrders.detail.overview.scheduleTrip')}</CardLink>
+        )
+      }
     >
       {visible.length === 0 ? (
         <div className="py-2 text-center text-[12.5px] text-fg-muted">
           {t('common.actions.noEntitiesYet', { entities: getName('dispatch', true) })}
         </div>
       ) : (
-        <>
-          <div className="mb-2.5 text-[11px] text-fg-muted">
-            {t('workOrders.detail.overview.tripCounts', { done, inFlight, scheduled })}
-          </div>
-          <div className="flex items-stretch gap-2 overflow-x-auto pb-0.5">
-            {ordered.map((d) => (
-              <TripCell key={d.id} d={d} onSelect={onSelect} />
-            ))}
-          </div>
-        </>
+        <div className="flex items-stretch gap-2 overflow-x-auto pb-0.5">
+          {ordered.map((d) => (
+            <TripCell key={d.id} d={d} onSelect={onSelect} />
+          ))}
+        </div>
       )}
     </Card>
   );
