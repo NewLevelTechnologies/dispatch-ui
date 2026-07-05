@@ -39,6 +39,9 @@ export interface NotificationLogDto {
   // (suppressed / failed-before-render) and historical rows sent before this
   // shipped. For SMS it's the whole message; for email it's the plain-text body.
   body?: string;
+  // Who the notification targeted — drives the Tech/Customer audience chip.
+  // Optional: not yet on the backend log; the chip hides until it ships.
+  audience?: 'TECH' | 'CUSTOMER';
   createdAt: string;
   sentAt?: string;
   deliveredAt?: string;

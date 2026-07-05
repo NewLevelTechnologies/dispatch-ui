@@ -195,14 +195,6 @@ function DispatchDetailContent({
       }),
   });
   const notifications = useMemo<NotificationLogDto[]>(() => notifPage?.content ?? [], [notifPage]);
-  // Fallback "notified" timestamp when the lifecycle field isn't populated yet.
-  const notifiedFallback = useMemo(() => {
-    const ts = notifications
-      .map((n) => n.sentAt ?? n.createdAt)
-      .filter(Boolean)
-      .map((s) => new Date(s as string).getTime());
-    return ts.length ? new Date(Math.min(...ts)).toISOString() : null;
-  }, [notifications]);
 
   // Captured this visit — media keyed by dispatchId (same source + key as the tab).
   const { data: filesPage } = useQuery({
@@ -230,7 +222,7 @@ function DispatchDetailContent({
   const steps = [
     { label: t('workOrders.dispatches.drawer.timelineScheduled'), at: lc.scheduled },
     { label: t('workOrders.dispatches.drawer.timelineTechNotified'), at: lc.techNotified ?? null },
-    { label: t('workOrders.dispatches.drawer.timelineNotified'), at: lc.notified ?? notifiedFallback },
+    { label: t('workOrders.dispatches.drawer.timelineNotified'), at: lc.notified },
     { label: t('workOrders.dispatches.drawer.timelineEnRoute'), at: lc.enroute },
     { label: t('workOrders.dispatches.drawer.timelineArrived'), at: lc.arrived },
     { label: t('workOrders.dispatches.drawer.timelineDeparted'), at: lc.departed },
@@ -440,35 +432,48 @@ function DispatchDetailContent({
             </div>
           )}
           <div className="flex flex-col gap-2">
-            {notifications.map((log) => (
-              <div key={log.id} className="flex items-start gap-2">
-                <span className="grid size-[22px] shrink-0 place-items-center rounded bg-bg-active text-[10px] font-bold text-fg-muted">
-                  {log.channel.slice(0, 3)}
-                </span>
-                <div className="min-w-0 grow">
-                  <div className="flex items-baseline gap-1.5">
-                    <Pill tone={NOTIF_TONE[log.status]} dot>
-                      {titleCase(log.status)}
-                    </Pill>
-                    <span className="truncate text-[10.5px] text-fg-dim">
-                      {log.recipientPhone
-                        ? formatPhone(log.recipientPhone)
-                        : log.recipientEmail || log.recipientName}
-                    </span>
-                    <span className="grow" />
-                    <span className="whitespace-nowrap text-[10.5px] text-fg-dim">
-                      {stamp(log.sentAt ?? log.createdAt)}
-                    </span>
+            {notifications.map((log) => {
+              const tech = log.audience === 'TECH';
+              return (
+                <div key={log.id} className="flex items-start gap-2">
+                  <span className="grid size-[22px] shrink-0 place-items-center rounded bg-bg-active text-[9.5px] font-bold text-fg-muted">
+                    {log.channel.slice(0, 3)}
+                  </span>
+                  <div className="min-w-0 grow">
+                    <div className="flex items-center gap-1.5">
+                      {log.audience && (
+                        <span
+                          className="shrink-0 rounded-full px-1.5 py-px text-[9.5px] font-bold tracking-[0.03em]"
+                          style={{
+                            background: tech
+                              ? 'color-mix(in oklch, var(--violet-500) 14%, var(--bg-elev))'
+                              : 'color-mix(in oklch, var(--accent-500) 13%, var(--bg-elev))',
+                            color: tech ? 'var(--violet-500)' : 'var(--accent-700)',
+                          }}
+                        >
+                          {tech
+                            ? t('workOrders.dispatches.drawer.audienceTech')
+                            : t('workOrders.dispatches.drawer.audienceCustomer')}
+                        </span>
+                      )}
+                      <span className="truncate text-[10.5px] text-fg-dim">
+                        {log.recipientPhone
+                          ? formatPhone(log.recipientPhone)
+                          : log.recipientEmail || log.recipientName}
+                      </span>
+                      <span className="grow" />
+                      <Pill tone={NOTIF_TONE[log.status]} dot>
+                        {titleCase(log.status)}
+                      </Pill>
+                    </div>
+                    {log.body && (
+                      <div className="mt-0.5 text-[11.5px] leading-snug text-fg-muted">{log.body}</div>
+                    )}
+                    <div className="mt-px text-[10px] text-fg-dim">{stamp(log.sentAt ?? log.createdAt)}</div>
                   </div>
-                  {log.subject && (
-                    <div className="mt-0.5 text-[11.5px] font-medium leading-snug text-fg">{log.subject}</div>
-                  )}
-                  {log.body && (
-                    <div className="mt-0.5 text-[11.5px] leading-snug text-fg-muted">{log.body}</div>
-                  )}
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </Section>
       </div>

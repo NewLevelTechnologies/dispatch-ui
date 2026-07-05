@@ -213,6 +213,7 @@ describe('DispatchDetailDrawer', () => {
           entityType: 'DISPATCH',
           entityId: 'd1',
           body: 'Daniel is on the way — ETA ~12:38p.',
+          audience: 'CUSTOMER',
           createdAt: '2099-05-15T13:55:00Z',
           sentAt: '2099-05-15T13:55:01Z',
           retryCount: 0,
@@ -224,6 +225,8 @@ describe('DispatchDetailDrawer', () => {
     expect(await screen.findByText('Delivered')).toBeInTheDocument();
     // The rendered SMS body appears when present.
     expect(screen.getByText('Daniel is on the way — ETA ~12:38p.')).toBeInTheDocument();
+    // The audience chip reflects who was notified.
+    expect(screen.getByText('Customer')).toBeInTheDocument();
   });
 
   it('renders the notes section only when notes are present', async () => {
