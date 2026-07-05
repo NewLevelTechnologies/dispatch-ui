@@ -13,6 +13,9 @@ export type DispatchStatus = 'SCHEDULED' | 'EN_ROUTE' | 'IN_PROGRESS' | 'COMPLET
 // top-level arrivedAt/departedAt. Per FE_HANDOFF_trip_lifecycle.md.
 export interface DispatchLifecycle {
   scheduled: string | null;
+  // Tech-assignment notification (notifyAssignedUser). Optional — not yet on the
+  // backend lifecycle; the timeline step renders hollow until it ships.
+  techNotified?: string | null;
   notified: string | null;
   enroute: string | null;
   arrived: string | null;

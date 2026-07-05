@@ -195,14 +195,6 @@ function DispatchDetailContent({
       }),
   });
   const notifications = useMemo<NotificationLogDto[]>(() => notifPage?.content ?? [], [notifPage]);
-  // Fallback "notified" timestamp when the lifecycle field isn't populated yet.
-  const notifiedFallback = useMemo(() => {
-    const ts = notifications
-      .map((n) => n.sentAt ?? n.createdAt)
-      .filter(Boolean)
-      .map((s) => new Date(s as string).getTime());
-    return ts.length ? new Date(Math.min(...ts)).toISOString() : null;
-  }, [notifications]);
 
   // Captured this visit — media keyed by dispatchId (same source + key as the tab).
   const { data: filesPage } = useQuery({
@@ -221,6 +213,7 @@ function DispatchDetailContent({
   // notification data when the by-id lifecycle isn't loaded/populated yet).
   const lc: DispatchLifecycle = full.lifecycle ?? {
     scheduled: full.createdAt,
+    techNotified: null,
     notified: null,
     enroute: null,
     arrived: full.arrivedAt,
@@ -228,7 +221,8 @@ function DispatchDetailContent({
   };
   const steps = [
     { label: t('workOrders.dispatches.drawer.timelineScheduled'), at: lc.scheduled },
-    { label: t('workOrders.dispatches.drawer.timelineNotified'), at: lc.notified ?? notifiedFallback },
+    { label: t('workOrders.dispatches.drawer.timelineTechNotified'), at: lc.techNotified ?? null },
+    { label: t('workOrders.dispatches.drawer.timelineNotified'), at: lc.notified },
     { label: t('workOrders.dispatches.drawer.timelineEnRoute'), at: lc.enroute },
     { label: t('workOrders.dispatches.drawer.timelineArrived'), at: lc.arrived },
     { label: t('workOrders.dispatches.drawer.timelineDeparted'), at: lc.departed },
@@ -259,7 +253,7 @@ function DispatchDetailContent({
       : full.status === 'EN_ROUTE'
         ? { label: t('workOrders.dispatches.drawer.markOnSite'), next: 'IN_PROGRESS' as DispatchStatus }
         : full.status === 'IN_PROGRESS'
-          ? { label: t('workOrders.dispatches.drawer.completeVisit'), next: 'COMPLETED' as DispatchStatus }
+          ? { label: t('workOrders.dispatches.drawer.completeVisit', { entity: getName('dispatch') }), next: 'COMPLETED' as DispatchStatus }
           : null;
 
   // Work addressed — resolve the visit's ids against the WO's items. Empty =
@@ -345,7 +339,7 @@ function DispatchDetailContent({
         {/* 3 · Visit timeline — connector runs green to the furthest-reached
             milestone; a passed-but-unstamped step (e.g. skipped En route) shows
             as a hollow dot on the green line, not a broken chain. */}
-        <Section title={t('workOrders.dispatches.drawer.timeline')}>
+        <Section title={t('workOrders.dispatches.drawer.timeline', { entity: getName('dispatch') })}>
           {steps.map((s, i) => (
             <TimelineStep
               key={s.label}
@@ -411,7 +405,7 @@ function DispatchDetailContent({
 
         {/* 5 · Captured this visit — derived from the media graph by dispatchId */}
         {media.length > 0 && (
-          <Section title={t('workOrders.dispatches.drawer.captured')} count={media.length}>
+          <Section title={t('workOrders.dispatches.drawer.captured', { entity: getName('dispatch') })} count={media.length}>
             <div className="flex flex-wrap gap-1.5">
               {media.map((m) => (
                 <MediaThumb key={m.id} m={m} />
@@ -438,35 +432,48 @@ function DispatchDetailContent({
             </div>
           )}
           <div className="flex flex-col gap-2">
-            {notifications.map((log) => (
-              <div key={log.id} className="flex items-start gap-2">
-                <span className="grid size-[22px] shrink-0 place-items-center rounded bg-bg-active text-[10px] font-bold text-fg-muted">
-                  {log.channel.slice(0, 3)}
-                </span>
-                <div className="min-w-0 grow">
-                  <div className="flex items-baseline gap-1.5">
-                    <Pill tone={NOTIF_TONE[log.status]} dot>
-                      {titleCase(log.status)}
-                    </Pill>
-                    <span className="truncate text-[10.5px] text-fg-dim">
-                      {log.recipientPhone
-                        ? formatPhone(log.recipientPhone)
-                        : log.recipientEmail || log.recipientName}
-                    </span>
-                    <span className="grow" />
-                    <span className="whitespace-nowrap text-[10.5px] text-fg-dim">
-                      {stamp(log.sentAt ?? log.createdAt)}
-                    </span>
+            {notifications.map((log) => {
+              const tech = log.audience === 'TECH';
+              return (
+                <div key={log.id} className="flex items-start gap-2">
+                  <span className="grid size-[22px] shrink-0 place-items-center rounded bg-bg-active text-[9.5px] font-bold text-fg-muted">
+                    {log.channel.slice(0, 3)}
+                  </span>
+                  <div className="min-w-0 grow">
+                    <div className="flex items-center gap-1.5">
+                      {log.audience && (
+                        <span
+                          className="shrink-0 rounded-full px-1.5 py-px text-[9.5px] font-bold tracking-[0.03em]"
+                          style={{
+                            background: tech
+                              ? 'color-mix(in oklch, var(--violet-500) 14%, var(--bg-elev))'
+                              : 'color-mix(in oklch, var(--accent-500) 13%, var(--bg-elev))',
+                            color: tech ? 'var(--violet-500)' : 'var(--accent-700)',
+                          }}
+                        >
+                          {tech
+                            ? t('workOrders.dispatches.drawer.audienceTech')
+                            : t('workOrders.dispatches.drawer.audienceCustomer')}
+                        </span>
+                      )}
+                      <span className="truncate text-[10.5px] text-fg-dim">
+                        {log.recipientPhone
+                          ? formatPhone(log.recipientPhone)
+                          : log.recipientEmail || log.recipientName}
+                      </span>
+                      <span className="grow" />
+                      <Pill tone={NOTIF_TONE[log.status]} dot>
+                        {titleCase(log.status)}
+                      </Pill>
+                    </div>
+                    {log.body && (
+                      <div className="mt-0.5 text-[11.5px] leading-snug text-fg-muted">{log.body}</div>
+                    )}
+                    <div className="mt-px text-[10px] text-fg-dim">{stamp(log.sentAt ?? log.createdAt)}</div>
                   </div>
-                  {log.subject && (
-                    <div className="mt-0.5 text-[11.5px] font-medium leading-snug text-fg">{log.subject}</div>
-                  )}
-                  {log.body && (
-                    <div className="mt-0.5 text-[11.5px] leading-snug text-fg-muted">{log.body}</div>
-                  )}
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </Section>
       </div>
@@ -576,7 +583,7 @@ function TimelineStep({
         />
         <div className="w-0.5 flex-1" style={{ background: last ? 'transparent' : bottomDone ? 'var(--success-500)' : 'var(--border)' }} />
       </div>
-      <div className="flex grow items-baseline gap-2 pb-2.5 pt-px">
+      <div className="flex grow items-baseline gap-2 pb-[9px] pt-px">
         <span
           className="whitespace-nowrap text-[12.5px]"
           style={{ fontWeight: reached || active ? 600 : 400, color: reached || active ? 'var(--fg-strong)' : 'var(--fg-dim)' }}

@@ -156,7 +156,7 @@ describe('DispatchDetailDrawer', () => {
   it('renders nothing when dispatch is null', () => {
     renderDrawer(null);
     expect(screen.queryByText('Jason Smith')).not.toBeInTheDocument();
-    expect(screen.queryByText(/visit timeline/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/dispatch timeline/i)).not.toBeInTheDocument();
   });
 
   it('renders the sequence header, status, and tech with Call/Text', async () => {
@@ -170,7 +170,8 @@ describe('DispatchDetailDrawer', () => {
 
   it('renders the visit timeline with reached and hollow steps', async () => {
     renderDrawer(mockDispatch());
-    expect(await screen.findByText('Visit timeline')).toBeInTheDocument();
+    expect(await screen.findByText('Dispatch timeline')).toBeInTheDocument();
+    expect(screen.getByText('Tech notified')).toBeInTheDocument();
     expect(screen.getByText('Customer notified')).toBeInTheDocument();
     expect(screen.getByText('En route')).toBeInTheDocument();
     expect(screen.getByText('Arrived on site')).toBeInTheDocument();
@@ -181,7 +182,7 @@ describe('DispatchDetailDrawer', () => {
   it('derives "captured this visit" media from files keyed by dispatchId', async () => {
     mockFilesList.mockResolvedValue(filesPage([photoFile()]));
     renderDrawer(mockDispatch());
-    expect(await screen.findByText('Captured this visit')).toBeInTheDocument();
+    expect(await screen.findByText('Captured this dispatch')).toBeInTheDocument();
     expect(screen.getByAltText('before.jpg')).toBeInTheDocument();
   });
 
@@ -212,6 +213,7 @@ describe('DispatchDetailDrawer', () => {
           entityType: 'DISPATCH',
           entityId: 'd1',
           body: 'Daniel is on the way — ETA ~12:38p.',
+          audience: 'CUSTOMER',
           createdAt: '2099-05-15T13:55:00Z',
           sentAt: '2099-05-15T13:55:01Z',
           retryCount: 0,
@@ -223,6 +225,8 @@ describe('DispatchDetailDrawer', () => {
     expect(await screen.findByText('Delivered')).toBeInTheDocument();
     // The rendered SMS body appears when present.
     expect(screen.getByText('Daniel is on the way — ETA ~12:38p.')).toBeInTheDocument();
+    // The audience chip reflects who was notified.
+    expect(screen.getByText('Customer')).toBeInTheDocument();
   });
 
   it('renders the notes section only when notes are present', async () => {
@@ -260,7 +264,7 @@ describe('DispatchDetailDrawer', () => {
   it('IN_PROGRESS footer: Complete visit transitions to COMPLETED (no Mark on site)', async () => {
     const user = userEvent.setup();
     renderDrawer(mockDispatch({ status: 'IN_PROGRESS' }));
-    await user.click(await screen.findByRole('button', { name: /complete visit/i }));
+    await user.click(await screen.findByRole('button', { name: /complete dispatch/i }));
     await waitFor(() => expect(mockDispatchUpdate).toHaveBeenCalledWith('d1', { status: 'COMPLETED' }));
     expect(screen.queryByRole('button', { name: /mark on site/i })).not.toBeInTheDocument();
   });
@@ -272,6 +276,7 @@ describe('DispatchDetailDrawer', () => {
         arrivedAt: '2099-05-15T14:31:00Z',
         lifecycle: {
           scheduled: '2099-05-14T15:48:00Z',
+          techNotified: '2099-05-14T15:55:00Z',
           notified: '2099-05-14T16:02:00Z',
           enroute: '2099-05-15T14:12:00Z',
           arrived: '2099-05-15T14:31:00Z',
@@ -294,7 +299,7 @@ describe('DispatchDetailDrawer', () => {
     await user.click(await screen.findByRole('button', { name: /^delete$/i }));
     expect(onDelete).toHaveBeenCalledWith(expect.objectContaining({ id: 'd1' }));
     expect(screen.queryByRole('button', { name: /mark on site/i })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /complete visit/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /complete dispatch/i })).not.toBeInTheDocument();
   });
 
   it('hides all footer actions in read-only mode', async () => {
