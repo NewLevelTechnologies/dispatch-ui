@@ -68,6 +68,18 @@ const TIME_ONLY = new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2
 const stamp = (iso: string): string => `${MONTH_DAY.format(new Date(iso))} · ${TIME_ONLY.format(new Date(iso))}`;
 const titleCase = (s: string): string => s.charAt(0) + s.slice(1).toLowerCase();
 
+// The Tech/Customer-notified timeline steps derive from the notification log
+// (the earliest actually-sent row for that audience), NOT trip.lifecycle —
+// only the four operational steps come from lifecycle.
+function earliestNotified(logs: NotificationLogDto[], audience: 'TECH' | 'CUSTOMER'): string | null {
+  const times = logs
+    .filter((n) => n.audience === audience && (n.status === 'SENT' || n.status === 'DELIVERED'))
+    .map((n) => n.sentAt ?? n.createdAt)
+    .filter((s): s is string => Boolean(s))
+    .sort();
+  return times[0] ?? null;
+}
+
 function formatWindow(startIso: string, endIso: string): string {
   const start = new Date(startIso);
   const end = new Date(endIso);
@@ -195,6 +207,8 @@ function DispatchDetailContent({
       }),
   });
   const notifications = useMemo<NotificationLogDto[]>(() => notifPage?.content ?? [], [notifPage]);
+  const techNotifiedAt = useMemo(() => earliestNotified(notifications, 'TECH'), [notifications]);
+  const customerNotifiedAt = useMemo(() => earliestNotified(notifications, 'CUSTOMER'), [notifications]);
 
   // Captured this visit — media keyed by dispatchId (same source + key as the tab).
   const { data: filesPage } = useQuery({
@@ -213,7 +227,6 @@ function DispatchDetailContent({
   // notification data when the by-id lifecycle isn't loaded/populated yet).
   const lc: DispatchLifecycle = full.lifecycle ?? {
     scheduled: full.createdAt,
-    techNotified: null,
     notified: null,
     enroute: null,
     arrived: full.arrivedAt,
@@ -221,8 +234,8 @@ function DispatchDetailContent({
   };
   const steps = [
     { label: t('workOrders.dispatches.drawer.timelineScheduled'), at: lc.scheduled },
-    { label: t('workOrders.dispatches.drawer.timelineTechNotified'), at: lc.techNotified ?? null },
-    { label: t('workOrders.dispatches.drawer.timelineNotified'), at: lc.notified },
+    { label: t('workOrders.dispatches.drawer.timelineTechNotified'), at: techNotifiedAt },
+    { label: t('workOrders.dispatches.drawer.timelineNotified'), at: customerNotifiedAt },
     { label: t('workOrders.dispatches.drawer.timelineEnRoute'), at: lc.enroute },
     { label: t('workOrders.dispatches.drawer.timelineArrived'), at: lc.arrived },
     { label: t('workOrders.dispatches.drawer.timelineDeparted'), at: lc.departed },

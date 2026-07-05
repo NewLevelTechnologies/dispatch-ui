@@ -269,22 +269,46 @@ describe('DispatchDetailDrawer', () => {
     expect(screen.queryByRole('button', { name: /mark on site/i })).not.toBeInTheDocument();
   });
 
-  it('renders the timeline from the by-id lifecycle (only unreached steps show —)', async () => {
+  it('renders the timeline: operational from lifecycle, notified steps from the log', async () => {
+    const notif = (over: Partial<NotificationLogDto>): NotificationLogDto => ({
+      id: 'n',
+      notificationId: 'x',
+      notificationTypeId: 'x',
+      notificationTypeName: 'T',
+      channel: 'SMS',
+      recipientName: 'R',
+      status: 'SENT',
+      entityType: 'DISPATCH',
+      entityId: 'd1',
+      createdAt: '2099-05-14T16:00:00Z',
+      retryCount: 0,
+      ...over,
+    });
+    mockGetNotificationLogs.mockResolvedValue({
+      ...emptyLogsPage,
+      empty: false,
+      numberOfElements: 2,
+      totalElements: 2,
+      content: [
+        notif({ id: 'nt', audience: 'TECH', status: 'SENT', sentAt: '2099-05-14T15:55:00Z' }),
+        notif({ id: 'nc', audience: 'CUSTOMER', status: 'DELIVERED', sentAt: '2099-05-14T16:02:00Z' }),
+      ],
+    });
     renderDrawer(
       mockDispatch({
         status: 'IN_PROGRESS',
         arrivedAt: '2099-05-15T14:31:00Z',
         lifecycle: {
           scheduled: '2099-05-14T15:48:00Z',
-          techNotified: '2099-05-14T15:55:00Z',
-          notified: '2099-05-14T16:02:00Z',
+          notified: null,
           enroute: '2099-05-15T14:12:00Z',
           arrived: '2099-05-15T14:31:00Z',
           departed: null,
         },
       }),
     );
-    // Scheduled/notified/enroute/arrived reached → only Departed shows the dash.
+    // Scheduled/enroute/arrived from lifecycle + Tech/Customer notified from the
+    // log → only Departed remains unreached.
     expect(await screen.findByText('En route')).toBeInTheDocument();
     await waitFor(() => expect(screen.getAllByText('—')).toHaveLength(1));
   });
