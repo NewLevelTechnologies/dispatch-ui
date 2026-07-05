@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { screen } from '@testing-library/react';
+import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderWithProviders } from '../test/utils';
 import DispatchesTab from './DispatchesTab';
@@ -81,7 +81,13 @@ describe('DispatchesTab', () => {
 
   it('renders a dispatch card with the tech name', () => {
     renderTab([row({})]);
-    expect(screen.getByText(/Daniel P\./)).toBeInTheDocument();
+    expect(screen.getByText('Daniel Park')).toBeInTheDocument();
+  });
+
+  it('shows the dispatch sequence and the addressed work-item count', () => {
+    renderTab([row({ addressedWorkItemIds: ['wi-a', 'wi-b'] })]);
+    expect(screen.getByText(/dispatch 1/i)).toBeInTheDocument();
+    expect(screen.getByText(/2 work items/i)).toBeInTheDocument();
   });
 
   it('renders the live (in-progress) dispatch with the On site label', () => {
@@ -170,11 +176,24 @@ describe('DispatchesTab', () => {
     expect(await screen.findByText(/1 video/i)).toBeInTheDocument();
   });
 
-  it('calls onSelect when a dispatch card is clicked', async () => {
+  it('calls onSelect when the card head is clicked', async () => {
     const onSelect = vi.fn();
     const user = userEvent.setup();
     renderTab([row({ status: 'COMPLETED' })], { onSelect });
-    await user.click(screen.getByText(/Daniel P\./).closest('button')!);
+    await user.click(screen.getByText(/view details/i).closest('button')!);
     expect(onSelect).toHaveBeenCalled();
+  });
+
+  it('advances a live dispatch to on-site via Mark on site', async () => {
+    const user = userEvent.setup();
+    vi.mocked(apiClient.put).mockResolvedValue({ data: row({ status: 'IN_PROGRESS' }) });
+    renderTab([row({ id: 'd-live', status: 'EN_ROUTE' })]);
+    await user.click(screen.getByRole('button', { name: /mark on site/i }));
+    await waitFor(() =>
+      expect(apiClient.put).toHaveBeenCalledWith(
+        expect.stringMatching(/\/scheduling\/dispatches\/d-live$/),
+        { status: 'IN_PROGRESS' },
+      ),
+    );
   });
 });
