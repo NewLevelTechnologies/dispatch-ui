@@ -2419,6 +2419,7 @@
         "timelineEnRoute": "En route",
         "timelineNotified": "Customer notified",
         "timelineScheduled": "Scheduled",
+        "timelineTechNotified": "Tech notified",
         "workAddressed": "Work addressed"
       },
       "editTitle": "Edit dispatch",

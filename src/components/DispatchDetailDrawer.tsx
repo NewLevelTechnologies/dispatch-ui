@@ -221,6 +221,7 @@ function DispatchDetailContent({
   // notification data when the by-id lifecycle isn't loaded/populated yet).
   const lc: DispatchLifecycle = full.lifecycle ?? {
     scheduled: full.createdAt,
+    techNotified: null,
     notified: null,
     enroute: null,
     arrived: full.arrivedAt,
@@ -228,6 +229,7 @@ function DispatchDetailContent({
   };
   const steps = [
     { label: t('workOrders.dispatches.drawer.timelineScheduled'), at: lc.scheduled },
+    { label: t('workOrders.dispatches.drawer.timelineTechNotified'), at: lc.techNotified ?? null },
     { label: t('workOrders.dispatches.drawer.timelineNotified'), at: lc.notified ?? notifiedFallback },
     { label: t('workOrders.dispatches.drawer.timelineEnRoute'), at: lc.enroute },
     { label: t('workOrders.dispatches.drawer.timelineArrived'), at: lc.arrived },
@@ -576,7 +578,7 @@ function TimelineStep({
         />
         <div className="w-0.5 flex-1" style={{ background: last ? 'transparent' : bottomDone ? 'var(--success-500)' : 'var(--border)' }} />
       </div>
-      <div className="flex grow items-baseline gap-2 pb-2.5 pt-px">
+      <div className="flex grow items-baseline gap-2 pb-[9px] pt-px">
         <span
           className="whitespace-nowrap text-[12.5px]"
           style={{ fontWeight: reached || active ? 600 : 400, color: reached || active ? 'var(--fg-strong)' : 'var(--fg-dim)' }}

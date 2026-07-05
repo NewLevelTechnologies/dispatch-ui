@@ -1161,6 +1161,7 @@ vi.mock('react-i18next', () => {
     'workOrders.dispatches.drawer.timelineEnRoute': 'En route',
     'workOrders.dispatches.drawer.timelineNotified': 'Customer notified',
     'workOrders.dispatches.drawer.timelineScheduled': 'Scheduled',
+    'workOrders.dispatches.drawer.timelineTechNotified': 'Tech notified',
     'workOrders.dispatches.drawer.workAddressed': 'Work addressed',
     'workOrders.dispatches.editTitle': 'Edit dispatch',
     'workOrders.dispatches.empty': 'No {{entity, lowercase}} assigned yet.',

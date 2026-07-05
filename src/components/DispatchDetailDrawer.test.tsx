@@ -171,6 +171,7 @@ describe('DispatchDetailDrawer', () => {
   it('renders the visit timeline with reached and hollow steps', async () => {
     renderDrawer(mockDispatch());
     expect(await screen.findByText('Dispatch timeline')).toBeInTheDocument();
+    expect(screen.getByText('Tech notified')).toBeInTheDocument();
     expect(screen.getByText('Customer notified')).toBeInTheDocument();
     expect(screen.getByText('En route')).toBeInTheDocument();
     expect(screen.getByText('Arrived on site')).toBeInTheDocument();
@@ -272,6 +273,7 @@ describe('DispatchDetailDrawer', () => {
         arrivedAt: '2099-05-15T14:31:00Z',
         lifecycle: {
           scheduled: '2099-05-14T15:48:00Z',
+          techNotified: '2099-05-14T15:55:00Z',
           notified: '2099-05-14T16:02:00Z',
           enroute: '2099-05-15T14:12:00Z',
           arrived: '2099-05-15T14:31:00Z',
