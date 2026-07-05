@@ -459,7 +459,10 @@ function DispatchDetailContent({
                     </span>
                   </div>
                   {log.subject && (
-                    <div className="mt-0.5 text-[11.5px] leading-snug text-fg-muted">{log.subject}</div>
+                    <div className="mt-0.5 text-[11.5px] font-medium leading-snug text-fg">{log.subject}</div>
+                  )}
+                  {log.body && (
+                    <div className="mt-0.5 text-[11.5px] leading-snug text-fg-muted">{log.body}</div>
                   )}
                 </div>
               </div>
