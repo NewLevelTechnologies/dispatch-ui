@@ -35,6 +35,10 @@ export interface NotificationLogDto {
   entityType: string;
   entityId: string;
   subject?: string; // Optional - SMS notifications don't have subjects
+  // Rendered plain-text message that was sent. Null for SMS body-less cases
+  // (suppressed / failed-before-render) and historical rows sent before this
+  // shipped. For SMS it's the whole message; for email it's the plain-text body.
+  body?: string;
   createdAt: string;
   sentAt?: string;
   deliveredAt?: string;
