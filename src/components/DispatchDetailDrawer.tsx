@@ -259,7 +259,7 @@ function DispatchDetailContent({
       : full.status === 'EN_ROUTE'
         ? { label: t('workOrders.dispatches.drawer.markOnSite'), next: 'IN_PROGRESS' as DispatchStatus }
         : full.status === 'IN_PROGRESS'
-          ? { label: t('workOrders.dispatches.drawer.completeVisit'), next: 'COMPLETED' as DispatchStatus }
+          ? { label: t('workOrders.dispatches.drawer.completeVisit', { entity: getName('dispatch') }), next: 'COMPLETED' as DispatchStatus }
           : null;
 
   // Work addressed — resolve the visit's ids against the WO's items. Empty =
@@ -345,7 +345,7 @@ function DispatchDetailContent({
         {/* 3 · Visit timeline — connector runs green to the furthest-reached
             milestone; a passed-but-unstamped step (e.g. skipped En route) shows
             as a hollow dot on the green line, not a broken chain. */}
-        <Section title={t('workOrders.dispatches.drawer.timeline')}>
+        <Section title={t('workOrders.dispatches.drawer.timeline', { entity: getName('dispatch') })}>
           {steps.map((s, i) => (
             <TimelineStep
               key={s.label}
@@ -411,7 +411,7 @@ function DispatchDetailContent({
 
         {/* 5 · Captured this visit — derived from the media graph by dispatchId */}
         {media.length > 0 && (
-          <Section title={t('workOrders.dispatches.drawer.captured')} count={media.length}>
+          <Section title={t('workOrders.dispatches.drawer.captured', { entity: getName('dispatch') })} count={media.length}>
             <div className="flex flex-wrap gap-1.5">
               {media.map((m) => (
                 <MediaThumb key={m.id} m={m} />

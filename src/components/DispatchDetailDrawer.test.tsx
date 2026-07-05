@@ -156,7 +156,7 @@ describe('DispatchDetailDrawer', () => {
   it('renders nothing when dispatch is null', () => {
     renderDrawer(null);
     expect(screen.queryByText('Jason Smith')).not.toBeInTheDocument();
-    expect(screen.queryByText(/visit timeline/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/dispatch timeline/i)).not.toBeInTheDocument();
   });
 
   it('renders the sequence header, status, and tech with Call/Text', async () => {
@@ -170,7 +170,7 @@ describe('DispatchDetailDrawer', () => {
 
   it('renders the visit timeline with reached and hollow steps', async () => {
     renderDrawer(mockDispatch());
-    expect(await screen.findByText('Visit timeline')).toBeInTheDocument();
+    expect(await screen.findByText('Dispatch timeline')).toBeInTheDocument();
     expect(screen.getByText('Customer notified')).toBeInTheDocument();
     expect(screen.getByText('En route')).toBeInTheDocument();
     expect(screen.getByText('Arrived on site')).toBeInTheDocument();
@@ -181,7 +181,7 @@ describe('DispatchDetailDrawer', () => {
   it('derives "captured this visit" media from files keyed by dispatchId', async () => {
     mockFilesList.mockResolvedValue(filesPage([photoFile()]));
     renderDrawer(mockDispatch());
-    expect(await screen.findByText('Captured this visit')).toBeInTheDocument();
+    expect(await screen.findByText('Captured this dispatch')).toBeInTheDocument();
     expect(screen.getByAltText('before.jpg')).toBeInTheDocument();
   });
 
@@ -260,7 +260,7 @@ describe('DispatchDetailDrawer', () => {
   it('IN_PROGRESS footer: Complete visit transitions to COMPLETED (no Mark on site)', async () => {
     const user = userEvent.setup();
     renderDrawer(mockDispatch({ status: 'IN_PROGRESS' }));
-    await user.click(await screen.findByRole('button', { name: /complete visit/i }));
+    await user.click(await screen.findByRole('button', { name: /complete dispatch/i }));
     await waitFor(() => expect(mockDispatchUpdate).toHaveBeenCalledWith('d1', { status: 'COMPLETED' }));
     expect(screen.queryByRole('button', { name: /mark on site/i })).not.toBeInTheDocument();
   });
@@ -294,7 +294,7 @@ describe('DispatchDetailDrawer', () => {
     await user.click(await screen.findByRole('button', { name: /^delete$/i }));
     expect(onDelete).toHaveBeenCalledWith(expect.objectContaining({ id: 'd1' }));
     expect(screen.queryByRole('button', { name: /mark on site/i })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /complete visit/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /complete dispatch/i })).not.toBeInTheDocument();
   });
 
   it('hides all footer actions in read-only mode', async () => {
