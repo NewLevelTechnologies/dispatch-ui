@@ -1,10 +1,11 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import {
   ChatBubbleLeftRightIcon,
   PhoneIcon,
   PlayIcon,
+  PlusIcon,
   XMarkIcon,
 } from '@heroicons/react/24/outline';
 import {
@@ -14,6 +15,7 @@ import {
 } from '../api/notificationApi';
 import {
   dispatchesApi,
+  dispatchNotesApi,
   userApi,
   workOrderFilesApi,
   type Dispatch,
@@ -409,12 +411,8 @@ function DispatchDetailContent({
           </Section>
         )}
 
-        {/* 5 · Visit notes */}
-        {full.notes && (
-          <Section title={t('workOrders.dispatches.drawer.notes')}>
-            <p className="whitespace-pre-wrap text-[12.5px] leading-relaxed text-fg">{full.notes}</p>
-          </Section>
-        )}
+        {/* 5 · Visit notes — a multi-entry log; the office can add here too */}
+        <VisitNotesSection dispatchId={dispatch.id} readOnly={readOnly} />
 
         {/* 5 · Captured this visit — derived from the media graph by dispatchId */}
         {media.length > 0 && (
@@ -533,6 +531,89 @@ function DispatchDetailContent({
         )}
       </div>
     </>
+  );
+}
+
+// Visit notes — the dispatch's note log (body · author · when) plus an office
+// add box. The tech app appends to the same log; the server stamps the author.
+function VisitNotesSection({ dispatchId, readOnly }: { dispatchId: string; readOnly: boolean }) {
+  const { t } = useTranslation();
+  const queryClient = useQueryClient();
+  const [draft, setDraft] = useState('');
+  const [adding, setAdding] = useState(false);
+  const { data: notes = [] } = useQuery({
+    queryKey: ['dispatch-notes', dispatchId],
+    queryFn: () => dispatchNotesApi.list(dispatchId),
+  });
+  const create = useMutation({
+    mutationFn: (body: string) => dispatchNotesApi.create(dispatchId, { body }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['dispatch-notes', dispatchId] });
+      setDraft('');
+      setAdding(false);
+    },
+    onError: (err: unknown) => {
+      const msg =
+        err instanceof Error && 'response' in err
+          ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
+          : undefined;
+      alert(msg || t('workOrders.dispatches.drawer.noteError'));
+    },
+  });
+  const canAdd = draft.trim().length > 0 && !create.isPending;
+  return (
+    <Section title={t('workOrders.dispatches.drawer.notes')}>
+      <div className="flex flex-col gap-2">
+        {notes.length === 0 && (
+          <div className="text-[12px] text-fg-dim">{t('workOrders.dispatches.drawer.notesEmpty')}</div>
+        )}
+        {notes.map((n) => (
+          <div key={n.id} className="rounded-md border border-border-soft bg-bg-elev-2 px-2.5 py-2">
+            <div className="whitespace-pre-wrap text-[12.5px] leading-relaxed text-fg">{n.body}</div>
+            <div className="mt-1 text-[10px] text-fg-dim">
+              {[n.authorName, stamp(n.createdAt)].filter(Boolean).join(' · ')}
+            </div>
+          </div>
+        ))}
+      </div>
+      {/* Collapsed to a compact trigger to save vertical space; expands on click. */}
+      {!readOnly &&
+        (adding ? (
+          <div className="mt-2 rounded-md border border-border bg-bg p-2">
+            <textarea
+              autoFocus
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              rows={2}
+              placeholder={t('workOrders.dispatches.drawer.addNotePlaceholder')}
+              aria-label={t('workOrders.dispatches.drawer.addNotePlaceholder')}
+              className="w-full resize-none border-0 bg-transparent text-[12.5px] leading-relaxed text-fg-strong outline-none"
+            />
+            <div className="mt-1 flex items-center gap-2">
+              <span className="text-[10.5px] text-fg-dim">{t('workOrders.dispatches.drawer.officeNoteHint')}</span>
+              <span className="flex-1" />
+              <Button
+                plain
+                size="xxs"
+                onClick={() => {
+                  setAdding(false);
+                  setDraft('');
+                }}
+              >
+                {t('common.cancel')}
+              </Button>
+              <Button color="accent" size="xxs" disabled={!canAdd} onClick={() => create.mutate(draft.trim())}>
+                {t('workOrders.dispatches.drawer.addNote')}
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <Button outline size="xxs" className="mt-2" onClick={() => setAdding(true)}>
+            <PlusIcon data-slot="icon" />
+            {t('workOrders.dispatches.drawer.addNote')}
+          </Button>
+        ))}
+    </Section>
   );
 }
 
