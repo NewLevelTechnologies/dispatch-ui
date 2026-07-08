@@ -1,10 +1,11 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import {
   ChatBubbleLeftRightIcon,
   PhoneIcon,
   PlayIcon,
+  PlusIcon,
   XMarkIcon,
 } from '@heroicons/react/24/outline';
 import {
@@ -14,6 +15,7 @@ import {
 } from '../api/notificationApi';
 import {
   dispatchesApi,
+  dispatchNotesApi,
   userApi,
   workOrderFilesApi,
   type Dispatch,
@@ -329,15 +331,15 @@ function DispatchDetailContent({
               <>
                 <a
                   href={`tel:${techDigits}`}
-                  className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-[11.5px] text-fg-strong no-underline hover:bg-bg-hover"
+                  className="inline-flex h-[30px] items-center gap-1 rounded-md border border-border px-2.5 text-[12.5px] font-semibold text-fg-strong no-underline hover:bg-bg-hover"
                 >
-                  <PhoneIcon className="size-3" /> {t('workOrders.dispatches.drawer.call')}
+                  <PhoneIcon className="size-3.5" /> {t('workOrders.dispatches.drawer.call')}
                 </a>
                 <a
                   href={`sms:${techDigits}`}
-                  className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-[11.5px] text-fg-strong no-underline hover:bg-bg-hover"
+                  className="inline-flex h-[30px] items-center gap-1 rounded-md border border-border px-2.5 text-[12.5px] font-semibold text-fg-strong no-underline hover:bg-bg-hover"
                 >
-                  <ChatBubbleLeftRightIcon className="size-3" /> {t('workOrders.dispatches.drawer.text')}
+                  <ChatBubbleLeftRightIcon className="size-3.5" /> {t('workOrders.dispatches.drawer.text')}
                 </a>
               </>
             )}
@@ -409,12 +411,8 @@ function DispatchDetailContent({
           </Section>
         )}
 
-        {/* 5 · Visit notes */}
-        {full.notes && (
-          <Section title={t('workOrders.dispatches.drawer.notes')}>
-            <p className="whitespace-pre-wrap text-[12.5px] leading-relaxed text-fg">{full.notes}</p>
-          </Section>
-        )}
+        {/* 5 · Visit notes — a multi-entry log; the office can add here too */}
+        <VisitNotesSection dispatchId={dispatch.id} readOnly={readOnly} />
 
         {/* 5 · Captured this visit — derived from the media graph by dispatchId */}
         {media.length > 0 && (
@@ -502,7 +500,7 @@ function DispatchDetailContent({
             </span>
             <span className="grow" />
             {!readOnly && (
-              <Button plain onClick={() => onDelete(dispatch)}>
+              <Button plain size="xs" onClick={() => onDelete(dispatch)}>
                 {t('common.delete')}
               </Button>
             )}
@@ -510,11 +508,11 @@ function DispatchDetailContent({
         ) : (
           !readOnly && (
             <>
-              <Button plain onClick={() => onEdit(dispatch)}>
+              <Button plain size="xs" onClick={() => onEdit(dispatch)}>
                 {t('workOrders.dispatches.drawer.reassign')}
               </Button>
               {full.status === 'SCHEDULED' && (
-                <Button plain onClick={() => onEdit(dispatch)}>
+                <Button plain size="xs" onClick={() => onEdit(dispatch)}>
                   {t('workOrders.dispatches.reschedule')}
                 </Button>
               )}
@@ -522,6 +520,7 @@ function DispatchDetailContent({
               {primary && (
                 <Button
                   color="accent"
+                  size="xs"
                   disabled={statusMutation.isPending}
                   onClick={() => statusMutation.mutate(primary.next)}
                 >
@@ -533,6 +532,100 @@ function DispatchDetailContent({
         )}
       </div>
     </>
+  );
+}
+
+// Visit notes — the dispatch's note log (body · author · when) plus an office
+// add box. The tech app appends to the same log; the server stamps the author.
+function VisitNotesSection({ dispatchId, readOnly }: { dispatchId: string; readOnly: boolean }) {
+  const { t } = useTranslation();
+  const queryClient = useQueryClient();
+  const [draft, setDraft] = useState('');
+  const [adding, setAdding] = useState(false);
+  const { data: notes = [] } = useQuery({
+    queryKey: ['dispatch-notes', dispatchId],
+    queryFn: () => dispatchNotesApi.list(dispatchId),
+  });
+  const create = useMutation({
+    mutationFn: (body: string) => dispatchNotesApi.create(dispatchId, { body }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['dispatch-notes', dispatchId] });
+      setDraft('');
+      setAdding(false);
+    },
+    onError: (err: unknown) => {
+      const msg =
+        err instanceof Error && 'response' in err
+          ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
+          : undefined;
+      alert(msg || t('workOrders.dispatches.drawer.noteError'));
+    },
+  });
+  const canAdd = draft.trim().length > 0 && !create.isPending;
+  return (
+    <Section title={t('workOrders.dispatches.drawer.notes')}>
+      <div className="flex flex-col gap-2">
+        {notes.length === 0 && (
+          <div className="text-[12px] text-fg-dim">{t('workOrders.dispatches.drawer.notesEmpty')}</div>
+        )}
+        {notes.map((n) => (
+          <div key={n.id} className="rounded-md border border-border-soft bg-bg-elev-2 px-2.5 py-2">
+            <div className="whitespace-pre-wrap text-[12.5px] leading-relaxed text-fg">{n.body}</div>
+            <div className="mt-1 text-[10px] text-fg-dim">
+              {[n.authorName, stamp(n.createdAt)].filter(Boolean).join(' · ')}
+            </div>
+          </div>
+        ))}
+      </div>
+      {/* Collapsed to a compact trigger to save vertical space; expands on click. */}
+      {!readOnly &&
+        (adding ? (
+          <div className="mt-2 rounded-md border border-border bg-bg p-2">
+            <textarea
+              autoFocus
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              rows={2}
+              placeholder={t('workOrders.dispatches.drawer.addNotePlaceholder')}
+              aria-label={t('workOrders.dispatches.drawer.addNotePlaceholder')}
+              className="w-full resize-none border-0 bg-transparent text-[12.5px] leading-relaxed text-fg-strong outline-none"
+            />
+            <div className="mt-1 flex items-center gap-2">
+              <span className="text-[10.5px] text-fg-dim">{t('workOrders.dispatches.drawer.officeNoteHint')}</span>
+              <span className="flex-1" />
+              <Button
+                plain
+                size="xs"
+                onClick={() => {
+                  setAdding(false);
+                  setDraft('');
+                }}
+              >
+                {t('common.cancel')}
+              </Button>
+              <Button color="accent" size="xs" disabled={!canAdd} onClick={() => create.mutate(draft.trim())}>
+                {t('workOrders.dispatches.drawer.addNote')}
+              </Button>
+            </div>
+          </div>
+        ) : (
+          // Bespoke muted ghost (transparent, borderless, no hover-fill) — Catalyst
+          // `plain` can't produce it (hardcodes text-zinc-950 + a hover-fill), so this
+          // stays a bare <button>. .btn token = 12.5px/600/30px; both are inline because
+          // a bare button's Tailwind text-/font- utilities lose to the unlayered body
+          // font flowing through Preflight's `button { font: inherit }`.
+          <button
+            type="button"
+            onClick={() => setAdding(true)}
+            className="mt-2 inline-flex h-[30px] items-center gap-1 text-fg-muted hover:text-fg-strong"
+            style={{ fontSize: '12.5px', fontWeight: 600 }}
+          >
+            <PlusIcon className="size-3.5 shrink-0" />
+            {/* Geist seats text high next to an icon; nudge to optical center. */}
+            <span className="relative top-[0.5px]">{t('workOrders.dispatches.drawer.addNote')}</span>
+          </button>
+        ))}
+    </Section>
   );
 }
 

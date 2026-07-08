@@ -340,12 +340,15 @@ export {
 // Scheduling APIs
 export {
   dispatchesApi,
+  dispatchNotesApi,
   availabilityApi,
   recurringOrdersApi,
   dispatchRowTitle,
   type Dispatch,
   type DispatchStatus,
   type DispatchLifecycle,
+  type DispatchNoteResponse,
+  type CreateDispatchNoteRequest,
   type DispatchBoardRow,
   type DispatchBoardPage,
   type DispatchSortField,

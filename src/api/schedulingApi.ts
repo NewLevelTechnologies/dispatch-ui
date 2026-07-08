@@ -305,6 +305,52 @@ export const dispatchesApi = {
   },
 };
 
+// ========== DISPATCH (VISIT) NOTES ==========
+// The trip drawer's Visit-notes log — a multi-entry note collection nested
+// under the dispatch (per FE_HANDOFF_dispatch_visit_notes.md). Same shape as
+// the customer/location/equipment note. The server stamps author from the JWT
+// (office + tech both create); NEVER send author fields. Distinct from
+// `dispatch.notes` (a single string, still the CANCELLED/NO_SHOW reason).
+export interface DispatchNoteResponse {
+  id: string;
+  body: string;
+  authorUserId: string | null;
+  authorName: string | null;
+  pinned: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateDispatchNoteRequest {
+  body: string;
+  pinned?: boolean;
+}
+
+export const dispatchNotesApi = {
+  list: async (dispatchId: string): Promise<DispatchNoteResponse[]> => {
+    const response = await apiClient.get<DispatchNoteResponse[]>(`/scheduling/dispatches/${dispatchId}/notes`);
+    return response.data;
+  },
+  create: async (dispatchId: string, request: CreateDispatchNoteRequest): Promise<DispatchNoteResponse> => {
+    const response = await apiClient.post<DispatchNoteResponse>(`/scheduling/dispatches/${dispatchId}/notes`, request);
+    return response.data;
+  },
+  update: async (
+    dispatchId: string,
+    noteId: string,
+    request: { body?: string; pinned?: boolean },
+  ): Promise<DispatchNoteResponse> => {
+    const response = await apiClient.patch<DispatchNoteResponse>(
+      `/scheduling/dispatches/${dispatchId}/notes/${noteId}`,
+      request,
+    );
+    return response.data;
+  },
+  delete: async (dispatchId: string, noteId: string): Promise<void> => {
+    await apiClient.delete(`/scheduling/dispatches/${dispatchId}/notes/${noteId}`);
+  },
+};
+
 // ========== AVAILABILITY ==========
 
 export interface Availability {

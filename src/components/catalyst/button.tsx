@@ -10,7 +10,11 @@ const styles = {
     // items-center (not items-baseline) so an icon child renders on the same
     // visual midline as the label — items-baseline aligns to the text baseline
     // and the icon ends up visibly higher than the letters.
-    'relative isolate inline-flex items-center justify-center rounded-lg border font-semibold',
+    // !font-semibold (not font-semibold): Preflight's `button { font: inherit }` flows the
+    // unlayered body weight (400) onto every <button>, and a layered weight utility can't beat
+    // it — so plain font-semibold rendered 400. The important modifier wins. (See the same
+    // unlayered-CSS trap documented on .card-action.) 12.5px/600/30px is the .btn design token.
+    'relative isolate inline-flex items-center justify-center rounded-lg border !font-semibold',
     // Focus
     'focus:not-data-focus:outline-hidden data-focus:outline-2 data-focus:outline-offset-2 data-focus:outline-blue-500',
     // Disabled
@@ -30,13 +34,15 @@ const styles = {
     // Use on page headers and form submits.
     xs: [
       'h-[30px] gap-1 px-2.5 text-[12.5px]',
-      '*:data-[slot=icon]:size-4',
+      // 14px glyph (size-3.5) keeps the icon subordinate to the 12.5px/600 label — .btn token.
+      '*:data-[slot=icon]:size-3.5',
     ],
     // Section-level tight — 26px tall, 11.5px text. Use inside cards / rows
     // where the action belongs to a section, not the page.
     xxs: [
       'h-[26px] gap-1 px-2.5 text-[11.5px]',
-      '*:data-[slot=icon]:size-3.5',
+      // ~12px glyph (size-3) for the 11.5px label — .btn.sm token.
+      '*:data-[slot=icon]:size-3',
     ],
   },
   solid: [

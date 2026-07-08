@@ -74,6 +74,7 @@ export default function ActivityButton({ workOrderId, drawerOpen, onOpen }: Prop
   return (
     <Button
       outline
+      size="xs"
       onClick={handleOpen}
       aria-label={t('workOrders.activity.heading')}
     >

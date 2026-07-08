@@ -10,6 +10,8 @@ const mockGetNotificationLogs = vi.fn();
 const mockFilesList = vi.fn();
 const mockDispatchUpdate = vi.fn();
 const mockGetById = vi.fn();
+const mockNotesList = vi.fn();
+const mockNotesCreate = vi.fn();
 
 vi.mock('../api/userApi', () => ({
   userApi: { getAll: (...args: unknown[]) => mockUserGetAll(...args) },
@@ -40,6 +42,11 @@ vi.mock('../api/schedulingApi', async () => {
       ...actual.dispatchesApi,
       update: (...args: unknown[]) => mockDispatchUpdate(...args),
       getById: (...args: unknown[]) => mockGetById(...args),
+    },
+    dispatchNotesApi: {
+      ...actual.dispatchNotesApi,
+      list: (...args: unknown[]) => mockNotesList(...args),
+      create: (...args: unknown[]) => mockNotesCreate(...args),
     },
   };
 });
@@ -151,6 +158,7 @@ describe('DispatchDetailDrawer', () => {
     mockFilesList.mockResolvedValue(filesPage([]));
     mockDispatchUpdate.mockResolvedValue(mockDispatch({ status: 'IN_PROGRESS' }));
     mockGetById.mockResolvedValue(mockDispatch());
+    mockNotesList.mockResolvedValue([]);
   });
 
   it('renders nothing when dispatch is null', () => {
@@ -229,14 +237,42 @@ describe('DispatchDetailDrawer', () => {
     expect(screen.getByText('Customer')).toBeInTheDocument();
   });
 
-  it('renders the notes section only when notes are present', async () => {
-    const { unmount } = renderDrawer(mockDispatch({ notes: 'Customer prefers AM' }));
-    expect(await screen.findByText('Customer prefers AM')).toBeInTheDocument();
-    unmount();
+  it('renders the visit-notes log and adds an office note', async () => {
+    const user = userEvent.setup();
+    mockNotesList.mockResolvedValue([
+      {
+        id: 'note-1',
+        body: 'Return to install contactor.',
+        authorUserId: 'u9',
+        authorName: 'Daniel Park',
+        pinned: false,
+        createdAt: '2099-05-15T14:00:00Z',
+        updatedAt: '2099-05-15T14:00:00Z',
+      },
+    ]);
+    mockNotesCreate.mockResolvedValue({
+      id: 'note-2',
+      body: 'Office follow-up.',
+      authorUserId: null,
+      authorName: 'Maria C.',
+      pinned: false,
+      createdAt: '2099-05-15T15:00:00Z',
+      updatedAt: '2099-05-15T15:00:00Z',
+    });
+    renderDrawer(mockDispatch());
 
-    renderDrawer(mockDispatch({ notes: null }));
-    await screen.findByText('Jason Smith');
-    expect(screen.queryByText('Customer prefers AM')).not.toBeInTheDocument();
+    expect(await screen.findByText('Return to install contactor.')).toBeInTheDocument();
+    // The add box is collapsed — expand the compact "+ Add note" first.
+    await user.click(screen.getByRole('button', { name: /add note/i }));
+    await user.type(screen.getByLabelText(/add a note/i), 'Office follow-up.');
+    await user.click(screen.getByRole('button', { name: /add note/i }));
+    await waitFor(() => expect(mockNotesCreate).toHaveBeenCalledWith('d1', { body: 'Office follow-up.' }));
+  });
+
+  it('shows the empty state and hides the add box when read-only', async () => {
+    renderDrawer(mockDispatch(), { readOnly: true });
+    expect(await screen.findByText(/no notes recorded on this visit yet/i)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /add note/i })).not.toBeInTheDocument();
   });
 
   it('SCHEDULED footer: Reassign opens edit; Mark en route transitions to EN_ROUTE', async () => {
