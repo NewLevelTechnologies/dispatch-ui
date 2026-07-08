@@ -331,13 +331,13 @@ function DispatchDetailContent({
               <>
                 <a
                   href={`tel:${techDigits}`}
-                  className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-[11.5px] text-fg-strong no-underline hover:bg-bg-hover"
+                  className="inline-flex h-[30px] items-center gap-1 rounded-md border border-border px-2.5 text-[12.5px] font-semibold text-fg-strong no-underline hover:bg-bg-hover"
                 >
                   <PhoneIcon className="size-3" /> {t('workOrders.dispatches.drawer.call')}
                 </a>
                 <a
                   href={`sms:${techDigits}`}
-                  className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-[11.5px] text-fg-strong no-underline hover:bg-bg-hover"
+                  className="inline-flex h-[30px] items-center gap-1 rounded-md border border-border px-2.5 text-[12.5px] font-semibold text-fg-strong no-underline hover:bg-bg-hover"
                 >
                   <ChatBubbleLeftRightIcon className="size-3" /> {t('workOrders.dispatches.drawer.text')}
                 </a>
@@ -500,7 +500,7 @@ function DispatchDetailContent({
             </span>
             <span className="grow" />
             {!readOnly && (
-              <Button plain onClick={() => onDelete(dispatch)}>
+              <Button plain size="xs" onClick={() => onDelete(dispatch)}>
                 {t('common.delete')}
               </Button>
             )}
@@ -508,11 +508,11 @@ function DispatchDetailContent({
         ) : (
           !readOnly && (
             <>
-              <Button plain onClick={() => onEdit(dispatch)}>
+              <Button plain size="xs" onClick={() => onEdit(dispatch)}>
                 {t('workOrders.dispatches.drawer.reassign')}
               </Button>
               {full.status === 'SCHEDULED' && (
-                <Button plain onClick={() => onEdit(dispatch)}>
+                <Button plain size="xs" onClick={() => onEdit(dispatch)}>
                   {t('workOrders.dispatches.reschedule')}
                 </Button>
               )}
@@ -520,6 +520,7 @@ function DispatchDetailContent({
               {primary && (
                 <Button
                   color="accent"
+                  size="xs"
                   disabled={statusMutation.isPending}
                   onClick={() => statusMutation.mutate(primary.next)}
                 >
@@ -594,7 +595,7 @@ function VisitNotesSection({ dispatchId, readOnly }: { dispatchId: string; readO
               <span className="flex-1" />
               <Button
                 plain
-                size="xxs"
+                size="xs"
                 onClick={() => {
                   setAdding(false);
                   setDraft('');
@@ -602,22 +603,24 @@ function VisitNotesSection({ dispatchId, readOnly }: { dispatchId: string; readO
               >
                 {t('common.cancel')}
               </Button>
-              <Button color="accent" size="xxs" disabled={!canAdd} onClick={() => create.mutate(draft.trim())}>
+              <Button color="accent" size="xs" disabled={!canAdd} onClick={() => create.mutate(draft.trim())}>
                 {t('workOrders.dispatches.drawer.addNote')}
               </Button>
             </div>
           </div>
         ) : (
-          // Ghost: a minimal-weight secondary action — transparent, borderless,
-          // muted 11.5px. fontSize is inline because a bare button's Tailwind
-          // text-[Npx] loses to the unlayered components CSS.
+          // Bespoke muted ghost (transparent, borderless, no hover-fill) — Catalyst
+          // `plain` can't produce it (hardcodes text-zinc-950 + a hover-fill), so this
+          // stays a bare <button>. .btn token = 12.5px/600/30px; both are inline because
+          // a bare button's Tailwind text-/font- utilities lose to the unlayered body
+          // font flowing through Preflight's `button { font: inherit }`.
           <button
             type="button"
             onClick={() => setAdding(true)}
-            className="mt-2 inline-flex items-center gap-1 font-semibold text-fg-muted hover:text-fg-strong"
-            style={{ fontSize: '11.5px' }}
+            className="mt-2 inline-flex h-[30px] items-center gap-1 text-fg-muted hover:text-fg-strong"
+            style={{ fontSize: '12.5px', fontWeight: 600 }}
           >
-            <PlusIcon className="size-3.5 shrink-0" />
+            <PlusIcon className="size-4 shrink-0" />
             {/* Geist seats text high next to an icon; nudge to optical center. */}
             <span className="relative top-[0.5px]">{t('workOrders.dispatches.drawer.addNote')}</span>
           </button>
