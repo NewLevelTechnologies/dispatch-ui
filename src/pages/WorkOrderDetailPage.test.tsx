@@ -205,6 +205,20 @@ describe('WorkOrderDetailPage', () => {
       if (url.match(/\/work-orders\/[^/]+\/approvals$/)) {
         return Promise.resolve({ data: [] });
       }
+      if (url.match(/\/work-orders\/[^/]+\/files$/)) {
+        return Promise.resolve({
+          data: {
+            content: [],
+            counts: { all: 3, photos: 2, videos: 0, documents: 1 },
+            totalElements: 3,
+            totalPages: 1,
+            number: 0,
+            size: 1,
+            first: true,
+            last: true,
+          },
+        });
+      }
       if (url.match(/\/work-orders\/[^/]+$/)) {
         return workOrder
           ? Promise.resolve({ data: workOrder })
@@ -314,6 +328,13 @@ describe('WorkOrderDetailPage', () => {
     expect(screen.getByRole('tab', { name: /work items/i })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: /dispatches/i })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: /quotes & invoices/i })).toBeInTheDocument();
+  });
+
+  it('shows the file count badge on the Files tab', async () => {
+    mockApiResponses();
+    renderPage();
+    // The list envelope reports counts.all = 3 → the tab's badge.
+    expect(await screen.findByRole('tab', { name: /files\s*3/i })).toBeInTheDocument();
   });
 
   it('switches tabs and unmounts the Overview when Work items is selected', async () => {
