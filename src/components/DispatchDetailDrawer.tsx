@@ -608,10 +608,19 @@ function VisitNotesSection({ dispatchId, readOnly }: { dispatchId: string; readO
             </div>
           </div>
         ) : (
-          <Button outline size="xxs" className="mt-2" onClick={() => setAdding(true)}>
-            <PlusIcon data-slot="icon" />
-            {t('workOrders.dispatches.drawer.addNote')}
-          </Button>
+          // Ghost: a minimal-weight secondary action — transparent, borderless,
+          // muted 11.5px. fontSize is inline because a bare button's Tailwind
+          // text-[Npx] loses to the unlayered components CSS.
+          <button
+            type="button"
+            onClick={() => setAdding(true)}
+            className="mt-2 inline-flex items-center gap-1 font-semibold text-fg-muted hover:text-fg-strong"
+            style={{ fontSize: '11.5px' }}
+          >
+            <PlusIcon className="size-3.5 shrink-0" />
+            {/* Geist seats text high next to an icon; nudge to optical center. */}
+            <span className="relative top-[0.5px]">{t('workOrders.dispatches.drawer.addNote')}</span>
+          </button>
         ))}
     </Section>
   );
