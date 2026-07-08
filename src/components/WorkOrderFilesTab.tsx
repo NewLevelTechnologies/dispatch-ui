@@ -539,7 +539,7 @@ function DocRow({
 // Delete (when not read-only) routes back to the tab's ConfirmDialog. Built on
 // Headless Dialog directly, same dark edge-to-edge panel as the location one.
 // ─────────────────────────────────────────────────────────────────────────
-function FileLightbox({
+export function FileLightbox({
   media,
   startIndex,
   onClose,

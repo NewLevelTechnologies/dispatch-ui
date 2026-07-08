@@ -200,6 +200,15 @@ describe('DispatchDetailDrawer', () => {
     expect(await screen.findByText('Before')).toBeInTheDocument();
   });
 
+  it('opens the fullscreen viewer when a captured thumbnail is clicked', async () => {
+    const user = userEvent.setup();
+    mockFilesList.mockResolvedValue(filesPage([photoFile()]));
+    renderDrawer(mockDispatch());
+    await user.click((await screen.findByAltText('before.jpg')).closest('button')!);
+    // The viewer renders a second, larger copy of the image.
+    expect(await screen.findAllByAltText('before.jpg')).toHaveLength(2);
+  });
+
   it('opens the pre-tagged upload dialog from the Captured section', async () => {
     const user = userEvent.setup();
     renderDrawer(mockDispatch());

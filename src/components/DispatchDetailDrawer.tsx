@@ -33,6 +33,7 @@ import { Pill, Tag } from './ui/Pill';
 import { Button } from './catalyst/button';
 import { SlideOver } from './catalyst/slideover';
 import WorkOrderFileUploadDialog from './WorkOrderFileUploadDialog';
+import { FileLightbox } from './WorkOrderFilesTab';
 import { formatPhone } from '../utils/formatPhone';
 
 type PillTone = 'neutral' | 'info' | 'success' | 'warning' | 'danger' | 'accent' | 'violet';
@@ -177,6 +178,8 @@ function DispatchDetailContent({
   const { getName } = useGlossary();
   const queryClient = useQueryClient();
   const [uploadOpen, setUploadOpen] = useState(false);
+  // Index into `media` for the fullscreen viewer; null = closed.
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
 
   // The board row lacks lifecycle/label — fetch the by-id read for those.
   const { data: detail } = useQuery({
@@ -426,8 +429,8 @@ function DispatchDetailContent({
           >
             {media.length > 0 && (
               <div className="flex flex-wrap gap-1.5">
-                {media.map((m) => (
-                  <MediaThumb key={m.id} m={m} />
+                {media.map((m, i) => (
+                  <MediaThumb key={m.id} m={m} onOpen={() => setLightboxIndex(i)} />
                 ))}
               </div>
             )}
@@ -463,6 +466,14 @@ function DispatchDetailContent({
             defaultDispatchId={dispatch.id}
           />
         )}
+        {/* Fullscreen viewer for captured media (view-only here; manage in Files). */}
+        <FileLightbox
+          media={media}
+          startIndex={lightboxIndex}
+          onClose={() => setLightboxIndex(null)}
+          readOnly
+          onRequestDelete={() => undefined}
+        />
 
         {/* 6 · Customer notifications — the notification_logs trail */}
         <Section title={t('workOrders.dispatches.drawer.notifications')} last>
@@ -747,11 +758,13 @@ function TimelineStep({
   );
 }
 
-function MediaThumb({ m }: { m: WorkOrderFile }) {
+function MediaThumb({ m, onOpen }: { m: WorkOrderFile; onOpen: () => void }) {
   const { t } = useTranslation();
   return (
-    <div
-      className="relative size-14 shrink-0 overflow-hidden rounded-sm border border-border bg-bg-elev-2"
+    <button
+      type="button"
+      onClick={onOpen}
+      className="relative size-14 shrink-0 overflow-hidden rounded-sm border border-border bg-bg-elev-2 transition hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-500"
       title={m.caption ?? m.fileName}
     >
       {m.thumbnailUrl || m.kind === 'PHOTO' ? (
@@ -771,6 +784,6 @@ function MediaThumb({ m }: { m: WorkOrderFile }) {
           )}
         </span>
       )}
-    </div>
+    </button>
   );
 }
