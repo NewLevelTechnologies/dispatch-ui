@@ -54,7 +54,11 @@ describe('WorkOrderFileUploadDialog', () => {
     await user.click(screen.getByRole('button', { name: /^upload$/i }));
 
     await waitFor(() =>
-      expect(uploadSpy).toHaveBeenCalledWith('wo-1', expect.any(File), expect.objectContaining({ dispatchId: null }))
+      expect(uploadSpy).toHaveBeenCalledWith(
+        'wo-1',
+        expect.any(File),
+        expect.objectContaining({ dispatchId: null, captureTag: null }),
+      )
     );
     await waitFor(() => expect(onClose).toHaveBeenCalled());
   });
@@ -127,6 +131,34 @@ describe('WorkOrderFileUploadDialog', () => {
         expect.objectContaining({ caption: 'Nameplate', dispatchId: 'd-1' }),
       ),
     );
+  });
+
+  it('offers a Before/After tag per photo/video row and uploads it', async () => {
+    const user = userEvent.setup();
+    const uploadSpy = vi
+      .spyOn(workOrderFilesApi, 'upload')
+      .mockResolvedValue({ id: 'f-1' } as unknown as WorkOrderFile);
+    render();
+
+    await user.upload(fileInput(), png());
+    await user.selectOptions(screen.getByRole('combobox', { name: /before\/after/i }), 'BEFORE');
+    await user.click(screen.getByRole('button', { name: /^upload$/i }));
+
+    await waitFor(() =>
+      expect(uploadSpy).toHaveBeenCalledWith(
+        'wo-1',
+        expect.any(File),
+        expect.objectContaining({ captureTag: 'BEFORE' }),
+      ),
+    );
+  });
+
+  it('omits the Before/After tag for a non-visual (document) file', async () => {
+    const user = userEvent.setup();
+    render();
+    await user.upload(fileInput(), new File(['x'], 'report.pdf', { type: 'application/pdf' }));
+    expect(screen.getByText('report.pdf')).toBeInTheDocument();
+    expect(screen.queryByRole('combobox', { name: /before\/after/i })).not.toBeInTheDocument();
   });
 
   it('labels the button for a multi-file batch and uploads each', async () => {

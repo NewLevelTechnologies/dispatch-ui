@@ -2405,6 +2405,8 @@
         "audienceCustomer": "Customer",
         "audienceTech": "Tech",
         "call": "Call",
+        "captureAfter": "After",
+        "captureBefore": "Before",
         "captured": "Captured this {{entity, lowercase}}",
         "completeVisit": "Complete {{entity, lowercase}}",
         "markEnRoute": "Mark en route",

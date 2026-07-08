@@ -709,6 +709,7 @@ function TimelineStep({
 }
 
 function MediaThumb({ m }: { m: WorkOrderFile }) {
+  const { t } = useTranslation();
   return (
     <div
       className="relative size-14 shrink-0 overflow-hidden rounded-sm border border-border bg-bg-elev-2"
@@ -720,6 +721,15 @@ function MediaThumb({ m }: { m: WorkOrderFile }) {
       {m.kind === 'VIDEO' && (
         <span className="absolute inset-0 grid place-items-center bg-black/30 text-white">
           <PlayIcon className="size-4" />
+        </span>
+      )}
+      {m.captureTag != null && (
+        <span className="absolute left-0.5 top-0.5 rounded-[3px] bg-black/70 px-1 py-px text-[8.5px] font-semibold uppercase leading-none tracking-wide text-white">
+          {t(
+            m.captureTag === 'BEFORE'
+              ? 'workOrders.dispatches.drawer.captureBefore'
+              : 'workOrders.dispatches.drawer.captureAfter',
+          )}
         </span>
       )}
     </div>

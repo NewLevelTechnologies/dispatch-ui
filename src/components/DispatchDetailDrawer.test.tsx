@@ -194,6 +194,12 @@ describe('DispatchDetailDrawer', () => {
     expect(screen.getByAltText('before.jpg')).toBeInTheDocument();
   });
 
+  it('labels captured media with its Before/After tag', async () => {
+    mockFilesList.mockResolvedValue(filesPage([photoFile({ captureTag: 'BEFORE' })]));
+    renderDrawer(mockDispatch());
+    expect(await screen.findByText('Before')).toBeInTheDocument();
+  });
+
   it('renders the notifications empty state and scopes the query to the dispatch', async () => {
     renderDrawer(mockDispatch());
     await waitFor(() => expect(screen.getByText(/no notifications sent yet/i)).toBeInTheDocument());

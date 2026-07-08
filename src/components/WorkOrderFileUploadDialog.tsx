@@ -18,6 +18,7 @@ import {
   VIDEO_CONTENT_TYPES,
   VIDEO_MAX_BYTES,
   type Dispatch,
+  type WorkOrderFileCaptureTag,
 } from '../api';
 import { useGlossary } from '../contexts/GlossaryContext';
 import { Dialog, DialogActions, DialogBody, DialogDescription, DialogTitle } from './catalyst/dialog';
@@ -42,6 +43,8 @@ interface QueuedFile {
   caption: string;
   // '' = no trip tag.
   dispatchId: string;
+  // '' = no Before/After label. Photos/video only.
+  captureTag: '' | WorkOrderFileCaptureTag;
   status: RowStatus;
   stage?: UploadStage;
   errorMessage?: string;
@@ -68,6 +71,11 @@ const makeLocalId = () => `f-${++nextLocalId}`;
 
 function isVideo(file: File): boolean {
   return (VIDEO_CONTENT_TYPES as readonly string[]).includes(file.type);
+}
+
+// Before/After only applies to captured visual media, not PDFs/docs.
+function isImageOrVideo(file: File): boolean {
+  return file.type.startsWith('image/') || isVideo(file);
 }
 
 function validateFile(file: File): string | null {
@@ -125,7 +133,7 @@ export default function WorkOrderFileUploadDialog({ isOpen, onClose, workOrderId
         rejected.push(`${file.name}: ${err}`);
         continue;
       }
-      accepted.push({ id: makeLocalId(), file, caption: '', dispatchId: '', status: 'queued' });
+      accepted.push({ id: makeLocalId(), file, caption: '', dispatchId: '', captureTag: '', status: 'queued' });
     }
     if (rejected.length > 0) setTopLevelError(rejected.join('\n'));
     if (accepted.length > 0) setRows((prev) => [...prev, ...accepted]);
@@ -184,6 +192,7 @@ export default function WorkOrderFileUploadDialog({ isOpen, onClose, workOrderId
         await workOrderFilesApi.upload(workOrderId, row.file, {
           caption: row.caption.trim() || null,
           dispatchId: row.dispatchId || null,
+          captureTag: row.captureTag || null,
           onProgress: (s) => updateRow(row.id, { stage: s }),
         });
         updateRow(row.id, { status: 'done', stage: undefined });
@@ -325,6 +334,22 @@ export default function WorkOrderFileUploadDialog({ isOpen, onClose, workOrderId
                               {o.label}
                             </option>
                           ))}
+                        </Select>
+                      )}
+                      {isImageOrVideo(row.file) && (
+                        <Select
+                          name={`capture-${row.id}`}
+                          value={row.captureTag}
+                          onChange={(e) =>
+                            updateRow(row.id, { captureTag: e.target.value as '' | WorkOrderFileCaptureTag })
+                          }
+                          disabled={isUploading || row.status !== 'queued'}
+                          aria-label="Before/After"
+                          className="w-32 shrink-0"
+                        >
+                          <option value="">No label</option>
+                          <option value="BEFORE">Before</option>
+                          <option value="AFTER">After</option>
                         </Select>
                       )}
                     </div>

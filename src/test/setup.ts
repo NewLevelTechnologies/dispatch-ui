@@ -1147,6 +1147,8 @@ vi.mock('react-i18next', () => {
     'workOrders.dispatches.drawer.audienceCustomer': 'Customer',
     'workOrders.dispatches.drawer.audienceTech': 'Tech',
     'workOrders.dispatches.drawer.call': 'Call',
+    'workOrders.dispatches.drawer.captureAfter': 'After',
+    'workOrders.dispatches.drawer.captureBefore': 'Before',
     'workOrders.dispatches.drawer.captured': 'Captured this {{entity, lowercase}}',
     'workOrders.dispatches.drawer.completeVisit': 'Complete {{entity, lowercase}}',
     'workOrders.dispatches.drawer.markEnRoute': 'Mark en route',
