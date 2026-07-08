@@ -675,7 +675,7 @@ export default function WorkOrderDetailPage() {
             {/* Action cluster */}
             <div className="flex flex-shrink-0 flex-wrap items-center gap-1.5">
               {sitePhone && (
-                <Button outline onClick={() => handleCopy('phone', formatPhone(sitePhone) || sitePhone)}>
+                <Button outline size="xs" onClick={() => handleCopy('phone', formatPhone(sitePhone) || sitePhone)}>
                   <PhoneIcon data-slot="icon" />
                   {copied === 'phone' ? t('workOrders.detail.copied') : t('workOrders.detail.callSite')}
                 </Button>
@@ -683,6 +683,7 @@ export default function WorkOrderDetailPage() {
               {mapsQuery && (
                 <Button
                   outline
+                  size="xs"
                   onClick={() =>
                     window.open(
                       `https://maps.google.com/?q=${encodeURIComponent(mapsQuery)}`,
@@ -702,6 +703,7 @@ export default function WorkOrderDetailPage() {
               />
               <Button
                 outline
+                size="xs"
                 onClick={() => setEditWorkOrderDialogOpen(true)}
                 disabled={frozen}
                 title={frozen ? t('workOrders.detail.frozen') : undefined}
@@ -709,7 +711,7 @@ export default function WorkOrderDetailPage() {
                 <PencilIcon data-slot="icon" />
                 {t('common.edit')}
               </Button>
-              <Button color="accent" onClick={handleAddWorkItem} disabled={frozen}>
+              <Button color="accent" size="xs" onClick={handleAddWorkItem} disabled={frozen}>
                 <PlusIcon data-slot="icon" />
                 {`${t('common.add')} ${getName('work_item').toLowerCase()}`}
               </Button>
