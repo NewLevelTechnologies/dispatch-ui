@@ -333,13 +333,13 @@ function DispatchDetailContent({
                   href={`tel:${techDigits}`}
                   className="inline-flex h-[30px] items-center gap-1 rounded-md border border-border px-2.5 text-[12.5px] font-semibold text-fg-strong no-underline hover:bg-bg-hover"
                 >
-                  <PhoneIcon className="size-3" /> {t('workOrders.dispatches.drawer.call')}
+                  <PhoneIcon className="size-3.5" /> {t('workOrders.dispatches.drawer.call')}
                 </a>
                 <a
                   href={`sms:${techDigits}`}
                   className="inline-flex h-[30px] items-center gap-1 rounded-md border border-border px-2.5 text-[12.5px] font-semibold text-fg-strong no-underline hover:bg-bg-hover"
                 >
-                  <ChatBubbleLeftRightIcon className="size-3" /> {t('workOrders.dispatches.drawer.text')}
+                  <ChatBubbleLeftRightIcon className="size-3.5" /> {t('workOrders.dispatches.drawer.text')}
                 </a>
               </>
             )}
@@ -620,7 +620,7 @@ function VisitNotesSection({ dispatchId, readOnly }: { dispatchId: string; readO
             className="mt-2 inline-flex h-[30px] items-center gap-1 text-fg-muted hover:text-fg-strong"
             style={{ fontSize: '12.5px', fontWeight: 600 }}
           >
-            <PlusIcon className="size-4 shrink-0" />
+            <PlusIcon className="size-3.5 shrink-0" />
             {/* Geist seats text high next to an icon; nudge to optical center. */}
             <span className="relative top-[0.5px]">{t('workOrders.dispatches.drawer.addNote')}</span>
           </button>

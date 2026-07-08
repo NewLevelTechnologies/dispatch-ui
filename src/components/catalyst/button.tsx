@@ -34,13 +34,15 @@ const styles = {
     // Use on page headers and form submits.
     xs: [
       'h-[30px] gap-1 px-2.5 text-[12.5px]',
-      '*:data-[slot=icon]:size-4',
+      // 14px glyph (size-3.5) keeps the icon subordinate to the 12.5px/600 label — .btn token.
+      '*:data-[slot=icon]:size-3.5',
     ],
     // Section-level tight — 26px tall, 11.5px text. Use inside cards / rows
     // where the action belongs to a section, not the page.
     xxs: [
       'h-[26px] gap-1 px-2.5 text-[11.5px]',
-      '*:data-[slot=icon]:size-3.5',
+      // ~12px glyph (size-3) for the 11.5px label — .btn.sm token.
+      '*:data-[slot=icon]:size-3',
     ],
   },
   solid: [
