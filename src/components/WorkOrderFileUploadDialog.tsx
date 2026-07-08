@@ -32,6 +32,9 @@ interface Props {
   onClose: () => void;
   workOrderId: string;
   dispatches: Dispatch[];
+  // When set (e.g. launched from a trip drawer), every queued file is tagged to
+  // this dispatch and the per-row trip picker is hidden — the visit is implicit.
+  defaultDispatchId?: string;
 }
 
 type UploadStage = 'requesting' | 'uploading' | 'confirming';
@@ -89,7 +92,13 @@ function validateFile(file: File): string | null {
   return null;
 }
 
-export default function WorkOrderFileUploadDialog({ isOpen, onClose, workOrderId, dispatches }: Props) {
+export default function WorkOrderFileUploadDialog({
+  isOpen,
+  onClose,
+  workOrderId,
+  dispatches,
+  defaultDispatchId,
+}: Props) {
   const queryClient = useQueryClient();
   const { t } = useTranslation();
   const { getName } = useGlossary();
@@ -133,7 +142,14 @@ export default function WorkOrderFileUploadDialog({ isOpen, onClose, workOrderId
         rejected.push(`${file.name}: ${err}`);
         continue;
       }
-      accepted.push({ id: makeLocalId(), file, caption: '', dispatchId: '', captureTag: '', status: 'queued' });
+      accepted.push({
+        id: makeLocalId(),
+        file,
+        caption: '',
+        dispatchId: defaultDispatchId ?? '',
+        captureTag: '',
+        status: 'queued',
+      });
     }
     if (rejected.length > 0) setTopLevelError(rejected.join('\n'));
     if (accepted.length > 0) setRows((prev) => [...prev, ...accepted]);
@@ -319,7 +335,7 @@ export default function WorkOrderFileUploadDialog({ isOpen, onClose, workOrderId
                         aria-label="Caption"
                         className="flex-1"
                       />
-                      {tripOptions.length > 0 && (
+                      {!defaultDispatchId && tripOptions.length > 0 && (
                         <Select
                           name={`trip-${row.id}`}
                           value={row.dispatchId}

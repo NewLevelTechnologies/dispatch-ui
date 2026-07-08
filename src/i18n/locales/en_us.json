@@ -2407,6 +2407,7 @@
         "call": "Call",
         "captureAfter": "After",
         "captureBefore": "Before",
+        "captureHint": "Capture or upload here today — the tech app will feed the same place later.",
         "captured": "Captured this {{entity, lowercase}}",
         "completeVisit": "Complete {{entity, lowercase}}",
         "markEnRoute": "Mark en route",
@@ -2429,6 +2430,7 @@
         "timelineNotified": "Customer notified",
         "timelineScheduled": "Scheduled",
         "timelineTechNotified": "Tech notified",
+        "uploadMedia": "Upload media",
         "workAddressed": "Work addressed"
       },
       "editTitle": "Edit dispatch",

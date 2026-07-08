@@ -191,13 +191,26 @@ describe('DispatchDetailDrawer', () => {
     mockFilesList.mockResolvedValue(filesPage([photoFile()]));
     renderDrawer(mockDispatch());
     expect(await screen.findByText('Captured this dispatch')).toBeInTheDocument();
-    expect(screen.getByAltText('before.jpg')).toBeInTheDocument();
+    expect(await screen.findByAltText('before.jpg')).toBeInTheDocument();
   });
 
   it('labels captured media with its Before/After tag', async () => {
     mockFilesList.mockResolvedValue(filesPage([photoFile({ captureTag: 'BEFORE' })]));
     renderDrawer(mockDispatch());
     expect(await screen.findByText('Before')).toBeInTheDocument();
+  });
+
+  it('opens the pre-tagged upload dialog from the Captured section', async () => {
+    const user = userEvent.setup();
+    renderDrawer(mockDispatch());
+    await user.click(await screen.findByRole('button', { name: /upload media/i }));
+    expect(await screen.findByText('Upload files')).toBeInTheDocument();
+  });
+
+  it('hides the Captured upload affordance when read-only', async () => {
+    renderDrawer(mockDispatch(), { readOnly: true });
+    await screen.findByText(/no notifications sent yet/i);
+    expect(screen.queryByRole('button', { name: /upload media/i })).not.toBeInTheDocument();
   });
 
   it('renders the notifications empty state and scopes the query to the dispatch', async () => {

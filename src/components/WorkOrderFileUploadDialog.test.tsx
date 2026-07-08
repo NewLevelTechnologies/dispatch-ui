@@ -161,6 +161,35 @@ describe('WorkOrderFileUploadDialog', () => {
     expect(screen.queryByRole('combobox', { name: /before\/after/i })).not.toBeInTheDocument();
   });
 
+  it('pre-tags every file to the default dispatch and hides the trip picker', async () => {
+    const user = userEvent.setup();
+    const uploadSpy = vi
+      .spyOn(workOrderFilesApi, 'upload')
+      .mockResolvedValue({ id: 'f-1' } as unknown as WorkOrderFile);
+    renderWithProviders(
+      <WorkOrderFileUploadDialog
+        isOpen
+        onClose={vi.fn()}
+        workOrderId="wo-1"
+        dispatches={[dispatch('d-1', '2026-05-14T16:00:00Z')]}
+        defaultDispatchId="d-1"
+      />,
+    );
+
+    await user.upload(fileInput(), png());
+    // The visit is implicit in this context — no per-row trip picker.
+    expect(screen.queryByRole('combobox', { name: /trip/i })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /^upload$/i }));
+    await waitFor(() =>
+      expect(uploadSpy).toHaveBeenCalledWith(
+        'wo-1',
+        expect.any(File),
+        expect.objectContaining({ dispatchId: 'd-1' }),
+      ),
+    );
+  });
+
   it('labels the button for a multi-file batch and uploads each', async () => {
     const user = userEvent.setup();
     const uploadSpy = vi
