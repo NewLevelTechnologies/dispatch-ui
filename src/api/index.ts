@@ -270,6 +270,7 @@ export {
   type LocationFileCategory,
   type LocationFile,
   type WorkOrderFile,
+  type WorkOrderFileCaptureTag,
   type RequestFileUploadUrlResponse,
   type RequestLocationFileUploadUrlRequest,
   type RequestEquipmentFileUploadUrlRequest,

@@ -398,16 +398,28 @@ function TileMeta({ f }: { f: WorkOrderFile }) {
   );
 }
 
+// Before/After label overlaid on captured visit media (set by the tech app or
+// the office upload dialog). Absolute — the tile's thumbnail wrapper is relative.
+function CaptureTagBadge({ f }: { f: WorkOrderFile }) {
+  if (f.captureTag == null) return null;
+  return (
+    <span className="absolute left-1 top-1 rounded bg-black/70 px-1.5 py-0.5 text-[10px] font-semibold uppercase leading-none tracking-wide text-white">
+      {f.captureTag === 'BEFORE' ? 'Before' : 'After'}
+    </span>
+  );
+}
+
 function PhotoTile({ f, onOpen }: { f: WorkOrderFile; onOpen: () => void }) {
   return (
     <button type="button" onClick={onOpen} className="group min-w-0 text-left">
-      <div className="aspect-[4/3] overflow-hidden rounded-md border border-border-soft bg-bg-active">
+      <div className="relative aspect-[4/3] overflow-hidden rounded-md border border-border-soft bg-bg-active">
         <img
           src={f.thumbnailUrl ?? f.url}
           alt={f.caption ?? f.fileName}
           loading="lazy"
           className="size-full object-cover transition-opacity group-hover:opacity-85"
         />
+        <CaptureTagBadge f={f} />
       </div>
       <TileMeta f={f} />
     </button>
@@ -457,6 +469,7 @@ function VideoTile({ f, onOpen }: { f: WorkOrderFile; onOpen: () => void }) {
             )}
           </>
         )}
+        <CaptureTagBadge f={f} />
       </div>
       <TileMeta f={f} />
     </button>
@@ -526,7 +539,7 @@ function DocRow({
 // Delete (when not read-only) routes back to the tab's ConfirmDialog. Built on
 // Headless Dialog directly, same dark edge-to-edge panel as the location one.
 // ─────────────────────────────────────────────────────────────────────────
-function FileLightbox({
+export function FileLightbox({
   media,
   startIndex,
   onClose,

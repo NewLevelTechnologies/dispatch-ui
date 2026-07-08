@@ -15,6 +15,7 @@ import {
   workItemStatusesApi,
   workflowsApi,
   workflowConfigApi,
+  workOrderFilesApi,
   type Dispatch,
   type Equipment,
   type ProgressCategory,
@@ -409,6 +410,16 @@ export default function WorkOrderDetailPage() {
     enabled: !!id,
   });
 
+  // Files tab badge — the list envelope carries the global `all` count. Keyed
+  // under ['work-order-files', id, …] so uploads/deletes (which invalidate that
+  // prefix) refresh the badge too.
+  const { data: fileCount } = useQuery({
+    queryKey: ['work-order-files', id, 'count'],
+    queryFn: () => workOrderFilesApi.list(id!, { limit: 1 }),
+    enabled: !!id,
+    select: (page) => page.counts?.all ?? page.content.length,
+  });
+
   const { data: workOrderTypes } = useQuery({
     queryKey: ['work-order-types'],
     queryFn: () => workOrderTypesApi.getAll(),
@@ -563,7 +574,7 @@ export default function WorkOrderDetailPage() {
       count: invoicesForCount.length + quotesForCount.length,
     },
     { id: 'purchasing', label: t('workOrders.detail.tabs.purchasing') },
-    { id: 'files', label: t('workOrders.detail.tabs.files') },
+    { id: 'files', label: t('workOrders.detail.tabs.files'), count: fileCount },
     { id: 'activity', label: t('workOrders.detail.tabs.activity') },
   ];
 

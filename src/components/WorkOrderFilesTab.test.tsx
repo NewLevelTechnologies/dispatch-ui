@@ -156,6 +156,18 @@ describe('WorkOrderFilesTab', () => {
     expect(screen.getByText('RTU-12 quote.pdf')).toBeInTheDocument();
   });
 
+  it('shows a Before/After badge on tagged captured media', async () => {
+    mockApi({
+      files: [
+        { ...tripPhoto, captureTag: 'BEFORE' },
+        { ...equipVideo, captureTag: 'AFTER' },
+      ],
+    });
+    renderTab();
+    expect(await screen.findByText('Before')).toBeInTheDocument();
+    expect(screen.getByText('After')).toBeInTheDocument();
+  });
+
   it('groups visual files by capture trip (dispatchId) and equipment', async () => {
     mockApi();
     renderTab();

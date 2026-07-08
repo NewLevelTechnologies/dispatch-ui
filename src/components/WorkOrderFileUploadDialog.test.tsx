@@ -54,7 +54,11 @@ describe('WorkOrderFileUploadDialog', () => {
     await user.click(screen.getByRole('button', { name: /^upload$/i }));
 
     await waitFor(() =>
-      expect(uploadSpy).toHaveBeenCalledWith('wo-1', expect.any(File), expect.objectContaining({ dispatchId: null }))
+      expect(uploadSpy).toHaveBeenCalledWith(
+        'wo-1',
+        expect.any(File),
+        expect.objectContaining({ dispatchId: null, captureTag: null }),
+      )
     );
     await waitFor(() => expect(onClose).toHaveBeenCalled());
   });
@@ -125,6 +129,63 @@ describe('WorkOrderFileUploadDialog', () => {
         'wo-1',
         expect.any(File),
         expect.objectContaining({ caption: 'Nameplate', dispatchId: 'd-1' }),
+      ),
+    );
+  });
+
+  it('offers a Before/After tag per photo/video row and uploads it', async () => {
+    const user = userEvent.setup();
+    const uploadSpy = vi
+      .spyOn(workOrderFilesApi, 'upload')
+      .mockResolvedValue({ id: 'f-1' } as unknown as WorkOrderFile);
+    render();
+
+    await user.upload(fileInput(), png());
+    await user.selectOptions(screen.getByRole('combobox', { name: /before\/after/i }), 'BEFORE');
+    await user.click(screen.getByRole('button', { name: /^upload$/i }));
+
+    await waitFor(() =>
+      expect(uploadSpy).toHaveBeenCalledWith(
+        'wo-1',
+        expect.any(File),
+        expect.objectContaining({ captureTag: 'BEFORE' }),
+      ),
+    );
+  });
+
+  it('omits the Before/After tag for a non-visual (document) file', async () => {
+    const user = userEvent.setup();
+    render();
+    await user.upload(fileInput(), new File(['x'], 'report.pdf', { type: 'application/pdf' }));
+    expect(screen.getByText('report.pdf')).toBeInTheDocument();
+    expect(screen.queryByRole('combobox', { name: /before\/after/i })).not.toBeInTheDocument();
+  });
+
+  it('pre-tags every file to the default dispatch and hides the trip picker', async () => {
+    const user = userEvent.setup();
+    const uploadSpy = vi
+      .spyOn(workOrderFilesApi, 'upload')
+      .mockResolvedValue({ id: 'f-1' } as unknown as WorkOrderFile);
+    renderWithProviders(
+      <WorkOrderFileUploadDialog
+        isOpen
+        onClose={vi.fn()}
+        workOrderId="wo-1"
+        dispatches={[dispatch('d-1', '2026-05-14T16:00:00Z')]}
+        defaultDispatchId="d-1"
+      />,
+    );
+
+    await user.upload(fileInput(), png());
+    // The visit is implicit in this context — no per-row trip picker.
+    expect(screen.queryByRole('combobox', { name: /trip/i })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /^upload$/i }));
+    await waitFor(() =>
+      expect(uploadSpy).toHaveBeenCalledWith(
+        'wo-1',
+        expect.any(File),
+        expect.objectContaining({ dispatchId: 'd-1' }),
       ),
     );
   });

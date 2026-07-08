@@ -136,6 +136,10 @@ export interface LocationFile {
   createdAt: string;
 }
 
+// Before/After capture tag on work-order visit media. Work-order uploads only
+// (equipment/agreement/location routes ignore it). Values are case-sensitive.
+export type WorkOrderFileCaptureTag = 'BEFORE' | 'AFTER';
+
 /** work-order-service FileDto — a file born on a job and/or anchored to
  *  equipment. At least one anchor is present; both may be. */
 export interface WorkOrderFile {
@@ -168,6 +172,10 @@ export interface WorkOrderFile {
   // location/equipment/agreement file mocks don't need backfilling; treat
   // undefined the same as null.
   dispatchId?: string | null;
+  // Before/After label for visit photos/video. Null when untagged or not a
+  // photo/video. Optional on the FE type (additive — existing files and
+  // non-WO files come back without it); treat undefined the same as null.
+  captureTag?: WorkOrderFileCaptureTag | null;
   // Subject: the asset the file depicts/documents.
   equipmentId: string | null;
   equipmentName: string | null;
@@ -335,13 +343,17 @@ export interface RequestWorkOrderFileUploadUrlRequest {
   caption?: string | null;
   // Tag the upload to the visit it was captured on. Optional.
   dispatchId?: string | null;
+  // Before/After tag for the captured photo/video. Optional.
+  captureTag?: WorkOrderFileCaptureTag | null;
 }
 
 // PATCH semantics: omitted key = unchanged; explicit null clears.
-// `dispatchId` is tri-state (omit / null / set) to retag a file's visit.
+// `dispatchId` and `captureTag` are tri-state (omit / null / set) to retag a
+// file's visit or Before/After label.
 export interface PatchWorkOrderFileRequest {
   caption?: string | null;
   dispatchId?: string | null;
+  captureTag?: WorkOrderFileCaptureTag | null;
 }
 
 export const workOrderFilesApi = {
@@ -381,6 +393,7 @@ export const workOrderFilesApi = {
     options: {
       caption?: string | null;
       dispatchId?: string | null;
+      captureTag?: WorkOrderFileCaptureTag | null;
       onProgress?: (stage: 'requesting' | 'uploading' | 'confirming') => void;
     } = {}
   ): Promise<WorkOrderFile> => {
@@ -391,6 +404,7 @@ export const workOrderFilesApi = {
       fileName: file.name,
       caption: options.caption ?? null,
       dispatchId: options.dispatchId ?? null,
+      captureTag: options.captureTag ?? null,
     });
     options.onProgress?.('uploading');
     await putToS3(uploadUrl, file.type, file);

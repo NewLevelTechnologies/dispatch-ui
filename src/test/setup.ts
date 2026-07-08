@@ -1147,6 +1147,10 @@ vi.mock('react-i18next', () => {
     'workOrders.dispatches.drawer.audienceCustomer': 'Customer',
     'workOrders.dispatches.drawer.audienceTech': 'Tech',
     'workOrders.dispatches.drawer.call': 'Call',
+    'workOrders.dispatches.drawer.captureAfter': 'After',
+    'workOrders.dispatches.drawer.captureBefore': 'Before',
+    'workOrders.dispatches.drawer.captureHint':
+      'Capture or upload here today — the tech app will feed the same place later.',
     'workOrders.dispatches.drawer.captured': 'Captured this {{entity, lowercase}}',
     'workOrders.dispatches.drawer.completeVisit': 'Complete {{entity, lowercase}}',
     'workOrders.dispatches.drawer.markEnRoute': 'Mark en route',
@@ -1169,6 +1173,7 @@ vi.mock('react-i18next', () => {
     'workOrders.dispatches.drawer.timelineNotified': 'Customer notified',
     'workOrders.dispatches.drawer.timelineScheduled': 'Scheduled',
     'workOrders.dispatches.drawer.timelineTechNotified': 'Tech notified',
+    'workOrders.dispatches.drawer.uploadMedia': 'Upload media',
     'workOrders.dispatches.drawer.workAddressed': 'Work addressed',
     'workOrders.dispatches.editTitle': 'Edit dispatch',
     'workOrders.dispatches.empty': 'No {{entity, lowercase}} assigned yet.',

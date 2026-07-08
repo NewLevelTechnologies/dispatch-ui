@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import {
+  ArrowUpTrayIcon,
   ChatBubbleLeftRightIcon,
   PhoneIcon,
   PlayIcon,
@@ -31,6 +32,8 @@ import { Avatar } from './ui/Avatar';
 import { Pill, Tag } from './ui/Pill';
 import { Button } from './catalyst/button';
 import { SlideOver } from './catalyst/slideover';
+import WorkOrderFileUploadDialog from './WorkOrderFileUploadDialog';
+import { FileLightbox } from './WorkOrderFilesTab';
 import { formatPhone } from '../utils/formatPhone';
 
 type PillTone = 'neutral' | 'info' | 'success' | 'warning' | 'danger' | 'accent' | 'violet';
@@ -174,6 +177,9 @@ function DispatchDetailContent({
   const { t } = useTranslation();
   const { getName } = useGlossary();
   const queryClient = useQueryClient();
+  const [uploadOpen, setUploadOpen] = useState(false);
+  // Index into `media` for the fullscreen viewer; null = closed.
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
 
   // The board row lacks lifecycle/label — fetch the by-id read for those.
   const { data: detail } = useQuery({
@@ -414,16 +420,60 @@ function DispatchDetailContent({
         {/* 5 · Visit notes — a multi-entry log; the office can add here too */}
         <VisitNotesSection dispatchId={dispatch.id} readOnly={readOnly} />
 
-        {/* 5 · Captured this visit — derived from the media graph by dispatchId */}
-        {media.length > 0 && (
-          <Section title={t('workOrders.dispatches.drawer.captured', { entity: getName('dispatch') })} count={media.length}>
-            <div className="flex flex-wrap gap-1.5">
-              {media.map((m) => (
-                <MediaThumb key={m.id} m={m} />
-              ))}
-            </div>
+        {/* 5 · Captured this visit — derived media + office upload (secondary path,
+            pre-tagged to this dispatch). Rich per-media tagging is the tech app. */}
+        {(media.length > 0 || !readOnly) && (
+          <Section
+            title={t('workOrders.dispatches.drawer.captured', { entity: getName('dispatch') })}
+            count={media.length || undefined}
+          >
+            {media.length > 0 && (
+              <div className="flex flex-wrap gap-1.5">
+                {media.map((m, i) => (
+                  <MediaThumb key={m.id} m={m} onOpen={() => setLightboxIndex(i)} />
+                ))}
+              </div>
+            )}
+            {!readOnly && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setUploadOpen(true)}
+                  className={`inline-flex h-[30px] items-center gap-1 text-fg-muted hover:text-fg-strong${media.length > 0 ? ' mt-2' : ''}`}
+                  style={{ fontSize: '12.5px', fontWeight: 600 }}
+                >
+                  <ArrowUpTrayIcon className="size-3.5 shrink-0" />
+                  {/* Geist seats text high next to an icon; nudge to optical center. */}
+                  <span className="relative top-[0.5px]">
+                    {t('workOrders.dispatches.drawer.uploadMedia')}
+                  </span>
+                </button>
+                {media.length === 0 && (
+                  <p className="mt-1.5 text-[11px] leading-snug text-fg-dim">
+                    {t('workOrders.dispatches.drawer.captureHint')}
+                  </p>
+                )}
+              </>
+            )}
           </Section>
         )}
+        {!readOnly && (
+          <WorkOrderFileUploadDialog
+            isOpen={uploadOpen}
+            onClose={() => setUploadOpen(false)}
+            workOrderId={dispatch.workOrderId}
+            dispatches={dispatches ?? [dispatch]}
+            defaultDispatchId={dispatch.id}
+          />
+        )}
+        {/* Fullscreen viewer for captured media (view-only here; manage in Files). */}
+        <FileLightbox
+          media={media}
+          startIndex={lightboxIndex}
+          onClose={() => setLightboxIndex(null)}
+          readOnly
+          onRequestDelete={() => undefined}
+        />
 
         {/* 6 · Customer notifications — the notification_logs trail */}
         <Section title={t('workOrders.dispatches.drawer.notifications')} last>
@@ -708,10 +758,13 @@ function TimelineStep({
   );
 }
 
-function MediaThumb({ m }: { m: WorkOrderFile }) {
+function MediaThumb({ m, onOpen }: { m: WorkOrderFile; onOpen: () => void }) {
+  const { t } = useTranslation();
   return (
-    <div
-      className="relative size-14 shrink-0 overflow-hidden rounded-sm border border-border bg-bg-elev-2"
+    <button
+      type="button"
+      onClick={onOpen}
+      className="relative size-14 shrink-0 overflow-hidden rounded-sm border border-border bg-bg-elev-2 transition hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-500"
       title={m.caption ?? m.fileName}
     >
       {m.thumbnailUrl || m.kind === 'PHOTO' ? (
@@ -722,6 +775,15 @@ function MediaThumb({ m }: { m: WorkOrderFile }) {
           <PlayIcon className="size-4" />
         </span>
       )}
-    </div>
+      {m.captureTag != null && (
+        <span className="absolute left-0.5 top-0.5 rounded-[3px] bg-black/70 px-1 py-px text-[8.5px] font-semibold uppercase leading-none tracking-wide text-white">
+          {t(
+            m.captureTag === 'BEFORE'
+              ? 'workOrders.dispatches.drawer.captureBefore'
+              : 'workOrders.dispatches.drawer.captureAfter',
+          )}
+        </span>
+      )}
+    </button>
   );
 }
