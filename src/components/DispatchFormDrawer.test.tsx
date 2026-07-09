@@ -120,7 +120,18 @@ describe('DispatchFormDrawer', () => {
     await screen.findByText(/edit dispatch/i);
     await user.click(screen.getByRole('button', { name: /notify .* now/i }));
     await user.click(screen.getByRole('button', { name: /save changes/i }));
-    await waitFor(() => expect(mockNotify).toHaveBeenCalledWith('d-1'));
+    // Edit + release "now", customer text off → TECH audience.
+    await waitFor(() => expect(mockNotify).toHaveBeenCalledWith('d-1', 'TECH'));
+  });
+
+  it('texts both tech and customer when both are on in edit', async () => {
+    const user = userEvent.setup();
+    render({ dispatch: editDispatch });
+    await screen.findByText(/edit dispatch/i);
+    await user.click(screen.getByRole('button', { name: /notify .* now/i }));
+    await user.click(screen.getByRole('switch', { name: /text the customer/i }));
+    await user.click(screen.getByRole('button', { name: /save changes/i }));
+    await waitFor(() => expect(mockNotify).toHaveBeenCalledWith('d-1', 'BOTH'));
   });
 
   it('warns when a parts-blocked item is in the addressed set', async () => {
@@ -153,7 +164,7 @@ describe('DispatchFormDrawer', () => {
     expect(screen.getByRole('option', { name: /Marcus Lee/ })).toBeInTheDocument();
   });
 
-  it('creates a dispatch with the chosen tech, needy items, and notify', async () => {
+  it('creates a dispatch with the chosen tech, needy items, and notifications', async () => {
     const user = userEvent.setup();
     render({ dispatch: null, workItems: [NEEDY_ITEM] });
     // Pick a technician through the searchable picker.
@@ -170,5 +181,18 @@ describe('DispatchFormDrawer', () => {
         }),
       ),
     );
+    // Customer text defaults on for a new dispatch → CUSTOMER notify after create.
+    await waitFor(() => expect(mockNotify).toHaveBeenCalledWith('d-1', 'CUSTOMER'));
+  });
+
+  it('skips the customer text on create when the toggle is off', async () => {
+    const user = userEvent.setup();
+    render({ dispatch: null, workItems: [NEEDY_ITEM] });
+    await user.click(await screen.findByRole('button', { name: /^technician$/i }));
+    await user.click(await screen.findByRole('option', { name: /Daniel Park/ }));
+    await user.click(screen.getByRole('switch', { name: /text the customer/i }));
+    await user.click(screen.getByRole('button', { name: /schedule dispatch/i }));
+    await waitFor(() => expect(mockCreate).toHaveBeenCalled());
+    expect(mockNotify).not.toHaveBeenCalled();
   });
 });

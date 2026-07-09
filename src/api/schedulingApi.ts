@@ -306,10 +306,14 @@ export const dispatchesApi = {
     await apiClient.delete(`/scheduling/dispatches/${id}`);
   },
 
-  // Manually trigger an SMS to the assigned technician. Idempotent on the
-  // backend, so this safely doubles as a resend when window/notes change.
-  notify: async (id: string): Promise<void> => {
-    await apiClient.post(`/scheduling/dispatches/${id}/notify`);
+  // Trigger a dispatch SMS. `audience` picks who: TECH (default — the assigned
+  // technician, back-compat), CUSTOMER (their arrival window, respecting the
+  // customer's per-type opt-in), or BOTH. Explicit + logged, not a side effect
+  // of writing the dispatch. Idempotent, so it also doubles as a resend.
+  notify: async (id: string, audience?: 'TECH' | 'CUSTOMER' | 'BOTH'): Promise<void> => {
+    await apiClient.post(`/scheduling/dispatches/${id}/notify`, undefined, {
+      params: audience ? { audience } : undefined,
+    });
   },
 };
 

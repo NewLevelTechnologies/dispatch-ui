@@ -113,6 +113,7 @@ export default function DispatchFormDrawer({
   const [winKey, setWinKey] = useState(PRESETS[1].key);
   const [addressed, setAddressed] = useState<string[]>([]);
   const [release, setRelease] = useState<'now' | 'deck'>('now');
+  const [notifyCustomer, setNotifyCustomer] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   // A non-standard existing window becomes a selectable "current" option.
@@ -134,15 +135,17 @@ export default function DispatchFormDrawer({
       setDate(d);
       setWinKey(win.key);
       setAddressed(dispatch.addressedWorkItemIds ?? []);
-      // Edit defaults to "hold": we don't re-notify on every save. Switching to
-      // "now" is an explicit release action (fires /notify).
+      // Edit defaults to "hold" + no customer text: we don't re-notify on every
+      // save. Switching either on is an explicit release/re-notify action.
       setRelease('deck');
+      setNotifyCustomer(false);
     } else {
       setAssignedUserId('');
       setDate(defaultDate());
       setWinKey(PRESETS[1].key);
       setAddressed(workItems.filter((wi) => NEEDY.has(wi.statusCategory)).map((wi) => wi.id));
       setRelease('now');
+      setNotifyCustomer(true);
     }
   }, [open, dispatch, workItems]);
   /* eslint-enable react-hooks/set-state-in-effect */
@@ -188,10 +191,16 @@ export default function DispatchFormDrawer({
           arrivalWindowEnd: endIso,
           addressedWorkItemIds: addressed,
         });
-        // Releasing an on-deck trip: notify the tech now.
-        if (release === 'now') await dispatchesApi.notify(dispatch.id);
+        // Notify as an explicit, logged action (never a side effect of the
+        // write): release the tech ("now") and/or text the customer their
+        // window. Fold into one call by audience.
+        const tech = release === 'now';
+        const audience = tech && notifyCustomer ? 'BOTH' : tech ? 'TECH' : notifyCustomer ? 'CUSTOMER' : null;
+        if (audience) await dispatchesApi.notify(dispatch.id, audience);
       } else {
-        await dispatchesApi.create({
+        // Tech SMS rides the create flag; the customer text is a follow-up
+        // notify on the new dispatch (respects the customer's per-type opt-in).
+        const created = await dispatchesApi.create({
           workOrderId,
           assignedUserId,
           arrivalWindowStart: startIso,
@@ -199,6 +208,7 @@ export default function DispatchFormDrawer({
           addressedWorkItemIds: addressed,
           notifyAssignedUser: release === 'now',
         });
+        if (notifyCustomer) await dispatchesApi.notify(created.id, 'CUSTOMER');
       }
     },
     onSuccess: () => {
@@ -339,7 +349,7 @@ export default function DispatchFormDrawer({
           </Section>
 
           {/* Release — the on-deck decision */}
-          <Section title="Release" last>
+          <Section title="Release">
             <div className="flex overflow-hidden rounded-md border border-border">
               {(
                 [
@@ -370,6 +380,31 @@ export default function DispatchFormDrawer({
                 ? `The ${techWord} is notified and the ${dispatchWord} enters their queue now.`
                 : `Scheduled and assigned, but the ${techWord} isn’t notified yet — release it when ready.`}
             </div>
+          </Section>
+
+          {/* Customer — text the customer their arrival window. Explicit,
+              logged send (POST /notify?audience=CUSTOMER after save); the
+              backend respects the customer's per-type SMS opt-in. */}
+          <Section title="Customer" last>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={notifyCustomer}
+              onClick={() => setNotifyCustomer((v) => !v)}
+              className="flex w-full items-center gap-3 text-left"
+            >
+              <div className="min-w-0 grow">
+                <div className="text-[12.5px] font-semibold text-fg-strong">Text the customer</div>
+                <div className="text-[11px] text-fg-muted">Send the customer the date + arrival window</div>
+              </div>
+              <span
+                className={`relative h-5 w-9 shrink-0 rounded-full transition-colors ${notifyCustomer ? 'bg-accent-500' : 'bg-bg-active'}`}
+              >
+                <span
+                  className={`absolute top-0.5 size-4 rounded-full bg-white shadow transition-all ${notifyCustomer ? 'left-[18px]' : 'left-0.5'}`}
+                />
+              </span>
+            </button>
           </Section>
         </div>
 
