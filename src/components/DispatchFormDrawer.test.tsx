@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import { renderWithProviders, userEvent } from '../test/utils';
 import DispatchFormDrawer from './DispatchFormDrawer';
 import type { Dispatch, User, WorkItemResponse } from '../api';
@@ -140,11 +140,13 @@ describe('DispatchFormDrawer', () => {
     expect(await screen.findByText(/parts-blocked/i)).toBeInTheDocument();
   });
 
-  it('cancels the dispatch through the confirm', async () => {
+  it('cancels the dispatch through the confirm dialog', async () => {
     const user = userEvent.setup();
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
     render({ dispatch: editDispatch });
-    await user.click(await screen.findByRole('button', { name: /cancel dispatch/i }));
+    // Footer trigger opens the shared ConfirmDialog (no native window.confirm).
+    await user.click(await screen.findByRole('button', { name: /^cancel dispatch$/i }));
+    const dialog = await screen.findByRole('dialog', { name: /cancel dispatch\?/i });
+    await user.click(within(dialog).getByRole('button', { name: /^cancel dispatch$/i }));
     await waitFor(() => expect(mockUpdate).toHaveBeenCalledWith('d-1', { status: 'CANCELLED' }));
   });
 

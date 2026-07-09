@@ -19,6 +19,7 @@ import { useGlossary } from '../contexts/GlossaryContext';
 import { SlideOver } from './catalyst/slideover';
 import { Button } from './catalyst/button';
 import { Avatar } from './ui/Avatar';
+import ConfirmDialog from './ConfirmDialog';
 
 interface Props {
   open: boolean;
@@ -114,6 +115,7 @@ export default function DispatchFormDrawer({
   const [addressed, setAddressed] = useState<string[]>([]);
   const [release, setRelease] = useState<'now' | 'deck'>('now');
   const [notifyCustomer, setNotifyCustomer] = useState(true);
+  const [confirmCancel, setConfirmCancel] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // A non-standard existing window becomes a selectable "current" option.
@@ -415,11 +417,7 @@ export default function DispatchFormDrawer({
               plain
               size="xs"
               disabled={busy}
-              onClick={() => {
-                if (window.confirm(`Cancel this ${dispatchWord}? It stays on the record for audit.`)) {
-                  cancelDispatch.mutate();
-                }
-              }}
+              onClick={() => setConfirmCancel(true)}
               style={{ color: 'var(--danger-600)' }}
             >
               {`Cancel ${dispatchWord}`}
@@ -434,6 +432,18 @@ export default function DispatchFormDrawer({
           </Button>
         </div>
       </div>
+
+      <ConfirmDialog
+        isOpen={confirmCancel}
+        onClose={() => setConfirmCancel(false)}
+        onConfirm={() => cancelDispatch.mutate()}
+        title={`Cancel ${dispatchWord}?`}
+        message="It stays on the record for audit."
+        confirmLabel={`Cancel ${dispatchWord}`}
+        cancelLabel={`Keep ${dispatchWord}`}
+        isDestructive
+        isPending={cancelDispatch.isPending}
+      />
     </SlideOver>
   );
 }
