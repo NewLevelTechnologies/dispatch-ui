@@ -55,10 +55,15 @@ export interface CreateDispatchRequest {
   arrivalWindowEnd: string;
   estimatedDuration?: number;
   notes?: string;
+  // Short caption for what the trip covers ("Diagnostic", "Install day 1").
+  label?: string;
   // Opt-in SMS to the assigned technician on create. Default workflow is to
   // schedule silently and notify later from the dispatch row, so this defaults
   // to false / omitted.
   notifyAssignedUser?: boolean;
+  // Work items this trip addresses; omit/empty = unscoped (covers the whole
+  // work order). Drives the "Work addressed" chips.
+  addressedWorkItemIds?: string[];
 }
 
 export interface UpdateDispatchRequest {
@@ -70,6 +75,9 @@ export interface UpdateDispatchRequest {
   estimatedDuration?: number;
   status?: DispatchStatus;
   notes?: string;
+  label?: string;
+  // Replace the addressed-work-item set. omit = unchanged; [] = clear (unscoped).
+  addressedWorkItemIds?: string[];
 }
 
 // ---- Resolved technician view (location detail) ----

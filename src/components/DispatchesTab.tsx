@@ -19,7 +19,7 @@ import { PlusIcon, PlayIcon } from '@heroicons/react/24/solid';
 // ── Dispatches tab — one card per dispatch, built to the designer's Trips-tab
 // mock (screen-wo-detail-tabs.jsx). Live-first ordering. Each card's head is
 // the click target → opens the detail drawer (onSelect). "+ Schedule" →
-// AssignTechnicianDialog (onAssign); live "Reschedule" → onEdit; live
+// DispatchFormDrawer (onAssign); live "Reschedule" → onEdit; live
 // Mark-on-site/Complete advance the status directly.
 //
 // Card head = seq badge + "{Dispatch} N · label" + status pill + window +

@@ -30,7 +30,7 @@ import ActivityButton from '../components/ActivityButton';
 import ActivityDrawer from '../components/ActivityDrawer';
 import ActivityStream from '../components/ActivityStream';
 import AppLayout from '../components/AppLayout';
-import AssignTechnicianDialog from '../components/AssignTechnicianDialog';
+import DispatchFormDrawer from '../components/DispatchFormDrawer';
 import DispatchDetailDrawer from '../components/DispatchDetailDrawer';
 import DispatchesTab from '../components/DispatchesTab';
 import EditableField from '../components/EditableField';
@@ -768,6 +768,10 @@ export default function WorkOrderDetailPage() {
               onAddWorkItem={handleAddWorkItem}
               onOpenFinancial={openFinancialTab}
               onSelectDispatch={(d) => setSelectedDispatch(d)}
+              onScheduleDispatch={() => {
+                setEditingDispatch(null);
+                setAssignDispatchDialogOpen(true);
+              }}
               extraRail={
                 <Card title={<CardTitle>{t('workOrders.detail.info', { entity: getName('work_order') })}</CardTitle>} padding="none">
                   <div className="px-3.5 py-3">
@@ -943,7 +947,7 @@ export default function WorkOrderDetailPage() {
 
       {/* Dispatch detail drawer — row body click opens this with the
           dispatch's lifecycle audit + notification history. Edit handoff
-          closes the drawer and opens the AssignTechnicianDialog in edit
+          closes the drawer and opens the DispatchFormDrawer in edit
           mode. Delete fires the dispatches mutation directly. */}
       <DispatchDetailDrawer
         dispatch={selectedDispatch}
@@ -998,13 +1002,16 @@ export default function WorkOrderDetailPage() {
         workOrder={workOrder}
       />
 
-      <AssignTechnicianDialog
-        isOpen={assignDispatchDialogOpen}
+      <DispatchFormDrawer
+        open={assignDispatchDialogOpen}
         onClose={() => {
           setAssignDispatchDialogOpen(false);
           setEditingDispatch(null);
         }}
         workOrderId={workOrder.id}
+        workItems={workOrder.workItems ?? []}
+        locationName={location?.locationName}
+        workOrderNumber={woDisplayNumber}
         dispatch={editingDispatch}
       />
 

@@ -125,6 +125,7 @@ describe('WorkOrderOverview', () => {
         onAddWorkItem={vi.fn()}
         onOpenFinancial={vi.fn()}
         onSelectDispatch={vi.fn()}
+        onScheduleDispatch={vi.fn()}
         {...props}
       />
     );
@@ -175,6 +176,14 @@ describe('WorkOrderOverview', () => {
     // The Quoted rollup (quoted > 0) routes to the quotes tab.
     await user.click(screen.getByText('$742.67').closest('button')!);
     expect(onOpenFinancial).toHaveBeenCalledWith('quotes');
+  });
+
+  it('opens the schedule form from the dispatch card action', async () => {
+    const onScheduleDispatch = vi.fn();
+    const user = userEvent.setup();
+    render({ onScheduleDispatch });
+    await user.click(screen.getByRole('button', { name: /schedule/i }));
+    expect(onScheduleDispatch).toHaveBeenCalled();
   });
 
   it('drops the live attention row when there are no dispatches', () => {

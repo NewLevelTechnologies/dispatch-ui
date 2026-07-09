@@ -291,11 +291,11 @@ function WorkItemPeekRow({ wi, last, onClick }: { wi: WorkItemResponse; last: bo
 // Horizontal-scroll so many trips slide rather than crush.
 function TripStrip({
   dispatches,
-  onOpenTrips,
+  onSchedule,
   onSelect,
 }: {
   dispatches: DispatchBoardRow[];
-  onOpenTrips: () => void;
+  onSchedule: () => void;
   onSelect: (d: Dispatch) => void;
 }) {
   const { t } = useTranslation();
@@ -325,10 +325,10 @@ function TripStrip({
           <div className="flex items-center gap-2 text-[11px] text-fg-muted">
             <span>{t('workOrders.detail.overview.tripCounts', { done, inFlight, scheduled })}</span>
             <span aria-hidden>·</span>
-            <CardLink onClick={onOpenTrips}>{t('workOrders.detail.overview.scheduleTrip')}</CardLink>
+            <CardLink onClick={onSchedule}>{t('workOrders.detail.overview.scheduleTrip')}</CardLink>
           </div>
         ) : (
-          <CardLink onClick={onOpenTrips}>{t('workOrders.detail.overview.scheduleTrip')}</CardLink>
+          <CardLink onClick={onSchedule}>{t('workOrders.detail.overview.scheduleTrip')}</CardLink>
         )
       }
     >
@@ -617,6 +617,7 @@ export interface WorkOrderOverviewProps {
   onAddWorkItem: () => void;
   onOpenFinancial: (tab: 'invoices' | 'quotes') => void;
   onSelectDispatch: (d: Dispatch) => void;
+  onScheduleDispatch: () => void;
   // Page-owned right-rail card (Job details: inline-edit PO# / NTE / created).
   // Rendered after the Money card; wiring stays in the page.
   extraRail?: ReactNode;
@@ -631,6 +632,7 @@ export default function WorkOrderOverview({
   onAddWorkItem,
   onOpenFinancial,
   onSelectDispatch,
+  onScheduleDispatch,
   extraRail,
 }: WorkOrderOverviewProps) {
   const { t } = useTranslation();
@@ -657,7 +659,7 @@ export default function WorkOrderOverview({
           <WorkItemsPeek workOrder={workOrder} onAdd={onAddWorkItem} onOpenItems={() => onOpenTab('items')} />
           <TripStrip
             dispatches={dispatches}
-            onOpenTrips={() => onOpenTab('trips')}
+            onSchedule={onScheduleDispatch}
             onSelect={onSelectDispatch}
           />
           <NotesCard entityType="work_order" entityId={workOrder.id} />
