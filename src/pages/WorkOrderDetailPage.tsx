@@ -768,6 +768,10 @@ export default function WorkOrderDetailPage() {
               onAddWorkItem={handleAddWorkItem}
               onOpenFinancial={openFinancialTab}
               onSelectDispatch={(d) => setSelectedDispatch(d)}
+              onScheduleDispatch={() => {
+                setEditingDispatch(null);
+                setAssignDispatchDialogOpen(true);
+              }}
               extraRail={
                 <Card title={<CardTitle>{t('workOrders.detail.info', { entity: getName('work_order') })}</CardTitle>} padding="none">
                   <div className="px-3.5 py-3">
