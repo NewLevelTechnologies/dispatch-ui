@@ -201,6 +201,9 @@ export interface WorkOrder extends WorkOrderSummary {
   tenantId?: string;
 
   // Detail-only fields
+  // Concise, glanceable job summary shown in the detail header. Nullable —
+  // when absent the header falls back to the first work item's description.
+  summary?: string | null;
   cancellationReason?: string | null;
   cancelledByUserId?: string | null;
   createdByUserId?: string;

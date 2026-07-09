@@ -537,10 +537,10 @@ export default function WorkOrderDetailPage() {
   const woType = (workOrderTypes ?? []).find((wt) => wt.id === workOrder.workOrderTypeId);
   const woDivision = (divisions ?? []).find((d) => d.id === workOrder.divisionId);
 
-  // Job essence: backend `summary` (on the wire; FE type lags — read via cast),
-  // else the first work item + "+N more". Mirrors deriveJobLabel on the
-  // Location detail page.
-  const summary = (workOrder as { summary?: string | null }).summary;
+  // Job essence: backend `summary`, else the first work item + "+N more".
+  // Mirrors deriveJobLabel on the Location detail page. The header span clamps
+  // it (below) so a summary-less fetch shows a snippet, not the whole blurb.
+  const summary = workOrder.summary;
   const firstItem = workOrder.workItems?.[0]?.description;
   const moreItems = Math.max(0, (workOrder.workItemCount ?? 0) - 1);
   const essence = summary || (firstItem ? (moreItems > 0 ? `${firstItem} +${moreItems} more` : firstItem) : null);
@@ -661,7 +661,12 @@ export default function WorkOrderDetailPage() {
                 {essence && (
                   <>
                     <span className="text-fg-dim">·</span>
-                    <span className="text-fg-strong">{essence}</span>
+                    {/* Glanceable job essence — clamp so a long work-item
+                        description (no backend summary) doesn't dump the whole
+                        blurb into the header. Full text on hover. */}
+                    <span className="max-w-[42ch] truncate text-fg-strong" title={essence}>
+                      {essence}
+                    </span>
                   </>
                 )}
                 <span className="text-fg-dim">·</span>
