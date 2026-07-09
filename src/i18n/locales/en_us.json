@@ -2419,6 +2419,7 @@
         "notificationsEmpty": "No notifications sent yet.",
         "notificationsError": "Couldn't load notification history.",
         "notificationsLoading": "Loading notifications...",
+        "notifyNow": "Notify now →",
         "officeNoteHint": "Office note · tech records the rest on site",
         "reassign": "Reassign",
         "statusError": "Couldn't update the {{entity, lowercase}}.",

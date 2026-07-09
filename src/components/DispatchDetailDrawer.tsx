@@ -13,6 +13,7 @@ import {
   notificationApi,
   type NotificationLogDto,
   type NotificationStatus,
+  type PageableResponse,
 } from '../api/notificationApi';
 import {
   dispatchesApi,
@@ -240,10 +241,10 @@ function DispatchDetailContent({
     arrived: full.arrivedAt,
     departed: full.departedAt,
   };
-  const steps = [
+  const steps: { label: string; at: string | null; notify?: 'TECH' | 'CUSTOMER' }[] = [
     { label: t('workOrders.dispatches.drawer.timelineScheduled'), at: lc.scheduled },
-    { label: t('workOrders.dispatches.drawer.timelineTechNotified'), at: techNotifiedAt },
-    { label: t('workOrders.dispatches.drawer.timelineNotified'), at: customerNotifiedAt },
+    { label: t('workOrders.dispatches.drawer.timelineTechNotified'), at: techNotifiedAt, notify: 'TECH' },
+    { label: t('workOrders.dispatches.drawer.timelineNotified'), at: customerNotifiedAt, notify: 'CUSTOMER' },
     { label: t('workOrders.dispatches.drawer.timelineEnRoute'), at: lc.enroute },
     { label: t('workOrders.dispatches.drawer.timelineArrived'), at: lc.arrived },
     { label: t('workOrders.dispatches.drawer.timelineDeparted'), at: lc.departed },
@@ -266,6 +267,52 @@ function DispatchDetailContent({
       alert(msg || t('workOrders.dispatches.drawer.statusError', { entity: getName('dispatch') }));
     },
   });
+
+  // Milestone notify — released from a pending timeline step ("Notify now →").
+  // /notify is async (202), so an immediate refetch wouldn't see the new log
+  // row yet. techNotified / customerNotified are DERIVED from the log, so we
+  // OPTIMISTICALLY insert a sent row: the step fills + the row appears at once.
+  // It reconciles with the real row on the next natural refetch (drawer reopen).
+  const notifKey = ['notification-logs', { entityType: 'DISPATCH', entityId: dispatch.id }] as const;
+  const notifyMutation = useMutation({
+    mutationFn: (audience: 'TECH' | 'CUSTOMER') => dispatchesApi.notify(dispatch.id, audience),
+    onMutate: async (audience: 'TECH' | 'CUSTOMER') => {
+      await queryClient.cancelQueries({ queryKey: notifKey });
+      const prev = queryClient.getQueryData<PageableResponse<NotificationLogDto>>(notifKey);
+      const optimistic: NotificationLogDto = {
+        id: `optimistic-${audience}`,
+        notificationId: `optimistic-${audience}`,
+        notificationTypeId: '',
+        notificationTypeName: '',
+        channel: audience === 'TECH' ? 'PUSH' : 'SMS',
+        recipientName: audience === 'TECH' ? techName : '',
+        status: 'SENT',
+        entityType: 'DISPATCH',
+        entityId: dispatch.id,
+        audience,
+        createdAt: new Date().toISOString(),
+        retryCount: 0,
+      };
+      queryClient.setQueryData<PageableResponse<NotificationLogDto>>(notifKey, (old) =>
+        old ? { ...old, content: [optimistic, ...old.content] } : old,
+      );
+      return { prev };
+    },
+    onError: (err: unknown, _audience, ctx) => {
+      if (ctx?.prev) queryClient.setQueryData(notifKey, ctx.prev);
+      const msg =
+        err instanceof Error && 'response' in err
+          ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
+          : undefined;
+      alert(msg || t('workOrders.dispatches.drawer.statusError', { entity: getName('dispatch') }));
+    },
+    onSuccess: () => {
+      // Board rows may surface notify state; the log reconciles on reopen.
+      queryClient.invalidateQueries({ queryKey: ['dispatches'] });
+    },
+  });
+  // Notify-able only while on deck (SCHEDULED); live/done/cancelled hide it.
+  const canNotify = !readOnly && full.status === 'SCHEDULED';
 
   // State-aware primary transition: Scheduled → En route → On site → Complete.
   const primary =
@@ -372,6 +419,8 @@ function DispatchDetailContent({
               bottomDone={i < lastReached}
               first={i === 0}
               last={i === steps.length - 1}
+              onNotify={s.notify && canNotify && !s.at ? () => notifyMutation.mutate(s.notify!) : undefined}
+              notifyPending={notifyMutation.isPending}
             />
           ))}
         </Section>
@@ -710,6 +759,8 @@ function TimelineStep({
   bottomDone,
   first,
   last,
+  onNotify,
+  notifyPending,
 }: {
   label: string;
   at: string | null;
@@ -719,7 +770,10 @@ function TimelineStep({
   bottomDone: boolean;
   first: boolean;
   last: boolean;
+  onNotify?: () => void;
+  notifyPending?: boolean;
 }) {
+  const { t } = useTranslation();
   const dotColor = active ? 'var(--violet-500)' : reached ? 'var(--success-500)' : 'var(--border-strong)';
   const filled = reached || active;
   return (
@@ -744,12 +798,27 @@ function TimelineStep({
           {label}
         </span>
         <span className="grow" />
-        <span
-          className="whitespace-nowrap text-[11.5px]"
-          style={{ color: active ? 'var(--violet-500)' : reached ? 'var(--fg-muted)' : 'var(--fg-dim)' }}
-        >
-          {at ? stamp(at) : '—'}
-        </span>
+        {/* A pending, notify-able milestone offers an inline release/send —
+            "Notify now →". Bare button, so size/weight go inline (unlayered
+            CSS beats the text-/font- utilities otherwise). */}
+        {!reached && onNotify ? (
+          <button
+            type="button"
+            onClick={onNotify}
+            disabled={notifyPending}
+            className="whitespace-nowrap rounded border border-border px-1.5 text-fg-accent hover:bg-bg-hover disabled:opacity-50"
+            style={{ fontSize: '11px', fontWeight: 600, height: 22 }}
+          >
+            {t('workOrders.dispatches.drawer.notifyNow')}
+          </button>
+        ) : (
+          <span
+            className="whitespace-nowrap text-[11.5px]"
+            style={{ color: active ? 'var(--violet-500)' : reached ? 'var(--fg-muted)' : 'var(--fg-dim)' }}
+          >
+            {at ? stamp(at) : '—'}
+          </span>
+        )}
       </div>
     </div>
   );
