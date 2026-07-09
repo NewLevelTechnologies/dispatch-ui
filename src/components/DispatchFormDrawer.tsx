@@ -186,6 +186,13 @@ export default function DispatchFormDrawer({
     mutationFn: async () => {
       const startIso = toIso(date, selectedWin.sh, selectedWin.sm);
       const endIso = toIso(date, selectedWin.eh, selectedWin.em);
+      // One notification path for both create + edit: an explicit, logged
+      // notify by audience (never a create/update side effect). Doing the tech
+      // notify via /notify — not the create `notifyAssignedUser` flag — so it
+      // lands in the notification log + drives the tech-notified timeline step
+      // the same way the customer text does.
+      const tech = release === 'now';
+      const audience = tech && notifyCustomer ? 'BOTH' : tech ? 'TECH' : notifyCustomer ? 'CUSTOMER' : null;
       if (editing && dispatch) {
         await dispatchesApi.update(dispatch.id, {
           assignedUserId,
@@ -193,24 +200,16 @@ export default function DispatchFormDrawer({
           arrivalWindowEnd: endIso,
           addressedWorkItemIds: addressed,
         });
-        // Notify as an explicit, logged action (never a side effect of the
-        // write): release the tech ("now") and/or text the customer their
-        // window. Fold into one call by audience.
-        const tech = release === 'now';
-        const audience = tech && notifyCustomer ? 'BOTH' : tech ? 'TECH' : notifyCustomer ? 'CUSTOMER' : null;
         if (audience) await dispatchesApi.notify(dispatch.id, audience);
       } else {
-        // Tech SMS rides the create flag; the customer text is a follow-up
-        // notify on the new dispatch (respects the customer's per-type opt-in).
         const created = await dispatchesApi.create({
           workOrderId,
           assignedUserId,
           arrivalWindowStart: startIso,
           arrivalWindowEnd: endIso,
           addressedWorkItemIds: addressed,
-          notifyAssignedUser: release === 'now',
         });
-        if (notifyCustomer) await dispatchesApi.notify(created.id, 'CUSTOMER');
+        if (audience) await dispatchesApi.notify(created.id, audience);
       }
     },
     onSuccess: () => {

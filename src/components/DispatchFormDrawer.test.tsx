@@ -179,22 +179,23 @@ describe('DispatchFormDrawer', () => {
           workOrderId: 'wo-1',
           assignedUserId: 'u-1',
           addressedWorkItemIds: ['wi-1'],
-          notifyAssignedUser: true,
         }),
       ),
     );
-    // Customer text defaults on for a new dispatch → CUSTOMER notify after create.
-    await waitFor(() => expect(mockNotify).toHaveBeenCalledWith('d-1', 'CUSTOMER'));
+    // Both default on for a new dispatch (release "now" + customer text) → one
+    // explicit notify covering BOTH, via /notify (not the create flag), so the
+    // tech notification is logged like the customer's.
+    await waitFor(() => expect(mockNotify).toHaveBeenCalledWith('d-1', 'BOTH'));
   });
 
-  it('skips the customer text on create when the toggle is off', async () => {
+  it('notifies only the tech on create when the customer text is off', async () => {
     const user = userEvent.setup();
     render({ dispatch: null, workItems: [NEEDY_ITEM] });
     await user.click(await screen.findByRole('button', { name: /^technician$/i }));
     await user.click(await screen.findByRole('option', { name: /Daniel Park/ }));
     await user.click(screen.getByRole('switch', { name: /text the customer/i }));
     await user.click(screen.getByRole('button', { name: /schedule dispatch/i }));
-    await waitFor(() => expect(mockCreate).toHaveBeenCalled());
-    expect(mockNotify).not.toHaveBeenCalled();
+    // Release still "now" → TECH only (no CUSTOMER/BOTH).
+    await waitFor(() => expect(mockNotify).toHaveBeenCalledWith('d-1', 'TECH'));
   });
 });
