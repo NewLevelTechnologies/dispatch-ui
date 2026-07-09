@@ -103,7 +103,7 @@ describe('DispatchesTab', () => {
     const user = userEvent.setup();
     renderTab([row({})], { onAssign });
     // The add button reads "Schedule Dispatch" — distinct from the card button
-    // (name includes the status "Scheduled") and the live card's "Reschedule".
+    // (name includes the status "Scheduled") and the live card's "Edit dispatch".
     await user.click(screen.getByRole('button', { name: /schedule dispatch/i }));
     expect(onAssign).toHaveBeenCalled();
   });
@@ -113,17 +113,17 @@ describe('DispatchesTab', () => {
     expect(screen.queryByRole('button', { name: /schedule dispatch/i })).not.toBeInTheDocument();
   });
 
-  it('reschedules a live dispatch via onEdit', async () => {
+  it('edits a live dispatch via onEdit', async () => {
     const onEdit = vi.fn();
     const user = userEvent.setup();
     renderTab([row({ id: 'd-live', status: 'IN_PROGRESS' })], { onEdit });
-    await user.click(screen.getByRole('button', { name: /reschedule/i }));
+    await user.click(screen.getByRole('button', { name: /edit dispatch/i }));
     expect(onEdit).toHaveBeenCalled();
   });
 
-  it('hides Reschedule on a live dispatch when readOnly', () => {
+  it('hides the edit action on a live dispatch when readOnly', () => {
     renderTab([row({ id: 'd-live', status: 'IN_PROGRESS' })], { readOnly: true });
-    expect(screen.queryByRole('button', { name: /reschedule/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /edit dispatch/i })).not.toBeInTheDocument();
   });
 
   it('derives photo/video counts + thumbnails from files by dispatchId', async () => {

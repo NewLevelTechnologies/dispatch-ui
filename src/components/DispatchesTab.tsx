@@ -300,7 +300,7 @@ function DispatchCard({
           <div className="mt-2.5 flex items-center gap-2">
             <span className="flex-1" />
             <Button plain onClick={() => onEdit(d)}>
-              {t('workOrders.dispatches.reschedule')}
+              {`${t('common.edit')} ${getName('dispatch').toLowerCase()}`}
             </Button>
             <Button color="accent" disabled={advancing} onClick={() => onAdvance(d, primary.next)}>
               {primary.label}

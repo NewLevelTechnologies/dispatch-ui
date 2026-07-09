@@ -303,13 +303,13 @@ describe('DispatchDetailDrawer', () => {
     expect(screen.queryByRole('button', { name: /add note/i })).not.toBeInTheDocument();
   });
 
-  it('SCHEDULED footer: Reassign opens edit; Mark en route transitions to EN_ROUTE', async () => {
+  it('SCHEDULED footer: Edit opens the form; Mark en route transitions to EN_ROUTE', async () => {
     const onEdit = vi.fn();
     const onClose = vi.fn();
     const user = userEvent.setup();
     renderDrawer(mockDispatch(), { onEdit, onClose });
 
-    await user.click(await screen.findByRole('button', { name: /reassign/i }));
+    await user.click(await screen.findByRole('button', { name: /edit dispatch/i }));
     expect(onEdit).toHaveBeenCalledWith(expect.objectContaining({ id: 'd1' }));
 
     await user.click(screen.getByRole('button', { name: /mark en route/i }));
@@ -393,7 +393,7 @@ describe('DispatchDetailDrawer', () => {
   it('hides all footer actions in read-only mode', async () => {
     renderDrawer(mockDispatch(), { readOnly: true });
     await screen.findByText('Jason Smith');
-    expect(screen.queryByRole('button', { name: /reassign/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /edit dispatch/i })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /mark en route/i })).not.toBeInTheDocument();
   });
 
