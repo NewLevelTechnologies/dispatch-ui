@@ -139,9 +139,36 @@ describe('DispatchFormDrawer', () => {
 
   it('keeps the primary action disabled until a tech is chosen', async () => {
     render({ dispatch: null, workItems: [NEEDY_ITEM] });
-    // Create starts with no tech → can't schedule yet (Combobox selection isn't
-    // drivable under jsdom's zero-height virtualizer, so the happy-path create
-    // submit is exercised in-app; the mutation shape mirrors the tested update).
     expect(await screen.findByRole('button', { name: /schedule dispatch/i })).toBeDisabled();
+  });
+
+  it('filters the technician list from the picker search', async () => {
+    const user = userEvent.setup();
+    render({ dispatch: null });
+    await user.click(await screen.findByRole('button', { name: /^technician$/i }));
+    expect(screen.getByRole('option', { name: /Daniel Park/ })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: /Marcus Lee/ })).toBeInTheDocument();
+    await user.type(screen.getByRole('textbox', { name: /search technicians/i }), 'Marcus');
+    expect(screen.queryByRole('option', { name: /Daniel Park/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('option', { name: /Marcus Lee/ })).toBeInTheDocument();
+  });
+
+  it('creates a dispatch with the chosen tech, needy items, and notify', async () => {
+    const user = userEvent.setup();
+    render({ dispatch: null, workItems: [NEEDY_ITEM] });
+    // Pick a technician through the searchable picker.
+    await user.click(await screen.findByRole('button', { name: /^technician$/i }));
+    await user.click(await screen.findByRole('option', { name: /Daniel Park/ }));
+    await user.click(screen.getByRole('button', { name: /schedule dispatch/i }));
+    await waitFor(() =>
+      expect(mockCreate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          workOrderId: 'wo-1',
+          assignedUserId: 'u-1',
+          addressedWorkItemIds: ['wi-1'],
+          notifyAssignedUser: true,
+        }),
+      ),
+    );
   });
 });

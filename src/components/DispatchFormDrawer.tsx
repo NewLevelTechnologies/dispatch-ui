@@ -3,21 +3,22 @@
 // drawer (DispatchDetailDrawer). Same right-side SlideOver chrome, so scheduling
 // or editing a dispatch feels like the same object you view. Replaces the legacy
 // AssignTechnicianDialog. Sections: Work addressed → When → Assign tech → Release.
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { CalendarDaysIcon, CheckIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import { CalendarDaysIcon, CheckIcon, ChevronUpDownIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import {
   dispatchesApi,
   userApi,
   type Dispatch,
   type ProgressCategory,
+  type User,
   type WorkItemResponse,
 } from '../api';
 import { useGlossary } from '../contexts/GlossaryContext';
 import { SlideOver } from './catalyst/slideover';
 import { Button } from './catalyst/button';
-import { Combobox, ComboboxLabel, ComboboxOption } from './catalyst/combobox';
+import { Avatar } from './ui/Avatar';
 
 interface Props {
   open: boolean;
@@ -156,10 +157,6 @@ export default function DispatchFormDrawer({
         ),
     [users],
   );
-  const selectedTech = techs.find((u) => u.id === assignedUserId);
-  const techName = (u: (typeof techs)[number] | null | undefined) =>
-    u ? `${u.firstName} ${u.lastName}`.trim() || u.email : undefined;
-
   const selectedWin = winOptions.find((w) => w.key === winKey) ?? winOptions[0];
   const blocked = addressed.some((id) => workItems.find((wi) => wi.id === id)?.statusCategory === 'BLOCKED');
   const canSave = !!assignedUserId && !!date && !!selectedWin;
@@ -333,20 +330,7 @@ export default function DispatchFormDrawer({
 
           {/* Assign tech */}
           <Section title={`Assign ${techWord}`}>
-            <Combobox
-              aria-label={getName('technician')}
-              options={techs}
-              value={selectedTech}
-              onChange={(u) => setAssignedUserId(u?.id ?? '')}
-              displayValue={techName}
-              placeholder={`Search ${techWord}s…`}
-            >
-              {(u) => (
-                <ComboboxOption value={u}>
-                  <ComboboxLabel>{techName(u)}</ComboboxLabel>
-                </ComboboxOption>
-              )}
-            </Combobox>
+            <TechPicker techs={techs} value={assignedUserId} onChange={setAssignedUserId} techWord={techWord} />
             {!assignedUserId && (
               <div className="mt-1.5 text-[11px] text-fg-dim">
                 A {techWord} is required — an unassigned {dispatchWord} is just unscheduled work.
@@ -427,5 +411,120 @@ function Section({ title, children, last }: { title: string; children: React.Rea
       </div>
       {children}
     </section>
+  );
+}
+
+const techName = (u: User) => `${u.firstName} ${u.lastName}`.trim() || u.email;
+// Real, non-fabricated secondary line: the tech's primary role. (Distance /
+// last-serviced / best-fit would need a ranking backend — deferred.)
+const techMeta = (u: User) => u.roles?.[0]?.name ?? undefined;
+
+// Searchable technician picker: avatar-led trigger + a search-and-list panel,
+// matching the compose mock. Rows render in the DOM (unlike a virtualized
+// combobox), so it's driveable in tests.
+function TechPicker({
+  techs,
+  value,
+  onChange,
+  techWord,
+}: {
+  techs: User[];
+  value: string;
+  onChange: (id: string) => void;
+  techWord: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [q, setQ] = useState('');
+  const ref = useRef<HTMLDivElement>(null);
+  const selected = techs.find((u) => u.id === value);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const onDoc = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpen(false);
+    };
+    document.addEventListener('mousedown', onDoc);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDoc);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [open]);
+
+  const filtered = q.trim()
+    ? techs.filter((u) => techName(u).toLowerCase().includes(q.trim().toLowerCase()))
+    : techs;
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        aria-label={techWord}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        onClick={() => setOpen((o) => !o)}
+        className={[
+          'flex min-h-[44px] w-full items-center gap-2.5 rounded-sm border bg-bg px-2.5 text-left',
+          open ? 'border-accent-500' : 'border-border hover:border-border-strong',
+        ].join(' ')}
+      >
+        {selected ? (
+          <>
+            <Avatar name={techName(selected)} size="sm" />
+            <div className="min-w-0 grow">
+              <div className="truncate text-[12.5px] font-semibold text-fg-strong">{techName(selected)}</div>
+              {techMeta(selected) && <div className="truncate text-[11px] text-fg-muted">{techMeta(selected)}</div>}
+            </div>
+          </>
+        ) : (
+          <span className="grow text-[12.5px] text-fg-muted">Choose a {techWord}…</span>
+        )}
+        <ChevronUpDownIcon className="size-4 shrink-0 text-fg-muted" />
+      </button>
+
+      {open && (
+        <div className="absolute inset-x-0 top-[calc(100%+4px)] z-30 overflow-hidden rounded-md border border-border bg-bg-elev shadow-lg">
+          <div className="border-b border-border-soft p-2">
+            <input
+              autoFocus
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder={`Search ${techWord}s…`}
+              aria-label={`Search ${techWord}s`}
+              className="h-8 w-full rounded-sm border border-border bg-bg px-2.5 text-[12.5px] text-fg-strong outline-none focus:border-accent-500"
+            />
+          </div>
+          <div role="listbox" className="max-h-[240px] overflow-y-auto">
+            {filtered.map((u) => (
+              <button
+                key={u.id}
+                type="button"
+                role="option"
+                aria-selected={u.id === value}
+                onClick={() => {
+                  onChange(u.id);
+                  setOpen(false);
+                  setQ('');
+                }}
+                className="flex w-full items-center gap-2.5 border-b border-border-soft px-2.5 py-2 text-left last:border-b-0 hover:bg-bg-hover aria-selected:bg-accent-500/8"
+              >
+                <Avatar name={techName(u)} size="sm" />
+                <div className="min-w-0 grow">
+                  <div className="truncate text-[12.5px] font-semibold text-fg-strong">{techName(u)}</div>
+                  {techMeta(u) && <div className="truncate text-[11px] text-fg-muted">{techMeta(u)}</div>}
+                </div>
+                {u.id === value && <CheckIcon className="size-4 shrink-0 text-fg-accent" />}
+              </button>
+            ))}
+            {filtered.length === 0 && (
+              <div className="px-3 py-4 text-center text-[12px] text-fg-muted">No {techWord}s match “{q}”.</div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
