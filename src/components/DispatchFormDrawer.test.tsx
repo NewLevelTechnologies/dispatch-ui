@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import { renderWithProviders, userEvent } from '../test/utils';
 import DispatchFormDrawer from './DispatchFormDrawer';
 import type { Dispatch, User, WorkItemResponse } from '../api';
@@ -120,7 +120,18 @@ describe('DispatchFormDrawer', () => {
     await screen.findByText(/edit dispatch/i);
     await user.click(screen.getByRole('button', { name: /notify .* now/i }));
     await user.click(screen.getByRole('button', { name: /save changes/i }));
-    await waitFor(() => expect(mockNotify).toHaveBeenCalledWith('d-1'));
+    // Edit + release "now", customer text off → TECH audience.
+    await waitFor(() => expect(mockNotify).toHaveBeenCalledWith('d-1', 'TECH'));
+  });
+
+  it('texts both tech and customer when both are on in edit', async () => {
+    const user = userEvent.setup();
+    render({ dispatch: editDispatch });
+    await screen.findByText(/edit dispatch/i);
+    await user.click(screen.getByRole('button', { name: /notify .* now/i }));
+    await user.click(screen.getByRole('switch', { name: /text the customer/i }));
+    await user.click(screen.getByRole('button', { name: /save changes/i }));
+    await waitFor(() => expect(mockNotify).toHaveBeenCalledWith('d-1', 'BOTH'));
   });
 
   it('warns when a parts-blocked item is in the addressed set', async () => {
@@ -129,11 +140,13 @@ describe('DispatchFormDrawer', () => {
     expect(await screen.findByText(/parts-blocked/i)).toBeInTheDocument();
   });
 
-  it('cancels the dispatch through the confirm', async () => {
+  it('cancels the dispatch through the confirm dialog', async () => {
     const user = userEvent.setup();
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
     render({ dispatch: editDispatch });
-    await user.click(await screen.findByRole('button', { name: /cancel dispatch/i }));
+    // Footer trigger opens the shared ConfirmDialog (no native window.confirm).
+    await user.click(await screen.findByRole('button', { name: /^cancel dispatch$/i }));
+    const dialog = await screen.findByRole('dialog', { name: /cancel dispatch\?/i });
+    await user.click(within(dialog).getByRole('button', { name: /^cancel dispatch$/i }));
     await waitFor(() => expect(mockUpdate).toHaveBeenCalledWith('d-1', { status: 'CANCELLED' }));
   });
 
@@ -153,7 +166,7 @@ describe('DispatchFormDrawer', () => {
     expect(screen.getByRole('option', { name: /Marcus Lee/ })).toBeInTheDocument();
   });
 
-  it('creates a dispatch with the chosen tech, needy items, and notify', async () => {
+  it('creates a dispatch with the chosen tech, needy items, and notifications', async () => {
     const user = userEvent.setup();
     render({ dispatch: null, workItems: [NEEDY_ITEM] });
     // Pick a technician through the searchable picker.
@@ -166,9 +179,23 @@ describe('DispatchFormDrawer', () => {
           workOrderId: 'wo-1',
           assignedUserId: 'u-1',
           addressedWorkItemIds: ['wi-1'],
-          notifyAssignedUser: true,
         }),
       ),
     );
+    // Both default on for a new dispatch (release "now" + customer text) → one
+    // explicit notify covering BOTH, via /notify (not the create flag), so the
+    // tech notification is logged like the customer's.
+    await waitFor(() => expect(mockNotify).toHaveBeenCalledWith('d-1', 'BOTH'));
+  });
+
+  it('notifies only the tech on create when the customer text is off', async () => {
+    const user = userEvent.setup();
+    render({ dispatch: null, workItems: [NEEDY_ITEM] });
+    await user.click(await screen.findByRole('button', { name: /^technician$/i }));
+    await user.click(await screen.findByRole('option', { name: /Daniel Park/ }));
+    await user.click(screen.getByRole('switch', { name: /text the customer/i }));
+    await user.click(screen.getByRole('button', { name: /schedule dispatch/i }));
+    // Release still "now" → TECH only (no CUSTOMER/BOTH).
+    await waitFor(() => expect(mockNotify).toHaveBeenCalledWith('d-1', 'TECH'));
   });
 });

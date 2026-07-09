@@ -558,14 +558,11 @@ function DispatchDetailContent({
         ) : (
           !readOnly && (
             <>
+              {/* One edit entry — the form covers tech, window, work items, and
+                  release, so a single "Edit" reads truer than Reassign/Reschedule. */}
               <Button plain size="xs" onClick={() => onEdit(dispatch)}>
-                {t('workOrders.dispatches.drawer.reassign')}
+                {`${t('common.edit')} ${getName('dispatch').toLowerCase()}`}
               </Button>
-              {full.status === 'SCHEDULED' && (
-                <Button plain size="xs" onClick={() => onEdit(dispatch)}>
-                  {t('workOrders.dispatches.reschedule')}
-                </Button>
-              )}
               <span className="grow" />
               {primary && (
                 <Button
