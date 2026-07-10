@@ -20,6 +20,7 @@ import { SlideOver } from './catalyst/slideover';
 import { Button } from './catalyst/button';
 import { Avatar } from './ui/Avatar';
 import ConfirmDialog from './ConfirmDialog';
+import { workItemLabel } from '../utils/workItemLabel';
 
 interface Props {
   open: boolean;
@@ -103,7 +104,7 @@ export default function DispatchFormDrawer({
   dispatch,
 }: Props) {
   const { t } = useTranslation();
-  const { getName } = useGlossary();
+  const { getName, getAbbrev } = useGlossary();
   const queryClient = useQueryClient();
   const editing = !!dispatch;
   const dispatchWord = getName('dispatch').toLowerCase();
@@ -286,6 +287,11 @@ export default function DispatchFormDrawer({
                       ].join(' ')}
                     >
                       {on && <CheckIcon className="size-3 shrink-0" />}
+                      {wi.sequence != null && (
+                        <span className="shrink-0 font-mono text-[10px] opacity-70">
+                          {workItemLabel(getAbbrev('work_item'), wi.sequence)}
+                        </span>
+                      )}
                       <span className="truncate">{wi.description}</span>
                     </button>
                   );

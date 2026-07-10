@@ -82,6 +82,12 @@ export interface WorkItemEquipmentSummary {
 
 export interface WorkItemResponse {
   id: string;
+  // 1-based line number, scoped per work order (every WO starts at 1); the
+  // `workItems` list is returned sorted by it. Render as a chip with the
+  // work_item glossary abbreviation → `WI-01`. Global identity stays the UUID.
+  // Optional on the FE type (additive — existing fixtures don't backfill it);
+  // always present on the real WO-detail response, so guard before rendering.
+  sequence?: number;
   statusId: string | null;
   statusCategory: ProgressCategory;
   // The customer's complaint captured at intake.

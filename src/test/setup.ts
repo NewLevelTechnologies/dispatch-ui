@@ -2076,6 +2076,8 @@ vi.mock('../contexts/GlossaryContext', async () => {
         const entry = GLOSSARY_DEFAULTS[code];
         return entry ? (plural ? entry.plural : entry.singular) : code;
       },
+      getAbbrev: (code: string) =>
+        GLOSSARY_DEFAULTS[code]?.abbreviation ?? code.slice(0, 2).toUpperCase(),
       updateGlossary: vi.fn(),
     })),
     GlossaryProvider: ({ children }: { children: React.ReactNode }) => children,

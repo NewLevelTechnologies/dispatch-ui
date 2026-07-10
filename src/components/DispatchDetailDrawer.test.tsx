@@ -427,6 +427,7 @@ describe('DispatchDetailDrawer', () => {
     const workItems = [
       {
         id: 'wi-1',
+        sequence: 1,
         statusId: null,
         statusCategory: 'IN_PROGRESS',
         description: 'No cooling — upstairs condenser',
@@ -439,6 +440,8 @@ describe('DispatchDetailDrawer', () => {
     renderDrawer(mockDispatch({ addressedWorkItemIds: ['wi-1'] }), { workItems, onViewWorkItems });
 
     expect(await screen.findByText('Work addressed')).toBeInTheDocument();
+    // Sub-line carries the per-WO work-item identifier (sequence 1 → WI-01).
+    expect(await screen.findByText('WI-01')).toBeInTheDocument();
     await user.click(await screen.findByText('No cooling — upstairs condenser'));
     expect(onViewWorkItems).toHaveBeenCalled();
   });

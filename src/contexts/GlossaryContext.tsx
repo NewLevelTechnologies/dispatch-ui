@@ -36,12 +36,15 @@ export const GLOSSARY_DEFAULTS: Record<string, GlossaryEntry> = {
   schedule: { singular: 'Schedule', plural: 'Schedules' },
   service_location: { singular: 'Location', plural: 'Locations' },
   technician: { singular: 'Technician', plural: 'Technicians' },
-  work_item: { singular: 'Work Item', plural: 'Work Items' },
-  work_order: { singular: 'Work Order', plural: 'Work Orders' },
+  work_item: { singular: 'Work Item', plural: 'Work Items', abbreviation: 'WI' },
+  work_order: { singular: 'Work Order', plural: 'Work Orders', abbreviation: 'WO' },
 };
 
 interface GlossaryContextType {
   getName: (entityCode: string, plural?: boolean) => string;
+  // Short code for chips / number prefixes (e.g. "WI", "WO") — tenant override
+  // from the glossary payload, else the built-in default, else first 2 letters.
+  getAbbrev: (entityCode: string) => string;
   updateGlossary: (newOverrides: Glossary) => void;
 }
 
@@ -68,6 +71,7 @@ export const GlossaryProvider: React.FC<GlossaryProviderProps> = ({
         merged[entityCode] = {
           singular: override?.singular || GLOSSARY_DEFAULTS[entityCode]?.singular || entityCode,
           plural: override?.plural || GLOSSARY_DEFAULTS[entityCode]?.plural || entityCode + 's',
+          abbreviation: override?.abbreviation || GLOSSARY_DEFAULTS[entityCode]?.abbreviation,
         };
       });
     }
@@ -85,6 +89,7 @@ export const GlossaryProvider: React.FC<GlossaryProviderProps> = ({
         merged[entityCode] = {
           singular: override?.singular || GLOSSARY_DEFAULTS[entityCode]?.singular || entityCode,
           plural: override?.plural || GLOSSARY_DEFAULTS[entityCode]?.plural || entityCode + 's',
+          abbreviation: override?.abbreviation || GLOSSARY_DEFAULTS[entityCode]?.abbreviation,
         };
       });
     }
@@ -125,8 +130,15 @@ export const GlossaryProvider: React.FC<GlossaryProviderProps> = ({
     return entityCode.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase());
   };
 
+  const getAbbrev = (entityCode: string): string => {
+    const entry = glossary[entityCode];
+    if (entry?.abbreviation) return entry.abbreviation;
+    // Fall back to the first two letters of the (glossary) singular name.
+    return getName(entityCode).replace(/[^a-zA-Z]/g, '').slice(0, 2).toUpperCase() || entityCode.slice(0, 2).toUpperCase();
+  };
+
   return (
-    <GlossaryContext.Provider value={{ getName, updateGlossary }}>
+    <GlossaryContext.Provider value={{ getName, getAbbrev, updateGlossary }}>
       {children}
     </GlossaryContext.Provider>
   );

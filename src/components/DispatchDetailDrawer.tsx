@@ -36,6 +36,7 @@ import { SlideOver } from './catalyst/slideover';
 import WorkOrderFileUploadDialog from './WorkOrderFileUploadDialog';
 import { FileLightbox } from './WorkOrderFilesTab';
 import { formatPhone } from '../utils/formatPhone';
+import { workItemLabel } from '../utils/workItemLabel';
 
 type PillTone = 'neutral' | 'info' | 'success' | 'warning' | 'danger' | 'accent' | 'violet';
 
@@ -176,7 +177,7 @@ function DispatchDetailContent({
   onViewWorkItems,
 }: ContentProps) {
   const { t } = useTranslation();
-  const { getName } = useGlossary();
+  const { getName, getAbbrev } = useGlossary();
   const queryClient = useQueryClient();
   const [uploadOpen, setUploadOpen] = useState(false);
   // Index into `media` for the fullscreen viewer; null = closed.
@@ -436,8 +437,14 @@ function DispatchDetailContent({
                       <div className="truncate text-[12.5px] font-medium text-fg-strong">
                         {wi ? wi.description : id}
                       </div>
-                      {wi?.equipment && (
-                        <div className="truncate text-[10.5px] text-fg-dim">{wi.equipment.name}</div>
+                      {wi && (wi.sequence != null || wi.equipment) && (
+                        <div className="truncate text-[10.5px] text-fg-dim">
+                          {wi.sequence != null && (
+                            <span className="font-mono">{workItemLabel(getAbbrev('work_item'), wi.sequence)}</span>
+                          )}
+                          {wi.sequence != null && wi.equipment && ' · '}
+                          {wi.equipment?.name}
+                        </div>
                       )}
                     </div>
                     {wi && (
