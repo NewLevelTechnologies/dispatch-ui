@@ -16,6 +16,7 @@
 //
 // i18n: entity names route through getName(); a follow-up pass extracts the
 // remaining literal microcopy into workOrders.detail.overview.* keys.
+import { useMemo } from 'react';
 import type { ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
@@ -42,6 +43,7 @@ import { useGlossary } from '../../contexts/GlossaryContext';
 import { Card } from '../../components/catalyst/card';
 import { CardTitle, CardLink } from '../../components/customer-detail/shared';
 import { Pill, Tag } from '../../components/ui/Pill';
+import { workItemLabel } from '../../utils/workItemLabel';
 import { Avatar } from '../../components/ui/Avatar';
 import NotesCard from '../../components/NotesCard';
 import { ActivityRow } from '../../components/ActivityStream';
@@ -291,10 +293,12 @@ function WorkItemPeekRow({ wi, last, onClick }: { wi: WorkItemResponse; last: bo
 // Horizontal-scroll so many trips slide rather than crush.
 function TripStrip({
   dispatches,
+  wiLabelById,
   onSchedule,
   onSelect,
 }: {
   dispatches: DispatchBoardRow[];
+  wiLabelById: Map<string, string>;
   onSchedule: () => void;
   onSelect: (d: Dispatch) => void;
 }) {
@@ -339,7 +343,7 @@ function TripStrip({
       ) : (
         <div className="flex items-stretch gap-2 overflow-x-auto pb-0.5">
           {ordered.map((d) => (
-            <TripCell key={d.id} d={d} onSelect={onSelect} />
+            <TripCell key={d.id} d={d} wiLabelById={wiLabelById} onSelect={onSelect} />
           ))}
         </div>
       )}
@@ -349,15 +353,21 @@ function TripStrip({
 
 function TripCell({
   d,
+  wiLabelById,
   onSelect,
 }: {
   d: DispatchBoardRow;
+  wiLabelById: Map<string, string>;
   onSelect: (d: Dispatch) => void;
 }) {
   const p = DISPATCH_PRESENTATION[d.status];
   const accent =
     d.status === 'COMPLETED' ? 'var(--success-500)' : p.live ? 'var(--violet-500)' : 'var(--info-500)';
   const name = d.assignedUserName;
+  // Which work items this trip covers, as "WI-01" chips (empty = whole WO).
+  const addressedLabels = (d.addressedWorkItemIds ?? [])
+    .map((id) => wiLabelById.get(id))
+    .filter((l): l is string => !!l);
   // Cap the cell width so a lone dispatch stays card-sized + left-aligned
   // rather than stretching full-width like a banner; several cells share the
   // row and scroll (mock: flex 1 1 200px, max-width 320).
@@ -386,6 +396,21 @@ function TripCell({
           {ETA_TIME.format(new Date(d.arrivalWindowStart))}–{ETA_TIME.format(new Date(d.arrivalWindowEnd))}
         </span>
       </div>
+      {addressedLabels.length > 0 && (
+        <div className="mt-1.5 flex flex-wrap items-center gap-1">
+          {addressedLabels.slice(0, 3).map((label) => (
+            <span
+              key={label}
+              className="rounded-xs bg-bg-active px-1 py-px font-mono text-[9.5px] font-semibold text-fg-muted"
+            >
+              {label}
+            </span>
+          ))}
+          {addressedLabels.length > 3 && (
+            <span className="text-[9.5px] text-fg-dim">+{addressedLabels.length - 3}</span>
+          )}
+        </div>
+      )}
     </button>
   );
 }
@@ -636,7 +661,15 @@ export default function WorkOrderOverview({
   extraRail,
 }: WorkOrderOverviewProps) {
   const { t } = useTranslation();
-  const { getName } = useGlossary();
+  const { getName, getAbbrev } = useGlossary();
+  // Resolve addressed work-item ids → "WI-01" chips for the trip cells.
+  const wiLabelById = useMemo(() => {
+    const m = new Map<string, string>();
+    (workOrder.workItems ?? []).forEach((wi) => {
+      if (wi.sequence != null) m.set(wi.id, workItemLabel(getAbbrev('work_item'), wi.sequence));
+    });
+    return m;
+  }, [workOrder.workItems, getAbbrev]);
   const attention = deriveAttention({
     workOrder,
     dispatches,
@@ -659,6 +692,7 @@ export default function WorkOrderOverview({
           <WorkItemsPeek workOrder={workOrder} onAdd={onAddWorkItem} onOpenItems={() => onOpenTab('items')} />
           <TripStrip
             dispatches={dispatches}
+            wiLabelById={wiLabelById}
             onSchedule={onScheduleDispatch}
             onSelect={onSelectDispatch}
           />

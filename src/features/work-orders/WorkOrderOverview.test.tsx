@@ -26,6 +26,7 @@ const workOrder = {
   workItems: [
     {
       id: 'wi-1',
+      sequence: 1,
       statusId: null,
       statusCategory: 'BLOCKED',
       description: 'No cooling — upstairs',
@@ -36,6 +37,7 @@ const workOrder = {
     },
     {
       id: 'wi-2',
+      sequence: 2,
       statusId: null,
       statusCategory: 'NOT_STARTED',
       description: 'Thermostat unresponsive',
@@ -82,6 +84,7 @@ const liveDispatch: DispatchBoardRow = {
   arrivedAt: null,
   departedAt: null,
   notes: null,
+  addressedWorkItemIds: ['wi-1'],
   createdAt: 'x',
   updatedAt: 'x',
   workOrderNumber: 'WO-1',
@@ -144,6 +147,12 @@ describe('WorkOrderOverview', () => {
     expect(screen.getAllByText('No cooling — upstairs').length).toBeGreaterThan(0);
     expect(screen.getByText('Thermostat unresponsive')).toBeInTheDocument();
     expect(screen.getAllByText(/Daniel P\./).length).toBeGreaterThan(0); // trip strip cell
+  });
+
+  it('shows the addressed work-item chip on the trip cell', () => {
+    render();
+    // liveDispatch addresses wi-1 (sequence 1) → "WI-01" chip on the cell.
+    expect(screen.getByText('WI-01')).toBeInTheDocument();
   });
 
   it('renders the Location card (address, gate, access, pinned note) and Money card', () => {

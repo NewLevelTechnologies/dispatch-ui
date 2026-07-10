@@ -9,6 +9,7 @@ const mockUserGetAll = vi.fn();
 const mockGetNotificationLogs = vi.fn();
 const mockFilesList = vi.fn();
 const mockDispatchUpdate = vi.fn();
+const mockNotify = vi.fn();
 const mockGetById = vi.fn();
 const mockNotesList = vi.fn();
 const mockNotesCreate = vi.fn();
@@ -41,6 +42,7 @@ vi.mock('../api/schedulingApi', async () => {
     dispatchesApi: {
       ...actual.dispatchesApi,
       update: (...args: unknown[]) => mockDispatchUpdate(...args),
+      notify: (...args: unknown[]) => mockNotify(...args),
       getById: (...args: unknown[]) => mockGetById(...args),
     },
     dispatchNotesApi: {
@@ -157,6 +159,7 @@ describe('DispatchDetailDrawer', () => {
     mockGetNotificationLogs.mockResolvedValue(emptyLogsPage);
     mockFilesList.mockResolvedValue(filesPage([]));
     mockDispatchUpdate.mockResolvedValue(mockDispatch({ status: 'IN_PROGRESS' }));
+    mockNotify.mockResolvedValue(undefined);
     mockGetById.mockResolvedValue(mockDispatch());
     mockNotesList.mockResolvedValue([]);
   });
@@ -185,6 +188,27 @@ describe('DispatchDetailDrawer', () => {
     expect(screen.getByText('Arrived on site')).toBeInTheDocument();
     // En route (never), Arrived, Departed all hollow for a fresh SCHEDULED visit.
     expect(screen.getAllByText('—').length).toBeGreaterThanOrEqual(3);
+  });
+
+  it('releases an on-deck dispatch from a pending timeline step', async () => {
+    const user = userEvent.setup();
+    renderDrawer(mockDispatch()); // SCHEDULED + empty log → Tech/Customer steps pending
+    const notifyButtons = await screen.findAllByRole('button', { name: /notify now/i });
+    expect(notifyButtons).toHaveLength(2); // Tech notified + Customer notified
+    // Second notify-able step is Customer notified → CUSTOMER audience (not TECH).
+    await user.click(notifyButtons[1]);
+    await waitFor(() => expect(mockNotify).toHaveBeenCalledWith('d1', 'CUSTOMER'));
+    // Optimistic: /notify is async, but the customer step fills right away (only
+    // the tech step still offers "Notify now →") — no hard refresh needed.
+    await waitFor(() =>
+      expect(screen.getAllByRole('button', { name: /notify now/i })).toHaveLength(1),
+    );
+  });
+
+  it('hides Notify now once the dispatch is no longer on deck', async () => {
+    renderDrawer(mockDispatch({ status: 'COMPLETED' }));
+    await screen.findByText('Dispatch timeline');
+    expect(screen.queryByRole('button', { name: /notify now/i })).not.toBeInTheDocument();
   });
 
   it('derives "captured this visit" media from files keyed by dispatchId', async () => {
@@ -403,6 +427,7 @@ describe('DispatchDetailDrawer', () => {
     const workItems = [
       {
         id: 'wi-1',
+        sequence: 1,
         statusId: null,
         statusCategory: 'IN_PROGRESS',
         description: 'No cooling — upstairs condenser',
@@ -415,6 +440,8 @@ describe('DispatchDetailDrawer', () => {
     renderDrawer(mockDispatch({ addressedWorkItemIds: ['wi-1'] }), { workItems, onViewWorkItems });
 
     expect(await screen.findByText('Work addressed')).toBeInTheDocument();
+    // Sub-line carries the per-WO work-item identifier (sequence 1 → WI-01).
+    expect(await screen.findByText('WI-01')).toBeInTheDocument();
     await user.click(await screen.findByText('No cooling — upstairs condenser'));
     expect(onViewWorkItems).toHaveBeenCalled();
   });

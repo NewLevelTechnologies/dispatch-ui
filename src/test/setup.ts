@@ -1162,6 +1162,7 @@ vi.mock('react-i18next', () => {
     'workOrders.dispatches.drawer.notificationsEmpty': 'No notifications sent yet.',
     'workOrders.dispatches.drawer.notificationsError': "Couldn't load notification history.",
     'workOrders.dispatches.drawer.notificationsLoading': 'Loading notifications...',
+    'workOrders.dispatches.drawer.notifyNow': 'Notify now →',
     'workOrders.dispatches.drawer.officeNoteHint': 'Office note · tech records the rest on site',
     'workOrders.dispatches.drawer.reassign': 'Reassign',
     'workOrders.dispatches.drawer.statusError': "Couldn't update the {{entity, lowercase}}.",
@@ -2075,6 +2076,8 @@ vi.mock('../contexts/GlossaryContext', async () => {
         const entry = GLOSSARY_DEFAULTS[code];
         return entry ? (plural ? entry.plural : entry.singular) : code;
       },
+      getAbbrev: (code: string) =>
+        GLOSSARY_DEFAULTS[code]?.abbreviation ?? code.slice(0, 2).toUpperCase(),
       updateGlossary: vi.fn(),
     })),
     GlossaryProvider: ({ children }: { children: React.ReactNode }) => children,

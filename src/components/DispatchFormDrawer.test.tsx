@@ -38,12 +38,16 @@ const tech = (id: string, first: string, last: string): User =>
     enabled: true,
   }) as User;
 
-const wi = (id: string, description: string, statusCategory: WorkItemResponse['statusCategory']): WorkItemResponse =>
-  ({ id, description, statusCategory }) as WorkItemResponse;
+const wi = (
+  id: string,
+  description: string,
+  statusCategory: WorkItemResponse['statusCategory'],
+  sequence: number,
+): WorkItemResponse => ({ id, description, statusCategory, sequence }) as WorkItemResponse;
 
-const NEEDY_ITEM = wi('wi-1', 'No cooling upstairs', 'AWAITING_SCHEDULE');
-const DONE_ITEM = wi('wi-2', 'Replaced capacitor', 'COMPLETED');
-const BLOCKED_ITEM = wi('wi-3', 'Compressor swap', 'BLOCKED');
+const NEEDY_ITEM = wi('wi-1', 'No cooling upstairs', 'AWAITING_SCHEDULE', 1);
+const DONE_ITEM = wi('wi-2', 'Replaced capacitor', 'COMPLETED', 2);
+const BLOCKED_ITEM = wi('wi-3', 'Compressor swap', 'BLOCKED', 3);
 
 const editDispatch: Dispatch = {
   id: 'd-1',
@@ -87,6 +91,8 @@ describe('DispatchFormDrawer', () => {
     // Needy item chip is selected (renders a check); completed one is not.
     const needyChip = await screen.findByRole('button', { name: /No cooling upstairs/ });
     expect(needyChip.querySelector('svg')).not.toBeNull();
+    // Chip carries the per-WO work-item identifier (sequence 1 → WI-01).
+    expect(within(needyChip).getByText('WI-01')).toBeInTheDocument();
     const doneChip = screen.getByRole('button', { name: /Replaced capacitor/ });
     expect(doneChip.querySelector('svg')).toBeNull();
   });
