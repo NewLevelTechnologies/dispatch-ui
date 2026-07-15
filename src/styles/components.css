@@ -396,6 +396,12 @@
   letter-spacing: 0.01em;
   white-space: nowrap;
 }
+/* Word-label variant — proportional, for type/kind labels ("Field purchase",
+   "Retail") rather than codes. Higher specificity beats the base mono rule. */
+.tag.tag--word {
+  font-family: var(--font-sans);
+  letter-spacing: normal;
+}
 
 /* ── Dense table — much tighter than Catalyst default ───────────── */
 /* Responsive strategy:

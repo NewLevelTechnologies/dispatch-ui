@@ -89,6 +89,13 @@ describe('PurchaseOrderDetailPage', () => {
     await waitFor(() => expect(mockUpdate).toHaveBeenCalledWith('po-1', { status: 'RECEIVED' }));
   });
 
+  it('returns to the vendor on Back when opened with ?from=vendor', async () => {
+    renderAt('/purchase-orders/po-1?from=vendor&vendorId=v-1&vName=Grainger');
+
+    const back = await screen.findByRole('link', { name: /Grainger/i });
+    expect(back).toHaveAttribute('href', '/vendors/v-1');
+  });
+
   it('links Edit to the edit route', async () => {
     renderAt();
 

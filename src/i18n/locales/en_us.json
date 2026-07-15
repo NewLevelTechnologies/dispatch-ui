@@ -432,6 +432,8 @@
     "tenantSettings": "Tenant Settings",
     "user": "User",
     "users": "Users",
+    "vendor": "Vendor",
+    "vendors": "Vendors",
     "workOrder": "Work Order",
     "workOrders": "Work Orders"
   },

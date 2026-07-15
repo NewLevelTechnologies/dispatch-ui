@@ -9,6 +9,7 @@ import {
   UserGroupIcon,
   ClipboardDocumentListIcon,
   WrenchScrewdriverIcon,
+  TruckIcon,
   CalendarIcon,
   Cog6ToothIcon,
   SunIcon,
@@ -127,6 +128,7 @@ export default function AppLayout({ children, flush }: { children: React.ReactNo
     { name: getName('equipment', true), href: '/equipment', icon: WrenchScrewdriverIcon },
     { name: t('equipment.entities.parts'), href: '/parts-inventory', icon: CubeIcon },
     { name: t('equipment.entities.warehouses'), href: '/warehouses', icon: BuildingStorefrontIcon },
+    { name: t('entities.vendors'), href: '/vendors', icon: TruckIcon },
   ];
 
   const financialNavigation = [

@@ -309,6 +309,8 @@ vi.mock('react-i18next', () => {
     'entities.tenantSettings': 'Tenant Settings',
     'entities.user': 'User',
     'entities.users': 'Users',
+    'entities.vendor': 'Vendor',
+    'entities.vendors': 'Vendors',
     'entities.workOrder': 'Work Order',
     'entities.workOrders': 'Work Orders',
     'equipment.comingSoon': 'Coming soon...',

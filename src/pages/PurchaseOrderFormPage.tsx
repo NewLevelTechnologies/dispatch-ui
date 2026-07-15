@@ -79,8 +79,12 @@ export default function PurchaseOrderFormPage() {
     enabled: !!workOrderId,
   });
   const woNumber = workOrder?.workOrderNumber || (workOrderId ? `#${workOrderId.slice(0, 8)}` : null);
-  const backTo = workOrderId ? `/work-orders/${workOrderId}` : '/work-orders';
-  const backLabel = woNumber ?? getName('work_order', true);
+  // Smart back — honor ?from=vendor (New PO launched from a vendor's page), else
+  // the attached work order, else the cross-job list.
+  const fromVendorId = params.get('from') === 'vendor' ? params.get('vendorId') : null;
+  const fromVendorName = params.get('vName') || 'Vendor';
+  const backTo = fromVendorId ? `/vendors/${fromVendorId}` : workOrderId ? `/work-orders/${workOrderId}` : '/work-orders';
+  const backLabel = fromVendorId ? fromVendorName : (woNumber ?? getName('work_order', true));
 
   // FIELD = counter run (received on save) · ORDER = special order (draft/placed).
   const type: PurchaseOrderType = editing
@@ -126,6 +130,21 @@ export default function PurchaseOrderFormPage() {
         : [blankRow()],
     );
   }, [editing, po]);
+
+  // Seed the vendor from ?vendorId (e.g. "New PO" launched from a vendor's page).
+  const vendorIdParam = params.get('vendorId');
+  const { data: seedVendor } = useQuery({
+    queryKey: ['vendor', vendorIdParam],
+    queryFn: () => vendorApi.getById(vendorIdParam!),
+    enabled: !editing && !!vendorIdParam,
+  });
+  useEffect(() => {
+    if (editing || !seedVendor) return;
+    setVendorName(seedVendor.name);
+    setVendorId(seedVendor.id);
+    setPickedVendor(seedVendor);
+    if (seedVendor.taxRate != null) setTaxPct(String(Math.round(seedVendor.taxRate * 10000) / 100));
+  }, [editing, seedVendor]);
 
   // Vendor suggestions — pick an existing vendor (avoids typo-dupes) or free-type
   // a name that the backend resolves-or-creates on save.
@@ -190,7 +209,11 @@ export default function PurchaseOrderFormPage() {
       queryClient.invalidateQueries({ queryKey: ['purchase-orders'] });
       if (workOrderId) queryClient.invalidateQueries({ queryKey: ['purchase-orders', workOrderId] });
       showSuccess(editing ? 'Purchase order saved' : 'Purchase order created');
-      navigate(`/purchase-orders/${saved.id}`);
+      // Carry ?from=vendor through so the new PO's Back still returns to the vendor.
+      const suffix = fromVendorId
+        ? `?from=vendor&vendorId=${fromVendorId}&vName=${encodeURIComponent(fromVendorName)}`
+        : '';
+      navigate(`/purchase-orders/${saved.id}${suffix}`);
     },
     onError: (err: unknown) => showError('Could not save the purchase order', extractApiError(err) ?? undefined),
   });

@@ -10,6 +10,7 @@ const mockCreate = vi.fn();
 const mockUpdate = vi.fn();
 const mockScan = vi.fn();
 const mockVendorSearch = vi.fn();
+const mockVendorGetById = vi.fn();
 const mockWoGetById = vi.fn();
 
 vi.mock('../api/purchaseOrderApi', async () => {
@@ -23,7 +24,11 @@ vi.mock('../api/purchaseOrderApi', async () => {
       update: (...a: unknown[]) => mockUpdate(...a),
       scanReceipt: (...a: unknown[]) => mockScan(...a),
     },
-    vendorApi: { search: (...a: unknown[]) => mockVendorSearch(...a), create: vi.fn() },
+    vendorApi: {
+      search: (...a: unknown[]) => mockVendorSearch(...a),
+      getById: (...a: unknown[]) => mockVendorGetById(...a),
+      create: vi.fn(),
+    },
   };
 });
 
@@ -141,6 +146,31 @@ describe('PurchaseOrderFormPage', () => {
     await waitFor(() => expect(screen.getByLabelText('Tax rate percent')).toHaveValue(8.25));
     expect(screen.getByText(/Acct ACC-1 · Net 30 · Online portal · Dana/)).toBeInTheDocument();
     expect(screen.getByText('Preferred')).toBeInTheDocument();
+  });
+
+  it('seeds the vendor from ?vendorId (New PO launched from a vendor)', async () => {
+    mockVendorGetById.mockResolvedValue({
+      id: 'v-7',
+      name: 'Johnstone Supply',
+      taxRate: 0.09,
+      accountNumber: 'JS-42',
+      paymentTerms: 'Net 30',
+    });
+    renderAt('/purchase-orders/new?type=order&vendorId=v-7');
+
+    await screen.findByText('New purchase order');
+    await waitFor(() => expect(screen.getByLabelText('Vendor')).toHaveValue('Johnstone Supply'));
+    expect(screen.getByLabelText('Tax rate percent')).toHaveValue(9);
+    await waitFor(() => expect(mockVendorGetById).toHaveBeenCalledWith('v-7'));
+  });
+
+  it('returns to the vendor on Back when launched with ?from=vendor', async () => {
+    mockVendorGetById.mockResolvedValue({ id: 'v-7', name: 'Johnstone Supply' });
+    renderAt('/purchase-orders/new?type=order&vendorId=v-7&from=vendor&vName=Johnstone%20Supply');
+
+    await screen.findByText('New purchase order');
+    const back = screen.getByRole('link', { name: /Johnstone Supply/i });
+    expect(back).toHaveAttribute('href', '/vendors/v-7');
   });
 
   it('prefills in edit mode and saves changes with the existing vendor id', async () => {
