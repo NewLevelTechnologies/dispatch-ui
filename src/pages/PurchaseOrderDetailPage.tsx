@@ -1,6 +1,6 @@
 /* eslint-disable i18next/no-literal-string -- dense procurement detail; short operational labels stay literal (same convention as the other detail pages). Entity names route through getName(). */
 import { useRef } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   CubeIcon,
@@ -56,9 +56,14 @@ const fmtDate = (iso?: string | null) =>
 
 export default function PurchaseOrderDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const [params] = useSearchParams();
   const navigate = useNavigate();
   const { getName } = useGlossary();
   const queryClient = useQueryClient();
+
+  // Smart back — honor ?from=vendor (a vendor's PO history / New PO), else the
+  // work order the PO is attached to, else the cross-job list.
+  const fromVendorId = params.get('from') === 'vendor' ? params.get('vendorId') : null;
 
   const { data: po, isLoading, isError } = useQuery({
     queryKey: ['purchase-order', id],
@@ -96,7 +101,16 @@ export default function PurchaseOrderDetailPage() {
   }
 
   const field = po.type === 'FIELD';
-  const backTo = po.workOrderId ? `/work-orders/${po.workOrderId}` : '/work-orders';
+  const backTo = fromVendorId
+    ? `/vendors/${fromVendorId}`
+    : po.workOrderId
+      ? `/work-orders/${po.workOrderId}`
+      : '/work-orders';
+  const backLabel = fromVendorId
+    ? params.get('vName') || 'Vendor'
+    : po.workOrderId
+      ? getName('work_order')
+      : getName('work_order', true);
   const billTotal = po.lines.reduce((s, l) => s + (l.billPrice ?? 0) * l.quantityOrdered, 0);
   const margin = billTotal - (po.totalCost ?? 0);
   const marginPct = billTotal > 0 ? Math.round((margin / billTotal) * 100) : 0;
@@ -105,7 +119,7 @@ export default function PurchaseOrderDetailPage() {
     <AppLayout>
       <div className="mx-auto max-w-[1080px] px-1 py-1">
         <Link to={backTo} className="mb-2.5 inline-flex items-center gap-1 text-[11.5px] text-fg-muted hover:text-fg-strong">
-          ← {po.workOrderId ? getName('work_order') : getName('work_order', true)}
+          ← {backLabel}
         </Link>
 
         {/* Header */}
@@ -126,7 +140,7 @@ export default function PurchaseOrderDetailPage() {
               <Heading level={1} size="page-sm" className="m-0">
                 {po.vendorName}
               </Heading>
-              <Tag>{TYPE_LABEL[po.type]}</Tag>
+              <Tag word>{TYPE_LABEL[po.type]}</Tag>
               <Pill tone={STATUS_TONE[po.status]} dot>
                 {STATUS_LABEL[po.status]}
               </Pill>

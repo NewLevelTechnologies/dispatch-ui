@@ -144,7 +144,7 @@ function PORow({ po }: { po: PurchaseOrderListItem }) {
         <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
           <span className="shrink-0 font-mono text-[12.5px] font-bold text-fg-strong">{po.poNumber}</span>
           <span className="truncate text-[12.5px] text-fg-strong">{po.vendorName}</span>
-          <Tag>{TYPE_LABEL[po.type]}</Tag>
+          <Tag word>{TYPE_LABEL[po.type]}</Tag>
         </div>
         <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[11px] text-fg-dim">
           <span>

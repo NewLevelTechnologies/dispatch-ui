@@ -164,6 +164,15 @@ describe('PurchaseOrderFormPage', () => {
     await waitFor(() => expect(mockVendorGetById).toHaveBeenCalledWith('v-7'));
   });
 
+  it('returns to the vendor on Back when launched with ?from=vendor', async () => {
+    mockVendorGetById.mockResolvedValue({ id: 'v-7', name: 'Johnstone Supply' });
+    renderAt('/purchase-orders/new?type=order&vendorId=v-7&from=vendor&vName=Johnstone%20Supply');
+
+    await screen.findByText('New purchase order');
+    const back = screen.getByRole('link', { name: /Johnstone Supply/i });
+    expect(back).toHaveAttribute('href', '/vendors/v-7');
+  });
+
   it('prefills in edit mode and saves changes with the existing vendor id', async () => {
     const user = userEvent.setup();
     mockGetById.mockResolvedValue(existingPo);

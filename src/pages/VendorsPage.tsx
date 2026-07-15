@@ -31,7 +31,8 @@ const KIND_LABEL: Record<VendorKind, string> = {
 };
 const FILTER_KINDS: VendorKind[] = ['DISTRIBUTOR', 'MANUFACTURER', 'RETAIL'];
 
-const money0 = (n?: number | null) => '$' + Math.round(n ?? 0).toLocaleString('en-US');
+const currency = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
+const money = (n?: number | null) => currency.format(n ?? 0);
 
 export default function VendorsPage() {
   const navigate = useNavigate();
@@ -59,7 +60,7 @@ export default function VendorsPage() {
   const subtitle =
     vendors.length === 0 && !isLoading
       ? null
-      : `${vendors.length.toLocaleString()} ${vendors.length === 1 ? t('entities.vendor').toLowerCase() : t('entities.vendors').toLowerCase()} · ${openTotal} open POs · ${money0(spendTotal)} YTD`;
+      : `${vendors.length.toLocaleString()} ${vendors.length === 1 ? t('entities.vendor').toLowerCase() : t('entities.vendors').toLowerCase()} · ${openTotal} open POs · ${money(spendTotal)} YTD`;
 
   const hasFilters = !!search.trim() || !!kind;
 
@@ -168,7 +169,7 @@ export default function VendorsPage() {
                           {v.openPOs ? v.openPOs : <span className="text-fg-dim">—</span>}
                         </td>
                         <td className="right num" data-label="YTD spend">
-                          <span className="font-mono font-semibold text-fg-strong">{money0(v.ytdSpend)}</span>
+                          <span className="font-mono font-semibold text-fg-strong">{money(v.ytdSpend)}</span>
                         </td>
                         <td className="muted" data-label="Last order">
                           {v.lastOrder ? formatTimestamp(v.lastOrder) : <span className="text-fg-dim">—</span>}

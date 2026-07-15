@@ -54,7 +54,7 @@ describe('VendorsPage', () => {
     expect(await screen.findByText('Ferguson HVAC')).toBeInTheDocument();
     expect(screen.getByText('ACC-1')).toBeInTheDocument();
     expect(screen.getByText('Preferred')).toBeInTheDocument();
-    expect(screen.getByText('$12,500')).toBeInTheDocument();
+    expect(screen.getByText('$12,500.00')).toBeInTheDocument();
   });
 
   it('filters by kind chip', async () => {

@@ -67,20 +67,25 @@ describe('VendorDetailPage', () => {
     mockPoList.mockResolvedValue({ content: [poRow], totalElements: 1 } as unknown as Page<PurchaseOrderListItem>);
   });
 
-  it('renders the vendor header, account and activity', async () => {
+  it('renders the header and the facts strip (account, tax, ordering, activity)', async () => {
     render();
 
     expect(await screen.findByRole('heading', { name: 'Ferguson HVAC' })).toBeInTheDocument();
     expect(screen.getByText('ACC-1')).toBeInTheDocument();
     expect(screen.getByText('8.6%')).toBeInTheDocument();
+    expect(screen.getByText('Online portal')).toBeInTheDocument();
+    expect(screen.getByText('$12,500.00')).toBeInTheDocument();
     expect(screen.getByText('Preferred')).toBeInTheDocument();
   });
 
-  it('lists the vendor purchase orders linking to each PO', async () => {
+  it('lists the vendor purchase orders linking to each PO with a from=vendor back arg', async () => {
     render();
 
     const poLink = await screen.findByRole('link', { name: /PO-00001/i });
-    expect(poLink).toHaveAttribute('href', '/purchase-orders/po-1');
+    const href = poLink.getAttribute('href') || '';
+    expect(href).toContain('/purchase-orders/po-1');
+    expect(href).toContain('from=vendor');
+    expect(href).toContain('vendorId=v-1');
   });
 
   it('links Edit to the edit route', async () => {

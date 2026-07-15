@@ -15,7 +15,8 @@
 //   <Pill tone="success">Paid</Pill>
 //
 // Tag is the same idea but rectangular, monospace — for codes like
-// "PRT-CAP-3550", "T-04", "WO-3892".
+// "PRT-CAP-3550", "T-04", "WO-3892". Pass `word` for a proportional label
+// ("Field purchase", "Retail") that isn't a code.
 // ─────────────────────────────────────────────────────────────────
 import type { HTMLAttributes } from 'react';
 import clsx from 'clsx';
@@ -47,6 +48,6 @@ export function Pill({
   );
 }
 
-export function Tag({ className, ...p }: HTMLAttributes<HTMLSpanElement>) {
-  return <span className={clsx('tag', className)} {...p} />;
+export function Tag({ word, className, ...p }: HTMLAttributes<HTMLSpanElement> & { word?: boolean }) {
+  return <span className={clsx('tag', word && 'tag--word', className)} {...p} />;
 }

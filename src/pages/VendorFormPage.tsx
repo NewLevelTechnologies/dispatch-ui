@@ -8,7 +8,7 @@ import { showError, showSuccess, extractApiError } from '../lib/toast';
 import AppLayout from '../components/AppLayout';
 import { Card } from '../components/catalyst/card';
 import { Button } from '../components/catalyst/button';
-import { Checkbox } from '../components/catalyst/checkbox';
+import { Switch } from '../components/catalyst/switch';
 import { Field, Label } from '../components/catalyst/fieldset';
 import { Input } from '../components/catalyst/input';
 import { Select } from '../components/catalyst/select';
@@ -185,8 +185,8 @@ export default function VendorFormPage() {
                     ))}
                   </Select>
                 </Field>
-                <label className="flex h-9 cursor-pointer items-center gap-2">
-                  <Checkbox color="accent" checked={form.preferred} onChange={(v) => set({ preferred: v })} />
+                <label className="flex h-9 cursor-pointer items-center gap-2.5">
+                  <Switch checked={form.preferred} onChange={(v) => set({ preferred: v })} aria-label="Preferred vendor" />
                   <span className="text-[12.5px] text-fg-strong">Preferred vendor</span>
                 </label>
               </div>
