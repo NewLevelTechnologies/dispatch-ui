@@ -117,6 +117,32 @@ describe('PurchaseOrderFormPage', () => {
     );
   });
 
+  it('prefills the tax rate and shows account meta when a vendor is picked', async () => {
+    const user = userEvent.setup();
+    mockVendorSearch.mockResolvedValue([
+      {
+        id: 'v-9',
+        name: 'Ferguson HVAC',
+        preferred: true,
+        taxRate: 0.0825,
+        accountNumber: 'ACC-1',
+        paymentTerms: 'Net 30',
+        orderingMethod: 'Online portal',
+        rep: 'Dana',
+      },
+    ]);
+    renderAt('/purchase-orders/new?type=order&workOrderId=wo-1');
+
+    await screen.findByText('New purchase order');
+    await user.type(screen.getByLabelText('Vendor'), 'Fer');
+    await user.click(await screen.findByRole('button', { name: 'Ferguson HVAC' }));
+
+    // Tax prefilled from the vendor default (0.0825 → 8.25%).
+    await waitFor(() => expect(screen.getByLabelText('Tax rate percent')).toHaveValue(8.25));
+    expect(screen.getByText(/Acct ACC-1 · Net 30 · Online portal · Dana/)).toBeInTheDocument();
+    expect(screen.getByText('Preferred')).toBeInTheDocument();
+  });
+
   it('prefills in edit mode and saves changes with the existing vendor id', async () => {
     const user = userEvent.setup();
     mockGetById.mockResolvedValue(existingPo);

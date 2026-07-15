@@ -43,6 +43,24 @@ export interface PurchaseOrderLine {
   lineCost: number; // unitCost × quantityOrdered
 }
 
+// Receipt / document attached to a PO (inventory-owned file store, presigned
+// two-step upload — mirrors the WO/customer file flow). `url` is a presigned
+// read URL (images + PDF preview inline); refetch rather than caching it.
+export type PoFileStatus = 'PENDING' | 'CONFIRMED';
+export interface PoFileResponse {
+  id: string;
+  fileName: string;
+  contentType: string;
+  sizeBytes: number;
+  url: string;
+  status: PoFileStatus;
+  uploadedBy?: string | null;
+  createdAt: string;
+}
+
+export const PO_FILE_CONTENT_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'] as const;
+export const PO_FILE_MAX_BYTES = 25 * 1024 * 1024; // 25 MB
+
 export interface PurchaseOrderResponse {
   id: string;
   poNumber: string;
@@ -60,6 +78,8 @@ export interface PurchaseOrderResponse {
   eta?: string | null;
   notes?: string | null;
   lines: PurchaseOrderLine[];
+  // Confirmed receipt/document files (newest first). Additive — may be absent.
+  files?: PoFileResponse[];
   subtotalCost: number;
   taxAmount: number;
   totalCost: number;
@@ -109,24 +129,48 @@ export interface UpdatePurchaseOrderRequest {
   lines?: PurchaseOrderLineInput[];
 }
 
+export type VendorKind = 'DISTRIBUTOR' | 'MANUFACTURER' | 'RETAIL' | 'OTHER';
+
 export interface Vendor {
   id: string;
   name: string;
+  kind?: VendorKind | null;
+  preferred?: boolean;
   accountNumber?: string | null;
   paymentTerms?: string | null;
+  // Default tax rate (e.g. 0.086) — prefills the New-PO tax.
+  taxRate?: number | null;
+  // Free text (values have slashes/spaces): "Online portal" / "Phone / email" / "Counter pickup" / "EDI".
+  orderingMethod?: string | null;
+  rep?: string | null;
   phone?: string | null;
   email?: string | null;
+  address?: string | null;
   notes?: string | null;
+  isActive?: boolean;
+  // Read-only rollups (list + detail), computed server-side.
+  openPOs?: number;
+  ytdSpend?: number;
+  lastOrder?: string | null;
 }
 
 export interface CreateVendorRequest {
   name: string;
+  kind?: VendorKind | null;
+  preferred?: boolean;
   accountNumber?: string | null;
   paymentTerms?: string | null;
+  taxRate?: number | null;
+  orderingMethod?: string | null;
+  rep?: string | null;
   phone?: string | null;
   email?: string | null;
+  address?: string | null;
   notes?: string | null;
 }
+
+// PATCH: omitted = unchanged; set isActive:false to deactivate (frees the name).
+export type UpdateVendorRequest = Partial<CreateVendorRequest> & { isActive?: boolean };
 
 // Stateless receipt-scan pre-fill (AItenant-gated → 403 when off).
 export interface ReceiptExtractionLine {
@@ -200,9 +244,68 @@ export const vendorApi = {
     return response.data;
   },
 
+  getById: async (id: string): Promise<Vendor> => {
+    const response = await apiClient.get<Vendor>(`/inventory/vendors/${id}`);
+    return response.data;
+  },
+
   create: async (request: CreateVendorRequest): Promise<Vendor> => {
     const response = await apiClient.post<Vendor>('/inventory/vendors', request);
     return response.data;
+  },
+
+  update: async (id: string, request: UpdateVendorRequest): Promise<Vendor> => {
+    const response = await apiClient.patch<Vendor>(`/inventory/vendors/${id}`, request);
+    return response.data;
+  },
+};
+
+// Direct-to-S3 PUT (fetch, not apiClient — no JWT on the presigned URL). The
+// Content-Type must match the upload-url request exactly (403 otherwise).
+async function putToS3(uploadUrl: string, contentType: string, file: File | Blob): Promise<void> {
+  const res = await fetch(uploadUrl, { method: 'PUT', headers: { 'Content-Type': contentType }, body: file });
+  if (!res.ok) throw new Error(`S3 upload failed with ${res.status}`);
+}
+
+// Receipt / document files on a PO — presigned two-step upload
+// (upload-url → PUT → confirm), list, delete. Under inventory-service.
+export const poFilesApi = {
+  list: async (poId: string): Promise<PoFileResponse[]> => {
+    const response = await apiClient.get<PoFileResponse[]>(`/inventory/purchase-orders/${poId}/files`);
+    return response.data;
+  },
+
+  requestUploadUrl: async (
+    poId: string,
+    request: { contentType: string; sizeBytes: number; fileName: string },
+  ): Promise<{ fileId: string; uploadUrl: string; s3Key: string }> => {
+    const response = await apiClient.post<{ fileId: string; uploadUrl: string; s3Key: string }>(
+      `/inventory/purchase-orders/${poId}/files/upload-url`,
+      request,
+    );
+    return response.data;
+  },
+
+  confirm: async (poId: string, fileId: string): Promise<PoFileResponse> => {
+    const response = await apiClient.post<PoFileResponse>(
+      `/inventory/purchase-orders/${poId}/files/${fileId}/confirm`,
+    );
+    return response.data;
+  },
+
+  /** Orchestrates the 3-step upload (request → PUT → confirm). */
+  upload: async (poId: string, file: File): Promise<PoFileResponse> => {
+    const { fileId, uploadUrl } = await poFilesApi.requestUploadUrl(poId, {
+      contentType: file.type,
+      sizeBytes: file.size,
+      fileName: file.name,
+    });
+    await putToS3(uploadUrl, file.type, file);
+    return poFilesApi.confirm(poId, fileId);
+  },
+
+  delete: async (poId: string, fileId: string): Promise<void> => {
+    await apiClient.delete(`/inventory/purchase-orders/${poId}/files/${fileId}`);
   },
 };
 

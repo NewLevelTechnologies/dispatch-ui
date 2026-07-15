@@ -7,6 +7,8 @@ import type { PurchaseOrderResponse } from '../api';
 
 const mockGetById = vi.fn();
 const mockUpdate = vi.fn();
+const mockFileUpload = vi.fn();
+const mockFileDelete = vi.fn();
 
 vi.mock('../api/purchaseOrderApi', async () => {
   const actual = await vi.importActual<typeof import('../api/purchaseOrderApi')>('../api/purchaseOrderApi');
@@ -15,6 +17,13 @@ vi.mock('../api/purchaseOrderApi', async () => {
     purchaseOrderApi: {
       getById: (...a: unknown[]) => mockGetById(...a),
       update: (...a: unknown[]) => mockUpdate(...a),
+    },
+    poFilesApi: {
+      list: vi.fn(),
+      requestUploadUrl: vi.fn(),
+      confirm: vi.fn(),
+      upload: (...a: unknown[]) => mockFileUpload(...a),
+      delete: (...a: unknown[]) => mockFileDelete(...a),
     },
   };
 });
@@ -92,5 +101,34 @@ describe('PurchaseOrderDetailPage', () => {
     renderAt();
 
     expect(await screen.findByText(/Couldn't load this purchase order/i)).toBeInTheDocument();
+  });
+
+  it('renders an attached receipt and deletes it', async () => {
+    const user = userEvent.setup();
+    mockFileDelete.mockResolvedValue(undefined);
+    mockGetById.mockResolvedValue({
+      ...po,
+      files: [
+        { id: 'f-1', fileName: 'receipt.jpg', contentType: 'image/jpeg', sizeBytes: 1000, url: 'https://x/r.jpg', status: 'CONFIRMED', createdAt: '2026-07-14T00:00:00Z' },
+      ],
+    });
+    renderAt();
+
+    expect(await screen.findByAltText('receipt.jpg')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /Remove file/i }));
+    await waitFor(() => expect(mockFileDelete).toHaveBeenCalledWith('po-1', 'f-1'));
+  });
+
+  it('uploads a receipt from the empty state', async () => {
+    const user = userEvent.setup();
+    mockFileUpload.mockResolvedValue({ id: 'f-9' });
+    renderAt();
+
+    expect(await screen.findByText(/No receipt attached/i)).toBeInTheDocument();
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+    await user.upload(input, new File(['x'], 'receipt.jpg', { type: 'image/jpeg' }));
+
+    await waitFor(() => expect(mockFileUpload).toHaveBeenCalledTimes(1));
+    expect(mockFileUpload.mock.calls[0][0]).toBe('po-1');
   });
 });
