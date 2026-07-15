@@ -190,8 +190,11 @@ export interface ReceiptExtractionResult {
 interface ListPurchaseOrdersParams {
   workOrderId?: string;
   workItemId?: string;
+  vendorId?: string;
   status?: PurchaseOrderStatus;
   type?: PurchaseOrderType;
+  // PO-number substring search.
+  q?: string;
   page?: number;
   size?: number;
 }

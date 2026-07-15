@@ -127,6 +127,21 @@ export default function PurchaseOrderFormPage() {
     );
   }, [editing, po]);
 
+  // Seed the vendor from ?vendorId (e.g. "New PO" launched from a vendor's page).
+  const vendorIdParam = params.get('vendorId');
+  const { data: seedVendor } = useQuery({
+    queryKey: ['vendor', vendorIdParam],
+    queryFn: () => vendorApi.getById(vendorIdParam!),
+    enabled: !editing && !!vendorIdParam,
+  });
+  useEffect(() => {
+    if (editing || !seedVendor) return;
+    setVendorName(seedVendor.name);
+    setVendorId(seedVendor.id);
+    setPickedVendor(seedVendor);
+    if (seedVendor.taxRate != null) setTaxPct(String(Math.round(seedVendor.taxRate * 10000) / 100));
+  }, [editing, seedVendor]);
+
   // Vendor suggestions — pick an existing vendor (avoids typo-dupes) or free-type
   // a name that the backend resolves-or-creates on save.
   const { data: vendorMatches = [] } = useQuery({
