@@ -245,6 +245,25 @@ export {
   type UpdateWarehouseRequest,
 } from './equipmentApi';
 
+// Purchase Orders + Vendors (inventory-service) — WO Purchasing tab
+export {
+  purchaseOrderApi,
+  vendorApi,
+  type PurchaseOrderType,
+  type PurchaseOrderStatus,
+  type InventoryMode,
+  type PurchaseOrderListItem,
+  type PurchaseOrderLine,
+  type PurchaseOrderResponse,
+  type PurchaseOrderLineInput,
+  type CreatePurchaseOrderRequest,
+  type UpdatePurchaseOrderRequest,
+  type Vendor,
+  type CreateVendorRequest,
+  type ReceiptExtractionResult,
+  type ReceiptExtractionLine,
+} from './purchaseOrderApi';
+
 // Files APIs (location aggregate + direct site uploads)
 export {
   filesApi,
