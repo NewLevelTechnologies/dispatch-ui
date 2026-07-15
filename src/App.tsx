@@ -18,6 +18,8 @@ import ServiceLocationsPage from './pages/ServiceLocationsPage';
 import ServiceLocationDetailPage from './pages/ServiceLocationDetailPage';
 import WorkOrdersPage from './pages/WorkOrdersPage';
 import WorkOrderDetailPage from './pages/WorkOrderDetailPage';
+import PurchaseOrderFormPage from './pages/PurchaseOrderFormPage';
+import PurchaseOrderDetailPage from './pages/PurchaseOrderDetailPage';
 import EquipmentPage from './pages/EquipmentPage';
 import EquipmentDetailPage from './pages/EquipmentDetailPage';
 import EquipmentFormPage from './pages/EquipmentFormPage';
@@ -180,6 +182,9 @@ function App() {
       <Route path="/service-locations/:locId/equipment/new" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<EquipmentFormPage />} />} />
       <Route path="/work-orders" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<WorkOrdersPage />} />} />
       <Route path="/work-orders/:id" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<WorkOrderDetailPage />} />} />
+      <Route path="/purchase-orders/new" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<PurchaseOrderFormPage />} />} />
+      <Route path="/purchase-orders/:id" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<PurchaseOrderDetailPage />} />} />
+      <Route path="/purchase-orders/:id/edit" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<PurchaseOrderFormPage />} />} />
       <Route path="/equipment" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<EquipmentPage />} />} />
       <Route path="/equipment/new" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<EquipmentFormPage />} />} />
       <Route path="/equipment/:id" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<EquipmentDetailPage />} />} />

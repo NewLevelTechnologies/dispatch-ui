@@ -16,6 +16,7 @@ import {
   workflowsApi,
   workflowConfigApi,
   workOrderFilesApi,
+  purchaseOrderApi,
   type Dispatch,
   type Equipment,
   type ProgressCategory,
@@ -44,6 +45,7 @@ import WorkOrderFormDialog from '../components/WorkOrderFormDialog';
 import WorkOrderApprovalsCallout from '../features/work-orders/WorkOrderApprovalsCallout';
 import WorkOrderOverview from '../features/work-orders/WorkOrderOverview';
 import WorkOrderFilesTab from '../components/WorkOrderFilesTab';
+import WorkOrderPurchasingTab from '../components/WorkOrderPurchasingTab';
 import { formatPhone } from '../utils/formatPhone';
 import { titleCaseAddress } from '../utils/titleCaseAddress';
 import { roleAccent } from '../utils/roleColor';
@@ -52,7 +54,6 @@ import { TimeAgo } from '../components/TimeAgo';
 import { Heading } from '../components/catalyst/heading';
 import { Text } from '../components/catalyst/text';
 import { LoadingState } from '../components/ui/LoadingState';
-import { EmptyState } from '../components/ui/EmptyState';
 import { Tabs } from '../components/ui/Tabs';
 import { Pill, Tag } from '../components/ui/Pill';
 import { Card } from '../components/catalyst/card';
@@ -420,6 +421,16 @@ export default function WorkOrderDetailPage() {
     select: (page) => page.counts?.all ?? page.content.length,
   });
 
+  // Purchasing tab badge — PO count for this WO. Keyed under the same
+  // ['purchase-orders', id, …] prefix the tab/form invalidate, so it refreshes
+  // when a PO is created or edited.
+  const { data: poCount } = useQuery({
+    queryKey: ['purchase-orders', id, 'count'],
+    queryFn: () => purchaseOrderApi.list({ workOrderId: id!, size: 1 }),
+    enabled: !!id,
+    select: (page) => page.totalElements,
+  });
+
   const { data: workOrderTypes } = useQuery({
     queryKey: ['work-order-types'],
     queryFn: () => workOrderTypesApi.getAll(),
@@ -573,7 +584,7 @@ export default function WorkOrderDetailPage() {
       label: t('workOrders.detail.tabs.documents'),
       count: invoicesForCount.length + quotesForCount.length,
     },
-    { id: 'purchasing', label: t('workOrders.detail.tabs.purchasing') },
+    { id: 'purchasing', label: t('workOrders.detail.tabs.purchasing'), count: poCount },
     { id: 'files', label: t('workOrders.detail.tabs.files'), count: fileCount },
     { id: 'activity', label: t('workOrders.detail.tabs.activity') },
   ];
@@ -920,13 +931,7 @@ export default function WorkOrderDetailPage() {
           )}
 
           {tab === 'purchasing' && (
-            <Card>
-              <EmptyState
-                compact
-                title={t('workOrders.detail.tabs.purchasing')}
-                description={t('common.comingSoon')}
-              />
-            </Card>
+            <WorkOrderPurchasingTab workOrderId={workOrder.id} readOnly={frozen} />
           )}
 
           {tab === 'files' && (
