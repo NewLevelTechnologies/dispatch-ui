@@ -1,11 +1,23 @@
 /* eslint-disable i18next/no-literal-string -- dense procurement detail; short operational labels stay literal (same convention as the other detail pages). Entity names route through getName(). */
+import { useRef } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { CubeIcon, ReceiptPercentIcon, PencilSquareIcon } from '@heroicons/react/24/outline';
+import {
+  CubeIcon,
+  ReceiptPercentIcon,
+  PencilSquareIcon,
+  ArrowUpTrayIcon,
+  DocumentIcon,
+  TrashIcon,
+} from '@heroicons/react/24/outline';
 import {
   purchaseOrderApi,
+  poFilesApi,
+  PO_FILE_CONTENT_TYPES,
+  PO_FILE_MAX_BYTES,
   type PurchaseOrderStatus,
   type PurchaseOrderResponse,
+  type PoFileResponse,
 } from '../api';
 import { useGlossary } from '../contexts/GlossaryContext';
 import { showError } from '../lib/toast';
@@ -215,6 +227,8 @@ export default function PurchaseOrderDetailPage() {
                 <div className="mt-2.5 border-t border-border-soft pt-2.5 text-[11.5px] leading-relaxed text-fg-muted">{po.notes}</div>
               )}
             </Card>
+
+            <ReceiptCard poId={po.id} files={po.files ?? []} />
           </div>
 
           {/* Right rail */}
@@ -259,6 +273,105 @@ export default function PurchaseOrderDetailPage() {
         </div>
       </div>
     </AppLayout>
+  );
+}
+
+// Receipt / documents attached to the PO. Presigned upload → the PO detail
+// refetches (getById carries `files`). Scan pre-fills the form; this stores the
+// image — separate steps in v1 (per FE_HANDOFF_po_receipt_photo.md).
+function ReceiptCard({ poId, files }: { poId: string; files: PoFileResponse[] }) {
+  const queryClient = useQueryClient();
+  const fileRef = useRef<HTMLInputElement | null>(null);
+
+  const refresh = () => queryClient.invalidateQueries({ queryKey: ['purchase-order', poId] });
+
+  const upload = useMutation({
+    mutationFn: (file: File) => poFilesApi.upload(poId, file),
+    onSuccess: refresh,
+    onError: (err: unknown) => showError('Upload failed', err instanceof Error ? err.message : undefined),
+  });
+  const remove = useMutation({
+    mutationFn: (fileId: string) => poFilesApi.delete(poId, fileId),
+    onSuccess: refresh,
+    onError: (err: unknown) => showError('Could not remove the file', err instanceof Error ? err.message : undefined),
+  });
+
+  const pick = (file?: File) => {
+    if (!file) return;
+    if (!(PO_FILE_CONTENT_TYPES as readonly string[]).includes(file.type)) {
+      showError('Unsupported file type', 'Attach a JPG, PNG, WebP, or PDF.');
+      return;
+    }
+    if (file.size > PO_FILE_MAX_BYTES) {
+      showError('File is too large', 'Receipts must be under 25 MB.');
+      return;
+    }
+    upload.mutate(file);
+  };
+
+  return (
+    <Card
+      title="Receipt"
+      action={
+        <>
+          <input
+            ref={fileRef}
+            type="file"
+            accept={PO_FILE_CONTENT_TYPES.join(',')}
+            className="sr-only"
+            onChange={(e) => {
+              pick(e.target.files?.[0]);
+              e.target.value = '';
+            }}
+          />
+          <Button plain size="xs" disabled={upload.isPending} onClick={() => fileRef.current?.click()}>
+            <ArrowUpTrayIcon data-slot="icon" />
+            {upload.isPending ? 'Uploading…' : 'Upload'}
+          </Button>
+        </>
+      }
+    >
+      {files.length === 0 ? (
+        <Text size="sm" tone="muted">
+          No receipt attached. Upload the photo or PDF from the counter run.
+        </Text>
+      ) : (
+        <div className="flex flex-wrap gap-2.5">
+          {files.map((f) => {
+            const isImage = f.contentType.startsWith('image/');
+            return (
+              <div key={f.id} className="group relative">
+                <a
+                  href={f.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="block overflow-hidden rounded-md border border-border bg-bg-elev-2"
+                  title={f.fileName}
+                >
+                  {isImage ? (
+                    <img src={f.url} alt={f.fileName} className="size-[72px] object-cover" />
+                  ) : (
+                    <span className="flex size-[72px] flex-col items-center justify-center gap-1 text-fg-muted">
+                      <DocumentIcon className="size-6" />
+                      <span className="max-w-[64px] truncate px-1 text-[9px]">{f.fileName}</span>
+                    </span>
+                  )}
+                </a>
+                <button
+                  type="button"
+                  onClick={() => remove.mutate(f.id)}
+                  disabled={remove.isPending}
+                  aria-label="Remove file"
+                  className="absolute -right-1.5 -top-1.5 hidden rounded-full border border-border bg-bg-elev p-0.5 text-fg-muted shadow-sm hover:text-danger-600 group-hover:block"
+                >
+                  <TrashIcon className="size-3.5" />
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </Card>
   );
 }
 

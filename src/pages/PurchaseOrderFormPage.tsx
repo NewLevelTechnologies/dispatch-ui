@@ -94,6 +94,8 @@ export default function PurchaseOrderFormPage() {
 
   const [vendorName, setVendorName] = useState('');
   const [vendorId, setVendorId] = useState<string | null>(null);
+  // The chosen vendor record (when picked from the list) — drives tax prefill + the meta line.
+  const [pickedVendor, setPickedVendor] = useState<Vendor | null>(null);
   const [payment, setPayment] = useState(field ? 'Company account' : 'Net 30');
   const [eta, setEta] = useState('');
   const [notes, setNotes] = useState('');
@@ -286,14 +288,19 @@ export default function PurchaseOrderFormPage() {
             <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
               <VendorField
                 name={vendorName}
+                meta={pickedVendor}
                 onName={(v) => {
                   setVendorName(v);
                   setVendorId(null);
+                  setPickedVendor(null);
                 }}
                 matches={vendorId ? [] : vendorMatches}
                 onPick={(v) => {
                   setVendorName(v.name);
                   setVendorId(v.id);
+                  setPickedVendor(v);
+                  // Prefill the PO tax from the vendor's default (explicit taxRate still wins on save).
+                  if (v.taxRate != null) setTaxPct(String(Math.round(v.taxRate * 10000) / 100));
                 }}
               />
               {field ? (
@@ -489,16 +496,22 @@ export default function PurchaseOrderFormPage() {
 // resolves-or-creates by name on save).
 function VendorField({
   name,
+  meta,
   onName,
   matches,
   onPick,
 }: {
   name: string;
+  meta: Vendor | null;
   onName: (v: string) => void;
   matches: Vendor[];
   onPick: (v: Vendor) => void;
 }) {
   const [open, setOpen] = useState(false);
+  // Inherited account/terms/ordering/rep from the chosen vendor (snapshotted onto the PO server-side).
+  const metaBits = meta
+    ? [meta.accountNumber && `Acct ${meta.accountNumber}`, meta.paymentTerms, meta.orderingMethod, meta.rep].filter(Boolean)
+    : [];
   return (
     <Field size="xs" className="relative">
       <Label size="xs" required>
@@ -516,6 +529,16 @@ function VendorField({
         placeholder="Grainger, Home Depot…"
         aria-label="Vendor"
       />
+      {metaBits.length > 0 && (
+        <div className="mt-1 flex items-center gap-1 text-[11px] text-fg-muted">
+          {meta?.preferred && (
+            <span className="rounded-sm bg-success-500/12 px-1 py-px text-[9.5px] font-semibold uppercase tracking-wide text-success-600">
+              Preferred
+            </span>
+          )}
+          <span className="truncate">{metaBits.join(' · ')}</span>
+        </div>
+      )}
       {open && matches.length > 0 && name.trim().length >= 2 && (
         <div className="absolute inset-x-0 top-full z-30 mt-1 max-h-44 overflow-y-auto rounded-md border border-border bg-bg-elev shadow-lg">
           {matches.slice(0, 6).map((v) => (

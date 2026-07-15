@@ -249,6 +249,9 @@ export {
 export {
   purchaseOrderApi,
   vendorApi,
+  poFilesApi,
+  PO_FILE_CONTENT_TYPES,
+  PO_FILE_MAX_BYTES,
   type PurchaseOrderType,
   type PurchaseOrderStatus,
   type InventoryMode,
@@ -258,8 +261,12 @@ export {
   type PurchaseOrderLineInput,
   type CreatePurchaseOrderRequest,
   type UpdatePurchaseOrderRequest,
+  type PoFileResponse,
+  type PoFileStatus,
   type Vendor,
+  type VendorKind,
   type CreateVendorRequest,
+  type UpdateVendorRequest,
   type ReceiptExtractionResult,
   type ReceiptExtractionLine,
 } from './purchaseOrderApi';
