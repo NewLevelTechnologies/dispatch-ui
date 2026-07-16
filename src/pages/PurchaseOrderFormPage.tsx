@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { PlusIcon, XMarkIcon, BuildingStorefrontIcon, CubeIcon, ReceiptPercentIcon } from '@heroicons/react/24/outline';
 import {
   purchaseOrderApi,
+  poFilesApi,
   vendorApi,
   workOrderApi,
   type PurchaseOrderLineInput,
@@ -106,6 +107,11 @@ export default function PurchaseOrderFormPage() {
   const [taxPct, setTaxPct] = useState('');
   const [rows, setRows] = useState<Row[]>([blankRow()]);
   const [scanOff, setScanOff] = useState(false);
+  // The receipt the user scanned — retained so create can attach it to the PO
+  // without a second manual upload (scan and store are separate calls, but the
+  // user only picks the file once).
+  const [receiptFile, setReceiptFile] = useState<File | null>(null);
+  const receiptAttachFailed = useRef(false);
   const fileRef = useRef<HTMLInputElement | null>(null);
 
   // Prefill transient form state once the PO loads (same pattern as the *FormPage components).
@@ -185,7 +191,7 @@ export default function PurchaseOrderFormPage() {
 
   const save = useMutation({
     // `status` seeds the create; edit preserves the PO's existing status (unused here).
-    mutationFn: (status: PurchaseOrderStatus) => {
+    mutationFn: async (status: PurchaseOrderStatus) => {
       const vendor = vendorId ? { vendorId } : { vendorName: vendorName.trim() };
       const common = {
         ...vendor,
@@ -198,17 +204,32 @@ export default function PurchaseOrderFormPage() {
       if (editing && id) {
         return purchaseOrderApi.update(id, common);
       }
-      return purchaseOrderApi.create({
+      receiptAttachFailed.current = false;
+      const created = await purchaseOrderApi.create({
         workOrderId: workOrderId || null,
         type,
         status,
         ...common,
       });
+      // Attach the scanned receipt to the new PO — same File, no re-pick. The
+      // scan endpoint is OCR-only (stateless), so this is the store step.
+      if (receiptFile) {
+        try {
+          await poFilesApi.upload(created.id, receiptFile);
+        } catch {
+          receiptAttachFailed.current = true;
+        }
+      }
+      return created;
     },
     onSuccess: (saved) => {
       queryClient.invalidateQueries({ queryKey: ['purchase-orders'] });
       if (workOrderId) queryClient.invalidateQueries({ queryKey: ['purchase-orders', workOrderId] });
-      showSuccess(editing ? 'Purchase order saved' : 'Purchase order created');
+      if (receiptAttachFailed.current) {
+        showError('Purchase order created — but the receipt image didn’t attach. Add it from the purchase order.');
+      } else {
+        showSuccess(editing ? 'Purchase order saved' : 'Purchase order created');
+      }
       // Carry ?from=vendor through so the new PO's Back still returns to the vendor.
       const suffix = fromVendorId
         ? `?from=vendor&vendorId=${fromVendorId}&vName=${encodeURIComponent(fromVendorName)}`
@@ -252,6 +273,14 @@ export default function PurchaseOrderFormPage() {
 
   const busy = save.isPending || scan.isPending;
 
+  // Pick a receipt (drop or picker): retain it for the on-create attach and
+  // kick off the OCR pre-fill in one step.
+  const pickReceipt = (f?: File | null) => {
+    if (!f) return;
+    setReceiptFile(f);
+    scan.mutate(f);
+  };
+
   if (editing && poLoading) {
     return (
       <AppLayout>
@@ -281,13 +310,24 @@ export default function PurchaseOrderFormPage() {
             </Text>
           </div>
 
-          {/* Receipt scan pre-fill (field, AI-gated). Desktop upload, not a camera. */}
+          {/* Receipt scan pre-fill (field, AI-gated). Single file, so a direct
+              picker (one click) — picking scans it to pre-fill AND retains it for
+              the on-create attach (no second upload). */}
           {field && !editing && !scanOff && (
             <div className="mb-3.5 flex items-center gap-3 rounded-[10px] border border-dashed border-accent-500/40 bg-accent-500/5 px-3.5 py-3">
               <ReceiptPercentIcon className="size-5 shrink-0 text-fg-accent" />
               <div className="min-w-0 grow">
-                <div className="text-[12.5px] font-semibold text-fg-strong">Scan a receipt to pre-fill</div>
-                <div className="text-[11px] text-fg-muted">Vendor and line items auto-fill from the photo — you confirm the amounts.</div>
+                {receiptFile ? (
+                  <>
+                    <div className="text-[12.5px] font-semibold text-fg-strong">Receipt attached</div>
+                    <div className="truncate text-[11px] text-fg-muted">{receiptFile.name} — saved to this purchase order on create.</div>
+                  </>
+                ) : (
+                  <>
+                    <div className="text-[12.5px] font-semibold text-fg-strong">Scan a receipt to pre-fill</div>
+                    <div className="text-[11px] text-fg-muted">Vendor and line items auto-fill from the photo — you confirm the amounts.</div>
+                  </>
+                )}
               </div>
               <input
                 ref={fileRef}
@@ -295,13 +335,12 @@ export default function PurchaseOrderFormPage() {
                 accept="image/*"
                 className="sr-only"
                 onChange={(e) => {
-                  const f = e.target.files?.[0];
-                  if (f) scan.mutate(f);
+                  pickReceipt(e.target.files?.[0]);
                   e.target.value = '';
                 }}
               />
               <Button color="accent" size="xs" disabled={busy} onClick={() => fileRef.current?.click()}>
-                {scan.isPending ? 'Reading…' : 'Upload receipt'}
+                {scan.isPending ? 'Reading…' : receiptFile ? 'Replace' : 'Upload receipt'}
               </Button>
             </div>
           )}

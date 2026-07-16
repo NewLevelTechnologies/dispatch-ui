@@ -187,7 +187,9 @@ export default function VendorDetailPage() {
                   <Pill tone={STATUS_TONE[po.status]} dot>
                     {STATUS_LABEL[po.status]}
                   </Pill>
-                  <span className="shrink-0 font-mono text-[12px] font-semibold tabular-nums text-fg-strong">{money(po.totalCost)}</span>
+                  <span className="w-20 shrink-0 text-right font-mono text-[12px] font-semibold tabular-nums text-fg-strong">
+                    {money(po.totalCost)}
+                  </span>
                 </Link>
               ))}
             </div>

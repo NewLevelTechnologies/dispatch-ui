@@ -165,7 +165,7 @@ function PORow({ po }: { po: PurchaseOrderListItem }) {
         {STATUS_LABEL[po.status]}
       </Pill>
 
-      <div className="flex shrink-0 flex-col items-end">
+      <div className="flex w-24 shrink-0 flex-col items-end">
         <span className="font-mono text-[13.5px] font-bold tabular-nums text-fg-strong">
           {currency.format(po.totalCost ?? 0)}
         </span>

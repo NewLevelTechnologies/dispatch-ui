@@ -297,13 +297,20 @@ export const poFilesApi = {
   },
 
   /** Orchestrates the 3-step upload (request → PUT → confirm). */
-  upload: async (poId: string, file: File): Promise<PoFileResponse> => {
+  upload: async (
+    poId: string,
+    file: File,
+    options: { onProgress?: (stage: 'requesting' | 'uploading' | 'confirming') => void } = {},
+  ): Promise<PoFileResponse> => {
+    options.onProgress?.('requesting');
     const { fileId, uploadUrl } = await poFilesApi.requestUploadUrl(poId, {
       contentType: file.type,
       sizeBytes: file.size,
       fileName: file.name,
     });
+    options.onProgress?.('uploading');
     await putToS3(uploadUrl, file.type, file);
+    options.onProgress?.('confirming');
     return poFilesApi.confirm(poId, fileId);
   },
 

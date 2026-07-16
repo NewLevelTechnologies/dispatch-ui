@@ -131,7 +131,7 @@ describe('PurchaseOrderDetailPage', () => {
     mockFileUpload.mockResolvedValue({ id: 'f-9' });
     renderAt();
 
-    expect(await screen.findByText(/No receipt attached/i)).toBeInTheDocument();
+    await screen.findByText(/No receipt attached/i);
     const input = document.querySelector('input[type="file"]') as HTMLInputElement;
     await user.upload(input, new File(['x'], 'receipt.jpg', { type: 'image/jpeg' }));
 

@@ -12,6 +12,7 @@ const mockScan = vi.fn();
 const mockVendorSearch = vi.fn();
 const mockVendorGetById = vi.fn();
 const mockWoGetById = vi.fn();
+const mockPoUpload = vi.fn();
 
 vi.mock('../api/purchaseOrderApi', async () => {
   const actual = await vi.importActual<typeof import('../api/purchaseOrderApi')>('../api/purchaseOrderApi');
@@ -23,6 +24,13 @@ vi.mock('../api/purchaseOrderApi', async () => {
       create: (...a: unknown[]) => mockCreate(...a),
       update: (...a: unknown[]) => mockUpdate(...a),
       scanReceipt: (...a: unknown[]) => mockScan(...a),
+    },
+    poFilesApi: {
+      upload: (...a: unknown[]) => mockPoUpload(...a),
+      delete: vi.fn(),
+      list: vi.fn(),
+      requestUploadUrl: vi.fn(),
+      confirm: vi.fn(),
     },
     vendorApi: {
       search: (...a: unknown[]) => mockVendorSearch(...a),
@@ -102,6 +110,35 @@ describe('PurchaseOrderFormPage', () => {
     expect(payload.lines).toEqual([expect.objectContaining({ name: 'Air filter', quantityOrdered: 1 })]);
     // Navigates to the new PO's detail page.
     expect(await screen.findByText('PO detail page')).toBeInTheDocument();
+  });
+
+  it('attaches the scanned receipt to the new PO without a second upload', async () => {
+    const user = userEvent.setup();
+    mockScan.mockResolvedValue({
+      vendorName: 'Home Depot',
+      lines: [{ name: 'Air filter', quantity: 1, unitCost: 5 }],
+      warnings: [],
+    });
+    mockCreate.mockResolvedValue({ ...existingPo, id: 'po-9' });
+    mockPoUpload.mockResolvedValue({ id: 'f-1' });
+    renderAt('/purchase-orders/new?type=field&workOrderId=wo-1');
+
+    await screen.findByText('Record field purchase');
+    const file = new File(['x'], 'receipt.jpg', { type: 'image/jpeg' });
+    // Picking the receipt scans it (pre-fill) and retains it for the on-create attach.
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+    await user.upload(input, file);
+    await waitFor(() => expect(mockScan).toHaveBeenCalled());
+
+    const saveBtn = screen.getByRole('button', { name: /Save purchase/i });
+    await waitFor(() => expect(saveBtn).toBeEnabled());
+    await user.click(saveBtn);
+
+    await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(mockPoUpload).toHaveBeenCalledTimes(1));
+    // Same File the user scanned, attached to the created PO — never re-picked.
+    expect(mockPoUpload.mock.calls[0][0]).toBe('po-9');
+    expect(mockPoUpload.mock.calls[0][1]).toBe(file);
   });
 
   it('offers Save draft / Place order for a special order and places it as ORDERED', async () => {

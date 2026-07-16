@@ -21,6 +21,7 @@ import {
 } from '../api';
 import { useGlossary } from '../contexts/GlossaryContext';
 import { showError } from '../lib/toast';
+import EquipmentThumbnail from '../components/EquipmentThumbnail';
 import AppLayout from '../components/AppLayout';
 import { Card } from '../components/catalyst/card';
 import { Button } from '../components/catalyst/button';
@@ -290,9 +291,10 @@ export default function PurchaseOrderDetailPage() {
   );
 }
 
-// Receipt / documents attached to the PO. Presigned upload → the PO detail
-// refetches (getById carries `files`). Scan pre-fills the form; this stores the
-// image — separate steps in v1 (per FE_HANDOFF_po_receipt_photo.md).
+// Receipt / documents attached to the PO. Upload runs through the shared upload
+// direct picker (single receipt is one file — fewer clicks than a dialog); the
+// PO detail refetches (getById carries `files`). Thumbnails use the shared
+// EquipmentThumbnail (contain — no crop, no distortion).
 function ReceiptCard({ poId, files }: { poId: string; files: PoFileResponse[] }) {
   const queryClient = useQueryClient();
   const fileRef = useRef<HTMLInputElement | null>(null);
@@ -350,26 +352,20 @@ function ReceiptCard({ poId, files }: { poId: string; files: PoFileResponse[] })
           No receipt attached. Upload the photo or PDF from the counter run.
         </Text>
       ) : (
-        <div className="flex flex-wrap gap-2.5">
+        <div className="flex flex-wrap gap-3">
           {files.map((f) => {
             const isImage = f.contentType.startsWith('image/');
             return (
-              <div key={f.id} className="group relative">
-                <a
-                  href={f.url}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="block overflow-hidden rounded-md border border-border bg-bg-elev-2"
-                  title={f.fileName}
-                >
+              <div key={f.id} className="group relative w-20">
+                <a href={f.url} target="_blank" rel="noreferrer" title={f.fileName} className="block">
                   {isImage ? (
-                    <img src={f.url} alt={f.fileName} className="size-[72px] object-cover" />
+                    <EquipmentThumbnail url={f.url} name={f.fileName} sizeClass="size-20" fit="contain" />
                   ) : (
-                    <span className="flex size-[72px] flex-col items-center justify-center gap-1 text-fg-muted">
-                      <DocumentIcon className="size-6" />
-                      <span className="max-w-[64px] truncate px-1 text-[9px]">{f.fileName}</span>
-                    </span>
+                    <div className="grid size-20 place-items-center rounded-md bg-zinc-100 text-fg-muted ring-1 ring-zinc-950/5 dark:bg-zinc-900 dark:ring-white/10">
+                      <DocumentIcon className="size-7" />
+                    </div>
                   )}
+                  <span className="mt-1 block truncate text-[10px] text-fg-muted">{f.fileName}</span>
                 </a>
                 <button
                   type="button"
