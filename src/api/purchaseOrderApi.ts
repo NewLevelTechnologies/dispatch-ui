@@ -12,7 +12,15 @@ import type { Page } from './workOrderApi';
 // FIELD = counter run · ORDER = special order · STOCK = no job.
 export type PurchaseOrderType = 'FIELD' | 'ORDER' | 'STOCK';
 // Free set on the backend (no state machine) — a plain status dropdown.
-export type PurchaseOrderStatus = 'DRAFT' | 'ORDERED' | 'PARTIALLY_RECEIVED' | 'RECEIVED' | 'BILLED';
+// CANCELLED is terminal-by-convention (set via PATCH); it drops out of the
+// vendor open/spend rollups. Drafts are hard-deleted instead (see delete()).
+export type PurchaseOrderStatus =
+  | 'DRAFT'
+  | 'ORDERED'
+  | 'PARTIALLY_RECEIVED'
+  | 'RECEIVED'
+  | 'BILLED'
+  | 'CANCELLED';
 // Only acts on the not-yet-built receive flow — safe to default UNTRACKED.
 export type InventoryMode = 'TRACKED' | 'UNTRACKED';
 
@@ -85,6 +93,11 @@ export interface PurchaseOrderResponse {
   totalCost: number;
   createdAt: string;
   updatedAt: string;
+  // Cancellation metadata (when status = CANCELLED). Optional — the backend may
+  // not populate these yet (see FE_ASK_po_cancel_metadata.md); render what's present.
+  cancelledAt?: string | null;
+  cancelledByName?: string | null;
+  cancellationReason?: string | null;
 }
 
 // A line on create/patch. Omit id for new lines; PATCH `lines` replaces the set.
@@ -127,6 +140,9 @@ export interface UpdatePurchaseOrderRequest {
   eta?: string | null;
   notes?: string | null;
   lines?: PurchaseOrderLineInput[];
+  // Optional free-text (max 500), only read when status is set to CANCELLED.
+  // Reopening (any non-cancelled status) clears the cancellation metadata.
+  cancellationReason?: string | null;
 }
 
 export type VendorKind = 'DISTRIBUTOR' | 'MANUFACTURER' | 'RETAIL' | 'OTHER';
@@ -223,6 +239,12 @@ export const purchaseOrderApi = {
       request,
     );
     return response.data;
+  },
+
+  // Hard-delete a DRAFT PO (cascades lines + receipt files). 409 if status ≠ DRAFT
+  // (cancel those instead via update({ status: 'CANCELLED' })); 404 if missing.
+  delete: async (id: string): Promise<void> => {
+    await apiClient.delete(`/inventory/purchase-orders/${id}`);
   },
 
   // Multipart receipt upload → suggested fields (creates no PO). Callers must

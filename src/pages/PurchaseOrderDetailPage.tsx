@@ -1,5 +1,5 @@
 /* eslint-disable i18next/no-literal-string -- dense procurement detail; short operational labels stay literal (same convention as the other detail pages). Entity names route through getName(). */
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -20,12 +20,15 @@ import {
   type PoFileResponse,
 } from '../api';
 import { useGlossary } from '../contexts/GlossaryContext';
-import { showError } from '../lib/toast';
+import { showError, showSuccess, extractApiError } from '../lib/toast';
 import EquipmentThumbnail from '../components/EquipmentThumbnail';
+import ConfirmDialog from '../components/ConfirmDialog';
 import AppLayout from '../components/AppLayout';
 import { Card } from '../components/catalyst/card';
 import { Button } from '../components/catalyst/button';
 import { Select } from '../components/catalyst/select';
+import { Textarea } from '../components/catalyst/textarea';
+import { Field, Label } from '../components/catalyst/fieldset';
 import { Heading } from '../components/catalyst/heading';
 import { Text } from '../components/catalyst/text';
 import { Pill, Tag } from '../components/ui/Pill';
@@ -40,6 +43,7 @@ const STATUS_TONE: Record<PurchaseOrderStatus, PillTone> = {
   PARTIALLY_RECEIVED: 'warning',
   RECEIVED: 'success',
   BILLED: 'violet',
+  CANCELLED: 'neutral',
 };
 const STATUS_LABEL: Record<PurchaseOrderStatus, string> = {
   DRAFT: 'Draft',
@@ -47,6 +51,7 @@ const STATUS_LABEL: Record<PurchaseOrderStatus, string> = {
   PARTIALLY_RECEIVED: 'Partially received',
   RECEIVED: 'Received',
   BILLED: 'Billed',
+  CANCELLED: 'Cancelled',
 };
 const TYPE_LABEL = { FIELD: 'Field purchase', ORDER: 'Special order', STOCK: 'Stock' } as const;
 
@@ -65,12 +70,23 @@ export default function PurchaseOrderDetailPage() {
   // Smart back — honor ?from=vendor (a vendor's PO history / New PO), else the
   // work order the PO is attached to, else the cross-job list.
   const fromVendorId = params.get('from') === 'vendor' ? params.get('vendorId') : null;
+  // Removal confirm — 'delete' (hard, drafts) vs 'cancel' (terminal status, committed).
+  const [confirmAction, setConfirmAction] = useState<'delete' | 'cancel' | null>(null);
+  const [cancelReason, setCancelReason] = useState('');
 
   const { data: po, isLoading, isError } = useQuery({
     queryKey: ['purchase-order', id],
     queryFn: () => purchaseOrderApi.getById(id!),
     enabled: !!id,
   });
+
+  // Both the PO lists (WO tab, vendor history) and the vendor rollups
+  // (openPOs/ytdSpend) shift on cancel/delete.
+  const invalidateAll = () => {
+    queryClient.invalidateQueries({ queryKey: ['purchase-orders'] });
+    queryClient.invalidateQueries({ queryKey: ['vendors'] });
+    queryClient.invalidateQueries({ queryKey: ['vendor'] });
+  };
 
   const statusMutation = useMutation({
     mutationFn: (status: PurchaseOrderStatus) => purchaseOrderApi.update(id!, { status }),
@@ -79,6 +95,30 @@ export default function PurchaseOrderDetailPage() {
       queryClient.invalidateQueries({ queryKey: ['purchase-orders'] });
     },
     onError: (err: unknown) => showError('Could not change the status', err instanceof Error ? err.message : undefined),
+  });
+
+  // Draft → hard delete (cascades files); returns to the back target.
+  const deleteMutation = useMutation({
+    mutationFn: () => purchaseOrderApi.delete(id!),
+    onSuccess: () => {
+      invalidateAll();
+      showSuccess('Purchase order deleted');
+      navigate(fromVendorId ? `/vendors/${fromVendorId}` : po?.workOrderId ? `/work-orders/${po.workOrderId}` : '/work-orders');
+    },
+    onError: (err: unknown) => showError('Could not delete the purchase order', extractApiError(err) ?? undefined),
+  });
+
+  // Committed → cancel (terminal status; keeps record + files, drops from rollups).
+  // Reason passed as an argument (not closed over) so it's never stale.
+  const cancelMutation = useMutation({
+    mutationFn: (reason?: string) =>
+      purchaseOrderApi.update(id!, { status: 'CANCELLED', cancellationReason: reason || undefined }),
+    onSuccess: (updated) => {
+      queryClient.setQueryData(['purchase-order', id], updated);
+      invalidateAll();
+      showSuccess('Purchase order cancelled');
+    },
+    onError: (err: unknown) => showError('Could not cancel the purchase order', extractApiError(err) ?? undefined),
   });
 
   if (isLoading) {
@@ -102,6 +142,7 @@ export default function PurchaseOrderDetailPage() {
   }
 
   const field = po.type === 'FIELD';
+  const cancelled = po.status === 'CANCELLED';
   const backTo = fromVendorId
     ? `/vendors/${fromVendorId}`
     : po.workOrderId
@@ -112,6 +153,10 @@ export default function PurchaseOrderDetailPage() {
     : po.workOrderId
       ? getName('work_order')
       : getName('work_order', true);
+  // Carry this page's ?from context into Edit, so Cancel/Save returns here (and
+  // this page keeps its own origin for its Back link).
+  const qs = params.toString();
+  const editHref = `/purchase-orders/${po.id}/edit${qs ? `?${qs}` : ''}`;
   const billTotal = po.lines.reduce((s, l) => s + (l.billPrice ?? 0) * l.quantityOrdered, 0);
   const margin = billTotal - (po.totalCost ?? 0);
   const marginPct = billTotal > 0 ? Math.round((margin / billTotal) * 100) : 0;
@@ -162,34 +207,72 @@ export default function PurchaseOrderDetailPage() {
             <span className="label-tiny">Total cost</span>
             <span className="font-mono text-[22px] font-bold tabular-nums tracking-tight text-fg-strong">{money(po.totalCost)}</span>
           </div>
-          <div className="flex items-center gap-2">
-            {/* Receiving isn't built yet — a plain status set is the honest control. */}
-            <label className="flex items-center gap-1.5 text-[11px] text-fg-muted">
-              Status
-              <Select
-                value={po.status}
-                onChange={(e) => statusMutation.mutate(e.target.value as PurchaseOrderStatus)}
-                disabled={statusMutation.isPending}
-                aria-label="Status"
-                className="!w-auto"
-              >
-                {STATUSES.map((s) => (
-                  <option key={s} value={s}>
-                    {STATUS_LABEL[s]}
-                  </option>
-                ))}
-              </Select>
-            </label>
-            <Button href={`/purchase-orders/${po.id}/edit`} outline size="xs">
-              <PencilSquareIcon data-slot="icon" />
-              Edit
+          {/* Cancelled is terminal + read-only: no status/delete/cancel/edit,
+              just an optional Reopen (→ Draft). Otherwise the full controls. */}
+          {cancelled ? (
+            // Field purchases were paid at the counter — un-cancelling is a restore
+            // to Received, not a reopen to Draft (which only makes sense for orders).
+            <Button
+              outline
+              size="xs"
+              disabled={statusMutation.isPending}
+              onClick={() => statusMutation.mutate(field ? 'RECEIVED' : 'DRAFT')}
+            >
+              {field ? 'Restore' : 'Reopen'}
             </Button>
-          </div>
+          ) : (
+            <div className="flex items-center gap-2">
+              {/* Receiving isn't built yet — a plain status set is the honest control. */}
+              <label className="flex items-center gap-1.5 text-[11px] text-fg-muted">
+                Status
+                <Select
+                  value={po.status}
+                  onChange={(e) => statusMutation.mutate(e.target.value as PurchaseOrderStatus)}
+                  disabled={statusMutation.isPending}
+                  aria-label="Status"
+                  className="!w-auto"
+                >
+                  {STATUSES.map((s) => (
+                    <option key={s} value={s}>
+                      {STATUS_LABEL[s]}
+                    </option>
+                  ))}
+                </Select>
+              </label>
+              {/* Draft → hard delete; committed → cancel (terminal). Both confirmed. */}
+              {po.status === 'DRAFT' ? (
+                <Button outline size="xs" onClick={() => setConfirmAction('delete')}>
+                  <TrashIcon data-slot="icon" />
+                  Delete
+                </Button>
+              ) : (
+                <Button outline size="xs" onClick={() => setConfirmAction('cancel')}>
+                  Cancel PO
+                </Button>
+              )}
+              <Button href={editHref} outline size="xs">
+                <PencilSquareIcon data-slot="icon" />
+                Edit
+              </Button>
+            </div>
+          )}
         </div>
 
-        <POStepper type={po.type} status={po.status} />
+        {/* Cancelled banner — slim, under the header. Renders whatever cancel
+            metadata the backend provides (date / by / reason). */}
+        {po.status === 'CANCELLED' && (
+          <div className="mt-2 rounded-md border border-border-soft bg-bg-elev-2 px-3 py-2 text-[12px] text-fg-muted">
+            <span className="font-semibold text-fg-strong">Cancelled</span>
+            {po.cancelledAt && <> {fmtDate(po.cancelledAt)}</>}
+            {po.cancelledByName && <> by {po.cancelledByName}</>}
+            {po.cancellationReason && <span className="text-fg-dim"> · {po.cancellationReason}</span>}
+          </div>
+        )}
 
-        <div className="mt-3 grid grid-cols-1 items-start gap-3 lg:grid-cols-[1fr_320px]">
+        <POStepper type={po.type} status={po.status} cancelledAt={po.cancelledAt} />
+
+        {/* Body reads inert on a cancelled PO — muted to match the banner. */}
+        <div className={`mt-3 grid grid-cols-1 items-start gap-3 lg:grid-cols-[1fr_320px] ${cancelled ? 'opacity-60' : ''}`}>
           <div className="flex min-w-0 flex-col gap-3">
             {/* Vendor & details */}
             <Card title="Vendor & details">
@@ -224,7 +307,8 @@ export default function PurchaseOrderDetailPage() {
                         <td className="py-2 text-right tabular-nums">{l.quantityOrdered}</td>
                         <td className="py-2 text-right tabular-nums text-fg-muted">
                           {l.quantityReceived >= l.quantityOrdered && l.quantityOrdered > 0 ? (
-                            <Pill tone="success" dot>
+                            // On a cancelled PO the receipt state reads inert — grey, no live dot.
+                            <Pill tone={cancelled ? 'neutral' : 'success'} dot={!cancelled}>
                               {l.quantityReceived}
                             </Pill>
                           ) : (
@@ -287,6 +371,38 @@ export default function PurchaseOrderDetailPage() {
           </div>
         </div>
       </div>
+
+      <ConfirmDialog
+        isOpen={confirmAction !== null}
+        onClose={() => {
+          setConfirmAction(null);
+          setCancelReason('');
+        }}
+        onConfirm={() =>
+          confirmAction === 'delete' ? deleteMutation.mutate() : cancelMutation.mutate(cancelReason.trim() || undefined)
+        }
+        title={confirmAction === 'delete' ? 'Delete purchase order?' : 'Cancel purchase order?'}
+        message={
+          confirmAction === 'delete'
+            ? `${po.poNumber} and its receipt files will be permanently deleted. This can't be undone.`
+            : `${po.poNumber} will be cancelled — it drops out of open totals but its record and receipt files are kept.`
+        }
+        confirmLabel={confirmAction === 'delete' ? 'Delete' : 'Cancel PO'}
+        cancelLabel="Keep"
+        isDestructive
+      >
+        {confirmAction === 'cancel' && (
+          <Field>
+            <Label>Reason (optional)</Label>
+            <Textarea
+              value={cancelReason}
+              onChange={(e) => setCancelReason(e.target.value.slice(0, 500))}
+              rows={2}
+              placeholder="e.g. duplicate of PO-00007"
+            />
+          </Field>
+        )}
+      </ConfirmDialog>
     </AppLayout>
   );
 }
@@ -395,11 +511,22 @@ function KV({ label, value }: { label: string; value: string }) {
 }
 
 // Read-only progress — derived from status (the receive action that advances it
-// automatically is backend-deferred).
-function POStepper({ type, status }: { type: PurchaseOrderResponse['type']; status: PurchaseOrderStatus }) {
+// automatically is backend-deferred). On CANCELLED the timeline terminates: the
+// type's steps render greyed/inert and a final "Cancelled {date}" node caps it.
+function POStepper({
+  type,
+  status,
+  cancelledAt,
+}: {
+  type: PurchaseOrderResponse['type'];
+  status: PurchaseOrderStatus;
+  cancelledAt?: string | null;
+}) {
   const steps = type === 'FIELD' ? ['Purchased', 'Received', 'Billed'] : ['Draft', 'Ordered', 'Received', 'Billed'];
-  const reached =
-    type === 'FIELD'
+  const cancelled = status === 'CANCELLED';
+  const reached = cancelled
+    ? -1
+    : type === 'FIELD'
       ? status === 'BILLED'
         ? 2
         : status === 'RECEIVED' || status === 'PARTIALLY_RECEIVED'
@@ -418,10 +545,10 @@ function POStepper({ type, status }: { type: PurchaseOrderResponse['type']; stat
         const done = i < reached;
         const here = i === reached;
         return (
-          <div key={s} className="flex flex-shrink-0 items-center gap-2">
-            {i > 0 && <span className={`h-0.5 w-4 sm:w-8 ${i <= reached ? 'bg-success-500' : 'bg-border'}`} />}
+          <div key={s} className={`flex flex-shrink-0 items-center gap-2 ${cancelled ? 'opacity-45' : ''}`}>
+            {i > 0 && <span className={`h-0.5 w-4 sm:w-8 ${!cancelled && i <= reached ? 'bg-success-500' : 'bg-border'}`} />}
             <span
-              className="grid size-4 place-items-center rounded-full text-[9px] font-bold text-white"
+              className="grid size-4 place-items-center rounded-full text-[9px] font-bold"
               style={{
                 background: done ? 'var(--success-500)' : here ? 'var(--accent-500)' : 'var(--bg-active)',
                 color: done || here ? 'white' : 'var(--fg-dim)',
@@ -433,6 +560,15 @@ function POStepper({ type, status }: { type: PurchaseOrderResponse['type']; stat
           </div>
         );
       })}
+      {cancelled && (
+        <div className="flex flex-shrink-0 items-center gap-2">
+          <span className="h-0.5 w-4 bg-border sm:w-8" />
+          <span className="grid size-4 place-items-center rounded-full bg-fg-muted text-[9px] font-bold text-white">✕</span>
+          <span className="text-[11.5px] font-bold text-fg-strong">
+            Cancelled{cancelledAt ? ` ${fmtDate(cancelledAt)}` : ''}
+          </span>
+        </div>
+      )}
     </div>
   );
 }
