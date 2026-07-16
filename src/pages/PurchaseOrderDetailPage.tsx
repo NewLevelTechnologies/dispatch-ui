@@ -27,6 +27,8 @@ import AppLayout from '../components/AppLayout';
 import { Card } from '../components/catalyst/card';
 import { Button } from '../components/catalyst/button';
 import { Select } from '../components/catalyst/select';
+import { Textarea } from '../components/catalyst/textarea';
+import { Field, Label } from '../components/catalyst/fieldset';
 import { Heading } from '../components/catalyst/heading';
 import { Text } from '../components/catalyst/text';
 import { Pill, Tag } from '../components/ui/Pill';
@@ -70,6 +72,7 @@ export default function PurchaseOrderDetailPage() {
   const fromVendorId = params.get('from') === 'vendor' ? params.get('vendorId') : null;
   // Removal confirm — 'delete' (hard, drafts) vs 'cancel' (terminal status, committed).
   const [confirmAction, setConfirmAction] = useState<'delete' | 'cancel' | null>(null);
+  const [cancelReason, setCancelReason] = useState('');
 
   const { data: po, isLoading, isError } = useQuery({
     queryKey: ['purchase-order', id],
@@ -106,8 +109,10 @@ export default function PurchaseOrderDetailPage() {
   });
 
   // Committed → cancel (terminal status; keeps record + files, drops from rollups).
+  // Reason passed as an argument (not closed over) so it's never stale.
   const cancelMutation = useMutation({
-    mutationFn: () => purchaseOrderApi.update(id!, { status: 'CANCELLED' }),
+    mutationFn: (reason?: string) =>
+      purchaseOrderApi.update(id!, { status: 'CANCELLED', cancellationReason: reason || undefined }),
     onSuccess: (updated) => {
       queryClient.setQueryData(['purchase-order', id], updated);
       invalidateAll();
@@ -137,6 +142,7 @@ export default function PurchaseOrderDetailPage() {
   }
 
   const field = po.type === 'FIELD';
+  const cancelled = po.status === 'CANCELLED';
   const backTo = fromVendorId
     ? `/vendors/${fromVendorId}`
     : po.workOrderId
@@ -203,9 +209,16 @@ export default function PurchaseOrderDetailPage() {
           </div>
           {/* Cancelled is terminal + read-only: no status/delete/cancel/edit,
               just an optional Reopen (→ Draft). Otherwise the full controls. */}
-          {po.status === 'CANCELLED' ? (
-            <Button outline size="xs" disabled={statusMutation.isPending} onClick={() => statusMutation.mutate('DRAFT')}>
-              Reopen
+          {cancelled ? (
+            // Field purchases were paid at the counter — un-cancelling is a restore
+            // to Received, not a reopen to Draft (which only makes sense for orders).
+            <Button
+              outline
+              size="xs"
+              disabled={statusMutation.isPending}
+              onClick={() => statusMutation.mutate(field ? 'RECEIVED' : 'DRAFT')}
+            >
+              {field ? 'Restore' : 'Reopen'}
             </Button>
           ) : (
             <div className="flex items-center gap-2">
@@ -258,7 +271,8 @@ export default function PurchaseOrderDetailPage() {
 
         <POStepper type={po.type} status={po.status} cancelledAt={po.cancelledAt} />
 
-        <div className="mt-3 grid grid-cols-1 items-start gap-3 lg:grid-cols-[1fr_320px]">
+        {/* Body reads inert on a cancelled PO — muted to match the banner. */}
+        <div className={`mt-3 grid grid-cols-1 items-start gap-3 lg:grid-cols-[1fr_320px] ${cancelled ? 'opacity-60' : ''}`}>
           <div className="flex min-w-0 flex-col gap-3">
             {/* Vendor & details */}
             <Card title="Vendor & details">
@@ -293,7 +307,8 @@ export default function PurchaseOrderDetailPage() {
                         <td className="py-2 text-right tabular-nums">{l.quantityOrdered}</td>
                         <td className="py-2 text-right tabular-nums text-fg-muted">
                           {l.quantityReceived >= l.quantityOrdered && l.quantityOrdered > 0 ? (
-                            <Pill tone="success" dot>
+                            // On a cancelled PO the receipt state reads inert — grey, no live dot.
+                            <Pill tone={cancelled ? 'neutral' : 'success'} dot={!cancelled}>
                               {l.quantityReceived}
                             </Pill>
                           ) : (
@@ -359,8 +374,13 @@ export default function PurchaseOrderDetailPage() {
 
       <ConfirmDialog
         isOpen={confirmAction !== null}
-        onClose={() => setConfirmAction(null)}
-        onConfirm={() => (confirmAction === 'delete' ? deleteMutation.mutate() : cancelMutation.mutate())}
+        onClose={() => {
+          setConfirmAction(null);
+          setCancelReason('');
+        }}
+        onConfirm={() =>
+          confirmAction === 'delete' ? deleteMutation.mutate() : cancelMutation.mutate(cancelReason.trim() || undefined)
+        }
         title={confirmAction === 'delete' ? 'Delete purchase order?' : 'Cancel purchase order?'}
         message={
           confirmAction === 'delete'
@@ -370,7 +390,19 @@ export default function PurchaseOrderDetailPage() {
         confirmLabel={confirmAction === 'delete' ? 'Delete' : 'Cancel PO'}
         cancelLabel="Keep"
         isDestructive
-      />
+      >
+        {confirmAction === 'cancel' && (
+          <Field>
+            <Label>Reason (optional)</Label>
+            <Textarea
+              value={cancelReason}
+              onChange={(e) => setCancelReason(e.target.value.slice(0, 500))}
+              rows={2}
+              placeholder="e.g. duplicate of PO-00007"
+            />
+          </Field>
+        )}
+      </ConfirmDialog>
     </AppLayout>
   );
 }

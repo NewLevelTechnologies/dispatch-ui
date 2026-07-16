@@ -155,7 +155,7 @@ describe('PurchaseOrderDetailPage', () => {
     await waitFor(() => expect(mockDelete).toHaveBeenCalledWith('po-1'));
   });
 
-  it('cancels a committed PO via a CANCELLED status patch', async () => {
+  it('cancels a committed PO with a reason via a CANCELLED status patch', async () => {
     const user = userEvent.setup();
     // Default fixture is ORDERED (committed).
     mockUpdate.mockResolvedValue({ ...po, status: 'CANCELLED' });
@@ -165,9 +165,12 @@ describe('PurchaseOrderDetailPage', () => {
     expect(screen.queryByRole('button', { name: /^Delete$/i })).not.toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: /Cancel PO/i }));
     const dialog = await screen.findByRole('dialog');
+    await user.type(within(dialog).getByPlaceholderText(/duplicate of PO/i), 'duplicate order');
     await user.click(within(dialog).getByRole('button', { name: /Cancel PO/i }));
 
-    await waitFor(() => expect(mockUpdate).toHaveBeenCalledWith('po-1', { status: 'CANCELLED' }));
+    await waitFor(() =>
+      expect(mockUpdate).toHaveBeenCalledWith('po-1', { status: 'CANCELLED', cancellationReason: 'duplicate order' }),
+    );
   });
 
   it('is read-only on a CANCELLED PO — banner, Reopen only, no status/delete/cancel/edit', async () => {
@@ -192,7 +195,7 @@ describe('PurchaseOrderDetailPage', () => {
     expect(screen.queryByRole('link', { name: /Edit/i })).not.toBeInTheDocument();
   });
 
-  it('reopens a cancelled PO to DRAFT', async () => {
+  it('reopens a cancelled ORDER to DRAFT', async () => {
     const user = userEvent.setup();
     mockGetById.mockResolvedValue({ ...po, status: 'CANCELLED' });
     mockUpdate.mockResolvedValue({ ...po, status: 'DRAFT' });
@@ -202,5 +205,19 @@ describe('PurchaseOrderDetailPage', () => {
     await user.click(screen.getByRole('button', { name: /Reopen/i }));
 
     await waitFor(() => expect(mockUpdate).toHaveBeenCalledWith('po-1', { status: 'DRAFT' }));
+  });
+
+  it('restores a cancelled FIELD purchase to RECEIVED', async () => {
+    const user = userEvent.setup();
+    mockGetById.mockResolvedValue({ ...po, type: 'FIELD', status: 'CANCELLED' });
+    mockUpdate.mockResolvedValue({ ...po, type: 'FIELD', status: 'RECEIVED' });
+    renderAt();
+
+    await screen.findByRole('heading', { name: 'Grainger' });
+    // Field purchases restore (→ Received), not reopen (→ Draft).
+    expect(screen.queryByRole('button', { name: /Reopen/i })).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /Restore/i }));
+
+    await waitFor(() => expect(mockUpdate).toHaveBeenCalledWith('po-1', { status: 'RECEIVED' }));
   });
 });

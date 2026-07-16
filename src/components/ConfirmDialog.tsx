@@ -1,9 +1,11 @@
-import { Alert, AlertActions, AlertDescription, AlertTitle } from './catalyst/alert';
+import type { ReactNode } from 'react';
+import { Alert, AlertActions, AlertBody, AlertDescription, AlertTitle } from './catalyst/alert';
 import { Button } from './catalyst/button';
 
 // Shared destructive-confirmation surface. Renders Catalyst <Alert> under the
 // hood so every confirm in the app reads the same way (see
-// handoff/design-system-reference.md §5).
+// handoff/design-system-reference.md §5). Pass `children` for an extra control
+// in the body (e.g. an optional reason input).
 interface ConfirmDialogProps {
   isOpen: boolean;
   onClose: () => void;
@@ -14,6 +16,7 @@ interface ConfirmDialogProps {
   cancelLabel?: string;
   isDestructive?: boolean;
   isPending?: boolean;
+  children?: ReactNode;
 }
 
 export default function ConfirmDialog({
@@ -26,6 +29,7 @@ export default function ConfirmDialog({
   cancelLabel = 'Cancel',
   isDestructive = false,
   isPending = false,
+  children,
 }: ConfirmDialogProps) {
   const handleConfirm = () => {
     onConfirm();
@@ -36,6 +40,7 @@ export default function ConfirmDialog({
     <Alert open={isOpen} onClose={onClose}>
       <AlertTitle>{title}</AlertTitle>
       <AlertDescription>{message}</AlertDescription>
+      {children && <AlertBody>{children}</AlertBody>}
       <AlertActions>
         <Button plain onClick={onClose} disabled={isPending}>
           {cancelLabel}

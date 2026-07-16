@@ -140,6 +140,9 @@ export interface UpdatePurchaseOrderRequest {
   eta?: string | null;
   notes?: string | null;
   lines?: PurchaseOrderLineInput[];
+  // Optional free-text (max 500), only read when status is set to CANCELLED.
+  // Reopening (any non-cancelled status) clears the cancellation metadata.
+  cancellationReason?: string | null;
 }
 
 export type VendorKind = 'DISTRIBUTOR' | 'MANUFACTURER' | 'RETAIL' | 'OTHER';
