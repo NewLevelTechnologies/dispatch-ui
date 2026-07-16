@@ -1,12 +1,13 @@
 /* eslint-disable i18next/no-literal-string -- route placeholders + assertion strings in a test fixture. */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import { renderWithProviders, userEvent } from '../test/utils';
 import PurchaseOrderDetailPage from './PurchaseOrderDetailPage';
 import type { PurchaseOrderResponse } from '../api';
 
 const mockGetById = vi.fn();
 const mockUpdate = vi.fn();
+const mockDelete = vi.fn();
 const mockFileUpload = vi.fn();
 const mockFileDelete = vi.fn();
 
@@ -17,6 +18,7 @@ vi.mock('../api/purchaseOrderApi', async () => {
     purchaseOrderApi: {
       getById: (...a: unknown[]) => mockGetById(...a),
       update: (...a: unknown[]) => mockUpdate(...a),
+      delete: (...a: unknown[]) => mockDelete(...a),
     },
     poFilesApi: {
       list: vi.fn(),
@@ -137,5 +139,68 @@ describe('PurchaseOrderDetailPage', () => {
 
     await waitFor(() => expect(mockFileUpload).toHaveBeenCalledTimes(1));
     expect(mockFileUpload.mock.calls[0][0]).toBe('po-1');
+  });
+
+  it('deletes a DRAFT PO after confirming', async () => {
+    const user = userEvent.setup();
+    mockGetById.mockResolvedValue({ ...po, status: 'DRAFT' });
+    mockDelete.mockResolvedValue(undefined);
+    renderAt();
+
+    await screen.findByRole('heading', { name: 'Grainger' });
+    await user.click(screen.getByRole('button', { name: /^Delete$/i }));
+    const dialog = await screen.findByRole('dialog');
+    await user.click(within(dialog).getByRole('button', { name: /^Delete$/i }));
+
+    await waitFor(() => expect(mockDelete).toHaveBeenCalledWith('po-1'));
+  });
+
+  it('cancels a committed PO via a CANCELLED status patch', async () => {
+    const user = userEvent.setup();
+    // Default fixture is ORDERED (committed).
+    mockUpdate.mockResolvedValue({ ...po, status: 'CANCELLED' });
+    renderAt();
+
+    await screen.findByRole('heading', { name: 'Grainger' });
+    expect(screen.queryByRole('button', { name: /^Delete$/i })).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /Cancel PO/i }));
+    const dialog = await screen.findByRole('dialog');
+    await user.click(within(dialog).getByRole('button', { name: /Cancel PO/i }));
+
+    await waitFor(() => expect(mockUpdate).toHaveBeenCalledWith('po-1', { status: 'CANCELLED' }));
+  });
+
+  it('is read-only on a CANCELLED PO — banner, Reopen only, no status/delete/cancel/edit', async () => {
+    mockGetById.mockResolvedValue({
+      ...po,
+      status: 'CANCELLED',
+      cancelledByName: 'Dana Reyes',
+      cancelledAt: '2026-07-16T00:00:00Z',
+      cancellationReason: 'duplicate',
+    });
+    renderAt();
+
+    await screen.findByRole('heading', { name: 'Grainger' });
+    // Cancelled banner (with the metadata we render when present).
+    expect(screen.getByText(/by Dana Reyes/)).toBeInTheDocument();
+    expect(screen.getByText(/duplicate/)).toBeInTheDocument();
+    // Read-only: only Reopen; no status dropdown / delete / cancel / edit.
+    expect(screen.getByRole('button', { name: /Reopen/i })).toBeInTheDocument();
+    expect(screen.queryByLabelText('Status')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Delete$/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Cancel PO/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /Edit/i })).not.toBeInTheDocument();
+  });
+
+  it('reopens a cancelled PO to DRAFT', async () => {
+    const user = userEvent.setup();
+    mockGetById.mockResolvedValue({ ...po, status: 'CANCELLED' });
+    mockUpdate.mockResolvedValue({ ...po, status: 'DRAFT' });
+    renderAt();
+
+    await screen.findByRole('heading', { name: 'Grainger' });
+    await user.click(screen.getByRole('button', { name: /Reopen/i }));
+
+    await waitFor(() => expect(mockUpdate).toHaveBeenCalledWith('po-1', { status: 'DRAFT' }));
   });
 });

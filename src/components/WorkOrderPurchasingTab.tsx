@@ -29,6 +29,7 @@ const STATUS_TONE: Record<PurchaseOrderStatus, PillTone> = {
   PARTIALLY_RECEIVED: 'warning',
   RECEIVED: 'success',
   BILLED: 'violet',
+  CANCELLED: 'neutral',
 };
 const STATUS_LABEL: Record<PurchaseOrderStatus, string> = {
   DRAFT: 'Draft',
@@ -36,6 +37,7 @@ const STATUS_LABEL: Record<PurchaseOrderStatus, string> = {
   PARTIALLY_RECEIVED: 'Partially received',
   RECEIVED: 'Received',
   BILLED: 'Billed',
+  CANCELLED: 'Cancelled',
 };
 const TYPE_LABEL: Record<PurchaseOrderType, string> = {
   FIELD: 'Field purchase',
@@ -123,10 +125,13 @@ export default function WorkOrderPurchasingTab({ workOrderId, readOnly = false }
 
 function PORow({ po }: { po: PurchaseOrderListItem }) {
   const field = po.type === 'FIELD';
+  // Cancelled stays in the list but de-emphasized (muted, dimmed) — it's out of
+  // the open/committed rollups.
+  const cancelled = po.status === 'CANCELLED';
   return (
     <Link
       to={`/purchase-orders/${po.id}`}
-      className="flex w-full items-center gap-3 border-b border-border-soft px-4 py-3 text-left last:border-b-0 hover:bg-bg-hover"
+      className={`flex w-full items-center gap-3 border-b border-border-soft px-4 py-3 text-left last:border-b-0 hover:bg-bg-hover ${cancelled ? 'opacity-55' : ''}`}
     >
       <span
         className="grid size-[30px] shrink-0 place-items-center rounded-md"

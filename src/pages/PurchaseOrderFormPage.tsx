@@ -80,12 +80,29 @@ export default function PurchaseOrderFormPage() {
     enabled: !!workOrderId,
   });
   const woNumber = workOrder?.workOrderNumber || (workOrderId ? `#${workOrderId.slice(0, 8)}` : null);
-  // Smart back — honor ?from=vendor (New PO launched from a vendor's page), else
-  // the attached work order, else the cross-job list.
+  // Smart back — preserve the ?from=vendor context to carry through.
   const fromVendorId = params.get('from') === 'vendor' ? params.get('vendorId') : null;
   const fromVendorName = params.get('vName') || 'Vendor';
-  const backTo = fromVendorId ? `/vendors/${fromVendorId}` : workOrderId ? `/work-orders/${workOrderId}` : '/work-orders';
-  const backLabel = fromVendorId ? fromVendorName : (woNumber ?? getName('work_order', true));
+  const fromSuffix = fromVendorId
+    ? `?from=vendor&vendorId=${fromVendorId}&vName=${encodeURIComponent(fromVendorName)}`
+    : '';
+  // Editing is launched from the PO detail → Cancel/back returns there (carrying
+  // its own origin). Creating returns to where it launched (vendor, else the WO,
+  // else the cross-job list).
+  const backTo =
+    editing && id
+      ? `/purchase-orders/${id}${fromSuffix}`
+      : fromVendorId
+        ? `/vendors/${fromVendorId}`
+        : workOrderId
+          ? `/work-orders/${workOrderId}`
+          : '/work-orders';
+  const backLabel =
+    editing && id
+      ? (po?.poNumber ?? 'Purchase order')
+      : fromVendorId
+        ? fromVendorName
+        : (woNumber ?? getName('work_order', true));
 
   // FIELD = counter run (received on save) · ORDER = special order (draft/placed).
   const type: PurchaseOrderType = editing
@@ -230,11 +247,8 @@ export default function PurchaseOrderFormPage() {
       } else {
         showSuccess(editing ? 'Purchase order saved' : 'Purchase order created');
       }
-      // Carry ?from=vendor through so the new PO's Back still returns to the vendor.
-      const suffix = fromVendorId
-        ? `?from=vendor&vendorId=${fromVendorId}&vName=${encodeURIComponent(fromVendorName)}`
-        : '';
-      navigate(`/purchase-orders/${saved.id}${suffix}`);
+      // Land on the saved PO's detail, carrying the ?from=vendor context through.
+      navigate(`/purchase-orders/${saved.id}${fromSuffix}`);
     },
     onError: (err: unknown) => showError('Could not save the purchase order', extractApiError(err) ?? undefined),
   });

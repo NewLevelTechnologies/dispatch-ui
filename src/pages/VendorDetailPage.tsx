@@ -23,6 +23,7 @@ const STATUS_TONE: Record<PurchaseOrderStatus, PillTone> = {
   PARTIALLY_RECEIVED: 'warning',
   RECEIVED: 'success',
   BILLED: 'violet',
+  CANCELLED: 'neutral',
 };
 const STATUS_LABEL: Record<PurchaseOrderStatus, string> = {
   DRAFT: 'Draft',
@@ -30,6 +31,7 @@ const STATUS_LABEL: Record<PurchaseOrderStatus, string> = {
   PARTIALLY_RECEIVED: 'Partially received',
   RECEIVED: 'Received',
   BILLED: 'Billed',
+  CANCELLED: 'Cancelled',
 };
 const TYPE_LABEL = { FIELD: 'Field purchase', ORDER: 'Special order', STOCK: 'Stock' } as const;
 const KIND_LABEL: Record<VendorKind, string> = {
@@ -178,7 +180,7 @@ export default function VendorDetailPage() {
                 <Link
                   key={po.id}
                   to={`/purchase-orders/${po.id}?from=vendor&vendorId=${vendor.id}&vName=${encodeURIComponent(vendor.name)}`}
-                  className="flex items-center gap-2.5 border-b border-border-soft px-3.5 py-2.5 last:border-b-0 hover:bg-bg-hover"
+                  className={`flex items-center gap-2.5 border-b border-border-soft px-3.5 py-2.5 last:border-b-0 hover:bg-bg-hover ${po.status === 'CANCELLED' ? 'opacity-55' : ''}`}
                 >
                   <span className="shrink-0 font-mono text-[12px] font-bold text-fg-strong">{po.poNumber}</span>
                   <Tag word>{TYPE_LABEL[po.type]}</Tag>
