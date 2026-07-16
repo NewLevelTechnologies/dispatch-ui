@@ -421,14 +421,15 @@ export default function WorkOrderDetailPage() {
     select: (page) => page.counts?.all ?? page.content.length,
   });
 
-  // Purchasing tab badge — PO count for this WO. Keyed under the same
-  // ['purchase-orders', id, …] prefix the tab/form invalidate, so it refreshes
-  // when a PO is created or edited.
+  // Purchasing tab badge — shares the WorkOrderPurchasingTab's exact query
+  // (['purchase-orders', id] + size 100) so the badge and the tab's own count
+  // are the same number from one fetch. Counts content (not totalElements,
+  // which the backend reports unreliably for small page sizes).
   const { data: poCount } = useQuery({
-    queryKey: ['purchase-orders', id, 'count'],
-    queryFn: () => purchaseOrderApi.list({ workOrderId: id!, size: 1 }),
+    queryKey: ['purchase-orders', id],
+    queryFn: () => purchaseOrderApi.list({ workOrderId: id!, size: 100 }),
     enabled: !!id,
-    select: (page) => page.totalElements,
+    select: (page) => page.content.length,
   });
 
   const { data: workOrderTypes } = useQuery({
