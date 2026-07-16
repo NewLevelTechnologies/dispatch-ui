@@ -98,6 +98,13 @@ describe('PurchaseOrderDetailPage', () => {
     expect(back).toHaveAttribute('href', '/vendors/v-1');
   });
 
+  it('returns to the Purchasing list on Back when opened with ?from=purchasing', async () => {
+    renderAt('/purchase-orders/po-1?from=purchasing');
+
+    const back = await screen.findByRole('link', { name: /Purchasing/i });
+    expect(back).toHaveAttribute('href', '/purchasing');
+  });
+
   it('links Edit to the edit route', async () => {
     renderAt();
 

@@ -70,6 +70,7 @@ export default function PurchaseOrderDetailPage() {
   // Smart back — honor ?from=vendor (a vendor's PO history / New PO), else the
   // work order the PO is attached to, else the cross-job list.
   const fromVendorId = params.get('from') === 'vendor' ? params.get('vendorId') : null;
+  const fromPurchasing = params.get('from') === 'purchasing';
   // Removal confirm — 'delete' (hard, drafts) vs 'cancel' (terminal status, committed).
   const [confirmAction, setConfirmAction] = useState<'delete' | 'cancel' | null>(null);
   const [cancelReason, setCancelReason] = useState('');
@@ -103,7 +104,15 @@ export default function PurchaseOrderDetailPage() {
     onSuccess: () => {
       invalidateAll();
       showSuccess('Purchase order deleted');
-      navigate(fromVendorId ? `/vendors/${fromVendorId}` : po?.workOrderId ? `/work-orders/${po.workOrderId}` : '/work-orders');
+      navigate(
+        fromVendorId
+          ? `/vendors/${fromVendorId}`
+          : fromPurchasing
+            ? '/purchasing'
+            : po?.workOrderId
+              ? `/work-orders/${po.workOrderId}`
+              : '/work-orders',
+      );
     },
     onError: (err: unknown) => showError('Could not delete the purchase order', extractApiError(err) ?? undefined),
   });
@@ -145,14 +154,18 @@ export default function PurchaseOrderDetailPage() {
   const cancelled = po.status === 'CANCELLED';
   const backTo = fromVendorId
     ? `/vendors/${fromVendorId}`
-    : po.workOrderId
-      ? `/work-orders/${po.workOrderId}`
-      : '/work-orders';
+    : fromPurchasing
+      ? '/purchasing'
+      : po.workOrderId
+        ? `/work-orders/${po.workOrderId}`
+        : '/work-orders';
   const backLabel = fromVendorId
     ? params.get('vName') || 'Vendor'
-    : po.workOrderId
-      ? getName('work_order')
-      : getName('work_order', true);
+    : fromPurchasing
+      ? 'Purchasing'
+      : po.workOrderId
+        ? getName('work_order')
+        : getName('work_order', true);
   // Carry this page's ?from context into Edit, so Cancel/Save returns here (and
   // this page keeps its own origin for its Back link).
   const qs = params.toString();

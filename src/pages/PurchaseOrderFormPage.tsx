@@ -83,26 +83,33 @@ export default function PurchaseOrderFormPage() {
   // Smart back — preserve the ?from=vendor context to carry through.
   const fromVendorId = params.get('from') === 'vendor' ? params.get('vendorId') : null;
   const fromVendorName = params.get('vName') || 'Vendor';
+  const fromPurchasing = params.get('from') === 'purchasing';
   const fromSuffix = fromVendorId
     ? `?from=vendor&vendorId=${fromVendorId}&vName=${encodeURIComponent(fromVendorName)}`
-    : '';
+    : fromPurchasing
+      ? '?from=purchasing'
+      : '';
   // Editing is launched from the PO detail → Cancel/back returns there (carrying
-  // its own origin). Creating returns to where it launched (vendor, else the WO,
-  // else the cross-job list).
+  // its own origin). Creating returns to where it launched (vendor, the cross-job
+  // Purchasing list, the WO, else the WO list).
   const backTo =
     editing && id
       ? `/purchase-orders/${id}${fromSuffix}`
       : fromVendorId
         ? `/vendors/${fromVendorId}`
-        : workOrderId
-          ? `/work-orders/${workOrderId}`
-          : '/work-orders';
+        : fromPurchasing
+          ? '/purchasing'
+          : workOrderId
+            ? `/work-orders/${workOrderId}`
+            : '/work-orders';
   const backLabel =
     editing && id
       ? (po?.poNumber ?? 'Purchase order')
       : fromVendorId
         ? fromVendorName
-        : (woNumber ?? getName('work_order', true));
+        : fromPurchasing
+          ? 'Purchasing'
+          : (woNumber ?? getName('work_order', true));
 
   // FIELD = counter run (received on save) · ORDER = special order (draft/placed).
   const type: PurchaseOrderType = editing
