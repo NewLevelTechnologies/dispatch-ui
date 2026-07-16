@@ -41,7 +41,7 @@ export function SidebarBody({ className, ...props }: React.ComponentPropsWithout
       {...props}
       className={clsx(
         className,
-        'flex flex-1 flex-col overflow-y-auto px-2.5 py-3 [&>[data-slot=section]+[data-slot=section]]:mt-5'
+        'flex flex-1 flex-col overflow-y-auto px-2.5 py-3 [&>[data-slot=section]+[data-slot=section]]:mt-3.5'
       )}
     />
   )
@@ -64,7 +64,7 @@ export function SidebarSection({ className, ...props }: React.ComponentPropsWith
 
   return (
     <LayoutGroup id={id}>
-      <div {...props} data-slot="section" className={clsx(className, 'flex flex-col gap-0.5')} />
+      <div {...props} data-slot="section" className={clsx(className, 'flex flex-col')} />
     </LayoutGroup>
   )
 }
@@ -83,7 +83,7 @@ export function SidebarHeading({ className, ...props }: React.ComponentPropsWith
       {...props}
       className={clsx(
         className,
-        'mb-1.5 px-2 text-[10px] font-semibold tracking-wider text-sidebar-fg-dim uppercase'
+        'mb-1 px-2.5 text-[10px] font-semibold tracking-wider text-sidebar-fg-dim uppercase'
       )}
     />
   )
@@ -104,8 +104,8 @@ export const SidebarItem = forwardRef(function SidebarItem(
   const classes = clsx(
     // Base
     'flex w-full items-center gap-2.5 rounded-sm px-2.5 py-1.5 text-left text-[12.5px] font-medium text-sidebar-fg',
-    // Leading icon
-    '*:data-[slot=icon]:size-5 *:data-[slot=icon]:shrink-0 *:data-[slot=icon]:text-sidebar-fg-dim',
+    // Leading icon — 16px to match the mock (was 20px).
+    '*:data-[slot=icon]:size-4 *:data-[slot=icon]:shrink-0 *:data-[slot=icon]:text-sidebar-fg-dim',
     // Trailing icon
     '*:last:data-[slot=icon]:ml-auto *:last:data-[slot=icon]:size-4',
     // Avatar
