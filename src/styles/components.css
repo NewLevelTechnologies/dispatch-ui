@@ -524,8 +524,10 @@
 .dense-table .right { text-align: right; }
 /* Two-line cell (top + sub) */
 .dense-table .cell-stack { display: flex; flex-direction: column; gap: 1px; }
-.dense-table .cell-stack .top { color: var(--fg-strong); font-weight: 600; font-size: 13px; }
-.dense-table .cell-stack .bot { color: var(--fg-muted); font-size: 12px; font-weight: 400; }
+.dense-table .cell-stack .top { color: var(--fg-strong); font-weight: 500; font-size: 13px; }
+.dense-table .cell-stack .bot { color: var(--fg-dim); font-size: 10.5px; font-weight: 400; }
+/* Content sub-line (a name, a place) — lifts from chrome --fg-dim to --fg-muted. */
+.dense-table .cell-stack .bot.bot--muted { color: var(--fg-muted); }
 
 /* When a flush card body wraps a dense table, let the table scroll
    horizontally if it's wider than the card. Without this, the table

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import {
@@ -141,7 +141,11 @@ function formatDate(iso: string | null | undefined): string {
 export default function WorkOrderDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const queryClient = useQueryClient();
+  // Smart back — honor ?from=purchasing (the cross-job Purchasing list),
+  // else the entity list.
+  const fromPurchasing = searchParams.get('from') === 'purchasing';
   const { t } = useTranslation();
   const { getName } = useGlossary();
   const [copied, setCopied] = useState<'phone' | 'address' | null>(null);
@@ -516,9 +520,11 @@ export default function WorkOrderDetailPage() {
               {error && `: ${(error as Error).message}`}
             </Text>
           </div>
-          <Button className="mt-4" onClick={() => navigate('/work-orders')}>
+          <Button className="mt-4" onClick={() => navigate(fromPurchasing ? '/purchasing' : '/work-orders')}>
             <ArrowLeftIcon className="size-4" />
-            {t('common.actions.backTo', { entities: getName('work_order', true) })}
+            {fromPurchasing
+              ? t('common.actions.backTo', { entities: t('entities.purchasing') })
+              : t('common.actions.backTo', { entities: getName('work_order', true) })}
           </Button>
         </div>
       </AppLayout>
@@ -594,9 +600,11 @@ export default function WorkOrderDetailPage() {
     <AppLayout>
       <div className="mx-auto max-w-[1240px]">
         {/* Smart back */}
-        <Button plain onClick={() => navigate('/work-orders')} className="mb-2">
+        <Button plain onClick={() => navigate(fromPurchasing ? '/purchasing' : '/work-orders')} className="mb-2">
           <ArrowLeftIcon className="size-4" />
-          {t('common.actions.backTo', { entities: getName('work_order', true) })}
+          {fromPurchasing
+            ? t('common.actions.backTo', { entities: t('entities.purchasing') })
+            : t('common.actions.backTo', { entities: getName('work_order', true) })}
         </Button>
 
         {/* Header — location-led identity + classification + actions. */}

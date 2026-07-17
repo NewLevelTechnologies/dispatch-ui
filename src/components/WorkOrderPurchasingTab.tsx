@@ -9,41 +9,14 @@
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { CubeIcon, PlusIcon, ReceiptPercentIcon } from '@heroicons/react/24/outline';
-import {
-  purchaseOrderApi,
-  type PurchaseOrderListItem,
-  type PurchaseOrderStatus,
-  type PurchaseOrderType,
-} from '../api';
+import { purchaseOrderApi, type PurchaseOrderListItem } from '../api';
 import { useGlossary } from '../contexts/GlossaryContext';
 import { Pill, Tag } from './ui/Pill';
+import { PoTypeBadge } from './ui/PoTypeBadge';
+import { PO_STATUS_LABEL, PO_STATUS_TONE, poStatusHasDot } from '../lib/poStatus';
 import { Button } from './catalyst/button';
 import { Text } from './catalyst/text';
 import { LoadingState } from './ui/LoadingState';
-
-type PillTone = 'neutral' | 'info' | 'success' | 'warning' | 'danger' | 'accent' | 'violet';
-
-const STATUS_TONE: Record<PurchaseOrderStatus, PillTone> = {
-  DRAFT: 'neutral',
-  ORDERED: 'info',
-  PARTIALLY_RECEIVED: 'warning',
-  RECEIVED: 'success',
-  BILLED: 'violet',
-  CANCELLED: 'neutral',
-};
-const STATUS_LABEL: Record<PurchaseOrderStatus, string> = {
-  DRAFT: 'Draft',
-  ORDERED: 'Ordered',
-  PARTIALLY_RECEIVED: 'Partially received',
-  RECEIVED: 'Received',
-  BILLED: 'Billed',
-  CANCELLED: 'Cancelled',
-};
-const TYPE_LABEL: Record<PurchaseOrderType, string> = {
-  FIELD: 'Field purchase',
-  ORDER: 'Special order',
-  STOCK: 'Stock',
-};
 
 const currency = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
 const formatDate = (iso?: string | null): string =>
@@ -149,7 +122,7 @@ function PORow({ po }: { po: PurchaseOrderListItem }) {
         <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
           <span className="shrink-0 font-mono text-[12.5px] font-bold text-fg-strong">{po.poNumber}</span>
           <span className="truncate text-[12.5px] text-fg-strong">{po.vendorName}</span>
-          <Tag word>{TYPE_LABEL[po.type]}</Tag>
+          <PoTypeBadge type={po.type} />
         </div>
         <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[11px] text-fg-dim">
           <span>
@@ -166,8 +139,8 @@ function PORow({ po }: { po: PurchaseOrderListItem }) {
         </div>
       </div>
 
-      <Pill tone={STATUS_TONE[po.status]} dot>
-        {STATUS_LABEL[po.status]}
+      <Pill tone={PO_STATUS_TONE[po.status]} dot={poStatusHasDot(po.status)}>
+        {PO_STATUS_LABEL[po.status]}
       </Pill>
 
       <div className="flex w-24 shrink-0 flex-col items-end">

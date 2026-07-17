@@ -24,7 +24,9 @@ export type PurchaseOrderStatus =
 // Only acts on the not-yet-built receive flow — safe to default UNTRACKED.
 export type InventoryMode = 'TRACKED' | 'UNTRACKED';
 
-// Row shape for the tab's summary table.
+// Row shape for the list tables. The last three are event-sourced from a
+// work-order cache (see FE_HANDOFF_purchasing_list_enrichment.md) — null until
+// the WO is cached / for stock POs / unresolved creators. Render as "—".
 export interface PurchaseOrderListItem {
   id: string;
   poNumber: string;
@@ -33,10 +35,19 @@ export interface PurchaseOrderListItem {
   type: PurchaseOrderType;
   status: PurchaseOrderStatus;
   workOrderId: string | null;
+  workOrderNumber?: string | null;
+  serviceLocationName?: string | null;
+  createdByName?: string | null;
   eta?: string | null;
   createdAt: string;
   itemCount: number;
   totalCost: number;
+}
+
+// Header aggregate over the whole filtered set (not just a page).
+export interface PurchaseOrderSummary {
+  openCount: number;
+  committedCost: number;
 }
 
 export interface PurchaseOrderLine {
@@ -207,17 +218,30 @@ interface ListPurchaseOrdersParams {
   workOrderId?: string;
   workItemId?: string;
   vendorId?: string;
-  status?: PurchaseOrderStatus;
+  // Single or many — axios serializes an array as repeated `status` params.
+  status?: PurchaseOrderStatus | PurchaseOrderStatus[];
   type?: PurchaseOrderType;
-  // PO-number substring search.
+  // Case-insensitive substring across PO#, vendor, WO#, and site (WO#/site
+  // depend on the work-order cache being populated).
   q?: string;
   page?: number;
   size?: number;
 }
 
+// Summary takes the list's filters, minus paging.
+type PurchaseOrderSummaryParams = Omit<ListPurchaseOrdersParams, 'page' | 'size'>;
+
 export const purchaseOrderApi = {
   list: async (params: ListPurchaseOrdersParams = {}): Promise<Page<PurchaseOrderListItem>> => {
     const response = await apiClient.get<Page<PurchaseOrderListItem>>('/inventory/purchase-orders', {
+      params,
+    });
+    return response.data;
+  },
+
+  // Header aggregate over the whole filtered set (open count + committed cost).
+  summary: async (params: PurchaseOrderSummaryParams = {}): Promise<PurchaseOrderSummary> => {
+    const response = await apiClient.get<PurchaseOrderSummary>('/inventory/purchase-orders/summary', {
       params,
     });
     return response.data;

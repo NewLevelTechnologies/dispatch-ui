@@ -1,6 +1,6 @@
 /* eslint-disable i18next/no-literal-string -- dense records list; short procurement column/label strings stay literal (same convention as VendorsPage). */
-import { useEffect, useState, useDeferredValue } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useEffect, useMemo, useState, useDeferredValue } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { CubeIcon, ReceiptPercentIcon, PlusIcon } from '@heroicons/react/24/outline';
@@ -10,10 +10,13 @@ import { extractApiError } from '../lib/toast';
 import { Button } from '../components/catalyst/button';
 import { PageHead } from '../components/ui/PageHead';
 import { Card, CardBody } from '../components/ui/Card';
-import { Pill, Tag } from '../components/ui/Pill';
+import { Pill } from '../components/ui/Pill';
+import { PoTypeBadge } from '../components/ui/PoTypeBadge';
+import { PO_STATUS_LABEL, PO_STATUS_TONE, PO_TYPE_LABEL, poStatusHasDot } from '../lib/poStatus';
 import { DenseTable, DenseTHead, DenseRow, CellStack, CellTop, CellSub } from '../components/ui/DenseTable';
 import { ListToolbar, ListSearch } from '../components/ui/ListToolbar';
 import { FilterChipListbox, ChipListboxOption } from '../components/ui/FilterChipListbox';
+import { FilterChipRow, FilterChip } from '../components/ui/FilterChipRow';
 import { ListFooter } from '../components/ui/ListFooter';
 import { LoadingState } from '../components/ui/LoadingState';
 import { EmptyState } from '../components/ui/EmptyState';
@@ -21,35 +24,15 @@ import { ErrorState } from '../components/ui/ErrorState';
 
 // Purchasing — records-level list of POs across every job + vendor (the office
 // companion to the WO Purchasing tab). Server-side paged + filtered
-// (inventory-service). Backend supports single status/type + a PO-number `q`;
-// the mock's multi-status/compound chips, broad search, "open · committed cost"
-// header stat, and WO#/site columns need backend work — see
-// FE_ASK_purchasing_list_enrichment.md. Rows open the PO detail.
-type PillTone = 'neutral' | 'info' | 'success' | 'warning' | 'danger' | 'accent' | 'violet';
-
+// (inventory-service). Status pill + type badge come from the shared PO display
+// helpers so every surface reads the same. Rows open the PO detail.
 const STATUSES: PurchaseOrderStatus[] = ['DRAFT', 'ORDERED', 'PARTIALLY_RECEIVED', 'RECEIVED', 'BILLED', 'CANCELLED'];
-const STATUS_TONE: Record<PurchaseOrderStatus, PillTone> = {
-  DRAFT: 'neutral',
-  ORDERED: 'info',
-  PARTIALLY_RECEIVED: 'warning',
-  RECEIVED: 'success',
-  BILLED: 'violet',
-  CANCELLED: 'neutral',
-};
-const STATUS_LABEL: Record<PurchaseOrderStatus, string> = {
-  DRAFT: 'Draft',
-  ORDERED: 'Ordered',
-  PARTIALLY_RECEIVED: 'Partially received',
-  RECEIVED: 'Received',
-  BILLED: 'Billed',
-  CANCELLED: 'Cancelled',
-};
 const TYPES: PurchaseOrderType[] = ['FIELD', 'ORDER', 'STOCK'];
-const TYPE_LABEL: Record<PurchaseOrderType, string> = {
-  FIELD: 'Field purchase',
-  ORDER: 'Special order',
-  STOCK: 'Stock',
-};
+
+// Quick-chip presets (server-side, via the plural status filter).
+const AWAITING: PurchaseOrderStatus[] = ['ORDERED', 'PARTIALLY_RECEIVED'];
+const TO_BILL: PurchaseOrderStatus[] = ['ORDERED', 'PARTIALLY_RECEIVED', 'RECEIVED'];
+const sameSet = (a: string[], b: string[]) => a.length === b.length && [...a].sort().join() === [...b].sort().join();
 
 const PAGE_SIZE = 50;
 const currency = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
@@ -64,7 +47,8 @@ export default function PurchasingPage() {
 
   const urlSearch = searchParams.get('search') ?? '';
   const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10));
-  const status = (searchParams.get('status') as PurchaseOrderStatus | null) || null;
+  // Status is multi (repeated ?status=…); memoize so the query key is stable per URL.
+  const statusSel = useMemo(() => searchParams.getAll('status') as PurchaseOrderStatus[], [searchParams]);
   const type = (searchParams.get('type') as PurchaseOrderType | null) || null;
 
   const [searchQuery, setSearchQuery] = useState(urlSearch);
@@ -80,6 +64,13 @@ export default function PurchasingPage() {
     if (key !== 'page') next.delete('page');
     setSearchParams(next, { replace: key === 'search' });
   };
+  const setStatuses = (values: PurchaseOrderStatus[]) => {
+    const next = new URLSearchParams(searchParams);
+    next.delete('status');
+    values.forEach((s) => next.append('status', s));
+    next.delete('page');
+    setSearchParams(next, { replace: false });
+  };
   const pageHref = (target: number): string => {
     const next = new URLSearchParams(searchParams);
     if (target <= 1) next.delete('page');
@@ -88,16 +79,36 @@ export default function PurchasingPage() {
     return qs ? `?${qs}` : '?';
   };
 
+  // Shared filter args for the list + summary so the header stat stays in sync.
+  const filterArgs = {
+    q: deferredSearch || undefined,
+    status: statusSel.length ? statusSel : undefined,
+    type: type || undefined,
+  };
+
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ['purchase-orders', 'list', page, deferredSearch, status, type],
-    queryFn: () =>
-      purchaseOrderApi.list({
-        page: page - 1,
-        size: PAGE_SIZE,
-        q: deferredSearch || undefined,
-        status: status || undefined,
-        type: type || undefined,
-      }),
+    queryKey: ['purchase-orders', 'list', page, deferredSearch, statusSel, type],
+    queryFn: () => purchaseOrderApi.list({ page: page - 1, size: PAGE_SIZE, ...filterArgs }),
+  });
+  // Header aggregate over the whole filtered set (open count + committed cost).
+  const { data: summary } = useQuery({
+    queryKey: ['purchase-orders', 'summary', deferredSearch, statusSel, type],
+    queryFn: () => purchaseOrderApi.summary(filterArgs),
+  });
+
+  // Quick-chip counts — global preset totals (independent of the current
+  // selection), via lean size-1 list calls read for totalElements.
+  const { data: awaitingCount } = useQuery({
+    queryKey: ['purchase-orders', 'chip-count', 'awaiting'],
+    queryFn: () => purchaseOrderApi.list({ status: AWAITING, size: 1 }).then((p) => p.totalElements),
+  });
+  const { data: fieldCount } = useQuery({
+    queryKey: ['purchase-orders', 'chip-count', 'field'],
+    queryFn: () => purchaseOrderApi.list({ type: 'FIELD', size: 1 }).then((p) => p.totalElements),
+  });
+  const { data: toBillCount } = useQuery({
+    queryKey: ['purchase-orders', 'chip-count', 'tobill'],
+    queryFn: () => purchaseOrderApi.list({ status: TO_BILL, size: 1 }).then((p) => p.totalElements),
   });
 
   const orders = data?.content ?? [];
@@ -106,20 +117,28 @@ export default function PurchasingPage() {
   const showingStart = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
   const showingEnd = Math.min(page * PAGE_SIZE, total);
 
-  const hasFilters = !!deferredSearch || !!status || !!type;
+  const awaitingActive = sameSet(statusSel, AWAITING);
+  const toBillActive = sameSet(statusSel, TO_BILL);
+
+  const hasFilters = !!deferredSearch || statusSel.length > 0 || !!type;
   const clearFilters = () => {
     setSearchQuery('');
     setSearchParams(new URLSearchParams(), { replace: false });
   };
 
-  // Header stat: "committed cost" (sum of open POs) needs a backend aggregate we
-  // don't have — degrade to the total count until FE_ASK_purchasing_list_enrichment lands.
-  const subtitle =
-    total === 0 && !isLoading ? null : `${total.toLocaleString()} purchase order${total === 1 ? '' : 's'}`;
+  // Header stat — open count + committed cost over the whole filtered set (from
+  // the summary aggregate). Only the two values are emphasized; the words stay
+  // muted (PageHead renders sub muted).
+  const subtitle = summary ? (
+    <>
+      <span className="font-semibold text-fg-strong">{summary.openCount.toLocaleString()}</span> open ·{' '}
+      <span className="font-semibold text-fg-strong">{money(summary.committedCost)}</span> committed cost
+    </>
+  ) : null;
 
   return (
     <AppLayout>
-      <div>
+      <div className="max-w-[1320px]">
         <PageHead
           title="Purchasing"
           sub={subtitle}
@@ -140,7 +159,7 @@ export default function PurchasingPage() {
         <ListToolbar
           search={
             <ListSearch
-              placeholder="Search PO number…"
+              placeholder="Search PO#, vendor, job, site…"
               value={searchQuery}
               onChange={(value) => {
                 setSearchQuery(value);
@@ -150,17 +169,23 @@ export default function PurchasingPage() {
           }
         >
           <FilterChipListbox
+            multiple
             label="Status"
             ariaLabel="Status"
-            value={status}
-            displayValue={status ? STATUS_LABEL[status] : null}
-            resetLabel="Any status"
-            onChange={(v) => setParam('status', v)}
-            onClear={() => setParam('status', null)}
+            value={statusSel}
+            displayValue={
+              statusSel.length === 0
+                ? null
+                : statusSel.length === 1
+                  ? PO_STATUS_LABEL[statusSel[0]]
+                  : `${statusSel.length} selected`
+            }
+            onChange={(ids) => setStatuses(ids as PurchaseOrderStatus[])}
+            onClear={() => setStatuses([])}
           >
             {STATUSES.map((s) => (
               <ChipListboxOption key={s} value={s}>
-                {STATUS_LABEL[s]}
+                {PO_STATUS_LABEL[s]}
               </ChipListboxOption>
             ))}
           </FilterChipListbox>
@@ -168,17 +193,37 @@ export default function PurchasingPage() {
             label="Type"
             ariaLabel="Type"
             value={type}
-            displayValue={type ? TYPE_LABEL[type] : null}
+            displayValue={type ? PO_TYPE_LABEL[type] : null}
             resetLabel="Any type"
             onChange={(v) => setParam('type', v)}
             onClear={() => setParam('type', null)}
           >
             {TYPES.map((ty) => (
               <ChipListboxOption key={ty} value={ty}>
-                {TYPE_LABEL[ty]}
+                {PO_TYPE_LABEL[ty]}
               </ChipListboxOption>
             ))}
           </FilterChipListbox>
+          <FilterChipRow>
+            <FilterChip
+              label="Awaiting receipt"
+              count={awaitingCount}
+              active={awaitingActive}
+              onToggle={() => setStatuses(awaitingActive ? [] : AWAITING)}
+            />
+            <FilterChip
+              label="Field purchases"
+              count={fieldCount}
+              active={type === 'FIELD'}
+              onToggle={() => setParam('type', type === 'FIELD' ? null : 'FIELD')}
+            />
+            <FilterChip
+              label="To bill"
+              count={toBillCount}
+              active={toBillActive}
+              onToggle={() => setStatuses(toBillActive ? [] : TO_BILL)}
+            />
+          </FilterChipRow>
         </ListToolbar>
 
         <Card>
@@ -216,9 +261,9 @@ export default function PurchasingPage() {
                         <th>Purchase order</th>
                         <th>Vendor</th>
                         <th>For</th>
-                        <th>Status</th>
-                        <th>Date</th>
-                        <th className="right">Cost</th>
+                        <th className="whitespace-nowrap">Status</th>
+                        <th className="whitespace-nowrap">Date</th>
+                        <th className="right whitespace-nowrap">Cost</th>
                       </tr>
                     </DenseTHead>
                     <tbody>
@@ -233,33 +278,59 @@ export default function PurchasingPage() {
                             <td>
                               <CellStack>
                                 <CellTop>
-                                  <span className="font-mono font-bold text-fg-strong">{po.poNumber}</span>
-                                  <Tag word>{TYPE_LABEL[po.type]}</Tag>
+                                  <span className="flex items-baseline gap-1.5">
+                                    <span
+                                      className={`font-mono ${cancelled ? 'font-normal text-fg-muted' : 'font-bold text-fg-strong'}`}
+                                    >
+                                      {po.poNumber}
+                                    </span>
+                                    <PoTypeBadge type={po.type} />
+                                  </span>
                                 </CellTop>
-                                <CellSub>
+                                <CellSub muted>
                                   {po.itemCount} {po.itemCount === 1 ? 'item' : 'items'}
+                                  {po.createdByName ? ` · ${po.createdByName}` : ''}
                                 </CellSub>
                               </CellStack>
                             </td>
                             <td data-label="Vendor">
                               <span className="text-fg-strong">{po.vendorName}</span>
                             </td>
-                            <td className="muted" data-label="For">
-                              {po.workOrderId ? 'Work order' : 'Stock'}
+                            <td data-label="For">
+                              {po.workOrderId ? (
+                                <CellStack>
+                                  <CellTop>
+                                    {po.workOrderNumber ? (
+                                      <Link
+                                        to={`/work-orders/${po.workOrderId}?from=purchasing`}
+                                        onClick={(e) => e.stopPropagation()}
+                                        className="font-mono font-semibold text-fg-accent hover:underline"
+                                      >
+                                        {po.workOrderNumber}
+                                      </Link>
+                                    ) : (
+                                      <span className="text-fg-dim">—</span>
+                                    )}
+                                  </CellTop>
+                                  {po.serviceLocationName && <CellSub>{po.serviceLocationName}</CellSub>}
+                                </CellStack>
+                              ) : (
+                                <span className="text-fg-muted">Stock</span>
+                              )}
                             </td>
-                            <td data-label="Status">
-                              <Pill tone={STATUS_TONE[po.status]} dot={!cancelled}>
-                                {STATUS_LABEL[po.status]}
+                            <td className="whitespace-nowrap" data-label="Status">
+                              <Pill tone={PO_STATUS_TONE[po.status]} dot={poStatusHasDot(po.status)}>
+                                {PO_STATUS_LABEL[po.status]}
                               </Pill>
                             </td>
-                            <td className="muted" data-label="Date">
+                            <td className="muted whitespace-nowrap" data-label="Date">
                               <CellStack>
                                 <CellTop>{formatDate(po.createdAt)}</CellTop>
                                 {po.eta && <CellSub>ETA {formatDate(po.eta)}</CellSub>}
                               </CellStack>
                             </td>
-                            <td className="right num" data-label="Cost">
-                              <span className="font-mono font-semibold text-fg-strong">{money(po.totalCost)}</span>
+                            <td className="right num whitespace-nowrap" data-label="Cost">
+                              <span className="font-semibold tabular-nums text-fg-strong">{money(po.totalCost)}</span>
                             </td>
                           </DenseRow>
                         );

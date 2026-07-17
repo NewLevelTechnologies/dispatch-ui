@@ -2,38 +2,17 @@
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { BuildingStorefrontIcon, PencilSquareIcon, PlusIcon } from '@heroicons/react/24/outline';
-import {
-  vendorApi,
-  purchaseOrderApi,
-  type PurchaseOrderStatus,
-  type VendorKind,
-} from '../api';
+import { vendorApi, purchaseOrderApi, type VendorKind } from '../api';
 import { formatTimestamp } from '../lib/formatTimestamp';
+import { PO_STATUS_LABEL, PO_STATUS_TONE, poStatusHasDot } from '../lib/poStatus';
 import AppLayout from '../components/AppLayout';
 import { Card } from '../components/catalyst/card';
 import { Button } from '../components/catalyst/button';
 import { Text } from '../components/catalyst/text';
 import { Pill, Tag } from '../components/ui/Pill';
+import { PoTypeBadge } from '../components/ui/PoTypeBadge';
 import { LoadingState } from '../components/ui/LoadingState';
 
-type PillTone = 'neutral' | 'info' | 'success' | 'warning' | 'danger' | 'accent' | 'violet';
-const STATUS_TONE: Record<PurchaseOrderStatus, PillTone> = {
-  DRAFT: 'neutral',
-  ORDERED: 'info',
-  PARTIALLY_RECEIVED: 'warning',
-  RECEIVED: 'success',
-  BILLED: 'violet',
-  CANCELLED: 'neutral',
-};
-const STATUS_LABEL: Record<PurchaseOrderStatus, string> = {
-  DRAFT: 'Draft',
-  ORDERED: 'Ordered',
-  PARTIALLY_RECEIVED: 'Partially received',
-  RECEIVED: 'Received',
-  BILLED: 'Billed',
-  CANCELLED: 'Cancelled',
-};
-const TYPE_LABEL = { FIELD: 'Field purchase', ORDER: 'Special order', STOCK: 'Stock' } as const;
 const KIND_LABEL: Record<VendorKind, string> = {
   DISTRIBUTOR: 'Distributor',
   MANUFACTURER: 'Manufacturer',
@@ -183,11 +162,11 @@ export default function VendorDetailPage() {
                   className={`flex items-center gap-2.5 border-b border-border-soft px-3.5 py-2.5 last:border-b-0 hover:bg-bg-hover ${po.status === 'CANCELLED' ? 'opacity-55' : ''}`}
                 >
                   <span className="shrink-0 font-mono text-[12px] font-bold text-fg-strong">{po.poNumber}</span>
-                  <Tag word>{TYPE_LABEL[po.type]}</Tag>
+                  <PoTypeBadge type={po.type} />
                   <span className="truncate text-[11.5px] text-fg-muted">{po.workOrderId ? 'Work order' : 'Stock'}</span>
                   <span className="grow" />
-                  <Pill tone={STATUS_TONE[po.status]} dot>
-                    {STATUS_LABEL[po.status]}
+                  <Pill tone={PO_STATUS_TONE[po.status]} dot={poStatusHasDot(po.status)}>
+                    {PO_STATUS_LABEL[po.status]}
                   </Pill>
                   <span className="w-20 shrink-0 text-right font-mono text-[12px] font-semibold tabular-nums text-fg-strong">
                     {money(po.totalCost)}
