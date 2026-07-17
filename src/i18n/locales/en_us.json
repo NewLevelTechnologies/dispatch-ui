@@ -2495,11 +2495,17 @@
       "completed": "Completed",
       "inProgress": "In Progress",
       "itemStatus": "Item status",
+      "itemStatusHint": "contains an item",
+      "live": "Live",
+      "more": "More filters",
       "notStarted": "Not Started",
       "open": "Open",
       "region": "Region",
       "scheduled": "Scheduled",
-      "searchPlaceholder": "Search by WO#, {{customer, lowercase}}, or address…"
+      "searchPlaceholder": "Search by WO#, {{customer, lowercase}}, or address…",
+      "showArchived": "Show archived",
+      "unassigned": "Unassigned",
+      "urgentHigh": "Urgent / High"
     },
     "form": {
       "customerOrderNumber": "Customer PO",

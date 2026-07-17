@@ -3,7 +3,8 @@ import clsx from 'clsx';
 import { useSearchParams, Link as RouterLink } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { EllipsisVerticalIcon } from '@heroicons/react/24/outline';
+import { EllipsisVerticalIcon, FunnelIcon, ChevronDownIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import { Popover, PopoverButton, PopoverPanel } from '@headlessui/react';
 import {
   workOrderApi,
   workOrderTypesApi,
@@ -13,6 +14,7 @@ import {
   userApi,
   type WorkOrderSummary,
   type ProgressCategory,
+  type WorkOrderPriority,
   type ListWorkOrdersParams,
 } from '../api';
 import {
@@ -24,19 +26,20 @@ import {
 } from '../lib/dateRangePresets';
 import { useGlossary } from '../contexts/GlossaryContext';
 import AppLayout from '../components/AppLayout';
-import WorkItemsCell from '../components/WorkItemsCell';
 import { titleCaseAddress } from '../utils/titleCaseAddress';
 import WorkOrderFormDialog from '../components/WorkOrderFormDialog';
 import CancelWorkOrderDialog from '../components/CancelWorkOrderDialog';
 import { Button } from '../components/catalyst/button';
 import { Dropdown, DropdownButton, DropdownDivider, DropdownItem, DropdownLabel, DropdownMenu } from '../components/catalyst/dropdown';
 import { FilterChipListbox, ChipListboxOption } from '../components/ui/FilterChipListbox';
+import { FilterChipRow, FilterChip } from '../components/ui/FilterChipRow';
+import { Switch } from '../components/catalyst/switch';
 import IconButton from '../components/IconButton';
 import { DateRangeChip } from '../components/ui/DateRangeChip';
 import { PageHead } from '../components/ui/PageHead';
 import { Card, CardBody } from '../components/ui/Card';
 import { LoadingState } from '../components/ui/LoadingState';
-import { Pill } from '../components/ui/Pill';
+import { Pill, Tag } from '../components/ui/Pill';
 import { ViewTabs } from '../components/ui/Tabs';
 import {
   DenseTable, DenseTHead, DenseRow, CellStack, CellTop, CellSub,
@@ -89,13 +92,6 @@ const PROGRESS_TRANSLATION_KEYS: Record<ProgressCategory, string> = {
   CANCELLED: 'cancelled',
 };
 
-const PRIORITY_TONES: Record<'LOW' | 'NORMAL' | 'HIGH' | 'URGENT', PillTone> = {
-  LOW: 'neutral',
-  NORMAL: 'info',
-  HIGH: 'warning',
-  URGENT: 'danger',
-};
-
 const PRIORITY_TRANSLATION_KEYS: Record<string, string> = {
   LOW: 'low',
   NORMAL: 'normal',
@@ -114,6 +110,51 @@ function formatDate(dateString?: string | null) {
 
 function isCancelled(wo: WorkOrderSummary): boolean {
   return wo.lifecycleState === 'CANCELLED';
+}
+
+// Toggle an id in/out of a multi-value filter array (for the More-filters pills).
+function toggleInArray(arr: string[], id: string): string[] {
+  return arr.includes(id) ? arr.filter((x) => x !== id) : [...arr, id];
+}
+
+// A WO reads "live" when a tech is on site right now — drives the row tint
+// and the pulsing status dot.
+function isLive(wo: WorkOrderSummary): boolean {
+  return !!wo.assignedUsers?.some((u) => u.state === 'ON_SITE');
+}
+
+// The one-line job essence under the WO#: the backend summary, else the first
+// work item + "+N more". (Type is shown as its own badge, so no type fallback
+// here — an empty string just renders no summary line.)
+function deriveSummary(wo: WorkOrderSummary): string {
+  if (wo.summary) return wo.summary;
+  const first = wo.workItems[0]?.description;
+  if (!first) return '';
+  const more = Math.max(0, wo.workItemCount - 1);
+  return more > 0 ? `${first} +${more} more` : first;
+}
+
+// Elevated-priority flag — only URGENT/HIGH surface; NORMAL/LOW are the quiet
+// default and get no badge. Loud, compact, uppercase, tone-colored — sits
+// inline next to the WO# on the dispatcher's scan line. `label` is passed
+// pre-translated so this stays a pure presentational component.
+function PriorityFlag({ priority, label }: { priority: 'HIGH' | 'URGENT'; label: string }) {
+  const urgent = priority === 'URGENT';
+  return (
+    <span
+      className={clsx(
+        'shrink-0 whitespace-nowrap rounded-[3px] px-[5px] py-px text-[9.5px] font-bold uppercase tracking-[0.04em]',
+        urgent ? 'text-danger-500' : 'text-warning-fg',
+      )}
+      style={{
+        background: urgent
+          ? 'color-mix(in oklch, var(--danger-500) 14%, transparent)'
+          : 'color-mix(in oklch, var(--warning-500) 16%, transparent)',
+      }}
+    >
+      {label}
+    </span>
+  );
 }
 
 // ─── Component ───────────────────────────────────────────────────────────────
@@ -150,6 +191,11 @@ export default function WorkOrdersPage() {
   // to its concrete range below until any new selection overwrites it.
   const legacyDatePreset = (searchParams.get('date') as DatePreset | null) ?? '';
   const includeArchived = searchParams.get('archived') === 'true';
+  // Quick-triage chips (see FE_HANDOFF_wo_list_quick_filters): Live (on-site),
+  // Unassigned, Urgent/High. Urgent/High owns the whole `priority` param.
+  const priorityIds = useMemo(() => searchParams.getAll('priority'), [searchParams]);
+  const onSiteOnly = searchParams.get('onSite') === 'true';
+  const unassignedOnly = searchParams.get('unassigned') === 'true';
   const pageNumber = Math.max(1, parseInt(searchParams.get('page') ?? '1', 10) || 1);
 
   // Local search input state — mirrors URL for instant feedback. Written to the
@@ -258,13 +304,16 @@ export default function WorkOrdersPage() {
       dispatchRegionIds: regionIds.length > 0 ? regionIds : undefined,
       workItemStatusIds: itemStatusIds.length > 0 ? itemStatusIds : undefined,
       assignedUserId: assignedId || undefined,
+      priority: priorityIds.length > 0 ? (priorityIds as WorkOrderPriority[]) : undefined,
+      unassigned: unassignedOnly || undefined,
+      onSite: onSiteOnly || undefined,
       scheduledDateFrom: dateRange.from || undefined,
       scheduledDateTo: dateRange.to || undefined,
       includeArchived: includeArchived || undefined,
       page: pageNumber - 1, // URL is 1-based; backend Spring Page is 0-based
       size: PAGE_SIZE,
     }),
-    [tab, deferredSearch, typeIds, divisionIds, regionIds, itemStatusIds, assignedId, dateRange, includeArchived, pageNumber]
+    [tab, deferredSearch, typeIds, divisionIds, regionIds, itemStatusIds, assignedId, priorityIds, unassignedOnly, onSiteOnly, dateRange, includeArchived, pageNumber]
   );
 
   const { data: pageData, isLoading, error } = useQuery({
@@ -275,6 +324,32 @@ export default function WorkOrdersPage() {
   const workOrders: WorkOrderSummary[] = pageData?.content ?? [];
   const totalElements = pageData?.totalElements ?? 0;
   const totalPages = pageData?.totalPages ?? 0;
+
+  // Quick-chip counts — one lean size-1 probe each. Scoped to the FULL current
+  // query context (tab + search + every active filter/chip), minus pagination,
+  // with this chip's predicate forced on. That guarantees the number equals
+  // what you actually get when the chip is toggled on — including when other
+  // filters or chips are already active — rather than a tab-only count that
+  // diverges the moment anything else is applied.
+  const countBase = useMemo(() => {
+    // Drop pagination; keep everything else (tab, q, taxonomy, assigned,
+    // date, archived, and the currently-active quick chips).
+    const base = { ...queryParams };
+    delete base.page;
+    delete base.size;
+    return base;
+  }, [queryParams]);
+
+  // One server-computed facet call (strict-AND, correspondence-guaranteed) —
+  // replaces the three size=1 probes. Runs in parallel with the list; the
+  // backend ANDs each chip predicate onto this same filter set.
+  const { data: facets } = useQuery({
+    queryKey: ['work-orders', 'facets', countBase],
+    queryFn: () => workOrderApi.facets(countBase),
+  });
+  const liveCount = facets?.onSite;
+  const unassignedCount = facets?.unassigned;
+  const urgentCount = facets?.urgentHigh;
 
   // ── Mutations ─────────────────────────────────────────────────────────────
   const deleteMutation = useMutation({
@@ -419,6 +494,20 @@ export default function WorkOrdersPage() {
     });
   }
 
+  // Quick chips manage their own toggle state (not shown in the removable
+  // `activeChips` summary), but they still count as "a filter is on" for the
+  // clear-all affordance and the empty-state copy.
+  const hasQuickFilter = onSiteOnly || unassignedOnly || priorityIds.length > 0;
+  const anyFilter = activeChips.length > 0 || hasQuickFilter;
+
+  // Region is an advanced lens, gated to multi-region tenants (single-branch
+  // shops never see it). It + Item status live in the More-filters overflow.
+  const showRegion = activeRegions.length > 1;
+  const moreCount = itemStatusIds.length + (showRegion ? regionIds.length : 0);
+  // Overflow filters surface as removable pills below the row so an active
+  // secondary filter is obvious even though the control is tucked in More.
+  const overflowChips = activeChips.filter((c) => c.key === 'itemStatus' || c.key === 'region');
+
   const clearAllFilters = () => {
     setSearchParams(new URLSearchParams());
     setSearchInput('');
@@ -511,7 +600,9 @@ export default function WorkOrdersPage() {
                 </FilterChipListbox>
               )}
 
-              {activeDivisions.length > 0 && (
+              {/* Division gated to multi-division tenants — a single-division
+                  filter is useless (same treatment as Region). */}
+              {activeDivisions.length > 1 && (
                 <FilterChipListbox
                   multiple
                   label={getName('division')}
@@ -529,41 +620,10 @@ export default function WorkOrdersPage() {
                 </FilterChipListbox>
               )}
 
-              {activeRegions.length > 0 && (
-                <FilterChipListbox
-                  multiple
-                  label={t('workOrders.filters.region')}
-                  ariaLabel={t('workOrders.filters.region')}
-                  value={regionIds}
-                  displayValue={formatMultiValue(regionIds, activeRegions)}
-                  onChange={(ids) => updateParams({ region: ids, page: null })}
-                  onClear={() => updateParams({ region: [], page: null })}
-                >
-                  {activeRegions.map((r) => (
-                    <ChipListboxOption key={r.id} value={r.id}>
-                      {r.name}
-                    </ChipListboxOption>
-                  ))}
-                </FilterChipListbox>
-              )}
-
-              {activeItemStatuses.length > 0 && (
-                <FilterChipListbox
-                  multiple
-                  label={t('workOrders.filters.itemStatus')}
-                  ariaLabel={t('workOrders.filters.itemStatus')}
-                  value={itemStatusIds}
-                  displayValue={formatMultiValue(itemStatusIds, activeItemStatuses)}
-                  onChange={(ids) => updateParams({ itemStatus: ids, page: null })}
-                  onClear={() => updateParams({ itemStatus: [], page: null })}
-                >
-                  {activeItemStatuses.map((s) => (
-                    <ChipListboxOption key={s.id} value={s.id}>
-                      {s.name}
-                    </ChipListboxOption>
-                  ))}
-                </FilterChipListbox>
-              )}
+              {/* Region + Item status live in the More-filters overflow below —
+                  Region is gated to multi-region tenants, and Item status is a
+                  DIFFERENT axis from the WO-status tabs (kept out of the primary
+                  row so the two aren't mistaken for the same control). */}
 
               {/* Assigned is single-select — assignedUserId takes one UUID.
                   Matches WOs with at least one non-cancelled dispatch assigned
@@ -596,28 +656,93 @@ export default function WorkOrdersPage() {
                 }
               />
 
-              {/* Archived: hidden by default. "Archived only" is a backend
-                  gap (no `archivedOnly` param yet) — surfaced as an option
-                  but mapped to includeArchived=true for now so the user
-                  isn't blocked from at least *finding* archived rows. */}
-              <FilterChipListbox
-                label={t('workOrders.filters.archived')}
-                ariaLabel={t('workOrders.filters.archived')}
-                value={includeArchived ? 'shown' : null}
-                displayValue={includeArchived ? t('workOrders.filters.archivedShown') : null}
-                onChange={(id) => {
-                  updateParams({
-                    archived: id === 'shown' || id === 'only' ? 'true' : null,
-                    page: null,
-                  });
-                }}
-                onClear={() => updateParams({ archived: null, page: null })}
-                resetLabel={t('workOrders.filters.archivedHidden')}
-              >
-                <ChipListboxOption value="shown">{t('workOrders.filters.archivedShown')}</ChipListboxOption>
-              </FilterChipListbox>
+              {/* More filters — advanced/secondary lenses (Item status, Region)
+                  tucked out of the primary row. Item status is deliberately NOT
+                  a peer of the WO-status tabs. */}
+              <Popover className="relative">
+                <PopoverButton
+                  className={clsx(
+                    'inline-flex h-8 items-center gap-1.5 rounded-md border px-2.5 text-[12px] font-medium focus:outline-none',
+                    moreCount > 0
+                      ? 'border-accent-500/45 bg-accent-500/10 text-fg-accent'
+                      : 'border-border bg-bg-elev text-fg'
+                  )}
+                >
+                  <FunnelIcon className="size-3.5" />
+                  <span>{t('workOrders.filters.more')}</span>
+                  {moreCount > 0 && (
+                    <span className="rounded-[3px] bg-accent-500/20 px-1.5 text-[10.5px] font-semibold tabular-nums text-fg-accent">
+                      {moreCount}
+                    </span>
+                  )}
+                  <ChevronDownIcon className="size-3 text-fg-muted" />
+                </PopoverButton>
+                <PopoverPanel
+                  anchor="bottom start"
+                  className="z-30 mt-1 min-w-[240px] rounded-md border border-border bg-bg-elev p-3 shadow-lg [--anchor-gap:4px]"
+                >
+                  <div className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-fg-muted">
+                    {t('workOrders.filters.itemStatus')}
+                    <span className="ml-1 font-normal normal-case text-fg-dim">· {t('workOrders.filters.itemStatusHint')}</span>
+                  </div>
+                  <FilterChipRow className={showRegion ? 'mb-3' : undefined}>
+                    {activeItemStatuses.map((s) => (
+                      <FilterChip
+                        key={s.id}
+                        label={s.name}
+                        active={itemStatusIds.includes(s.id)}
+                        onToggle={() => updateParams({ itemStatus: toggleInArray(itemStatusIds, s.id), page: null })}
+                      />
+                    ))}
+                  </FilterChipRow>
+                  {showRegion && (
+                    <>
+                      <div className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-fg-muted">
+                        {t('workOrders.filters.region')}
+                      </div>
+                      <FilterChipRow>
+                        {activeRegions.map((r) => (
+                          <FilterChip
+                            key={r.id}
+                            label={r.name}
+                            active={regionIds.includes(r.id)}
+                            onToggle={() => updateParams({ region: toggleInArray(regionIds, r.id), page: null })}
+                          />
+                        ))}
+                      </FilterChipRow>
+                    </>
+                  )}
+                </PopoverPanel>
+              </Popover>
 
-              {activeChips.length > 0 && (
+              {/* Quick-triage toggles — the dispatcher's primary buckets. */}
+              <FilterChipRow>
+                <FilterChip
+                  label={t('workOrders.filters.live')}
+                  tone="info"
+                  count={liveCount}
+                  active={onSiteOnly}
+                  onToggle={() => updateParams({ onSite: onSiteOnly ? null : true, page: null })}
+                />
+                <FilterChip
+                  label={t('workOrders.filters.unassigned')}
+                  tone="warning"
+                  count={unassignedCount}
+                  active={unassignedOnly}
+                  onToggle={() => updateParams({ unassigned: unassignedOnly ? null : true, page: null })}
+                />
+                <FilterChip
+                  label={t('workOrders.filters.urgentHigh')}
+                  tone="danger"
+                  count={urgentCount}
+                  active={priorityIds.length > 0}
+                  onToggle={() =>
+                    updateParams({ priority: priorityIds.length > 0 ? [] : ['URGENT', 'HIGH'], page: null })
+                  }
+                />
+              </FilterChipRow>
+
+              {anyFilter && (
                 <button
                   type="button"
                   onClick={clearAllFilters}
@@ -626,8 +751,45 @@ export default function WorkOrdersPage() {
                   {t('workOrders.filters.clearAll')}
                 </button>
               )}
+
+              {/* Show archived — a VISIBILITY toggle, not a filter dimension.
+                  Pushed to the far right, away from the filter controls. */}
+              <label
+                className={clsx(
+                  'ml-auto flex cursor-pointer items-center gap-2 text-[12px]',
+                  includeArchived ? 'text-fg-accent' : 'text-fg-muted'
+                )}
+              >
+                <Switch
+                  checked={includeArchived}
+                  onChange={(checked) => updateParams({ archived: checked ? 'true' : null, page: null })}
+                  aria-label={t('workOrders.filters.showArchived')}
+                />
+                {t('workOrders.filters.showArchived')}
+              </label>
           </ListToolbar>
 
+          {overflowChips.length > 0 && (
+            <div className="mt-2 flex flex-wrap items-center gap-1.5">
+              {overflowChips.map((c) => (
+                <span
+                  key={c.key}
+                  className="inline-flex items-center gap-1 rounded-md border border-accent-500/40 bg-accent-500/10 py-0.5 pl-2 pr-1 text-[11.5px] text-fg-accent"
+                >
+                  <span className="text-fg-muted">{c.label}:</span>
+                  {c.value}
+                  <button
+                    type="button"
+                    onClick={c.onClear}
+                    aria-label={`${c.label} — clear`}
+                    className="rounded p-0.5 hover:bg-accent-500/15 hover:text-fg-strong"
+                  >
+                    <XMarkIcon className="size-3" />
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Lifecycle / progress tabs */}
@@ -656,7 +818,7 @@ export default function WorkOrdersPage() {
           </Card>
         )}
 
-        {pageData && workOrders.length === 0 && activeChips.length === 0 && tabId === DEFAULT_TAB && (
+        {pageData && workOrders.length === 0 && !anyFilter && tabId === DEFAULT_TAB && (
           <Card>
             <CardBody>
               <p className="text-[12.5px] text-fg-muted">
@@ -669,13 +831,13 @@ export default function WorkOrdersPage() {
           </Card>
         )}
 
-        {pageData && workOrders.length === 0 && (activeChips.length > 0 || tabId !== DEFAULT_TAB) && (
+        {pageData && workOrders.length === 0 && (anyFilter || tabId !== DEFAULT_TAB) && (
           <Card>
             <CardBody>
               <p className="text-[12.5px] text-fg-muted">
                 {t('common.actions.noMatchSearch', { entities: getName('work_order', true) })}
               </p>
-              {activeChips.length > 0 && (
+              {anyFilter && (
                 <Button plain className="mt-2" onClick={clearAllFilters}>
                   {t('workOrders.filters.clearAll')}
                 </Button>
@@ -687,15 +849,23 @@ export default function WorkOrdersPage() {
         {workOrders.length > 0 && (
           <Card>
             <CardBody flush>
-              <DenseTable>
+              <DenseTable className="table-fixed">
+                {/* Fixed layout + widths so the Work-order cell's summary line
+                    truncates to one line instead of ballooning the row (mock
+                    uses the same colgroup). Ignored in mobile card mode. */}
+                <colgroup>
+                  <col className="w-[32%]" />
+                  <col className="w-[24%]" />
+                  <col className="w-[13%]" />
+                  <col className="w-[15%]" />
+                  <col className="w-[13%]" />
+                  <col className="w-[40px]" />
+                </colgroup>
                 <DenseTHead>
                   <tr>
-                    <th>{t('workOrders.table.id')}</th>
+                    <th>{getName('work_order')}</th>
                     <th>{getName('service_location')}</th>
-                    <th>{t('workOrders.table.work')}</th>
-                    <th>{t('workOrders.table.type')}</th>
                     <th>{t('workOrders.table.statusHeader')}</th>
-                    <th>{t('workOrders.table.priority')}</th>
                     <th>{t('workOrders.table.assigned')}</th>
                     <th>{t('workOrders.table.scheduled')}</th>
                     <th></th>
@@ -707,30 +877,57 @@ export default function WorkOrdersPage() {
                     const archived = !!workOrder.archivedAt;
                     const completed = workOrder.progressCategory === 'COMPLETED';
                     const dimmed = cancelled || archived;
+                    const live = !dimmed && isLive(workOrder);
+                    const typeName = activeTypes.find((tp) => tp.id === workOrder.workOrderTypeId)?.name;
+                    const divisionName = activeDivisions.find((d) => d.id === workOrder.divisionId)?.name;
+                    const priority = workOrder.priority ?? 'NORMAL';
+                    const elevated = priority === 'URGENT' || priority === 'HIGH';
+                    const summary = deriveSummary(workOrder);
                     return (
-                      <DenseRow key={workOrder.id} className={dimmed ? 'opacity-60' : undefined}>
+                      <DenseRow
+                        key={workOrder.id}
+                        className={clsx(dimmed && 'opacity-60', live && 'row-live')}
+                      >
+                        {/* Work order — the dispatcher's scan cell: identity +
+                            classification (type / division / elevated priority)
+                            on the top line, the work summary beneath. */}
                         <td>
                           <CellStack>
                             <CellTop>
-                              <RouterLink
-                                to={`/work-orders/${workOrder.id}`}
-                                className="id-mono text-fg-muted hover:text-accent-500 hover:underline"
-                              >
-                                {workOrder.workOrderNumber || `#${workOrder.id.substring(0, 8)}`}
-                              </RouterLink>
+                              <span className="flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5">
+                                <RouterLink
+                                  to={`/work-orders/${workOrder.id}`}
+                                  className="id-mono font-bold text-fg-strong hover:text-accent-500 hover:underline whitespace-nowrap"
+                                >
+                                  {workOrder.workOrderNumber || `#${workOrder.id.substring(0, 8)}`}
+                                </RouterLink>
+                                {typeName && <Tag word>{typeName}</Tag>}
+                                {divisionName && (
+                                  <span className="whitespace-nowrap text-[10px] text-fg-dim">{divisionName}</span>
+                                )}
+                                {elevated && (
+                                  <PriorityFlag
+                                    priority={priority as 'HIGH' | 'URGENT'}
+                                    label={t(`workOrders.priority.${PRIORITY_TRANSLATION_KEYS[priority]}`)}
+                                  />
+                                )}
+                              </span>
                             </CellTop>
-                            {archived && (
-                              <CellSub>{t('workOrders.actions.archived')}</CellSub>
+                            {summary && (
+                              <span className="block truncate text-[12px] text-fg" title={summary}>
+                                {summary}
+                              </span>
                             )}
+                            {archived && <CellSub>{t('workOrders.actions.archived')}</CellSub>}
                           </CellStack>
                         </td>
                         <td>
                           <CellStack>
-                            <CellTop>
+                            <CellTop className="truncate">
                               <span className="dt-inline-label">{getName('service_location')}: </span>
                               {workOrder.serviceLocation?.locationName || workOrder.customer?.name || '-'}
                             </CellTop>
-                            <CellSub>
+                            <CellSub className="truncate">
                               {(() => {
                                 const a = workOrder.serviceLocation?.address;
                                 if (!a) return '';
@@ -746,18 +943,6 @@ export default function WorkOrdersPage() {
                             </CellSub>
                           </CellStack>
                         </td>
-                        <td data-label={t('workOrders.table.work')}>
-                          <WorkItemsCell
-                            items={workOrder.workItems}
-                            totalCount={workOrder.workItemCount}
-                          />
-                        </td>
-                        <td
-                          className={clsx(!activeTypes.find((tp) => tp.id === workOrder.workOrderTypeId) && 'dt-empty')}
-                          data-label={t('workOrders.table.type')}
-                        >
-                          {activeTypes.find((tp) => tp.id === workOrder.workOrderTypeId)?.name ?? '—'}
-                        </td>
                         <td>
                           {cancelled ? (
                             <CellStack>
@@ -769,15 +954,10 @@ export default function WorkOrdersPage() {
                               )}
                             </CellStack>
                           ) : (
-                            <Pill tone={PROGRESS_TONES[workOrder.progressCategory]} dot>
+                            <Pill tone={PROGRESS_TONES[workOrder.progressCategory]} dot live={live}>
                               {t(`workOrders.progress.${PROGRESS_TRANSLATION_KEYS[workOrder.progressCategory]}`)}
                             </Pill>
                           )}
-                        </td>
-                        <td>
-                          <Pill tone={PRIORITY_TONES[workOrder.priority ?? 'NORMAL']}>
-                            {t(`workOrders.priority.${PRIORITY_TRANSLATION_KEYS[workOrder.priority ?? 'NORMAL']}`)}
-                          </Pill>
                         </td>
                         <td
                           className={clsx(!(workOrder.assignedUsers && workOrder.assignedUsers.length > 0) && 'dt-empty')}

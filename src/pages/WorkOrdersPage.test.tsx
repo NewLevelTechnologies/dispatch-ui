@@ -462,13 +462,14 @@ describe('WorkOrdersPage', () => {
 
     // Route /users to a real user page; everything else gets the WO page.
     const mockGets = (workOrders: unknown[]) => {
-      vi.mocked(apiClient.get).mockImplementation((url) =>
-        Promise.resolve(
-          String(url).startsWith('/users')
-            ? { data: pageOf(mockUsers) }
-            : { data: pageOf(workOrders) }
-        )
-      );
+      vi.mocked(apiClient.get).mockImplementation((url) => {
+        const u = String(url);
+        if (u.startsWith('/work-orders/facets')) {
+          return Promise.resolve({ data: { onSite: 0, unassigned: 0, urgentHigh: 0 } });
+        }
+        if (u.startsWith('/users')) return Promise.resolve({ data: pageOf(mockUsers) });
+        return Promise.resolve({ data: pageOf(workOrders) });
+      });
     };
 
     it('renders the assigned column from embedded assignedUsers (lead + overflow, dash when empty)', async () => {
@@ -495,7 +496,9 @@ describe('WorkOrdersPage', () => {
       const user = userEvent.setup();
       const { router } = renderWithProviders(<WorkOrdersPage />);
 
-      const assignedFilter = await screen.findByRole('button', { name: /assigned/i });
+      // Anchor to the start so the "Unassigned" quick-filter chip (which also
+      // contains "assigned") doesn't collide with the Assigned dropdown.
+      const assignedFilter = await screen.findByRole('button', { name: /^assigned/i });
       await user.click(assignedFilter);
 
       const brian = await screen.findByRole('option', { name: /brian ortega/i });
@@ -513,6 +516,62 @@ describe('WorkOrdersPage', () => {
           | undefined;
         expect(lastParams?.assignedUserId).toBe('user-1');
       });
+    });
+
+    it('the Unassigned quick chip filters on unassigned=true (server-side)', async () => {
+      mockGets(mockWorkOrders);
+      const user = userEvent.setup();
+      const { router } = renderWithProviders(<WorkOrdersPage />);
+
+      const chip = await screen.findByRole('button', { name: /^unassigned/i });
+      await user.click(chip);
+
+      await waitFor(() => {
+        expect(router.state.location.search).toContain('unassigned=true');
+      });
+      await waitFor(() => {
+        const woCalls = vi.mocked(apiClient.get).mock.calls.filter(
+          ([url]) => String(url).startsWith('/work-orders')
+        );
+        const listCall = woCalls.find(([, cfg]) => {
+          const p = cfg?.params as { unassigned?: boolean; size?: number } | undefined;
+          return p?.unassigned === true && p?.size !== 1;
+        });
+        expect(listCall).toBeTruthy();
+      });
+    });
+
+    it('the Urgent / High quick chip filters on priority=[URGENT,HIGH]', async () => {
+      mockGets(mockWorkOrders);
+      const user = userEvent.setup();
+      const { router } = renderWithProviders(<WorkOrdersPage />);
+
+      const chip = await screen.findByRole('button', { name: /urgent \/ high/i });
+      await user.click(chip);
+
+      await waitFor(() => {
+        expect(router.state.location.search).toContain('priority=URGENT');
+        expect(router.state.location.search).toContain('priority=HIGH');
+      });
+    });
+
+    it('the Show archived toggle sets archived=true (visibility, not a filter dropdown)', async () => {
+      mockGets(mockWorkOrders);
+      const user = userEvent.setup();
+      const { router } = renderWithProviders(<WorkOrdersPage />);
+
+      const toggle = await screen.findByRole('switch', { name: /show archived/i });
+      await user.click(toggle);
+
+      await waitFor(() => {
+        expect(router.state.location.search).toContain('archived=true');
+      });
+    });
+
+    it('exposes a More filters overflow (Item status / Region live here, not the primary row)', async () => {
+      mockGets(mockWorkOrders);
+      renderWithProviders(<WorkOrdersPage />);
+      expect(await screen.findByRole('button', { name: /more filters/i })).toBeInTheDocument();
     });
   });
 
