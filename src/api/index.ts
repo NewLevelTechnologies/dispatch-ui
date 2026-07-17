@@ -256,6 +256,7 @@ export {
   type PurchaseOrderStatus,
   type InventoryMode,
   type PurchaseOrderListItem,
+  type PurchaseOrderSummary,
   type PurchaseOrderLine,
   type PurchaseOrderResponse,
   type PurchaseOrderLineInput,
