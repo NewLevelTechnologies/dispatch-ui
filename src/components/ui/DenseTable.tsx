@@ -97,9 +97,9 @@ export function DenseRow({
 export function CellStack({ children }: { children: ReactNode }) {
   return <div className="cell-stack">{children}</div>;
 }
-export function CellTop({ children }: { children: ReactNode }) {
-  return <span className="top">{children}</span>;
+export function CellTop({ children, className }: { children: ReactNode; className?: string }) {
+  return <span className={clsx('top', className)}>{children}</span>;
 }
-export function CellSub({ children }: { children: ReactNode }) {
-  return <span className="bot">{children}</span>;
+export function CellSub({ children, className }: { children: ReactNode; className?: string }) {
+  return <span className={clsx('bot', className)}>{children}</span>;
 }

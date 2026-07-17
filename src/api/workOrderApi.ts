@@ -186,6 +186,12 @@ export interface WorkOrderSummary {
   workItemCount: number;
   workItems: WorkItemSummaryProjection[];
 
+  // Concise, glanceable job summary (AI/derived) — the same field the detail
+  // header uses, and it IS returned on list rows too. Nullable; fall back to
+  // the first work item + "+N more" when absent. (Historically read via a cast
+  // at several list call sites because the type omitted it; declared here now.)
+  summary?: string | null;
+
   // Count-led equipment summary for dense list rows: `label` is precomputed by
   // the backend (the unit name when count === 1, else "N units"); `count` is 0
   // when no equipment is linked. Load-bearing on rows where the AI summary
@@ -330,6 +336,15 @@ export interface ListWorkOrdersParams {
   // `technicians`, so a matching row always shows the user in its column.
   assignedUserId?: string;
 
+  // Quick-triage filters (see FE_HANDOFF_wo_list_quick_filters). All compose
+  // AND with every other filter and are correct over the full paged set.
+  // `priority` is repeatable/CSV and ORs within the set; `unassigned` matches
+  // rows with an empty `assignedUsers`; `onSite` matches rows with an on-site
+  // (IN_PROGRESS) assignment — exactly the rows the FE tints "live".
+  priority?: WorkOrderPriority | WorkOrderPriority[];
+  unassigned?: boolean;
+  onSite?: boolean;
+
   // Scheduled date range — ISO yyyy-mm-dd. From is inclusive at 00:00,
   // To is exclusive at 00:00 of the next day (handled server-side).
   scheduledDateFrom?: string;
@@ -345,6 +360,15 @@ export interface ListWorkOrdersParams {
 
   // Sort — whitelist enforced server-side: scheduledDate, createdAt, workOrderNumber, priority
   sort?: `${WorkOrderSortField},${SortDirection}`;
+}
+
+// Server-computed quick-filter chip counts (GET /work-orders/facets). Each count
+// is the list total with that one chip predicate ANDed onto the SAME filter set
+// passed in (strict-AND → guaranteed correspondence with what a click returns).
+export interface WorkOrderQuickFacets {
+  onSite: number;
+  unassigned: number;
+  urgentHigh: number;
 }
 
 function cleanParams(params?: ListWorkOrdersParams): Record<string, string | number | boolean | string[]> {
@@ -365,6 +389,13 @@ function cleanParams(params?: ListWorkOrdersParams): Record<string, string | num
 export const workOrderApi = {
   getAll: async (params?: ListWorkOrdersParams): Promise<Page<WorkOrderSummary>> => {
     const response = await apiClient.get<Page<WorkOrderSummary>>('/work-orders', { params: cleanParams(params) });
+    return response.data;
+  },
+
+  // Quick-filter chip counts — pass the same filter params as the list (paging
+  // is ignored server-side). One call replaces the old three size=1 probes.
+  facets: async (params?: ListWorkOrdersParams): Promise<WorkOrderQuickFacets> => {
+    const response = await apiClient.get<WorkOrderQuickFacets>('/work-orders/facets', { params: cleanParams(params) });
     return response.data;
   },
 
