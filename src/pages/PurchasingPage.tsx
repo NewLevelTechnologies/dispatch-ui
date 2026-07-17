@@ -1,6 +1,6 @@
 /* eslint-disable i18next/no-literal-string -- dense records list; short procurement column/label strings stay literal (same convention as VendorsPage). */
 import { useEffect, useMemo, useState, useDeferredValue } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { CubeIcon, ReceiptPercentIcon, PlusIcon } from '@heroicons/react/24/outline';
@@ -10,7 +10,9 @@ import { extractApiError } from '../lib/toast';
 import { Button } from '../components/catalyst/button';
 import { PageHead } from '../components/ui/PageHead';
 import { Card, CardBody } from '../components/ui/Card';
-import { Pill, Tag } from '../components/ui/Pill';
+import { Pill } from '../components/ui/Pill';
+import { PoTypeBadge } from '../components/ui/PoTypeBadge';
+import { PO_STATUS_LABEL, PO_STATUS_TONE, PO_TYPE_LABEL, poStatusHasDot } from '../lib/poStatus';
 import { DenseTable, DenseTHead, DenseRow, CellStack, CellTop, CellSub } from '../components/ui/DenseTable';
 import { ListToolbar, ListSearch } from '../components/ui/ListToolbar';
 import { FilterChipListbox, ChipListboxOption } from '../components/ui/FilterChipListbox';
@@ -22,35 +24,15 @@ import { ErrorState } from '../components/ui/ErrorState';
 
 // Purchasing — records-level list of POs across every job + vendor (the office
 // companion to the WO Purchasing tab). Server-side paged + filtered
-// (inventory-service). Backend supports single status/type + a PO-number `q`;
-// the mock's multi-status/compound chips, broad search, "open · committed cost"
-// header stat, and WO#/site columns need backend work — see
-// FE_ASK_purchasing_list_enrichment.md. Rows open the PO detail.
-type PillTone = 'neutral' | 'info' | 'success' | 'warning' | 'danger' | 'accent' | 'violet';
-
+// (inventory-service). Status pill + type badge come from the shared PO display
+// helpers so every surface reads the same. Rows open the PO detail.
 const STATUSES: PurchaseOrderStatus[] = ['DRAFT', 'ORDERED', 'PARTIALLY_RECEIVED', 'RECEIVED', 'BILLED', 'CANCELLED'];
-const STATUS_TONE: Record<PurchaseOrderStatus, PillTone> = {
-  DRAFT: 'neutral',
-  ORDERED: 'info',
-  PARTIALLY_RECEIVED: 'warning',
-  RECEIVED: 'success',
-  BILLED: 'violet',
-  CANCELLED: 'neutral',
-};
-const STATUS_LABEL: Record<PurchaseOrderStatus, string> = {
-  DRAFT: 'Draft',
-  ORDERED: 'Ordered',
-  PARTIALLY_RECEIVED: 'Partially received',
-  RECEIVED: 'Received',
-  BILLED: 'Billed',
-  CANCELLED: 'Cancelled',
-};
 const TYPES: PurchaseOrderType[] = ['FIELD', 'ORDER', 'STOCK'];
-const TYPE_LABEL: Record<PurchaseOrderType, string> = {
-  FIELD: 'Field purchase',
-  ORDER: 'Special order',
-  STOCK: 'Stock',
-};
+
+// Quick-chip presets (server-side, via the plural status filter).
+const AWAITING: PurchaseOrderStatus[] = ['ORDERED', 'PARTIALLY_RECEIVED'];
+const TO_BILL: PurchaseOrderStatus[] = ['ORDERED', 'PARTIALLY_RECEIVED', 'RECEIVED'];
+const sameSet = (a: string[], b: string[]) => a.length === b.length && [...a].sort().join() === [...b].sort().join();
 
 const PAGE_SIZE = 50;
 const currency = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
@@ -114,16 +96,27 @@ export default function PurchasingPage() {
     queryFn: () => purchaseOrderApi.summary(filterArgs),
   });
 
+  // Quick-chip counts — global preset totals (independent of the current
+  // selection), via lean size-1 list calls read for totalElements.
+  const { data: awaitingCount } = useQuery({
+    queryKey: ['purchase-orders', 'chip-count', 'awaiting'],
+    queryFn: () => purchaseOrderApi.list({ status: AWAITING, size: 1 }).then((p) => p.totalElements),
+  });
+  const { data: fieldCount } = useQuery({
+    queryKey: ['purchase-orders', 'chip-count', 'field'],
+    queryFn: () => purchaseOrderApi.list({ type: 'FIELD', size: 1 }).then((p) => p.totalElements),
+  });
+  const { data: toBillCount } = useQuery({
+    queryKey: ['purchase-orders', 'chip-count', 'tobill'],
+    queryFn: () => purchaseOrderApi.list({ status: TO_BILL, size: 1 }).then((p) => p.totalElements),
+  });
+
   const orders = data?.content ?? [];
   const total = data?.totalElements ?? 0;
   const totalPages = data?.totalPages ?? 0;
   const showingStart = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
   const showingEnd = Math.min(page * PAGE_SIZE, total);
 
-  // Quick-chip presets (server-side, via the plural status filter).
-  const AWAITING: PurchaseOrderStatus[] = ['ORDERED', 'PARTIALLY_RECEIVED'];
-  const TO_BILL: PurchaseOrderStatus[] = ['ORDERED', 'PARTIALLY_RECEIVED', 'RECEIVED'];
-  const sameSet = (a: string[], b: string[]) => a.length === b.length && [...a].sort().join() === [...b].sort().join();
   const awaitingActive = sameSet(statusSel, AWAITING);
   const toBillActive = sameSet(statusSel, TO_BILL);
 
@@ -134,14 +127,18 @@ export default function PurchasingPage() {
   };
 
   // Header stat — open count + committed cost over the whole filtered set (from
-  // the summary aggregate, kept in sync with the table via the same filters).
-  const subtitle = summary
-    ? `${summary.openCount.toLocaleString()} open · ${money(summary.committedCost)} committed cost`
-    : null;
+  // the summary aggregate). Only the two values are emphasized; the words stay
+  // muted (PageHead renders sub muted).
+  const subtitle = summary ? (
+    <>
+      <span className="font-semibold text-fg-strong">{summary.openCount.toLocaleString()}</span> open ·{' '}
+      <span className="font-semibold text-fg-strong">{money(summary.committedCost)}</span> committed cost
+    </>
+  ) : null;
 
   return (
     <AppLayout>
-      <div>
+      <div className="max-w-[1320px]">
         <PageHead
           title="Purchasing"
           sub={subtitle}
@@ -180,7 +177,7 @@ export default function PurchasingPage() {
               statusSel.length === 0
                 ? null
                 : statusSel.length === 1
-                  ? STATUS_LABEL[statusSel[0]]
+                  ? PO_STATUS_LABEL[statusSel[0]]
                   : `${statusSel.length} selected`
             }
             onChange={(ids) => setStatuses(ids as PurchaseOrderStatus[])}
@@ -188,7 +185,7 @@ export default function PurchasingPage() {
           >
             {STATUSES.map((s) => (
               <ChipListboxOption key={s} value={s}>
-                {STATUS_LABEL[s]}
+                {PO_STATUS_LABEL[s]}
               </ChipListboxOption>
             ))}
           </FilterChipListbox>
@@ -196,32 +193,35 @@ export default function PurchasingPage() {
             label="Type"
             ariaLabel="Type"
             value={type}
-            displayValue={type ? TYPE_LABEL[type] : null}
+            displayValue={type ? PO_TYPE_LABEL[type] : null}
             resetLabel="Any type"
             onChange={(v) => setParam('type', v)}
             onClear={() => setParam('type', null)}
           >
             {TYPES.map((ty) => (
               <ChipListboxOption key={ty} value={ty}>
-                {TYPE_LABEL[ty]}
+                {PO_TYPE_LABEL[ty]}
               </ChipListboxOption>
             ))}
           </FilterChipListbox>
           <FilterChipRow>
             <FilterChip
               label="Awaiting receipt"
+              count={awaitingCount}
               active={awaitingActive}
               onToggle={() => setStatuses(awaitingActive ? [] : AWAITING)}
             />
             <FilterChip
-              label="To bill"
-              active={toBillActive}
-              onToggle={() => setStatuses(toBillActive ? [] : TO_BILL)}
-            />
-            <FilterChip
               label="Field purchases"
+              count={fieldCount}
               active={type === 'FIELD'}
               onToggle={() => setParam('type', type === 'FIELD' ? null : 'FIELD')}
+            />
+            <FilterChip
+              label="To bill"
+              count={toBillCount}
+              active={toBillActive}
+              onToggle={() => setStatuses(toBillActive ? [] : TO_BILL)}
             />
           </FilterChipRow>
         </ListToolbar>
@@ -261,9 +261,9 @@ export default function PurchasingPage() {
                         <th>Purchase order</th>
                         <th>Vendor</th>
                         <th>For</th>
-                        <th>Status</th>
-                        <th>Date</th>
-                        <th className="right">Cost</th>
+                        <th className="whitespace-nowrap">Status</th>
+                        <th className="whitespace-nowrap">Date</th>
+                        <th className="right whitespace-nowrap">Cost</th>
                       </tr>
                     </DenseTHead>
                     <tbody>
@@ -278,10 +278,16 @@ export default function PurchasingPage() {
                             <td>
                               <CellStack>
                                 <CellTop>
-                                  <span className="font-mono font-bold text-fg-strong">{po.poNumber}</span>
-                                  <Tag word>{TYPE_LABEL[po.type]}</Tag>
+                                  <span className="flex items-baseline gap-1.5">
+                                    <span
+                                      className={`font-mono ${cancelled ? 'font-normal text-fg-muted' : 'font-bold text-fg-strong'}`}
+                                    >
+                                      {po.poNumber}
+                                    </span>
+                                    <PoTypeBadge type={po.type} />
+                                  </span>
                                 </CellTop>
-                                <CellSub>
+                                <CellSub muted>
                                   {po.itemCount} {po.itemCount === 1 ? 'item' : 'items'}
                                   {po.createdByName ? ` · ${po.createdByName}` : ''}
                                 </CellSub>
@@ -294,9 +300,17 @@ export default function PurchasingPage() {
                               {po.workOrderId ? (
                                 <CellStack>
                                   <CellTop>
-                                    <span className="font-mono font-semibold text-fg-strong">
-                                      {po.workOrderNumber || 'Work order'}
-                                    </span>
+                                    {po.workOrderNumber ? (
+                                      <Link
+                                        to={`/work-orders/${po.workOrderId}?from=purchasing`}
+                                        onClick={(e) => e.stopPropagation()}
+                                        className="font-mono font-semibold text-fg-accent hover:underline"
+                                      >
+                                        {po.workOrderNumber}
+                                      </Link>
+                                    ) : (
+                                      <span className="text-fg-dim">—</span>
+                                    )}
                                   </CellTop>
                                   {po.serviceLocationName && <CellSub>{po.serviceLocationName}</CellSub>}
                                 </CellStack>
@@ -304,19 +318,19 @@ export default function PurchasingPage() {
                                 <span className="text-fg-muted">Stock</span>
                               )}
                             </td>
-                            <td data-label="Status">
-                              <Pill tone={STATUS_TONE[po.status]} dot={!cancelled}>
-                                {STATUS_LABEL[po.status]}
+                            <td className="whitespace-nowrap" data-label="Status">
+                              <Pill tone={PO_STATUS_TONE[po.status]} dot={poStatusHasDot(po.status)}>
+                                {PO_STATUS_LABEL[po.status]}
                               </Pill>
                             </td>
-                            <td className="muted" data-label="Date">
+                            <td className="muted whitespace-nowrap" data-label="Date">
                               <CellStack>
                                 <CellTop>{formatDate(po.createdAt)}</CellTop>
                                 {po.eta && <CellSub>ETA {formatDate(po.eta)}</CellSub>}
                               </CellStack>
                             </td>
-                            <td className="right num" data-label="Cost">
-                              <span className="font-mono font-semibold text-fg-strong">{money(po.totalCost)}</span>
+                            <td className="right num whitespace-nowrap" data-label="Cost">
+                              <span className="font-semibold tabular-nums text-fg-strong">{money(po.totalCost)}</span>
                             </td>
                           </DenseRow>
                         );

@@ -44,13 +44,15 @@ const routes = [
   { path: '/purchasing', element: <PurchasingPage /> },
   { path: '/purchase-orders/:id', element: <div>PO detail page</div> },
   { path: '/purchase-orders/new', element: <div>PO form</div> },
+  { path: '/work-orders/:id', element: <div>Work order page</div> },
 ];
 const render = () => renderWithProviders(<div />, { routes, initialPath: '/purchasing' });
 
 describe('PurchasingPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockSummary.mockResolvedValue({ openCount: 1, committedCost: 125.5 });
+    // Unique values so the header openCount/committedCost don't collide with row data.
+    mockSummary.mockResolvedValue({ openCount: 7, committedCost: 1592.26 });
   });
 
   it('renders POs with number, type, vendor, status, cost, WO#/site + creator', async () => {
@@ -62,7 +64,9 @@ describe('PurchasingPage', () => {
     expect(screen.getByText('WO-2026-0007')).toBeInTheDocument();
     expect(screen.getByText('Acme HQ')).toBeInTheDocument();
     expect(screen.getByText(/Casey Rivera/)).toBeInTheDocument();
-    expect(screen.getByText(/1 open · \$125\.50 committed cost/)).toBeInTheDocument();
+    // Header summary — emphasized values.
+    expect(screen.getByText('7')).toBeInTheDocument();
+    expect(screen.getByText('$1,592.26')).toBeInTheDocument();
     expect(screen.getByText('Ordered')).toBeInTheDocument();
     expect(screen.getByText('Special order')).toBeInTheDocument();
     expect(screen.getByText('$125.50')).toBeInTheDocument();
@@ -112,6 +116,18 @@ describe('PurchasingPage', () => {
         ),
       ).toBe(true),
     );
+  });
+
+  it('the WO# link opens the work order (not the PO), carrying from=purchasing', async () => {
+    const user = userEvent.setup();
+    mockList.mockResolvedValue(page([po()]));
+    render();
+
+    const woLink = await screen.findByRole('link', { name: 'WO-2026-0007' });
+    expect(woLink).toHaveAttribute('href', '/work-orders/wo-1?from=purchasing');
+
+    await user.click(woLink);
+    expect(await screen.findByText('Work order page')).toBeInTheDocument();
   });
 
   it('searches by PO number (server q)', async () => {

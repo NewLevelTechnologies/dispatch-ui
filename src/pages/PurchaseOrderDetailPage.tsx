@@ -31,29 +31,13 @@ import { Textarea } from '../components/catalyst/textarea';
 import { Field, Label } from '../components/catalyst/fieldset';
 import { Heading } from '../components/catalyst/heading';
 import { Text } from '../components/catalyst/text';
-import { Pill, Tag } from '../components/ui/Pill';
+import { Pill } from '../components/ui/Pill';
+import { PoTypeBadge } from '../components/ui/PoTypeBadge';
+import { PO_STATUS_LABEL, PO_STATUS_TONE, poStatusHasDot } from '../lib/poStatus';
 import { LoadingState } from '../components/ui/LoadingState';
 
-type PillTone = 'neutral' | 'info' | 'success' | 'warning' | 'danger' | 'accent' | 'violet';
-
+// Dropdown options exclude CANCELLED (that's the dedicated Cancel action).
 const STATUSES: PurchaseOrderStatus[] = ['DRAFT', 'ORDERED', 'PARTIALLY_RECEIVED', 'RECEIVED', 'BILLED'];
-const STATUS_TONE: Record<PurchaseOrderStatus, PillTone> = {
-  DRAFT: 'neutral',
-  ORDERED: 'info',
-  PARTIALLY_RECEIVED: 'warning',
-  RECEIVED: 'success',
-  BILLED: 'violet',
-  CANCELLED: 'neutral',
-};
-const STATUS_LABEL: Record<PurchaseOrderStatus, string> = {
-  DRAFT: 'Draft',
-  ORDERED: 'Ordered',
-  PARTIALLY_RECEIVED: 'Partially received',
-  RECEIVED: 'Received',
-  BILLED: 'Billed',
-  CANCELLED: 'Cancelled',
-};
-const TYPE_LABEL = { FIELD: 'Field purchase', ORDER: 'Special order', STOCK: 'Stock' } as const;
 
 const currency = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
 const money = (n?: number | null) => currency.format(n ?? 0);
@@ -199,9 +183,9 @@ export default function PurchaseOrderDetailPage() {
               <Heading level={1} size="page-sm" className="m-0">
                 {po.vendorName}
               </Heading>
-              <Tag word>{TYPE_LABEL[po.type]}</Tag>
-              <Pill tone={STATUS_TONE[po.status]} dot>
-                {STATUS_LABEL[po.status]}
+              <PoTypeBadge type={po.type} />
+              <Pill tone={PO_STATUS_TONE[po.status]} dot={poStatusHasDot(po.status)}>
+                {PO_STATUS_LABEL[po.status]}
               </Pill>
             </div>
             <div className="mt-1 flex flex-wrap items-center gap-2 text-[11.5px] text-fg-muted">
@@ -247,7 +231,7 @@ export default function PurchaseOrderDetailPage() {
                 >
                   {STATUSES.map((s) => (
                     <option key={s} value={s}>
-                      {STATUS_LABEL[s]}
+                      {PO_STATUS_LABEL[s]}
                     </option>
                   ))}
                 </Select>

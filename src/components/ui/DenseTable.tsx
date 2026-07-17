@@ -100,6 +100,9 @@ export function CellStack({ children }: { children: ReactNode }) {
 export function CellTop({ children }: { children: ReactNode }) {
   return <span className="top">{children}</span>;
 }
-export function CellSub({ children }: { children: ReactNode }) {
-  return <span className="bot">{children}</span>;
+// `muted` lifts the sub-line from the default --fg-dim (chrome tier) to
+// --fg-muted — use it when the line carries real content (a person's name,
+// a place), not just chrome (IDs, separators, ETAs).
+export function CellSub({ children, muted }: { children: ReactNode; muted?: boolean }) {
+  return <span className={clsx('bot', muted && 'bot--muted')}>{children}</span>;
 }
