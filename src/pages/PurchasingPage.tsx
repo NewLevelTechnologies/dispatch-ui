@@ -287,7 +287,7 @@ export default function PurchasingPage() {
                                     <PoTypeBadge type={po.type} />
                                   </span>
                                 </CellTop>
-                                <CellSub muted>
+                                <CellSub>
                                   {po.itemCount} {po.itemCount === 1 ? 'item' : 'items'}
                                   {po.createdByName ? ` · ${po.createdByName}` : ''}
                                 </CellSub>

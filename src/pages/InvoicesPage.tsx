@@ -403,7 +403,7 @@ export default function InvoicesPage() {
                     return (
                     <DenseRow key={invoice.id}>
                       <td>
-                        <span className="id-mono text-fg-muted">{invoice.invoiceNumber}</span>
+                        <span className={clsx('id-mono', voided ? 'text-fg-muted' : 'text-fg-strong')}>{invoice.invoiceNumber}</span>
                       </td>
                       <td className="strong" data-label={t('invoices.table.customer')}>{invoice.customerName ?? invoice.customerId}</td>
                       <td data-label={t('invoices.table.invoiceDate')}>{formatDate(invoice.invoiceDate)}</td>
