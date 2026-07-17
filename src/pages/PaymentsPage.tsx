@@ -255,7 +255,7 @@ export default function PaymentsPage() {
                 <tbody>
                   {filteredPayments.map((payment) => (
                     <DenseRow key={payment.id}>
-                      <td><span className="id-mono text-fg-muted">{payment.paymentNumber}</span></td>
+                      <td><span className="id-mono text-fg-strong">{payment.paymentNumber}</span></td>
                       <td className="strong" data-label={t('payments.table.customer')}>{getCustomerName(payment.customerId)}</td>
                       <td data-label={t('payments.table.invoice')}><span className="id-mono text-fg-muted">{getInvoiceNumber(payment.invoiceId)}</span></td>
                       <td data-label={t('payments.table.paymentDate')}>{formatDate(payment.paymentDate)}</td>
