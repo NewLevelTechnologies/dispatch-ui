@@ -70,6 +70,9 @@ type BaseProps = {
   ariaLabel: string;
   displayValue?: string | null;
   onClear?: () => void;
+  /** Optional disambiguating subtitle shown as a header row in the popover
+   *  (e.g. Item status · "contains an item"). */
+  hint?: string;
   children: ReactNode;
 };
 
@@ -89,7 +92,7 @@ type MultiProps = BaseProps & {
 type Props = SingleProps | MultiProps;
 
 export function FilterChipListbox(props: Props) {
-  const { label, ariaLabel, displayValue, onClear, children } = props;
+  const { label, ariaLabel, displayValue, onClear, hint, children } = props;
   const resetLabel = props.multiple === true ? undefined : props.resetLabel;
 
   // isSet drives the accent tint + × button visibility. In single mode it's
@@ -147,6 +150,11 @@ export function FilterChipListbox(props: Props) {
           'transition data-leave:duration-100 data-leave:ease-in data-closed:data-leave:opacity-0'
         )}
       >
+        {hint && (
+          <div className="border-b border-border-soft px-3 py-1.5 text-[11px] text-fg-dim">
+            {label} · {hint}
+          </div>
+        )}
         {resetLabel && <ChipResetRow>{resetLabel}</ChipResetRow>}
         {children}
       </Headless.ListboxOptions>

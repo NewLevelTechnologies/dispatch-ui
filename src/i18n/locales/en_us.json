@@ -2498,14 +2498,25 @@
       "itemStatusHint": "contains an item",
       "live": "Live",
       "more": "More filters",
+      "nSelected": "{{count}} selected",
       "notStarted": "Not Started",
       "open": "Open",
       "region": "Region",
       "scheduled": "Scheduled",
       "searchPlaceholder": "Search by WO#, {{customer, lowercase}}, or address…",
       "showArchived": "Show archived",
+      "status": "Status",
       "unassigned": "Unassigned",
       "urgentHigh": "Urgent / High"
+    },
+    "header": {
+      "allTime": "all-time",
+      "open": "open"
+    },
+    "scope": {
+      "all": "All work",
+      "mine": "Assigned to me",
+      "mineHint": "Showing only work assigned to you"
     },
     "form": {
       "customerOrderNumber": "Customer PO",
@@ -2562,6 +2573,7 @@
       "scheduled": "Scheduled",
       "statusHeader": "Status",
       "type": "Type",
+      "unassigned": "Unassigned",
       "work": "Work",
       "workItemsMore": "+{{count}} more"
     },

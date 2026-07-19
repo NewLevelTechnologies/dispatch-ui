@@ -299,9 +299,14 @@ export interface ListWorkOrdersParams {
   // service location name/address, site contact name, and description.
   q?: string;
 
-  // Lifecycle / progress
+  // Lifecycle / progress — two SEPARATE axes, AND-composed server-side.
+  // `progressCategory` (where the work stands) is repeatable/CSV; the WO Status
+  // dropdown multi-selects it (OR within). `lifecycleState` (ACTIVE/CANCELLED)
+  // is the admin cancel axis: cancelling sets lifecycleState=CANCELLED and does
+  // NOT touch progressCategory, so "Cancelled" filters on lifecycleState and
+  // progress views pin lifecycleState=ACTIVE to keep cancelled WOs out.
   lifecycleState?: LifecycleState;
-  progressCategory?: ProgressCategory;
+  progressCategory?: ProgressCategory | ProgressCategory[];
 
   // Tenant taxonomy. Prefer the plural form (workOrderTypeIds: string[]) — the
   // backend OR's within a filter and AND's across filters. Singulars are still

@@ -407,15 +407,38 @@ describe('WorkOrdersPage', () => {
       });
     });
 
-    it('reads filter dropdown value from the URL', async () => {
+    it('maps a progress status to progressCategory + lifecycleState=ACTIVE', async () => {
       vi.mocked(apiClient.get).mockResolvedValue({ data: pageOf([]) });
 
-      renderWithProviders(<WorkOrdersPage />, { initialPath: '/?tab=blocked' });
+      renderWithProviders(<WorkOrdersPage />, { initialPath: '/?status=BLOCKED' });
 
-      // The "Blocked" tab is the active one
+      // ?status=BLOCKED → list query: progressCategory=['BLOCKED'] AND
+      // lifecycleState=ACTIVE (ACTIVE keeps cancelled-mid-work WOs out).
       await waitFor(() => {
-        const blockedTab = screen.getByRole('tab', { name: /^blocked$/i });
-        expect(blockedTab).toHaveAttribute('aria-selected', 'true');
+        const hit = vi.mocked(apiClient.get).mock.calls.some(([url, cfg]) => {
+          if (String(url) !== '/work-orders') return false;
+          const p = (cfg as { params?: { progressCategory?: unknown; lifecycleState?: unknown } } | undefined)?.params;
+          return Array.isArray(p?.progressCategory) && p.progressCategory.length === 1
+            && p.progressCategory[0] === 'BLOCKED' && p.lifecycleState === 'ACTIVE';
+        });
+        expect(hit).toBe(true);
+      });
+    });
+
+    it('maps Cancelled to lifecycleState=CANCELLED with no progressCategory', async () => {
+      vi.mocked(apiClient.get).mockResolvedValue({ data: pageOf([]) });
+
+      renderWithProviders(<WorkOrdersPage />, { initialPath: '/?status=CANCELLED' });
+
+      // Cancellation is a lifecycle axis, not a progress category — filtering on
+      // progressCategory=CANCELLED would miss most cancelled WOs.
+      await waitFor(() => {
+        const hit = vi.mocked(apiClient.get).mock.calls.some(([url, cfg]) => {
+          if (String(url) !== '/work-orders') return false;
+          const p = (cfg as { params?: { progressCategory?: unknown; lifecycleState?: unknown } } | undefined)?.params;
+          return p?.lifecycleState === 'CANCELLED' && p?.progressCategory === undefined;
+        });
+        expect(hit).toBe(true);
       });
     });
 
@@ -472,7 +495,7 @@ describe('WorkOrdersPage', () => {
       });
     };
 
-    it('renders the assigned column from embedded assignedUsers (lead + overflow, dash when empty)', async () => {
+    it('renders the assigned column from embedded assignedUsers (lead + overflow, Unassigned when empty)', async () => {
       mockGets([
         {
           ...mockWorkOrders[0],
@@ -489,6 +512,9 @@ describe('WorkOrdersPage', () => {
       await waitFor(() => {
         expect(screen.getByText('Dana Park +1')).toBeInTheDocument();
       });
+      // Empty assignedUsers renders the "Unassigned" cell (not a bare dash) —
+      // ≥2 because the Unassigned quick-filter chip carries the label too.
+      expect(screen.getAllByText('Unassigned').length).toBeGreaterThanOrEqual(2);
     });
 
     it('selecting an assigned user updates the URL and the API query', async () => {
@@ -496,9 +522,9 @@ describe('WorkOrdersPage', () => {
       const user = userEvent.setup();
       const { router } = renderWithProviders(<WorkOrdersPage />);
 
-      // Anchor to the start so the "Unassigned" quick-filter chip (which also
-      // contains "assigned") doesn't collide with the Assigned dropdown.
-      const assignedFilter = await screen.findByRole('button', { name: /^assigned/i });
+      // Match exactly "Assigned" so neither the "Unassigned" quick chip nor the
+      // "Assigned to me" scope button collides with the Assigned dropdown.
+      const assignedFilter = await screen.findByRole('button', { name: /^assigned$/i });
       await user.click(assignedFilter);
 
       const brian = await screen.findByRole('option', { name: /brian ortega/i });
@@ -568,10 +594,13 @@ describe('WorkOrdersPage', () => {
       });
     });
 
-    it('exposes a More filters overflow (Item status / Region live here, not the primary row)', async () => {
+    it('presents WO status as a primary dropdown, not tabs', async () => {
       mockGets(mockWorkOrders);
       renderWithProviders(<WorkOrdersPage />);
-      expect(await screen.findByRole('button', { name: /more filters/i })).toBeInTheDocument();
+      // Status is a dropdown chip (default "Open"); the lifecycle tabs are gone.
+      // Exact match so the chip's "Status — clear" × button doesn't collide.
+      expect(await screen.findByRole('button', { name: /^status$/i })).toBeInTheDocument();
+      expect(screen.queryByRole('tab')).not.toBeInTheDocument();
     });
   });
 

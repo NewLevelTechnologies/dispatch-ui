@@ -3,8 +3,7 @@ import clsx from 'clsx';
 import { useSearchParams, Link as RouterLink } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { EllipsisVerticalIcon, FunnelIcon, ChevronDownIcon, XMarkIcon } from '@heroicons/react/24/outline';
-import { Popover, PopoverButton, PopoverPanel } from '@headlessui/react';
+import { EllipsisVerticalIcon } from '@heroicons/react/24/outline';
 import {
   workOrderApi,
   workOrderTypesApi,
@@ -25,6 +24,7 @@ import {
   type DateRange,
 } from '../lib/dateRangePresets';
 import { useGlossary } from '../contexts/GlossaryContext';
+import { useCurrentUser } from '../hooks/useCurrentUser';
 import AppLayout from '../components/AppLayout';
 import { titleCaseAddress } from '../utils/titleCaseAddress';
 import WorkOrderFormDialog from '../components/WorkOrderFormDialog';
@@ -40,7 +40,6 @@ import { PageHead } from '../components/ui/PageHead';
 import { Card, CardBody } from '../components/ui/Card';
 import { LoadingState } from '../components/ui/LoadingState';
 import { Pill, Tag } from '../components/ui/Pill';
-import { ViewTabs } from '../components/ui/Tabs';
 import {
   DenseTable, DenseTHead, DenseRow, CellStack, CellTop, CellSub,
 } from '../components/ui/DenseTable';
@@ -50,25 +49,36 @@ import { AssignedUsersCell } from '../components/ui/AssignedUsersCell';
 
 // ─── Filter constants ────────────────────────────────────────────────────────
 
-type LifecycleTabId = 'active' | 'notStarted' | 'inProgress' | 'blocked' | 'completed' | 'cancelled' | 'all';
+// WO status is now a multi-select dropdown over progress categories (not tabs).
+// `OPEN_CATEGORIES` is the smart default ("Open" = every non-terminal status).
+// Multi-value filtering needs the plural `progressCategory` param — see
+// FE_ASK_wo_list_plural_status; until it lands the backend honors one at a time.
+const WO_STATUS_OPTIONS: ProgressCategory[] = [
+  'NOT_STARTED',
+  'AWAITING_SCHEDULE',
+  'IN_PROGRESS',
+  'BLOCKED',
+  'COMPLETED',
+  'CANCELLED',
+];
+const OPEN_CATEGORIES: ProgressCategory[] = ['NOT_STARTED', 'AWAITING_SCHEDULE', 'IN_PROGRESS', 'BLOCKED'];
 
-const DEFAULT_TAB: LifecycleTabId = 'active';
-
-interface LifecycleTab {
-  id: LifecycleTabId;
-  labelKey: string;
-  params: Pick<ListWorkOrdersParams, 'lifecycleState' | 'progressCategory'>;
+function isOpenDefault(ids: string[]): boolean {
+  return ids.length === OPEN_CATEGORIES.length && OPEN_CATEGORIES.every((c) => ids.includes(c));
 }
 
-const LIFECYCLE_TABS: LifecycleTab[] = [
-  { id: 'active', labelKey: 'workOrders.filters.open', params: { lifecycleState: 'ACTIVE' } },
-  { id: 'notStarted', labelKey: 'workOrders.filters.notStarted', params: { progressCategory: 'NOT_STARTED' } },
-  { id: 'inProgress', labelKey: 'workOrders.filters.inProgress', params: { progressCategory: 'IN_PROGRESS' } },
-  { id: 'blocked', labelKey: 'workOrders.filters.blocked', params: { progressCategory: 'BLOCKED' } },
-  { id: 'completed', labelKey: 'workOrders.filters.completed', params: { progressCategory: 'COMPLETED' } },
-  { id: 'cancelled', labelKey: 'workOrders.filters.cancelled', params: { lifecycleState: 'CANCELLED' } },
-  { id: 'all', labelKey: 'workOrders.filters.all', params: {} },
-];
+// Cancellation is a SEPARATE axis (lifecycleState), not a progress category —
+// and the server AND-composes the two, so "Cancelled" can't be OR'd with
+// progress states in one request. Keep Cancelled mutually exclusive in the
+// dropdown: adding it drops progress; adding a progress state drops it. The
+// last action wins (diff against the previous selection).
+function resolveStatusSelection(next: string[], prev: string[]): string[] {
+  const hasCancelled = next.includes('CANCELLED');
+  const hasProgress = next.some((s) => s !== 'CANCELLED');
+  if (!hasCancelled || !hasProgress) return next;
+  const justAdded = next.filter((s) => !prev.includes(s));
+  return justAdded.includes('CANCELLED') ? ['CANCELLED'] : next.filter((s) => s !== 'CANCELLED');
+}
 
 const PAGE_SIZE = 50;
 
@@ -110,11 +120,6 @@ function formatDate(dateString?: string | null) {
 
 function isCancelled(wo: WorkOrderSummary): boolean {
   return wo.lifecycleState === 'CANCELLED';
-}
-
-// Toggle an id in/out of a multi-value filter array (for the More-filters pills).
-function toggleInArray(arr: string[], id: string): string[] {
-  return arr.includes(id) ? arr.filter((x) => x !== id) : [...arr, id];
 }
 
 // A WO reads "live" when a tech is on site right now — drives the row tint
@@ -163,6 +168,7 @@ export default function WorkOrdersPage() {
   const queryClient = useQueryClient();
   const { t } = useTranslation();
   const { getName } = useGlossary();
+  const { data: currentUser } = useCurrentUser();
   const [searchParams, setSearchParams] = useSearchParams();
 
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -178,13 +184,21 @@ export default function WorkOrdersPage() {
   // The array reads are memoized: searchParams.getAll() returns a fresh array
   // every call, which would bust the queryParams useMemo and refetch on every
   // render even when nothing changed.
-  const tabId = (searchParams.get('tab') as LifecycleTabId | null) ?? DEFAULT_TAB;
+  // WO status multi-select — no `status` param means the "Open" default.
+  const statusIds = useMemo(() => {
+    const raw = searchParams.getAll('status');
+    return raw.length > 0 ? raw : OPEN_CATEGORIES;
+  }, [searchParams]);
   const urlSearch = searchParams.get('q') ?? '';
   const typeIds = useMemo(() => searchParams.getAll('type'), [searchParams]);
   const divisionIds = useMemo(() => searchParams.getAll('division'), [searchParams]);
   const regionIds = useMemo(() => searchParams.getAll('region'), [searchParams]);
   const itemStatusIds = useMemo(() => searchParams.getAll('itemStatus'), [searchParams]);
   const assignedId = searchParams.get('assigned') ?? '';
+  // Scope: "Assigned to me" is just assignedUserId pinned to the current user
+  // (shares the `assigned` param with the filter). "My team" is not built.
+  const myId = currentUser?.id ?? '';
+  const scopeMine = !!myId && assignedId === myId;
   const customFrom = searchParams.get('from') ?? '';
   const customTo = searchParams.get('to') ?? '';
   // Legacy bookmarked `?date=<preset>` (pre-DateRangeChip URL shape) — resolved
@@ -285,19 +299,21 @@ export default function WorkOrdersPage() {
     return EMPTY_DATE_RANGE;
   }, [customFrom, customTo, legacyDatePreset]);
 
-  const tab = useMemo(
-    () => LIFECYCLE_TABS.find((f) => f.id === tabId) ?? LIFECYCLE_TABS[0],
-    [tabId]
-  );
-
   // ── Build the API query params ────────────────────────────────────────────
   // The four taxonomy filters use the plural form (workOrderTypeIds, etc.).
   // Don't send both singular and plural for the same filter — backend's
   // precedence rule is "plural wins," so the singular would be dead weight at
-  // best and a footgun at worst.
+  // best and a footgun at worst. WO status goes plural too (progressCategory).
+  // Map the status selection onto the two server axes: "Cancelled" →
+  // lifecycleState=CANCELLED (progress dropped); any progress subset →
+  // progressCategory=<subset> + lifecycleState=ACTIVE (ACTIVE keeps a
+  // cancelled-mid-work WO out of a live progress bucket). Cancelled is
+  // mutually exclusive in the dropdown, so statusIds is one axis or the other.
+  const cancelledView = statusIds.includes('CANCELLED');
   const queryParams: ListWorkOrdersParams = useMemo(
     () => ({
-      ...tab.params,
+      progressCategory: cancelledView ? undefined : (statusIds as ProgressCategory[]),
+      lifecycleState: cancelledView ? 'CANCELLED' : 'ACTIVE',
       q: deferredSearch || undefined,
       workOrderTypeIds: typeIds.length > 0 ? typeIds : undefined,
       divisionIds: divisionIds.length > 0 ? divisionIds : undefined,
@@ -313,7 +329,7 @@ export default function WorkOrdersPage() {
       page: pageNumber - 1, // URL is 1-based; backend Spring Page is 0-based
       size: PAGE_SIZE,
     }),
-    [tab, deferredSearch, typeIds, divisionIds, regionIds, itemStatusIds, assignedId, priorityIds, unassignedOnly, onSiteOnly, dateRange, includeArchived, pageNumber]
+    [statusIds, cancelledView, deferredSearch, typeIds, divisionIds, regionIds, itemStatusIds, assignedId, priorityIds, unassignedOnly, onSiteOnly, dateRange, includeArchived, pageNumber]
   );
 
   const { data: pageData, isLoading, error } = useQuery({
@@ -350,6 +366,22 @@ export default function WorkOrdersPage() {
   const liveCount = facets?.onSite;
   const unassignedCount = facets?.unassigned;
   const urgentCount = facets?.urgentHigh;
+
+  // Header stats — "N open · N all-time", scope-aware (my work vs all work) but
+  // independent of the tab and filters. Lean size-1 probes.
+  const headerScope = scopeMine ? { assignedUserId: myId } : {};
+  const { data: openCount } = useQuery({
+    queryKey: ['work-orders', 'count', 'open', headerScope],
+    queryFn: () =>
+      workOrderApi
+        .getAll({ ...headerScope, progressCategory: OPEN_CATEGORIES, lifecycleState: 'ACTIVE', size: 1 })
+        .then((p) => p.totalElements),
+  });
+  const { data: allTimeCount } = useQuery({
+    queryKey: ['work-orders', 'count', 'all', headerScope],
+    queryFn: () =>
+      workOrderApi.getAll({ ...headerScope, includeArchived: true, size: 1 }).then((p) => p.totalElements),
+  });
 
   // ── Mutations ─────────────────────────────────────────────────────────────
   const deleteMutation = useMutation({
@@ -494,19 +526,26 @@ export default function WorkOrdersPage() {
     });
   }
 
-  // Quick chips manage their own toggle state (not shown in the removable
+  // Quick chips + WO status manage their own state (not in the removable
   // `activeChips` summary), but they still count as "a filter is on" for the
-  // clear-all affordance and the empty-state copy.
+  // clear-all affordance and the empty-state copy. WO status counts only when
+  // it's off its "Open" default.
   const hasQuickFilter = onSiteOnly || unassignedOnly || priorityIds.length > 0;
-  const anyFilter = activeChips.length > 0 || hasQuickFilter;
+  const statusChanged = !isOpenDefault(statusIds);
+  const anyFilter = activeChips.length > 0 || hasQuickFilter || statusChanged;
 
-  // Region is an advanced lens, gated to multi-region tenants (single-branch
-  // shops never see it). It + Item status live in the More-filters overflow.
+  // WO status chip label: "Open" at the default, else the selected labels
+  // ("Cancelled" is a single exclusive selection, so it reads through here too).
+  const statusLabel = (c: string) => t(`workOrders.progress.${PROGRESS_TRANSLATION_KEYS[c as ProgressCategory]}`);
+  const statusDisplay = isOpenDefault(statusIds)
+    ? t('workOrders.filters.open')
+    : statusIds.length <= 2
+      ? statusIds.map(statusLabel).join(', ')
+      : t('workOrders.filters.nSelected', { count: statusIds.length });
+
+  // Region is a tenant-conditional lens — its own primary dropdown, gated to
+  // multi-region tenants (single-branch shops never see it).
   const showRegion = activeRegions.length > 1;
-  const moreCount = itemStatusIds.length + (showRegion ? regionIds.length : 0);
-  // Overflow filters surface as removable pills below the row so an active
-  // secondary filter is obvious even though the control is tucked in More.
-  const overflowChips = activeChips.filter((c) => c.key === 'itemStatus' || c.key === 'region');
 
   const clearAllFilters = () => {
     setSearchParams(new URLSearchParams());
@@ -524,32 +563,21 @@ export default function WorkOrdersPage() {
     return qs ? `?${qs}` : '?';
   };
 
-  // ── Tab options for ViewTabs (no per-tab counts available yet) ─────────────
-  const viewTabs = LIFECYCLE_TABS.map((f) => ({ id: f.id, label: t(f.labelKey) }));
-
   const showingStart = totalElements === 0 ? 0 : (pageNumber - 1) * PAGE_SIZE + 1;
   const showingEnd = Math.min(pageNumber * PAGE_SIZE, totalElements);
 
-  // Subtitle — uses the one count we actually have (active tab's total).
-  // The handoff's "3 open · 1 urgent · 2 scheduled today" pattern wants
-  // per-tab counts, which are gated on a backend counts-summary endpoint.
-  const activeTabLabel = t(tab.labelKey).toLowerCase();
-  const subtitleParts: string[] = [];
-  if (totalElements > 0) {
-    subtitleParts.push(
-      `${totalElements.toLocaleString()} ${activeTabLabel} ${getName('work_order', true).toLowerCase()}`
-    );
-    if (totalElements > PAGE_SIZE) {
-      subtitleParts.push(
-        t('common.pagination.showing', {
-          start: showingStart,
-          end: showingEnd,
-          total: totalElements.toLocaleString(),
-        })
-      );
-    }
-  }
-  const subtitle = subtitleParts.length > 0 ? subtitleParts.join(' · ') : null;
+  // Subtitle — "N open · N all-time" (scope-aware), the tenant's headline
+  // counts, emphasized numbers over muted words. Numbers appear once the
+  // probes resolve.
+  const subtitle =
+    openCount != null && allTimeCount != null ? (
+      <>
+        <span className="font-semibold tabular-nums text-fg-strong">{openCount.toLocaleString()}</span>{' '}
+        {t('workOrders.header.open')} ·{' '}
+        <span className="tabular-nums">{allTimeCount.toLocaleString()}</span>{' '}
+        {t('workOrders.header.allTime')}
+      </>
+    ) : null;
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
@@ -565,6 +593,38 @@ export default function WorkOrdersPage() {
           }
         />
 
+        {/* Scope — "Assigned to me" is assignedUserId pinned to the current
+            user; "All work" clears it. (My team is not built.) */}
+        {myId && (
+          <div className="mb-3 flex items-center gap-2">
+            <div className="inline-flex h-[30px] overflow-hidden rounded-md border border-border">
+              <button
+                type="button"
+                onClick={() => updateParams({ assigned: myId, page: null })}
+                aria-pressed={scopeMine}
+                className={clsx(
+                  'flex items-center px-3 text-[12px] font-semibold',
+                  scopeMine ? 'bg-accent-500/10 text-fg-accent' : 'bg-bg-elev text-fg-muted'
+                )}
+              >
+                {t('workOrders.scope.mine')}
+              </button>
+              <button
+                type="button"
+                onClick={() => updateParams({ assigned: null, page: null })}
+                aria-pressed={!scopeMine}
+                className={clsx(
+                  'flex items-center border-l border-border px-3 text-[12px] font-semibold',
+                  !scopeMine ? 'bg-accent-500/10 text-fg-accent' : 'bg-bg-elev text-fg-muted'
+                )}
+              >
+                {t('workOrders.scope.all')}
+              </button>
+            </div>
+            {scopeMine && <span className="text-[11px] text-fg-dim">{t('workOrders.scope.mineHint')}</span>}
+          </div>
+        )}
+
         {/* Filter bar — loose on the canvas, not wrapped in a Card. Cards
             are reserved for content surfaces (the table below); the filter
             row is an action affordance. */}
@@ -579,6 +639,50 @@ export default function WorkOrdersPage() {
               />
             }
           >
+              {/* WO Status — primary multi-select dropdown (replaces the tabs;
+                  lists every state, "Open" default). Multi-value filtering
+                  rides plural progressCategory (FE_ASK_wo_list_plural_status). */}
+              <FilterChipListbox
+                multiple
+                label={t('workOrders.filters.status')}
+                ariaLabel={t('workOrders.filters.status')}
+                value={statusIds}
+                displayValue={statusDisplay}
+                onChange={(ids) => {
+                  const resolved = resolveStatusSelection(ids, statusIds);
+                  updateParams({ status: isOpenDefault(resolved) ? [] : resolved, page: null });
+                }}
+                onClear={() => updateParams({ status: [], page: null })}
+              >
+                {WO_STATUS_OPTIONS.map((c) => (
+                  <ChipListboxOption key={c} value={c}>
+                    {statusLabel(c)}
+                  </ChipListboxOption>
+                ))}
+              </FilterChipListbox>
+
+              {/* Item status — a DIFFERENT axis from WO status (matches WOs that
+                  CONTAIN an item in this state). Primary + subtitled so the two
+                  are never confused. */}
+              {activeItemStatuses.length > 0 && (
+                <FilterChipListbox
+                  multiple
+                  label={t('workOrders.filters.itemStatus')}
+                  ariaLabel={t('workOrders.filters.itemStatus')}
+                  hint={t('workOrders.filters.itemStatusHint')}
+                  value={itemStatusIds}
+                  displayValue={formatMultiValue(itemStatusIds, activeItemStatuses)}
+                  onChange={(ids) => updateParams({ itemStatus: ids, page: null })}
+                  onClear={() => updateParams({ itemStatus: [], page: null })}
+                >
+                  {activeItemStatuses.map((s) => (
+                    <ChipListboxOption key={s.id} value={s.id}>
+                      {s.name}
+                    </ChipListboxOption>
+                  ))}
+                </FilterChipListbox>
+              )}
+
               {/* Four taxonomy chips are multi-select. No "Any X" reset row —
                   the × button clears all, and an empty array means "show all"
                   by way of the empty-state chip styling. */}
@@ -629,7 +733,7 @@ export default function WorkOrdersPage() {
                   Matches WOs with at least one non-cancelled dispatch assigned
                   to the user, including completed/no-show visits ("Brian's
                   work orders" includes past trips). */}
-              {userOptions.length > 0 && (
+              {userOptions.length > 0 && !scopeMine && (
                 <FilterChipListbox
                   label={t('workOrders.filters.assigned')}
                   ariaLabel={t('workOrders.filters.assigned')}
@@ -656,64 +760,25 @@ export default function WorkOrdersPage() {
                 }
               />
 
-              {/* More filters — advanced/secondary lenses (Item status, Region)
-                  tucked out of the primary row. Item status is deliberately NOT
-                  a peer of the WO-status tabs. */}
-              <Popover className="relative">
-                <PopoverButton
-                  className={clsx(
-                    'inline-flex h-8 items-center gap-1.5 rounded-md border px-2.5 text-[12px] font-medium focus:outline-none',
-                    moreCount > 0
-                      ? 'border-accent-500/45 bg-accent-500/10 text-fg-accent'
-                      : 'border-border bg-bg-elev text-fg'
-                  )}
+              {/* Region — tenant-conditional lens, its own gated dropdown
+                  (multi-region tenants only). */}
+              {showRegion && (
+                <FilterChipListbox
+                  multiple
+                  label={t('workOrders.filters.region')}
+                  ariaLabel={t('workOrders.filters.region')}
+                  value={regionIds}
+                  displayValue={formatMultiValue(regionIds, activeRegions)}
+                  onChange={(ids) => updateParams({ region: ids, page: null })}
+                  onClear={() => updateParams({ region: [], page: null })}
                 >
-                  <FunnelIcon className="size-3.5" />
-                  <span>{t('workOrders.filters.more')}</span>
-                  {moreCount > 0 && (
-                    <span className="rounded-[3px] bg-accent-500/20 px-1.5 text-[10.5px] font-semibold tabular-nums text-fg-accent">
-                      {moreCount}
-                    </span>
-                  )}
-                  <ChevronDownIcon className="size-3 text-fg-muted" />
-                </PopoverButton>
-                <PopoverPanel
-                  anchor="bottom start"
-                  className="z-30 mt-1 min-w-[240px] rounded-md border border-border bg-bg-elev p-3 shadow-lg [--anchor-gap:4px]"
-                >
-                  <div className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-fg-muted">
-                    {t('workOrders.filters.itemStatus')}
-                    <span className="ml-1 font-normal normal-case text-fg-dim">· {t('workOrders.filters.itemStatusHint')}</span>
-                  </div>
-                  <FilterChipRow className={showRegion ? 'mb-3' : undefined}>
-                    {activeItemStatuses.map((s) => (
-                      <FilterChip
-                        key={s.id}
-                        label={s.name}
-                        active={itemStatusIds.includes(s.id)}
-                        onToggle={() => updateParams({ itemStatus: toggleInArray(itemStatusIds, s.id), page: null })}
-                      />
-                    ))}
-                  </FilterChipRow>
-                  {showRegion && (
-                    <>
-                      <div className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-fg-muted">
-                        {t('workOrders.filters.region')}
-                      </div>
-                      <FilterChipRow>
-                        {activeRegions.map((r) => (
-                          <FilterChip
-                            key={r.id}
-                            label={r.name}
-                            active={regionIds.includes(r.id)}
-                            onToggle={() => updateParams({ region: toggleInArray(regionIds, r.id), page: null })}
-                          />
-                        ))}
-                      </FilterChipRow>
-                    </>
-                  )}
-                </PopoverPanel>
-              </Popover>
+                  {activeRegions.map((r) => (
+                    <ChipListboxOption key={r.id} value={r.id}>
+                      {r.name}
+                    </ChipListboxOption>
+                  ))}
+                </FilterChipListbox>
+              )}
 
               {/* Quick-triage toggles — the dispatcher's primary buckets. */}
               <FilterChipRow>
@@ -768,37 +833,7 @@ export default function WorkOrdersPage() {
                 {t('workOrders.filters.showArchived')}
               </label>
           </ListToolbar>
-
-          {overflowChips.length > 0 && (
-            <div className="mt-2 flex flex-wrap items-center gap-1.5">
-              {overflowChips.map((c) => (
-                <span
-                  key={c.key}
-                  className="inline-flex items-center gap-1 rounded-md border border-accent-500/40 bg-accent-500/10 py-0.5 pl-2 pr-1 text-[11.5px] text-fg-accent"
-                >
-                  <span className="text-fg-muted">{c.label}:</span>
-                  {c.value}
-                  <button
-                    type="button"
-                    onClick={c.onClear}
-                    aria-label={`${c.label} — clear`}
-                    className="rounded p-0.5 hover:bg-accent-500/15 hover:text-fg-strong"
-                  >
-                    <XMarkIcon className="size-3" />
-                  </button>
-                </span>
-              ))}
-            </div>
-          )}
         </div>
-
-        {/* Lifecycle / progress tabs */}
-        <ViewTabs
-          className="mb-3"
-          value={tabId}
-          onChange={(id) => updateParams({ tab: id === DEFAULT_TAB ? null : id, page: null })}
-          tabs={viewTabs}
-        />
 
         {isLoading && (
           <Card>
@@ -818,7 +853,7 @@ export default function WorkOrdersPage() {
           </Card>
         )}
 
-        {pageData && workOrders.length === 0 && !anyFilter && tabId === DEFAULT_TAB && (
+        {pageData && workOrders.length === 0 && !anyFilter && (
           <Card>
             <CardBody>
               <p className="text-[12.5px] text-fg-muted">
@@ -831,7 +866,7 @@ export default function WorkOrdersPage() {
           </Card>
         )}
 
-        {pageData && workOrders.length === 0 && (anyFilter || tabId !== DEFAULT_TAB) && (
+        {pageData && workOrders.length === 0 && anyFilter && (
           <Card>
             <CardBody>
               <p className="text-[12.5px] text-fg-muted">
@@ -954,7 +989,7 @@ export default function WorkOrdersPage() {
                               )}
                             </CellStack>
                           ) : (
-                            <Pill tone={PROGRESS_TONES[workOrder.progressCategory]} dot live={live}>
+                            <Pill tone={PROGRESS_TONES[workOrder.progressCategory]} dot={live} live={live}>
                               {t(`workOrders.progress.${PROGRESS_TRANSLATION_KEYS[workOrder.progressCategory]}`)}
                             </Pill>
                           )}
