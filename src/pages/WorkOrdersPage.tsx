@@ -67,6 +67,19 @@ function isOpenDefault(ids: string[]): boolean {
   return ids.length === OPEN_CATEGORIES.length && OPEN_CATEGORIES.every((c) => ids.includes(c));
 }
 
+// Cancellation is a SEPARATE axis (lifecycleState), not a progress category —
+// and the server AND-composes the two, so "Cancelled" can't be OR'd with
+// progress states in one request. Keep Cancelled mutually exclusive in the
+// dropdown: adding it drops progress; adding a progress state drops it. The
+// last action wins (diff against the previous selection).
+function resolveStatusSelection(next: string[], prev: string[]): string[] {
+  const hasCancelled = next.includes('CANCELLED');
+  const hasProgress = next.some((s) => s !== 'CANCELLED');
+  if (!hasCancelled || !hasProgress) return next;
+  const justAdded = next.filter((s) => !prev.includes(s));
+  return justAdded.includes('CANCELLED') ? ['CANCELLED'] : next.filter((s) => s !== 'CANCELLED');
+}
+
 const PAGE_SIZE = 50;
 
 type PillTone = 'neutral' | 'info' | 'success' | 'warning' | 'danger' | 'accent' | 'violet';
@@ -291,9 +304,16 @@ export default function WorkOrdersPage() {
   // Don't send both singular and plural for the same filter — backend's
   // precedence rule is "plural wins," so the singular would be dead weight at
   // best and a footgun at worst. WO status goes plural too (progressCategory).
+  // Map the status selection onto the two server axes: "Cancelled" →
+  // lifecycleState=CANCELLED (progress dropped); any progress subset →
+  // progressCategory=<subset> + lifecycleState=ACTIVE (ACTIVE keeps a
+  // cancelled-mid-work WO out of a live progress bucket). Cancelled is
+  // mutually exclusive in the dropdown, so statusIds is one axis or the other.
+  const cancelledView = statusIds.includes('CANCELLED');
   const queryParams: ListWorkOrdersParams = useMemo(
     () => ({
-      progressCategory: statusIds as ProgressCategory[],
+      progressCategory: cancelledView ? undefined : (statusIds as ProgressCategory[]),
+      lifecycleState: cancelledView ? 'CANCELLED' : 'ACTIVE',
       q: deferredSearch || undefined,
       workOrderTypeIds: typeIds.length > 0 ? typeIds : undefined,
       divisionIds: divisionIds.length > 0 ? divisionIds : undefined,
@@ -309,7 +329,7 @@ export default function WorkOrdersPage() {
       page: pageNumber - 1, // URL is 1-based; backend Spring Page is 0-based
       size: PAGE_SIZE,
     }),
-    [statusIds, deferredSearch, typeIds, divisionIds, regionIds, itemStatusIds, assignedId, priorityIds, unassignedOnly, onSiteOnly, dateRange, includeArchived, pageNumber]
+    [statusIds, cancelledView, deferredSearch, typeIds, divisionIds, regionIds, itemStatusIds, assignedId, priorityIds, unassignedOnly, onSiteOnly, dateRange, includeArchived, pageNumber]
   );
 
   const { data: pageData, isLoading, error } = useQuery({
@@ -353,7 +373,9 @@ export default function WorkOrdersPage() {
   const { data: openCount } = useQuery({
     queryKey: ['work-orders', 'count', 'open', headerScope],
     queryFn: () =>
-      workOrderApi.getAll({ ...headerScope, progressCategory: OPEN_CATEGORIES, size: 1 }).then((p) => p.totalElements),
+      workOrderApi
+        .getAll({ ...headerScope, progressCategory: OPEN_CATEGORIES, lifecycleState: 'ACTIVE', size: 1 })
+        .then((p) => p.totalElements),
   });
   const { data: allTimeCount } = useQuery({
     queryKey: ['work-orders', 'count', 'all', headerScope],
@@ -512,16 +534,14 @@ export default function WorkOrdersPage() {
   const statusChanged = !isOpenDefault(statusIds);
   const anyFilter = activeChips.length > 0 || hasQuickFilter || statusChanged;
 
-  // WO status chip label: "Open" at the default, "All" when every status is
-  // picked, else the selected labels.
+  // WO status chip label: "Open" at the default, else the selected labels
+  // ("Cancelled" is a single exclusive selection, so it reads through here too).
   const statusLabel = (c: string) => t(`workOrders.progress.${PROGRESS_TRANSLATION_KEYS[c as ProgressCategory]}`);
   const statusDisplay = isOpenDefault(statusIds)
     ? t('workOrders.filters.open')
-    : statusIds.length === WO_STATUS_OPTIONS.length
-      ? t('workOrders.filters.all')
-      : statusIds.length <= 2
-        ? statusIds.map(statusLabel).join(', ')
-        : t('workOrders.filters.nSelected', { count: statusIds.length });
+    : statusIds.length <= 2
+      ? statusIds.map(statusLabel).join(', ')
+      : t('workOrders.filters.nSelected', { count: statusIds.length });
 
   // Region is a tenant-conditional lens — its own primary dropdown, gated to
   // multi-region tenants (single-branch shops never see it).
@@ -628,7 +648,10 @@ export default function WorkOrdersPage() {
                 ariaLabel={t('workOrders.filters.status')}
                 value={statusIds}
                 displayValue={statusDisplay}
-                onChange={(ids) => updateParams({ status: isOpenDefault(ids) ? [] : ids, page: null })}
+                onChange={(ids) => {
+                  const resolved = resolveStatusSelection(ids, statusIds);
+                  updateParams({ status: isOpenDefault(resolved) ? [] : resolved, page: null });
+                }}
                 onClear={() => updateParams({ status: [], page: null })}
               >
                 {WO_STATUS_OPTIONS.map((c) => (

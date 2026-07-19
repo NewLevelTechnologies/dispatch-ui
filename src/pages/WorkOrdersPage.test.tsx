@@ -407,18 +407,36 @@ describe('WorkOrdersPage', () => {
       });
     });
 
-    it('reads WO status from the URL into the progressCategory query', async () => {
+    it('maps a progress status to progressCategory + lifecycleState=ACTIVE', async () => {
       vi.mocked(apiClient.get).mockResolvedValue({ data: pageOf([]) });
 
       renderWithProviders(<WorkOrdersPage />, { initialPath: '/?status=BLOCKED' });
 
-      // ?status=BLOCKED → the list query filters progressCategory=['BLOCKED']
-      // (the size-1 header/facet probes use a different set, so this is unique).
+      // ?status=BLOCKED → list query: progressCategory=['BLOCKED'] AND
+      // lifecycleState=ACTIVE (ACTIVE keeps cancelled-mid-work WOs out).
       await waitFor(() => {
         const hit = vi.mocked(apiClient.get).mock.calls.some(([url, cfg]) => {
           if (String(url) !== '/work-orders') return false;
-          const pc = (cfg as { params?: { progressCategory?: unknown } } | undefined)?.params?.progressCategory;
-          return Array.isArray(pc) && pc.length === 1 && pc[0] === 'BLOCKED';
+          const p = (cfg as { params?: { progressCategory?: unknown; lifecycleState?: unknown } } | undefined)?.params;
+          return Array.isArray(p?.progressCategory) && p.progressCategory.length === 1
+            && p.progressCategory[0] === 'BLOCKED' && p.lifecycleState === 'ACTIVE';
+        });
+        expect(hit).toBe(true);
+      });
+    });
+
+    it('maps Cancelled to lifecycleState=CANCELLED with no progressCategory', async () => {
+      vi.mocked(apiClient.get).mockResolvedValue({ data: pageOf([]) });
+
+      renderWithProviders(<WorkOrdersPage />, { initialPath: '/?status=CANCELLED' });
+
+      // Cancellation is a lifecycle axis, not a progress category — filtering on
+      // progressCategory=CANCELLED would miss most cancelled WOs.
+      await waitFor(() => {
+        const hit = vi.mocked(apiClient.get).mock.calls.some(([url, cfg]) => {
+          if (String(url) !== '/work-orders') return false;
+          const p = (cfg as { params?: { progressCategory?: unknown; lifecycleState?: unknown } } | undefined)?.params;
+          return p?.lifecycleState === 'CANCELLED' && p?.progressCategory === undefined;
         });
         expect(hit).toBe(true);
       });
