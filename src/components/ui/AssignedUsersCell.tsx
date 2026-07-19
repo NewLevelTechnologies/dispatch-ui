@@ -24,7 +24,16 @@ function userInitials(name: string): string {
 export function AssignedUsersCell({ users }: { users?: WorkOrderAssignedUser[] }) {
   const { t } = useTranslation();
   const lead = users?.[0];
-  if (!lead) return <span className="text-[11px] text-fg-dim">—</span>;
+  // Unassigned is a triage signal on dispatch lists — a dashed-ring placeholder
+  // + a warning-toned label, not a blank dash.
+  if (!lead) {
+    return (
+      <span className="flex items-center gap-1.5">
+        <span className="size-[18px] shrink-0 rounded-full border-[1.5px] border-dashed border-border-strong" />
+        <span className="text-[12px] font-medium text-warning-fg">{t('workOrders.table.unassigned')}</span>
+      </span>
+    );
+  }
 
   const named = Boolean(lead.name);
   const name = lead.name ?? t('workOrders.table.assignedUser');

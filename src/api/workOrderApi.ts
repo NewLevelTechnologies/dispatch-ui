@@ -299,9 +299,12 @@ export interface ListWorkOrdersParams {
   // service location name/address, site contact name, and description.
   q?: string;
 
-  // Lifecycle / progress
+  // Lifecycle / progress. `progressCategory` accepts one value or an array
+  // (repeatable/CSV) — the WO Status dropdown multi-selects statuses. Plural
+  // support is pending on the backend (FE_ASK_wo_list_plural_status); until it
+  // lands the server honors a single value.
   lifecycleState?: LifecycleState;
-  progressCategory?: ProgressCategory;
+  progressCategory?: ProgressCategory | ProgressCategory[];
 
   // Tenant taxonomy. Prefer the plural form (workOrderTypeIds: string[]) — the
   // backend OR's within a filter and AND's across filters. Singulars are still
