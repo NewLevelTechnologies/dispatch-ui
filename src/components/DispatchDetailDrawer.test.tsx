@@ -280,13 +280,16 @@ describe('DispatchDetailDrawer', () => {
         } satisfies NotificationLogDto,
       ],
     });
+    const user = userEvent.setup();
     renderDrawer(mockDispatch());
     // Status enum renders title-cased (DELIVERED → Delivered).
     expect(await screen.findByText('Delivered')).toBeInTheDocument();
-    // The rendered SMS body appears when present.
-    expect(screen.getByText('Daniel is on the way — ETA ~12:38p.')).toBeInTheDocument();
-    // The audience chip reflects who was notified.
+    // The audience chip reflects who was notified — shown on the collapsed row.
     expect(screen.getByText('Customer')).toBeInTheDocument();
+    // The body is a delivery log entry: collapsed by default, revealed on tap.
+    expect(screen.queryByText('Daniel is on the way — ETA ~12:38p.')).not.toBeInTheDocument();
+    await user.click(screen.getByText('Customer').closest('button')!);
+    expect(await screen.findByText('Daniel is on the way — ETA ~12:38p.')).toBeInTheDocument();
   });
 
   it('renders the visit-notes log and adds an office note', async () => {

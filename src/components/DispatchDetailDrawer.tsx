@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import {
   ArrowUpTrayIcon,
   ChatBubbleLeftRightIcon,
+  ChevronDownIcon,
   PhoneIcon,
   PlayIcon,
   PlusIcon,
@@ -548,49 +549,10 @@ function DispatchDetailContent({
               {t('workOrders.dispatches.drawer.notificationsEmpty')}
             </div>
           )}
-          <div className="flex flex-col gap-2">
-            {notifications.map((log) => {
-              const tech = log.audience === 'TECH';
-              return (
-                <div key={log.id} className="flex items-start gap-2">
-                  <span className="grid size-[22px] shrink-0 place-items-center rounded bg-bg-active text-[9.5px] font-bold text-fg-muted">
-                    {log.channel.slice(0, 3)}
-                  </span>
-                  <div className="min-w-0 grow">
-                    <div className="flex items-center gap-1.5">
-                      {log.audience && (
-                        <span
-                          className="shrink-0 rounded-full px-1.5 py-px text-[9.5px] font-bold tracking-[0.03em]"
-                          style={{
-                            background: tech
-                              ? 'color-mix(in oklch, var(--violet-500) 14%, var(--bg-elev))'
-                              : 'color-mix(in oklch, var(--accent-500) 13%, var(--bg-elev))',
-                            color: tech ? 'var(--violet-500)' : 'var(--accent-700)',
-                          }}
-                        >
-                          {tech
-                            ? t('workOrders.dispatches.drawer.audienceTech')
-                            : t('workOrders.dispatches.drawer.audienceCustomer')}
-                        </span>
-                      )}
-                      <span className="truncate text-[10.5px] text-fg-dim">
-                        {log.recipientPhone
-                          ? formatPhone(log.recipientPhone)
-                          : log.recipientEmail || log.recipientName}
-                      </span>
-                      <span className="grow" />
-                      <Pill tone={NOTIF_TONE[log.status]} dot>
-                        {titleCase(log.status)}
-                      </Pill>
-                    </div>
-                    {log.body && (
-                      <div className="mt-0.5 text-[11.5px] leading-snug text-fg-muted">{log.body}</div>
-                    )}
-                    <div className="mt-px text-[10px] text-fg-dim">{stamp(log.sentAt ?? log.createdAt)}</div>
-                  </div>
-                </div>
-              );
-            })}
+          <div className="flex flex-col gap-1.5">
+            {notifications.map((log) => (
+              <NotificationRow key={log.id} log={log} />
+            ))}
           </div>
         </Section>
       </div>
@@ -729,6 +691,67 @@ function VisitNotesSection({ dispatchId, readOnly }: { dispatchId: string; readO
           </button>
         ))}
     </Section>
+  );
+}
+
+// Collapsed one-line delivery log row — channel · audience · time + status.
+// The full SMS body is a wall of text for a log; reveal it (and the recipient)
+// on tap. This confirms a message went out; it isn't a message reader.
+function NotificationRow({ log }: { log: NotificationLogDto }) {
+  const { t } = useTranslation();
+  const [expanded, setExpanded] = useState(false);
+  const tech = log.audience === 'TECH';
+  const audienceLabel = log.audience
+    ? tech
+      ? t('workOrders.dispatches.drawer.audienceTech')
+      : t('workOrders.dispatches.drawer.audienceCustomer')
+    : null;
+  const recipient = log.recipientPhone
+    ? formatPhone(log.recipientPhone)
+    : log.recipientEmail || log.recipientName || null;
+  const canExpand = Boolean(log.body || recipient);
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={canExpand ? () => setExpanded((v) => !v) : undefined}
+        aria-expanded={canExpand ? expanded : undefined}
+        className={`flex w-full items-center gap-1.5 text-left ${canExpand ? 'cursor-pointer hover:opacity-80' : 'cursor-default'}`}
+      >
+        <span className="grid size-[22px] shrink-0 place-items-center rounded bg-bg-active text-[9.5px] font-bold text-fg-muted">
+          {log.channel.slice(0, 3)}
+        </span>
+        {audienceLabel && (
+          <span
+            className="shrink-0 rounded-full px-1.5 py-px text-[9.5px] font-bold tracking-[0.03em]"
+            style={{
+              background: tech
+                ? 'color-mix(in oklch, var(--violet-500) 14%, var(--bg-elev))'
+                : 'color-mix(in oklch, var(--accent-500) 13%, var(--bg-elev))',
+              color: tech ? 'var(--violet-500)' : 'var(--accent-700)',
+            }}
+          >
+            {audienceLabel}
+          </span>
+        )}
+        <span className="truncate text-[11px] text-fg-dim">{stamp(log.sentAt ?? log.createdAt)}</span>
+        <span className="grow" />
+        <Pill tone={NOTIF_TONE[log.status]} dot>
+          {titleCase(log.status)}
+        </Pill>
+        {canExpand && (
+          <ChevronDownIcon
+            className={`size-3.5 shrink-0 text-fg-dim transition-transform ${expanded ? 'rotate-180' : ''}`}
+          />
+        )}
+      </button>
+      {expanded && (
+        <div className="mt-1 pl-[28px]">
+          {recipient && <div className="text-[10.5px] text-fg-dim">{recipient}</div>}
+          {log.body && <div className="mt-0.5 text-[11.5px] leading-snug text-fg-muted">{log.body}</div>}
+        </div>
+      )}
+    </div>
   );
 }
 
