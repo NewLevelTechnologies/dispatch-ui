@@ -243,23 +243,55 @@ function DispatchDetailContent({
     arrived: full.arrivedAt,
     departed: full.departedAt,
   };
-  const steps: { label: string; at: string | null; notify?: 'TECH' | 'CUSTOMER' }[] = [
+  // The timeline is the control surface: each step carries its own inline action
+  // when it's a reachable next move, so the lifecycle advances where it's read.
+  // Forward transitions can skip, so we surface the next step (primary) AND the
+  // sensible skip-ahead (secondary) — a Scheduled visit offers "Mark en route"
+  // (primary) and "Mark arrived" (secondary), so a tech already on site isn't
+  // forced through en route. The terminal Complete lives in the footer (reachable
+  // from any state), so the Departed step never carries a button. Notify steps
+  // release the tech/customer while still on deck.
+  const steps: {
+    label: string;
+    at: string | null;
+    notify?: 'TECH' | 'CUSTOMER';
+    advance?: DispatchStatus;
+    emphasis?: 'primary' | 'secondary';
+  }[] = [
     { label: t('workOrders.dispatches.drawer.timelineScheduled'), at: lc.scheduled },
     { label: t('workOrders.dispatches.drawer.timelineTechNotified'), at: techNotifiedAt, notify: 'TECH' },
     { label: t('workOrders.dispatches.drawer.timelineNotified'), at: customerNotifiedAt, notify: 'CUSTOMER' },
-    { label: t('workOrders.dispatches.drawer.timelineEnRoute'), at: lc.enroute },
-    { label: t('workOrders.dispatches.drawer.timelineArrived'), at: lc.arrived },
+    {
+      label: t('workOrders.dispatches.drawer.timelineEnRoute'),
+      at: lc.enroute,
+      // En route is the expected next move only from Scheduled; it's skippable,
+      // so once past Scheduled it carries no button (correct it via Edit).
+      ...(full.status === 'SCHEDULED' ? { advance: 'EN_ROUTE' as DispatchStatus, emphasis: 'primary' as const } : {}),
+    },
+    {
+      label: t('workOrders.dispatches.drawer.timelineArrived'),
+      at: lc.arrived,
+      // Arrived is reachable from Scheduled (skip → secondary) or En route (primary).
+      ...(full.status === 'SCHEDULED'
+        ? { advance: 'IN_PROGRESS' as DispatchStatus, emphasis: 'secondary' as const }
+        : full.status === 'EN_ROUTE'
+          ? { advance: 'IN_PROGRESS' as DispatchStatus, emphasis: 'primary' as const }
+          : {}),
+    },
     { label: t('workOrders.dispatches.drawer.timelineDeparted'), at: lc.departed },
   ];
   const lastReached = steps.reduce((max, s, i) => (s.at ? i : max), -1);
 
   const statusMutation = useMutation({
-    mutationFn: (status: DispatchStatus) => dispatchesApi.update(dispatch.id, { status }),
-    onSuccess: () => {
+    // Timeline advances keep the drawer open (it's a control surface — you may
+    // mark the next step right after); the footer's terminal Complete closes it.
+    mutationFn: ({ status }: { status: DispatchStatus; close?: boolean }) =>
+      dispatchesApi.update(dispatch.id, { status }),
+    onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['dispatches'] });
       queryClient.invalidateQueries({ queryKey: ['dispatch', dispatch.id] });
       queryClient.invalidateQueries({ queryKey: ['work-order-activity', dispatch.workOrderId] });
-      onClose();
+      if (variables.close) onClose();
     },
     onError: (err: unknown) => {
       const msg =
@@ -316,15 +348,11 @@ function DispatchDetailContent({
   // Notify-able only while on deck (SCHEDULED); live/done/cancelled hide it.
   const canNotify = !readOnly && full.status === 'SCHEDULED';
 
-  // State-aware primary transition: Scheduled → En route → On site → Complete.
-  const primary =
-    full.status === 'SCHEDULED'
-      ? { label: t('workOrders.dispatches.drawer.markEnRoute'), next: 'EN_ROUTE' as DispatchStatus }
-      : full.status === 'EN_ROUTE'
-        ? { label: t('workOrders.dispatches.drawer.markOnSite'), next: 'IN_PROGRESS' as DispatchStatus }
-        : full.status === 'IN_PROGRESS'
-          ? { label: t('workOrders.dispatches.drawer.completeVisit', { entity: getName('dispatch') }), next: 'COMPLETED' as DispatchStatus }
-          : null;
+  // Complete is the terminal escape hatch — always reachable from a non-terminal
+  // state via the footer, regardless of where the timeline got stuck (a tech
+  // who's already home taps Complete; skipped steps stay "not recorded").
+  const canComplete =
+    !readOnly && (full.status === 'SCHEDULED' || full.status === 'EN_ROUTE' || full.status === 'IN_PROGRESS');
 
   // Work addressed — resolve the visit's ids against the WO's items. Empty =
   // unscoped (covers the whole WO), so the section hides.
@@ -410,21 +438,43 @@ function DispatchDetailContent({
             milestone; a passed-but-unstamped step (e.g. skipped En route) shows
             as a hollow dot on the green line, not a broken chain. */}
         <Section title={t('workOrders.dispatches.drawer.timeline', { entity: getName('dispatch') })}>
-          {steps.map((s, i) => (
-            <TimelineStep
-              key={s.label}
-              label={s.label}
-              at={s.at}
-              reached={!!s.at}
-              active={!!p.live && i === lastReached}
-              topDone={i > 0 && i <= lastReached}
-              bottomDone={i < lastReached}
-              first={i === 0}
-              last={i === steps.length - 1}
-              onNotify={s.notify && canNotify && !s.at ? () => notifyMutation.mutate(s.notify!) : undefined}
-              notifyPending={notifyMutation.isPending}
-            />
-          ))}
+          {steps.map((s, i) => {
+            // A step bypassed by a later one reads as "Skipped" (honest — no fake
+            // timestamp), distinct from an inert future "—".
+            const skipped = !s.at && i < lastReached;
+            const advanceLabel =
+              s.advance === 'EN_ROUTE'
+                ? t('workOrders.dispatches.drawer.markEnRoute')
+                : s.advance === 'IN_PROGRESS'
+                  ? t('workOrders.dispatches.drawer.markArrived')
+                  : undefined;
+            const canAdvanceHere = !readOnly && !!s.advance && !s.at;
+            const notifyLabel =
+              s.notify === 'TECH'
+                ? t('workOrders.dispatches.drawer.notifyTech')
+                : t('workOrders.dispatches.drawer.notifyCustomer');
+            return (
+              <TimelineStep
+                key={s.label}
+                label={s.label}
+                at={s.at}
+                reached={!!s.at}
+                skipped={skipped}
+                active={!!p.live && i === lastReached}
+                topDone={i > 0 && i <= lastReached}
+                bottomDone={i < lastReached}
+                first={i === 0}
+                last={i === steps.length - 1}
+                onNotify={s.notify && canNotify && !s.at ? () => notifyMutation.mutate(s.notify!) : undefined}
+                notifyLabel={s.notify ? notifyLabel : undefined}
+                notifyPending={notifyMutation.isPending}
+                onAdvance={canAdvanceHere ? () => statusMutation.mutate({ status: s.advance! }) : undefined}
+                advanceLabel={advanceLabel}
+                advanceEmphasis={s.emphasis}
+                advancePending={statusMutation.isPending}
+              />
+            );
+          })}
         </Section>
 
         {/* 4 · Work addressed — items this visit covers (empty = whole WO) */}
@@ -577,19 +627,20 @@ function DispatchDetailContent({
           !readOnly && (
             <>
               {/* One edit entry — the form covers tech, window, work items, and
-                  release, so a single "Edit" reads truer than Reassign/Reschedule. */}
+                  release. Step-by-step transitions live on the timeline; the
+                  footer carries only Complete, the always-reachable escape hatch. */}
               <Button plain size="xs" onClick={() => onEdit(dispatch)}>
                 {`${t('common.edit')} ${getName('dispatch').toLowerCase()}`}
               </Button>
               <span className="grow" />
-              {primary && (
+              {canComplete && (
                 <Button
                   color="accent"
                   size="xs"
                   disabled={statusMutation.isPending}
-                  onClick={() => statusMutation.mutate(primary.next)}
+                  onClick={() => statusMutation.mutate({ status: 'COMPLETED', close: true })}
                 >
-                  {primary.label}
+                  {t('workOrders.dispatches.drawer.completeVisit', { entity: getName('dispatch') })}
                 </Button>
               )}
             </>
@@ -784,24 +835,36 @@ function TimelineStep({
   label,
   at,
   reached,
+  skipped,
   active,
   topDone,
   bottomDone,
   first,
   last,
   onNotify,
+  notifyLabel,
   notifyPending,
+  onAdvance,
+  advanceLabel,
+  advanceEmphasis,
+  advancePending,
 }: {
   label: string;
   at: string | null;
   reached: boolean;
+  skipped: boolean;
   active: boolean;
   topDone: boolean;
   bottomDone: boolean;
   first: boolean;
   last: boolean;
   onNotify?: () => void;
+  notifyLabel?: string;
   notifyPending?: boolean;
+  onAdvance?: () => void;
+  advanceLabel?: string;
+  advanceEmphasis?: 'primary' | 'secondary';
+  advancePending?: boolean;
 }) {
   const { t } = useTranslation();
   const dotColor = active ? 'var(--violet-500)' : reached ? 'var(--success-500)' : 'var(--border-strong)';
@@ -828,9 +891,10 @@ function TimelineStep({
           {label}
         </span>
         <span className="grow" />
-        {/* A pending, notify-able milestone offers an inline release/send —
-            "Notify now →". Bare button, so size/weight go inline (unlayered
-            CSS beats the text-/font- utilities otherwise). */}
+        {/* Inline actions release/advance the lifecycle right at the step —
+            bare button, so size/weight go inline (unlayered CSS beats the
+            text-/font- utilities otherwise). Notify → release; advance →
+            transition (primary = accent, secondary skip = muted). */}
         {!reached && onNotify ? (
           <button
             type="button"
@@ -839,14 +903,45 @@ function TimelineStep({
             className="whitespace-nowrap rounded border border-border px-1.5 text-fg-accent hover:bg-bg-hover disabled:opacity-50"
             style={{ fontSize: '11px', fontWeight: 600, height: 22 }}
           >
-            {t('workOrders.dispatches.drawer.notifyNow')}
+            {notifyLabel} →
+          </button>
+        ) : !reached && onAdvance && advanceLabel ? (
+          <button
+            type="button"
+            onClick={onAdvance}
+            disabled={advancePending}
+            className={`whitespace-nowrap rounded border px-1.5 hover:bg-bg-hover disabled:opacity-50 ${
+              advanceEmphasis === 'secondary' ? 'border-border text-fg-muted' : 'text-fg-accent'
+            }`}
+            style={{
+              fontSize: '11px',
+              fontWeight: 600,
+              height: 22,
+              // Happy-path step gets a subtle accent tint (over transparent, so it
+              // holds on tinted surfaces); the skip stays a quiet ghost.
+              ...(advanceEmphasis === 'secondary'
+                ? {}
+                : {
+                    background: 'color-mix(in oklch, var(--accent-500) 12%, transparent)',
+                    borderColor: 'color-mix(in oklch, var(--accent-500) 40%, var(--border))',
+                  }),
+            }}
+          >
+            {advanceLabel} →
           </button>
         ) : (
           <span
             className="whitespace-nowrap text-[11.5px]"
-            style={{ color: active ? 'var(--violet-500)' : reached ? 'var(--fg-muted)' : 'var(--fg-dim)' }}
+            style={{
+              color: active
+                ? 'var(--violet-500)'
+                : reached
+                  ? 'var(--fg-muted)'
+                  : 'var(--fg-dim)',
+              fontStyle: skipped ? 'italic' : 'normal',
+            }}
           >
-            {at ? stamp(at) : '—'}
+            {at ? stamp(at) : skipped ? t('workOrders.dispatches.drawer.timelineNotRecorded') : '—'}
           </span>
         )}
       </div>

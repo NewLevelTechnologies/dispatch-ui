@@ -180,35 +180,37 @@ describe('DispatchDetailDrawer', () => {
   });
 
   it('renders the visit timeline with reached and hollow steps', async () => {
-    renderDrawer(mockDispatch());
+    // read-only: no inline actions, so pending steps render as hollow "—".
+    renderDrawer(mockDispatch(), { readOnly: true });
     expect(await screen.findByText('Dispatch timeline')).toBeInTheDocument();
     expect(screen.getByText('Tech notified')).toBeInTheDocument();
     expect(screen.getByText('Customer notified')).toBeInTheDocument();
     expect(screen.getByText('En route')).toBeInTheDocument();
     expect(screen.getByText('Arrived on site')).toBeInTheDocument();
-    // En route (never), Arrived, Departed all hollow for a fresh SCHEDULED visit.
+    // Everything past Scheduled is hollow for a fresh (read-only) SCHEDULED visit.
     expect(screen.getAllByText('—').length).toBeGreaterThanOrEqual(3);
   });
 
   it('releases an on-deck dispatch from a pending timeline step', async () => {
     const user = userEvent.setup();
     renderDrawer(mockDispatch()); // SCHEDULED + empty log → Tech/Customer steps pending
-    const notifyButtons = await screen.findAllByRole('button', { name: /notify now/i });
-    expect(notifyButtons).toHaveLength(2); // Tech notified + Customer notified
+    // Notify steps are labelled by audience: "Notify tech →" / "Notify customer →".
+    const notifyButtons = await screen.findAllByRole('button', { name: /notify (tech|customer)/i });
+    expect(notifyButtons).toHaveLength(2);
     // Second notify-able step is Customer notified → CUSTOMER audience (not TECH).
     await user.click(notifyButtons[1]);
     await waitFor(() => expect(mockNotify).toHaveBeenCalledWith('d1', 'CUSTOMER'));
     // Optimistic: /notify is async, but the customer step fills right away (only
-    // the tech step still offers "Notify now →") — no hard refresh needed.
+    // the tech step still offers a notify action) — no hard refresh needed.
     await waitFor(() =>
-      expect(screen.getAllByRole('button', { name: /notify now/i })).toHaveLength(1),
+      expect(screen.getAllByRole('button', { name: /notify (tech|customer)/i })).toHaveLength(1),
     );
   });
 
-  it('hides Notify now once the dispatch is no longer on deck', async () => {
+  it('hides the notify actions once the dispatch is no longer on deck', async () => {
     renderDrawer(mockDispatch({ status: 'COMPLETED' }));
     await screen.findByText('Dispatch timeline');
-    expect(screen.queryByRole('button', { name: /notify now/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /notify (tech|customer)/i })).not.toBeInTheDocument();
   });
 
   it('derives "captured this visit" media from files keyed by dispatchId', async () => {
@@ -330,7 +332,7 @@ describe('DispatchDetailDrawer', () => {
     expect(screen.queryByRole('button', { name: /add note/i })).not.toBeInTheDocument();
   });
 
-  it('SCHEDULED footer: Edit opens the form; Mark en route transitions to EN_ROUTE', async () => {
+  it('SCHEDULED footer: Edit opens the form; Complete is the always-on escape hatch', async () => {
     const onEdit = vi.fn();
     const onClose = vi.fn();
     const user = userEvent.setup();
@@ -339,25 +341,57 @@ describe('DispatchDetailDrawer', () => {
     await user.click(await screen.findByRole('button', { name: /edit dispatch/i }));
     expect(onEdit).toHaveBeenCalledWith(expect.objectContaining({ id: 'd1' }));
 
-    await user.click(screen.getByRole('button', { name: /mark en route/i }));
-    await waitFor(() => expect(mockDispatchUpdate).toHaveBeenCalledWith('d1', { status: 'EN_ROUTE' }));
+    // Complete short-circuits to COMPLETED from any non-terminal state + closes.
+    await user.click(screen.getByRole('button', { name: /^complete dispatch$/i }));
+    await waitFor(() => expect(mockDispatchUpdate).toHaveBeenCalledWith('d1', { status: 'COMPLETED' }));
     await waitFor(() => expect(onClose).toHaveBeenCalled());
   });
 
-  it('EN_ROUTE footer: Mark on site transitions to IN_PROGRESS', async () => {
+  it('SCHEDULED timeline: Mark en route (primary) advances to EN_ROUTE, keeping the drawer open', async () => {
+    const onClose = vi.fn();
     const user = userEvent.setup();
-    renderDrawer(mockDispatch({ status: 'EN_ROUTE' }));
-    await user.click(await screen.findByRole('button', { name: /mark on site/i }));
-    await waitFor(() => expect(mockDispatchUpdate).toHaveBeenCalledWith('d1', { status: 'IN_PROGRESS' }));
-    expect(screen.queryByRole('button', { name: /mark en route/i })).not.toBeInTheDocument();
+    renderDrawer(mockDispatch(), { onClose });
+    // Both the next step (Mark en route) and the skip-ahead (Mark arrived) are offered.
+    expect(await screen.findByRole('button', { name: /mark arrived\s*→/i })).toBeInTheDocument();
+    await user.click(await screen.findByRole('button', { name: /mark en route\s*→/i }));
+    await waitFor(() => expect(mockDispatchUpdate).toHaveBeenCalledWith('d1', { status: 'EN_ROUTE' }));
+    // A timeline advance is not terminal — the drawer stays open.
+    expect(onClose).not.toHaveBeenCalled();
   });
 
-  it('IN_PROGRESS footer: Complete visit transitions to COMPLETED (no Mark on site)', async () => {
+  it('EN_ROUTE timeline: Mark arrived advances to IN_PROGRESS', async () => {
+    const user = userEvent.setup();
+    renderDrawer(mockDispatch({ status: 'EN_ROUTE' }));
+    await user.click(await screen.findByRole('button', { name: /mark arrived\s*→/i }));
+    await waitFor(() => expect(mockDispatchUpdate).toHaveBeenCalledWith('d1', { status: 'IN_PROGRESS' }));
+  });
+
+  it('IN_PROGRESS footer: Complete transitions to COMPLETED; timeline has no step buttons', async () => {
     const user = userEvent.setup();
     renderDrawer(mockDispatch({ status: 'IN_PROGRESS' }));
-    await user.click(await screen.findByRole('button', { name: /complete dispatch/i }));
+    await user.click(await screen.findByRole('button', { name: /^complete dispatch$/i }));
     await waitFor(() => expect(mockDispatchUpdate).toHaveBeenCalledWith('d1', { status: 'COMPLETED' }));
-    expect(screen.queryByRole('button', { name: /mark on site/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /mark arrived/i })).not.toBeInTheDocument();
+  });
+
+  it('renders a bypassed step as "not recorded" (honest skip), never blank', async () => {
+    // Jumped straight to on-site: arrived stamped, en route never recorded.
+    renderDrawer(
+      mockDispatch({
+        status: 'IN_PROGRESS',
+        arrivedAt: '2099-05-15T14:31:00Z',
+        lifecycle: {
+          scheduled: '2099-05-14T15:48:00Z',
+          notified: null,
+          enroute: null,
+          arrived: '2099-05-15T14:31:00Z',
+          departed: null,
+        },
+      }),
+    );
+    await screen.findByText('Dispatch timeline');
+    // A step bypassed by a later one shows the honest label, not an empty cell.
+    expect(screen.getAllByText('Not recorded').length).toBeGreaterThanOrEqual(1);
   });
 
   it('renders the timeline: operational from lifecycle, notified steps from the log', async () => {
@@ -397,6 +431,9 @@ describe('DispatchDetailDrawer', () => {
           departed: null,
         },
       }),
+      // read-only: no inline transition affordance, so the pending Departed step
+      // shows "—" (this test is about timeline data derivation, not actions).
+      { readOnly: true },
     );
     // Scheduled/enroute/arrived from lifecycle + Tech/Customer notified from the
     // log → only Departed remains unreached.
