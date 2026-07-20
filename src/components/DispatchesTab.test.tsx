@@ -4,9 +4,21 @@ import userEvent from '@testing-library/user-event';
 import { renderWithProviders } from '../test/utils';
 import DispatchesTab from './DispatchesTab';
 import apiClient from '../api/client';
-import type { DispatchBoardRow } from '../api';
+import type { DispatchBoardRow, WorkItemResponse } from '../api';
 
 vi.mock('../api/client');
+
+const workItem = (over: Partial<WorkItemResponse> & { id: string }): WorkItemResponse => ({
+  sequence: 1,
+  statusId: null,
+  statusCategory: 'IN_PROGRESS',
+  description: 'Complaint',
+  equipmentId: null,
+  equipment: null,
+  createdAt: '2026-05-01T00:00:00Z',
+  updatedAt: '2026-05-01T00:00:00Z',
+  ...over,
+});
 
 const row = (over: Partial<DispatchBoardRow>): DispatchBoardRow => ({
   id: 'd-1',
@@ -95,7 +107,8 @@ describe('DispatchesTab', () => {
       row({ id: 'd-sched', status: 'SCHEDULED', assignedUserName: 'Sched Tech' }),
       row({ id: 'd-live', status: 'IN_PROGRESS', assignedUserName: 'Live Tech' }),
     ]);
-    expect(screen.getByText('On site')).toBeInTheDocument();
+    // "On site" appears on both the status pill and the live status strip.
+    expect(screen.getAllByText('On site').length).toBeGreaterThan(0);
   });
 
   it('calls onAssign from the Schedule button', async () => {
@@ -195,5 +208,60 @@ describe('DispatchesTab', () => {
         { status: 'IN_PROGRESS' },
       ),
     );
+  });
+
+  it('renders addressed work-item chips (WI-02) when work items are provided', () => {
+    renderTab([row({ addressedWorkItemIds: ['wi-a', 'wi-b'] })], {
+      workItems: [workItem({ id: 'wi-a', sequence: 1 }), workItem({ id: 'wi-b', sequence: 2 })],
+    });
+    expect(screen.getByText('WI-01')).toBeInTheDocument();
+    expect(screen.getByText('WI-02')).toBeInTheDocument();
+    // The vague count pill is gone once the chips resolve.
+    expect(screen.queryByText(/work items/i)).not.toBeInTheDocument();
+  });
+
+  it('flags a parts-blocked visit from a blocked addressed work item', () => {
+    renderTab([row({ addressedWorkItemIds: ['wi-a'] })], {
+      workItems: [workItem({ id: 'wi-a', statusCategory: 'BLOCKED' })],
+    });
+    expect(screen.getByText(/awaiting parts/i)).toBeInTheDocument();
+  });
+
+  it('gives a scheduled card the drawer-mirrored footer (Edit + Mark en route)', () => {
+    renderTab([row({ status: 'SCHEDULED' })]);
+    expect(screen.getByRole('button', { name: /edit dispatch/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /mark en route/i })).toBeInTheDocument();
+  });
+
+  it('advances a scheduled dispatch to en route via Mark en route', async () => {
+    const user = userEvent.setup();
+    vi.mocked(apiClient.put).mockResolvedValue({ data: row({ status: 'EN_ROUTE' }) });
+    renderTab([row({ id: 'd-1', status: 'SCHEDULED' })]);
+    await user.click(screen.getByRole('button', { name: /mark en route/i }));
+    await waitFor(() =>
+      expect(apiClient.put).toHaveBeenCalledWith(
+        expect.stringMatching(/\/scheduling\/dispatches\/d-1$/),
+        { status: 'EN_ROUTE' },
+      ),
+    );
+  });
+
+  it('reads differently for an en-route visit (live status strip + committed ETA)', () => {
+    renderTab([row({ id: 'd-live', status: 'EN_ROUTE' })]);
+    expect(screen.getByText(/arriving by/i)).toBeInTheDocument();
+    expect(screen.getByText(/self-reported/i)).toBeInTheDocument();
+  });
+
+  it('shows the visit note on the card', () => {
+    renderTab([row({ status: 'COMPLETED', notes: 'Replaced the run capacitor.' })]);
+    expect(screen.getByText('Replaced the run capacitor.')).toBeInTheDocument();
+  });
+
+  it('offers View invoice on a completed card and calls onViewInvoice', async () => {
+    const onViewInvoice = vi.fn();
+    const user = userEvent.setup();
+    renderTab([row({ status: 'COMPLETED' })], { onViewInvoice });
+    await user.click(screen.getByRole('button', { name: /view invoice/i }));
+    expect(onViewInvoice).toHaveBeenCalled();
   });
 });

@@ -909,6 +909,7 @@ export default function WorkOrderDetailPage() {
             <DispatchesTab
               workOrderId={workOrder.id}
               dispatches={dispatches}
+              workItems={workOrder.workItems ?? []}
               readOnly={frozen}
               onAssign={() => {
                 setEditingDispatch(null);
@@ -919,6 +920,7 @@ export default function WorkOrderDetailPage() {
                 setAssignDispatchDialogOpen(true);
               }}
               onSelect={(d) => setSelectedDispatch(d)}
+              onViewInvoice={openFinancialTab}
             />
           )}
 
