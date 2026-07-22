@@ -37,6 +37,14 @@ export interface Dispatch {
   notes: string | null;
   createdAt: string;
   updatedAt: string;
+  // Stable per-work-order trip identity from scheduling (1-based, assigned at
+  // creation, counts cancelled/rescheduled trips so it never renumbers). NOT the
+  // user-facing trip number: because it counts cancelled visits it reads as
+  // "Trip 21" on a churned WO. The UI shows a POSITIONAL number instead —
+  // 1-indexed by arrival across non-cancelled visits (see DispatchDetailDrawer /
+  // DispatchesTab / WorkOrderOverview). Keep `seq` only for a durable reference
+  // (audit, notifications) where stability matters more than the display value.
+  seq?: number;
   // Per-visit label ("Diagnosis", "Repair · WI-01") + lifecycle milestone
   // timestamps. Present on the by-id read; absent (undefined) on the board
   // list projection — render defensively.

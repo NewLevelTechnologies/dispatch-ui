@@ -51,6 +51,11 @@ export interface WorkItemEquipmentSummary {
   model?: string | null;
   serialNumber?: string | null;
   locationOnSite?: string | null;
+  // Parts-coverage warranty expiry (ISO date; backend serializes this on the
+  // summary already). Labor coverage (warrantyLaborExpiresAt) lives on the full
+  // equipment record, not this projection. Drives the work-item row's warranty
+  // pill: a future date = covered, a past date = out of warranty, null = no pill.
+  warrantyExpiresAt?: string | null;
   // Presigned URL of the profile image, if any. Short-lived (~1hr).
   profileImageUrl?: string | null;
   // Immediate parent's display name (when this equipment is itself a
@@ -99,6 +104,13 @@ export interface WorkItemResponse {
   diagnosis?: string | null;
   equipmentId: string | null;
   equipment: WorkItemEquipmentSummary | null;
+  // Whether this item is expected to service a piece of equipment. Default true
+  // (equipment-tracking is the common case) — so a null `equipmentId` reads as
+  // "attach a unit on site". False marks work that never touches equipment (a
+  // drain clog, general labor); the UI then shows a calm "No equipment" instead
+  // of the attach prompt. Moot once `equipmentId` is set (equipment wins).
+  // Optional on the FE type for the pre-deploy window; treat undefined as true.
+  equipmentNeeded?: boolean;
   createdAt: string;
   updatedAt: string;
 }
