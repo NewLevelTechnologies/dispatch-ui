@@ -27,6 +27,7 @@ import {
   TruckIcon,
   PhoneIcon,
   ClockIcon,
+  PlusIcon,
 } from '@heroicons/react/24/outline';
 import {
   activityApi,
@@ -98,6 +99,16 @@ function formatWindow(startIso: string, endIso: string): string {
     start.getDate() === end.getDate();
   if (sameDay) return `${ETA_DATE.format(start)} ${ETA_TIME.format(start)}–${ETA_TIME.format(end)}`;
   return `${ETA_DATE.format(start)} ${ETA_TIME.format(start)} – ${ETA_DATE.format(end)} ${ETA_TIME.format(end)}`;
+}
+
+// Warranty pill state from the equipment summary's parts-coverage expiry
+// (equipment.warrantyExpiresAt — already on the wire). Future = covered, past =
+// expired, absent/unparseable = no pill (never fabricate coverage).
+function warrantyState(expiresAt?: string | null): 'covered' | 'expired' | null {
+  if (!expiresAt) return null;
+  const ms = new Date(expiresAt).getTime();
+  if (Number.isNaN(ms)) return null;
+  return ms >= Date.now() ? 'covered' : 'expired';
 }
 
 function firstNameLastInitial(name: string | null | undefined): string {
@@ -216,15 +227,21 @@ function AttentionStrip({ items }: { items: AttentionItem[] }) {
   );
 }
 
-// ── Work-items peek — one compact row per item (full diagnosis/parts table is
-// on the Work items tab). Readiness + trips-addressed lines light up when
-// work_item parts/laborHrs/tripIds land (BE ask #1).
+// ── Work-items peek — one compact row per item, built to the mock's
+// ItemOverviewRow: EQUIPMENT is the anchor (or the attach prompt when none is
+// linked), the complaint reads as the calm note beneath, and a footer carries
+// readiness + which trips cover it. Full diagnosis/parts table is on the Work
+// items tab. Fields not yet on the wire degrade: no warranty pill, no repeat-
+// repair line, no parts/labor readiness (BE ask #1), no explicit "no equipment
+// needed" state (needs a work_item.eqNeeded flag).
 function WorkItemsPeek({
   workOrder,
+  tripsByWorkItem,
   onAdd,
   onOpenItems,
 }: {
   workOrder: WorkOrder;
+  tripsByWorkItem: Map<string, number[]>;
   onAdd: () => void;
   onOpenItems: () => void;
 }) {
@@ -243,15 +260,32 @@ function WorkItemsPeek({
         </div>
       ) : (
         items.map((wi, i) => (
-          <WorkItemPeekRow key={wi.id} wi={wi} last={i === items.length - 1} onClick={onOpenItems} />
+          <WorkItemPeekRow
+            key={wi.id}
+            wi={wi}
+            trips={tripsByWorkItem.get(wi.id) ?? []}
+            last={i === items.length - 1}
+            onClick={onOpenItems}
+          />
         ))
       )}
     </Card>
   );
 }
 
-function WorkItemPeekRow({ wi, last, onClick }: { wi: WorkItemResponse; last: boolean; onClick: () => void }) {
+function WorkItemPeekRow({
+  wi,
+  trips,
+  last,
+  onClick,
+}: {
+  wi: WorkItemResponse;
+  trips: number[];
+  last: boolean;
+  onClick: () => void;
+}) {
   const { t } = useTranslation();
+  const { getAbbrev } = useGlossary();
   const tone = PROGRESS_TONE[wi.statusCategory];
   const rail =
     tone === 'warning'
@@ -261,29 +295,91 @@ function WorkItemPeekRow({ wi, last, onClick }: { wi: WorkItemResponse; last: bo
         : tone === 'success'
           ? 'var(--success-500)'
           : 'var(--info-500)';
+  const eq = wi.equipment;
+  const wiId = wi.sequence != null ? workItemLabel(getAbbrev('work_item'), wi.sequence) : null;
+  const makeModel = eq ? [eq.make, eq.model].filter(Boolean).join(' ') : '';
+  const warranty = warrantyState(eq?.warrantyExpiresAt);
+  // Equipment tri-state (only when no unit is linked): needs-attachment (the
+  // default — accent prompt) vs. explicitly none-needed (calm "No equipment").
+  // `equipmentNeeded === false` is the dismissed state; undefined → true.
+  const noneNeeded = !eq && wi.equipmentNeeded === false;
+  // Readiness: parts/labor aren't on the wire yet, so the only honest signal is
+  // whether a tech has assessed it. Show the "not yet diagnosed" prompt until
+  // diagnosis lands; once diagnosed, omit (the parts/labor rollup fills this
+  // slot when BE ask #1 ships).
+  const diagnosed = !!wi.diagnosis?.trim();
   return (
     <button
       type="button"
       onClick={onClick}
-      className="block w-full cursor-pointer px-4 py-3 text-left hover:bg-bg-hover"
+      className="block w-full cursor-pointer py-3 pl-3.5 pr-4 text-left hover:bg-bg-hover"
       style={{ borderBottom: last ? 'none' : '1px solid var(--border-soft)', borderLeft: `3px solid ${rail}` }}
     >
+      {/* Anchor line — equipment identity, attach affordance, or (when no unit
+          is needed) the complaint itself + WI-id + status. The scannable frame;
+          the raw complaint reads calm beneath it, except in the none-needed
+          state where it's already serving as the anchor. */}
       <div className="flex items-baseline gap-2">
-        <span className="text-[13.5px] font-semibold text-fg-strong">{wi.description}</span>
+        {eq ? (
+          <span className="min-w-0 text-[13px] font-semibold text-fg-strong">
+            {eq.name}
+            {makeModel && <span className="font-normal text-fg-muted"> · {makeModel}</span>}
+          </span>
+        ) : noneNeeded ? (
+          <span className="min-w-0 line-clamp-2 text-[13px] font-semibold text-fg-strong">{wi.description}</span>
+        ) : (
+          <span className="flex items-center gap-1 text-[12.5px] font-semibold text-fg-accent">
+            <PlusIcon className="size-3" />
+            {t('workOrders.detail.overview.attachEquipment')}
+          </span>
+        )}
+        {wiId && (
+          <span className="shrink-0 whitespace-nowrap font-mono text-[10.5px] font-semibold text-fg-dim">{wiId}</span>
+        )}
         <span className="flex-1" />
+        {warranty && (
+          <Pill tone={warranty === 'covered' ? 'success' : 'neutral'} dot>
+            {warranty === 'covered'
+              ? t('workOrders.detail.overview.warrantyCovered')
+              : t('workOrders.detail.overview.warrantyExpired')}
+          </Pill>
+        )}
+        {noneNeeded && (
+          <span className="shrink-0 whitespace-nowrap text-[11px] text-fg-dim">
+            {t('workOrders.detail.overview.noEquipment')}
+          </span>
+        )}
         <Pill tone={tone} dot>{wi.statusCategory.replace(/_/g, ' ').toLowerCase()}</Pill>
       </div>
-      <div className="mt-1 flex flex-wrap items-center gap-2 text-[11.5px] text-fg-muted">
-        {wi.equipment ? (
-          <span>
-            {wi.equipment.name}
-            {(wi.equipment.make || wi.equipment.model) && (
-              <span className="text-fg-dim"> · {[wi.equipment.make, wi.equipment.model].filter(Boolean).join(' ')}</span>
-            )}
-          </span>
-        ) : (
-          <span className="font-medium text-fg-accent">{t('workOrders.detail.overview.attachEquipment')}</span>
+      {/* The complaint — regular weight, calm, clamped to 2 lines so a long
+          dictated dump never dominates. Full text on the Work items tab.
+          Suppressed in the none-needed state (it's already the anchor). */}
+      {!noneNeeded && (
+        <div className="mt-[5px] line-clamp-2 text-[12.5px] leading-normal text-fg">{wi.description}</div>
+      )}
+      {/* Footer — readiness · trips covering this item · Details. */}
+      <div className="mt-2 flex items-center gap-2 text-[11.5px] text-fg-muted">
+        {!diagnosed && (
+          <>
+            <span>{t('workOrders.detail.overview.notYetDiagnosed')}</span>
+            <span className="text-fg-dim" aria-hidden>·</span>
+          </>
         )}
+        <span className="flex items-center gap-1">
+          <TruckIcon className="size-3" />
+          {trips.length > 0 ? (
+            trips.map((n, i) => (
+              <span key={n}>
+                {i > 0 && ', '}
+                {t('workOrders.detail.overview.tripShort', { n })}
+              </span>
+            ))
+          ) : (
+            <span className="text-fg-dim">{t('workOrders.detail.notScheduled')}</span>
+          )}
+        </span>
+        <span className="flex-1" />
+        <span className="font-semibold text-fg-accent">{t('workOrders.detail.overview.details')}</span>
       </div>
     </button>
   );
@@ -670,6 +766,31 @@ export default function WorkOrderOverview({
     });
     return m;
   }, [workOrder.workItems, getAbbrev]);
+  // Reverse of the trip strip: for each work item, which trips cover it. The
+  // trip NUMBER shown to users is positional — 1-indexed by arrival across the
+  // WO's non-cancelled visits — matching the dispatch drawer, Dispatches tab and
+  // Files tab. Deliberately NOT the backend `seq`: that's stable-at-creation and
+  // counts cancelled/rescheduled trips, so a churned WO reads "trip 21". Attribute
+  // each trip to the items it explicitly addresses — unscoped (whole-WO) trips
+  // aren't attributed, so those rows read "Not scheduled".
+  const wiTripsById = useMemo(() => {
+    const ordered = dispatches
+      .filter((d) => d.status !== 'CANCELLED')
+      .sort((a, b) => new Date(a.arrivalWindowStart).getTime() - new Date(b.arrivalWindowStart).getTime());
+    const tripNumber = new Map<string, number>();
+    ordered.forEach((d, i) => tripNumber.set(d.id, i + 1));
+    const byWorkItem = new Map<string, number[]>();
+    ordered.forEach((d) => {
+      const n = tripNumber.get(d.id)!;
+      (d.addressedWorkItemIds ?? []).forEach((wiId) => {
+        const arr = byWorkItem.get(wiId) ?? [];
+        if (!arr.includes(n)) arr.push(n);
+        byWorkItem.set(wiId, arr);
+      });
+    });
+    byWorkItem.forEach((arr) => arr.sort((a, b) => a - b));
+    return byWorkItem;
+  }, [dispatches]);
   const attention = deriveAttention({
     workOrder,
     dispatches,
@@ -689,7 +810,12 @@ export default function WorkOrderOverview({
 
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1fr_340px]">
         <div className="flex min-w-0 flex-col gap-3">
-          <WorkItemsPeek workOrder={workOrder} onAdd={onAddWorkItem} onOpenItems={() => onOpenTab('items')} />
+          <WorkItemsPeek
+            workOrder={workOrder}
+            tripsByWorkItem={wiTripsById}
+            onAdd={onAddWorkItem}
+            onOpenItems={() => onOpenTab('items')}
+          />
           <TripStrip
             dispatches={dispatches}
             wiLabelById={wiLabelById}

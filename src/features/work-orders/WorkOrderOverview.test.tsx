@@ -152,7 +152,56 @@ describe('WorkOrderOverview', () => {
   it('shows the addressed work-item chip on the trip cell', () => {
     render();
     // liveDispatch addresses wi-1 (sequence 1) → "WI-01" chip on the cell.
-    expect(screen.getByText('WI-01')).toBeInTheDocument();
+    // The peek row now also renders the WI-id, so the label appears twice.
+    expect(screen.getAllByText('WI-01').length).toBeGreaterThan(0);
+  });
+
+  it('renders a warranty pill from the equipment summary parts-coverage date', () => {
+    const equipped = {
+      ...workOrder,
+      workItems: [
+        {
+          id: 'wi-eq',
+          sequence: 1,
+          statusId: null,
+          statusCategory: 'IN_PROGRESS',
+          description: 'No cooling — upstairs',
+          equipmentId: 'eq-1',
+          equipment: { id: 'eq-1', name: 'Upstairs condenser', make: 'Carrier', model: '24ACC6', warrantyExpiresAt: '2999-01-01' },
+          createdAt: '2026-05-01T00:00:00Z',
+          updatedAt: '2026-05-01T00:00:00Z',
+        },
+      ],
+    } as unknown as WorkOrder;
+    render({ workOrder: equipped });
+    // Equipment name is the anchor; a future coverage date → "Parts covered".
+    expect(screen.getByText('Upstairs condenser')).toBeInTheDocument();
+    expect(screen.getByText('Parts covered')).toBeInTheDocument();
+  });
+
+  it('renders the none-needed equipment state: complaint anchor + calm "No equipment", no attach prompt', () => {
+    const noEq = {
+      ...workOrder,
+      workItems: [
+        {
+          id: 'wi-drain',
+          sequence: 1,
+          statusId: null,
+          statusCategory: 'NOT_STARTED',
+          description: 'Clear condensate drain line — routine',
+          equipmentId: null,
+          equipment: null,
+          equipmentNeeded: false,
+          createdAt: '2026-05-01T00:00:00Z',
+          updatedAt: '2026-05-01T00:00:00Z',
+        },
+      ],
+    } as unknown as WorkOrder;
+    render({ workOrder: noEq });
+    expect(screen.getByText('Clear condensate drain line — routine')).toBeInTheDocument();
+    expect(screen.getByText('No equipment')).toBeInTheDocument();
+    // The nag is suppressed — no attach prompt in the none-needed state.
+    expect(screen.queryByText('Attach equipment on site')).not.toBeInTheDocument();
   });
 
   it('renders the Location card (address, gate, access, pinned note) and Money card', () => {
@@ -191,7 +240,9 @@ describe('WorkOrderOverview', () => {
     const onScheduleDispatch = vi.fn();
     const user = userEvent.setup();
     render({ onScheduleDispatch });
-    await user.click(screen.getByRole('button', { name: /schedule/i }));
+    // Target the dispatch action specifically — peek rows now carry a
+    // "Not scheduled" footer, which also matches /schedule/i.
+    await user.click(screen.getByRole('button', { name: /\+ schedule/i }));
     expect(onScheduleDispatch).toHaveBeenCalled();
   });
 
