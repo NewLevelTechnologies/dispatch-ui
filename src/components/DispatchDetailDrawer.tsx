@@ -543,18 +543,13 @@ function DispatchDetailContent({
             )}
             {!readOnly && (
               <>
-                <button
-                  type="button"
-                  onClick={() => setUploadOpen(true)}
-                  className={`inline-flex h-[30px] items-center gap-1 text-fg-muted hover:text-fg-strong${media.length > 0 ? ' mt-2' : ''}`}
-                  style={{ fontSize: '12.5px', fontWeight: 600 }}
-                >
-                  <ArrowUpTrayIcon className="size-3.5 shrink-0" />
-                  {/* Geist seats text high next to an icon; nudge to optical center. */}
-                  <span className="relative top-[0.5px]">
-                    {t('workOrders.dispatches.drawer.uploadMedia')}
-                  </span>
-                </button>
+                {/* One bordered upload action at the standard .btn token (xs =
+                    12.5px / 600 / 30px, 14px icon) — photo + video share the one
+                    picker (WorkOrderFileUploadDialog, pre-scoped to this dispatch). */}
+                <Button outline size="xs" onClick={() => setUploadOpen(true)} className={media.length > 0 ? 'mt-2' : undefined}>
+                  <ArrowUpTrayIcon data-slot="icon" />
+                  {t('workOrders.dispatches.drawer.uploadMedia')}
+                </Button>
                 {media.length === 0 && (
                   <p className="mt-1.5 text-[11px] leading-snug text-fg-dim">
                     {t('workOrders.dispatches.drawer.captureHint')}
