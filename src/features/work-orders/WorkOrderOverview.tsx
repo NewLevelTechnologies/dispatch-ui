@@ -47,9 +47,11 @@ import { Pill, Tag } from '../../components/ui/Pill';
 import { workItemLabel } from '../../utils/workItemLabel';
 import { Avatar } from '../../components/ui/Avatar';
 import NotesCard from '../../components/NotesCard';
+import EquipmentThumbnail from '../../components/EquipmentThumbnail';
 import { ActivityRow } from '../../components/ActivityStream';
 import { formatPhone } from '../../utils/formatPhone';
 import { titleCaseAddress } from '../../utils/titleCaseAddress';
+import { tripsByWorkItem } from '../../utils/tripsByWorkItem';
 
 type PillTone = 'neutral' | 'info' | 'success' | 'warning' | 'danger' | 'accent' | 'violet';
 
@@ -243,7 +245,7 @@ function WorkItemsPeek({
   workOrder: WorkOrder;
   tripsByWorkItem: Map<string, number[]>;
   onAdd: () => void;
-  onOpenItems: () => void;
+  onOpenItems: (workItemId: string) => void;
 }) {
   const { t } = useTranslation();
   const { getName } = useGlossary();
@@ -265,7 +267,7 @@ function WorkItemsPeek({
             wi={wi}
             trips={tripsByWorkItem.get(wi.id) ?? []}
             last={i === items.length - 1}
-            onClick={onOpenItems}
+            onClick={() => onOpenItems(wi.id)}
           />
         ))
       )}
@@ -312,74 +314,89 @@ function WorkItemPeekRow({
     <button
       type="button"
       onClick={onClick}
-      className="block w-full cursor-pointer py-3 pl-3.5 pr-4 text-left hover:bg-bg-hover"
+      className="flex w-full cursor-pointer items-start gap-3 py-3 pl-3.5 pr-4 text-left hover:bg-bg-hover"
       style={{ borderBottom: last ? 'none' : '1px solid var(--border-soft)', borderLeft: `3px solid ${rail}` }}
     >
-      {/* Anchor line — equipment identity, attach affordance, or (when no unit
-          is needed) the complaint itself + WI-id + status. The scannable frame;
-          the raw complaint reads calm beneath it, except in the none-needed
-          state where it's already serving as the anchor. */}
-      <div className="flex items-baseline gap-2">
-        {eq ? (
-          <span className="min-w-0 text-[13px] font-semibold text-fg-strong">
-            {eq.name}
-            {makeModel && <span className="font-normal text-fg-muted"> · {makeModel}</span>}
-          </span>
-        ) : noneNeeded ? (
-          <span className="min-w-0 line-clamp-2 text-[13px] font-semibold text-fg-strong">{wi.description}</span>
-        ) : (
-          <span className="flex items-center gap-1 text-[12.5px] font-semibold text-fg-accent">
-            <PlusIcon className="size-3" />
-            {t('workOrders.detail.overview.attachEquipment')}
-          </span>
-        )}
-        {wiId && (
-          <span className="shrink-0 whitespace-nowrap font-mono text-[10.5px] font-semibold text-fg-dim">{wiId}</span>
-        )}
-        <span className="flex-1" />
-        {warranty && (
-          <Pill tone={warranty === 'covered' ? 'success' : 'neutral'} dot>
-            {warranty === 'covered'
-              ? t('workOrders.detail.overview.warrantyCovered')
-              : t('workOrders.detail.overview.warrantyExpired')}
-          </Pill>
-        )}
-        {noneNeeded && (
-          <span className="shrink-0 whitespace-nowrap text-[11px] text-fg-dim">
-            {t('workOrders.detail.overview.noEquipment')}
-          </span>
-        )}
-        <Pill tone={tone} dot>{wi.statusCategory.replace(/_/g, ' ').toLowerCase()}</Pill>
-      </div>
-      {/* The complaint — regular weight, calm, clamped to 2 lines so a long
-          dictated dump never dominates. Full text on the Work items tab.
-          Suppressed in the none-needed state (it's already the anchor). */}
-      {!noneNeeded && (
-        <div className="mt-[5px] line-clamp-2 text-[12.5px] leading-normal text-fg">{wi.description}</div>
+      {/* Equipment recognition anchor — profile photo or type monogram, shown
+          only when a unit is attached (48px), matching the mock's overview row. */}
+      {eq && (
+        <EquipmentThumbnail
+          url={eq.profileImageUrl}
+          name={eq.name}
+          type={eq.equipmentTypeName}
+          monogram
+          sizeClass="size-12"
+          fit="contain"
+          className="mt-0.5"
+        />
       )}
-      {/* Footer — readiness · trips covering this item · Details. */}
-      <div className="mt-2 flex items-center gap-2 text-[11.5px] text-fg-muted">
-        {!diagnosed && (
-          <>
-            <span>{t('workOrders.detail.overview.notYetDiagnosed')}</span>
-            <span className="text-fg-dim" aria-hidden>·</span>
-          </>
-        )}
-        <span className="flex items-center gap-1">
-          <TruckIcon className="size-3" />
-          {trips.length > 0 ? (
-            trips.map((n, i) => (
-              <span key={n}>
-                {i > 0 && ', '}
-                {t('workOrders.detail.overview.tripShort', { n })}
-              </span>
-            ))
+      <div className="min-w-0 flex-1">
+        {/* Anchor line — equipment identity, attach affordance, or (when no unit
+            is needed) the complaint itself + WI-id + status. The scannable frame;
+            the raw complaint reads calm beneath it, except in the none-needed
+            state where it's already serving as the anchor. */}
+        <div className="flex items-baseline gap-2">
+          {eq ? (
+            <span className="min-w-0 text-[13px] font-semibold text-fg-strong">
+              {eq.name}
+              {makeModel && <span className="font-normal text-fg-muted"> · {makeModel}</span>}
+            </span>
+          ) : noneNeeded ? (
+            <span className="min-w-0 line-clamp-2 text-[13px] font-semibold text-fg-strong">{wi.description}</span>
           ) : (
-            <span className="text-fg-dim">{t('workOrders.detail.notScheduled')}</span>
+            <span className="flex items-center gap-1 text-[12.5px] font-semibold text-fg-accent">
+              <PlusIcon className="size-3" />
+              {t('workOrders.detail.overview.attachEquipment')}
+            </span>
           )}
-        </span>
-        <span className="flex-1" />
-        <span className="font-semibold text-fg-accent">{t('workOrders.detail.overview.details')}</span>
+          {wiId && (
+            <span className="shrink-0 whitespace-nowrap font-mono text-[10.5px] font-semibold text-fg-dim">{wiId}</span>
+          )}
+          <span className="flex-1" />
+          {warranty && (
+            <Pill tone={warranty === 'covered' ? 'success' : 'neutral'} dot>
+              {warranty === 'covered'
+                ? t('workOrders.detail.overview.warrantyCovered')
+                : t('workOrders.detail.overview.warrantyExpired')}
+            </Pill>
+          )}
+          {noneNeeded && (
+            <span className="shrink-0 whitespace-nowrap text-[11px] text-fg-dim">
+              {t('workOrders.detail.overview.noEquipment')}
+            </span>
+          )}
+          <Pill tone={tone} dot>{wi.statusCategory.replace(/_/g, ' ').toLowerCase()}</Pill>
+        </div>
+        {/* The complaint — regular weight, calm, clamped to 2 lines so a long
+            dictated dump never dominates. Full text on the Work items tab.
+            Suppressed in the none-needed state (it's already the anchor). */}
+        {!noneNeeded && (
+          <div className="mt-[5px] line-clamp-2 text-[12.5px] leading-normal text-fg">{wi.description}</div>
+        )}
+        {/* Footer — readiness · trips covering this item · Details. */}
+        <div className="mt-2 flex items-center gap-2 text-[11.5px] text-fg-muted">
+          {!diagnosed && (
+            <>
+              <span>{t('workOrders.detail.overview.notYetDiagnosed')}</span>
+              <span className="text-fg-dim" aria-hidden>·</span>
+            </>
+          )}
+          <span className="flex items-center gap-1">
+            <TruckIcon className="size-3" />
+            {trips.length > 0 ? (
+              trips.map((n, i) => (
+                <span key={n}>
+                  {i > 0 && ', '}
+                  {t('workOrders.detail.overview.tripShort', { n })}
+                </span>
+              ))
+            ) : (
+              <span className="text-fg-dim">{t('workOrders.detail.notScheduled')}</span>
+            )}
+          </span>
+          <span className="flex-1" />
+          <span className="font-semibold text-fg-accent">{t('workOrders.detail.overview.details')}</span>
+        </div>
       </div>
     </button>
   );
@@ -736,6 +753,8 @@ export interface WorkOrderOverviewProps {
   dispatches: DispatchBoardRow[];
   onOpenTab: (tab: string) => void;
   onAddWorkItem: () => void;
+  /** Deep-link a specific work item: switch to the Items tab and focus it. */
+  onOpenWorkItem: (workItemId: string) => void;
   onOpenFinancial: (tab: 'invoices' | 'quotes') => void;
   onSelectDispatch: (d: Dispatch) => void;
   onScheduleDispatch: () => void;
@@ -751,6 +770,7 @@ export default function WorkOrderOverview({
   dispatches,
   onOpenTab,
   onAddWorkItem,
+  onOpenWorkItem,
   onOpenFinancial,
   onSelectDispatch,
   onScheduleDispatch,
@@ -766,31 +786,9 @@ export default function WorkOrderOverview({
     });
     return m;
   }, [workOrder.workItems, getAbbrev]);
-  // Reverse of the trip strip: for each work item, which trips cover it. The
-  // trip NUMBER shown to users is positional — 1-indexed by arrival across the
-  // WO's non-cancelled visits — matching the dispatch drawer, Dispatches tab and
-  // Files tab. Deliberately NOT the backend `seq`: that's stable-at-creation and
-  // counts cancelled/rescheduled trips, so a churned WO reads "trip 21". Attribute
-  // each trip to the items it explicitly addresses — unscoped (whole-WO) trips
-  // aren't attributed, so those rows read "Not scheduled".
-  const wiTripsById = useMemo(() => {
-    const ordered = dispatches
-      .filter((d) => d.status !== 'CANCELLED')
-      .sort((a, b) => new Date(a.arrivalWindowStart).getTime() - new Date(b.arrivalWindowStart).getTime());
-    const tripNumber = new Map<string, number>();
-    ordered.forEach((d, i) => tripNumber.set(d.id, i + 1));
-    const byWorkItem = new Map<string, number[]>();
-    ordered.forEach((d) => {
-      const n = tripNumber.get(d.id)!;
-      (d.addressedWorkItemIds ?? []).forEach((wiId) => {
-        const arr = byWorkItem.get(wiId) ?? [];
-        if (!arr.includes(n)) arr.push(n);
-        byWorkItem.set(wiId, arr);
-      });
-    });
-    byWorkItem.forEach((arr) => arr.sort((a, b) => a - b));
-    return byWorkItem;
-  }, [dispatches]);
+  // For each work item, which positional trip numbers address it (shared util,
+  // also used by the Work items tab so the two surfaces never drift).
+  const wiTripsById = useMemo(() => tripsByWorkItem(dispatches), [dispatches]);
   const attention = deriveAttention({
     workOrder,
     dispatches,
@@ -814,7 +812,7 @@ export default function WorkOrderOverview({
             workOrder={workOrder}
             tripsByWorkItem={wiTripsById}
             onAdd={onAddWorkItem}
-            onOpenItems={() => onOpenTab('items')}
+            onOpenItems={onOpenWorkItem}
           />
           <TripStrip
             dispatches={dispatches}

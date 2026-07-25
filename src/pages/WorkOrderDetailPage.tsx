@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
@@ -44,6 +44,7 @@ import WorkItemsTab from '../components/WorkItemsTab';
 import WorkOrderFormDialog from '../components/WorkOrderFormDialog';
 import WorkOrderApprovalsCallout from '../features/work-orders/WorkOrderApprovalsCallout';
 import WorkOrderOverview from '../features/work-orders/WorkOrderOverview';
+import { tripsByWorkItem } from '../utils/tripsByWorkItem';
 import WorkOrderFilesTab from '../components/WorkOrderFilesTab';
 import WorkOrderPurchasingTab from '../components/WorkOrderPurchasingTab';
 import { formatPhone } from '../utils/formatPhone';
@@ -141,7 +142,7 @@ function formatDate(iso: string | null | undefined): string {
 export default function WorkOrderDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
   // Smart back — honor ?from=purchasing (the cross-job Purchasing list),
   // else the entity list.
@@ -483,6 +484,10 @@ export default function WorkOrderDetailPage() {
     queryFn: () => dispatchesApi.listForWorkOrder(id!),
     enabled: !!id,
   });
+  // Positional trip numbers per work item — shared with the overview peek so
+  // the Work items tab header/footer never drift from it. (Hook stays above any
+  // early return.)
+  const wiTrips = useMemo(() => tripsByWorkItem(dispatches), [dispatches]);
 
   const handleCopy = async (kind: 'phone' | 'address', value: string) => {
     if (!value) return;
@@ -581,6 +586,18 @@ export default function WorkOrderDetailPage() {
   };
 
   const openFinancialTab = () => setTab('estimate');
+
+  // Deep-link a work item from the overview peek: switch to the Items tab and
+  // hand the target id to WorkItemsTab (scroll + brief highlight). Kept in the
+  // URL (?item=) so a shared/refreshed link re-focuses the same item.
+  const openWorkItem = (workItemId: string) => {
+    setSearchParams((prev) => {
+      prev.set('tab', 'items');
+      prev.set('item', workItemId);
+      return prev;
+    });
+  };
+  const focusWorkItemId = searchParams.get('item');
 
   const tabItems: { id: WorkOrderTab; label: string; count?: number }[] = [
     { id: 'overview', label: t('workOrders.detail.tabs.overview') },
@@ -791,6 +808,7 @@ export default function WorkOrderDetailPage() {
               dispatches={dispatches}
               onOpenTab={(t2) => setTab(t2 as WorkOrderTab)}
               onAddWorkItem={handleAddWorkItem}
+              onOpenWorkItem={openWorkItem}
               onOpenFinancial={openFinancialTab}
               onSelectDispatch={(d) => setSelectedDispatch(d)}
               onScheduleDispatch={() => {
@@ -902,6 +920,8 @@ export default function WorkOrderDetailPage() {
               onAddEquipment={handleAddEquipmentToWorkItem}
               onSelectSubUnit={handleSelectSubUnit}
               onAddSubUnit={handleAddSubUnit}
+              focusWorkItemId={focusWorkItemId}
+              tripsByWorkItem={wiTrips}
             />
           )}
 
