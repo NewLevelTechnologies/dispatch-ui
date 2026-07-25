@@ -5,7 +5,6 @@ import { useTranslation } from 'react-i18next';
 import {
   customerApi,
   dispatchesApi,
-  equipmentApi,
   financialSummaryApi,
   invoicesApi,
   quotesApi,
@@ -39,7 +38,6 @@ import EquipmentFormDialog from '../components/EquipmentFormDialog';
 import EquipmentQuickViewDrawer from '../components/EquipmentQuickViewDrawer';
 import FinancialInvoicesTab from '../components/FinancialInvoicesTab';
 import FinancialQuotesTab from '../components/FinancialQuotesTab';
-import WorkItemFormDialog from '../components/WorkItemFormDialog';
 import WorkItemsTab from '../components/WorkItemsTab';
 import WorkOrderFormDialog from '../components/WorkOrderFormDialog';
 import WorkOrderApprovalsCallout from '../features/work-orders/WorkOrderApprovalsCallout';
@@ -152,8 +150,11 @@ export default function WorkOrderDetailPage() {
   const [copied, setCopied] = useState<'phone' | 'address' | null>(null);
   const [activityDrawerOpen, setActivityDrawerOpen] = useState(false);
   const [tab, setTab] = useUrlTab<WorkOrderTab>(TAB_IDS, 'overview');
-  const [workItemDialogOpen, setWorkItemDialogOpen] = useState(false);
-  const [editingWorkItem, setEditingWorkItem] = useState<WorkItemResponse | null>(null);
+  // Bumped by the "Add work item" affordances (header button, overview card,
+  // the W shortcut) to open the inline composer on the Items tab. All work-item
+  // editing is inline on the card (complaint / diagnosis / equipment) — there
+  // is no add or edit modal.
+  const [composeWorkItemSignal, setComposeWorkItemSignal] = useState(0);
   const [editWorkOrderDialogOpen, setEditWorkOrderDialogOpen] = useState(false);
   const [assignDispatchDialogOpen, setAssignDispatchDialogOpen] = useState(false);
   // Same dialog handles edit — when set, the dialog opens prefilled in PUT mode.
@@ -161,12 +162,6 @@ export default function WorkOrderDetailPage() {
   // Row click opens the read+manage drawer (lifecycle audit, notification
   // history, edit/delete footer). Null = closed.
   const [selectedDispatch, setSelectedDispatch] = useState<Dispatch | null>(null);
-  // Equipment edit dialog opens from a work-item row's "Edit all" button. We
-  // fetch the full Equipment record on demand because WorkItemEquipmentSummary
-  // doesn't carry the deeper fields the dialog edits (description, install
-  // date, warranty, etc.).
-  const [equipmentDialogOpen, setEquipmentDialogOpen] = useState(false);
-  const [editingEquipment, setEditingEquipment] = useState<Equipment | null>(null);
   // "Add Equipment" from a work-item row's empty-state opens the same dialog
   // in CREATE mode with the WO's service location pre-locked. The work item
   // tracked here is the one we'll link the new equipment to once it's
@@ -182,20 +177,6 @@ export default function WorkOrderDetailPage() {
   // lock and no work-item linking (sub-units belong to their parent
   // equipment, not directly to the work item).
   const [addSubUnitParent, setAddSubUnitParent] = useState<{ id: string; name: string } | null>(null);
-
-  const handleEditEquipment = async (equipmentId: string) => {
-    try {
-      const full = await equipmentApi.getById(equipmentId);
-      setEditingEquipment(full);
-      setEquipmentDialogOpen(true);
-    } catch (err) {
-      const msg =
-        err instanceof Error && 'response' in err
-          ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
-          : undefined;
-      alert(msg || t('common.actions.errorLoadingEntity', { entity: getName('equipment') }));
-    }
-  };
 
   const handleAddEquipmentToWorkItem = (wi: WorkItemResponse) => {
     setAddEquipmentForWorkItem(wi);
@@ -301,6 +282,63 @@ export default function WorkOrderDetailPage() {
     }
   };
 
+  // Inline diagnosis edit on each card (mirrors description). EditableField
+  // stays in edit mode if this throws, so surface the error then re-throw.
+  const handleSaveWorkItemDiagnosis = async (wi: WorkItemResponse, next: string) => {
+    try {
+      await workOrderApi.updateWorkItem(id!, wi.id, { diagnosis: next.trim() || null });
+      queryClient.invalidateQueries({ queryKey: ['work-orders'] });
+      queryClient.invalidateQueries({ queryKey: ['work-order-activity', id] });
+    } catch (err) {
+      const msg =
+        err instanceof Error && 'response' in err
+          ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
+          : undefined;
+      alert(msg || t('common.form.errorUpdate', { entity: getName('work_item') }));
+      throw err;
+    }
+  };
+
+  // Inline equipment attach / change / clear from a card's WOEquipmentPicker.
+  // equipmentId null (Clear) detaches; a string attaches.
+  const handleAttachEquipmentToWorkItem = async (wi: WorkItemResponse, equipmentId: string | null) => {
+    if ((wi.equipment?.id ?? null) === equipmentId) return; // no-op re-pick / clear-when-empty
+    try {
+      await workOrderApi.updateWorkItem(id!, wi.id, { equipmentId });
+      queryClient.invalidateQueries({ queryKey: ['work-orders'] });
+      queryClient.invalidateQueries({ queryKey: ['work-orders-list'] });
+      queryClient.invalidateQueries({ queryKey: ['work-order-activity', id] });
+    } catch (err) {
+      const msg =
+        err instanceof Error && 'response' in err
+          ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
+          : undefined;
+      alert(msg || t('common.form.errorUpdate', { entity: getName('work_item') }));
+    }
+  };
+
+  // Toggle the equipmentNeeded flag (backend shipped it on the PATCH). false
+  // also detaches any attached unit so "no equipment needed" can't leave a
+  // stale id; true reverts to the needs-attach prompt.
+  const handleSetWorkItemEquipmentNeeded = async (wi: WorkItemResponse, needed: boolean) => {
+    try {
+      await workOrderApi.updateWorkItem(
+        id!,
+        wi.id,
+        needed ? { equipmentNeeded: true } : { equipmentNeeded: false, equipmentId: null }
+      );
+      queryClient.invalidateQueries({ queryKey: ['work-orders'] });
+      queryClient.invalidateQueries({ queryKey: ['work-orders-list'] });
+      queryClient.invalidateQueries({ queryKey: ['work-order-activity', id] });
+    } catch (err) {
+      const msg =
+        err instanceof Error && 'response' in err
+          ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
+          : undefined;
+      alert(msg || t('common.form.errorUpdate', { entity: getName('work_item') }));
+    }
+  };
+
   // Generic single-field PATCH for inline edits on the WO meta card. Each
   // EditableField calls this with the field name and new value. EditableField
   // stays in edit mode if we throw, so we propagate after alert so the user
@@ -348,12 +386,9 @@ export default function WorkOrderDetailPage() {
     return () => window.removeEventListener('keydown', handler);
   }, [activityDrawerOpen]);
 
-  // W shortcut → open the work item dialog in create mode. Mirrors the N
-  // shortcut: ignored when an input is focused, when modifier keys are held,
-  // or when the dialog is already open. Re-binds on open-state change so the
-  // closed-only check is reliable.
+  // W shortcut → open the inline work-item composer on the Items tab. Ignored
+  // when an input is focused or modifier keys are held.
   useEffect(() => {
-    if (workItemDialogOpen) return; // listener inactive while dialog is open
     const handler = (e: KeyboardEvent) => {
       if (e.key !== 'w' && e.key !== 'W') return;
       if (e.metaKey || e.ctrlKey || e.altKey) return;
@@ -367,12 +402,12 @@ export default function WorkOrderDetailPage() {
         return;
       }
       e.preventDefault();
-      setEditingWorkItem(null);
-      setWorkItemDialogOpen(true);
+      setTab('items');
+      setComposeWorkItemSignal((s) => s + 1);
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [workItemDialogOpen]);
+  }, [setTab]);
 
   const {
     data: workOrder,
@@ -581,8 +616,7 @@ export default function WorkOrderDetailPage() {
 
   const handleAddWorkItem = () => {
     setTab('items');
-    setEditingWorkItem(null);
-    setWorkItemDialogOpen(true);
+    setComposeWorkItemSignal((s) => s + 1);
   };
 
   const openFinancialTab = () => setTab('estimate');
@@ -803,6 +837,7 @@ export default function WorkOrderDetailPage() {
           {tab === 'overview' && (
             <WorkOrderOverview
               workOrder={workOrder}
+              statuses={workItemStatuses}
               location={locationDetail}
               financialSummary={financialSummary}
               dispatches={dispatches}
@@ -910,18 +945,17 @@ export default function WorkOrderDetailPage() {
               transitions={workflowTransitions}
               enforceWorkflow={workflowConfig?.enforcementMode === 'STRICT'}
               readOnly={frozen}
-              onEdit={(wi) => {
-                setEditingWorkItem(wi);
-                setWorkItemDialogOpen(true);
-              }}
               onDelete={handleDeleteWorkItem}
               onSaveDescription={handleSaveWorkItemDescription}
-              onEditEquipment={handleEditEquipment}
+              onSaveDiagnosis={handleSaveWorkItemDiagnosis}
+              onAttachEquipment={handleAttachEquipmentToWorkItem}
+              onSetEquipmentNeeded={handleSetWorkItemEquipmentNeeded}
               onAddEquipment={handleAddEquipmentToWorkItem}
               onSelectSubUnit={handleSelectSubUnit}
               onAddSubUnit={handleAddSubUnit}
               focusWorkItemId={focusWorkItemId}
               tripsByWorkItem={wiTrips}
+              openComposerSignal={composeWorkItemSignal}
             />
           )}
 
@@ -1025,18 +1059,6 @@ export default function WorkOrderDetailPage() {
         }}
       />
 
-      <WorkItemFormDialog
-        isOpen={workItemDialogOpen}
-        onClose={() => {
-          setWorkItemDialogOpen(false);
-          setEditingWorkItem(null);
-        }}
-        workOrderId={workOrder.id}
-        serviceLocationId={workOrder.serviceLocationId || workOrder.serviceLocation?.id}
-        workItem={editingWorkItem}
-        readOnly={frozen}
-      />
-
       <WorkOrderFormDialog
         isOpen={editWorkOrderDialogOpen}
         onClose={() => setEditWorkOrderDialogOpen(false)}
@@ -1054,15 +1076,6 @@ export default function WorkOrderDetailPage() {
         locationName={location?.locationName}
         workOrderNumber={woDisplayNumber}
         dispatch={editingDispatch}
-      />
-
-      <EquipmentFormDialog
-        isOpen={equipmentDialogOpen}
-        onClose={() => {
-          setEquipmentDialogOpen(false);
-          setEditingEquipment(null);
-        }}
-        equipment={editingEquipment}
       />
 
       {/* Same dialog component, opened in CREATE mode with the WO's service

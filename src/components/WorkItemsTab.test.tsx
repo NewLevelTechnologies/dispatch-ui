@@ -142,25 +142,86 @@ describe('WorkItemsTab', () => {
     expect(screen.queryByLabelText(/complaint/i)).not.toBeInTheDocument();
   });
 
-  it('fires onEdit and onDelete from the row menu', async () => {
-    const onEdit = vi.fn();
+  it('fires onDelete from the row menu (edit is inline — no Edit item)', async () => {
     const onDelete = vi.fn();
     const user = userEvent.setup();
     renderWithProviders(
-      <WorkItemsTab {...baseProps} workItems={[wi('wi-1', 'No cooling')]} onEdit={onEdit} onDelete={onDelete} />
+      <WorkItemsTab {...baseProps} workItems={[wi('wi-1', 'No cooling')]} onDelete={onDelete} />
     );
     await user.click(screen.getByRole('button', { name: /more options/i }));
-    await user.click(await screen.findByRole('menuitem', { name: /edit/i }));
-    expect(onEdit).toHaveBeenCalled();
-
-    await user.click(screen.getByRole('button', { name: /more options/i }));
+    // Editing is inline, so the row menu no longer offers an Edit action.
+    expect(screen.queryByRole('menuitem', { name: /edit/i })).not.toBeInTheDocument();
     await user.click(await screen.findByRole('menuitem', { name: /delete/i }));
     expect(onDelete).toHaveBeenCalled();
   });
 
+  it('shows the inline attach picker and attaches on pick for a needs-attach item', async () => {
+    const onAttachEquipment = vi.fn();
+    const user = userEvent.setup();
+    // Picker candidates come from equipmentApi.list (via the mocked api client).
+    vi.mocked(apiClient.get).mockResolvedValue({
+      data: { content: [{ id: 'eq-9', name: 'Rooftop unit', make: 'Trane', model: 'XR14' }] },
+    } as never);
+    renderWithProviders(
+      <WorkItemsTab
+        {...baseProps}
+        serviceLocationId="loc-1"
+        workItems={[wi('wi-1', 'No cooling')]}
+        onAttachEquipment={onAttachEquipment}
+      />
+    );
+    await user.click(await screen.findByRole('button', { name: /rooftop unit/i }));
+    expect(onAttachEquipment).toHaveBeenCalledWith(expect.objectContaining({ id: 'wi-1' }), 'eq-9');
+  });
+
+  it('undoes the none-needed state via Attach (sets equipmentNeeded true)', async () => {
+    const onSetEquipmentNeeded = vi.fn();
+    const user = userEvent.setup();
+    renderWithProviders(
+      <WorkItemsTab
+        {...baseProps}
+        serviceLocationId="loc-1"
+        workItems={[wi('wi-1', 'Drain clog', { equipmentNeeded: false })]}
+        onSetEquipmentNeeded={onSetEquipmentNeeded}
+      />
+    );
+    await user.click(screen.getByRole('button', { name: /^attach$/i }));
+    expect(onSetEquipmentNeeded).toHaveBeenCalledWith(expect.objectContaining({ id: 'wi-1' }), true);
+  });
+
+  it('marks an item as not needing equipment from the picker', async () => {
+    const onSetEquipmentNeeded = vi.fn();
+    const user = userEvent.setup();
+    renderWithProviders(
+      <WorkItemsTab
+        {...baseProps}
+        serviceLocationId="loc-1"
+        workItems={[wi('wi-1', 'Drain clog')]}
+        onSetEquipmentNeeded={onSetEquipmentNeeded}
+      />
+    );
+    await user.click(await screen.findByRole('button', { name: /doesn't need/i }));
+    expect(onSetEquipmentNeeded).toHaveBeenCalledWith(expect.objectContaining({ id: 'wi-1' }), false);
+  });
+
+  it('swaps an attached item to the inline picker when Change is clicked', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(
+      <WorkItemsTab
+        {...baseProps}
+        serviceLocationId="loc-1"
+        workItems={[wi('wi-1', 'No cooling', { equipmentId: 'eq-1', equipment: equip() })]}
+        onAttachEquipment={vi.fn()}
+      />
+    );
+    await user.click(await screen.findByRole('button', { name: /^change$/i }));
+    // The dashed attach panel takes over in place of the equipment block.
+    expect(await screen.findByText(/pick what's installed/i)).toBeInTheDocument();
+  });
+
   it('hides add + row actions when readOnly', () => {
     renderWithProviders(
-      <WorkItemsTab {...baseProps} workItems={[wi('wi-1', 'No cooling')]} readOnly onEdit={vi.fn()} onDelete={vi.fn()} />
+      <WorkItemsTab {...baseProps} workItems={[wi('wi-1', 'No cooling')]} readOnly onDelete={vi.fn()} />
     );
     expect(screen.queryByRole('button', { name: /add work item/i })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /more options/i })).not.toBeInTheDocument();
