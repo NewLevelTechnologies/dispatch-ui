@@ -186,7 +186,14 @@ export default function DispatchesTab({
   return (
     <div className="flex flex-col gap-3">
       {!readOnly && (
-        <Button outline className="self-start" onClick={onAssign}>
+        <Button
+          outline
+          // outline is transparent in light mode → it washes into the page grey.
+          // Sit it on the card fill (--bg-elev), like the mock's .btn, in both themes.
+          className="self-start shadow-sm"
+          style={{ backgroundColor: 'var(--bg-elev)' }}
+          onClick={onAssign}
+        >
           <PlusIcon data-slot="icon" />
           {t('workOrders.dispatches.schedule', { entity: getName('dispatch') })}
         </Button>

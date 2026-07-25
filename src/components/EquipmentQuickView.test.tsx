@@ -6,6 +6,9 @@ import type { Equipment } from '../api';
 
 const mockGetById = vi.fn();
 const mockUpdate = vi.fn();
+const mockNotesCreate = vi.fn();
+const mockNotesUpdate = vi.fn();
+const mockNotesDelete = vi.fn();
 
 vi.mock('../api/equipmentApi', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../api/equipmentApi')>();
@@ -14,6 +17,12 @@ vi.mock('../api/equipmentApi', async (importOriginal) => {
     equipmentApi: {
       getById: (...args: unknown[]) => mockGetById(...args),
       update: (...args: unknown[]) => mockUpdate(...args),
+    },
+    equipmentNotesApi: {
+      ...actual.equipmentNotesApi,
+      create: (...args: unknown[]) => mockNotesCreate(...args),
+      update: (...args: unknown[]) => mockNotesUpdate(...args),
+      delete: (...args: unknown[]) => mockNotesDelete(...args),
     },
   };
 });
@@ -51,7 +60,17 @@ describe('EquipmentQuickView', () => {
     vi.clearAllMocks();
     mockGetById.mockResolvedValue(baseEquipment);
     mockUpdate.mockResolvedValue(baseEquipment);
+    mockNotesCreate.mockResolvedValue({});
+    mockNotesUpdate.mockResolvedValue({});
+    mockNotesDelete.mockResolvedValue(undefined);
   });
+
+  const note = {
+    id: 'n1',
+    body: 'Rooftop access via ladder',
+    authorName: 'A. Reyes',
+    createdAt: '2025-11-02T12:00:00Z',
+  };
 
   it('shows the loading state until the equipment fetch resolves', () => {
     // Pending promise — never resolves
@@ -167,5 +186,46 @@ describe('EquipmentQuickView', () => {
       expect(screen.getByRole('button', { name: /compressor/i })).toBeInTheDocument()
     );
     expect(screen.queryByRole('button', { name: /add unit/i })).not.toBeInTheDocument();
+  });
+
+  it('renders equipment-scoped notes', async () => {
+    mockGetById.mockResolvedValue({ ...baseEquipment, recentNotes: [note], noteCount: 1 });
+    renderWithProviders(<EquipmentQuickView equipmentId="eq-1" onSelectSubUnit={vi.fn()} />);
+    await waitFor(() => expect(screen.getByText('Rooftop access via ladder')).toBeInTheDocument());
+    expect(screen.getByText(/A\. Reyes/)).toBeInTheDocument();
+  });
+
+  it('adds a note via equipmentNotesApi.create', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<EquipmentQuickView equipmentId="eq-1" onSelectSubUnit={vi.fn()} />);
+    await waitFor(() => expect(screen.getByText('Outdoor HVAC unit')).toBeInTheDocument());
+    await user.click(screen.getByRole('button', { name: /add note/i }));
+    await user.type(await screen.findByRole('textbox', { name: /note body/i }), 'New service note');
+    await user.click(screen.getByRole('button', { name: /^save$/i }));
+    await waitFor(() => expect(mockNotesCreate).toHaveBeenCalledWith('eq-1', { body: 'New service note' }));
+  });
+
+  it('edits an existing note via equipmentNotesApi.update', async () => {
+    mockGetById.mockResolvedValue({ ...baseEquipment, recentNotes: [note], noteCount: 1 });
+    const user = userEvent.setup();
+    renderWithProviders(<EquipmentQuickView equipmentId="eq-1" onSelectSubUnit={vi.fn()} />);
+    await waitFor(() => expect(screen.getByText('Rooftop access via ladder')).toBeInTheDocument());
+    await user.click(screen.getByRole('button', { name: /rooftop access via ladder/i }));
+    const box = await screen.findByRole('textbox', { name: /note body/i });
+    await user.clear(box);
+    await user.type(box, 'Updated note');
+    await user.click(screen.getByRole('button', { name: /^save$/i }));
+    await waitFor(() => expect(mockNotesUpdate).toHaveBeenCalledWith('eq-1', 'n1', { body: 'Updated note' }));
+  });
+
+  it('deletes a note through the confirm dialog', async () => {
+    mockGetById.mockResolvedValue({ ...baseEquipment, recentNotes: [note], noteCount: 1 });
+    const user = userEvent.setup();
+    renderWithProviders(<EquipmentQuickView equipmentId="eq-1" onSelectSubUnit={vi.fn()} />);
+    await waitFor(() => expect(screen.getByText('Rooftop access via ladder')).toBeInTheDocument());
+    await user.click(screen.getByRole('button', { name: /^delete$/i }));
+    const deletes = await screen.findAllByRole('button', { name: /^delete$/i });
+    await user.click(deletes[deletes.length - 1]);
+    await waitFor(() => expect(mockNotesDelete).toHaveBeenCalledWith('eq-1', 'n1'));
   });
 });

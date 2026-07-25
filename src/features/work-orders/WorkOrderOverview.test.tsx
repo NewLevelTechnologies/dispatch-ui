@@ -121,6 +121,7 @@ describe('WorkOrderOverview', () => {
     renderWithProviders(
       <WorkOrderOverview
         workOrder={workOrder}
+        statuses={[]}
         location={location}
         financialSummary={summary}
         dispatches={[liveDispatch]}
@@ -133,6 +134,17 @@ describe('WorkOrderOverview', () => {
         {...props}
       />
     );
+
+  it('shows the actual work-item status name in the peek (matching the tab pill)', () => {
+    render({
+      statuses: [{ id: 'st-1', name: 'Diagnosing', isActive: true } as never],
+      workOrder: {
+        ...workOrder,
+        workItems: [{ ...workOrder.workItems![0], statusId: 'st-1' }],
+      } as unknown as WorkOrder,
+    });
+    expect(screen.getByText('Diagnosing')).toBeInTheDocument();
+  });
 
   it('derives the attention strip: live dispatch, blocked item, and balance due', () => {
     render();

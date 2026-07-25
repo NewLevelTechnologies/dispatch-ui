@@ -33,6 +33,7 @@ import {
   activityApi,
   type WorkOrder,
   type WorkItemResponse,
+  type WorkItemStatus,
   type WorkOrderFinancialSummary,
   type Dispatch,
   type DispatchBoardRow,
@@ -229,6 +230,18 @@ function AttentionStrip({ items }: { items: AttentionItem[] }) {
   );
 }
 
+// statusCategory → progress i18n key. Mirrors WorkItemStatusPill's fallback so
+// the peek and the tab pill read the same label when an item carries no specific
+// tenant status.
+const PROGRESS_LABEL_KEYS: Record<ProgressCategory, string> = {
+  NOT_STARTED: 'notStarted',
+  AWAITING_SCHEDULE: 'awaitingSchedule',
+  IN_PROGRESS: 'inProgress',
+  BLOCKED: 'blocked',
+  COMPLETED: 'completed',
+  CANCELLED: 'cancelled',
+};
+
 // ── Work-items peek — one compact row per item, built to the mock's
 // ItemOverviewRow: EQUIPMENT is the anchor (or the attach prompt when none is
 // linked), the complaint reads as the calm note beneath, and a footer carries
@@ -238,11 +251,13 @@ function AttentionStrip({ items }: { items: AttentionItem[] }) {
 // needed" state (needs a work_item.eqNeeded flag).
 function WorkItemsPeek({
   workOrder,
+  statuses,
   tripsByWorkItem,
   onAdd,
   onOpenItems,
 }: {
   workOrder: WorkOrder;
+  statuses: WorkItemStatus[];
   tripsByWorkItem: Map<string, number[]>;
   onAdd: () => void;
   onOpenItems: (workItemId: string) => void;
@@ -265,6 +280,7 @@ function WorkItemsPeek({
           <WorkItemPeekRow
             key={wi.id}
             wi={wi}
+            statuses={statuses}
             trips={tripsByWorkItem.get(wi.id) ?? []}
             last={i === items.length - 1}
             onClick={() => onOpenItems(wi.id)}
@@ -277,11 +293,13 @@ function WorkItemsPeek({
 
 function WorkItemPeekRow({
   wi,
+  statuses,
   trips,
   last,
   onClick,
 }: {
   wi: WorkItemResponse;
+  statuses: WorkItemStatus[];
   trips: number[];
   last: boolean;
   onClick: () => void;
@@ -289,6 +307,11 @@ function WorkItemPeekRow({
   const { t } = useTranslation();
   const { getAbbrev } = useGlossary();
   const tone = PROGRESS_TONE[wi.statusCategory];
+  // Actual work-item status name (tenant-configured), matching the Items-tab
+  // pill; fall back to the progress-category label only when no status is set.
+  const statusLabel =
+    statuses.find((s) => s.id === wi.statusId)?.name ||
+    t(`workOrders.progress.${PROGRESS_LABEL_KEYS[wi.statusCategory]}`);
   const rail =
     tone === 'warning'
       ? 'var(--warning-500)'
@@ -365,7 +388,7 @@ function WorkItemPeekRow({
               {t('workOrders.detail.overview.noEquipment')}
             </span>
           )}
-          <Pill tone={tone} dot>{wi.statusCategory.replace(/_/g, ' ').toLowerCase()}</Pill>
+          <Pill tone={tone} dot>{statusLabel}</Pill>
         </div>
         {/* The complaint — regular weight, calm, clamped to 2 lines so a long
             dictated dump never dominates. Full text on the Work items tab.
@@ -748,6 +771,9 @@ function ActivityTeaser({ workOrderId, onViewAll }: { workOrderId: string; onVie
 
 export interface WorkOrderOverviewProps {
   workOrder: WorkOrder;
+  /** Tenant work-item statuses — resolves each item's statusId → status name so
+   *  the peek shows the same label as the Items-tab pill. */
+  statuses: WorkItemStatus[];
   location?: ServiceLocationDetailDto;
   financialSummary?: WorkOrderFinancialSummary;
   dispatches: DispatchBoardRow[];
@@ -775,6 +801,7 @@ export default function WorkOrderOverview({
   onSelectDispatch,
   onScheduleDispatch,
   extraRail,
+  statuses,
 }: WorkOrderOverviewProps) {
   const { t } = useTranslation();
   const { getName, getAbbrev } = useGlossary();
@@ -810,6 +837,7 @@ export default function WorkOrderOverview({
         <div className="flex min-w-0 flex-col gap-3">
           <WorkItemsPeek
             workOrder={workOrder}
+            statuses={statuses}
             tripsByWorkItem={wiTripsById}
             onAdd={onAddWorkItem}
             onOpenItems={onOpenWorkItem}

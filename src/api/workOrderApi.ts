@@ -256,6 +256,8 @@ export interface CreateWorkItemRequest {
   description: string;
   statusId?: string;
   equipmentId?: string | null;
+  // Defaults true server-side; set false to book a known no-equipment job.
+  equipmentNeeded?: boolean;
   // Tech's on-site assessment (≤5000). Usually empty at create.
   diagnosis?: string;
 }
@@ -266,6 +268,11 @@ export interface UpdateWorkItemRequest {
   description?: string;
   statusId?: string;
   equipmentId?: string | null;
+  // Optional boolean, defaults true server-side; omit to leave unchanged.
+  // false = "No equipment needed", true = undo. Can be sent alongside
+  // equipmentId (e.g. { equipmentNeeded: false, equipmentId: null } to detach
+  // and mark not-needed in one PATCH).
+  equipmentNeeded?: boolean;
   diagnosis?: string | null;
 }
 
