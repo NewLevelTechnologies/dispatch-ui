@@ -1812,6 +1812,7 @@ vi.mock('react-i18next', () => {
     'workOrders.workItems.deleteConfirm': 'Delete this {{entity, lowercase}}? This cannot be undone.',
     'workOrders.workItems.diagnosis': 'Diagnosis',
     'workOrders.workItems.diagnosisPlaceholder': "The tech's on-site assessment — cause, findings, and fix.",
+    'workOrders.workItems.duplicate': 'Duplicate {{entity, lowercase}}',
     'workOrders.workItems.notDiagnosed': 'Not yet diagnosed — tech will assess on site and add findings.',
     'workOrders.workItems.complaint': 'Complaint',
     'workOrders.workItems.complaintPlaceholder': "What's the customer reporting?",

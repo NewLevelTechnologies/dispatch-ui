@@ -12,7 +12,7 @@ import { useGlossary } from '../contexts/GlossaryContext';
 import { showError, extractApiError } from '../lib/toast';
 import EquipmentFormDialog from './EquipmentFormDialog';
 import WOEquipmentPicker from './WOEquipmentPicker';
-import EditableField from './EditableField';
+import InlineComposer from './InlineComposer';
 import WorkItemStatusPill from './WorkItemStatusPill';
 import WorkItemEquipmentBlock from './WorkItemEquipmentBlock';
 import { workItemLabel } from '../utils/workItemLabel';
@@ -51,6 +51,7 @@ interface Props {
   enforceWorkflow: boolean;
   readOnly?: boolean;
   onDelete?: (wi: WorkItemResponse) => void;
+  onDuplicate?: (wi: WorkItemResponse) => void;
   onSaveDescription?: (wi: WorkItemResponse, next: string) => Promise<void>;
   onSaveDiagnosis?: (wi: WorkItemResponse, next: string) => Promise<void>;
   onAttachEquipment?: (wi: WorkItemResponse, equipmentId: string | null) => void | Promise<void>;
@@ -83,6 +84,7 @@ export default function WorkItemsTab({
   enforceWorkflow,
   readOnly = false,
   onDelete,
+  onDuplicate,
   onSaveDescription,
   onSaveDiagnosis,
   onAttachEquipment,
@@ -98,9 +100,9 @@ export default function WorkItemsTab({
   const { getName } = useGlossary();
   const [composing, setComposing] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
-  const [highlightedId, setHighlightedId] = useState<string | null>(null);
-  const lastFocusedRef = useRef<string | null>(null);
-  const highlightTimer = useRef<number | null>(null);
+  // Deep-link flash: captured once at mount from the ?item= target. Rendered as
+  // a transient background wash on the card and cleared on a timer (see below).
+  const [flash, setFlash] = useState<string | null>(focusWorkItemId ?? null);
 
   // The page's "Add work item" affordances (header button, overview card, the
   // W shortcut) bump `openComposerSignal` to open the inline composer. This is
@@ -111,33 +113,19 @@ export default function WorkItemsTab({
     setComposing(true);
   }, [openComposerSignal]);
 
-  // Deep-link from the overview peek: scroll the targeted item into view and
-  // flash a brief highlight. lastFocusedRef guards against re-scrolling on
-  // unrelated re-renders (e.g. a background refetch); the timer lives in a ref
-  // so a dependency change can't cancel the flash early.
+  // Deep-link flash → scroll the target into view, then clear the wash on a
+  // timer. Keyed on `flash` alone (not workItems / the URL), so a background
+  // refetch can't re-arm it and StrictMode's mount → cleanup → mount re-runs the
+  // timer correctly: it fires setFlash(null) once, then the guard short-circuits
+  // and it never re-fires. No status-rail styling is touched — only the wash.
   useEffect(() => {
-    if (!focusWorkItemId || lastFocusedRef.current === focusWorkItemId) return;
-    if (!workItems.some((wi) => wi.id === focusWorkItemId)) return;
-    lastFocusedRef.current = focusWorkItemId;
-    const el = containerRef.current?.querySelector<HTMLElement>(
-      `[data-work-item-id="${focusWorkItemId}"]`
-    );
-    el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    // Transient deep-link highlight synchronized from the URL (?item=) — not
-    // derivable render state, and it must auto-clear after the flash, so the
-    // effect is the right home for it.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setHighlightedId(focusWorkItemId);
-    if (highlightTimer.current) window.clearTimeout(highlightTimer.current);
-    highlightTimer.current = window.setTimeout(() => setHighlightedId(null), 1600);
-  }, [focusWorkItemId, workItems]);
-
-  useEffect(
-    () => () => {
-      if (highlightTimer.current) window.clearTimeout(highlightTimer.current);
-    },
-    []
-  );
+    if (!flash) return undefined;
+    containerRef.current
+      ?.querySelector<HTMLElement>(`[data-work-item-id="${flash}"]`)
+      ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    const timer = window.setTimeout(() => setFlash(null), 1800);
+    return () => window.clearTimeout(timer);
+  }, [flash]);
 
   // Predicted next sequence for the composer's WI-id badge (server assigns the
   // real one on create; max existing + 1, matching the mock's head).
@@ -184,13 +172,14 @@ export default function WorkItemsTab({
             workOrderId={workOrderId}
             serviceLocationId={serviceLocationId}
             wi={wi}
-            highlighted={highlightedId === wi.id}
+            highlighted={flash === wi.id}
             trips={tripsByWorkItem?.get(wi.id) ?? []}
             statuses={statuses}
             transitions={transitions}
             enforceWorkflow={enforceWorkflow}
             readOnly={readOnly}
             onDelete={onDelete}
+            onDuplicate={onDuplicate}
             onSaveDescription={onSaveDescription}
             onSaveDiagnosis={onSaveDiagnosis}
             onAttachEquipment={onAttachEquipment}
@@ -216,6 +205,7 @@ function WorkItemCard({
   enforceWorkflow,
   readOnly,
   onDelete,
+  onDuplicate,
   onSaveDescription,
   onSaveDiagnosis,
   onAttachEquipment,
@@ -234,6 +224,7 @@ function WorkItemCard({
   enforceWorkflow: boolean;
   readOnly: boolean;
   onDelete?: (wi: WorkItemResponse) => void;
+  onDuplicate?: (wi: WorkItemResponse) => void;
   onSaveDescription?: (wi: WorkItemResponse, next: string) => Promise<void>;
   onSaveDiagnosis?: (wi: WorkItemResponse, next: string) => Promise<void>;
   onAttachEquipment?: (wi: WorkItemResponse, equipmentId: string | null) => void | Promise<void>;
@@ -244,9 +235,13 @@ function WorkItemCard({
 }) {
   const { t } = useTranslation();
   const { getName, getAbbrev } = useGlossary();
-  const showActions = !readOnly && !!onDelete;
+  const showActions = !readOnly && !!(onDelete || onDuplicate || onSaveDescription);
   const diagnosis = wi.diagnosis?.trim();
   const wiId = wi.sequence != null ? workItemLabel(getAbbrev('work_item'), wi.sequence) : null;
+  // Section-scoped inline editing (mock): complaint + diagnosis each flip to an
+  // InlineComposer in place — no modal, no monolithic "edit mode".
+  const [editingComplaint, setEditingComplaint] = useState(false);
+  const [editingDiagnosis, setEditingDiagnosis] = useState(false);
 
   const attached = !!wi.equipment;
   const noneNeeded = !attached && wi.equipmentNeeded === false;
@@ -259,72 +254,114 @@ function WorkItemCard({
   return (
     <div
       data-work-item-id={wi.id}
-      className="overflow-hidden rounded-lg border border-border bg-bg-elev transition-shadow duration-500"
+      className="overflow-hidden rounded-lg border border-border bg-bg-elev transition-colors duration-[400ms] ease-out"
       style={{
         borderLeft: `3px solid ${RAIL[wi.statusCategory]}`,
-        boxShadow: highlighted ? '0 0 0 2px var(--accent-500)' : undefined,
+        // Deep-link orientation flash (see the highlight effect): a transient
+        // accent WASH that fades in then self-clears — not a border, so the
+        // status rail (borderLeft) survives. Mixed over --bg-elev (not
+        // transparent) so the card stays opaque; undefined when idle → zero
+        // residual styling after the fade.
+        backgroundColor: highlighted
+          ? 'color-mix(in oklch, var(--accent-500) 7%, var(--bg-elev))'
+          : undefined,
       }}
     >
-      {/* Head — two groups on one centered row (mock card-head): complaint +
-          WI-id (left, baseline) · trips + status + kebab (right, centered). */}
+      {/* Head — complaint (+ WI-id) · trips + status + kebab. While editing the
+          complaint the composer spans the full card and the right cluster hides
+          (mock: card-title flex 1 1 100%). */}
       <div className="flex items-center gap-3 border-b border-border-soft px-3.5 py-2.5">
-        <div className="flex min-w-0 flex-1 items-baseline gap-2">
-          {/* Complaint — 13px/600 --fg-strong, no clamp (mock §3). Inline-editable. */}
-          <div className="min-w-0 flex-1 text-[13px] font-semibold text-fg-strong">
-            {onSaveDescription && !readOnly ? (
-              <EditableField
-                as="textarea"
-                value={wi.description}
-                onSave={(next) => onSaveDescription(wi, next)}
-                rows={2}
-                ariaLabel={t('workOrders.workItems.editDescription')}
-              />
-            ) : (
-              wi.description
+        <div className={`flex min-w-0 items-baseline gap-2 ${editingComplaint ? 'w-full' : 'flex-1'}`}>
+          {editingComplaint && onSaveDescription ? (
+            <InlineComposer
+              value={wi.description}
+              rows={2}
+              placeholder={t('workOrders.workItems.complaintPlaceholder')}
+              ariaLabel={t('workOrders.workItems.editDescription')}
+              onCancel={() => setEditingComplaint(false)}
+              onSave={async (next) => {
+                await onSaveDescription(wi, next);
+                setEditingComplaint(false);
+              }}
+            />
+          ) : (
+            <>
+              {/* Complaint — 13px/600 --fg-strong; click to edit in place. The
+                  font stays on the wrapper so the inner <button> inherits it —
+                  Preflight's `button { font: inherit }` would otherwise flow the
+                  body weight (400) onto a directly-styled button. */}
+              <div className="min-w-0 flex-1 text-[13px] font-semibold text-fg-strong">
+                {onSaveDescription && !readOnly ? (
+                  <button
+                    type="button"
+                    onClick={() => setEditingComplaint(true)}
+                    title={t('workOrders.workItems.editDescription')}
+                    className="w-full cursor-text text-left"
+                  >
+                    {wi.description}
+                  </button>
+                ) : (
+                  wi.description
+                )}
+              </div>
+              {wiId && (
+                <span className="shrink-0 whitespace-nowrap font-mono text-[10.5px] font-semibold text-fg-dim">
+                  {wiId}
+                </span>
+              )}
+            </>
+          )}
+        </div>
+        {!editingComplaint && (
+          <div className="flex shrink-0 items-center gap-2">
+            {/* Trips addressing this item (mock JSX lines 216–222). */}
+            <span className="flex items-center gap-1 whitespace-nowrap text-[11px] text-fg-muted">
+              <TruckIcon className="size-3" />
+              {trips.length > 0 ? (
+                <span>
+                  {`${trips.length > 1 ? getName('dispatch', true) : getName('dispatch')} `}
+                  <span className="font-semibold text-fg-strong">{trips.join(', ')}</span>
+                </span>
+              ) : (
+                <span className="text-fg-dim">{t('workOrders.detail.notScheduled')}</span>
+              )}
+            </span>
+            <WorkItemStatusPill
+              workOrderId={workOrderId}
+              workItem={wi}
+              statuses={statuses}
+              transitions={transitions}
+              enforceWorkflow={enforceWorkflow}
+              readOnly={readOnly}
+            />
+            {showActions && (
+              <Dropdown>
+                <DropdownButton plain className="size-6 justify-center p-0" aria-label={t('common.moreOptions')}>
+                  <EllipsisHorizontalIcon className="size-3.5" />
+                </DropdownButton>
+                <DropdownMenu anchor="bottom end">
+                  {onSaveDescription && (
+                    <DropdownItem onClick={() => setEditingComplaint(true)}>
+                      <DropdownLabel>{t('workOrders.workItems.editDescription')}</DropdownLabel>
+                    </DropdownItem>
+                  )}
+                  {onDuplicate && (
+                    <DropdownItem onClick={() => onDuplicate(wi)}>
+                      <DropdownLabel>
+                        {t('workOrders.workItems.duplicate', { entity: getName('work_item') })}
+                      </DropdownLabel>
+                    </DropdownItem>
+                  )}
+                  {onDelete && (
+                    <DropdownItem onClick={() => onDelete(wi)}>
+                      <DropdownLabel>{t('common.delete')}</DropdownLabel>
+                    </DropdownItem>
+                  )}
+                </DropdownMenu>
+              </Dropdown>
             )}
           </div>
-          {wiId && (
-            <span className="shrink-0 whitespace-nowrap font-mono text-[10.5px] font-semibold text-fg-dim">
-              {wiId}
-            </span>
-          )}
-        </div>
-        <div className="flex shrink-0 items-center gap-2">
-          {/* Trips addressing this item (mock JSX lines 216–222). */}
-          <span className="flex items-center gap-1 whitespace-nowrap text-[11px] text-fg-muted">
-            <TruckIcon className="size-3" />
-            {trips.length > 0 ? (
-              <span>
-                {`${trips.length > 1 ? getName('dispatch', true) : getName('dispatch')} `}
-                <span className="font-semibold text-fg-strong">{trips.join(', ')}</span>
-              </span>
-            ) : (
-              <span className="text-fg-dim">{t('workOrders.detail.notScheduled')}</span>
-            )}
-          </span>
-          <WorkItemStatusPill
-            workOrderId={workOrderId}
-            workItem={wi}
-            statuses={statuses}
-            transitions={transitions}
-            enforceWorkflow={enforceWorkflow}
-            readOnly={readOnly}
-          />
-          {showActions && (
-            <Dropdown>
-              <DropdownButton plain className="size-6 justify-center p-0" aria-label={t('common.moreOptions')}>
-                <EllipsisHorizontalIcon className="size-3.5" />
-              </DropdownButton>
-              <DropdownMenu anchor="bottom end">
-                {onDelete && (
-                  <DropdownItem onClick={() => onDelete(wi)}>
-                    <DropdownLabel>{t('common.delete')}</DropdownLabel>
-                  </DropdownItem>
-                )}
-              </DropdownMenu>
-            </Dropdown>
-          )}
-        </div>
+        )}
       </div>
 
       {/* Body — equipment (3 states) → diagnosis → parts & readiness. */}
@@ -383,8 +420,9 @@ function WorkItemCard({
           </span>
         )}
 
-        {/* Diagnosis — tinted panel (mock §5): label-tiny + 12px body, --fg.
-            Inline-editable; empty state prompts the tech (no italics). */}
+        {/* Diagnosis — tinted panel (mock §5). Section-scoped inline edit: the
+            label row carries an accent Edit / + Add; clicking the body (or that
+            affordance) flips it to an InlineComposer in place. */}
         <div
           className="px-[11px] py-[9px]"
           style={{
@@ -393,24 +431,46 @@ function WorkItemCard({
             borderLeft: '2px solid var(--border-strong)',
           }}
         >
-          <div className="mb-[3px] text-[10px] font-bold uppercase tracking-[0.05em] text-fg-muted">
-            {t('workOrders.workItems.diagnosis')}
+          <div className="mb-[3px] flex items-baseline gap-2">
+            <span className="text-[10px] font-bold uppercase tracking-[0.05em] text-fg-muted">
+              {t('workOrders.workItems.diagnosis')}
+            </span>
+            <span className="flex-1" />
+            {!readOnly && onSaveDiagnosis && !editingDiagnosis && (
+              <button
+                type="button"
+                onClick={() => setEditingDiagnosis(true)}
+                className="shrink-0 text-[11.5px] leading-none !font-semibold text-fg-accent hover:underline"
+              >
+                {diagnosis ? t('common.edit') : `+ ${t('common.add')}`}
+              </button>
+            )}
           </div>
-          {!readOnly && onSaveDiagnosis ? (
-            <EditableField
-              as="textarea"
+          {editingDiagnosis && onSaveDiagnosis ? (
+            <InlineComposer
               value={wi.diagnosis ?? ''}
-              onSave={(next) => onSaveDiagnosis(wi, next)}
               rows={3}
               placeholder={t('workOrders.workItems.diagnosisPlaceholder')}
               ariaLabel={t('workOrders.workItems.diagnosis')}
-              className="block w-full"
-              renderDisplay={(v) => (
-                <span className="block whitespace-pre-wrap text-[12px] leading-normal text-fg">
-                  {v || t('workOrders.workItems.notDiagnosed')}
-                </span>
-              )}
+              onCancel={() => setEditingDiagnosis(false)}
+              onSave={async (next) => {
+                await onSaveDiagnosis(wi, next);
+                setEditingDiagnosis(false);
+              }}
             />
+          ) : !readOnly && onSaveDiagnosis ? (
+            // Font on the wrapper so the <button> inherits it (Preflight
+            // `button { font: inherit }` trap — see the complaint above).
+            <div className="text-[12px] leading-normal text-fg">
+              <button
+                type="button"
+                onClick={() => setEditingDiagnosis(true)}
+                title={t('common.edit')}
+                className="block w-full cursor-text whitespace-pre-wrap text-left"
+              >
+                {diagnosis || t('workOrders.workItems.notDiagnosed')}
+              </button>
+            </div>
           ) : (
             <p className="whitespace-pre-wrap text-[12px] leading-normal text-fg">
               {diagnosis || t('workOrders.workItems.notDiagnosed')}

@@ -239,6 +239,30 @@ export default function WorkOrderDetailPage() {
     deleteWorkItemMutation.mutate({ workItemId: wi.id });
   };
 
+  // Duplicate item (⋯ menu) — clone the complaint, diagnosis, and equipment
+  // link into a fresh item; status resets server-side (Triage).
+  const duplicateWorkItemMutation = useMutation({
+    mutationFn: (wi: WorkItemResponse) =>
+      workOrderApi.createWorkItem(id!, {
+        description: wi.description,
+        diagnosis: wi.diagnosis?.trim() || undefined,
+        equipmentId: wi.equipment?.id ?? undefined,
+        equipmentNeeded: wi.equipmentNeeded,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['work-orders'] });
+      queryClient.invalidateQueries({ queryKey: ['work-orders-list'] });
+      queryClient.invalidateQueries({ queryKey: ['work-order-activity', id] });
+    },
+    onError: (err: unknown) => {
+      const msg =
+        err instanceof Error && 'response' in err
+          ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
+          : undefined;
+      alert(msg || t('common.form.errorCreate', { entity: getName('work_item') }));
+    },
+  });
+
   const deleteWorkOrderMutation = useMutation({
     mutationFn: () => workOrderApi.delete(id!),
     onSuccess: () => {
@@ -946,6 +970,7 @@ export default function WorkOrderDetailPage() {
               enforceWorkflow={workflowConfig?.enforcementMode === 'STRICT'}
               readOnly={frozen}
               onDelete={handleDeleteWorkItem}
+              onDuplicate={(wi) => duplicateWorkItemMutation.mutate(wi)}
               onSaveDescription={handleSaveWorkItemDescription}
               onSaveDiagnosis={handleSaveWorkItemDiagnosis}
               onAttachEquipment={handleAttachEquipmentToWorkItem}
