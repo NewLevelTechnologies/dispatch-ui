@@ -2,8 +2,15 @@ import * as Headless from '@headlessui/react'
 import clsx from 'clsx'
 import React, { forwardRef } from 'react'
 
+// Sizing variants. `md` is the stock Catalyst sizing (responsive). `xs` is the
+// dense variant — ~32px tall, 12.5px text — mirroring the Input `xs` size.
+const sizes = {
+  md: ['py-[calc(--spacing(2.5)-1px)] sm:py-[calc(--spacing(1.5)-1px)]', 'text-base/6 sm:text-sm/6'],
+  xs: ['py-[calc(--spacing(1.5)-1px)]', 'text-[12.5px]/[18px]'],
+}
+
 export const Select = forwardRef(function Select(
-  { className, multiple, ...props }: { className?: string } & Omit<Headless.SelectProps, 'as' | 'className'>,
+  { className, multiple, size, ...props }: { className?: string; size?: keyof typeof sizes } & Omit<Headless.SelectProps, 'as' | 'className' | 'size'>,
   ref: React.ForwardedRef<HTMLSelectElement>
 ) {
   return (
@@ -29,7 +36,8 @@ export const Select = forwardRef(function Select(
         {...props}
         className={clsx([
           // Basic layout
-          'relative block w-full appearance-none rounded-lg py-[calc(--spacing(2.5)-1px)] sm:py-[calc(--spacing(1.5)-1px)]',
+          'relative block w-full appearance-none rounded-lg',
+          sizes[size ?? 'md'][0],
           // Horizontal padding
           multiple
             ? 'px-[calc(--spacing(3.5)-1px)] sm:px-[calc(--spacing(3)-1px)]'
@@ -37,7 +45,8 @@ export const Select = forwardRef(function Select(
           // Options (multi-select)
           '[&_optgroup]:font-semibold',
           // Typography
-          'text-base/6 text-fg-strong placeholder:text-fg-dim sm:text-sm/6',
+          sizes[size ?? 'md'][1],
+          'text-fg-strong placeholder:text-fg-dim',
           // Border
           'border border-border data-hover:border-border-strong',
           // Background color (option list bg uses elevated surface in dark mode)

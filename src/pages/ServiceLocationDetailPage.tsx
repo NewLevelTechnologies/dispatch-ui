@@ -3122,7 +3122,7 @@ function EquipmentRow({
     >
       <td>
         <div className="flex items-center gap-2.5">
-          <EquipmentThumbnail url={e.profileImageUrl} name={e.name} sizeClass="size-8" fit="contain" />
+          <EquipmentThumbnail url={e.profileImageUrl} name={e.name} type={e.equipmentTypeName} monogram sizeClass="size-8" fit="contain" />
           <div className="min-w-0">
             {/* Name is words → proportional; the serial below is an identifier
                 matched character-by-character against a data plate → mono. */}

@@ -3,8 +3,21 @@ import { PhotoIcon } from '@heroicons/react/24/outline';
 interface EquipmentThumbnailProps {
   /** Presigned S3 URL of the profile image; null/undefined falls back to a placeholder. */
   url?: string | null;
-  /** Used as the alt text and the placeholder's aria-label. */
+  /** Used as the alt text and (with `type`) the monogram fallback source. */
   name: string;
+  /**
+   * Equipment type label. When `monogram` is on and there's no photo, it drives
+   * the monogram letters (falling back to `name`) and the tile's hue — so units
+   * of the same type read with the same color across every surface.
+   */
+  type?: string | null;
+  /**
+   * Opt in to a photo-OR-monogram tile (the `EqThumbBox` behavior). With no
+   * photo, renders a type/name-derived monogram on a stable hue instead of the
+   * neutral icon. Opt-in so non-equipment reuse (e.g. file thumbnails) keeps the
+   * plain icon placeholder.
+   */
+  monogram?: boolean;
   /** Tailwind size class (size-8, size-10, size-12). Defaults to size-9 (~36px). */
   sizeClass?: string;
   /**
@@ -19,9 +32,11 @@ interface EquipmentThumbnailProps {
 
 /**
  * Compact equipment image thumbnail used in list/table contexts. Renders the
- * profile image when present, otherwise a neutral placeholder icon. Square
- * aspect, rounded corners, with a subtle ring so it reads as an image even
- * when the placeholder is shown against a similar-toned background.
+ * profile image when present. With `monogram` on, a photo-less unit shows a
+ * type-derived monogram tile (never a blank box); otherwise it falls back to a
+ * neutral placeholder icon. Square aspect, rounded corners, with a subtle ring
+ * so it reads as an image even when the placeholder is shown against a
+ * similar-toned background.
  *
  * Note: the wrapper is intentionally a plain block (not flex) so the inner
  * <img>'s `size-full + object-cover` can fill the box correctly. The
@@ -30,10 +45,46 @@ interface EquipmentThumbnailProps {
 export default function EquipmentThumbnail({
   url,
   name,
+  type,
+  monogram = false,
   sizeClass = 'size-9',
   fit = 'cover',
   className = '',
 }: EquipmentThumbnailProps) {
+  const showMonogram = !url && monogram;
+
+  if (showMonogram) {
+    const seed = (type?.trim() || name?.trim() || '').toString();
+    const hue = hueFromString(seed);
+    return (
+      <div
+        className={[sizeClass, 'shrink-0 overflow-hidden rounded-md', className]
+          .filter(Boolean)
+          .join(' ')}
+        style={{ background: `oklch(58% 0.12 ${hue})` }}
+        role="img"
+        aria-label={name}
+      >
+        {/* SVG text auto-scales with the box, so one component serves every
+            sizeClass (size-5 chips → size-16 heroes) without a per-size font. */}
+        <svg viewBox="0 0 100 100" className="block size-full" aria-hidden="true">
+          <text
+            x="50"
+            y="55"
+            textAnchor="middle"
+            dominantBaseline="middle"
+            fontSize="44"
+            fontWeight="700"
+            fill="#ffffff"
+            style={{ fontFamily: 'var(--font-sans, ui-sans-serif, system-ui, sans-serif)' }}
+          >
+            {monogramText(type, name)}
+          </text>
+        </svg>
+      </div>
+    );
+  }
+
   // When the image is letterboxed (contain), the background and ring become
   // visible chrome around the photo and look like padding. Drop them so the
   // image sits "in space." Cover mode keeps the chrome — img fills the box,
@@ -69,4 +120,26 @@ export default function EquipmentThumbnail({
       )}
     </div>
   );
+}
+
+/**
+ * 1–2 letter monogram from the equipment type (preferred — it groups units of a
+ * kind) or the name. Two words → first initial of each; one word → first two
+ * letters. Never empty: the name fallback guarantees a glyph.
+ */
+function monogramText(type?: string | null, name?: string | null): string {
+  const src = (type?.trim() || name?.trim() || '').toString();
+  if (!src) return '?';
+  const words = src.split(/\s+/);
+  const letters = words.length > 1 ? words[0][0] + words[1][0] : src.slice(0, 2);
+  return letters.toUpperCase();
+}
+
+/** Deterministic hue (0–359) from a string, so a given type/name is always the same color. */
+function hueFromString(s: string): number {
+  let h = 0;
+  for (let i = 0; i < s.length; i += 1) {
+    h = (h * 31 + s.charCodeAt(i)) >>> 0;
+  }
+  return h % 360;
 }

@@ -241,6 +241,8 @@ export default function WorkItemsTable({
                     <EquipmentThumbnail
                       url={wi.equipment.profileImageUrl}
                       name={wi.equipment.name}
+                      type={wi.equipment.equipmentTypeName}
+                      monogram
                       sizeClass="size-8"
                       fit="contain"
                     />
@@ -439,15 +441,25 @@ function EquipmentBlock({
       if (onAddEquipment) onAddEquipment(workItem);
       else if (onEditWorkItem) onEditWorkItem(workItem);
     };
+    // Explicit "none needed" state (equipmentNeeded === false): a calm, dismissed
+    // line rather than the accent attach prompt — some items never attach a unit
+    // (a drain clog, general labor). A compact "Attach" still lets a tech link one
+    // on site. Toggling back to needed is a backend ask (equipmentNeeded isn't on
+    // the work-item PATCH yet), so this is display-only for now.
+    const noneNeeded = workItem.equipmentNeeded === false;
     return (
       <section aria-label={getName('equipment')}>
         <SectionHeader label={getName('equipment')} />
         <div className="mt-1 flex flex-wrap items-center gap-2">
-          <Text className="text-zinc-600 dark:text-zinc-400">
-            {t('workOrders.workItems.noEquipmentLinked', {
-              entity: getName('equipment'),
-            })}
-          </Text>
+          {noneNeeded ? (
+            <Text className="text-fg-dim">{t('workOrders.workItems.noEquipmentNeeded')}</Text>
+          ) : (
+            <Text className="text-zinc-600 dark:text-zinc-400">
+              {t('workOrders.workItems.noEquipmentLinked', {
+                entity: getName('equipment'),
+              })}
+            </Text>
+          )}
           {canAdd && (
             <button
               type="button"
@@ -455,7 +467,9 @@ function EquipmentBlock({
               className="inline-flex items-center gap-1 text-blue-600 hover:underline dark:text-blue-400"
             >
               <PlusIcon className="size-4" />
-              {t('common.actions.add', { entity: getName('equipment') })}
+              {noneNeeded
+                ? t('workOrders.workItems.attach')
+                : t('common.actions.add', { entity: getName('equipment') })}
             </button>
           )}
         </div>
@@ -544,6 +558,8 @@ function EquipmentBlockBody({
     <EquipmentThumbnail
       url={equipment.profileImageUrl}
       name={equipment.name}
+      type={equipment.equipmentTypeName}
+      monogram
       sizeClass="size-12"
       fit="contain"
     />
@@ -583,7 +599,21 @@ function EquipmentBlockBody({
           stacking a labeled PHOTOS section below — saves vertical and
           reads as "here's the unit, and here are more views of it." */}
       <div className="mt-1 flex items-start gap-3">
-        {heroClickable ? (
+        {/* The thumbnail peeks the equipment RECORD in the quickview drawer —
+            the same drawer sub-unit chips open (mock: thumb is a click target).
+            The name stays inline-editable; "Open page" escalates to the full
+            screen; the photo strip still opens the lightbox. Falls back to the
+            lightbox when the drawer isn't wired (e.g. the legacy table). */}
+        {onSelectSubUnit ? (
+          <button
+            type="button"
+            onClick={() => onSelectSubUnit({ id: equipment.id, name: equipment.name })}
+            aria-label={t('workOrders.workItems.openRecord')}
+            className="rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+          >
+            {heroThumbnail}
+          </button>
+        ) : heroClickable ? (
           <button
             type="button"
             onClick={() => setLightboxIndex(0)}
@@ -823,6 +853,7 @@ function SubUnitsRow({
             <EquipmentThumbnail
               url={d.profileImageUrl}
               name={d.name}
+              monogram
               sizeClass="size-5"
               fit="cover"
             />
@@ -838,6 +869,7 @@ function SubUnitsRow({
             <EquipmentThumbnail
               url={d.profileImageUrl}
               name={d.name}
+              monogram
               sizeClass="size-5"
               fit="cover"
             />

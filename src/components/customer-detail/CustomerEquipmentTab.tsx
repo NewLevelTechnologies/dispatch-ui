@@ -214,7 +214,7 @@ export default function CustomerEquipmentTab({
                           to={`/equipment/${item.id}`}
                           className="flex items-center gap-2 text-fg-strong hover:text-fg-accent hover:underline"
                         >
-                          <EquipmentThumbnail url={item.profileImageUrl} name={item.name} sizeClass="size-9" fit="contain" />
+                          <EquipmentThumbnail url={item.profileImageUrl} name={item.name} type={item.equipmentTypeName} monogram sizeClass="size-9" fit="contain" />
                           <span className="font-medium">{item.name}</span>
                         </Link>
                       </td>

@@ -6,16 +6,15 @@ import apiClient from '../api/client';
 import type { WorkItemEquipmentSummary, WorkItemResponse } from '../api';
 
 const mockImagesList = vi.fn();
-const mockFiltersGetAll = vi.fn();
 
-// EquipmentBlock (reused inside each card's expanded body) lazy-fetches images
-// + filters for attached equipment; stub them so attached cards render.
+// WorkItemEquipmentBlock lazy-fetches the equipment image list for the media
+// row; stub it so attached cards render. (Prior-visit count comes from the
+// work-orders list via the mocked api client below.)
 vi.mock('../api/equipmentApi', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../api/equipmentApi')>();
   return {
     ...actual,
     equipmentImagesApi: { ...actual.equipmentImagesApi, list: (...a: unknown[]) => mockImagesList(...a) },
-    equipmentFiltersApi: { ...actual.equipmentFiltersApi, getAll: (...a: unknown[]) => mockFiltersGetAll(...a) },
   };
 });
 
@@ -58,7 +57,8 @@ describe('WorkItemsTab', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockImagesList.mockResolvedValue([]);
-    mockFiltersGetAll.mockResolvedValue([]);
+    // Prior-visit count query (work-orders list) resolves empty by default.
+    vi.mocked(apiClient.get).mockResolvedValue({ data: { content: [], totalElements: 0 } } as never);
   });
 
   it('shows the empty state when there are no work items', () => {
@@ -98,7 +98,7 @@ describe('WorkItemsTab', () => {
       <WorkItemsTab {...baseProps} workItems={[wi('wi-1', 'No cooling', { equipmentId: 'eq-1', equipment: equip() })]} />
     );
     await waitFor(() => {
-      expect(screen.getByText('Upstairs Furnace')).toBeInTheDocument();
+      expect(screen.getByText('Carrier 58TN0A080')).toBeInTheDocument();
     });
   });
 

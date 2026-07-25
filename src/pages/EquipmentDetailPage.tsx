@@ -671,6 +671,8 @@ export default function EquipmentDetailPage() {
                   <EquipmentThumbnail
                     url={equipment.profileImageUrl}
                     name={t('equipment.detail.profileImageAlt', { name: equipment.name })}
+                    type={equipment.equipmentTypeName}
+                    monogram
                     sizeClass="size-[52px]"
                     fit="contain"
                   />
@@ -765,6 +767,8 @@ export default function EquipmentDetailPage() {
                 <EquipmentThumbnail
                   url={equipment.profileImageUrl}
                   name={t('equipment.detail.profileImageAlt', { name: equipment.name })}
+                  type={equipment.equipmentTypeName}
+                  monogram
                   sizeClass="size-[52px]"
                   fit="contain"
                 />
@@ -1669,7 +1673,7 @@ function UnitRow({ unit }: { unit: EquipmentSummary }) {
   return (
     <li>
       <RouterLink to={`/equipment/${unit.id}`} className="flex items-center gap-2.5 px-3.5 py-2 hover:bg-bg-elev-2">
-        <EquipmentThumbnail url={unit.profileImageUrl} name={unit.name} sizeClass="size-8" fit="contain" />
+        <EquipmentThumbnail url={unit.profileImageUrl} name={unit.name} type={unit.equipmentTypeName} monogram sizeClass="size-8" fit="contain" />
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5">
             <span className="truncate text-[12.5px] font-medium text-fg-strong">{unit.name}</span>

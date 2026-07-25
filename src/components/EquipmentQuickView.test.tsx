@@ -69,6 +69,7 @@ describe('EquipmentQuickView', () => {
     await waitFor(() =>
       expect(screen.getByText('Outdoor HVAC unit')).toBeInTheDocument()
     );
+    // Subtitle reads type · category (app convention: broad grouping first).
     expect(screen.getByText(/HVAC · Air Handler/)).toBeInTheDocument();
     expect(screen.getByText(/^Active$/i)).toBeInTheDocument();
   });
@@ -92,21 +93,23 @@ describe('EquipmentQuickView', () => {
     expect(screen.getByText('Roof')).toBeInTheDocument();
   });
 
-  it('inline-edits the make field via equipmentApi.update', async () => {
+  it('edits the make field and persists via equipmentApi.update on Save', async () => {
     const user = userEvent.setup();
     renderWithProviders(
       <EquipmentQuickView equipmentId="eq-1" onSelectSubUnit={vi.fn()} />
     );
     await waitFor(() => expect(screen.getByText('Goodman')).toBeInTheDocument());
 
-    await user.click(screen.getByRole('button', { name: /^make$/i }));
+    // Identification becomes an edit form after entering Edit mode (mock §5);
+    // changes persist on Save.
+    await user.click(screen.getByRole('button', { name: /^edit$/i }));
     const input = await screen.findByRole('textbox', { name: /^make$/i });
     await user.clear(input);
     await user.type(input, 'Trane');
-    input.blur();
+    await user.click(screen.getByRole('button', { name: /^save$/i }));
 
     await waitFor(() => {
-      expect(mockUpdate).toHaveBeenCalledWith('eq-1', { make: 'Trane' });
+      expect(mockUpdate).toHaveBeenCalledWith('eq-1', expect.objectContaining({ make: 'Trane' }));
     });
   });
 

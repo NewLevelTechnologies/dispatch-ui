@@ -126,6 +126,7 @@ describe('WorkOrderOverview', () => {
         dispatches={[liveDispatch]}
         onOpenTab={vi.fn()}
         onAddWorkItem={vi.fn()}
+        onOpenWorkItem={vi.fn()}
         onOpenFinancial={vi.fn()}
         onSelectDispatch={vi.fn()}
         onScheduleDispatch={vi.fn()}
@@ -218,18 +219,19 @@ describe('WorkOrderOverview', () => {
     const onOpenTab = vi.fn();
     const onOpenFinancial = vi.fn();
     const onAddWorkItem = vi.fn();
+    const onOpenWorkItem = vi.fn();
     const user = userEvent.setup();
-    render({ onOpenTab, onOpenFinancial, onAddWorkItem });
+    render({ onOpenTab, onOpenFinancial, onAddWorkItem, onOpenWorkItem });
 
     // The money attention row's action label is "View {invoice-plural}".
     await user.click(screen.getByRole('button', { name: /view invoices/i }));
     expect(onOpenFinancial).toHaveBeenCalledWith('invoices');
 
-    // Peek "+ Work item" → onAddWorkItem; a peek row → items tab.
+    // Peek "+ Work item" → onAddWorkItem; a peek row → deep-links that item.
     await user.click(screen.getByRole('button', { name: /\+ work item/i }));
     expect(onAddWorkItem).toHaveBeenCalled();
     await user.click(screen.getByText('Thermostat unresponsive').closest('button')!);
-    expect(onOpenTab).toHaveBeenCalledWith('items');
+    expect(onOpenWorkItem).toHaveBeenCalledWith('wi-2');
 
     // The Quoted rollup (quoted > 0) routes to the quotes tab.
     await user.click(screen.getByText('$742.67').closest('button')!);

@@ -94,15 +94,15 @@ export default function EquipmentQuickViewDrawer({
               </span>
             </>
           ) : (
-            <XMarkIcon className="size-5" />
+            <XMarkIcon className="size-[15px]" />
           )}
         </button>
         {top && (
           <RouterLink
             to={`/equipment/${top.id}`}
-            className="ml-2 inline-flex items-center gap-1 rounded-md p-1 text-sm text-zinc-700 hover:bg-zinc-100 hover:text-blue-600 dark:text-zinc-300 dark:hover:bg-zinc-800 dark:hover:text-blue-400"
+            className="ml-2 inline-flex items-center gap-1 rounded-md p-1 text-[12px] leading-none font-semibold text-fg-accent hover:underline"
           >
-            <ArrowTopRightOnSquareIcon className="size-4" />
+            <ArrowTopRightOnSquareIcon className="size-[12px]" />
             {t('workOrders.workItems.openPage')}
           </RouterLink>
         )}
