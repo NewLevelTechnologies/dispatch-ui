@@ -149,10 +149,65 @@ describe('WorkItemsTab', () => {
       <WorkItemsTab {...baseProps} workItems={[wi('wi-1', 'No cooling')]} onDelete={onDelete} />
     );
     await user.click(screen.getByRole('button', { name: /more options/i }));
-    // Editing is inline, so the row menu no longer offers an Edit action.
+    // With only onDelete wired, the menu is Delete-only (Edit description /
+    // Duplicate appear only when their handlers are provided).
     expect(screen.queryByRole('menuitem', { name: /edit/i })).not.toBeInTheDocument();
     await user.click(await screen.findByRole('menuitem', { name: /delete/i }));
     expect(onDelete).toHaveBeenCalled();
+  });
+
+  it('edits the complaint inline (click the text → composer → Save)', async () => {
+    const onSaveDescription = vi.fn().mockResolvedValue(undefined);
+    const user = userEvent.setup();
+    renderWithProviders(
+      <WorkItemsTab {...baseProps} workItems={[wi('wi-1', 'No cooling')]} onSaveDescription={onSaveDescription} />
+    );
+    await user.click(screen.getByRole('button', { name: /no cooling/i }));
+    const textarea = screen.getByRole('textbox');
+    await user.clear(textarea);
+    await user.type(textarea, 'No heat upstairs');
+    await user.click(screen.getByRole('button', { name: /^save$/i }));
+    await waitFor(() =>
+      expect(onSaveDescription).toHaveBeenCalledWith(expect.objectContaining({ id: 'wi-1' }), 'No heat upstairs')
+    );
+  });
+
+  it('edits the diagnosis inline via the Edit affordance', async () => {
+    const onSaveDiagnosis = vi.fn().mockResolvedValue(undefined);
+    const user = userEvent.setup();
+    renderWithProviders(
+      <WorkItemsTab
+        {...baseProps}
+        workItems={[wi('wi-1', 'No cooling', { diagnosis: 'Cap failed' })]}
+        onSaveDiagnosis={onSaveDiagnosis}
+      />
+    );
+    await user.click(screen.getByRole('button', { name: /^edit$/i }));
+    const textarea = screen.getByRole('textbox');
+    await user.clear(textarea);
+    await user.type(textarea, 'Compressor seized');
+    await user.click(screen.getByRole('button', { name: /^save$/i }));
+    await waitFor(() =>
+      expect(onSaveDiagnosis).toHaveBeenCalledWith(expect.objectContaining({ id: 'wi-1' }), 'Compressor seized')
+    );
+  });
+
+  it('offers Edit description + Duplicate + Delete in the row menu', async () => {
+    const onDuplicate = vi.fn();
+    const onSaveDescription = vi.fn().mockResolvedValue(undefined);
+    const user = userEvent.setup();
+    renderWithProviders(
+      <WorkItemsTab
+        {...baseProps}
+        workItems={[wi('wi-1', 'No cooling')]}
+        onDelete={vi.fn()}
+        onDuplicate={onDuplicate}
+        onSaveDescription={onSaveDescription}
+      />
+    );
+    await user.click(screen.getByRole('button', { name: /more options/i }));
+    await user.click(await screen.findByRole('menuitem', { name: /duplicate/i }));
+    expect(onDuplicate).toHaveBeenCalledWith(expect.objectContaining({ id: 'wi-1' }));
   });
 
   it('shows the inline attach picker and attaches on pick for a needs-attach item', async () => {

@@ -2629,6 +2629,7 @@
       "descriptionRequired": "Description is required",
       "diagnosis": "Diagnosis",
       "diagnosisPlaceholder": "The tech's on-site assessment — cause, findings, and fix.",
+      "duplicate": "Duplicate {{entity, lowercase}}",
       "editAll": "Edit all",
       "editDescription": "Edit description",
       "editItem": "Edit item",
