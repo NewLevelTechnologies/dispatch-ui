@@ -1810,6 +1810,8 @@ vi.mock('react-i18next', () => {
     'workOrders.workItems.backToEntity': 'Back to {{entity}}',
     'workOrders.workItems.collapseRow': 'Hide details',
     'workOrders.workItems.deleteConfirm': 'Delete this {{entity, lowercase}}? This cannot be undone.',
+    'workOrders.workItems.deleteMessage': "This can't be undone.",
+    'workOrders.workItems.deleteTitle': 'Delete {{entity, lowercase}}?',
     'workOrders.workItems.diagnosis': 'Diagnosis',
     'workOrders.workItems.diagnosisPlaceholder': "The tech's on-site assessment — cause, findings, and fix.",
     'workOrders.workItems.duplicate': 'Duplicate {{entity, lowercase}}',
