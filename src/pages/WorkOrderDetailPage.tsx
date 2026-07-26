@@ -30,6 +30,7 @@ import ActivityButton from '../components/ActivityButton';
 import ActivityDrawer from '../components/ActivityDrawer';
 import ActivityStream from '../components/ActivityStream';
 import AppLayout from '../components/AppLayout';
+import ConfirmDialog from '../components/ConfirmDialog';
 import DispatchFormDrawer from '../components/DispatchFormDrawer';
 import DispatchDetailDrawer from '../components/DispatchDetailDrawer';
 import DispatchesTab from '../components/DispatchesTab';
@@ -167,6 +168,8 @@ export default function WorkOrderDetailPage() {
   // tracked here is the one we'll link the new equipment to once it's
   // created (via EquipmentFormDialog's onCreated callback).
   const [addEquipmentForWorkItem, setAddEquipmentForWorkItem] = useState<WorkItemResponse | null>(null);
+  // Work-item delete goes through the app ConfirmDialog (not window.confirm).
+  const [workItemToDelete, setWorkItemToDelete] = useState<WorkItemResponse | null>(null);
   // Sub-unit chip click opens the equipment quickview drawer in-context.
   // Drawer manages its own stack of pushed sub-units internally; this state
   // is just the seed (the equipment whose chip was clicked).
@@ -224,6 +227,7 @@ export default function WorkOrderDetailPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['work-orders'] });
       queryClient.invalidateQueries({ queryKey: ['work-order-activity', id] });
+      setWorkItemToDelete(null);
     },
     onError: (err: unknown) => {
       const msg =
@@ -234,10 +238,8 @@ export default function WorkOrderDetailPage() {
     },
   });
 
-  const handleDeleteWorkItem = (wi: WorkItemResponse) => {
-    if (!window.confirm(t('workOrders.workItems.deleteConfirm', { entity: getName('work_item') }))) return;
-    deleteWorkItemMutation.mutate({ workItemId: wi.id });
-  };
+  // The card's ⋯ → Delete opens the ConfirmDialog; onConfirm fires the mutation.
+  const handleDeleteWorkItem = (wi: WorkItemResponse) => setWorkItemToDelete(wi);
 
   // Duplicate item (⋯ menu) — clone the complaint, diagnosis, and equipment
   // link into a fresh item; status resets server-side (Triage).
@@ -1133,6 +1135,19 @@ export default function WorkOrderDetailPage() {
       {/* Equipment quickview drawer — slides in from the right when a
           sub-unit chip is clicked. Manages its own internal stack for
           drawer-over-drawer recursion. */}
+      <ConfirmDialog
+        isOpen={!!workItemToDelete}
+        onClose={() => setWorkItemToDelete(null)}
+        onConfirm={() =>
+          workItemToDelete && deleteWorkItemMutation.mutate({ workItemId: workItemToDelete.id })
+        }
+        title={t('workOrders.workItems.deleteTitle', { entity: getName('work_item') })}
+        message={t('workOrders.workItems.deleteMessage')}
+        confirmLabel={t('common.delete')}
+        isDestructive
+        isPending={deleteWorkItemMutation.isPending}
+      />
+
       <EquipmentQuickViewDrawer
         initialEquipment={drawerEquipment}
         onClose={() => setDrawerEquipment(null)}

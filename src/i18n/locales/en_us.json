@@ -2626,6 +2626,8 @@
       "complaintPlaceholder": "What's the customer reporting?",
       "complaintSummary": "Complaint / summary",
       "deleteConfirm": "Delete this {{entity, lowercase}}? This cannot be undone.",
+      "deleteMessage": "This can't be undone.",
+      "deleteTitle": "Delete {{entity, lowercase}}?",
       "descriptionRequired": "Description is required",
       "diagnosis": "Diagnosis",
       "diagnosisPlaceholder": "The tech's on-site assessment — cause, findings, and fix.",
