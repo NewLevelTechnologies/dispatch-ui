@@ -173,15 +173,26 @@ describe('EquipmentQuickView', () => {
     expect(onSelectSubUnit).toHaveBeenCalledWith({ id: 'sub-1', name: 'Compressor' });
   });
 
-  it('does not render an "+ Add unit" affordance — adding from the drawer would create depth-2 records', async () => {
+  it('renders an always-on Units section with "+ Add unit" for a top-level system', async () => {
+    // The work-item card hides its units row at zero, so the drawer is the
+    // guaranteed home for adding the first unit on a parent system.
+    mockGetById.mockResolvedValue({ ...baseEquipment, descendants: [], descendantCount: 0 });
+    renderWithProviders(<EquipmentQuickView equipmentId="eq-1" onSelectSubUnit={vi.fn()} />);
+    await waitFor(() =>
+      expect(screen.getByText(/no units on this system/i)).toBeInTheDocument()
+    );
+    expect(screen.getByRole('button', { name: /add unit/i })).toBeInTheDocument();
+  });
+
+  it('hides "+ Add unit" when viewing a sub-unit — adding there would create a depth-2 record', async () => {
     mockGetById.mockResolvedValue({
       ...baseEquipment,
+      parentId: 'parent-1',
+      parentName: 'Rooftop system',
       descendants: [{ id: 'sub-1', name: 'Compressor', profileImageUrl: null }],
       descendantCount: 1,
     });
-    renderWithProviders(
-      <EquipmentQuickView equipmentId="eq-1" onSelectSubUnit={vi.fn()} />
-    );
+    renderWithProviders(<EquipmentQuickView equipmentId="eq-1" onSelectSubUnit={vi.fn()} />);
     await waitFor(() =>
       expect(screen.getByRole('button', { name: /compressor/i })).toBeInTheDocument()
     );

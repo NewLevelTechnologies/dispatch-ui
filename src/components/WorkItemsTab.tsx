@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import {
@@ -15,9 +15,12 @@ import WOEquipmentPicker from './WOEquipmentPicker';
 import InlineComposer from './InlineComposer';
 import WorkItemStatusPill from './WorkItemStatusPill';
 import WorkItemEquipmentBlock from './WorkItemEquipmentBlock';
+import EquipmentThumbnail from './EquipmentThumbnail';
 import { workItemLabel } from '../utils/workItemLabel';
+import { progressRailColor } from '../lib/workItemProgress';
 import { Button } from './catalyst/button';
 import { Input } from './catalyst/input';
+import { Select } from './catalyst/select';
 import { Text } from './catalyst/text';
 import {
   Dropdown,
@@ -26,17 +29,32 @@ import {
   DropdownLabel,
   DropdownMenu,
 } from './catalyst/dropdown';
-import { PlusIcon, EllipsisHorizontalIcon, TruckIcon } from '@heroicons/react/24/outline';
+import {
+  PlusIcon,
+  EllipsisHorizontalIcon,
+  TruckIcon,
+  ChevronRightIcon,
+} from '@heroicons/react/24/outline';
 
-// Status-category → left-rail accent. Mirrors the overview peek grammar.
-const RAIL: Record<ProgressCategory, string> = {
-  NOT_STARTED: 'var(--info-500)',
-  AWAITING_SCHEDULE: 'var(--info-500)',
-  IN_PROGRESS: 'var(--violet-500)',
-  BLOCKED: 'var(--warning-500)',
-  COMPLETED: 'var(--success-500)',
-  CANCELLED: 'var(--fg-dim)',
+// Sort options for the tab header (mock WI_SORTS). Default is "Needs attention".
+type WiSort = 'attention' | 'dispatch' | 'reported' | 'newest';
+const WI_SORTS: WiSort[] = ['attention', 'dispatch', 'reported', 'newest'];
+
+// "Needs attention" rank over status categories: blocked work needs a human
+// first; finished work sorts last. Mirrors the mock's Awaiting-parts 0 →
+// Triage 1 → Repairing 2 → Done 3 ordering, mapped onto ProgressCategory.
+const ATTENTION_RANK: Record<ProgressCategory, number> = {
+  BLOCKED: 0,
+  NOT_STARTED: 1,
+  AWAITING_SCHEDULE: 1,
+  IN_PROGRESS: 2,
+  COMPLETED: 3,
+  CANCELLED: 3,
 };
+
+// Resolved items are closed work: they collapse by default and don't count as
+// "open" in the header tally.
+const isResolved = (c: ProgressCategory) => c === 'COMPLETED' || c === 'CANCELLED';
 
 // Props mirror WorkItemsTable so the page swap is drop-in. All editing is
 // inline (mock): `onAdd` → the inline composer; complaint/diagnosis →
@@ -99,6 +117,7 @@ export default function WorkItemsTab({
   const { t } = useTranslation();
   const { getName } = useGlossary();
   const [composing, setComposing] = useState(false);
+  const [sort, setSort] = useState<WiSort>('attention');
   const containerRef = useRef<HTMLDivElement>(null);
   // Deep-link flash: captured once at mount from the ?item= target. Rendered as
   // a transient background wash on the card and cleared on a timer (see below).
@@ -131,30 +150,83 @@ export default function WorkItemsTab({
   // real one on create; max existing + 1, matching the mock's head).
   const nextSequence = workItems.reduce((max, w) => Math.max(max, w.sequence ?? 0), 0) + 1;
 
+  const openCount = workItems.filter((w) => !isResolved(w.statusCategory)).length;
+
+  // Client-side ordering (mock WorkItemsTab). Never mutate the prop array; the
+  // native sort is stable, so ties keep the server order (sequence ascending).
+  const ordered = useMemo(() => {
+    const xs = workItems.slice();
+    if (sort === 'attention') {
+      xs.sort((a, b) => ATTENTION_RANK[a.statusCategory] - ATTENTION_RANK[b.statusCategory]);
+    } else if (sort === 'dispatch') {
+      // Lowest trip number addressing the item; unscheduled sorts last (99).
+      const firstTrip = (w: WorkItemResponse) => {
+        const trips = tripsByWorkItem?.get(w.id);
+        return trips && trips.length ? Math.min(...trips) : 99;
+      };
+      xs.sort((a, b) => firstTrip(a) - firstTrip(b));
+    } else if (sort === 'reported') {
+      xs.sort((a, b) => (a.sequence ?? Infinity) - (b.sequence ?? Infinity));
+    } else if (sort === 'newest') {
+      xs.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    }
+    return xs;
+  }, [workItems, sort, tripsByWorkItem]);
+
   return (
     <div ref={containerRef} className="flex flex-col gap-3">
-      {!readOnly &&
-        (composing ? (
-          <NewWorkItemComposer
-            workOrderId={workOrderId}
-            serviceLocationId={serviceLocationId}
-            nextSequence={nextSequence}
-            onClose={() => setComposing(false)}
-          />
-        ) : (
+      {/* Tab header — Add (hidden while composing) + open/total tally on the
+          left; the sort control on the right. Counts + sort appear only once
+          there's something to count and order. */}
+      <div className="flex flex-wrap items-center gap-2">
+        {!readOnly && !composing && (
           <Button
             outline
             // outline is transparent in light mode → it washes into the page
             // grey. The mock's .btn sits on --bg-elev (the card fill). Inline so
             // it wins the resting + hover state in both themes.
-            className="self-start shadow-sm"
+            className="shadow-sm"
             style={{ backgroundColor: 'var(--bg-elev)' }}
             onClick={() => setComposing(true)}
           >
             <PlusIcon data-slot="icon" />
             {`${t('common.add')} ${getName('work_item').toLowerCase()}`}
           </Button>
-        ))}
+        )}
+        {workItems.length > 0 && (
+          <>
+            <span className="text-[11.5px] text-fg-muted">
+              {t('workOrders.workItems.openTotalCount', { open: openCount, total: workItems.length })}
+            </span>
+            <span className="flex-1" />
+            <label className="flex items-center gap-2">
+              <span className="text-[10px] font-bold uppercase tracking-[0.05em] text-fg-muted">
+                {t('workOrders.workItems.sortLabel')}
+              </span>
+              <span className="w-44">
+                <Select size="xs" value={sort} onChange={(e) => setSort(e.target.value as WiSort)}>
+                  {WI_SORTS.map((s) => (
+                    <option key={s} value={s}>
+                      {s === 'dispatch'
+                        ? t('workOrders.workItems.sortByEntity', { entity: getName('dispatch') })
+                        : t(`workOrders.workItems.sort${s.charAt(0).toUpperCase()}${s.slice(1)}`)}
+                    </option>
+                  ))}
+                </Select>
+              </span>
+            </label>
+          </>
+        )}
+      </div>
+
+      {!readOnly && composing && (
+        <NewWorkItemComposer
+          workOrderId={workOrderId}
+          serviceLocationId={serviceLocationId}
+          nextSequence={nextSequence}
+          onClose={() => setComposing(false)}
+        />
+      )}
 
       {workItems.length === 0 && !composing ? (
         <div className="rounded-lg border border-dashed border-border p-6 text-center">
@@ -166,7 +238,7 @@ export default function WorkItemsTab({
           </Text>
         </div>
       ) : (
-        workItems.map((wi) => (
+        ordered.map((wi) => (
           <WorkItemCard
             key={wi.id}
             workOrderId={workOrderId}
@@ -238,6 +310,12 @@ function WorkItemCard({
   const showActions = !readOnly && !!(onDelete || onDuplicate || onSaveDescription);
   const diagnosis = wi.diagnosis?.trim();
   const wiId = wi.sequence != null ? workItemLabel(getAbbrev('work_item'), wi.sequence) : null;
+  // Collapsible with a state-driven default: work that needs a human opens
+  // expanded; resolved (done/cancelled) work collapses so a long job stays
+  // scannable. A deep-linked item always opens. Captured once — clearing the
+  // flash later must not re-collapse it.
+  const bodyId = `wi-${wi.id}-body`;
+  const [open, setOpen] = useState(highlighted || !isResolved(wi.statusCategory));
   // Section-scoped inline editing (mock): complaint + diagnosis each flip to an
   // InlineComposer in place — no modal, no monolithic "edit mode".
   const [editingComplaint, setEditingComplaint] = useState(false);
@@ -256,7 +334,7 @@ function WorkItemCard({
       data-work-item-id={wi.id}
       className="overflow-hidden rounded-lg border border-border bg-bg-elev transition-colors duration-[400ms] ease-out"
       style={{
-        borderLeft: `3px solid ${RAIL[wi.statusCategory]}`,
+        borderLeft: `3px solid ${progressRailColor(wi.statusCategory)}`,
         // Deep-link orientation flash (see the highlight effect): a transient
         // accent WASH that fades in then self-clears — not a border, so the
         // status rail (borderLeft) survives. Mixed over --bg-elev (not
@@ -267,11 +345,38 @@ function WorkItemCard({
           : undefined,
       }}
     >
-      {/* Head — complaint (+ WI-id) · trips + status + kebab. While editing the
-          complaint the composer spans the full card and the right cluster hides
-          (mock: card-title flex 1 1 100%). */}
-      <div className="flex items-center gap-3 border-b border-border-soft px-3.5 py-2.5">
-        <div className={`flex min-w-0 items-baseline gap-2 ${editingComplaint ? 'w-full' : 'flex-1'}`}>
+      {/* Head — chevron + complaint (+ WI-id) · trips + status + kebab. Clicking
+          empty header space toggles the card; the chevron is the accessible
+          affordance (aria-expanded). The guard ignores clicks that land on a
+          control (chevron/complaint/status/kebab) or the inline composer, so
+          those keep their own behavior. While editing the complaint the composer
+          spans the full card and the chevron + right cluster hide. */}
+      <div
+        className="flex items-start gap-3 border-b border-border-soft px-3.5 py-2.5"
+        onClick={(e) => {
+          if (editingComplaint) return;
+          const el = e.target as HTMLElement;
+          if (el.closest('button') || el.closest('input') || el.closest('textarea')) return;
+          setOpen((o) => !o);
+        }}
+      >
+        {!editingComplaint && (
+          <button
+            type="button"
+            onClick={() => setOpen((o) => !o)}
+            aria-expanded={open}
+            aria-controls={bodyId}
+            aria-label={
+              open ? t('workOrders.workItems.collapseRow') : t('workOrders.workItems.expandRow')
+            }
+            className="-ml-1 inline-flex size-5 shrink-0 items-center justify-center rounded text-fg-muted transition-colors hover:text-fg-strong"
+          >
+            <ChevronRightIcon
+              className={'size-4 transition-transform duration-150' + (open ? ' rotate-90' : '')}
+            />
+          </button>
+        )}
+        <div className={`flex min-w-0 items-start gap-2 ${editingComplaint ? 'w-full' : 'flex-1'}`}>
           {editingComplaint && onSaveDescription ? (
             <InlineComposer
               value={wi.description}
@@ -290,7 +395,7 @@ function WorkItemCard({
                   font stays on the wrapper so the inner <button> inherits it —
                   Preflight's `button { font: inherit }` would otherwise flow the
                   body weight (400) onto a directly-styled button. */}
-              <div className="min-w-0 flex-1 text-[13px] font-semibold text-fg-strong">
+              <div className="min-w-0 flex-1 text-[13px]/5 font-semibold text-fg-strong">
                 {onSaveDescription && !readOnly ? (
                   <button
                     type="button"
@@ -305,7 +410,7 @@ function WorkItemCard({
                 )}
               </div>
               {wiId && (
-                <span className="shrink-0 whitespace-nowrap font-mono text-[10.5px] font-semibold text-fg-dim">
+                <span className="shrink-0 whitespace-nowrap font-mono text-[10.5px]/5 font-semibold text-fg-dim">
                   {wiId}
                 </span>
               )}
@@ -336,7 +441,7 @@ function WorkItemCard({
             />
             {showActions && (
               <Dropdown>
-                <DropdownButton plain className="size-6 justify-center p-0" aria-label={t('common.moreOptions')}>
+                <DropdownButton plain className="size-5 justify-center p-0" aria-label={t('common.moreOptions')}>
                   <EllipsisHorizontalIcon className="size-3.5" />
                 </DropdownButton>
                 <DropdownMenu anchor="bottom end">
@@ -364,8 +469,46 @@ function WorkItemCard({
         )}
       </div>
 
+      {/* Collapsed — a one-line summary stands in for the body: the equipment
+          anchor (thumb + name · make/model) so the row stays identifiable, and
+          the parts readiness at a glance. The status rail (border-left) still
+          reads. */}
+      {!open && !editingComplaint && (
+        <div className="flex flex-wrap items-center gap-2 px-3.5 pb-2.5 pt-2">
+          {wi.equipment ? (
+            <>
+              <EquipmentThumbnail
+                url={wi.equipment.profileImageUrl}
+                name={wi.equipment.name}
+                category={wi.equipment.equipmentCategoryName}
+                type={wi.equipment.equipmentTypeName}
+                monogram
+                sizeClass="size-5"
+                fit="contain"
+              />
+              <span className="min-w-0 truncate text-[11.5px] text-fg-muted">
+                {[wi.equipment.name, [wi.equipment.make, wi.equipment.model].filter(Boolean).join(' ')]
+                  .filter(Boolean)
+                  .join(' · ')}
+              </span>
+            </>
+          ) : (
+            <span className="text-[11.5px] text-fg-dim">
+              {noneNeeded
+                ? t('workOrders.workItems.noEquipmentNeeded')
+                : t('workOrders.workItems.noEquipmentAttached', { entity: getName('equipment') })}
+            </span>
+          )}
+          <span className="flex-1" />
+          {/* Parts are backend-deferred, so the summary reads "No parts yet"
+              until the procurement log lands. */}
+          <span className="text-[11.5px] text-fg-muted">{t('workOrders.workItems.noPartsShort')}</span>
+        </div>
+      )}
+
       {/* Body — equipment (3 states) → diagnosis → parts & readiness. */}
-      <div className="space-y-3 px-3.5 py-3">
+      {open && (
+      <div id={bodyId} className="space-y-3 px-3.5 py-3">
         {attached && !picking ? (
           <WorkItemEquipmentBlock
             equipment={wi.equipment!}
@@ -407,7 +550,7 @@ function WorkItemCard({
                   void onSetEquipmentNeeded?.(wi, true);
                   setPicking(true);
                 }}
-                className="inline-flex items-center gap-1 text-[11.5px] leading-none !font-semibold text-fg-accent hover:underline"
+                className="card-action"
               >
                 <PlusIcon className="size-3" />
                 {t('workOrders.workItems.attach')}
@@ -420,73 +563,98 @@ function WorkItemCard({
           </span>
         )}
 
-        {/* Diagnosis — tinted panel (mock §5). Section-scoped inline edit: the
-            label row carries an accent Edit / + Add; clicking the body (or that
-            affordance) flips it to an InlineComposer in place. */}
-        <div
-          className="px-[11px] py-[9px]"
-          style={{
-            background: 'var(--bg-elev-2)',
-            borderRadius: 'var(--r-sm)',
-            borderLeft: '2px solid var(--border-strong)',
-          }}
-        >
-          <div className="mb-[3px] flex items-baseline gap-2">
-            <span className="text-[10px] font-bold uppercase tracking-[0.05em] text-fg-muted">
-              {t('workOrders.workItems.diagnosis')}
-            </span>
-            <span className="flex-1" />
-            {!readOnly && onSaveDiagnosis && !editingDiagnosis && (
-              <button
-                type="button"
-                onClick={() => setEditingDiagnosis(true)}
-                className="shrink-0 text-[11.5px] leading-none !font-semibold text-fg-accent hover:underline"
-              >
-                {diagnosis ? t('common.edit') : `+ ${t('common.add')}`}
-              </button>
+        {/* Diagnosis — tinted panel ONLY once there's a finding (or while
+            editing). Empty state is a single quiet "+ Add diagnosis" invite: the
+            old placeholder sentence just restated the status pill and made a
+            fresh triage item look as heavy as a worked one. Card height should
+            track real content. */}
+        {diagnosis || editingDiagnosis ? (
+          <div
+            className="px-[11px] py-[9px]"
+            style={{
+              background: 'var(--bg-elev-2)',
+              borderRadius: 'var(--r-sm)',
+              borderLeft: '2px solid var(--border-strong)',
+            }}
+          >
+            <div className="mb-[3px] flex items-baseline gap-2">
+              <span className="text-[10px] font-bold uppercase tracking-[0.05em] text-fg-muted">
+                {t('workOrders.workItems.diagnosis')}
+              </span>
+              <span className="flex-1" />
+              {!readOnly && onSaveDiagnosis && !editingDiagnosis && (
+                <button
+                  type="button"
+                  onClick={() => setEditingDiagnosis(true)}
+                  className="card-action shrink-0"
+                >
+                  {t('common.edit')}
+                </button>
+              )}
+            </div>
+            {editingDiagnosis && onSaveDiagnosis ? (
+              <InlineComposer
+                value={wi.diagnosis ?? ''}
+                rows={3}
+                placeholder={t('workOrders.workItems.diagnosisPlaceholder')}
+                ariaLabel={t('workOrders.workItems.diagnosis')}
+                onCancel={() => setEditingDiagnosis(false)}
+                onSave={async (next) => {
+                  await onSaveDiagnosis(wi, next);
+                  setEditingDiagnosis(false);
+                }}
+              />
+            ) : !readOnly && onSaveDiagnosis ? (
+              // Font on the wrapper so the <button> inherits it (Preflight
+              // `button { font: inherit }` trap — see the complaint above).
+              <div className="text-[12px] leading-normal text-fg">
+                <button
+                  type="button"
+                  onClick={() => setEditingDiagnosis(true)}
+                  title={t('common.edit')}
+                  className="block w-full cursor-text whitespace-pre-wrap text-left"
+                >
+                  {diagnosis}
+                </button>
+              </div>
+            ) : (
+              <p className="whitespace-pre-wrap text-[12px] leading-normal text-fg">{diagnosis}</p>
             )}
           </div>
-          {editingDiagnosis && onSaveDiagnosis ? (
-            <InlineComposer
-              value={wi.diagnosis ?? ''}
-              rows={3}
-              placeholder={t('workOrders.workItems.diagnosisPlaceholder')}
-              ariaLabel={t('workOrders.workItems.diagnosis')}
-              onCancel={() => setEditingDiagnosis(false)}
-              onSave={async (next) => {
-                await onSaveDiagnosis(wi, next);
-                setEditingDiagnosis(false);
-              }}
-            />
-          ) : !readOnly && onSaveDiagnosis ? (
-            // Font on the wrapper so the <button> inherits it (Preflight
-            // `button { font: inherit }` trap — see the complaint above).
-            <div className="text-[12px] leading-normal text-fg">
-              <button
-                type="button"
-                onClick={() => setEditingDiagnosis(true)}
-                title={t('common.edit')}
-                className="block w-full cursor-text whitespace-pre-wrap text-left"
-              >
-                {diagnosis || t('workOrders.workItems.notDiagnosed')}
-              </button>
-            </div>
-          ) : (
-            <p className="whitespace-pre-wrap text-[12px] leading-normal text-fg">
-              {diagnosis || t('workOrders.workItems.notDiagnosed')}
-            </p>
-          )}
-        </div>
-
-        {/* Parts & readiness — the parts log + PO linkage are backend-deferred
-            (ship with procurement), so render the mock's empty state for now. */}
-        <div>
-          <div className="text-[10px] font-bold uppercase tracking-[0.05em] text-fg-muted">
-            {t('workOrders.workItems.partsReadiness')}
+        ) : !readOnly && onSaveDiagnosis ? (
+          <div>
+            <button
+              type="button"
+              onClick={() => setEditingDiagnosis(true)}
+              className="card-action"
+            >
+              {`+ ${t('common.add')} ${t('workOrders.workItems.diagnosis').toLowerCase()}`}
+            </button>
           </div>
-          <p className="mt-0.5 text-[12.5px] text-fg-dim">{t('workOrders.workItems.noPartsYet')}</p>
-        </div>
+        ) : null}
+
+        {/* Parts & readiness — no parts on file yet. Per the card cleanup, the
+            empty state drops the label + explanatory sentence and shows only a
+            quiet action line: the two entry points into the PO form (order +
+            field purchase), scoped to this work order. The label + parts table
+            return once parts exist (procurement). */}
+        {readOnly ? (
+          <p className="text-[12px] text-fg-dim">{t('workOrders.workItems.noPartsShort')}</p>
+        ) : (
+          // Right-aligned pair (mock): Record field purchase (ghost) beside
+          // Add parts (bordered) — both link into the PO form, scoped to this WO.
+          <div className="flex items-center gap-2">
+            <span className="flex-1" />
+            <Button ghost size="xxs" href={`/purchase-orders/new?type=field&workOrderId=${workOrderId}`}>
+              {t('workOrders.workItems.recordFieldPurchase')}
+            </Button>
+            <Button outline size="xxs" href={`/purchase-orders/new?type=order&workOrderId=${workOrderId}`}>
+              {t('workOrders.workItems.addParts')}
+            </Button>
+          </div>
+        )}
       </div>
+      )}
     </div>
   );
 }

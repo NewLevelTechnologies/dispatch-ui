@@ -3,12 +3,19 @@ import { PhotoIcon } from '@heroicons/react/24/outline';
 interface EquipmentThumbnailProps {
   /** Presigned S3 URL of the profile image; null/undefined falls back to a placeholder. */
   url?: string | null;
-  /** Used as the alt text and (with `type`) the monogram fallback source. */
+  /** Used as the alt text and the monogram fallback source. */
   name: string;
   /**
-   * Equipment type label. When `monogram` is on and there's no photo, it drives
-   * the monogram letters (falling back to `name`) and the tile's hue — so units
-   * of the same type read with the same color across every surface.
+   * Equipment CATEGORY — the specific child (Condenser, Air Handler, Water
+   * Heater). When `monogram` is on and there's no photo, category drives the
+   * monogram letters and hue. Category (not type) is the seed on purpose: type
+   * is the broad parent (HVAC), so every unit would collapse to identical "HV"
+   * tiles — category gives "CO"/"AH"/"WH" and a distinct hue per kind.
+   */
+  category?: string | null;
+  /**
+   * Equipment type label — the broad parent (HVAC). Only a fallback seed for the
+   * monogram/hue when `category` is absent (prefer passing `category`).
    */
   type?: string | null;
   /**
@@ -45,6 +52,7 @@ interface EquipmentThumbnailProps {
 export default function EquipmentThumbnail({
   url,
   name,
+  category,
   type,
   monogram = false,
   sizeClass = 'size-9',
@@ -54,7 +62,9 @@ export default function EquipmentThumbnail({
   const showMonogram = !url && monogram;
 
   if (showMonogram) {
-    const seed = (type?.trim() || name?.trim() || '').toString();
+    // Category-first seed (the specific child) so units of the same type don't
+    // collapse to one monogram/hue; type/name are fallbacks.
+    const seed = (category?.trim() || type?.trim() || name?.trim() || '').toString();
     const hue = hueFromString(seed);
     return (
       <div
@@ -78,7 +88,7 @@ export default function EquipmentThumbnail({
             fill="#ffffff"
             style={{ fontFamily: 'var(--font-sans, ui-sans-serif, system-ui, sans-serif)' }}
           >
-            {monogramText(type, name)}
+            {monogramText(category ?? type, name)}
           </text>
         </svg>
       </div>
@@ -123,12 +133,12 @@ export default function EquipmentThumbnail({
 }
 
 /**
- * 1–2 letter monogram from the equipment type (preferred — it groups units of a
- * kind) or the name. Two words → first initial of each; one word → first two
- * letters. Never empty: the name fallback guarantees a glyph.
+ * 1–2 letter monogram from the equipment category (preferred — the specific
+ * child differentiates units) or the name. Two words → first initial of each;
+ * one word → first two letters. Never empty: the name fallback guarantees a glyph.
  */
-function monogramText(type?: string | null, name?: string | null): string {
-  const src = (type?.trim() || name?.trim() || '').toString();
+function monogramText(seed?: string | null, name?: string | null): string {
+  const src = (seed?.trim() || name?.trim() || '').toString();
   if (!src) return '?';
   const words = src.split(/\s+/);
   const letters = words.length > 1 ? words[0][0] + words[1][0] : src.slice(0, 2);

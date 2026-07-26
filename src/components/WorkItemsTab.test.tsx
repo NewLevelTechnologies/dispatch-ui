@@ -74,7 +74,7 @@ describe('WorkItemsTab', () => {
     expect(screen.getByText('Loud rattle')).toBeInTheDocument();
   });
 
-  it('shows the diagnosis when present and the empty state when not', () => {
+  it('shows the diagnosis when present and a quiet add-affordance when empty', () => {
     renderWithProviders(
       <WorkItemsTab
         {...baseProps}
@@ -82,15 +82,76 @@ describe('WorkItemsTab', () => {
           wi('wi-1', 'No cooling', { diagnosis: 'Run capacitor failed' }),
           wi('wi-2', 'Loud rattle'),
         ]}
+        onSaveDiagnosis={vi.fn()}
       />
     );
     expect(screen.getByText('Run capacitor failed')).toBeInTheDocument();
-    expect(screen.getByText(/not yet diagnosed/i)).toBeInTheDocument();
+    // Empty diagnosis is trimmed to a single "+ Add diagnosis" invite — no tinted
+    // panel, no "Not yet diagnosed…" placeholder (it just restated the status).
+    expect(screen.queryByText(/not yet diagnosed/i)).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /add diagnosis/i })).toBeInTheDocument();
   });
 
-  it('renders the parts & readiness empty state (parts are backend-deferred)', () => {
+  it('renders the parts empty-state action line linking to the PO form', () => {
     renderWithProviders(<WorkItemsTab {...baseProps} workItems={[wi('wi-1', 'No cooling')]} />);
-    expect(screen.getByText(/no parts identified yet/i)).toBeInTheDocument();
+    // Card cleanup: the label + explanatory sentence are gone; only the quiet
+    // action line remains, pointing at the two PO-form entry points.
+    expect(screen.queryByText(/no parts identified yet/i)).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /add parts/i })).toHaveAttribute(
+      'href',
+      '/purchase-orders/new?type=order&workOrderId=wo-1'
+    );
+    expect(screen.getByRole('link', { name: /record field purchase/i })).toHaveAttribute(
+      'href',
+      '/purchase-orders/new?type=field&workOrderId=wo-1'
+    );
+  });
+
+  it('shows the open / total tally', () => {
+    renderWithProviders(
+      <WorkItemsTab
+        {...baseProps}
+        workItems={[
+          wi('wi-1', 'Still open', { statusCategory: 'IN_PROGRESS' }),
+          wi('wi-2', 'Finished', { statusCategory: 'COMPLETED' }),
+        ]}
+      />
+    );
+    expect(screen.getByText('1 open · 2 total')).toBeInTheDocument();
+  });
+
+  it('collapses resolved items by default and expands on click', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(
+      <WorkItemsTab
+        {...baseProps}
+        workItems={[wi('wi-1', 'Old repair', { statusCategory: 'COMPLETED', diagnosis: 'Replaced capacitor' })]}
+      />
+    );
+    // Collapsed by default: the header complaint shows, the body (diagnosis) doesn't.
+    expect(screen.getByText('Old repair')).toBeInTheDocument();
+    expect(screen.queryByText('Replaced capacitor')).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /show details/i }));
+    expect(screen.getByText('Replaced capacitor')).toBeInTheDocument();
+  });
+
+  it('reorders the cards when the sort changes', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(
+      <WorkItemsTab
+        {...baseProps}
+        workItems={[
+          wi('wi-1', 'First complaint', { sequence: 1, statusCategory: 'IN_PROGRESS' }),
+          wi('wi-2', 'Second complaint', { sequence: 2, statusCategory: 'BLOCKED' }),
+        ]}
+      />
+    );
+    const order = () => screen.getAllByText(/ complaint$/).map((el) => el.textContent);
+    // Default "Needs attention": blocked (wi-2) outranks in-progress (wi-1).
+    expect(order()).toEqual(['Second complaint', 'First complaint']);
+    // "Reported order": by sequence ascending.
+    await user.selectOptions(screen.getByRole('combobox'), 'reported');
+    expect(order()).toEqual(['First complaint', 'Second complaint']);
   });
 
   it('shows the attached equipment record', async () => {
