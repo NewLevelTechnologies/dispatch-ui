@@ -7,6 +7,8 @@ import type { WorkItemEquipmentSummary } from '../api';
 
 const mockGetById = vi.fn();
 const mockImagesList = vi.fn();
+const mockNotesList = vi.fn();
+const mockNotesCreate = vi.fn();
 
 vi.mock('../api/equipmentApi', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../api/equipmentApi')>();
@@ -14,6 +16,11 @@ vi.mock('../api/equipmentApi', async (importOriginal) => {
     ...actual,
     equipmentApi: { ...actual.equipmentApi, getById: (...a: unknown[]) => mockGetById(...a) },
     equipmentImagesApi: { ...actual.equipmentImagesApi, list: (...a: unknown[]) => mockImagesList(...a) },
+    equipmentNotesApi: {
+      ...actual.equipmentNotesApi,
+      list: (...a: unknown[]) => mockNotesList(...a),
+      create: (...a: unknown[]) => mockNotesCreate(...a),
+    },
   };
 });
 
@@ -40,6 +47,8 @@ describe('WorkItemEquipmentBlock', () => {
       { id: 'i2', url: 'u2', thumbnailUrl: 't2', caption: null, isProfile: true, isNameplate: false, sortOrder: 1 },
     ]);
     mockGetById.mockResolvedValue({ id: 'eq-1', installDate: '2019-03-15', lastServicedAt: '2026-03-14T00:00:00Z' });
+    mockNotesList.mockResolvedValue([]);
+    mockNotesCreate.mockResolvedValue({ id: 'n-new' });
     // Service-history list: 3 WOs touch this unit → 2 prior visits (minus current).
     vi.mocked(apiClient.get).mockResolvedValue({ data: { content: [], totalElements: 3 } } as never);
   });
@@ -50,8 +59,9 @@ describe('WorkItemEquipmentBlock', () => {
     expect(screen.getByText(/out of warranty/i)).toBeInTheDocument();
     await waitFor(() => {
       expect(screen.getByText(/installed Mar 2019/)).toBeInTheDocument();
+      // Prior-visit count now rides the metadata line (no separate history band).
       // Exact day is timezone-dependent; assert the count + "last" prefix only.
-      expect(screen.getByText(/2 prior visits · last/)).toBeInTheDocument();
+      expect(screen.getByText(/2 prior · last/)).toBeInTheDocument();
     });
   });
 
@@ -113,5 +123,37 @@ describe('WorkItemEquipmentBlock', () => {
     );
     expect(screen.queryByRole('button', { name: /^change$/i })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /add/i })).not.toBeInTheDocument();
+  });
+
+  it('shows the most-recent equipment note + a count link into the drawer', async () => {
+    mockNotesList.mockResolvedValue([
+      { id: 'n1', body: 'Older note', authorName: 'Bri', authorUserId: null, pinned: false, createdAt: '2026-03-01T00:00:00Z', updatedAt: '2026-03-01T00:00:00Z' },
+      { id: 'n2', body: 'Disconnect is in the garage panel', authorName: 'Daniel', authorUserId: null, pinned: false, createdAt: '2026-05-01T00:00:00Z', updatedAt: '2026-05-01T00:00:00Z' },
+    ]);
+    const onOpenEquipment = vi.fn();
+    const user = userEvent.setup();
+    renderWithProviders(
+      <WorkItemEquipmentBlock equipment={equipment} readOnly={false} onOpenEquipment={onOpenEquipment} />
+    );
+    // The newest note (by createdAt) shows inline, not the older one.
+    await waitFor(() =>
+      expect(screen.getByText(/disconnect is in the garage panel/i)).toBeInTheDocument()
+    );
+    // Count derives from the list length; the link opens the drawer's full list.
+    await user.click(screen.getByRole('button', { name: /2 notes/i }));
+    expect(onOpenEquipment).toHaveBeenCalledWith({ id: 'eq-1', name: 'Upstairs condenser' });
+  });
+
+  it('adds an equipment note inline via "+ Note" (scope hint, no modal)', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<WorkItemEquipmentBlock equipment={equipment} readOnly={false} />);
+    await user.click(screen.getByRole('button', { name: /^note$/i }));
+    // The scope hint makes clear the note follows the equipment, not this job.
+    expect(screen.getByText(/follows the unit to every work order/i)).toBeInTheDocument();
+    await user.type(screen.getByRole('textbox'), 'Disconnect box corroded');
+    await user.click(screen.getByRole('button', { name: /^save$/i }));
+    await waitFor(() =>
+      expect(mockNotesCreate).toHaveBeenCalledWith('eq-1', { body: 'Disconnect box corroded' })
+    );
   });
 });

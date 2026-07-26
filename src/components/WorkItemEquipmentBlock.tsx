@@ -1,13 +1,16 @@
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { CameraIcon, ChevronRightIcon, PlusIcon } from '@heroicons/react/24/outline';
-import { equipmentApi, equipmentImagesApi, type WorkItemEquipmentSummary } from '../api';
+import { equipmentApi, equipmentImagesApi, equipmentNotesApi, type WorkItemEquipmentSummary } from '../api';
 import { workOrdersListQueryOptions } from '../api/workOrdersListQuery';
 import { useGlossary } from '../contexts/GlossaryContext';
+import { showError, extractApiError } from '../lib/toast';
 import EquipmentThumbnail from './EquipmentThumbnail';
 import EquipmentImageUploadDialog from './EquipmentImageUploadDialog';
 import EquipmentPhotoLightbox from './EquipmentPhotoLightbox';
+import InlineComposer from './InlineComposer';
+import TimeAgo from './TimeAgo';
 import { Pill } from './ui/Pill';
 import { Button } from './catalyst/button';
 
@@ -70,14 +73,38 @@ export default function WorkItemEquipmentBlock({
 }: Props) {
   const { t } = useTranslation();
   const { getName } = useGlossary();
+  const queryClient = useQueryClient();
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [uploadOpen, setUploadOpen] = useState(false);
+  const [addingNote, setAddingNote] = useState(false);
 
   // Lazy image list (media row + lightbox). Cache key matches EquipmentDetailPage
   // so uploads elsewhere invalidate this surface in lockstep.
   const { data: images = [] } = useQuery({
     queryKey: ['equipment-images', equipment.id],
     queryFn: () => equipmentImagesApi.list(equipment.id),
+  });
+  // Equipment-scoped notes — ONE shared source with the drawer's Notes section:
+  // both read this exact cache key and both invalidate it on write, so a save
+  // from either surface re-renders the other. No local notes state here (this
+  // block stays mounted while the drawer opens/closes, so a local copy would go
+  // stale the moment the drawer wrote).
+  const { data: notesData } = useQuery({
+    queryKey: ['equipment-notes', equipment.id],
+    queryFn: () => equipmentNotesApi.list(equipment.id),
+  });
+  const notes = Array.isArray(notesData) ? notesData : [];
+  const createNoteMutation = useMutation({
+    mutationFn: (body: string) => equipmentNotesApi.create(equipment.id, { body }),
+    onSuccess: () => {
+      // Invalidate the shared key (drawer + this block) + the record's embedded
+      // recentNotes projection — same set the drawer's Notes section invalidates.
+      queryClient.invalidateQueries({ queryKey: ['equipment-notes', equipment.id] });
+      queryClient.invalidateQueries({ queryKey: ['equipment-detail', equipment.id] });
+      queryClient.invalidateQueries({ queryKey: ['equipment'] });
+      setAddingNote(false);
+    },
+    onError: (err) => showError(t('equipment.notes.addNote'), extractApiError(err) ?? undefined),
   });
   // Prior-visit count — derived from the cross-job service history (WOs touching
   // this unit), minus the current one. Same source the drawer + detail page use.
@@ -107,6 +134,11 @@ export default function WorkItemEquipmentBlock({
     ? [fmtMonthYear(full.installDate), ageYears(full.installDate)].filter(Boolean).join(' · ')
     : null;
   const lastServicedDate = full?.lastServicedAt ? fmtMonthDay(full.lastServicedAt) : null;
+  // Count + most-recent both derive from the one notes list — never a separate
+  // count field (a second source of truth for the same fact drifts).
+  const mostRecentNote = notes.length
+    ? [...notes].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0]
+    : null;
 
   return (
     <section aria-label={getName('equipment')}>
@@ -123,6 +155,7 @@ export default function WorkItemEquipmentBlock({
             <EquipmentThumbnail
               url={equipment.profileImageUrl}
               name={equipment.name}
+              category={equipment.equipmentCategoryName}
               type={equipment.equipmentTypeName}
               monogram
               sizeClass="size-7"
@@ -133,13 +166,22 @@ export default function WorkItemEquipmentBlock({
             <div className="truncate text-[12px] font-semibold text-fg-strong">
               {makeModel || equipment.name}
             </div>
-            {(equipment.serialNumber || installedText) && (
+            {/* Metadata line — SN · installed · age · N prior · last date.
+                Prior-visit count rides here (it's context, not an alert), so no
+                separate history band. Chronic repeat-repair, when present, gets
+                its own alert row below (backend ask — omitted until it lands). */}
+            {(equipment.serialNumber || installedText || priorVisits > 0) && (
               <div className="truncate text-[10.5px] text-fg-dim">
                 {equipment.serialNumber && (
                   <span className="font-mono">{`${t('workOrders.workItems.serialAbbrev')} ${equipment.serialNumber}`}</span>
                 )}
                 {installedText && (
                   <span>{`${equipment.serialNumber ? ' · ' : ''}${t('workOrders.workItems.installedShort')} ${installedText}`}</span>
+                )}
+                {priorVisits > 0 && (
+                  <span>
+                    {`${equipment.serialNumber || installedText ? ' · ' : ''}${t('workOrders.workItems.priorCount', { count: priorVisits })}${lastServicedDate ? ` · ${t('workOrders.workItems.lastShort')} ${lastServicedDate}` : ''}`}
+                  </span>
                 )}
               </div>
             )}
@@ -152,40 +194,27 @@ export default function WorkItemEquipmentBlock({
             </Pill>
           )}
           {!readOnly && onChange && (
-            <Button plain size="xxs" onClick={onChange}>
+            <Button ghost size="xxs" onClick={onChange}>
               {t('workOrders.workItems.change')}
             </Button>
           )}
           <button
             type="button"
             onClick={openDrawer}
-            className="shrink-0 whitespace-nowrap text-[11.5px] !font-semibold text-fg-accent hover:underline"
+            className="card-action relative top-[0.5px] shrink-0 whitespace-nowrap"
           >
             {t('workOrders.workItems.openRecordArrow')}
           </button>
         </div>
 
-        {/* History signal — prior-visit count (chronic ⟳ flag is a backend ask). */}
-        <div className="flex flex-wrap items-center gap-2 border-b border-border-soft px-3 py-1.5">
-          <span className="text-[11.5px] text-fg-muted">
-            {priorVisits > 0
-              ? `${t('workOrders.workItems.priorVisits', { count: priorVisits })}${lastServicedDate ? ` · ${t('workOrders.workItems.lastShort')} ${lastServicedDate}` : ''}`
-              : t('workOrders.workItems.noPriorService')}
-          </span>
-          <span className="flex-1" />
-          <button
-            type="button"
-            onClick={openDrawer}
-            className="text-[11.5px] !font-semibold text-fg-accent hover:underline"
-          >
-            {t('workOrders.workItems.historyArrow')}
-          </button>
-        </div>
-
-        {/* Units — child equipment as compact pills (parent systems only). */}
-        {(units.length > 0 || (!readOnly && onAddSubUnit)) && (
+        {/* Units — child equipment as compact pills (parent systems only).
+            Hidden entirely at zero units (no "Units · 0" scaffolding): the
+            equipment drawer's Units section always renders, so adding the first
+            unit stays reachable there. Once units exist, the row shows here with
+            its own "+ Add unit". */}
+        {units.length > 0 && (
           <div className="flex flex-wrap items-center gap-2 border-b border-border-soft px-3 py-2">
-            <span className="text-[10px] font-bold uppercase tracking-[0.05em] text-fg-muted">
+            <span className="label-tiny relative top-[0.5px]">
               {`${getName('equipment_component', true)} · ${unitTotal}`}
             </span>
             {units.map((u) => (
@@ -207,14 +236,14 @@ export default function WorkItemEquipmentBlock({
               </button>
             ))}
             {!readOnly && onAddSubUnit && (
-              <button
-                type="button"
+              <Button
+                ghost
+                size="xxs"
                 onClick={() => onAddSubUnit({ id: equipment.id, name: equipment.name })}
-                className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11.5px] leading-none !font-semibold text-fg-accent hover:underline"
               >
-                <PlusIcon className="size-3" />
+                <PlusIcon data-slot="icon" />
                 {t('common.actions.add', { entity: getName('equipment_component') })}
-              </button>
+              </Button>
             )}
           </div>
         )}
@@ -244,7 +273,7 @@ export default function WorkItemEquipmentBlock({
                 onClick={() => setLightboxIndex(4)}
                 className="flex size-[34px] items-center justify-center rounded text-[10.5px] font-semibold text-fg-muted ring-1 ring-border hover:text-fg-accent"
               >
-                +{orderedImages.length - 4}
+                {'+' + (orderedImages.length - 4)}
               </button>
             )}
             {!hasImages && (
@@ -252,13 +281,73 @@ export default function WorkItemEquipmentBlock({
             )}
           </div>
           <span className="flex-1" />
+          {notes.length > 0 && (
+            // Count from the notes list (single source); opens the drawer's full
+            // Notes list. !text- forces the size over the unlayered body-inherit
+            // that otherwise bumps a bare <button> to 13px.
+            <button
+              type="button"
+              onClick={openDrawer}
+              className="whitespace-nowrap !text-[11px] text-fg-muted hover:text-fg-accent"
+            >
+              {notes.length === 1
+                ? t('workOrders.workItems.noteCountOne', { count: notes.length })
+                : t('workOrders.workItems.noteCount', { count: notes.length })}
+            </button>
+          )}
           {!readOnly && (
-            <Button plain size="xxs" onClick={() => setUploadOpen(true)}>
+            <Button ghost size="xxs" onClick={() => setUploadOpen(true)}>
               <CameraIcon data-slot="icon" />
               {t('workOrders.workItems.capture')}
             </Button>
           )}
+          {!readOnly && (
+            <Button ghost size="xxs" onClick={() => setAddingNote(true)}>
+              <PlusIcon data-slot="icon" />
+              {t('workOrders.workItems.note')}
+            </Button>
+          )}
         </div>
+
+        {/* Most-recent equipment note — one clamped line (truncate, NOT
+            line-clamp: as a flex item it blockifies and the ellipsis never
+            renders) so an inline "+ Note" write is immediately visible. The full
+            list lives in the record drawer. */}
+        {!addingNote && mostRecentNote && (
+          <div className="flex items-baseline gap-2 px-3 pb-2">
+            <span className="min-w-0 truncate text-[11.5px] text-fg">
+              {/* Decorative note marker — inside the truncating span so it clips
+                  with the body as one line. */}
+              {/* eslint-disable-next-line i18next/no-literal-string */}
+              <span className="text-fg-dim" aria-hidden>⚲ </span>
+              {mostRecentNote.body}
+            </span>
+            <span className="shrink-0 whitespace-nowrap text-[10.5px] text-fg-dim">
+              {mostRecentNote.authorName ? `${mostRecentNote.authorName} · ` : ''}
+              <TimeAgo iso={mostRecentNote.createdAt} />
+            </span>
+          </div>
+        )}
+
+        {/* Inline note composer — same InlineComposer as complaint/diagnosis.
+            The scope hint above it is load-bearing: these notes follow the
+            equipment across every work order, not this job. */}
+        {addingNote && (
+          <div className="px-3 pb-2.5">
+            <p className="mb-1.5 text-[10.5px] leading-normal text-fg-dim">
+              {t('workOrders.workItems.noteScopeHint')}
+            </p>
+            <InlineComposer
+              rows={2}
+              placeholder={t('workOrders.workItems.notePlaceholder')}
+              ariaLabel={t('equipment.notes.addNote')}
+              onCancel={() => setAddingNote(false)}
+              onSave={async (body) => {
+                await createNoteMutation.mutateAsync(body);
+              }}
+            />
+          </div>
+        )}
       </div>
 
       <EquipmentPhotoLightbox

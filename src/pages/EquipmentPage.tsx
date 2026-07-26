@@ -323,6 +323,7 @@ export default function EquipmentPage() {
                             <EquipmentThumbnail
                               url={item.profileImageUrl}
                               name={item.name}
+                              category={item.equipmentCategoryName}
                               type={item.equipmentTypeName}
                               monogram
                               sizeClass="size-12"

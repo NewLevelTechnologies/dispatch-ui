@@ -17,6 +17,7 @@ import { workOrdersListQueryOptions } from '../api/workOrdersListQuery';
 import { formatFilterSize } from '../utils/formatFilterSize';
 import { useGlossary } from '../contexts/GlossaryContext';
 import ConfirmDialog from './ConfirmDialog';
+import EquipmentFormDialog from './EquipmentFormDialog';
 import EquipmentImageUploadDialog from './EquipmentImageUploadDialog';
 import EquipmentPhotoLightbox from './EquipmentPhotoLightbox';
 import EquipmentThumbnail from './EquipmentThumbnail';
@@ -61,6 +62,7 @@ export default function EquipmentQuickView({ equipmentId, onSelectSubUnit }: Equ
   const queryClient = useQueryClient();
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [isImageUploadOpen, setIsImageUploadOpen] = useState(false);
+  const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
   const [draft, setDraft] = useState<Draft | null>(null);
   const editing = draft !== null;
 
@@ -199,10 +201,10 @@ export default function EquipmentQuickView({ equipmentId, onSelectSubUnit }: Equ
             aria-label={t('equipment.images.openFullSize')}
             className="rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
           >
-            <EquipmentThumbnail url={equipment.profileImageUrl} name={equipment.name} type={equipment.equipmentTypeName} monogram sizeClass="size-16" fit="contain" />
+            <EquipmentThumbnail url={equipment.profileImageUrl} name={equipment.name} category={equipment.equipmentCategoryName} type={equipment.equipmentTypeName} monogram sizeClass="size-16" fit="contain" />
           </button>
         ) : (
-          <EquipmentThumbnail url={equipment.profileImageUrl} name={equipment.name} type={equipment.equipmentTypeName} monogram sizeClass="size-16" fit="contain" />
+          <EquipmentThumbnail url={equipment.profileImageUrl} name={equipment.name} category={equipment.equipmentCategoryName} type={equipment.equipmentTypeName} monogram sizeClass="size-16" fit="contain" />
         )}
         <div className="min-w-0 flex-1">
           {editing && draft ? (
@@ -346,9 +348,17 @@ export default function EquipmentQuickView({ equipmentId, onSelectSubUnit }: Equ
         )}
       </DSection>
 
-      {/* Units (parent systems only) */}
-      {directChildren.length > 0 && (
-        <DSection label={`${getName('equipment_component', true)} · ${directChildren.length}`}>
+      {/* Units — a parent system's child equipment. The work-item card hides its
+          units row at zero to save space, so for a top-level system the drawer
+          always renders this section (empty state "No units…" + "+ Add unit") as
+          the guaranteed home for adding the first unit on site. When the drawer
+          is showing a SUB-unit (has a parent), Units only renders if descendants
+          exist and there's no "+ Add unit" — adding there would create a
+          depth-2 record, which the units model (parent systems only) disallows. */}
+      {(directChildren.length > 0 || !equipment.parentId) && (
+        <DSection
+          label={`${getName('equipment_component', true)}${directChildren.length ? ` · ${directChildren.length}` : ''}`}
+        >
           <div className="flex flex-wrap items-center gap-2">
             {directChildren.map((sub) => (
               <button
@@ -362,6 +372,17 @@ export default function EquipmentQuickView({ equipmentId, onSelectSubUnit }: Equ
                 <ChevronRightIcon className="size-3 text-fg-dim" aria-hidden />
               </button>
             ))}
+            {directChildren.length === 0 && (
+              <span className="text-[12px] text-fg-dim">
+                {t('equipment.detail.noUnits', { entities: getName('equipment_component', true) })}
+              </span>
+            )}
+            {!equipment.parentId && (
+              <Button ghost size="xxs" onClick={() => setIsAddUnitOpen(true)}>
+                <PlusIcon data-slot="icon" />
+                {t('common.actions.add', { entity: getName('equipment_component') })}
+              </Button>
+            )}
           </div>
         </DSection>
       )}
@@ -401,7 +422,9 @@ export default function EquipmentQuickView({ equipmentId, onSelectSubUnit }: Equ
                 onClick={() => setLightboxIndex(4)}
                 className="grid size-[60px] place-items-center rounded-lg text-[12px] font-semibold text-fg-muted ring-1 ring-border hover:text-fg-accent"
               >
-                +{orderedImages.length - 4}
+                {/* Single text node: in a grid container `+{n}` renders two
+                    children that each take a grid row, stacking "+" over the digit. */}
+                {'+' + (orderedImages.length - 4)}
               </button>
             )}
           </div>
@@ -478,6 +501,17 @@ export default function EquipmentQuickView({ equipmentId, onSelectSubUnit }: Equ
         onClose={() => setIsImageUploadOpen(false)}
         equipmentId={equipment.id}
         defaultSetProfile={!hasImages}
+      />
+      {/* Add unit — create with THIS equipment locked as the parent (and its
+          service location); on success refresh the record so the new unit chip
+          appears in the Units section. */}
+      <EquipmentFormDialog
+        isOpen={isAddUnitOpen}
+        onClose={() => setIsAddUnitOpen(false)}
+        equipment={null}
+        lockedServiceLocationId={equipment.serviceLocationId}
+        lockedParent={{ id: equipment.id, name: equipment.name }}
+        onCreated={() => invalidateEquipmentRelatedCaches()}
       />
     </div>
   );

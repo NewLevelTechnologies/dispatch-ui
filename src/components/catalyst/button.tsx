@@ -25,6 +25,12 @@ const styles = {
   sizes: {
     // Stock Catalyst sizing — bigger on mobile, tighter at sm breakpoint.
     // Default when no `size` prop is set, so existing call sites are unaffected.
+    // TODO(md-font-size, pending Paul's eval): like xs/xxs, md's font-size is a
+    // LAYERED utility (text-base/6, sm:text-sm/6) so Preflight's unlayered
+    // `button { font: inherit }` beats it — every md button renders the body's
+    // 13px instead of the intended 14px (desktop). NOT forced with `!` yet: it
+    // would enlarge ~450 default buttons app-wide, a broad visual change Paul
+    // wants to evaluate first. (xs/xxs were safe to fix — they get smaller.)
     md: [
       'gap-x-1.5 text-base/6',
       'px-[calc(--spacing(3.5)-1px)] py-[calc(--spacing(2.5)-1px)] sm:px-[calc(--spacing(3)-1px)] sm:py-[calc(--spacing(1.5)-1px)] sm:text-sm/6',
@@ -33,14 +39,19 @@ const styles = {
     // Admin-tool tight — 30px tall, 12.5px text, 10px horizontal padding, 4px gap.
     // Use on page headers and form submits.
     xs: [
-      'h-[30px] gap-1 px-2.5 text-[12.5px]',
+      // !text-: same trap as the base's !font-semibold — Preflight's unlayered
+      // `button { font: inherit }` flows the body's 13px onto the button, and a
+      // layered text-size utility can't beat it. The important modifier wins, so
+      // xs actually renders 12.5px instead of the inherited 13px.
+      'h-[30px] gap-1 px-2.5 !text-[12.5px]',
       // 14px glyph (size-3.5) keeps the icon subordinate to the 12.5px/600 label — .btn token.
       '*:data-[slot=icon]:size-3.5',
     ],
     // Section-level tight — 26px tall, 11.5px text. Use inside cards / rows
     // where the action belongs to a section, not the page.
     xxs: [
-      'h-[26px] gap-1 px-2.5 text-[11.5px]',
+      // !text- for the same reason as xs above (unlayered `font: inherit` trap).
+      'h-[26px] gap-1 px-2.5 !text-[11.5px]',
       // ~12px glyph (size-3) for the 11.5px label — .btn.sm token.
       '*:data-[slot=icon]:size-3',
     ],
@@ -94,6 +105,17 @@ const styles = {
     'dark:text-white dark:data-active:bg-white/10 dark:data-hover:bg-white/10',
     // Icon
     '[--btn-icon:var(--color-zinc-500)] data-active:[--btn-icon:var(--color-zinc-700)] data-hover:[--btn-icon:var(--color-zinc-700)] dark:[--btn-icon:var(--color-zinc-500)] dark:data-active:[--btn-icon:var(--color-zinc-400)] dark:data-hover:[--btn-icon:var(--color-zinc-400)]',
+  ],
+  // Ghost — the recessive tertiary register (mock `.btn.ghost`): transparent,
+  // MUTED label that lifts to fg-strong + a subtle fill on hover. Distinct from
+  // `plain`, which stays near-black for borderless actions that still need
+  // presence. Use inside cards/rows where the action must sit under the content
+  // (Change, Capture, "Add unit", section actions). Tokens are theme-aware, so
+  // no separate dark block. Color utilities aren't subject to the base's
+  // `font:`-shorthand trap, so no `!` is needed here.
+  ghost: [
+    'border-transparent text-fg-muted data-active:bg-bg-hover data-active:text-fg-strong data-hover:bg-bg-hover data-hover:text-fg-strong',
+    '[--btn-icon:var(--fg-muted)] data-active:[--btn-icon:var(--fg-strong)] data-hover:[--btn-icon:var(--fg-strong)]',
   ],
   colors: {
     'dark/zinc': [
@@ -227,9 +249,10 @@ const styles = {
 type OutlineVariant = true | 'red'
 
 type ButtonProps = (
-  | { color?: keyof typeof styles.colors; outline?: never; plain?: never }
-  | { color?: never; outline: OutlineVariant; plain?: never }
-  | { color?: never; outline?: never; plain: true }
+  | { color?: keyof typeof styles.colors; outline?: never; plain?: never; ghost?: never }
+  | { color?: never; outline: OutlineVariant; plain?: never; ghost?: never }
+  | { color?: never; outline?: never; plain: true; ghost?: never }
+  | { color?: never; outline?: never; plain?: never; ghost: true }
 ) & { size?: keyof typeof styles.sizes; className?: string; children: React.ReactNode } & (
     | ({ href?: never } & Omit<Headless.ButtonProps, 'as' | 'className'>)
     | ({ href: string } & Omit<React.ComponentPropsWithoutRef<typeof Link>, 'className'>)
@@ -253,7 +276,7 @@ function nudgeLabel(children: React.ReactNode): React.ReactNode {
 }
 
 export const Button = forwardRef(function Button(
-  { color, outline, plain, size, className, children, ...props }: ButtonProps,
+  { color, outline, plain, ghost, size, className, children, ...props }: ButtonProps,
   ref: React.ForwardedRef<HTMLElement>
 ) {
   const outlineStyle = outline ? styles.outline[outline === true ? 'default' : outline] : null
@@ -261,7 +284,13 @@ export const Button = forwardRef(function Button(
     className,
     styles.base,
     styles.sizes[size ?? 'md'],
-    outlineStyle ? outlineStyle : plain ? styles.plain : clsx(styles.solid, styles.colors[color ?? 'dark/zinc'])
+    outlineStyle
+      ? outlineStyle
+      : plain
+        ? styles.plain
+        : ghost
+          ? styles.ghost
+          : clsx(styles.solid, styles.colors[color ?? 'dark/zinc'])
   )
   const content = nudgeLabel(children)
 

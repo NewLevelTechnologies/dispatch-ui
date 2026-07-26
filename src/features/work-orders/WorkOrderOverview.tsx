@@ -53,6 +53,7 @@ import { ActivityRow } from '../../components/ActivityStream';
 import { formatPhone } from '../../utils/formatPhone';
 import { titleCaseAddress } from '../../utils/titleCaseAddress';
 import { tripsByWorkItem } from '../../utils/tripsByWorkItem';
+import { PROGRESS_TONE } from '../../lib/workItemProgress';
 
 type PillTone = 'neutral' | 'info' | 'success' | 'warning' | 'danger' | 'accent' | 'violet';
 
@@ -62,17 +63,6 @@ const num = (s: string | number | null | undefined): number => {
   if (s == null) return 0;
   const n = typeof s === 'number' ? s : parseFloat(s);
   return Number.isFinite(n) ? n : 0;
-};
-
-// statusCategory → Pill tone. Mirrors the header progress pill mapping; the
-// work-item peek and the WO progress share one visual grammar.
-const PROGRESS_TONE: Record<ProgressCategory, PillTone> = {
-  NOT_STARTED: 'neutral',
-  AWAITING_SCHEDULE: 'info',
-  IN_PROGRESS: 'violet',
-  BLOCKED: 'warning',
-  COMPLETED: 'success',
-  CANCELLED: 'neutral',
 };
 
 // Dispatch (trip) status → { tone, label, live }. IN_PROGRESS is the live
@@ -346,6 +336,7 @@ function WorkItemPeekRow({
         <EquipmentThumbnail
           url={eq.profileImageUrl}
           name={eq.name}
+          category={eq.equipmentCategoryName}
           type={eq.equipmentTypeName}
           monogram
           sizeClass="size-12"

@@ -7,7 +7,8 @@ import {
   type WorkItemResponse,
   type WorkItemStatus,
 } from '../api';
-import { Badge } from './catalyst/badge';
+import { Pill } from './ui/Pill';
+import { PROGRESS_TONE } from '../lib/workItemProgress';
 import {
   Dropdown,
   DropdownButton,
@@ -15,15 +16,6 @@ import {
   DropdownLabel,
   DropdownMenu,
 } from './catalyst/dropdown';
-
-const PROGRESS_COLORS: Record<ProgressCategory, 'zinc' | 'sky' | 'blue' | 'amber' | 'lime'> = {
-  NOT_STARTED: 'zinc',
-  AWAITING_SCHEDULE: 'sky',
-  IN_PROGRESS: 'blue',
-  BLOCKED: 'amber',
-  COMPLETED: 'lime',
-  CANCELLED: 'zinc',
-};
 
 const PROGRESS_TRANSLATION_KEYS: Record<ProgressCategory, string> = {
   NOT_STARTED: 'notStarted',
@@ -109,7 +101,9 @@ export default function WorkItemStatusPill({
 
   if (!isInteractive) {
     return (
-      <Badge color={PROGRESS_COLORS[workItem.statusCategory]}>{currentLabel}</Badge>
+      <Pill tone={PROGRESS_TONE[workItem.statusCategory]} dot>
+        {currentLabel}
+      </Pill>
     );
   }
 
@@ -121,7 +115,9 @@ export default function WorkItemStatusPill({
         className="cursor-pointer rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
         aria-label={t('workOrders.workItems.changeStatus', { current: currentLabel })}
       >
-        <Badge color={PROGRESS_COLORS[workItem.statusCategory]}>{currentLabel}</Badge>
+        <Pill tone={PROGRESS_TONE[workItem.statusCategory]} dot>
+          {currentLabel}
+        </Pill>
       </DropdownButton>
       <DropdownMenu anchor="bottom start">
         {allowedStatuses.map((s) => (

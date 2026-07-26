@@ -123,6 +123,7 @@ export default function WOEquipmentPicker({
               <EquipmentThumbnail
                 url={e.profileImageUrl}
                 name={e.name}
+                category={e.equipmentCategoryName}
                 type={e.equipmentTypeName}
                 monogram
                 sizeClass="size-[30px]"
