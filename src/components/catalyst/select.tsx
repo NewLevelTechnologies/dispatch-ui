@@ -50,7 +50,7 @@ export const Select = forwardRef(function Select(
           // Border
           'border border-border data-hover:border-border-strong',
           // Background color (option list bg uses elevated surface in dark mode)
-          'bg-transparent dark:bg-bg-elev dark:*:bg-bg-elev',
+          'bg-transparent dark:bg-bg dark:*:bg-bg',
           // Hide default focus styles
           'focus:outline-hidden',
           // Invalid state

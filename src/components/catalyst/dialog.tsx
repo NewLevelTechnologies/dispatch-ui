@@ -44,7 +44,7 @@ export function Dialog({
             className={clsx(
               className,
               sizes[size],
-              'row-start-2 w-full min-w-0 rounded-t-3xl bg-white shadow-lg ring-1 ring-zinc-950/10 sm:mb-auto sm:rounded-2xl dark:bg-zinc-900 dark:ring-white/10 forced-colors:outline',
+              'row-start-2 w-full min-w-0 rounded-t-3xl bg-bg-elev shadow-lg ring-1 ring-border sm:mb-auto sm:rounded-2xl forced-colors:outline',
               padding === 'none'
                 ? 'overflow-hidden'
                 : 'p-(--gutter) [--gutter:--spacing(8)]',
@@ -66,7 +66,7 @@ export function DialogTitle({
   return (
     <Headless.DialogTitle
       {...props}
-      className={clsx(className, 'text-lg/6 font-semibold text-balance text-zinc-950 sm:text-base/6 dark:text-white')}
+      className={clsx(className, 'text-lg/6 font-semibold text-balance text-fg-strong sm:text-base/6')}
     />
   )
 }

@@ -106,13 +106,16 @@
 
 /* ── Dark theme ──────────────────────────────────────────────────── */
 .theme-dark {
-  /* Surfaces — lifted off pure black so text has contrast headroom */
-  --bg:           oklch(22% 0.008 250);   /* topbar           was 17% */
-  --bg-sunken:    oklch(19% 0.008 250);   /* content pane     was 14% */
-  --bg-elev:      oklch(24% 0.010 250);   /* cards            was 21% */
-  --bg-elev-2:    oklch(27% 0.011 250);   /*                  was 24% */
-  --bg-hover:     oklch(29% 0.012 250);   /*                  was 26% */
-  --bg-active:    oklch(32% 0.014 250);   /*                  was 29% */
+  /* Surfaces — lifted off pure black so text has contrast headroom.
+     Recalibrated: runtime measurement showed the ladder itself was fine but
+     read flat, so surfaces move ≤1 L point and the separation comes from the
+     borders below. Chroma rises ~40% — enough to read cool, short of navy. */
+  --bg:           oklch(21% 0.012 250);   /* topbar           was 22% .008 */
+  --bg-sunken:    oklch(17% 0.012 250);   /* content pane     was 19% .008 */
+  --bg-elev:      oklch(24% 0.014 250);   /* cards            was 24% .010 */
+  --bg-elev-2:    oklch(28% 0.015 250);   /*                  was 27% .011 */
+  --bg-hover:     oklch(30% 0.016 250);   /*                  was 29% .012 */
+  --bg-active:    oklch(33% 0.017 250);   /*                  was 32% .014 */
 
   --sidebar-bg:     oklch(16% 0.008 255); /*                  was 13% */
   --sidebar-bg-2:   oklch(21% 0.010 255); /*                  was 17% */
@@ -129,10 +132,12 @@
   /* Warning foreground — lighter amber (oklch 74%) so it reads on dark canvas. */
   --warning-fg: var(--warning-500);
 
-  /* Borders — more present so cards read as cards */
-  --border:        oklch(32% 0.012 250);  /*                  was 28% */
-  --border-strong: oklch(40% 0.015 250);  /*                  was 35% */
-  --border-soft:   oklch(28% 0.010 250);  /*                  was 24% */
+  /* Borders — these do the heavy lifting. The measured card→divider step was
+     4 L points (24%→28%), right at the visibility threshold at that lightness;
+     that was the real source of the "flat, edgeless" read, not the surfaces. */
+  --border:        oklch(37% 0.018 250);  /*                  was 32% — card edge now 13 pts over card */
+  --border-strong: oklch(45% 0.020 250);  /*                  was 40% */
+  --border-soft:   oklch(31% 0.016 250);  /*                  was 28% — card→divider now 7 pts */
 
   /* Shadows unchanged */
   --shadow-sm: 0 1px 2px 0 rgba(0,0,0,0.4);
