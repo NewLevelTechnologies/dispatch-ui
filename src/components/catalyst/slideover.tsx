@@ -27,7 +27,12 @@ export function SlideOver({
                 'pointer-events-auto w-screen max-w-4xl transform transition duration-200 ease-in-out data-closed:translate-x-full sm:duration-300'
               )}
             >
-              <div className="flex h-full flex-col bg-white shadow-xl dark:bg-zinc-900">
+              {/* A drawer is an elevated surface, same rung as a card: --bg-elev
+                  with a --border left edge doing the separation. Dark mode has no
+                  usable shadow, so the border carries it there; the shadow stays
+                  for light. Must never sit on --bg/--bg-sunken — at canvas height
+                  the panel reads as a hole in the page instead of above it. */}
+              <div className="flex h-full flex-col border-l border-border bg-bg-elev shadow-xl">
                 {children}
               </div>
             </Headless.DialogPanel>
@@ -45,7 +50,7 @@ export function SlideOverHeader({
   ...props
 }: { className?: string; onClose?: () => void; children: React.ReactNode } & React.ComponentPropsWithoutRef<'div'>) {
   return (
-    <div {...props} className={clsx(className, 'border-b border-zinc-950/10 px-6 py-4 dark:border-white/10')}>
+    <div {...props} className={clsx(className, 'border-b border-border-soft px-6 py-4')}>
       <div className="flex items-start justify-between">
         <div className="flex-1">{children}</div>
         {onClose && (
@@ -67,7 +72,7 @@ export function SlideOverTitle({
   return (
     <Headless.DialogTitle
       {...props}
-      className={clsx(className, 'text-lg font-semibold text-zinc-950 dark:text-white')}
+      className={clsx(className, 'text-lg font-semibold text-fg-strong')}
     />
   )
 }
@@ -89,7 +94,7 @@ export function SlideOverFooter({ className, ...props }: React.ComponentPropsWit
       {...props}
       className={clsx(
         className,
-        'border-t border-zinc-950/10 px-6 py-4 dark:border-white/10',
+        'border-t border-border-soft px-6 py-4',
         'flex flex-shrink-0 items-center justify-end gap-3'
       )}
     />

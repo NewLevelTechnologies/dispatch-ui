@@ -55,7 +55,7 @@ export const Input = forwardRef(function Input(
         // Basic layout
         'relative block w-full',
         // Background color + shadow applied to inset pseudo element, so shadow blends with border in light mode
-        'before:absolute before:inset-px before:rounded-[calc(var(--radius-lg)-1px)] before:bg-white before:shadow-sm',
+        'before:absolute before:inset-px before:rounded-[calc(var(--radius-lg)-1px)] before:bg-bg-elev before:shadow-sm',
         // Background color is moved to control and shadow is removed in dark mode so hide `before` pseudo
         'dark:before:hidden',
         // Focus ring — uses the warm/cool accent token, not Catalyst's hardcoded blue.
@@ -93,7 +93,7 @@ export const Input = forwardRef(function Input(
           // Border
           'border border-border data-hover:border-border-strong',
           // Background color
-          'bg-transparent dark:bg-white/5',
+          'bg-transparent dark:bg-bg',
           // Hide default focus styles
           'focus:outline-hidden',
           // Invalid state
