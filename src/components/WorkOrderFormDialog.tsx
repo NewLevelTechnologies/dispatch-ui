@@ -49,7 +49,7 @@ interface WorkOrderFormState {
   customerOrderNumber: string;
   // Create-mode only: the description for the first work item, sent inside the
   // atomic POST /work-orders payload as workItems: [{ description }]. Edit mode
-  // ignores this field — work item edits go through WorkItemFormDialog.
+  // ignores this field — work item edits happen inline on the detail page.
   firstWorkItemDescription: string;
 }
 
@@ -1017,7 +1017,7 @@ export default function WorkOrderFormDialog({ isOpen, onClose, workOrder, prefil
 
               {/* First work item — required on create. The atomic POST sends
                   this as workItems: [{ description }]. Edit mode hides it; work
-                  item edits go through WorkItemFormDialog on the detail page. */}
+                  item edits happen inline on the detail page's Work items tab. */}
               {!isEdit && (
                 <Field>
                   <Label className="text-xs">
@@ -1040,10 +1040,9 @@ export default function WorkOrderFormDialog({ isOpen, onClose, workOrder, prefil
           </Fieldset>
 
           {/* Work items aren't editable in this dialog. The WO detail page is
-              the dedicated surface — inline status pill on the table for status
-              edits, WorkItemFormDialog for adding new items / editing description.
-              Keeping work items here would duplicate UIs and violate the
-              three-pattern rule (§1.1 of WORK_ORDER_DETAIL_DESIGN.md). */}
+              the dedicated surface — the Work items tab has inline cards plus an
+              inline add-item composer (NewWorkItemComposer). Keeping work items
+              here would duplicate UIs and violate the three-pattern rule. */}
         </form>
       </DialogBody>
       <DialogActions>
