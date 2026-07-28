@@ -47,6 +47,10 @@ vi.mock('../api/equipmentApi', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../api/equipmentApi')>();
   return { ...actual, equipmentApi: { ...actual.equipmentApi, list: (...a: unknown[]) => mockEquipmentList(...a) } };
 });
+vi.mock('../api/tenantSettingsApi', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../api/tenantSettingsApi')>();
+  return { ...actual, tenantSettingsApi: { ...actual.tenantSettingsApi, getSettings: () => Promise.resolve({ defaultPremiseType: 'BUSINESS' }) } };
+});
 vi.mock('../api/client');
 
 const locationDetail = {
@@ -155,9 +159,10 @@ describe('WorkOrderIntakePage', () => {
     await screen.findByRole('option', { name: 'Service Call' });
 
     await user.click(screen.getByRole('radio', { name: /new customer & location/i }));
-    await user.type(screen.getByLabelText(/customer name/i), 'Jordan Avila');
+    // ONE name — no separate "location name" over-ask.
+    await user.type(screen.getByLabelText(/^name/i), 'Jordan Avila');
+    await user.type(screen.getByLabelText(/^phone/i), '6025550100');
     await user.type(screen.getByLabelText(/^email/i), 'jordan@example.com');
-    await user.type(screen.getByLabelText(/location name/i), 'Avila Residence');
     await user.type(screen.getByLabelText(/street address/i), '123 Main St');
     await user.type(screen.getByLabelText(/^city/i), 'Phoenix');
     await user.type(screen.getByLabelText(/^state/i), 'AZ');
@@ -167,7 +172,15 @@ describe('WorkOrderIntakePage', () => {
 
     await user.click(screen.getByRole('button', { name: /add work order/i }));
 
-    await waitFor(() => expect(mockCreateCustomer).toHaveBeenCalled());
+    // One name seeds both the customer and its first location.
+    await waitFor(() =>
+      expect(mockCreateCustomer).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: 'Jordan Avila',
+          serviceLocations: [expect.objectContaining({ locationName: 'Jordan Avila' })],
+        })
+      )
+    );
     await waitFor(() =>
       expect(mockCreateWorkOrder).toHaveBeenCalledWith(
         expect.objectContaining({ customerId: 'cust-new', serviceLocationId: 'loc-new' })

@@ -10,6 +10,7 @@ import {
   workOrderTypesApi,
   divisionsApi,
   dispatchRegionApi,
+  tenantSettingsApi,
   type CreateWorkOrderRequest,
   type CreateCustomerRequest,
   type CreateWorkItemRequest,
@@ -112,12 +113,15 @@ export default function WorkOrderIntakePage() {
   const [selectedLocation, setSelectedLocation] = useState<ServiceLocationSearchResult | null>(null);
 
   // New customer + location — lightweight ("just enough to start; enrich later").
-  const [customerName, setCustomerName] = useState('');
+  // Mirrors Add Customer's model so we don't over-ask: ONE name (a person OR a
+  // company) seeds both the customer and its first location — never a separate
+  // "location name" — and premise defaults from the company profile.
+  const [newName, setNewName] = useState('');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
-  const [newLocationName, setNewLocationName] = useState('');
   const [newAddress, setNewAddress] = useState({ ...blankAddress });
-  const [premiseType, setPremiseType] = useState<PremiseType>('RESIDENCE');
+  const [premise, setPremise] = useState<PremiseType>('BUSINESS');
+  const [premiseTouched, setPremiseTouched] = useState(false);
   const [dispatchRegionId, setDispatchRegionId] = useState('');
 
   // ── Work items ──────────────────────────────────────────────────────────
@@ -138,6 +142,15 @@ export default function WorkOrderIntakePage() {
     queryFn: () => dispatchRegionApi.getAll(false),
     enabled: customerMode === 'new',
   });
+  // Premise default comes from the company profile (per-location, not a customer
+  // type) — same as Add Customer. `premiseTouched` keeps a deliberate choice.
+  const { data: tenantSettings } = useQuery({
+    queryKey: ['tenant-settings'],
+    queryFn: () => tenantSettingsApi.getSettings(),
+    enabled: customerMode === 'new',
+  });
+  const defaultPremise: PremiseType = tenantSettings?.defaultPremiseType ?? 'BUSINESS';
+  const effectivePremise = premiseTouched ? premise : defaultPremise;
 
   // Prefill the customer name for the restricted picker (from ?customerId).
   const { data: prefillCustomer } = useQuery({
@@ -203,9 +216,9 @@ export default function WorkOrderIntakePage() {
 
   // ── Validation ────────────────────────────────────────────────────────
   const newCustomerReady =
-    customerName.trim() !== '' &&
+    newName.trim() !== '' &&
+    phone.trim() !== '' &&
     email.trim() !== '' &&
-    newLocationName.trim() !== '' &&
     newAddress.streetAddress.trim() !== '' &&
     newAddress.city.trim() !== '' &&
     newAddress.state.trim() !== '' &&
@@ -274,7 +287,7 @@ export default function WorkOrderIntakePage() {
     setCreatingCustomer(true);
     try {
       const customerRequest: CreateCustomerRequest = {
-        name: customerName.trim(),
+        name: newName.trim(),
         email: email.trim(),
         phone: phone.trim() || null,
         billingAddress: newAddress,
@@ -282,8 +295,10 @@ export default function WorkOrderIntakePage() {
         serviceLocations: [
           {
             dispatchRegionId,
-            locationName: newLocationName.trim(),
-            premiseType,
+            // One name seeds both records — the first location isn't asked for
+            // separately (same as Add Customer).
+            locationName: newName.trim(),
+            premiseType: effectivePremise,
             address: newAddress,
           },
         ],
@@ -354,18 +369,20 @@ export default function WorkOrderIntakePage() {
                     />
                   ) : (
                     <NewCustomerFields
-                      customerName={customerName}
-                      setCustomerName={setCustomerName}
+                      name={newName}
+                      setName={setNewName}
                       phone={phone}
                       setPhone={setPhone}
                       email={email}
                       setEmail={setEmail}
-                      locationName={newLocationName}
-                      setLocationName={setNewLocationName}
                       address={newAddress}
                       setAddress={setNewAddress}
-                      premiseType={premiseType}
-                      setPremiseType={setPremiseType}
+                      premise={effectivePremise}
+                      defaultPremise={defaultPremise}
+                      onPremiseChange={(v) => {
+                        setPremiseTouched(true);
+                        setPremise(v);
+                      }}
                       dispatchRegionId={dispatchRegionId}
                       setDispatchRegionId={setDispatchRegionId}
                       regions={regions ?? []}
@@ -492,10 +509,9 @@ export default function WorkOrderIntakePage() {
                   mode={customerMode}
                   selectedLocation={selectedLocation}
                   locationDetail={locationDetail}
-                  newCustomerName={customerName}
-                  newLocationName={newLocationName}
+                  newName={newName}
                   newAddress={newAddress}
-                  premiseType={premiseType}
+                  premise={effectivePremise}
                   typeName={activeTypes.find((tx) => tx.id === workOrderTypeId)?.name ?? null}
                   divisionName={activeDivisions.find((d) => d.id === divisionId)?.name ?? null}
                   priority={priority}
@@ -511,35 +527,38 @@ export default function WorkOrderIntakePage() {
 }
 
 // ── New customer & location — lightweight inline create ───────────────────
+// Mirrors Add Customer's "don't over-ask" model: ONE name (a person OR a
+// company) becomes both the customer and its first location — we never ask for
+// a separate location name — and premise is a per-location default from the
+// company profile, not a customer type. Full billing / advanced live on the
+// Add Customer page for back-office enrichment.
 function NewCustomerFields({
-  customerName,
-  setCustomerName,
+  name,
+  setName,
   phone,
   setPhone,
   email,
   setEmail,
-  locationName,
-  setLocationName,
   address,
   setAddress,
-  premiseType,
-  setPremiseType,
+  premise,
+  defaultPremise,
+  onPremiseChange,
   dispatchRegionId,
   setDispatchRegionId,
   regions,
 }: {
-  customerName: string;
-  setCustomerName: (v: string) => void;
+  name: string;
+  setName: (v: string) => void;
   phone: string;
   setPhone: (v: string) => void;
   email: string;
   setEmail: (v: string) => void;
-  locationName: string;
-  setLocationName: (v: string) => void;
   address: { streetAddress: string; city: string; state: string; zipCode: string };
   setAddress: (v: { streetAddress: string; city: string; state: string; zipCode: string }) => void;
-  premiseType: PremiseType;
-  setPremiseType: (v: PremiseType) => void;
+  premise: PremiseType;
+  defaultPremise: PremiseType;
+  onPremiseChange: (v: PremiseType) => void;
   dispatchRegionId: string;
   setDispatchRegionId: (v: string) => void;
   regions: { id: string; name: string }[];
@@ -548,45 +567,27 @@ function NewCustomerFields({
   return (
     <div className="space-y-2.5">
       <Text size="xs" tone="dim">
-        Just enough to start the job — enrich the full customer record later.
+        Just enough to start the job — full billing &amp; details enrich later on the customer’s page.
       </Text>
-      <div className="grid gap-2.5 sm:grid-cols-2">
-        <Field size="xs">
-          <Label size="xs" required>
-            Customer name
-          </Label>
-          <Input size="xs" value={customerName} onChange={(e) => setCustomerName(e.target.value)} placeholder="e.g. Jordan Avila" />
-        </Field>
-        <Field size="xs">
-          <Label size="xs">Phone</Label>
-          <Input size="xs" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="(602) 555-0149" />
-        </Field>
-      </div>
+      {/* One name — a household or a company — seeds both records. */}
       <Field size="xs">
         <Label size="xs" required>
-          Email
+          Name
         </Label>
-        <Input size="xs" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="name@example.com" />
+        <Input size="xs" value={name} onChange={(e) => setName(e.target.value)} placeholder="Maria Sanchez — or Iverson Properties LLC" />
       </Field>
       <div className="grid gap-2.5 sm:grid-cols-2">
         <Field size="xs">
           <Label size="xs" required>
-            Location name
+            Phone
           </Label>
-          <Input size="xs" value={locationName} onChange={(e) => setLocationName(e.target.value)} placeholder="e.g. Avila Residence" />
+          <Input size="xs" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="(602) 555-0149" />
         </Field>
         <Field size="xs">
           <Label size="xs" required>
-            Region
+            Email
           </Label>
-          <Select size="xs" value={dispatchRegionId} onChange={(e) => setDispatchRegionId(e.target.value)} aria-label="Region">
-            <option value="">Select…</option>
-            {regions.map((r) => (
-              <option key={r.id} value={r.id}>
-                {r.name}
-              </option>
-            ))}
-          </Select>
+          <Input size="xs" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="name@example.com" />
         </Field>
       </div>
       <Field size="xs">
@@ -595,7 +596,7 @@ function NewCustomerFields({
         </Label>
         <Input size="xs" value={address.streetAddress} onChange={(e) => set({ streetAddress: e.target.value })} placeholder="123 Main St" />
       </Field>
-      <div className="grid gap-2.5 sm:grid-cols-[1fr_80px_100px]">
+      <div className="grid gap-2.5 sm:grid-cols-[1fr_72px_88px_1fr]">
         <Field size="xs">
           <Label size="xs" required>
             City
@@ -614,15 +615,31 @@ function NewCustomerFields({
           </Label>
           <Input size="xs" value={address.zipCode} onChange={(e) => set({ zipCode: e.target.value })} />
         </Field>
+        <Field size="xs">
+          <Label size="xs" required>
+            Region
+          </Label>
+          <Select size="xs" value={dispatchRegionId} onChange={(e) => setDispatchRegionId(e.target.value)} aria-label="Region">
+            <option value="">Select…</option>
+            {regions.map((r) => (
+              <option key={r.id} value={r.id}>
+                {r.name}
+              </option>
+            ))}
+          </Select>
+        </Field>
       </div>
       <div>
         <MiniLabel>Premise</MiniLabel>
         <div className="mt-1">
-          <ToggleGroup value={premiseType} onChange={setPremiseType} aria-label="Premise">
+          <ToggleGroup value={premise} onChange={onPremiseChange} aria-label="Premise">
             <ToggleGroupOption value="RESIDENCE">Residence</ToggleGroupOption>
-            <ToggleGroupOption value="BUSINESS">Commercial</ToggleGroupOption>
+            <ToggleGroupOption value="BUSINESS">Business</ToggleGroupOption>
           </ToggleGroup>
         </div>
+        <Text size="xs" tone="dim" className="mt-1">
+          Default for new locations is {defaultPremise === 'BUSINESS' ? 'Business' : 'Residence'} · set in Company profile.
+        </Text>
       </div>
     </div>
   );
@@ -792,10 +809,9 @@ function IntakeRail({
   mode,
   selectedLocation,
   locationDetail,
-  newCustomerName,
-  newLocationName,
+  newName,
   newAddress,
-  premiseType,
+  premise: newPremise,
   typeName,
   divisionName,
   priority,
@@ -804,23 +820,23 @@ function IntakeRail({
   mode: 'existing' | 'new';
   selectedLocation: ServiceLocationSearchResult | null;
   locationDetail: ServiceLocationDetailDto | undefined;
-  newCustomerName: string;
-  newLocationName: string;
+  newName: string;
   newAddress: { streetAddress: string; city: string; state: string; zipCode: string };
-  premiseType: PremiseType;
+  premise: PremiseType;
   typeName: string | null;
   divisionName: string | null;
   priority: WorkOrderPriority;
   itemCount: number;
 }) {
   const isNew = mode === 'new';
-  const name = isNew ? newLocationName || newCustomerName : selectedLocation?.locationName || selectedLocation?.customerName;
+  // One name is both the site and the payer for a brand-new caller.
+  const name = isNew ? newName : selectedLocation?.locationName || selectedLocation?.customerName;
   const address = isNew ? newAddress : selectedLocation?.address;
-  const customerName = isNew ? newCustomerName : selectedLocation?.customerName;
-  const premise = isNew ? premiseType : locationDetail?.premiseType;
+  const customerName = isNew ? newName : selectedLocation?.customerName;
+  const premise = isNew ? newPremise : locationDetail?.premiseType;
   const pinnedNote = locationDetail?.notes?.find((n) => n.pinned) ?? locationDetail?.notes?.[0];
   const facts = locationDetail?.arrivalFacts ?? [];
-  const hasLocation = isNew ? !!(newLocationName || newCustomerName) : !!selectedLocation;
+  const hasLocation = isNew ? !!newName : !!selectedLocation;
 
   const line2 = address
     ? `${titleCaseAddress(address.streetAddress)} · ${titleCaseAddress(address.city)}, ${address.state} ${address.zipCode}`.trim()
@@ -836,7 +852,7 @@ function IntakeRail({
         <>
           <div className="flex flex-wrap items-baseline gap-1.5">
             <span className="text-[14px] font-bold text-fg-strong">{name || 'New location'}</span>
-            {premise && <Pill tone="neutral">{premise === 'BUSINESS' ? 'Commercial' : 'Residence'}</Pill>}
+            {premise && <Pill tone="neutral">{premise === 'BUSINESS' ? 'Business' : 'Residence'}</Pill>}
             {isNew && (
               <Pill tone="success" dot>
                 New
