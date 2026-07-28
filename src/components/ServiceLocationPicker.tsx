@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { MapPinIcon, CheckIcon } from '@heroicons/react/24/outline';
+import { MapPinIcon, HomeIcon, BuildingOffice2Icon, CheckIcon } from '@heroicons/react/24/outline';
 import { customerApi, type ServiceLocationSearchResult } from '../api';
 import { Field, Label } from './catalyst/fieldset';
 import { Input } from './catalyst/input';
@@ -64,6 +64,7 @@ export default function ServiceLocationPicker({
         customerId: loc.customerId,
         customerName,
         locationName: loc.locationName ?? null,
+        premiseType: loc.premiseType ?? null,
         address: {
           streetAddress: loc.address.streetAddress,
           city: loc.address.city,
@@ -168,6 +169,13 @@ export default function ServiceLocationPicker({
                       ? location.customerName
                       : null;
                   const selected = value?.id === location.id;
+                  // Premise glyph (PREMISE-1); neutral map-pin until the field lands.
+                  const PremiseIcon =
+                    location.premiseType === 'BUSINESS'
+                      ? BuildingOffice2Icon
+                      : location.premiseType === 'RESIDENCE'
+                        ? HomeIcon
+                        : MapPinIcon;
                   return (
                     <button
                       key={location.id}
@@ -181,7 +189,7 @@ export default function ServiceLocationPicker({
                       }
                     >
                       <span className="mt-px grid size-7 flex-shrink-0 place-items-center rounded-md bg-bg-active text-fg-muted">
-                        <MapPinIcon className="size-4" />
+                        <PremiseIcon className="size-4" />
                       </span>
                       <span className="min-w-0 flex-1">
                         <span className="flex items-baseline gap-2">
