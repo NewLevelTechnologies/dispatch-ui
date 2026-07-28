@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import {
@@ -10,7 +11,7 @@ import {
 } from '../api';
 import { useGlossary } from '../contexts/GlossaryContext';
 import { showError, extractApiError } from '../lib/toast';
-import EquipmentFormDialog from './EquipmentFormDialog';
+import { equipmentCreateUrl, workItemAttachToken } from '../lib/equipmentCreate';
 import WOEquipmentPicker from './WOEquipmentPicker';
 import InlineComposer from './InlineComposer';
 import WorkItemStatusPill from './WorkItemStatusPill';
@@ -676,9 +677,9 @@ function NewWorkItemComposer({
   const { t } = useTranslation();
   const { getName, getAbbrev } = useGlossary();
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const [complaint, setComplaint] = useState('');
   const [equipmentId, setEquipmentId] = useState<string | null>(null);
-  const [addEquipmentOpen, setAddEquipmentOpen] = useState(false);
 
   const createMutation = useMutation({
     mutationFn: () =>
@@ -697,6 +698,43 @@ function NewWorkItemComposer({
   });
 
   const canSave = complaint.trim().length > 0 && !createMutation.isPending;
+
+  // "+ Add new equipment on site" from the composer. Creating a record is a
+  // full page, and the composer's draft can't survive that navigation — so we
+  // commit this complaint as a work item first, then hand off to the equipment
+  // page, which attaches the new record back to it on return (the same path a
+  // saved card uses). The item needs a description, hence the complaint guard.
+  const [committing, setCommitting] = useState(false);
+  const handleAddNewEquipment = async () => {
+    const description = complaint.trim();
+    if (!description || !serviceLocationId || committing) {
+      if (!description) {
+        showError(
+          t('workOrders.workItems.complaintRequiredForEquipment', {
+            defaultValue: 'Enter a complaint before adding equipment.',
+          })
+        );
+      }
+      return;
+    }
+    setCommitting(true);
+    try {
+      const created = await workOrderApi.createWorkItem(workOrderId, { description });
+      queryClient.invalidateQueries({ queryKey: ['work-orders'] });
+      queryClient.invalidateQueries({ queryKey: ['work-orders-list'] });
+      queryClient.invalidateQueries({ queryKey: ['work-order-activity', workOrderId] });
+      navigate(
+        equipmentCreateUrl({
+          returnTo: `/work-orders/${workOrderId}?tab=items`,
+          locationId: serviceLocationId,
+          attachTo: workItemAttachToken(created.id),
+        })
+      );
+    } catch (err) {
+      setCommitting(false);
+      showError(t('common.form.errorCreate', { entity: getName('work_item') }), extractApiError(err) ?? undefined);
+    }
+  };
 
   return (
     <div
@@ -734,7 +772,7 @@ function NewWorkItemComposer({
               serviceLocationId={serviceLocationId}
               value={equipmentId}
               onPick={setEquipmentId}
-              onAddNew={() => setAddEquipmentOpen(true)}
+              onAddNew={handleAddNewEquipment}
             />
           </div>
         )}
@@ -750,16 +788,6 @@ function NewWorkItemComposer({
           </Button>
         </div>
       </div>
-
-      {/* "Add new equipment on site" → create with the location locked; on
-          success the picker's list refetches and we preselect the new unit. */}
-      <EquipmentFormDialog
-        isOpen={addEquipmentOpen}
-        onClose={() => setAddEquipmentOpen(false)}
-        equipment={null}
-        lockedServiceLocationId={serviceLocationId}
-        onCreated={(created) => setEquipmentId(created.id)}
-      />
     </div>
   );
 }

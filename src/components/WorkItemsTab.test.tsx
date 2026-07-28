@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
+import type { RouteObject } from 'react-router-dom';
 import { renderWithProviders, userEvent } from '../test/utils';
 import WorkItemsTab from './WorkItemsTab';
 import apiClient from '../api/client';
@@ -178,6 +179,30 @@ describe('WorkItemsTab', () => {
         expect.objectContaining({ description: 'Thermostat dead' })
       );
     });
+  });
+
+  it('composer "+ Add new equipment" commits the item, then routes to the full-page create', async () => {
+    const user = userEvent.setup();
+    vi.mocked(apiClient.post).mockResolvedValue({ data: { id: 'wi-new', description: 'Compressor swap' } });
+    const routes: RouteObject[] = [
+      { path: '/', element: <WorkItemsTab {...baseProps} serviceLocationId="loc-1" workItems={[]} /> },
+      // eslint-disable-next-line i18next/no-literal-string
+      { path: '/equipment/new', element: <div>New equipment page</div> },
+    ];
+    const { router } = renderWithProviders(<div />, { routes, initialPath: '/' });
+
+    await user.click(screen.getByRole('button', { name: /add work item/i }));
+    await user.type(screen.getByLabelText(/complaint/i), 'Compressor swap');
+    // "+ Add new equipment on site" commits the complaint as a work item first…
+    await user.click(await screen.findByRole('button', { name: /add new equipment on site/i }));
+    await waitFor(() =>
+      expect(apiClient.post).toHaveBeenCalledWith(
+        expect.stringMatching(/\/work-orders\/wo-1\/work-items$/),
+        expect.objectContaining({ description: 'Compressor swap' })
+      )
+    );
+    // …then hands off to the full-page equipment create.
+    await waitFor(() => expect(router.state.location.pathname).toBe('/equipment/new'));
   });
 
   it('surfaces an error when the composer create fails', async () => {

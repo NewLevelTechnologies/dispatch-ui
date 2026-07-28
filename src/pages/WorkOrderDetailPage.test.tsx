@@ -228,7 +228,7 @@ describe('WorkOrderDetailPage', () => {
     });
   };
 
-  const renderPage = (id = 'wo-1') => {
+  const renderPage = (id = 'wo-1', search = '') => {
     /* eslint-disable i18next/no-literal-string -- test-only placeholder routes */
     const routes: RouteObject[] = [
       { path: '/work-orders/:id', element: <WorkOrderDetailPage /> },
@@ -240,7 +240,7 @@ describe('WorkOrderDetailPage', () => {
 
     return renderWithProviders(<WorkOrderDetailPage />, {
       routes,
-      initialPath: `/work-orders/${id}`,
+      initialPath: `/work-orders/${id}${search}`,
     });
   };
 
@@ -256,6 +256,18 @@ describe('WorkOrderDetailPage', () => {
     await waitFor(() => {
       expect(screen.getByText(/error loading/i)).toBeInTheDocument();
     });
+  });
+
+  it('auto-attaches new equipment on return from the full-page create (?newEquipmentId + ?attachTo=wi:)', async () => {
+    mockApiResponses();
+    vi.mocked(apiClient.patch).mockResolvedValue({ data: {} });
+    renderPage('wo-1', '?tab=items&newEquipmentId=eq-new&attachTo=wi:it-1');
+    // The return effect PATCHes the launching work item with the new equipment.
+    await waitFor(() =>
+      expect(apiClient.patch).toHaveBeenCalledWith('/work-orders/wo-1/work-items/it-1', {
+        equipmentId: 'eq-new',
+      })
+    );
   });
 
   // ── Header (location-led) ────────────────────────────────────────────

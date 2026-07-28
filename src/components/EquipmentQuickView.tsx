@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { Link as RouterLink } from 'react-router-dom';
+import { Link as RouterLink, useNavigate, useLocation } from 'react-router-dom';
 import {
   equipmentApi,
   equipmentCategoriesApi,
@@ -15,9 +15,9 @@ import {
 } from '../api';
 import { workOrdersListQueryOptions } from '../api/workOrdersListQuery';
 import { formatFilterSize } from '../utils/formatFilterSize';
+import { equipmentCreateUrl } from '../lib/equipmentCreate';
 import { useGlossary } from '../contexts/GlossaryContext';
 import ConfirmDialog from './ConfirmDialog';
-import EquipmentFormDialog from './EquipmentFormDialog';
 import EquipmentImageUploadDialog from './EquipmentImageUploadDialog';
 import EquipmentPhotoLightbox from './EquipmentPhotoLightbox';
 import EquipmentThumbnail from './EquipmentThumbnail';
@@ -62,7 +62,8 @@ export default function EquipmentQuickView({ equipmentId, onSelectSubUnit }: Equ
   const queryClient = useQueryClient();
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [isImageUploadOpen, setIsImageUploadOpen] = useState(false);
-  const [isAddUnitOpen, setIsAddUnitOpen] = useState(false);
+  const navigate = useNavigate();
+  const routerLocation = useLocation();
   const [draft, setDraft] = useState<Draft | null>(null);
   const editing = draft !== null;
 
@@ -378,7 +379,19 @@ export default function EquipmentQuickView({ equipmentId, onSelectSubUnit }: Equ
               </span>
             )}
             {!equipment.parentId && (
-              <Button ghost size="xxs" onClick={() => setIsAddUnitOpen(true)}>
+              <Button
+                ghost
+                size="xxs"
+                onClick={() =>
+                  navigate(
+                    equipmentCreateUrl({
+                      returnTo: routerLocation.pathname + routerLocation.search,
+                      locationId: equipment.serviceLocationId,
+                      parent: equipment.id,
+                    })
+                  )
+                }
+              >
                 <PlusIcon data-slot="icon" />
                 {t('common.actions.add', { entity: getName('equipment_component') })}
               </Button>
@@ -501,17 +514,6 @@ export default function EquipmentQuickView({ equipmentId, onSelectSubUnit }: Equ
         onClose={() => setIsImageUploadOpen(false)}
         equipmentId={equipment.id}
         defaultSetProfile={!hasImages}
-      />
-      {/* Add unit — create with THIS equipment locked as the parent (and its
-          service location); on success refresh the record so the new unit chip
-          appears in the Units section. */}
-      <EquipmentFormDialog
-        isOpen={isAddUnitOpen}
-        onClose={() => setIsAddUnitOpen(false)}
-        equipment={null}
-        lockedServiceLocationId={equipment.serviceLocationId}
-        lockedParent={{ id: equipment.id, name: equipment.name }}
-        onCreated={() => invalidateEquipmentRelatedCaches()}
       />
     </div>
   );

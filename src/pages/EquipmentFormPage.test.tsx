@@ -103,6 +103,17 @@ function renderStandaloneAdd() {
   return renderWithProviders(<EquipmentFormPage />, { routes, initialEntries: ['/equipment/new'] });
 }
 
+// In-context launch: a WO picker / customer-detail add opens /equipment/new
+// with the location scoped by query and a returnTo to come back to.
+function renderInContext(path: string) {
+  const routes: RouteObject[] = [
+    { path: '/equipment/new', element: <EquipmentFormPage /> },
+    // eslint-disable-next-line i18next/no-literal-string
+    { path: '*', element: <div>Elsewhere</div> },
+  ];
+  return renderWithProviders(<EquipmentFormPage />, { routes, initialEntries: [path] });
+}
+
 describe('EquipmentFormPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -269,6 +280,55 @@ describe('EquipmentFormPage', () => {
     // No location chosen → the required picker blocks submit, nothing is created.
     await user.click(screen.getByRole('button', { name: /add equipment/i }));
     expect(mockCreate).not.toHaveBeenCalled();
+  });
+
+  it('in-context: ?locationId scopes the create (no picker) and returns to the caller with the new id + attach token', async () => {
+    const user = userEvent.setup();
+    // A WO work-item picker launched us: location fixed to loc-1, come back to
+    // the Work items tab, attach to work item it-1.
+    const { router } = renderInContext(
+      '/equipment/new?locationId=loc-1&returnTo=%2Fwork-orders%2Fwo-1%3Ftab%3Ditems&attachTo=wi%3Ait-1'
+    );
+    await waitFor(() => expect(screen.getByRole('heading', { name: /add equipment/i, level: 1 })).toBeInTheDocument());
+    // Location is fixed by the query param — the standalone picker is not shown.
+    expect(screen.queryByPlaceholderText(/search by customer/i)).not.toBeInTheDocument();
+    expect((await screen.findAllByText('Headquarters')).length).toBeGreaterThan(0);
+
+    const selects = () => screen.getAllByRole('combobox');
+    await screen.findByRole('option', { name: 'HVAC' });
+    await user.selectOptions(selects()[0], 't-hvac');
+    await waitFor(() => expect(screen.getByRole('option', { name: 'Rooftop' })).toBeInTheDocument());
+    await user.selectOptions(selects()[1], 'c-rtu');
+    await user.type(screen.getByPlaceholderText(/RTU-3/), 'RTU-7');
+    await user.click(screen.getByRole('button', { name: /add equipment/i }));
+
+    await waitFor(() => expect(mockCreate).toHaveBeenCalledWith(expect.objectContaining({ serviceLocationId: 'loc-1' })));
+    // Returns to the caller's URL, preserving its query and handing back the new id + token.
+    await waitFor(() => expect(router.state.location.pathname).toBe('/work-orders/wo-1'));
+    const params = new URLSearchParams(router.state.location.search);
+    expect(params.get('tab')).toBe('items');
+    expect(params.get('newEquipmentId')).toBe('eq-new');
+    expect(params.get('attachTo')).toBe('wi:it-1');
+  });
+
+  it('in-context: a returnTo without an attach token comes back clean (no id param)', async () => {
+    const user = userEvent.setup();
+    // Sub-unit / customer-detail add: return to the caller, nothing to wire.
+    const { router } = renderInContext('/equipment/new?locationId=loc-1&returnTo=%2Fcustomers%2Fc-1%3Ftab%3Dequipment');
+    await waitFor(() => expect(screen.getByRole('heading', { name: /add equipment/i, level: 1 })).toBeInTheDocument());
+
+    const selects = () => screen.getAllByRole('combobox');
+    await screen.findByRole('option', { name: 'HVAC' });
+    await user.selectOptions(selects()[0], 't-hvac');
+    await waitFor(() => expect(screen.getByRole('option', { name: 'Rooftop' })).toBeInTheDocument());
+    await user.selectOptions(selects()[1], 'c-rtu');
+    await user.type(screen.getByPlaceholderText(/RTU-3/), 'RTU-8');
+    await user.click(screen.getByRole('button', { name: /add equipment/i }));
+
+    await waitFor(() => expect(router.state.location.pathname).toBe('/customers/c-1'));
+    const params = new URLSearchParams(router.state.location.search);
+    expect(params.get('tab')).toBe('equipment');
+    expect(params.get('newEquipmentId')).toBeNull();
   });
 
   it('re-parents in edit mode (Placement) and sends parentId', async () => {
