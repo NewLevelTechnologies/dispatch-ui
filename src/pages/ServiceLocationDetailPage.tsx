@@ -55,7 +55,6 @@ import {
   type ArrivalFactDto,
   EquipmentStatus,
   type EquipmentSummary,
-  type ServiceLocationSearchResult,
   type ProgressCategory,
   type WorkOrderPriority,
   type WorkOrderSummary,
@@ -82,7 +81,6 @@ import { TimeAgo } from '../components/TimeAgo';
 import { titleCaseAddress } from '../utils/titleCaseAddress';
 import { extractApiError, showError, showInfo, showSuccess, showUndo } from '../lib/toast';
 import AppLayout from '../components/AppLayout';
-import WorkOrderFormDialog from '../components/WorkOrderFormDialog';
 import LocationActivityStream from '../components/LocationActivityStream';
 import LocationFilesTab from '../components/LocationFilesTab';
 import ServiceLocationContactDialog from '../components/ServiceLocationContactDialog';
@@ -175,7 +173,6 @@ export default function ServiceLocationDetailPage() {
   const queryClient = useQueryClient();
 
   const [activeTab, setActiveTab] = useUrlTab(LOCATION_TABS, 'overview');
-  const [isNewWorkOrderOpen, setIsNewWorkOrderOpen] = useState(false);
   const [confirmClose, setConfirmClose] = useState(false);
   const [deletingEquipment, setDeletingEquipment] = useState<EquipmentSummary | null>(null);
 
@@ -307,7 +304,7 @@ export default function ServiceLocationDetailPage() {
           <LocationHeader
             location={location}
             headline={headline}
-            onNewJob={() => setIsNewWorkOrderOpen(true)}
+            onNewJob={() => navigate(`/work-orders/new?locationId=${location.id}`)}
             canEdit={canEditServiceLocations}
             onClose={
               canCloseServiceLocations && location.status !== 'CLOSED'
@@ -342,7 +339,7 @@ export default function ServiceLocationDetailPage() {
           )}
 
           {activeTab === 'jobs' && (
-            <JobsTab location={location} onNewJob={() => setIsNewWorkOrderOpen(true)} />
+            <JobsTab location={location} onNewJob={() => navigate(`/work-orders/new?locationId=${location.id}`)} />
           )}
 
           {activeTab === 'invoices' && <InvoicesTab location={location} />}
@@ -367,28 +364,6 @@ export default function ServiceLocationDetailPage() {
           />
         </div>
       </div>
-
-      <WorkOrderFormDialog
-        isOpen={isNewWorkOrderOpen}
-        onClose={() => setIsNewWorkOrderOpen(false)}
-        prefilledServiceLocation={
-          {
-            id: location.id,
-            customerId: location.customerId,
-            customerName: location.customerName,
-            locationName: location.locationName ?? null,
-            address: {
-              streetAddress: location.address.streetAddress,
-              city: location.address.city,
-              state: location.address.state,
-              zipCode: location.address.zipCode,
-            },
-            siteContactName: location.siteContactName ?? null,
-            siteContactPhone: location.siteContactPhone ?? null,
-            status: 'ACTIVE',
-          } satisfies ServiceLocationSearchResult
-        }
-      />
 
       <ConfirmDialog
         isOpen={confirmClose}

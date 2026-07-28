@@ -17,6 +17,7 @@ import AgreementDetailPage from './pages/AgreementDetailPage';
 import ServiceLocationsPage from './pages/ServiceLocationsPage';
 import ServiceLocationDetailPage from './pages/ServiceLocationDetailPage';
 import WorkOrdersPage from './pages/WorkOrdersPage';
+import WorkOrderIntakePage from './pages/WorkOrderIntakePage';
 import WorkOrderDetailPage from './pages/WorkOrderDetailPage';
 import PurchaseOrderFormPage from './pages/PurchaseOrderFormPage';
 import PurchaseOrderDetailPage from './pages/PurchaseOrderDetailPage';
@@ -185,6 +186,7 @@ function App() {
       <Route path="/service-locations/:id" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<ServiceLocationDetailPage />} />} />
       <Route path="/service-locations/:locId/equipment/new" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<EquipmentFormPage />} />} />
       <Route path="/work-orders" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<WorkOrdersPage />} />} />
+      <Route path="/work-orders/new" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<WorkOrderIntakePage />} />} />
       <Route path="/work-orders/:id" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<WorkOrderDetailPage />} />} />
       <Route path="/purchasing" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<PurchasingPage />} />} />
       <Route path="/purchase-orders/new" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<PurchaseOrderFormPage />} />} />

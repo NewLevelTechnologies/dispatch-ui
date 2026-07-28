@@ -19,8 +19,11 @@ interface Props {
   value?: string | null;
   /** Pass an id to attach; pass null (via the header Clear) to detach. */
   onPick: (equipmentId: string | null) => void;
-  /** "Add new equipment on site" → opens the create dialog with the location locked. */
+  /** "Add new equipment" affordance. WO-detail callers route to the full-page
+   *  create; intake wires it to a name-only inline quick-add. */
   onAddNew?: () => void;
+  /** Override the add-new row label (intake: "name only" quick-add). */
+  addNewLabel?: string;
   /** Back out of the picker — only shown when there's a state to return to. */
   onCancel?: () => void;
   /** "This item doesn't need equipment" → detach + mark not-needed. */
@@ -45,6 +48,7 @@ export default function WOEquipmentPicker({
   value,
   onPick,
   onAddNew,
+  addNewLabel,
   onCancel,
   onNotNeeded,
   busy = false,
@@ -158,7 +162,7 @@ export default function WOEquipmentPicker({
           className="flex w-full items-center gap-1.5 px-[11px] py-2.5 text-[12px] leading-none !font-semibold text-fg-accent hover:underline"
         >
           <PlusIcon className="size-3.5" />
-          {t('workOrders.workItems.addEquipmentOnSite', { entity: getName('equipment') })}
+          {addNewLabel ?? t('workOrders.workItems.addEquipmentOnSite', { entity: getName('equipment') })}
         </button>
       )}
 

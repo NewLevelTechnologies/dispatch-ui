@@ -1209,16 +1209,19 @@ describe('EquipmentDetailPage', () => {
     });
   });
 
-  it('opens the new work order dialog from the header', async () => {
+  it('navigates to the full-page intake from the header, prefilled with the location', async () => {
     mockGetById.mockResolvedValue(baseEquipment);
     const user = userEvent.setup();
-    renderPage();
+    const { router } = renderPage();
 
     await waitFor(() => {
       expect(screen.getByRole('heading', { name: 'Upstairs Furnace' })).toBeInTheDocument();
     });
     await user.click(screen.getByRole('button', { name: /new work order/i }));
-    expect(await screen.findByRole('dialog')).toBeInTheDocument();
+    // Create is a full page now; the equipment's location prefills intake.
+    await waitFor(() => expect(router.state.location.pathname).toBe('/work-orders/new'));
+    expect(router.state.location.search).toContain('locationId=');
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
   it('shows the media peek on overview with the nameplate called out and a video thumb', async () => {

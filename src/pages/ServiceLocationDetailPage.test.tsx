@@ -1388,20 +1388,19 @@ describe('ServiceLocationDetailPage', () => {
     );
   });
 
-  it('opens the new-work-order dialog with the service location pre-selected', async () => {
+  it('navigates to the full-page intake with this location prefilled', async () => {
     mockApiResponses();
     const user = userEvent.setup();
-    renderDetailPage();
+    const { router } = renderDetailPage();
     await waitFor(() => expect(screen.getByText('Main Office')).toBeInTheDocument());
 
-    // Header + Jobs-in-flight card both expose a "New Work Order" button; either opens
-    // the same dialog. Click the first.
+    // Header + Jobs-in-flight card both expose a "New Work Order" button; either
+    // navigates to /work-orders/new with this location prefilled. Click the first.
     await user.click(screen.getAllByRole('button', { name: /new work order/i })[0]);
 
-    await waitFor(() => expect(screen.getByRole('dialog')).toBeInTheDocument());
-    expect(screen.getByDisplayValue(/Main Office.*123 Main St.*Springfield/i)).toBeInTheDocument();
-    expect(screen.queryByRole('radio', { name: /existing customer/i })).not.toBeInTheDocument();
-    expect(screen.queryByRole('radio', { name: /new customer/i })).not.toBeInTheDocument();
+    await waitFor(() => expect(router.state.location.pathname).toBe('/work-orders/new'));
+    expect(router.state.location.search).toContain('locationId=');
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
   // ── Lifecycle footer ────────────────────────────────────────────────────
