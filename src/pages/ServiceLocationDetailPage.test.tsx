@@ -1501,9 +1501,8 @@ describe('ServiceLocationDetailPage', () => {
       await waitFor(() => expect(router.state.location.pathname).toBe('/equipment/eq-1/edit'));
     });
 
-    it('confirms before deleting and calls the delete endpoint', async () => {
+    it('confirms deletion via the ConfirmDialog and calls the delete endpoint', async () => {
       mockApiResponses(mockLocation, [], equipmentList);
-      const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
       const deleteSpy = vi.mocked(apiClient.delete).mockResolvedValue({ data: undefined });
       const user = userEvent.setup();
       renderDetailPage();
@@ -1516,11 +1515,12 @@ describe('ServiceLocationDetailPage', () => {
       await user.click(within(row).getByRole('button', { name: /more options/i }));
       await user.click(await screen.findByRole('menuitem', { name: /delete/i }));
 
-      await waitFor(() => {
-        expect(confirmSpy).toHaveBeenCalled();
-        expect(deleteSpy).toHaveBeenCalledWith('/equipment/eq-1');
-      });
-      confirmSpy.mockRestore();
+      // The app ConfirmDialog opens (no window.confirm); confirm inside it.
+      const dialog = await screen.findByRole('dialog');
+      expect(within(dialog).getByText(/upstairs furnace/i)).toBeInTheDocument();
+      await user.click(within(dialog).getByRole('button', { name: /^delete$/i }));
+
+      await waitFor(() => expect(deleteSpy).toHaveBeenCalledWith('/equipment/eq-1'));
     });
   });
 
