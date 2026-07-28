@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { MapPinIcon, CheckIcon } from '@heroicons/react/24/outline';
 import { customerApi, type ServiceLocationSearchResult } from '../api';
 import { Field, Label } from './catalyst/fieldset';
 import { Input } from './catalyst/input';
@@ -144,33 +145,57 @@ export default function ServiceLocationPicker({
         />
 
         {shouldShowDropdown && (
-          <div className="absolute z-10 mt-1 w-full rounded-lg bg-white shadow-lg ring-1 ring-zinc-950/10 dark:bg-zinc-900 dark:ring-white/10">
+          <div className="absolute z-20 mt-1 w-full overflow-hidden rounded-md border border-border bg-bg-elev shadow-md">
             {isLoading && (
-              <div className="p-3 text-sm text-zinc-600 dark:text-zinc-400">Searching...</div>
+              /* eslint-disable-next-line i18next/no-literal-string */
+              <div className="px-3 py-2.5 text-[12px] text-fg-muted">Searching…</div>
             )}
 
             {!isLoading && locations.length === 0 && (
               /* eslint-disable-next-line i18next/no-literal-string */
-              <div className="p-3 text-sm text-zinc-600 dark:text-zinc-400">No locations found</div>
+              <div className="px-3 py-2.5 text-[12px] text-fg-muted">No locations found</div>
             )}
 
             {!isLoading && locations.length > 0 && (
-              <div className="max-h-60 overflow-y-auto p-1">
-                {locations.map((location) => (
-                  <button
-                    key={location.id}
-                    type="button"
-                    onClick={() => handleSelect(location)}
-                    className="w-full rounded-lg px-3 py-2.5 text-left transition-colors hover:bg-blue-500 hover:text-white focus:bg-blue-500 focus:text-white focus:outline-hidden dark:text-white dark:hover:bg-blue-600"
-                  >
-                    <div className="font-medium text-zinc-950 dark:text-white group-hover:text-white">
-                      {location.locationName || location.customerName}
-                    </div>
-                    <div className="text-sm text-zinc-600 dark:text-zinc-400 group-hover:text-white">
-                      {titleCaseAddress(location.address.streetAddress)}, {titleCaseAddress(location.address.city)}, {location.address.state} {location.address.zipCode}
-                    </div>
-                  </button>
-                ))}
+              <div className="max-h-72 overflow-y-auto p-1">
+                {locations.map((location) => {
+                  const name = location.locationName || location.customerName;
+                  // Show the owner when the site is named for something other
+                  // than the customer (disambiguates "Rental" vs "Residence",
+                  // repeated addresses, etc.).
+                  const owner =
+                    location.locationName && location.customerName !== location.locationName
+                      ? location.customerName
+                      : null;
+                  const selected = value?.id === location.id;
+                  return (
+                    <button
+                      key={location.id}
+                      type="button"
+                      onClick={() => handleSelect(location)}
+                      className="flex w-full items-start gap-2.5 rounded-sm px-2 py-2 text-left transition-colors hover:bg-bg-hover focus-visible:bg-bg-hover focus:outline-none"
+                      style={
+                        selected
+                          ? { background: 'color-mix(in oklch, var(--accent-500) 9%, transparent)' }
+                          : undefined
+                      }
+                    >
+                      <span className="mt-px grid size-7 flex-shrink-0 place-items-center rounded-md bg-bg-active text-fg-muted">
+                        <MapPinIcon className="size-4" />
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="flex items-baseline gap-2">
+                          <span className="truncate text-[12.5px] font-semibold text-fg-strong">{name}</span>
+                          {owner && <span className="ml-auto flex-shrink-0 text-[11px] text-fg-dim">{owner}</span>}
+                        </span>
+                        <span className="mt-0.5 block truncate text-[11px] text-fg-muted">
+                          {titleCaseAddress(location.address.streetAddress)}, {titleCaseAddress(location.address.city)}, {location.address.state} {location.address.zipCode}
+                        </span>
+                      </span>
+                      {selected && <CheckIcon className="mt-0.5 size-4 flex-shrink-0 text-fg-accent" />}
+                    </button>
+                  );
+                })}
               </div>
             )}
           </div>
@@ -179,7 +204,7 @@ export default function ServiceLocationPicker({
 
       {!restrictToCustomer && searchQuery.length > 0 && searchQuery.length < 2 && (
         /* eslint-disable-next-line i18next/no-literal-string */
-        <p className="mt-1 text-sm text-zinc-500">Type at least 2 characters to search</p>
+        <p className="mt-1 text-[11px] text-fg-dim">Type at least 2 characters to search</p>
       )}
     </Field>
   );

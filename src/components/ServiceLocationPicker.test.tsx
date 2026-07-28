@@ -166,7 +166,7 @@ describe('ServiceLocationPicker', () => {
 
     // Should show loading after debounce
     await waitFor(() => {
-      expect(screen.getByText('Searching...')).toBeInTheDocument();
+      expect(screen.getByText('Searching…')).toBeInTheDocument();
     });
   });
 
@@ -702,7 +702,7 @@ describe('ServiceLocationPicker', () => {
 
     // Type 1 character - no dropdown
     await user.type(input, 'j');
-    expect(screen.queryByText('Searching...')).not.toBeInTheDocument();
+    expect(screen.queryByText('Searching…')).not.toBeInTheDocument();
 
     // Type second character - show dropdown
     await user.type(input, 'o');
