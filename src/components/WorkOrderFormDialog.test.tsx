@@ -107,7 +107,7 @@ describe('WorkOrderFormDialog', () => {
       );
 
       // Description and internalNotes are no longer on the WO; work item edits
-      // happen via WorkItemFormDialog and notes via the activity rail composer.
+      // happen inline on the detail page and notes via the activity rail composer.
       // Edit-mode pre-fill should populate the still-editable fields.
       await waitFor(() => {
         const dateInput = screen.getByLabelText(/scheduled date/i);
