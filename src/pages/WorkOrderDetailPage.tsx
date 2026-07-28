@@ -17,7 +17,6 @@ import {
   workOrderFilesApi,
   purchaseOrderApi,
   type Dispatch,
-  type Equipment,
   type ProgressCategory,
   type ServiceLocationDetailDto,
   type UpdateWorkOrderRequest,
@@ -35,8 +34,9 @@ import DispatchFormDrawer from '../components/DispatchFormDrawer';
 import DispatchDetailDrawer from '../components/DispatchDetailDrawer';
 import DispatchesTab from '../components/DispatchesTab';
 import EditableField from '../components/EditableField';
-import EquipmentFormDialog from '../components/EquipmentFormDialog';
 import EquipmentQuickViewDrawer from '../components/EquipmentQuickViewDrawer';
+import { equipmentCreateUrl, workItemAttachToken, parseWorkItemAttachToken } from '../lib/equipmentCreate';
+import { showError, extractApiError } from '../lib/toast';
 import FinancialInvoicesTab from '../components/FinancialInvoicesTab';
 import FinancialQuotesTab from '../components/FinancialQuotesTab';
 import WorkItemsTab from '../components/WorkItemsTab';
@@ -163,26 +163,25 @@ export default function WorkOrderDetailPage() {
   // Row click opens the read+manage drawer (lifecycle audit, notification
   // history, edit/delete footer). Null = closed.
   const [selectedDispatch, setSelectedDispatch] = useState<Dispatch | null>(null);
-  // "Add Equipment" from a work-item row's empty-state opens the same dialog
-  // in CREATE mode with the WO's service location pre-locked. The work item
-  // tracked here is the one we'll link the new equipment to once it's
-  // created (via EquipmentFormDialog's onCreated callback).
-  const [addEquipmentForWorkItem, setAddEquipmentForWorkItem] = useState<WorkItemResponse | null>(null);
   // Work-item delete goes through the app ConfirmDialog (not window.confirm).
   const [workItemToDelete, setWorkItemToDelete] = useState<WorkItemResponse | null>(null);
   // Sub-unit chip click opens the equipment quickview drawer in-context.
   // Drawer manages its own stack of pushed sub-units internally; this state
   // is just the seed (the equipment whose chip was clicked).
   const [drawerEquipment, setDrawerEquipment] = useState<{ id: string; name: string } | null>(null);
-  // "+ Add unit" inside a chip row OR inside the drawer opens
-  // EquipmentFormDialog with this equipment locked as the parent. Same dialog
-  // component as the empty-state add-equipment flow, just with a different
-  // lock and no work-item linking (sub-units belong to their parent
-  // equipment, not directly to the work item).
-  const [addSubUnitParent, setAddSubUnitParent] = useState<{ id: string; name: string } | null>(null);
 
+  // "+ Add new equipment" on a work item → the full-page create ("creating a
+  // record is a page"), scoped to the WO's location and told to attach the new
+  // record back to this item on return. `workOrder` is defined below; the
+  // handler reads it at click time, when it has loaded.
   const handleAddEquipmentToWorkItem = (wi: WorkItemResponse) => {
-    setAddEquipmentForWorkItem(wi);
+    navigate(
+      equipmentCreateUrl({
+        returnTo: `/work-orders/${id}?tab=items`,
+        locationId: workOrder?.serviceLocationId || workOrder?.serviceLocation?.id,
+        attachTo: workItemAttachToken(wi.id),
+      })
+    );
   };
 
   // Sub-unit chip click → open the quickview drawer for that equipment.
@@ -191,34 +190,17 @@ export default function WorkOrderDetailPage() {
     setDrawerEquipment(subUnit);
   };
 
-  // "+ Add unit" → EquipmentFormDialog with the parent locked. Routes from
-  // both the work-item row's chip row AND the inside-drawer chip row through
-  // this single handler so dialog state lives in one place.
+  // "+ Add unit" (from a work-item chip row) → the full-page create with the
+  // parent locked. Sub-units inherit the parent's location; no work-item link,
+  // so no attachTo — we just return to the Work items tab.
   const handleAddSubUnit = (parent: { id: string; name: string }) => {
-    setAddSubUnitParent(parent);
-  };
-
-  // After the user creates new equipment from the row's empty state, link it
-  // to the work item that triggered the flow. EquipmentFormDialog already
-  // invalidated equipment + work-order caches on its own; this PATCH is a
-  // second mutation that sets workItem.equipmentId, then re-invalidates so
-  // the row swaps from empty state to populated.
-  const handleEquipmentCreatedForWorkItem = async (created: Equipment) => {
-    const wi = addEquipmentForWorkItem;
-    setAddEquipmentForWorkItem(null);
-    if (!wi || !id) return;
-    try {
-      await workOrderApi.updateWorkItem(id, wi.id, { equipmentId: created.id });
-      queryClient.invalidateQueries({ queryKey: ['work-orders'] });
-      queryClient.invalidateQueries({ queryKey: ['work-orders-list'] });
-      queryClient.invalidateQueries({ queryKey: ['work-order-activity', id] });
-    } catch (err) {
-      const msg =
-        err instanceof Error && 'response' in err
-          ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
-          : undefined;
-      alert(msg || t('common.form.errorUpdate', { entity: getName('work_item') }));
-    }
+    navigate(
+      equipmentCreateUrl({
+        returnTo: `/work-orders/${id}?tab=items`,
+        locationId: workOrder?.serviceLocationId || workOrder?.serviceLocation?.id,
+        parent: parent.id,
+      })
+    );
   };
 
   const deleteWorkItemMutation = useMutation({
@@ -364,6 +346,43 @@ export default function WorkOrderDetailPage() {
       alert(msg || t('common.form.errorUpdate', { entity: getName('work_item') }));
     }
   };
+
+  // Return from the full-page equipment create (the picker's "+ Add new
+  // equipment"). EquipmentFormPage sent us back with ?newEquipmentId and
+  // ?attachTo=wi:<id>; attach the new record to that work item, then strip the
+  // params so a refresh doesn't re-attach. Sub-unit / no-attach returns just
+  // land here with the caches already invalidated by the form.
+  useEffect(() => {
+    const newEquipmentId = searchParams.get('newEquipmentId');
+    if (!newEquipmentId || !id) return;
+    const workItemId = parseWorkItemAttachToken(searchParams.get('attachTo'));
+    const clearParams = () => {
+      const next = new URLSearchParams(searchParams);
+      next.delete('newEquipmentId');
+      next.delete('attachTo');
+      setSearchParams(next, { replace: true });
+    };
+    if (!workItemId) {
+      clearParams();
+      return;
+    }
+    void (async () => {
+      try {
+        await workOrderApi.updateWorkItem(id, workItemId, { equipmentId: newEquipmentId });
+        queryClient.invalidateQueries({ queryKey: ['work-orders'] });
+        queryClient.invalidateQueries({ queryKey: ['work-orders-list'] });
+        queryClient.invalidateQueries({ queryKey: ['work-order-activity', id] });
+      } catch (err) {
+        showError(
+          t('common.form.errorUpdate', { entity: getName('work_item') }),
+          extractApiError(err) ?? undefined
+        );
+      } finally {
+        clearParams();
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, id]);
 
   // Generic single-field PATCH for inline edits on the WO meta card. Each
   // EditableField calls this with the field name and new value. EditableField
@@ -1103,33 +1122,6 @@ export default function WorkOrderDetailPage() {
         locationName={location?.locationName}
         workOrderNumber={woDisplayNumber}
         dispatch={editingDispatch}
-      />
-
-      {/* Same dialog component, opened in CREATE mode with the WO's service
-          location pre-locked. onCreated wires the new equipment back to the
-          work item that triggered the flow. */}
-      <EquipmentFormDialog
-        isOpen={addEquipmentForWorkItem !== null}
-        onClose={() => setAddEquipmentForWorkItem(null)}
-        equipment={null}
-        lockedServiceLocationId={
-          workOrder?.serviceLocationId || workOrder?.serviceLocation?.id
-        }
-        onCreated={handleEquipmentCreatedForWorkItem}
-      />
-
-      {/* Sub-unit creation: same dialog, but locked to a parent equipment
-          rather than a work item. Used by the chip-row and the in-drawer
-          "+ Add" affordance. The new sub-unit inherits the parent's service
-          location implicitly on the backend. */}
-      <EquipmentFormDialog
-        isOpen={addSubUnitParent !== null}
-        onClose={() => setAddSubUnitParent(null)}
-        equipment={null}
-        lockedServiceLocationId={
-          workOrder?.serviceLocationId || workOrder?.serviceLocation?.id
-        }
-        lockedParent={addSubUnitParent}
       />
 
       {/* Equipment quickview drawer — slides in from the right when a

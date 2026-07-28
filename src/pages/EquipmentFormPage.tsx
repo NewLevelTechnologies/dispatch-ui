@@ -52,16 +52,25 @@ function NameplateBadge({ kind }: { kind: NameplateMark }) {
 
 // Add / Edit Equipment — full-page form. The redesigned sibling of Add
 // Location / Add Customer (same max-w-[680px], section cards, gated
-// validation, footer-with-primary). Replaces EquipmentFormDialog everywhere
-// EXCEPT the in-context Work Order flows (add-to-work-item, add-sub-unit),
-// which keep the dialog because they chain `onCreated` and must not navigate
-// away from the work order.
+// validation, footer-with-primary). This is the ONE surface for creating an
+// equipment record — the legacy EquipmentFormDialog is gone. In-context
+// callers (a WO work-item picker, the equipment drawer's "+ Add unit", a
+// customer-detail add) launch this page with a returnTo and auto-attach the
+// new record when it hands them back the id (see the launch contract below).
 //
 // One file, route-driven:
 //   • /service-locations/:locId/equipment/new   scoped add (FK from route)
 //       + ?parent=:equipId → sub-unit under that system
 //   • /equipment/new                            standalone add (location picker)
 //   • /equipment/:id/edit                        edit
+//
+// In-context launch contract (create only, all query params):
+//   • ?locationId=  scope to this location, skip the picker (like :locId)
+//   • ?returnTo=    URL-encoded path to return to on save AND cancel
+//   • ?attachTo=    opaque token echoed back on the return URL
+//   • ?parent=      sub-unit parent (as above)
+// On save with a returnTo, we navigate to `returnTo?newEquipmentId=<id>
+// [&attachTo=<token>]`; the caller reads those to wire the new record on.
 //
 // Notes:
 //   • Specs card renders the chosen category's custom fields (tenant registry)
@@ -85,6 +94,19 @@ interface FormState {
   warrantyLaborExpiresAt: string;
   warrantyDetails: string;
   parentId: string;
+}
+
+// Build the return URL for an in-context create. Only when the caller gave an
+// attach token do we hand back the new id (+ token) for auto-wiring; otherwise
+// (sub-unit, customer-detail add) we return clean, since the form already
+// invalidated the caller's caches. Preserves any query the returnTo carries.
+function appendReturnParams(returnTo: string, newEquipmentId: string, attachTo: string | null): string {
+  if (!attachTo) return returnTo;
+  const [path, existing] = returnTo.split('?');
+  const params = new URLSearchParams(existing ?? '');
+  params.set('newEquipmentId', newEquipmentId);
+  params.set('attachTo', attachTo);
+  return `${path}?${params.toString()}`;
 }
 
 const blankForm: FormState = {
@@ -113,7 +135,26 @@ export default function EquipmentFormPage() {
   const isEdit = Boolean(id);
   // Sub-unit context — only meaningful in (scoped) add mode.
   const addParentId = !isEdit ? searchParams.get('parent') : null;
-  const standalone = !isEdit && !locId;
+  // In-context launch contract (create only). A caller — a WO work-item
+  // equipment picker, the equipment drawer's "+ Add unit", a customer-detail
+  // "+ Add equipment" — sends the location to scope to (`locationId`) and the
+  // URL to return to (`returnTo`). `attachTo` is an opaque token we echo back
+  // untouched so the caller can wire the new record onto whatever launched us
+  // (a saved work item, a local draft). See appendReturnParams.
+  // returnTo works in both modes (edit returns to the caller too — e.g.
+  // customer-detail equipment edit); the rest are create-only concepts.
+  const returnTo = searchParams.get('returnTo');
+  const queryLocationId = !isEdit ? searchParams.get('locationId') : null;
+  const attachTo = !isEdit ? searchParams.get('attachTo') : null;
+  // Restrict the standalone location picker to one customer (a multi-location
+  // customer-detail "+ Add equipment" — the location is still chosen here).
+  const queryCustomerId = !isEdit ? searchParams.get('customerId') : null;
+  const queryCustomerName = !isEdit ? searchParams.get('customerName') : null;
+  const restrictCustomer = queryCustomerId ? { id: queryCustomerId, name: queryCustomerName ?? '' } : null;
+  // The owning location is fixed when it arrives via the route (`:locId`) or the
+  // `?locationId=` query param; only a bare /equipment/new needs the picker.
+  const scopedLocationId = locId ?? queryLocationId ?? null;
+  const standalone = !isEdit && !scopedLocationId;
 
   const [pickedLocation, setPickedLocation] = useState<ServiceLocationSearchResult | null>(null);
   const [form, setForm] = useState<FormState>(blankForm);
@@ -191,8 +232,8 @@ export default function EquipmentFormPage() {
   }, [isEdit, equipment, hydrated]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
-  // Location that owns this unit (route in scoped/edit, picked in standalone).
-  const headerLocationId = isEdit ? equipment?.serviceLocationId : standalone ? undefined : locId;
+  // Location that owns this unit (route/query in scoped/edit, picked in standalone).
+  const headerLocationId = isEdit ? equipment?.serviceLocationId : standalone ? undefined : scopedLocationId;
   const { data: serviceLocation } = useQuery({
     queryKey: ['service-location', headerLocationId],
     queryFn: () => customerApi.getServiceLocationById(headerLocationId!),
@@ -244,7 +285,7 @@ export default function EquipmentFormPage() {
     ? equipment?.serviceLocationId
     : standalone
       ? pickedLocation?.id
-      : locId;
+      : scopedLocationId;
 
   const set = <K extends keyof FormState>(key: K, value: FormState[K]) =>
     setForm((f) => ({ ...f, [key]: value }));
@@ -272,13 +313,15 @@ export default function EquipmentFormPage() {
   const locationLabel =
     serviceLocation?.locationName || serviceLocation?.customerName || getName('service_location');
 
-  const cancelHref = isEdit
-    ? `/equipment/${id}`
-    : addParentId
-      ? `/equipment/${addParentId}`
-      : standalone
-        ? '/equipment'
-        : `/service-locations/${locId}?tab=equipment`;
+  const cancelHref = returnTo
+    ? returnTo
+    : isEdit
+      ? `/equipment/${id}`
+      : addParentId
+        ? `/equipment/${addParentId}`
+        : standalone
+          ? '/equipment'
+          : `/service-locations/${scopedLocationId}?tab=equipment`;
 
   const backLabel = isEdit
     ? (equipment?.name ?? getName('equipment'))
@@ -457,6 +500,12 @@ export default function EquipmentFormPage() {
           ? t('common.form.successUpdate', { entity: getName('equipment'), defaultValue: 'Equipment updated' })
           : t('common.form.successCreate', { entity: getName('equipment'), defaultValue: 'Equipment created' })
       );
+      // In-context launch: return to the caller (create hands back the id for
+      // auto-attach; edit just goes back) instead of the record page.
+      if (returnTo) {
+        navigate(appendReturnParams(returnTo, saved.id, attachTo));
+        return;
+      }
       navigate(`/equipment/${saved.id}`);
     },
     onError: (err: unknown) =>
@@ -565,6 +614,7 @@ export default function EquipmentFormPage() {
                   value={pickedLocation}
                   onChange={setPickedLocation}
                   label={getName('service_location')}
+                  restrictToCustomer={restrictCustomer}
                   required
                 />
                 {touched.serviceLocationId && errors.serviceLocationId && (

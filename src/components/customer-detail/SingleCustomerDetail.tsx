@@ -6,7 +6,7 @@
 // customer-level cards (Billing & AR, Account details, Notes) + the Equipment /
 // Work Orders tabs are reused from the MULTI work.
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { EllipsisVerticalIcon, PencilSquareIcon, PlusIcon } from '@heroicons/react/24/outline';
@@ -18,7 +18,6 @@ import {
   EquipmentStatus,
   type Customer,
   type CustomerStatus,
-  type Equipment,
   type EquipmentSummary,
   type UpdateCustomerRequest,
   type PremiseType,
@@ -40,7 +39,7 @@ import { LoadingState } from '../ui/LoadingState';
 import IconButton from '../IconButton';
 import ConfirmDialog from '../ConfirmDialog';
 import WorkOrderFormDialog from '../WorkOrderFormDialog';
-import EquipmentFormDialog from '../EquipmentFormDialog';
+import { equipmentCreateUrl, equipmentEditUrl } from '../../lib/equipmentCreate';
 import NotificationPreferencesDialog from '../NotificationPreferencesDialog';
 import LocationFilesTab from '../LocationFilesTab';
 import LocationActivityStream from '../LocationActivityStream';
@@ -142,12 +141,14 @@ export default function SingleCustomerDetail({ customer }: { customer: Customer 
   const [editingHeader, setEditingHeader] = useState(false);
   const [isNewWorkOrderOpen, setIsNewWorkOrderOpen] = useState(false);
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
-  const [isEquipmentOpen, setIsEquipmentOpen] = useState(false);
-  const [editingEquipment, setEditingEquipment] = useState<Equipment | null>(null);
   const [deletingEquipment, setDeletingEquipment] = useState<EquipmentSummary | null>(null);
   const [lifecycleConfirm, setLifecycleConfirm] = useState(false);
 
+  const navigate = useNavigate();
+  const routerLocation = useLocation();
   const locId = customer.serviceLocations[0]?.id ?? '';
+  // Return here (Equipment tab) after the full-page equipment create/edit.
+  const equipmentReturnTo = `${routerLocation.pathname}?tab=equipment`;
 
   // The single location's full detail — feeds the inlined location cards
   // (Site instructions / Site contact / Work orders / Dispatches), which are the
@@ -234,11 +235,11 @@ export default function SingleCustomerDetail({ customer }: { customer: Customer 
     },
   });
 
-  const handleEditEquipment = async (item: EquipmentSummary) => {
-    const full = await equipmentApi.getById(item.id);
-    setEditingEquipment(full);
-    setIsEquipmentOpen(true);
-  };
+  // Add/edit equipment are full pages now; return to this customer's Equipment tab.
+  const handleAddEquipment = () =>
+    navigate(equipmentCreateUrl({ returnTo: equipmentReturnTo, locationId: locId || undefined }));
+  const handleEditEquipment = (item: EquipmentSummary) =>
+    navigate(equipmentEditUrl(item.id, equipmentReturnTo));
 
   const addr = customer.serviceLocations[0]?.address;
   const headerAddress = addr
@@ -389,10 +390,7 @@ export default function SingleCustomerDetail({ customer }: { customer: Customer 
             <CustomerEquipmentTab
               customerId={customer.id}
               canEdit={canEditCustomers}
-              onAdd={() => {
-                setEditingEquipment(null);
-                setIsEquipmentOpen(true);
-              }}
+              onAdd={handleAddEquipment}
               onEdit={handleEditEquipment}
               onDelete={setDeletingEquipment}
             />
@@ -453,15 +451,6 @@ export default function SingleCustomerDetail({ customer }: { customer: Customer 
         isOpen={isNewWorkOrderOpen}
         onClose={() => setIsNewWorkOrderOpen(false)}
         prefilledCustomer={{ id: customer.id, name: customer.name }}
-      />
-      <EquipmentFormDialog
-        isOpen={isEquipmentOpen}
-        onClose={() => {
-          setIsEquipmentOpen(false);
-          setEditingEquipment(null);
-        }}
-        equipment={editingEquipment}
-        lockedServiceLocationId={locId || undefined}
       />
       <ConfirmDialog
         isOpen={deletingEquipment !== null}

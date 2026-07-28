@@ -149,7 +149,8 @@ export default function WOEquipmentPicker({
         })
       )}
 
-      {/* Add new — routes to the create dialog with the location pre-locked. */}
+      {/* Add new — the caller routes to the full-page equipment create with the
+          location pre-scoped ("creating a record is a page"); see onAddNew. */}
       {onAddNew && (
         <button
           type="button"

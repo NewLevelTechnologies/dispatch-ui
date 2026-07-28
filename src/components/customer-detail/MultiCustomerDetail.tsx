@@ -6,7 +6,7 @@
 // tabs reuse the existing list components inside the new shell (the mock stubs
 // them — they are not part of this design pass).
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { EllipsisVerticalIcon, PlusIcon } from '@heroicons/react/24/outline';
@@ -18,7 +18,6 @@ import {
   EquipmentStatus,
   type Customer,
   type CustomerStatus,
-  type Equipment,
   type EquipmentSummary,
   type UpdateCustomerRequest,
 } from '../../api';
@@ -37,7 +36,6 @@ import { Callout } from '../ui/Callout';
 import IconButton from '../IconButton';
 import ConfirmDialog from '../ConfirmDialog';
 import WorkOrderFormDialog from '../WorkOrderFormDialog';
-import EquipmentFormDialog from '../EquipmentFormDialog';
 import NotificationPreferencesDialog from '../NotificationPreferencesDialog';
 import CustomerActivityStream from './CustomerActivityStream';
 import CustomerAgreementsTab from '../CustomerAgreementsTab';
@@ -53,6 +51,7 @@ import { formatDateShort } from './format';
 import { formatPhone } from '../../utils/formatPhone';
 import { titleCaseAddress } from '../../utils/titleCaseAddress';
 import { useUrlTab } from '../../hooks/useUrlTab';
+import { equipmentCreateUrl, equipmentEditUrl } from '../../lib/equipmentCreate';
 
 type TabId =
   | 'overview'
@@ -79,6 +78,7 @@ export default function MultiCustomerDetail({ customer }: { customer: Customer }
   const { t } = useTranslation();
   const { getName } = useGlossary();
   const navigate = useNavigate();
+  const routerLocation = useLocation();
   const queryClient = useQueryClient();
   const canEditCustomers = useHasCapability('EDIT_CUSTOMERS');
   const canAddServiceLocations = useHasCapability('ADD_SERVICE_LOCATIONS');
@@ -88,8 +88,6 @@ export default function MultiCustomerDetail({ customer }: { customer: Customer }
   const [editingHeader, setEditingHeader] = useState(false);
   const [isNewWorkOrderOpen, setIsNewWorkOrderOpen] = useState(false);
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
-  const [isEquipmentOpen, setIsEquipmentOpen] = useState(false);
-  const [editingEquipment, setEditingEquipment] = useState<Equipment | null>(null);
   const [deletingEquipment, setDeletingEquipment] = useState<EquipmentSummary | null>(null);
   const [lifecycleConfirm, setLifecycleConfirm] = useState(false);
 
@@ -158,11 +156,14 @@ export default function MultiCustomerDetail({ customer }: { customer: Customer }
     },
   });
 
-  const handleEditEquipment = async (item: EquipmentSummary) => {
-    const full = await equipmentApi.getById(item.id);
-    setEditingEquipment(full);
-    setIsEquipmentOpen(true);
-  };
+  // Add/edit equipment are full pages now. A multi-location customer has no
+  // single location, so add scopes the picker to this customer; both return to
+  // the Equipment tab on save/cancel.
+  const equipmentReturnTo = `${routerLocation.pathname}?tab=equipment`;
+  const handleAddEquipment = () =>
+    navigate(equipmentCreateUrl({ returnTo: equipmentReturnTo, customerId: customer.id, customerName: customer.name }));
+  const handleEditEquipment = (item: EquipmentSummary) =>
+    navigate(equipmentEditUrl(item.id, equipmentReturnTo));
 
   const tabs: { id: TabId; label: string; count?: number }[] = [
     { id: 'overview', label: t('customers.tabs.overview') },
@@ -323,10 +324,7 @@ export default function MultiCustomerDetail({ customer }: { customer: Customer }
             <CustomerEquipmentTab
               customerId={customer.id}
               canEdit={canEditCustomers}
-              onAdd={() => {
-                setEditingEquipment(null);
-                setIsEquipmentOpen(true);
-              }}
+              onAdd={handleAddEquipment}
               onEdit={handleEditEquipment}
               onDelete={setDeletingEquipment}
             />
@@ -390,15 +388,6 @@ export default function MultiCustomerDetail({ customer }: { customer: Customer }
         isOpen={isNewWorkOrderOpen}
         onClose={() => setIsNewWorkOrderOpen(false)}
         prefilledCustomer={{ id: customer.id, name: customer.name }}
-      />
-      <EquipmentFormDialog
-        isOpen={isEquipmentOpen}
-        onClose={() => {
-          setIsEquipmentOpen(false);
-          setEditingEquipment(null);
-        }}
-        equipment={editingEquipment}
-        lockedCustomer={{ id: customer.id, name: customer.name }}
       />
       <ConfirmDialog
         isOpen={deletingEquipment !== null}
