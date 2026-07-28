@@ -177,6 +177,7 @@ export default function ServiceLocationDetailPage() {
   const [activeTab, setActiveTab] = useUrlTab(LOCATION_TABS, 'overview');
   const [isNewWorkOrderOpen, setIsNewWorkOrderOpen] = useState(false);
   const [confirmClose, setConfirmClose] = useState(false);
+  const [deletingEquipment, setDeletingEquipment] = useState<EquipmentSummary | null>(null);
 
   const canEditServiceLocations = useHasCapability('EDIT_SERVICE_LOCATIONS');
   const canCloseServiceLocations = useHasCapability('CLOSE_SERVICE_LOCATIONS');
@@ -242,10 +243,10 @@ export default function ServiceLocationDetailPage() {
     navigate(`/equipment/${item.id}/edit`);
   };
 
+  // Destructive delete goes through the app ConfirmDialog (not window.confirm),
+  // matching every other destructive action on this page.
   const handleDeleteEquipment = (item: EquipmentSummary) => {
-    if (window.confirm(t('common.actions.deleteConfirm', { name: item.name }))) {
-      deleteEquipmentMutation.mutate(item.id);
-    }
+    setDeletingEquipment(item);
   };
 
   const closeLocationMutation = useMutation({
@@ -398,6 +399,16 @@ export default function ServiceLocationDetailPage() {
         confirmLabel={t('serviceLocations.actions.close', { defaultValue: 'Close location' })}
         isDestructive
         isPending={closeLocationMutation.isPending}
+      />
+      <ConfirmDialog
+        isOpen={deletingEquipment !== null}
+        onClose={() => setDeletingEquipment(null)}
+        onConfirm={() => deletingEquipment && deleteEquipmentMutation.mutate(deletingEquipment.id)}
+        title={deletingEquipment ? t('common.actions.deleteConfirm', { name: deletingEquipment.name }) : ''}
+        message={t('common.actions.deleteWarning', { defaultValue: 'This cannot be undone.' })}
+        confirmLabel={t('common.delete')}
+        isDestructive
+        isPending={deleteEquipmentMutation.isPending}
       />
     </AppLayout>
   );
