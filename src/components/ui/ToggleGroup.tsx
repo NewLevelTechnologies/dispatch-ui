@@ -32,6 +32,9 @@ interface ToggleGroupProps<T extends string> {
   onChange: (value: T) => void;
   children: ReactNode;
   className?: string;
+  // `sm` tightens padding + type for inline placements (e.g. beside a field
+  // label); the default size is the standalone settings-row control.
+  size?: 'sm';
   'aria-label'?: string;
 }
 
@@ -40,11 +43,12 @@ export function ToggleGroup<T extends string>({
   onChange,
   children,
   className,
+  size,
   'aria-label': ariaLabel,
 }: ToggleGroupProps<T>) {
   return (
     <Headless.RadioGroup value={value} onChange={onChange} aria-label={ariaLabel}>
-      <div className={clsx('toggle-group', className)}>{children}</div>
+      <div className={clsx('toggle-group', size === 'sm' && 'toggle-group--sm', className)}>{children}</div>
     </Headless.RadioGroup>
   );
 }
