@@ -144,6 +144,38 @@ export interface ServiceLocationSearchResult {
   status: 'ACTIVE' | 'INACTIVE' | 'CLOSED';
 }
 
+// ── Duplicate check (Add Customer intake) ──────────────────────────────
+// Address-first dedup: address match = near-certain (one address is one place),
+// name match = possible only. The backend tags each candidate with matchReason
+// so the FE presents them at the right confidence. Address/premise/status/
+// lastServiceAt are null on a NAME-only match. openJobCount is the matched
+// location's open WO count (ADDRESS/BOTH) or the customer's (NAME).
+export type DuplicateMatchReason = 'ADDRESS' | 'NAME' | 'BOTH';
+
+export interface DuplicateCandidate {
+  customerId: string;
+  // The owning customer/account name.
+  name: string;
+  customerNumber: string;
+  // The matched LOCATION's name (e.g. "Brock Landers") — the operative label on
+  // an address match, since that's what we route to. Optional until the backend
+  // adds it; null for a name-only match. Falls back to the customer name.
+  locationName?: string | null;
+  serviceLocationId: string | null;
+  premiseType: PremiseType | null;
+  matchReason: DuplicateMatchReason;
+  // Matched location's address (null on a NAME-only match). The wire also
+  // carries country/lat/long/validated/timeZone; the guard only reads these.
+  address: { streetAddress: string; city: string; state: string; zipCode: string } | null;
+  status: 'ACTIVE' | 'INACTIVE' | 'CLOSED' | null;
+  lastServiceAt: string | null;
+  openJobCount: number;
+}
+
+export interface DuplicateCheckResponse {
+  candidates: DuplicateCandidate[];
+}
+
 export interface ServiceLocationSearchResponse {
   content: ServiceLocationSearchResult[];
   totalElements: number;
@@ -705,6 +737,22 @@ export const customerApi = {
     sort?: string;
   }): Promise<CustomerSearchResponse> => {
     const response = await apiClient.get<CustomerSearchResponse>('/customers/search', {
+      params,
+    });
+    return response.data;
+  },
+
+  // Address-first duplicate check for the Add Customer intake form. Send at
+  // least `name` or `street` (else 400). Candidates come pre-ordered
+  // BOTH → ADDRESS → NAME, capped at 5. See DuplicateCandidate.
+  duplicateCheck: async (params: {
+    name?: string;
+    street?: string;
+    city?: string;
+    state?: string;
+    zip?: string;
+  }): Promise<DuplicateCheckResponse> => {
+    const response = await apiClient.get<DuplicateCheckResponse>('/customers/duplicate-check', {
       params,
     });
     return response.data;

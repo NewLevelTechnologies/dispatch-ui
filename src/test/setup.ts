@@ -135,6 +135,7 @@ vi.mock('react-i18next', () => {
     'common.form.city': 'City',
     'common.form.code': 'Code',
     'common.form.color': 'Color',
+    'common.form.contactName': 'Contact name',
     'common.form.contractPricingTier': 'Contract Pricing Tier',
     'common.form.description': 'Description',
     'common.form.descriptionCreate': 'Create a new {{entity, lowercase}} record.',

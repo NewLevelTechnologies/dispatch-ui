@@ -291,6 +291,14 @@
   outline: 2px solid var(--accent-500);
   outline-offset: 1px;
 }
+/* `sm` — inline placements (e.g. beside a field label). */
+.toggle-group--sm { padding: 2px; gap: 2px; border-radius: 7px; }
+.toggle-group--sm .toggle-group-option {
+  padding: 2px 8px;
+  gap: 4px;
+  font-size: 11px;
+  border-radius: 5px;
+}
 
 /* ── Badge — accent variant ──────────────────────────────────────
    The Catalyst Badge ships with a flat Tailwind-token palette. Our
