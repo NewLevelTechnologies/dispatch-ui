@@ -91,6 +91,7 @@
       "city": "City",
       "code": "Code",
       "color": "Color",
+      "contactName": "Contact name",
       "contractPricingTier": "Contract Pricing Tier",
       "description": "Description",
       "descriptionCreate": "Create a new {{entity, lowercase}} record.",
