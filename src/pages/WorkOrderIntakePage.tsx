@@ -34,7 +34,7 @@ import { Heading } from '../components/catalyst/heading';
 import { Text } from '../components/catalyst/text';
 import { ToggleGroup, ToggleGroupOption } from '../components/ui/ToggleGroup';
 import { Pill } from '../components/ui/Pill';
-import { PlusIcon, XMarkIcon, CheckIcon } from '@heroicons/react/24/outline';
+import { PlusIcon, XMarkIcon, CheckIcon, BoltIcon } from '@heroicons/react/24/outline';
 
 // New Work Order intake (mock: New Job.html / screen-wo-intake.jsx). A CSR
 // books this while on the phone, so it's one dense form — location-led (the
@@ -89,6 +89,31 @@ const blankAddress = { streetAddress: '', city: '', state: '', zipCode: '' };
 // above a segmented control / bare input, so use a plain styled label).
 function MiniLabel({ children }: { children: React.ReactNode }) {
   return <div className="mb-1 text-[11px] font-semibold text-fg-strong">{children}</div>;
+}
+
+// Numbered step badge on each section header (mock: the flow reads as an
+// ordered checklist). Flips to a ✓ once the section has what it needs.
+function StepBadge({ n, complete }: { n: number; complete?: boolean }) {
+  return (
+    <span
+      aria-hidden="true"
+      className={`grid size-[18px] shrink-0 place-items-center rounded-full text-[10px] font-bold ${
+        complete ? 'bg-success-500 text-white' : 'border border-border-strong bg-bg-active text-fg-muted'
+      }`}
+    >
+      {complete ? '✓' : n}
+    </span>
+  );
+}
+
+// A section title with its step badge — passed to <Card title=…>.
+function StepTitle({ n, complete, children }: { n: number; complete?: boolean; children: React.ReactNode }) {
+  return (
+    <span className="flex items-center gap-2">
+      <StepBadge n={n} complete={complete} />
+      {children}
+    </span>
+  );
 }
 
 export default function WorkOrderIntakePage() {
@@ -351,7 +376,7 @@ export default function WorkOrderIntakePage() {
               {/* ── Form column ── */}
               <div className="min-w-0 space-y-3.5">
                 {/* Service location — the lead section; customer derives from it. */}
-                <Card title={getName('service_location')}>
+                <Card title={<StepTitle n={1} complete={locationReady}>{getName('service_location')}</StepTitle>}>
                   <div className="mb-2.5">
                     <ToggleGroup value={customerMode} onChange={setCustomerMode} aria-label="Customer">
                       <ToggleGroupOption value="existing">Existing</ToggleGroupOption>
@@ -391,7 +416,7 @@ export default function WorkOrderIntakePage() {
                 </Card>
 
                 {/* Job details — WO classification. */}
-                <Card title="Details">
+                <Card title={<StepTitle n={2} complete={!!workOrderTypeId}>Job details</StepTitle>}>
                   <div className="grid gap-2.5 sm:grid-cols-2">
                     <Field size="xs">
                       <Label size="xs" required>
@@ -445,10 +470,10 @@ export default function WorkOrderIntakePage() {
                 {/* Work items — repeatable drafts. */}
                 <Card
                   title={
-                    <span className="flex items-center gap-2">
+                    <StepTitle n={3} complete={complaintDrafts.length > 0}>
                       {getName('work_item', true)}
                       <Pill tone="neutral">{drafts.length}</Pill>
-                    </span>
+                    </StepTitle>
                   }
                   action={
                     <Button type="button" outline size="xxs" onClick={addDraft}>
@@ -503,8 +528,8 @@ export default function WorkOrderIntakePage() {
                 </Card>
               </div>
 
-              {/* ── Summary rail ── */}
-              <aside className="lg:sticky lg:top-1">
+              {/* ── Summary rail — live summary + on-create read-back ── */}
+              <aside className="space-y-3.5 lg:sticky lg:top-1">
                 <IntakeRail
                   mode={customerMode}
                   selectedLocation={selectedLocation}
@@ -515,6 +540,12 @@ export default function WorkOrderIntakePage() {
                   typeName={activeTypes.find((tx) => tx.id === workOrderTypeId)?.name ?? null}
                   divisionName={activeDivisions.find((d) => d.id === divisionId)?.name ?? null}
                   priority={priority}
+                  itemCount={complaintDrafts.length}
+                />
+                <OnCreateCard
+                  mode={customerMode}
+                  newName={newName}
+                  selectedLocation={selectedLocation}
                   itemCount={complaintDrafts.length}
                 />
               </aside>
@@ -843,7 +874,7 @@ function IntakeRail({
     : null;
 
   return (
-    <Card title="Summary" action={<Pill tone="neutral">Draft</Pill>}>
+    <Card title="Job summary">
       {!hasLocation ? (
         <Text size="sm" tone="muted">
           Pick a service location to see who’s billed and how to get on site.
@@ -911,20 +942,61 @@ function IntakeRail({
         />
         <RailRow label="Work items" value={String(itemCount)} />
       </dl>
+    </Card>
+  );
+}
 
-      <div className="my-3 border-t border-border-soft" />
+// ── "On create we'll…" — a plain-language read-back so the CSR can confirm
+// exactly what the button does before committing. Only lists what actually
+// happens today: create the customer/location (when new) + the work order in
+// Triage. No dispatch/SMS lines — those aren't wired at intake yet, so
+// promising them here would be a lie.
+function OnCreateCard({
+  mode,
+  newName,
+  selectedLocation,
+  itemCount,
+}: {
+  mode: 'existing' | 'new';
+  newName: string;
+  selectedLocation: ServiceLocationSearchResult | null;
+  itemCount: number;
+}) {
+  const lines: string[] = [];
+  if (mode === 'new') {
+    lines.push(`Create the customer${newName.trim() ? ` ${newName.trim()}` : ''}`);
+    lines.push('Create their first service location');
+  }
+  lines.push(
+    `Create the work order with ${itemCount || 'no'} ${itemCount === 1 ? 'item' : 'items'} in Triage — number assigned on save`
+  );
+  lines.push(
+    mode === 'existing' && selectedLocation
+      ? `Attach it to ${selectedLocation.customerName}`
+      : 'Land you on the work order to schedule & dispatch'
+  );
 
-      <div className="flex items-start gap-2 text-[11.5px] text-fg-muted">
-        <span
-          className="mt-px grid size-4 flex-shrink-0 place-items-center rounded-full text-[9px] font-bold text-success-500"
-          style={{ background: 'color-mix(in oklch, var(--success-500) 16%, var(--bg-elev))' }}
-        >
-          ✓
+  return (
+    <Card
+      title={
+        <span className="flex items-center gap-2">
+          <BoltIcon className="size-3.5 text-fg-muted" />
+          On create we’ll
         </span>
-        <span className="leading-relaxed">
-          On create: one work order with {itemCount || 'no'} {itemCount === 1 ? 'item' : 'items'} in Triage. You’ll land
-          on it to schedule and dispatch.
-        </span>
+      }
+    >
+      <div className="flex flex-col gap-2">
+        {lines.map((s, i) => (
+          <div key={i} className="flex items-start gap-2 text-[12px] text-fg">
+            <span
+              className="mt-px grid size-[15px] shrink-0 place-items-center rounded-full text-[9px] font-bold text-success-500"
+              style={{ background: 'color-mix(in oklch, var(--success-500) 16%, var(--bg-elev))' }}
+            >
+              ✓
+            </span>
+            <span className="leading-relaxed">{s}</span>
+          </div>
+        ))}
       </div>
     </Card>
   );
