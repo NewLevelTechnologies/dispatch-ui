@@ -35,7 +35,6 @@ import { Tabs } from '../ui/Tabs';
 import { Callout } from '../ui/Callout';
 import IconButton from '../IconButton';
 import ConfirmDialog from '../ConfirmDialog';
-import WorkOrderFormDialog from '../WorkOrderFormDialog';
 import NotificationPreferencesDialog from '../NotificationPreferencesDialog';
 import CustomerActivityStream from './CustomerActivityStream';
 import CustomerAgreementsTab from '../CustomerAgreementsTab';
@@ -86,7 +85,6 @@ export default function MultiCustomerDetail({ customer }: { customer: Customer }
   const [activeTab, setActiveTab] = useUrlTab(VALID_TABS, 'overview');
 
   const [editingHeader, setEditingHeader] = useState(false);
-  const [isNewWorkOrderOpen, setIsNewWorkOrderOpen] = useState(false);
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
   const [deletingEquipment, setDeletingEquipment] = useState<EquipmentSummary | null>(null);
   const [lifecycleConfirm, setLifecycleConfirm] = useState(false);
@@ -264,7 +262,7 @@ export default function MultiCustomerDetail({ customer }: { customer: Customer }
               <Button
                 outline
                 size="xs"
-                onClick={() => setIsNewWorkOrderOpen(true)}
+                onClick={() => navigate(`/work-orders/new?customerId=${customer.id}`)}
                 aria-label={t('common.actions.new', { entity: getName('work_order') })}
               >
                 <PlusIcon className="size-4" />
@@ -334,7 +332,7 @@ export default function MultiCustomerDetail({ customer }: { customer: Customer }
             <CustomerWorkOrdersTab
               customerId={customer.id}
               canCreate
-              onNewJob={() => setIsNewWorkOrderOpen(true)}
+              onNewJob={() => navigate(`/work-orders/new?customerId=${customer.id}`)}
             />
           )}
 
@@ -383,11 +381,6 @@ export default function MultiCustomerDetail({ customer }: { customer: Customer }
         onClose={() => setIsNotificationOpen(false)}
         customerId={customer.id}
         contactName={customer.name}
-      />
-      <WorkOrderFormDialog
-        isOpen={isNewWorkOrderOpen}
-        onClose={() => setIsNewWorkOrderOpen(false)}
-        prefilledCustomer={{ id: customer.id, name: customer.name }}
       />
       <ConfirmDialog
         isOpen={deletingEquipment !== null}

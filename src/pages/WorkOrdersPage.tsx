@@ -1,6 +1,6 @@
 import { useDeferredValue, useEffect, useMemo, useState } from 'react';
 import clsx from 'clsx';
-import { useSearchParams, Link as RouterLink } from 'react-router-dom';
+import { useSearchParams, useNavigate, Link as RouterLink } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { EllipsisVerticalIcon } from '@heroicons/react/24/outline';
@@ -170,6 +170,7 @@ export default function WorkOrdersPage() {
   const { getName } = useGlossary();
   const { data: currentUser } = useCurrentUser();
   const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
 
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isCancelOpen, setIsCancelOpen] = useState(false);
@@ -417,10 +418,8 @@ export default function WorkOrdersPage() {
     },
   });
 
-  const handleAdd = () => {
-    setSelectedWorkOrder(null);
-    setIsFormOpen(true);
-  };
+  // Create is a full page now (WorkOrderFormDialog stays for edit only).
+  const handleAdd = () => navigate('/work-orders/new');
 
   const handleEdit = (workOrder: WorkOrderSummary) => {
     setSelectedWorkOrder(workOrder);

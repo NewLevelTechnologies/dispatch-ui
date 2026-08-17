@@ -74,7 +74,6 @@ import EquipmentServiceHistoryTab from '../components/EquipmentServiceHistoryTab
 import EquipmentVideosSection from '../components/EquipmentVideosSection';
 import EquipmentDocumentsSection from '../components/EquipmentDocumentsSection';
 import EquipmentMediaLightbox, { type MediaLightboxItem } from '../components/EquipmentMediaLightbox';
-import WorkOrderFormDialog from '../components/WorkOrderFormDialog';
 // Card title + quiet "View all" affordance — reused from the customer-detail
 // chrome so equipment cards match the other redesigned detail pages exactly.
 import { CardTitle, CardLink } from '../components/customer-detail/shared';
@@ -198,7 +197,6 @@ export default function EquipmentDetailPage() {
   const [isMediaUploadOpen, setIsMediaUploadOpen] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [showAllFilterSizes, setShowAllFilterSizes] = useState(false);
-  const [isNewWorkOrderOpen, setIsNewWorkOrderOpen] = useState(false);
   const [retireConfirm, setRetireConfirm] = useState(false);
   // Destructive confirms — Catalyst ConfirmDialog, never the native window.confirm.
   const [equipmentDeleteConfirm, setEquipmentDeleteConfirm] = useState(false);
@@ -240,17 +238,12 @@ export default function EquipmentDetailPage() {
     enabled: identityEditing && Boolean(identityDraft?.equipmentCategoryId),
   });
 
-  // Service location (Located-at card + back-link) and its customer (the card's
-  // owner line + New WO prefill). Equipment carries only serviceLocationId.
+  // Service location (Located-at card + back-link). Equipment carries only
+  // serviceLocationId; the new-WO button prefills intake with it.
   const { data: serviceLocation } = useQuery({
     queryKey: ['service-location', equipment?.serviceLocationId ?? ''],
     queryFn: () => customerApi.getServiceLocationById(equipment!.serviceLocationId),
     enabled: Boolean(equipment?.serviceLocationId),
-  });
-  const { data: locationCustomer } = useQuery({
-    queryKey: ['customers', serviceLocation?.customerId ?? ''],
-    queryFn: () => customerApi.getById(serviceLocation!.customerId),
-    enabled: Boolean(serviceLocation?.customerId),
   });
 
   const { data: filters = [], isLoading: filtersLoading } = useQuery({
@@ -847,7 +840,7 @@ export default function EquipmentDetailPage() {
                   <Button
                     outline
                     size="xs"
-                    onClick={() => setIsNewWorkOrderOpen(true)}
+                    onClick={() => navigate(`/work-orders/new?locationId=${equipment.serviceLocationId}`)}
                     aria-label={t('common.actions.new', { entity: getName('work_order') })}
                   >
                     <PlusIcon className="size-4" />
@@ -1604,12 +1597,6 @@ export default function EquipmentDetailPage() {
         items={mediaItems}
         startIndex={lightboxIndex}
         onClose={() => setLightboxIndex(null)}
-      />
-
-      <WorkOrderFormDialog
-        isOpen={isNewWorkOrderOpen}
-        onClose={() => setIsNewWorkOrderOpen(false)}
-        prefilledCustomer={locationCustomer ? { id: locationCustomer.id, name: locationCustomer.name } : null}
       />
 
       <ConfirmDialog

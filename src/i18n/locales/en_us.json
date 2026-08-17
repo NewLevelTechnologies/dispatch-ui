@@ -142,6 +142,8 @@
       "previous": "Previous",
       "showing": "Showing {{start}}-{{end}} of {{total}}"
     },
+    "premiseBusiness": "Business",
+    "premiseResidence": "Residence",
     "previous": "Previous",
     "save": "Save",
     "saving": "Saving...",

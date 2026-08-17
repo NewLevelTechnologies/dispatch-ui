@@ -130,6 +130,9 @@ export interface ServiceLocationSearchResult {
   customerId: string;
   customerName: string;
   locationName?: string | null;
+  // Per PREMISE-1: the search projection now carries premiseType. Optional so
+  // the picker degrades to a neutral glyph until the backend field deploys.
+  premiseType?: PremiseType | null;
   address: {
     streetAddress: string;
     city: string;

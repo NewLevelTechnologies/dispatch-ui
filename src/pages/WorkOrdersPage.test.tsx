@@ -162,11 +162,11 @@ describe('WorkOrdersPage', () => {
     });
   });
 
-  it('opens create dialog when create button is clicked', async () => {
+  it('navigates to the full-page intake when create is clicked', async () => {
     vi.mocked(apiClient.get).mockResolvedValue({ data: pageOf([]) });
     const user = userEvent.setup();
 
-    renderWithProviders(<WorkOrdersPage />);
+    const { router } = renderWithProviders(<WorkOrdersPage />);
 
     await waitFor(() => {
       expect(screen.getByText('No work orders found')).toBeInTheDocument();
@@ -175,8 +175,9 @@ describe('WorkOrdersPage', () => {
     const createButton = screen.getByRole('button', { name: /create work order/i });
     await user.click(createButton);
 
-    expect(screen.getByRole('dialog')).toBeInTheDocument();
-    expect(screen.getAllByText('Create Work Order').length).toBeGreaterThan(0);
+    // Create is a full page now, not a dialog.
+    expect(router.state.location.pathname).toBe('/work-orders/new');
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
   it('formats scheduled dates correctly', async () => {

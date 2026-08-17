@@ -166,7 +166,7 @@ describe('ServiceLocationPicker', () => {
 
     // Should show loading after debounce
     await waitFor(() => {
-      expect(screen.getByText('Searching...')).toBeInTheDocument();
+      expect(screen.getByText('Searching…')).toBeInTheDocument();
     });
   });
 
@@ -216,7 +216,7 @@ describe('ServiceLocationPicker', () => {
     expect(mockOnChange).toHaveBeenCalledWith(mockSearchResults.content[0]);
   });
 
-  it('displays selected location value', () => {
+  it('collapses to a read-back row once a location is picked', () => {
     const selectedLocation = mockSearchResults.content[0];
 
     renderWithProviders(
@@ -226,30 +226,97 @@ describe('ServiceLocationPicker', () => {
       />
     );
 
-    const input = screen.getByPlaceholderText('Search by customer, address, or phone...');
-    expect(input).toHaveValue("John's House - 123 Main St, Atlanta, GA");
+    // The search box is gone: the CSR is done searching and is now reading the
+    // site back to the caller.
+    expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
+    expect(screen.getByText("John's House")).toBeInTheDocument();
+    // Address, then the owner — the site is named for something other than the
+    // customer, so "John Doe" earns its slot.
+    expect(screen.getByText(/123 Main St · Atlanta, GA 30301 · John Doe/)).toBeInTheDocument();
+    expect(screen.getByText('Change')).toBeInTheDocument();
   });
 
-  it('clears search query on focus to allow new search', async () => {
-    const user = userEvent.setup();
-    const selectedLocation = mockSearchResults.content[0];
-
+  it('omits the owner when the site is named for the customer', () => {
     renderWithProviders(
       <ServiceLocationPicker
-        value={selectedLocation}
+        value={mockSearchResults.content[1]}
         onChange={mockOnChange}
       />
     );
 
+    // locationName is null, so the row is titled with the customer name and
+    // repeating it on the address line would be noise.
+    expect(screen.getByText('Jane Smith')).toBeInTheDocument();
+    expect(screen.getByText('456 Oak Ave · Marietta, GA 30060')).toBeInTheDocument();
+  });
+
+  it('carries premise on the glyph rather than a text badge', () => {
+    renderWithProviders(
+      <ServiceLocationPicker
+        value={{ ...mockSearchResults.content[0], premiseType: 'RESIDENCE' }}
+        onChange={mockOnChange}
+      />
+    );
+
+    // The glyph is unambiguous on screen, so the words don't take a slot on the
+    // row — but they stay reachable on hover and by screen readers.
+    expect(screen.queryByText('RESIDENCE')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Residence')).toBeInTheDocument();
+  });
+
+  it('reopens the search box when Change is clicked', async () => {
+    const user = userEvent.setup();
+
+    renderWithProviders(
+      <ServiceLocationPicker
+        value={mockSearchResults.content[0]}
+        onChange={mockOnChange}
+      />
+    );
+
+    await user.click(screen.getByText('Change'));
+
     const input = screen.getByPlaceholderText('Search by customer, address, or phone...');
-    expect(input).toHaveValue("John's House - 123 Main St, Atlanta, GA");
+    // Empty and focused — the CSR searches afresh rather than editing around
+    // the old formatted text.
+    expect(input).toHaveValue('');
+    expect(input).toHaveFocus();
+  });
 
-    // Focus clears searchQuery (triggers onFocus handler)
-    await user.click(input);
+  it('returns to the picked row on Cancel without changing the selection', async () => {
+    const user = userEvent.setup();
 
-    // The input still shows displayValue until user starts typing
-    // This is expected behavior - we clear searchQuery but displayValue remains
-    expect(input).toHaveValue("John's House - 123 Main St, Atlanta, GA");
+    renderWithProviders(
+      <ServiceLocationPicker
+        value={mockSearchResults.content[0]}
+        onChange={mockOnChange}
+      />
+    );
+
+    await user.click(screen.getByText('Change'));
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+
+    expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
+    expect(screen.getByText("John's House")).toBeInTheDocument();
+    expect(mockOnChange).not.toHaveBeenCalled();
+  });
+
+  it('does not require the search box while a location is already picked', async () => {
+    const user = userEvent.setup();
+
+    renderWithProviders(
+      <ServiceLocationPicker
+        value={mockSearchResults.content[0]}
+        onChange={mockOnChange}
+        required
+      />
+    );
+
+    await user.click(screen.getByText('Change'));
+
+    // The existing pick satisfies the field. Requiring the search box too would
+    // block submit whenever a CSR opens Change and doesn't retype.
+    expect(screen.getByRole('textbox')).not.toBeRequired();
   });
 
   it('marks field as required when required prop is true', () => {
@@ -430,29 +497,23 @@ describe('ServiceLocationPicker', () => {
 
   it('allows user to search again after selecting a value', async () => {
     const user = userEvent.setup();
-    const selectedLocation = mockSearchResults.content[0];
+    vi.mocked(apiClient.get).mockResolvedValue({ data: mockSearchResults });
 
     renderWithProviders(
       <ServiceLocationPicker
-        value={selectedLocation}
+        value={mockSearchResults.content[0]}
         onChange={mockOnChange}
       />
     );
 
-    const input = screen.getByPlaceholderText('Search by customer, address, or phone...');
+    await user.click(screen.getByText('Change'));
+    await user.type(screen.getByRole('textbox'), 'jane');
 
-    // Should show formatted value initially
-    expect(input).toHaveValue("John's House - 123 Main St, Atlanta, GA");
-
-    // Focus triggers onFocus handler that clears searchQuery
-    await user.click(input);
-
-    // Type new search - should override the display value
-    await user.type(input, 'test');
-
-    // Input should now show the new search text appended
-    // (Since displayValue is shown when searchQuery is empty, typing adds to it)
-    expect((input as HTMLInputElement).value).toContain('test');
+    await waitFor(() => {
+      expect(apiClient.get).toHaveBeenCalledWith('/service-locations/search', {
+        params: { q: 'jane', page: 0, size: 50 },
+      });
+    });
   });
 
   it('handles rapid typing with debounce correctly', async () => {
@@ -702,7 +763,7 @@ describe('ServiceLocationPicker', () => {
 
     // Type 1 character - no dropdown
     await user.type(input, 'j');
-    expect(screen.queryByText('Searching...')).not.toBeInTheDocument();
+    expect(screen.queryByText('Searching…')).not.toBeInTheDocument();
 
     // Type second character - show dropdown
     await user.type(input, 'o');

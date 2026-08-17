@@ -35,6 +35,10 @@ interface ToggleGroupProps<T extends string> {
   // `sm` tightens padding + type for inline placements (e.g. beside a field
   // label); the default size is the standalone settings-row control.
   size?: 'sm';
+  // `joined` swaps the recessed tray of separate pills for one bordered bar of
+  // butt-joined segments with wide hit areas — for a short, always-visible
+  // choice that deserves the width (WO priority). Pairs with per-option `tone`.
+  variant?: 'joined';
   'aria-label'?: string;
 }
 
@@ -44,11 +48,21 @@ export function ToggleGroup<T extends string>({
   children,
   className,
   size,
+  variant,
   'aria-label': ariaLabel,
 }: ToggleGroupProps<T>) {
   return (
     <Headless.RadioGroup value={value} onChange={onChange} aria-label={ariaLabel}>
-      <div className={clsx('toggle-group', size === 'sm' && 'toggle-group--sm', className)}>{children}</div>
+      <div
+        className={clsx(
+          'toggle-group',
+          size === 'sm' && 'toggle-group--sm',
+          variant === 'joined' && 'toggle-group--joined',
+          className
+        )}
+      >
+        {children}
+      </div>
     </Headless.RadioGroup>
   );
 }
@@ -59,6 +73,11 @@ interface ToggleGroupOptionProps<T extends string> {
   className?: string;
   'aria-label'?: string;
   title?: string;
+  // Tints this option when it's selected, instead of the default neutral rise.
+  // Only for groups where the choice carries a severity the app already colors
+  // the same way elsewhere (WO priority → the tone its pill gets on a list
+  // row). Don't reach for it to decorate an ordinary preference toggle.
+  tone?: 'neutral' | 'info' | 'success' | 'warning' | 'danger';
 }
 
 export function ToggleGroupOption<T extends string>({
@@ -67,12 +86,14 @@ export function ToggleGroupOption<T extends string>({
   className,
   'aria-label': ariaLabel,
   title,
+  tone,
 }: ToggleGroupOptionProps<T>) {
   return (
     <Headless.Radio
       value={value}
       aria-label={ariaLabel}
       title={title}
+      data-tone={tone}
       className={clsx('toggle-group-option', className)}
     >
       {children}
