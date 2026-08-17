@@ -15,6 +15,7 @@ import {
   type CreateCustomerRequest,
   type CreateWorkItemRequest,
   type ServiceLocationSearchResult,
+  type CustomerSearchResult,
   type ServiceLocationDetailDto,
   type WorkOrderPriority,
   type PremiseType,
@@ -134,8 +135,20 @@ export default function WorkOrderIntakePage() {
   const [customerOrderNumber, setCustomerOrderNumber] = useState('');
 
   // ── Location ──────────────────────────────────────────────────────────
-  const [customerMode, setCustomerMode] = useState<'existing' | 'new'>('existing');
+  // The three realities a CSR can be in when the phone rings. Which one they're
+  // in is discovered by searching, not declared up front — the picker routes
+  // here, there's no mode toggle to pre-answer the question.
+  //   existing     — the location is on file
+  //   new-location — the CUSTOMER is on file, this property isn't
+  //   new          — nobody is on file yet
+  const [customerMode, setCustomerMode] = useState<'existing' | 'new-location' | 'new'>('existing');
   const [selectedLocation, setSelectedLocation] = useState<ServiceLocationSearchResult | null>(null);
+  // Set only in 'new-location': the account the new property hangs off.
+  const [createForCustomer, setCreateForCustomer] = useState<CustomerSearchResult | null>(null);
+  const [newLocationName, setNewLocationName] = useState('');
+
+  // Both create paths need a region + the tenant's premise default.
+  const creatingLocation = customerMode !== 'existing';
 
   // New customer + location — lightweight ("just enough to start; enrich later").
   // Mirrors Add Customer's model so we don't over-ask: ONE name (a person OR a
@@ -165,14 +178,14 @@ export default function WorkOrderIntakePage() {
   const { data: regions } = useQuery({
     queryKey: ['dispatch-regions', 'active'],
     queryFn: () => dispatchRegionApi.getAll(false),
-    enabled: customerMode === 'new',
+    enabled: creatingLocation,
   });
   // Premise default comes from the company profile (per-location, not a customer
   // type) — same as Add Customer. `premiseTouched` keeps a deliberate choice.
   const { data: tenantSettings } = useQuery({
     queryKey: ['tenant-settings'],
     queryFn: () => tenantSettingsApi.getSettings(),
-    enabled: customerMode === 'new',
+    enabled: creatingLocation,
   });
   const defaultPremise: PremiseType = tenantSettings?.defaultPremiseType ?? 'BUSINESS';
   const effectivePremise = premiseTouched ? premise : defaultPremise;
@@ -213,10 +226,10 @@ export default function WorkOrderIntakePage() {
 
   // Auto-select the only region so a single-region tenant never has to pick.
   useEffect(() => {
-    if (customerMode === 'new' && regions?.length === 1 && !dispatchRegionId) {
+    if (creatingLocation && regions?.length === 1 && !dispatchRegionId) {
       setDispatchRegionId(regions[0].id);
     }
-  }, [customerMode, regions, dispatchRegionId]);
+  }, [creatingLocation, regions, dispatchRegionId]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
   // The resolved, real service location (existing mode only) — scopes equipment
@@ -249,7 +262,21 @@ export default function WorkOrderIntakePage() {
     newAddress.state.trim() !== '' &&
     newAddress.zipCode.trim() !== '' &&
     dispatchRegionId !== '';
-  const locationReady = customerMode === 'existing' ? !!selectedLocation : newCustomerReady;
+  // A new property on a known account only needs the address — the customer is
+  // already on file, so we never re-ask for their name, phone or email.
+  const newLocationReady =
+    !!createForCustomer &&
+    newAddress.streetAddress.trim() !== '' &&
+    newAddress.city.trim() !== '' &&
+    newAddress.state.trim() !== '' &&
+    newAddress.zipCode.trim() !== '' &&
+    dispatchRegionId !== '';
+  const locationReady =
+    customerMode === 'existing'
+      ? !!selectedLocation
+      : customerMode === 'new-location'
+        ? newLocationReady
+        : newCustomerReady;
   const complaintDrafts = drafts.filter((d) => d.complaint.trim() !== '');
   const canSubmit = locationReady && !!workOrderTypeId && complaintDrafts.length > 0;
 
@@ -304,6 +331,31 @@ export default function WorkOrderIntakePage() {
         customerId: selectedLocation.customerId,
         serviceLocationId: selectedLocation.id,
       });
+      return;
+    }
+
+    // New property on an existing account — create just the location under the
+    // customer we already have, then the work order. Critically NOT a customer
+    // create: reaching for that path here is what produces a duplicate account.
+    if (customerMode === 'new-location' && createForCustomer) {
+      setCreatingCustomer(true);
+      try {
+        const location = await customerApi.addServiceLocation(createForCustomer.id, {
+          dispatchRegionId,
+          locationName: newLocationName.trim() || undefined,
+          premiseType: effectivePremise,
+          address: newAddress,
+        });
+        queryClient.invalidateQueries({ queryKey: ['service-locations'] });
+        queryClient.invalidateQueries({ queryKey: ['customer-service-locations', createForCustomer.id] });
+        createMutation.mutate({ ...base, customerId: createForCustomer.id, serviceLocationId: location.id });
+      } catch (err) {
+        setCreatingCustomer(false);
+        showError(
+          t('common.form.errorCreate', { entity: getName('service_location') }),
+          extractApiError(err) ?? undefined
+        );
+      }
       return;
     }
 
@@ -377,13 +429,6 @@ export default function WorkOrderIntakePage() {
               <div className="min-w-0 space-y-3.5">
                 {/* Service location — the lead section; customer derives from it. */}
                 <Card title={<StepTitle n={1} complete={locationReady}>{getName('service_location')}</StepTitle>}>
-                  <div className="mb-2.5">
-                    <ToggleGroup value={customerMode} onChange={setCustomerMode} aria-label="Customer">
-                      <ToggleGroupOption value="existing">Existing</ToggleGroupOption>
-                      <ToggleGroupOption value="new">New customer &amp; location</ToggleGroupOption>
-                    </ToggleGroup>
-                  </div>
-
                   {customerMode === 'existing' ? (
                     <ServiceLocationPicker
                       value={selectedLocation}
@@ -392,10 +437,45 @@ export default function WorkOrderIntakePage() {
                       // The numbered card header above already names this.
                       hideLabel
                       restrictToCustomer={restrictToCustomer}
+                      // Entering from a customer record already answers "which
+                      // account", so the restricted picker keeps its own shape.
+                      searchFirst={
+                        restrictToCustomer
+                          ? undefined
+                          : {
+                              onCreateForCustomer: (c) => {
+                                setCreateForCustomer(c);
+                                setCustomerMode('new-location');
+                              },
+                              onCreateNewCustomer: () => setCustomerMode('new'),
+                            }
+                      }
                       required
+                    />
+                  ) : customerMode === 'new-location' && createForCustomer ? (
+                    <NewLocationFields
+                      customerName={createForCustomer.name}
+                      onCancel={() => {
+                        setCreateForCustomer(null);
+                        setCustomerMode('existing');
+                      }}
+                      locationName={newLocationName}
+                      setLocationName={setNewLocationName}
+                      address={newAddress}
+                      setAddress={setNewAddress}
+                      premise={effectivePremise}
+                      defaultPremise={defaultPremise}
+                      onPremiseChange={(v) => {
+                        setPremiseTouched(true);
+                        setPremise(v);
+                      }}
+                      dispatchRegionId={dispatchRegionId}
+                      setDispatchRegionId={setDispatchRegionId}
+                      regions={regions ?? []}
                     />
                   ) : (
                     <NewCustomerFields
+                      onCancel={() => setCustomerMode('existing')}
                       name={newName}
                       setName={setNewName}
                       phone={phone}
@@ -536,6 +616,8 @@ export default function WorkOrderIntakePage() {
               <aside className="space-y-3.5 lg:sticky lg:top-1">
                 <IntakeRail
                   mode={customerMode}
+                  newLocationName={newLocationName}
+                  existingCustomerName={createForCustomer?.name ?? null}
                   selectedLocation={selectedLocation}
                   locationDetail={locationDetail}
                   newName={newName}
@@ -548,6 +630,7 @@ export default function WorkOrderIntakePage() {
                 <OnCreateCard
                   mode={customerMode}
                   newName={newName}
+                  existingCustomerName={createForCustomer?.name ?? null}
                   selectedLocation={selectedLocation}
                   itemCount={complaintDrafts.length}
                 />
@@ -566,7 +649,126 @@ export default function WorkOrderIntakePage() {
 // a separate location name — and premise is a per-location default from the
 // company profile, not a customer type. Full billing / advanced live on the
 // Add Customer page for back-office enrichment.
+// Header for either create panel: says which reality the CSR is in and offers
+// the way back to the search. Without it, picking "New customer" by mistake is
+// a dead end — the mode toggle used to be the escape hatch.
+function CreatePanelHead({ children, onCancel }: { children: React.ReactNode; onCancel: () => void }) {
+  const { t } = useTranslation();
+  return (
+    <div className="mb-2.5 flex items-center justify-between gap-2 border-b border-border-soft pb-2">
+      <span className="text-[12px] font-semibold text-fg-strong">{children}</span>
+      <Button type="button" plain size="xxs" onClick={onCancel}>
+        {t('common.cancel')}
+      </Button>
+    </div>
+  );
+}
+
+// A new property on an account we already have. Deliberately does NOT re-ask
+// for name / phone / email — the customer is on file, and asking again is both
+// wasted keystrokes on a live call and the road to a duplicate account.
+function NewLocationFields({
+  customerName,
+  onCancel,
+  locationName,
+  setLocationName,
+  address,
+  setAddress,
+  premise,
+  defaultPremise,
+  onPremiseChange,
+  dispatchRegionId,
+  setDispatchRegionId,
+  regions,
+}: {
+  customerName: string;
+  onCancel: () => void;
+  locationName: string;
+  setLocationName: (v: string) => void;
+  address: { streetAddress: string; city: string; state: string; zipCode: string };
+  setAddress: (v: { streetAddress: string; city: string; state: string; zipCode: string }) => void;
+  premise: PremiseType;
+  defaultPremise: PremiseType;
+  onPremiseChange: (v: PremiseType) => void;
+  dispatchRegionId: string;
+  setDispatchRegionId: (v: string) => void;
+  regions: { id: string; name: string }[];
+}) {
+  const set = (patch: Partial<typeof address>) => setAddress({ ...address, ...patch });
+  return (
+    <div className="space-y-2.5">
+      <CreatePanelHead onCancel={onCancel}>New location for {customerName}</CreatePanelHead>
+      <Field size="xs">
+        <Label size="xs" required>
+          Street address
+        </Label>
+        <Input size="xs" value={address.streetAddress} onChange={(e) => set({ streetAddress: e.target.value })} placeholder="123 Main St" />
+      </Field>
+      <div className="grid gap-2.5 sm:grid-cols-[1fr_72px_88px_1fr]">
+        <Field size="xs">
+          <Label size="xs" required>
+            City
+          </Label>
+          <Input size="xs" value={address.city} onChange={(e) => set({ city: e.target.value })} />
+        </Field>
+        <Field size="xs">
+          <Label size="xs" required>
+            State
+          </Label>
+          <Input size="xs" value={address.state} onChange={(e) => set({ state: e.target.value.toUpperCase() })} maxLength={2} />
+        </Field>
+        <Field size="xs">
+          <Label size="xs" required>
+            ZIP
+          </Label>
+          <Input size="xs" value={address.zipCode} onChange={(e) => set({ zipCode: e.target.value })} />
+        </Field>
+        <Field size="xs">
+          <Label size="xs" required>
+            Region
+          </Label>
+          <Select size="xs" value={dispatchRegionId} onChange={(e) => setDispatchRegionId(e.target.value)} aria-label="Region">
+            <option value="">Select…</option>
+            {regions.map((r) => (
+              <option key={r.id} value={r.id}>
+                {r.name}
+              </option>
+            ))}
+          </Select>
+        </Field>
+      </div>
+      {/* Optional: a multi-site account usually calls its sites something
+          ("Bldg C", "Store #123"). Blank is fine — it falls back to the
+          account name, same as any unnamed location. */}
+      <Field size="xs">
+        <Label size="xs" hint="optional">
+          Name this site
+        </Label>
+        <Input
+          size="xs"
+          value={locationName}
+          onChange={(e) => setLocationName(e.target.value)}
+          placeholder="Red Lobster #123 — or leave blank"
+        />
+      </Field>
+      <div>
+        <MiniLabel>Premise</MiniLabel>
+        <div className="mt-1">
+          <ToggleGroup value={premise} onChange={onPremiseChange} aria-label="Premise">
+            <ToggleGroupOption value="RESIDENCE">Residence</ToggleGroupOption>
+            <ToggleGroupOption value="BUSINESS">Business</ToggleGroupOption>
+          </ToggleGroup>
+        </div>
+        <Text size="xs" tone="dim" className="mt-1">
+          Default for new locations is {defaultPremise === 'BUSINESS' ? 'Business' : 'Residence'} · set in Company profile.
+        </Text>
+      </div>
+    </div>
+  );
+}
+
 function NewCustomerFields({
+  onCancel,
   name,
   setName,
   phone,
@@ -582,6 +784,7 @@ function NewCustomerFields({
   setDispatchRegionId,
   regions,
 }: {
+  onCancel: () => void;
   name: string;
   setName: (v: string) => void;
   phone: string;
@@ -600,6 +803,7 @@ function NewCustomerFields({
   const set = (patch: Partial<typeof address>) => setAddress({ ...address, ...patch });
   return (
     <div className="space-y-2.5">
+      <CreatePanelHead onCancel={onCancel}>New customer</CreatePanelHead>
       <Text size="xs" tone="dim">
         Just enough to start the job — full billing &amp; details enrich later on the customer’s page.
       </Text>
@@ -844,30 +1048,47 @@ function IntakeRail({
   selectedLocation,
   locationDetail,
   newName,
+  newLocationName,
+  existingCustomerName,
   newAddress,
   typeName,
   divisionName,
   priority,
   itemCount,
 }: {
-  mode: 'existing' | 'new';
+  mode: 'existing' | 'new-location' | 'new';
   selectedLocation: ServiceLocationSearchResult | null;
   locationDetail: ServiceLocationDetailDto | undefined;
   newName: string;
+  newLocationName: string;
+  existingCustomerName: string | null;
   newAddress: { streetAddress: string; city: string; state: string; zipCode: string };
   typeName: string | null;
   divisionName: string | null;
   priority: WorkOrderPriority;
   itemCount: number;
 }) {
-  const isNew = mode === 'new';
-  // One name is both the site and the payer for a brand-new caller.
-  const name = isNew ? newName : selectedLocation?.locationName || selectedLocation?.customerName;
-  const address = isNew ? newAddress : selectedLocation?.address;
-  const customerName = isNew ? newName : selectedLocation?.customerName;
+  // The site is new in both create paths; only one of them also creates the
+  // customer. Keeping those separate is what lets the rail say "billed to
+  // Darden" while the property itself is brand new.
+  const isNewSite = mode !== 'existing';
+  const isNewCustomer = mode === 'new';
+  // One name is both the site and the payer for a brand-new caller. On a known
+  // account the site may be unnamed, in which case it reads as the account.
+  const name = isNewCustomer
+    ? newName
+    : mode === 'new-location'
+      ? newLocationName.trim() || existingCustomerName
+      : selectedLocation?.locationName || selectedLocation?.customerName;
+  const address = isNewSite ? newAddress : selectedLocation?.address;
+  const customerName = isNewCustomer
+    ? newName
+    : mode === 'new-location'
+      ? existingCustomerName
+      : selectedLocation?.customerName;
   const pinnedNote = locationDetail?.notes?.find((n) => n.pinned) ?? locationDetail?.notes?.[0];
   const facts = locationDetail?.arrivalFacts ?? [];
-  const hasLocation = isNew ? !!newName : !!selectedLocation;
+  const hasLocation = isNewCustomer ? !!newName : mode === 'new-location' ? !!existingCustomerName : !!selectedLocation;
 
   const line2 = address
     ? `${titleCaseAddress(address.streetAddress)} · ${titleCaseAddress(address.city)}, ${address.state} ${address.zipCode}`.trim()
@@ -883,9 +1104,9 @@ function IntakeRail({
         <>
           <div className="flex flex-wrap items-baseline gap-1.5">
             <span className="text-[14px] font-bold text-fg-strong">{name || 'New location'}</span>
-            {isNew && (
+            {isNewSite && (
               <Pill tone="success" dot>
-                New
+                {isNewCustomer ? 'New' : 'New location'}
               </Pill>
             )}
           </div>
@@ -953,11 +1174,13 @@ function IntakeRail({
 function OnCreateCard({
   mode,
   newName,
+  existingCustomerName,
   selectedLocation,
   itemCount,
 }: {
-  mode: 'existing' | 'new';
+  mode: 'existing' | 'new-location' | 'new';
   newName: string;
+  existingCustomerName: string | null;
   selectedLocation: ServiceLocationSearchResult | null;
   itemCount: number;
 }) {
@@ -966,13 +1189,20 @@ function OnCreateCard({
     lines.push(`Create the customer${newName.trim() ? ` ${newName.trim()}` : ''}`);
     lines.push('Create their first service location');
   }
+  // Says the quiet part out loud: this path adds a property to an account that
+  // already exists, and does NOT create a second copy of that customer.
+  if (mode === 'new-location') {
+    lines.push(`Add a new service location to ${existingCustomerName ?? 'the selected customer'}`);
+  }
   lines.push(
     `Create the work order with ${itemCount || 'no'} ${itemCount === 1 ? 'item' : 'items'} in Triage — number assigned on save`
   );
   lines.push(
     mode === 'existing' && selectedLocation
       ? `Attach it to ${selectedLocation.customerName}`
-      : 'Land you on the work order to schedule & dispatch'
+      : mode === 'new-location' && existingCustomerName
+        ? `Bill it to ${existingCustomerName}`
+        : 'Land you on the work order to schedule & dispatch'
   );
 
   return (

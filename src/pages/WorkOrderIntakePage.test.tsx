@@ -12,6 +12,8 @@ const mockTypesGetAll = vi.fn();
 const mockDivisionsGetAll = vi.fn();
 const mockRegionsGetAll = vi.fn();
 const mockEquipmentList = vi.fn();
+const mockSearchCustomers = vi.fn();
+const mockAddServiceLocation = vi.fn();
 
 vi.mock('../api/workOrderApi', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../api/workOrderApi')>();
@@ -40,6 +42,8 @@ vi.mock('../api/customerApi', async (importOriginal) => {
       getById: (...a: unknown[]) => mockGetCustomerById(...a),
       searchServiceLocations: () => Promise.resolve({ content: [], totalElements: 0, totalPages: 0, size: 50, number: 0 }),
       getServiceLocations: () => Promise.resolve([]),
+      search: (...a: unknown[]) => mockSearchCustomers(...a),
+      addServiceLocation: (...a: unknown[]) => mockAddServiceLocation(...a),
     },
   };
 });
@@ -90,6 +94,8 @@ describe('WorkOrderIntakePage', () => {
     mockEquipmentList.mockResolvedValue({ content: [], totalElements: 0, totalPages: 0, number: 0, size: 200 });
     mockCreateWorkOrder.mockResolvedValue({ id: 'wo-new' });
     mockCreateCustomer.mockResolvedValue({ id: 'cust-new', serviceLocations: [{ id: 'loc-new' }] });
+    mockSearchCustomers.mockResolvedValue({ content: [], totalElements: 0, totalPages: 0, size: 5, number: 0 });
+    mockAddServiceLocation.mockResolvedValue({ id: 'loc-added' });
   });
 
   it('renders the intake form with the location picker, classification and one work-item draft', async () => {
@@ -116,6 +122,63 @@ describe('WorkOrderIntakePage', () => {
     expect(urgent).toHaveAttribute('data-tone', 'danger');
     expect(screen.getByRole('radio', { name: 'Normal' })).not.toHaveAttribute('data-checked');
   });
+
+  it('adds a new property to an existing account without creating a second customer', async () => {
+    // Reality 2: the CUSTOMER is on file, this property isn't. Before the
+    // search-first picker there was no path to this at all — a CSR would reach
+    // for "New customer" and end up with a duplicate account.
+    mockRegionsGetAll.mockResolvedValue([{ id: 'r-1', name: 'West' }]);
+    mockSearchCustomers.mockResolvedValue({
+      content: [{ id: 'cust-darden', name: 'Darden Restaurants', type: 'STANDARD', category: 'COMMERCIAL' }],
+      totalElements: 1,
+      totalPages: 1,
+      size: 5,
+      number: 0,
+    });
+    const user = userEvent.setup();
+    renderIntake();
+    await screen.findByRole('heading', { name: /add work order/i, level: 1 });
+    await screen.findByRole('option', { name: 'Service Call' });
+
+    // The account surfaces as its own result, carrying the "+ New location" affordance.
+    await user.type(screen.getByPlaceholderText(/search by customer/i), 'Darden');
+    await screen.findByText('Darden Restaurants');
+    await user.click(screen.getByText('+ New location'));
+
+    // The account is known, so the form asks for the address only — never the
+    // customer's name, phone or email again.
+    expect(screen.getByText(/New location for Darden Restaurants/)).toBeInTheDocument();
+    expect(screen.queryByLabelText(/^phone/i)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/^email/i)).not.toBeInTheDocument();
+
+    await user.type(screen.getByLabelText(/street address/i), '2290 W Chandler Blvd');
+    await user.type(screen.getByLabelText(/^city/i), 'Chandler');
+    await user.type(screen.getByLabelText(/^state/i), 'AZ');
+    await user.type(screen.getByLabelText(/^zip/i), '85224');
+    await user.type(screen.getByLabelText(/name this site/i), 'Red Lobster #123');
+    await user.selectOptions(screen.getByLabelText('Type'), 'type-1');
+    await user.type(screen.getByPlaceholderText(/no cooling upstairs/i), 'Walk-in down');
+
+    await user.click(screen.getByRole('button', { name: /add work order/i }));
+
+    await waitFor(() =>
+      expect(mockAddServiceLocation).toHaveBeenCalledWith(
+        'cust-darden',
+        expect.objectContaining({
+          locationName: 'Red Lobster #123',
+          dispatchRegionId: 'r-1',
+          address: expect.objectContaining({ streetAddress: '2290 W Chandler Blvd' }),
+        })
+      )
+    );
+    // The whole point: the account was reused, not duplicated.
+    expect(mockCreateCustomer).not.toHaveBeenCalled();
+    await waitFor(() =>
+      expect(mockCreateWorkOrder).toHaveBeenCalledWith(
+        expect.objectContaining({ customerId: 'cust-darden', serviceLocationId: 'loc-added' })
+      )
+    );
+  }, 15000);
 
   it('keeps the create button disabled until a location, type and a complaint are present', async () => {
     const user = userEvent.setup();
@@ -177,7 +240,8 @@ describe('WorkOrderIntakePage', () => {
     await screen.findByRole('heading', { name: /add work order/i, level: 1 });
     await screen.findByRole('option', { name: 'Service Call' });
 
-    await user.click(screen.getByRole('radio', { name: /new customer & location/i }));
+    // Reality 3 is reached from the picker's footer, not a mode toggle.
+    await user.click(screen.getByRole('button', { name: /new customer/i }));
     // ONE name — no separate "location name" over-ask.
     await user.type(screen.getByLabelText(/^name/i), 'Jordan Avila');
     await user.type(screen.getByLabelText(/^phone/i), '6025550100');
