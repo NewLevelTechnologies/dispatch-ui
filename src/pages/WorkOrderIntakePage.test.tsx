@@ -167,7 +167,9 @@ describe('WorkOrderIntakePage', () => {
     expect(screen.getAllByPlaceholderText(/no cooling upstairs/i)).toHaveLength(1);
   });
 
-  it('creates the customer first in new-customer mode, then the work order', async () => {
+  // Types a whole customer + address through userEvent, so it runs ~2.5s under
+  // v8 coverage instrumentation and overran the 5s default in CI's coverage job.
+  it('creates the customer first in new-customer mode, then the work order', { timeout: 15000 }, async () => {
     // A single region auto-selects, satisfying the required region field.
     mockRegionsGetAll.mockResolvedValue([{ id: 'r-1', name: 'West' }]);
     const user = userEvent.setup();
