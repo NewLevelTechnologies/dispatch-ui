@@ -231,6 +231,15 @@ describe('WorkOrderIntakePage', () => {
     const billTo = screen.getByLabelText(/bill to/i);
     await user.clear(billTo);
     await user.type(billTo, 'Darden Restaurants');
+    await user.type(screen.getByLabelText(/billing street address/i), '1000 Darden Center Dr');
+    // City/State/ZIP appear twice once billing splits off — the billing copies
+    // are the last of each.
+    const cities = screen.getAllByLabelText(/^city/i);
+    await user.type(cities[cities.length - 1], 'Orlando');
+    const states = screen.getAllByLabelText(/^state/i);
+    await user.type(states[states.length - 1], 'FL');
+    const zips = screen.getAllByLabelText(/^zip/i);
+    await user.type(zips[zips.length - 1], '32837');
     await user.type(screen.getByLabelText(/billing email/i), 'ap@darden.com');
 
     await user.selectOptions(screen.getByLabelText('Type'), 'type-1');
@@ -244,6 +253,8 @@ describe('WorkOrderIntakePage', () => {
           name: 'Darden Restaurants',
           email: 'ap@darden.com',
           billingAddressSameAsService: false,
+          // The invoice goes to the payer's AP address, NOT the job site.
+          billingAddress: expect.objectContaining({ streetAddress: '1000 Darden Center Dr', city: 'Orlando' }),
           // …and the typed name names the site, keeping the on-site phone.
           serviceLocations: [
             expect.objectContaining({ locationName: 'Red Lobster #123', siteContactPhone: '6025550100' }),

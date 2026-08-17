@@ -177,6 +177,8 @@ export default function WorkOrderIntakePage() {
     setNewCustomer((c) => ({ ...c, ...patch }));
   const [contactNameTouched, setContactNameTouched] = useState(false);
   const [newAddress, setNewAddress] = useState({ ...blankAddress });
+  // Only collected when a separate party is invoiced — where the invoice goes.
+  const [newBillingAddress, setNewBillingAddress] = useState({ ...blankAddress });
   const [premiseTouched, setPremiseTouched] = useState(false);
   const [dispatchRegionId, setDispatchRegionId] = useState('');
   const newName = newCustomer.name;
@@ -276,8 +278,16 @@ export default function WorkOrderIntakePage() {
     newName.trim() !== '' &&
     // At least one reachable channel — neither is required on its own.
     contactChannelError(newCustomer.phone, newCustomer.email) === null &&
-    // A separate payer has to be named, or we'd invoice an unnamed account.
-    (newCustomer.sameBilling || newCustomer.billingName.trim() !== '') &&
+    // A separate payer has to be named AND have somewhere to receive the
+    // invoice, or we'd mail it to the job site under a flag saying we didn't.
+    (newCustomer.sameBilling ||
+      (newCustomer.billingName.trim() !== '' &&
+        newBillingAddress.streetAddress.trim() !== '' &&
+        newBillingAddress.city.trim() !== '' &&
+        newBillingAddress.state.trim() !== '' &&
+        newBillingAddress.zipCode.trim() !== '' &&
+        // The invoice has to reach the payer, not just be addressed to them.
+        contactChannelError(newCustomer.billingContactPhone, newCustomer.billingContactEmail) === null)) &&
     newAddress.streetAddress.trim() !== '' &&
     newAddress.city.trim() !== '' &&
     newAddress.state.trim() !== '' &&
@@ -394,6 +404,7 @@ export default function WorkOrderIntakePage() {
         { ...newCustomer, premise: effectivePremise },
         {
           serviceAddress: newAddress,
+          billingAddress: newCustomer.sameBilling ? undefined : newBillingAddress,
           dispatchRegionId,
           contactNameTouched,
         }
@@ -501,6 +512,8 @@ export default function WorkOrderIntakePage() {
                       setContactNameTouched={setContactNameTouched}
                       address={newAddress}
                       setAddress={setNewAddress}
+                      billingAddress={newBillingAddress}
+                      setBillingAddress={setNewBillingAddress}
                       defaultPremise={defaultPremise}
                       onPremiseChange={(v) => {
                         setPremiseTouched(true);
@@ -794,6 +807,8 @@ function NewCustomerFields({
   setContactNameTouched,
   address,
   setAddress,
+  billingAddress,
+  setBillingAddress,
   defaultPremise,
   onPremiseChange,
   dispatchRegionId,
@@ -807,6 +822,8 @@ function NewCustomerFields({
   setContactNameTouched: (v: boolean) => void;
   address: { streetAddress: string; city: string; state: string; zipCode: string };
   setAddress: (v: { streetAddress: string; city: string; state: string; zipCode: string }) => void;
+  billingAddress: { streetAddress: string; city: string; state: string; zipCode: string };
+  setBillingAddress: (v: { streetAddress: string; city: string; state: string; zipCode: string }) => void;
   defaultPremise: PremiseType;
   onPremiseChange: (v: PremiseType) => void;
   dispatchRegionId: string;
@@ -814,7 +831,9 @@ function NewCustomerFields({
   regions: { id: string; name: string }[];
 }) {
   const set = (patch: Partial<typeof address>) => setAddress({ ...address, ...patch });
+  const setBilling = (patch: Partial<typeof billingAddress>) => setBillingAddress({ ...billingAddress, ...patch });
   const guidance = nameGuidance(model.premise);
+  const billingContactErr = contactChannelError(model.billingContactPhone, model.billingContactEmail);
   // Mirrors the household name into the contact until someone personalizes it.
   const effectiveContactName = resolveContactName(model, contactNameTouched);
   const contactError = contactChannelError(model.phone, model.email);
@@ -950,11 +969,15 @@ function NewCustomerFields({
           the payer — the checkbox exists for the franchise / property-manager
           / corporate-AP case, and unchecking it re-points the whole record. */}
       <label
-        className="flex cursor-pointer items-start gap-2.5 rounded-md border p-2.5"
-        style={{
-          borderColor: 'color-mix(in oklch, var(--accent-500) 30%, transparent)',
-          background: 'color-mix(in oklch, var(--accent-500) 6%, transparent)',
-        }}
+        className="flex cursor-pointer items-start gap-2.5 rounded-md border p-2.5 transition-colors"
+        style={
+          model.sameBilling
+            ? {
+                borderColor: 'color-mix(in oklch, var(--accent-500) 30%, var(--border))',
+                background: 'color-mix(in oklch, var(--accent-500) 6%, transparent)',
+              }
+            : { borderColor: 'var(--border)', background: 'var(--bg-elev-2)' }
+        }
       >
         <Checkbox
           color="accent"
@@ -979,6 +1002,8 @@ function NewCustomerFields({
         </span>
       </label>
 
+      {/* Following the mock's BillingBlock: who pays, where the invoice is
+          mailed, then how it's delivered. */}
       {!model.sameBilling && (
         <div className="space-y-2.5 border-t border-dashed border-border-soft pt-2.5">
           <Field size="xs">
@@ -992,28 +1017,77 @@ function NewCustomerFields({
               placeholder="Darden Restaurants"
             />
           </Field>
-          <div className="grid gap-2.5 sm:grid-cols-2">
+          <Field size="xs">
+            <Label size="xs" required>
+              Billing street address
+            </Label>
+            <Input
+              size="xs"
+              value={billingAddress.streetAddress}
+              onChange={(e) => setBilling({ streetAddress: e.target.value })}
+              placeholder="1000 Darden Center Dr"
+            />
+          </Field>
+          <div className="grid gap-2.5 sm:grid-cols-[2fr_1fr_1fr]">
             <Field size="xs">
-              <Label size="xs">Billing phone</Label>
+              <Label size="xs" required>
+                City
+              </Label>
+              <Input size="xs" value={billingAddress.city} onChange={(e) => setBilling({ city: e.target.value })} placeholder="Orlando" />
+            </Field>
+            <Field size="xs">
+              <Label size="xs" required>
+                State
+              </Label>
               <Input
                 size="xs"
-                type="tel"
-                value={model.billingContactPhone}
-                onChange={(e) => setModel({ billingContactPhone: e.target.value })}
+                value={billingAddress.state}
+                onChange={(e) => setBilling({ state: e.target.value.toUpperCase() })}
+                maxLength={2}
+                placeholder="FL"
               />
             </Field>
             <Field size="xs">
-              <Label size="xs">Billing email</Label>
-              <Input
-                size="xs"
-                type="email"
-                value={model.billingContactEmail}
-                onChange={(e) => setModel({ billingContactEmail: e.target.value })}
-              />
+              <Label size="xs" required>
+                ZIP
+              </Label>
+              <Input size="xs" value={billingAddress.zipCode} onChange={(e) => setBilling({ zipCode: e.target.value })} placeholder="32837" />
             </Field>
           </div>
+          <div className="border-t border-border-soft pt-2.5">
+            {/* No AP contact name: accounts payable is a department, not a
+                person we ask for — the channel is the whole requirement. */}
+            <div className="grid gap-2.5 sm:grid-cols-2">
+              <Field size="xs">
+                <Label size="xs">Billing phone</Label>
+                <Input
+                  size="xs"
+                  type="tel"
+                  value={model.billingContactPhone}
+                  onChange={(e) => setModel({ billingContactPhone: e.target.value })}
+                />
+              </Field>
+              <Field size="xs">
+                <Label size="xs">Billing email</Label>
+                <Input
+                  size="xs"
+                  type="email"
+                  value={model.billingContactEmail}
+                  onChange={(e) => setModel({ billingContactEmail: e.target.value })}
+                />
+              </Field>
+            </div>
+            {billingContactErr ? (
+              <p className="mt-1 text-[11px] text-danger-500">{billingContactErr}</p>
+            ) : (
+              <Text size="xs" tone="dim" className="mt-1">
+                At least one — this is where we send the invoice.
+              </Text>
+            )}
+          </div>
           <Text size="xs" tone="dim">
-            At least one — this is where we deliver the invoice. The name above becomes the customer; “{model.name.trim() || 'the name at the top'}” names the location.
+            “{model.billingName.trim() || 'The name above'}” becomes the {'customer'}; “
+            {model.name.trim() || 'the name at the top'}” names the location.
           </Text>
         </div>
       )}

@@ -89,7 +89,13 @@ export function buildCustomerCreateRequest(
   m: CustomerCreateModel,
   opts: {
     serviceAddress: ApiAddress;
-    // Defaults to the service address when billing isn't split off.
+    /**
+     * Where the invoice is mailed. REQUIRED whenever `sameBilling` is false —
+     * the whole point of splitting billing off is that the payer's AP address
+     * differs from the job site, so quietly defaulting to the service address
+     * would send invoices to the wrong place under a flag that claims they
+     * aren't the same. Ignored when billing isn't split off.
+     */
     billingAddress?: ApiAddress;
     dispatchRegionId: string;
     contactNameTouched?: boolean;
@@ -97,13 +103,19 @@ export function buildCustomerCreateRequest(
   }
 ): CreateCustomerRequest {
   const separate = !m.sameBilling;
+  if (separate && !opts.billingAddress) {
+    // A backstop, not a user-facing path — each surface validates first. It
+    // exists because the wrong answer here (silently billing the job site) is
+    // invisible in the UI and only surfaces as a misdelivered invoice.
+    throw new Error('buildCustomerCreateRequest: billingAddress is required when billing is separate');
+  }
   const contactName = resolveContactName(m, opts.contactNameTouched ?? false);
   return {
     name: resolveCustomerName(m),
     // Optional on the wire (only name is required). Send null, not "".
     email: (separate ? m.billingContactEmail : m.email).trim() || null,
     phone: (separate ? m.billingContactPhone : m.phone).trim() || null,
-    billingAddress: separate ? (opts.billingAddress ?? opts.serviceAddress) : opts.serviceAddress,
+    billingAddress: separate ? opts.billingAddress! : opts.serviceAddress,
     billingAddressSameAsService: m.sameBilling,
     serviceLocations: [
       {
