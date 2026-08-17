@@ -100,6 +100,23 @@ describe('WorkOrderIntakePage', () => {
     expect(screen.getByPlaceholderText(/no cooling upstairs/i)).toBeInTheDocument();
   });
 
+  it('tints the selected priority with the tone that value carries elsewhere', async () => {
+    const user = userEvent.setup();
+    renderIntake();
+    await screen.findByRole('heading', { name: /add work order/i, level: 1 });
+
+    // Normal is the default, so it starts as the toned (info) selection.
+    expect(screen.getByRole('radio', { name: 'Normal' })).toHaveAttribute('data-checked');
+    expect(screen.getByRole('radio', { name: 'Normal' })).toHaveAttribute('data-tone', 'info');
+
+    // Escalating repaints the control red rather than just moving the highlight.
+    await user.click(screen.getByRole('radio', { name: 'Urgent' }));
+    const urgent = screen.getByRole('radio', { name: 'Urgent' });
+    expect(urgent).toHaveAttribute('data-checked');
+    expect(urgent).toHaveAttribute('data-tone', 'danger');
+    expect(screen.getByRole('radio', { name: 'Normal' })).not.toHaveAttribute('data-checked');
+  });
+
   it('keeps the create button disabled until a location, type and a complaint are present', async () => {
     const user = userEvent.setup();
     renderIntake('/work-orders/new?locationId=loc-1');

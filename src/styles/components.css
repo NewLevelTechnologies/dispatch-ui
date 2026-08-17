@@ -291,6 +291,89 @@
   outline: 2px solid var(--accent-500);
   outline-offset: 1px;
 }
+
+/* ── Toned selection ─────────────────────────────────────────────
+   For toggle groups where the CHOICE itself carries a severity that a
+   color already encodes elsewhere in the app — WO priority is the case:
+   Normal reads info, High warning, Urgent danger, matching the pill the
+   same value gets on a list row or a summary rail. A CSR setting Urgent
+   while on the phone sees the control go red, not just "a different
+   segment is raised."
+
+   Only the CHECKED option tints. Unchecked options stay muted so the row
+   still reads as one control rather than four competing badges, and the
+   hover rules are repeated so the base `[data-checked]:hover` (equal
+   specificity) can't wash the tint back to --bg-elev.
+
+   Tone fills mix over `transparent`, not the opaque --bg-elev, so the tint
+   composites over the recessed container — same convention as `.pill`. */
+.toggle-group-option[data-tone][data-checked],
+.toggle-group-option[data-tone][data-checked]:hover {
+  background: color-mix(in oklch, var(--tg-tone) 16%, transparent);
+  color: var(--tg-tone-fg, var(--tg-tone));
+  border-color: color-mix(in oklch, var(--tg-tone) 30%, transparent);
+  box-shadow: none;
+}
+.toggle-group-option[data-tone='info']    { --tg-tone: var(--info-500); }
+.toggle-group-option[data-tone='success'] { --tg-tone: var(--success-500); }
+.toggle-group-option[data-tone='warning'] { --tg-tone: var(--warning-500); --tg-tone-fg: var(--warning-fg); }
+.theme-dark .toggle-group-option[data-tone='warning'] { --tg-tone-fg: var(--warning-500); }
+.toggle-group-option[data-tone='danger']  { --tg-tone: var(--danger-500); }
+
+/* Neutral is the absence of a hue, not a color — "Low" shouldn't glow. It
+   keeps the recessed fill with muted text so it still reads as selected. */
+.toggle-group-option[data-tone='neutral'][data-checked],
+.toggle-group-option[data-tone='neutral'][data-checked]:hover {
+  background: var(--bg-active);
+  color: var(--fg-muted);
+  border-color: var(--border);
+  box-shadow: none;
+}
+
+/* Dark mode: 16% over the recessed container is too faint to read as a fill,
+   so lift the mix and composite over an opaque base — as `.pill` does. */
+.theme-dark .toggle-group-option[data-tone]:not([data-tone='neutral'])[data-checked],
+.theme-dark .toggle-group-option[data-tone]:not([data-tone='neutral'])[data-checked]:hover {
+  background: color-mix(in oklch, var(--tg-tone) 26%, var(--bg-elev));
+}
+/* ── `joined` variant ────────────────────────────────────────────
+   One bordered bar with butt-joined segments, instead of a recessed tray
+   of separate pills (mock: the WO priority control). Wide segments need
+   this shape — at 18px of horizontal padding the tray reads bloated,
+   because its own padding and the inter-pill gaps compound the width.
+   Here the container is transparent and only the selected segment is
+   filled, so the control reads as one bar with a highlighted region.
+
+   Corners are rounded on the first/last segment rather than clipped with
+   `overflow: hidden` on the container, which would also clip the
+   focus-visible outline and cost keyboard users the focus ring. */
+.toggle-group--joined {
+  align-items: stretch;
+  height: 32px;
+  padding: 0;
+  gap: 0;
+  border-radius: var(--r-md);
+  border: 1px solid var(--border);
+  background: transparent;
+  width: fit-content;
+}
+.toggle-group--joined .toggle-group-option {
+  padding: 0 18px;
+  border: 0;
+  border-radius: 0;
+  font-size: 12.5px;
+  font-weight: 600;
+  justify-content: center;
+}
+.toggle-group--joined .toggle-group-option:first-child {
+  border-start-start-radius: calc(var(--r-md) - 1px);
+  border-end-start-radius: calc(var(--r-md) - 1px);
+}
+.toggle-group--joined .toggle-group-option:last-child {
+  border-start-end-radius: calc(var(--r-md) - 1px);
+  border-end-end-radius: calc(var(--r-md) - 1px);
+}
+
 /* `sm` — inline placements (e.g. beside a field label). */
 .toggle-group--sm { padding: 2px; gap: 2px; border-radius: 7px; }
 .toggle-group--sm .toggle-group-option {

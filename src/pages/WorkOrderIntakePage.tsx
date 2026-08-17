@@ -458,9 +458,11 @@ export default function WorkOrderIntakePage() {
                   <div className="mt-2.5">
                     <MiniLabel>Priority</MiniLabel>
                     <div className="mt-1">
-                      <ToggleGroup value={priority} onChange={setPriority} aria-label="Priority">
+                      <ToggleGroup value={priority} onChange={setPriority} variant="joined" aria-label="Priority">
                         {PRIORITIES.map((p) => (
-                          <ToggleGroupOption key={p.value} value={p.value}>
+                          // Same tone the value gets as a pill on the rail and
+                          // on list rows, so severity reads consistently.
+                          <ToggleGroupOption key={p.value} value={p.value} tone={PRIORITY_TONE[p.value]}>
                             {p.label}
                           </ToggleGroupOption>
                         ))}
