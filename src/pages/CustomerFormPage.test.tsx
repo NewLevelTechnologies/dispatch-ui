@@ -130,7 +130,10 @@ describe('CustomerFormPage', () => {
     expect(screen.getByText(/add a phone or email/i)).toBeInTheDocument();
   });
 
-  it('separate billing: the bill-to name becomes the customer name, top name stays the location', async () => {
+  // Types a whole customer + both addresses through userEvent, so it runs ~2.6s
+  // under v8 coverage instrumentation and overran the 5s default in CI's
+  // coverage job.
+  it('separate billing: the bill-to name becomes the customer name, top name stays the location', { timeout: 15000 }, async () => {
     const user = userEvent.setup();
     vi.mocked(apiClient.post).mockResolvedValue({ data: { id: 'new-cust-10' } });
     renderAddCustomer();
