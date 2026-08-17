@@ -216,6 +216,73 @@ describe('ServiceLocationPicker', () => {
     expect(mockOnChange).toHaveBeenCalledWith(mockSearchResults.content[0]);
   });
 
+  describe('search-first zero-state', () => {
+    const searchFirst = { onCreateForCustomer: vi.fn(), onCreateNewCustomer: vi.fn() };
+
+    it('shows recently active locations before anything is typed', async () => {
+      vi.mocked(apiClient.get).mockImplementation((url: string) => {
+        if (url === '/service-locations/recent') {
+          return Promise.resolve({ data: { ...mockSearchResults, content: [mockSearchResults.content[0]] } });
+        }
+        return Promise.resolve({ data: { ...mockSearchResults, content: [] } });
+      });
+
+      renderWithProviders(
+        <ServiceLocationPicker value={null} onChange={mockOnChange} searchFirst={searchFirst} />
+      );
+
+      // Opening the picker mid-call must never show an empty panel.
+      await waitFor(() => expect(screen.getByText("John's House")).toBeInTheDocument());
+      expect(apiClient.get).toHaveBeenCalledWith('/service-locations/recent', {
+        params: { page: 0, size: 8 },
+      });
+      // The header names WHY these rows are here, not what they are.
+      expect(screen.getByText('Recent')).toBeInTheDocument();
+    });
+
+    it('does not hit the search endpoint or list customers before 2 characters', async () => {
+      const user = userEvent.setup();
+      vi.mocked(apiClient.get).mockResolvedValue({ data: { ...mockSearchResults, content: [] } });
+
+      renderWithProviders(
+        <ServiceLocationPicker value={null} onChange={mockOnChange} searchFirst={searchFirst} />
+      );
+
+      await user.type(screen.getByRole('textbox'), 'j');
+      await new Promise((resolve) => setTimeout(resolve, 400));
+
+      // Listing every account before a query would bury the location rows.
+      expect(apiClient.get).not.toHaveBeenCalledWith('/customers/search', expect.anything());
+      expect(apiClient.get).not.toHaveBeenCalledWith('/service-locations/search', expect.anything());
+    });
+
+    it('falls back to the empty-state copy when the tenant has no active locations', async () => {
+      vi.mocked(apiClient.get).mockResolvedValue({ data: { ...mockSearchResults, content: [] } });
+
+      renderWithProviders(
+        <ServiceLocationPicker value={null} onChange={mockOnChange} searchFirst={searchFirst} />
+      );
+
+      await waitFor(() => expect(screen.getByText(/Search by location, customer/i)).toBeInTheDocument());
+      expect(screen.queryByText('Recent')).not.toBeInTheDocument();
+    });
+
+    it('swaps the group header once a query is present', async () => {
+      const user = userEvent.setup();
+      vi.mocked(apiClient.get).mockResolvedValue({ data: mockSearchResults });
+
+      renderWithProviders(
+        <ServiceLocationPicker value={null} onChange={mockOnChange} searchFirst={searchFirst} />
+      );
+
+      await user.type(screen.getByRole('textbox'), 'john');
+
+      // Glossary-driven: the tenant's word for the entity, not a hardcoded label.
+      await waitFor(() => expect(screen.getByText('Locations')).toBeInTheDocument());
+      expect(screen.queryByText('Recent')).not.toBeInTheDocument();
+    });
+  });
+
   it('collapses to a read-back row once a location is picked', () => {
     const selectedLocation = mockSearchResults.content[0];
 

@@ -120,6 +120,7 @@ vi.mock('react-i18next', () => {
     'common.loading': 'Loading...',
     'common.moveDown': 'Move down',
     'common.moveUp': 'Move up',
+    'common.recent': 'Recent',
     'common.recentEntities': 'Recent {{entities}}',
     'common.restoring': 'Restoring...',
     'common.search': 'Search...',

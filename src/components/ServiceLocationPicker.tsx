@@ -11,6 +11,7 @@ import {
   UserIcon,
 } from '@heroicons/react/24/outline';
 import { customerApi, type ServiceLocationSearchResult, type CustomerSearchResult } from '../api';
+import { useGlossary } from '../contexts/GlossaryContext';
 import { Button } from './catalyst/button';
 import { Field, Label } from './catalyst/fieldset';
 import { Input, InputGroup } from './catalyst/input';
@@ -89,8 +90,16 @@ function EmptyResults({
   hasQuery: boolean;
   query: string;
 }) {
+  const { getName } = useGlossary();
+  const locationWord = getName('service_location').toLowerCase();
+  const customerWord = getName('customer').toLowerCase();
+
   if (!searchFirst) {
-    return <div className="px-3 py-2.5 text-[12px] text-fg-muted">No locations found</div>;
+    return (
+      <div className="px-3 py-2.5 text-[12px] text-fg-muted">
+        No {getName('service_location', true).toLowerCase()} found
+      </div>
+    );
   }
   return (
     <div className="px-3 py-2.5 text-[12px] leading-relaxed text-fg-muted">
@@ -102,7 +111,8 @@ function EmptyResults({
         </>
       ) : (
         <span className="text-fg-dim">
-          Search by location, customer, address, or phone — or add a new customer below.
+          Search by {locationWord}, {customerWord}, address, or phone — or add a new {customerWord}{' '}
+          below.
         </span>
       )}
     </div>
@@ -175,7 +185,7 @@ function PickedLocation({
 export default function ServiceLocationPicker({
   value,
   onChange,
-  label = 'Service Location',
+  label: labelProp,
   required = false,
   autoFocus = false,
   restrictToCustomer,
@@ -183,6 +193,11 @@ export default function ServiceLocationPicker({
   searchFirst,
 }: ServiceLocationPickerProps) {
   const { t } = useTranslation();
+  const { getName } = useGlossary();
+  // Entity names are tenant-configurable, so the fallback label is the glossary
+  // term rather than a baked-in "Service Location". `??` (not `||`) so a caller
+  // passing "" to suppress the label still gets no label.
+  const label = labelProp ?? getName('service_location');
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
   const [showDropdown, setShowDropdown] = useState(false);
@@ -222,6 +237,18 @@ export default function ServiceLocationPicker({
     queryKey: ['service-locations-search', debouncedQuery],
     queryFn: () => customerApi.searchServiceLocations(debouncedQuery, 0, 50),
     enabled: !restrictToCustomer && debouncedQuery.length >= 2,
+    staleTime: 30000,
+  });
+
+  // Search-first zero-state: the tenant's recently active locations, so opening
+  // the picker with the caller on the line never shows an empty panel. Its own
+  // endpoint and its own query key — no cache key whose meaning flips on an
+  // empty string. Restricted mode already opens on focus with the customer's
+  // own locations, so it never had the empty-panel problem.
+  const { data: recentResults, isLoading: recentLoading } = useQuery({
+    queryKey: ['service-locations-recent'],
+    queryFn: () => customerApi.getRecentServiceLocations(8),
+    enabled: !!searchFirst && !restrictToCustomer && debouncedQuery.trim().length < 2,
     staleTime: 30000,
   });
 
@@ -274,10 +301,16 @@ export default function ServiceLocationPicker({
         return haystack.includes(q);
       });
     }
+    // Zero-state falls back to the recency panel rather than an empty list.
+    if (searchFirst && searchQuery.trim().length < 2) return recentResults?.content ?? [];
     return searchResults?.content ?? [];
-  }, [restrictToCustomer, customerLocations, searchResults, searchQuery]);
+  }, [restrictToCustomer, customerLocations, searchResults, searchQuery, searchFirst, recentResults]);
 
-  const isLoading = restrictToCustomer ? customerLocationsLoading : searchLoading;
+  const isLoading = restrictToCustomer
+    ? customerLocationsLoading
+    : searchFirst && searchQuery.trim().length < 2
+      ? recentLoading
+      : searchLoading;
 
   // Restricted mode opens on focus (small list, no min length needed).
   // Tenant-wide mode requires 2+ chars to avoid a useless empty fetch.
@@ -335,7 +368,7 @@ export default function ServiceLocationPicker({
                 setShowDropdown(true);
               }
             }}
-            placeholder="Search by customer, address, or phone..."
+            placeholder={`Search by ${getName('customer').toLowerCase()}, address, or phone...`}
             autoFocus={autoFocus}
             // A picked location already satisfies the field; requiring the
             // search box too would block submit whenever the CSR opens
@@ -364,8 +397,9 @@ export default function ServiceLocationPicker({
             )}
 
             {!isLoading && searchFirst && locations.length > 0 && (
-              /* eslint-disable-next-line i18next/no-literal-string */
-              <PickerGroup>Service locations</PickerGroup>
+              <PickerGroup>
+                {hasQuery ? getName('service_location', true) : t('common.recent')}
+              </PickerGroup>
             )}
 
             {!isLoading && locations.length > 0 && (
@@ -417,7 +451,7 @@ export default function ServiceLocationPicker({
                     shouldn't have to infer why accounts are in a location
                     picker. */}
                 {/* eslint-disable-next-line i18next/no-literal-string */}
-                <PickerGroup>Customers · add a new location to an existing account</PickerGroup>
+                <PickerGroup>{getName('customer', true)} · add a new {getName('service_location').toLowerCase()} to an existing account</PickerGroup>
                 {customers.map((customer) => (
                   <button
                     key={customer.id}
@@ -441,7 +475,9 @@ export default function ServiceLocationPicker({
                       )}
                     </span>
                     {/* eslint-disable-next-line i18next/no-literal-string */}
-                    <span className="card-action shrink-0">+ New location</span>
+                    <span className="card-action shrink-0">
+                      + New {getName('service_location').toLowerCase()}
+                    </span>
                   </button>
                 ))}
               </>
@@ -455,7 +491,7 @@ export default function ServiceLocationPicker({
               >
                 <PlusIcon className="size-3.5 text-fg-accent" />
                 {/* eslint-disable-next-line i18next/no-literal-string */}
-                <span className="card-action">New customer</span>
+                <span className="card-action">New {getName('customer').toLowerCase()}</span>
               </button>
             )}
           </div>
