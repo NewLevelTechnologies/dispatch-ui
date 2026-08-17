@@ -216,11 +216,15 @@ describe('WorkOrderFormDialog', () => {
       const firstResult = screen.getByText("John's House").closest('button');
       await user.click(firstResult!);
 
-      // After selection, search input should be cleared (searchQuery is reset)
-      // The dropdown should also close
+      // The picker collapses to its read-back row: the dropdown and the search
+      // box are both gone, and the chosen site is shown with a way to change it.
       await waitFor(() => {
-        expect(screen.queryByText("John's House")).not.toBeInTheDocument();
+        expect(
+          screen.queryByPlaceholderText('Search by customer, address, or phone...')
+        ).not.toBeInTheDocument();
       });
+      expect(screen.getByText("John's House")).toBeInTheDocument();
+      expect(screen.getByText('Change')).toBeInTheDocument();
     });
   });
 

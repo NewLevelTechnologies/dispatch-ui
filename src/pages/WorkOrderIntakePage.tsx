@@ -389,6 +389,8 @@ export default function WorkOrderIntakePage() {
                       value={selectedLocation}
                       onChange={setSelectedLocation}
                       label={getName('service_location')}
+                      // The numbered card header above already names this.
+                      hideLabel
                       restrictToCustomer={restrictToCustomer}
                       required
                     />
@@ -536,7 +538,6 @@ export default function WorkOrderIntakePage() {
                   locationDetail={locationDetail}
                   newName={newName}
                   newAddress={newAddress}
-                  premise={effectivePremise}
                   typeName={activeTypes.find((tx) => tx.id === workOrderTypeId)?.name ?? null}
                   divisionName={activeDivisions.find((d) => d.id === divisionId)?.name ?? null}
                   priority={priority}
@@ -842,7 +843,6 @@ function IntakeRail({
   locationDetail,
   newName,
   newAddress,
-  premise: newPremise,
   typeName,
   divisionName,
   priority,
@@ -853,7 +853,6 @@ function IntakeRail({
   locationDetail: ServiceLocationDetailDto | undefined;
   newName: string;
   newAddress: { streetAddress: string; city: string; state: string; zipCode: string };
-  premise: PremiseType;
   typeName: string | null;
   divisionName: string | null;
   priority: WorkOrderPriority;
@@ -864,7 +863,6 @@ function IntakeRail({
   const name = isNew ? newName : selectedLocation?.locationName || selectedLocation?.customerName;
   const address = isNew ? newAddress : selectedLocation?.address;
   const customerName = isNew ? newName : selectedLocation?.customerName;
-  const premise = isNew ? newPremise : locationDetail?.premiseType;
   const pinnedNote = locationDetail?.notes?.find((n) => n.pinned) ?? locationDetail?.notes?.[0];
   const facts = locationDetail?.arrivalFacts ?? [];
   const hasLocation = isNew ? !!newName : !!selectedLocation;
@@ -883,7 +881,6 @@ function IntakeRail({
         <>
           <div className="flex flex-wrap items-baseline gap-1.5">
             <span className="text-[14px] font-bold text-fg-strong">{name || 'New location'}</span>
-            {premise && <Pill tone="neutral">{premise === 'BUSINESS' ? 'Business' : 'Residence'}</Pill>}
             {isNew && (
               <Pill tone="success" dot>
                 New

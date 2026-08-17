@@ -184,6 +184,8 @@ vi.mock('react-i18next', () => {
     'common.pagination.pageOf': 'Page {{page}} of {{total}}',
     'common.pagination.previous': 'Previous',
     'common.pagination.showing': 'Showing {{start}}-{{end}} of {{total}}',
+    'common.premiseBusiness': 'Business',
+    'common.premiseResidence': 'Residence',
     'common.previous': 'Previous',
     'common.save': 'Save',
     'common.saving': 'Saving...',
