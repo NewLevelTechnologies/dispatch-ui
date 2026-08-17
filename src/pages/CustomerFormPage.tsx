@@ -66,6 +66,13 @@ interface Addr {
 
 const EMPTY_ADDR: Addr = { street: '', line2: '', city: '', state: '', zip: '' };
 
+import {
+  buildCustomerCreateRequest,
+  nameGuidance,
+  resolveContactName,
+  resolveCustomerName,
+} from '../lib/customerCreateModel';
+
 interface FormShape {
   name: string;
   // Who to ask for on site. Maps to the first location's siteContactName — the
@@ -93,17 +100,6 @@ interface FormShape {
   accountManager: AccountManagerValue | null;
 }
 
-// Premise decides what "Name" means, so the field is explained by it. Residence:
-// the household ("Avila"). Business: the store/building, never the parent company
-// (that distinction is the one genuinely useful thing to say here).
-function nameGuidance(premise: PremiseType): { placeholder: string; hint: string | null } {
-  return premise === 'RESIDENCE'
-    ? { placeholder: 'Avila', hint: null }
-    : { placeholder: 'Red Lobster #123', hint: 'The store or building — not the parent company.' };
-}
-
-// Payment terms map to a number of days on the wire (paymentTermsDays);
-// 0 = due on receipt.
 const TERMS_OPTIONS: { value: number; label: string }[] = [
   { value: 0, label: 'Due on receipt' },
   { value: 15, label: 'Net 15' },
@@ -186,11 +182,11 @@ export default function CustomerFormPage() {
   const nameG = nameGuidance(effectivePremise);
   // Residence: the household name IS the contact, so it's mirrored until someone
   // personalizes it — one name typed once.
-  const effectiveContactName =
-    contactNameTouched || effectivePremise !== 'RESIDENCE' ? form.contactName : form.contactName || form.name;
-  // customer.name is the account we invoice: the billing name when billing is
-  // separate, otherwise the top name. The top name always names the location.
-  const resolvedCustomerName = (form.sameBilling ? form.name : form.billingName.trim() || form.name).trim();
+  const effectiveContactName = resolveContactName(
+    { name: form.name, contactName: form.contactName, premise: effectivePremise },
+    contactNameTouched
+  );
+  const resolvedCustomerName = resolveCustomerName(form);
 
   // Live readback in the footer — surfaces the resolved customer name so a
   // mistaken bill-to name is caught before submit.
@@ -297,34 +293,24 @@ export default function CustomerFormPage() {
       // party pays (the customer IS that party), else the top contact. The
       // on-site (top) contact always lands on the location; when billing is
       // separate that's the ONLY place it lives.
-      const request: CreateCustomerRequest = {
-        // The account we invoice: the billing name when billing is separate,
-        // else the top name. The first location keeps the top name below.
-        name: resolvedCustomerName,
-        // Optional on the wire (only name is required). Send null, not "".
-        email: (separate ? form.billingContactEmail : form.email).trim() || null,
-        phone: (separate ? form.billingContactPhone : form.phone).trim() || null,
-        billingAddress,
-        billingAddressSameAsService: form.sameBilling,
-        serviceLocations: [
-          {
-            dispatchRegionId: effectiveRegionId,
-            // The first location has no name field on this fast-intake form;
-            // seed it from the customer name so the site isn't unlabeled.
-            locationName: form.name.trim(),
-            premiseType: effectivePremise,
-            // Who a tech asks for at the door.
-            siteContactName: effectiveContactName.trim() || null,
-            siteContactPhone: separate ? form.phone.trim() || null : null,
-            siteContactEmail: separate ? form.email.trim() || null : null,
-            address: serviceAddress,
+      // Shared with the WO intake panel — the name/contact/billing routing is
+      // identical on both surfaces by construction, not by convention.
+      const request: CreateCustomerRequest = buildCustomerCreateRequest(
+        { ...form, premise: effectivePremise },
+        {
+          serviceAddress,
+          billingAddress,
+          dispatchRegionId: effectiveRegionId,
+          contactNameTouched,
+          // Back-office-only fields; intake doesn't collect these.
+          extra: {
+            paymentTermsDays: form.paymentTermsDays,
+            taxExempt: form.taxExempt,
+            taxExemptCertificate: form.taxExempt ? form.taxCert.trim() || null : null,
+            accountManagerUserId: form.accountManager?.id ?? null,
           },
-        ],
-        paymentTermsDays: form.paymentTermsDays,
-        taxExempt: form.taxExempt,
-        taxExemptCertificate: form.taxExempt ? form.taxCert.trim() || null : null,
-        accountManagerUserId: form.accountManager?.id ?? null,
-      };
+        }
+      );
       return customerApi.create(request);
     },
     onSuccess: (created) => {
@@ -591,6 +577,10 @@ export default function CustomerFormPage() {
               <label className="flex cursor-pointer items-start gap-2.5">
                 <Checkbox
                   color="accent"
+                  // The visible text sits in a sibling span, so the control
+                  // needs its own name — a bare <label> around a non-input
+                  // doesn't associate.
+                  aria-label="Bill this customer directly"
                   checked={form.sameBilling}
                   onChange={(v) =>
                     set({

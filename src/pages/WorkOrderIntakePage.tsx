@@ -26,6 +26,13 @@ import AppLayout from '../components/AppLayout';
 import ServiceLocationPicker from '../components/ServiceLocationPicker';
 import WOEquipmentPicker from '../components/WOEquipmentPicker';
 import { titleCaseAddress } from '../utils/titleCaseAddress';
+import {
+  buildCustomerCreateRequest,
+  contactChannelError,
+  nameGuidance,
+  resolveContactName,
+  type CustomerCreateModel,
+} from '../lib/customerCreateModel';
 import { Card } from '../components/catalyst/card';
 import { Button } from '../components/catalyst/button';
 import { Field, Label } from '../components/catalyst/fieldset';
@@ -35,6 +42,7 @@ import { Heading } from '../components/catalyst/heading';
 import { Text } from '../components/catalyst/text';
 import { ToggleGroup, ToggleGroupOption } from '../components/ui/ToggleGroup';
 import { Pill } from '../components/ui/Pill';
+import { Checkbox } from '../components/catalyst/checkbox';
 import { PlusIcon, XMarkIcon, CheckIcon, BoltIcon } from '@heroicons/react/24/outline';
 
 // New Work Order intake (mock: New Job.html / screen-wo-intake.jsx). A CSR
@@ -154,13 +162,24 @@ export default function WorkOrderIntakePage() {
   // Mirrors Add Customer's model so we don't over-ask: ONE name (a person OR a
   // company) seeds both the customer and its first location — never a separate
   // "location name" — and premise defaults from the company profile.
-  const [newName, setNewName] = useState('');
-  const [phone, setPhone] = useState('');
-  const [email, setEmail] = useState('');
+  const [newCustomer, setNewCustomer] = useState<CustomerCreateModel>({
+    name: '',
+    contactName: '',
+    phone: '',
+    email: '',
+    premise: 'BUSINESS',
+    sameBilling: true,
+    billingName: '',
+    billingContactPhone: '',
+    billingContactEmail: '',
+  });
+  const patchNewCustomer = (patch: Partial<CustomerCreateModel>) =>
+    setNewCustomer((c) => ({ ...c, ...patch }));
+  const [contactNameTouched, setContactNameTouched] = useState(false);
   const [newAddress, setNewAddress] = useState({ ...blankAddress });
-  const [premise, setPremise] = useState<PremiseType>('BUSINESS');
   const [premiseTouched, setPremiseTouched] = useState(false);
   const [dispatchRegionId, setDispatchRegionId] = useState('');
+  const newName = newCustomer.name;
 
   // ── Work items ──────────────────────────────────────────────────────────
   const [drafts, setDrafts] = useState<Draft[]>([newDraft(1)]);
@@ -188,7 +207,7 @@ export default function WorkOrderIntakePage() {
     enabled: creatingLocation,
   });
   const defaultPremise: PremiseType = tenantSettings?.defaultPremiseType ?? 'BUSINESS';
-  const effectivePremise = premiseTouched ? premise : defaultPremise;
+  const effectivePremise = premiseTouched ? newCustomer.premise : defaultPremise;
 
   // Prefill the customer name for the restricted picker (from ?customerId).
   const { data: prefillCustomer } = useQuery({
@@ -255,8 +274,10 @@ export default function WorkOrderIntakePage() {
   // ── Validation ────────────────────────────────────────────────────────
   const newCustomerReady =
     newName.trim() !== '' &&
-    phone.trim() !== '' &&
-    email.trim() !== '' &&
+    // At least one reachable channel — neither is required on its own.
+    contactChannelError(newCustomer.phone, newCustomer.email) === null &&
+    // A separate payer has to be named, or we'd invoice an unnamed account.
+    (newCustomer.sameBilling || newCustomer.billingName.trim() !== '') &&
     newAddress.streetAddress.trim() !== '' &&
     newAddress.city.trim() !== '' &&
     newAddress.state.trim() !== '' &&
@@ -310,9 +331,13 @@ export default function WorkOrderIntakePage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!canSubmit || submitting) {
-      if (!workOrderTypeId) showError('Pick a work order type.');
-      else if (!locationReady) showError('Pick a service location, or add the new customer & location.');
-      else if (complaintDrafts.length === 0) showError('Add at least one work item with a complaint.');
+      if (!workOrderTypeId) showError(`Pick a ${getName('work_order').toLowerCase()} type.`);
+      else if (!locationReady)
+        showError(
+          `Pick a ${getName('service_location').toLowerCase()}, or add the new ${getName('customer').toLowerCase()} & ${getName('service_location').toLowerCase()}.`
+        );
+      else if (complaintDrafts.length === 0)
+        showError(`Add at least one ${getName('work_item').toLowerCase()} with a complaint.`);
       return;
     }
 
@@ -363,23 +388,16 @@ export default function WorkOrderIntakePage() {
     // first, then the work order against the returned ids.
     setCreatingCustomer(true);
     try {
-      const customerRequest: CreateCustomerRequest = {
-        name: newName.trim(),
-        email: email.trim(),
-        phone: phone.trim() || null,
-        billingAddress: newAddress,
-        billingAddressSameAsService: true,
-        serviceLocations: [
-          {
-            dispatchRegionId,
-            // One name seeds both records — the first location isn't asked for
-            // separately (same as Add Customer).
-            locationName: newName.trim(),
-            premiseType: effectivePremise,
-            address: newAddress,
-          },
-        ],
-      };
+      // Shared with Add Customer: when a separate party is billed, the bill-to
+      // name becomes the CUSTOMER and the typed name demotes to the location.
+      const customerRequest: CreateCustomerRequest = buildCustomerCreateRequest(
+        { ...newCustomer, premise: effectivePremise },
+        {
+          serviceAddress: newAddress,
+          dispatchRegionId,
+          contactNameTouched,
+        }
+      );
       const createdCustomer = await customerApi.create(customerRequest);
       const firstLocation = createdCustomer.serviceLocations[0];
       queryClient.invalidateQueries({ queryKey: ['customers'] });
@@ -411,7 +429,8 @@ export default function WorkOrderIntakePage() {
                 </Heading>
                 <Text size="sm" tone="muted" className="mt-0.5">
                   Book a {getName('work_order').toLowerCase()} at a {getName('service_location').toLowerCase()}. Add
-                  every problem the customer is reporting as a separate {getName('work_item').toLowerCase()}.
+                  every problem the {getName('customer').toLowerCase()} is reporting as a separate{' '}
+                  {getName('work_item').toLowerCase()}.
                 </Text>
               </div>
               <div className="flex flex-shrink-0 items-center gap-2">
@@ -467,7 +486,7 @@ export default function WorkOrderIntakePage() {
                       defaultPremise={defaultPremise}
                       onPremiseChange={(v) => {
                         setPremiseTouched(true);
-                        setPremise(v);
+                        patchNewCustomer({ premise: v });
                       }}
                       dispatchRegionId={dispatchRegionId}
                       setDispatchRegionId={setDispatchRegionId}
@@ -476,19 +495,16 @@ export default function WorkOrderIntakePage() {
                   ) : (
                     <NewCustomerFields
                       onCancel={() => setCustomerMode('existing')}
-                      name={newName}
-                      setName={setNewName}
-                      phone={phone}
-                      setPhone={setPhone}
-                      email={email}
-                      setEmail={setEmail}
+                      model={{ ...newCustomer, premise: effectivePremise }}
+                      setModel={patchNewCustomer}
+                      contactNameTouched={contactNameTouched}
+                      setContactNameTouched={setContactNameTouched}
                       address={newAddress}
                       setAddress={setNewAddress}
-                      premise={effectivePremise}
                       defaultPremise={defaultPremise}
                       onPremiseChange={(v) => {
                         setPremiseTouched(true);
-                        setPremise(v);
+                        patchNewCustomer({ premise: v });
                       }}
                       dispatchRegionId={dispatchRegionId}
                       setDispatchRegionId={setDispatchRegionId}
@@ -599,13 +615,13 @@ export default function WorkOrderIntakePage() {
                       />
                     </Field>
                     <Field size="xs">
-                      <Label size="xs">Customer PO #</Label>
+                      <Label size="xs">{getName('customer')} PO #</Label>
                       <Input
                         size="xs"
                         value={customerOrderNumber}
                         onChange={(e) => setCustomerOrderNumber(e.target.value)}
                         placeholder="Optional"
-                        aria-label="Customer PO number"
+                        aria-label={`${getName('customer')} PO number`}
                       />
                     </Field>
                   </div>
@@ -694,10 +710,13 @@ function NewLocationFields({
   setDispatchRegionId: (v: string) => void;
   regions: { id: string; name: string }[];
 }) {
+  const { getName } = useGlossary();
   const set = (patch: Partial<typeof address>) => setAddress({ ...address, ...patch });
   return (
     <div className="space-y-2.5">
-      <CreatePanelHead onCancel={onCancel}>New location for {customerName}</CreatePanelHead>
+      <CreatePanelHead onCancel={onCancel}>
+        New {getName('service_location').toLowerCase()} for {customerName}
+      </CreatePanelHead>
       <Field size="xs">
         <Label size="xs" required>
           Street address
@@ -769,15 +788,12 @@ function NewLocationFields({
 
 function NewCustomerFields({
   onCancel,
-  name,
-  setName,
-  phone,
-  setPhone,
-  email,
-  setEmail,
+  model,
+  setModel,
+  contactNameTouched,
+  setContactNameTouched,
   address,
   setAddress,
-  premise,
   defaultPremise,
   onPremiseChange,
   dispatchRegionId,
@@ -785,15 +801,12 @@ function NewCustomerFields({
   regions,
 }: {
   onCancel: () => void;
-  name: string;
-  setName: (v: string) => void;
-  phone: string;
-  setPhone: (v: string) => void;
-  email: string;
-  setEmail: (v: string) => void;
+  model: CustomerCreateModel;
+  setModel: (patch: Partial<CustomerCreateModel>) => void;
+  contactNameTouched: boolean;
+  setContactNameTouched: (v: boolean) => void;
   address: { streetAddress: string; city: string; state: string; zipCode: string };
   setAddress: (v: { streetAddress: string; city: string; state: string; zipCode: string }) => void;
-  premise: PremiseType;
   defaultPremise: PremiseType;
   onPremiseChange: (v: PremiseType) => void;
   dispatchRegionId: string;
@@ -801,45 +814,61 @@ function NewCustomerFields({
   regions: { id: string; name: string }[];
 }) {
   const set = (patch: Partial<typeof address>) => setAddress({ ...address, ...patch });
+  const guidance = nameGuidance(model.premise);
+  // Mirrors the household name into the contact until someone personalizes it.
+  const effectiveContactName = resolveContactName(model, contactNameTouched);
+  const contactError = contactChannelError(model.phone, model.email);
+
   return (
     <div className="space-y-2.5">
       <CreatePanelHead onCancel={onCancel}>New customer</CreatePanelHead>
-      <Text size="xs" tone="dim">
-        Just enough to start the job — full billing &amp; details enrich later on the customer’s page.
-      </Text>
-      {/* One name — a household or a company — seeds both records. */}
+
+      {/* Premise sits on the label row because it decides what "Name" MEANS —
+          a household vs a specific site. Asking it after the name would be
+          asking the CSR to re-read what they just typed. */}
       <Field size="xs">
-        <Label size="xs" required>
+        <Label size="xs" required hint={guidance.hint ?? undefined}>
           Name
         </Label>
-        <Input size="xs" value={name} onChange={(e) => setName(e.target.value)} placeholder="Maria Sanchez — or Iverson Properties LLC" />
+        <div className="mb-1 flex items-center justify-end">
+          <ToggleGroup value={model.premise} onChange={onPremiseChange} size="sm" aria-label="Premise">
+            <ToggleGroupOption value="RESIDENCE" tone="success">
+              Residence
+            </ToggleGroupOption>
+            <ToggleGroupOption value="BUSINESS" tone="info">
+              Business
+            </ToggleGroupOption>
+          </ToggleGroup>
+        </div>
+        <Input
+          size="xs"
+          value={model.name}
+          onChange={(e) => setModel({ name: e.target.value })}
+          placeholder={guidance.placeholder}
+        />
+        <Text size="xs" tone="dim" className="mt-1">
+          Default for new locations is {defaultPremise === 'BUSINESS' ? 'Business' : 'Residence'} · set in Company
+          profile.
+        </Text>
       </Field>
-      <div className="grid gap-2.5 sm:grid-cols-2">
-        <Field size="xs">
-          <Label size="xs" required>
-            Phone
-          </Label>
-          <Input size="xs" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="(602) 555-0149" />
-        </Field>
-        <Field size="xs">
-          <Label size="xs" required>
-            Email
-          </Label>
-          <Input size="xs" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="name@example.com" />
-        </Field>
-      </div>
+
       <Field size="xs">
         <Label size="xs" required>
           Street address
         </Label>
-        <Input size="xs" value={address.streetAddress} onChange={(e) => set({ streetAddress: e.target.value })} placeholder="123 Main St" />
+        <Input
+          size="xs"
+          value={address.streetAddress}
+          onChange={(e) => set({ streetAddress: e.target.value })}
+          placeholder="4821 E Indian School Rd"
+        />
       </Field>
       <div className="grid gap-2.5 sm:grid-cols-[1fr_72px_88px_1fr]">
         <Field size="xs">
           <Label size="xs" required>
             City
           </Label>
-          <Input size="xs" value={address.city} onChange={(e) => set({ city: e.target.value })} />
+          <Input size="xs" value={address.city} onChange={(e) => set({ city: e.target.value })} placeholder="Phoenix" />
         </Field>
         <Field size="xs">
           <Label size="xs" required>
@@ -851,7 +880,7 @@ function NewCustomerFields({
           <Label size="xs" required>
             ZIP
           </Label>
-          <Input size="xs" value={address.zipCode} onChange={(e) => set({ zipCode: e.target.value })} />
+          <Input size="xs" value={address.zipCode} onChange={(e) => set({ zipCode: e.target.value })} placeholder="85018" />
         </Field>
         <Field size="xs">
           <Label size="xs" required>
@@ -867,18 +896,127 @@ function NewCustomerFields({
           </Select>
         </Field>
       </div>
-      <div>
-        <MiniLabel>Premise</MiniLabel>
-        <div className="mt-1">
-          <ToggleGroup value={premise} onChange={onPremiseChange} aria-label="Premise">
-            <ToggleGroupOption value="RESIDENCE">Residence</ToggleGroupOption>
-            <ToggleGroupOption value="BUSINESS">Business</ToggleGroupOption>
-          </ToggleGroup>
+
+      <div className="pt-1">
+        <div className="mb-1.5 text-[10px] font-bold tracking-[0.05em] text-fg-muted uppercase">Contact</div>
+        <Field size="xs">
+          <Label size="xs" hint="who we ask for">
+            Contact name
+          </Label>
+          <Input
+            size="xs"
+            value={effectiveContactName}
+            onChange={(e) => {
+              setContactNameTouched(true);
+              setModel({ contactName: e.target.value });
+            }}
+            placeholder="Tanya Avila"
+          />
+        </Field>
+        <div className="mt-2.5 grid gap-2.5 sm:grid-cols-2">
+          <Field size="xs">
+            <Label size="xs">Phone</Label>
+            <Input
+              size="xs"
+              type="tel"
+              value={model.phone}
+              onChange={(e) => setModel({ phone: e.target.value })}
+              placeholder="(602) 555-0100"
+            />
+          </Field>
+          <Field size="xs">
+            <Label size="xs">Email</Label>
+            <Input
+              size="xs"
+              type="email"
+              value={model.email}
+              onChange={(e) => setModel({ email: e.target.value })}
+              placeholder="name@example.com"
+            />
+          </Field>
         </div>
-        <Text size="xs" tone="dim" className="mt-1">
-          Default for new locations is {defaultPremise === 'BUSINESS' ? 'Business' : 'Residence'} · set in Company profile.
-        </Text>
+        {/* Neither channel is required on its own; having none is what's
+            invalid, so the rule is stated once under the pair. */}
+        {contactError ? (
+          <p className="mt-1 text-[11px] text-danger-500">{contactError}</p>
+        ) : (
+          <Text size="xs" tone="dim" className="mt-1">
+            At least one — we send confirmations and invoices through them.
+          </Text>
+        )}
       </div>
+
+      {/* Who pays. Defaulted on, because the common case is that the caller is
+          the payer — the checkbox exists for the franchise / property-manager
+          / corporate-AP case, and unchecking it re-points the whole record. */}
+      <label
+        className="flex cursor-pointer items-start gap-2.5 rounded-md border p-2.5"
+        style={{
+          borderColor: 'color-mix(in oklch, var(--accent-500) 30%, transparent)',
+          background: 'color-mix(in oklch, var(--accent-500) 6%, transparent)',
+        }}
+      >
+        <Checkbox
+          color="accent"
+          // The visible text sits in a sibling span, so the control needs its
+          // own name — a bare <label> around a non-input doesn't associate.
+          aria-label="Bill this customer directly"
+          checked={model.sameBilling}
+          onChange={(v) =>
+            setModel({
+              sameBilling: v,
+              // Seed the bill-to name from the top name when splitting off, so
+              // "same party, different mailing address" needs no retype.
+              billingName: !v && !model.billingName.trim() ? model.name.trim() : model.billingName,
+            })
+          }
+        />
+        <span>
+          <span className="block text-[12.5px] font-medium text-fg-strong">Bill this customer directly</span>
+          <span className="mt-0.5 block text-[11px] text-fg-muted">
+            Uncheck only if someone else is invoiced — a franchise owner, property manager, or corporate AP.
+          </span>
+        </span>
+      </label>
+
+      {!model.sameBilling && (
+        <div className="space-y-2.5 border-t border-dashed border-border-soft pt-2.5">
+          <Field size="xs">
+            <Label size="xs" required hint="the company that pays">
+              Bill to
+            </Label>
+            <Input
+              size="xs"
+              value={model.billingName}
+              onChange={(e) => setModel({ billingName: e.target.value })}
+              placeholder="Darden Restaurants"
+            />
+          </Field>
+          <div className="grid gap-2.5 sm:grid-cols-2">
+            <Field size="xs">
+              <Label size="xs">Billing phone</Label>
+              <Input
+                size="xs"
+                type="tel"
+                value={model.billingContactPhone}
+                onChange={(e) => setModel({ billingContactPhone: e.target.value })}
+              />
+            </Field>
+            <Field size="xs">
+              <Label size="xs">Billing email</Label>
+              <Input
+                size="xs"
+                type="email"
+                value={model.billingContactEmail}
+                onChange={(e) => setModel({ billingContactEmail: e.target.value })}
+              />
+            </Field>
+          </div>
+          <Text size="xs" tone="dim">
+            At least one — this is where we deliver the invoice. The name above becomes the customer; “{model.name.trim() || 'the name at the top'}” names the location.
+          </Text>
+        </div>
+      )}
     </div>
   );
 }
@@ -908,6 +1046,7 @@ function WorkItemDraftCard({
   onRemove: () => void;
 }) {
   const queryClient = useQueryClient();
+  const { getName } = useGlossary();
   const [quickBusy, setQuickBusy] = useState(false);
 
   const attach = (id: string, name: string | null) =>
@@ -952,7 +1091,7 @@ function WorkItemDraftCard({
 
       <div className="mt-2">
         <Field size="xs">
-          <Label size="xs">Complaint · in the customer’s words</Label>
+          <Label size="xs">Complaint · in the {getName('customer').toLowerCase()}’s words</Label>
           <Input
             size="xs"
             value={draft.complaint}
@@ -1068,6 +1207,7 @@ function IntakeRail({
   priority: WorkOrderPriority;
   itemCount: number;
 }) {
+  const { getName } = useGlossary();
   // The site is new in both create paths; only one of them also creates the
   // customer. Keeping those separate is what lets the rail say "billed to
   // Darden" while the property itself is brand new.
@@ -1098,15 +1238,18 @@ function IntakeRail({
     <Card title="Job summary">
       {!hasLocation ? (
         <Text size="sm" tone="muted">
-          Pick a service location to see who’s billed and how to get on site.
+          Pick a {getName('service_location').toLowerCase()} to see who’s billed and how to get on
+          site.
         </Text>
       ) : (
         <>
           <div className="flex flex-wrap items-baseline gap-1.5">
-            <span className="text-[14px] font-bold text-fg-strong">{name || 'New location'}</span>
+            <span className="text-[14px] font-bold text-fg-strong">
+              {name || `New ${getName('service_location').toLowerCase()}`}
+            </span>
             {isNewSite && (
               <Pill tone="success" dot>
-                {isNewCustomer ? 'New' : 'New location'}
+                {isNewCustomer ? 'New' : `New ${getName('service_location').toLowerCase()}`}
               </Pill>
             )}
           </div>
@@ -1184,25 +1327,29 @@ function OnCreateCard({
   selectedLocation: ServiceLocationSearchResult | null;
   itemCount: number;
 }) {
+  const { getName } = useGlossary();
+  const customerWord = getName('customer').toLowerCase();
+  const locationWord = getName('service_location').toLowerCase();
+
   const lines: string[] = [];
   if (mode === 'new') {
-    lines.push(`Create the customer${newName.trim() ? ` ${newName.trim()}` : ''}`);
-    lines.push('Create their first service location');
+    lines.push(`Create the ${customerWord}${newName.trim() ? ` ${newName.trim()}` : ''}`);
+    lines.push(`Create their first ${locationWord}`);
   }
   // Says the quiet part out loud: this path adds a property to an account that
   // already exists, and does NOT create a second copy of that customer.
   if (mode === 'new-location') {
-    lines.push(`Add a new service location to ${existingCustomerName ?? 'the selected customer'}`);
+    lines.push(`Add a new ${locationWord} to ${existingCustomerName ?? `the selected ${customerWord}`}`);
   }
   lines.push(
-    `Create the work order with ${itemCount || 'no'} ${itemCount === 1 ? 'item' : 'items'} in Triage — number assigned on save`
+    `Create the ${getName('work_order').toLowerCase()} with ${itemCount || 'no'} ${itemCount === 1 ? 'item' : 'items'} in Triage — number assigned on save`
   );
   lines.push(
     mode === 'existing' && selectedLocation
       ? `Attach it to ${selectedLocation.customerName}`
       : mode === 'new-location' && existingCustomerName
         ? `Bill it to ${existingCustomerName}`
-        : 'Land you on the work order to schedule & dispatch'
+        : `Land you on the ${getName('work_order').toLowerCase()} to schedule & dispatch`
   );
 
   return (

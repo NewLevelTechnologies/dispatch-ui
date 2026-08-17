@@ -180,6 +180,79 @@ describe('WorkOrderIntakePage', () => {
     );
   }, 15000);
 
+  it('accepts a new customer with only one contact channel', async () => {
+    // Neither phone nor email is required on its own — having none is what's
+    // invalid. The old panel demanded both.
+    mockRegionsGetAll.mockResolvedValue([{ id: 'r-1', name: 'West' }]);
+    const user = userEvent.setup();
+    renderIntake();
+    await screen.findByRole('heading', { name: /add work order/i, level: 1 });
+    await screen.findByRole('option', { name: 'Service Call' });
+
+    await user.click(screen.getByRole('button', { name: /new customer/i }));
+    await user.type(screen.getByLabelText(/^name/i), 'Jordan Avila');
+    await user.type(screen.getByLabelText(/^email/i), 'jordan@example.com');
+    await user.type(screen.getByLabelText(/street address/i), '123 Main St');
+    await user.type(screen.getByLabelText(/^city/i), 'Phoenix');
+    await user.type(screen.getByLabelText(/^state/i), 'AZ');
+    await user.type(screen.getByLabelText(/^zip/i), '85001');
+    await user.selectOptions(screen.getByLabelText('Type'), 'type-1');
+    await user.type(screen.getByPlaceholderText(/no cooling upstairs/i), 'No heat');
+
+    expect(screen.getByRole('button', { name: /add work order/i })).toBeEnabled();
+    await user.click(screen.getByRole('button', { name: /add work order/i }));
+
+    await waitFor(() =>
+      expect(mockCreateCustomer).toHaveBeenCalledWith(
+        expect.objectContaining({ email: 'jordan@example.com', phone: null })
+      )
+    );
+  }, 15000);
+
+  it('routes the bill-to name onto the customer when someone else is invoiced', async () => {
+    // Unchecking "Bill this customer directly" re-points the record: the payer
+    // becomes the customer and the typed name demotes to the location, taking
+    // the on-site contact with it.
+    mockRegionsGetAll.mockResolvedValue([{ id: 'r-1', name: 'West' }]);
+    const user = userEvent.setup();
+    renderIntake();
+    await screen.findByRole('heading', { name: /add work order/i, level: 1 });
+    await screen.findByRole('option', { name: 'Service Call' });
+
+    await user.click(screen.getByRole('button', { name: /new customer/i }));
+    await user.type(screen.getByLabelText(/^name/i), 'Red Lobster #123');
+    await user.type(screen.getByLabelText(/^phone/i), '6025550100');
+    await user.type(screen.getByLabelText(/street address/i), '2290 W Chandler Blvd');
+    await user.type(screen.getByLabelText(/^city/i), 'Chandler');
+    await user.type(screen.getByLabelText(/^state/i), 'AZ');
+    await user.type(screen.getByLabelText(/^zip/i), '85224');
+
+    await user.click(screen.getByRole('checkbox', { name: /bill this customer directly/i }));
+    const billTo = screen.getByLabelText(/bill to/i);
+    await user.clear(billTo);
+    await user.type(billTo, 'Darden Restaurants');
+    await user.type(screen.getByLabelText(/billing email/i), 'ap@darden.com');
+
+    await user.selectOptions(screen.getByLabelText('Type'), 'type-1');
+    await user.type(screen.getByPlaceholderText(/no cooling upstairs/i), 'Walk-in down');
+    await user.click(screen.getByRole('button', { name: /add work order/i }));
+
+    await waitFor(() =>
+      expect(mockCreateCustomer).toHaveBeenCalledWith(
+        expect.objectContaining({
+          // The payer is the customer…
+          name: 'Darden Restaurants',
+          email: 'ap@darden.com',
+          billingAddressSameAsService: false,
+          // …and the typed name names the site, keeping the on-site phone.
+          serviceLocations: [
+            expect.objectContaining({ locationName: 'Red Lobster #123', siteContactPhone: '6025550100' }),
+          ],
+        })
+      )
+    );
+  }, 15000);
+
   it('keeps the create button disabled until a location, type and a complaint are present', async () => {
     const user = userEvent.setup();
     renderIntake('/work-orders/new?locationId=loc-1');
