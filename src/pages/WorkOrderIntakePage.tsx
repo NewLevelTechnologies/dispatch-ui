@@ -305,6 +305,8 @@ export default function WorkOrderIntakePage() {
   // already on file, so we never re-ask for their name, phone or email.
   const newLocationReady =
     !!createForCustomer &&
+    // Every location is named — same rule as the Add Location page.
+    newLocationName.trim() !== '' &&
     newAddress.streetAddress.trim() !== '' &&
     newAddress.city.trim() !== '' &&
     newAddress.state.trim() !== '' &&
@@ -385,7 +387,7 @@ export default function WorkOrderIntakePage() {
       try {
         const location = await customerApi.addServiceLocation(createForCustomer.id, {
           dispatchRegionId,
-          locationName: newLocationName.trim() || undefined,
+          locationName: newLocationName.trim(),
           premiseType: effectivePremise,
           address: newAddress,
         });
@@ -740,66 +742,85 @@ function NewLocationFields({
   setDispatchRegionId: (v: string) => void;
   regions: { id: string; name: string }[];
 }) {
+  const { t } = useTranslation();
   const { getName } = useGlossary();
+  const hasRegions = regions.length > 0;
   const set = (patch: Partial<typeof address>) => setAddress({ ...address, ...patch });
+  // Name examples are persona-ordered by the tenant default premise: same two
+  // examples, the likely one first (matches AddLocationPage verbatim).
+  const residenceDefault = defaultPremise === 'RESIDENCE';
+  const namePlaceholder = residenceDefault
+    ? 'Homeowner’s name, or a label like Retail #047'
+    : 'Label like “Headquarters” or “Retail #047” — or homeowner’s name';
+  const nameHelper = residenceDefault
+    ? 'For a home, use the homeowner’s name. For commercial, a label staff recognize (“Headquarters”, “Retail #047”).'
+    : 'For commercial, a label staff recognize (“Headquarters”, “Retail #047”). For a home, use the homeowner’s name.';
   return (
     <div className="space-y-2.5">
       <CreatePanelHead hint="just enough to start — enrich later">
         New {getName('service_location').toLowerCase()} for {customerName}
       </CreatePanelHead>
+
+      {/* Identity before address, and required — same as the Add Location page.
+          Every location is named: a homeowner's name for a residence, a label
+          staff recognize for a commercial site. */}
+      <Field size="xs">
+        <Label size="xs" required>
+          {t('common.form.locationName')}
+        </Label>
+        <Input
+          size="xs"
+          value={locationName}
+          onChange={(e) => setLocationName(e.target.value)}
+          placeholder={namePlaceholder}
+        />
+        <Text size="xs" tone="muted" className="mt-1">
+          {nameHelper}
+        </Text>
+      </Field>
+
       <Field size="xs">
         <Label size="xs" required>
           Street address
         </Label>
         <Input size="xs" value={address.streetAddress} onChange={(e) => set({ streetAddress: e.target.value })} placeholder="123 Main St" />
       </Field>
-      <div className="grid gap-2.5 sm:grid-cols-[1fr_72px_88px_1fr]">
-        <Field size="xs">
+      {/* Same 12-column split as Add Customer's AddressBlock. */}
+      <div className="grid grid-cols-12 gap-2">
+        <Field size="xs" className={hasRegions ? 'col-span-4' : 'col-span-6'}>
           <Label size="xs" required>
             City
           </Label>
-          <Input size="xs" value={address.city} onChange={(e) => set({ city: e.target.value })} />
+          <Input size="xs" value={address.city} onChange={(e) => set({ city: e.target.value })} placeholder="Chandler" />
         </Field>
-        <Field size="xs">
+        <Field size="xs" className="col-span-2">
           <Label size="xs" required>
             State
           </Label>
-          <Input size="xs" value={address.state} onChange={(e) => set({ state: e.target.value.toUpperCase() })} maxLength={2} />
+          <Input size="xs" value={address.state} onChange={(e) => set({ state: e.target.value.toUpperCase() })} maxLength={2} placeholder="AZ" />
         </Field>
-        <Field size="xs">
+        <Field size="xs" className={hasRegions ? 'col-span-2' : 'col-span-4'}>
           <Label size="xs" required>
             ZIP
           </Label>
-          <Input size="xs" value={address.zipCode} onChange={(e) => set({ zipCode: e.target.value })} />
+          <Input size="xs" value={address.zipCode} onChange={(e) => set({ zipCode: e.target.value })} placeholder="85224" />
         </Field>
-        <Field size="xs">
-          <Label size="xs" required>
-            Region
-          </Label>
-          <Select size="xs" value={dispatchRegionId} onChange={(e) => setDispatchRegionId(e.target.value)} aria-label="Region">
-            <option value="">Select…</option>
-            {regions.map((r) => (
-              <option key={r.id} value={r.id}>
-                {r.name}
-              </option>
-            ))}
-          </Select>
-        </Field>
+        {hasRegions && (
+          <Field size="xs" className="col-span-4">
+            <Label size="xs" required>
+              Region
+            </Label>
+            <Select size="xs" value={dispatchRegionId} onChange={(e) => setDispatchRegionId(e.target.value)} aria-label="Region">
+              <option value="">Select…</option>
+              {regions.map((r) => (
+                <option key={r.id} value={r.id}>
+                  {r.name}
+                </option>
+              ))}
+            </Select>
+          </Field>
+        )}
       </div>
-      {/* Optional: a multi-site account usually calls its sites something
-          ("Bldg C", "Store #123"). Blank is fine — it falls back to the
-          account name, same as any unnamed location. */}
-      <Field size="xs">
-        <Label size="xs" hint="optional">
-          Name this site
-        </Label>
-        <Input
-          size="xs"
-          value={locationName}
-          onChange={(e) => setLocationName(e.target.value)}
-          placeholder="Red Lobster #123 — or leave blank"
-        />
-      </Field>
       <div>
         <MiniLabel>Premise</MiniLabel>
         <div className="mt-1">
@@ -846,6 +867,7 @@ function NewCustomerFields({
   regions: { id: string; name: string }[];
 }) {
   const { getName } = useGlossary();
+  const hasRegions = regions.length > 0;
   const set = (patch: Partial<typeof address>) => setAddress({ ...address, ...patch });
   const setBilling = (patch: Partial<typeof billingAddress>) => setBillingAddress({ ...billingAddress, ...patch });
   const guidance = nameGuidance(model.premise);
@@ -904,41 +926,43 @@ function NewCustomerFields({
           placeholder="4821 E Indian School Rd"
         />
       </Field>
-      <div className="grid gap-2.5 sm:grid-cols-[2fr_1fr_1fr]">
-        <Field size="xs">
+      {/* Same 12-column split as Add Customer's AddressBlock: Region rides the
+          city/state/ZIP row, and the row re-widens when a tenant has none. */}
+      <div className="grid grid-cols-12 gap-2">
+        <Field size="xs" className={hasRegions ? 'col-span-4' : 'col-span-6'}>
           <Label size="xs" required>
             City
           </Label>
           <Input size="xs" value={address.city} onChange={(e) => set({ city: e.target.value })} placeholder="Phoenix" />
         </Field>
-        <Field size="xs">
+        <Field size="xs" className="col-span-2">
           <Label size="xs" required>
             State
           </Label>
           <Input size="xs" value={address.state} onChange={(e) => set({ state: e.target.value.toUpperCase() })} maxLength={2} placeholder="AZ" />
         </Field>
-        <Field size="xs">
+        <Field size="xs" className={hasRegions ? 'col-span-2' : 'col-span-4'}>
           <Label size="xs" required>
             ZIP
           </Label>
           <Input size="xs" value={address.zipCode} onChange={(e) => set({ zipCode: e.target.value })} placeholder="85018" />
         </Field>
+        {hasRegions && (
+          <Field size="xs" className="col-span-4">
+            <Label size="xs" required>
+              Region
+            </Label>
+            <Select size="xs" value={dispatchRegionId} onChange={(e) => setDispatchRegionId(e.target.value)} aria-label="Region">
+              <option value="">Select…</option>
+              {regions.map((r) => (
+                <option key={r.id} value={r.id}>
+                  {r.name}
+                </option>
+              ))}
+            </Select>
+          </Field>
+        )}
       </div>
-      {regions.length > 0 && (
-        <Field size="xs">
-          <Label size="xs" required>
-            Region
-          </Label>
-          <Select size="xs" value={dispatchRegionId} onChange={(e) => setDispatchRegionId(e.target.value)} aria-label="Region">
-            <option value="">Select…</option>
-            {regions.map((r) => (
-              <option key={r.id} value={r.id}>
-                {r.name}
-              </option>
-            ))}
-          </Select>
-        </Field>
-      )}
 
       <div className="pt-1">
         <div className="mb-1.5 text-[10px] font-bold tracking-[0.05em] text-fg-muted uppercase">Contact</div>
@@ -1052,14 +1076,14 @@ function NewCustomerFields({
               placeholder="1000 Darden Center Dr"
             />
           </Field>
-          <div className="grid gap-2.5 sm:grid-cols-[2fr_1fr_1fr]">
-            <Field size="xs">
+          <div className="grid grid-cols-12 gap-2">
+            <Field size="xs" className="col-span-6">
               <Label size="xs" required>
                 City
               </Label>
               <Input size="xs" value={billingAddress.city} onChange={(e) => setBilling({ city: e.target.value })} placeholder="Orlando" />
             </Field>
-            <Field size="xs">
+            <Field size="xs" className="col-span-2">
               <Label size="xs" required>
                 State
               </Label>
@@ -1071,7 +1095,7 @@ function NewCustomerFields({
                 placeholder="FL"
               />
             </Field>
-            <Field size="xs">
+            <Field size="xs" className="col-span-4">
               <Label size="xs" required>
                 ZIP
               </Label>

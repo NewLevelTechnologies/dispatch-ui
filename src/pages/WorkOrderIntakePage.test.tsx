@@ -151,11 +151,12 @@ describe('WorkOrderIntakePage', () => {
     expect(screen.queryByLabelText(/^phone/i)).not.toBeInTheDocument();
     expect(screen.queryByLabelText(/^email/i)).not.toBeInTheDocument();
 
+    // Name first and required — same rule as the Add Location page.
+    await user.type(screen.getByLabelText(/location name/i), 'Red Lobster #123');
     await user.type(screen.getByLabelText(/street address/i), '2290 W Chandler Blvd');
     await user.type(screen.getByLabelText(/^city/i), 'Chandler');
     await user.type(screen.getByLabelText(/^state/i), 'AZ');
     await user.type(screen.getByLabelText(/^zip/i), '85224');
-    await user.type(screen.getByLabelText(/name this site/i), 'Red Lobster #123');
     await user.selectOptions(screen.getByLabelText('Type'), 'type-1');
     await user.type(screen.getByPlaceholderText(/no cooling upstairs/i), 'Walk-in down');
 
@@ -173,6 +174,7 @@ describe('WorkOrderIntakePage', () => {
     );
     // The whole point: the account was reused, not duplicated.
     expect(mockCreateCustomer).not.toHaveBeenCalled();
+    expect(mockAddServiceLocation).toHaveBeenCalledTimes(1);
     await waitFor(() =>
       expect(mockCreateWorkOrder).toHaveBeenCalledWith(
         expect.objectContaining({ customerId: 'cust-darden', serviceLocationId: 'loc-added' })
