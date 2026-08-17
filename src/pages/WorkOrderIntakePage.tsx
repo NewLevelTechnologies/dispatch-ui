@@ -43,7 +43,14 @@ import { Text } from '../components/catalyst/text';
 import { ToggleGroup, ToggleGroupOption } from '../components/ui/ToggleGroup';
 import { Pill } from '../components/ui/Pill';
 import { Checkbox } from '../components/catalyst/checkbox';
-import { PlusIcon, XMarkIcon, CheckIcon, BoltIcon } from '@heroicons/react/24/outline';
+import {
+  PlusIcon,
+  XMarkIcon,
+  CheckIcon,
+  BoltIcon,
+  HomeIcon,
+  BuildingOffice2Icon,
+} from '@heroicons/react/24/outline';
 
 // New Work Order intake (mock: New Job.html / screen-wo-intake.jsx). A CSR
 // books this while on the phone, so it's one dense form — location-led (the
@@ -93,6 +100,7 @@ const newDraft = (key: number): Draft => ({
 });
 
 const blankAddress = { streetAddress: '', city: '', state: '', zipCode: '' };
+
 
 // Standalone label (Catalyst's <Label> requires a <Field> ancestor; these sit
 // above a segmented control / bare input, so use a plain styled label).
@@ -458,7 +466,26 @@ export default function WorkOrderIntakePage() {
               {/* ── Form column ── */}
               <div className="min-w-0 space-y-3.5">
                 {/* Service location — the lead section; customer derives from it. */}
-                <Card title={<StepTitle n={1} complete={locationReady}>{getName('service_location')}</StepTitle>}>
+                <Card
+                  title={<StepTitle n={1} complete={locationReady}>{getName('service_location')}</StepTitle>}
+                  // One way out of the section, on the section itself — rather
+                  // than a Cancel buried inside whichever panel is open.
+                  action={
+                    creatingLocation ? (
+                      <Button
+                        type="button"
+                        plain
+                        size="xxs"
+                        onClick={() => {
+                          setCreateForCustomer(null);
+                          setCustomerMode('existing');
+                        }}
+                      >
+                        {t('common.cancel')}
+                      </Button>
+                    ) : undefined
+                  }
+                >
                   {customerMode === 'existing' ? (
                     <ServiceLocationPicker
                       value={selectedLocation}
@@ -485,10 +512,6 @@ export default function WorkOrderIntakePage() {
                   ) : customerMode === 'new-location' && createForCustomer ? (
                     <NewLocationFields
                       customerName={createForCustomer.name}
-                      onCancel={() => {
-                        setCreateForCustomer(null);
-                        setCustomerMode('existing');
-                      }}
                       locationName={newLocationName}
                       setLocationName={setNewLocationName}
                       address={newAddress}
@@ -505,7 +528,6 @@ export default function WorkOrderIntakePage() {
                     />
                   ) : (
                     <NewCustomerFields
-                      onCancel={() => setCustomerMode('existing')}
                       model={{ ...newCustomer, premise: effectivePremise }}
                       setModel={patchNewCustomer}
                       contactNameTouched={contactNameTouched}
@@ -678,17 +700,14 @@ export default function WorkOrderIntakePage() {
 // a separate location name — and premise is a per-location default from the
 // company profile, not a customer type. Full billing / advanced live on the
 // Add Customer page for back-office enrichment.
-// Header for either create panel: says which reality the CSR is in and offers
-// the way back to the search. Without it, picking "New customer" by mistake is
-// a dead end — the mode toggle used to be the escape hatch.
-function CreatePanelHead({ children, onCancel }: { children: React.ReactNode; onCancel: () => void }) {
-  const { t } = useTranslation();
+// Panel heading. Cancel is NOT here — it lives on the section card header,
+// where the mock puts it, so there's one way out of the section rather than a
+// control the CSR has to hunt for inside the panel.
+function CreatePanelHead({ children, hint }: { children: React.ReactNode; hint?: string }) {
   return (
-    <div className="mb-2.5 flex items-center justify-between gap-2 border-b border-border-soft pb-2">
-      <span className="text-[12px] font-semibold text-fg-strong">{children}</span>
-      <Button type="button" plain size="xxs" onClick={onCancel}>
-        {t('common.cancel')}
-      </Button>
+    <div className="mb-2.5 flex items-baseline justify-between gap-3 border-b border-border-soft pb-2">
+      <span className="text-[12.5px] font-semibold text-fg-strong">{children}</span>
+      {hint && <span className="text-[11px] text-fg-dim">{hint}</span>}
     </div>
   );
 }
@@ -698,7 +717,6 @@ function CreatePanelHead({ children, onCancel }: { children: React.ReactNode; on
 // wasted keystrokes on a live call and the road to a duplicate account.
 function NewLocationFields({
   customerName,
-  onCancel,
   locationName,
   setLocationName,
   address,
@@ -711,7 +729,6 @@ function NewLocationFields({
   regions,
 }: {
   customerName: string;
-  onCancel: () => void;
   locationName: string;
   setLocationName: (v: string) => void;
   address: { streetAddress: string; city: string; state: string; zipCode: string };
@@ -727,7 +744,7 @@ function NewLocationFields({
   const set = (patch: Partial<typeof address>) => setAddress({ ...address, ...patch });
   return (
     <div className="space-y-2.5">
-      <CreatePanelHead onCancel={onCancel}>
+      <CreatePanelHead hint="just enough to start — enrich later">
         New {getName('service_location').toLowerCase()} for {customerName}
       </CreatePanelHead>
       <Field size="xs">
@@ -800,7 +817,6 @@ function NewLocationFields({
 }
 
 function NewCustomerFields({
-  onCancel,
   model,
   setModel,
   contactNameTouched,
@@ -815,7 +831,6 @@ function NewCustomerFields({
   setDispatchRegionId,
   regions,
 }: {
-  onCancel: () => void;
   model: CustomerCreateModel;
   setModel: (patch: Partial<CustomerCreateModel>) => void;
   contactNameTouched: boolean;
@@ -830,6 +845,7 @@ function NewCustomerFields({
   setDispatchRegionId: (v: string) => void;
   regions: { id: string; name: string }[];
 }) {
+  const { getName } = useGlossary();
   const set = (patch: Partial<typeof address>) => setAddress({ ...address, ...patch });
   const setBilling = (patch: Partial<typeof billingAddress>) => setBillingAddress({ ...billingAddress, ...patch });
   const guidance = nameGuidance(model.premise);
@@ -840,21 +856,28 @@ function NewCustomerFields({
 
   return (
     <div className="space-y-2.5">
-      <CreatePanelHead onCancel={onCancel}>New customer</CreatePanelHead>
+      {/* Names BOTH records it creates. "New customer" alone reads as if no
+          location is made, and the sibling panel is "New location for X" — the
+          contrast between them is what stops a CSR duplicating an account. */}
+      <CreatePanelHead hint="just enough to start — enrich later">
+        New {getName('customer').toLowerCase()} + first {getName('service_location').toLowerCase()}
+      </CreatePanelHead>
 
-      {/* Premise sits on the label row because it decides what "Name" MEANS —
-          a household vs a specific site. Asking it after the name would be
-          asking the CSR to re-read what they just typed. */}
+      {/* Premise rides on the Name label row because it decides what "Name"
+          MEANS — a household vs a specific site. Below the field it would ask
+          the CSR to re-read what they just typed. */}
       <Field size="xs">
-        <Label size="xs" required hint={guidance.hint ?? undefined}>
-          Name
-        </Label>
-        <div className="mb-1 flex items-center justify-end">
+        <div className="mb-1 flex items-center justify-between gap-3">
+          <Label size="xs" required hint={guidance.hint ?? undefined}>
+            Name
+          </Label>
           <ToggleGroup value={model.premise} onChange={onPremiseChange} size="sm" aria-label="Premise">
             <ToggleGroupOption value="RESIDENCE" tone="success">
+              <HomeIcon className="size-3" />
               Residence
             </ToggleGroupOption>
             <ToggleGroupOption value="BUSINESS" tone="info">
+              <BuildingOffice2Icon className="size-3" />
               Business
             </ToggleGroupOption>
           </ToggleGroup>
@@ -866,8 +889,7 @@ function NewCustomerFields({
           placeholder={guidance.placeholder}
         />
         <Text size="xs" tone="dim" className="mt-1">
-          Default for new locations is {defaultPremise === 'BUSINESS' ? 'Business' : 'Residence'} · set in Company
-          profile.
+          Default is {defaultPremise === 'BUSINESS' ? 'Business' : 'Residence'} · set in Company profile.
         </Text>
       </Field>
 
@@ -882,7 +904,7 @@ function NewCustomerFields({
           placeholder="4821 E Indian School Rd"
         />
       </Field>
-      <div className="grid gap-2.5 sm:grid-cols-[1fr_72px_88px_1fr]">
+      <div className="grid gap-2.5 sm:grid-cols-[2fr_1fr_1fr]">
         <Field size="xs">
           <Label size="xs" required>
             City
@@ -893,7 +915,7 @@ function NewCustomerFields({
           <Label size="xs" required>
             State
           </Label>
-          <Input size="xs" value={address.state} onChange={(e) => set({ state: e.target.value.toUpperCase() })} maxLength={2} />
+          <Input size="xs" value={address.state} onChange={(e) => set({ state: e.target.value.toUpperCase() })} maxLength={2} placeholder="AZ" />
         </Field>
         <Field size="xs">
           <Label size="xs" required>
@@ -901,6 +923,8 @@ function NewCustomerFields({
           </Label>
           <Input size="xs" value={address.zipCode} onChange={(e) => set({ zipCode: e.target.value })} placeholder="85018" />
         </Field>
+      </div>
+      {regions.length > 0 && (
         <Field size="xs">
           <Label size="xs" required>
             Region
@@ -914,7 +938,7 @@ function NewCustomerFields({
             ))}
           </Select>
         </Field>
-      </div>
+      )}
 
       <div className="pt-1">
         <div className="mb-1.5 text-[10px] font-bold tracking-[0.05em] text-fg-muted uppercase">Contact</div>
