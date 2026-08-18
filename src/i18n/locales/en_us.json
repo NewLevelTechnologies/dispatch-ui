@@ -74,6 +74,7 @@
     "loading": "Loading...",
     "moveDown": "Move down",
     "moveUp": "Move up",
+    "recent": "Recent",
     "recentEntities": "Recent {{entities}}",
     "restoring": "Restoring...",
     "search": "Search...",

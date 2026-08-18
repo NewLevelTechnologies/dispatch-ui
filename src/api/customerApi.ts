@@ -775,6 +775,21 @@ export const customerApi = {
     return response.data;
   },
 
+  // The picker's zero-state: the tenant's most recently active locations, so a
+  // CSR who opens the picker before typing recognizes the site instead of
+  // spelling it. Same row shape and envelope as /search, so the picker renders
+  // one row component either way.
+  //
+  // ACTIVE only, and ordered most-recently-serviced first (falling back to when
+  // the site was added, for one we've never completed work at). The recency
+  // order is fixed server-side — this takes page/size only, no `sort`.
+  getRecentServiceLocations: async (size = 8): Promise<ServiceLocationSearchResponse> => {
+    const response = await apiClient.get<ServiceLocationSearchResponse>('/service-locations/recent', {
+      params: { page: 0, size },
+    });
+    return response.data;
+  },
+
   // New paginated service locations list
   getAllServiceLocationsPaginated: async (params?: {
     page?: number;     // 1-indexed for UI

@@ -12,9 +12,9 @@ import {
   dispatchRegionApi,
   tenantSettingsApi,
   type CreateWorkOrderRequest,
-  type CreateCustomerRequest,
   type CreateWorkItemRequest,
   type ServiceLocationSearchResult,
+  type CustomerSearchResult,
   type ServiceLocationDetailDto,
   type WorkOrderPriority,
   type PremiseType,
@@ -25,6 +25,13 @@ import AppLayout from '../components/AppLayout';
 import ServiceLocationPicker from '../components/ServiceLocationPicker';
 import WOEquipmentPicker from '../components/WOEquipmentPicker';
 import { titleCaseAddress } from '../utils/titleCaseAddress';
+import {
+  buildCustomerCreateRequest,
+  contactChannelError,
+  nameGuidance,
+  resolveContactName,
+  type CustomerCreateModel,
+} from '../lib/customerCreateModel';
 import { Card } from '../components/catalyst/card';
 import { Button } from '../components/catalyst/button';
 import { Field, Label } from '../components/catalyst/fieldset';
@@ -34,7 +41,16 @@ import { Heading } from '../components/catalyst/heading';
 import { Text } from '../components/catalyst/text';
 import { ToggleGroup, ToggleGroupOption } from '../components/ui/ToggleGroup';
 import { Pill } from '../components/ui/Pill';
-import { PlusIcon, XMarkIcon, CheckIcon, BoltIcon } from '@heroicons/react/24/outline';
+import { Checkbox } from '../components/catalyst/checkbox';
+import {
+  PlusIcon,
+  XMarkIcon,
+  CheckIcon,
+  BoltIcon,
+  UserIcon,
+  HomeIcon,
+  BuildingOffice2Icon,
+} from '@heroicons/react/24/outline';
 
 // New Work Order intake (mock: New Job.html / screen-wo-intake.jsx). A CSR
 // books this while on the phone, so it's one dense form — location-led (the
@@ -85,6 +101,7 @@ const newDraft = (key: number): Draft => ({
 
 const blankAddress = { streetAddress: '', city: '', state: '', zipCode: '' };
 
+
 // Standalone label (Catalyst's <Label> requires a <Field> ancestor; these sit
 // above a segmented control / bare input, so use a plain styled label).
 function MiniLabel({ children }: { children: React.ReactNode }) {
@@ -134,20 +151,45 @@ export default function WorkOrderIntakePage() {
   const [customerOrderNumber, setCustomerOrderNumber] = useState('');
 
   // ── Location ──────────────────────────────────────────────────────────
-  const [customerMode, setCustomerMode] = useState<'existing' | 'new'>('existing');
+  // The three realities a CSR can be in when the phone rings. Which one they're
+  // in is discovered by searching, not declared up front — the picker routes
+  // here, there's no mode toggle to pre-answer the question.
+  //   existing     — the location is on file
+  //   new-location — the CUSTOMER is on file, this property isn't
+  //   new          — nobody is on file yet
+  const [customerMode, setCustomerMode] = useState<'existing' | 'new-location' | 'new'>('existing');
   const [selectedLocation, setSelectedLocation] = useState<ServiceLocationSearchResult | null>(null);
+  // Set only in 'new-location': the account the new property hangs off.
+  const [createForCustomer, setCreateForCustomer] = useState<CustomerSearchResult | null>(null);
+  const [newLocationName, setNewLocationName] = useState('');
+
+  // Both create paths need a region + the tenant's premise default.
+  const creatingLocation = customerMode !== 'existing';
 
   // New customer + location — lightweight ("just enough to start; enrich later").
   // Mirrors Add Customer's model so we don't over-ask: ONE name (a person OR a
   // company) seeds both the customer and its first location — never a separate
   // "location name" — and premise defaults from the company profile.
-  const [newName, setNewName] = useState('');
-  const [phone, setPhone] = useState('');
-  const [email, setEmail] = useState('');
+  const [newCustomer, setNewCustomer] = useState<CustomerCreateModel>({
+    name: '',
+    contactName: '',
+    phone: '',
+    email: '',
+    premise: 'BUSINESS',
+    sameBilling: true,
+    billingName: '',
+    billingContactPhone: '',
+    billingContactEmail: '',
+  });
+  const patchNewCustomer = (patch: Partial<CustomerCreateModel>) =>
+    setNewCustomer((c) => ({ ...c, ...patch }));
+  const [contactNameTouched, setContactNameTouched] = useState(false);
   const [newAddress, setNewAddress] = useState({ ...blankAddress });
-  const [premise, setPremise] = useState<PremiseType>('BUSINESS');
+  // Only collected when a separate party is invoiced — where the invoice goes.
+  const [newBillingAddress, setNewBillingAddress] = useState({ ...blankAddress });
   const [premiseTouched, setPremiseTouched] = useState(false);
   const [dispatchRegionId, setDispatchRegionId] = useState('');
+  const newName = newCustomer.name;
 
   // ── Work items ──────────────────────────────────────────────────────────
   const [drafts, setDrafts] = useState<Draft[]>([newDraft(1)]);
@@ -165,17 +207,17 @@ export default function WorkOrderIntakePage() {
   const { data: regions } = useQuery({
     queryKey: ['dispatch-regions', 'active'],
     queryFn: () => dispatchRegionApi.getAll(false),
-    enabled: customerMode === 'new',
+    enabled: creatingLocation,
   });
   // Premise default comes from the company profile (per-location, not a customer
   // type) — same as Add Customer. `premiseTouched` keeps a deliberate choice.
   const { data: tenantSettings } = useQuery({
     queryKey: ['tenant-settings'],
     queryFn: () => tenantSettingsApi.getSettings(),
-    enabled: customerMode === 'new',
+    enabled: creatingLocation,
   });
   const defaultPremise: PremiseType = tenantSettings?.defaultPremiseType ?? 'BUSINESS';
-  const effectivePremise = premiseTouched ? premise : defaultPremise;
+  const effectivePremise = premiseTouched ? newCustomer.premise : defaultPremise;
 
   // Prefill the customer name for the restricted picker (from ?customerId).
   const { data: prefillCustomer } = useQuery({
@@ -196,7 +238,7 @@ export default function WorkOrderIntakePage() {
   });
   // Form initialization from async prefill data — the sanctioned use of
   // set-state-in-effect (see CLAUDE.md); it runs once and converges.
-  /* eslint-disable react-hooks/set-state-in-effect */
+   
   useEffect(() => {
     if (!prefillLocation || prefillApplied || selectedLocation) return;
     // Map the detail DTO onto the picker's search-result shape and preselect it.
@@ -213,11 +255,11 @@ export default function WorkOrderIntakePage() {
 
   // Auto-select the only region so a single-region tenant never has to pick.
   useEffect(() => {
-    if (customerMode === 'new' && regions?.length === 1 && !dispatchRegionId) {
+    if (creatingLocation && regions?.length === 1 && !dispatchRegionId) {
       setDispatchRegionId(regions[0].id);
     }
-  }, [customerMode, regions, dispatchRegionId]);
-  /* eslint-enable react-hooks/set-state-in-effect */
+  }, [creatingLocation, regions, dispatchRegionId]);
+   
 
   // The resolved, real service location (existing mode only) — scopes equipment
   // and drives the rail's reference details.
@@ -242,19 +284,122 @@ export default function WorkOrderIntakePage() {
   // ── Validation ────────────────────────────────────────────────────────
   const newCustomerReady =
     newName.trim() !== '' &&
-    phone.trim() !== '' &&
-    email.trim() !== '' &&
+    // At least one reachable channel — neither is required on its own.
+    contactChannelError(newCustomer.phone, newCustomer.email) === null &&
+    // A separate payer has to be named AND have somewhere to receive the
+    // invoice, or we'd mail it to the job site under a flag saying we didn't.
+    (newCustomer.sameBilling ||
+      (newCustomer.billingName.trim() !== '' &&
+        newBillingAddress.streetAddress.trim() !== '' &&
+        newBillingAddress.city.trim() !== '' &&
+        newBillingAddress.state.trim() !== '' &&
+        newBillingAddress.zipCode.trim() !== '' &&
+        // The invoice has to reach the payer, not just be addressed to them.
+        contactChannelError(newCustomer.billingContactPhone, newCustomer.billingContactEmail) === null)) &&
     newAddress.streetAddress.trim() !== '' &&
     newAddress.city.trim() !== '' &&
     newAddress.state.trim() !== '' &&
     newAddress.zipCode.trim() !== '' &&
     dispatchRegionId !== '';
-  const locationReady = customerMode === 'existing' ? !!selectedLocation : newCustomerReady;
+  // A new property on a known account only needs the address — the customer is
+  // already on file, so we never re-ask for their name, phone or email.
+  const newLocationReady =
+    !!createForCustomer &&
+    // Every location is named — same rule as the Add Location page.
+    newLocationName.trim() !== '' &&
+    newAddress.streetAddress.trim() !== '' &&
+    newAddress.city.trim() !== '' &&
+    newAddress.state.trim() !== '' &&
+    newAddress.zipCode.trim() !== '' &&
+    dispatchRegionId !== '';
+  // The work order needs a REAL location; the create panels produce one via
+  // "Create & use" rather than the submit button doing double duty.
+  const locationReady = !!selectedLocation;
   const complaintDrafts = drafts.filter((d) => d.complaint.trim() !== '');
   const canSubmit = locationReady && !!workOrderTypeId && complaintDrafts.length > 0;
 
   // ── Create ──────────────────────────────────────────────────────────────
   const [creatingCustomer, setCreatingCustomer] = useState(false);
+
+  // "Create & use" — the record is created from the panel, not deferred to
+  // submit. The CSR gets confirmation while the caller is still on the line,
+  // and everything downstream that needs a REAL service location id (the
+  // summary rail's gate/access/notes, and the work-item equipment picker)
+  // starts working instead of sitting empty until save.
+  const adoptCreatedLocation = (loc: ServiceLocationSearchResult) => {
+    setSelectedLocation(loc);
+    setCustomerMode('existing');
+    setCreateForCustomer(null);
+    setNewLocationName('');
+    setNewAddress({ ...blankAddress });
+    setNewBillingAddress({ ...blankAddress });
+  };
+
+  const createCustomerAndUse = async () => {
+    setCreatingCustomer(true);
+    try {
+      const created = await customerApi.create(
+        buildCustomerCreateRequest(
+          { ...newCustomer, premise: effectivePremise },
+          {
+            serviceAddress: newAddress,
+            billingAddress: newCustomer.sameBilling ? undefined : newBillingAddress,
+            dispatchRegionId,
+            contactNameTouched,
+          }
+        )
+      );
+      const first = created.serviceLocations[0];
+      queryClient.invalidateQueries({ queryKey: ['customers'] });
+      queryClient.invalidateQueries({ queryKey: ['service-locations'] });
+      adoptCreatedLocation({
+        id: first.id,
+        customerId: created.id,
+        customerName: created.name,
+        locationName: first.locationName ?? null,
+        premiseType: effectivePremise,
+        address: newAddress,
+        status: 'ACTIVE',
+      });
+      showSuccess(t('common.form.successCreate', { entity: getName('customer') }));
+    } catch (err) {
+      showError(t('common.form.errorCreate', { entity: getName('customer') }), extractApiError(err) ?? undefined);
+    } finally {
+      setCreatingCustomer(false);
+    }
+  };
+
+  const createLocationAndUse = async () => {
+    if (!createForCustomer) return;
+    setCreatingCustomer(true);
+    try {
+      const loc = await customerApi.addServiceLocation(createForCustomer.id, {
+        dispatchRegionId,
+        locationName: newLocationName.trim(),
+        premiseType: effectivePremise,
+        address: newAddress,
+      });
+      queryClient.invalidateQueries({ queryKey: ['service-locations'] });
+      queryClient.invalidateQueries({ queryKey: ['customer-service-locations', createForCustomer.id] });
+      adoptCreatedLocation({
+        id: loc.id,
+        customerId: createForCustomer.id,
+        customerName: createForCustomer.name,
+        locationName: newLocationName.trim() || null,
+        premiseType: effectivePremise,
+        address: newAddress,
+        status: 'ACTIVE',
+      });
+      showSuccess(t('common.form.successCreate', { entity: getName('service_location') }));
+    } catch (err) {
+      showError(
+        t('common.form.errorCreate', { entity: getName('service_location') }),
+        extractApiError(err) ?? undefined
+      );
+    } finally {
+      setCreatingCustomer(false);
+    }
+  };
 
   const buildWorkItems = (): CreateWorkItemRequest[] =>
     complaintDrafts.map((d) => ({
@@ -283,9 +428,13 @@ export default function WorkOrderIntakePage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!canSubmit || submitting) {
-      if (!workOrderTypeId) showError('Pick a work order type.');
-      else if (!locationReady) showError('Pick a service location, or add the new customer & location.');
-      else if (complaintDrafts.length === 0) showError('Add at least one work item with a complaint.');
+      if (!workOrderTypeId) showError(`Pick a ${getName('work_order').toLowerCase()} type.`);
+      else if (!locationReady)
+        showError(
+          `Pick a ${getName('service_location').toLowerCase()}, or add the new ${getName('customer').toLowerCase()} & ${getName('service_location').toLowerCase()}.`
+        );
+      else if (complaintDrafts.length === 0)
+        showError(`Add at least one ${getName('work_item').toLowerCase()} with a complaint.`);
       return;
     }
 
@@ -298,45 +447,14 @@ export default function WorkOrderIntakePage() {
       workItems: buildWorkItems(),
     };
 
-    if (customerMode === 'existing' && selectedLocation) {
-      createMutation.mutate({
-        ...base,
-        customerId: selectedLocation.customerId,
-        serviceLocationId: selectedLocation.id,
-      });
-      return;
-    }
-
-    // New customer & location — create the customer (with its first location)
-    // first, then the work order against the returned ids.
-    setCreatingCustomer(true);
-    try {
-      const customerRequest: CreateCustomerRequest = {
-        name: newName.trim(),
-        email: email.trim(),
-        phone: phone.trim() || null,
-        billingAddress: newAddress,
-        billingAddressSameAsService: true,
-        serviceLocations: [
-          {
-            dispatchRegionId,
-            // One name seeds both records — the first location isn't asked for
-            // separately (same as Add Customer).
-            locationName: newName.trim(),
-            premiseType: effectivePremise,
-            address: newAddress,
-          },
-        ],
-      };
-      const createdCustomer = await customerApi.create(customerRequest);
-      const firstLocation = createdCustomer.serviceLocations[0];
-      queryClient.invalidateQueries({ queryKey: ['customers'] });
-      queryClient.invalidateQueries({ queryKey: ['service-locations'] });
-      createMutation.mutate({ ...base, customerId: createdCustomer.id, serviceLocationId: firstLocation.id });
-    } catch (err) {
-      setCreatingCustomer(false);
-      showError(t('common.form.errorCreate', { entity: getName('customer') }), extractApiError(err) ?? undefined);
-    }
+    if (!selectedLocation) return;
+    // Nothing to create here any more: "Create & use" made the customer and/or
+    // location before the CSR got this far, so submit is only the work order.
+    createMutation.mutate({
+      ...base,
+      customerId: selectedLocation.customerId,
+      serviceLocationId: selectedLocation.id,
+    });
   };
 
   return (
@@ -359,7 +477,8 @@ export default function WorkOrderIntakePage() {
                 </Heading>
                 <Text size="sm" tone="muted" className="mt-0.5">
                   Book a {getName('work_order').toLowerCase()} at a {getName('service_location').toLowerCase()}. Add
-                  every problem the customer is reporting as a separate {getName('work_item').toLowerCase()}.
+                  every problem the {getName('customer').toLowerCase()} is reporting as a separate{' '}
+                  {getName('work_item').toLowerCase()}.
                 </Text>
               </div>
               <div className="flex flex-shrink-0 items-center gap-2">
@@ -376,14 +495,26 @@ export default function WorkOrderIntakePage() {
               {/* ── Form column ── */}
               <div className="min-w-0 space-y-3.5">
                 {/* Service location — the lead section; customer derives from it. */}
-                <Card title={<StepTitle n={1} complete={locationReady}>{getName('service_location')}</StepTitle>}>
-                  <div className="mb-2.5">
-                    <ToggleGroup value={customerMode} onChange={setCustomerMode} aria-label="Customer">
-                      <ToggleGroupOption value="existing">Existing</ToggleGroupOption>
-                      <ToggleGroupOption value="new">New customer &amp; location</ToggleGroupOption>
-                    </ToggleGroup>
-                  </div>
-
+                <Card
+                  title={<StepTitle n={1} complete={locationReady}>{getName('service_location')}</StepTitle>}
+                  // One way out of the section, on the section itself — rather
+                  // than a Cancel buried inside whichever panel is open.
+                  action={
+                    creatingLocation ? (
+                      <Button
+                        type="button"
+                        plain
+                        size="xxs"
+                        onClick={() => {
+                          setCreateForCustomer(null);
+                          setCustomerMode('existing');
+                        }}
+                      >
+                        {t('common.cancel')}
+                      </Button>
+                    ) : undefined
+                  }
+                >
                   {customerMode === 'existing' ? (
                     <ServiceLocationPicker
                       value={selectedLocation}
@@ -392,23 +523,61 @@ export default function WorkOrderIntakePage() {
                       // The numbered card header above already names this.
                       hideLabel
                       restrictToCustomer={restrictToCustomer}
+                      // Entering from a customer record already answers "which
+                      // account", so the restricted picker keeps its own shape.
+                      searchFirst={
+                        restrictToCustomer
+                          ? undefined
+                          : {
+                              onCreateForCustomer: (c) => {
+                                setCreateForCustomer(c);
+                                setCustomerMode('new-location');
+                              },
+                              onCreateNewCustomer: () => setCustomerMode('new'),
+                            }
+                      }
                       required
                     />
-                  ) : (
-                    <NewCustomerFields
-                      name={newName}
-                      setName={setNewName}
-                      phone={phone}
-                      setPhone={setPhone}
-                      email={email}
-                      setEmail={setEmail}
+                  ) : customerMode === 'new-location' && createForCustomer ? (
+                    <NewLocationFields
+                      customer={createForCustomer}
+                      onChangeAccount={() => {
+                        setCreateForCustomer(null);
+                        setCustomerMode('existing');
+                      }}
+                      ready={newLocationReady}
+                      busy={creatingCustomer}
+                      onCreate={createLocationAndUse}
+                      locationName={newLocationName}
+                      setLocationName={setNewLocationName}
                       address={newAddress}
                       setAddress={setNewAddress}
                       premise={effectivePremise}
+                      onPremiseChange={(v) => {
+                        setPremiseTouched(true);
+                        patchNewCustomer({ premise: v });
+                      }}
+                      dispatchRegionId={dispatchRegionId}
+                      setDispatchRegionId={setDispatchRegionId}
+                      regions={regions ?? []}
+                    />
+                  ) : (
+                    <NewCustomerFields
+                      ready={newCustomerReady}
+                      busy={creatingCustomer}
+                      onCreate={createCustomerAndUse}
+                      model={{ ...newCustomer, premise: effectivePremise }}
+                      setModel={patchNewCustomer}
+                      contactNameTouched={contactNameTouched}
+                      setContactNameTouched={setContactNameTouched}
+                      address={newAddress}
+                      setAddress={setNewAddress}
+                      billingAddress={newBillingAddress}
+                      setBillingAddress={setNewBillingAddress}
                       defaultPremise={defaultPremise}
                       onPremiseChange={(v) => {
                         setPremiseTouched(true);
-                        setPremise(v);
+                        patchNewCustomer({ premise: v });
                       }}
                       dispatchRegionId={dispatchRegionId}
                       setDispatchRegionId={setDispatchRegionId}
@@ -519,13 +688,13 @@ export default function WorkOrderIntakePage() {
                       />
                     </Field>
                     <Field size="xs">
-                      <Label size="xs">Customer PO #</Label>
+                      <Label size="xs">{getName('customer')} PO #</Label>
                       <Input
                         size="xs"
                         value={customerOrderNumber}
                         onChange={(e) => setCustomerOrderNumber(e.target.value)}
                         placeholder="Optional"
-                        aria-label="Customer PO number"
+                        aria-label={`${getName('customer')} PO number`}
                       />
                     </Field>
                   </div>
@@ -536,6 +705,8 @@ export default function WorkOrderIntakePage() {
               <aside className="space-y-3.5 lg:sticky lg:top-1">
                 <IntakeRail
                   mode={customerMode}
+                  newLocationName={newLocationName}
+                  existingCustomerName={createForCustomer?.name ?? null}
                   selectedLocation={selectedLocation}
                   locationDetail={locationDetail}
                   newName={newName}
@@ -548,6 +719,7 @@ export default function WorkOrderIntakePage() {
                 <OnCreateCard
                   mode={customerMode}
                   newName={newName}
+                  existingCustomerName={createForCustomer?.name ?? null}
                   selectedLocation={selectedLocation}
                   itemCount={complaintDrafts.length}
                 />
@@ -566,115 +738,546 @@ export default function WorkOrderIntakePage() {
 // a separate location name — and premise is a per-location default from the
 // company profile, not a customer type. Full billing / advanced live on the
 // Add Customer page for back-office enrichment.
-function NewCustomerFields({
-  name,
-  setName,
-  phone,
-  setPhone,
-  email,
-  setEmail,
+// The existing account a new property hangs off. Confirms WHICH account before
+// the CSR types an address — and Change is the way out if the picker matched
+// the wrong same-named customer.
+function AttachedAccount({
+  customer,
+  onChange,
+}: {
+  customer: CustomerSearchResult;
+  onChange: () => void;
+}) {
+  const { getName } = useGlossary();
+  // A true count from the customer's own locations — it's what distinguishes a
+  // 12-site national account from a same-named single-site one.
+  const { data: locations } = useQuery({
+    queryKey: ['customer-service-locations', customer.id],
+    queryFn: () => customerApi.getServiceLocations(customer.id),
+    staleTime: 30000,
+  });
+  const count = locations?.length;
+
+  return (
+    <div className="flex items-center gap-3 rounded-md border border-border bg-bg-elev-2 px-3 py-2">
+      <span className="grid size-[34px] shrink-0 place-items-center rounded-lg bg-bg-active text-fg-muted">
+        {customer.category === 'RESIDENTIAL' ? (
+          <UserIcon className="size-[17px]" />
+        ) : (
+          <BuildingOffice2Icon className="size-[17px]" />
+        )}
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-[13px] font-bold text-fg-strong">{customer.name}</span>
+        <span className="mt-0.5 block truncate text-[11.5px] text-fg-muted">
+          Existing {getName('customer').toLowerCase()}
+          {count !== undefined
+            ? ` · ${count} ${count === 1 ? getName('service_location').toLowerCase() : getName('service_location', true).toLowerCase()} on file`
+            : ''}
+        </span>
+      </span>
+      <button type="button" onClick={onChange} className="card-action shrink-0">
+        Change
+      </button>
+    </div>
+  );
+}
+
+// Footer for a create panel: what the button will do, and the button. Creating
+// here rather than at submit means the record exists before the CSR moves on —
+// which is what lets the summary rail fill in and the work-item equipment
+// picker (scoped to a real service location) work at all.
+function CreatePanelFoot({
+  readback,
+  disabled,
+  busy,
+  onCreate,
+}: {
+  readback: string;
+  disabled: boolean;
+  busy: boolean;
+  onCreate: () => void;
+}) {
+  return (
+    <div className="mt-1 flex items-center justify-between gap-3 border-t border-border-soft pt-2.5">
+      <span className="text-[11.5px] text-fg-muted">{readback}</span>
+      <Button type="button" size="xs" disabled={disabled || busy} onClick={onCreate}>
+        {busy ? 'Creating…' : 'Create & use'}
+      </Button>
+    </div>
+  );
+}
+
+// Panel heading. Cancel is NOT here — it lives on the section card header,
+// where the mock puts it, so there's one way out of the section rather than a
+// control the CSR has to hunt for inside the panel.
+function CreatePanelHead({ children, hint }: { children: React.ReactNode; hint?: string }) {
+  return (
+    <div className="mb-2.5 flex items-baseline justify-between gap-3 border-b border-border-soft pb-2">
+      <span className="text-[12.5px] font-semibold text-fg-strong">{children}</span>
+      {hint && <span className="text-[11px] text-fg-dim">{hint}</span>}
+    </div>
+  );
+}
+
+// A new property on an account we already have. Deliberately does NOT re-ask
+// for name / phone / email — the customer is on file, and asking again is both
+// wasted keystrokes on a live call and the road to a duplicate account.
+function NewLocationFields({
+  customer,
+  onChangeAccount,
+  ready,
+  busy,
+  onCreate,
+  locationName,
+  setLocationName,
   address,
   setAddress,
   premise,
-  defaultPremise,
   onPremiseChange,
   dispatchRegionId,
   setDispatchRegionId,
   regions,
 }: {
-  name: string;
-  setName: (v: string) => void;
-  phone: string;
-  setPhone: (v: string) => void;
-  email: string;
-  setEmail: (v: string) => void;
+  customer: CustomerSearchResult;
+  onChangeAccount: () => void;
+  ready: boolean;
+  busy: boolean;
+  onCreate: () => void;
+  locationName: string;
+  setLocationName: (v: string) => void;
   address: { streetAddress: string; city: string; state: string; zipCode: string };
   setAddress: (v: { streetAddress: string; city: string; state: string; zipCode: string }) => void;
   premise: PremiseType;
-  defaultPremise: PremiseType;
   onPremiseChange: (v: PremiseType) => void;
   dispatchRegionId: string;
   setDispatchRegionId: (v: string) => void;
   regions: { id: string; name: string }[];
 }) {
+  const { t } = useTranslation();
+  const { getName } = useGlossary();
+  const hasRegions = regions.length > 0;
   const set = (patch: Partial<typeof address>) => setAddress({ ...address, ...patch });
+  // Name examples are persona-ordered by the tenant default premise: same two
+  // examples, the likely one first (matches AddLocationPage verbatim).
+  // Scoped to a known account, so the guidance follows the SITE's premise
+  // rather than the tenant default, and closes with who gets invoiced — the
+  // fact that most often makes a CSR pause on a multi-site account.
+  const customerName = customer.name;
+  const residence = premise === 'RESIDENCE';
+  const namePlaceholder = residence ? 'Avila' : 'Red Lobster #123';
+  const nameHelper = residence
+    ? `The homeowner’s name. Invoices go to ${customerName}.`
+    : `The store or building — not the parent company. Invoices go to ${customerName}.`;
   return (
     <div className="space-y-2.5">
-      <Text size="xs" tone="dim">
-        Just enough to start the job — full billing &amp; details enrich later on the customer’s page.
-      </Text>
-      {/* One name — a household or a company — seeds both records. */}
+      <CreatePanelHead hint="just enough to start — enrich later">
+        New {getName('service_location').toLowerCase()} for {customerName}
+      </CreatePanelHead>
+
+      {/* The account this hangs off, shown as a row rather than left implicit
+          in the heading. It's the anti-duplicate affordance made visible: the
+          CSR can see they're adding to an EXISTING account, and Change is the
+          way out if it's the wrong one. */}
+      <AttachedAccount customer={customer} onChange={onChangeAccount} />
+
+      {/* Identity before address, and required — same as the Add Location page.
+          Premise rides the label row (as on the new-customer panel) because a
+          property manager can own residential rentals: the account's kind does
+          not decide the site's. */}
       <Field size="xs">
-        <Label size="xs" required>
-          Name
-        </Label>
-        <Input size="xs" value={name} onChange={(e) => setName(e.target.value)} placeholder="Maria Sanchez — or Iverson Properties LLC" />
+        <div className="mb-1 flex items-center justify-between gap-3">
+          <Label size="xs" required>
+            {t('common.form.locationName')}
+          </Label>
+          <ToggleGroup value={premise} onChange={onPremiseChange} size="sm" aria-label="Premise">
+            <ToggleGroupOption value="RESIDENCE" tone="success">
+              <HomeIcon className="size-3" />
+              Residence
+            </ToggleGroupOption>
+            <ToggleGroupOption value="BUSINESS" tone="info">
+              <BuildingOffice2Icon className="size-3" />
+              Business
+            </ToggleGroupOption>
+          </ToggleGroup>
+        </div>
+        <Input
+          size="xs"
+          value={locationName}
+          onChange={(e) => setLocationName(e.target.value)}
+          placeholder={namePlaceholder}
+        />
+        <Text size="xs" tone="muted" className="mt-1">
+          {nameHelper}
+        </Text>
       </Field>
-      <div className="grid gap-2.5 sm:grid-cols-2">
-        <Field size="xs">
-          <Label size="xs" required>
-            Phone
-          </Label>
-          <Input size="xs" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="(602) 555-0149" />
-        </Field>
-        <Field size="xs">
-          <Label size="xs" required>
-            Email
-          </Label>
-          <Input size="xs" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="name@example.com" />
-        </Field>
-      </div>
+
       <Field size="xs">
         <Label size="xs" required>
           Street address
         </Label>
         <Input size="xs" value={address.streetAddress} onChange={(e) => set({ streetAddress: e.target.value })} placeholder="123 Main St" />
       </Field>
-      <div className="grid gap-2.5 sm:grid-cols-[1fr_72px_88px_1fr]">
-        <Field size="xs">
+      {/* Same 12-column split as Add Customer's AddressBlock. */}
+      <div className="grid grid-cols-12 gap-2">
+        <Field size="xs" className={hasRegions ? 'col-span-4' : 'col-span-6'}>
           <Label size="xs" required>
             City
           </Label>
-          <Input size="xs" value={address.city} onChange={(e) => set({ city: e.target.value })} />
+          <Input size="xs" value={address.city} onChange={(e) => set({ city: e.target.value })} placeholder="Chandler" />
         </Field>
-        <Field size="xs">
+        <Field size="xs" className="col-span-2">
           <Label size="xs" required>
             State
           </Label>
-          <Input size="xs" value={address.state} onChange={(e) => set({ state: e.target.value.toUpperCase() })} maxLength={2} />
+          <Input size="xs" value={address.state} onChange={(e) => set({ state: e.target.value.toUpperCase() })} maxLength={2} placeholder="AZ" />
         </Field>
-        <Field size="xs">
+        <Field size="xs" className={hasRegions ? 'col-span-2' : 'col-span-4'}>
           <Label size="xs" required>
             ZIP
           </Label>
-          <Input size="xs" value={address.zipCode} onChange={(e) => set({ zipCode: e.target.value })} />
+          <Input size="xs" value={address.zipCode} onChange={(e) => set({ zipCode: e.target.value })} placeholder="85224" />
         </Field>
-        <Field size="xs">
-          <Label size="xs" required>
-            Region
-          </Label>
-          <Select size="xs" value={dispatchRegionId} onChange={(e) => setDispatchRegionId(e.target.value)} aria-label="Region">
-            <option value="">Select…</option>
-            {regions.map((r) => (
-              <option key={r.id} value={r.id}>
-                {r.name}
-              </option>
-            ))}
-          </Select>
-        </Field>
+        {hasRegions && (
+          <Field size="xs" className="col-span-4">
+            <Label size="xs" required>
+              Region
+            </Label>
+            <Select size="xs" value={dispatchRegionId} onChange={(e) => setDispatchRegionId(e.target.value)} aria-label="Region">
+              <option value="">Select…</option>
+              {regions.map((r) => (
+                <option key={r.id} value={r.id}>
+                  {r.name}
+                </option>
+              ))}
+            </Select>
+          </Field>
+        )}
       </div>
-      <div>
-        <MiniLabel>Premise</MiniLabel>
-        <div className="mt-1">
-          <ToggleGroup value={premise} onChange={onPremiseChange} aria-label="Premise">
-            <ToggleGroupOption value="RESIDENCE">Residence</ToggleGroupOption>
-            <ToggleGroupOption value="BUSINESS">Business</ToggleGroupOption>
+      <CreatePanelFoot
+        readback={`Adds this ${getName('service_location').toLowerCase()} to ${customerName}`}
+        disabled={!ready}
+        busy={busy}
+        onCreate={onCreate}
+      />
+    </div>
+  );
+}
+
+function NewCustomerFields({
+  ready,
+  busy,
+  onCreate,
+  model,
+  setModel,
+  contactNameTouched,
+  setContactNameTouched,
+  address,
+  setAddress,
+  billingAddress,
+  setBillingAddress,
+  defaultPremise,
+  onPremiseChange,
+  dispatchRegionId,
+  setDispatchRegionId,
+  regions,
+}: {
+  ready: boolean;
+  busy: boolean;
+  onCreate: () => void;
+  model: CustomerCreateModel;
+  setModel: (patch: Partial<CustomerCreateModel>) => void;
+  contactNameTouched: boolean;
+  setContactNameTouched: (v: boolean) => void;
+  address: { streetAddress: string; city: string; state: string; zipCode: string };
+  setAddress: (v: { streetAddress: string; city: string; state: string; zipCode: string }) => void;
+  billingAddress: { streetAddress: string; city: string; state: string; zipCode: string };
+  setBillingAddress: (v: { streetAddress: string; city: string; state: string; zipCode: string }) => void;
+  defaultPremise: PremiseType;
+  onPremiseChange: (v: PremiseType) => void;
+  dispatchRegionId: string;
+  setDispatchRegionId: (v: string) => void;
+  regions: { id: string; name: string }[];
+}) {
+  const { getName } = useGlossary();
+  const hasRegions = regions.length > 0;
+  const set = (patch: Partial<typeof address>) => setAddress({ ...address, ...patch });
+  const setBilling = (patch: Partial<typeof billingAddress>) => setBillingAddress({ ...billingAddress, ...patch });
+  const guidance = nameGuidance(model.premise);
+  const billingContactErr = contactChannelError(model.billingContactPhone, model.billingContactEmail);
+  // Mirrors the household name into the contact until someone personalizes it.
+  const effectiveContactName = resolveContactName(model, contactNameTouched);
+  const contactError = contactChannelError(model.phone, model.email);
+
+  return (
+    <div className="space-y-2.5">
+      {/* Names BOTH records it creates. "New customer" alone reads as if no
+          location is made, and the sibling panel is "New location for X" — the
+          contrast between them is what stops a CSR duplicating an account. */}
+      <CreatePanelHead hint="just enough to start — enrich later">
+        New {getName('customer').toLowerCase()} + first {getName('service_location').toLowerCase()}
+      </CreatePanelHead>
+
+      {/* Premise rides on the Name label row because it decides what "Name"
+          MEANS — a household vs a specific site. Below the field it would ask
+          the CSR to re-read what they just typed. */}
+      <Field size="xs">
+        <div className="mb-1 flex items-center justify-between gap-3">
+          <Label size="xs" required hint={guidance.hint ?? undefined}>
+            Name
+          </Label>
+          <ToggleGroup value={model.premise} onChange={onPremiseChange} size="sm" aria-label="Premise">
+            <ToggleGroupOption value="RESIDENCE" tone="success">
+              <HomeIcon className="size-3" />
+              Residence
+            </ToggleGroupOption>
+            <ToggleGroupOption value="BUSINESS" tone="info">
+              <BuildingOffice2Icon className="size-3" />
+              Business
+            </ToggleGroupOption>
           </ToggleGroup>
         </div>
+        <Input
+          size="xs"
+          value={model.name}
+          onChange={(e) => setModel({ name: e.target.value })}
+          placeholder={guidance.placeholder}
+        />
         <Text size="xs" tone="dim" className="mt-1">
-          Default for new locations is {defaultPremise === 'BUSINESS' ? 'Business' : 'Residence'} · set in Company profile.
+          Default is {defaultPremise === 'BUSINESS' ? 'Business' : 'Residence'} · set in Company profile.
         </Text>
+      </Field>
+
+      <Field size="xs">
+        <Label size="xs" required>
+          Street address
+        </Label>
+        <Input
+          size="xs"
+          value={address.streetAddress}
+          onChange={(e) => set({ streetAddress: e.target.value })}
+          placeholder="4821 E Indian School Rd"
+        />
+      </Field>
+      {/* Same 12-column split as Add Customer's AddressBlock: Region rides the
+          city/state/ZIP row, and the row re-widens when a tenant has none. */}
+      <div className="grid grid-cols-12 gap-2">
+        <Field size="xs" className={hasRegions ? 'col-span-4' : 'col-span-6'}>
+          <Label size="xs" required>
+            City
+          </Label>
+          <Input size="xs" value={address.city} onChange={(e) => set({ city: e.target.value })} placeholder="Phoenix" />
+        </Field>
+        <Field size="xs" className="col-span-2">
+          <Label size="xs" required>
+            State
+          </Label>
+          <Input size="xs" value={address.state} onChange={(e) => set({ state: e.target.value.toUpperCase() })} maxLength={2} placeholder="AZ" />
+        </Field>
+        <Field size="xs" className={hasRegions ? 'col-span-2' : 'col-span-4'}>
+          <Label size="xs" required>
+            ZIP
+          </Label>
+          <Input size="xs" value={address.zipCode} onChange={(e) => set({ zipCode: e.target.value })} placeholder="85018" />
+        </Field>
+        {hasRegions && (
+          <Field size="xs" className="col-span-4">
+            <Label size="xs" required>
+              Region
+            </Label>
+            <Select size="xs" value={dispatchRegionId} onChange={(e) => setDispatchRegionId(e.target.value)} aria-label="Region">
+              <option value="">Select…</option>
+              {regions.map((r) => (
+                <option key={r.id} value={r.id}>
+                  {r.name}
+                </option>
+              ))}
+            </Select>
+          </Field>
+        )}
       </div>
+
+      <div className="pt-1">
+        <div className="mb-1.5 text-[10px] font-bold tracking-[0.05em] text-fg-muted uppercase">Contact</div>
+        <Field size="xs">
+          <Label size="xs" hint="who we ask for">
+            Contact name
+          </Label>
+          <Input
+            size="xs"
+            value={effectiveContactName}
+            onChange={(e) => {
+              setContactNameTouched(true);
+              setModel({ contactName: e.target.value });
+            }}
+            placeholder="Tanya Avila"
+          />
+        </Field>
+        <div className="mt-2.5 grid gap-2.5 sm:grid-cols-2">
+          <Field size="xs">
+            <Label size="xs">Phone</Label>
+            <Input
+              size="xs"
+              type="tel"
+              value={model.phone}
+              onChange={(e) => setModel({ phone: e.target.value })}
+              placeholder="(602) 555-0100"
+            />
+          </Field>
+          <Field size="xs">
+            <Label size="xs">Email</Label>
+            <Input
+              size="xs"
+              type="email"
+              value={model.email}
+              onChange={(e) => setModel({ email: e.target.value })}
+              placeholder="name@example.com"
+            />
+          </Field>
+        </div>
+        {/* Neither channel is required on its own; having none is what's
+            invalid, so the rule is stated once under the pair. */}
+        {contactError ? (
+          <p className="mt-1 text-[11px] text-danger-500">{contactError}</p>
+        ) : (
+          <Text size="xs" tone="dim" className="mt-1">
+            At least one — we send confirmations and invoices through them.
+          </Text>
+        )}
+      </div>
+
+      {/* Who pays. Defaulted on, because the common case is that the caller is
+          the payer — the checkbox exists for the franchise / property-manager
+          / corporate-AP case, and unchecking it re-points the whole record. */}
+      <label
+        className="flex cursor-pointer items-start gap-2.5 rounded-md border p-2.5 transition-colors"
+        style={
+          model.sameBilling
+            ? {
+                borderColor: 'color-mix(in oklch, var(--accent-500) 30%, var(--border))',
+                background: 'color-mix(in oklch, var(--accent-500) 6%, transparent)',
+              }
+            : { borderColor: 'var(--border)', background: 'var(--bg-elev-2)' }
+        }
+      >
+        <Checkbox
+          color="accent"
+          // The visible text sits in a sibling span, so the control needs its
+          // own name — a bare <label> around a non-input doesn't associate.
+          aria-label="Bill this customer directly"
+          checked={model.sameBilling}
+          onChange={(v) =>
+            setModel({
+              sameBilling: v,
+              // Seed the bill-to name from the top name when splitting off, so
+              // "same party, different mailing address" needs no retype.
+              billingName: !v && !model.billingName.trim() ? model.name.trim() : model.billingName,
+            })
+          }
+        />
+        <span>
+          <span className="block text-[12.5px] font-medium text-fg-strong">Bill this customer directly</span>
+          <span className="mt-0.5 block text-[11px] text-fg-muted">
+            Uncheck only if someone else is invoiced — a franchise owner, property manager, or corporate AP.
+          </span>
+        </span>
+      </label>
+
+      {/* Following the mock's BillingBlock: who pays, where the invoice is
+          mailed, then how it's delivered. */}
+      {!model.sameBilling && (
+        <div className="space-y-2.5 border-t border-dashed border-border-soft pt-2.5">
+          <Field size="xs">
+            <Label size="xs" required hint="the company that pays">
+              Bill to
+            </Label>
+            <Input
+              size="xs"
+              value={model.billingName}
+              onChange={(e) => setModel({ billingName: e.target.value })}
+              placeholder="Darden Restaurants"
+            />
+          </Field>
+          <Field size="xs">
+            <Label size="xs" required>
+              Billing street address
+            </Label>
+            <Input
+              size="xs"
+              value={billingAddress.streetAddress}
+              onChange={(e) => setBilling({ streetAddress: e.target.value })}
+              placeholder="1000 Darden Center Dr"
+            />
+          </Field>
+          <div className="grid grid-cols-12 gap-2">
+            <Field size="xs" className="col-span-6">
+              <Label size="xs" required>
+                City
+              </Label>
+              <Input size="xs" value={billingAddress.city} onChange={(e) => setBilling({ city: e.target.value })} placeholder="Orlando" />
+            </Field>
+            <Field size="xs" className="col-span-2">
+              <Label size="xs" required>
+                State
+              </Label>
+              <Input
+                size="xs"
+                value={billingAddress.state}
+                onChange={(e) => setBilling({ state: e.target.value.toUpperCase() })}
+                maxLength={2}
+                placeholder="FL"
+              />
+            </Field>
+            <Field size="xs" className="col-span-4">
+              <Label size="xs" required>
+                ZIP
+              </Label>
+              <Input size="xs" value={billingAddress.zipCode} onChange={(e) => setBilling({ zipCode: e.target.value })} placeholder="32837" />
+            </Field>
+          </div>
+          <div className="border-t border-border-soft pt-2.5">
+            {/* No AP contact name: accounts payable is a department, not a
+                person we ask for — the channel is the whole requirement. */}
+            <div className="grid gap-2.5 sm:grid-cols-2">
+              <Field size="xs">
+                <Label size="xs">Billing phone</Label>
+                <Input
+                  size="xs"
+                  type="tel"
+                  value={model.billingContactPhone}
+                  onChange={(e) => setModel({ billingContactPhone: e.target.value })}
+                />
+              </Field>
+              <Field size="xs">
+                <Label size="xs">Billing email</Label>
+                <Input
+                  size="xs"
+                  type="email"
+                  value={model.billingContactEmail}
+                  onChange={(e) => setModel({ billingContactEmail: e.target.value })}
+                />
+              </Field>
+            </div>
+            {billingContactErr ? (
+              <p className="mt-1 text-[11px] text-danger-500">{billingContactErr}</p>
+            ) : (
+              <Text size="xs" tone="dim" className="mt-1">
+                At least one — this is where we send the invoice.
+              </Text>
+            )}
+          </div>
+          <Text size="xs" tone="dim">
+            “{model.billingName.trim() || 'The name above'}” becomes the {'customer'}; “
+            {model.name.trim() || 'the name at the top'}” names the location.
+          </Text>
+        </div>
+      )}
+      <CreatePanelFoot
+        readback={`Adds this ${getName('customer').toLowerCase()} and their first ${getName('service_location').toLowerCase()}`}
+        disabled={!ready}
+        busy={busy}
+        onCreate={onCreate}
+      />
     </div>
   );
 }
@@ -704,6 +1307,7 @@ function WorkItemDraftCard({
   onRemove: () => void;
 }) {
   const queryClient = useQueryClient();
+  const { getName } = useGlossary();
   const [quickBusy, setQuickBusy] = useState(false);
 
   const attach = (id: string, name: string | null) =>
@@ -748,7 +1352,7 @@ function WorkItemDraftCard({
 
       <div className="mt-2">
         <Field size="xs">
-          <Label size="xs">Complaint · in the customer’s words</Label>
+          <Label size="xs">Complaint · in the {getName('customer').toLowerCase()}’s words</Label>
           <Input
             size="xs"
             value={draft.complaint}
@@ -844,30 +1448,48 @@ function IntakeRail({
   selectedLocation,
   locationDetail,
   newName,
+  newLocationName,
+  existingCustomerName,
   newAddress,
   typeName,
   divisionName,
   priority,
   itemCount,
 }: {
-  mode: 'existing' | 'new';
+  mode: 'existing' | 'new-location' | 'new';
   selectedLocation: ServiceLocationSearchResult | null;
   locationDetail: ServiceLocationDetailDto | undefined;
   newName: string;
+  newLocationName: string;
+  existingCustomerName: string | null;
   newAddress: { streetAddress: string; city: string; state: string; zipCode: string };
   typeName: string | null;
   divisionName: string | null;
   priority: WorkOrderPriority;
   itemCount: number;
 }) {
-  const isNew = mode === 'new';
-  // One name is both the site and the payer for a brand-new caller.
-  const name = isNew ? newName : selectedLocation?.locationName || selectedLocation?.customerName;
-  const address = isNew ? newAddress : selectedLocation?.address;
-  const customerName = isNew ? newName : selectedLocation?.customerName;
+  const { getName } = useGlossary();
+  // The site is new in both create paths; only one of them also creates the
+  // customer. Keeping those separate is what lets the rail say "billed to
+  // Darden" while the property itself is brand new.
+  const isNewSite = mode !== 'existing';
+  const isNewCustomer = mode === 'new';
+  // One name is both the site and the payer for a brand-new caller. On a known
+  // account the site may be unnamed, in which case it reads as the account.
+  const name = isNewCustomer
+    ? newName
+    : mode === 'new-location'
+      ? newLocationName.trim() || existingCustomerName
+      : selectedLocation?.locationName || selectedLocation?.customerName;
+  const address = isNewSite ? newAddress : selectedLocation?.address;
+  const customerName = isNewCustomer
+    ? newName
+    : mode === 'new-location'
+      ? existingCustomerName
+      : selectedLocation?.customerName;
   const pinnedNote = locationDetail?.notes?.find((n) => n.pinned) ?? locationDetail?.notes?.[0];
   const facts = locationDetail?.arrivalFacts ?? [];
-  const hasLocation = isNew ? !!newName : !!selectedLocation;
+  const hasLocation = isNewCustomer ? !!newName : mode === 'new-location' ? !!existingCustomerName : !!selectedLocation;
 
   const line2 = address
     ? `${titleCaseAddress(address.streetAddress)} · ${titleCaseAddress(address.city)}, ${address.state} ${address.zipCode}`.trim()
@@ -877,15 +1499,18 @@ function IntakeRail({
     <Card title="Job summary">
       {!hasLocation ? (
         <Text size="sm" tone="muted">
-          Pick a service location to see who’s billed and how to get on site.
+          Pick a {getName('service_location').toLowerCase()} to see who’s billed and how to get on
+          site.
         </Text>
       ) : (
         <>
           <div className="flex flex-wrap items-baseline gap-1.5">
-            <span className="text-[14px] font-bold text-fg-strong">{name || 'New location'}</span>
-            {isNew && (
+            <span className="text-[14px] font-bold text-fg-strong">
+              {name || `New ${getName('service_location').toLowerCase()}`}
+            </span>
+            {isNewSite && (
               <Pill tone="success" dot>
-                New
+                {isNewCustomer ? 'New' : `New ${getName('service_location').toLowerCase()}`}
               </Pill>
             )}
           </div>
@@ -953,26 +1578,39 @@ function IntakeRail({
 function OnCreateCard({
   mode,
   newName,
+  existingCustomerName,
   selectedLocation,
   itemCount,
 }: {
-  mode: 'existing' | 'new';
+  mode: 'existing' | 'new-location' | 'new';
   newName: string;
+  existingCustomerName: string | null;
   selectedLocation: ServiceLocationSearchResult | null;
   itemCount: number;
 }) {
+  const { getName } = useGlossary();
+  const customerWord = getName('customer').toLowerCase();
+  const locationWord = getName('service_location').toLowerCase();
+
   const lines: string[] = [];
   if (mode === 'new') {
-    lines.push(`Create the customer${newName.trim() ? ` ${newName.trim()}` : ''}`);
-    lines.push('Create their first service location');
+    lines.push(`Create the ${customerWord}${newName.trim() ? ` ${newName.trim()}` : ''}`);
+    lines.push(`Create their first ${locationWord}`);
+  }
+  // Says the quiet part out loud: this path adds a property to an account that
+  // already exists, and does NOT create a second copy of that customer.
+  if (mode === 'new-location') {
+    lines.push(`Add a new ${locationWord} to ${existingCustomerName ?? `the selected ${customerWord}`}`);
   }
   lines.push(
-    `Create the work order with ${itemCount || 'no'} ${itemCount === 1 ? 'item' : 'items'} in Triage — number assigned on save`
+    `Create the ${getName('work_order').toLowerCase()} with ${itemCount || 'no'} ${itemCount === 1 ? 'item' : 'items'} in Triage — number assigned on save`
   );
   lines.push(
     mode === 'existing' && selectedLocation
       ? `Attach it to ${selectedLocation.customerName}`
-      : 'Land you on the work order to schedule & dispatch'
+      : mode === 'new-location' && existingCustomerName
+        ? `Bill it to ${existingCustomerName}`
+        : `Land you on the ${getName('work_order').toLowerCase()} to schedule & dispatch`
   );
 
   return (
