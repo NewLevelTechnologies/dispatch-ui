@@ -93,7 +93,11 @@ describe('WorkOrderIntakePage', () => {
     mockGetCustomerById.mockResolvedValue({ id: 'cust-1', name: 'Reyes Household' });
     mockEquipmentList.mockResolvedValue({ content: [], totalElements: 0, totalPages: 0, number: 0, size: 200 });
     mockCreateWorkOrder.mockResolvedValue({ id: 'wo-new' });
-    mockCreateCustomer.mockResolvedValue({ id: 'cust-new', serviceLocations: [{ id: 'loc-new' }] });
+    mockCreateCustomer.mockResolvedValue({
+      id: 'cust-new',
+      name: 'Jordan Avila',
+      serviceLocations: [{ id: 'loc-new', locationName: 'Jordan Avila' }],
+    });
     mockSearchCustomers.mockResolvedValue({ content: [], totalElements: 0, totalPages: 0, size: 5, number: 0 });
     mockAddServiceLocation.mockResolvedValue({ id: 'loc-added' });
   });
@@ -157,10 +161,7 @@ describe('WorkOrderIntakePage', () => {
     await user.type(screen.getByLabelText(/^city/i), 'Chandler');
     await user.type(screen.getByLabelText(/^state/i), 'AZ');
     await user.type(screen.getByLabelText(/^zip/i), '85224');
-    await user.selectOptions(screen.getByLabelText('Type'), 'type-1');
-    await user.type(screen.getByPlaceholderText(/no cooling upstairs/i), 'Walk-in down');
-
-    await user.click(screen.getByRole('button', { name: /add work order/i }));
+    await user.click(screen.getByRole('button', { name: /create & use/i }));
 
     await waitFor(() =>
       expect(mockAddServiceLocation).toHaveBeenCalledWith(
@@ -175,6 +176,17 @@ describe('WorkOrderIntakePage', () => {
     // The whole point: the account was reused, not duplicated.
     expect(mockCreateCustomer).not.toHaveBeenCalled();
     expect(mockAddServiceLocation).toHaveBeenCalledTimes(1);
+
+    // The panel collapses to the picked-location row, and the work order then
+    // books against the location that now really exists.
+    // Collapsed picked row — the name also appears in the summary rail, so key
+    // off the row's own Change affordance.
+    await screen.findByText('Change');
+    expect(screen.getAllByText('Red Lobster #123').length).toBeGreaterThan(0);
+    await user.selectOptions(screen.getByLabelText('Type'), 'type-1');
+    await user.type(screen.getByPlaceholderText(/no cooling upstairs/i), 'Walk-in down');
+    await user.click(screen.getByRole('button', { name: /add work order/i }));
+
     await waitFor(() =>
       expect(mockCreateWorkOrder).toHaveBeenCalledWith(
         expect.objectContaining({ customerId: 'cust-darden', serviceLocationId: 'loc-added' })
@@ -201,8 +213,7 @@ describe('WorkOrderIntakePage', () => {
     await user.selectOptions(screen.getByLabelText('Type'), 'type-1');
     await user.type(screen.getByPlaceholderText(/no cooling upstairs/i), 'No heat');
 
-    expect(screen.getByRole('button', { name: /add work order/i })).toBeEnabled();
-    await user.click(screen.getByRole('button', { name: /add work order/i }));
+    await user.click(screen.getByRole('button', { name: /create & use/i }));
 
     await waitFor(() =>
       expect(mockCreateCustomer).toHaveBeenCalledWith(
@@ -244,9 +255,7 @@ describe('WorkOrderIntakePage', () => {
     await user.type(zips[zips.length - 1], '32837');
     await user.type(screen.getByLabelText(/billing email/i), 'ap@darden.com');
 
-    await user.selectOptions(screen.getByLabelText('Type'), 'type-1');
-    await user.type(screen.getByPlaceholderText(/no cooling upstairs/i), 'Walk-in down');
-    await user.click(screen.getByRole('button', { name: /add work order/i }));
+    await user.click(screen.getByRole('button', { name: /create & use/i }));
 
     await waitFor(() =>
       expect(mockCreateCustomer).toHaveBeenCalledWith(
@@ -336,9 +345,12 @@ describe('WorkOrderIntakePage', () => {
     await user.type(screen.getByLabelText(/^city/i), 'Phoenix');
     await user.type(screen.getByLabelText(/^state/i), 'AZ');
     await user.type(screen.getByLabelText(/^zip/i), '85001');
+    // The record is created from the panel, not deferred to submit.
+    await user.click(screen.getByRole('button', { name: /create & use/i }));
+    await waitFor(() => expect(mockCreateCustomer).toHaveBeenCalled());
+
     await user.selectOptions(screen.getByLabelText('Type'), 'type-1');
     await user.type(screen.getByPlaceholderText(/no cooling upstairs/i), 'No heat');
-
     await user.click(screen.getByRole('button', { name: /add work order/i }));
 
     // One name seeds both the customer and its first location.
