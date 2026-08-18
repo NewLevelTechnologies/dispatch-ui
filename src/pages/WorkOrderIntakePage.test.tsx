@@ -151,7 +151,10 @@ describe('WorkOrderIntakePage', () => {
 
     // The account is known, so the form asks for the address only — never the
     // customer's name, phone or email again.
-    expect(screen.getByText(/New location for Darden Restaurants/)).toBeInTheDocument();
+    // The account card identifies the account now, not the heading — and it
+    // says the account already exists, which is the anti-duplicate signal.
+    expect(screen.getByText(/Existing customer/)).toBeInTheDocument();
+    expect(screen.getAllByText('Darden Restaurants').length).toBeGreaterThan(0);
     expect(screen.queryByLabelText(/^phone/i)).not.toBeInTheDocument();
     expect(screen.queryByLabelText(/^email/i)).not.toBeInTheDocument();
 
@@ -274,6 +277,25 @@ describe('WorkOrderIntakePage', () => {
       )
     );
   }, 15000);
+
+  it('names who is billed only when that differs from the site', async () => {
+    // Named for someone else — the CSR needs to know Reyes Household pays for
+    // work at "Reyes Residence".
+    renderIntake('/work-orders/new?locationId=loc-1');
+    await screen.findByRole('heading', { name: /add work order/i, level: 1 });
+    await waitFor(() => expect(screen.getByText('billed')).toBeInTheDocument());
+    expect(screen.getByText('Reyes Household')).toBeInTheDocument();
+  });
+
+  it('omits the billed line when the site is named for its own customer', async () => {
+    // Unnamed location, so the rail headline already IS the customer. Repeating
+    // it as "X billed" only asks the CSR to check that the two match.
+    mockGetServiceLocationById.mockResolvedValue({ ...locationDetail, locationName: null });
+    renderIntake('/work-orders/new?locationId=loc-1');
+    await screen.findByRole('heading', { name: /add work order/i, level: 1 });
+    await waitFor(() => expect(screen.getAllByText('Reyes Household').length).toBeGreaterThan(0));
+    expect(screen.queryByText('billed')).not.toBeInTheDocument();
+  });
 
   it('keeps the create button disabled until a location, type and a complaint are present', async () => {
     const user = userEvent.setup();

@@ -871,8 +871,11 @@ function NewLocationFields({
     : `The store or building — not the parent company. Invoices go to ${customerName}.`;
   return (
     <div className="space-y-2.5">
+      {/* Just what this is. Which account is the card's job, right below, and
+          the footer states it again where the CSR commits — naming it here too
+          made it three times in one panel. */}
       <CreatePanelHead hint="just enough to start — enrich later">
-        New {getName('service_location').toLowerCase()} for {customerName}
+        New {getName('service_location').toLowerCase()}
       </CreatePanelHead>
 
       {/* The account this hangs off, shown as a row rather than left implicit
@@ -1011,11 +1014,12 @@ function NewCustomerFields({
 
   return (
     <div className="space-y-2.5">
-      {/* Names BOTH records it creates. "New customer" alone reads as if no
-          location is made, and the sibling panel is "New location for X" — the
-          contrast between them is what stops a CSR duplicating an account. */}
+      {/* The noun still carries the contrast with the sibling panel — customer
+          vs location is what tells a CSR whether they're about to create an
+          account or attach to one. That a location comes too is stated once, in
+          the footer readback next to the button that does it. */}
       <CreatePanelHead hint="just enough to start — enrich later">
-        New {getName('customer').toLowerCase()} + first {getName('service_location').toLowerCase()}
+        New {getName('customer').toLowerCase()}
       </CreatePanelHead>
 
       {/* Premise rides on the Name label row because it decides what "Name"
@@ -1487,6 +1491,12 @@ function IntakeRail({
     : mode === 'new-location'
       ? existingCustomerName
       : selectedLocation?.customerName;
+  // Only say who's billed when that's a DIFFERENT party from the site already
+  // named above. When a location is named for its customer the line just repeats
+  // the headline, and asking a CSR to notice that the two are the same is the
+  // kind of noise that makes them start checking every time. Same rule the
+  // collapsed picker row uses to decide whether the owner earns a slot.
+  const billedTo = customerName && customerName !== name ? customerName : null;
   const pinnedNote = locationDetail?.notes?.find((n) => n.pinned) ?? locationDetail?.notes?.[0];
   const facts = locationDetail?.arrivalFacts ?? [];
   const hasLocation = isNewCustomer ? !!newName : mode === 'new-location' ? !!existingCustomerName : !!selectedLocation;
@@ -1515,9 +1525,9 @@ function IntakeRail({
             )}
           </div>
           {line2 && <div className="mt-0.5 text-[11.5px] text-fg-muted">{line2}</div>}
-          {customerName && (
+          {billedTo && (
             <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[12px]">
-              <span className="font-semibold text-fg-strong">{customerName}</span>
+              <span className="font-semibold text-fg-strong">{billedTo}</span>
               <span className="text-fg-dim">billed</span>
             </div>
           )}
