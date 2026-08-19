@@ -13,6 +13,7 @@ import {
   tenantSettingsApi,
   type CreateWorkOrderRequest,
   type CreateWorkItemRequest,
+  type CreateCustomerRequest,
   type ServiceLocationSearchResult,
   type CustomerSearchResult,
   type ServiceLocationDetailDto,
@@ -165,6 +166,13 @@ export default function WorkOrderIntakePage() {
 
   // Both create paths need a region + the tenant's premise default.
   const creatingLocation = customerMode !== 'existing';
+  // The panel has been filled in and collapsed, but NOTHING is written yet.
+  // Intake has no server-side draft on purpose: everything lands in one
+  // transaction on job submit, so Cancel means cancel. Committing the customer
+  // early would leave a record behind on the mis-starts that live calls are
+  // full of — wrong number, "let me call you back", a hang-up mid-address —
+  // and the CSR wouldn't know it existed, so the next call makes a second one.
+  const [staged, setStaged] = useState(false);
 
   // New customer + location — lightweight ("just enough to start; enrich later").
   // Mirrors Add Customer's model so we don't over-ask: ONE name (a person OR a
@@ -238,7 +246,7 @@ export default function WorkOrderIntakePage() {
   });
   // Form initialization from async prefill data — the sanctioned use of
   // set-state-in-effect (see CLAUDE.md); it runs once and converges.
-   
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (!prefillLocation || prefillApplied || selectedLocation) return;
     // Map the detail DTO onto the picker's search-result shape and preselect it.
@@ -259,7 +267,7 @@ export default function WorkOrderIntakePage() {
       setDispatchRegionId(regions[0].id);
     }
   }, [creatingLocation, regions, dispatchRegionId]);
-   
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   // The resolved, real service location (existing mode only) — scopes equipment
   // and drives the rail's reference details.
@@ -312,94 +320,12 @@ export default function WorkOrderIntakePage() {
     newAddress.state.trim() !== '' &&
     newAddress.zipCode.trim() !== '' &&
     dispatchRegionId !== '';
-  // The work order needs a REAL location; the create panels produce one via
-  // "Create & use" rather than the submit button doing double duty.
-  const locationReady = !!selectedLocation;
+  const locationReady = customerMode === 'existing' ? !!selectedLocation : staged;
   const complaintDrafts = drafts.filter((d) => d.complaint.trim() !== '');
   const canSubmit = locationReady && !!workOrderTypeId && complaintDrafts.length > 0;
 
   // ── Create ──────────────────────────────────────────────────────────────
   const [creatingCustomer, setCreatingCustomer] = useState(false);
-
-  // "Create & use" — the record is created from the panel, not deferred to
-  // submit. The CSR gets confirmation while the caller is still on the line,
-  // and everything downstream that needs a REAL service location id (the
-  // summary rail's gate/access/notes, and the work-item equipment picker)
-  // starts working instead of sitting empty until save.
-  const adoptCreatedLocation = (loc: ServiceLocationSearchResult) => {
-    setSelectedLocation(loc);
-    setCustomerMode('existing');
-    setCreateForCustomer(null);
-    setNewLocationName('');
-    setNewAddress({ ...blankAddress });
-    setNewBillingAddress({ ...blankAddress });
-  };
-
-  const createCustomerAndUse = async () => {
-    setCreatingCustomer(true);
-    try {
-      const created = await customerApi.create(
-        buildCustomerCreateRequest(
-          { ...newCustomer, premise: effectivePremise },
-          {
-            serviceAddress: newAddress,
-            billingAddress: newCustomer.sameBilling ? undefined : newBillingAddress,
-            dispatchRegionId,
-            contactNameTouched,
-          }
-        )
-      );
-      const first = created.serviceLocations[0];
-      queryClient.invalidateQueries({ queryKey: ['customers'] });
-      queryClient.invalidateQueries({ queryKey: ['service-locations'] });
-      adoptCreatedLocation({
-        id: first.id,
-        customerId: created.id,
-        customerName: created.name,
-        locationName: first.locationName ?? null,
-        premiseType: effectivePremise,
-        address: newAddress,
-        status: 'ACTIVE',
-      });
-      showSuccess(t('common.form.successCreate', { entity: getName('customer') }));
-    } catch (err) {
-      showError(t('common.form.errorCreate', { entity: getName('customer') }), extractApiError(err) ?? undefined);
-    } finally {
-      setCreatingCustomer(false);
-    }
-  };
-
-  const createLocationAndUse = async () => {
-    if (!createForCustomer) return;
-    setCreatingCustomer(true);
-    try {
-      const loc = await customerApi.addServiceLocation(createForCustomer.id, {
-        dispatchRegionId,
-        locationName: newLocationName.trim(),
-        premiseType: effectivePremise,
-        address: newAddress,
-      });
-      queryClient.invalidateQueries({ queryKey: ['service-locations'] });
-      queryClient.invalidateQueries({ queryKey: ['customer-service-locations', createForCustomer.id] });
-      adoptCreatedLocation({
-        id: loc.id,
-        customerId: createForCustomer.id,
-        customerName: createForCustomer.name,
-        locationName: newLocationName.trim() || null,
-        premiseType: effectivePremise,
-        address: newAddress,
-        status: 'ACTIVE',
-      });
-      showSuccess(t('common.form.successCreate', { entity: getName('service_location') }));
-    } catch (err) {
-      showError(
-        t('common.form.errorCreate', { entity: getName('service_location') }),
-        extractApiError(err) ?? undefined
-      );
-    } finally {
-      setCreatingCustomer(false);
-    }
-  };
 
   const buildWorkItems = (): CreateWorkItemRequest[] =>
     complaintDrafts.map((d) => ({
@@ -447,14 +373,64 @@ export default function WorkOrderIntakePage() {
       workItems: buildWorkItems(),
     };
 
-    if (!selectedLocation) return;
-    // Nothing to create here any more: "Create & use" made the customer and/or
-    // location before the CSR got this far, so submit is only the work order.
-    createMutation.mutate({
-      ...base,
-      customerId: selectedLocation.customerId,
-      serviceLocationId: selectedLocation.id,
-    });
+    if (customerMode === 'existing' && selectedLocation) {
+      createMutation.mutate({
+        ...base,
+        customerId: selectedLocation.customerId,
+        serviceLocationId: selectedLocation.id,
+      });
+      return;
+    }
+
+    // New property on an existing account — create just the location under the
+    // customer we already have, then the work order. Critically NOT a customer
+    // create: reaching for that path here is what produces a duplicate account.
+    if (customerMode === 'new-location' && createForCustomer) {
+      setCreatingCustomer(true);
+      try {
+        const location = await customerApi.addServiceLocation(createForCustomer.id, {
+          dispatchRegionId,
+          locationName: newLocationName.trim(),
+          premiseType: effectivePremise,
+          address: newAddress,
+        });
+        queryClient.invalidateQueries({ queryKey: ['service-locations'] });
+        queryClient.invalidateQueries({ queryKey: ['customer-service-locations', createForCustomer.id] });
+        createMutation.mutate({ ...base, customerId: createForCustomer.id, serviceLocationId: location.id });
+      } catch (err) {
+        setCreatingCustomer(false);
+        showError(
+          t('common.form.errorCreate', { entity: getName('service_location') }),
+          extractApiError(err) ?? undefined
+        );
+      }
+      return;
+    }
+
+    // New customer & location — create the customer (with its first location)
+    // first, then the work order against the returned ids.
+    setCreatingCustomer(true);
+    try {
+      // Shared with Add Customer: when a separate party is billed, the bill-to
+      // name becomes the CUSTOMER and the typed name demotes to the location.
+      const customerRequest: CreateCustomerRequest = buildCustomerCreateRequest(
+        { ...newCustomer, premise: effectivePremise },
+        {
+          serviceAddress: newAddress,
+          billingAddress: newCustomer.sameBilling ? undefined : newBillingAddress,
+          dispatchRegionId,
+          contactNameTouched,
+        }
+      );
+      const createdCustomer = await customerApi.create(customerRequest);
+      const firstLocation = createdCustomer.serviceLocations[0];
+      queryClient.invalidateQueries({ queryKey: ['customers'] });
+      queryClient.invalidateQueries({ queryKey: ['service-locations'] });
+      createMutation.mutate({ ...base, customerId: createdCustomer.id, serviceLocationId: firstLocation.id });
+    } catch (err) {
+      setCreatingCustomer(false);
+      showError(t('common.form.errorCreate', { entity: getName('customer') }), extractApiError(err) ?? undefined);
+    }
   };
 
   return (
@@ -507,6 +483,7 @@ export default function WorkOrderIntakePage() {
                         size="xxs"
                         onClick={() => {
                           setCreateForCustomer(null);
+                          setStaged(false);
                           setCustomerMode('existing');
                         }}
                       >
@@ -538,6 +515,23 @@ export default function WorkOrderIntakePage() {
                       }
                       required
                     />
+                  ) : staged ? (
+                    <StagedLocationRow
+                      name={
+                        customerMode === 'new-location'
+                          ? newLocationName.trim()
+                          : newCustomer.name.trim()
+                      }
+                      address={newAddress}
+                      owner={customerMode === 'new-location' ? (createForCustomer?.name ?? null) : null}
+                      pillLabel={
+                        customerMode === 'new-location'
+                          ? `New ${getName('service_location').toLowerCase()}`
+                          : `New ${getName('customer').toLowerCase()}`
+                      }
+                      premise={effectivePremise}
+                      onChange={() => setStaged(false)}
+                    />
                   ) : customerMode === 'new-location' && createForCustomer ? (
                     <NewLocationFields
                       customer={createForCustomer}
@@ -546,8 +540,7 @@ export default function WorkOrderIntakePage() {
                         setCustomerMode('existing');
                       }}
                       ready={newLocationReady}
-                      busy={creatingCustomer}
-                      onCreate={createLocationAndUse}
+                      onCreate={() => setStaged(true)}
                       locationName={newLocationName}
                       setLocationName={setNewLocationName}
                       address={newAddress}
@@ -564,8 +557,7 @@ export default function WorkOrderIntakePage() {
                   ) : (
                     <NewCustomerFields
                       ready={newCustomerReady}
-                      busy={creatingCustomer}
-                      onCreate={createCustomerAndUse}
+                      onCreate={() => setStaged(true)}
                       model={{ ...newCustomer, premise: effectivePremise }}
                       setModel={patchNewCustomer}
                       contactNameTouched={contactNameTouched}
@@ -789,22 +781,79 @@ function AttachedAccount({
 // picker (scoped to a real service location) work at all.
 function CreatePanelFoot({
   readback,
+  label,
   disabled,
-  busy,
   onCreate,
 }: {
   readback: string;
+  label: string;
   disabled: boolean;
-  busy: boolean;
   onCreate: () => void;
 }) {
   return (
     <div className="mt-1 flex items-center justify-between gap-3 border-t border-border-soft pt-2.5">
-      <span className="text-[11.5px] text-fg-muted">{readback}</span>
-      <Button type="button" size="xs" disabled={disabled || busy} onClick={onCreate}>
-        {busy ? 'Creating…' : 'Create & use'}
+      {/* Says plainly that pressing this writes nothing — the values are held
+          in page state until the job is created, so a CSR who abandons a call
+          leaves no record behind. */}
+      <span className="text-[11.5px] text-fg-muted">
+        {readback}
+        <span className="text-fg-dim"> · saved when you create the job</span>
+      </span>
+      <Button type="button" size="xs" disabled={disabled} onClick={onCreate}>
+        <CheckIcon className="size-3" />
+        {label}
       </Button>
     </div>
+  );
+}
+
+// A staged location — filled in, collapsed, NOT yet written. Mirrors the shape
+// of the picker's collapsed row so the section reads the same whether the
+// location was picked or typed, with a pill making the pending state explicit.
+function StagedLocationRow({
+  name,
+  address,
+  owner,
+  pillLabel,
+  premise,
+  onChange,
+}: {
+  name: string;
+  address: { streetAddress: string; city: string; state: string; zipCode: string };
+  owner: string | null;
+  pillLabel: string;
+  premise: PremiseType;
+  onChange: () => void;
+}) {
+  const { t } = useTranslation();
+  const line = [
+    titleCaseAddress(address.streetAddress),
+    `${titleCaseAddress(address.city)}, ${address.state} ${address.zipCode}`.trim(),
+    owner,
+  ]
+    .filter(Boolean)
+    .join(' · ');
+
+  return (
+    <button
+      type="button"
+      onClick={onChange}
+      className="flex w-full items-center gap-3 rounded-md border border-border bg-bg px-3 py-2 text-left transition-colors hover:border-border-strong hover:bg-bg-hover focus:outline-none focus-visible:border-accent-500"
+    >
+      <span className="grid size-[34px] shrink-0 place-items-center rounded-lg bg-bg-active text-fg-muted">
+        {premise === 'RESIDENCE' ? <HomeIcon className="size-[17px]" /> : <BuildingOffice2Icon className="size-[17px]" />}
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="flex items-center gap-1.5">
+          <span className="truncate text-[13.5px] font-bold text-fg-strong">{name}</span>
+          <Pill tone="success" dot>
+            {pillLabel}
+          </Pill>
+        </span>
+        <span className="mt-0.5 block truncate text-[11.5px] text-fg-muted">{line}</span>
+      </span>
+      <span className="card-action shrink-0">{t('common.edit')}</span>
+    </button>
   );
 }
 
@@ -827,7 +876,6 @@ function NewLocationFields({
   customer,
   onChangeAccount,
   ready,
-  busy,
   onCreate,
   locationName,
   setLocationName,
@@ -842,7 +890,6 @@ function NewLocationFields({
   customer: CustomerSearchResult;
   onChangeAccount: () => void;
   ready: boolean;
-  busy: boolean;
   onCreate: () => void;
   locationName: string;
   setLocationName: (v: string) => void;
@@ -959,8 +1006,8 @@ function NewLocationFields({
       </div>
       <CreatePanelFoot
         readback={`Adds this ${getName('service_location').toLowerCase()} to ${customerName}`}
+        label={`Use this ${getName('service_location').toLowerCase()}`}
         disabled={!ready}
-        busy={busy}
         onCreate={onCreate}
       />
     </div>
@@ -969,7 +1016,6 @@ function NewLocationFields({
 
 function NewCustomerFields({
   ready,
-  busy,
   onCreate,
   model,
   setModel,
@@ -986,7 +1032,6 @@ function NewCustomerFields({
   regions,
 }: {
   ready: boolean;
-  busy: boolean;
   onCreate: () => void;
   model: CustomerCreateModel;
   setModel: (patch: Partial<CustomerCreateModel>) => void;
@@ -1278,8 +1323,8 @@ function NewCustomerFields({
       )}
       <CreatePanelFoot
         readback={`Adds this ${getName('customer').toLowerCase()} and their first ${getName('service_location').toLowerCase()}`}
+        label={`Use this ${getName('customer').toLowerCase()}`}
         disabled={!ready}
-        busy={busy}
         onCreate={onCreate}
       />
     </div>
