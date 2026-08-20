@@ -1059,12 +1059,16 @@ function NewCustomerFields({
 
   return (
     <div className="space-y-2.5">
-      {/* The noun still carries the contrast with the sibling panel — customer
-          vs location is what tells a CSR whether they're about to create an
-          account or attach to one. That a location comes too is stated once, in
-          the footer readback next to the button that does it. */}
+      {/* Named for what the panel ASKS for, not everything it creates. The
+          first field below is the site's name (it becomes locationName; the
+          customer name derives from it), so a "new customer" heading points a
+          CSR at the wrong thing. That a customer is created too is stated in
+          the footer read-back and in the rail's on-create list.
+
+          The sibling panel is distinguished by its account card, not by a noun
+          here — that card is a far louder signal than a heading word. */}
       <CreatePanelHead hint="just enough to start — enrich later">
-        New {getName('customer').toLowerCase()}
+        New {getName('service_location').toLowerCase()}
       </CreatePanelHead>
 
       {/* Premise rides on the Name label row because it decides what "Name"
