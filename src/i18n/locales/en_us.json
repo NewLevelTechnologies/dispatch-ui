@@ -104,7 +104,7 @@
       "invalidEmail": "Invalid email address",
       "firstName": "First Name",
       "lastName": "Last Name",
-      "locationName": "Location Name",
+      "locationName": "{{entity}} Name",
       "mobilePhone": "Mobile",
       "name": "Name",
       "notes": "Notes",

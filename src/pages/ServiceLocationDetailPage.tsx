@@ -640,7 +640,7 @@ function LocationHeaderEdit({
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_auto]">
         <Field>
           <Label className="text-xs">
-            {t('common.form.locationName')} <span className="font-normal text-fg-dim">· optional for residences</span>
+            {t('common.form.locationName', { entity: getName('service_location') })} <span className="font-normal text-fg-dim">· optional for residences</span>
           </Label>
           <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g., Headquarters, Retail #047" />
         </Field>

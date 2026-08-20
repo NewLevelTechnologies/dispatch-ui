@@ -230,7 +230,7 @@ export default function ServiceLocationFormDialog({ isOpen, onClose, serviceLoca
         <form onSubmit={handleSubmit} id="service-location-form" className="space-y-3">
           {/* Location Name */}
           <Field>
-            <Label className="text-xs">{t('common.form.locationName')} *</Label>
+            <Label className="text-xs">{t('common.form.locationName', { entity: getName('service_location') })} *</Label>
             <Input
               name="locationName"
               value={formData.locationName}

@@ -938,7 +938,7 @@ function NewLocationFields({
       <Field size="xs">
         <div className="mb-1 flex items-center justify-between gap-3">
           <Label size="xs" required>
-            {t('common.form.locationName')}
+            {t('common.form.locationName', { entity: getName('service_location') })}
           </Label>
           <ToggleGroup value={premise} onChange={onPremiseChange} size="sm" aria-label="Premise">
             <ToggleGroupOption value="RESIDENCE" tone="success">
@@ -1047,6 +1047,7 @@ function NewCustomerFields({
   setDispatchRegionId: (v: string) => void;
   regions: { id: string; name: string }[];
 }) {
+  const { t } = useTranslation();
   const { getName } = useGlossary();
   const hasRegions = regions.length > 0;
   const set = (patch: Partial<typeof address>) => setAddress({ ...address, ...patch });
@@ -1077,7 +1078,7 @@ function NewCustomerFields({
       <Field size="xs">
         <div className="mb-1 flex items-center justify-between gap-3">
           <Label size="xs" required hint={guidance.hint ?? undefined}>
-            Name
+            {t('common.form.locationName', { entity: getName('service_location') })}
           </Label>
           <ToggleGroup value={model.premise} onChange={onPremiseChange} size="sm" aria-label="Premise">
             <ToggleGroupOption value="RESIDENCE" tone="success">

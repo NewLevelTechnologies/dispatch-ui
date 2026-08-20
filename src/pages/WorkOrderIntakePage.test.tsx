@@ -206,7 +206,7 @@ describe('WorkOrderIntakePage', () => {
     await screen.findByRole('option', { name: 'Service Call' });
 
     await user.click(screen.getByRole('button', { name: /new customer/i }));
-    await user.type(screen.getByLabelText(/^name/i), 'Jordan Avila');
+    await user.type(screen.getByLabelText(/location name/i), 'Jordan Avila');
     await user.type(screen.getByLabelText(/^email/i), 'jordan@example.com');
     await user.type(screen.getByLabelText(/street address/i), '123 Main St');
     await user.type(screen.getByLabelText(/^city/i), 'Phoenix');
@@ -240,7 +240,7 @@ describe('WorkOrderIntakePage', () => {
     await screen.findByRole('option', { name: 'Service Call' });
 
     await user.click(screen.getByRole('button', { name: /new customer/i }));
-    await user.type(screen.getByLabelText(/^name/i), 'Red Lobster #123');
+    await user.type(screen.getByLabelText(/location name/i), 'Red Lobster #123');
     await user.type(screen.getByLabelText(/^phone/i), '6025550100');
     await user.type(screen.getByLabelText(/street address/i), '2290 W Chandler Blvd');
     await user.type(screen.getByLabelText(/^city/i), 'Chandler');
@@ -367,7 +367,7 @@ describe('WorkOrderIntakePage', () => {
     // Reality 3 is reached from the picker's footer, not a mode toggle.
     await user.click(screen.getByRole('button', { name: /new customer/i }));
     // ONE name — no separate "location name" over-ask.
-    await user.type(screen.getByLabelText(/^name/i), 'Jordan Avila');
+    await user.type(screen.getByLabelText(/location name/i), 'Jordan Avila');
     await user.type(screen.getByLabelText(/^phone/i), '6025550100');
     await user.type(screen.getByLabelText(/^email/i), 'jordan@example.com');
     await user.type(screen.getByLabelText(/street address/i), '123 Main St');
