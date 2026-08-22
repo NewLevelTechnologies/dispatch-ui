@@ -632,7 +632,7 @@ When migrating an existing page to use glossary:
 
 **Core files:**
 - `src/contexts/GlossaryContext.tsx` - Glossary provider and getName() function
-- `src/i18n/locales/en_us.json` - Common parameterized translation keys
+- `packages/i18n/src/locales/en_us.json` - Common parameterized translation keys (shared package)
 - `src/test/setup.ts` - Test mocks for translations and glossary
 
 ---

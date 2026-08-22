@@ -39,7 +39,6 @@ export default defineConfig({
         'src/App.tsx',
         'src/components/AppLayout.tsx',
         'src/contexts/**',
-        'src/i18n/**',
         // Exclude config files
         'src/config/**',
         // Exclude types

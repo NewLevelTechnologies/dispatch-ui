@@ -613,7 +613,11 @@ The application uses **react-i18next** for internationalization with a centraliz
 
 ### Translation File Structure
 
-**Location**: `src/i18n/locales/en_us.json`
+**Location**: `packages/i18n/src/locales/en_us.json` (shared with the mobile app)
+
+The web app no longer keeps its own copy. `main.tsx` does `import '@dispatch/i18n'`,
+which initializes i18next from the shared package, and components import
+`useTranslation` from `@dispatch/i18n` rather than `react-i18next` directly.
 
 **Organization**:
 ```json
@@ -1169,7 +1173,7 @@ This frontend uses a **modern, simple architecture**:
 5. Use the API service with React Query
 6. Use Catalyst UI components
 7. Use parameterized `common.*` i18n keys with `getName()` for entity references
-8. Add i18n translations to `src/i18n/locales/en_us.json` (only if new keys needed)
+8. Add i18n translations to `packages/i18n/src/locales/en_us.json` (only if new keys needed)
 9. Handle loading, error, and empty states with glossary
 10. Add proper TypeScript types throughout
 11. Write tests with flexible matchers (not exact entity names)
