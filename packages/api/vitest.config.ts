@@ -1,4 +1,5 @@
 import { defineConfig } from 'vitest/config';
+import { COVERAGE_THRESHOLDS } from '../../coverage-thresholds.mjs';
 
 export default defineConfig({
   test: {
@@ -17,9 +18,7 @@ export default defineConfig({
         // re-exports would otherwise dominate the denominator.
         'src/index.ts',
       ],
-      // TODO: enable `thresholds: COVERAGE_THRESHOLDS` once this package
-      // clears the standard. Tracked at 35.5% statements today; tests are
-      // landing module by module, biggest gap first.
+      thresholds: COVERAGE_THRESHOLDS,
     },
   },
 });
