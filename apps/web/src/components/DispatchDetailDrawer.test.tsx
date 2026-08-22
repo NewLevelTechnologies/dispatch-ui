@@ -1,0 +1,502 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { screen, waitFor } from '@testing-library/react';
+import { renderWithProviders, userEvent } from '../test/utils';
+import DispatchDetailDrawer from './DispatchDetailDrawer';
+import type { Dispatch, DispatchStatus, User, WorkItemResponse, WorkOrderFile } from '../api/setup';
+import type { NotificationLogDto } from '../api/setup';
+
+const mockUserGetAll = vi.fn();
+const mockGetNotificationLogs = vi.fn();
+const mockFilesList = vi.fn();
+const mockDispatchUpdate = vi.fn();
+const mockNotify = vi.fn();
+const mockGetById = vi.fn();
+const mockNotesList = vi.fn();
+const mockNotesCreate = vi.fn();
+
+vi.mock('@dispatch/api/src/userApi', () => ({
+  userApi: { getAll: (...args: unknown[]) => mockUserGetAll(...args) },
+  default: { getAll: (...args: unknown[]) => mockUserGetAll(...args) },
+}));
+
+vi.mock('@dispatch/api/src/notificationApi', async () => {
+  const actual = await vi.importActual<typeof import('../api/setup')>('@dispatch/api/src/notificationApi');
+  return {
+    ...actual,
+    notificationApi: { getNotificationLogs: (...args: unknown[]) => mockGetNotificationLogs(...args) },
+  };
+});
+
+vi.mock('@dispatch/api/src/filesApi', async () => {
+  const actual = await vi.importActual<typeof import('../api/setup')>('@dispatch/api/src/filesApi');
+  return {
+    ...actual,
+    workOrderFilesApi: { ...actual.workOrderFilesApi, list: (...args: unknown[]) => mockFilesList(...args) },
+  };
+});
+
+vi.mock('@dispatch/api/src/schedulingApi', async () => {
+  const actual = await vi.importActual<typeof import('../api/setup')>('@dispatch/api/src/schedulingApi');
+  return {
+    ...actual,
+    dispatchesApi: {
+      ...actual.dispatchesApi,
+      update: (...args: unknown[]) => mockDispatchUpdate(...args),
+      notify: (...args: unknown[]) => mockNotify(...args),
+      getById: (...args: unknown[]) => mockGetById(...args),
+    },
+    dispatchNotesApi: {
+      ...actual.dispatchNotesApi,
+      list: (...args: unknown[]) => mockNotesList(...args),
+      create: (...args: unknown[]) => mockNotesCreate(...args),
+    },
+  };
+});
+
+const mockUser = (id: string, first: string, last: string): User => ({
+  id,
+  tenantId: 't1',
+  cognitoSub: `sub-${id}`,
+  email: `${first.toLowerCase()}@example.com`,
+  firstName: first,
+  lastName: last,
+  phoneNumber: '555-1234',
+  enabled: true,
+  createdAt: '2026-01-01T00:00:00Z',
+  updatedAt: '2026-01-01T00:00:00Z',
+});
+
+const mockDispatch = (overrides: Partial<Dispatch> = {}): Dispatch => ({
+  id: 'd1',
+  workOrderId: 'wo-1',
+  assignedUserId: 'u1',
+  arrivalWindowStart: '2099-05-15T14:00:00Z',
+  arrivalWindowEnd: '2099-05-15T16:00:00Z',
+  estimatedDuration: 90,
+  status: 'SCHEDULED' as DispatchStatus,
+  arrivedAt: null,
+  departedAt: null,
+  notes: null,
+  createdAt: '2026-05-09T00:00:00Z',
+  updatedAt: '2026-05-09T00:00:00Z',
+  ...overrides,
+});
+
+const emptyLogsPage = {
+  content: [] as NotificationLogDto[],
+  totalElements: 0,
+  totalPages: 0,
+  last: true,
+  size: 25,
+  number: 0,
+  numberOfElements: 0,
+  first: true,
+  empty: true,
+};
+
+const filesPage = (content: WorkOrderFile[] = []) => ({
+  content,
+  counts: { all: content.length, photos: 0, videos: 0, documents: 0 },
+  totalElements: content.length,
+  totalPages: content.length ? 1 : 0,
+  number: 0,
+  size: 100,
+  first: true,
+  last: true,
+});
+
+const photoFile = (over: Partial<WorkOrderFile> = {}): WorkOrderFile =>
+  ({
+    id: 'm1',
+    kind: 'PHOTO',
+    status: 'READY',
+    fileName: 'before.jpg',
+    url: 'https://s3/1',
+    thumbnailUrl: 'https://s3/1t',
+    durationSeconds: null,
+    contentType: 'image/jpeg',
+    sizeBytes: 1,
+    widthPx: null,
+    heightPx: null,
+    thumbnailWidthPx: null,
+    thumbnailHeightPx: null,
+    caption: null,
+    workOrderId: 'wo-1',
+    workOrderNumber: null,
+    workItemId: null,
+    dispatchId: 'd1',
+    equipmentId: null,
+    equipmentName: null,
+    agreementId: null,
+    isProfile: false,
+    uploadedBy: null,
+    uploadedByName: null,
+    createdAt: '2099-05-15T15:00:00Z',
+    ...over,
+  }) as WorkOrderFile;
+
+const renderDrawer = (dispatch: Dispatch | null, props: Partial<React.ComponentProps<typeof DispatchDetailDrawer>> = {}) => {
+  // The by-id read backs lifecycle/label — echo the dispatch under test.
+  if (dispatch) mockGetById.mockResolvedValue(dispatch);
+  return renderWithProviders(
+    <DispatchDetailDrawer
+      dispatch={dispatch}
+      dispatches={props.dispatches ?? (dispatch ? [dispatch] : [])}
+      workItems={props.workItems}
+      readOnly={props.readOnly}
+      onClose={props.onClose ?? vi.fn()}
+      onEdit={props.onEdit ?? vi.fn()}
+      onDelete={props.onDelete ?? vi.fn()}
+      onViewWorkItems={props.onViewWorkItems}
+    />,
+  );
+};
+
+describe('DispatchDetailDrawer', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockUserGetAll.mockResolvedValue([mockUser('u1', 'Jason', 'Smith')]);
+    mockGetNotificationLogs.mockResolvedValue(emptyLogsPage);
+    mockFilesList.mockResolvedValue(filesPage([]));
+    mockDispatchUpdate.mockResolvedValue(mockDispatch({ status: 'IN_PROGRESS' }));
+    mockNotify.mockResolvedValue(undefined);
+    mockGetById.mockResolvedValue(mockDispatch());
+    mockNotesList.mockResolvedValue([]);
+  });
+
+  it('renders nothing when dispatch is null', () => {
+    renderDrawer(null);
+    expect(screen.queryByText('Jason Smith')).not.toBeInTheDocument();
+    expect(screen.queryByText(/dispatch timeline/i)).not.toBeInTheDocument();
+  });
+
+  it('renders the sequence header, status, and tech with Call/Text', async () => {
+    renderDrawer(mockDispatch());
+    // seq derives from the dispatches prop (this is the only visit → Dispatch 1).
+    expect(await screen.findByText('Dispatch 1')).toBeInTheDocument();
+    expect(await screen.findByText('Jason Smith')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /call/i })).toHaveAttribute('href', 'tel:5551234');
+    expect(screen.getByRole('link', { name: /text/i })).toHaveAttribute('href', 'sms:5551234');
+  });
+
+  it('renders the visit timeline with reached and hollow steps', async () => {
+    // read-only: no inline actions, so pending steps render as hollow "—".
+    renderDrawer(mockDispatch(), { readOnly: true });
+    expect(await screen.findByText('Dispatch timeline')).toBeInTheDocument();
+    expect(screen.getByText('Tech notified')).toBeInTheDocument();
+    expect(screen.getByText('Customer notified')).toBeInTheDocument();
+    expect(screen.getByText('En route')).toBeInTheDocument();
+    expect(screen.getByText('Arrived on site')).toBeInTheDocument();
+    // Everything past Scheduled is hollow for a fresh (read-only) SCHEDULED visit.
+    expect(screen.getAllByText('—').length).toBeGreaterThanOrEqual(3);
+  });
+
+  it('releases an on-deck dispatch from a pending timeline step', async () => {
+    const user = userEvent.setup();
+    renderDrawer(mockDispatch()); // SCHEDULED + empty log → Tech/Customer steps pending
+    // Notify steps are labelled by audience: "Notify tech →" / "Notify customer →".
+    const notifyButtons = await screen.findAllByRole('button', { name: /notify (tech|customer)/i });
+    expect(notifyButtons).toHaveLength(2);
+    // Second notify-able step is Customer notified → CUSTOMER audience (not TECH).
+    await user.click(notifyButtons[1]);
+    await waitFor(() => expect(mockNotify).toHaveBeenCalledWith('d1', 'CUSTOMER'));
+    // Optimistic: /notify is async, but the customer step fills right away (only
+    // the tech step still offers a notify action) — no hard refresh needed.
+    await waitFor(() =>
+      expect(screen.getAllByRole('button', { name: /notify (tech|customer)/i })).toHaveLength(1),
+    );
+  });
+
+  it('hides the notify actions once the dispatch is no longer on deck', async () => {
+    renderDrawer(mockDispatch({ status: 'COMPLETED' }));
+    await screen.findByText('Dispatch timeline');
+    expect(screen.queryByRole('button', { name: /notify (tech|customer)/i })).not.toBeInTheDocument();
+  });
+
+  it('derives "captured this visit" media from files keyed by dispatchId', async () => {
+    mockFilesList.mockResolvedValue(filesPage([photoFile()]));
+    renderDrawer(mockDispatch());
+    expect(await screen.findByText('Captured this dispatch')).toBeInTheDocument();
+    expect(await screen.findByAltText('before.jpg')).toBeInTheDocument();
+  });
+
+  it('labels captured media with its Before/After tag', async () => {
+    mockFilesList.mockResolvedValue(filesPage([photoFile({ captureTag: 'BEFORE' })]));
+    renderDrawer(mockDispatch());
+    expect(await screen.findByText('Before')).toBeInTheDocument();
+  });
+
+  it('opens the fullscreen viewer when a captured thumbnail is clicked', async () => {
+    const user = userEvent.setup();
+    mockFilesList.mockResolvedValue(filesPage([photoFile()]));
+    renderDrawer(mockDispatch());
+    await user.click((await screen.findByAltText('before.jpg')).closest('button')!);
+    // The viewer renders a second, larger copy of the image.
+    expect(await screen.findAllByAltText('before.jpg')).toHaveLength(2);
+  });
+
+  it('opens the pre-tagged upload dialog from the Captured section', async () => {
+    const user = userEvent.setup();
+    renderDrawer(mockDispatch());
+    await user.click(await screen.findByRole('button', { name: /upload media/i }));
+    expect(await screen.findByText('Upload files')).toBeInTheDocument();
+  });
+
+  it('hides the Captured upload affordance when read-only', async () => {
+    renderDrawer(mockDispatch(), { readOnly: true });
+    await screen.findByText(/no notifications sent yet/i);
+    expect(screen.queryByRole('button', { name: /upload media/i })).not.toBeInTheDocument();
+  });
+
+  it('renders the notifications empty state and scopes the query to the dispatch', async () => {
+    renderDrawer(mockDispatch());
+    await waitFor(() => expect(screen.getByText(/no notifications sent yet/i)).toBeInTheDocument());
+    expect(mockGetNotificationLogs).toHaveBeenCalledWith(
+      expect.objectContaining({ entityType: 'DISPATCH', entityId: 'd1' }),
+    );
+  });
+
+  it('renders notification log rows when present', async () => {
+    mockGetNotificationLogs.mockResolvedValue({
+      ...emptyLogsPage,
+      empty: false,
+      numberOfElements: 1,
+      totalElements: 1,
+      content: [
+        {
+          id: 'n1',
+          notificationId: 'nid1',
+          notificationTypeId: 'nt1',
+          notificationTypeName: 'Dispatch Assigned',
+          channel: 'SMS',
+          recipientName: 'Jason Smith',
+          recipientPhone: '555-1234',
+          status: 'DELIVERED',
+          entityType: 'DISPATCH',
+          entityId: 'd1',
+          body: 'Daniel is on the way — ETA ~12:38p.',
+          audience: 'CUSTOMER',
+          createdAt: '2099-05-15T13:55:00Z',
+          sentAt: '2099-05-15T13:55:01Z',
+          retryCount: 0,
+        } satisfies NotificationLogDto,
+      ],
+    });
+    const user = userEvent.setup();
+    renderDrawer(mockDispatch());
+    // Status enum renders title-cased (DELIVERED → Delivered).
+    expect(await screen.findByText('Delivered')).toBeInTheDocument();
+    // The audience chip reflects who was notified — shown on the collapsed row.
+    expect(screen.getByText('Customer')).toBeInTheDocument();
+    // The body is a delivery log entry: collapsed by default, revealed on tap.
+    expect(screen.queryByText('Daniel is on the way — ETA ~12:38p.')).not.toBeInTheDocument();
+    await user.click(screen.getByText('Customer').closest('button')!);
+    expect(await screen.findByText('Daniel is on the way — ETA ~12:38p.')).toBeInTheDocument();
+  });
+
+  it('renders the visit-notes log and adds an office note', async () => {
+    const user = userEvent.setup();
+    mockNotesList.mockResolvedValue([
+      {
+        id: 'note-1',
+        body: 'Return to install contactor.',
+        authorUserId: 'u9',
+        authorName: 'Daniel Park',
+        pinned: false,
+        createdAt: '2099-05-15T14:00:00Z',
+        updatedAt: '2099-05-15T14:00:00Z',
+      },
+    ]);
+    mockNotesCreate.mockResolvedValue({
+      id: 'note-2',
+      body: 'Office follow-up.',
+      authorUserId: null,
+      authorName: 'Maria C.',
+      pinned: false,
+      createdAt: '2099-05-15T15:00:00Z',
+      updatedAt: '2099-05-15T15:00:00Z',
+    });
+    renderDrawer(mockDispatch());
+
+    expect(await screen.findByText('Return to install contactor.')).toBeInTheDocument();
+    // The add box is collapsed — expand the compact "+ Add note" first.
+    await user.click(screen.getByRole('button', { name: /add note/i }));
+    await user.type(screen.getByLabelText(/add a note/i), 'Office follow-up.');
+    await user.click(screen.getByRole('button', { name: /add note/i }));
+    await waitFor(() => expect(mockNotesCreate).toHaveBeenCalledWith('d1', { body: 'Office follow-up.' }));
+  });
+
+  it('shows the empty state and hides the add box when read-only', async () => {
+    renderDrawer(mockDispatch(), { readOnly: true });
+    expect(await screen.findByText(/no notes recorded on this visit yet/i)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /add note/i })).not.toBeInTheDocument();
+  });
+
+  it('SCHEDULED footer: Edit opens the form; Complete is the always-on escape hatch', async () => {
+    const onEdit = vi.fn();
+    const onClose = vi.fn();
+    const user = userEvent.setup();
+    renderDrawer(mockDispatch(), { onEdit, onClose });
+
+    await user.click(await screen.findByRole('button', { name: /edit dispatch/i }));
+    expect(onEdit).toHaveBeenCalledWith(expect.objectContaining({ id: 'd1' }));
+
+    // Complete short-circuits to COMPLETED from any non-terminal state + closes.
+    await user.click(screen.getByRole('button', { name: /^complete dispatch$/i }));
+    await waitFor(() => expect(mockDispatchUpdate).toHaveBeenCalledWith('d1', { status: 'COMPLETED' }));
+    await waitFor(() => expect(onClose).toHaveBeenCalled());
+  });
+
+  it('SCHEDULED timeline: Mark en route (primary) advances to EN_ROUTE, keeping the drawer open', async () => {
+    const onClose = vi.fn();
+    const user = userEvent.setup();
+    renderDrawer(mockDispatch(), { onClose });
+    // Both the next step (Mark en route) and the skip-ahead (Mark arrived) are offered.
+    expect(await screen.findByRole('button', { name: /mark arrived\s*→/i })).toBeInTheDocument();
+    await user.click(await screen.findByRole('button', { name: /mark en route\s*→/i }));
+    await waitFor(() => expect(mockDispatchUpdate).toHaveBeenCalledWith('d1', { status: 'EN_ROUTE' }));
+    // A timeline advance is not terminal — the drawer stays open.
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it('EN_ROUTE timeline: Mark arrived advances to IN_PROGRESS', async () => {
+    const user = userEvent.setup();
+    renderDrawer(mockDispatch({ status: 'EN_ROUTE' }));
+    await user.click(await screen.findByRole('button', { name: /mark arrived\s*→/i }));
+    await waitFor(() => expect(mockDispatchUpdate).toHaveBeenCalledWith('d1', { status: 'IN_PROGRESS' }));
+  });
+
+  it('IN_PROGRESS footer: Complete transitions to COMPLETED; timeline has no step buttons', async () => {
+    const user = userEvent.setup();
+    renderDrawer(mockDispatch({ status: 'IN_PROGRESS' }));
+    await user.click(await screen.findByRole('button', { name: /^complete dispatch$/i }));
+    await waitFor(() => expect(mockDispatchUpdate).toHaveBeenCalledWith('d1', { status: 'COMPLETED' }));
+    expect(screen.queryByRole('button', { name: /mark arrived/i })).not.toBeInTheDocument();
+  });
+
+  it('renders a bypassed step as "not recorded" (honest skip), never blank', async () => {
+    // Jumped straight to on-site: arrived stamped, en route never recorded.
+    renderDrawer(
+      mockDispatch({
+        status: 'IN_PROGRESS',
+        arrivedAt: '2099-05-15T14:31:00Z',
+        lifecycle: {
+          scheduled: '2099-05-14T15:48:00Z',
+          notified: null,
+          enroute: null,
+          arrived: '2099-05-15T14:31:00Z',
+          departed: null,
+        },
+      }),
+    );
+    await screen.findByText('Dispatch timeline');
+    // A step bypassed by a later one shows the honest label, not an empty cell.
+    expect(screen.getAllByText('Not recorded').length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('renders the timeline: operational from lifecycle, notified steps from the log', async () => {
+    const notif = (over: Partial<NotificationLogDto>): NotificationLogDto => ({
+      id: 'n',
+      notificationId: 'x',
+      notificationTypeId: 'x',
+      notificationTypeName: 'T',
+      channel: 'SMS',
+      recipientName: 'R',
+      status: 'SENT',
+      entityType: 'DISPATCH',
+      entityId: 'd1',
+      createdAt: '2099-05-14T16:00:00Z',
+      retryCount: 0,
+      ...over,
+    });
+    mockGetNotificationLogs.mockResolvedValue({
+      ...emptyLogsPage,
+      empty: false,
+      numberOfElements: 2,
+      totalElements: 2,
+      content: [
+        notif({ id: 'nt', audience: 'TECH', status: 'SENT', sentAt: '2099-05-14T15:55:00Z' }),
+        notif({ id: 'nc', audience: 'CUSTOMER', status: 'DELIVERED', sentAt: '2099-05-14T16:02:00Z' }),
+      ],
+    });
+    renderDrawer(
+      mockDispatch({
+        status: 'IN_PROGRESS',
+        arrivedAt: '2099-05-15T14:31:00Z',
+        lifecycle: {
+          scheduled: '2099-05-14T15:48:00Z',
+          notified: null,
+          enroute: '2099-05-15T14:12:00Z',
+          arrived: '2099-05-15T14:31:00Z',
+          departed: null,
+        },
+      }),
+      // read-only: no inline transition affordance, so the pending Departed step
+      // shows "—" (this test is about timeline data derivation, not actions).
+      { readOnly: true },
+    );
+    // Scheduled/enroute/arrived from lifecycle + Tech/Customer notified from the
+    // log → only Departed remains unreached.
+    expect(await screen.findByText('En route')).toBeInTheDocument();
+    await waitFor(() => expect(screen.getAllByText('—')).toHaveLength(1));
+  });
+
+  it('COMPLETED footer: shows completed time + Delete, no transitions', async () => {
+    const onDelete = vi.fn();
+    const user = userEvent.setup();
+    renderDrawer(
+      mockDispatch({ status: 'COMPLETED', arrivedAt: '2099-05-15T14:05:00Z', departedAt: '2099-05-15T15:30:00Z' }),
+      { onDelete },
+    );
+    await user.click(await screen.findByRole('button', { name: /^delete$/i }));
+    expect(onDelete).toHaveBeenCalledWith(expect.objectContaining({ id: 'd1' }));
+    expect(screen.queryByRole('button', { name: /mark on site/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /complete dispatch/i })).not.toBeInTheDocument();
+  });
+
+  it('hides all footer actions in read-only mode', async () => {
+    renderDrawer(mockDispatch(), { readOnly: true });
+    await screen.findByText('Jason Smith');
+    expect(screen.queryByRole('button', { name: /edit dispatch/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /mark en route/i })).not.toBeInTheDocument();
+  });
+
+  it('lists the work items this visit addresses and links out', async () => {
+    const onViewWorkItems = vi.fn();
+    const user = userEvent.setup();
+    const workItems = [
+      {
+        id: 'wi-1',
+        sequence: 1,
+        statusId: null,
+        statusCategory: 'IN_PROGRESS',
+        description: 'No cooling — upstairs condenser',
+        equipmentId: null,
+        equipment: null,
+        createdAt: '2099-05-01T00:00:00Z',
+        updatedAt: '2099-05-01T00:00:00Z',
+      },
+    ] as unknown as WorkItemResponse[];
+    renderDrawer(mockDispatch({ addressedWorkItemIds: ['wi-1'] }), { workItems, onViewWorkItems });
+
+    expect(await screen.findByText('Work addressed')).toBeInTheDocument();
+    // Sub-line carries the per-WO work-item identifier (sequence 1 → WI-01).
+    expect(await screen.findByText('WI-01')).toBeInTheDocument();
+    await user.click(await screen.findByText('No cooling — upstairs condenser'));
+    expect(onViewWorkItems).toHaveBeenCalled();
+  });
+
+  it('hides Work addressed when the visit is unscoped (no addressed items)', async () => {
+    renderDrawer(mockDispatch());
+    await screen.findByText('Jason Smith');
+    expect(screen.queryByText('Work addressed')).not.toBeInTheDocument();
+  });
+
+  it('invokes onClose when the X button is clicked', async () => {
+    const onClose = vi.fn();
+    const user = userEvent.setup();
+    renderDrawer(mockDispatch(), { onClose });
+    await user.click(await screen.findByRole('button', { name: /close/i }));
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+});

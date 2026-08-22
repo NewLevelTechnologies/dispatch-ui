@@ -1,0 +1,560 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { screen, waitFor, fireEvent } from '@testing-library/react';
+import type { RouteObject } from 'react-router-dom';
+import { renderWithProviders, userEvent } from '../test/utils';
+import EquipmentFormPage from './EquipmentFormPage';
+
+const mockList = vi.fn();
+const mockGetById = vi.fn();
+const mockCreate = vi.fn();
+const mockUpdate = vi.fn();
+const mockTypesGetAll = vi.fn();
+const mockCategoriesGetAll = vi.fn();
+const mockFieldsGetAll = vi.fn();
+const mockGetServiceLocationById = vi.fn();
+const mockExtract = vi.fn();
+const mockImageUpload = vi.fn();
+const mockImagePatch = vi.fn();
+const mockGetSettings = vi.fn();
+
+vi.mock('@dispatch/api/src/equipmentApi', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../api/setup')>();
+  return {
+    ...actual,
+    equipmentApi: {
+      list: (...args: unknown[]) => mockList(...args),
+      getById: (...args: unknown[]) => mockGetById(...args),
+      create: (...args: unknown[]) => mockCreate(...args),
+      update: (...args: unknown[]) => mockUpdate(...args),
+      extractNameplate: (...args: unknown[]) => mockExtract(...args),
+    },
+    equipmentImagesApi: {
+      ...actual.equipmentImagesApi,
+      upload: (...args: unknown[]) => mockImageUpload(...args),
+      patch: (...args: unknown[]) => mockImagePatch(...args),
+    },
+    equipmentTypesApi: { getAll: (...args: unknown[]) => mockTypesGetAll(...args) },
+    equipmentCategoriesApi: { getAll: (...args: unknown[]) => mockCategoriesGetAll(...args) },
+    equipmentCategoryFieldsApi: { getAll: (...args: unknown[]) => mockFieldsGetAll(...args) },
+  };
+});
+
+vi.mock('@dispatch/api/src/tenantSettingsApi', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../api/setup')>();
+  return {
+    ...actual,
+    tenantSettingsApi: { ...actual.tenantSettingsApi, getSettings: (...args: unknown[]) => mockGetSettings(...args) },
+  };
+});
+
+vi.mock('@dispatch/api/src/customerApi', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../api/setup')>();
+  return {
+    ...actual,
+    customerApi: {
+      getServiceLocationById: (...args: unknown[]) => mockGetServiceLocationById(...args),
+      getAllPaginated: () => Promise.resolve({ content: [], totalElements: 0, totalPages: 0, number: 0, size: 50 }),
+      getServiceLocations: () => Promise.resolve([]),
+    },
+  };
+});
+
+vi.mock('@dispatch/api/src/client');
+
+const hvacType = { id: 't-hvac', tenantId: 't', name: 'HVAC', sortOrder: 0, archivedAt: null, createdAt: '', updatedAt: '' };
+const rtuCategory = { id: 'c-rtu', tenantId: 't', equipmentTypeId: 't-hvac', name: 'Rooftop', sortOrder: 0, archivedAt: null, createdAt: '', updatedAt: '' };
+const headquarters = {
+  id: 'loc-1',
+  customerId: 'cust-1',
+  customerName: 'Iverson Properties LLC',
+  locationName: 'Headquarters',
+  premiseType: 'BUSINESS',
+  dispatchRegionId: '',
+  address: { streetAddress: '1820 W McDowell Rd', city: 'Phoenix', state: 'AZ', zipCode: '85007' },
+  additionalContacts: [],
+};
+
+const page = (content: unknown[]) => ({ content, totalElements: content.length, totalPages: 1, number: 0, size: 200, first: true, last: true });
+
+function renderScopedAdd(initialPath = '/service-locations/loc-1/equipment/new') {
+  const routes: RouteObject[] = [
+    { path: '/service-locations/:locId/equipment/new', element: <EquipmentFormPage /> },
+    // eslint-disable-next-line i18next/no-literal-string
+    { path: '*', element: <div>Elsewhere</div> },
+  ];
+  return renderWithProviders(<EquipmentFormPage />, { routes, initialEntries: [initialPath] });
+}
+
+function renderEdit(id = 'eq-9') {
+  const routes: RouteObject[] = [
+    { path: '/equipment/:id/edit', element: <EquipmentFormPage /> },
+    // eslint-disable-next-line i18next/no-literal-string
+    { path: '*', element: <div>Elsewhere</div> },
+  ];
+  return renderWithProviders(<EquipmentFormPage />, { routes, initialEntries: [`/equipment/${id}/edit`] });
+}
+
+function renderStandaloneAdd() {
+  const routes: RouteObject[] = [
+    { path: '/equipment/new', element: <EquipmentFormPage /> },
+    // eslint-disable-next-line i18next/no-literal-string
+    { path: '*', element: <div>Elsewhere</div> },
+  ];
+  return renderWithProviders(<EquipmentFormPage />, { routes, initialEntries: ['/equipment/new'] });
+}
+
+// In-context launch: a WO picker / customer-detail add opens /equipment/new
+// with the location scoped by query and a returnTo to come back to.
+function renderInContext(path: string) {
+  const routes: RouteObject[] = [
+    { path: '/equipment/new', element: <EquipmentFormPage /> },
+    // eslint-disable-next-line i18next/no-literal-string
+    { path: '*', element: <div>Elsewhere</div> },
+  ];
+  return renderWithProviders(<EquipmentFormPage />, { routes, initialEntries: [path] });
+}
+
+describe('EquipmentFormPage', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockTypesGetAll.mockResolvedValue([hvacType]);
+    mockCategoriesGetAll.mockResolvedValue([rtuCategory]);
+    mockGetServiceLocationById.mockResolvedValue(headquarters);
+    mockList.mockResolvedValue(page([]));
+    mockFieldsGetAll.mockResolvedValue([]);
+    mockCreate.mockResolvedValue({ id: 'eq-new' });
+    mockUpdate.mockResolvedValue({ id: 'eq-9' });
+    mockImageUpload.mockResolvedValue({ id: 'img-1' });
+    mockImagePatch.mockResolvedValue({ id: 'img-1', isNameplate: true });
+    // AI off by default — the nameplate hero is opt-in per tenant.
+    mockGetSettings.mockResolvedValue({ enableAiFeatures: false });
+  });
+
+  it('renders scoped-add header with the location context and cascades category off type', async () => {
+    const user = userEvent.setup();
+    renderScopedAdd();
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: /add equipment/i, level: 1 })).toBeInTheDocument();
+    });
+    // "At Headquarters" context resolves once the location loads (also echoed in the footer).
+    expect((await screen.findAllByText('Headquarters')).length).toBeGreaterThan(0);
+
+    // Category select is disabled until a type is chosen; selecting HVAC enables it.
+    const selects = () => screen.getAllByRole('combobox');
+    expect(selects()[1]).toBeDisabled();
+
+    await screen.findByRole('option', { name: 'HVAC' });
+    await user.selectOptions(selects()[0], 't-hvac');
+    await waitFor(() => expect(screen.getByRole('option', { name: 'Rooftop' })).toBeInTheDocument());
+    expect(selects()[1]).toBeEnabled();
+  });
+
+  it('gates validation until submit and does not create when required fields are empty', async () => {
+    const user = userEvent.setup();
+    renderScopedAdd();
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: /add equipment/i, level: 1 })).toBeInTheDocument();
+    });
+
+    // Fresh form shows no inline errors.
+    expect(screen.queryByText('Required')).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /add equipment/i }));
+
+    expect(mockCreate).not.toHaveBeenCalled();
+    expect(screen.getAllByText('Required').length).toBeGreaterThan(0);
+  });
+
+  it('submits a create request with the classification + identity and navigates to the unit', async () => {
+    const user = userEvent.setup();
+    const { router, container } = renderScopedAdd();
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: /add equipment/i, level: 1 })).toBeInTheDocument();
+    });
+
+    const selects = () => screen.getAllByRole('combobox');
+    await screen.findByRole('option', { name: 'HVAC' });
+    await user.selectOptions(selects()[0], 't-hvac');
+    await waitFor(() => expect(screen.getByRole('option', { name: 'Rooftop' })).toBeInTheDocument());
+    await user.selectOptions(selects()[1], 'c-rtu');
+    await user.type(screen.getByPlaceholderText(/RTU-3/), 'RTU-7');
+    // Fill the optional identity fields too (exercises their input handlers).
+    await user.type(screen.getByPlaceholderText('Carrier'), 'Trane');
+    await user.type(screen.getByPlaceholderText('50TC-A06'), 'XR-15');
+    await user.type(screen.getByPlaceholderText('A1142099'), 'SN-7');
+    await user.type(screen.getByPlaceholderText(/compressor 10yr/i), '10-year parts');
+    // Date inputs (installed, parts-thru, labor-thru) in DOM order — fireEvent
+    // is the reliable way to set a native date control.
+    const dateInputs = container.querySelectorAll('input[type="date"]');
+    fireEvent.change(dateInputs[0], { target: { value: '2020-03-01' } }); // installed
+    fireEvent.change(dateInputs[1], { target: { value: '2030-03-01' } }); // parts
+    fireEvent.change(dateInputs[2], { target: { value: '2022-03-01' } }); // labor
+
+    await user.click(screen.getByRole('button', { name: /add equipment/i }));
+
+    await waitFor(() => {
+      expect(mockCreate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: 'RTU-7',
+          serviceLocationId: 'loc-1',
+          equipmentTypeId: 't-hvac',
+          equipmentCategoryId: 'c-rtu',
+          make: 'Trane',
+          model: 'XR-15',
+          serialNumber: 'SN-7',
+          installDate: '2020-03-01',
+          warrantyExpiresAt: '2030-03-01',
+          warrantyLaborExpiresAt: '2022-03-01',
+          warrantyDetails: '10-year parts',
+          parentId: null,
+        })
+      );
+    });
+    await waitFor(() => expect(router.state.location.pathname).toBe('/equipment/eq-new'));
+  });
+
+  it('threads ?parent into the sub-unit context and the create payload', async () => {
+    mockGetById.mockResolvedValue({ id: 'eq-parent', name: 'RTU-3', serviceLocationId: 'loc-1', status: 'ACTIVE' });
+    const user = userEvent.setup();
+    renderScopedAdd('/service-locations/loc-1/equipment/new?parent=eq-parent');
+
+    // Parent name appears in both the sub-unit context line and the footer.
+    expect((await screen.findAllByText('RTU-3')).length).toBeGreaterThan(0);
+
+    const selects = () => screen.getAllByRole('combobox');
+    await screen.findByRole('option', { name: 'HVAC' });
+    await user.selectOptions(selects()[0], 't-hvac');
+    await waitFor(() => expect(screen.getByRole('option', { name: 'Rooftop' })).toBeInTheDocument());
+    await user.selectOptions(selects()[1], 'c-rtu');
+    await user.type(screen.getByPlaceholderText(/RTU-3/), 'Compressor');
+
+    await user.click(screen.getByRole('button', { name: /add equipment/i }));
+
+    await waitFor(() => {
+      expect(mockCreate).toHaveBeenCalledWith(expect.objectContaining({ parentId: 'eq-parent' }));
+    });
+  });
+
+  it('prefills from the record in edit mode and submits an update', async () => {
+    mockGetById.mockResolvedValue({
+      id: 'eq-9',
+      name: 'Upstairs Furnace',
+      serviceLocationId: 'loc-1',
+      status: 'ACTIVE',
+      equipmentTypeId: 't-hvac',
+      equipmentCategoryId: 'c-rtu',
+      make: 'Carrier',
+      parentId: null,
+      descendantCount: 0,
+    });
+    const user = userEvent.setup();
+    const { router } = renderEdit('eq-9');
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: /edit equipment/i, level: 1 })).toBeInTheDocument();
+    });
+    const nameInput = screen.getByPlaceholderText(/RTU-3/) as HTMLInputElement;
+    expect(nameInput.value).toBe('Upstairs Furnace');
+
+    await user.clear(nameInput);
+    await user.type(nameInput, 'Rooftop Unit 9');
+    await user.click(screen.getByRole('button', { name: /edit equipment/i }));
+
+    await waitFor(() => {
+      expect(mockUpdate).toHaveBeenCalledWith('eq-9', expect.objectContaining({ name: 'Rooftop Unit 9' }));
+    });
+    await waitFor(() => expect(router.state.location.pathname).toBe('/equipment/eq-9'));
+  });
+
+  it('renders the standalone add form with a location picker and requires a location', async () => {
+    const user = userEvent.setup();
+    renderStandaloneAdd();
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: /add equipment/i, level: 1 })).toBeInTheDocument();
+    });
+    // Standalone add (no location from the route) exposes the picker.
+    expect(screen.getByPlaceholderText(/search by customer/i)).toBeInTheDocument();
+
+    // No location chosen → the required picker blocks submit, nothing is created.
+    await user.click(screen.getByRole('button', { name: /add equipment/i }));
+    expect(mockCreate).not.toHaveBeenCalled();
+  });
+
+  it('in-context: ?locationId scopes the create (no picker) and returns to the caller with the new id + attach token', async () => {
+    const user = userEvent.setup();
+    // A WO work-item picker launched us: location fixed to loc-1, come back to
+    // the Work items tab, attach to work item it-1.
+    const { router } = renderInContext(
+      '/equipment/new?locationId=loc-1&returnTo=%2Fwork-orders%2Fwo-1%3Ftab%3Ditems&attachTo=wi%3Ait-1'
+    );
+    await waitFor(() => expect(screen.getByRole('heading', { name: /add equipment/i, level: 1 })).toBeInTheDocument());
+    // Location is fixed by the query param — the standalone picker is not shown.
+    expect(screen.queryByPlaceholderText(/search by customer/i)).not.toBeInTheDocument();
+    expect((await screen.findAllByText('Headquarters')).length).toBeGreaterThan(0);
+
+    const selects = () => screen.getAllByRole('combobox');
+    await screen.findByRole('option', { name: 'HVAC' });
+    await user.selectOptions(selects()[0], 't-hvac');
+    await waitFor(() => expect(screen.getByRole('option', { name: 'Rooftop' })).toBeInTheDocument());
+    await user.selectOptions(selects()[1], 'c-rtu');
+    await user.type(screen.getByPlaceholderText(/RTU-3/), 'RTU-7');
+    await user.click(screen.getByRole('button', { name: /add equipment/i }));
+
+    await waitFor(() => expect(mockCreate).toHaveBeenCalledWith(expect.objectContaining({ serviceLocationId: 'loc-1' })));
+    // Returns to the caller's URL, preserving its query and handing back the new id + token.
+    await waitFor(() => expect(router.state.location.pathname).toBe('/work-orders/wo-1'));
+    const params = new URLSearchParams(router.state.location.search);
+    expect(params.get('tab')).toBe('items');
+    expect(params.get('newEquipmentId')).toBe('eq-new');
+    expect(params.get('attachTo')).toBe('wi:it-1');
+  });
+
+  it('in-context: a returnTo without an attach token comes back clean (no id param)', async () => {
+    const user = userEvent.setup();
+    // Sub-unit / customer-detail add: return to the caller, nothing to wire.
+    const { router } = renderInContext('/equipment/new?locationId=loc-1&returnTo=%2Fcustomers%2Fc-1%3Ftab%3Dequipment');
+    await waitFor(() => expect(screen.getByRole('heading', { name: /add equipment/i, level: 1 })).toBeInTheDocument());
+
+    const selects = () => screen.getAllByRole('combobox');
+    await screen.findByRole('option', { name: 'HVAC' });
+    await user.selectOptions(selects()[0], 't-hvac');
+    await waitFor(() => expect(screen.getByRole('option', { name: 'Rooftop' })).toBeInTheDocument());
+    await user.selectOptions(selects()[1], 'c-rtu');
+    await user.type(screen.getByPlaceholderText(/RTU-3/), 'RTU-8');
+    await user.click(screen.getByRole('button', { name: /add equipment/i }));
+
+    await waitFor(() => expect(router.state.location.pathname).toBe('/customers/c-1'));
+    const params = new URLSearchParams(router.state.location.search);
+    expect(params.get('tab')).toBe('equipment');
+    expect(params.get('newEquipmentId')).toBeNull();
+  });
+
+  it('re-parents in edit mode (Placement) and sends parentId', async () => {
+    mockGetById.mockResolvedValue({
+      id: 'eq-9',
+      name: 'Compressor',
+      serviceLocationId: 'loc-1',
+      status: 'ACTIVE',
+      equipmentTypeId: 't-hvac',
+      equipmentCategoryId: 'c-rtu',
+      parentId: null,
+      descendantCount: 0,
+    });
+    // Candidate parents at the same location (top-level, active, excludes self).
+    mockList.mockResolvedValue(
+      page([
+        { id: 'eq-sys', name: 'RTU-3', parentId: null, status: 'ACTIVE', equipmentTypeName: null, equipmentCategoryName: null, make: null, model: null, serialNumber: null, locationOnSite: null },
+      ])
+    );
+    const user = userEvent.setup();
+    renderEdit('eq-9');
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: /edit equipment/i, level: 1 })).toBeInTheDocument();
+    });
+    const parentOption = await screen.findByRole('option', { name: 'RTU-3' });
+    await user.selectOptions(parentOption.closest('select')!, 'eq-sys');
+    await user.click(screen.getByRole('button', { name: /edit equipment/i }));
+
+    await waitFor(() => {
+      expect(mockUpdate).toHaveBeenCalledWith('eq-9', expect.objectContaining({ parentId: 'eq-sys' }));
+    });
+  });
+
+  it('shows a loading state while the edit record loads', async () => {
+    mockGetById.mockReturnValue(new Promise(() => {}));
+    renderEdit('eq-9');
+    expect(await screen.findByText(/loading/i)).toBeInTheDocument();
+  });
+
+  it('shows an error state when the edit record fails to load', async () => {
+    mockGetById.mockRejectedValue(new Error('nope'));
+    renderEdit('eq-9');
+    expect(await screen.findByRole('button', { name: /back/i })).toBeInTheDocument();
+  });
+
+  it('renders the category spec fields and writes their values into attributes', async () => {
+    const specField = (id: string, fieldKey: string, label: string, dataType: string, opts: Record<string, unknown> = {}) => ({
+      id, tenantId: 't', equipmentCategoryId: 'c-rtu', fieldKey, label, dataType,
+      options: null, required: false, helpText: null, sortOrder: 0, archivedAt: null, createdAt: '', updatedAt: '', ...opts,
+    });
+    mockFieldsGetAll.mockResolvedValue([
+      specField('f-num', 'tonnage', 'Tonnage', 'NUMBER'),
+      specField('f-cur', 'install_cost', 'Install Cost', 'CURRENCY'),
+      specField('f-date', 'installed_on', 'Installed On', 'DATE'),
+      specField('f-bool', 'under_warranty', 'Under Warranty', 'BOOLEAN'),
+      specField('f-sel', 'refrigerant', 'Refrigerant', 'SELECT', { options: ['R-410A', 'R-22'] }),
+      specField('f-text', 'notes', 'Notes', 'TEXT'),
+    ]);
+    const user = userEvent.setup();
+    renderScopedAdd();
+    await waitFor(() => expect(screen.getByRole('heading', { name: /add equipment/i, level: 1 })).toBeInTheDocument());
+
+    const selects = () => screen.getAllByRole('combobox');
+    await screen.findByRole('option', { name: 'HVAC' });
+    await user.selectOptions(selects()[0], 't-hvac');
+    await waitFor(() => expect(screen.getByRole('option', { name: 'Rooftop' })).toBeInTheDocument());
+    await user.selectOptions(selects()[1], 'c-rtu');
+
+    // The Specs section renders the category's typed fields.
+    expect(await screen.findByLabelText('Tonnage')).toBeInTheDocument();
+    expect(screen.getByLabelText('Install Cost')).toBeInTheDocument();
+    expect(screen.getByLabelText('Refrigerant')).toBeInTheDocument();
+
+    await user.type(screen.getByPlaceholderText(/RTU-3/), 'RTU-9');
+    await user.type(screen.getByLabelText('Tonnage'), '5');
+    await user.selectOptions(screen.getByLabelText('Refrigerant'), 'R-410A');
+    await user.click(screen.getByLabelText('Under Warranty'));
+
+    await user.click(screen.getByRole('button', { name: /add equipment/i }));
+
+    await waitFor(() => expect(mockCreate).toHaveBeenCalled());
+    const attrs = JSON.parse((mockCreate.mock.calls[0][0] as { attributes: string }).attributes);
+    expect(attrs).toMatchObject({ tonnage: 5, refrigerant: 'R-410A', under_warranty: true });
+  });
+
+  // ===== Nameplate OCR (add-mode hero) =====
+  const jpeg = (name = 'plate.jpg') => new File(['x'], name, { type: 'image/jpeg' });
+  const fileInputOf = (container: HTMLElement) => container.querySelector('input[type="file"]') as HTMLInputElement;
+
+  it('omits the nameplate hero when AI features are off', async () => {
+    renderScopedAdd();
+    await waitFor(() => expect(screen.getByRole('heading', { name: /add equipment/i, level: 1 })).toBeInTheDocument());
+    expect(screen.queryByText(/auto-fill from the nameplate/i)).not.toBeInTheDocument();
+  });
+
+  it('omits the nameplate hero in edit mode even when AI is on', async () => {
+    mockGetSettings.mockResolvedValue({ enableAiFeatures: true });
+    mockGetById.mockResolvedValue({ id: 'eq-9', name: 'RTU-9', serviceLocationId: 'loc-1', status: 'ACTIVE' });
+    renderEdit('eq-9');
+    await waitFor(() => expect(screen.getByRole('heading', { name: /edit equipment/i, level: 1 })).toBeInTheDocument());
+    expect(screen.queryByText(/auto-fill from the nameplate/i)).not.toBeInTheDocument();
+  });
+
+  it('reads a nameplate, pre-fills identity with READ/VERIFY markers + warnings, and clears a marker on edit', async () => {
+    mockGetSettings.mockResolvedValue({ enableAiFeatures: true });
+    mockExtract.mockResolvedValue({
+      make: 'Carrier', model: '50TC-A06', serialNumber: 'A1142099',
+      attributes: { tonnage: '5' }, warnings: ['serial last digit unclear from glare'],
+    });
+    const user = userEvent.setup();
+    const { container } = renderScopedAdd();
+    await waitFor(() => expect(screen.getByText(/auto-fill from the nameplate/i)).toBeInTheDocument());
+
+    fireEvent.change(fileInputOf(container), { target: { files: [jpeg()] } });
+
+    await waitFor(() => expect(mockExtract).toHaveBeenCalled());
+    expect(await screen.findByText(/filled from the nameplate/i)).toBeInTheDocument();
+    expect(screen.getByText(/serial last digit unclear/i)).toBeInTheDocument();
+
+    expect((screen.getByPlaceholderText('Carrier') as HTMLInputElement).value).toBe('Carrier');
+    expect((screen.getByPlaceholderText('50TC-A06') as HTMLInputElement).value).toBe('50TC-A06');
+    expect((screen.getByPlaceholderText('A1142099') as HTMLInputElement).value).toBe('A1142099');
+    expect(screen.getAllByText('READ').length).toBeGreaterThan(0);
+    expect(screen.getByText('VERIFY')).toBeInTheDocument();
+
+    // Editing the serial clears its VERIFY marker (review-then-trust).
+    await user.type(screen.getByPlaceholderText('A1142099'), 'X');
+    await waitFor(() => expect(screen.queryByText('VERIFY')).not.toBeInTheDocument());
+  });
+
+  it('rejects a non-image (HEIC) file client-side without calling the API', async () => {
+    mockGetSettings.mockResolvedValue({ enableAiFeatures: true });
+    const { container } = renderScopedAdd();
+    await waitFor(() => expect(screen.getByText(/auto-fill from the nameplate/i)).toBeInTheDocument());
+    fireEvent.change(fileInputOf(container), { target: { files: [new File(['x'], 'plate.heic', { type: 'image/heic' })] } });
+    expect(await screen.findByText(/jpeg, png, or webp/i)).toBeInTheDocument();
+    expect(mockExtract).not.toHaveBeenCalled();
+  });
+
+  it('hides the hero when extraction returns 403 (AI disabled mid-session)', async () => {
+    mockGetSettings.mockResolvedValue({ enableAiFeatures: true });
+    mockExtract.mockRejectedValue(Object.assign(new Error('forbidden'), { response: { status: 403 } }));
+    const { container } = renderScopedAdd();
+    await waitFor(() => expect(screen.getByText(/auto-fill from the nameplate/i)).toBeInTheDocument());
+    fireEvent.change(fileInputOf(container), { target: { files: [jpeg()] } });
+    await waitFor(() => expect(screen.queryByText(/auto-fill from the nameplate/i)).not.toBeInTheDocument());
+  });
+
+  it('falls back to manual entry with a message when extraction errors (502)', async () => {
+    mockGetSettings.mockResolvedValue({ enableAiFeatures: true });
+    mockExtract.mockRejectedValue(Object.assign(new Error('down'), { response: { status: 502, data: { message: 'model unreachable' } } }));
+    const { container } = renderScopedAdd();
+    await waitFor(() => expect(screen.getByText(/auto-fill from the nameplate/i)).toBeInTheDocument());
+    fireEvent.change(fileInputOf(container), { target: { files: [jpeg()] } });
+    // Hero stays (idle) and surfaces the error; manual entry still works.
+    expect(await screen.findByText(/model unreachable/i)).toBeInTheDocument();
+    expect(screen.getByText(/auto-fill from the nameplate/i)).toBeInTheDocument();
+  });
+
+  it('lets the tech replace the photo (resets the hero to idle)', async () => {
+    mockGetSettings.mockResolvedValue({ enableAiFeatures: true });
+    mockExtract.mockResolvedValue({ make: 'Carrier', model: null, serialNumber: null, attributes: null, warnings: null });
+    const user = userEvent.setup();
+    const { container } = renderScopedAdd();
+    await waitFor(() => expect(screen.getByText(/auto-fill from the nameplate/i)).toBeInTheDocument());
+    fireEvent.change(fileInputOf(container), { target: { files: [jpeg()] } });
+    expect(await screen.findByText(/filled from the nameplate/i)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /replace photo/i }));
+    expect(await screen.findByText(/auto-fill from the nameplate/i)).toBeInTheDocument();
+  });
+
+  it('uploads the nameplate photo to the created unit on save', async () => {
+    mockGetSettings.mockResolvedValue({ enableAiFeatures: true });
+    mockExtract.mockResolvedValue({ make: 'Carrier', model: null, serialNumber: null, attributes: null, warnings: null });
+    const user = userEvent.setup();
+    const { container } = renderScopedAdd();
+    await waitFor(() => expect(screen.getByText(/auto-fill from the nameplate/i)).toBeInTheDocument());
+
+    const file = jpeg();
+    fireEvent.change(fileInputOf(container), { target: { files: [file] } });
+    await waitFor(() => expect(mockExtract).toHaveBeenCalled());
+
+    const selects = () => screen.getAllByRole('combobox');
+    await screen.findByRole('option', { name: 'HVAC' });
+    await user.selectOptions(selects()[0], 't-hvac');
+    await waitFor(() => expect(screen.getByRole('option', { name: 'Rooftop' })).toBeInTheDocument());
+    await user.selectOptions(selects()[1], 'c-rtu');
+    await user.type(screen.getByPlaceholderText(/RTU-3/), 'RTU-7');
+    await user.click(screen.getByRole('button', { name: /add equipment/i }));
+
+    await waitFor(() => expect(mockCreate).toHaveBeenCalled());
+    await waitFor(() => expect(mockImageUpload).toHaveBeenCalledWith('eq-new', file, { caption: 'Nameplate' }));
+    // The uploaded shot is flagged as the unit's nameplate (source of truth).
+    await waitFor(() => expect(mockImagePatch).toHaveBeenCalledWith('eq-new', 'img-1', { isNameplate: true }));
+  });
+
+  it('retains an OCR spec read and snaps it onto the category SELECT once chosen', async () => {
+    mockGetSettings.mockResolvedValue({ enableAiFeatures: true });
+    // The plate reports R410A *before* a category (and its spec list) is known.
+    mockExtract.mockResolvedValue({
+      make: null, model: null, serialNumber: null, attributes: { refrigerant: 'R410A TXV INSTALLED' }, warnings: null,
+    });
+    mockFieldsGetAll.mockResolvedValue([
+      { id: 'f-sel', tenantId: 't', equipmentCategoryId: 'c-rtu', fieldKey: 'refrigerant', label: 'Refrigerant', dataType: 'SELECT',
+        options: ['R-410A', 'R-454B', 'R-22'], required: false, helpText: null, sortOrder: 0, archivedAt: null, createdAt: '', updatedAt: '' },
+    ]);
+    const user = userEvent.setup();
+    const { container } = renderScopedAdd();
+    await waitFor(() => expect(screen.getByText(/auto-fill from the nameplate/i)).toBeInTheDocument());
+
+    // Read the plate first — no category yet, so the spec field doesn't exist.
+    fireEvent.change(fileInputOf(container), { target: { files: [jpeg()] } });
+    await waitFor(() => expect(mockExtract).toHaveBeenCalled());
+    expect(screen.queryByLabelText('Refrigerant')).not.toBeInTheDocument();
+
+    // Now choose the category → the retained read snaps onto the select option.
+    const selects = () => screen.getAllByRole('combobox');
+    await screen.findByRole('option', { name: 'HVAC' });
+    await user.selectOptions(selects()[0], 't-hvac');
+    await waitFor(() => expect(screen.getByRole('option', { name: 'Rooftop' })).toBeInTheDocument());
+    await user.selectOptions(selects()[1], 'c-rtu');
+
+    // Once it snaps, the label carries a READ badge ("Refrigerant READ"), so match loosely.
+    const refrigerant = (await screen.findByLabelText(/Refrigerant/)) as HTMLSelectElement;
+    await waitFor(() => expect(refrigerant.value).toBe('R-410A'));
+    expect(screen.getByText('READ')).toBeInTheDocument();
+  });
+});

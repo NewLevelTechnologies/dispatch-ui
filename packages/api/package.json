@@ -1,0 +1,23 @@
+{
+  "name": "@dispatch/api",
+  "version": "1.0.0",
+  "private": true,
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": {
+    "build": "tsc",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@dispatch/types": "workspace:*",
+    "axios": "^1.13.6"
+  },
+  "peerDependencies": {
+    "aws-amplify": "^6.16.3"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "aws-amplify": "^6.16.3",
+    "typescript": "^5.9.3"
+  }
+}
