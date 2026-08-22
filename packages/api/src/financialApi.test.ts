@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { invoicesApi, quotesApi, financialActivityApi } from '@dispatch/api/src/financialApi';
-import apiClient from '@dispatch/api/src/client';
+import { invoicesApi, quotesApi, financialActivityApi } from './financialApi';
+import apiClient from './client';
 
-vi.mock('@dispatch/api/src/client');
+vi.mock('./client');
 
 const okSendResponse = {
   data: {

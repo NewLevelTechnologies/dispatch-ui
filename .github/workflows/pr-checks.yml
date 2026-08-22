@@ -37,9 +37,11 @@ jobs:
       - name: Run linter
         run: pnpm turbo run lint
 
-      # Runs the full vitest suite AND enforces the coverage thresholds in
-      # apps/web/vitest.config.ts. One pass instead of two — a plain `test`
-      # step would re-run the same ~2000 tests for no extra signal.
+      # Runs every suite — apps/web plus the @dispatch/* packages — and
+      # enforces the coverage thresholds in apps/web/vitest.config.ts. One pass
+      # instead of two: adding a plain `test` step would re-run the same ~2000
+      # tests for no extra signal. Any package that gains a test:coverage
+      # script is picked up here automatically.
       - name: Run tests with coverage
         run: pnpm turbo run test:coverage -- --run
 

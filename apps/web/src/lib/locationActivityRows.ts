@@ -14,7 +14,7 @@ import type {
 import { getDayBucket } from './activityDayBucket';
 import { glyphFor, type ActivityTone } from './activityGlyph';
 import { resolveEventSummary } from '../components/activityFormatters';
-import { formatExactTimestamp, formatTimestamp } from './formatTimestamp';
+import { formatExactTimestamp, formatTimestamp } from '@dispatch/utils';
 
 export type ChipId = 'all' | 'job' | 'visit' | 'invoice' | 'payment' | 'note' | 'change';
 

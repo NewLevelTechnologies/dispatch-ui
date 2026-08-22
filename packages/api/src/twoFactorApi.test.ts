@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { twoFactorApi } from '@dispatch/api/src/twoFactorApi';
-import apiClient from '@dispatch/api/src/client';
+import { twoFactorApi } from './twoFactorApi';
+import apiClient from './client';
 
-vi.mock('@dispatch/api/src/client');
+vi.mock('./client');
 
 describe('twoFactorApi', () => {
   beforeEach(() => {

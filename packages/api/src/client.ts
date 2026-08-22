@@ -73,6 +73,13 @@ class ApiClient {
   //
   // The casts are internal only — axios resolves its return through a private
   // conditional type we can't name from outside the package.
+  //
+  // The `any` defaults below are deliberate and load-bearing: they are axios's
+  // own defaults for these parameters. Narrowing them to `unknown` makes the
+  // response type resolve concretely at every call site, which breaks
+  // `vi.mocked(apiClient.get).mockResolvedValue({ data })` throughout the
+  // consuming app's suite.
+  /* eslint-disable @typescript-eslint/no-explicit-any */
   get<T = any, R = AxiosResponse<T>, D = any>(
     url: string,
     config?: AxiosRequestConfig<D>
@@ -110,6 +117,7 @@ class ApiClient {
   ): Promise<R> {
     return this.instance.patch(url, data, config) as Promise<R>;
   }
+  /* eslint-enable @typescript-eslint/no-explicit-any */
 }
 
 // Export singleton with a dev-environment default baseURL. Platform-specific

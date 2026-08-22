@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { approvalsApi } from '@dispatch/api/src/approvalsApi';
-import apiClient from '@dispatch/api/src/client';
+import { approvalsApi } from './approvalsApi';
+import apiClient from './client';
 
-vi.mock('@dispatch/api/src/client');
+vi.mock('./client');
 
 describe('approvalsApi', () => {
   beforeEach(() => {

@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { userApi } from '@dispatch/api/src/userApi';
-import apiClient from '@dispatch/api/src/client';
+import { userApi } from './userApi';
+import apiClient from './client';
 
-vi.mock('@dispatch/api/src/client');
+vi.mock('./client');
 
 function makeUser(over: Record<string, unknown> = {}) {
   return {

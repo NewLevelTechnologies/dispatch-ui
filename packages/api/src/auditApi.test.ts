@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { auditApi } from '@dispatch/api/src/auditApi';
-import apiClient from '@dispatch/api/src/client';
+import { auditApi } from './auditApi';
+import apiClient from './client';
 
-vi.mock('@dispatch/api/src/client');
+vi.mock('./client');
 
 const mockLogs = [
   {

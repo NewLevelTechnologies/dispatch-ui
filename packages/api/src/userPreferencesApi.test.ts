@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { getUserPreferences, updateUserPreferences } from '@dispatch/api/src/userPreferencesApi';
-import apiClient from '@dispatch/api/src/client';
+import { getUserPreferences, updateUserPreferences } from './userPreferencesApi';
+import apiClient from './client';
 
-vi.mock('@dispatch/api/src/client');
+vi.mock('./client');
 
 describe('userPreferencesApi', () => {
   beforeEach(() => {

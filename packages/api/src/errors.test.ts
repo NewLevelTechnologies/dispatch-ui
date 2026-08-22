@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { getApiErrorMessage, getApiErrorCode } from '@dispatch/api/src/errors';
+import { getApiErrorMessage, getApiErrorCode } from './errors';
 
 describe('getApiErrorMessage', () => {
   it('extracts message from Axios-style error response', () => {

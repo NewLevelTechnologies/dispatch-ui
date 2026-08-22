@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { agreementFilesApi } from '@dispatch/api/src/filesApi';
-import apiClient from '@dispatch/api/src/client';
+import { agreementFilesApi } from './filesApi';
+import apiClient from './client';
 
-vi.mock('@dispatch/api/src/client');
+vi.mock('./client');
 
 beforeEach(() => {
   vi.clearAllMocks();
