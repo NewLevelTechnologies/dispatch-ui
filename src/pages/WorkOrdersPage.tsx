@@ -27,6 +27,7 @@ import { useGlossary } from '../contexts/GlossaryContext';
 import { useCurrentUser } from '../hooks/useCurrentUser';
 import AppLayout from '../components/AppLayout';
 import { titleCaseAddress } from '../utils/titleCaseAddress';
+import { withBackContext } from '../lib/backContext';
 import WorkOrderFormDialog from '../components/WorkOrderFormDialog';
 import CancelWorkOrderDialog from '../components/CancelWorkOrderDialog';
 import { Button } from '../components/catalyst/button';
@@ -562,14 +563,11 @@ export default function WorkOrdersPage() {
     return qs ? `?${qs}` : '?';
   };
 
-  // Back-context for links that leave the list. `from` names the surface; the
-  // dispatcher's whole filter state rides along in `back` so the location
-  // page's back-link returns them to the queue they were working, not to the
-  // default Open view.
-  const locationHref = (locationId: string): string => {
-    const qs = searchParams.toString();
-    return `/service-locations/${locationId}?from=work-orders${qs ? `&back=${encodeURIComponent(qs)}` : ''}`;
-  };
+  // Links that leave the list carry the dispatcher's whole filter state, so the
+  // location page's back-link returns them to the queue they were working
+  // rather than the default Open view (see lib/backContext).
+  const locationHref = (locationId: string): string =>
+    withBackContext(`/service-locations/${locationId}`, 'work-orders', searchParams.toString());
 
   const showingStart = totalElements === 0 ? 0 : (pageNumber - 1) * PAGE_SIZE + 1;
   const showingEnd = Math.min(pageNumber * PAGE_SIZE, totalElements);

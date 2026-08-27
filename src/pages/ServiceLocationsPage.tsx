@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, useDeferredValue } from 'react';
 import clsx from 'clsx';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { withBackContext } from '../lib/backContext';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { EllipsisVerticalIcon, MapPinIcon } from '@heroicons/react/24/outline';
@@ -112,6 +113,10 @@ export default function ServiceLocationsPage() {
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
 
   // URL-driven filter state
+  // Row / View links carry the list's filter state, so the detail page's
+  // back-link returns to this queue rather than the default view.
+  const detailHref = (locationId: string): string =>
+    withBackContext(`/service-locations/${locationId}`, 'locations', searchParams.toString());
   const urlSearch = searchParams.get('search') ?? '';
   const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10));
   const regionId = searchParams.get('region') ?? '';
@@ -584,7 +589,7 @@ export default function ServiceLocationsPage() {
                           onClick={(e: React.MouseEvent) => {
                             const target = e.target as HTMLElement;
                             if (target.closest('[role="menu"]') || target.closest('button[aria-label]') || target.closest('a')) return;
-                            navigate(`/service-locations/${location.id}?from=locations`);
+                            navigate(detailHref(location.id));
                           }}
                         >
                           <td>
@@ -664,7 +669,7 @@ export default function ServiceLocationsPage() {
                                     <EllipsisVerticalIcon className="size-4" />
                                   </DropdownButton>
                                   <DropdownMenu anchor="bottom end">
-                                    <DropdownItem onClick={() => navigate(`/service-locations/${location.id}?from=locations`)}>
+                                    <DropdownItem onClick={() => navigate(detailHref(location.id))}>
                                       <DropdownLabel>{t('common.view')}</DropdownLabel>
                                     </DropdownItem>
                                     {canEditServiceLocations && (

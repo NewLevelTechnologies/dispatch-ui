@@ -70,6 +70,7 @@ import { FilterChipListbox, ChipListboxOption } from '../components/ui/FilterChi
 import { DateRangeChip } from '../components/ui/DateRangeChip';
 import { roleColor } from '../utils/roleColor';
 import { useGlossary } from '../contexts/GlossaryContext';
+import { resolveBack } from '../lib/backContext';
 import { useHasCapability } from '../hooks/useCurrentUser';
 import { useMediaQuery } from '../hooks/useMediaQuery';
 import { useUrlPage } from '../hooks/useUrlPage';
@@ -153,22 +154,23 @@ function useBackContext(location: ServiceLocationDetailDto): { label: string; hr
     if (woId) return { label: woNo || getName('work_order'), href: `/work-orders/${woId}` };
   }
   // The work-order LIST — a different surface from `work-order`, which is one
-  // job's page. `back` carries the list's own query string (filters, chips,
-  // page), so a dispatcher returns to the queue they were working rather than
-  // the default Open view. It's only ever spliced in after the `?`, so it
-  // can't redirect off the route.
+  // job's page. Like the other list cases it honors `back`, so a dispatcher
+  // returns to the queue they were working rather than the default view.
   if (from === 'work-orders') {
-    const back = params.get('back');
-    return {
-      label: getName('work_order', true),
-      href: back ? `/work-orders?${back}` : '/work-orders',
-    };
+    return { label: getName('work_order', true), href: resolveBack('/work-orders', params.get('back')) };
+  }
+  // The equipment list — a tech looking up which site a unit sits at.
+  if (from === 'equipment') {
+    return { label: getName('equipment', true), href: resolveBack('/equipment', params.get('back')) };
   }
   if (from === 'locations') {
     // Spec labels this "All locations · {customer}". There's no per-customer
     // locations route yet, so the href stays the global list; the customer
     // name rides the label for context.
-    return { label: `All locations · ${location.customerName}`, href: '/service-locations' };
+    return {
+      label: `All locations · ${location.customerName}`,
+      href: resolveBack('/service-locations', params.get('back')),
+    };
   }
   if (from === 'search') {
     const q = params.get('q');

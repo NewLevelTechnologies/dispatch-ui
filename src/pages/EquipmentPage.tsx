@@ -1,6 +1,7 @@
 import { useState, useDeferredValue } from 'react';
 import clsx from 'clsx';
 import { Link as RouterLink, useNavigate, useSearchParams } from 'react-router-dom';
+import { withBackContext } from '../lib/backContext';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { EllipsisVerticalIcon } from '@heroicons/react/24/outline';
@@ -50,6 +51,12 @@ export default function EquipmentPage() {
   // right page in a new tab. Internal `page` here stays 0-based to match the
   // backend Spring Page contract.
   const [searchParams, setSearchParams] = useSearchParams();
+  // Links off the list carry its filter state, so a detail page's back-link
+  // returns to this queue rather than a default view (see lib/backContext).
+  const detailHref = (equipmentId: string): string =>
+    withBackContext(`/equipment/${equipmentId}`, 'equipment', searchParams.toString());
+  const locationHref = (locationId: string): string =>
+    withBackContext(`/service-locations/${locationId}`, 'equipment', searchParams.toString());
   const page = Math.max(0, parseInt(searchParams.get('page') ?? '1', 10) - 1);
   const setPage = (next: number) => {
     const params = new URLSearchParams(searchParams);
@@ -319,7 +326,7 @@ export default function EquipmentPage() {
                     <DenseRow key={item.id}>
                       <td>
                         <div className="flex items-center gap-2">
-                          <RouterLink to={`/equipment/${item.id}`}>
+                          <RouterLink to={detailHref(item.id)}>
                             <EquipmentThumbnail
                               url={item.profileImageUrl}
                               name={item.name}
@@ -333,7 +340,7 @@ export default function EquipmentPage() {
                           <CellStack>
                             <CellTop>
                               <RouterLink
-                                to={`/equipment/${item.id}`}
+                                to={detailHref(item.id)}
                                 className="hover:text-accent-500 hover:underline"
                               >
                                 {item.name}
@@ -342,7 +349,7 @@ export default function EquipmentPage() {
                             {item.parentId && item.parentName && (
                               <CellSub>
                                 <RouterLink
-                                  to={`/equipment/${item.parentId}`}
+                                  to={detailHref(item.parentId)}
                                   className="hover:text-accent-500 hover:underline"
                                 >
                                   {t('equipment.table.componentOf', {
@@ -358,7 +365,7 @@ export default function EquipmentPage() {
                       <td className={clsx(!item.serviceLocationId && 'dt-empty')}>
                         {item.serviceLocationId ? (
                           <RouterLink
-                            to={`/service-locations/${item.serviceLocationId}`}
+                            to={locationHref(item.serviceLocationId)}
                             className="block hover:text-accent-500"
                           >
                             <CellStack>

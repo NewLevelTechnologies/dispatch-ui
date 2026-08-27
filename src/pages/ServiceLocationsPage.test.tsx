@@ -162,6 +162,22 @@ describe('ServiceLocationsPage', () => {
     ).toBe(true);
   });
 
+  it('row click carries the list filters so the detail back-link returns to the same queue', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({ data: mockServiceLocationsResponse });
+    const user = userEvent.setup();
+
+    renderWithProviders(<ServiceLocationsPage />, { initialPath: '/?status=inactive' });
+
+    await waitFor(() => {
+      expect(screen.getByText('Main Office')).toBeInTheDocument();
+    });
+    await user.click(screen.getByText('Main Office'));
+
+    expect(navigateSpy).toHaveBeenCalledWith(
+      `/service-locations/location-1?from=locations&back=${encodeURIComponent('status=inactive')}`
+    );
+  });
+
   it('applies the default ACTIVE status scope when the URL has no status param', async () => {
     vi.mocked(apiClient.get).mockResolvedValue({ data: mockServiceLocationsResponse });
 

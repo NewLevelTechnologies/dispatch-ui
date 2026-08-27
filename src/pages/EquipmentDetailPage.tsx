@@ -11,7 +11,8 @@
 // units + filters; a water heater doesn't). Photos + Videos live together on a
 // single Media tab, with a profile-photo-led media peek on the overview.
 import { useState } from 'react';
-import { useParams, useNavigate, useLocation, Link as RouterLink } from 'react-router-dom';
+import { useParams, useNavigate, useLocation, useSearchParams, Link as RouterLink } from 'react-router-dom';
+import { resolveBack } from '../lib/backContext';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import {
@@ -184,6 +185,7 @@ export default function EquipmentDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { key: routeKey } = useLocation();
+  const [searchParams] = useSearchParams();
   const { t } = useTranslation();
   const { getName } = useGlossary();
   const queryClient = useQueryClient();
@@ -544,6 +546,15 @@ export default function EquipmentDetailPage() {
       `${serviceLocation.address.streetAddress}, ${serviceLocation.address.city}`
     : getName('service_location');
 
+  // Smart back. Default up is the parent location — equipment's natural home,
+  // and where a cold link or a refresh should land. Arriving from the equipment
+  // list is the exception: that's a queue someone was working, so `back` takes
+  // them to it with its filters intact rather than to the site.
+  const backCtx =
+    searchParams.get('from') === 'equipment'
+      ? { label: getName('equipment', true), href: resolveBack('/equipment', searchParams.get('back')) }
+      : { label: locationLabel, href: `/service-locations/${equipment.serviceLocationId}` };
+
   // Quick-add suggestions = tenant common sizes this unit doesn't already take.
   const assignedSizes = new Set(filters.map((f) => formatFilterSize(f)));
   const quickAddCandidates = activeFilterSizes.filter((s) => !assignedSizes.has(formatFilterSize(s)));
@@ -636,12 +647,11 @@ export default function EquipmentDetailPage() {
     <AppLayout>
       <div className="px-1 py-1">
         <div className="mx-auto max-w-[1240px]">
-          {/* Smart back: the parent location is equipment's natural home. */}
           <RouterLink
-            to={`/service-locations/${equipment.serviceLocationId}`}
+            to={backCtx.href}
             className="mb-2.5 inline-flex items-center gap-1 text-[11.5px] text-fg-muted hover:text-fg-strong"
           >
-            ← {locationLabel}
+            ← {backCtx.label}
           </RouterLink>
 
           {/* Header — identity lives here (name + type/category pills + a

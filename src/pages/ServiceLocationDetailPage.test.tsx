@@ -578,6 +578,16 @@ describe('ServiceLocationDetailPage', () => {
     expect(backLink).toHaveAttribute('href', '/work-orders');
   });
 
+  it('back-link restores the filters the Locations list was carrying', async () => {
+    mockApiResponses();
+    renderDetailPage(`location-1?from=locations&back=${encodeURIComponent('status=inactive')}`);
+    await waitFor(() => {
+      expect(screen.getByText('Main Office')).toBeInTheDocument();
+    });
+    const backLink = screen.getByRole('link', { name: /All locations/i });
+    expect(backLink).toHaveAttribute('href', '/service-locations?status=inactive');
+  });
+
   it('back-link restores the filters the work-order list was carrying', async () => {
     mockApiResponses();
     const back = encodeURIComponent('unassigned=true&q=lenox');
