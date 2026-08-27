@@ -142,6 +142,7 @@ const LOCATION_TABS = [
 // ─────────────────────────────────────────────────────────────────────────
 function useBackContext(location: ServiceLocationDetailDto): { label: string; href: string } {
   const [params] = useSearchParams();
+  const { getName } = useGlossary();
   const from = (params.get('from') || '').toLowerCase();
 
   if (from === 'work-order') {
@@ -149,7 +150,19 @@ function useBackContext(location: ServiceLocationDetailDto): { label: string; hr
     // the human-readable WO number rides woNo for the label.
     const woId = params.get('woId');
     const woNo = params.get('woNo');
-    if (woId) return { label: woNo || 'Work order', href: `/work-orders/${woId}` };
+    if (woId) return { label: woNo || getName('work_order'), href: `/work-orders/${woId}` };
+  }
+  // The work-order LIST — a different surface from `work-order`, which is one
+  // job's page. `back` carries the list's own query string (filters, chips,
+  // page), so a dispatcher returns to the queue they were working rather than
+  // the default Open view. It's only ever spliced in after the `?`, so it
+  // can't redirect off the route.
+  if (from === 'work-orders') {
+    const back = params.get('back');
+    return {
+      label: getName('work_order', true),
+      href: back ? `/work-orders?${back}` : '/work-orders',
+    };
   }
   if (from === 'locations') {
     // Spec labels this "All locations · {customer}". There's no per-customer

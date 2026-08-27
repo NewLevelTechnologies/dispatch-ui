@@ -257,10 +257,24 @@ describe('WorkOrdersPage', () => {
     renderWithProviders(<WorkOrdersPage />);
 
     const link = await screen.findByRole('link', { name: "John's House" });
-    expect(link).toHaveAttribute('href', '/service-locations/location-1');
+    // ?from carries the back-context so the location page's back-link returns
+    // to the list rather than defaulting to the parent customer.
+    expect(link).toHaveAttribute('href', '/service-locations/location-1?from=work-orders');
     // An unnamed location falls back to the CUSTOMER's name, which isn't a
     // location — it stays plain text rather than linking somewhere it isn't.
     expect(screen.getByText('Jane Smith').closest('a')).toBeNull();
+  });
+
+  it('carries the active filter state so the back-link returns to the same queue', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({ data: pageOf(mockWorkOrders) });
+
+    renderWithProviders(<WorkOrdersPage />, { initialPath: '/?unassigned=true&q=lenox' });
+
+    const link = await screen.findByRole('link', { name: "John's House" });
+    expect(link).toHaveAttribute(
+      'href',
+      `/service-locations/location-1?from=work-orders&back=${encodeURIComponent('unassigned=true&q=lenox')}`
+    );
   });
 
 

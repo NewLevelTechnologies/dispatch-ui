@@ -562,6 +562,15 @@ export default function WorkOrdersPage() {
     return qs ? `?${qs}` : '?';
   };
 
+  // Back-context for links that leave the list. `from` names the surface; the
+  // dispatcher's whole filter state rides along in `back` so the location
+  // page's back-link returns them to the queue they were working, not to the
+  // default Open view.
+  const locationHref = (locationId: string): string => {
+    const qs = searchParams.toString();
+    return `/service-locations/${locationId}?from=work-orders${qs ? `&back=${encodeURIComponent(qs)}` : ''}`;
+  };
+
   const showingStart = totalElements === 0 ? 0 : (pageNumber - 1) * PAGE_SIZE + 1;
   const showingEnd = Math.min(pageNumber * PAGE_SIZE, totalElements);
 
@@ -965,7 +974,7 @@ export default function WorkOrdersPage() {
                                   into a nav app or an email. */}
                               {workOrder.serviceLocation?.locationName ? (
                                 <RouterLink
-                                  to={`/service-locations/${workOrder.serviceLocation.id}`}
+                                  to={locationHref(workOrder.serviceLocation.id)}
                                   className="text-fg-accent hover:underline"
                                 >
                                   {workOrder.serviceLocation.locationName}

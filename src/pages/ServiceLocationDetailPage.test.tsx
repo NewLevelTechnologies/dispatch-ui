@@ -568,6 +568,27 @@ describe('ServiceLocationDetailPage', () => {
     expect(backLink).toHaveAttribute('href', '/customers/customer-1');
   });
 
+  it('back-link returns to the work-order list when it came from there', async () => {
+    mockApiResponses();
+    renderDetailPage('location-1?from=work-orders');
+    await waitFor(() => {
+      expect(screen.getByText('Main Office')).toBeInTheDocument();
+    });
+    const backLink = screen.getByRole('link', { name: /← Work Orders/i });
+    expect(backLink).toHaveAttribute('href', '/work-orders');
+  });
+
+  it('back-link restores the filters the work-order list was carrying', async () => {
+    mockApiResponses();
+    const back = encodeURIComponent('unassigned=true&q=lenox');
+    renderDetailPage(`location-1?from=work-orders&back=${back}`);
+    await waitFor(() => {
+      expect(screen.getByText('Main Office')).toBeInTheDocument();
+    });
+    const backLink = screen.getByRole('link', { name: /← Work Orders/i });
+    expect(backLink).toHaveAttribute('href', '/work-orders?unassigned=true&q=lenox');
+  });
+
   it('links to the parent customer from the Billed-to card', async () => {
     mockApiResponses();
     renderDetailPage();
