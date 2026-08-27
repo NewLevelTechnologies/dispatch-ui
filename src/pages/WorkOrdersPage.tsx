@@ -959,7 +959,20 @@ export default function WorkOrdersPage() {
                           <CellStack>
                             <CellTop className="truncate">
                               <span className="dt-inline-label">{getName('service_location')}: </span>
-                              {workOrder.serviceLocation?.locationName || workOrder.customer?.name || '-'}
+                              {/* The name navigates, the address below stays plain
+                                  text — same split as the Work-order cell, and it
+                                  keeps the address drag-selectable for the copy
+                                  into a nav app or an email. */}
+                              {workOrder.serviceLocation?.locationName ? (
+                                <RouterLink
+                                  to={`/service-locations/${workOrder.serviceLocation.id}`}
+                                  className="text-fg-accent hover:underline"
+                                >
+                                  {workOrder.serviceLocation.locationName}
+                                </RouterLink>
+                              ) : (
+                                workOrder.customer?.name || '-'
+                              )}
                             </CellTop>
                             <CellSub className="truncate">
                               {(() => {

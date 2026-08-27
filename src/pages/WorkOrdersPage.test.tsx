@@ -33,7 +33,6 @@ const mockWorkOrders = [
     id: 'aaaaaaaa-bbbb-cccc-dddd-111111111111',
     workOrderNumber: 'WO-00001',
     customerId: 'cccccccc-dddd-eeee-ffff-222222222222',
-    serviceLocationId: 'location-1',
     lifecycleState: 'ACTIVE' as const,
     progressCategory: 'NOT_STARTED' as const,
     priority: 'NORMAL' as const,
@@ -65,7 +64,6 @@ const mockWorkOrders = [
     id: 'bbbbbbbb-cccc-dddd-eeee-333333333333',
     workOrderNumber: 'WO-00002',
     customerId: 'dddddddd-eeee-ffff-0000-444444444444',
-    serviceLocationId: 'location-2',
     lifecycleState: 'ACTIVE' as const,
     progressCategory: 'IN_PROGRESS' as const,
     priority: 'NORMAL' as const,
@@ -251,6 +249,18 @@ describe('WorkOrdersPage', () => {
     expect(screen.getByText('Jane Smith')).toBeInTheDocument();
     expect(screen.getByText(/456 Oak Ave/)).toBeInTheDocument();
     expect(screen.getByText(/Marietta/)).toBeInTheDocument();
+  });
+
+  it('links the service location name to its detail page', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({ data: pageOf(mockWorkOrders) });
+
+    renderWithProviders(<WorkOrdersPage />);
+
+    const link = await screen.findByRole('link', { name: "John's House" });
+    expect(link).toHaveAttribute('href', '/service-locations/location-1');
+    // An unnamed location falls back to the CUSTOMER's name, which isn't a
+    // location — it stays plain text rather than linking somewhere it isn't.
+    expect(screen.getByText('Jane Smith').closest('a')).toBeNull();
   });
 
 
