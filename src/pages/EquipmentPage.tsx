@@ -170,6 +170,12 @@ export default function EquipmentPage() {
     return parts.join(', ');
   };
 
+  // Primary line of the location cell: the site's name, else its address.
+  // Either one NAMES the location, so either one carries the link (unlike the
+  // work-order list, whose fallback is the customer — a different entity).
+  const locationLabel = (item: EquipmentSummary): string =>
+    item.serviceLocationName || formatAddress(item);
+
   const statusViewTabs = [
     { id: EquipmentStatus.ACTIVE, label: t('equipment.status.active') },
     { id: EquipmentStatus.RETIRED, label: t('equipment.status.retired') },
@@ -364,23 +370,32 @@ export default function EquipmentPage() {
                       </td>
                       <td className={clsx(!item.serviceLocationId && 'dt-empty')}>
                         {item.serviceLocationId ? (
-                          <RouterLink
-                            to={locationHref(item.serviceLocationId)}
-                            className="block hover:text-accent-500"
-                          >
-                            <CellStack>
-                              <CellTop>
-                                <span className="dt-inline-label">{getName('service_location')}: </span>
-                                {item.serviceLocationName || formatAddress(item) || '-'}
-                              </CellTop>
-                              <CellSub>
-                                {[
-                                  item.serviceLocationName ? formatAddress(item) : null,
-                                  item.customerName,
-                                ].filter(Boolean).join(' · ')}
-                              </CellSub>
-                            </CellStack>
-                          </RouterLink>
+                          <CellStack>
+                            <CellTop>
+                              <span className="dt-inline-label">{getName('service_location')}: </span>
+                              {/* The link goes INSIDE the cell primitive — around
+                                  CellStack it can't tint anything, since .top/.bot
+                                  declare their own color. Accent at rest because
+                                  this leaves the list's own entity; the address
+                                  below stays plain text so it drag-selects. */}
+                              {locationLabel(item) ? (
+                                <RouterLink
+                                  to={locationHref(item.serviceLocationId)}
+                                  className="text-fg-accent hover:underline"
+                                >
+                                  {locationLabel(item)}
+                                </RouterLink>
+                              ) : (
+                                '-'
+                              )}
+                            </CellTop>
+                            <CellSub>
+                              {[
+                                item.serviceLocationName ? formatAddress(item) : null,
+                                item.customerName,
+                              ].filter(Boolean).join(' · ')}
+                            </CellSub>
+                          </CellStack>
                         ) : (
                           <span className="muted">-</span>
                         )}

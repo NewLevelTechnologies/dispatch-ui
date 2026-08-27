@@ -152,8 +152,11 @@ describe('EquipmentPage', () => {
       expect(screen.getByText('Main Office')).toBeInTheDocument();
     });
 
-    // Address + customer name in the secondary line.
-    expect(screen.getByText(/123 Main St, Atlanta, GA 30301.*Acme Inc/)).toBeInTheDocument();
+    // Address + customer name in the secondary line — outside the link, so it
+    // stays drag-selectable for the copy into a nav app or an email.
+    const sub = screen.getByText(/123 Main St, Atlanta, GA 30301.*Acme Inc/);
+    expect(sub).toBeInTheDocument();
+    expect(sub.closest('a')).toBeNull();
     // Cell is a link to the service location detail page.
     expect(screen.getByRole('link', { name: /Main Office/ })).toHaveAttribute(
       'href',
