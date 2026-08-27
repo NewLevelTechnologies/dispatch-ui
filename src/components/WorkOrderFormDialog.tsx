@@ -209,8 +209,10 @@ export default function WorkOrderFormDialog({ isOpen, onClose, workOrder, prefil
       // (detail when loaded, falling back to the summary for instant render).
       const wo = effective as WorkOrder;
       setFormData({
-        customerId: wo.customerId,
-        serviceLocationId: wo.serviceLocationId,
+        // The ids live on the nested records — the API sends no flat
+        // customerId / serviceLocationId on either the list or detail shape.
+        customerId: wo.customer?.id ?? '',
+        serviceLocationId: wo.serviceLocation?.id ?? '',
         workOrderTypeId: wo.workOrderTypeId ?? '',
         divisionId: wo.divisionId ?? '',
         priority: wo.priority ?? 'NORMAL',
@@ -221,8 +223,8 @@ export default function WorkOrderFormDialog({ isOpen, onClose, workOrder, prefil
       setSelectedLocation(
         wo.serviceLocation
           ? {
-              id: wo.serviceLocationId,
-              customerId: wo.customerId,
+              id: wo.serviceLocation.id,
+              customerId: wo.serviceLocation.customerId ?? wo.customer?.id ?? '',
               customerName: wo.customer?.name ?? '',
               locationName: wo.serviceLocation.locationName ?? null,
               address: wo.serviceLocation.address,

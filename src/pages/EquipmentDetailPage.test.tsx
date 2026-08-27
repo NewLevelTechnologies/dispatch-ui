@@ -269,6 +269,22 @@ describe('EquipmentDetailPage', () => {
     expect(img.src).toBe('https://example.com/profile.jpg');
   });
 
+  it('back-link goes to the parent location by default', async () => {
+    renderPage();
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Upstairs Furnace' })).toBeInTheDocument();
+    });
+    expect(screen.getByRole('link', { name: /←/ })).toHaveAttribute('href', '/service-locations/loc-1');
+  });
+
+  it('back-link returns to the equipment list, filters intact, when it came from there', async () => {
+    renderPage(`eq-1?from=equipment&back=${encodeURIComponent('status=ACTIVE&q=carrier')}`);
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Upstairs Furnace' })).toBeInTheDocument();
+    });
+    expect(screen.getByRole('link', { name: /←/ })).toHaveAttribute('href', '/equipment?status=ACTIVE&q=carrier');
+  });
+
   it('falls back to a placeholder icon when no profile image is set', async () => {
     mockGetById.mockResolvedValue(baseEquipment);
     renderPage();

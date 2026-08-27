@@ -335,7 +335,7 @@ export default function AddLocationPage() {
                 residence, a recognizable label for a commercial site). */}
             <Card title={getName('service_location')} className="mb-3.5">
               <Field size="xs">
-                <Label size="xs" required>{t('common.form.locationName')}</Label>
+                <Label size="xs" required>{t('common.form.locationName', { entity: getName('service_location') })}</Label>
                 <Input
                   size="xs"
                   value={form.locationName}

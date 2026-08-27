@@ -142,8 +142,13 @@ export interface WorkOrderAssignedUser {
 export interface WorkOrderSummary {
   id: string;
   workOrderNumber?: string;
-  customerId: string;
-  serviceLocationId: string;
+  // NOT sent by the API. Neither WorkOrderSummaryDto (list) nor
+  // WorkOrderResponse (detail) carries a flat id — both nest the whole record
+  // under `customer` / `serviceLocation`. Read the ids from `customer.id` /
+  // `serviceLocation.id`; these stay declared, and optional, only so the
+  // request-shaped form state that reuses this type still checks.
+  customerId?: string;
+  serviceLocationId?: string;
 
   // Tenant taxonomy
   workOrderTypeId?: string | null;

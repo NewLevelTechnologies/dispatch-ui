@@ -14,6 +14,7 @@ const mockRegionsGetAll = vi.fn();
 const mockEquipmentList = vi.fn();
 const mockSearchCustomers = vi.fn();
 const mockAddServiceLocation = vi.fn();
+const mockVerifyAddress = vi.fn();
 
 vi.mock('../api/workOrderApi', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../api/workOrderApi')>();
@@ -44,6 +45,7 @@ vi.mock('../api/customerApi', async (importOriginal) => {
       getServiceLocations: () => Promise.resolve([]),
       search: (...a: unknown[]) => mockSearchCustomers(...a),
       addServiceLocation: (...a: unknown[]) => mockAddServiceLocation(...a),
+      verifyAddress: (...a: unknown[]) => mockVerifyAddress(...a),
     },
   };
 });
@@ -100,6 +102,14 @@ describe('WorkOrderIntakePage', () => {
     });
     mockSearchCustomers.mockResolvedValue({ content: [], totalElements: 0, totalPages: 0, size: 5, number: 0 });
     mockAddServiceLocation.mockResolvedValue({ id: 'loc-added' });
+    // Quiet by default: located, nothing to suggest, no coordinates.
+    mockVerifyAddress.mockResolvedValue({
+      located: true,
+      suggestedSingleLine: null,
+      latitude: null,
+      longitude: null,
+      timeZone: null,
+    });
   });
 
   it('renders the intake form with the location picker, classification and one work-item draft', async () => {
@@ -164,8 +174,17 @@ describe('WorkOrderIntakePage', () => {
     await user.type(screen.getByLabelText(/^city/i), 'Chandler');
     await user.type(screen.getByLabelText(/^state/i), 'AZ');
     await user.type(screen.getByLabelText(/^zip/i), '85224');
-    await user.click(screen.getByRole('button', { name: /create & use/i }));
+    // Staging collapses the panel and writes NOTHING — intake has no
+    // server-side draft, so an abandoned call leaves no record behind.
+    await user.click(screen.getByRole('button', { name: /use this location/i }));
+    expect(mockAddServiceLocation).not.toHaveBeenCalled();
+    expect(screen.getAllByText('Red Lobster #123').length).toBeGreaterThan(0);
 
+    await user.selectOptions(screen.getByLabelText('Type'), 'type-1');
+    await user.type(screen.getByPlaceholderText(/no cooling upstairs/i), 'Walk-in down');
+    await user.click(screen.getByRole('button', { name: /add work order/i }));
+
+    // One transaction on submit: the location, then the job against it.
     await waitFor(() =>
       expect(mockAddServiceLocation).toHaveBeenCalledWith(
         'cust-darden',
@@ -179,16 +198,6 @@ describe('WorkOrderIntakePage', () => {
     // The whole point: the account was reused, not duplicated.
     expect(mockCreateCustomer).not.toHaveBeenCalled();
     expect(mockAddServiceLocation).toHaveBeenCalledTimes(1);
-
-    // The panel collapses to the picked-location row, and the work order then
-    // books against the location that now really exists.
-    // Collapsed picked row — the name also appears in the summary rail, so key
-    // off the row's own Change affordance.
-    await screen.findByText('Change');
-    expect(screen.getAllByText('Red Lobster #123').length).toBeGreaterThan(0);
-    await user.selectOptions(screen.getByLabelText('Type'), 'type-1');
-    await user.type(screen.getByPlaceholderText(/no cooling upstairs/i), 'Walk-in down');
-    await user.click(screen.getByRole('button', { name: /add work order/i }));
 
     await waitFor(() =>
       expect(mockCreateWorkOrder).toHaveBeenCalledWith(
@@ -207,7 +216,7 @@ describe('WorkOrderIntakePage', () => {
     await screen.findByRole('option', { name: 'Service Call' });
 
     await user.click(screen.getByRole('button', { name: /new customer/i }));
-    await user.type(screen.getByLabelText(/^name/i), 'Jordan Avila');
+    await user.type(screen.getByLabelText(/location name/i), 'Jordan Avila');
     await user.type(screen.getByLabelText(/^email/i), 'jordan@example.com');
     await user.type(screen.getByLabelText(/street address/i), '123 Main St');
     await user.type(screen.getByLabelText(/^city/i), 'Phoenix');
@@ -216,7 +225,12 @@ describe('WorkOrderIntakePage', () => {
     await user.selectOptions(screen.getByLabelText('Type'), 'type-1');
     await user.type(screen.getByPlaceholderText(/no cooling upstairs/i), 'No heat');
 
-    await user.click(screen.getByRole('button', { name: /create & use/i }));
+    await user.click(screen.getByRole('button', { name: /use this customer/i }));
+    expect(mockCreateCustomer).not.toHaveBeenCalled();
+
+    await user.selectOptions(screen.getByLabelText('Type'), 'type-1');
+    await user.type(screen.getByPlaceholderText(/no cooling upstairs/i), 'No heat');
+    await user.click(screen.getByRole('button', { name: /add work order/i }));
 
     await waitFor(() =>
       expect(mockCreateCustomer).toHaveBeenCalledWith(
@@ -236,7 +250,7 @@ describe('WorkOrderIntakePage', () => {
     await screen.findByRole('option', { name: 'Service Call' });
 
     await user.click(screen.getByRole('button', { name: /new customer/i }));
-    await user.type(screen.getByLabelText(/^name/i), 'Red Lobster #123');
+    await user.type(screen.getByLabelText(/location name/i), 'Red Lobster #123');
     await user.type(screen.getByLabelText(/^phone/i), '6025550100');
     await user.type(screen.getByLabelText(/street address/i), '2290 W Chandler Blvd');
     await user.type(screen.getByLabelText(/^city/i), 'Chandler');
@@ -258,7 +272,10 @@ describe('WorkOrderIntakePage', () => {
     await user.type(zips[zips.length - 1], '32837');
     await user.type(screen.getByLabelText(/billing email/i), 'ap@darden.com');
 
-    await user.click(screen.getByRole('button', { name: /create & use/i }));
+    await user.click(screen.getByRole('button', { name: /use this customer/i }));
+    await user.selectOptions(screen.getByLabelText('Type'), 'type-1');
+    await user.type(screen.getByPlaceholderText(/no cooling upstairs/i), 'Walk-in down');
+    await user.click(screen.getByRole('button', { name: /add work order/i }));
 
     await waitFor(() =>
       expect(mockCreateCustomer).toHaveBeenCalledWith(
@@ -360,16 +377,16 @@ describe('WorkOrderIntakePage', () => {
     // Reality 3 is reached from the picker's footer, not a mode toggle.
     await user.click(screen.getByRole('button', { name: /new customer/i }));
     // ONE name — no separate "location name" over-ask.
-    await user.type(screen.getByLabelText(/^name/i), 'Jordan Avila');
+    await user.type(screen.getByLabelText(/location name/i), 'Jordan Avila');
     await user.type(screen.getByLabelText(/^phone/i), '6025550100');
     await user.type(screen.getByLabelText(/^email/i), 'jordan@example.com');
     await user.type(screen.getByLabelText(/street address/i), '123 Main St');
     await user.type(screen.getByLabelText(/^city/i), 'Phoenix');
     await user.type(screen.getByLabelText(/^state/i), 'AZ');
     await user.type(screen.getByLabelText(/^zip/i), '85001');
-    // The record is created from the panel, not deferred to submit.
-    await user.click(screen.getByRole('button', { name: /create & use/i }));
-    await waitFor(() => expect(mockCreateCustomer).toHaveBeenCalled());
+    await user.click(screen.getByRole('button', { name: /use this customer/i }));
+    // Nothing written yet — one transaction on job submit.
+    expect(mockCreateCustomer).not.toHaveBeenCalled();
 
     await user.selectOptions(screen.getByLabelText('Type'), 'type-1');
     await user.type(screen.getByPlaceholderText(/no cooling upstairs/i), 'No heat');
@@ -390,5 +407,56 @@ describe('WorkOrderIntakePage', () => {
       )
     );
     await waitFor(() => expect(router.state.location.pathname).toBe('/work-orders/wo-new'));
+  });
+
+  it('offers the standardized address and saves the coordinates it geocoded', { timeout: 15000 }, async () => {
+    mockRegionsGetAll.mockResolvedValue([{ id: 'r-1', name: 'West' }]);
+    mockVerifyAddress.mockResolvedValue({
+      located: true,
+      suggestedSingleLine: '123 W MAIN ST, PHOENIX, AZ, 85001',
+      latitude: 33.4484,
+      longitude: -112.074,
+      timeZone: 'America/Phoenix',
+    });
+    const user = userEvent.setup();
+    renderIntake();
+    await screen.findByRole('heading', { name: /add work order/i, level: 1 });
+    await screen.findByRole('option', { name: 'Service Call' });
+
+    await user.click(screen.getByRole('button', { name: /new customer/i }));
+    await user.type(screen.getByLabelText(/location name/i), 'Jordan Avila');
+    await user.type(screen.getByLabelText(/^phone/i), '6025550100');
+    await user.type(screen.getByLabelText(/street address/i), '123 Main St');
+    await user.type(screen.getByLabelText(/^city/i), 'Phoenix');
+    await user.type(screen.getByLabelText(/^state/i), 'AZ');
+    await user.type(screen.getByLabelText(/^zip/i), '85001');
+    // Nothing is asked of the geocoder until the address is complete AND the
+    // CSR has left the field — never as they type.
+    expect(mockVerifyAddress).not.toHaveBeenCalled();
+    await user.tab();
+
+    // Offered, not forced: the CSR can take it or keep what they typed.
+    await screen.findByText('123 W MAIN ST, PHOENIX, AZ, 85001');
+    await user.click(screen.getByRole('button', { name: 'Use this' }));
+    expect(screen.getByLabelText(/street address/i)).toHaveValue('123 W MAIN ST');
+
+    await user.click(screen.getByRole('button', { name: /use this customer/i }));
+    await user.selectOptions(screen.getByLabelText('Type'), 'type-1');
+    await user.type(screen.getByPlaceholderText(/no cooling upstairs/i), 'No heat');
+    await user.click(screen.getByRole('button', { name: /add work order/i }));
+
+    // The coordinates ride along on the create, so the site has a map pin the
+    // moment it exists rather than after the server's async backfill.
+    await waitFor(() =>
+      expect(mockCreateCustomer).toHaveBeenCalledWith(
+        expect.objectContaining({
+          serviceLocations: [
+            expect.objectContaining({
+              address: expect.objectContaining({ latitude: 33.4484, longitude: -112.074 }),
+            }),
+          ],
+        })
+      )
+    );
   });
 });

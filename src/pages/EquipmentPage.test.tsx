@@ -152,12 +152,28 @@ describe('EquipmentPage', () => {
       expect(screen.getByText('Main Office')).toBeInTheDocument();
     });
 
-    // Address + customer name in the secondary line.
-    expect(screen.getByText(/123 Main St, Atlanta, GA 30301.*Acme Inc/)).toBeInTheDocument();
+    // Address + customer name in the secondary line — outside the link, so it
+    // stays drag-selectable for the copy into a nav app or an email.
+    const sub = screen.getByText(/123 Main St, Atlanta, GA 30301.*Acme Inc/);
+    expect(sub).toBeInTheDocument();
+    expect(sub.closest('a')).toBeNull();
     // Cell is a link to the service location detail page.
     expect(screen.getByRole('link', { name: /Main Office/ })).toHaveAttribute(
       'href',
-      '/service-locations/loc-1'
+      '/service-locations/loc-1?from=equipment'
+    );
+  });
+
+  it('carries the active filter state so a detail back-link returns to the same queue', async () => {
+    renderWithProviders(<EquipmentPage />, { initialPath: '/?status=ACTIVE&q=carrier' });
+
+    await waitFor(() => {
+      expect(screen.getByText('Main Office')).toBeInTheDocument();
+    });
+    const back = encodeURIComponent('status=ACTIVE&q=carrier');
+    expect(screen.getByRole('link', { name: /Main Office/ })).toHaveAttribute(
+      'href',
+      `/service-locations/loc-1?from=equipment&back=${back}`
     );
   });
 
@@ -420,7 +436,7 @@ describe('EquipmentPage', () => {
 
     // Default glossary maps equipment_component → "Unit", so the hint reads "Unit of {parent}".
     const hint = await screen.findByRole('link', { name: /unit of hvac system 01/i });
-    expect(hint).toHaveAttribute('href', '/equipment/parent-1');
+    expect(hint).toHaveAttribute('href', '/equipment/parent-1?from=equipment');
   });
 
   it('does not render the component hint for top-level equipment', async () => {
