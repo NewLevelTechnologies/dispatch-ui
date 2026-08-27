@@ -14,6 +14,7 @@ const mockRegionsGetAll = vi.fn();
 const mockEquipmentList = vi.fn();
 const mockSearchCustomers = vi.fn();
 const mockAddServiceLocation = vi.fn();
+const mockVerifyAddress = vi.fn();
 
 vi.mock('../api/workOrderApi', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../api/workOrderApi')>();
@@ -44,6 +45,7 @@ vi.mock('../api/customerApi', async (importOriginal) => {
       getServiceLocations: () => Promise.resolve([]),
       search: (...a: unknown[]) => mockSearchCustomers(...a),
       addServiceLocation: (...a: unknown[]) => mockAddServiceLocation(...a),
+      verifyAddress: (...a: unknown[]) => mockVerifyAddress(...a),
     },
   };
 });
@@ -100,6 +102,14 @@ describe('WorkOrderIntakePage', () => {
     });
     mockSearchCustomers.mockResolvedValue({ content: [], totalElements: 0, totalPages: 0, size: 5, number: 0 });
     mockAddServiceLocation.mockResolvedValue({ id: 'loc-added' });
+    // Quiet by default: located, nothing to suggest, no coordinates.
+    mockVerifyAddress.mockResolvedValue({
+      located: true,
+      suggestedSingleLine: null,
+      latitude: null,
+      longitude: null,
+      timeZone: null,
+    });
   });
 
   it('renders the intake form with the location picker, classification and one work-item draft', async () => {
@@ -397,5 +407,56 @@ describe('WorkOrderIntakePage', () => {
       )
     );
     await waitFor(() => expect(router.state.location.pathname).toBe('/work-orders/wo-new'));
+  });
+
+  it('offers the standardized address and saves the coordinates it geocoded', { timeout: 15000 }, async () => {
+    mockRegionsGetAll.mockResolvedValue([{ id: 'r-1', name: 'West' }]);
+    mockVerifyAddress.mockResolvedValue({
+      located: true,
+      suggestedSingleLine: '123 W MAIN ST, PHOENIX, AZ, 85001',
+      latitude: 33.4484,
+      longitude: -112.074,
+      timeZone: 'America/Phoenix',
+    });
+    const user = userEvent.setup();
+    renderIntake();
+    await screen.findByRole('heading', { name: /add work order/i, level: 1 });
+    await screen.findByRole('option', { name: 'Service Call' });
+
+    await user.click(screen.getByRole('button', { name: /new customer/i }));
+    await user.type(screen.getByLabelText(/location name/i), 'Jordan Avila');
+    await user.type(screen.getByLabelText(/^phone/i), '6025550100');
+    await user.type(screen.getByLabelText(/street address/i), '123 Main St');
+    await user.type(screen.getByLabelText(/^city/i), 'Phoenix');
+    await user.type(screen.getByLabelText(/^state/i), 'AZ');
+    await user.type(screen.getByLabelText(/^zip/i), '85001');
+    // Nothing is asked of the geocoder until the address is complete AND the
+    // CSR has left the field — never as they type.
+    expect(mockVerifyAddress).not.toHaveBeenCalled();
+    await user.tab();
+
+    // Offered, not forced: the CSR can take it or keep what they typed.
+    await screen.findByText('123 W MAIN ST, PHOENIX, AZ, 85001');
+    await user.click(screen.getByRole('button', { name: 'Use this' }));
+    expect(screen.getByLabelText(/street address/i)).toHaveValue('123 W MAIN ST');
+
+    await user.click(screen.getByRole('button', { name: /use this customer/i }));
+    await user.selectOptions(screen.getByLabelText('Type'), 'type-1');
+    await user.type(screen.getByPlaceholderText(/no cooling upstairs/i), 'No heat');
+    await user.click(screen.getByRole('button', { name: /add work order/i }));
+
+    // The coordinates ride along on the create, so the site has a map pin the
+    // moment it exists rather than after the server's async backfill.
+    await waitFor(() =>
+      expect(mockCreateCustomer).toHaveBeenCalledWith(
+        expect.objectContaining({
+          serviceLocations: [
+            expect.objectContaining({
+              address: expect.objectContaining({ latitude: 33.4484, longitude: -112.074 }),
+            }),
+          ],
+        })
+      )
+    );
   });
 });

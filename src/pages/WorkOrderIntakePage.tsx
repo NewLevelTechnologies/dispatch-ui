@@ -25,6 +25,8 @@ import { showError, showSuccess, extractApiError } from '../lib/toast';
 import AppLayout from '../components/AppLayout';
 import ServiceLocationPicker from '../components/ServiceLocationPicker';
 import WOEquipmentPicker from '../components/WOEquipmentPicker';
+import { AddressSuggestion } from '../components/AddressSuggestion';
+import { useAddressVerify, type AddressVerify } from '../hooks/useAddressVerify';
 import { titleCaseAddress } from '../utils/titleCaseAddress';
 import {
   buildCustomerCreateRequest,
@@ -195,6 +197,12 @@ export default function WorkOrderIntakePage() {
   const [newAddress, setNewAddress] = useState({ ...blankAddress });
   // Only collected when a separate party is invoiced — where the invoice goes.
   const [newBillingAddress, setNewBillingAddress] = useState({ ...blankAddress });
+  // Geocode-verify on blur — the same "suggest, don't force" flow as Add
+  // Customer / Add Location, and the reason a location booked at intake gets
+  // its map pin at save rather than waiting on the server's async backfill.
+  // One instance per address; `newAddress` is shared by both create panels.
+  const serviceAv = useAddressVerify();
+  const billingAv = useAddressVerify();
   const [premiseTouched, setPremiseTouched] = useState(false);
   const [dispatchRegionId, setDispatchRegionId] = useState('');
   const newName = newCustomer.name;
@@ -392,7 +400,9 @@ export default function WorkOrderIntakePage() {
           dispatchRegionId,
           locationName: newLocationName.trim(),
           premiseType: effectivePremise,
-          address: newAddress,
+          // Coordinates ride along only while they're the ones geocoded for
+          // this exact address — editing any field returns null instead.
+          address: { ...newAddress, ...(serviceAv.coordsFor(newAddress) ?? {}) },
         });
         queryClient.invalidateQueries({ queryKey: ['service-locations'] });
         queryClient.invalidateQueries({ queryKey: ['customer-service-locations', createForCustomer.id] });
@@ -416,8 +426,10 @@ export default function WorkOrderIntakePage() {
       const customerRequest: CreateCustomerRequest = buildCustomerCreateRequest(
         { ...newCustomer, premise: effectivePremise },
         {
-          serviceAddress: newAddress,
-          billingAddress: newCustomer.sameBilling ? undefined : newBillingAddress,
+          serviceAddress: { ...newAddress, ...(serviceAv.coordsFor(newAddress) ?? {}) },
+          billingAddress: newCustomer.sameBilling
+            ? undefined
+            : { ...newBillingAddress, ...(billingAv.coordsFor(newBillingAddress) ?? {}) },
           dispatchRegionId,
           contactNameTouched,
         }
@@ -545,6 +557,7 @@ export default function WorkOrderIntakePage() {
                       setLocationName={setNewLocationName}
                       address={newAddress}
                       setAddress={setNewAddress}
+                      verify={serviceAv}
                       premise={effectivePremise}
                       onPremiseChange={(v) => {
                         setPremiseTouched(true);
@@ -564,8 +577,10 @@ export default function WorkOrderIntakePage() {
                       setContactNameTouched={setContactNameTouched}
                       address={newAddress}
                       setAddress={setNewAddress}
+                      verify={serviceAv}
                       billingAddress={newBillingAddress}
                       setBillingAddress={setNewBillingAddress}
+                      billingVerify={billingAv}
                       defaultPremise={defaultPremise}
                       onPremiseChange={(v) => {
                         setPremiseTouched(true);
@@ -881,6 +896,7 @@ function NewLocationFields({
   setLocationName,
   address,
   setAddress,
+  verify,
   premise,
   onPremiseChange,
   dispatchRegionId,
@@ -895,6 +911,7 @@ function NewLocationFields({
   setLocationName: (v: string) => void;
   address: { streetAddress: string; city: string; state: string; zipCode: string };
   setAddress: (v: { streetAddress: string; city: string; state: string; zipCode: string }) => void;
+  verify: AddressVerify;
   premise: PremiseType;
   onPremiseChange: (v: PremiseType) => void;
   dispatchRegionId: string;
@@ -966,7 +983,13 @@ function NewLocationFields({
         <Label size="xs" required>
           Street address
         </Label>
-        <Input size="xs" value={address.streetAddress} onChange={(e) => set({ streetAddress: e.target.value })} placeholder="123 Main St" />
+        <Input
+          size="xs"
+          value={address.streetAddress}
+          onChange={(e) => set({ streetAddress: e.target.value })}
+          onBlur={() => verify.run(address)}
+          placeholder="123 Main St"
+        />
       </Field>
       {/* Same 12-column split as Add Customer's AddressBlock. */}
       <div className="grid grid-cols-12 gap-2">
@@ -974,19 +997,26 @@ function NewLocationFields({
           <Label size="xs" required>
             City
           </Label>
-          <Input size="xs" value={address.city} onChange={(e) => set({ city: e.target.value })} placeholder="Chandler" />
+          <Input size="xs" value={address.city} onChange={(e) => set({ city: e.target.value })} onBlur={() => verify.run(address)} placeholder="Chandler" />
         </Field>
         <Field size="xs" className="col-span-2">
           <Label size="xs" required>
             State
           </Label>
-          <Input size="xs" value={address.state} onChange={(e) => set({ state: e.target.value.toUpperCase() })} maxLength={2} placeholder="AZ" />
+          <Input
+            size="xs"
+            value={address.state}
+            onChange={(e) => set({ state: e.target.value.toUpperCase() })}
+            onBlur={() => verify.run(address)}
+            maxLength={2}
+            placeholder="AZ"
+          />
         </Field>
         <Field size="xs" className={hasRegions ? 'col-span-2' : 'col-span-4'}>
           <Label size="xs" required>
             ZIP
           </Label>
-          <Input size="xs" value={address.zipCode} onChange={(e) => set({ zipCode: e.target.value })} placeholder="85224" />
+          <Input size="xs" value={address.zipCode} onChange={(e) => set({ zipCode: e.target.value })} onBlur={() => verify.run(address)} placeholder="85224" />
         </Field>
         {hasRegions && (
           <Field size="xs" className="col-span-4">
@@ -1004,6 +1034,7 @@ function NewLocationFields({
           </Field>
         )}
       </div>
+      <AddressSuggestion verify={verify} typed={address} onAccept={(a) => setAddress({ ...address, ...a })} />
       <CreatePanelFoot
         readback={`Adds this ${getName('service_location').toLowerCase()} to ${customerName}`}
         label={`Use this ${getName('service_location').toLowerCase()}`}
@@ -1023,8 +1054,10 @@ function NewCustomerFields({
   setContactNameTouched,
   address,
   setAddress,
+  verify,
   billingAddress,
   setBillingAddress,
+  billingVerify,
   defaultPremise,
   onPremiseChange,
   dispatchRegionId,
@@ -1039,8 +1072,10 @@ function NewCustomerFields({
   setContactNameTouched: (v: boolean) => void;
   address: { streetAddress: string; city: string; state: string; zipCode: string };
   setAddress: (v: { streetAddress: string; city: string; state: string; zipCode: string }) => void;
+  verify: AddressVerify;
   billingAddress: { streetAddress: string; city: string; state: string; zipCode: string };
   setBillingAddress: (v: { streetAddress: string; city: string; state: string; zipCode: string }) => void;
+  billingVerify: AddressVerify;
   defaultPremise: PremiseType;
   onPremiseChange: (v: PremiseType) => void;
   dispatchRegionId: string;
@@ -1110,6 +1145,7 @@ function NewCustomerFields({
           size="xs"
           value={address.streetAddress}
           onChange={(e) => set({ streetAddress: e.target.value })}
+          onBlur={() => verify.run(address)}
           placeholder="4821 E Indian School Rd"
         />
       </Field>
@@ -1120,19 +1156,26 @@ function NewCustomerFields({
           <Label size="xs" required>
             City
           </Label>
-          <Input size="xs" value={address.city} onChange={(e) => set({ city: e.target.value })} placeholder="Phoenix" />
+          <Input size="xs" value={address.city} onChange={(e) => set({ city: e.target.value })} onBlur={() => verify.run(address)} placeholder="Phoenix" />
         </Field>
         <Field size="xs" className="col-span-2">
           <Label size="xs" required>
             State
           </Label>
-          <Input size="xs" value={address.state} onChange={(e) => set({ state: e.target.value.toUpperCase() })} maxLength={2} placeholder="AZ" />
+          <Input
+            size="xs"
+            value={address.state}
+            onChange={(e) => set({ state: e.target.value.toUpperCase() })}
+            onBlur={() => verify.run(address)}
+            maxLength={2}
+            placeholder="AZ"
+          />
         </Field>
         <Field size="xs" className={hasRegions ? 'col-span-2' : 'col-span-4'}>
           <Label size="xs" required>
             ZIP
           </Label>
-          <Input size="xs" value={address.zipCode} onChange={(e) => set({ zipCode: e.target.value })} placeholder="85018" />
+          <Input size="xs" value={address.zipCode} onChange={(e) => set({ zipCode: e.target.value })} onBlur={() => verify.run(address)} placeholder="85018" />
         </Field>
         {hasRegions && (
           <Field size="xs" className="col-span-4">
@@ -1150,6 +1193,7 @@ function NewCustomerFields({
           </Field>
         )}
       </div>
+      <AddressSuggestion verify={verify} typed={address} onAccept={(a) => setAddress({ ...address, ...a })} />
 
       <div className="pt-1">
         <div className="mb-1.5 text-[10px] font-bold tracking-[0.05em] text-fg-muted uppercase">Contact</div>
@@ -1260,6 +1304,7 @@ function NewCustomerFields({
               size="xs"
               value={billingAddress.streetAddress}
               onChange={(e) => setBilling({ streetAddress: e.target.value })}
+              onBlur={() => billingVerify.run(billingAddress)}
               placeholder="1000 Darden Center Dr"
             />
           </Field>
@@ -1268,7 +1313,13 @@ function NewCustomerFields({
               <Label size="xs" required>
                 City
               </Label>
-              <Input size="xs" value={billingAddress.city} onChange={(e) => setBilling({ city: e.target.value })} placeholder="Orlando" />
+              <Input
+                size="xs"
+                value={billingAddress.city}
+                onChange={(e) => setBilling({ city: e.target.value })}
+                onBlur={() => billingVerify.run(billingAddress)}
+                placeholder="Orlando"
+              />
             </Field>
             <Field size="xs" className="col-span-2">
               <Label size="xs" required>
@@ -1278,6 +1329,7 @@ function NewCustomerFields({
                 size="xs"
                 value={billingAddress.state}
                 onChange={(e) => setBilling({ state: e.target.value.toUpperCase() })}
+                onBlur={() => billingVerify.run(billingAddress)}
                 maxLength={2}
                 placeholder="FL"
               />
@@ -1286,9 +1338,20 @@ function NewCustomerFields({
               <Label size="xs" required>
                 ZIP
               </Label>
-              <Input size="xs" value={billingAddress.zipCode} onChange={(e) => setBilling({ zipCode: e.target.value })} placeholder="32837" />
+              <Input
+                size="xs"
+                value={billingAddress.zipCode}
+                onChange={(e) => setBilling({ zipCode: e.target.value })}
+                onBlur={() => billingVerify.run(billingAddress)}
+                placeholder="32837"
+              />
             </Field>
           </div>
+          <AddressSuggestion
+            verify={billingVerify}
+            typed={billingAddress}
+            onAccept={(a) => setBillingAddress({ ...billingAddress, ...a })}
+          />
           <div className="border-t border-border-soft pt-2.5">
             {/* No AP contact name: accounts payable is a department, not a
                 person we ask for — the channel is the whole requirement. */}
