@@ -6,15 +6,11 @@ This is the **root documentation** for the Dispatch monorepo, which contains bot
 
 ## 🚧 WORK IN PROGRESS - MONOREPO MIGRATION 🚧
 
-**Status**: Phase 1 complete, Phase 2 in progress
+**Status**: Phases 1–4 & 7 complete. Remaining: mobile scaffold (Phase 5), docs polish (Phase 8).
 
-**TODO - Update this file as we build:**
-- [ ] Document `packages/types` once extracted
-- [ ] Document `packages/api` once extracted
-- [ ] Document `packages/utils` once extracted
-- [ ] Add examples of importing from shared packages
-- [ ] Add troubleshooting section for monorepo issues
-- [ ] Document mobile app once created
+**TODO:**
+- [ ] Document mobile app once created (Phase 5)
+- [ ] Final documentation polish (Phase 8)
 
 ---
 
@@ -360,20 +356,21 @@ export default defineConfig({
 
 ## Migration Status
 
-**Current Phase**: Phase 1 Complete ✅
+**Current Phase**: Phases 1–4 & 7 Complete ✅
 
 - [x] Create monorepo structure
 - [x] Set up root package.json with Turborepo
 - [x] Create pnpm workspace configuration
 - [x] Move web app to `apps/web/`
 - [x] Create shared package scaffolds
-- [ ] **Extract `packages/types`** (Phase 2 - In Progress)
-- [ ] **Extract `packages/api`** (Phase 2 - In Progress)
-- [ ] **Extract `packages/utils`** (Phase 2 - In Progress)
-- [ ] Update imports in web app (Phase 3)
-- [ ] Test web app in monorepo (Phase 4)
+- [x] Extract `packages/api` (Phase 2)
+- [x] Extract `packages/utils` (Phase 2)
+- [x] Extract `packages/i18n` (Phase 2)
+- [x] `packages/types` — placeholder; types colocated with APIs (Phase 2)
+- [x] Update imports in web app (Phase 3)
+- [x] Test web app in monorepo (Phase 4)
 - [ ] Add mobile app scaffold (Phase 5)
-- [ ] Update CI/CD workflows (Phase 7)
+- [x] Update CI/CD workflows (Phase 7)
 - [ ] Update documentation (Phase 8)
 
 ---
