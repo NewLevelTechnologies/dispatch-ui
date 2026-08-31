@@ -147,7 +147,7 @@ vi.mock('react-i18next', () => {
     'common.form.firstName': 'First Name',
     'common.form.lastName': 'Last Name',
     'common.form.afterHoursPhone': 'After-Hours Phone',
-    'common.form.locationName': 'Location Name',
+    'common.form.locationName': '{{entity}} Name',
     'common.form.mobilePhone': 'Mobile',
     'common.form.name': 'Name',
     'common.form.notes': 'Notes',

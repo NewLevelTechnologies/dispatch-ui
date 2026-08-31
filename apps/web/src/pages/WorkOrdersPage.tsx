@@ -27,6 +27,7 @@ import { useGlossary } from '../contexts/GlossaryContext';
 import { useCurrentUser } from '../hooks/useCurrentUser';
 import AppLayout from '../components/AppLayout';
 import { titleCaseAddress } from '../utils/titleCaseAddress';
+import { withBackContext } from '../lib/backContext';
 import WorkOrderFormDialog from '../components/WorkOrderFormDialog';
 import CancelWorkOrderDialog from '../components/CancelWorkOrderDialog';
 import { Button } from '../components/catalyst/button';
@@ -562,6 +563,12 @@ export default function WorkOrdersPage() {
     return qs ? `?${qs}` : '?';
   };
 
+  // Links that leave the list carry the dispatcher's whole filter state, so the
+  // location page's back-link returns them to the queue they were working
+  // rather than the default Open view (see lib/backContext).
+  const locationHref = (locationId: string): string =>
+    withBackContext(`/service-locations/${locationId}`, 'work-orders', searchParams.toString());
+
   const showingStart = totalElements === 0 ? 0 : (pageNumber - 1) * PAGE_SIZE + 1;
   const showingEnd = Math.min(pageNumber * PAGE_SIZE, totalElements);
 
@@ -959,7 +966,20 @@ export default function WorkOrdersPage() {
                           <CellStack>
                             <CellTop className="truncate">
                               <span className="dt-inline-label">{getName('service_location')}: </span>
-                              {workOrder.serviceLocation?.locationName || workOrder.customer?.name || '-'}
+                              {/* The name navigates, the address below stays plain
+                                  text — same split as the Work-order cell, and it
+                                  keeps the address drag-selectable for the copy
+                                  into a nav app or an email. */}
+                              {workOrder.serviceLocation?.locationName ? (
+                                <RouterLink
+                                  to={locationHref(workOrder.serviceLocation.id)}
+                                  className="text-fg-accent hover:underline"
+                                >
+                                  {workOrder.serviceLocation.locationName}
+                                </RouterLink>
+                              ) : (
+                                workOrder.customer?.name || '-'
+                              )}
                             </CellTop>
                             <CellSub className="truncate">
                               {(() => {

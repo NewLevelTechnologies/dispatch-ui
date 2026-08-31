@@ -1,6 +1,7 @@
 import { useState, useDeferredValue } from 'react';
 import clsx from 'clsx';
 import { Link as RouterLink, useNavigate, useSearchParams } from 'react-router-dom';
+import { withBackContext } from '../lib/backContext';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from '@dispatch/i18n';
 import { EllipsisVerticalIcon } from '@heroicons/react/24/outline';
@@ -50,6 +51,12 @@ export default function EquipmentPage() {
   // right page in a new tab. Internal `page` here stays 0-based to match the
   // backend Spring Page contract.
   const [searchParams, setSearchParams] = useSearchParams();
+  // Links off the list carry its filter state, so a detail page's back-link
+  // returns to this queue rather than a default view (see lib/backContext).
+  const detailHref = (equipmentId: string): string =>
+    withBackContext(`/equipment/${equipmentId}`, 'equipment', searchParams.toString());
+  const locationHref = (locationId: string): string =>
+    withBackContext(`/service-locations/${locationId}`, 'equipment', searchParams.toString());
   const page = Math.max(0, parseInt(searchParams.get('page') ?? '1', 10) - 1);
   const setPage = (next: number) => {
     const params = new URLSearchParams(searchParams);
@@ -162,6 +169,12 @@ export default function EquipmentPage() {
     if (cityState) parts.push(cityState);
     return parts.join(', ');
   };
+
+  // Primary line of the location cell: the site's name, else its address.
+  // Either one NAMES the location, so either one carries the link (unlike the
+  // work-order list, whose fallback is the customer — a different entity).
+  const locationLabel = (item: EquipmentSummary): string =>
+    item.serviceLocationName || formatAddress(item);
 
   const statusViewTabs = [
     { id: EquipmentStatus.ACTIVE, label: t('equipment.status.active') },
@@ -319,7 +332,7 @@ export default function EquipmentPage() {
                     <DenseRow key={item.id}>
                       <td>
                         <div className="flex items-center gap-2">
-                          <RouterLink to={`/equipment/${item.id}`}>
+                          <RouterLink to={detailHref(item.id)}>
                             <EquipmentThumbnail
                               url={item.profileImageUrl}
                               name={item.name}
@@ -333,7 +346,7 @@ export default function EquipmentPage() {
                           <CellStack>
                             <CellTop>
                               <RouterLink
-                                to={`/equipment/${item.id}`}
+                                to={detailHref(item.id)}
                                 className="hover:text-accent-500 hover:underline"
                               >
                                 {item.name}
@@ -342,7 +355,7 @@ export default function EquipmentPage() {
                             {item.parentId && item.parentName && (
                               <CellSub>
                                 <RouterLink
-                                  to={`/equipment/${item.parentId}`}
+                                  to={detailHref(item.parentId)}
                                   className="hover:text-accent-500 hover:underline"
                                 >
                                   {t('equipment.table.componentOf', {
@@ -357,23 +370,32 @@ export default function EquipmentPage() {
                       </td>
                       <td className={clsx(!item.serviceLocationId && 'dt-empty')}>
                         {item.serviceLocationId ? (
-                          <RouterLink
-                            to={`/service-locations/${item.serviceLocationId}`}
-                            className="block hover:text-accent-500"
-                          >
-                            <CellStack>
-                              <CellTop>
-                                <span className="dt-inline-label">{getName('service_location')}: </span>
-                                {item.serviceLocationName || formatAddress(item) || '-'}
-                              </CellTop>
-                              <CellSub>
-                                {[
-                                  item.serviceLocationName ? formatAddress(item) : null,
-                                  item.customerName,
-                                ].filter(Boolean).join(' · ')}
-                              </CellSub>
-                            </CellStack>
-                          </RouterLink>
+                          <CellStack>
+                            <CellTop>
+                              <span className="dt-inline-label">{getName('service_location')}: </span>
+                              {/* The link goes INSIDE the cell primitive — around
+                                  CellStack it can't tint anything, since .top/.bot
+                                  declare their own color. Accent at rest because
+                                  this leaves the list's own entity; the address
+                                  below stays plain text so it drag-selects. */}
+                              {locationLabel(item) ? (
+                                <RouterLink
+                                  to={locationHref(item.serviceLocationId)}
+                                  className="text-fg-accent hover:underline"
+                                >
+                                  {locationLabel(item)}
+                                </RouterLink>
+                              ) : (
+                                '-'
+                              )}
+                            </CellTop>
+                            <CellSub>
+                              {[
+                                item.serviceLocationName ? formatAddress(item) : null,
+                                item.customerName,
+                              ].filter(Boolean).join(' · ')}
+                            </CellSub>
+                          </CellStack>
                         ) : (
                           <span className="muted">-</span>
                         )}

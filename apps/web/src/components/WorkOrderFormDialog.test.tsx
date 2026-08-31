@@ -78,8 +78,14 @@ describe('WorkOrderFormDialog', () => {
   describe('Edit mode', () => {
     const existingWorkOrder = {
       id: '1',
-      customerId: 'customer-1',
-      serviceLocationId: 'location-1',
+      // Wire shape: the API nests both records and sends no flat ids.
+      customer: { id: 'customer-1', name: 'John Doe' },
+      serviceLocation: {
+        id: 'location-1',
+        customerId: 'customer-1',
+        locationName: "John's House",
+        address: { streetAddress: '123 Main St', city: 'Atlanta', state: 'GA', zipCode: '30301' },
+      },
       lifecycleState: 'ACTIVE' as const,
       progressCategory: 'NOT_STARTED' as const,
       priority: 'NORMAL' as const,
@@ -290,8 +296,14 @@ describe('WorkOrderFormDialog', () => {
     it('successfully updates work order in edit mode', async () => {
       const existingWorkOrder = {
         id: '1',
-        customerId: 'customer-1',
-        serviceLocationId: 'location-1',
+        // Wire shape: the API nests both records and sends no flat ids.
+        customer: { id: 'customer-1', name: 'John Doe' },
+        serviceLocation: {
+          id: 'location-1',
+          customerId: 'customer-1',
+          locationName: "John's House",
+          address: { streetAddress: '123 Main St', city: 'Atlanta', state: 'GA', zipCode: '30301' },
+        },
         lifecycleState: 'ACTIVE' as const,
         progressCategory: 'NOT_STARTED' as const,
         priority: 'NORMAL' as const,
@@ -325,16 +337,9 @@ describe('WorkOrderFormDialog', () => {
         expect(screen.getByText('Not Started')).toBeInTheDocument();
       });
 
-      // Select a service location first (required even in edit mode)
-      const searchInput = screen.getByPlaceholderText('Search by customer, address, or phone...');
-      await user.type(searchInput, 'john');
-
-      await waitFor(() => {
-        expect(screen.getByText("John's House")).toBeInTheDocument();
-      });
-
-      const firstResult = screen.getByText("John's House").closest('button');
-      await user.click(firstResult!);
+      // The location is already prefilled from the nested serviceLocation, so
+      // the picker shows the selection rather than a search box — no re-pick.
+      expect(screen.getByText("John's House")).toBeInTheDocument();
 
       // Update an editable WO field — priority is a segmented button group;
       // click "High" to flip from the default "Normal".
@@ -348,7 +353,9 @@ describe('WorkOrderFormDialog', () => {
       // Update payload contains only editable fields.
       // status / description / internalNotes are NOT part of the contract anymore.
       // serviceLocationId IS now editable (cross-customer reassignment is in
-      // scope) — confirm it's carried through on the patch.
+      // scope) — confirm the prefilled one is carried through on the patch.
+      // It comes from the nested record; there is no flat id on the wire, and
+      // reading one sent `undefined` here.
       await waitFor(() => {
         expect(apiClient.patch).toHaveBeenCalledWith('/work-orders/1', expect.objectContaining({
           priority: 'HIGH',
@@ -424,8 +431,14 @@ describe('WorkOrderFormDialog', () => {
     it('shows cancellation banner and disables submit when work order is cancelled', async () => {
       const cancelledWorkOrder = {
         id: '1',
-        customerId: 'customer-1',
-        serviceLocationId: 'location-1',
+        // Wire shape: the API nests both records and sends no flat ids.
+        customer: { id: 'customer-1', name: 'John Doe' },
+        serviceLocation: {
+          id: 'location-1',
+          customerId: 'customer-1',
+          locationName: "John's House",
+          address: { streetAddress: '123 Main St', city: 'Atlanta', state: 'GA', zipCode: '30301' },
+        },
         lifecycleState: 'CANCELLED' as const,
         progressCategory: 'CANCELLED' as const,
         priority: 'NORMAL' as const,
@@ -556,8 +569,14 @@ describe('WorkOrderFormDialog', () => {
     it('does not show radio toggle in edit mode', async () => {
       const existingWorkOrder = {
         id: '1',
-        customerId: 'customer-1',
-        serviceLocationId: 'location-1',
+        // Wire shape: the API nests both records and sends no flat ids.
+        customer: { id: 'customer-1', name: 'John Doe' },
+        serviceLocation: {
+          id: 'location-1',
+          customerId: 'customer-1',
+          locationName: "John's House",
+          address: { streetAddress: '123 Main St', city: 'Atlanta', state: 'GA', zipCode: '30301' },
+        },
         lifecycleState: 'ACTIVE' as const,
         progressCategory: 'NOT_STARTED' as const,
         priority: 'NORMAL' as const,
