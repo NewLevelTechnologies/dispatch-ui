@@ -135,27 +135,29 @@ Dispatch UI is the frontend for the Dispatch management platform, built with **V
 - **Authentication**: AWS Amplify 6.16.3 (Cognito integration)
 - **HTTP Client**: Axios 1.13.6
 - **Animation**: Motion 12.36.0
-- **Package Manager**: npm
+- **Package Manager**: pnpm (via monorepo root)
 
 ## Build & Run Commands
 
 ### Development
 
+All commands run from the **monorepo root** (`dispatch/`):
+
 ```bash
-# Install dependencies
-npm install
+# Install dependencies (all workspaces)
+pnpm install
 
-# Start dev server (http://localhost:5173)
-npm run dev
+# Start web dev server (http://localhost:5173)
+pnpm web:dev
 
-# Build for production
-npm run build
+# Build web app (via Turborepo)
+pnpm turbo run build --filter=web
 
-# Preview production build
-npm run preview
+# Run linter (all projects)
+pnpm turbo run lint
 
-# Run linter
-npm run lint
+# Run tests with coverage (all projects)
+pnpm turbo run test:coverage
 ```
 
 ### Environment Variables
@@ -300,19 +302,12 @@ Every entity (Customers, Work Orders, Equipment, etc.) follows this pattern:
 ## Project Structure
 
 ```
-dispatch-ui/
+apps/web/
 ├── src/
 │   ├── main.tsx              # Entry point with Amplify + React Query setup
 │   ├── App.tsx               # Routes and authentication
 │   ├── api/
-│   │   ├── client.ts         # Shared Axios instance with JWT auth
-│   │   ├── index.ts          # Central barrel export for all APIs
-│   │   ├── customerApi.ts    # Customer service API
-│   │   ├── workOrderApi.ts   # Work Order service API
-│   │   ├── userApi.ts        # User management API
-│   │   ├── equipmentApi.ts   # Equipment, Parts, Warehouses APIs
-│   │   ├── financialApi.ts   # Invoices, Quotes, Payments APIs
-│   │   └── schedulingApi.ts  # Dispatches, Availability, Recurring Orders APIs
+│   │   └── setup.ts          # Configures @dispatch/api with Amplify auth, re-exports all APIs
 │   ├── components/
 │   │   ├── AppLayout.tsx     # Main layout with sidebar navigation
 │   │   ├── *FormDialog.tsx   # Dialog components for create/edit
@@ -326,13 +321,18 @@ dispatch-ui/
 │   ├── test/
 │   │   ├── setup.ts          # Test configuration and mocks
 │   │   └── utils.tsx         # Custom render with providers
-│   └── types/
-│       └── index.ts          # TypeScript type definitions
-├── .github/workflows/        # CI/CD pipelines
-├── package.json              # Dependencies and scripts
-├── vite.config.ts            # Vite configuration
-└── vitest.config.ts          # Vitest test configuration
+│   └── utils/
+│       └── invalidateRoleConsumers.ts  # React Query cache helper (web-only)
+├── package.json
+├── vite.config.ts
+└── vitest.config.ts
 ```
+
+**Shared packages** (see root CLAUDE.md for details):
+- `packages/api/` — API services, types, Axios client (`@dispatch/api`)
+- `packages/utils/` — Formatters, validators, color/label helpers (`@dispatch/utils`)
+- `packages/i18n/` — i18next config and locale files (`@dispatch/i18n`)
+- `packages/types/` — Placeholder for cross-package types (`@dispatch/types`)
 
 ---
 
@@ -340,112 +340,70 @@ dispatch-ui/
 
 ### Overview
 
-The application uses **dedicated API service classes** for all backend communication:
+API services live in the shared `@dispatch/api` package (`packages/api/src/`), making them available to both the web and mobile apps. The web app configures the shared client with Amplify auth via `src/api/setup.ts` and re-exports everything.
 
-- **Single source of truth**: Shared `apiClient` handles authentication and configuration
-- **Type safety**: TypeScript interfaces for all requests and responses
-- **Consistency**: Standard CRUD patterns across all services
-- **Maintainability**: Easy to update authentication, error handling, or base URLs
-- **Testability**: Simple to mock in tests
-
-### API Service Structure
-
-Each domain has its own API service file:
-
-- **`customerApi.ts`** - Customer CRUD operations
-- **`workOrderApi.ts`** - Work Order CRUD operations
-- **`userApi.ts`** - User management operations
-- **`equipmentApi.ts`** - Equipment, Parts Inventory, and Warehouses
-- **`financialApi.ts`** - Invoices, Quotes, and Payments
-- **`schedulingApi.ts`** - Dispatches, Availability, and Recurring Orders
-
-### Central Barrel Export
-
-All APIs are exported from `src/api/index.ts`:
+### How the web app uses APIs
 
 ```typescript
-// Single import for everything you need
-import { customerApi, workOrderApi, type Customer, type WorkOrder } from '../api';
+// Web app components import from the local setup, which re-exports @dispatch/api
+import { customerApi, workOrderApi, type Customer, type WorkOrder } from '../api/setup';
 ```
+
+`src/api/setup.ts` does three things:
+1. Points `apiClient` at `VITE_API_BASE_URL`
+2. Wires in Amplify auth via `createAmplifyAuthProvider()`
+3. Re-exports all of `@dispatch/api`
 
 ### Creating a New API Service
 
-**Pattern structure** (see `src/api/customerApi.ts` for full example):
+Create the service in `packages/api/src/`, not in the web app:
 
 ```typescript
-// src/api/inventoryApi.ts
-import apiClient from './client';
+// packages/api/src/inventoryApi.ts
+import { apiClient } from './client';
 
-export interface InventoryItem {
-  id: string;
-  name: string;
-  quantity: number;
-}
-
+export interface InventoryItem { id: string; name: string; quantity: number; }
 export interface CreateInventoryItemRequest { /* ... */ }
-export interface UpdateInventoryItemRequest { /* ... */ }
 
 export const inventoryApi = {
   getAll: async (): Promise<InventoryItem[]> => {
     const response = await apiClient.get<InventoryItem[]>('/inventory');
     return response.data;
   },
-  getById: async (id: string): Promise<InventoryItem> => { /* ... */ },
-  create: async (request: CreateInventoryItemRequest): Promise<InventoryItem> => { /* ... */ },
-  update: async (id: string, request: UpdateInventoryItemRequest): Promise<InventoryItem> => { /* ... */ },
-  delete: async (id: string): Promise<void> => { /* ... */ },
+  // ...
 };
-
-export default inventoryApi;
 ```
 
-**Then export from** `src/api/index.ts`:
+**Then export from** `packages/api/src/index.ts`:
 ```typescript
-export { inventoryApi, type InventoryItem, type CreateInventoryItemRequest, type UpdateInventoryItemRequest } from './inventoryApi';
+export { inventoryApi, type InventoryItem, type CreateInventoryItemRequest } from './inventoryApi';
 ```
+
+The web app picks it up automatically through `setup.ts`'s `export * from '@dispatch/api'`.
 
 ### Using API Services with React Query
 
 ```typescript
-import { customerApi, type Customer } from '../api';
+import { customerApi, type Customer } from '../api/setup';
 
-// Fetch data
 const { data, isLoading, error } = useQuery({
   queryKey: ['customers'],
   queryFn: () => customerApi.getAll(),
 });
 
-// Create
 const createMutation = useMutation({
   mutationFn: (data: Customer) => customerApi.create(data),
-  onSuccess: () => {
-    queryClient.invalidateQueries({ queryKey: ['customers'] });
-  },
-});
-
-// Update
-const updateMutation = useMutation({
-  mutationFn: (data: Customer) => customerApi.update(customer.id, data),
-  onSuccess: () => {
-    queryClient.invalidateQueries({ queryKey: ['customers'] });
-  },
-});
-
-// Delete
-const deleteMutation = useMutation({
-  mutationFn: (id: string) => customerApi.delete(id),
-  onSuccess: () => {
-    queryClient.invalidateQueries({ queryKey: ['customers'] });
-  },
+  onSuccess: () => queryClient.invalidateQueries({ queryKey: ['customers'] }),
 });
 ```
 
-**Benefits of this pattern**:
-- ✅ No need to import `apiClient` directly in components
-- ✅ TypeScript autocomplete for all API methods
-- ✅ Consistent error handling across the app
-- ✅ Easy to add custom methods (e.g., `getByCustomer()`, `search()`)
-- ✅ Simple to mock in tests: `vi.mock('../api')`
+### Mocking in tests
+
+```typescript
+import { apiClient } from '../api/setup';
+vi.mock('../api/setup');
+vi.mocked(apiClient.get).mockResolvedValue({ data: mockData });
+```
 
 ---
 
@@ -555,9 +513,9 @@ Follow this pattern for consistency. **See `CustomersPage.tsx` and `CustomerForm
 ```typescript
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useTranslation } from 'react-i18next';
+import { useTranslation } from '@dispatch/i18n';
 import { useGlossary } from '../contexts/GlossaryContext'; // ALWAYS add this
-import { entityApi, type Entity } from '../api';
+import { entityApi, type Entity } from '../api/setup';
 import AppLayout from '../components/AppLayout';
 import EntityFormDialog from '../components/EntityFormDialog';
 ```
@@ -574,9 +532,9 @@ import EntityFormDialog from '../components/EntityFormDialog';
 ```typescript
 import { useState, useEffect } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { useTranslation } from 'react-i18next';
+import { useTranslation } from '@dispatch/i18n';
 import { useGlossary } from '../contexts/GlossaryContext'; // ALWAYS add this
-import { entityApi, type Entity } from '../api';
+import { entityApi, type Entity } from '../api/setup';
 import { Dialog, DialogActions, DialogBody, DialogDescription, DialogTitle } from './catalyst/dialog';
 ```
 
@@ -673,7 +631,7 @@ which initializes i18next from the shared package, and components import
 ### Using Translations in Components
 
 ```typescript
-import { useTranslation } from 'react-i18next';
+import { useTranslation } from '@dispatch/i18n';
 
 const { t } = useTranslation();
 
@@ -869,36 +827,23 @@ const createMutation = useMutation({
 
 ### Authentication Pattern
 
-**API Client** (`src/api/client.ts`) automatically adds JWT tokens to all requests via Axios interceptor using AWS Amplify `fetchAuthSession()`.
+`src/api/setup.ts` configures the shared `@dispatch/api` client with Amplify auth on startup. Components never touch auth directly — `apiClient` adds the JWT automatically.
 
 ---
 
 ## Common Utilities
 
-### Date Formatting
+Shared utilities live in `@dispatch/utils` (`packages/utils/src/`):
 
 ```typescript
-const formatDate = (dateString?: string) => {
-  if (!dateString) return '-';
-  return new Date(dateString).toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-  });
-};
+import { formatCurrency, formatPhone, formatTimestamp } from '@dispatch/utils';
+import { titleCaseAddress, validateEmail, workItemLabel } from '@dispatch/utils';
+import { roleAccent, roleColor, tagPillTone } from '@dispatch/utils';
+import { parseAttributes, buildAttributes, formatSpecValue } from '@dispatch/utils';
+import { tripsByWorkItem, formatFilterSize } from '@dispatch/utils';
 ```
 
-### Currency Formatting
-
-```typescript
-const formatCurrency = (amount?: number) => {
-  if (!amount) return '-';
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-  }).format(amount);
-};
-```
+The only web-local util is `invalidateRoleConsumers.ts` (React Query cache helper).
 
 ---
 
@@ -908,14 +853,13 @@ const formatCurrency = (amount?: number) => {
 
 **PR Checks** (`.github/workflows/pr-checks.yml`):
 - Runs on PRs to `dev`, `qa`, `main`
-- Lints code: `npm run lint`
-- Builds project: `npm run build`
+- Uses pnpm + Turborepo: `pnpm turbo run lint`, `test:coverage`, `build --filter=web`
 - **Branch protection**: PRs cannot merge if checks fail
 
 **Deploy** (`.github/workflows/deploy.yml`):
-- Runs on push to `dev` branch
-- Builds with Vite: `npm run build`
-- Syncs to S3: `s3://dispatch-dev-frontend`
+- Runs on push to `dev` branch (with path filters for `apps/web/**`, `packages/**`)
+- Builds with Turborepo: `pnpm turbo run build --filter=web`
+- Syncs `apps/web/dist/` to S3: `s3://dispatch-dev-frontend`
 - Invalidates CloudFront: Distribution `E21TOAR61GO7PC`
 - Uses OIDC (IAM role: `dispatch-dev-github-actions-dispatch-ui`)
 
@@ -923,7 +867,7 @@ const formatCurrency = (amount?: number) => {
 - Manual workflow to create/update repository labels
 
 **PR Auto Labeler** (`.github/workflows/pr-labeler.yml`):
-- Auto-labels PRs by branch name, changed files, and size
+- Auto-labels PRs by branch name, changed files, size, and monorepo scope (`app:web`, `pkg:api`, etc.)
 
 ### GitHub Actions Variables
 
@@ -955,11 +899,11 @@ The project uses strict TypeScript ESLint rules:
 ### Fixing Linting Errors
 
 ```bash
-# Auto-fix what can be auto-fixed
-npm run lint -- --fix
+# Auto-fix what can be auto-fixed (from monorepo root)
+pnpm turbo run lint -- --fix
 
 # Check remaining issues
-npm run lint
+pnpm turbo run lint
 ```
 
 **Common fixes**:
@@ -986,17 +930,14 @@ The project uses **Vitest** + **React Testing Library** for automated testing.
 ### Running Tests
 
 ```bash
-# Run all tests (watch mode)
-npm test
+# Run all tests (from monorepo root)
+pnpm test
 
-# Run tests once (CI mode)
-npm test -- --run
+# Run with coverage (all projects)
+pnpm turbo run test:coverage
 
-# Run with UI
-npm run test:ui
-
-# Run with coverage
-npm run test:coverage
+# Run web tests only (watch mode, from apps/web/)
+cd apps/web && pnpm test
 ```
 
 ### Test File Patterns
@@ -1020,9 +961,9 @@ renderWithProviders(<MyComponent />);
 **Mock API calls**:
 ```typescript
 import { vi } from 'vitest';
-import apiClient from '../api/client';
+import { apiClient } from '../api/setup';
 
-vi.mock('../api/client');
+vi.mock('../api/setup');
 
 // In test:
 vi.mocked(apiClient.get).mockResolvedValue({ data: mockData });
@@ -1030,7 +971,7 @@ vi.mocked(apiClient.get).mockResolvedValue({ data: mockData });
 
 ### Testing Best Practices
 
-1. **Mock API calls at the module level**: `vi.mock('../api/client')`
+1. **Mock API calls at the module level**: `vi.mock('../api/setup')`
 2. **Clear mocks between tests**: `beforeEach(() => { vi.clearAllMocks(); })`
 3. **Use `waitFor` for async operations**: `await waitFor(() => { expect(...).toBeInTheDocument(); })`
 4. **Simulate user interactions with `userEvent`**: `await user.click(button)`
@@ -1133,7 +1074,7 @@ export default defineConfig({
 
 **4. Linting errors prevent commit**
 - **Problem**: ESLint errors block PR checks
-- **Solution**: Run `npm run lint -- --fix` to auto-fix, then manually fix remaining issues
+- **Solution**: Run `pnpm turbo run lint -- --fix` to auto-fix, then manually fix remaining issues
 
 **5. CORS errors**
 - **Problem**: API calls blocked
@@ -1163,12 +1104,12 @@ This frontend uses a **modern, simple architecture**:
 - ✅ TypeScript for type safety
 - ✅ Vite for fast builds
 - ✅ AWS Amplify for authentication
-- ✅ i18n support with react-i18next and parameterized keys
+- ✅ i18n support with `@dispatch/i18n` and parameterized keys
 
 **When adding new features**:
 1. **CRITICAL**: Import `useGlossary` and use `getName()` for all entity names (see GLOSSARY_INTEGRATION.md)
-2. Create API service class in `src/api/` with TypeScript interfaces
-3. Export from `src/api/index.ts` barrel file
+2. Create API service in `packages/api/src/` and export from `packages/api/src/index.ts`
+3. Import in the web app via `from '../api/setup'` (it re-exports `@dispatch/api`)
 4. Follow the Entity Page + Form Dialog pattern (see CustomersPage.tsx as reference)
 5. Use the API service with React Query
 6. Use Catalyst UI components
