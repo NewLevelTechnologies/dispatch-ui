@@ -12,8 +12,8 @@
     "clean": "turbo run clean && rm -rf node_modules",
     "web:dev": "turbo run dev --filter=web",
     "mobile:dev": "turbo run dev --filter=mobile",
-    "mobile:ios": "cd apps/mobile && npm run ios",
-    "mobile:android": "cd apps/mobile && npm run android"
+    "mobile:ios": "cd apps/mobile && pnpm ios",
+    "mobile:android": "cd apps/mobile && pnpm android"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.4",
