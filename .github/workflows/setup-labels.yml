@@ -24,7 +24,15 @@ jobs:
               { name: 'test', color: 'bfe5bf', description: 'Test updates' },
               { name: 'refactoring', color: 'fbca04', description: 'Code refactoring' },
 
-              // Frontend-specific labels
+              // Scope labels — which app or package a PR touches
+              { name: 'app:web', color: '1d76db', description: 'Changes to the web app (apps/web)' },
+              { name: 'app:mobile', color: '1d76db', description: 'Changes to the mobile app (apps/mobile)' },
+              { name: 'pkg:api', color: '5319e7', description: 'Changes to @dispatch/api' },
+              { name: 'pkg:utils', color: '5319e7', description: 'Changes to @dispatch/utils' },
+              { name: 'pkg:i18n', color: '5319e7', description: 'Changes to @dispatch/i18n' },
+              { name: 'pkg:types', color: '5319e7', description: 'Changes to @dispatch/types' },
+
+              // Content-type labels
               { name: 'components', color: 'c5def5', description: 'React component changes' },
               { name: 'pages', color: 'c5def5', description: 'Page-level changes' },
               { name: 'api', color: 'c5def5', description: 'API integration changes' },

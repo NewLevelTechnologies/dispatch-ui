@@ -69,17 +69,37 @@ jobs:
             for (const file of files) {
               const path = file.filename;
 
-              // Component-specific labels (apps/*/src/components/)
+              // Scope labels — which app or shared package is touched
+              if (path.startsWith('apps/web/')) {
+                labels.add('app:web');
+              }
+              if (path.startsWith('apps/mobile/')) {
+                labels.add('app:mobile');
+              }
+              if (path.startsWith('packages/api/')) {
+                labels.add('pkg:api');
+              }
+              if (path.startsWith('packages/utils/')) {
+                labels.add('pkg:utils');
+              }
+              if (path.startsWith('packages/i18n/')) {
+                labels.add('pkg:i18n');
+              }
+              if (path.startsWith('packages/types/')) {
+                labels.add('pkg:types');
+              }
+
+              // Content-type labels
               if (path.includes('/components/')) {
                 labels.add('components');
               }
               if (path.includes('/pages/') || path.includes('/features/')) {
                 labels.add('pages');
               }
-              if (path.startsWith('packages/api/') || path.includes('/api/')) {
+              if (path.includes('/api/')) {
                 labels.add('api');
               }
-              if (path.startsWith('packages/utils/') || path.includes('/utils/') || path.includes('/lib/')) {
+              if (path.includes('/utils/') || path.includes('/lib/')) {
                 labels.add('utils');
               }
 
