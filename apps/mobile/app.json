@@ -1,0 +1,17 @@
+{
+  "expo": {
+    "name": "Dispatch",
+    "slug": "dispatch-mobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "dispatch",
+    "platforms": ["ios", "android"],
+    "ios": {
+      "bundleIdentifier": "com.newleveltech.dispatch"
+    },
+    "android": {
+      "package": "com.newleveltech.dispatch"
+    },
+    "plugins": ["expo-router", "expo-secure-store"]
+  }
+}
