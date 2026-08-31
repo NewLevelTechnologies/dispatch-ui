@@ -17,7 +17,7 @@ import InlineComposer from './InlineComposer';
 import WorkItemStatusPill from './WorkItemStatusPill';
 import WorkItemEquipmentBlock from './WorkItemEquipmentBlock';
 import EquipmentThumbnail from './EquipmentThumbnail';
-import { workItemLabel } from '../utils/workItemLabel';
+import { workItemLabel } from '@dispatch/utils';
 import { progressRailColor } from '../lib/workItemProgress';
 import { Button } from './catalyst/button';
 import { Input } from './catalyst/input';

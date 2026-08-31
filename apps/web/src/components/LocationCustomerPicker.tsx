@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { useTranslation } from '@dispatch/i18n';
 import { customerApi, type CustomerListDto } from '../api/setup';
 import { useGlossary } from '../contexts/GlossaryContext';
-import { titleCaseAddress } from '../utils/titleCaseAddress';
+import { titleCaseAddress } from '@dispatch/utils';
 import { Input } from './catalyst/input';
 import { CustomerResultRow } from './CustomerResultRow';
 

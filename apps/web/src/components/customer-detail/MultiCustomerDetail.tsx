@@ -47,8 +47,7 @@ import CustomerWorkOrdersTab from './CustomerWorkOrdersTab';
 import CustomerContactsTab from './CustomerContactsTab';
 import { OrgMark } from './shared';
 import { formatDateShort } from './format';
-import { formatPhone } from '@dispatch/utils';
-import { titleCaseAddress } from '../../utils/titleCaseAddress';
+import { formatPhone, titleCaseAddress } from '@dispatch/utils';
 import { useUrlTab } from '../../hooks/useUrlTab';
 import { equipmentCreateUrl, equipmentEditUrl } from '../../lib/equipmentCreate';
 

@@ -15,7 +15,7 @@
 // stays in flow so revealing it never shifts layout.
 // ─────────────────────────────────────────────────────────────────
 import clsx from 'clsx';
-import { tagPillTone } from '../../utils/tagColor';
+import { tagPillTone } from '@dispatch/utils';
 
 interface TagPillProps {
   /** The tag's color enum (NEUTRAL, INFO, ACCENT_1, …). Off-enum → neutral. */

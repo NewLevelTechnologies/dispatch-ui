@@ -10,7 +10,7 @@
 // status palette flows through without each caller having to map.
 // ─────────────────────────────────────────────────────────────────
 import clsx from 'clsx';
-import { roleAccent } from '../../utils/roleColor';
+import { roleAccent } from '@dispatch/utils';
 
 // Approval embeds can return null name/accentId when the upstream status
 // row has been deleted or hasn't yet propagated through the cross-service

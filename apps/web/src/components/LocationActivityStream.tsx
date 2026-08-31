@@ -28,7 +28,7 @@ import {
 } from '../api/setup';
 import { useGlossary } from '../contexts/GlossaryContext';
 import { useHasCapability } from '../hooks/useCurrentUser';
-import { formatExactTimestamp, formatTimestamp } from '@dispatch/utils';
+import { formatExactTimestamp, formatTimestamp, roleColor } from '@dispatch/utils';
 import { ACTIVITY_TONE_STYLE, glyphFor, type ActivityTone } from '../lib/activityGlyph';
 import {
   buildDays,
@@ -44,7 +44,6 @@ import {
   type TFunc,
 } from '../lib/locationActivityRows';
 import { resolveEventSummary } from './activityFormatters';
-import { roleColor } from '../utils/roleColor';
 import { LoadingState } from './ui/LoadingState';
 
 const PAGE_SIZE = 50;

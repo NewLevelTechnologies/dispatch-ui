@@ -1,4 +1,4 @@
-import type { DispatchBoardRow } from '../api/setup';
+import type { DispatchBoardRow } from '@dispatch/api';
 
 /**
  * Maps each work-item id → the positional trip numbers that address it.

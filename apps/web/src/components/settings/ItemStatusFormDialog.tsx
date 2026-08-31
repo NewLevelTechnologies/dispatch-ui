@@ -19,7 +19,7 @@ import { CheckboxField, Checkbox } from '../catalyst/checkbox';
 import { Button } from '../catalyst/button';
 import { AccentPicker } from '../ui/AccentPicker';
 import { dense } from '../ui/dense';
-import { STATUS_ACCENT_OPTIONS } from '../../utils/roleColor';
+import { STATUS_ACCENT_OPTIONS } from '@dispatch/utils';
 import { showError, extractApiError } from '../../lib/toast';
 import { toUpperSnake } from '../../lib/code';
 

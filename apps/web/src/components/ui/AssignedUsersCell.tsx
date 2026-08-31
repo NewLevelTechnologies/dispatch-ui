@@ -14,7 +14,7 @@
 // ─────────────────────────────────────────────────────────────────
 import { useTranslation } from '@dispatch/i18n';
 import type { WorkOrderAssignedUser } from '../../api/setup';
-import { roleColor } from '../../utils/roleColor';
+import { roleColor } from '@dispatch/utils';
 
 function userInitials(name: string): string {
   const parts = name.trim().split(/\s+/);

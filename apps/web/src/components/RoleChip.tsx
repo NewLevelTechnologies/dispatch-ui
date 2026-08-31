@@ -1,5 +1,5 @@
 import type { CSSProperties } from 'react';
-import { roleAccent } from '../utils/roleColor';
+import { roleAccent } from '@dispatch/utils';
 
 // Small dot + role name chip used in the user-detail header and Roles +
 // Regions card. One component, one source of truth for size and color, so

@@ -16,7 +16,7 @@ import { Text } from '../components/catalyst/text';
 import { useCurrentUser } from '../hooks/useCurrentUser';
 import { useTheme } from '../components/ThemeProvider';
 import { userApi, type User } from '../api/setup';
-import { roleColor } from '../utils/roleColor';
+import { roleColor } from '@dispatch/utils';
 import { showError, showSuccess, extractApiError } from '../lib/toast';
 import { Callout } from '../components/ui/Callout';
 import { ToggleGroup, ToggleGroupOption } from '../components/ui/ToggleGroup';

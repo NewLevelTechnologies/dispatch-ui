@@ -36,8 +36,7 @@ import { Button } from './catalyst/button';
 import { SlideOver } from './catalyst/slideover';
 import WorkOrderFileUploadDialog from './WorkOrderFileUploadDialog';
 import { FileLightbox } from './WorkOrderFilesTab';
-import { formatPhone } from '@dispatch/utils';
-import { workItemLabel } from '../utils/workItemLabel';
+import { formatPhone, workItemLabel } from '@dispatch/utils';
 
 type PillTone = 'neutral' | 'info' | 'success' | 'warning' | 'danger' | 'accent' | 'violet';
 

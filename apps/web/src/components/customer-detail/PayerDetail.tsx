@@ -49,8 +49,7 @@ import { buildAttentionItems } from './attention';
 import { useGoToInvoicesBucket } from './invoiceAgingNav';
 import { PayerMark, CardTitle } from './shared';
 import { formatDateShort, formatMoney } from './format';
-import { formatPhone } from '@dispatch/utils';
-import { titleCaseAddress } from '../../utils/titleCaseAddress';
+import { formatPhone, titleCaseAddress } from '@dispatch/utils';
 
 type TabId = 'overview' | 'invoices' | 'contacts' | 'activity';
 const PAYER_TABS: readonly TabId[] = ['overview', 'invoices', 'contacts', 'activity'];

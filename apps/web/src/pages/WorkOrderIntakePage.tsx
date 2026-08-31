@@ -27,7 +27,7 @@ import ServiceLocationPicker from '../components/ServiceLocationPicker';
 import WOEquipmentPicker from '../components/WOEquipmentPicker';
 import { AddressSuggestion } from '../components/AddressSuggestion';
 import { useAddressVerify, type AddressVerify } from '../hooks/useAddressVerify';
-import { titleCaseAddress } from '../utils/titleCaseAddress';
+import { titleCaseAddress } from '@dispatch/utils';
 import {
   buildCustomerCreateRequest,
   contactChannelError,

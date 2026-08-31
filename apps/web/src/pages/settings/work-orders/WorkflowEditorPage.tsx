@@ -19,7 +19,7 @@ import { Button } from '../../../components/catalyst/button';
 import { LoadingState } from '../../../components/ui/LoadingState';
 import { ErrorState } from '../../../components/ui/ErrorState';
 import ConfirmDialog from '../../../components/ConfirmDialog';
-import { roleAccent } from '../../../utils/roleColor';
+import { roleAccent } from '@dispatch/utils';
 import { extractApiError, showError, showSuccess } from '../../../lib/toast';
 import { WorkflowMatrix } from './WorkflowMatrix';
 import TransitionEditPanel from './TransitionEditPanel';

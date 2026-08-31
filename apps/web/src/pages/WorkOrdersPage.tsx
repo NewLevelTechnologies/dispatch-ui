@@ -26,7 +26,7 @@ import {
 import { useGlossary } from '../contexts/GlossaryContext';
 import { useCurrentUser } from '../hooks/useCurrentUser';
 import AppLayout from '../components/AppLayout';
-import { titleCaseAddress } from '../utils/titleCaseAddress';
+import { titleCaseAddress } from '@dispatch/utils';
 import { withBackContext } from '../lib/backContext';
 import WorkOrderFormDialog from '../components/WorkOrderFormDialog';
 import CancelWorkOrderDialog from '../components/CancelWorkOrderDialog';

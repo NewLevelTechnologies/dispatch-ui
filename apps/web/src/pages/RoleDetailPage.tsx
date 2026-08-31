@@ -33,7 +33,7 @@ import {
   DropdownMenu,
 } from '../components/catalyst/dropdown';
 import ConfirmDialog from '../components/ConfirmDialog';
-import { roleAccentFromRole } from '../utils/roleColor';
+import { roleAccentFromRole } from '@dispatch/utils';
 import { invalidateRoleConsumers } from '../utils/invalidateRoleConsumers';
 import { showError, showSuccess, extractApiError } from '../lib/toast';
 

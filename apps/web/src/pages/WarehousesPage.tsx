@@ -5,7 +5,7 @@ import { useTranslation } from '@dispatch/i18n';
 import { PatternFormat } from 'react-number-format';
 import { EllipsisVerticalIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import AppLayout from '../components/AppLayout';
-import { titleCaseAddress } from '../utils/titleCaseAddress';
+import { titleCaseAddress } from '@dispatch/utils';
 import { Button } from '../components/catalyst/button';
 import { PageHead } from '../components/ui/PageHead';
 import { Card, CardBody } from '../components/ui/Card';

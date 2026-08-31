@@ -45,14 +45,11 @@ import { useGlossary } from '../../contexts/GlossaryContext';
 import { Card } from '../../components/catalyst/card';
 import { CardTitle, CardLink } from '../../components/customer-detail/shared';
 import { Pill, Tag } from '../../components/ui/Pill';
-import { workItemLabel } from '../../utils/workItemLabel';
+import { formatPhone, titleCaseAddress, tripsByWorkItem, workItemLabel } from '@dispatch/utils';
 import { Avatar } from '../../components/ui/Avatar';
 import NotesCard from '../../components/NotesCard';
 import EquipmentThumbnail from '../../components/EquipmentThumbnail';
 import { ActivityRow } from '../../components/ActivityStream';
-import { formatPhone } from '@dispatch/utils';
-import { titleCaseAddress } from '../../utils/titleCaseAddress';
-import { tripsByWorkItem } from '../../utils/tripsByWorkItem';
 import { PROGRESS_TONE } from '../../lib/workItemProgress';
 
 type PillTone = 'neutral' | 'info' | 'success' | 'warning' | 'danger' | 'accent' | 'violet';

@@ -5,7 +5,7 @@ import { useTranslation } from '@dispatch/i18n';
 import { PatternFormat } from 'react-number-format';
 import { contactApi, type AdditionalContact, type CreateAdditionalContactRequest } from '../api/setup';
 import { extractApiError, showError } from '../lib/toast';
-import { validateEmail } from '../utils/validation';
+import { validateEmail } from '@dispatch/utils';
 import { Dialog, DialogActions, DialogBody, DialogDescription, DialogTitle } from './catalyst/dialog';
 import { Button } from './catalyst/button';
 import { Field, FieldGroup, Fieldset, Label } from './catalyst/fieldset';

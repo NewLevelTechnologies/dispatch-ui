@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { RoleChip } from './RoleChip';
-import { roleAccent, roleColor } from '../utils/roleColor';
+import { roleAccent, roleColor } from '@dispatch/utils';
 
 describe('RoleChip', () => {
   it('renders the role name', () => {

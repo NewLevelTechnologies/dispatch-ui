@@ -59,7 +59,7 @@ import { ListFooter } from '../../../components/ui/ListFooter';
 import { LoadingState } from '../../../components/ui/LoadingState';
 import { PageHead } from '../../../components/ui/PageHead';
 import { extractApiError, showError, showSuccess } from '../../../lib/toast';
-import { formatFilterSize } from '../../../utils/formatFilterSize';
+import { formatFilterSize } from '@dispatch/utils';
 
 const QUERY_KEY = ['tenant-filter-sizes'] as const;
 

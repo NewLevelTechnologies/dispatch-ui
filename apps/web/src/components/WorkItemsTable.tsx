@@ -15,7 +15,7 @@ import {
   type WorkItemResponse,
   type WorkItemStatus,
 } from '../api/setup';
-import { formatFilterSize } from '../utils/formatFilterSize';
+import { formatFilterSize } from '@dispatch/utils';
 import { useGlossary } from '../contexts/GlossaryContext';
 import EquipmentNotesSection from './EquipmentNotesSection';
 import EquipmentThumbnail from './EquipmentThumbnail';

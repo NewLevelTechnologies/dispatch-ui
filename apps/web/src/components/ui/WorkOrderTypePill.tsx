@@ -8,7 +8,7 @@
 // `--wo-type-accent` custom property; the `.wo-type-pill` class (components.css)
 // turns it into the light/dark tint + text treatment (dark mode brightens it).
 import type { CSSProperties } from 'react';
-import { roleAccent } from '../../utils/roleColor';
+import { roleAccent } from '@dispatch/utils';
 
 export function WorkOrderTypePill({
   type,

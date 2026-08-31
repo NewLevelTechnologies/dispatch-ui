@@ -6,7 +6,7 @@ import { useTranslation } from '@dispatch/i18n';
 import { ChevronRightIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import { PatternFormat } from 'react-number-format';
 import { userApi, dispatchRegionApi, type Role } from '../api/setup';
-import { roleAccentFromRole } from '../utils/roleColor';
+import { roleAccentFromRole } from '@dispatch/utils';
 import { showError, showSuccess, extractApiError } from '../lib/toast';
 import { Badge } from '../components/catalyst/badge';
 import { Button } from '../components/catalyst/button';

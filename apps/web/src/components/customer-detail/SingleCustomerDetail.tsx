@@ -55,8 +55,7 @@ import { EquipmentSummaryCard } from '../detail/EquipmentSummaryCard';
 import { SiteWorkOrdersCard, SiteInstructionsCard, SiteContactCard, DispatchesTab } from '../detail/locationCards';
 import { OrgMark } from './shared';
 import { formatDateShort } from './format';
-import { formatPhone } from '@dispatch/utils';
-import { titleCaseAddress } from '../../utils/titleCaseAddress';
+import { formatPhone, titleCaseAddress } from '@dispatch/utils';
 
 type TabId = 'overview' | 'equipment' | 'jobs' | 'agreements' | 'invoices' | 'dispatches' | 'files' | 'activity';
 const SINGLE_TABS: readonly TabId[] = ['overview', 'equipment', 'jobs', 'agreements', 'invoices', 'dispatches', 'files', 'activity'];

@@ -45,7 +45,7 @@ import clsx from 'clsx';
 import { useGlossary } from '../../contexts/GlossaryContext';
 import { showError, showSuccess, extractApiError } from '../../lib/toast';
 import { handleConcurrentEdit } from '../../lib/conflict';
-import { titleCaseAddress } from '../../utils/titleCaseAddress';
+import { titleCaseAddress } from '@dispatch/utils';
 import { Card } from '../catalyst/card';
 import { Button } from '../catalyst/button';
 import { Checkbox } from '../catalyst/checkbox';

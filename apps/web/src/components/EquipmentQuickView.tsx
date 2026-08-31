@@ -14,7 +14,7 @@ import {
   type EquipmentNote,
 } from '../api/setup';
 import { workOrdersListQueryOptions } from '../api/setup';
-import { formatFilterSize } from '../utils/formatFilterSize';
+import { formatFilterSize } from '@dispatch/utils';
 import { equipmentCreateUrl } from '../lib/equipmentCreate';
 import { useGlossary } from '../contexts/GlossaryContext';
 import ConfirmDialog from './ConfirmDialog';

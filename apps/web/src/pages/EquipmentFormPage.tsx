@@ -32,7 +32,7 @@ import { Heading } from '../components/catalyst/heading';
 import { Text } from '../components/catalyst/text';
 import { Callout } from '../components/ui/Callout';
 import { SpecFieldInput } from '../components/EquipmentSpecFields';
-import { parseAttributes, buildAttributes, matchOption } from '../utils/equipmentAttributes';
+import { parseAttributes, buildAttributes, matchOption } from '@dispatch/utils';
 
 // Nameplate review markers. READ = OCR filled it (accent); VERIFY = OCR is
 // error-prone here, confirm it (amber). Cleared the moment the field is edited.

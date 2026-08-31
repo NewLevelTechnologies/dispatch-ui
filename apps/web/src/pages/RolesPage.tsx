@@ -26,7 +26,7 @@ import { FilterChipListbox, ChipListboxOption } from '../components/ui/FilterChi
 import { LoadingState } from '../components/ui/LoadingState';
 import { EmptyState } from '../components/ui/EmptyState';
 import { ErrorState } from '../components/ui/ErrorState';
-import { roleAccentFromRole } from '../utils/roleColor';
+import { roleAccentFromRole } from '@dispatch/utils';
 import { invalidateRoleConsumers } from '../utils/invalidateRoleConsumers';
 import { showError, showSuccess, extractApiError } from '../lib/toast';
 

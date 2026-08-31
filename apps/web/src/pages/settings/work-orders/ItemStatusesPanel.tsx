@@ -33,7 +33,7 @@ import { LoadingState } from '../../../components/ui/LoadingState';
 import { EmptyState } from '../../../components/ui/EmptyState';
 import { ErrorState } from '../../../components/ui/ErrorState';
 import { DragHandle } from '../../../components/settings/DragHandle';
-import { roleAccent } from '../../../utils/roleColor';
+import { roleAccent } from '@dispatch/utils';
 import ConfirmDialog from '../../../components/ConfirmDialog';
 import ItemStatusFormDialog from '../../../components/settings/ItemStatusFormDialog';
 

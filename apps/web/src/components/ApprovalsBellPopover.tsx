@@ -34,7 +34,7 @@ import { Avatar } from './ui/Avatar';
 import { Button } from './catalyst/button';
 import { Textarea } from './catalyst/textarea';
 import { extractApiError, showError, showSuccess } from '../lib/toast';
-import { roleAccent } from '../utils/roleColor';
+import { roleAccent } from '@dispatch/utils';
 
 type BellTab = 'forMe' | 'mine';
 

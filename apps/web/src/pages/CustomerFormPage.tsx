@@ -33,7 +33,7 @@ import { ToggleGroup, ToggleGroupOption } from '../components/ui/ToggleGroup';
 import { Badge } from '../components/catalyst/badge';
 import { US_STATES } from '../constants/states';
 import { AddressSuggestion } from '../components/AddressSuggestion';
-import { titleCaseAddress } from '../utils/titleCaseAddress';
+import { titleCaseAddress } from '@dispatch/utils';
 import { useAddressVerify } from '../hooks/useAddressVerify';
 
 // Add Customer — creates a Customer + its FIRST service location atomically

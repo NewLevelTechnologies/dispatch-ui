@@ -16,7 +16,7 @@
 // current entity's own entry out in edit mode (so the user can keep
 // their existing color).
 // ─────────────────────────────────────────────────────────────────
-import { ROLE_ACCENT_OPTIONS, type AccentOption } from '../../utils/roleColor';
+import { ROLE_ACCENT_OPTIONS, type AccentOption } from '@dispatch/utils';
 
 interface Props<TOwner> {
   value: string;

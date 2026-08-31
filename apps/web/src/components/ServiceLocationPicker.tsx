@@ -15,7 +15,7 @@ import { useGlossary } from '../contexts/GlossaryContext';
 import { Button } from './catalyst/button';
 import { Field, Label } from './catalyst/fieldset';
 import { Input, InputGroup } from './catalyst/input';
-import { titleCaseAddress } from '../utils/titleCaseAddress';
+import { titleCaseAddress } from '@dispatch/utils';
 
 interface ServiceLocationPickerProps {
   value: ServiceLocationSearchResult | null;

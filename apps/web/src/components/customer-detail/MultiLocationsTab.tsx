@@ -23,13 +23,12 @@ import {
   type ServiceLocation,
 } from '../../api/setup';
 import { useGlossary } from '../../contexts/GlossaryContext';
-import { formatPhone } from '@dispatch/utils';
+import { formatPhone, titleCaseAddress } from '@dispatch/utils';
 import { Card } from '../catalyst/card';
 import { Button } from '../catalyst/button';
 import { Input, InputGroup } from '../catalyst/input';
 import { Pill } from '../ui/Pill';
 import { DenseTable, DenseTHead, DenseRow, CellStack, CellTop, CellSub } from '../ui/DenseTable';
-import { titleCaseAddress } from '../../utils/titleCaseAddress';
 import { formatDateShort, formatMoney } from './format';
 
 type StatusFilter = ServiceLocation['status'];

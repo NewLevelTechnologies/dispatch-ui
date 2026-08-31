@@ -20,7 +20,7 @@ import { SlideOver } from './catalyst/slideover';
 import { Button } from './catalyst/button';
 import { Avatar } from './ui/Avatar';
 import ConfirmDialog from './ConfirmDialog';
-import { workItemLabel } from '../utils/workItemLabel';
+import { workItemLabel } from '@dispatch/utils';
 
 interface Props {
   open: boolean;

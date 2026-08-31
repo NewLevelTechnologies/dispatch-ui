@@ -2,7 +2,7 @@ import { Fragment, useEffect, useMemo } from 'react';
 import { useTranslation } from '@dispatch/i18n';
 import { CheckIcon } from '@heroicons/react/20/solid';
 import type { Workflow, WorkflowTransition, WorkItemStatus } from '../../../api/setup';
-import { roleAccent } from '../../../utils/roleColor';
+import { roleAccent } from '@dispatch/utils';
 
 const CELL_PX = 36;
 const COL_HEAD_PX = 110;

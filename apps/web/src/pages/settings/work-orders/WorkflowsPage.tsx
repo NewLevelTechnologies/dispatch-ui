@@ -35,7 +35,7 @@ import { LoadingState } from '../../../components/ui/LoadingState';
 import { EmptyState } from '../../../components/ui/EmptyState';
 import { ErrorState } from '../../../components/ui/ErrorState';
 import { showError, showSuccess, extractApiError } from '../../../lib/toast';
-import { roleAccent } from '../../../utils/roleColor';
+import { roleAccent } from '@dispatch/utils';
 
 const WORKFLOWS_KEY = ['workflows'] as const;
 const CONFIG_KEY = ['workflow-config'] as const;

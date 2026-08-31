@@ -17,7 +17,7 @@ import { Pill, Tag } from './ui/Pill';
 import { Button } from './catalyst/button';
 import { Text } from './catalyst/text';
 import { FileLightbox } from './WorkOrderFilesTab';
-import { workItemLabel } from '../utils/workItemLabel';
+import { workItemLabel } from '@dispatch/utils';
 import { PlusIcon, PlayIcon } from '@heroicons/react/24/solid';
 import { MagnifyingGlassPlusIcon } from '@heroicons/react/24/outline';
 

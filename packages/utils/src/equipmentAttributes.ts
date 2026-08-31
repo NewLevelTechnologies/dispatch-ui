@@ -1,4 +1,4 @@
-import type { EquipmentCategoryField } from '../api/setup';
+import type { EquipmentCategoryField } from '@dispatch/api';
 
 // Equipment spec values (a category's custom fields) ↔ the `attributes` JSON
 // string. State/values are held as strings (booleans as 'true'/''); coerced by

@@ -11,7 +11,7 @@ import { Textarea } from './catalyst/textarea';
 import { Checkbox } from './catalyst/checkbox';
 import { Text, Strong } from './catalyst/text';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './catalyst/table';
-import { validateEmail } from '../utils/validation';
+import { validateEmail } from '@dispatch/utils';
 
 interface AdditionalContactFormDialogProps {
   isOpen: boolean;

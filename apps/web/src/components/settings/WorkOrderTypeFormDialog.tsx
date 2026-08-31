@@ -13,7 +13,7 @@ import { Description, ErrorMessage, Field, Label } from '../catalyst/fieldset';
 import { Input } from '../catalyst/input';
 import { Button } from '../catalyst/button';
 import { AccentPicker } from '../ui/AccentPicker';
-import { ROLE_ACCENT_OPTIONS } from '../../utils/roleColor';
+import { ROLE_ACCENT_OPTIONS } from '@dispatch/utils';
 import { showError, extractApiError } from '../../lib/toast';
 import { toUpperSnake } from '../../lib/code';
 

@@ -16,7 +16,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from '@dispatch/i18n';
 import { tagApi, type Tag, type TagScope, type TagSummary } from '../../api/setup';
 import { showError, showUndo, extractApiError } from '../../lib/toast';
-import { nextTagColor } from '../../utils/tagColor';
+import { nextTagColor } from '@dispatch/utils';
 import TagPicker from '../TagPicker';
 import { TagPill } from '../ui/TagPill';
 

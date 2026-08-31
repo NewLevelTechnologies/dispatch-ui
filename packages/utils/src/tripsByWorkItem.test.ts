@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { tripsByWorkItem } from './tripsByWorkItem';
-import type { DispatchBoardRow } from '../api/setup';
+import type { DispatchBoardRow } from '@dispatch/api';
 
 const dispatch = (
   id: string,

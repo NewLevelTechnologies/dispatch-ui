@@ -20,7 +20,7 @@ import {
   ROLE_ACCENT_OPTIONS,
   roleAccent,
   roleAccentFromRole,
-} from '../utils/roleColor';
+} from '@dispatch/utils';
 import { invalidateRoleConsumers } from '../utils/invalidateRoleConsumers';
 import { showError, showSuccess, extractApiError } from '../lib/toast';
 

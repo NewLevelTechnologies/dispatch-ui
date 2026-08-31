@@ -11,7 +11,7 @@ import {
   type CadenceUnit,
   type AgreementVisitsWhen,
 } from '../../api/setup';
-import { titleCaseAddress } from '../../utils/titleCaseAddress';
+import { titleCaseAddress } from '@dispatch/utils';
 
 // id → location, for resolving the bare serviceLocationId on coverage + visit
 // rows to a human label without an N+1 storm. One customer-scoped list call.

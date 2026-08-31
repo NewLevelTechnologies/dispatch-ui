@@ -32,7 +32,7 @@ import { Button } from '../../../components/catalyst/button';
 import { Text } from '../../../components/catalyst/text';
 import ConfirmDialog from '../../../components/ConfirmDialog';
 import { extractApiError, showError, showSuccess } from '../../../lib/toast';
-import { roleAccent } from '../../../utils/roleColor';
+import { roleAccent } from '@dispatch/utils';
 
 // v1 ships with a single approver capability; the picker stays multi-select
 // because per-cap granularity (HIGH_VALUE_TRANSITIONS, etc.) is on the

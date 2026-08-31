@@ -16,7 +16,7 @@
 // ─────────────────────────────────────────────────────────────────
 import type { CSSProperties } from 'react';
 import clsx from 'clsx';
-import { roleColor } from '../../utils/roleColor';
+import { roleColor } from '@dispatch/utils';
 
 function initialsFromName(name: string) {
   const parts = name.trim().split(/\s+/);

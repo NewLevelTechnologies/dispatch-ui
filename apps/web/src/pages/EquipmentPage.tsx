@@ -17,7 +17,7 @@ import {
 } from '../api/setup';
 import AppLayout from '../components/AppLayout';
 import EquipmentThumbnail from '../components/EquipmentThumbnail';
-import { titleCaseAddress } from '../utils/titleCaseAddress';
+import { titleCaseAddress } from '@dispatch/utils';
 import { Button } from '../components/catalyst/button';
 import { PageHead } from '../components/ui/PageHead';
 import { Card, CardBody } from '../components/ui/Card';

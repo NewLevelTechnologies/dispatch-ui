@@ -40,7 +40,7 @@ import { ToggleGroup, ToggleGroupOption } from './ui/ToggleGroup';
 import { useCurrentUser, useHasAnyCapability } from '../hooks/useCurrentUser';
 import { useApprovalsVisible } from '../hooks/useApprovalsVisible';
 import { useMediaQuery } from '../hooks/useMediaQuery';
-import { roleColor } from '../utils/roleColor';
+import { roleColor } from '@dispatch/utils';
 import ApprovalsBellPopover from './ApprovalsBellPopover';
 
 const ENV_BADGE: Record<string, { label: string; className: string }> = {
