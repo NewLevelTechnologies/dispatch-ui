@@ -4,12 +4,9 @@ This is the **root documentation** for the Dispatch monorepo, which contains bot
 
 ---
 
-## 🚧 WORK IN PROGRESS - MONOREPO MIGRATION 🚧
+## Monorepo Migration — Complete ✅
 
-**Status**: Phases 1–4, 7 & 8 complete. Remaining: mobile scaffold (Phase 5).
-
-**TODO:**
-- [ ] Document mobile app once created (Phase 5)
+All phases of the migration are complete. The mobile app scaffold is in place; real screens, auth, and navigation are ongoing feature work.
 
 ---
 
@@ -355,7 +352,7 @@ export default defineConfig({
 
 ## Migration Status
 
-**Current Phase**: Phases 1–4, 7 & 8 Complete ✅
+**Current Phase**: All phases complete ✅
 
 - [x] Create monorepo structure
 - [x] Set up root package.json with Turborepo
@@ -368,7 +365,7 @@ export default defineConfig({
 - [x] `packages/types` — placeholder; types colocated with APIs (Phase 2)
 - [x] Update imports in web app (Phase 3)
 - [x] Test web app in monorepo (Phase 4)
-- [ ] Add mobile app scaffold (Phase 5)
+- [x] Add mobile app scaffold (Phase 5)
 - [x] Update CI/CD workflows (Phase 7)
 - [x] Update documentation (Phase 8)
 
