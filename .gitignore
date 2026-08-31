@@ -12,6 +12,9 @@ dist
 dist-ssr
 *.local
 
+# Turborepo local build cache and task logs
+.turbo
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

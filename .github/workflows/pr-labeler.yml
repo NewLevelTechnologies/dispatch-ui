@@ -24,7 +24,7 @@ jobs:
             const labels = [];
 
             // Branch-based labels
-            if (branchName.startsWith('feature/')) {
+            if (branchName.startsWith('feat/') || branchName.startsWith('feature/')) {
               labels.push('feature');
             } else if (branchName.startsWith('fix/') || branchName.startsWith('bugfix/')) {
               labels.push('bug');
@@ -69,17 +69,37 @@ jobs:
             for (const file of files) {
               const path = file.filename;
 
-              // Component-specific labels
-              if (path.includes('src/components/')) {
+              // Scope labels — which app or shared package is touched
+              if (path.startsWith('apps/web/')) {
+                labels.add('app:web');
+              }
+              if (path.startsWith('apps/mobile/')) {
+                labels.add('app:mobile');
+              }
+              if (path.startsWith('packages/api/')) {
+                labels.add('pkg:api');
+              }
+              if (path.startsWith('packages/utils/')) {
+                labels.add('pkg:utils');
+              }
+              if (path.startsWith('packages/i18n/')) {
+                labels.add('pkg:i18n');
+              }
+              if (path.startsWith('packages/types/')) {
+                labels.add('pkg:types');
+              }
+
+              // Content-type labels
+              if (path.includes('/components/')) {
                 labels.add('components');
               }
-              if (path.includes('src/pages/')) {
+              if (path.includes('/pages/') || path.includes('/features/')) {
                 labels.add('pages');
               }
-              if (path.includes('src/api/')) {
+              if (path.includes('/api/')) {
                 labels.add('api');
               }
-              if (path.includes('src/utils/') || path.includes('src/lib/')) {
+              if (path.includes('/utils/') || path.includes('/lib/')) {
                 labels.add('utils');
               }
 
@@ -96,7 +116,7 @@ jobs:
               if (path.includes('.github/workflows/')) {
                 labels.add('ci-cd');
               }
-              if (path.includes('package.json') || path.includes('package-lock.json')) {
+              if (path.includes('package.json') || path.includes('pnpm-lock.yaml') || path.includes('pnpm-workspace.yaml')) {
                 labels.add('dependencies');
               }
             }
