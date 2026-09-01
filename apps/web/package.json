@@ -62,7 +62,7 @@
     "jsdom": "^27.0.1",
     "jsdom-testing-mocks": "^1.16.0",
     "tailwindcss": "^4.2.1",
-    "typescript": "~6.0.3",
+    "typescript": "catalog:",
     "typescript-eslint": "^8.56.1",
     "vite": "^6.4.1",
     "vitest": "^3.2.4"

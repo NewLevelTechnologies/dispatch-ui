@@ -47,9 +47,10 @@ dispatch/
 ## Technology Stack
 
 ### Monorepo Tools
-- **Package Manager**: pnpm 8.15.9 (workspaces)
+- **Package Manager**: pnpm 11.25.0 (workspaces + catalogs)
+- **Runtime**: Node 22 (Node 20 reached end-of-life 2026-04-30)
 - **Build System**: Turborepo 2.10.11 (caching, orchestration)
-- **Language**: TypeScript 5.9.3
+- **Language**: TypeScript 6.0.3 (pinned once via the pnpm catalog)
 
 ### Applications
 - **Web**: Vite + React 19 + TypeScript + Tailwind CSS 4 + Catalyst UI
@@ -67,12 +68,22 @@ dispatch/
 ### Install Dependencies
 
 ```bash
-# Install pnpm globally (if not already installed)
-npm install -g pnpm
+# Use the pnpm version pinned in package.json's "packageManager" field.
+# Corepack ships with Node and reads that field, so everyone gets the same
+# pnpm without installing it globally.
+corepack enable
 
 # Install all dependencies (root + all packages)
 pnpm install
 ```
+
+> **Node 22 or newer is required** — pnpm 11 needs Node >= 22.13, and Node 20
+> reached end-of-life on 2026-04-30.
+>
+> If `pnpm` on your PATH is older than 11 you'll see
+> `ERR_PNPM_UNSUPPORTED_ENGINE`. `corepack enable` fixes it by shimming `pnpm`
+> to the pinned version. This bites even when you invoke a newer pnpm directly,
+> because `pnpm run` shells out to whatever `pnpm` is on PATH.
 
 ### Development Commands
 
