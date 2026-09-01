@@ -13,6 +13,11 @@ packages:
 # place.
 catalog:
   typescript: 6.0.3
+  # apps/web was already on 24.x; packages/api had been left on 20.x, whose
+  # Node line reached end-of-life 2026-04-30. Aligned up to 24.x so the same
+  # shared sources are not typechecked against two different Node type
+  # universes (web compiles packages/api/src directly).
+  '@types/node': 24.13.3
 
 # pnpm 10+ does not run dependency install scripts unless they are allowlisted.
 # esbuild is the only dependency in this repo with one — it downloads its
