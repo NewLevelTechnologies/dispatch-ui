@@ -48,7 +48,7 @@ dispatch/
 
 ### Monorepo Tools
 - **Package Manager**: pnpm 11.25.0 (workspaces + catalogs)
-- **Runtime**: Node 22 (Node 20 reached end-of-life 2026-04-30)
+- **Runtime**: Node 24 LTS (Node 20 reached end-of-life 2026-04-30, Node 22 is still supported but the toolchain targets 24)
 - **Build System**: Turborepo 2.10.11 (caching, orchestration)
 - **Language**: TypeScript 6.0.3 (pinned once via the pnpm catalog)
 
@@ -77,8 +77,10 @@ corepack enable
 pnpm install
 ```
 
-> **Node 22 or newer is required** — pnpm 11 needs Node >= 22.13, and Node 20
-> reached end-of-life on 2026-04-30.
+> **Node 24 is required** (`engines.node >=24.0.0`). It is the current LTS,
+> supported to 2028-04-30, and it is what CI runs and what `@types/node` describes
+> — so nothing can typecheck against an API the runtime lacks. Note odd-numbered
+> Node releases (21, 23, …) are never LTS and are already end-of-life.
 >
 > If `pnpm` on your PATH is older than 11 you'll see
 > `ERR_PNPM_UNSUPPORTED_ENGINE`. `corepack enable` fixes it by shimming `pnpm`

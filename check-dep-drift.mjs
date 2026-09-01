@@ -22,9 +22,15 @@
  * No package version changed. The whole failure came from the peer hash.
  *
  * We compare RESOLVED versions rather than the declared ranges, because
- * resolution is what pnpm keys on. apps/web pins `~6.0.3` while the packages
- * pin `^6.0.3`; those agree today but are different range operators, so a
- * string comparison of the declarations would be both noisy and unsound.
+ * resolution is what pnpm keys on. Declarations cannot answer the question:
+ * these deps are now declared as `catalog:`, a literal that carries no version
+ * at all, and before that apps/web pinned `~6.0.3` while the packages pinned
+ * `^6.0.3` — same version, different operators.
+ *
+ * This is also why the catalog does not make this check redundant. Catalogs are
+ * opt-in per declaration site: a package that writes an explicit version instead
+ * of `catalog:` installs cleanly with no warning (verified), and only a resolved-
+ * version comparison catches it.
  */
 
 import { createRequire } from 'node:module';
@@ -39,7 +45,7 @@ const repoRoot = path.dirname(fileURLToPath(import.meta.url));
  * package. Add to this list when a dep starts causing cross-package grief —
  * typically anything other packages declare as a *peer*.
  */
-const SYNCED_DEPS = ['typescript'];
+const SYNCED_DEPS = ['typescript', '@types/node'];
 
 /** Minimal reader for the `dir/*` glob style used in pnpm-workspace.yaml. */
 function readWorkspaceDirs() {
