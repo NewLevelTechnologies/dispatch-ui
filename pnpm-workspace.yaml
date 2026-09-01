@@ -1,3 +1,25 @@
 packages:
   - 'apps/*'
   - 'packages/*'
+
+# Single source of truth for dependencies that must stay in lockstep across
+# every workspace package. Packages reference these as "catalog:" instead of
+# repeating a range, so they cannot drift apart.
+#
+# typescript is catalogued because a split version silently forks any package
+# that declares it as a peer — react-i18next did exactly that, producing two
+# React contexts and 79 failing tests (see #380). check-dep-drift.mjs enforces
+# the invariant in CI; the catalog is what makes it hard to break in the first
+# place.
+catalog:
+  typescript: 6.0.3
+
+# pnpm 10+ does not run dependency install scripts unless they are allowlisted.
+# esbuild is the only dependency in this repo with one — it downloads its
+# platform binary — and vite/vitest fail without it.
+#
+# Note this key is `allowBuilds` (a map), not pnpm 10's `onlyBuiltDependencies`
+# (a list), and it lives here rather than in package.json: pnpm 11 no longer
+# reads the "pnpm" field from package.json. See https://pnpm.io/settings.
+allowBuilds:
+  esbuild: true

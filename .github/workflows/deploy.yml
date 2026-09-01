@@ -20,7 +20,7 @@ env:
   AWS_REGION: us-east-1
   S3_BUCKET: dispatch-dev-frontend
   CLOUDFRONT_DISTRIBUTION_ID: E21TOAR61GO7PC
-  NODE_VERSION: '20'
+  NODE_VERSION: '22'
 
 permissions:
   id-token: write   # Required for OIDC authentication
