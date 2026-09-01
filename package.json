@@ -4,6 +4,7 @@
   "private": true,
   "description": "Dispatch management platform - monorepo",
   "scripts": {
+    "check:deps": "node check-dep-drift.mjs",
     "dev": "turbo run dev",
     "build": "turbo run build",
     "lint": "turbo run lint",
