@@ -1,10 +1,13 @@
 #!/usr/bin/env node
 /**
- * Fails when workspace packages resolve DIFFERENT versions of a dependency that
- * must stay in lockstep across the monorepo.
+ * Guards two invariants for dependencies that must stay in lockstep across the
+ * monorepo:
  *
- * Why this exists
- * ---------------
+ *   1. VERSION DRIFT  — every package resolves the SAME version.
+ *   2. PHANTOM DEPS   — every package that needs it DECLARES it.
+ *
+ * Why (1)
+ * -------
  * `react-i18next` (like many libraries) declares `typescript` as a *peer*
  * dependency. pnpm keys each instance of a peer-dependent package by the
  * versions of its peers, so when apps/web was on TypeScript 6.0.3 while
@@ -17,20 +20,32 @@
  * one was invisible to useTranslation() imported from the other, so every
  * translation silently fell through to its key. That surfaced as 79 failing
  * tests across 25 files, all asserting on rendered copy — nothing pointed at
- * TypeScript, and lint/build/tsc were all clean.
+ * TypeScript, and lint/build/tsc were all clean. (#380)
  *
- * No package version changed. The whole failure came from the peer hash.
+ * We compare RESOLVED versions rather than declared ranges, because resolution
+ * is what pnpm keys on. Declarations cannot answer the question: these deps are
+ * declared as `catalog:`, a literal carrying no version at all.
  *
- * We compare RESOLVED versions rather than the declared ranges, because
- * resolution is what pnpm keys on. Declarations cannot answer the question:
- * these deps are now declared as `catalog:`, a literal that carries no version
- * at all, and before that apps/web pinned `~6.0.3` while the packages pinned
- * `^6.0.3` — same version, different operators.
- *
- * This is also why the catalog does not make this check redundant. Catalogs are
+ * This is also why the catalog does not make the check redundant. Catalogs are
  * opt-in per declaration site: a package that writes an explicit version instead
- * of `catalog:` installs cleanly with no warning (verified), and only a resolved-
- * version comparison catches it.
+ * of `catalog:` installs cleanly with no warning (verified), and only a
+ * resolved-version comparison catches it.
+ *
+ * Why (2)
+ * -------
+ * A package that stops declaring a dependency KEEPS WORKING, which is what makes
+ * this worth automating. pnpm creates a `node_modules` at the workspace root, and
+ * Node's resolver walks up parent directories into it — so `require("typescript")`
+ * from packages/utils succeeds even with no local symlink and no declaration.
+ * `pnpm exec tsc` likewise finds the root's `node_modules/.bin`.
+ *
+ * The manifest then lies: the package cannot be built in isolation, moved, or
+ * published, and it silently inherits whatever the root happens to pin. The
+ * monorepo migration was already bitten by this class of bug — npm's flat
+ * hoisting had masked two undeclared @codemirror packages (#376).
+ *
+ * Declaring a dependency is not what makes it RESOLVABLE. It is what makes it
+ * EXPLICIT — and therefore checkable.
  */
 
 import { createRequire } from 'node:module';
@@ -41,11 +56,21 @@ import { fileURLToPath } from 'node:url';
 const repoRoot = path.dirname(fileURLToPath(import.meta.url));
 
 /**
- * Dependencies that must resolve to a single version across every workspace
- * package. Add to this list when a dep starts causing cross-package grief —
- * typically anything other packages declare as a *peer*.
+ * Dependencies that must stay in lockstep, and who is required to declare each.
+ *
+ *   requiredIn: 'all'  — every workspace package must declare it
+ *   requiredIn: [...]  — only these must; other packages are ignored entirely
+ *
+ * The explicit list matters: because of the root-hoisting described above, EVERY
+ * package can resolve EVERY root dependency. Flagging all of them would bury the
+ * real signal in noise, so we state the expectation instead of inferring it.
+ * Adding a package that needs one of these means adding it here — and the check
+ * tells you when you forget.
  */
-const SYNCED_DEPS = ['typescript', '@types/node'];
+const SYNCED_DEPS = [
+  { name: 'typescript', requiredIn: 'all' },
+  { name: '@types/node', requiredIn: ['apps/web', 'packages/api'] },
+];
 
 /** Minimal reader for the `dir/*` glob style used in pnpm-workspace.yaml. */
 function readWorkspaceDirs() {
@@ -54,7 +79,9 @@ function readWorkspaceDirs() {
     .split('\n')
     .map((l) => l.trim())
     .filter((l) => l.startsWith('- '))
-    .map((l) => l.slice(2).trim().replace(/^['"]|['"]$/g, ''));
+    .map((l) => l.slice(2).trim().replace(/^['"]|['"]$/g, ''))
+    // `allowBuilds` and other settings also use list syntax; keep path-like entries.
+    .filter((l) => l.includes('/') || existsSync(path.join(repoRoot, l, 'package.json')));
 
   const dirs = ['.']; // the root workspace itself
   for (const pattern of patterns) {
@@ -70,7 +97,7 @@ function readWorkspaceDirs() {
       if (existsSync(path.join(repoRoot, rel, 'package.json'))) dirs.push(rel);
     }
   }
-  return dirs.sort();
+  return [...new Set(dirs)].sort();
 }
 
 /** The declared range for `dep`, or null if this package doesn't ask for it. */
@@ -85,47 +112,95 @@ function resolvedVersion(dir, dep) {
     const require = createRequire(path.join(repoRoot, dir, 'noop.js'));
     return JSON.parse(readFileSync(require.resolve(`${dep}/package.json`), 'utf8')).version;
   } catch {
-    return null; // declared but not installed, or not reachable from here
+    return null;
   }
 }
 
+/**
+ * True when `dir` has its own symlink for `dep`. pnpm creates one only for
+ * declared dependencies, so its absence alongside a successful resolve is the
+ * fingerprint of a root-hoisted phantom.
+ */
+function hasOwnLink(dir, dep) {
+  return existsSync(path.join(repoRoot, dir, 'node_modules', dep));
+}
+
 const workspaceDirs = readWorkspaceDirs();
-let failed = false;
+const problems = [];
 
-for (const dep of SYNCED_DEPS) {
+for (const { name: dep, requiredIn } of SYNCED_DEPS) {
+  const expected = requiredIn === 'all' ? workspaceDirs : requiredIn;
+
+  // A stale entry in requiredIn is itself a bug — catch renames and typos.
+  for (const dir of expected) {
+    if (!workspaceDirs.includes(dir)) {
+      problems.push(`${dep}: requiredIn lists "${dir}", which is not a workspace package`);
+    }
+  }
+
   const rows = workspaceDirs
-    .map((dir) => ({ dir, range: declaredRange(dir, dep), version: resolvedVersion(dir, dep) }))
-    .filter((r) => r.range !== null);
+    .filter((dir) => expected.includes(dir) || declaredRange(dir, dep) !== null)
+    .map((dir) => ({
+      dir,
+      range: declaredRange(dir, dep),
+      version: resolvedVersion(dir, dep),
+      linked: hasOwnLink(dir, dep),
+    }));
 
+  console.log(dep);
   if (rows.length === 0) {
-    console.log(`${dep}: not declared by any workspace package — skipping\n`);
+    console.log('  (not required or declared anywhere)\n');
     continue;
   }
 
   const width = Math.max(...rows.map((r) => r.dir.length));
-  console.log(`${dep}`);
   for (const { dir, range, version } of rows) {
-    console.log(`  ${dir.padEnd(width)}  declared ${String(range).padEnd(10)} resolved ${version ?? 'NOT INSTALLED'}`);
+    const note =
+      range === null ? (version ? '  <== PHANTOM (resolved via root, not declared)' : '  <== MISSING') : '';
+    const declared = range === null ? '(none)' : String(range);
+    console.log(`  ${dir.padEnd(width)}  declared ${declared.padEnd(10)} resolved ${version ?? '-'}${note}`);
   }
 
-  const missing = rows.filter((r) => r.version === null);
-  const versions = [...new Set(rows.filter((r) => r.version).map((r) => r.version))];
+  const phantoms = rows.filter((r) => r.range === null && r.version !== null);
+  const missing = rows.filter((r) => r.range === null && r.version === null);
+  const declaredRows = rows.filter((r) => r.range !== null);
+  const unresolved = declaredRows.filter((r) => r.version === null);
+  const versions = [...new Set(declaredRows.filter((r) => r.version).map((r) => r.version))];
 
+  if (phantoms.length > 0) {
+    problems.push(
+      `${dep}: resolved but NOT declared by ${phantoms.map((p) => p.dir).join(', ')} — ` +
+        `these work only by falling through to the workspace root, so the manifest is wrong. ` +
+        `Add "${dep}": "catalog:" to each.`
+    );
+  }
   if (missing.length > 0) {
-    failed = true;
-    console.error(`\n  ✗ ${dep} is declared but not installed in: ${missing.map((m) => m.dir).join(', ')}`);
-    console.error(`    Run \`pnpm install\`.`);
-  } else if (versions.length > 1) {
-    failed = true;
-    console.error(`\n  ✗ ${dep} resolves to ${versions.length} different versions: ${versions.join(', ')}`);
-    console.error(`    Every workspace package must resolve the SAME version. Split versions fork any`);
-    console.error(`    dependency that peers on ${dep}, which fails in ways that look unrelated (see the`);
-    console.error(`    header of this file). Align the pins in the package.json files above, then`);
-    console.error(`    re-run \`pnpm install\`.`);
-  } else {
-    console.log(`\n  ✓ ${dep} resolves to ${versions[0]} everywhere`);
+    problems.push(
+      `${dep}: required in ${missing.map((m) => m.dir).join(', ')} but neither declared nor resolvable.`
+    );
+  }
+  if (unresolved.length > 0) {
+    problems.push(
+      `${dep}: declared but not installed in ${unresolved.map((u) => u.dir).join(', ')}. Run \`pnpm install\`.`
+    );
+  }
+  if (versions.length > 1) {
+    problems.push(
+      `${dep}: resolves to ${versions.length} different versions (${versions.join(', ')}). ` +
+        `Split versions fork any package that peers on ${dep}, failing in ways that look unrelated — ` +
+        `see the header of this file.`
+    );
+  }
+
+  if (phantoms.length + missing.length + unresolved.length === 0 && versions.length === 1) {
+    console.log(`\n  ✓ ${dep} resolves to ${versions[0]} everywhere, declared by every package that needs it`);
   }
   console.log('');
 }
 
-process.exit(failed ? 1 : 0);
+if (problems.length > 0) {
+  console.error('Dependency problems found:\n');
+  for (const p of problems) console.error(`  ✗ ${p}\n`);
+  process.exit(1);
+}
+process.exit(0);
