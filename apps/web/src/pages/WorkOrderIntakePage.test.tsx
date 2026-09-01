@@ -70,6 +70,19 @@ function renderIntake(initialPath = '/work-orders/new') {
   return renderWithProviders(<WorkOrderIntakePage />, { routes, initialPath });
 }
 
+// Three tests here fill one or two complete addresses through userEvent, which
+// dispatches per-keystroke and re-renders React each time. They run 1.5-2.3s
+// locally but are the slowest in the suite by ~7x, and CI is far slower in
+// aggregate — the full run takes ~800s of test time there versus ~50s locally,
+// because 171 files share a couple of runner cores. A 15s budget left only ~7x
+// headroom and one of them timed out in CI (#384). 30s keeps a comfortable
+// margin while still failing fast enough to catch a genuine hang.
+//
+// If more tests here need this, prefer trimming the typed fixtures over raising
+// the number again — `userEvent.setup({ delay: null })` was measured and only
+// bought ~15%, so the cost is the re-renders, not the keystroke delay.
+const HEAVY_FORM_TIMEOUT = 30_000;
+
 describe('WorkOrderIntakePage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -189,7 +202,7 @@ describe('WorkOrderIntakePage', () => {
         expect.objectContaining({ customerId: 'cust-darden', serviceLocationId: 'loc-added' })
       )
     );
-  }, 15000);
+  }, HEAVY_FORM_TIMEOUT);
 
   it('accepts a new customer with only one contact channel', async () => {
     // Neither phone nor email is required on its own — having none is what's
@@ -222,7 +235,7 @@ describe('WorkOrderIntakePage', () => {
         expect.objectContaining({ email: 'jordan@example.com', phone: null })
       )
     );
-  }, 15000);
+  }, HEAVY_FORM_TIMEOUT);
 
   it('routes the bill-to name onto the customer when someone else is invoiced', async () => {
     // Unchecking "Bill this customer directly" re-points the record: the payer
@@ -278,7 +291,7 @@ describe('WorkOrderIntakePage', () => {
         })
       )
     );
-  }, 15000);
+  }, HEAVY_FORM_TIMEOUT);
 
   it('names who is billed only when that differs from the site', async () => {
     // Named for someone else — the CSR needs to know Reyes Household pays for
