@@ -1,17 +1,26 @@
 {
   "expo": {
-    "name": "Dispatch",
+    "name": "Dispatch Mobile",
     "slug": "dispatch-mobile",
     "version": "1.0.0",
     "orientation": "portrait",
     "scheme": "dispatch",
-    "platforms": ["ios", "android"],
+    "platforms": [
+      "ios",
+      "android"
+    ],
     "ios": {
-      "bundleIdentifier": "com.newleveltech.dispatch"
+      "bundleIdentifier": "com.newleveltech.dispatch",
+      "infoPlist": {
+        "CFBundleDisplayName": "Dispatch"
+      }
     },
     "android": {
       "package": "com.newleveltech.dispatch"
     },
-    "plugins": ["expo-router", "expo-secure-store"]
+    "plugins": [
+      "expo-router",
+      "expo-secure-store"
+    ]
   }
 }

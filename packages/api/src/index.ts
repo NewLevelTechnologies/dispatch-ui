@@ -2,7 +2,10 @@
 export { default as apiClient, apiClient as api, type AuthTokenProvider, ApiClient } from './client';
 export { getApiErrorMessage, getApiErrorCode } from './errors';
 export { setPublicApiBaseURL } from './publicClient';
-export { createAmplifyAuthProvider } from './amplifyAuthProvider';
+// NOTE: createAmplifyAuthProvider is deliberately NOT re-exported here.
+// It pulls aws-amplify/auth into the module graph, which breaks the React
+// Native bundle (@aws-amplify/core's .native.js requires @aws-amplify/react-native).
+// Web imports it directly: '@dispatch/api/src/amplifyAuthProvider'.
 
 // Audit API
 export {

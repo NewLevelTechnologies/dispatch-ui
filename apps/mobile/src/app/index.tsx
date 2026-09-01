@@ -6,7 +6,7 @@ import { formatPhone } from '@dispatch/utils';
 export default function HomeScreen() {
   const { data: settings, isLoading, error } = useQuery({
     queryKey: ['tenant-settings'],
-    queryFn: () => tenantSettingsApi.get(),
+    queryFn: () => tenantSettingsApi.getSettings(),
   });
 
   return (
@@ -27,7 +27,7 @@ export default function HomeScreen() {
           <Text style={styles.value}>{settings.companyName ?? '—'}</Text>
           <Text style={styles.label}>Phone</Text>
           <Text style={styles.value}>
-            {settings.companyPhone ? formatPhone(settings.companyPhone) : '—'}
+            {settings.phone ? formatPhone(settings.phone) : '—'}
           </Text>
         </View>
       )}

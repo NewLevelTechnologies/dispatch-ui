@@ -1,5 +1,6 @@
 // Web app API setup - configures the shared API client with Amplify auth
-import { apiClient, createAmplifyAuthProvider, setPublicApiBaseURL } from '@dispatch/api';
+import { apiClient, setPublicApiBaseURL } from '@dispatch/api';
+import { createAmplifyAuthProvider } from '@dispatch/api/src/amplifyAuthProvider';
 
 // Point the shared clients at this build's API origin. The package defaults to
 // the dev API, so without this a qa/prod bundle would silently talk to dev.
