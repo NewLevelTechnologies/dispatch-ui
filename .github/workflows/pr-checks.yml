@@ -38,13 +38,19 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      # Fails if workspace packages resolve different versions of a dependency
-      # that must stay in lockstep (currently just typescript). pnpm keys
-      # peer-dependent packages by their peers' versions, so a split TypeScript
-      # version forks anything peering on it — react-i18next did exactly that,
-      # producing two React contexts and 79 failing tests that all looked like
-      # unrelated i18n bugs. Runs right after install so it fails in seconds,
-      # before the ~2000-test suite. See check-dep-drift.mjs.
+      # Guards two invariants for deps that must stay in lockstep (typescript
+      # and @types/node):
+      #   1. every package resolves the SAME version — pnpm keys peer-dependent
+      #      packages by their peers' versions, so a split TypeScript version
+      #      forks anything peering on it. react-i18next did exactly that,
+      #      producing two React contexts and 79 failing tests that all looked
+      #      like unrelated i18n bugs (#380).
+      #   2. every package that needs one DECLARES it — the workspace root's
+      #      node_modules makes undeclared deps resolve anyway, so a phantom
+      #      dependency works locally and only breaks once the package is built
+      #      in isolation or the root's version moves.
+      # Runs right after install so it fails in seconds, before the ~2000-test
+      # suite. See check-dep-drift.mjs.
       - name: Check dependency drift
         run: pnpm check:deps
 
