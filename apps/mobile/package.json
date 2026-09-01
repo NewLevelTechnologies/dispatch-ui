@@ -5,8 +5,8 @@
   "main": "expo-router/entry",
   "scripts": {
     "dev": "expo start",
-    "android": "expo start --android",
-    "ios": "expo start --ios",
+    "android": "expo run:android",
+    "ios": "expo run:ios",
     "lint": "eslint .",
     "test": "echo 'No tests yet'",
     "test:coverage": "echo 'No tests yet'"
@@ -15,20 +15,23 @@
     "@dispatch/api": "workspace:*",
     "@dispatch/i18n": "workspace:*",
     "@dispatch/utils": "workspace:*",
-    "expo": "~53.0.0",
-    "expo-router": "~4.0.0",
-    "expo-status-bar": "~2.2.0",
-    "react": "19.0.0",
-    "react-native": "0.79.2",
-    "react-native-safe-area-context": "5.4.0",
-    "react-native-screens": "~4.11.0",
     "@tanstack/react-query": "^5.90.21",
-    "expo-secure-store": "~14.2.3"
+    "expo": "~57.0.18",
+    "expo-dev-client": "~57.0.16",
+    "expo-router": "~57.0.17",
+    "expo-secure-store": "~57.0.2",
+    "expo-status-bar": "~57.0.1",
+    "react": "19.2.3",
+    "react-native": "0.86.3",
+    "react-native-reanimated": "4.5.1",
+    "react-native-safe-area-context": "5.7.0",
+    "react-native-screens": "~4.26.2",
+    "react-native-worklets": "0.10.1"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",
     "@types/react": "~19.2.0",
     "eslint": "^9.39.4",
-    "typescript": "^5.9.3"
+    "typescript": "^6.0.3"
   }
 }
