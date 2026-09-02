@@ -289,7 +289,8 @@ pnpm turbo run build
   - React patterns, Catalyst UI, CSR optimization
   - Glossary integration, i18n, authentication
   - Testing, linting, troubleshooting
-- **Mobile App**: Coming soon
+- **Mobile App**: See [apps/mobile/README.md](./apps/mobile/README.md)
+  - Local development, Jest setup, and the EAS/TestFlight release runbook
 
 ---
 

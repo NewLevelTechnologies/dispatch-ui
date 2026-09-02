@@ -10,17 +10,24 @@
       "android"
     ],
     "ios": {
-      "bundleIdentifier": "com.newleveltech.dispatch",
+      "bundleIdentifier": "net.newleveltech.dispatch",
       "infoPlist": {
         "CFBundleDisplayName": "Dispatch"
       }
     },
     "android": {
-      "package": "com.newleveltech.dispatch"
+      "package": "net.newleveltech.dispatch"
     },
     "plugins": [
       "expo-router",
       "expo-secure-store"
-    ]
+    ],
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "62a2fdb7-5d38-491a-a091-cbb3438e713f"
+      }
+    },
+    "owner": "new-level-technologies"
   }
 }
