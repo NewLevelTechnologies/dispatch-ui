@@ -4,6 +4,7 @@ import { renderWithProviders, userEvent } from '../test/utils';
 import CustomerFormDialog from './CustomerFormDialog';
 import { apiClient } from '../api/setup';
 import type { Customer } from '../api/setup';
+import { HEAVY_FORM_TIMEOUT } from '../test/timeouts';
 
 // Mock the API client
 vi.mock('@dispatch/api/src/client');
@@ -100,7 +101,7 @@ describe('CustomerFormDialog', () => {
       expect(apiClient.post).not.toHaveBeenCalled();
     });
 
-    it('displays saving state during submission', { timeout: 20000 }, async () => {
+    it('displays saving state during submission', { timeout: HEAVY_FORM_TIMEOUT }, async () => {
       const user = userEvent.setup();
       vi.mocked(apiClient.post).mockImplementation(
         () => new Promise(() => {}) // Never resolves
@@ -175,7 +176,7 @@ describe('CustomerFormDialog', () => {
       });
     });
 
-    it('handles all form fields including optional fields', { timeout: 10000 }, async () => {
+    it('handles all form fields including optional fields', { timeout: HEAVY_FORM_TIMEOUT }, async () => {
       const user = userEvent.setup();
       vi.mocked(apiClient.post).mockResolvedValue({ data: mockCustomer });
 
@@ -261,7 +262,7 @@ describe('CustomerFormDialog', () => {
       expect(screen.getByDisplayValue('(555) 123-4567')).toBeInTheDocument();
     });
 
-    it('submits updated data', { timeout: 10000 }, async () => {
+    it('submits updated data', async () => {
       const user = userEvent.setup();
       vi.mocked(apiClient.put).mockResolvedValue({ data: mockCustomer });
 
@@ -426,7 +427,7 @@ describe('CustomerFormDialog', () => {
   });
 
   describe('Standard customer with separate billing address', () => {
-    it('renders the billing-address section and submits both addresses', { timeout: 15000 }, async () => {
+    it('renders the billing-address section and submits both addresses', async () => {
       const user = userEvent.setup();
       vi.mocked(apiClient.post).mockResolvedValue({ data: mockCustomer });
       renderWithProviders(<CustomerFormDialog isOpen={true} onClose={mockOnClose} />);
@@ -561,7 +562,7 @@ describe('CustomerFormDialog', () => {
   });
 
   describe('Edit mode billing address and type', () => {
-    it('persists identity + billing-address edits in a single PUT', { timeout: 10000 }, async () => {
+    it('persists identity + billing-address edits in a single PUT', async () => {
       const user = userEvent.setup();
       vi.mocked(apiClient.put).mockResolvedValue({ data: mockCustomer });
 

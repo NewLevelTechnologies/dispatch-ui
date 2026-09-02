@@ -119,7 +119,7 @@ describe('PartsInventoryPage', () => {
     });
   });
 
-  it('opens create dialog when add button is clicked', { timeout: 10000 }, async () => {
+  it('opens create dialog when add button is clicked', async () => {
     mockPartsGetAll.mockResolvedValue([]);
     mockPartsCreate.mockResolvedValue({ ...mockParts[0], id: '3' });
     const user = userEvent.setup();
