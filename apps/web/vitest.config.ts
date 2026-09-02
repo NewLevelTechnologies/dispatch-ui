@@ -10,6 +10,29 @@ export default defineConfig({
     environment: './src/test/jsdom-fixed-env.ts',
     setupFiles: './src/test/setup.ts',
     css: true,
+
+    // Vitest defaults to 5000ms, which this suite has outgrown.
+    //
+    // The form-heavy tests drive long userEvent sequences, dispatching per
+    // keystroke with a React re-render each time. Measured locally *under
+    // coverage*, several sit just under the default with no margin left:
+    //
+    //   CustomerFormDialog  all form fields ............. 4770ms
+    //   WorkOrderIntakePage one contact channel ......... 4027ms
+    //   WorkOrderIntakePage standardized address ........ 3926ms
+    //   CustomerFormPage    separate billing ............ 3809ms
+    //
+    // CI roughly doubles those: 171 files share a couple of runner cores, and
+    // coverage instrumentation adds its own overhead — the full run takes ~800s
+    // of test time there versus ~50s locally. A 4770ms test on a 5000ms budget
+    // is not flaky by luck, it is a failure waiting for a slow runner, and
+    // patching whichever one fails first just relocates the problem (see #385,
+    // then CustomerFormPage failing next).
+    //
+    // 15s gives roughly 3x headroom over the slowest default-timeout test while
+    // still surfacing a genuinely hung test quickly. The three heaviest tests in
+    // WorkOrderIntakePage keep their explicit 30s — they exceed even this.
+    testTimeout: 15_000,
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],

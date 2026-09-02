@@ -206,7 +206,7 @@ describe('CustomersPage', () => {
     });
   });
 
-  it('navigates to the add-customer page when the add button is clicked', { timeout: 10000 }, async () => {
+  it('navigates to the add-customer page when the add button is clicked', async () => {
     vi.mocked(apiClient.get).mockResolvedValue({ data: { ...mockCustomersListResponse, content: [], totalElements: 0, empty: true } });
     const user = userEvent.setup();
 
@@ -229,7 +229,7 @@ describe('CustomersPage', () => {
   // The redesigned row shows the location count as a sub line only when the
   // customer has more than one location — single-location customers don't
   // need the count surfaced because each row already implies one.
-  it('displays customer location count for customers with multiple locations', { timeout: 10000 }, async () => {
+  it('displays customer location count for customers with multiple locations', async () => {
     vi.mocked(apiClient.get).mockResolvedValue({ data: mockCustomersListResponse });
 
     renderWithProviders(<CustomersPage />);
