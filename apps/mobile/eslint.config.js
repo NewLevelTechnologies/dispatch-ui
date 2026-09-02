@@ -66,4 +66,16 @@ export default defineConfig([
       }],
     },
   },
+  {
+    // Test fixtures are not user-facing, so the no-hardcoded-strings rule does
+    // not apply: a test that renders <Text>count 0</Text> and asserts on that
+    // exact string is clearer than one indirecting through the locale file, and
+    // routing it through t() would couple the assertion to translations it is
+    // not testing. apps/web never needed this exemption because its tests render
+    // app components rather than declaring their own JSX text.
+    files: ['**/*.test.{ts,tsx}', 'src/test/**/*.{ts,tsx}'],
+    rules: {
+      'i18next/no-literal-string': 'off',
+    },
+  },
 ])

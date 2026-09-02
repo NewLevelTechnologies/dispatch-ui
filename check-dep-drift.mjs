@@ -69,7 +69,7 @@ const repoRoot = path.dirname(fileURLToPath(import.meta.url));
  */
 const SYNCED_DEPS = [
   { name: 'typescript', requiredIn: 'all' },
-  { name: '@types/node', requiredIn: ['apps/web', 'packages/api'] },
+  { name: '@types/node', requiredIn: ['apps/web', 'apps/mobile', 'packages/api'] },
 ];
 
 /** Minimal reader for the `dir/*` glob style used in pnpm-workspace.yaml. */
