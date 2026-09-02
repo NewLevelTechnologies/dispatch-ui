@@ -62,8 +62,14 @@ jobs:
       # instead of two: adding a plain `test` step would re-run the same ~2000
       # tests for no extra signal. Any package that gains a test:coverage
       # script is picked up here automatically.
+      #
+      # No extra flags are passed. This used to append `-- --run`, a
+      # vitest-only flag, which every package received — so when apps/mobile
+      # moved to jest, jest read `--run` as a test-path pattern, matched
+      # nothing and failed. Each package's own script is self-contained
+      # instead, so this step stays runner-agnostic.
       - name: Run tests with coverage
-        run: pnpm turbo run test:coverage -- --run
+        run: pnpm turbo run test:coverage
 
       - name: Build
         run: pnpm turbo run build --filter=web
