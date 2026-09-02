@@ -20,6 +20,8 @@
 import 'react-native-get-random-values';
 
 import { Amplify } from 'aws-amplify';
+import { cognitoUserPoolsTokenProvider } from 'aws-amplify/auth/cognito';
+import { secureTokenStorage } from '../storage/secureTokenStorage';
 
 const userPoolId = process.env.EXPO_PUBLIC_COGNITO_USER_POOL_ID;
 const userPoolClientId = process.env.EXPO_PUBLIC_COGNITO_CLIENT_ID;
@@ -44,3 +46,15 @@ Amplify.configure({
     },
   },
 });
+
+// Keep tokens in the iOS Keychain / Android Keystore rather than Amplify's
+// React Native default of AsyncStorage, which is plain text on disk.
+//
+// Must run after Amplify.configure — the token provider reads configuration when
+// it is first used, and swapping storage beforehand has no configured provider
+// to attach to.
+//
+// Switching storage strands any tokens previously written to AsyncStorage, so
+// existing sessions are not carried over: everyone signs in once more after this
+// ships. That is a one-time cost, and the orphaned values expire on their own.
+cognitoUserPoolsTokenProvider.setKeyValueStorage(secureTokenStorage);
