@@ -1,5 +1,3 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
-
 /**
  * The mock enforces the two SecureStore constraints the adapter exists to work
  * around, so these tests fail if either workaround is removed:
@@ -9,34 +7,48 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
  *
  * A permissive mock would pass no matter what the adapter did, which is the
  * usual way a storage test ends up proving nothing.
+ *
+ * Everything lives inside the factory because jest.mock is hoisted above the
+ * imports and may not close over out-of-scope variables. The store is handed
+ * back on the mocked module so assertions can inspect what was really written.
  */
-const store = new Map<string, string>();
-const VALID_KEY = /^[A-Za-z0-9._-]+$/;
-const MAX_VALUE_BYTES = 2048;
+jest.mock('expo-secure-store', () => {
+  const mockStore = new Map<string, string>();
+  const mockValidKey = /^[A-Za-z0-9._-]+$/;
+  const mockMaxBytes = 2048;
 
-function assertKey(key: string) {
-  if (!VALID_KEY.test(key)) throw new Error(`SecureStore: invalid key characters: ${key}`);
-}
+  const assertKey = (key: string) => {
+    if (!mockValidKey.test(key)) throw new Error(`SecureStore: invalid key characters: ${key}`);
+  };
 
-vi.mock('expo-secure-store', () => ({
-  setItemAsync: async (key: string, value: string) => {
-    assertKey(key);
-    if (Buffer.byteLength(value, 'utf8') > MAX_VALUE_BYTES) {
-      throw new Error(`SecureStore: value too large (${Buffer.byteLength(value, 'utf8')})`);
-    }
-    store.set(key, value);
-  },
-  getItemAsync: async (key: string) => {
-    assertKey(key);
-    return store.has(key) ? store.get(key)! : null;
-  },
-  deleteItemAsync: async (key: string) => {
-    assertKey(key);
-    store.delete(key);
-  },
-}));
+  return {
+    __store: mockStore,
+    __maxBytes: mockMaxBytes,
+    setItemAsync: async (key: string, value: string) => {
+      assertKey(key);
+      if (Buffer.byteLength(value, 'utf8') > mockMaxBytes) {
+        throw new Error(`SecureStore: value too large (${Buffer.byteLength(value, 'utf8')})`);
+      }
+      mockStore.set(key, value);
+    },
+    getItemAsync: async (key: string) => {
+      assertKey(key);
+      return mockStore.has(key) ? mockStore.get(key)! : null;
+    },
+    deleteItemAsync: async (key: string) => {
+      assertKey(key);
+      mockStore.delete(key);
+    },
+  };
+});
 
-const { secureTokenStorage } = await import('./secureTokenStorage');
+import * as SecureStore from 'expo-secure-store';
+import { secureTokenStorage } from './secureTokenStorage';
+
+const { __store: store, __maxBytes: MAX_VALUE_BYTES } = SecureStore as unknown as {
+  __store: Map<string, string>;
+  __maxBytes: number;
+};
 
 /** The real shape of an Amplify token key — note the email in the middle. */
 const AMPLIFY_KEY =

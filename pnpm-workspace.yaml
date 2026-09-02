@@ -19,12 +19,22 @@ catalog:
   # universes (web compiles packages/api/src directly).
   '@types/node': 24.13.3
 
-# pnpm 10+ does not run dependency install scripts unless they are allowlisted.
-# esbuild is the only dependency in this repo with one — it downloads its
-# platform binary — and vite/vitest fail without it.
+# pnpm 10+ does not run dependency install scripts unless they are allowlisted
+# here, and treats an un-declared one as an install error rather than a warning.
 #
 # Note this key is `allowBuilds` (a map), not pnpm 10's `onlyBuiltDependencies`
 # (a list), and it lives here rather than in package.json: pnpm 11 no longer
 # reads the "pnpm" field from package.json. See https://pnpm.io/settings.
+#
+#   esbuild          — downloads its platform binary; vite and vitest fail
+#                      outright without it.
+#   @parcel/watcher  — jest-haste-map's file watcher (watch mode).
+#   unrs-resolver    — jest-resolve's native module resolver.
+#
+# The two Jest entries are accelerators, not requirements: Jest falls back to
+# slower pure-JS paths if their builds fail, so they are safe to flip to false
+# if a platform ever cannot compile them.
 allowBuilds:
+  '@parcel/watcher': true
   esbuild: true
+  unrs-resolver: true

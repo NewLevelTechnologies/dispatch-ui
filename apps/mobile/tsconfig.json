@@ -12,7 +12,11 @@
       "@dispatch/i18n": [
         "../../packages/i18n/src"
       ]
-    }
+    },
+    "types": [
+      "jest",
+      "node"
+    ]
   },
   "include": [
     "**/*.ts",
