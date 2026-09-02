@@ -12,7 +12,8 @@
     "ios": {
       "bundleIdentifier": "net.newleveltech.dispatch",
       "infoPlist": {
-        "CFBundleDisplayName": "Dispatch"
+        "CFBundleDisplayName": "Dispatch",
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
