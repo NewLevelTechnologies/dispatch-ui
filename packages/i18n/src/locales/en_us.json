@@ -1,10 +1,41 @@
 {
   "app": {
+    "authenticatedRequestSucceeded": "Authenticated request succeeded",
+    "couldNotLoadTenantSettings": "Could not load tenant settings",
     "loading": "Loading...",
-    "name": "Dispatch"
+    "name": "Dispatch",
+    "pocHint": "Proves the mobile app authenticates against the same Cognito pool as web and uses the token to read from the API.",
+    "signedInAs": "Signed in as {{username}}",
+    "tokenErrorHint": "A 401 here means the token is not reaching the API; anything else means auth worked and the request failed for another reason."
   },
   "auth": {
-    "signInPrompt": "Sign in to your account"
+    "authenticatorCode": "Authenticator code",
+    "chooseMethod": "Choose a method",
+    "codePlaceholder": "123456",
+    "codeSentTo": "Sent to {{destination}}.",
+    "cognitoRequested": "Cognito requested: {{step}}",
+    "emailCode": "Email code",
+    "emailLabel": "Email",
+    "emailPlaceholder": "you@example.com",
+    "mfaMultipleEnabled": "This account has more than one method enabled.",
+    "newPassword": "New password",
+    "newPasswordRequired": "This account requires a new password before signing in.",
+    "passwordLabel": "Password",
+    "responseLabel": "Response",
+    "sameCredentialsAsWeb": "Same credentials as the web app.",
+    "setNewPassword": "Set a new password",
+    "signIn": "Sign in",
+    "signInFailed": "Sign in failed.",
+    "signInPrompt": "Sign in to your account",
+    "signOut": "Sign out",
+    "smsCode": "SMS code",
+    "startOver": "Start over",
+    "stepRequired": "Additional step required: {{step}}.",
+    "totpHint": "Enter the 6-digit code from your authenticator app.",
+    "totpSetupHint": "Add this secret to your authenticator app, then enter the code it shows.",
+    "verificationTitle": "Verification",
+    "verify": "Verify",
+    "verifyCodeFailed": "Could not verify that code."
   },
   "common": {
     "accountManagerPicker": {
@@ -101,8 +132,8 @@
       "errorCreate": "Failed to create {{entity, lowercase}}",
       "errorDelete": "Failed to delete {{entity, lowercase}}",
       "errorUpdate": "Failed to update {{entity, lowercase}}",
-      "invalidEmail": "Invalid email address",
       "firstName": "First Name",
+      "invalidEmail": "Invalid email address",
       "lastName": "Last Name",
       "locationName": "{{entity}} Name",
       "mobilePhone": "Mobile",
@@ -113,8 +144,8 @@
       "optionalCount": "{{count}} optional",
       "paymentTermsDays": "Payment Terms (Days)",
       "phone": "Phone",
-      "requiresPurchaseOrder": "Requires Purchase Order",
       "required": "{{field}} is required",
+      "requiresPurchaseOrder": "Requires Purchase Order",
       "role": "Role",
       "select": "Select...",
       "serviceAddress": "Service Address",
@@ -128,6 +159,7 @@
       "streetAddress": "Street Address",
       "taxExempt": "Tax Exempt",
       "taxExemptCertificate": "Tax Exempt Certificate",
+      "timezone": "Timezone",
       "titleCreate": "{{action}} {{entity}}",
       "titleEdit": "{{action}} {{entity}}",
       "zipCode": "Zip Code"
@@ -1824,18 +1856,6 @@
   },
   "tenantSettings": {
     "description": "Manage company branding, contact information, and business settings",
-    "sections": {
-      "branding": "Branding & Logo",
-      "businessSettings": "Business Settings",
-      "companyInfo": "Company Information",
-      "contactInfo": "Contact Information",
-      "featureFlags": "Feature Flags",
-      "terminology": "Terminology"
-    },
-    "tabs": {
-      "general": "General",
-      "terminology": "Terminology"
-    },
     "form": {
       "address": "Address",
       "city": "City",
@@ -1890,7 +1910,20 @@
       "logoUploadedSuccess": "Logo uploaded successfully",
       "noLogo": "No logo uploaded",
       "settingsUpdatedSuccess": "Settings updated successfully"
-    }
+    },
+    "sections": {
+      "branding": "Branding & Logo",
+      "businessSettings": "Business Settings",
+      "companyInfo": "Company Information",
+      "contactInfo": "Contact Information",
+      "featureFlags": "Feature Flags",
+      "terminology": "Terminology"
+    },
+    "tabs": {
+      "general": "General",
+      "terminology": "Terminology"
+    },
+    "title": "Tenant"
   },
   "users": {
     "actions": {

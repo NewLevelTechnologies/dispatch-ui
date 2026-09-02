@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -11,169 +11,51 @@ import {
   View,
 } from 'react-native';
 import { Stack } from 'expo-router';
+import { useTranslation } from '@dispatch/i18n';
 import { useAuth } from '../auth/AuthContext';
+import type { Challenge } from '../auth/AuthContext';
 
 export default function SignInScreen() {
-  const { submit, respond, challenge, cancelChallenge } = useAuth();
+  const { challenge } = useAuth();
+
+  // Keyed on the step so React remounts the form whenever Cognito advances.
+  // That resets the entered code and any error for free — the alternative, an
+  // effect syncing state to the step, is what react-hooks/set-state-in-effect
+  // warns about, and it leaves a frame where a stale code is still on screen.
+  return challenge ? (
+    <ChallengeForm key={challenge.step} challenge={challenge} />
+  ) : (
+    <PasswordForm />
+  );
+}
+
+function PasswordForm() {
+  const { t } = useTranslation();
+  const { submit } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [entry, setEntry] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  // Clear the previous answer whenever Cognito moves to a different step, so a
-  // stale TOTP code is never resubmitted against a new challenge.
-  useEffect(() => {
-    setEntry('');
-    setError(null);
-  }, [challenge?.step]);
+  const canSubmit = email.trim().length > 0 && password.length > 0 && !busy;
 
-  async function run(fn: () => Promise<string | null>) {
+  async function onSubmit() {
     setBusy(true);
     setError(null);
-    const failure = await fn();
+    const failure = await submit(email.trim(), password);
     if (failure) setError(failure);
     setBusy(false);
   }
 
-  // --- Challenge steps -------------------------------------------------------
-  if (challenge) {
-    const isChoice = challenge.kind === 'mfaSelection';
-    const isPassword = challenge.kind === 'newPassword';
-    const canSend = entry.trim().length > 0 && !busy;
-
-    return (
-      <>
-        <Stack.Screen options={{ title: 'Verify' }} />
-        <KeyboardAvoidingView
-          style={styles.flex}
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        >
-          <ScrollView contentContainerStyle={styles.container}>
-            <Text style={styles.title}>
-              {isChoice ? 'Choose a method' : isPassword ? 'Set a new password' : 'Verification'}
-            </Text>
-
-            {challenge.kind === 'code' && (
-              <>
-                {challenge.hint ? <Text style={styles.subtitle}>{challenge.hint}</Text> : null}
-                <Text style={styles.label}>{challenge.prompt}</Text>
-                <TextInput
-                  style={[styles.input, styles.code]}
-                  value={entry}
-                  onChangeText={setEntry}
-                  keyboardType="number-pad"
-                  autoComplete="one-time-code"
-                  textContentType="oneTimeCode"
-                  autoFocus
-                  editable={!busy}
-                  maxLength={10}
-                  placeholder="123456"
-                  onSubmitEditing={() => canSend && run(() => respond(entry.trim()))}
-                />
-              </>
-            )}
-
-            {challenge.kind === 'totpSetup' && (
-              <>
-                <Text style={styles.subtitle}>
-                  Add this secret to your authenticator app, then enter the code it shows.
-                </Text>
-                <View style={styles.secretBox}>
-                  <Text selectable style={styles.secret}>
-                    {challenge.secret}
-                  </Text>
-                </View>
-                <Text style={styles.label}>Authenticator code</Text>
-                <TextInput
-                  style={[styles.input, styles.code]}
-                  value={entry}
-                  onChangeText={setEntry}
-                  keyboardType="number-pad"
-                  autoFocus
-                  editable={!busy}
-                  maxLength={10}
-                  placeholder="123456"
-                />
-              </>
-            )}
-
-            {isChoice && (
-              <>
-                <Text style={styles.subtitle}>This account has more than one method enabled.</Text>
-                {challenge.options.map((option) => (
-                  <Pressable
-                    key={option}
-                    style={styles.option}
-                    disabled={busy}
-                    onPress={() => run(() => respond(option))}
-                  >
-                    <Text style={styles.optionText}>{option}</Text>
-                  </Pressable>
-                ))}
-              </>
-            )}
-
-            {isPassword && (
-              <>
-                <Text style={styles.subtitle}>
-                  This account requires a new password before signing in.
-                </Text>
-                <Text style={styles.label}>New password</Text>
-                <TextInput
-                  style={styles.input}
-                  value={entry}
-                  onChangeText={setEntry}
-                  secureTextEntry
-                  autoCapitalize="none"
-                  autoFocus
-                  editable={!busy}
-                />
-              </>
-            )}
-
-            {error ? <Text style={styles.error}>{error}</Text> : null}
-
-            {!isChoice && (
-              <Pressable
-                style={[styles.button, !canSend && styles.buttonDisabled]}
-                disabled={!canSend}
-                onPress={() => run(() => respond(entry.trim()))}
-              >
-                {busy ? (
-                  <ActivityIndicator color="#fff" />
-                ) : (
-                  <Text style={styles.buttonText}>Verify</Text>
-                )}
-              </Pressable>
-            )}
-
-            <Pressable style={styles.link} disabled={busy} onPress={cancelChallenge}>
-              <Text style={styles.linkText}>Start over</Text>
-            </Pressable>
-
-            <Text style={styles.step}>{challenge.step}</Text>
-          </ScrollView>
-        </KeyboardAvoidingView>
-      </>
-    );
-  }
-
-  // --- Password step ---------------------------------------------------------
-  const canSubmit = email.trim().length > 0 && password.length > 0 && !busy;
-
   return (
     <>
-      <Stack.Screen options={{ title: 'Sign in' }} />
-      <KeyboardAvoidingView
-        style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
+      <Stack.Screen options={{ title: t('auth.signIn') }} />
+      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView contentContainerStyle={styles.container}>
-          <Text style={styles.title}>Dispatch</Text>
-          <Text style={styles.subtitle}>Sign in with your Dispatch account.</Text>
+          <Text style={styles.title}>{t('app.name')}</Text>
+          <Text style={styles.subtitle}>{t('auth.signInPrompt')}</Text>
 
-          <Text style={styles.label}>Email</Text>
+          <Text style={styles.label}>{t('auth.emailLabel')}</Text>
           <TextInput
             style={styles.input}
             value={email}
@@ -184,10 +66,10 @@ export default function SignInScreen() {
             keyboardType="email-address"
             textContentType="username"
             editable={!busy}
-            placeholder="you@example.com"
+            placeholder={t('auth.emailPlaceholder')}
           />
 
-          <Text style={styles.label}>Password</Text>
+          <Text style={styles.label}>{t('auth.passwordLabel')}</Text>
           <TextInput
             style={styles.input}
             value={password}
@@ -197,7 +79,7 @@ export default function SignInScreen() {
             autoComplete="current-password"
             textContentType="password"
             editable={!busy}
-            onSubmitEditing={() => canSubmit && run(() => submit(email.trim(), password))}
+            onSubmitEditing={() => canSubmit && onSubmit()}
             returnKeyType="go"
           />
 
@@ -206,14 +88,140 @@ export default function SignInScreen() {
           <Pressable
             style={[styles.button, !canSubmit && styles.buttonDisabled]}
             disabled={!canSubmit}
-            onPress={() => run(() => submit(email.trim(), password))}
+            onPress={onSubmit}
           >
-            {busy ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Sign in</Text>}
+            {busy ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>{t('auth.signIn')}</Text>}
           </Pressable>
 
-          <Text style={styles.hint}>
-            Same credentials as the web app — mobile points at the same Cognito user pool.
-          </Text>
+          <Text style={styles.hint}>{t('auth.sameCredentialsAsWeb')}</Text>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </>
+  );
+}
+
+function ChallengeForm({ challenge }: { challenge: Challenge }) {
+  const { t } = useTranslation();
+  const { respond, cancelChallenge } = useAuth();
+  const [entry, setEntry] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const isChoice = challenge.kind === 'mfaSelection';
+  const isPassword = challenge.kind === 'newPassword';
+  const canSend = entry.trim().length > 0 && !busy;
+
+  async function send(value: string) {
+    setBusy(true);
+    setError(null);
+    const failure = await respond(value);
+    if (failure) setError(failure);
+    setBusy(false);
+  }
+
+  const heading = isChoice
+    ? t('auth.chooseMethod')
+    : isPassword
+      ? t('auth.setNewPassword')
+      : t('auth.verificationTitle');
+
+  return (
+    <>
+      <Stack.Screen options={{ title: t('auth.verify') }} />
+      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <ScrollView contentContainerStyle={styles.container}>
+          <Text style={styles.title}>{heading}</Text>
+
+          {challenge.kind === 'code' && (
+            <>
+              {challenge.hintKey ? (
+                <Text style={styles.subtitle}>{t(challenge.hintKey, challenge.hintValues)}</Text>
+              ) : null}
+              <Text style={styles.label}>{t(challenge.promptKey)}</Text>
+              <TextInput
+                style={[styles.input, styles.code]}
+                value={entry}
+                onChangeText={setEntry}
+                keyboardType="number-pad"
+                autoComplete="one-time-code"
+                textContentType="oneTimeCode"
+                autoFocus
+                editable={!busy}
+                maxLength={10}
+                placeholder={t('auth.codePlaceholder')}
+                onSubmitEditing={() => canSend && send(entry.trim())}
+              />
+            </>
+          )}
+
+          {challenge.kind === 'totpSetup' && (
+            <>
+              <Text style={styles.subtitle}>{t('auth.totpSetupHint')}</Text>
+              <View style={styles.secretBox}>
+                <Text selectable style={styles.secret}>
+                  {challenge.secret}
+                </Text>
+              </View>
+              <Text style={styles.label}>{t('auth.authenticatorCode')}</Text>
+              <TextInput
+                style={[styles.input, styles.code]}
+                value={entry}
+                onChangeText={setEntry}
+                keyboardType="number-pad"
+                autoFocus
+                editable={!busy}
+                maxLength={10}
+                placeholder={t('auth.codePlaceholder')}
+              />
+            </>
+          )}
+
+          {challenge.kind === 'mfaSelection' && (
+            <>
+              <Text style={styles.subtitle}>{t('auth.mfaMultipleEnabled')}</Text>
+              {challenge.options.map((option) => (
+                <Pressable key={option} style={styles.option} disabled={busy} onPress={() => send(option)}>
+                  <Text style={styles.optionText}>{option}</Text>
+                </Pressable>
+              ))}
+            </>
+          )}
+
+          {challenge.kind === 'newPassword' && (
+            <>
+              <Text style={styles.subtitle}>{t('auth.newPasswordRequired')}</Text>
+              <Text style={styles.label}>{t('auth.newPassword')}</Text>
+              <TextInput
+                style={styles.input}
+                value={entry}
+                onChangeText={setEntry}
+                secureTextEntry
+                autoCapitalize="none"
+                autoFocus
+                editable={!busy}
+              />
+            </>
+          )}
+
+          {error ? <Text style={styles.error}>{error}</Text> : null}
+
+          {!isChoice && (
+            <Pressable
+              style={[styles.button, !canSend && styles.buttonDisabled]}
+              disabled={!canSend}
+              onPress={() => send(entry.trim())}
+            >
+              {busy ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>{t('auth.verify')}</Text>}
+            </Pressable>
+          )}
+
+          <Pressable style={styles.link} disabled={busy} onPress={cancelChallenge}>
+            <Text style={styles.linkText}>{t('auth.startOver')}</Text>
+          </Pressable>
+
+          {/* Raw Cognito step, deliberately shown: if an unexpected challenge
+              arrives, this is the first thing anyone debugging it needs. */}
+          <Text style={styles.step}>{challenge.step}</Text>
         </ScrollView>
       </KeyboardAvoidingView>
     </>
@@ -237,12 +245,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
   },
   code: { fontSize: 22, letterSpacing: 4, textAlign: 'center' },
-  secretBox: {
-    backgroundColor: '#f3f4f6',
-    borderRadius: 8,
-    padding: 14,
-    marginBottom: 20,
-  },
+  secretBox: { backgroundColor: '#f3f4f6', borderRadius: 8, padding: 14, marginBottom: 20 },
   secret: { fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace', fontSize: 14 },
   option: {
     borderWidth: 1,

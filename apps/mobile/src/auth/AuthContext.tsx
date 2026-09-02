@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
+import { useTranslation } from '@dispatch/i18n';
 import { confirmSignIn, getCurrentUser, signIn, signOut } from 'aws-amplify/auth';
 import type { SignInOutput } from 'aws-amplify/auth';
 
@@ -15,7 +16,13 @@ type AuthStatus = 'loading' | 'signedIn' | 'signedOut';
  */
 export type Challenge =
   /** A one-time code: TOTP authenticator app, SMS, or emailed code. */
-  | { kind: 'code'; step: string; prompt: string; hint?: string }
+  | {
+      kind: 'code';
+      step: string;
+      promptKey: string;
+      hintKey?: string;
+      hintValues?: Record<string, string>;
+    }
   /** The pool allows more than one MFA method and wants the user to pick. */
   | { kind: 'mfaSelection'; step: string; options: string[] }
   /** First TOTP enrolment — the secret must be added to an authenticator app. */
@@ -45,17 +52,18 @@ function toChallenge(next: SignInOutput['nextStep']): Challenge | null {
       return {
         kind: 'code',
         step: next.signInStep,
-        prompt: 'Authenticator code',
-        hint: 'Enter the 6-digit code from your authenticator app.',
+        promptKey: 'auth.authenticatorCode',
+        hintKey: 'auth.totpHint',
       };
 
     case 'CONFIRM_SIGN_IN_WITH_SMS_CODE':
       return {
         kind: 'code',
         step: next.signInStep,
-        prompt: 'SMS code',
-        hint: next.codeDeliveryDetails?.destination
-          ? `Sent to ${next.codeDeliveryDetails.destination}.`
+        promptKey: 'auth.smsCode',
+        hintKey: next.codeDeliveryDetails?.destination ? 'auth.codeSentTo' : undefined,
+        hintValues: next.codeDeliveryDetails?.destination
+          ? { destination: next.codeDeliveryDetails.destination }
           : undefined,
       };
 
@@ -63,9 +71,10 @@ function toChallenge(next: SignInOutput['nextStep']): Challenge | null {
       return {
         kind: 'code',
         step: next.signInStep,
-        prompt: 'Email code',
-        hint: next.codeDeliveryDetails?.destination
-          ? `Sent to ${next.codeDeliveryDetails.destination}.`
+        promptKey: 'auth.emailCode',
+        hintKey: next.codeDeliveryDetails?.destination ? 'auth.codeSentTo' : undefined,
+        hintValues: next.codeDeliveryDetails?.destination
+          ? { destination: next.codeDeliveryDetails.destination }
           : undefined,
       };
 
@@ -97,13 +106,15 @@ function toChallenge(next: SignInOutput['nextStep']): Challenge | null {
       return {
         kind: 'code',
         step: next.signInStep,
-        prompt: 'Response',
-        hint: `Cognito requested: ${next.signInStep}`,
+        promptKey: 'auth.responseLabel',
+        hintKey: 'auth.cognitoRequested',
+        hintValues: { step: next.signInStep },
       };
   }
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const { t } = useTranslation();
   const [status, setStatus] = useState<AuthStatus>('loading');
   const [username, setUsername] = useState<string | null>(null);
   const [challenge, setChallenge] = useState<Challenge | null>(null);
@@ -145,10 +156,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       try {
         return await settle(await signIn({ username: email, password }));
       } catch (error) {
-        return error instanceof Error ? error.message : 'Sign in failed.';
+        return error instanceof Error ? error.message : t('auth.signInFailed');
       }
     },
-    [settle]
+    [settle, t]
   );
 
   const respond = useCallback(
@@ -159,10 +170,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // A wrong TOTP code lands here. Cognito keeps the challenge open, so
         // stay on the same screen and let the user retype rather than kicking
         // them back to the password form.
-        return error instanceof Error ? error.message : 'Could not verify that code.';
+        return error instanceof Error ? error.message : t('auth.verifyCodeFailed');
       }
     },
-    [settle]
+    [settle, t]
   );
 
   const cancelChallenge = useCallback(() => setChallenge(null), []);

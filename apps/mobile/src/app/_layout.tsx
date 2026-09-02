@@ -4,6 +4,8 @@ import { StatusBar } from 'expo-status-bar';
 import { ActivityIndicator, View } from 'react-native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
+// Initialize i18next from the shared package (same locales as web).
+import '@dispatch/i18n';
 // Initialize the shared API client (Amplify config, base URL, auth provider).
 import '../api/setup';
 import { AuthProvider, useAuth } from '../auth/AuthContext';
