@@ -181,9 +181,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const leave = useCallback(async () => {
     try {
       await signOut();
+    } catch {
+      // Swallowed deliberately. Amplify clears its local tokens before the
+      // network call, so a failure here means the revoke did not reach Cognito
+      // — not that the user is still signed in locally. Re-throwing would
+      // surface as an unhandled rejection from the onPress handler, since
+      // nothing awaits leave(), and there is no action the user could take.
     } finally {
-      // Drop local state even if the network call failed — staying "signed in"
-      // after the user asked to leave is the worse failure.
+      // Drop local state either way — staying "signed in" after the user asked
+      // to leave is the worse failure.
       setUsername(null);
       setChallenge(null);
       setStatus('signedOut');

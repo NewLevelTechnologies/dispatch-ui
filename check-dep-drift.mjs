@@ -70,6 +70,17 @@ const repoRoot = path.dirname(fileURLToPath(import.meta.url));
 const SYNCED_DEPS = [
   { name: 'typescript', requiredIn: 'all' },
   { name: '@types/node', requiredIn: ['apps/web', 'apps/mobile', 'packages/api'] },
+  // Both apps render components from packages/i18n, so all three must agree on
+  // React. packages/i18n declares it as a peer (the consumer supplies it at
+  // runtime) *and* as a devDependency for its own build — and it was that
+  // devDependency, left floating on ^19.2.4, that pulled a second React in.
+  { name: 'react', requiredIn: ['apps/web', 'apps/mobile', 'packages/i18n'] },
+  // react-dom is listed for packages/i18n too, even though only web renders to
+  // the DOM: react-i18next peers on it, so leaving it undeclared there let pnpm
+  // satisfy the peer with a different version and fork react-i18next all over
+  // again — the same failure as #380, just keyed on react-dom instead of
+  // typescript.
+  { name: 'react-dom', requiredIn: ['apps/web', 'packages/i18n'] },
 ];
 
 /** Minimal reader for the `dir/*` glob style used in pnpm-workspace.yaml. */
