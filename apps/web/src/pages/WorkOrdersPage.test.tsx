@@ -278,7 +278,7 @@ describe('WorkOrdersPage', () => {
   });
 
 
-  it('opens edit dialog when edit button is clicked', { timeout: 10000 }, async () => {
+  it('opens edit dialog when edit button is clicked', async () => {
     vi.mocked(apiClient.get).mockResolvedValue({ data: pageOf(mockWorkOrders) });
     const user = userEvent.setup();
 
@@ -301,7 +301,7 @@ describe('WorkOrdersPage', () => {
     expect(screen.getAllByText('Edit Work Order').length).toBeGreaterThan(0);
   });
 
-  it('calls delete mutation when delete is confirmed', { timeout: 10000 }, async () => {
+  it('calls delete mutation when delete is confirmed', async () => {
     vi.mocked(apiClient.get).mockResolvedValue({ data: pageOf(mockWorkOrders) });
     vi.mocked(apiClient.delete).mockResolvedValue({ data: {} });
     const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
@@ -329,7 +329,7 @@ describe('WorkOrdersPage', () => {
     confirmSpy.mockRestore();
   });
 
-  it('does not delete when deletion is cancelled', { timeout: 10000 }, async () => {
+  it('does not delete when deletion is cancelled', async () => {
     vi.mocked(apiClient.get).mockResolvedValue({ data: pageOf(mockWorkOrders) });
     vi.mocked(apiClient.delete).mockResolvedValue({ data: {} });
     const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);

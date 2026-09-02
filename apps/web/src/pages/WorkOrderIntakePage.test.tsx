@@ -3,6 +3,7 @@ import { screen, waitFor } from '@testing-library/react';
 import type { RouteObject } from 'react-router-dom';
 import { renderWithProviders, userEvent } from '../test/utils';
 import WorkOrderIntakePage from './WorkOrderIntakePage';
+import { HEAVY_FORM_TIMEOUT } from '../test/timeouts';
 
 const mockCreateWorkOrder = vi.fn();
 const mockCreateCustomer = vi.fn();
@@ -70,19 +71,6 @@ function renderIntake(initialPath = '/work-orders/new') {
   return renderWithProviders(<WorkOrderIntakePage />, { routes, initialPath });
 }
 
-// Three tests here fill one or two complete addresses through userEvent, which
-// dispatches per-keystroke and re-renders React each time. They run 1.5-2.3s
-// locally but are the slowest in the suite by ~7x, and CI is far slower in
-// aggregate — the full run takes ~800s of test time there versus ~50s locally,
-// because 171 files share a couple of runner cores. A 15s budget left only ~7x
-// headroom and one of them timed out in CI (#384). 30s keeps a comfortable
-// margin while still failing fast enough to catch a genuine hang.
-//
-// If more tests here need this, prefer trimming the typed fixtures over raising
-// the number again — `userEvent.setup({ delay: null })` was measured and only
-// bought ~15%, so the cost is the re-renders, not the keystroke delay.
-const HEAVY_FORM_TIMEOUT = 30_000;
-
 describe('WorkOrderIntakePage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -135,7 +123,7 @@ describe('WorkOrderIntakePage', () => {
     expect(screen.getByRole('radio', { name: 'Normal' })).not.toHaveAttribute('data-checked');
   });
 
-  it('adds a new property to an existing account without creating a second customer', async () => {
+  it('adds a new property to an existing account without creating a second customer', { timeout: HEAVY_FORM_TIMEOUT }, async () => {
     // Reality 2: the CUSTOMER is on file, this property isn't. Before the
     // search-first picker there was no path to this at all — a CSR would reach
     // for "New customer" and end up with a duplicate account.
@@ -202,9 +190,9 @@ describe('WorkOrderIntakePage', () => {
         expect.objectContaining({ customerId: 'cust-darden', serviceLocationId: 'loc-added' })
       )
     );
-  }, HEAVY_FORM_TIMEOUT);
+  });
 
-  it('accepts a new customer with only one contact channel', async () => {
+  it('accepts a new customer with only one contact channel', { timeout: HEAVY_FORM_TIMEOUT }, async () => {
     // Neither phone nor email is required on its own — having none is what's
     // invalid. The old panel demanded both.
     mockRegionsGetAll.mockResolvedValue([{ id: 'r-1', name: 'West' }]);
@@ -235,9 +223,9 @@ describe('WorkOrderIntakePage', () => {
         expect.objectContaining({ email: 'jordan@example.com', phone: null })
       )
     );
-  }, HEAVY_FORM_TIMEOUT);
+  });
 
-  it('routes the bill-to name onto the customer when someone else is invoiced', async () => {
+  it('routes the bill-to name onto the customer when someone else is invoiced', { timeout: HEAVY_FORM_TIMEOUT }, async () => {
     // Unchecking "Bill this customer directly" re-points the record: the payer
     // becomes the customer and the typed name demotes to the location, taking
     // the on-site contact with it.
@@ -291,7 +279,7 @@ describe('WorkOrderIntakePage', () => {
         })
       )
     );
-  }, HEAVY_FORM_TIMEOUT);
+  });
 
   it('names who is billed only when that differs from the site', async () => {
     // Named for someone else — the CSR needs to know Reyes Household pays for
@@ -364,7 +352,7 @@ describe('WorkOrderIntakePage', () => {
 
   // Types a whole customer + address through userEvent, so it runs ~2.5s under
   // v8 coverage instrumentation and overran the 5s default in CI's coverage job.
-  it('creates the customer first in new-customer mode, then the work order', { timeout: 15000 }, async () => {
+  it('creates the customer first in new-customer mode, then the work order', { timeout: HEAVY_FORM_TIMEOUT }, async () => {
     // A single region auto-selects, satisfying the required region field.
     mockRegionsGetAll.mockResolvedValue([{ id: 'r-1', name: 'West' }]);
     const user = userEvent.setup();
@@ -407,7 +395,7 @@ describe('WorkOrderIntakePage', () => {
     await waitFor(() => expect(router.state.location.pathname).toBe('/work-orders/wo-new'));
   });
 
-  it('offers the standardized address and saves the coordinates it geocoded', { timeout: 15000 }, async () => {
+  it('offers the standardized address and saves the coordinates it geocoded', { timeout: HEAVY_FORM_TIMEOUT }, async () => {
     mockRegionsGetAll.mockResolvedValue([{ id: 'r-1', name: 'West' }]);
     mockVerifyAddress.mockResolvedValue({
       located: true,
