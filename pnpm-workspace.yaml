@@ -18,6 +18,14 @@ catalog:
   # shared sources are not typechecked against two different Node type
   # universes (web compiles packages/api/src directly).
   '@types/node': 24.13.3
+  # React must be single-versioned across the workspace: packages/i18n
+  # exports React hooks that BOTH apps render, so a split gives mobile one
+  # React for its own components and another for anything reached through
+  # @dispatch/i18n — two renderers, and every hook call through the shared
+  # package fails. Expo SDK 57 requires exactly 19.2.3, so that is the
+  # version everything meets at; web was merely floating on ^19.2.4.
+  react: 19.2.3
+  react-dom: 19.2.3
 
 # pnpm 10+ does not run dependency install scripts unless they are allowlisted
 # here, and treats an un-declared one as an install error rather than a warning.

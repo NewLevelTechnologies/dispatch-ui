@@ -16,7 +16,8 @@
   "devDependencies": {
     "@types/react": "^19.2.14",
     "eslint": "^9.39.4",
-    "react": "^19.2.4",
+    "react": "catalog:",
+    "react-dom": "catalog:",
     "typescript": "catalog:"
   },
   "peerDependencies": {

@@ -28,10 +28,27 @@ export default {
   // shared threshold and force either a red build or a weakened standard.
   // A directory joins this list when it gains a suite, so untested code stays
   // *unmeasured* rather than silently counted as covered.
-  collectCoverageFrom: ['src/storage/**/*.ts'],
+  collectCoverageFrom: [
+    'src/**/*.{ts,tsx}',
+    // Test-support code is not product code; measuring it inflates the number
+    // without telling anyone anything.
+    '!src/test/**',
+  ],
   coveragePathIgnorePatterns: ['\\.test\\.ts$'],
 
   // Same repo-wide minimums as every other project; Jest's threshold keys match
   // the shared module's shape exactly.
   coverageThreshold: { global: COVERAGE_THRESHOLDS },
+
+  // Jest's 5000ms default is not enough here, for the same reason apps/web
+  // raised vitest's (#387): these suites run fine alone — the whole file takes
+  // ~2.5s — but `turbo run test` runs them beside web's 171 files on the same
+  // cores, and a render test that takes 300ms alone took over 5s under that
+  // load. Raising it after CI flakes is the pattern that produced #385 and
+  // #387; this is the same fix applied before the first failure rather than
+  // after it.
+  //
+  // 15s matches web's testTimeout and still surfaces a genuinely hung test
+  // quickly.
+  testTimeout: 15_000,
 };
