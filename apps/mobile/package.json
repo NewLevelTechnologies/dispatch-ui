@@ -4,10 +4,12 @@
   "private": true,
   "main": "expo-router/entry",
   "scripts": {
-    "dev": "expo start",
     "android": "expo run:android",
+    "build:ios": "pnpm dlx eas-cli build --platform ios --profile production",
+    "dev": "expo start",
     "ios": "expo run:ios",
     "lint": "eslint .",
+    "submit:ios": "pnpm dlx eas-cli submit --platform ios --profile production",
     "test": "jest",
     "test:coverage": "jest --coverage",
     "test:watch": "jest --watch"

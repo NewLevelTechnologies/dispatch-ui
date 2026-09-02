@@ -10,13 +10,13 @@
       "android"
     ],
     "ios": {
-      "bundleIdentifier": "com.newleveltech.dispatch",
+      "bundleIdentifier": "net.newleveltech.dispatch",
       "infoPlist": {
         "CFBundleDisplayName": "Dispatch"
       }
     },
     "android": {
-      "package": "com.newleveltech.dispatch"
+      "package": "net.newleveltech.dispatch"
     },
     "plugins": [
       "expo-router",

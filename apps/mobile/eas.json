@@ -1,0 +1,47 @@
+{
+  "cli": {
+    "version": ">= 16.0.0",
+    "appVersionSource": "remote"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "ios": { "simulator": true },
+      "env": {
+        "EXPO_PUBLIC_COGNITO_USER_POOL_ID": "us-east-1_Pi5LBJ3ZG",
+        "EXPO_PUBLIC_COGNITO_CLIENT_ID": "4vupgqt07fuia6a9df1fob36g9",
+        "EXPO_PUBLIC_COGNITO_DOMAIN": "dev-dispatch-auth.auth.us-east-1.amazoncognito.com",
+        "EXPO_PUBLIC_API_BASE_URL": "https://dev.api.dispatch.newleveltech.net/api/v1",
+        "EXPO_PUBLIC_ENV": "development"
+      }
+    },
+    "preview": {
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_COGNITO_USER_POOL_ID": "us-east-1_Pi5LBJ3ZG",
+        "EXPO_PUBLIC_COGNITO_CLIENT_ID": "4vupgqt07fuia6a9df1fob36g9",
+        "EXPO_PUBLIC_COGNITO_DOMAIN": "dev-dispatch-auth.auth.us-east-1.amazoncognito.com",
+        "EXPO_PUBLIC_API_BASE_URL": "https://dev.api.dispatch.newleveltech.net/api/v1",
+        "EXPO_PUBLIC_ENV": "development"
+      }
+    },
+    "production": {
+      "autoIncrement": true,
+      "env": {
+        "EXPO_PUBLIC_COGNITO_USER_POOL_ID": "us-east-1_Pi5LBJ3ZG",
+        "EXPO_PUBLIC_COGNITO_CLIENT_ID": "4vupgqt07fuia6a9df1fob36g9",
+        "EXPO_PUBLIC_COGNITO_DOMAIN": "dev-dispatch-auth.auth.us-east-1.amazoncognito.com",
+        "EXPO_PUBLIC_API_BASE_URL": "https://dev.api.dispatch.newleveltech.net/api/v1",
+        "EXPO_PUBLIC_ENV": "development"
+      }
+    }
+  },
+  "submit": {
+    "production": {
+      "ios": {
+        "bundleIdentifier": "net.newleveltech.dispatch"
+      }
+    }
+  }
+}
