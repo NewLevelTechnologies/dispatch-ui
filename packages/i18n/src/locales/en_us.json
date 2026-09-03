@@ -2904,8 +2904,14 @@
       "title": "Your access to {{company}} ended",
       "titleGeneric": "Your access to that workspace ended"
     },
+    "menuLabel": "Workspaces",
     "signOut": "Sign out",
     "signedInAs": "Signed in as {{email}}",
+    "switchAria": "Switch workspace",
+    "switching": {
+      "body": "Loading this workspace\u2019s jobs and customers",
+      "title": "Switching to {{company}}\u2026"
+    },
     "tryAgain": "Try again",
     "unknown": {
       "body": "This address is for a workspace your account doesn\u2019t have access to.",

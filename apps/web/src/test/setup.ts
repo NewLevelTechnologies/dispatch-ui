@@ -2132,7 +2132,11 @@ vi.mock('react-i18next', () => {
       'An administrator removed or disabled your membership. Anything unsaved there is gone \u2014 your sign-in and your other workspaces are unaffected.',
     'workspace.removed.title': 'Your access to {{company}} ended',
     'workspace.removed.titleGeneric': 'Your access to that workspace ended',
+    'workspace.menuLabel': 'Workspaces',
     'workspace.signOut': 'Sign out',
+    'workspace.switchAria': 'Switch workspace',
+    'workspace.switching.body': 'Loading this workspace\u2019s jobs and customers',
+    'workspace.switching.title': 'Switching to {{company}}\u2026',
     'workspace.signedInAs': 'Signed in as {{email}}',
     'workspace.tryAgain': 'Try again',
     'workspace.unknown.body':

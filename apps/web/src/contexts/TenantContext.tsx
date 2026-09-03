@@ -20,6 +20,7 @@ import {
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuthenticator } from '@aws-amplify/ui-react';
 import { apiClient, userApi, type TenantMembership } from '../api/setup';
+import { SwitchingOverlay } from '../components/workspace/WorkspaceStates';
 import {
   clearStoredTenant,
   persistTenantId,
@@ -44,12 +45,30 @@ interface TenantContextValue {
   refresh: () => void;
 }
 
+// Long enough to read the destination name, short enough not to feel like a
+// stall. Applies even when the remount is instant.
+const SWITCH_HOLD_MS = 450;
+
 const TenantContext = createContext<TenantContextValue | null>(null);
 
+/**
+ * For anything that genuinely requires a workspace — the gate, and any page
+ * logic branching on tenancy. Throws rather than silently acting on no tenant.
+ */
 export function useTenant(): TenantContextValue {
   const ctx = useContext(TenantContext);
   if (!ctx) throw new Error('useTenant must be used inside <TenantProvider>');
   return ctx;
+}
+
+/**
+ * For chrome that merely *displays* the workspace and already has to handle
+ * "not resolved yet" anyway — the sidebar brand block being the case in point.
+ * Returns null outside a provider instead of taking the app down, so rendering
+ * a page in isolation does not require the whole tenancy stack.
+ */
+export function useOptionalTenant(): TenantContextValue | null {
+  return useContext(TenantContext);
 }
 
 export function TenantProvider({ children }: { children: ReactNode }) {
@@ -64,6 +83,7 @@ export function TenantProvider({ children }: { children: ReactNode }) {
   // and no window where the two disagree.
   const [chosenTenantId, setChosenTenantId] = useState<string | null>(null);
   const [revokedFrom, setRevokedFrom] = useState<TenantMembership | null>(null);
+  const [switchingTo, setSwitchingTo] = useState<TenantMembership | null>(null);
 
   const {
     data: memberships,
@@ -89,6 +109,7 @@ export function TenantProvider({ children }: { children: ReactNode }) {
 
   const switchTenant = useCallback(
     (membership: TenantMembership) => {
+      setSwitchingTo(membership);
       setChosenTenantId(membership.tenantId);
       setRevokedFrom(null);
       // Not optional: every cached list, detail and count belongs to the
@@ -98,6 +119,14 @@ export function TenantProvider({ children }: { children: ReactNode }) {
     },
     [queryClient]
   );
+
+  // Hold the transition a minimum beat even when the remount is instant, so it
+  // reads as a switch rather than a flicker.
+  useEffect(() => {
+    if (!switchingTo) return;
+    const id = setTimeout(() => setSwitchingTo(null), SWITCH_HOLD_MS);
+    return () => clearTimeout(id);
+  }, [switchingTo]);
 
   // An explicit choice wins over the resolver — re-resolving mid-session would
   // fight a switch the person just made.
@@ -160,5 +189,13 @@ export function TenantProvider({ children }: { children: ReactNode }) {
     ]
   );
 
-  return <TenantContext.Provider value={value}>{children}</TenantContext.Provider>;
+  return (
+    <TenantContext.Provider value={value}>
+      {children}
+      {/* Rendered by the provider, not the switcher, so any caller that changes
+          workspace gets the transition — including recovery from a revoked
+          membership. */}
+      {switchingTo && <SwitchingOverlay companyName={switchingTo.companyName} />}
+    </TenantContext.Provider>
+  );
 }
