@@ -1,5 +1,5 @@
 // Central API exports
-export { default as apiClient, apiClient as api, type AuthTokenProvider, ApiClient } from './client';
+export { default as apiClient, apiClient as api, type AuthTokenProvider, type TenantProvider, ApiClient } from './client';
 export { getApiErrorMessage, getApiErrorCode } from './errors';
 export { setPublicApiBaseURL } from './publicClient';
 // NOTE: createAmplifyAuthProvider is deliberately NOT re-exported here.
@@ -122,7 +122,9 @@ export {
   type AccentInUseRef,
   type ColorsInUseMap,
   type AuditLogEntry,
-  type TwoFactorStatus
+  type TwoFactorStatus,
+  type TenantMembership,
+  type MembershipListResponse
 } from './userApi';
 
 // Work Order API

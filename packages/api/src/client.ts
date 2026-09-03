@@ -12,9 +12,42 @@ export interface AuthTokenProvider {
   getAccessToken: () => Promise<string | null>;
 }
 
+/**
+ * Supplies the tenant the caller is currently acting in.
+ *
+ * The JWT says *who*; this header says *which*. One person can hold a
+ * membership in several tenants, so the token alone can no longer identify a
+ * workspace. Sync by design: the value is read from browser storage or memory,
+ * never fetched, and making it async would put an await in front of every
+ * request for no gain.
+ */
+export interface TenantProvider {
+  getActiveTenantId: () => string | null;
+}
+
+/**
+ * Endpoints that must go out WITHOUT `X-Tenant-Id`.
+ *
+ * `/users/me/tenants` is the bootstrap call — it runs before a tenant has been
+ * chosen and answers "which workspaces does this person belong to?". Sending a
+ * stale or guessed tenant on it would be meaningless at best; the backend marks
+ * it `@TenantOptional` for the same reason.
+ *
+ * Matched against the path only, so query strings and the configured baseURL
+ * prefix don't defeat it.
+ */
+const TENANT_OPTIONAL_PATHS = ['/users/me/tenants'];
+
+function isTenantOptional(url: string | undefined): boolean {
+  if (!url) return false;
+  const path = url.split('?')[0]?.replace(/\/+$/, '') ?? '';
+  return TENANT_OPTIONAL_PATHS.some((p) => path === p || path.endsWith(p));
+}
+
 class ApiClient {
   private instance: AxiosInstance;
   private authProvider?: AuthTokenProvider;
+  private tenantProvider?: TenantProvider;
 
   constructor(baseURL: string) {
     this.instance = axios.create({
@@ -38,6 +71,16 @@ class ApiClient {
             config.headers.Authorization = `Bearer ${token}`;
           }
         }
+        // Every authenticated call names its tenant. Routing all of them
+        // through this one interceptor is what keeps the app from shipping
+        // half-migrated — a bare fetch/axios call would silently lose the
+        // header and resolve against the legacy JWT claim instead.
+        if (this.tenantProvider && config.headers && !isTenantOptional(config.url)) {
+          const tenantId = this.tenantProvider.getActiveTenantId();
+          if (tenantId) {
+            config.headers['X-Tenant-Id'] = tenantId;
+          }
+        }
         return config;
       },
       (error) => Promise.reject(error)
@@ -53,6 +96,14 @@ class ApiClient {
   // Set auth provider (called by platform-specific code)
   setAuthProvider(provider: AuthTokenProvider) {
     this.authProvider = provider;
+  }
+
+  // Set the active-tenant provider (called by platform-specific code).
+  // Until one is installed, no `X-Tenant-Id` is sent and the backend falls back
+  // to the legacy `custom:tenant_id` claim — which is exactly the behaviour
+  // wanted before this rollout completes.
+  setTenantProvider(provider: TenantProvider) {
+    this.tenantProvider = provider;
   }
 
   // Point the client at a different API origin. Each app reads its own env
