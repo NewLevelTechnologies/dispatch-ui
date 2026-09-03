@@ -26,6 +26,14 @@ export interface TenantProvider {
 }
 
 /**
+ * The two ways a membership stops being usable mid-session. Both are 403s and
+ * both mean "return this person to a workspace they still belong to"; they are
+ * kept distinct because only the backend can tell removal from disablement, and
+ * an audit trail may want to.
+ */
+export type TenantRevokedCode = 'NOT_A_MEMBER' | 'USER_DISABLED';
+
+/**
  * Endpoints that must go out WITHOUT `X-Tenant-Id`.
  *
  * `/users/me/tenants` is the bootstrap call — it runs before a tenant has been
@@ -48,6 +56,7 @@ class ApiClient {
   private instance: AxiosInstance;
   private authProvider?: AuthTokenProvider;
   private tenantProvider?: TenantProvider;
+  private tenantRevokedHandler?: (code: TenantRevokedCode) => void;
 
   constructor(baseURL: string) {
     this.instance = axios.create({
@@ -86,10 +95,25 @@ class ApiClient {
       (error) => Promise.reject(error)
     );
 
-    // Response interceptor — propagate errors so callers can show them.
+    // Response interceptor — propagate errors so callers can show them, but
+    // first surface the one class of failure no individual caller can handle:
+    // the membership behind every request in flight is gone.
+    //
+    // Revocation takes effect on the next request now, not at token expiry, so
+    // this is a normal event for a working user rather than an edge case. It is
+    // raised centrally because it is not "this query failed" — every query
+    // against that workspace has failed, and the page in front of them is
+    // already unreachable.
     this.instance.interceptors.response.use(
       (response) => response,
-      (error) => Promise.reject(error)
+      (error) => {
+        const status = error?.response?.status;
+        const code = error?.response?.data?.code;
+        if (status === 403 && (code === 'NOT_A_MEMBER' || code === 'USER_DISABLED')) {
+          this.tenantRevokedHandler?.(code);
+        }
+        return Promise.reject(error);
+      }
     );
   }
 
@@ -104,6 +128,15 @@ class ApiClient {
   // wanted before this rollout completes.
   setTenantProvider(provider: TenantProvider) {
     this.tenantProvider = provider;
+  }
+
+  /**
+   * Called when the backend reports that this person's membership in the active
+   * tenant is gone. Fires on every failing request, so the handler must be
+   * idempotent — the app should latch the state, not stack up notifications.
+   */
+  setTenantRevokedHandler(handler: (code: TenantRevokedCode) => void) {
+    this.tenantRevokedHandler = handler;
   }
 
   // Point the client at a different API origin. Each app reads its own env

@@ -2882,5 +2882,35 @@
     "deletedValues": "Deleted values",
     "noFieldChanges": "No field changes detected",
     "totalEvents": "{{count}} audit events"
+  },
+  "workspace": {
+    "askAdmin": "Ask your administrator to invite this address to their workspace, then sign in again.",
+    "choose": {
+      "subhead": "You have access to {{count}} workspaces. You can switch any time.",
+      "title": "Choose a workspace"
+    },
+    "continueIn": "Continue in",
+    "error": {
+      "body": "Something went wrong reaching the server. Your account is fine \u2014 this is a connection problem, not a change to your access.",
+      "title": "Couldn\u2019t load your workspaces"
+    },
+    "loading": "Loading your workspaces\u2026",
+    "none": {
+      "body": "Your sign-in worked, but this account isn\u2019t an active member of any workspace right now. An administrator may have removed or paused your access.",
+      "title": "No workspaces available"
+    },
+    "removed": {
+      "body": "An administrator removed or disabled your membership. Anything unsaved there is gone \u2014 your sign-in and your other workspaces are unaffected.",
+      "title": "Your access to {{company}} ended",
+      "titleGeneric": "Your access to that workspace ended"
+    },
+    "signOut": "Sign out",
+    "signedInAs": "Signed in as {{email}}",
+    "tryAgain": "Try again",
+    "unknown": {
+      "body": "This address is for a workspace your account doesn\u2019t have access to.",
+      "title": "You\u2019re not a member of this workspace",
+      "yours": "Your workspaces"
+    }
   }
 }

@@ -2115,6 +2115,30 @@ vi.mock('react-i18next', () => {
     'payers.table.outstanding': 'Outstanding',
     'payers.table.tags': 'Tags',
     'payers.table.terms': 'Terms',
+    'workspace.askAdmin':
+      'Ask your administrator to invite this address to their workspace, then sign in again.',
+    'workspace.choose.subhead':
+      'You have access to {{count}} workspaces. You can switch any time.',
+    'workspace.choose.title': 'Choose a workspace',
+    'workspace.continueIn': 'Continue in',
+    'workspace.error.body':
+      'Something went wrong reaching the server. Your account is fine \u2014 this is a connection problem, not a change to your access.',
+    'workspace.error.title': 'Couldn\u2019t load your workspaces',
+    'workspace.loading': 'Loading your workspaces\u2026',
+    'workspace.none.body':
+      'Your sign-in worked, but this account isn\u2019t an active member of any workspace right now. An administrator may have removed or paused your access.',
+    'workspace.none.title': 'No workspaces available',
+    'workspace.removed.body':
+      'An administrator removed or disabled your membership. Anything unsaved there is gone \u2014 your sign-in and your other workspaces are unaffected.',
+    'workspace.removed.title': 'Your access to {{company}} ended',
+    'workspace.removed.titleGeneric': 'Your access to that workspace ended',
+    'workspace.signOut': 'Sign out',
+    'workspace.signedInAs': 'Signed in as {{email}}',
+    'workspace.tryAgain': 'Try again',
+    'workspace.unknown.body':
+      'This address is for a workspace your account doesn\u2019t have access to.',
+    'workspace.unknown.title': 'You\u2019re not a member of this workspace',
+    'workspace.unknown.yours': 'Your workspaces',
   };
 
   return {
