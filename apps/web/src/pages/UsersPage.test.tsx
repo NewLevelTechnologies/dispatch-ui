@@ -295,8 +295,10 @@ describe('UsersPage', () => {
 
     await user.click(screen.getByRole('menuitem', { name: /disable/i }));
 
+    // Scoped to the workspace, not the account. No tenant settings are mocked
+    // here, so the title falls back to the generic workspace phrase.
     await waitFor(() => {
-      expect(screen.getByText(/disable john doe/i)).toBeInTheDocument();
+      expect(screen.getByText(/remove john doe from this workspace/i)).toBeInTheDocument();
     });
   });
 

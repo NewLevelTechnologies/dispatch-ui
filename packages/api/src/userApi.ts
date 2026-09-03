@@ -244,10 +244,46 @@ export interface AuditLogEntry {
   timestamp: string;
 }
 
+/**
+ * One workspace the signed-in person may act in.
+ *
+ * `userId` is the membership id (`tenant_users.id`) and **differs per tenant**.
+ * It is what `/users/me` returns once a tenant is selected, and what every
+ * service's audit trail and "assigned to" references point at — so it must
+ * never be cached across a workspace switch, and an id from one workspace means
+ * nothing in another.
+ *
+ * `tenantSlug` is the only tenant identifier ever shown to a user: it
+ * disambiguates same-named companies, and becomes the hostname label once
+ * per-tenant subdomains ship. `tenantId` is never rendered.
+ */
+export interface TenantMembership {
+  tenantId: string;
+  tenantSlug: string;
+  companyName: string;
+  userId: string;
+}
+
+export interface MembershipListResponse {
+  memberships: TenantMembership[];
+}
+
 export const userApi = {
   getCurrentUser: async (): Promise<User> => {
     const response = await apiClient.get<User>('/users/me');
     return response.data;
+  },
+
+  // The workspaces this person may act in. Runs BEFORE a tenant is chosen and
+  // is the one call that goes out without `X-Tenant-Id` (see the tenant-optional
+  // list in client.ts).
+  //
+  // An empty array is a valid 200, not an error: every membership may be
+  // disabled, removed, or in a suspended tenant. Ordered by company name, and
+  // deliberately kept in that order — see `listMyTenants` callers.
+  listMyTenants: async (): Promise<TenantMembership[]> => {
+    const response = await apiClient.get<MembershipListResponse>('/users/me/tenants');
+    return response.data.memberships;
   },
 
   // Paged user search. The wire format takes repeated keys for

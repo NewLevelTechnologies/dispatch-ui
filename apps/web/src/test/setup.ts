@@ -813,8 +813,12 @@ vi.mock('react-i18next', () => {
     'serviceLocations.tabs.activity': 'Activity',
     'serviceLocations.tabs.overview': 'Overview',
     'users.actions.deleteWarning': 'This action cannot be undone. All user data and history will be permanently removed.',
-    'users.actions.disableConfirm': 'Disable {{name}}?',
-    'users.actions.disableWarning': 'They will no longer be able to sign in. Audit history is preserved.',
+    'users.actions.disableConfirm': 'Remove {{name}} from {{company}}?',
+    'users.actions.disableNotAffected':
+      'Their sign-in, password and two-factor setup. If they belong to other workspaces, those are unaffected.',
+    'users.actions.disableNotAffectedLabel': 'Not affected',
+    'users.actions.disableWarning':
+      'They lose access to this workspace immediately, including any open session. Their work history here is kept.',
     'users.actions.enableConfirm': 'Enable {{name}}?',
     'users.actions.enableWarning': "They'll regain sign-in access immediately. Roles and regions are kept as-is.",
     'users.breakdown.disabled': '{{count}} disabled',
@@ -2111,6 +2115,30 @@ vi.mock('react-i18next', () => {
     'payers.table.outstanding': 'Outstanding',
     'payers.table.tags': 'Tags',
     'payers.table.terms': 'Terms',
+    'workspace.askAdmin':
+      'Ask your administrator to invite this address to their workspace, then sign in again.',
+    'workspace.choose.subhead':
+      'You have access to {{count}} workspaces. You can switch any time.',
+    'workspace.choose.title': 'Choose a workspace',
+    'workspace.continueIn': 'Continue in',
+    'workspace.error.body':
+      'Something went wrong reaching the server. Your account is fine \u2014 this is a connection problem, not a change to your access.',
+    'workspace.error.title': 'Couldn\u2019t load your workspaces',
+    'workspace.loading': 'Loading your workspaces\u2026',
+    'workspace.none.body':
+      'Your sign-in worked, but this account isn\u2019t an active member of any workspace right now. An administrator may have removed or paused your access.',
+    'workspace.none.title': 'No workspaces available',
+    'workspace.removed.body':
+      'An administrator removed or disabled your membership. Anything unsaved there is gone \u2014 your sign-in and your other workspaces are unaffected.',
+    'workspace.removed.title': 'Your access to {{company}} ended',
+    'workspace.removed.titleGeneric': 'Your access to that workspace ended',
+    'workspace.signOut': 'Sign out',
+    'workspace.signedInAs': 'Signed in as {{email}}',
+    'workspace.tryAgain': 'Try again',
+    'workspace.unknown.body':
+      'This address is for a workspace your account doesn\u2019t have access to.',
+    'workspace.unknown.title': 'You\u2019re not a member of this workspace',
+    'workspace.unknown.yours': 'Your workspaces',
   };
 
   return {

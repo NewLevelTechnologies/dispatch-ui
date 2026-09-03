@@ -4,7 +4,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from '@dispatch/i18n';
 import { ArrowLeftIcon } from '@heroicons/react/24/outline';
-import { userApi, dispatchRegionApi, type User, type Role } from '../api/setup';
+import { userApi, dispatchRegionApi, tenantSettingsApi, type User, type Role } from '../api/setup';
 import { RoleChip } from '../components/RoleChip';
 import { formatPhone, roleAccent } from '@dispatch/utils';
 import { auditApi, type AccountActivityEvent } from '../api/setup';
@@ -58,6 +58,17 @@ export default function UserDetailPage() {
     queryFn: () => userApi.getById(id!),
   });
 
+  // Naming the workspace is what makes the deactivate dialog read correctly —
+  // "Remove Dana from ACME HVAC" is the true scope, where "Deactivate user"
+  // reads as destroying their account. Shared cache key with App.tsx, so this
+  // is already warm and costs no extra request. Falls back to a generic phrase
+  // rather than rendering a blank where the company name should be.
+  const { data: tenantSettings } = useQuery({
+    queryKey: ['tenant-settings'],
+    queryFn: () => tenantSettingsApi.getSettings(),
+  });
+  const workspaceName = tenantSettings?.companyName || 'this workspace';
+
   const { data: allRegions } = useQuery({
     queryKey: ['dispatch-regions'],
     queryFn: () => dispatchRegionApi.getAll(true),
@@ -68,9 +79,9 @@ export default function UserDetailPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users', id] });
       queryClient.invalidateQueries({ queryKey: ['users'] });
-      showSuccess('User deactivated');
+      showSuccess('Access removed');
     },
-    onError: (err) => showError("Couldn't deactivate user", extractApiError(err)),
+    onError: (err) => showError("Couldn't remove access", extractApiError(err)),
   });
 
   const enableMutation = useMutation({
@@ -197,7 +208,10 @@ export default function UserDetailPage() {
         onConfirm={confirmLifecycle}
         title={
           lifecycleConfirm === 'deactivate'
-            ? t('users.actions.disableConfirm', { name: `${user.firstName} ${user.lastName}` })
+            ? t('users.actions.disableConfirm', {
+                name: `${user.firstName} ${user.lastName}`,
+                company: workspaceName,
+              })
             : t('users.actions.enableConfirm', { name: `${user.firstName} ${user.lastName}` })
         }
         message={
@@ -205,10 +219,20 @@ export default function UserDetailPage() {
             ? t('users.actions.disableWarning')
             : t('users.actions.enableWarning')
         }
-        confirmLabel={lifecycleConfirm === 'deactivate' ? 'Deactivate' : 'Reactivate'}
+        confirmLabel={lifecycleConfirm === 'deactivate' ? 'Remove access' : 'Reactivate'}
         isDestructive={lifecycleConfirm === 'deactivate'}
         isPending={disableMutation.isPending || enableMutation.isPending}
-      />
+      >
+        {/* Removal is per-workspace: the person keeps their login and any other
+            workspaces. Stated unconditionally — whether they actually belong to
+            others is cross-tenant information this admin has no claim on, and
+            the sentence is true either way. */}
+        {lifecycleConfirm === 'deactivate' && (
+          <Callout kind="neutral" title={t('users.actions.disableNotAffectedLabel')}>
+            {t('users.actions.disableNotAffected')}
+          </Callout>
+        )}
+      </ConfirmDialog>
     </div>
   );
 }
@@ -667,7 +691,17 @@ function SecurityCard({ userId, email, canEdit }: { userId: string; email: strin
         confirmLabel={pendingConfirm ? confirmCopy[pendingConfirm].confirmLabel : 'Confirm'}
         isDestructive
         isPending={resetPasswordMutation.isPending || resetMfaMutation.isPending || signOutMutation.isPending}
-      />
+      >
+        {/* All three of these act on the shared Cognito identity, not on the
+            membership — so an admin here can affect a person's sign-in in every
+            workspace they belong to. Unconditional: true regardless of how many
+            they're in, and it needs no cross-tenant field to say. */}
+        {pendingConfirm && (
+          <Callout kind="warning">
+            This affects their sign-in everywhere, not just this workspace.
+          </Callout>
+        )}
+      </ConfirmDialog>
     </Card>
   );
 }

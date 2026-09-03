@@ -12,9 +12,51 @@ export interface AuthTokenProvider {
   getAccessToken: () => Promise<string | null>;
 }
 
+/**
+ * Supplies the tenant the caller is currently acting in.
+ *
+ * The JWT says *who*; this header says *which*. One person can hold a
+ * membership in several tenants, so the token alone can no longer identify a
+ * workspace. Sync by design: the value is read from browser storage or memory,
+ * never fetched, and making it async would put an await in front of every
+ * request for no gain.
+ */
+export interface TenantProvider {
+  getActiveTenantId: () => string | null;
+}
+
+/**
+ * The two ways a membership stops being usable mid-session. Both are 403s and
+ * both mean "return this person to a workspace they still belong to"; they are
+ * kept distinct because only the backend can tell removal from disablement, and
+ * an audit trail may want to.
+ */
+export type TenantRevokedCode = 'NOT_A_MEMBER' | 'USER_DISABLED';
+
+/**
+ * Endpoints that must go out WITHOUT `X-Tenant-Id`.
+ *
+ * `/users/me/tenants` is the bootstrap call — it runs before a tenant has been
+ * chosen and answers "which workspaces does this person belong to?". Sending a
+ * stale or guessed tenant on it would be meaningless at best; the backend marks
+ * it `@TenantOptional` for the same reason.
+ *
+ * Matched against the path only, so query strings and the configured baseURL
+ * prefix don't defeat it.
+ */
+const TENANT_OPTIONAL_PATHS = ['/users/me/tenants'];
+
+function isTenantOptional(url: string | undefined): boolean {
+  if (!url) return false;
+  const path = url.split('?')[0]?.replace(/\/+$/, '') ?? '';
+  return TENANT_OPTIONAL_PATHS.some((p) => path === p || path.endsWith(p));
+}
+
 class ApiClient {
   private instance: AxiosInstance;
   private authProvider?: AuthTokenProvider;
+  private tenantProvider?: TenantProvider;
+  private tenantRevokedHandler?: (code: TenantRevokedCode) => void;
 
   constructor(baseURL: string) {
     this.instance = axios.create({
@@ -38,21 +80,63 @@ class ApiClient {
             config.headers.Authorization = `Bearer ${token}`;
           }
         }
+        // Every authenticated call names its tenant. Routing all of them
+        // through this one interceptor is what keeps the app from shipping
+        // half-migrated — a bare fetch/axios call would silently lose the
+        // header and resolve against the legacy JWT claim instead.
+        if (this.tenantProvider && config.headers && !isTenantOptional(config.url)) {
+          const tenantId = this.tenantProvider.getActiveTenantId();
+          if (tenantId) {
+            config.headers['X-Tenant-Id'] = tenantId;
+          }
+        }
         return config;
       },
       (error) => Promise.reject(error)
     );
 
-    // Response interceptor — propagate errors so callers can show them.
+    // Response interceptor — propagate errors so callers can show them, but
+    // first surface the one class of failure no individual caller can handle:
+    // the membership behind every request in flight is gone.
+    //
+    // Revocation takes effect on the next request now, not at token expiry, so
+    // this is a normal event for a working user rather than an edge case. It is
+    // raised centrally because it is not "this query failed" — every query
+    // against that workspace has failed, and the page in front of them is
+    // already unreachable.
     this.instance.interceptors.response.use(
       (response) => response,
-      (error) => Promise.reject(error)
+      (error) => {
+        const status = error?.response?.status;
+        const code = error?.response?.data?.code;
+        if (status === 403 && (code === 'NOT_A_MEMBER' || code === 'USER_DISABLED')) {
+          this.tenantRevokedHandler?.(code);
+        }
+        return Promise.reject(error);
+      }
     );
   }
 
   // Set auth provider (called by platform-specific code)
   setAuthProvider(provider: AuthTokenProvider) {
     this.authProvider = provider;
+  }
+
+  // Set the active-tenant provider (called by platform-specific code).
+  // Until one is installed, no `X-Tenant-Id` is sent and the backend falls back
+  // to the legacy `custom:tenant_id` claim — which is exactly the behaviour
+  // wanted before this rollout completes.
+  setTenantProvider(provider: TenantProvider) {
+    this.tenantProvider = provider;
+  }
+
+  /**
+   * Called when the backend reports that this person's membership in the active
+   * tenant is gone. Fires on every failing request, so the handler must be
+   * idempotent — the app should latch the state, not stack up notifications.
+   */
+  setTenantRevokedHandler(handler: (code: TenantRevokedCode) => void) {
+    this.tenantRevokedHandler = handler;
   }
 
   // Point the client at a different API origin. Each app reads its own env

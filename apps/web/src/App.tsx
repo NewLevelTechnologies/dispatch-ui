@@ -64,10 +64,18 @@ import AccountSettingsPage from './pages/AccountSettingsPage';
 import ApprovalsPage from './pages/ApprovalsPage';
 import PublicInvoicePage from './pages/PublicInvoicePage';
 import PublicQuotePage from './pages/PublicQuotePage';
+import TenantGate from './components/workspace/TenantGate';
+import { useTenant } from './contexts/TenantContext';
 
 // ProtectedRoute component - defined outside of App to avoid recreation on every render
+//
+// Signed in is not the same as being in a workspace: one person can hold
+// memberships in several, or in none. TenantGate sits here, at the single seam
+// every authenticated page already passes through, so a page can assume an
+// active tenant and every request it fires carries one. Public share-link pages
+// and /login are outside it by construction.
 const ProtectedRoute = ({ element, isAuthenticated }: { element: React.ReactElement; isAuthenticated: boolean }) => {
-  return isAuthenticated ? element : <Navigate to="/login" replace />;
+  return isAuthenticated ? <TenantGate>{element}</TenantGate> : <Navigate to="/login" replace />;
 };
 
 // Preserves the :id param when redirecting from old /roles/:id route to the new location.
@@ -114,10 +122,17 @@ function App() {
   }, [authStatus]);
 
   // Load tenant settings (includes glossary)
+  //
+  // Waits for an active workspace. /tenant-settings is tenant-scoped, so firing
+  // it before one is chosen would resolve against the legacy JWT claim — which
+  // for a multi-tenant person is an arbitrary one of their workspaces, not the
+  // one they are about to pick. That would load ACME's glossary and branding
+  // into a Globex session.
+  const { activeMembership } = useTenant();
   const { data: tenantSettings, isLoading: settingsLoading, error: settingsError } = useQuery({
     queryKey: ['tenant-settings'],
     queryFn: () => tenantSettingsApi.getSettings(),
-    enabled: authStatus === 'authenticated',
+    enabled: authStatus === 'authenticated' && !!activeMembership,
     staleTime: 30 * 60 * 1000, // 30 minutes - settings change rarely, but should propagate reasonably fast
     retry: 2, // Retry failed requests twice before giving up
   });
@@ -127,8 +142,15 @@ function App() {
     console.error('Failed to load tenant settings:', settingsError);
   }
 
-  // Show loading while checking auth OR loading settings
-  if (authStatus === 'configuring' || (authStatus === 'authenticated' && settingsLoading)) {
+  // Show loading while checking auth OR loading settings.
+  //
+  // Gated on having a workspace: without one the settings query never runs, so
+  // `settingsLoading` would stay pending forever and hold this screen in front
+  // of the picker the person needs to reach.
+  if (
+    authStatus === 'configuring' ||
+    (authStatus === 'authenticated' && !!activeMembership && settingsLoading)
+  ) {
     return (
       <div className="flex h-screen items-center justify-center">
         <div className="text-lg">Loading...</div>

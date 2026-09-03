@@ -5,7 +5,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from '@dispatch/i18n';
 import { EllipsisVerticalIcon, UsersIcon } from '@heroicons/react/24/outline';
 import IconButton from '../components/IconButton';
-import { userApi, type User, type Role, type InvitationStatus } from '../api/setup';
+import { userApi, tenantSettingsApi, type User, type Role, type InvitationStatus } from '../api/setup';
+import { Callout } from '../components/ui/Callout';
 import { useHasCapability, useCurrentUser } from '../hooks/useCurrentUser';
 import { PageHead } from '../components/ui/PageHead';
 import { Button } from '../components/catalyst/button';
@@ -118,6 +119,14 @@ export default function UsersPage() {
   const canEditUsers = useHasCapability('EDIT_USERS');
   const canDeleteUsers = useHasCapability('DELETE_USERS');
   const { data: currentUser } = useCurrentUser();
+
+  // Names the workspace in the remove-access dialog. Shared cache key with
+  // App.tsx, so no extra request; generic fallback rather than a blank.
+  const { data: tenantSettings } = useQuery({
+    queryKey: ['tenant-settings'],
+    queryFn: () => tenantSettingsApi.getSettings(),
+  });
+  const workspaceName = tenantSettings?.companyName || 'this workspace';
 
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: [
@@ -581,7 +590,7 @@ export default function UsersPage() {
           pendingAction?.kind === 'delete'
             ? t('common.actions.deleteConfirm', { name: pendingName })
             : pendingAction?.kind === 'disable'
-              ? t('users.actions.disableConfirm', { name: pendingName })
+              ? t('users.actions.disableConfirm', { name: pendingName, company: workspaceName })
               : t('users.actions.enableConfirm', { name: pendingName })
         }
         message={
@@ -602,7 +611,16 @@ export default function UsersPage() {
         }
         isDestructive={pendingAction?.kind !== 'enable'}
         isPending={confirmPending}
-      />
+      >
+        {/* Same scope note as the detail page: removal is per-workspace, and
+            the person keeps their login and any other workspaces. Deliberately
+            not shown for delete, which really is destructive. */}
+        {pendingAction?.kind === 'disable' && (
+          <Callout kind="neutral" title={t('users.actions.disableNotAffectedLabel')}>
+            {t('users.actions.disableNotAffected')}
+          </Callout>
+        )}
+      </ConfirmDialog>
     </>
   );
 }
