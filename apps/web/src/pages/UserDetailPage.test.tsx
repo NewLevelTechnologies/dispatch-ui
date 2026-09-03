@@ -98,6 +98,10 @@ describe('UserDetailPage', () => {
       if (url === `/users/${user.id}/2fa/status`) {
         return Promise.resolve({ data: { enabled: [], preferred: undefined } });
       }
+      // Names the workspace in the remove-access dialog.
+      if (url === '/tenant-settings') {
+        return Promise.resolve({ data: { companyName: 'ACME HVAC Services' } });
+      }
 
       // Fallback for unmatched URLs
       console.warn('Unmatched API URL in test:', url);
@@ -336,13 +340,11 @@ describe('UserDetailPage', () => {
     const disableButton = screen.getByRole('button', { name: /^deactivate$/i });
     await user.click(disableButton);
 
-    // ConfirmDialog opens with the user's name
-    const confirmButton = await screen.findByRole('button', { name: /^deactivate$/i });
-    // Two "Deactivate" buttons can transiently coexist (the trigger in the
-    // page + the confirm in the dialog). Click the one inside the dialog —
-    // the dialog renders after the trigger, so the *last* match is it.
-    const buttons = screen.getAllByRole('button', { name: /^deactivate$/i });
-    await user.click(buttons[buttons.length - 1] ?? confirmButton);
+    // The confirm is now "Remove access" — deactivation is scoped to this
+    // workspace, not the person's account. That also disambiguates it from the
+    // footer trigger, which the old /^deactivate$/ lookup had to work around.
+    const confirmButton = await screen.findByRole('button', { name: /^remove access$/i });
+    await user.click(confirmButton);
 
     await waitFor(() => {
       expect(postSpy).toHaveBeenCalledWith('/users/user-123/deactivate');

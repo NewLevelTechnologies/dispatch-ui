@@ -7,7 +7,7 @@ import { ChevronRightIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outli
 import { PatternFormat } from 'react-number-format';
 import { userApi, dispatchRegionApi, type Role } from '../api/setup';
 import { roleAccentFromRole } from '@dispatch/utils';
-import { showError, showSuccess, extractApiError } from '../lib/toast';
+import { showError, showSuccess, extractApiError, errorStatus } from '../lib/toast';
 import { Badge } from '../components/catalyst/badge';
 import { Button } from '../components/catalyst/button';
 import { Card } from '../components/catalyst/card';
@@ -114,15 +114,43 @@ export default function UserFormPage({ mode }: UserFormPageProps) {
       }),
     onSuccess: (created) => {
       queryClient.invalidateQueries({ queryKey: ['users'] });
-      showSuccess(
-        sendInvite ? 'Invitation sent' : 'User created',
-        sendInvite
-          ? `Email sent to ${created.email}. Link is valid 7 days.`
-          : undefined
-      );
+      // Branch on the status the backend derived from the person's real Cognito
+      // state, NOT on whether we just created them. Inviting an email that
+      // already has a login links that identity into this workspace and sends
+      // no email at all — promising one is a support ticket.
+      //
+      // `sendInvite: false` is a third case the invite-status split doesn't
+      // cover: the row exists, nothing was sent, whatever status comes back.
+      if (!sendInvite) {
+        showSuccess('User created', `No invitation was sent to ${created.email}.`);
+      } else if (created.invitationStatus === 'ACTIVE') {
+        showSuccess(
+          `${created.firstName} ${created.lastName} was added to this workspace`,
+          'No email was sent — they already have a login. This workspace appears in their workspace switcher the next time they sign in.'
+        );
+      } else {
+        // INVITED covers a brand-new person *and* someone another workspace
+        // invited who never finished their first sign-in. The pending invite is
+        // real in both cases, so resend stays available on their row.
+        showSuccess(
+          `Invitation sent to ${created.email}`,
+          "They'll get an email with a temporary password. You can resend it from their row until they sign in."
+        );
+      }
       navigate(`/settings/access/users/${created.id}`);
     },
     onError: (error: unknown) => {
+      // The 409 is per-workspace now, not per-platform: it means "already on
+      // THIS user list". The same email in another workspace links instead of
+      // colliding, so the old "a user with that email already exists" reading
+      // is wrong.
+      if (errorStatus(error) === 409) {
+        showError(
+          'Already a member of this workspace',
+          `${formData.email} is already on your user list. Check the list for their current role and status.`
+        );
+        return;
+      }
       showError(
         t('common.form.errorCreate', { entity: t('entities.user') }),
         extractApiError(error)

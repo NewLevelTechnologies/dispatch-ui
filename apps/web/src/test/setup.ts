@@ -813,8 +813,12 @@ vi.mock('react-i18next', () => {
     'serviceLocations.tabs.activity': 'Activity',
     'serviceLocations.tabs.overview': 'Overview',
     'users.actions.deleteWarning': 'This action cannot be undone. All user data and history will be permanently removed.',
-    'users.actions.disableConfirm': 'Disable {{name}}?',
-    'users.actions.disableWarning': 'They will no longer be able to sign in. Audit history is preserved.',
+    'users.actions.disableConfirm': 'Remove {{name}} from {{company}}?',
+    'users.actions.disableNotAffected':
+      'Their sign-in, password and two-factor setup. If they belong to other workspaces, those are unaffected.',
+    'users.actions.disableNotAffectedLabel': 'Not affected',
+    'users.actions.disableWarning':
+      'They lose access to this workspace immediately, including any open session. Their work history here is kept.',
     'users.actions.enableConfirm': 'Enable {{name}}?',
     'users.actions.enableWarning': "They'll regain sign-in access immediately. Roles and regions are kept as-is.",
     'users.breakdown.disabled': '{{count}} disabled',

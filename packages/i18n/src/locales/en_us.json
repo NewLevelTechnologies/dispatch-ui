@@ -1928,8 +1928,10 @@
   "users": {
     "actions": {
       "deleteWarning": "This action cannot be undone. All user data and history will be permanently removed.",
-      "disableConfirm": "Disable {{name}}?",
-      "disableWarning": "They will no longer be able to sign in. Audit history is preserved.",
+      "disableConfirm": "Remove {{name}} from {{company}}?",
+      "disableNotAffected": "Their sign-in, password and two-factor setup. If they belong to other workspaces, those are unaffected.",
+      "disableNotAffectedLabel": "Not affected",
+      "disableWarning": "They lose access to this workspace immediately, including any open session. Their work history here is kept.",
       "enableConfirm": "Enable {{name}}?",
       "enableWarning": "They'll regain sign-in access immediately. Roles and regions are kept as-is."
     },
