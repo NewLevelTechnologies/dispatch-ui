@@ -80,10 +80,10 @@ function WorkspaceRow({
           style={
             current
               ? { background: 'var(--accent-500)', color: 'white' }
-              : {
-                  background: 'color-mix(in oklch, var(--accent-500) 16%, transparent)',
-                  color: 'var(--accent-700)',
-                }
+              : // Neutral, not a lighter accent. Two tints of one hue read as
+                // two states of the same thing; accent-versus-grey reads as
+                // one selected and the rest not.
+                { background: 'var(--bg-active)', color: 'var(--fg-muted)' }
           }
           aria-hidden="true"
         >

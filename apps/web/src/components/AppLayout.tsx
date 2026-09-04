@@ -13,8 +13,6 @@ import {
   ShoppingCartIcon,
   CalendarIcon,
   Cog6ToothIcon,
-  SunIcon,
-  MoonIcon,
   DocumentTextIcon,
   DocumentChartBarIcon,
   CreditCardIcon,
@@ -34,10 +32,8 @@ import { approvalsApi, type ApprovalsBellSummary } from '../api/setup';
 import { Sidebar, SidebarBody, SidebarFooter, SidebarHeader, SidebarHeading, SidebarItem, SidebarSection } from './catalyst/sidebar';
 import { SidebarLayout } from './catalyst/sidebar-layout';
 import { Navbar } from './catalyst/navbar';
-import { Dropdown, DropdownButton, DropdownDivider, DropdownItem, DropdownLabel, DropdownMenu } from './catalyst/dropdown';
+import { Dropdown, DropdownButton, DropdownDescription, DropdownDivider, DropdownItem, DropdownLabel, DropdownMenu } from './catalyst/dropdown';
 import WorkspaceBrand from './workspace/WorkspaceBrand';
-import { useTheme } from './ThemeProvider';
-import { ToggleGroup, ToggleGroupOption } from './ui/ToggleGroup';
 import { useCurrentUser, useHasAnyCapability } from '../hooks/useCurrentUser';
 import { useApprovalsVisible } from '../hooks/useApprovalsVisible';
 import { useMediaQuery } from '../hooks/useMediaQuery';
@@ -55,7 +51,6 @@ export default function AppLayout({ children, flush }: { children: React.ReactNo
   const location = useLocation();
   const { t } = useTranslation();
   const { getName } = useGlossary();
-  const { mode, accent, setMode, setAccent } = useTheme();
   const { data: currentUser } = useCurrentUser();
 
   // Sidebar identity row: show full name + primary role once /me resolves.
@@ -321,43 +316,41 @@ export default function AppLayout({ children, flush }: { children: React.ReactNo
                 <EllipsisHorizontalIcon className="size-4 shrink-0 text-sidebar-fg-dim" />
               </DropdownButton>
               <DropdownMenu className="min-w-64" anchor="top start">
-                <div className="px-3 py-2">
-                  <div className="mb-2 text-sm font-medium text-fg-strong">{t('common.theme')}</div>
-                  <ToggleGroup value={mode} onChange={setMode} aria-label={t('common.theme')} className="w-full">
-                    <ToggleGroupOption value="light" aria-label="Light mode" className="flex-1 justify-center">
-                      <SunIcon className="h-4 w-4" />
-                    </ToggleGroupOption>
-                    <ToggleGroupOption value="dark" aria-label="Dark mode" className="flex-1 justify-center">
-                      <MoonIcon className="h-4 w-4" />
-                    </ToggleGroupOption>
-                  </ToggleGroup>
-                  <div className="mt-3 mb-2 text-sm font-medium text-fg-strong">{t('common.themeAccent')}</div>
-                  <ToggleGroup value={accent} onChange={setAccent} aria-label={t('common.themeAccent')} className="w-full">
-                    <ToggleGroupOption
-                      value="warm"
-                      aria-label={t('common.themeAccentWarm')}
-                      title={t('common.themeAccentWarm')}
-                      className="flex-1 justify-center"
-                    >
-                      <span
-                        className="size-4 rounded-full ring-1 ring-black/10"
-                        style={{ background: 'oklch(68% 0.185 50)' }}
-                      />
-                    </ToggleGroupOption>
-                    <ToggleGroupOption
-                      value="cool"
-                      aria-label={t('common.themeAccentCool')}
-                      title={t('common.themeAccentCool')}
-                      className="flex-1 justify-center"
-                    >
-                      <span
-                        className="size-4 rounded-full ring-1 ring-black/10"
-                        style={{ background: 'oklch(56% 0.125 215)' }}
-                      />
-                    </ToggleGroupOption>
-                  </ToggleGroup>
+                {/* Identity leads. One login now spans workspaces, so the email
+                    is the fact that matters most here — and it was previously
+                    visible only on the trigger. */}
+                <div className="col-span-full flex items-center gap-2.5 px-3.5 py-2.5 sm:px-3">
+                  <span
+                    className="grid size-8 shrink-0 place-items-center rounded-full text-[11px] font-semibold text-white"
+                    style={{ background: avatarBg }}
+                    aria-hidden="true"
+                  >
+                    {avatarInitials}
+                  </span>
+                  <span className="flex min-w-0 flex-1 flex-col leading-tight">
+                    <span className="flex items-baseline gap-1.5">
+                      <span className="truncate text-[13px] font-semibold text-fg-strong">
+                        {fullName || loginEmail}
+                      </span>
+                      {primaryRole && (
+                        <span className="shrink-0 text-[10.5px] text-fg-muted">{primaryRole}</span>
+                      )}
+                    </span>
+                    {loginEmail && (
+                      <span className="truncate text-[11.5px] text-fg-muted">{loginEmail}</span>
+                    )}
+                  </span>
                 </div>
                 <DropdownDivider />
+                {/* Theme and accent deliberately absent: they are durable
+                    preferences, not per-session actions, and the canonical
+                    controls already exist on Account Settings — which also
+                    offers System, the option this menu was missing.
+                    Their removal is also what un-strands the icons below. The
+                    theme block was a raw div in a menu whose grid starts with
+                    an `auto` column, so it widened that shared column to its
+                    own ~200px and pushed every label at col-start-2 across the
+                    panel. */}
                 <DropdownItem href="/account/settings">
                   <Cog6ToothIcon data-slot="icon" />
                   <DropdownLabel>{t('account.settings')}</DropdownLabel>
@@ -367,12 +360,16 @@ export default function AppLayout({ children, flush }: { children: React.ReactNo
                   <DropdownLabel>{t('common.helpSupport')}</DropdownLabel>
                 </DropdownItem>
                 <DropdownDivider />
+                {/* Its own group, and it states its scope: with one identity
+                    across several workspaces, "sign out" is no longer
+                    self-evident. */}
                 <DropdownItem
                   onClick={() => signOut()}
                   className="text-danger-500 data-focus:bg-danger-500/10 data-focus:text-danger-500 *:data-[slot=icon]:text-danger-500 data-focus:*:data-[slot=icon]:text-danger-500"
                 >
                   <ArrowRightStartOnRectangleIcon data-slot="icon" />
                   <DropdownLabel>{t('common.signOut')}</DropdownLabel>
+                  <DropdownDescription>{t('workspace.signOutScope')}</DropdownDescription>
                 </DropdownItem>
               </DropdownMenu>
             </Dropdown>
