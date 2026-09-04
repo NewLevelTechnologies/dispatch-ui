@@ -109,14 +109,21 @@ describe('WorkspaceBrand', () => {
     expect(menu.getByText('globex-facilities')).toBeInTheDocument();
   });
 
-  it('keeps the environment badge alongside the workspace name', () => {
-    // Knowing you are on prod outranks reading a long company name.
+  it('gives the whole block to the company name', () => {
+    // Nothing else shares this row — the environment badge moved to the topbar
+    // so a long company name is not the thing that gets truncated at 220px.
     mockTenant([ACME, GLOBEX], ACME);
-    renderWithProviders(
-      <WorkspaceBrand envBadge={{ label: 'DEV', className: 'test-badge' }} />
-    );
-    expect(screen.getByText('DEV')).toBeInTheDocument();
-    expect(screen.getByText('ACME HVAC Services')).toBeInTheDocument();
+    renderWithProviders(<WorkspaceBrand />);
+    expect(screen.getByTitle('ACME HVAC Services')).toBeInTheDocument();
+  });
+
+  it('marks the trigger with derived initials rather than a logo', () => {
+    // A logo thumbnail at 28px in a dark rail reads as an anonymous coloured
+    // square; initials survive the size.
+    mockTenant([ACME], ACME);
+    renderWithProviders(<WorkspaceBrand />);
+    expect(screen.getByText('AH')).toBeInTheDocument();
+    expect(document.querySelector('img')).toBeNull();
   });
 
   it('renders without a tenant provider rather than taking the sidebar down', () => {
