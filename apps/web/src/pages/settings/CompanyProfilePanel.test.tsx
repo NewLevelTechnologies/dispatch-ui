@@ -409,14 +409,57 @@ describe('CompanyProfilePanel', () => {
     await waitFor(() => expect(apiClient.post).toHaveBeenCalled());
   });
 
-  it('rejects a logo larger than 1MB without uploading', async () => {
+  it('accepts a JPEG, which the server has always taken', async () => {
+    // The client used to refuse JPEG while the server accepted it, so the most
+    // common logo format anyone has to hand was rejected by us alone.
+    const user = userEvent.setup();
+    vi.mocked(apiClient.post).mockResolvedValue({
+      data: { message: 'ok', urls: { original: 'https://x/logo.png' } },
+    });
+    renderWithProviders(<CompanyProfilePanel />);
+    await waitFor(() => expect(screen.getByText('Acme HVAC')).toBeInTheDocument());
+
+    await user.click(editButtonFor('Branding'));
+    const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+    await user.upload(fileInput, new File(['x'], 'logo.jpg', { type: 'image/jpeg' }));
+    await user.click(screen.getByRole('button', { name: /save changes/i }));
+
+    await waitFor(() => expect(apiClient.post).toHaveBeenCalled());
+    expect(showError).not.toHaveBeenCalled();
+  });
+
+  it('rejects a type the server cannot process, rather than letting it 400 there', async () => {
+    // SVG in particular: the processing step rasterises to PNG renditions and
+    // has nothing to render vector with, so the server refuses it. This used to
+    // be offered in the picker and fail server-side.
+    //
+    // applyAccept: false on purpose — it is a setup option in user-event v14.
+    // The accept attribute already filters this out of the picker, so the JS
+    // check exists for what accept does not cover: drag-and-drop, or a picker
+    // filter the user overrides. Leaving accept applied would test the browser
+    // rather than our guard.
+    const user = userEvent.setup({ applyAccept: false });
+    renderWithProviders(<CompanyProfilePanel />);
+    await waitFor(() => expect(screen.getByText('Acme HVAC')).toBeInTheDocument());
+
+    await user.click(editButtonFor('Branding'));
+    const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+    await user.upload(fileInput, new File(['<svg/>'], 'logo.svg', { type: 'image/svg+xml' }));
+
+    expect(showError).toHaveBeenCalled();
+    expect(apiClient.post).not.toHaveBeenCalled();
+  });
+
+  it('rejects a logo over the size the server accepts', async () => {
     const user = userEvent.setup();
     renderWithProviders(<CompanyProfilePanel />);
     await waitFor(() => expect(screen.getByText('Acme HVAC')).toBeInTheDocument());
 
     await user.click(editButtonFor('Branding'));
     const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
-    const bigFile = new File(['x'.repeat(2 * 1024 * 1024)], 'logo.png', { type: 'image/png' });
+    // Over 5MB, matching LogoProcessingService. At the old 1MB ceiling this
+    // fixture was 2MB — well within what the server would have accepted.
+    const bigFile = new File(['x'.repeat(6 * 1024 * 1024)], 'logo.png', { type: 'image/png' });
     await user.upload(fileInput, bigFile);
 
     expect(showError).toHaveBeenCalled();
