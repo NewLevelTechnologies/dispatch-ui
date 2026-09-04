@@ -425,6 +425,9 @@ export {
   type RecognitionBasis,
 } from './tenantSettingsApi';
 
+// Tenant API — the tenant record itself (base name), not its branding.
+export { tenantApi, type Tenant, type RenameTenantRequest } from './tenantApi';
+
 // Glossary API
 export { glossaryApi, type EntityInfo } from './glossaryApi';
 
