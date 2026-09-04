@@ -180,7 +180,7 @@ export default function AppLayout({ children, flush }: { children: React.ReactNo
             {/* The brand block is now the workspace: it already answers "where
                 am I", and the active workspace lives here and nowhere else. It
                 becomes a switcher only when there is more than one. */}
-            <WorkspaceBrand envBadge={envBadge} />
+            <WorkspaceBrand />
           </SidebarHeader>
 
           <SidebarBody className="[&>[data-slot=section]+[data-slot=section]]:mt-5">
@@ -381,6 +381,16 @@ export default function AppLayout({ children, flush }: { children: React.ReactNo
       }
       navbar={
         <Navbar>
+          {/* Environment badge lives here, not in the sidebar brand block: at a
+              220px rail it competed with the company name, which is the primary
+              "where am I" label and should be the last thing to lose space. */}
+          {envBadge && (
+            <span
+              className={`inline-flex shrink-0 items-center rounded px-1.5 py-0.5 text-[10px] font-bold tracking-wider ring-1 ring-inset ${envBadge.className}`}
+            >
+              {envBadge.label}
+            </span>
+          )}
           {breadcrumbs.length > 0 && (
             <div className="flex items-center gap-1.5 text-[12.5px] text-fg-muted">
               {breadcrumbs.map((c, i) => (

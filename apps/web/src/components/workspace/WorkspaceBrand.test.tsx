@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { screen } from '@testing-library/react';
-import { renderWithProviders, userEvent } from '../../test/utils';
+import { renderWithProviders, userEvent, within } from '../../test/utils';
 import WorkspaceBrand from './WorkspaceBrand';
 import { useOptionalTenant } from '../../contexts/TenantContext';
 import { tenantSettingsApi, type TenantMembership } from '../../api/setup';
@@ -90,14 +90,40 @@ describe('WorkspaceBrand', () => {
     expect(switchTenant).not.toHaveBeenCalled();
   });
 
-  it('keeps the environment badge alongside the workspace name', () => {
-    // Knowing you are on prod outranks reading a long company name.
+  it('gives every row a monogram and its slug', async () => {
+    // Both went missing when the rows were plain text, and the slug is what
+    // separates two workspaces with similar names.
+    const user = userEvent.setup();
     mockTenant([ACME, GLOBEX], ACME);
-    renderWithProviders(
-      <WorkspaceBrand envBadge={{ label: 'DEV', className: 'test-badge' }} />
-    );
-    expect(screen.getByText('DEV')).toBeInTheDocument();
-    expect(screen.getByText('ACME HVAC Services')).toBeInTheDocument();
+    renderWithProviders(<WorkspaceBrand />);
+
+    await user.click(screen.getByRole('button', { name: /switch workspace/i }));
+    await screen.findByRole('menuitem', { name: /globex facilities/i });
+
+    // Scoped to the menu: the active workspace's monogram also renders in the
+    // brand block itself, so an unscoped query matches twice.
+    const menu = within(screen.getByRole('menu'));
+    expect(menu.getByText('AH')).toBeInTheDocument();
+    expect(menu.getByText('GF')).toBeInTheDocument();
+    expect(menu.getByText('acme-hvac')).toBeInTheDocument();
+    expect(menu.getByText('globex-facilities')).toBeInTheDocument();
+  });
+
+  it('gives the whole block to the company name', () => {
+    // Nothing else shares this row — the environment badge moved to the topbar
+    // so a long company name is not the thing that gets truncated at 220px.
+    mockTenant([ACME, GLOBEX], ACME);
+    renderWithProviders(<WorkspaceBrand />);
+    expect(screen.getByTitle('ACME HVAC Services')).toBeInTheDocument();
+  });
+
+  it('marks the trigger with derived initials rather than a logo', () => {
+    // A logo thumbnail at 28px in a dark rail reads as an anonymous coloured
+    // square; initials survive the size.
+    mockTenant([ACME], ACME);
+    renderWithProviders(<WorkspaceBrand />);
+    expect(screen.getByText('AH')).toBeInTheDocument();
+    expect(document.querySelector('img')).toBeNull();
   });
 
   it('renders without a tenant provider rather than taking the sidebar down', () => {
