@@ -13,7 +13,16 @@ import { useTranslation } from '@dispatch/i18n';
 import { CheckIcon, ChevronDownIcon } from '@heroicons/react/16/solid';
 import { tenantSettingsApi } from '../../api/setup';
 import { useOptionalTenant } from '../../contexts/TenantContext';
-import { Dropdown, DropdownButton, DropdownItem, DropdownMenu } from '../catalyst/dropdown';
+import {
+  Dropdown,
+  DropdownButton,
+  DropdownDescription,
+  DropdownHeading,
+  DropdownItem,
+  DropdownLabel,
+  DropdownMenu,
+  DropdownSection,
+} from '../catalyst/dropdown';
 import { tenantMark } from './tenantMark';
 
 function BrandMark({ name, logoUrl }: { name: string; logoUrl?: string | null }) {
@@ -99,29 +108,55 @@ export default function WorkspaceBrand({ envBadge }: { envBadge?: { label: strin
       </DropdownButton>
       {/* Catalyst's own menu, matching the account menu in the sidebar footer.
           Outside-click, Escape and focus management come with it. */}
-      <DropdownMenu className="min-w-64" anchor="bottom start">
-        <div className="px-3 pt-1 pb-1.5 text-[10px] font-bold uppercase tracking-wider text-fg-dim">
-          {t('workspace.menuLabel')}
-        </div>
-        {memberships.map((m) => {
+      <DropdownMenu className="min-w-68" anchor="bottom start">
+        {/* The heading is a Headless MenuHeading and throws outside a
+            MenuSection, which would take the page down on open. The section
+            also hosts the shared subgrid the rows align to. */}
+        <DropdownSection>
+          <DropdownHeading className="text-[10px] font-bold uppercase tracking-wider">
+            {t('workspace.menuLabel')}
+          </DropdownHeading>
+          {memberships.map((m) => {
           const current = m.tenantId === activeMembership?.tenantId;
           return (
             <DropdownItem
               key={m.tenantId}
+              className={current ? 'bg-bg-active' : undefined}
               onClick={() => {
                 if (!current) switchTenant?.(m);
               }}
             >
-              <span className="flex min-w-0 flex-1 flex-col leading-tight">
-                <span className="truncate text-[12.5px] font-medium text-fg-strong">
-                  {m.companyName}
-                </span>
-                <span className="truncate font-mono text-[10.5px] text-fg-dim">{m.tenantSlug}</span>
+              {/* Explicitly placed in Catalyst's item grid — column 1, spanning
+                  both rows so it centres against the name and slug. Left to
+                  auto-placement it lands wherever the label isn't. */}
+              <span
+                className="col-start-1 row-span-2 row-start-1 mr-2.5 grid size-7 shrink-0 place-items-center rounded-md text-[10px] font-bold"
+                style={
+                  current
+                    ? { background: 'var(--accent-500)', color: 'white' }
+                    : {
+                        background: 'color-mix(in oklch, var(--accent-500) 16%, transparent)',
+                        color: 'var(--accent-700)',
+                      }
+                }
+                aria-hidden="true"
+              >
+                {tenantMark(m.companyName)}
               </span>
-              {current && <CheckIcon className="size-4 shrink-0 text-fg-accent" />}
+              <DropdownLabel className={current ? 'font-semibold' : undefined}>
+                {m.companyName}
+              </DropdownLabel>
+              <DropdownDescription className="font-mono">{m.tenantSlug}</DropdownDescription>
+              {/* Column 5 is the grid's trailing slot (where a shortcut would
+                  go). Without it this lands in column 1 and reads as a bullet
+                  floating off to the left of the row. */}
+              {current && (
+                <CheckIcon className="col-start-5 row-start-1 size-4 self-center justify-self-end text-fg-accent" />
+              )}
             </DropdownItem>
-          );
-        })}
+            );
+          })}
+        </DropdownSection>
       </DropdownMenu>
     </Dropdown>
   );

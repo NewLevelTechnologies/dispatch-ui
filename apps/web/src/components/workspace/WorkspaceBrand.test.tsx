@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { screen } from '@testing-library/react';
-import { renderWithProviders, userEvent } from '../../test/utils';
+import { renderWithProviders, userEvent, within } from '../../test/utils';
 import WorkspaceBrand from './WorkspaceBrand';
 import { useOptionalTenant } from '../../contexts/TenantContext';
 import { tenantSettingsApi, type TenantMembership } from '../../api/setup';
@@ -88,6 +88,25 @@ describe('WorkspaceBrand', () => {
     await user.click(screen.getByRole('button', { name: /switch workspace/i }));
     await user.click(await screen.findByRole('menuitem', { name: /acme hvac/i }));
     expect(switchTenant).not.toHaveBeenCalled();
+  });
+
+  it('gives every row a monogram and its slug', async () => {
+    // Both went missing when the rows were plain text, and the slug is what
+    // separates two workspaces with similar names.
+    const user = userEvent.setup();
+    mockTenant([ACME, GLOBEX], ACME);
+    renderWithProviders(<WorkspaceBrand />);
+
+    await user.click(screen.getByRole('button', { name: /switch workspace/i }));
+    await screen.findByRole('menuitem', { name: /globex facilities/i });
+
+    // Scoped to the menu: the active workspace's monogram also renders in the
+    // brand block itself, so an unscoped query matches twice.
+    const menu = within(screen.getByRole('menu'));
+    expect(menu.getByText('AH')).toBeInTheDocument();
+    expect(menu.getByText('GF')).toBeInTheDocument();
+    expect(menu.getByText('acme-hvac')).toBeInTheDocument();
+    expect(menu.getByText('globex-facilities')).toBeInTheDocument();
   });
 
   it('keeps the environment badge alongside the workspace name', () => {
