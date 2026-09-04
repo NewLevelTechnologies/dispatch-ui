@@ -52,11 +52,13 @@ function BrandMark({ name }: { name: string }) {
  * row's text origin and the list edge goes ragged. Every row gets a tile, so
  * every row's text starts in the same place.
  *
- * Current-workspace identity rests on four things a hovered sibling does not
- * compete with — the inset accent rail, the filled tile, the heavier name, and
- * the trailing check. Hover is toned down to a light accent tint in
- * components.css, because Catalyst's stock filled row out-shouted all of them
- * and made hover read as the selection.
+ * Background means hover and nothing else. A permanent tint on the current row
+ * would put two tinted rows on screen the moment a sibling is hovered, and the
+ * reader cannot tell which of them is active — the original hover-confusion
+ * bug in a quieter form.
+ *
+ * So current state is carried by three things no hovered row touches: the
+ * accent-filled tile, the heavier name, and the trailing check.
  */
 function WorkspaceRow({
   membership,
@@ -69,7 +71,6 @@ function WorkspaceRow({
 }) {
   return (
     <DropdownItem
-      className={current ? 'workspace-current bg-bg-active' : undefined}
       onClick={() => {
         if (!current) onSelect(membership);
       }}
