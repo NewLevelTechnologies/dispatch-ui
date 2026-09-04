@@ -785,8 +785,20 @@ function RecognitionBasisDialog({
 // the server. Upload and removal are mutually exclusive: choosing one clears
 // the other.
 // ──────────────────────────────────────────────────────────────────
-const LOGO_MAX_BYTES = 1 * 1024 * 1024;
-const LOGO_MIME_TYPES = ['image/png', 'image/svg+xml'];
+// Mirrors LogoProcessingService's own limits. These used to disagree with the
+// server in both directions: SVG was offered here and rejected there, and JPEG
+// was accepted there but blocked here.
+//
+// No SVG. The processing step rasterises to fixed-size PNG renditions, so there
+// is nothing to render an SVG with — and user-uploaded SVG can carry script, so
+// serving it from the CDN would want sanitising too. Supporting it is backend
+// work for a format almost no tenant brings.
+//
+// `image/jpg` is not a registered type and browsers report `image/jpeg` for
+// .jpg files, but the server accepts both, so both are tolerated here rather
+// than rejecting something the server would have taken.
+const LOGO_MAX_BYTES = 5 * 1024 * 1024;
+const LOGO_MIME_TYPES = ['image/png', 'image/jpeg', 'image/jpg'];
 
 function BrandingCard({ settings, canEdit }: { settings: TenantSettings; canEdit: boolean }) {
   const queryClient = useQueryClient();
@@ -841,11 +853,11 @@ function BrandingCard({ settings, canEdit }: { settings: TenantSettings; canEdit
     e.target.value = '';
     if (!picked) return;
     if (!LOGO_MIME_TYPES.includes(picked.type)) {
-      showError("Couldn't use that file", 'Logo must be a PNG or SVG.');
+      showError("Couldn't use that file", 'Logo must be a PNG or JPEG.');
       return;
     }
     if (picked.size > LOGO_MAX_BYTES) {
-      showError("Couldn't use that file", 'Logo must be 1 MB or smaller.');
+      showError("Couldn't use that file", 'Logo must be 5 MB or smaller.');
       return;
     }
     setRemoveRequested(false);
@@ -934,7 +946,7 @@ function BrandingCard({ settings, canEdit }: { settings: TenantSettings; canEdit
               <Text size="xs" tone="dim" className="mt-1.5">{file.name} — save to apply</Text>
             ) : (
               <Text size="xs" tone="muted" className="mt-1.5 leading-[1.5]">
-                PNG or SVG recommended · transparent background · square or wide formats · max 1 MB.
+                PNG or JPEG · a square mark works best · transparent background · max 5 MB.
               </Text>
             )}
           </div>
