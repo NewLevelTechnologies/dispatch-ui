@@ -117,7 +117,19 @@ export default function WorkspaceBrand() {
   // row therefore share one mark — which is the point: no company wears a logo
   // in one place and initials in another. Other rows fall back to monograms
   // until the membership list carries a logo of its own.
-  const logoUrl = tenantSettings?.logoThumbnailUrl ?? tenantSettings?.logoSmallUrl ?? null;
+  // Smallest adequate rendition first, then down the chain to the original.
+  // Only `logoOriginalUrl` is guaranteed to exist: the resized renditions come
+  // from a processing step, so a logo uploaded before that shipped — or one
+  // whose processing failed — has the original and nothing else. Stopping at
+  // thumbnail/small would silently show a monogram for a tenant that does have
+  // a logo.
+  const logoUrl =
+    tenantSettings?.logoThumbnailUrl ??
+    tenantSettings?.logoSmallUrl ??
+    tenantSettings?.logoMediumUrl ??
+    tenantSettings?.logoLargeUrl ??
+    tenantSettings?.logoOriginalUrl ??
+    null;
   const canSwitch = memberships.length > 1;
 
   const label = (
