@@ -5,12 +5,6 @@ import { COVERAGE_THRESHOLDS } from '../../coverage-thresholds.mjs';
 
 export default defineConfig({
   plugins: [react()],
-  // Mirrors the `define` in vite.config.ts. Vitest does not read that file, so
-  // without this the build-time literal is simply undefined and any component
-  // rendering it throws a ReferenceError.
-  define: {
-    __BUILD_SHA__: JSON.stringify('test'),
-  },
   test: {
     globals: true,
     environment: './src/test/jsdom-fixed-env.ts',
