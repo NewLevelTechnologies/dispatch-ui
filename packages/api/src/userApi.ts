@@ -256,12 +256,23 @@ export interface AuditLogEntry {
  * `tenantSlug` is the only tenant identifier ever shown to a user: it
  * disambiguates same-named companies, and becomes the hostname label once
  * per-tenant subdomains ship. `tenantId` is never rendered.
+ *
+ * `companyName` is the tenant's BASE name — the short internal one shown in the
+ * switcher and picker. It is deliberately not `TenantSettings.companyName`,
+ * which is the customer-facing display name on invoices and outbound email
+ * ("Atech" vs "Atech Incorporated, Inc").
+ *
+ * `logoUrl` is the 128px rendition, read live from the shared tenant-settings
+ * cache rather than mirrored into the membership registry. Null means "render
+ * the monogram" — either the tenant has no logo, or its branding is not
+ * currently cached. Never an error.
  */
 export interface TenantMembership {
   tenantId: string;
   tenantSlug: string;
   companyName: string;
   userId: string;
+  logoUrl?: string | null;
 }
 
 export interface MembershipListResponse {

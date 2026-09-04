@@ -3,13 +3,9 @@ import { screen } from '@testing-library/react';
 import { renderWithProviders, userEvent, within } from '../../test/utils';
 import WorkspaceBrand from './WorkspaceBrand';
 import { useOptionalTenant } from '../../contexts/TenantContext';
-import { tenantSettingsApi, type TenantMembership } from '../../api/setup';
+import type { TenantMembership } from '../../api/setup';
 
 vi.mock('../../contexts/TenantContext');
-vi.mock('../../api/setup', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../api/setup')>()),
-  tenantSettingsApi: { getSettings: vi.fn() },
-}));
 
 const ACME: TenantMembership = {
   tenantId: 'tenant-acme',
@@ -42,7 +38,6 @@ function mockTenant(memberships: TenantMembership[], active: TenantMembership | 
 
 beforeEach(() => {
   vi.clearAllMocks();
-  vi.mocked(tenantSettingsApi.getSettings).mockResolvedValue({} as never);
 });
 
 describe('WorkspaceBrand', () => {
@@ -124,18 +119,52 @@ describe('WorkspaceBrand', () => {
     expect(document.querySelector('img')).toBeNull();
   });
 
-  it('prefers the tenant logo on the trigger when one is set', async () => {
-    vi.mocked(tenantSettingsApi.getSettings).mockResolvedValue({
-      logoThumbnailUrl: 'https://cdn.test/acme-thumb.png',
-    } as never);
-    mockTenant([ACME], ACME);
+  it('prefers the tenant logo on the trigger when one is set', () => {
+    // Off the membership list, not tenant-settings: that query is tenant-scoped
+    // and evicted on switch, which used to blank the mark during the refetch.
+    const branded = { ...ACME, logoUrl: 'https://cdn.test/acme.png' };
+    mockTenant([branded], branded);
     renderWithProviders(<WorkspaceBrand />);
 
-    const img = await screen.findByRole('presentation');
-    expect(img).toHaveAttribute('src', 'https://cdn.test/acme-thumb.png');
-    // Menu rows stay on monograms — other workspaces' branding is not
-    // reachable from this session.
+    const img = document.querySelector('img');
+    expect(img).toHaveAttribute('src', 'https://cdn.test/acme.png');
     expect(screen.queryByText('AH')).not.toBeInTheDocument();
+  });
+
+  it('gives each row its own logo, so every workspace is recognisable', async () => {
+    // The whole point of the field: a logo you can only see once you are
+    // already inside a workspace cannot help you choose one.
+    const user = userEvent.setup();
+    const brandedAcme = { ...ACME, logoUrl: 'https://cdn.test/acme.png' };
+    const brandedGlobex = { ...GLOBEX, logoUrl: 'https://cdn.test/globex.png' };
+    mockTenant([brandedAcme, brandedGlobex], brandedAcme);
+    renderWithProviders(<WorkspaceBrand />);
+
+    await user.click(screen.getByRole('button', { name: /switch workspace/i }));
+    await screen.findByRole('menuitem', { name: /globex facilities/i });
+
+    // Queried as <img> rather than by role: SVG icons in the row also resolve
+    // to a presentation role, so the role query is not specific to logos.
+    const srcs = Array.from(screen.getByRole('menu').querySelectorAll('img')).map((el) =>
+      el.getAttribute('src')
+    );
+    expect(srcs).toEqual(['https://cdn.test/acme.png', 'https://cdn.test/globex.png']);
+  });
+
+  it('falls back per row, so a logo-less workspace beside a branded one still reads', async () => {
+    const user = userEvent.setup();
+    const brandedAcme = { ...ACME, logoUrl: 'https://cdn.test/acme.png' };
+    mockTenant([brandedAcme, GLOBEX], brandedAcme);
+    renderWithProviders(<WorkspaceBrand />);
+
+    await user.click(screen.getByRole('button', { name: /switch workspace/i }));
+    await screen.findByRole('menuitem', { name: /globex facilities/i });
+
+    const menu = screen.getByRole('menu');
+    const imgs = Array.from(menu.querySelectorAll('img'));
+    expect(imgs).toHaveLength(1);
+    expect(imgs[0]).toHaveAttribute('src', 'https://cdn.test/acme.png');
+    expect(within(menu).getByText('GF')).toBeInTheDocument();
   });
 
   it('renders without a tenant provider rather than taking the sidebar down', () => {
