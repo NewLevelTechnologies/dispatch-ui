@@ -77,14 +77,20 @@ function WorkspaceRow({
     >
       <div className="col-span-full flex w-full items-center gap-2.5">
         <span
-          className="grid size-7 shrink-0 place-items-center rounded-md text-[10px] font-bold"
+          className="grid size-7 shrink-0 place-items-center rounded-md text-[10.5px] font-bold"
           style={
             current
               ? { background: 'var(--accent-500)', color: 'white' }
-              : // Neutral, not a lighter accent. Two tints of one hue read as
-                // two states of the same thing; accent-versus-grey reads as
-                // one selected and the rest not.
-                { background: 'var(--bg-active)', color: 'var(--fg-muted)' }
+              : // Neutral, not a lighter accent: two tints of one hue read as
+                // two states of the same thing, where accent-versus-grey reads
+                // as one selected and the rest not.
+                //
+                // `--fg` rather than `--fg-muted`. Muted on `--bg-active` is
+                // ~4.9:1, which is fine for body text but not for two letters
+                // at 10.5px/700 — the AA ratio assumes roughly 14px. `--fg`
+                // takes it to ~12:1. A component-level choice, not a token
+                // problem; light-mode tokens are correct as they stand.
+                { background: 'var(--bg-active)', color: 'var(--fg)' }
           }
           aria-hidden="true"
         >
