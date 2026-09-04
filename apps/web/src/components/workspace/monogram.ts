@@ -16,7 +16,7 @@ const LEGAL_SUFFIX =
  * words — including the degenerate case where every word is a suffix, which
  * would otherwise produce an empty mark.
  */
-export function tenantMark(name: string): string {
+export function tenantMonogram(name: string): string {
   const trimmed = name?.trim() ?? '';
   if (!trimmed) return '?';
 

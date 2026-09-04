@@ -9,10 +9,11 @@
 // focusable, not clickable. Most tenants will only ever have one workspace, and
 // they should not see an affordance for something they cannot do. The chevron
 // is the only thing that appears above one.
+import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from '@dispatch/i18n';
 import { CheckIcon, ChevronDownIcon } from '@heroicons/react/16/solid';
 import { useOptionalTenant } from '../../contexts/TenantContext';
-import type { TenantMembership } from '../../api/setup';
+import { tenantSettingsApi, type TenantMembership } from '../../api/setup';
 import {
   Dropdown,
   DropdownButton,
@@ -21,28 +22,7 @@ import {
   DropdownMenu,
   DropdownSection,
 } from '../catalyst/dropdown';
-import { tenantMark } from './tenantMark';
-
-/**
- * Two derived letters on the accent gradient — deliberately not the tenant's
- * logo.
- *
- * A logo thumbnail at 28px in a dark rail reads as an anonymous coloured
- * square, which is worse than initials you can parse. The logo has a home on
- * customer-facing documents and Company Profile, at a size that carries it.
- * Seeding from `--accent-500` also means the mark recolours on a workspace
- * switch with no per-tenant hue logic.
- */
-function BrandMark({ name }: { name: string }) {
-  return (
-    <div
-      className="grid size-7 shrink-0 place-items-center rounded-md bg-gradient-to-br from-accent-500 to-accent-700 text-[11px] font-bold text-white shadow-sm"
-      aria-hidden="true"
-    >
-      {tenantMark(name)}
-    </div>
-  );
-}
+import TenantMark from './TenantMark';
 
 /**
  * One workspace row.
@@ -63,10 +43,13 @@ function BrandMark({ name }: { name: string }) {
 function WorkspaceRow({
   membership,
   current,
+  logoUrl,
   onSelect,
 }: {
   membership: TenantMembership;
   current: boolean;
+  /** Only ever set for the active workspace — see the note in WorkspaceBrand. */
+  logoUrl?: string | null;
   onSelect: (m: TenantMembership) => void;
 }) {
   return (
@@ -76,26 +59,12 @@ function WorkspaceRow({
       }}
     >
       <div className="col-span-full flex w-full items-center gap-2.5">
-        <span
-          className="grid size-7 shrink-0 place-items-center rounded-md text-[10.5px] font-bold"
-          style={
-            current
-              ? { background: 'var(--accent-500)', color: 'white' }
-              : // Neutral, not a lighter accent: two tints of one hue read as
-                // two states of the same thing, where accent-versus-grey reads
-                // as one selected and the rest not.
-                //
-                // `--fg` rather than `--fg-muted`. Muted on `--bg-active` is
-                // ~4.9:1, which is fine for body text but not for two letters
-                // at 10.5px/700 — the AA ratio assumes roughly 14px. `--fg`
-                // takes it to ~12:1. A component-level choice, not a token
-                // problem; light-mode tokens are correct as they stand.
-                { background: 'var(--bg-active)', color: 'var(--fg)' }
-          }
-          aria-hidden="true"
-        >
-          {tenantMark(membership.companyName)}
-        </span>
+        <TenantMark
+          name={membership.companyName}
+          logoUrl={logoUrl}
+          size={26}
+          current={current}
+        />
         <span className="flex min-w-0 flex-1 flex-col leading-tight">
           <span
             className={`truncate text-[12.5px] text-fg-strong ${
@@ -130,14 +99,30 @@ export default function WorkspaceBrand() {
   const activeMembership = tenant?.activeMembership ?? null;
   const switchTenant = tenant?.switchTenant;
 
+  const { data: tenantSettings } = useQuery({
+    queryKey: ['tenant-settings'],
+    queryFn: () => tenantSettingsApi.getSettings(),
+    enabled: !!activeMembership,
+  });
+
   // Falls back to the product name only before a workspace resolves — in
   // practice the gate means that is never visible.
   const name = activeMembership?.companyName ?? t('app.name');
+  // Thumbnail rendition, and the same cache key App.tsx already uses, so this
+  // costs no extra request.
+  //
+  // Only ever the ACTIVE workspace's logo. /users/me/tenants carries no
+  // branding, and /tenant-settings is tenant-scoped, so another workspace's
+  // logo is simply not reachable from this session. The trigger and the current
+  // row therefore share one mark — which is the point: no company wears a logo
+  // in one place and initials in another. Other rows fall back to monograms
+  // until the membership list carries a logo of its own.
+  const logoUrl = tenantSettings?.logoThumbnailUrl ?? tenantSettings?.logoSmallUrl ?? null;
   const canSwitch = memberships.length > 1;
 
   const label = (
     <>
-      <BrandMark name={name} />
+      <TenantMark name={name} logoUrl={logoUrl} size={28} />
       {/* Truncates, because a company name can be far longer than the
           hardcoded product name it replaced. Nothing else shares this row: the
           environment badge lives in the topbar, where it does not compete with
@@ -179,6 +164,7 @@ export default function WorkspaceBrand() {
               key={m.tenantId}
               membership={m}
               current={m.tenantId === activeMembership?.tenantId}
+              logoUrl={m.tenantId === activeMembership?.tenantId ? logoUrl : null}
               onSelect={(target) => switchTenant?.(target)}
             />
           ))}

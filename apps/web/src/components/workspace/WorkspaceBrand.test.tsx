@@ -117,13 +117,25 @@ describe('WorkspaceBrand', () => {
     expect(screen.getByTitle('ACME HVAC Services')).toBeInTheDocument();
   });
 
-  it('marks the trigger with derived initials rather than a logo', () => {
-    // A logo thumbnail at 28px in a dark rail reads as an anonymous coloured
-    // square; initials survive the size.
+  it('falls back to derived initials when the tenant has no logo', () => {
     mockTenant([ACME], ACME);
     renderWithProviders(<WorkspaceBrand />);
     expect(screen.getByText('AH')).toBeInTheDocument();
     expect(document.querySelector('img')).toBeNull();
+  });
+
+  it('prefers the tenant logo on the trigger when one is set', async () => {
+    vi.mocked(tenantSettingsApi.getSettings).mockResolvedValue({
+      logoThumbnailUrl: 'https://cdn.test/acme-thumb.png',
+    } as never);
+    mockTenant([ACME], ACME);
+    renderWithProviders(<WorkspaceBrand />);
+
+    const img = await screen.findByRole('presentation');
+    expect(img).toHaveAttribute('src', 'https://cdn.test/acme-thumb.png');
+    // Menu rows stay on monograms — other workspaces' branding is not
+    // reachable from this session.
+    expect(screen.queryByText('AH')).not.toBeInTheDocument();
   });
 
   it('renders without a tenant provider rather than taking the sidebar down', () => {
