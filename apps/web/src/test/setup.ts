@@ -2134,6 +2134,7 @@ vi.mock('react-i18next', () => {
     'workspace.removed.titleGeneric': 'Your access to that workspace ended',
     'workspace.menuLabel': 'Workspaces',
     'workspace.signOut': 'Sign out',
+    'workspace.signOutScope': 'Signs you out of all workspaces',
     'workspace.switchAria': 'Switch workspace',
     'workspace.switching.body': 'Loading this workspace\u2019s jobs and customers',
     'workspace.switching.title': 'Switching to {{company}}\u2026',

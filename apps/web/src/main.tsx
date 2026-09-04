@@ -27,16 +27,18 @@ createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
       <Authenticator.Provider>
-        {/* Above App: App's own tenant-scoped queries (settings, glossary) have
-            to wait on the workspace this resolves, or a multi-tenant person
-            loads one workspace's glossary into another's session. */}
-        <TenantProvider>
-          <ThemeProvider>
-            <BrowserRouter>
+        <ThemeProvider>
+          {/* Router outside, provider inside: switching workspaces navigates
+              home, so the provider needs useNavigate. Still above App, because
+              App's own tenant-scoped queries (settings, glossary) have to wait
+              on the workspace this resolves — otherwise a multi-tenant person
+              loads one workspace's glossary into another's session. */}
+          <BrowserRouter>
+            <TenantProvider>
               <App />
-            </BrowserRouter>
-          </ThemeProvider>
-        </TenantProvider>
+            </TenantProvider>
+          </BrowserRouter>
+        </ThemeProvider>
       </Authenticator.Provider>
     </QueryClientProvider>
   </StrictMode>

@@ -2906,6 +2906,7 @@
     },
     "menuLabel": "Workspaces",
     "signOut": "Sign out",
+    "signOutScope": "Signs you out of all workspaces",
     "signedInAs": "Signed in as {{email}}",
     "switchAria": "Switch workspace",
     "switching": {

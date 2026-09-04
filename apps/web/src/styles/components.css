@@ -1035,25 +1035,24 @@
   color: var(--fg-strong);
 }
 
-/* The current workspace has to stay legible while a sibling is hovered, so it
-   is marked by something hover does not compete with.
+/* ── Account menu: destructive row ───────────────────────────────────
+   Catalyst's menu items assume a saturated focus fill, so they set
+   `data-focus:text-white` on the item and `group-data-focus:text-white` on the
+   description and icon. A destructive row wants a pale red wash instead of a
+   solid one, and white text on a 10% tint is unreadable — which is exactly
+   what it rendered as.
 
-   Drawn as a pseudo-element rather than a border or an inset shadow. A border
-   would shift this row's content and leave the list edge ragged against its
-   neighbours; an inset shadow gets clipped by the row's own corner radius, so
-   a 3px bar tapers at both ends and reads as a blob instead of a rail. A
-   positioned element is inset from the row's corners entirely, so it keeps a
-   constant width and cannot interact with either radius. */
-.workspace-menu .workspace-current {
-  position: relative;
+   Selectors here carry a class + attribute, so they outrank Tailwind's
+   single-class utilities on specificity and do not depend on source order. */
+.account-menu .menu-danger[data-focus] {
+  background: color-mix(in oklch, var(--danger-500) 10%, transparent);
+  color: var(--danger-500);
 }
-.workspace-menu .workspace-current::before {
-  content: '';
-  position: absolute;
-  left: 4px;
-  top: 7px;
-  bottom: 7px;
-  width: 3px;
-  border-radius: 999px;
-  background: var(--accent-500);
+.account-menu .menu-danger[data-focus] [data-slot='icon'] {
+  color: var(--danger-500);
+}
+/* Kept a step down from the label so the row reads as one thing with a
+   sub-line, not two equal red strings. */
+.account-menu .menu-danger[data-focus] [data-slot='description'] {
+  color: color-mix(in oklch, var(--danger-500) 78%, transparent);
 }
