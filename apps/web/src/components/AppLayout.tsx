@@ -404,21 +404,33 @@ export default function AppLayout({ children, flush }: { children: React.ReactNo
                 </DropdownItem>
               </DropdownMenu>
             </Dropdown>
+            {/* Product identity. The rail TOP answers "whose data am I in";
+                the bottom answers "what am I using, and who am I", so the
+                product name belongs here rather than back in the brand block
+                competing with the company for the anchor slot.
+                Deliberately smaller and dimmer than the person's own name —
+                it is orientation of last resort, the word you say to support.
+                Not a link.
+                The environment badge sits here too: DEV qualifies the SYSTEM,
+                not the page, so beside a page title in the topbar it was
+                labelling the wrong thing. */}
+            <div className="mt-1 flex items-center gap-1.5 px-2 pb-1">
+              <span className="text-[11px] font-semibold tracking-tight text-sidebar-fg">
+                {t('app.name')}
+              </span>
+              {envBadge && (
+                <span
+                  className={`inline-flex shrink-0 items-center rounded px-1.5 py-px text-[9px] font-bold tracking-wider ring-1 ring-inset ${envBadge.className}`}
+                >
+                  {envBadge.label}
+                </span>
+              )}
+            </div>
           </SidebarFooter>
         </Sidebar>
       }
       navbar={
         <Navbar>
-          {/* Environment badge lives here, not in the sidebar brand block: at a
-              220px rail it competed with the company name, which is the primary
-              "where am I" label and should be the last thing to lose space. */}
-          {envBadge && (
-            <span
-              className={`inline-flex shrink-0 items-center rounded px-1.5 py-0.5 text-[10px] font-bold tracking-wider ring-1 ring-inset ${envBadge.className}`}
-            >
-              {envBadge.label}
-            </span>
-          )}
           {breadcrumbs.length > 0 && (
             <div className="flex items-center gap-1.5 text-[12.5px] text-fg-muted">
               {breadcrumbs.map((c, i) => (
