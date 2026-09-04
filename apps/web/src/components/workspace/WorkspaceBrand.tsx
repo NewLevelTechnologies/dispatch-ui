@@ -122,7 +122,7 @@ export default function WorkspaceBrand() {
 
   const label = (
     <>
-      <TenantMark name={name} logoUrl={logoUrl} size={28} />
+      <TenantMark name={name} logoUrl={logoUrl} size={28} onDark />
       {/* Truncates, because a company name can be far longer than the
           hardcoded product name it replaced. Nothing else shares this row: the
           environment badge lives in the topbar, where it does not compete with
