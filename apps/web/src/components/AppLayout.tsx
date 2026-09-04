@@ -34,6 +34,8 @@ import { SidebarLayout } from './catalyst/sidebar-layout';
 import { Navbar } from './catalyst/navbar';
 import { Dropdown, DropdownButton, DropdownDescription, DropdownDivider, DropdownItem, DropdownLabel, DropdownMenu } from './catalyst/dropdown';
 import WorkspaceBrand from './workspace/WorkspaceBrand';
+import { useTheme } from './ThemeProvider';
+import { ToggleGroup, ToggleGroupOption } from './ui/ToggleGroup';
 import { useCurrentUser, useHasAnyCapability } from '../hooks/useCurrentUser';
 import { useApprovalsVisible } from '../hooks/useApprovalsVisible';
 import { useMediaQuery } from '../hooks/useMediaQuery';
@@ -51,6 +53,7 @@ export default function AppLayout({ children, flush }: { children: React.ReactNo
   const location = useLocation();
   const { t } = useTranslation();
   const { getName } = useGlossary();
+  const { mode, setMode } = useTheme();
   const { data: currentUser } = useCurrentUser();
 
   // Sidebar identity row: show full name + primary role once /me resolves.
@@ -342,22 +345,50 @@ export default function AppLayout({ children, flush }: { children: React.ReactNo
                   </span>
                 </div>
                 <DropdownDivider />
-                {/* Theme and accent deliberately absent: they are durable
-                    preferences, not per-session actions, and the canonical
-                    controls already exist on Account Settings — which also
-                    offers System, the option this menu was missing.
-                    Their removal is also what un-strands the icons below. The
-                    theme block was a raw div in a menu whose grid starts with
-                    an `auto` column, so it widened that shared column to its
-                    own ~200px and pushed every label at col-start-2 across the
-                    panel. */}
+                {/* Theme stays — it gets used constantly — but as one row with
+                    no section heading, and now including System.
+                    `col-span-full` is load-bearing: without it a raw child sits
+                    in the menu grid's leading `auto` column and widens that
+                    shared column to its own width, which pushes every
+                    DropdownItem label (col-start-2) a fifth of the panel away
+                    from its icon. That was the icon-stranding bug, and it was
+                    the missing span rather than the control itself.
+                    Accent is gone: a pick-once brand setting, and Account
+                    Settings already owns the canonical control. */}
+                <div className="col-span-full flex items-center gap-2 px-3.5 py-1.5 sm:px-3">
+                  <span className="text-[12px] text-fg">{t('account.preferences.theme')}</span>
+                  <span className="flex-1" />
+                  {/* `sm` is the documented inline variant — the default size
+                      is the standalone settings-row control, which is too tall
+                      for a menu row. */}
+                  <ToggleGroup
+                    value={mode}
+                    onChange={setMode}
+                    size="sm"
+                    aria-label={t('account.preferences.theme')}
+                  >
+                    <ToggleGroupOption value="light">
+                      {t('account.preferences.themeLight')}
+                    </ToggleGroupOption>
+                    <ToggleGroupOption value="dark">
+                      {t('account.preferences.themeDark')}
+                    </ToggleGroupOption>
+                    {/* "System", not the mock's "Auto" — Account Settings
+                        already calls it System and one setting should not have
+                        two names. */}
+                    <ToggleGroupOption value="system">
+                      {t('account.preferences.themeSystem')}
+                    </ToggleGroupOption>
+                  </ToggleGroup>
+                </div>
+                <DropdownDivider />
                 <DropdownItem href="/account/settings">
                   <Cog6ToothIcon data-slot="icon" />
-                  <DropdownLabel>{t('account.settings')}</DropdownLabel>
+                  <DropdownLabel className="text-[12.5px]">{t('account.settings')}</DropdownLabel>
                 </DropdownItem>
                 <DropdownItem onClick={() => { /* Help & Support — placeholder until docs/widget ships */ }}>
                   <LifebuoyIcon data-slot="icon" />
-                  <DropdownLabel>{t('common.helpSupport')}</DropdownLabel>
+                  <DropdownLabel className="text-[12.5px]">{t('common.helpSupport')}</DropdownLabel>
                 </DropdownItem>
                 <DropdownDivider />
                 {/* Its own group, and it states its scope: with one identity
@@ -368,7 +399,7 @@ export default function AppLayout({ children, flush }: { children: React.ReactNo
                   className="text-danger-500 data-focus:bg-danger-500/10 data-focus:text-danger-500 *:data-[slot=icon]:text-danger-500 data-focus:*:data-[slot=icon]:text-danger-500"
                 >
                   <ArrowRightStartOnRectangleIcon data-slot="icon" />
-                  <DropdownLabel>{t('common.signOut')}</DropdownLabel>
+                  <DropdownLabel className="text-[12.5px]">{t('common.signOut')}</DropdownLabel>
                   <DropdownDescription>{t('workspace.signOutScope')}</DropdownDescription>
                 </DropdownItem>
               </DropdownMenu>
