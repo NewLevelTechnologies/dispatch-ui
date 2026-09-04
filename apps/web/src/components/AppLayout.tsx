@@ -425,6 +425,11 @@ export default function AppLayout({ children, flush }: { children: React.ReactNo
                   {envBadge.label}
                 </span>
               )}
+              {/* Build identifier, injected by Vite. Mono because it gets read
+                  back character by character to support. */}
+              <span className="ml-auto font-mono text-[10px] text-sidebar-fg-dim">
+                {__BUILD_SHA__}
+              </span>
             </div>
           </SidebarFooter>
         </Sidebar>
