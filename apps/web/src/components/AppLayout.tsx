@@ -425,6 +425,12 @@ export default function AppLayout({ children, flush }: { children: React.ReactNo
                   {envBadge.label}
                 </span>
               )}
+              {/* Build date, injected by Vite. A date rather than a version or
+                  a hash: it needs no one to remember to bump it, and it answers
+                  the question people actually ask — how old is this. */}
+              <span className="ml-auto font-mono text-[10px] text-sidebar-fg-dim">
+                {__BUILD_DATE__}
+              </span>
             </div>
           </SidebarFooter>
         </Sidebar>
