@@ -286,6 +286,35 @@ export function AccessRemoved({
 }
 
 /**
+ * Shown while a switch settles. Not decorative: switching drops the whole query
+ * cache and remounts, so without this the person watches every table empty and
+ * every count fall to zero — indistinguishable from a broken app.
+ *
+ * Names the destination, which is the confirmation the click did what they
+ * meant. Held a minimum beat by the caller so it reads as a transition rather
+ * than a flash.
+ */
+export function SwitchingOverlay({ companyName }: { companyName: string }) {
+  const { t } = useTranslation();
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      className="fixed inset-0 z-50 grid place-items-center backdrop-blur-[2px]"
+      style={{ background: 'color-mix(in oklch, var(--bg-sunken) 78%, transparent)' }}
+    >
+      <div className="flex flex-col items-center gap-3">
+        <TenantMark name={companyName} size={46} />
+        <div className="text-[13.5px] font-semibold text-fg-strong">
+          {t('workspace.switching.title', { company: companyName })}
+        </div>
+        <div className="text-[11.5px] text-fg-muted">{t('workspace.switching.body')}</div>
+      </div>
+    </div>
+  );
+}
+
+/**
  * Phase 4 · The hostname names a workspace this person isn't in. Distinct from
  * "no workspaces at all": the remedy is to go to one they do belong to, so the
  * ones they have are listed rather than merely mentioned.

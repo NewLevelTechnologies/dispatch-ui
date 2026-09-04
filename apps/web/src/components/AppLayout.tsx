@@ -35,6 +35,7 @@ import { Sidebar, SidebarBody, SidebarFooter, SidebarHeader, SidebarHeading, Sid
 import { SidebarLayout } from './catalyst/sidebar-layout';
 import { Navbar } from './catalyst/navbar';
 import { Dropdown, DropdownButton, DropdownDivider, DropdownItem, DropdownLabel, DropdownMenu } from './catalyst/dropdown';
+import WorkspaceBrand from './workspace/WorkspaceBrand';
 import { useTheme } from './ThemeProvider';
 import { ToggleGroup, ToggleGroupOption } from './ui/ToggleGroup';
 import { useCurrentUser, useHasAnyCapability } from '../hooks/useCurrentUser';
@@ -176,23 +177,10 @@ export default function AppLayout({ children, flush }: { children: React.ReactNo
       sidebar={
         <Sidebar>
           <SidebarHeader>
-            <div className="flex items-center gap-2.5">
-              <div className="grid h-7 w-7 place-items-center rounded-md bg-gradient-to-br from-accent-500 to-accent-700 text-[13px] font-bold text-white shadow-sm">
-                {t('app.name').charAt(0)}
-              </div>
-              <div className="flex min-w-0 flex-1 items-center gap-2">
-                <span className="text-[14px] font-semibold tracking-tight text-white">
-                  {t('app.name')}
-                </span>
-                {envBadge && (
-                  <span
-                    className={`inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-bold tracking-wider ring-1 ring-inset ${envBadge.className}`}
-                  >
-                    {envBadge.label}
-                  </span>
-                )}
-              </div>
-            </div>
+            {/* The brand block is now the workspace: it already answers "where
+                am I", and the active workspace lives here and nowhere else. It
+                becomes a switcher only when there is more than one. */}
+            <WorkspaceBrand envBadge={envBadge} />
           </SidebarHeader>
 
           <SidebarBody className="[&>[data-slot=section]+[data-slot=section]]:mt-5">
