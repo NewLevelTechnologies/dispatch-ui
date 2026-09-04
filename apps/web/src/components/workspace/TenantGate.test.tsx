@@ -79,13 +79,32 @@ describe('TenantGate', () => {
     expect(screen.getByText('No workspaces available')).toBeInTheDocument();
   });
 
-  it('does not claim zero memberships when the bootstrap call failed', () => {
-    // The distinction matters: one asserts something about their access, the
-    // other admits we do not know.
+  it('keeps the app usable when the bootstrap call fails', () => {
+    // While the backend still honours the legacy claim, a failed bootstrap
+    // costs the switcher, not the app. Blocking would turn a transient blip
+    // into a lockout of every authenticated page.
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
     mockTenant({ error: new Error('network') });
     render(<TenantGate>{APP}</TenantGate>);
-    expect(screen.getByText('Couldn’t load your workspaces')).toBeInTheDocument();
+    expect(screen.getByText('Work orders')).toBeInTheDocument();
+  });
+
+  it('never claims zero memberships when the bootstrap call failed', () => {
+    // That screen asserts something about their access; a network failure
+    // means we do not know.
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    mockTenant({ error: new Error('network') });
+    render(<TenantGate>{APP}</TenantGate>);
     expect(screen.queryByText('No workspaces available')).not.toBeInTheDocument();
+  });
+
+  it('says so in the console rather than failing silently', () => {
+    // A persistent failure costs everyone their switcher, so it has to be
+    // findable even though the app carries on.
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    mockTenant({ error: new Error('network') });
+    render(<TenantGate>{APP}</TenantGate>);
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('bootstrap failed'), expect.anything());
   });
 
   it('names the lost workspace on revocation and offers the rest', () => {
