@@ -318,7 +318,7 @@ export default function AppLayout({ children, flush }: { children: React.ReactNo
                 </span>
                 <EllipsisHorizontalIcon className="size-4 shrink-0 text-sidebar-fg-dim" />
               </DropdownButton>
-              <DropdownMenu className="min-w-64" anchor="top start">
+              <DropdownMenu className="account-menu min-w-64" anchor="top start">
                 {/* Identity leads. One login now spans workspaces, so the email
                     is the fact that matters most here — and it was previously
                     visible only on the trigger. */}
@@ -396,7 +396,7 @@ export default function AppLayout({ children, flush }: { children: React.ReactNo
                     self-evident. */}
                 <DropdownItem
                   onClick={() => signOut()}
-                  className="text-danger-500 data-focus:bg-danger-500/10 data-focus:text-danger-500 *:data-[slot=icon]:text-danger-500 data-focus:*:data-[slot=icon]:text-danger-500"
+                  className="menu-danger text-danger-500 *:data-[slot=icon]:text-danger-500"
                 >
                   <ArrowRightStartOnRectangleIcon data-slot="icon" />
                   <DropdownLabel className="text-[12.5px]">{t('common.signOut')}</DropdownLabel>

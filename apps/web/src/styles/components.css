@@ -1057,3 +1057,25 @@
   border-radius: 999px;
   background: var(--accent-500);
 }
+
+/* ── Account menu: destructive row ───────────────────────────────────
+   Catalyst's menu items assume a saturated focus fill, so they set
+   `data-focus:text-white` on the item and `group-data-focus:text-white` on the
+   description and icon. A destructive row wants a pale red wash instead of a
+   solid one, and white text on a 10% tint is unreadable — which is exactly
+   what it rendered as.
+
+   Selectors here carry a class + attribute, so they outrank Tailwind's
+   single-class utilities on specificity and do not depend on source order. */
+.account-menu .menu-danger[data-focus] {
+  background: color-mix(in oklch, var(--danger-500) 10%, transparent);
+  color: var(--danger-500);
+}
+.account-menu .menu-danger[data-focus] [data-slot='icon'] {
+  color: var(--danger-500);
+}
+/* Kept a step down from the label so the row reads as one thing with a
+   sub-line, not two equal red strings. */
+.account-menu .menu-danger[data-focus] [data-slot='description'] {
+  color: color-mix(in oklch, var(--danger-500) 78%, transparent);
+}
