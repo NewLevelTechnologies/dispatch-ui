@@ -414,8 +414,14 @@ export default function AppLayout({ children, flush }: { children: React.ReactNo
                 The environment badge sits here too: DEV qualifies the SYSTEM,
                 not the page, so beside a page title in the topbar it was
                 labelling the wrong thing. */}
-            <div className="mt-1 flex items-center gap-1.5 px-2 pb-1">
-              <span className="text-[11px] font-semibold tracking-tight text-sidebar-fg">
+            <div className="mt-1 flex items-center gap-[7px] px-2 pt-1.5 pb-1">
+              {/* A tracked uppercase wordmark, not sentence case. "Admin" sits
+                  directly above it in sentence case, so a sentence-case product
+                  name read as a third line of the person's details rather than
+                  as system chrome — and nobody writes a job title this way.
+                  Also holds up in production, where the env badge is absent and
+                  this is a single word alone on the line. */}
+              <span className="text-[10px] font-semibold uppercase tracking-[0.09em] text-sidebar-fg-dim">
                 {t('app.name')}
               </span>
               {envBadge && (
