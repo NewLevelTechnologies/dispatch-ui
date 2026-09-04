@@ -1016,3 +1016,29 @@
   color: var(--fg);
   font-size: 11.5px;
 }
+
+/* ── Workspace switcher ──────────────────────────────────────────────
+   Catalyst's menu-item focus style is a hardcoded `bg-blue-500` with white
+   text (dropdown.tsx), which ignores the accent token entirely. Beside the
+   accent-tinted tiles and the accent check, that blue reads as a different
+   system — and a fully filled row out-shouts the current workspace, so hover
+   looks like the selection and the selection looks inactive.
+
+   Scoped to this menu rather than fixed app-wide: the same hardcoded blue is
+   in combobox.tsx and listbox.tsx too, and correcting all three is a
+   deliberate, app-wide visual change rather than a switcher fix.
+
+   Unlayered and imported after Tailwind, so it wins on source order at equal
+   specificity — no `!important` needed. */
+.workspace-menu [data-focus] {
+  background: color-mix(in oklch, var(--accent-500) 12%, transparent);
+  color: var(--fg-strong);
+}
+
+/* The current workspace has to stay legible while a sibling is hovered, so it
+   is marked by something hover does not compete with. An inset shadow rather
+   than a border: a real border would shift this row's content 3px and leave
+   the list edge ragged against its neighbours. */
+.workspace-menu .workspace-current {
+  box-shadow: inset 3px 0 0 var(--accent-500);
+}

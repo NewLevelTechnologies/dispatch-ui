@@ -52,11 +52,11 @@ function BrandMark({ name }: { name: string }) {
  * row's text origin and the list edge goes ragged. Every row gets a tile, so
  * every row's text starts in the same place.
  *
- * Current-workspace identity rests on three things hover cannot touch — the
- * filled tile, the heavier name, and the trailing check. Catalyst paints the
- * hovered row `bg-blue-500` with white text, which is louder than any
- * background tint the current row could carry, so the current row has to be
- * legible by something other than its background.
+ * Current-workspace identity rests on four things a hovered sibling does not
+ * compete with — the inset accent rail, the filled tile, the heavier name, and
+ * the trailing check. Hover is toned down to a light accent tint in
+ * components.css, because Catalyst's stock filled row out-shouted all of them
+ * and made hover read as the selection.
  */
 function WorkspaceRow({
   membership,
@@ -69,7 +69,7 @@ function WorkspaceRow({
 }) {
   return (
     <DropdownItem
-      className={current ? 'bg-bg-active' : undefined}
+      className={current ? 'workspace-current bg-bg-active' : undefined}
       onClick={() => {
         if (!current) onSelect(membership);
       }}
@@ -91,7 +91,7 @@ function WorkspaceRow({
         </span>
         <span className="flex min-w-0 flex-1 flex-col leading-tight">
           <span
-            className={`truncate text-[12.5px] text-fg-strong group-data-focus:text-white ${
+            className={`truncate text-[12.5px] text-fg-strong ${
               current ? 'font-semibold' : 'font-medium'
             }`}
           >
@@ -101,12 +101,12 @@ function WorkspaceRow({
               also occupies the sub-line the spec once wanted for role — which
               the membership list does not carry, and which we deliberately do
               not fan out per-tenant requests to fill. */}
-          <span className="truncate font-mono text-[10.5px] text-fg-dim group-data-focus:text-white/70">
+          <span className="truncate font-mono text-[10.5px] text-fg-dim">
             {membership.tenantSlug}
           </span>
         </span>
         {current && (
-          <CheckIcon className="size-4 shrink-0 text-fg-accent group-data-focus:text-white" />
+          <CheckIcon className="size-4 shrink-0 text-fg-accent" />
         )}
       </div>
     </DropdownItem>
@@ -160,7 +160,7 @@ export default function WorkspaceBrand() {
       </DropdownButton>
       {/* Same component as the account menu in the sidebar footer, so radius,
           ring, shadow, blur and item padding are identical by construction. */}
-      <DropdownMenu className="min-w-64" anchor="bottom start">
+      <DropdownMenu className="workspace-menu min-w-64" anchor="bottom start">
         {/* The heading is a Headless MenuHeading and throws outside a
             MenuSection, which would take the page down on open. */}
         <DropdownSection>
