@@ -9,11 +9,10 @@
 // focusable, not clickable. Most tenants will only ever have one workspace, and
 // they should not see an affordance for something they cannot do. The chevron
 // is the only thing that appears above one.
-import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from '@dispatch/i18n';
 import { CheckIcon, ChevronDownIcon } from '@heroicons/react/16/solid';
 import { useOptionalTenant } from '../../contexts/TenantContext';
-import { tenantSettingsApi, type TenantMembership } from '../../api/setup';
+import type { TenantMembership } from '../../api/setup';
 import {
   Dropdown,
   DropdownButton,
@@ -48,7 +47,6 @@ function WorkspaceRow({
 }: {
   membership: TenantMembership;
   current: boolean;
-  /** Only ever set for the active workspace — see the note in WorkspaceBrand. */
   logoUrl?: string | null;
   onSelect: (m: TenantMembership) => void;
 }) {
@@ -99,37 +97,16 @@ export default function WorkspaceBrand() {
   const activeMembership = tenant?.activeMembership ?? null;
   const switchTenant = tenant?.switchTenant;
 
-  const { data: tenantSettings } = useQuery({
-    queryKey: ['tenant-settings'],
-    queryFn: () => tenantSettingsApi.getSettings(),
-    enabled: !!activeMembership,
-  });
-
   // Falls back to the product name only before a workspace resolves — in
   // practice the gate means that is never visible.
   const name = activeMembership?.companyName ?? t('app.name');
-  // Thumbnail rendition, and the same cache key App.tsx already uses, so this
-  // costs no extra request.
-  //
-  // Only ever the ACTIVE workspace's logo. /users/me/tenants carries no
-  // branding, and /tenant-settings is tenant-scoped, so another workspace's
-  // logo is simply not reachable from this session. The trigger and the current
-  // row therefore share one mark — which is the point: no company wears a logo
-  // in one place and initials in another. Other rows fall back to monograms
-  // until the membership list carries a logo of its own.
-  // Smallest adequate rendition first, then down the chain to the original.
-  // Only `logoOriginalUrl` is guaranteed to exist: the resized renditions come
-  // from a processing step, so a logo uploaded before that shipped — or one
-  // whose processing failed — has the original and nothing else. Stopping at
-  // thumbnail/small would silently show a monogram for a tenant that does have
-  // a logo.
-  const logoUrl =
-    tenantSettings?.logoThumbnailUrl ??
-    tenantSettings?.logoSmallUrl ??
-    tenantSettings?.logoMediumUrl ??
-    tenantSettings?.logoLargeUrl ??
-    tenantSettings?.logoOriginalUrl ??
-    null;
+
+  // Straight off the membership list. It used to come from /tenant-settings,
+  // which meant the mark blanked to a monogram during the refetch after every
+  // switch: that query is tenant-scoped and gets evicted, whereas the
+  // membership list is person-scoped and survives.
+  const logoUrl = activeMembership?.logoUrl ?? null;
+
   const canSwitch = memberships.length > 1;
 
   const label = (
@@ -176,7 +153,7 @@ export default function WorkspaceBrand() {
               key={m.tenantId}
               membership={m}
               current={m.tenantId === activeMembership?.tenantId}
-              logoUrl={m.tenantId === activeMembership?.tenantId ? logoUrl : null}
+              logoUrl={m.logoUrl}
               onSelect={(target) => switchTenant?.(target)}
             />
           ))}
