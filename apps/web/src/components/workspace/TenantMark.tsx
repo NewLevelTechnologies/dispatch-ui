@@ -58,12 +58,16 @@ export default function TenantMark({
         }}
       >
         {/* contain, never cover: a wide wordmark and a square badge both have
-            to survive the same square without cropping. */}
+            to survive the same square without cropping.
+
+            No inset. At this size the box is already tiny — 28px less a 1px
+            border each side is 26px — and 2px of padding per edge spent 15% of
+            the artwork's area on whitespace the border already provides. */}
         <img
           src={logoUrl}
           alt=""
           onError={() => setFailed(true)}
-          className="block size-full object-contain p-0.5"
+          className="block size-full object-contain"
         />
       </span>
     );
