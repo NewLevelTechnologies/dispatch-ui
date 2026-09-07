@@ -92,14 +92,15 @@ export default function UserDetailPage() {
     queryFn: () => dispatchRegionApi.getAll(true),
   });
 
-  // Asked only while the deactivate confirm is open. There is no menu to
-  // prefetch from here, so the confirm button waits on it — a deliberate stop
-  // can afford one indexed read, and a failure falls through to the
-  // conditional copy rather than blocking the removal.
   const [lifecycleConfirm, setLifecycleConfirm] = useState<'deactivate' | 'activate' | null>(null);
+  // Asked as soon as the page can offer a removal, not when the dialog opens.
+  // We already know who this is and the removal footer is on screen, so there
+  // is nothing to gain by waiting for the click — and everything to lose: a
+  // dialog that opens before the answer arrives has to hedge about whether the
+  // sign-in dies, which is the one thing the admin is deciding about.
   const { impact, isSettled: impactSettled } = useRemovalImpact(
     id,
-    lifecycleConfirm === 'deactivate'
+    canDeactivateUsers && !isMe
   );
   const endsSignIn = impact?.deactivateEndsSignIn;
 

@@ -130,6 +130,12 @@ export default function UsersPage() {
   const canInviteUsers = useHasCapability('INVITE_USERS');
   const canEditUsers = useHasCapability('EDIT_USERS');
   const canDeleteUsers = useHasCapability('DELETE_USERS');
+  // Removal is its own capability on the backend — POST /deactivate requires
+  // DEACTIVATE_USERS, not EDIT_USERS. Gating the menu item on EDIT_USERS put a
+  // Remove option in front of admins whose click would 403, and made the
+  // removal-impact pre-flight 403 with it. The detail page already gated on
+  // this; the list page did not.
+  const canDeactivateUsers = useHasCapability('DEACTIVATE_USERS');
   const { data: currentUser } = useCurrentUser();
 
   // What the pending removal will do to their sign-in. Prefetched when the row
@@ -617,7 +623,7 @@ export default function UsersPage() {
                         <td className="right">
                           {/* Own row keeps only Edit, so a delete-only admin
                               would otherwise get an empty menu on themselves. */}
-                          {(canEditUsers || (!isMe && canDeleteUsers)) && (
+                          {(canEditUsers || (!isMe && (canDeactivateUsers || canDeleteUsers))) && (
                             <div onClick={(e) => e.stopPropagation()}>
                               <Dropdown>
                                 {/* Warm the removal-impact read here rather
@@ -643,10 +649,10 @@ export default function UsersPage() {
                                       the affordance — the Users page administers
                                       other people, so the option shouldn't be
                                       here to reach for in the first place. */}
-                                  {!isMe && (canEditUsers || canDeleteUsers) && (
+                                  {!isMe && (canDeactivateUsers || canDeleteUsers) && (
                                     <>
                                       <DropdownDivider />
-                                      {canEditUsers &&
+                                      {canDeactivateUsers &&
                                         (user.enabled ? (
                                           <DropdownItem onClick={() => handleDisable(user)}>
                                             <DropdownLabel>
