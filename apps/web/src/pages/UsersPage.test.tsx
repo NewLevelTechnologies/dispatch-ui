@@ -3,6 +3,13 @@ import { screen, waitFor } from '@testing-library/react';
 import { renderWithProviders, userEvent } from '../test/utils';
 import UsersPage from './UsersPage';
 import { apiClient } from '../api/setup';
+import { useCurrentUser } from '../hooks/useCurrentUser';
+import { showUndo, showSuccess } from '../lib/toast';
+
+vi.mock('../lib/toast', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../lib/toast')>();
+  return { ...actual, showUndo: vi.fn(actual.showUndo), showSuccess: vi.fn(actual.showSuccess) };
+});
 
 vi.mock('@dispatch/api/src/client');
 
@@ -129,6 +136,17 @@ function applyUsersQuery(url: string, users: MockUser[]): MockUser[] {
   return out;
 }
 
+// The status filter defaults to Active, so a removed member (Jane Smith) is
+// absent until the admin asks for All. Tests that need her go through the same
+// chip a user would rather than reaching past the filter.
+async function revealAllStatuses(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(screen.getByRole('button', { name: /^Status$/i }));
+  await user.click(screen.getByRole('option', { name: /^all$/i }));
+  await waitFor(() => {
+    expect(screen.getByText('Jane Smith')).toBeInTheDocument();
+  });
+}
+
 function installApiMock(users: MockUser[] = mockUsers, roles = mockRoles) {
   vi.mocked(apiClient.get).mockImplementation((url: string) => {
     if (url.startsWith('/users/roles')) {
@@ -142,6 +160,28 @@ function installApiMock(users: MockUser[] = mockUsers, roles = mockRoles) {
     }
     return Promise.reject(new Error(`Unknown URL: ${url}`));
   });
+}
+
+// `useCurrentUser` is mocked globally with an id that matches no row. Tests
+// that care about "is this me" set it explicitly — and because mockReturnValue
+// survives clearAllMocks, so must the tests that need the opposite.
+function signInAs(userId: string) {
+  vi.mocked(useCurrentUser).mockReturnValue({
+    data: {
+      id: userId,
+      email: 'signed.in@example.com',
+      firstName: 'Signed',
+      lastName: 'In',
+      enabled: true,
+      capabilities: [
+        'VIEW_USERS',
+        'INVITE_USERS',
+        'EDIT_USERS',
+        'DEACTIVATE_USERS',
+        'DELETE_USERS',
+      ],
+    },
+  } as unknown as ReturnType<typeof useCurrentUser>);
 }
 
 describe('UsersPage', () => {
@@ -175,11 +215,26 @@ describe('UsersPage', () => {
     });
 
     expect(screen.getByText('john.doe@example.com')).toBeInTheDocument();
-    expect(screen.getByText('Jane Smith')).toBeInTheDocument();
+    expect(screen.getByText('Bob Johnson')).toBeInTheDocument();
+  });
+
+  it('hides removed members behind the Active default and reveals them under All', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<UsersPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('John Doe')).toBeInTheDocument();
+    });
+
+    // Jane's membership is removed, so she is not in the default view.
+    expect(screen.queryByText('Jane Smith')).not.toBeInTheDocument();
+
+    await revealAllStatuses(user);
     expect(screen.getByText('jane.smith@example.com')).toBeInTheDocument();
   });
 
   it('displays role badges for users', async () => {
+    const user = userEvent.setup();
     renderWithProviders(<UsersPage />);
 
     await waitFor(() => {
@@ -187,10 +242,13 @@ describe('UsersPage', () => {
     });
 
     expect(screen.getByText('Admin')).toBeInTheDocument();
+    // Technician is the removed member's role, so it needs the All view.
+    await revealAllStatuses(user);
     expect(screen.getByText('Technician')).toBeInTheDocument();
   });
 
-  it('displays enabled/disabled status indicators', async () => {
+  it('displays active and removed status indicators', async () => {
+    const user = userEvent.setup();
     renderWithProviders(<UsersPage />);
 
     await waitFor(() => {
@@ -198,7 +256,9 @@ describe('UsersPage', () => {
     });
 
     expect(screen.getAllByText('Active').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('Disabled').length).toBeGreaterThan(0);
+
+    await revealAllStatuses(user);
+    expect(screen.getAllByText('Removed').length).toBeGreaterThan(0);
   });
 
   it('displays an em-dash for users with no roles', async () => {
@@ -293,7 +353,7 @@ describe('UsersPage', () => {
     const dropdownButtons = screen.getAllByRole('button', { name: /more options/i });
     await user.click(dropdownButtons[0]);
 
-    await user.click(screen.getByRole('menuitem', { name: /disable/i }));
+    await user.click(screen.getByRole('menuitem', { name: /remove from this workspace/i }));
 
     // Scoped to the workspace, not the account. No tenant settings are mocked
     // here, so the title falls back to the generic workspace phrase.
@@ -302,21 +362,22 @@ describe('UsersPage', () => {
     });
   });
 
-  it('opens enable confirmation for disabled users', async () => {
+  it('opens restore confirmation for removed members', async () => {
     const user = userEvent.setup();
     renderWithProviders(<UsersPage />);
 
     await waitFor(() => {
-      expect(screen.getByText('Jane Smith')).toBeInTheDocument();
+      expect(screen.getByText('John Doe')).toBeInTheDocument();
     });
+    await revealAllStatuses(user);
 
     const dropdownButtons = screen.getAllByRole('button', { name: /more options/i });
     await user.click(dropdownButtons[1]);
 
-    await user.click(screen.getByRole('menuitem', { name: /enable/i }));
+    await user.click(screen.getByRole('menuitem', { name: /restore access/i }));
 
     await waitFor(() => {
-      expect(screen.getByText(/enable jane smith/i)).toBeInTheDocument();
+      expect(screen.getByText(/restore jane smith's access/i)).toBeInTheDocument();
     });
   });
 
@@ -331,9 +392,9 @@ describe('UsersPage', () => {
 
     const dropdownButtons = screen.getAllByRole('button', { name: /more options/i });
     await user.click(dropdownButtons[0]);
-    await user.click(screen.getByRole('menuitem', { name: /disable/i }));
+    await user.click(screen.getByRole('menuitem', { name: /remove from this workspace/i }));
 
-    const confirmButton = await screen.findByRole('button', { name: /^disable$/i });
+    const confirmButton = await screen.findByRole('button', { name: /^remove access$/i });
     await user.click(confirmButton);
 
     await waitFor(() => {
@@ -351,13 +412,12 @@ describe('UsersPage', () => {
 
     const dropdownButtons = screen.getAllByRole('button', { name: /more options/i });
     await user.click(dropdownButtons[0]);
-    await user.click(screen.getByRole('menuitem', { name: /delete/i }));
+    await user.click(screen.getByRole('menuitem', { name: /delete membership/i }));
 
     await waitFor(() => {
-      expect(screen.getByText(/delete john doe/i)).toBeInTheDocument();
-      expect(
-        screen.getByText(/all user data and history will be permanently removed/i)
-      ).toBeInTheDocument();
+      expect(screen.getByText(/delete john doe's membership/i)).toBeInTheDocument();
+      // Scoped to the workspace, and explicit that authored work survives.
+      expect(screen.getByText(/work they created here/i)).toBeInTheDocument();
     });
   });
 
@@ -421,16 +481,16 @@ describe('UsersPage', () => {
       });
 
       const searchInput = screen.getByPlaceholderText(/search by name or email/i);
-      await user.type(searchInput, 'jane');
+      await user.type(searchInput, 'bob');
 
       await waitFor(() => {
-        expect(screen.getByText('Jane Smith')).toBeInTheDocument();
+        expect(screen.getByText('Bob Johnson')).toBeInTheDocument();
         expect(screen.queryByText('John Doe')).not.toBeInTheDocument();
       });
 
       // Verify the q param hit the wire.
       const calls = vi.mocked(apiClient.get).mock.calls.map((c) => c[0]);
-      expect(calls.some((url) => typeof url === 'string' && url.includes('q=jane'))).toBe(true);
+      expect(calls.some((url) => typeof url === 'string' && url.includes('q=bob'))).toBe(true);
     });
 
     it('shows the no-match empty state when q returns zero rows', async () => {
@@ -446,7 +506,7 @@ describe('UsersPage', () => {
 
       await waitFor(() => {
         expect(screen.queryByText('John Doe')).not.toBeInTheDocument();
-        expect(screen.queryByText('Jane Smith')).not.toBeInTheDocument();
+        expect(screen.queryByText('Bob Johnson')).not.toBeInTheDocument();
         expect(screen.getByRole('button', { name: /clear filters/i })).toBeInTheDocument();
       });
     });
@@ -469,7 +529,7 @@ describe('UsersPage', () => {
 
       await waitFor(() => {
         expect(screen.getByText('John Doe')).toBeInTheDocument();
-        expect(screen.getByText('Jane Smith')).toBeInTheDocument();
+        expect(screen.getByText('Bob Johnson')).toBeInTheDocument();
       });
 
       await user.click(screen.getByRole('button', { name: /^Role$/i }));
@@ -477,7 +537,7 @@ describe('UsersPage', () => {
 
       await waitFor(() => {
         expect(screen.getByText('John Doe')).toBeInTheDocument();
-        expect(screen.queryByText('Jane Smith')).not.toBeInTheDocument();
+        expect(screen.queryByText('Bob Johnson')).not.toBeInTheDocument();
       });
 
       const calls = vi.mocked(apiClient.get).mock.calls.map((c) => c[0]);
@@ -498,14 +558,14 @@ describe('UsersPage', () => {
       await user.click(screen.getByRole('option', { name: /^admin$/i }));
 
       await waitFor(() => {
-        expect(screen.queryByText('Jane Smith')).not.toBeInTheDocument();
+        expect(screen.queryByText('Bob Johnson')).not.toBeInTheDocument();
       });
 
       await user.click(screen.getByRole('button', { name: /role.*clear/i }));
 
       await waitFor(() => {
         expect(screen.getByText('John Doe')).toBeInTheDocument();
-        expect(screen.getByText('Jane Smith')).toBeInTheDocument();
+        expect(screen.getByText('Bob Johnson')).toBeInTheDocument();
       });
     });
   });
@@ -521,22 +581,15 @@ describe('UsersPage', () => {
       expect(screen.getByRole('button', { name: /^Status$/i })).toBeInTheDocument();
     });
 
-    it('filters users by enabled status', async () => {
-      const user = userEvent.setup();
+    it('sends enabled=true without the filter being chosen', async () => {
       renderWithProviders(<UsersPage />);
-
-      await waitFor(() => {
-        expect(screen.getByText('Jane Smith')).toBeInTheDocument();
-      });
-
-      await user.click(screen.getByRole('button', { name: /^Status$/i }));
-      await user.click(screen.getByRole('option', { name: /^enabled$/i }));
 
       await waitFor(() => {
         expect(screen.getByText('John Doe')).toBeInTheDocument();
         expect(screen.getByText('Bob Johnson')).toBeInTheDocument();
-        expect(screen.queryByText('Jane Smith')).not.toBeInTheDocument();
       });
+
+      expect(screen.queryByText('Jane Smith')).not.toBeInTheDocument();
 
       const calls = vi.mocked(apiClient.get).mock.calls.map((c) => c[0]);
       expect(
@@ -544,16 +597,16 @@ describe('UsersPage', () => {
       ).toBe(true);
     });
 
-    it('filters users by disabled status', async () => {
+    it('filters users by removed status', async () => {
       const user = userEvent.setup();
       renderWithProviders(<UsersPage />);
 
       await waitFor(() => {
-        expect(screen.getByText('Jane Smith')).toBeInTheDocument();
+        expect(screen.getByText('John Doe')).toBeInTheDocument();
       });
 
       await user.click(screen.getByRole('button', { name: /^Status$/i }));
-      await user.click(screen.getByRole('option', { name: /^disabled$/i }));
+      await user.click(screen.getByRole('option', { name: /^removed$/i }));
 
       await waitFor(() => {
         expect(screen.getByText('Jane Smith')).toBeInTheDocument();
@@ -609,10 +662,12 @@ describe('UsersPage', () => {
         expect(screen.getByText('John Doe')).toBeInTheDocument();
       });
 
+      // Active is the default view rather than an applied filter, so the chip
+      // offers no × until the admin moves off it.
       expect(screen.queryByRole('button', { name: /status.*clear/i })).not.toBeInTheDocument();
 
       await user.click(screen.getByRole('button', { name: /^Status$/i }));
-      await user.click(screen.getByRole('option', { name: /^enabled$/i }));
+      await user.click(screen.getByRole('option', { name: /^removed$/i }));
 
       await waitFor(() => {
         expect(screen.getByRole('button', { name: /status.*clear/i })).toBeInTheDocument();
@@ -634,21 +689,26 @@ describe('UsersPage', () => {
         const statusBtn = screen.getByRole('button', { name: /^Status$/i });
         return user.click(statusBtn);
       });
-      await user.click(screen.getByRole('option', { name: /^enabled$/i }));
+      await user.click(screen.getByRole('option', { name: /^all$/i }));
 
+      // Admin + All: only John, who holds the Admin role.
       await waitFor(() => {
         expect(screen.getByText('John Doe')).toBeInTheDocument();
         expect(screen.queryByText('Jane Smith')).not.toBeInTheDocument();
         expect(screen.queryByText('Bob Johnson')).not.toBeInTheDocument();
       });
 
+      // Role × leaves All in place; Status × returns to the Active default.
       await user.click(screen.getByRole('button', { name: /role.*clear/i }));
-      await user.click(screen.getByRole('button', { name: /status.*clear/i }));
+      await waitFor(() => {
+        expect(screen.getByText('Jane Smith')).toBeInTheDocument();
+      });
 
+      await user.click(screen.getByRole('button', { name: /status.*clear/i }));
       await waitFor(() => {
         expect(screen.getByText('John Doe')).toBeInTheDocument();
-        expect(screen.getByText('Jane Smith')).toBeInTheDocument();
         expect(screen.getByText('Bob Johnson')).toBeInTheDocument();
+        expect(screen.queryByText('Jane Smith')).not.toBeInTheDocument();
       });
     });
   });
@@ -660,14 +720,19 @@ describe('UsersPage', () => {
       renderWithProviders(<UsersPage />);
 
       await waitFor(() => {
+        expect(screen.getByText('John Doe')).toBeInTheDocument();
+      });
+      await revealAllStatuses(user);
+
+      await waitFor(() => {
         expect(screen.getByText('Jane Smith')).toBeInTheDocument();
       });
 
       const dropdownButtons = screen.getAllByRole('button', { name: /more options/i });
       await user.click(dropdownButtons[1]);
-      await user.click(screen.getByRole('menuitem', { name: /enable/i }));
+      await user.click(screen.getByRole('menuitem', { name: /restore access/i }));
 
-      const confirmButton = await screen.findByRole('button', { name: /^enable$/i });
+      const confirmButton = await screen.findByRole('button', { name: /restore access/i });
       await user.click(confirmButton);
 
       await waitFor(() => {
@@ -851,7 +916,7 @@ describe('UsersPage', () => {
       });
 
       // Subtitle is one composite line; assert the pieces appear together.
-      expect(screen.getByText(/3 users · 5 disabled · 12 invited/)).toBeInTheDocument();
+      expect(screen.getByText(/3 users · 5 removed · 12 invited/)).toBeInTheDocument();
     });
 
     it('hides the breakdown pills when counts are zero', async () => {
@@ -903,4 +968,198 @@ describe('UsersPage', () => {
       expect(screen.getByText('Technician')).toBeInTheDocument();
     });
   });
+
+  describe('Self-removal', () => {
+    it('marks your own row and offers no removal on it', async () => {
+      signInAs('user-1');
+      const user = userEvent.setup();
+      renderWithProviders(<UsersPage />);
+
+      await waitFor(() => {
+        expect(screen.getByText('John Doe')).toBeInTheDocument();
+      });
+      expect(screen.getByText('You')).toBeInTheDocument();
+
+      // Row 0 is John, who is signed in.
+      const dropdownButtons = screen.getAllByRole('button', { name: /more options/i });
+      await user.click(dropdownButtons[0]);
+
+      // Edit stays — administering your own profile is fine. Removal does not.
+      expect(await screen.findByRole('menuitem', { name: /edit/i })).toBeInTheDocument();
+      expect(
+        screen.queryByRole('menuitem', { name: /remove from this workspace/i })
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole('menuitem', { name: /delete membership/i })
+      ).not.toBeInTheDocument();
+    });
+
+    it('still offers removal on other people\'s rows', async () => {
+      signInAs('user-1');
+      const user = userEvent.setup();
+      renderWithProviders(<UsersPage />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Bob Johnson')).toBeInTheDocument();
+      });
+
+      const dropdownButtons = screen.getAllByRole('button', { name: /more options/i });
+      await user.click(dropdownButtons[1]);
+
+      expect(
+        await screen.findByRole('menuitem', { name: /remove from this workspace/i })
+      ).toBeInTheDocument();
+    });
+  });
+
+  describe('Removal refusals', () => {
+    beforeEach(() => {
+      // Signed in as somebody not in the list, so every row is another person
+      // and the removal item is present. `mockReturnValue` outlives
+      // clearAllMocks, so this cannot be left to the previous block.
+      signInAs('someone-else');
+    });
+
+    // A 409 carries a `code`; the dialog is chosen from that, never from the
+    // message. Reachable from a stale list even with the own-row menu gated.
+    function refuseWith(code: string, message: string) {
+      vi.mocked(apiClient.post).mockRejectedValue(
+        Object.assign(new Error(message), {
+          response: { status: 409, data: { code, message } },
+        })
+      );
+    }
+
+    async function attemptRemoval() {
+      const user = userEvent.setup();
+      renderWithProviders(<UsersPage />);
+
+      await waitFor(() => {
+        expect(screen.getByText('John Doe')).toBeInTheDocument();
+      });
+
+      const dropdownButtons = screen.getAllByRole('button', { name: /more options/i });
+      await user.click(dropdownButtons[0]);
+      await user.click(screen.getByRole('menuitem', { name: /remove from this workspace/i }));
+
+      const confirms = await screen.findAllByRole('button', { name: /^remove access$/i });
+      await user.click(confirms[confirms.length - 1]);
+      return user;
+    }
+
+    it('shows the self-removal denial with no destructive button', async () => {
+      refuseWith('SELF_REMOVAL', 'You cannot remove your own access to this workspace');
+      await attemptRemoval();
+
+      await waitFor(() => {
+        expect(screen.getByText(/can't remove your own access/i)).toBeInTheDocument();
+      });
+
+      // A denial, not a confirmation: Close plus the resolution, nothing red.
+      expect(screen.getByRole('button', { name: /^close$/i })).toBeInTheDocument();
+      expect(
+        screen.queryByRole('button', { name: /^remove access$/i })
+      ).not.toBeInTheDocument();
+    });
+
+    it('shows the lockout denial and routes to the role editor', async () => {
+      refuseWith(
+        'LAST_USER_MANAGER',
+        'This is the only person who can manage users in this workspace.'
+      );
+      const user = await attemptRemoval();
+
+      await waitFor(() => {
+        expect(
+          screen.getByText(/only person who can manage users/i)
+        ).toBeInTheDocument();
+      });
+
+      await user.click(screen.getByRole('button', { name: /change roles/i }));
+      expect(mockNavigate).toHaveBeenCalledWith('/settings/access/users/user-1/edit');
+    });
+
+    it('falls back to an error toast for a 409 it does not recognise', async () => {
+      refuseWith('SOMETHING_NEW', 'Nope');
+      await attemptRemoval();
+
+      await waitFor(() => {
+        expect(screen.queryByText(/can't remove your own access/i)).not.toBeInTheDocument();
+      });
+      expect(
+        screen.queryByText(/only person who can manage users/i)
+      ).not.toBeInTheDocument();
+    });
+  });
+
+
+  describe('Removal toast', () => {
+    beforeEach(() => {
+      signInAs('someone-else');
+    });
+
+    it('names the person and workspace, and undoes via activate', async () => {
+      vi.mocked(apiClient.post).mockResolvedValue({
+        data: { ...mockUsers[0], enabled: false },
+      });
+      const user = userEvent.setup();
+      renderWithProviders(<UsersPage />);
+
+      await waitFor(() => {
+        expect(screen.getByText('John Doe')).toBeInTheDocument();
+      });
+
+      const dropdownButtons = screen.getAllByRole('button', { name: /more options/i });
+      await user.click(dropdownButtons[0]);
+      await user.click(screen.getByRole('menuitem', { name: /remove from this workspace/i }));
+      const confirms = await screen.findAllByRole('button', { name: /^remove access$/i });
+      await user.click(confirms[confirms.length - 1]);
+
+      await waitFor(() => {
+        expect(apiClient.post).toHaveBeenCalledWith('/users/user-1/deactivate');
+      });
+
+      // "removed" alone would read as deleted from the platform, so the toast
+      // has to name the workspace too.
+      await waitFor(() => {
+        expect(vi.mocked(showUndo)).toHaveBeenCalled();
+      });
+      const [message, undoLabel, onUndo] = vi.mocked(showUndo).mock.calls[0];
+      expect(message).toMatch(/John Doe removed from/i);
+      expect(undoLabel).toMatch(/undo/i);
+
+      // Undo is honest here: deactivate is reversible via activate.
+      onUndo();
+      await waitFor(() => {
+        expect(apiClient.post).toHaveBeenCalledWith('/users/user-1/activate');
+      });
+    });
+
+    it('offers no undo on a hard delete, which cannot be reversed', async () => {
+      vi.mocked(apiClient.delete).mockResolvedValue({ data: undefined });
+      const user = userEvent.setup();
+      renderWithProviders(<UsersPage />);
+
+      await waitFor(() => {
+        expect(screen.getByText('John Doe')).toBeInTheDocument();
+      });
+
+      const dropdownButtons = screen.getAllByRole('button', { name: /more options/i });
+      await user.click(dropdownButtons[0]);
+      await user.click(screen.getByRole('menuitem', { name: /delete membership/i }));
+      const confirm = await screen.findByRole('button', { name: /^delete$/i });
+      await user.click(confirm);
+
+      await waitFor(() => {
+        expect(apiClient.delete).toHaveBeenCalledWith('/users/user-1');
+      });
+
+      // A deleted membership cannot be restored, so no Undo is offered.
+      await waitFor(() => {
+        expect(vi.mocked(showSuccess)).toHaveBeenCalled();
+      });
+      expect(vi.mocked(showUndo)).not.toHaveBeenCalled();
+    });
+  });
+
 });
