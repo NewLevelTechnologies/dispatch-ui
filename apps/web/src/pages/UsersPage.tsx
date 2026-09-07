@@ -701,9 +701,10 @@ export default function UsersPage() {
         isDestructive={pendingAction?.kind !== 'enable'}
         isPending={confirmPending}
       >
-        {/* Same scope note as the detail page: removal is per-workspace, and
-            the person keeps their login and any other workspaces. Deliberately
-            not shown for delete, which really is destructive. */}
+        {/* Same note as the detail page: only what survives on every path.
+            Their sign-in is not on that list — a last-membership removal
+            disables the identity too. Deliberately not shown for delete,
+            which really is destructive. */}
         {pendingAction?.kind === 'disable' && (
           <Callout kind="neutral" title={t('users.actions.disableNotAffectedLabel')}>
             {t('users.actions.disableNotAffected')}
