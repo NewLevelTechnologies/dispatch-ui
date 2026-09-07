@@ -8,6 +8,43 @@ import apiClient from './client';
 // two non-active states.
 export type InvitationStatus = 'INVITED' | 'INVITATION_EXPIRED' | 'ACTIVE';
 
+// Which email an invite asked for.
+//
+// `INVITATION` — we created the Cognito identity, so Cognito mailed a temporary
+// password. `WORKSPACE_ADDED` — we linked an existing identity, so
+// notification-service was asked to explain the new workspace.
+//
+// Keyed on who created the identity, NOT on invitation status: a person another
+// tenant invited who never set a password comes back `INVITED` here and still
+// gets `WORKSPACE_ADDED`, because Cognito already mailed them once and will not
+// do it again. Branching invite copy on `invitationStatus` reproduces the
+// original bug this field exists to fix.
+export type NotificationRequested = 'INVITATION' | 'WORKSPACE_ADDED';
+
+/**
+ * What a removal will do to the person's sign-in, asked before the click.
+ *
+ * Two booleans rather than one because the two removals ask different
+ * questions: deactivate keys on other **enabled** memberships, delete keys on
+ * **any** membership at all. Someone whose only other membership is disabled
+ * loses their sign-in to a deactivate but keeps their identity through a
+ * delete, so a single flag would be confidently wrong about one of the two
+ * dialogs.
+ *
+ * `deactivateEndsSignIn` is false for an already-disabled member — deactivating
+ * them is a no-op and ends nothing.
+ *
+ * ADVISORY ONLY. A non-200 means *unknown*, never `false`: fall back to
+ * conditional copy and let the removal proceed. The self-removal and
+ * last-user-manager guards are enforced server-side regardless of what this
+ * returned, so a failed pre-flight cannot be used to slip past them — and a
+ * courtesy lookup must never be what stops an admin offboarding someone.
+ */
+export interface RemovalImpact {
+  deactivateEndsSignIn: boolean;
+  deleteEndsSignIn: boolean;
+}
+
 export interface User {
   id: string;
   tenantId: string;
@@ -22,6 +59,11 @@ export interface User {
   photoUrl?: string | null;
   enabled: boolean;
   invitationStatus?: InvitationStatus;
+  // Which mail the invite asked for. Only ever populated on the POST /users
+  // response — the question is meaningless on a read, so it is null elsewhere.
+  // "Requested", not "sent": user-service asks, notification-service applies
+  // the tenant's kill-switch, so copy built on this must not claim delivery.
+  notificationRequested?: NotificationRequested | null;
   roles?: Role[];
   capabilities?: string[];
   dispatchRegionIds?: string[];
@@ -416,6 +458,14 @@ export const userApi = {
   // The original method names are preserved so call sites stay the same.
   enable: async (id: string): Promise<User> => {
     const response = await apiClient.post<User>(`/users/${id}/activate`);
+    return response.data;
+  },
+
+  // Prefetched when a row's action menu opens, so the confirm dialog usually
+  // reads it from cache rather than making the admin wait. Cheap by design:
+  // one indexed read.
+  getRemovalImpact: async (id: string): Promise<RemovalImpact> => {
+    const response = await apiClient.get<RemovalImpact>(`/users/${id}/removal-impact`);
     return response.data;
   },
 

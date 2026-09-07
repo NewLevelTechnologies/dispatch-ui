@@ -8,6 +8,7 @@ import IconButton from '../components/IconButton';
 import { userApi, tenantSettingsApi, type User, type Role, type InvitationStatus } from '../api/setup';
 import { Callout } from '../components/ui/Callout';
 import { useHasCapability, useCurrentUser } from '../hooks/useCurrentUser';
+import { useRemovalImpact, usePrefetchRemovalImpact } from '../hooks/useRemovalImpact';
 import { PageHead } from '../components/ui/PageHead';
 import { Button } from '../components/catalyst/button';
 import { Dropdown, DropdownButton, DropdownDivider, DropdownItem, DropdownLabel, DropdownMenu } from '../components/catalyst/dropdown';
@@ -130,6 +131,20 @@ export default function UsersPage() {
   const canEditUsers = useHasCapability('EDIT_USERS');
   const canDeleteUsers = useHasCapability('DELETE_USERS');
   const { data: currentUser } = useCurrentUser();
+
+  // What the pending removal will do to their sign-in. Prefetched when the row
+  // menu opens (below), so this usually resolves from cache before the dialog
+  // paints. Only asked for the two removal paths — restoring access ends
+  // nothing, so there is nothing to warn about.
+  const prefetchRemovalImpact = usePrefetchRemovalImpact();
+  const { impact, isSettled: impactSettled } = useRemovalImpact(
+    pendingAction?.user.id,
+    pendingAction?.kind === 'disable' || pendingAction?.kind === 'delete'
+  );
+  // Each path asks a different question of the backend, so read the flag that
+  // belongs to the action actually pending.
+  const endsSignIn =
+    pendingAction?.kind === 'delete' ? impact?.deleteEndsSignIn : impact?.deactivateEndsSignIn;
 
   // Names the workspace in the remove-access dialog. Shared cache key with
   // App.tsx, so no extra request; generic fallback rather than a blank.
@@ -605,7 +620,14 @@ export default function UsersPage() {
                           {(canEditUsers || (!isMe && canDeleteUsers)) && (
                             <div onClick={(e) => e.stopPropagation()}>
                               <Dropdown>
-                                <DropdownButton as={IconButton} aria-label={t('common.moreOptions')}>
+                                {/* Warm the removal-impact read here rather
+                                    than on dialog open, so the confirm button
+                                    is rarely the thing waiting. */}
+                                <DropdownButton
+                                  as={IconButton}
+                                  aria-label={t('common.moreOptions')}
+                                  onClick={() => prefetchRemovalImpact(user.id)}
+                                >
                                   <EllipsisVerticalIcon className="size-4" />
                                 </DropdownButton>
                                 <DropdownMenu anchor="bottom end">
@@ -684,9 +706,17 @@ export default function UsersPage() {
         }
         message={
           pendingAction?.kind === 'delete'
-            ? t('users.actions.deleteWarning', { company: workspaceName })
+            ? endsSignIn === undefined
+              ? t('users.actions.deleteWarning', { company: workspaceName })
+              : endsSignIn
+                ? t('users.actions.deleteWarningEndsSignIn', { company: workspaceName })
+                : t('users.actions.deleteWarningKeepsSignIn', { company: workspaceName })
             : pendingAction?.kind === 'disable'
-              ? t('users.actions.disableWarning')
+              ? endsSignIn === undefined
+                ? t('users.actions.disableWarning')
+                : endsSignIn
+                  ? t('users.actions.disableWarningEndsSignIn')
+                  : t('users.actions.disableWarningKeepsSignIn')
               : t('users.actions.enableWarning')
         }
         confirmLabel={
@@ -699,7 +729,7 @@ export default function UsersPage() {
               : t('users.table.restoreAccess')
         }
         isDestructive={pendingAction?.kind !== 'enable'}
-        isPending={confirmPending}
+        isPending={confirmPending || (pendingAction?.kind !== 'enable' && !impactSettled)}
       >
         {/* Same note as the detail page: only what survives on every path.
             Their sign-in is not on that list — a last-membership removal
@@ -707,7 +737,9 @@ export default function UsersPage() {
             which really is destructive. */}
         {pendingAction?.kind === 'disable' && (
           <Callout kind="neutral" title={t('users.actions.disableNotAffectedLabel')}>
-            {t('users.actions.disableNotAffected')}
+            {endsSignIn === false
+              ? t('users.actions.disableNotAffectedKeepsSignIn')
+              : t('users.actions.disableNotAffected')}
           </Callout>
         )}
       </ConfirmDialog>

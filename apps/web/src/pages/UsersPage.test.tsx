@@ -158,6 +158,14 @@ function installApiMock(users: MockUser[] = mockUsers, roles = mockRoles) {
     if (url === '/users/me') {
       return Promise.resolve({ data: users[0] ?? null });
     }
+    // Pre-flight the confirm dialogs read. Default to "no sign-in impact" so
+    // the existing removal tests exercise the ordinary path; the tests that
+    // care override this.
+    if (/^\/users\/[^/]+\/removal-impact$/.test(url)) {
+      return Promise.resolve({
+        data: { deactivateEndsSignIn: false, deleteEndsSignIn: false },
+      });
+    }
     return Promise.reject(new Error(`Unknown URL: ${url}`));
   });
 }
@@ -1159,6 +1167,102 @@ describe('UsersPage', () => {
         expect(vi.mocked(showSuccess)).toHaveBeenCalled();
       });
       expect(vi.mocked(showUndo)).not.toHaveBeenCalled();
+    });
+  });
+
+
+  describe('Removal impact pre-flight', () => {
+    beforeEach(() => {
+      signInAs('someone-else');
+    });
+
+    // Override just the pre-flight, leaving the rest of the mock intact.
+    function impact(
+      body: { deactivateEndsSignIn: boolean; deleteEndsSignIn: boolean } | 'fail'
+    ) {
+      const base = vi.mocked(apiClient.get).getMockImplementation()!;
+      vi.mocked(apiClient.get).mockImplementation((url: string) => {
+        if (/^\/users\/[^/]+\/removal-impact$/.test(url)) {
+          return body === 'fail'
+            ? Promise.reject(new Error('pre-flight down'))
+            : Promise.resolve({ data: body });
+        }
+        return base(url);
+      });
+    }
+
+    async function openRemoveDialog() {
+      const user = userEvent.setup();
+      renderWithProviders(<UsersPage />);
+      await waitFor(() => {
+        expect(screen.getByText('John Doe')).toBeInTheDocument();
+      });
+      const dropdownButtons = screen.getAllByRole('button', { name: /more options/i });
+      await user.click(dropdownButtons[0]);
+      await user.click(screen.getByRole('menuitem', { name: /remove from this workspace/i }));
+      return user;
+    }
+
+    it('says the sign-in dies when this is their only workspace', async () => {
+      impact({ deactivateEndsSignIn: true, deleteEndsSignIn: true });
+      await openRemoveDialog();
+
+      await waitFor(() => {
+        expect(screen.getByText(/their sign-in is disabled too/i)).toBeInTheDocument();
+      });
+      // Not-affected must not claim the sign-in survives here.
+      expect(screen.queryByText(/their sign-in, password and two-factor/i)).not.toBeInTheDocument();
+    });
+
+    it('says the sign-in survives when they belong elsewhere', async () => {
+      impact({ deactivateEndsSignIn: false, deleteEndsSignIn: false });
+      await openRemoveDialog();
+
+      await waitFor(() => {
+        expect(
+          screen.getByText(/their sign-in and their other workspaces are unaffected/i)
+        ).toBeInTheDocument();
+      });
+      expect(screen.getByText(/their sign-in, password and two-factor/i)).toBeInTheDocument();
+    });
+
+    it('falls back to conditional copy when the pre-flight fails, and still allows removal', async () => {
+      impact('fail');
+      const user = await openRemoveDialog();
+
+      // Unknown means unknown — never "the sign-in is safe".
+      await waitFor(() => {
+        expect(screen.getByText(/if this is their only workspace/i)).toBeInTheDocument();
+      });
+      expect(screen.queryByText(/their sign-in, password and two-factor/i)).not.toBeInTheDocument();
+
+      // And the removal must not be blocked by a failed courtesy lookup.
+      const confirms = await screen.findAllByRole('button', { name: /^remove access$/i });
+      await user.click(confirms[confirms.length - 1]);
+      await waitFor(() => {
+        expect(apiClient.post).toHaveBeenCalledWith('/users/user-1/deactivate');
+      });
+    });
+
+    it('reads the delete flag for delete, not the deactivate one', async () => {
+      // The two paths diverge: someone whose only other membership is disabled
+      // loses their sign-in to a deactivate but keeps it through a delete.
+      impact({ deactivateEndsSignIn: true, deleteEndsSignIn: false });
+      const user = userEvent.setup();
+      renderWithProviders(<UsersPage />);
+      await waitFor(() => {
+        expect(screen.getByText('John Doe')).toBeInTheDocument();
+      });
+      const dropdownButtons = screen.getAllByRole('button', { name: /more options/i });
+      await user.click(dropdownButtons[0]);
+      await user.click(screen.getByRole('menuitem', { name: /delete membership/i }));
+
+      await waitFor(() => {
+        expect(screen.getByText(/their sign-in is unaffected/i)).toBeInTheDocument();
+      });
+      expect(
+        screen.queryByText(/because no other membership remains/i)
+      ).not.toBeInTheDocument();
     });
   });
 
