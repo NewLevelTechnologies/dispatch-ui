@@ -14,10 +14,25 @@ import { toast } from 'sonner';
 
 export function extractApiError(err: unknown): string | undefined {
   if (err instanceof Error && 'response' in err) {
-    const r = (err as { response?: { data?: { message?: string } } }).response;
+    const r = (err as { response?: { data?: { message?: string; error?: string } } }).response;
     if (r?.data?.message) return r.data.message;
+    // The JWT interceptor writes its human-readable half as `error` where the
+    // controllers use `message`. Both are server-authored prose for the user,
+    // so read either rather than falling through to a stack-trace message.
+    if (r?.data?.error) return r.data.error;
   }
   if (err instanceof Error && err.message) return err.message;
+  return undefined;
+}
+
+// Machine-readable failure reason. Every 409 from `/users` carries one, as do
+// the interceptor's 401/403 bodies — so one parser covers both. Prefer this to
+// matching on the message: the prose is server-authored and translatable, the
+// code is the contract.
+export function errorCode(err: unknown): string | undefined {
+  if (err instanceof Error && 'response' in err) {
+    return (err as { response?: { data?: { code?: string | null } } }).response?.data?.code ?? undefined;
+  }
   return undefined;
 }
 

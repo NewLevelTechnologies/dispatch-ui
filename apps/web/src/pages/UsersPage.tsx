@@ -10,9 +10,10 @@ import { Callout } from '../components/ui/Callout';
 import { useHasCapability, useCurrentUser } from '../hooks/useCurrentUser';
 import { PageHead } from '../components/ui/PageHead';
 import { Button } from '../components/catalyst/button';
-import { Dropdown, DropdownButton, DropdownItem, DropdownLabel, DropdownMenu } from '../components/catalyst/dropdown';
+import { Dropdown, DropdownButton, DropdownDivider, DropdownItem, DropdownLabel, DropdownMenu } from '../components/catalyst/dropdown';
 import ConfirmDialog from '../components/ConfirmDialog';
-import { showError, showSuccess, extractApiError } from '../lib/toast';
+import RemovalGuardDialog, { type RemovalGuard } from '../components/users/RemovalGuardDialog';
+import { showError, showSuccess, showUndo, extractApiError, errorCode, isConflict } from '../lib/toast';
 import { Avatar } from '../components/ui/Avatar';
 import { Pill } from '../components/ui/Pill';
 import { RoleChip } from '../components/RoleChip';
@@ -58,14 +59,20 @@ function sortRolesBySeniority(roles: Role[]): Role[] {
   });
 }
 
-type StatusValue = '' | 'enabled' | 'disabled';
+// Membership status in THIS workspace, not account status. A removed member is
+// a deactivated membership: the row is kept so the admin gets confirmation and
+// an undo, the same way this app treats deactivated customers, locations and
+// equipment. Defaults to `active` — removed people are history, and an admin
+// opening this page is doing today's work.
+type StatusValue = 'active' | 'removed' | 'all';
 type InvitationValue = '' | InvitationStatus;
 
-const STATUS_VALUES: StatusValue[] = ['enabled', 'disabled'];
+const STATUS_VALUES: StatusValue[] = ['active', 'removed', 'all'];
+const DEFAULT_STATUS: StatusValue = 'active';
 const INVITATION_VALUES: InvitationStatus[] = ['ACTIVE', 'INVITED', 'INVITATION_EXPIRED'];
 
 function readStatus(raw: string | null): StatusValue {
-  return STATUS_VALUES.includes(raw as StatusValue) ? (raw as StatusValue) : '';
+  return STATUS_VALUES.includes(raw as StatusValue) ? (raw as StatusValue) : DEFAULT_STATUS;
 }
 
 function readInvitation(raw: string | null): InvitationValue {
@@ -113,6 +120,10 @@ export default function UsersPage() {
   const [pendingAction, setPendingAction] = useState<
     { kind: 'delete' | 'disable' | 'enable'; user: User } | null
   >(null);
+  // Which removal the backend refused, if any. Set from the 409's `code`.
+  const [guard, setGuard] = useState<RemovalGuard | null>(null);
+  // The row the refusal came from, so "Change roles" lands on the right person.
+  const [guardUser, setGuardUser] = useState<User | null>(null);
 
   // Permission checks
   const canInviteUsers = useHasCapability('INVITE_USERS');
@@ -143,10 +154,12 @@ export default function UsersPage() {
         page: page - 1,
         size: PAGE_SIZE,
         q: deferredSearch || undefined,
+        // `?enabled=true` / `false`, omitted for `all` — no backend work needed
+        // for the Active default (FE_HANDOFF_workspace_user_removal §4).
         enabled:
-          statusFilter === 'enabled'
+          statusFilter === 'active'
             ? true
-            : statusFilter === 'disabled'
+            : statusFilter === 'removed'
               ? false
               : undefined,
         roleId: roleFilter ? [roleFilter] : undefined,
@@ -160,13 +173,22 @@ export default function UsersPage() {
     queryFn: () => userApi.getRoles(),
   });
 
+  // "View administrators" target. A tenant can also grant user management via a
+  // custom role, but finding those needs a per-role capability fetch — the
+  // system ADMIN role is the one worth linking (FE_HANDOFF §4). Undefined when
+  // there's no such role, and the dialog then drops the button rather than
+  // navigating nowhere.
+  const adminRoleId = roles?.find((r) => r.systemRoleCode === 'ADMIN')?.id;
+
   const users = data?.content ?? [];
   const totalUsers = data?.totalElements ?? 0;
   const totalPages = data?.totalPages ?? 0;
-  // Aggregates over the q/role-filtered set, ignoring status/invitation chips
-  // so the subtitle breakdown stays meaningful when those filters aren't
-  // active. Null on every page after the first envelope load is fine.
-  const disabledCount = data?.counts?.disabled ?? 0;
+  // Aggregates over the q/role-filtered set only — the status and invitation
+  // chips deliberately don't shrink them. So this still reports removed members
+  // while the Active default is filtering them out of the rows, which is
+  // exactly the hint that the All filter has something to show. Null on every
+  // page after the first envelope load is fine.
+  const removedCount = data?.counts?.disabled ?? 0;
   const invitedCount = data?.counts?.invited ?? 0;
   const showingStart = totalUsers === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
   const showingEnd = Math.min(page * PAGE_SIZE, totalUsers);
@@ -190,7 +212,9 @@ export default function UsersPage() {
       next.delete('page');
     }
     if (updates.status !== undefined) {
-      if (updates.status) next.set('status', updates.status);
+      // `active` is the default view, so it stays out of the URL — a clean
+      // /users link and the default state are the same thing.
+      if (updates.status !== DEFAULT_STATUS) next.set('status', updates.status);
       else next.delete('status');
       next.delete('page');
     }
@@ -237,31 +261,67 @@ export default function UsersPage() {
     setSearchParams(next, { replace: false });
   };
 
-  const disableMutation = useMutation({
-    mutationFn: (user: User) => userApi.disable(user.id),
-    onSuccess: (_, user) => {
-      queryClient.invalidateQueries({ queryKey: ['users'] });
-      showSuccess(`${user.firstName} ${user.lastName} disabled`);
-    },
-    onError: (err) => showError("Couldn't disable user", extractApiError(err)),
-  });
+  // Both removal routes answer 409 for two different refusals, told apart by
+  // `code`: SELF_REMOVAL and LAST_USER_MANAGER. Each gets its own dialog naming
+  // the resolution — a refusal in a red error toast tells an admin they failed
+  // without telling them what to do about it.
+  const removalError = (title: string) => (err: unknown, user: User) => {
+    const code = errorCode(err);
+    if (isConflict(err) && (code === 'SELF_REMOVAL' || code === 'LAST_USER_MANAGER')) {
+      setGuardUser(user);
+      setGuard(code);
+      return;
+    }
+    showError(title, extractApiError(err));
+  };
 
   const enableMutation = useMutation({
     mutationFn: (user: User) => userApi.enable(user.id),
     onSuccess: (_, user) => {
       queryClient.invalidateQueries({ queryKey: ['users'] });
-      showSuccess(`${user.firstName} ${user.lastName} enabled`);
+      showSuccess(
+        t('users.actions.restoredToast', {
+          name: `${user.firstName} ${user.lastName}`,
+          company: workspaceName,
+        })
+      );
     },
-    onError: (err) => showError("Couldn't enable user", extractApiError(err)),
+    onError: (err) => showError(t('users.actions.restoreFailed'), extractApiError(err)),
+  });
+
+  const disableMutation = useMutation({
+    mutationFn: (user: User) => userApi.disable(user.id),
+    onSuccess: (_, user) => {
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+      // Names the person AND the workspace: "removed" alone reads as deleted
+      // from the platform. Undo is honest here — deactivate is reversible via
+      // activate, and the row is still sitting in the list to prove it.
+      showUndo(
+        t('users.actions.removedToast', {
+          name: `${user.firstName} ${user.lastName}`,
+          company: workspaceName,
+        }),
+        t('common.undo'),
+        () => enableMutation.mutate(user)
+      );
+    },
+    onError: removalError(t('users.actions.removeFailed')),
   });
 
   const deleteMutation = useMutation({
     mutationFn: (user: User) => userApi.delete(user.id),
     onSuccess: (_, user) => {
       queryClient.invalidateQueries({ queryKey: ['users'] });
-      showSuccess(`${user.firstName} ${user.lastName} deleted`);
+      // Deliberately no Undo — a deleted membership cannot be restored, and
+      // offering one would be a lie the user only discovers after clicking.
+      showSuccess(
+        t('users.actions.deletedToast', {
+          name: `${user.firstName} ${user.lastName}`,
+          company: workspaceName,
+        })
+      );
     },
-    onError: (err) => showError("Couldn't delete user", extractApiError(err)),
+    onError: removalError(t('users.actions.deleteFailed')),
   });
 
   const handleAdd = () => {
@@ -277,7 +337,7 @@ export default function UsersPage() {
   const handleDelete = (user: User) => setPendingAction({ kind: 'delete', user });
 
   const hasFilters = Boolean(
-    deferredSearch || roleFilter || statusFilter || invitationFilter
+    deferredSearch || roleFilter || statusFilter !== DEFAULT_STATUS || invitationFilter
   );
   const clearFilters = () => {
     setSearchQuery('');
@@ -310,8 +370,8 @@ export default function UsersPage() {
         ? t('entities.user').toLowerCase()
         : t('entities.users').toLowerCase();
     parts.push(`${totalUsers.toLocaleString()} ${noun}`);
-    if (disabledCount > 0) {
-      parts.push(t('users.breakdown.disabled', { count: disabledCount }));
+    if (removedCount > 0) {
+      parts.push(t('users.breakdown.removed', { count: removedCount }));
     }
     if (invitedCount > 0) {
       parts.push(t('users.breakdown.invited', { count: invitedCount }));
@@ -377,14 +437,20 @@ export default function UsersPage() {
         <FilterChipListbox
           label={t('users.filter.status')}
           ariaLabel={t('users.filter.status')}
-          value={statusFilter || null}
-          displayValue={statusFilter ? t(`users.filter.${statusFilter}`) : null}
-          resetLabel={t('users.filter.all')}
+          value={statusFilter}
+          // Active is the neutral default, not an applied filter, so the chip
+          // stays untinted and offers no × there — while `value` still marks
+          // Active as the selected option inside the listbox. No reset row:
+          // All is a real option in the list rather than "no filter".
+          displayValue={
+            statusFilter === DEFAULT_STATUS ? null : t(`users.filter.${statusFilter}`)
+          }
           onChange={(id) => updateFilters({ status: readStatus(id) })}
-          onClear={() => updateFilters({ status: '' })}
+          onClear={() => updateFilters({ status: DEFAULT_STATUS })}
         >
-          <ChipListboxOption value="enabled">{t('users.filter.enabled')}</ChipListboxOption>
-          <ChipListboxOption value="disabled">{t('users.filter.disabled')}</ChipListboxOption>
+          <ChipListboxOption value="active">{t('users.filter.active')}</ChipListboxOption>
+          <ChipListboxOption value="removed">{t('users.filter.removed')}</ChipListboxOption>
+          <ChipListboxOption value="all">{t('users.filter.all')}</ChipListboxOption>
         </FilterChipListbox>
 
         <FilterChipListbox
@@ -462,7 +528,10 @@ export default function UsersPage() {
                   {users.map((user) => {
                     const fullName = `${user.firstName} ${user.lastName}`;
                     const isMe = currentUser?.id === user.id;
-                    const rowOpacity = !user.enabled ? 'opacity-55' : '';
+                    // Dim the IDENTITY of a removed member, never the whole row:
+                    // the status pill and the ⋯ menu have to stay readable and
+                    // actionable, since Restore access is reached from here.
+                    const identityDim = !user.enabled ? 'opacity-55' : '';
                     return (
                       <DenseRow
                         key={user.id}
@@ -472,10 +541,10 @@ export default function UsersPage() {
                             navigate(`/settings/access/users/${user.id}`);
                           }
                         }}
-                        className={`cursor-pointer ${rowOpacity}`}
+                        className="cursor-pointer"
                       >
                         <td>
-                          <div className="flex items-center gap-2.5">
+                          <div className={clsx('flex items-center gap-2.5', identityDim)}>
                             <Avatar name={fullName} src={user.photoUrl ?? undefined} size="sm" />
                             <CellStack>
                               <CellTop>
@@ -491,7 +560,10 @@ export default function UsersPage() {
                           </div>
                         </td>
                         <td
-                          className={clsx(!(user.roles && user.roles.length > 0) && 'dt-empty')}
+                          className={clsx(
+                            !(user.roles && user.roles.length > 0) && 'dt-empty',
+                            identityDim
+                          )}
                           data-label={t('common.form.role')}
                         >
                           {user.roles && user.roles.length > 0 ? (
@@ -524,11 +596,13 @@ export default function UsersPage() {
                           {user.enabled ? (
                             <Pill tone="success" dot live>{t('common.active')}</Pill>
                           ) : (
-                            <Pill tone="neutral" dot>{t('common.disabled')}</Pill>
+                            <Pill tone="neutral" dot>{t('users.status.removed')}</Pill>
                           )}
                         </td>
                         <td className="right">
-                          {(canEditUsers || canDeleteUsers) && (
+                          {/* Own row keeps only Edit, so a delete-only admin
+                              would otherwise get an empty menu on themselves. */}
+                          {(canEditUsers || (!isMe && canDeleteUsers)) && (
                             <div onClick={(e) => e.stopPropagation()}>
                               <Dropdown>
                                 <DropdownButton as={IconButton} aria-label={t('common.moreOptions')}>
@@ -536,25 +610,40 @@ export default function UsersPage() {
                                 </DropdownButton>
                                 <DropdownMenu anchor="bottom end">
                                   {canEditUsers && (
+                                    <DropdownItem onClick={() => handleEdit(user)}>
+                                      <DropdownLabel>{t('common.edit')}</DropdownLabel>
+                                    </DropdownItem>
+                                  )}
+                                  {/* Your own row offers no removal at all. The
+                                      backend rejects self-removal with a 409
+                                      (FE_HANDOFF §3), but a hidden menu item is
+                                      not the enforcement and enforcement is not
+                                      the affordance — the Users page administers
+                                      other people, so the option shouldn't be
+                                      here to reach for in the first place. */}
+                                  {!isMe && (canEditUsers || canDeleteUsers) && (
                                     <>
-                                      <DropdownItem onClick={() => handleEdit(user)}>
-                                        <DropdownLabel>{t('common.edit')}</DropdownLabel>
-                                      </DropdownItem>
-                                      {user.enabled ? (
-                                        <DropdownItem onClick={() => handleDisable(user)}>
-                                          <DropdownLabel>{t('users.table.disable')}</DropdownLabel>
-                                        </DropdownItem>
-                                      ) : (
-                                        <DropdownItem onClick={() => handleEnable(user)}>
-                                          <DropdownLabel>{t('users.table.enable')}</DropdownLabel>
+                                      <DropdownDivider />
+                                      {canEditUsers &&
+                                        (user.enabled ? (
+                                          <DropdownItem onClick={() => handleDisable(user)}>
+                                            <DropdownLabel>
+                                              {t('users.table.removeFromWorkspace')}
+                                            </DropdownLabel>
+                                          </DropdownItem>
+                                        ) : (
+                                          <DropdownItem onClick={() => handleEnable(user)}>
+                                            <DropdownLabel>
+                                              {t('users.table.restoreAccess')}
+                                            </DropdownLabel>
+                                          </DropdownItem>
+                                        ))}
+                                      {canDeleteUsers && (
+                                        <DropdownItem onClick={() => handleDelete(user)}>
+                                          <DropdownLabel>{t('users.table.deleteMembership')}</DropdownLabel>
                                         </DropdownItem>
                                       )}
                                     </>
-                                  )}
-                                  {canDeleteUsers && (
-                                    <DropdownItem onClick={() => handleDelete(user)}>
-                                      <DropdownLabel>{t('common.delete')}</DropdownLabel>
-                                    </DropdownItem>
                                   )}
                                 </DropdownMenu>
                               </Dropdown>
@@ -588,14 +677,14 @@ export default function UsersPage() {
         onConfirm={confirmPendingAction}
         title={
           pendingAction?.kind === 'delete'
-            ? t('common.actions.deleteConfirm', { name: pendingName })
+            ? t('users.actions.deleteConfirm', { name: pendingName, company: workspaceName })
             : pendingAction?.kind === 'disable'
               ? t('users.actions.disableConfirm', { name: pendingName, company: workspaceName })
-              : t('users.actions.enableConfirm', { name: pendingName })
+              : t('users.actions.enableConfirm', { name: pendingName, company: workspaceName })
         }
         message={
           pendingAction?.kind === 'delete'
-            ? t('users.actions.deleteWarning')
+            ? t('users.actions.deleteWarning', { company: workspaceName })
             : pendingAction?.kind === 'disable'
               ? t('users.actions.disableWarning')
               : t('users.actions.enableWarning')
@@ -606,8 +695,8 @@ export default function UsersPage() {
               ? t('common.deleting')
               : t('common.delete')
             : pendingAction?.kind === 'disable'
-              ? t('users.table.disable')
-              : t('users.table.enable')
+              ? t('users.actions.removeAccessLabel')
+              : t('users.table.restoreAccess')
         }
         isDestructive={pendingAction?.kind !== 'enable'}
         isPending={confirmPending}
@@ -621,6 +710,22 @@ export default function UsersPage() {
           </Callout>
         )}
       </ConfirmDialog>
+
+      {/* Reachable from a stale list even though the own-row menu offers no
+          removal — someone else can grant the last user-management role away
+          while this page sits open. */}
+      <RemovalGuardDialog
+        guard={guard}
+        onClose={() => {
+          setGuard(null);
+          setGuardUser(null);
+        }}
+        company={workspaceName}
+        onViewAdministrators={adminRoleId ? () => navigate(`/settings/access/roles/${adminRoleId}`) : undefined}
+        onChangeRoles={
+          guardUser ? () => navigate(`/settings/access/users/${guardUser.id}/edit`) : undefined
+        }
+      />
     </>
   );
 }

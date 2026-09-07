@@ -335,16 +335,14 @@ describe('UserDetailPage', () => {
       expect(screen.getByRole('heading', { name: 'John Doe' })).toBeInTheDocument();
     });
 
-    // The v1.5 lifecycle footer renames the destructive action from
-    // "Disable" → "Deactivate" to match the spec.
-    const disableButton = screen.getByRole('button', { name: /^deactivate$/i });
+    // Footer trigger and dialog confirm both read "Remove access" now: the
+    // trigger states the same scope as the dialog behind it. Trigger renders
+    // first, dialog second.
+    const disableButton = screen.getByRole('button', { name: /^remove access$/i });
     await user.click(disableButton);
 
-    // The confirm is now "Remove access" — deactivation is scoped to this
-    // workspace, not the person's account. That also disambiguates it from the
-    // footer trigger, which the old /^deactivate$/ lookup had to work around.
-    const confirmButton = await screen.findByRole('button', { name: /^remove access$/i });
-    await user.click(confirmButton);
+    const confirms = await screen.findAllByRole('button', { name: /^remove access$/i });
+    await user.click(confirms[confirms.length - 1]);
 
     await waitFor(() => {
       expect(postSpy).toHaveBeenCalledWith('/users/user-123/deactivate');
@@ -365,7 +363,7 @@ describe('UserDetailPage', () => {
       expect(screen.getByRole('heading', { name: 'John Doe' })).toBeInTheDocument();
     });
 
-    const disableButton = screen.getByRole('button', { name: /^deactivate$/i });
+    const disableButton = screen.getByRole('button', { name: /^remove access$/i });
     await user.click(disableButton);
 
     // Cancel in the ConfirmDialog
@@ -395,17 +393,16 @@ describe('UserDetailPage', () => {
     });
 
     // The inline status line shows "Disabled" for non-enabled users.
-    expect(screen.getByText('Disabled')).toBeInTheDocument();
+    expect(screen.getByText('Removed')).toBeInTheDocument();
 
-    // The lifecycle footer surfaces a "Reactivate" button when the user
-    // is disabled (was "Enable" in the prior layout).
-    const reactivateButton = screen.getByRole('button', { name: /^reactivate$/i });
+    // Removal is a membership status, so the way back is "Restore access".
+    const reactivateButton = screen.getByRole('button', { name: /^restore access$/i });
     await user.click(reactivateButton);
 
     // Confirm in the dialog — page button + dialog button can both match;
     // dialog renders second.
-    await screen.findByRole('button', { name: /^reactivate$/i });
-    const buttons = screen.getAllByRole('button', { name: /^reactivate$/i });
+    await screen.findByRole('button', { name: /^restore access$/i });
+    const buttons = screen.getAllByRole('button', { name: /^restore access$/i });
     await user.click(buttons[buttons.length - 1]);
 
     await waitFor(() => {
@@ -570,7 +567,7 @@ describe('UserDetailPage', () => {
       expect(screen.getByRole('heading', { name: 'John Doe' })).toBeInTheDocument();
     });
 
-    const disableButton = screen.getByRole('button', { name: /^deactivate$/i });
+    const disableButton = screen.getByRole('button', { name: /^remove access$/i });
     await user.click(disableButton);
 
     // Cancel in the ConfirmDialog
@@ -866,7 +863,7 @@ describe('UserDetailPage', () => {
       expect(screen.getByRole('heading', { name: 'John Doe' })).toBeInTheDocument();
     });
 
-    const reactivateButton = screen.getByRole('button', { name: /^reactivate$/i });
+    const reactivateButton = screen.getByRole('button', { name: /^restore access$/i });
     await user.click(reactivateButton);
 
     const cancelButton = await screen.findByRole('button', { name: /^cancel$/i });

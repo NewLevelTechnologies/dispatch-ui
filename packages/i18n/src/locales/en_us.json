@@ -1927,22 +1927,29 @@
   },
   "users": {
     "actions": {
-      "deleteWarning": "This action cannot be undone. All user data and history will be permanently removed.",
+      "deleteConfirm": "Delete {{name}}'s membership in {{company}}?",
+      "deleteFailed": "Couldn't delete membership",
+      "deleteWarning": "Deletes their access, roles and region assignments in {{company}}. Work they created here — work orders, notes, history — stays. This can't be undone; use Remove access if you might restore them.",
+      "deletedToast": "{{name}} deleted from {{company}}",
       "disableConfirm": "Remove {{name}} from {{company}}?",
       "disableNotAffected": "Their sign-in, password and two-factor setup. If they belong to other workspaces, those are unaffected.",
       "disableNotAffectedLabel": "Not affected",
       "disableWarning": "They lose access to this workspace immediately, including any open session. Their work history here is kept.",
-      "enableConfirm": "Enable {{name}}?",
-      "enableWarning": "They'll regain sign-in access immediately. Roles and regions are kept as-is."
+      "enableConfirm": "Restore {{name}}'s access to {{company}}?",
+      "enableWarning": "They regain access to this workspace immediately, with their previous roles and regions kept as-is. No email is sent.",
+      "removeAccessLabel": "Remove access",
+      "removeFailed": "Couldn't remove access",
+      "removeTitle": "Remove {{name}} from {{company}}",
+      "removedToast": "{{name}} removed from {{company}}",
+      "restoreFailed": "Couldn't restore access",
+      "restoreTitle": "Restore {{name}}'s access to {{company}}",
+      "restoredToast": "{{name}} restored to {{company}}"
     },
     "breakdown": {
-      "disabled": "{{count}} disabled",
-      "invited": "{{count}} invited"
+      "invited": "{{count}} invited",
+      "removed": "{{count}} removed"
     },
     "description": "People who can sign in to the app. Assign each user a role — roles determine which screens and actions they can access. Manage role permissions under Access › Roles.",
-    "empty": {
-      "noUsersDescription": "Invite your team to get started."
-    },
     "detail": {
       "accountActivity": "Account activity",
       "accountActivityHelper": "Sign-ins, access changes, security events. Record edits appear on each record.",
@@ -2013,17 +2020,20 @@
       "twoFactorValue": "Managed in Cognito",
       "userId": "User ID"
     },
+    "empty": {
+      "noUsersDescription": "Invite your team to get started."
+    },
     "filter": {
+      "active": "Active",
       "all": "All",
       "allInvitationStatuses": "Any invitation",
       "allRoles": "All roles",
       "clearFilters": "Clear filters",
-      "disabled": "Disabled",
-      "enabled": "Enabled",
       "invitationActive": "Active",
       "invitationExpired": "Invitation expired",
       "invitationInvited": "Invited",
       "invitationStatus": "Invitation",
+      "removed": "Removed",
       "role": "Role",
       "status": "Status"
     },
@@ -2046,7 +2056,8 @@
       "firstName": "First name",
       "hideDetails": "Hide details",
       "identity": "Identity",
-      "inviteHelper": "An invitation email goes out on save. Link is valid 7 days.",
+      "inviteSent": "Invitation sent to {{email}}",
+      "inviteSentDetail": "We've emailed them how to sign in to {{company}}.",
       "inviteTitle": "Invite user",
       "lastName": "Last name",
       "loadingCapabilities": "Loading capabilities…",
@@ -2062,29 +2073,35 @@
       "rolePlaceholder": "Select a role...",
       "roleRequired": "Please select at least one role",
       "roles": "Roles",
+      "rolesFailed": "Couldn't update roles",
       "rolesHelper": "Pick one role for most users. Multiple roles combine their capabilities.",
       "saveChanges": "Save changes",
       "searchRoles": "Search {{count}} roles…",
       "sendInvitation": "Send invitation",
-      "sendInvite": "Send invitation email",
-      "sendInviteTo": "Send invitation email to <0>{{email}}</0> on save",
-      "sendInviteToPlaceholder": "their address",
       "showDetails": "Show details"
+    },
+    "guard": {
+      "changeRoles": "Change roles",
+      "lastManagerBody": "This workspace has to keep at least one person who can manage users. Give someone else a role that includes user management first, then try again.",
+      "lastManagerTitle": "This is the only person who can manage users",
+      "selfBody": "Removing yourself would end your access to {{company}} immediately, and you couldn't restore it — only another administrator can. Ask one of them to remove you.",
+      "selfTitle": "You can't remove your own access",
+      "viewAdministrators": "View administrators"
     },
     "search": {
       "noMatch": "No users match \"{{query}}\"",
       "placeholder": "Search by name or email..."
     },
     "status": {
-      "disabled": "Disabled",
-      "enabled": "Enabled"
+      "removed": "Removed"
     },
     "table": {
       "actions": "Actions",
       "auditLog": "Audit Log",
-      "disable": "Disable",
-      "enable": "Enable",
+      "deleteMembership": "Delete membership",
       "lastUpdated": "Last Updated",
+      "removeFromWorkspace": "Remove from this workspace",
+      "restoreAccess": "Restore access",
       "you": "You"
     }
   },
@@ -2891,16 +2908,16 @@
     },
     "continueIn": "Continue in",
     "error": {
-      "body": "Something went wrong reaching the server. Your account is fine \u2014 this is a connection problem, not a change to your access.",
-      "title": "Couldn\u2019t load your workspaces"
+      "body": "Something went wrong reaching the server. Your account is fine — this is a connection problem, not a change to your access.",
+      "title": "Couldn’t load your workspaces"
     },
-    "loading": "Loading your workspaces\u2026",
+    "loading": "Loading your workspaces…",
     "none": {
-      "body": "Your sign-in worked, but this account isn\u2019t an active member of any workspace right now. An administrator may have removed or paused your access.",
+      "body": "Your sign-in worked, but this account isn’t an active member of any workspace right now. An administrator may have removed or paused your access.",
       "title": "No workspaces available"
     },
     "removed": {
-      "body": "An administrator removed or disabled your membership. Anything unsaved there is gone \u2014 your sign-in and your other workspaces are unaffected.",
+      "body": "An administrator removed or disabled your membership. Anything unsaved there is gone — your sign-in and your other workspaces are unaffected.",
       "title": "Your access to {{company}} ended",
       "titleGeneric": "Your access to that workspace ended"
     },
@@ -2910,13 +2927,13 @@
     "signedInAs": "Signed in as {{email}}",
     "switchAria": "Switch workspace",
     "switching": {
-      "body": "Loading this workspace\u2019s jobs and customers",
-      "title": "Switching to {{company}}\u2026"
+      "body": "Loading this workspace’s jobs and customers",
+      "title": "Switching to {{company}}…"
     },
     "tryAgain": "Try again",
     "unknown": {
-      "body": "This address is for a workspace your account doesn\u2019t have access to.",
-      "title": "You\u2019re not a member of this workspace",
+      "body": "This address is for a workspace your account doesn’t have access to.",
+      "title": "You’re not a member of this workspace",
       "yours": "Your workspaces"
     }
   }

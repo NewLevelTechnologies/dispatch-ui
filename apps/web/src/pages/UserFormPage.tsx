@@ -5,9 +5,10 @@ import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/rea
 import { useTranslation } from '@dispatch/i18n';
 import { ChevronRightIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import { PatternFormat } from 'react-number-format';
-import { userApi, dispatchRegionApi, type Role } from '../api/setup';
+import { userApi, dispatchRegionApi, tenantSettingsApi, type Role } from '../api/setup';
 import { roleAccentFromRole } from '@dispatch/utils';
-import { showError, showSuccess, extractApiError, errorStatus } from '../lib/toast';
+import { showError, showSuccess, extractApiError, errorStatus, errorCode, isConflict } from '../lib/toast';
+import RemovalGuardDialog, { type RemovalGuard } from '../components/users/RemovalGuardDialog';
 import { Badge } from '../components/catalyst/badge';
 import { Button } from '../components/catalyst/button';
 import { Card } from '../components/catalyst/card';
@@ -50,6 +51,19 @@ export default function UserFormPage({ mode }: UserFormPageProps) {
     queryFn: () => dispatchRegionApi.getAll(false),
   });
 
+  // Names the workspace in the invite result and the lockout dialog. Shared
+  // cache key with App.tsx, so this costs no extra request.
+  const { data: tenantSettings } = useQuery({
+    queryKey: ['tenant-settings'],
+    queryFn: () => tenantSettingsApi.getSettings(),
+  });
+  const workspaceName = tenantSettings?.companyName || 'this workspace';
+
+  // Set when a role save would leave the workspace with nobody able to manage
+  // users. Not predicted client-side — that needs a capability-aware count
+  // across every role, and getting it subtly wrong is worse than asking.
+  const [guard, setGuard] = useState<RemovalGuard | null>(null);
+
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -58,7 +72,6 @@ export default function UserFormPage({ mode }: UserFormPageProps) {
     roleIds: [] as string[],
     dispatchRegionIds: [] as string[],
   });
-  const [sendInvite, setSendInvite] = useState(true);
 
   useEffect(() => {
     if (isInvite) return;
@@ -110,33 +123,21 @@ export default function UserFormPage({ mode }: UserFormPageProps) {
         roleIds: formData.roleIds,
         dispatchRegionIds: formData.dispatchRegionIds,
         phoneNumber: formData.phoneNumber.trim() || null,
-        sendInvite,
       }),
     onSuccess: (created) => {
       queryClient.invalidateQueries({ queryKey: ['users'] });
-      // Branch on the status the backend derived from the person's real Cognito
-      // state, NOT on whether we just created them. Inviting an email that
-      // already has a login links that identity into this workspace and sends
-      // no email at all — promising one is a support ticket.
-      //
-      // `sendInvite: false` is a third case the invite-status split doesn't
-      // cover: the row exists, nothing was sent, whatever status comes back.
-      if (!sendInvite) {
-        showSuccess('User created', `No invitation was sent to ${created.email}.`);
-      } else if (created.invitationStatus === 'ACTIVE') {
-        showSuccess(
-          `${created.firstName} ${created.lastName} was added to this workspace`,
-          'No email was sent — they already have a login. This workspace appears in their workspace switcher the next time they sign in.'
-        );
-      } else {
-        // INVITED covers a brand-new person *and* someone another workspace
-        // invited who never finished their first sign-in. The pending invite is
-        // real in both cases, so resend stays available on their row.
-        showSuccess(
-          `Invitation sent to ${created.email}`,
-          "They'll get an email with a temporary password. You can resend it from their row until they sign in."
-        );
-      }
+      // ONE message, because the frontend cannot tell which email went out and
+      // must not guess. Every invite now sends something: a new identity gets
+      // Cognito's temporary password, a linked one gets `user.workspace_added`.
+      // The backend picks between them on whether it created the Cognito
+      // identity — which `invitationStatus` does not tell us (someone another
+      // tenant invited who never signed in comes back INVITED here and still
+      // gets the workspace-added mail). Naming a specific email would be wrong
+      // in exactly that case, so this says only what is true either way.
+      showSuccess(
+        t('users.form.inviteSent', { email: created.email }),
+        t('users.form.inviteSentDetail', { company: workspaceName })
+      );
       navigate(`/settings/access/users/${created.id}`);
     },
     onError: (error: unknown) => {
@@ -173,9 +174,19 @@ export default function UserFormPage({ mode }: UserFormPageProps) {
     },
   });
 
+  // Expect the lockout refusal HERE far more than on removal: self-removal is
+  // already blocked, so a remover is always left standing — but an admin can
+  // strip their own user-management role with no accomplice at all.
+  // `PUT /users/{id}/roles` can only ever return LAST_USER_MANAGER.
   const updateRolesMutation = useMutation({
     mutationFn: () => userApi.updateRoles(id!, { roleIds: formData.roleIds }),
-    onError: (err) => showError("Couldn't update roles", extractApiError(err)),
+    onError: (err) => {
+      if (isConflict(err) && errorCode(err) === 'LAST_USER_MANAGER') {
+        setGuard('LAST_USER_MANAGER');
+        return;
+      }
+      showError(t('users.form.rolesFailed'), extractApiError(err));
+    },
   });
 
   const updateRegionsMutation = useMutation({
@@ -390,21 +401,17 @@ export default function UserFormPage({ mode }: UserFormPageProps) {
               />
             </Card>
 
+            {/* Not a choice: the backend sends mail on every invite, so this
+                states what will happen instead of offering a toggle that had
+                no effect on the request. */}
             {isInvite && (
-              <label className="mt-2 flex items-center gap-2 px-1 text-[11.5px] text-fg-muted">
-                <Checkbox
-                  color="accent"
-                  checked={sendInvite}
-                  onChange={setSendInvite}
-                />
-                <span>
-                  Send invitation email to{' '}
-                  <strong className="text-fg-strong">
-                    {formData.email || 'their address'}
-                  </strong>{' '}
-                  on save
-                </span>
-              </label>
+              <p className="mt-2 px-1 text-[11.5px] text-fg-muted">
+                On save we email{' '}
+                <strong className="text-fg-strong">
+                  {formData.email || 'their address'}
+                </strong>{' '}
+                how to sign in.
+              </p>
             )}
           </div>
         </div>
@@ -446,6 +453,14 @@ export default function UserFormPage({ mode }: UserFormPageProps) {
           </Button>
         </div>
       </form>
+
+      {/* Close only: the resolution is to change the selection right here, so
+          there is nowhere else to send them. */}
+      <RemovalGuardDialog
+        guard={guard}
+        onClose={() => setGuard(null)}
+        company={workspaceName}
+      />
     </div>
   );
 }

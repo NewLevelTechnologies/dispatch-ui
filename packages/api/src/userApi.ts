@@ -112,7 +112,6 @@ export interface CreateUserRequest {
   roleIds: string[];
   dispatchRegionIds?: string[];
   phoneNumber?: string | null;
-  sendInvite?: boolean;
 }
 
 export interface UpdateUserProfileRequest {

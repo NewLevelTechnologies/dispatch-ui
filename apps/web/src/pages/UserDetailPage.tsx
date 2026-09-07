@@ -8,7 +8,7 @@ import { userApi, dispatchRegionApi, tenantSettingsApi, type User, type Role } f
 import { RoleChip } from '../components/RoleChip';
 import { formatPhone, roleAccent } from '@dispatch/utils';
 import { auditApi, type AccountActivityEvent } from '../api/setup';
-import { useHasCapability } from '../hooks/useCurrentUser';
+import { useHasCapability, useCurrentUser } from '../hooks/useCurrentUser';
 import { Avatar } from '../components/ui/Avatar';
 import { Callout } from '../components/ui/Callout';
 import { Pill } from '../components/ui/Pill';
@@ -19,7 +19,8 @@ import { DataRow } from '../components/catalyst/data-row';
 import { Heading } from '../components/catalyst/heading';
 import { Text } from '../components/catalyst/text';
 import ConfirmDialog from '../components/ConfirmDialog';
-import { showError, showSuccess, extractApiError } from '../lib/toast';
+import RemovalGuardDialog, { type RemovalGuard } from '../components/users/RemovalGuardDialog';
+import { showError, showSuccess, extractApiError, errorCode, isConflict } from '../lib/toast';
 
 function formatDateShort(d: string | Date | undefined): string {
   if (!d) return '—';
@@ -52,6 +53,22 @@ export default function UserDetailPage() {
   // it can be granted independently of profile/role edits.
   const canDeactivateUsers = useHasCapability('DEACTIVATE_USERS');
   const canViewAuditLogs = useHasCapability('VIEW_AUDIT_LOGS');
+  const { data: currentUser } = useCurrentUser();
+  // Your own detail page offers no removal, same as your own row on the list.
+  // The backend refuses it with a 409 either way, but the option shouldn't be
+  // sitting there to reach for.
+  const isMe = currentUser?.id === id;
+
+  // Which removal the backend refused, if any — read off the 409's `code`.
+  const [guard, setGuard] = useState<RemovalGuard | null>(null);
+  const removalError = (title: string) => (err: unknown) => {
+    const code = errorCode(err);
+    if (isConflict(err) && (code === 'SELF_REMOVAL' || code === 'LAST_USER_MANAGER')) {
+      setGuard(code);
+      return;
+    }
+    showError(title, extractApiError(err));
+  };
 
   const { data: user, isLoading, error } = useQuery({
     queryKey: ['users', id],
@@ -79,9 +96,14 @@ export default function UserDetailPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users', id] });
       queryClient.invalidateQueries({ queryKey: ['users'] });
-      showSuccess('Access removed');
+      showSuccess(
+        t('users.actions.removedToast', {
+          name: `${user?.firstName} ${user?.lastName}`,
+          company: workspaceName,
+        })
+      );
     },
-    onError: (err) => showError("Couldn't remove access", extractApiError(err)),
+    onError: removalError(t('users.actions.removeFailed')),
   });
 
   const enableMutation = useMutation({
@@ -89,9 +111,14 @@ export default function UserDetailPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users', id] });
       queryClient.invalidateQueries({ queryKey: ['users'] });
-      showSuccess('User reactivated');
+      showSuccess(
+        t('users.actions.restoredToast', {
+          name: `${user?.firstName} ${user?.lastName}`,
+          company: workspaceName,
+        })
+      );
     },
-    onError: (err) => showError("Couldn't reactivate user", extractApiError(err)),
+    onError: (err) => showError(t('users.actions.restoreFailed'), extractApiError(err)),
   });
 
   // Resend Invitation — only meaningful while the user is in INVITED or
@@ -191,10 +218,11 @@ export default function UserDetailPage() {
         </div>
       )}
 
-      {canDeactivateUsers && (
+      {canDeactivateUsers && !isMe && (
         <div className="mt-3">
           <LifecycleFooter
             user={user}
+            workspaceName={workspaceName}
             onDeactivate={handleDeactivate}
             onActivate={handleActivate}
             pending={disableMutation.isPending || enableMutation.isPending}
@@ -212,14 +240,21 @@ export default function UserDetailPage() {
                 name: `${user.firstName} ${user.lastName}`,
                 company: workspaceName,
               })
-            : t('users.actions.enableConfirm', { name: `${user.firstName} ${user.lastName}` })
+            : t('users.actions.enableConfirm', {
+                name: `${user.firstName} ${user.lastName}`,
+                company: workspaceName,
+              })
         }
         message={
           lifecycleConfirm === 'deactivate'
             ? t('users.actions.disableWarning')
             : t('users.actions.enableWarning')
         }
-        confirmLabel={lifecycleConfirm === 'deactivate' ? 'Remove access' : 'Reactivate'}
+        confirmLabel={
+          lifecycleConfirm === 'deactivate'
+            ? t('users.actions.removeAccessLabel')
+            : t('users.table.restoreAccess')
+        }
         isDestructive={lifecycleConfirm === 'deactivate'}
         isPending={disableMutation.isPending || enableMutation.isPending}
       >
@@ -233,6 +268,16 @@ export default function UserDetailPage() {
           </Callout>
         )}
       </ConfirmDialog>
+
+      {/* The footer offers no removal on your own page, but a stale tab can
+          still reach either refusal — someone else may have taken the last
+          user-management role away while this page sat open. */}
+      <RemovalGuardDialog
+        guard={guard}
+        onClose={() => setGuard(null)}
+        company={workspaceName}
+        onChangeRoles={() => navigate(`/settings/access/users/${user.id}/edit`)}
+      />
     </div>
   );
 }
@@ -251,6 +296,7 @@ function Header({
   onResendInvitation?: () => void;
   resendInvitationPending?: boolean;
 }) {
+  const { t } = useTranslation();
   const fullName = `${user.firstName} ${user.lastName}`;
   // Per the v1.5 spec: "Resend invite" only surfaces while the user is in
   // INVITED or INVITATION_EXPIRED. Don't gate on `enabled` — a disabled
@@ -273,7 +319,7 @@ function Header({
             {user.enabled ? (
               <Pill tone="success" dot live inline>Active</Pill>
             ) : (
-              <Pill tone="neutral" dot inline>Disabled</Pill>
+              <Pill tone="neutral" dot inline>{t('users.status.removed')}</Pill>
             )}
             <span className="text-fg-dim">·</span>
             <span className="break-all">{user.email}</span>
@@ -925,38 +971,47 @@ function AccountActivityCard({ userId }: { userId: string }) {
   );
 }
 
+// The trigger has to say the same thing as the dialog behind it. It previously
+// read "Deactivate / Revokes sign-in immediately", which named the wrong scope
+// twice: this ends one membership, not the person's login, and the workspace it
+// ends is the one worth naming.
 function LifecycleFooter({
   user,
+  workspaceName,
   onDeactivate,
   onActivate,
   pending,
 }: {
   user: User;
+  workspaceName: string;
   onDeactivate: () => void;
   onActivate: () => void;
   pending: boolean;
 }) {
+  const { t } = useTranslation();
   const first = user.firstName;
   return (
     <Callout
       kind="neutral"
       icon={null}
-      title={user.enabled ? `Deactivate ${first}` : `Reactivate ${first}`}
+      title={
+        user.enabled
+          ? t('users.actions.removeTitle', { name: first, company: workspaceName })
+          : t('users.actions.restoreTitle', { name: first, company: workspaceName })
+      }
       action={
         user.enabled ? (
           <Button outline="red" size="xxs" onClick={onDeactivate} disabled={pending}>
-            Deactivate
+            {t('users.actions.removeAccessLabel')}
           </Button>
         ) : (
           <Button outline size="xxs" onClick={onActivate} disabled={pending}>
-            Reactivate
+            {t('users.table.restoreAccess')}
           </Button>
         )
       }
     >
-      {user.enabled
-        ? 'Revokes sign-in immediately. Audit history is preserved.'
-        : 'Restores sign-in access. Existing roles and regions are kept as-is.'}
+      {user.enabled ? t('users.actions.disableWarning') : t('users.actions.enableWarning')}
     </Callout>
   );
 }

@@ -171,12 +171,18 @@ describe('UserFormPage', () => {
       });
     });
 
-    it('renders the send-invite checkbox', async () => {
+    it('states that an email will be sent, rather than offering a toggle', async () => {
       renderWithProviders(<UserInvitePage />);
 
       await waitFor(() => {
-        expect(screen.getByText(/Send invitation email to/i)).toBeInTheDocument();
+        expect(screen.getByText(/how to sign in/i)).toBeInTheDocument();
       });
+
+      // The old "Send invitation email" checkbox is gone: `sendInvite` was
+      // never read by the backend, so the control suppressed nothing.
+      expect(
+        screen.queryByRole('checkbox', { name: /send invitation email/i })
+      ).not.toBeInTheDocument();
     });
 
     it('navigates back via the Cancel link', async () => {
