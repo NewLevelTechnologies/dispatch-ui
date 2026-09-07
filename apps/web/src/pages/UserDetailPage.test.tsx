@@ -1077,10 +1077,10 @@ describe('UserDetailPage', () => {
       // Definite copy, on the card, before anything is clicked.
       await waitFor(() => {
         expect(
-          screen.getByText(/this is their only workspace, so their sign-in is disabled too/i)
+          screen.getByText(/ends their access and disables their sign-in/i)
         ).toBeInTheDocument();
       });
-      expect(screen.queryByText(/if this is their only workspace/i)).not.toBeInTheDocument();
+      expect(screen.queryByText(/may also disable their sign-in/i)).not.toBeInTheDocument();
     });
 
     it('states the sign-in survives when they belong elsewhere', async () => {
@@ -1091,7 +1091,7 @@ describe('UserDetailPage', () => {
       await waitFor(() => {
         expect(screen.getByText(/ends their access now, including any open session/i)).toBeInTheDocument();
       });
-      expect(screen.queryByText(/sign-in is disabled too/i)).not.toBeInTheDocument();
+      expect(screen.queryByText(/disables their sign-in/i)).not.toBeInTheDocument();
     });
 
     it('hedges only when the pre-flight fails', async () => {
@@ -1100,7 +1100,7 @@ describe('UserDetailPage', () => {
       await renderPage();
 
       await waitFor(() => {
-        expect(screen.getByText(/if this is their only workspace/i)).toBeInTheDocument();
+        expect(screen.getByText(/may also disable their sign-in/i)).toBeInTheDocument();
       });
     });
   });

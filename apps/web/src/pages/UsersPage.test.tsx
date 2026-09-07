@@ -1208,7 +1208,7 @@ describe('UsersPage', () => {
       await openRemoveDialog();
 
       await waitFor(() => {
-        expect(screen.getByText(/their sign-in is disabled too/i)).toBeInTheDocument();
+        expect(screen.getByText(/disables their sign-in/i)).toBeInTheDocument();
       });
       // Not-affected must not claim the sign-in survives here.
       expect(screen.queryByText(/their sign-in, password and two-factor/i)).not.toBeInTheDocument();
@@ -1232,7 +1232,7 @@ describe('UsersPage', () => {
 
       // Unknown means unknown — never "the sign-in is safe".
       await waitFor(() => {
-        expect(screen.getByText(/if this is their only workspace/i)).toBeInTheDocument();
+        expect(screen.getByText(/may also disable their sign-in/i)).toBeInTheDocument();
       });
       expect(screen.queryByText(/their sign-in, password and two-factor/i)).not.toBeInTheDocument();
 
@@ -1260,9 +1260,9 @@ describe('UsersPage', () => {
       await waitFor(() => {
         expect(screen.getByText(/their sign-in is unaffected/i)).toBeInTheDocument();
       });
-      expect(
-        screen.queryByText(/because no other membership remains/i)
-      ).not.toBeInTheDocument();
+      // The ends-sign-in wording must not appear for a delete that keeps
+      // the identity.
+      expect(screen.queryByText(/and their sign-in\. Work they created/i)).not.toBeInTheDocument();
     });
   });
 
