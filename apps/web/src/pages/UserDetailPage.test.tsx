@@ -1041,4 +1041,68 @@ describe('UserDetailPage', () => {
     });
   });
 
+
+  describe('Removal footer copy', () => {
+    // The footer is the always-visible surface — the one an admin reads before
+    // deciding to click anything. It must say what the dialog behind it says.
+    function withImpact(deactivateEndsSignIn: boolean | 'fail') {
+      const base = vi.mocked(apiClient.get).getMockImplementation()!;
+      vi.mocked(apiClient.get).mockImplementation((url: string) => {
+        if (/\/removal-impact$/.test(url)) {
+          return deactivateEndsSignIn === 'fail'
+            ? Promise.reject(new Error('pre-flight down'))
+            : Promise.resolve({
+                data: { deactivateEndsSignIn, deleteEndsSignIn: deactivateEndsSignIn },
+              });
+        }
+        return base(url);
+      });
+    }
+
+    async function renderPage() {
+      renderWithProviders(<UserDetailPage />, {
+        initialEntries: ['/users/user-123'],
+        path: '/users/:id',
+      });
+      await waitFor(() => {
+        expect(screen.getByRole('heading', { name: 'John Doe' })).toBeInTheDocument();
+      });
+    }
+
+    it('states the sign-in dies without waiting for the dialog', async () => {
+      setupStandardMocks();
+      withImpact(true);
+      await renderPage();
+
+      // Definite copy, on the card, before anything is clicked.
+      await waitFor(() => {
+        expect(
+          screen.getByText(/ends their access and disables their sign-in/i)
+        ).toBeInTheDocument();
+      });
+      expect(screen.queryByText(/may also disable their sign-in/i)).not.toBeInTheDocument();
+    });
+
+    it('states the sign-in survives when they belong elsewhere', async () => {
+      setupStandardMocks();
+      withImpact(false);
+      await renderPage();
+
+      await waitFor(() => {
+        expect(screen.getByText(/ends their access now, including any open session/i)).toBeInTheDocument();
+      });
+      expect(screen.queryByText(/disables their sign-in/i)).not.toBeInTheDocument();
+    });
+
+    it('hedges only when the pre-flight fails', async () => {
+      setupStandardMocks();
+      withImpact('fail');
+      await renderPage();
+
+      await waitFor(() => {
+        expect(screen.getByText(/may also disable their sign-in/i)).toBeInTheDocument();
+      });
+    });
+  });
+
 });

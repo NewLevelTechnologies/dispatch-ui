@@ -235,6 +235,7 @@ export default function UserDetailPage() {
           <LifecycleFooter
             user={user}
             workspaceName={workspaceName}
+            endsSignIn={endsSignIn}
             onDeactivate={handleDeactivate}
             onActivate={handleActivate}
             pending={disableMutation.isPending || enableMutation.isPending}
@@ -259,11 +260,7 @@ export default function UserDetailPage() {
         }
         message={
           lifecycleConfirm === 'deactivate'
-            ? endsSignIn === undefined
-              ? t('users.actions.disableWarning')
-              : endsSignIn
-                ? t('users.actions.disableWarningEndsSignIn')
-                : t('users.actions.disableWarningKeepsSignIn')
+            ? t(removalWarningKey(endsSignIn))
             : t('users.actions.enableWarning')
         }
         confirmLabel={
@@ -1040,6 +1037,20 @@ function AccountActivityCard({ userId }: { userId: string }) {
   );
 }
 
+// Which removal sentence applies. `endsSignIn` is undefined until the
+// pre-flight answers (or if it failed), and undefined means UNKNOWN — the
+// hedged wording — never "the sign-in is safe".
+//
+// Shared by the footer card and the confirm dialog on purpose: they describe
+// the same action, and letting each pick its own copy is how the trigger ended
+// up contradicting the dialog in the first place.
+function removalWarningKey(endsSignIn: boolean | undefined): string {
+  if (endsSignIn === undefined) return 'users.actions.disableWarning';
+  return endsSignIn
+    ? 'users.actions.disableWarningEndsSignIn'
+    : 'users.actions.disableWarningKeepsSignIn';
+}
+
 // The trigger has to say the same thing as the dialog behind it. It previously
 // read "Deactivate / Revokes sign-in immediately", which named the wrong scope
 // twice: this ends one membership, not the person's login, and the workspace it
@@ -1047,12 +1058,14 @@ function AccountActivityCard({ userId }: { userId: string }) {
 function LifecycleFooter({
   user,
   workspaceName,
+  endsSignIn,
   onDeactivate,
   onActivate,
   pending,
 }: {
   user: User;
   workspaceName: string;
+  endsSignIn: boolean | undefined;
   onDeactivate: () => void;
   onActivate: () => void;
   pending: boolean;
@@ -1080,7 +1093,7 @@ function LifecycleFooter({
         )
       }
     >
-      {user.enabled ? t('users.actions.disableWarning') : t('users.actions.enableWarning')}
+      {user.enabled ? t(removalWarningKey(endsSignIn)) : t('users.actions.enableWarning')}
     </Callout>
   );
 }
