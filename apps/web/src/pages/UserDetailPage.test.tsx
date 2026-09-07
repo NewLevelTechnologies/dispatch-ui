@@ -102,6 +102,13 @@ describe('UserDetailPage', () => {
       if (url === '/tenant-settings') {
         return Promise.resolve({ data: { companyName: 'ACME HVAC Services' } });
       }
+      // Pre-flight the deactivate confirm reads. Defaults to no sign-in
+      // impact; tests that care about the other states override it.
+      if (url === `/users/${user.id}/removal-impact`) {
+        return Promise.resolve({
+          data: { deactivateEndsSignIn: false, deleteEndsSignIn: false },
+        });
+      }
 
       // Fallback for unmatched URLs
       console.warn('Unmatched API URL in test:', url);

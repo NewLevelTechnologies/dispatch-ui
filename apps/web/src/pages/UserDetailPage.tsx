@@ -9,6 +9,7 @@ import { RoleChip } from '../components/RoleChip';
 import { formatPhone, roleAccent } from '@dispatch/utils';
 import { auditApi, type AccountActivityEvent } from '../api/setup';
 import { useHasCapability, useCurrentUser } from '../hooks/useCurrentUser';
+import { useRemovalImpact } from '../hooks/useRemovalImpact';
 import { Avatar } from '../components/ui/Avatar';
 import { Callout } from '../components/ui/Callout';
 import { Pill } from '../components/ui/Pill';
@@ -91,6 +92,17 @@ export default function UserDetailPage() {
     queryFn: () => dispatchRegionApi.getAll(true),
   });
 
+  // Asked only while the deactivate confirm is open. There is no menu to
+  // prefetch from here, so the confirm button waits on it — a deliberate stop
+  // can afford one indexed read, and a failure falls through to the
+  // conditional copy rather than blocking the removal.
+  const [lifecycleConfirm, setLifecycleConfirm] = useState<'deactivate' | 'activate' | null>(null);
+  const { impact, isSettled: impactSettled } = useRemovalImpact(
+    id,
+    lifecycleConfirm === 'deactivate'
+  );
+  const endsSignIn = impact?.deactivateEndsSignIn;
+
   const disableMutation = useMutation({
     mutationFn: () => userApi.disable(id!),
     onSuccess: () => {
@@ -157,7 +169,6 @@ export default function UserDetailPage() {
 
   const handleResendInvitation = () => resendInvitationMutation.mutate();
 
-  const [lifecycleConfirm, setLifecycleConfirm] = useState<'deactivate' | 'activate' | null>(null);
   const handleDeactivate = () => setLifecycleConfirm('deactivate');
   const handleActivate = () => setLifecycleConfirm('activate');
   const confirmLifecycle = () => {
@@ -247,7 +258,11 @@ export default function UserDetailPage() {
         }
         message={
           lifecycleConfirm === 'deactivate'
-            ? t('users.actions.disableWarning')
+            ? endsSignIn === undefined
+              ? t('users.actions.disableWarning')
+              : endsSignIn
+                ? t('users.actions.disableWarningEndsSignIn')
+                : t('users.actions.disableWarningKeepsSignIn')
             : t('users.actions.enableWarning')
         }
         confirmLabel={
@@ -256,7 +271,11 @@ export default function UserDetailPage() {
             : t('users.table.restoreAccess')
         }
         isDestructive={lifecycleConfirm === 'deactivate'}
-        isPending={disableMutation.isPending || enableMutation.isPending}
+        isPending={
+          disableMutation.isPending ||
+          enableMutation.isPending ||
+          (lifecycleConfirm === 'deactivate' && !impactSettled)
+        }
       >
         {/* Only what survives on every path. Their sign-in does NOT: the
             backend disables the Cognito identity and signs them out
@@ -267,7 +286,9 @@ export default function UserDetailPage() {
             `lastEnabledMembership`. */}
         {lifecycleConfirm === 'deactivate' && (
           <Callout kind="neutral" title={t('users.actions.disableNotAffectedLabel')}>
-            {t('users.actions.disableNotAffected')}
+            {endsSignIn === false
+              ? t('users.actions.disableNotAffectedKeepsSignIn')
+              : t('users.actions.disableNotAffected')}
           </Callout>
         )}
       </ConfirmDialog>

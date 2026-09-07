@@ -119,6 +119,8 @@ export {
   type UserPageCounts,
   type RoleMemberSearchParams,
   type InvitationStatus,
+  type NotificationRequested,
+  type RemovalImpact,
   type AccentInUseRef,
   type ColorsInUseMap,
   type AuditLogEntry,

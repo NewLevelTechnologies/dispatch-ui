@@ -3,6 +3,12 @@ import { screen, waitFor } from '@testing-library/react';
 import { renderWithProviders, userEvent } from '../test/utils';
 import { UserInvitePage, UserEditPage } from './UserFormPage';
 import { apiClient } from '../api/setup';
+import { showSuccess } from '../lib/toast';
+
+vi.mock('../lib/toast', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../lib/toast')>();
+  return { ...actual, showSuccess: vi.fn(actual.showSuccess) };
+});
 
 vi.mock('@dispatch/api/src/client');
 
@@ -434,4 +440,82 @@ describe('UserFormPage', () => {
       );
     });
   });
+
+  describe('Invite result copy', () => {
+    // Branches on notificationRequested, never on invitationStatus — the two
+    // don't partition the same way, which was the original bug.
+    function respondWith(notificationRequested: string | null, invitationStatus: string) {
+      vi.mocked(apiClient.post).mockResolvedValue({
+        data: {
+          ...mockUser,
+          id: 'new-user',
+          email: 'dana@example.com',
+          firstName: 'Dana',
+          lastName: 'Ruiz',
+          notificationRequested,
+          invitationStatus,
+        },
+      });
+    }
+
+    async function submitInvite() {
+      const user = userEvent.setup();
+      renderWithProviders(<UserInvitePage />);
+      await waitFor(() => {
+        expect(screen.getByText('Admin')).toBeInTheDocument();
+      });
+      const adminCheckbox = screen
+        .getByText('Admin')
+        .closest('label')!
+        .querySelector('[role="checkbox"]') as HTMLElement;
+      await user.click(adminCheckbox);
+
+      // Required fields, or native validation blocks the submit.
+      await user.type(screen.getByPlaceholderText('Maria'), 'Dana');
+      await user.type(screen.getByPlaceholderText('Chen'), 'Ruiz');
+      await user.type(
+        screen.getByPlaceholderText('maria@yourcompany.com'),
+        'dana@example.com'
+      );
+
+      await user.click(screen.getByRole('button', { name: /send invitation/i }));
+    }
+
+    it('names the temporary password only when Cognito mailed one', async () => {
+      respondWith('INVITATION', 'INVITED');
+      await submitInvite();
+
+      await waitFor(() => {
+        expect(vi.mocked(showSuccess)).toHaveBeenCalled();
+      });
+      const [, detail] = vi.mocked(showSuccess).mock.calls[0];
+      expect(detail).toMatch(/temporary password/i);
+    });
+
+    it('claims no email for a linked identity, whose mail the tenant can suppress', async () => {
+      // INVITED here too — this is the case invitationStatus gets wrong.
+      respondWith('WORKSPACE_ADDED', 'INVITED');
+      await submitInvite();
+
+      await waitFor(() => {
+        expect(vi.mocked(showSuccess)).toHaveBeenCalled();
+      });
+      const [, detail] = vi.mocked(showSuccess).mock.calls[0];
+      expect(detail).toMatch(/existing password/i);
+      // notification-service may suppress the mail, so we must not assert it.
+      expect(detail).not.toMatch(/emailed/i);
+    });
+
+    it('falls back to the neutral line when the field is absent', async () => {
+      respondWith(null, 'ACTIVE');
+      await submitInvite();
+
+      await waitFor(() => {
+        expect(vi.mocked(showSuccess)).toHaveBeenCalled();
+      });
+      const [, detail] = vi.mocked(showSuccess).mock.calls[0];
+      expect(detail).toMatch(/what they need to sign in/i);
+    });
+  });
+
 });

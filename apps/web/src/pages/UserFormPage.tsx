@@ -126,19 +126,30 @@ export default function UserFormPage({ mode }: UserFormPageProps) {
       }),
     onSuccess: (created) => {
       queryClient.invalidateQueries({ queryKey: ['users'] });
-      // ONE message, because the frontend cannot tell which email went out and
-      // must not guess. Every invite now sends something: a new identity gets
-      // Cognito's temporary password, a linked one gets `user.workspace_added`.
-      // The backend picks between them on whether it created the Cognito
-      // identity — which `invitationStatus` does not tell us (someone another
-      // tenant invited who never signed in comes back INVITED here and still
-      // gets the workspace-added mail). Naming a specific email would be wrong
-      // in exactly that case, so this says only what is true either way.
+      // Branch on `notificationRequested`, never on `invitationStatus` — the
+      // backend keys this on who created the Cognito identity, and someone
+      // another tenant invited who never signed in comes back INVITED here yet
+      // still gets the workspace-added mail. Branching on status is the
+      // original bug.
+      //
+      // Neither branch claims delivery. INVITATION is safe to describe as an
+      // email because Cognito mails it directly, outside the tenant's
+      // notification kill-switch; WORKSPACE_ADDED goes through
+      // notification-service, which may suppress it — so that branch leads
+      // with the fact that holds either way. Falls back to the neutral line if
+      // the field is absent (an older backend, or a response shape we don't
+      // recognise).
+      const detail =
+        created.notificationRequested === 'INVITATION'
+          ? t('users.form.memberAddedInvitation', { email: created.email })
+          : created.notificationRequested === 'WORKSPACE_ADDED'
+            ? t('users.form.memberAddedLinked', { company: workspaceName })
+            : t('users.form.memberAddedDetail', { email: created.email });
       showSuccess(
         t('users.form.memberAdded', {
           name: `${created.firstName} ${created.lastName}`,
         }),
-        t('users.form.memberAddedDetail', { email: created.email })
+        detail
       );
       navigate(`/settings/access/users/${created.id}`);
     },
