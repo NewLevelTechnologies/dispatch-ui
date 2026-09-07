@@ -1071,11 +1071,11 @@ describe('UsersPage', () => {
 
       await waitFor(() => {
         expect(
-          screen.getByText(/only person who can manage users/i)
+          screen.getByText(/no one able to manage members/i)
         ).toBeInTheDocument();
       });
 
-      await user.click(screen.getByRole('button', { name: /change roles/i }));
+      await user.click(screen.getByRole('button', { name: /manage roles/i }));
       expect(mockNavigate).toHaveBeenCalledWith('/settings/access/users/user-1/edit');
     });
 
@@ -1087,7 +1087,7 @@ describe('UsersPage', () => {
         expect(screen.queryByText(/can't remove your own access/i)).not.toBeInTheDocument();
       });
       expect(
-        screen.queryByText(/only person who can manage users/i)
+        screen.queryByText(/no one able to manage members/i)
       ).not.toBeInTheDocument();
     });
   });

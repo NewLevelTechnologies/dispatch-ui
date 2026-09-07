@@ -2056,13 +2056,13 @@
       "firstName": "First name",
       "hideDetails": "Hide details",
       "identity": "Identity",
-      "inviteSent": "Invitation sent to {{email}}",
-      "inviteSentDetail": "We've emailed them how to sign in to {{company}}.",
       "inviteTitle": "Invite user",
       "lastName": "Last name",
       "loadingCapabilities": "Loading capabilities…",
       "manageRegions": "Manage regions →",
       "manageRoles": "Manage roles →",
+      "memberAdded": "{{name}} was added to this workspace",
+      "memberAddedDetail": "We've emailed {{email}} with what they need to sign in.",
       "noActiveRegions": "No active dispatch regions configured.",
       "noRolesMatch": "No roles match \"{{query}}\".",
       "phone": "Phone",
@@ -2081,9 +2081,9 @@
       "showDetails": "Show details"
     },
     "guard": {
-      "changeRoles": "Change roles",
-      "lastManagerBody": "This workspace has to keep at least one person who can manage users. Give someone else a role that includes user management first, then try again.",
-      "lastManagerTitle": "This is the only person who can manage users",
+      "changeRoles": "Manage roles",
+      "lastManagerBody": "This workspace needs at least one enabled member who can invite or edit users. Removing the last one would leave nobody — including you — able to add it back.",
+      "lastManagerTitle": "This would leave no one able to manage members",
       "selfBody": "Removing yourself would end your access to {{company}} immediately, and you couldn't restore it — only another administrator can. Ask one of them to remove you.",
       "selfTitle": "You can't remove your own access",
       "viewAdministrators": "View administrators"
