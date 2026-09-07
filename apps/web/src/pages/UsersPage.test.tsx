@@ -425,7 +425,7 @@ describe('UsersPage', () => {
     await waitFor(() => {
       expect(screen.getByText(/delete john doe's membership/i)).toBeInTheDocument();
       // Scoped to the workspace, and explicit that authored work survives.
-      expect(screen.getByText(/work they created here/i)).toBeInTheDocument();
+      expect(screen.getByText(/work they created stays/i)).toBeInTheDocument();
     });
   });
 
@@ -1219,9 +1219,9 @@ describe('UsersPage', () => {
       await openRemoveDialog();
 
       await waitFor(() => {
-        expect(
-          screen.getByText(/their sign-in and their other workspaces are unaffected/i)
-        ).toBeInTheDocument();
+        // The body no longer restates what survives — the Not-affected inset
+        // below it carries that, and now names the sign-in.
+        expect(screen.getByText(/work history is kept/i)).toBeInTheDocument();
       });
       expect(screen.getByText(/their sign-in, password and two-factor/i)).toBeInTheDocument();
     });
