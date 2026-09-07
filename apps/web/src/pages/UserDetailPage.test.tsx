@@ -728,10 +728,11 @@ describe('UserDetailPage', () => {
     const ts = (offsetSec: number) => new Date(now - offsetSec * 1000).toISOString();
     const actor = { id: 'u-9', name: 'Maria Chen' };
 
-    // Cover each branch of classifyEvent: lifecycle (created/activated/
-    // deactivated/invitation_resent), access (role added/removed), security
-    // (password reset / mfa reset / global signout), and the forward-compat
-    // default for an unknown actionType.
+    // Every value in the backend's AccountChangeAction enum, plus the
+    // forward-compat default. This list is the guard against a new enum value
+    // rendering as an unlabelled row — which is how TWO_FA_DISABLED shipped
+    // looking like a blank "Activity" entry. Keep it in sync with
+    // shared-events/.../AccountChangeEvent.kt.
     const mockActivity = [
       { id: 'a-1', occurredAt: ts(10),  actionType: 'USER_CREATED',        payload: null, actor: null, ip: null, userAgent: null },
       { id: 'a-2', occurredAt: ts(20),  actionType: 'USER_ACTIVATED',      payload: null, actor, ip: null, userAgent: null },
@@ -743,6 +744,12 @@ describe('UserDetailPage', () => {
       { id: 'a-7', occurredAt: ts(70),  actionType: 'PASSWORD_RESET_SENT', payload: null, actor, ip: null, userAgent: null },
       { id: 'a-8', occurredAt: ts(80),  actionType: 'MFA_RESET',           payload: null, actor, ip: null, userAgent: null },
       { id: 'a-9', occurredAt: ts(90),  actionType: 'GLOBAL_SIGNOUT',      payload: null, actor, ip: null, userAgent: null },
+      { id: 'a-9a', occurredAt: ts(91), actionType: 'TWO_FA_ENABLED',       payload: { method: 'TOTP' }, actor, ip: null, userAgent: null },
+      // Emitted with no payload, so there is no method to name.
+      { id: 'a-9b', occurredAt: ts(92), actionType: 'TWO_FA_DISABLED',      payload: null, actor, ip: null, userAgent: null },
+      { id: 'a-9c', occurredAt: ts(93), actionType: 'TWO_FA_METHOD_CHANGED', payload: { method: 'SMS' }, actor, ip: null, userAgent: null },
+      { id: 'a-9d', occurredAt: ts(94), actionType: 'DEVICE_TRUSTED',       payload: null, actor, ip: null, userAgent: null },
+      { id: 'a-9e', occurredAt: ts(95), actionType: 'DEVICE_UNTRUSTED',     payload: null, actor, ip: null, userAgent: null },
       // Forward-compat: unknown values must render with a generic label.
       { id: 'a-10', occurredAt: ts(100), actionType: 'SOMETHING_NEW',      payload: null, actor, ip: null, userAgent: null },
     ];
@@ -769,8 +776,15 @@ describe('UserDetailPage', () => {
       expect(screen.getByText('Password reset link sent')).toBeInTheDocument();
       expect(screen.getByText('2FA reset')).toBeInTheDocument();
       expect(screen.getByText('Signed out of all sessions')).toBeInTheDocument();
-      // Unknown actionType falls through to the generic "Activity" label.
-      expect(screen.getByText('Activity')).toBeInTheDocument();
+      expect(screen.getByText('2FA enabled (TOTP)')).toBeInTheDocument();
+      expect(screen.getByText('2FA disabled')).toBeInTheDocument();
+      expect(screen.getByText('2FA method changed to SMS')).toBeInTheDocument();
+      expect(screen.getByText('Device trusted')).toBeInTheDocument();
+      expect(screen.getByText('Device no longer trusted')).toBeInTheDocument();
+      // Unknown actionType names itself rather than rendering a label with no
+      // information in it — a bare "Activity" row is indistinguishable from a
+      // broken one.
+      expect(screen.getByText('Something new')).toBeInTheDocument();
     });
   });
 

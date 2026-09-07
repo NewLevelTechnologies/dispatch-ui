@@ -135,8 +135,10 @@ export default function UserFormPage({ mode }: UserFormPageProps) {
       // gets the workspace-added mail). Naming a specific email would be wrong
       // in exactly that case, so this says only what is true either way.
       showSuccess(
-        t('users.form.inviteSent', { email: created.email }),
-        t('users.form.inviteSentDetail', { company: workspaceName })
+        t('users.form.memberAdded', {
+          name: `${created.firstName} ${created.lastName}`,
+        }),
+        t('users.form.memberAddedDetail', { email: created.email })
       );
       navigate(`/settings/access/users/${created.id}`);
     },

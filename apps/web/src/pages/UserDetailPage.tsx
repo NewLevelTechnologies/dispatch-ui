@@ -765,7 +765,14 @@ function SecurityCard({ userId, email, canEdit }: { userId: string; email: strin
 // are intentionally separate facts — render them back-to-back; do not
 // de-dupe. Payload may be null; only role events populate it today.
 // ──────────────────────────────────────────────────────────────────
-type Kind = 'signin' | 'access' | 'security' | 'failed' | 'lifecycle' | 'lifecycle-warn';
+type Kind =
+  | 'signin'
+  | 'access'
+  | 'security'
+  | 'security-warn'
+  | 'failed'
+  | 'lifecycle'
+  | 'lifecycle-warn';
 
 function rolePayloadName(payload: AccountActivityEvent['payload']): string {
   if (!payload || typeof payload !== 'object') return '(unknown role)';
@@ -810,6 +817,15 @@ function formatWindowSeconds(seconds: number): string {
   return `${hours}h`;
 }
 
+// SOME_NEW_ACTION → "Some new action". Only reached for action types this
+// switch doesn't know, so it can't be pretty — it just has to be honest about
+// what happened rather than rendering a label with no information in it.
+function humanizeActionType(actionType: string): string {
+  const words = actionType.replace(/_/g, ' ').trim().toLowerCase();
+  if (!words) return 'Activity';
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
 function classifyEvent(event: AccountActivityEvent): {
   kind: Kind;
   text: string;
@@ -848,6 +864,25 @@ function classifyEvent(event: AccountActivityEvent): {
         text: method ? `2FA enabled (${method})` : '2FA enabled',
       };
     }
+    case 'TWO_FA_DISABLED':
+      // Warn tone for the same reason USER_DEACTIVATED gets one: this weakens
+      // the account's posture and is worth the visual cue. Emitted with no
+      // payload, so there is no method to name.
+      return { kind: 'security-warn', text: '2FA disabled' };
+    case 'TWO_FA_METHOD_CHANGED': {
+      // Not emitted by the backend yet, but it's in the locked action enum —
+      // handled so it doesn't land in the fallback the day it starts firing.
+      const p = (event.payload ?? {}) as { method?: unknown };
+      const method = typeof p.method === 'string' ? p.method : null;
+      return {
+        kind: 'security',
+        text: method ? `2FA method changed to ${method}` : '2FA method changed',
+      };
+    }
+    case 'DEVICE_TRUSTED':
+      return { kind: 'security', text: 'Device trusted' };
+    case 'DEVICE_UNTRUSTED':
+      return { kind: 'security', text: 'Device no longer trusted' };
     case 'GLOBAL_SIGNOUT':
       return { kind: 'security', text: 'Signed out of all sessions' };
     case 'SIGN_IN_SUCCESS': {
@@ -878,10 +913,11 @@ function classifyEvent(event: AccountActivityEvent): {
       return { kind: 'failed', text: 'Failed sign-in attempts', meta };
     }
     default:
-      // Forward-compat: a brand-new actionType still renders. Use access
-      // tone (★) since it reads as "something happened" without claiming
-      // a category.
-      return { kind: 'access', text: 'Activity' };
+      // Forward-compat: a brand-new actionType still renders, and says which
+      // one. A bare "Activity" is indistinguishable from a broken row — that
+      // is how the missing TWO_FA_DISABLED case was found. Access tone (★)
+      // reads as "something happened" without claiming a category.
+      return { kind: 'access', text: humanizeActionType(event.actionType) };
   }
 }
 
@@ -908,6 +944,14 @@ const KIND_STYLES: Record<Kind, { glyph: string; bg: string; fg: string }> = {
     fg: 'var(--violet-500)',
   },
   'lifecycle-warn': {
+    glyph: '−',
+    bg: 'color-mix(in oklch, var(--warning-500) 14%, transparent)',
+    fg: 'var(--warning-fg)',
+  },
+  // Security events that reduce protection. The ✓ of `security` is this file's
+  // "a security event was recorded" mark (password-reset-sent uses it too), so
+  // it doesn't read as approval — but a weakening still earns the warn cue.
+  'security-warn': {
     glyph: '−',
     bg: 'color-mix(in oklch, var(--warning-500) 14%, transparent)',
     fg: 'var(--warning-fg)',
