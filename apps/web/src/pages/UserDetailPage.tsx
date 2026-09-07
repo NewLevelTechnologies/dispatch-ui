@@ -258,10 +258,13 @@ export default function UserDetailPage() {
         isDestructive={lifecycleConfirm === 'deactivate'}
         isPending={disableMutation.isPending || enableMutation.isPending}
       >
-        {/* Removal is per-workspace: the person keeps their login and any other
-            workspaces. Stated unconditionally — whether they actually belong to
-            others is cross-tenant information this admin has no claim on, and
-            the sentence is true either way. */}
+        {/* Only what survives on every path. Their sign-in does NOT: the
+            backend disables the Cognito identity and signs them out
+            everywhere when this was their last enabled membership
+            (UserService.kt:974), which is the common case. The consequence is
+            stated in the body, conditionally, because the frontend has no
+            signal for which case this is — see the BACKEND_ASKS note on
+            `lastEnabledMembership`. */}
         {lifecycleConfirm === 'deactivate' && (
           <Callout kind="neutral" title={t('users.actions.disableNotAffectedLabel')}>
             {t('users.actions.disableNotAffected')}
