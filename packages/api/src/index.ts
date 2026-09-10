@@ -386,7 +386,6 @@ export {
 export {
   dispatchesApi,
   dispatchNotesApi,
-  availabilityApi,
   dispatchRowTitle,
   type Dispatch,
   type DispatchStatus,
@@ -407,9 +406,6 @@ export {
   type OnSiteTech,
   type WorkOrderTech,
   type LocationTechSummaryResponse,
-  type Availability,
-  type CreateAvailabilityRequest,
-  type UpdateAvailabilityRequest,
 } from './schedulingApi';
 
 // Tenant Settings API
@@ -472,8 +468,6 @@ export {
   type BoardDispatch,
   type DispatchBoard,
   type GetBoardParams,
-  type TechLocation,
-  type TechLocationSource,
   type TechTimeOff,
   type UnscheduledWorkOrder,
   type UnscheduledPage,

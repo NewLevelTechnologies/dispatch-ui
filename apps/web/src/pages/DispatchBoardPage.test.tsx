@@ -1,11 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { screen } from '@testing-library/react';
+import { screen, waitFor } from '@testing-library/react';
 import { renderWithProviders, userEvent } from '../test/utils';
 import DispatchBoardPage from './DispatchBoardPage';
 
 const mockGetBoard = vi.fn();
 const mockGetUnscheduled = vi.fn();
 const mockRegionsGetAll = vi.fn();
+const mockRelease = vi.fn();
+const mockShowSuccess = vi.fn();
+const mockShowError = vi.fn();
 
 vi.mock('../api/setup', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../api/setup')>();
@@ -15,6 +18,7 @@ vi.mock('../api/setup', async (importOriginal) => {
       ...actual.dispatchBoardApi,
       getBoard: (...a: unknown[]) => mockGetBoard(...a),
       getUnscheduled: (...a: unknown[]) => mockGetUnscheduled(...a),
+      release: (...a: unknown[]) => mockRelease(...a),
     },
     dispatchRegionApi: {
       ...actual.dispatchRegionApi,
@@ -24,6 +28,17 @@ vi.mock('../api/setup', async (importOriginal) => {
 });
 
 vi.mock('@dispatch/api/src/client');
+
+// Toasts render through the <Toaster> in App.tsx, which isn't in this
+// harness — so assert the call, which is the intent anyway.
+vi.mock('../lib/toast', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../lib/toast')>();
+  return {
+    ...actual,
+    showSuccess: (...a: unknown[]) => mockShowSuccess(...a),
+    showError: (...a: unknown[]) => mockShowError(...a),
+  };
+});
 
 const tech = (id: string, name: string, regionIds: string[]) => ({
   id,
@@ -318,5 +333,119 @@ describe('DispatchBoardPage unscheduled rail', () => {
   it('keeps the empty message when there is genuinely nothing waiting', async () => {
     renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch' });
     expect(await screen.findByText('Nothing unscheduled')).toBeInTheDocument();
+  });
+});
+
+// "Stage the morning, release at 7am" — the reason on-deck is first-class,
+// and the one thing the board could render but not act on.
+describe('DispatchBoardPage release', () => {
+  const held = (over: Record<string, unknown> = {}) => ({
+    id: 'd1',
+    seq: 1,
+    status: 'SCHEDULED',
+    arrivalWindowStart: '2026-03-15T08:00:00Z',
+    arrivalWindowEnd: '2026-03-15T10:00:00Z',
+    estimatedDuration: null,
+    releasedAt: null,
+    version: 1,
+    assignedUserId: 'u1',
+    assignedUserName: 'Maya Alvarez',
+    workOrderId: 'wo1',
+    workOrderNumber: 'WO-1',
+    workOrderTypeId: null,
+    workOrderSummary: 'No cooling',
+    customerId: 'c1',
+    customerName: 'Pham, A.',
+    priority: 'NORMAL',
+    recurring: false,
+    serviceLocationId: 'l1',
+    serviceLocationCity: null,
+    serviceLocationState: null,
+    latitude: null,
+    longitude: null,
+    driveMinFromPrev: null,
+    arrivedAt: null,
+    departedAt: null,
+    addressedWorkItemIds: [],
+    ...over,
+  });
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockRegionsGetAll.mockResolvedValue([]);
+    mockGetUnscheduled.mockResolvedValue(emptyRail);
+    mockRelease.mockResolvedValue({ released: 2 });
+    mockGetBoard.mockResolvedValue({
+      techs: [tech('u1', 'Maya Alvarez', ['r1'])],
+      dispatches: [held(), held({ id: 'd2' })],
+    });
+  });
+
+  it('offers the action only when something is unreleased', async () => {
+    renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch' });
+    expect(await screen.findByRole('button', { name: 'Release 2' })).toBeInTheDocument();
+  });
+
+  it('hides the action when everything is released', async () => {
+    mockGetBoard.mockResolvedValue({
+      techs: [tech('u1', 'Maya Alvarez', ['r1'])],
+      dispatches: [held({ releasedAt: '2026-03-15T07:00:00Z' })],
+    });
+    renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch' });
+    await screen.findByText('Maya Alvarez');
+    expect(screen.queryByRole('button', { name: /^Release/ })).not.toBeInTheDocument();
+  });
+
+  // Texting N technicians can't be un-sent, so unlike the drag operations
+  // this one asks before acting.
+  it('confirms before texting anyone, and does nothing on cancel', async () => {
+    const u = userEvent.setup();
+    renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch' });
+
+    await u.click(await screen.findByRole('button', { name: 'Release 2' }));
+    expect(await screen.findByText('Release 2 dispatches?')).toBeInTheDocument();
+    expect(screen.getByText(/can't be undone/)).toBeInTheDocument();
+
+    await u.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(mockRelease).not.toHaveBeenCalled();
+  });
+
+  // Scope, not an id list — the server recomputes the unreleased set, so this
+  // can't reach outside the caller's regions or act on a stale board.
+  it('sends the date and scope, never a list of ids', async () => {
+    const u = userEvent.setup();
+    renderWithProviders(<DispatchBoardPage />, {
+      initialPath: '/dispatch?date=2026-03-15&region=r1',
+    });
+
+    await u.click(await screen.findByRole('button', { name: 'Release 2' }));
+    await u.click(screen.getByRole('button', { name: 'Release' }));
+
+    expect(mockRelease).toHaveBeenCalledWith({ date: '2026-03-15', regionIds: ['r1'] });
+  });
+
+  it('reports the count the SERVER released, not the one on screen', async () => {
+    const u = userEvent.setup();
+    // The server recomputes, so its answer can differ from a stale board.
+    mockRelease.mockResolvedValue({ released: 5 });
+    renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch' });
+
+    await u.click(await screen.findByRole('button', { name: 'Release 2' }));
+    await u.click(screen.getByRole('button', { name: 'Release' }));
+
+    await waitFor(() => expect(mockShowSuccess).toHaveBeenCalledWith('5 dispatches released'));
+  });
+
+  it('surfaces a failure instead of pretending it worked', async () => {
+    const u = userEvent.setup();
+    mockRelease.mockRejectedValue(new Error('nope'));
+    renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch' });
+
+    await u.click(await screen.findByRole('button', { name: 'Release 2' }));
+    await u.click(screen.getByRole('button', { name: 'Release' }));
+
+    await waitFor(() =>
+      expect(mockShowError).toHaveBeenCalledWith("Couldn't release", expect.anything())
+    );
   });
 });

@@ -8,6 +8,7 @@ import {
   axisPct,
   findClashes,
   formatAge,
+  compareRailOrder,
 } from './boardTime';
 
 describe('zonedHour', () => {
@@ -176,5 +177,54 @@ describe('formatAge', () => {
 
   it('says nothing for an unparseable timestamp', () => {
     expect(formatAge('nope', now)).toBeNull();
+  });
+});
+
+describe('compareRailOrder', () => {
+  const wo = (priority: string, createdAt: string) => ({ priority, createdAt });
+
+  // The server sorts priority alphabetically (it's a string column), which
+  // gives HIGH, LOW, NORMAL, URGENT — LOW second and URGENT last.
+  it('orders by severity, not alphabetically', () => {
+    const sorted = [
+      wo('LOW', '2026-03-01T00:00:00Z'),
+      wo('URGENT', '2026-03-01T00:00:00Z'),
+      wo('NORMAL', '2026-03-01T00:00:00Z'),
+      wo('HIGH', '2026-03-01T00:00:00Z'),
+    ]
+      .sort(compareRailOrder)
+      .map((w) => w.priority);
+
+    expect(sorted).toEqual(['URGENT', 'HIGH', 'NORMAL', 'LOW']);
+  });
+
+  it('breaks ties on age, oldest first', () => {
+    const sorted = [
+      wo('HIGH', '2026-03-05T00:00:00Z'),
+      wo('HIGH', '2026-03-01T00:00:00Z'),
+    ]
+      .sort(compareRailOrder)
+      .map((w) => w.createdAt);
+
+    expect(sorted[0]).toBe('2026-03-01T00:00:00Z');
+  });
+
+  // Severity always beats age: a fresh URGENT outranks an old LOW.
+  it('never lets age outrank severity', () => {
+    const sorted = [
+      wo('LOW', '2020-01-01T00:00:00Z'),
+      wo('URGENT', '2026-03-15T00:00:00Z'),
+    ].sort(compareRailOrder);
+
+    expect(sorted[0].priority).toBe('URGENT');
+  });
+
+  it('sinks an unknown priority rather than dropping it', () => {
+    const sorted = [
+      wo('MYSTERY', '2020-01-01T00:00:00Z'),
+      wo('LOW', '2026-03-15T00:00:00Z'),
+    ].sort(compareRailOrder);
+
+    expect(sorted.map((w) => w.priority)).toEqual(['LOW', 'MYSTERY']);
   });
 });
