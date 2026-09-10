@@ -416,7 +416,6 @@ export default function UserFormPage({ mode }: UserFormPageProps) {
                   onChange={(v) => setFormData((p) => ({ ...p, dispatchable: v }))}
                   roles={roles}
                   selectedRoleIds={formData.roleIds}
-                  dispatchRegionIds={formData.dispatchRegionIds}
                 />
               )}
               <CapabilityPreview
@@ -522,13 +521,11 @@ function DispatchableField({
   onChange,
   roles,
   selectedRoleIds,
-  dispatchRegionIds,
 }: {
   value: Dispatchable;
   onChange: (value: Dispatchable) => void;
   roles: Role[];
   selectedRoleIds: string[];
-  dispatchRegionIds: string[];
 }) {
   const selected = useMemo(
     () => roles.filter((r) => selectedRoleIds.includes(r.id)),
@@ -546,9 +543,8 @@ function DispatchableField({
         performsFieldWork:
           value === 'ALWAYS' ? true : value === 'NEVER' ? false : inherited,
         roles: selected,
-        dispatchRegionIds,
       }),
-    [value, inherited, selected, dispatchRegionIds],
+    [value, inherited, selected],
   );
 
   return (
@@ -585,13 +581,6 @@ function DispatchableField({
           )
         )}
       </p>
-
-      {summary.noRegions && (
-        <p className="mt-1 text-[11.5px] text-warning-fg">
-          Assignable, but with no regions they won&rsquo;t appear on any
-          dispatcher&rsquo;s board.
-        </p>
-      )}
 
       <p className="mt-1.5 text-[11px] text-fg-muted">
         Gates every assignment path — the board, tech pickers, and the

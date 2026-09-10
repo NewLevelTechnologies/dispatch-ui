@@ -414,14 +414,12 @@ function RoleStack({ roles, max = 3 }: { roles: Role[]; max?: number }) {
 // ──────────────────────────────────────────────────────────────────
 function AssignmentValue({ user }: { user: User }) {
   const { getName } = useGlossary();
-  const { assignable, override, reason, noRegions } = summarizeAssignment(user);
+  const { assignable, override, reason } = summarizeAssignment(user);
 
   const boardName = `${getName('dispatch').toLowerCase()} board`;
-  const surfaces = !assignable
-    ? `Hidden from the ${boardName} and from every tech picker`
-    : noRegions
-      ? `Reachable in tech pickers \u00b7 absent from every ${boardName}`
-      : `${getName('dispatch')} board \u00b7 tech pickers \u00b7 work-order dispatch drawer`;
+  const surfaces = assignable
+    ? `${getName('dispatch')} board \u00b7 tech pickers \u00b7 work-order dispatch drawer`
+    : `Hidden from the ${boardName} and from every tech picker`;
 
   return (
     <div className="flex min-w-0 flex-col gap-1">
@@ -436,7 +434,6 @@ function AssignmentValue({ user }: { user: User }) {
         {/* Chrome that appears only when it is load-bearing. */}
         {override === 'neutral' && <Badge>Override</Badge>}
         {override === 'warning' && <Pill tone="warning">Override</Pill>}
-        {noRegions && <Pill tone="warning">No regions</Pill>}
       </div>
 
       <span className="text-[11.5px] leading-[1.45] text-fg-muted">
@@ -448,17 +445,6 @@ function AssignmentValue({ user }: { user: User }) {
           ) : (
             <span key={i}>{part.text}</span>
           )
-        )}
-        {noRegions && (
-          <>
-            {' \u2014 but with no regions assigned they will not appear on any board. '}
-            <Link
-              to={`/settings/access/users/${user.id}/edit`}
-              className="font-medium text-fg-accent hover:underline"
-            >
-              Assign regions
-            </Link>
-          </>
         )}
       </span>
 

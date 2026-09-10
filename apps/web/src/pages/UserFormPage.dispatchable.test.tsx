@@ -163,11 +163,8 @@ describe('Dispatchable override', () => {
 const say = (parts: { text: string }[]) => parts.map((p) => p.text).join('');
 
 describe('Assignment summary on user detail', () => {
-  const base = { dispatchRegionIds: ['r1'] };
-
   it('answers assignable and names the role under INHERIT', () => {
     const r = summarizeAssignment({
-      ...base,
       dispatchable: 'INHERIT',
       performsFieldWork: true,
       roles: [TECH],
@@ -181,7 +178,6 @@ describe('Assignment summary on user detail', () => {
 
   it('says why someone is not assignable under INHERIT', () => {
     const r = summarizeAssignment({
-      ...base,
       dispatchable: 'INHERIT',
       performsFieldWork: false,
       roles: [CSR],
@@ -194,7 +190,6 @@ describe('Assignment summary on user detail', () => {
   // with nobody able to explain why.
   it('shouts when NEVER contradicts a qualifying role', () => {
     const r = summarizeAssignment({
-      ...base,
       dispatchable: 'NEVER',
       performsFieldWork: false,
       roles: [TECH],
@@ -205,7 +200,6 @@ describe('Assignment summary on user detail', () => {
 
   it('stays quiet when NEVER contradicts nothing', () => {
     const r = summarizeAssignment({
-      ...base,
       dispatchable: 'NEVER',
       performsFieldWork: false,
       roles: [CSR],
@@ -218,7 +212,6 @@ describe('Assignment summary on user detail', () => {
   // override is doing nothing, so removing a role won't behave as expected.
   it('flags a redundant ALWAYS', () => {
     const r = summarizeAssignment({
-      ...base,
       dispatchable: 'ALWAYS',
       performsFieldWork: true,
       roles: [TECH],
@@ -228,7 +221,6 @@ describe('Assignment summary on user detail', () => {
 
   it('explains a load-bearing ALWAYS', () => {
     const r = summarizeAssignment({
-      ...base,
       dispatchable: 'ALWAYS',
       performsFieldWork: true,
       roles: [CSR],
@@ -236,36 +228,26 @@ describe('Assignment summary on user detail', () => {
     expect(say(r.reason)).toContain('no role here performs field work');
   });
 
-  // The silent failure: assignable but on nobody's board. Each row looks
-  // fine alone, which is exactly why it has to surface here.
-  it('catches assignable-with-no-regions', () => {
+  // Regions NARROW, they don't exclude: scheduling-service applies a region
+  // condition only when a filter is set, so a tech with no assignments still
+  // appears on the unfiltered board. There is deliberately no warning here —
+  // one would push admins to assign regions in single-region tenants that
+  // have no use for them.
+  it('says nothing about regions, which narrow rather than exclude', () => {
     const r = summarizeAssignment({
-      dispatchRegionIds: [],
       dispatchable: 'INHERIT',
       performsFieldWork: true,
       roles: [TECH],
     });
     expect(r.assignable).toBe(true);
-    expect(r.noRegions).toBe(true);
-  });
-
-  // Not a region problem if they can't be assigned in the first place —
-  // two warnings for one cause is noise.
-  it('does not warn about regions when not assignable', () => {
-    const r = summarizeAssignment({
-      dispatchRegionIds: [],
-      dispatchable: 'INHERIT',
-      performsFieldWork: false,
-      roles: [CSR],
-    });
-    expect(r.noRegions).toBe(false);
+    expect(say(r.reason)).toBe('From the Technician role');
+    expect('noRegions' in r).toBe(false);
   });
 
   // Nested roles don't always carry the flag. Better vague than printing a
   // cause that contradicts the pill beside it.
   it('stays vague rather than contradicting the resolved answer', () => {
     const r = summarizeAssignment({
-      ...base,
       dispatchable: 'INHERIT',
       performsFieldWork: true,
       roles: [{ ...TECH, performsFieldWork: undefined }],
