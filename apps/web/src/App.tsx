@@ -36,7 +36,6 @@ import InvoicesPage from './pages/InvoicesPage';
 import QuotesPage from './pages/QuotesPage';
 import PaymentsPage from './pages/PaymentsPage';
 import DispatchBoardPage from './pages/DispatchBoardPage';
-import RecurringOrdersPage from './pages/RecurringOrdersPage';
 import UsersPage from './pages/UsersPage';
 import UserDetailPage from './pages/UserDetailPage';
 import { UserInvitePage, UserEditPage } from './pages/UserFormPage';
@@ -235,7 +234,6 @@ function App() {
           <Navigate> stubs: nothing links to them and nobody has bookmarked
           them, so redirects would be debt with no beneficiary. */}
       <Route path="/dispatch" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<DispatchBoardPage />} />} />
-      <Route path="/recurring-orders" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<RecurringOrdersPage />} />} />
       <Route path="/approvals" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<ApprovalsPage />} />} />
       {/* Legacy redirects: /roles moved under /settings/access */}
       <Route path="/roles" element={<Navigate to="/settings/access/roles" replace />} />

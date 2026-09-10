@@ -386,7 +386,6 @@ export {
   dispatchesApi,
   dispatchNotesApi,
   availabilityApi,
-  recurringOrdersApi,
   dispatchRowTitle,
   type Dispatch,
   type DispatchStatus,
@@ -410,9 +409,6 @@ export {
   type Availability,
   type CreateAvailabilityRequest,
   type UpdateAvailabilityRequest,
-  type RecurringOrder,
-  type CreateRecurringOrderRequest,
-  type UpdateRecurringOrderRequest,
 } from './schedulingApi';
 
 // Tenant Settings API

@@ -445,75 +445,10 @@ export const availabilityApi = {
   },
 };
 
-// ========== RECURRING ORDERS ==========
-
-export interface RecurringOrder {
-  id: string;
-  tenantId: string;
-  customerId: string;
-  equipmentId?: string | null;
-  frequency: string;
-  nextScheduledDate: string;
-  description?: string;
-  status: string;
-  notes?: string;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface CreateRecurringOrderRequest {
-  customerId: string;
-  equipmentId?: string | null;
-  frequency: string;
-  nextScheduledDate: string;
-  description?: string;
-  notes?: string;
-}
-
-export interface UpdateRecurringOrderRequest {
-  frequency?: string;
-  nextScheduledDate?: string;
-  description?: string;
-  status?: string;
-  notes?: string;
-}
-
-export const recurringOrdersApi = {
-  getAll: async (params?: {
-    customerId?: string;
-    equipmentId?: string;
-    status?: string;
-    dueBefore?: string;
-  }): Promise<RecurringOrder[]> => {
-    const response = await apiClient.get<RecurringOrder[]>('/scheduling/recurring-orders', { params });
-    return response.data;
-  },
-
-  getById: async (id: string): Promise<RecurringOrder> => {
-    const response = await apiClient.get<RecurringOrder>(`/scheduling/recurring-orders/${id}`);
-    return response.data;
-  },
-
-  create: async (request: CreateRecurringOrderRequest): Promise<RecurringOrder> => {
-    const response = await apiClient.post<RecurringOrder>('/scheduling/recurring-orders', request);
-    return response.data;
-  },
-
-  update: async (id: string, request: UpdateRecurringOrderRequest): Promise<RecurringOrder> => {
-    const response = await apiClient.put<RecurringOrder>(`/scheduling/recurring-orders/${id}`, request);
-    return response.data;
-  },
-
-  delete: async (id: string): Promise<void> => {
-    await apiClient.delete(`/scheduling/recurring-orders/${id}`);
-  },
-};
-
 // Export combined API
 export const allSchedulingApis = {
   dispatches: dispatchesApi,
   availability: availabilityApi,
-  recurringOrders: recurringOrdersApi,
 };
 
 export default allSchedulingApis;

@@ -462,7 +462,6 @@
     "revenue": "Revenue",
     "role": "Role",
     "roles": "Roles",
-    "scheduling": "Scheduling",
     "serviceLocation": "Location",
     "serviceLocations": "Locations",
     "settings": "Settings",
@@ -1301,27 +1300,8 @@
     "uncategorized": "Other"
   },
   "scheduling": {
-    "entities": {
-      "recurringOrder": "Recurring Order",
-      "recurringOrders": "Recurring Orders"
-    },
     "form": {
-      "customer": "Customer",
-      "descriptionPlaceholder": "Regular maintenance service",
-      "durationPlaceholder": "Minutes",
-      "frequency": "Frequency",
-      "nextScheduledDate": "Next Scheduled Date"
-    },
-    "frequency": {
-      "annually": "Annually",
-      "monthly": "Monthly",
-      "quarterly": "Quarterly",
-      "weekly": "Weekly"
-    },
-    "table": {
-      "customer": "Customer",
-      "frequency": "Frequency",
-      "nextScheduled": "Next Scheduled"
+      "durationPlaceholder": "Minutes"
     }
   },
   "settings": {
