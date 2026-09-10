@@ -19,8 +19,6 @@ import {
   CubeIcon,
   BuildingStorefrontIcon,
   ChartBarIcon,
-  ClockIcon,
-  ArrowPathIcon,
   MapPinIcon,
   EllipsisHorizontalIcon,
   LifebuoyIcon,
@@ -119,6 +117,17 @@ export default function AppLayout({ children, flush }: { children: React.ReactNo
     { name: getName('customer', true), href: '/customers', icon: UserGroupIcon },
     { name: getName('service_location', true), href: '/service-locations', icon: MapPinIcon },
     { name: getName('work_order', true), href: '/work-orders', icon: ClipboardDocumentListIcon },
+    // "Dispatch Board", not "Dispatch": `dispatch` is itself a glossary entity,
+    // so the bare noun reads as the RECORD and sets up the wrong expectation
+    // for a board. Not "Scheduling" either — that can't follow the glossary,
+    // and it would overlap the `schedule` entity, work-order scheduling and
+    // agreement visit schedules. Shares the page-heading key so the sidebar
+    // and the <h1> can't drift; a tenant on "Trip" gets "Trip Board".
+    {
+      name: t('dispatchBoard.title', { entity: getName('dispatch') }),
+      href: '/dispatch',
+      icon: CalendarIcon,
+    },
     ...(approvalsVisible
       ? [{ name: t('approvals.title'), href: '/approvals', icon: CheckBadgeIcon, badge: pendingApprovalCount }]
       : []),
@@ -138,12 +147,6 @@ export default function AppLayout({ children, flush }: { children: React.ReactNo
     { name: getName('payment', true), href: '/payments', icon: CreditCardIcon },
   ];
 
-  const schedulingNavigation = [
-    { name: getName('dispatch', true), href: '/dispatches', icon: CalendarIcon },
-    { name: t('scheduling.entities.availability'), href: '/availability', icon: ClockIcon },
-    { name: t('scheduling.entities.recurringOrders'), href: '/recurring-orders', icon: ArrowPathIcon },
-  ];
-
   const adminNavigation = [
     // Reports lives here as a role-restricted utility surface (alongside
     // Settings). Not gated yet — when we wire capability checks, gate on
@@ -160,7 +163,6 @@ export default function AppLayout({ children, flush }: { children: React.ReactNo
     { items: mainNavigation },
     { section: t('entities.inventory'), items: equipmentNavigation },
     { section: t('entities.financial'), items: financialNavigation },
-    { section: t('entities.scheduling'), items: schedulingNavigation },
     { items: adminNavigation },
   ];
   const activeGroup = navGroups.find((g) => g.items.some((i) => isCurrent(i.href)));
@@ -226,23 +228,6 @@ export default function AppLayout({ children, flush }: { children: React.ReactNo
             <SidebarSection>
               <SidebarHeading>{t('entities.financial')}</SidebarHeading>
               {financialNavigation.map((item) => {
-                const current = isCurrent(item.href);
-                return (
-                  <SidebarItem
-                    key={item.name}
-                    href={item.href}
-                    current={current}
-                  >
-                    <item.icon data-slot="icon" />
-                    <span>{item.name}</span>
-                  </SidebarItem>
-                );
-              })}
-            </SidebarSection>
-
-            <SidebarSection>
-              <SidebarHeading>{t('entities.scheduling')}</SidebarHeading>
-              {schedulingNavigation.map((item) => {
                 const current = isCurrent(item.href);
                 return (
                   <SidebarItem

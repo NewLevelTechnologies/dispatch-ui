@@ -37,19 +37,13 @@ import { SlideOver } from './catalyst/slideover';
 import WorkOrderFileUploadDialog from './WorkOrderFileUploadDialog';
 import { FileLightbox } from './WorkOrderFilesTab';
 import { formatPhone, workItemLabel } from '@dispatch/utils';
+import { DISPATCH_PRESENTATION, type PillTone } from '../lib/dispatchStatus';
 
-type PillTone = 'neutral' | 'info' | 'success' | 'warning' | 'danger' | 'accent' | 'violet';
-
-// Status → { tone, live, accent }. EN_ROUTE + IN_PROGRESS are both "live"
-// (violet); the drawer leads with self-reported status (no GPS/ETA bar).
-const PRESENTATION: Record<DispatchStatus, { tone: PillTone; live?: boolean; accent: string }> = {
-  SCHEDULED: { tone: 'info', accent: 'var(--info-500)' },
-  EN_ROUTE: { tone: 'violet', live: true, accent: 'var(--violet-500)' },
-  IN_PROGRESS: { tone: 'violet', live: true, accent: 'var(--violet-500)' },
-  COMPLETED: { tone: 'success', accent: 'var(--success-500)' },
-  NO_SHOW: { tone: 'warning', accent: 'var(--warning-500)' },
-  CANCELLED: { tone: 'neutral', accent: 'var(--border-strong)' },
-};
+// Status presentation now lives in lib/dispatchStatus so the dispatch board
+// renders blocks in the same tones this drawer shows. EN_ROUTE + IN_PROGRESS
+// are both "live" (violet); the drawer leads with self-reported status (no
+// GPS/ETA bar).
+const PRESENTATION = DISPATCH_PRESENTATION;
 
 const NOTIF_TONE: Record<NotificationStatus, PillTone> = {
   DELIVERED: 'success',

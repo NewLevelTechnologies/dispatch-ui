@@ -462,7 +462,6 @@
     "revenue": "Revenue",
     "role": "Role",
     "roles": "Roles",
-    "scheduling": "Scheduling",
     "serviceLocation": "Location",
     "serviceLocations": "Locations",
     "settings": "Settings",
@@ -1301,64 +1300,8 @@
     "uncategorized": "Other"
   },
   "scheduling": {
-    "description": "Manage dispatches, availability, and recurring orders",
-    "descriptionDispatches": "Schedule and manage work order dispatches",
-    "descriptionAvailability": "Manage user availability schedules",
-    "descriptionRecurringOrders": "Manage recurring maintenance schedules",
-    "entities": {
-      "availability": "Availability",
-      "availabilityRecord": "Availability Record",
-      "dispatch": "Dispatch",
-      "dispatches": "Dispatches",
-      "recurringOrder": "Recurring Order",
-      "recurringOrders": "Recurring Orders"
-    },
     "form": {
-      "assignedUser": "Assigned User",
-      "customer": "Customer",
-      "date": "Date",
-      "descriptionPlaceholder": "Regular maintenance service",
-      "durationPlaceholder": "Minutes",
-      "endTime": "End Time",
-      "equipment": "Equipment",
-      "estimatedDuration": "Estimated Duration (minutes)",
-      "frequency": "Frequency",
-      "nextScheduledDate": "Next Scheduled Date",
-      "reason": "Reason",
-      "reasonPlaceholder": "e.g., Vacation, Training, Meeting",
-      "arrivalWindowStart": "Arrival Window Start",
-      "scheduledDate": "Scheduled Date",
-      "startTime": "Start Time",
-      "user": "User",
-      "workOrder": "Work Order"
-    },
-    "frequency": {
-      "annually": "Annually",
-      "monthly": "Monthly",
-      "quarterly": "Quarterly",
-      "weekly": "Weekly"
-    },
-    "status": {
-      "available": "Available",
-      "busy": "Busy",
-      "tentative": "Tentative",
-      "unavailable": "Unavailable"
-    },
-    "table": {
-      "assignedUser": "Assigned User",
-      "customer": "Customer",
-      "date": "Date",
-      "arrivalWindowStart": "Arrival Window",
-      "endTime": "End Time",
-      "equipment": "Equipment",
-      "estimatedDuration": "Duration",
-      "frequency": "Frequency",
-      "nextScheduled": "Next Scheduled",
-      "reason": "Reason",
-      "scheduledDate": "Scheduled",
-      "startTime": "Start Time",
-      "user": "User",
-      "workOrder": "Work Order"
+      "durationPlaceholder": "Minutes"
     }
   },
   "settings": {
@@ -2942,6 +2885,72 @@
       "body": "This address is for a workspace your account doesn’t have access to.",
       "title": "You’re not a member of this workspace",
       "yours": "Your workspaces"
+    }
+  },
+  "dispatchBoard": {
+    "title": "{{entity}} Board",
+    "subtitleCount_one": "{{count}} {{entity, lowercase}} in scope",
+    "subtitleCount_other": "{{count}} {{entity, lowercase}} in scope",
+    "dateNav": {
+      "previous": "Previous day",
+      "next": "Next day",
+      "today": "Today"
+    },
+    "search": {
+      "placeholder": "Find a {{entity, lowercase}}…"
+    },
+    "filter": {
+      "region": "{{entity}}",
+      "allRegions": "All {{entity, lowercase}}",
+      "density": "Density",
+      "grouping": "Grouping",
+      "groupByNone": "No grouping",
+      "groupByRegion": "Group by {{entity, lowercase}}",
+      "hideEmpty": "Hide unscheduled {{entity}}"
+    },
+    "rail": {
+      "heading": "Unscheduled",
+      "hint": "One card per {{entity, lowercase}} · click to schedule, or drag onto a {{tech, lowercase}}",
+      "emptyTitle": "Nothing unscheduled",
+      "emptyBody": "The whole board is assigned."
+    },
+    "states": {
+      "loading": "Loading board…",
+      "errorTitle": "Couldn't load the board",
+      "errorBody": "The board data didn't come back. Retry, or reload the page.",
+      "emptyFilteredTitle": "No {{entity, lowercase}} match these filters",
+      "emptyFilteredBody": "Clear a filter to widen the board.",
+      "emptyTitle": "Nothing scheduled",
+      "emptyBody": "No {{entity, lowercase}} are scheduled for this day.",
+      "noTechsTitle": "No {{entity, lowercase}} on this board",
+      "noTechsBody": "A user appears here when one of their roles is marked “{{setting}}”.",
+      "noTechsAction": "Review roles",
+      "clearFilters": "Clear filters"
+    },
+    "grid": {
+      "coversMoreRegions_one": "Also covers {{count}} other region",
+      "coversMoreRegions_other": "Also covers {{count}} other regions",
+      "driveMinutes": "{{minutes}}m drive",
+      "estimate": "est {{hours}}h",
+      "noEstimate": "no est.",
+      "offNotDroppable": "{{label}} — not droppable",
+      "groupSummary": " · {{stops}} {{entity}}",
+      "groupHeld": " · {{count}} not released",
+      "noRegion": "No region"
+    },
+    "chips": {
+      "cancelled": "Cancelled",
+      "longdrive": "Drive > 30m",
+      "noshow": "No-show",
+      "recurring": "Agreement",
+      "unreleased": "Not released",
+      "urgent": "Urgent"
+    },
+    "density": {
+      "auto": "Density · auto ({{mode, lowercase}})",
+      "comfortable": "Comfortable",
+      "compact": "Compact",
+      "dense": "Dense"
     }
   }
 }

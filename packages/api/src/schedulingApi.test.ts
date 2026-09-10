@@ -3,7 +3,6 @@ import {
   dispatchesApi,
   dispatchNotesApi,
   availabilityApi,
-  recurringOrdersApi,
 } from './schedulingApi';
 import apiClient from './client';
 
@@ -189,29 +188,5 @@ describe('availabilityApi', () => {
       status: 'APPROVED',
     });
     expect(apiClient.delete).toHaveBeenCalledWith('/scheduling/availability/a-1');
-  });
-});
-
-describe('recurringOrdersApi', () => {
-  it('covers the recurring-order surface', async () => {
-    vi.mocked(apiClient.get).mockResolvedValue({ data: [] });
-
-    await recurringOrdersApi.getAll({ customerId: 'c-1', dueBefore: '2026-02-01' });
-    await recurringOrdersApi.getById('r-1');
-    await recurringOrdersApi.create({ customerId: 'c-1' } as never);
-    await recurringOrdersApi.update('r-1', { status: 'PAUSED' } as never);
-    await recurringOrdersApi.delete('r-1');
-
-    expect(apiClient.get).toHaveBeenCalledWith('/scheduling/recurring-orders', {
-      params: { customerId: 'c-1', dueBefore: '2026-02-01' },
-    });
-    expect(apiClient.get).toHaveBeenCalledWith('/scheduling/recurring-orders/r-1');
-    expect(apiClient.post).toHaveBeenCalledWith('/scheduling/recurring-orders', {
-      customerId: 'c-1',
-    });
-    expect(apiClient.put).toHaveBeenCalledWith('/scheduling/recurring-orders/r-1', {
-      status: 'PAUSED',
-    });
-    expect(apiClient.delete).toHaveBeenCalledWith('/scheduling/recurring-orders/r-1');
   });
 });
