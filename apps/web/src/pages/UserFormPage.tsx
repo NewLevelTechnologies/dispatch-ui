@@ -15,6 +15,7 @@ import {
 } from '../api/setup';
 import { ToggleGroup, ToggleGroupOption } from '../components/ui/ToggleGroup';
 import { summarizeAssignment } from '../lib/dispatchable';
+import { useGlossary } from '../contexts/GlossaryContext';
 import { roleAccentFromRole } from '@dispatch/utils';
 import { showError, showSuccess, extractApiError, errorStatus, errorCode, isConflict } from '../lib/toast';
 import RemovalGuardDialog, { type RemovalGuard } from '../components/users/RemovalGuardDialog';
@@ -531,11 +532,16 @@ function DispatchableField({
   roles: Role[];
   selectedRoleIds: string[];
 }) {
+  const { getName } = useGlossary();
   const selected = useMemo(
     () => roles.filter((r) => selectedRoleIds.includes(r.id)),
     [roles, selectedRoleIds],
   );
   const inherited = selected.some((r) => r.performsFieldWork);
+
+  // Tenant's own word for the entity — "Can be assigned trips" for a tenant
+  // that renamed it.
+  const assignLabel = `Can be assigned ${getName('dispatch', true).toLowerCase()}`;
 
   // The same helper the detail page reads, so the two can't drift — but fed
   // the FORM's current selections rather than the saved user, so it answers
@@ -554,13 +560,13 @@ function DispatchableField({
   return (
     <div className="mt-3 border-t border-border-soft pt-3">
       <div className="mb-1.5 text-[10px] font-semibold tracking-[0.06em] text-fg-muted uppercase">
-        Can be assigned dispatches
+        {assignLabel}
       </div>
       <ToggleGroup
         value={value}
         onChange={onChange}
         size="sm"
-        aria-label="Can be assigned dispatches"
+        aria-label={assignLabel}
       >
         {/* The inherited result is echoed INSIDE the label, not beside it:
             whoever is choosing can see what they would be overriding without
@@ -586,9 +592,6 @@ function DispatchableField({
         )}
       </p>
 
-      <p className="mt-1.5 text-[11px] text-fg-muted">
-        Applies to the board, tech pickers, and the dispatch drawer.
-      </p>
     </div>
   );
 }
