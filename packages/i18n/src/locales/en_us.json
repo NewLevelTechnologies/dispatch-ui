@@ -2912,7 +2912,11 @@
       "heading": "Unscheduled",
       "hint": "One card per {{entity, lowercase}} · click to schedule, or drag onto a {{tech, lowercase}}",
       "emptyTitle": "Nothing unscheduled",
-      "emptyBody": "The whole board is assigned."
+      "emptyBody": "The whole board is assigned.",
+      "urgent": "Urgent",
+      "recurring": "Agreement / recurring work",
+      "itemCount_one": "{{count}} item",
+      "itemCount_other": "{{count}} items"
     },
     "states": {
       "loading": "Loading board…",

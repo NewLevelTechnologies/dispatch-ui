@@ -7,6 +7,7 @@ import {
   buildAxis,
   axisPct,
   findClashes,
+  formatAge,
 } from './boardTime';
 
 describe('zonedHour', () => {
@@ -151,5 +152,29 @@ describe('findClashes', () => {
       { id: 'c', start: 10, end: 14 },
     ]);
     expect(clashes.size).toBe(3);
+  });
+});
+
+describe('formatAge', () => {
+  const now = new Date('2026-03-15T12:00:00Z');
+
+  it('coarsens as the wait grows', () => {
+    expect(formatAge('2026-03-15T11:19:00Z', now)).toBe('41m');
+    expect(formatAge('2026-03-15T10:00:00Z', now)).toBe('2h');
+    expect(formatAge('2026-03-14T12:00:00Z', now)).toBe('1d');
+    expect(formatAge('2026-03-11T12:00:00Z', now)).toBe('4d');
+  });
+
+  it('reports sub-minute work as 0m rather than blank', () => {
+    expect(formatAge('2026-03-15T11:59:40Z', now)).toBe('0m');
+  });
+
+  // Clock skew between server and browser shouldn't print "-3m".
+  it('says nothing for a future timestamp', () => {
+    expect(formatAge('2026-03-15T12:05:00Z', now)).toBeNull();
+  });
+
+  it('says nothing for an unparseable timestamp', () => {
+    expect(formatAge('nope', now)).toBeNull();
   });
 });
