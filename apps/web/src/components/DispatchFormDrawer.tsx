@@ -153,7 +153,14 @@ export default function DispatchFormDrawer({
   }, [open, dispatch, workItems]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
-  const { data: users = [] } = useQuery({ queryKey: ['users'], queryFn: () => userApi.getAll() });
+  // Field workers only. This is a PICKER, so it must offer exactly who can be
+  // assigned — listing every enabled user put admins and CSRs in a
+  // "technician" dropdown. Filtered server-side on the resolved answer, so it
+  // matches the dispatch board's rows precisely.
+  const { data: users = [] } = useQuery({
+    queryKey: ['users', 'field-work'],
+    queryFn: () => userApi.getFieldWorkers(),
+  });
   const techs = useMemo(
     () =>
       [...users]

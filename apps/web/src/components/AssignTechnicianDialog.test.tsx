@@ -7,6 +7,7 @@ import type { Dispatch, User } from '../api/setup';
 const mockDispatchesCreate = vi.fn();
 const mockDispatchesUpdate = vi.fn();
 const mockUserGetAll = vi.fn();
+const mockGetFieldWorkers = vi.fn();
 
 vi.mock('@dispatch/api/src/schedulingApi', () => ({
   dispatchesApi: {
@@ -15,8 +16,14 @@ vi.mock('@dispatch/api/src/schedulingApi', () => ({
   },
 }));
 vi.mock('@dispatch/api/src/userApi', () => ({
-  userApi: { getAll: (...args: unknown[]) => mockUserGetAll(...args) },
-  default: { getAll: (...args: unknown[]) => mockUserGetAll(...args) },
+  userApi: {
+    getAll: (...args: unknown[]) => mockUserGetAll(...args),
+    getFieldWorkers: (...args: unknown[]) => mockGetFieldWorkers(...args),
+  },
+  default: {
+    getAll: (...args: unknown[]) => mockUserGetAll(...args),
+    getFieldWorkers: (...args: unknown[]) => mockGetFieldWorkers(...args),
+  },
 }));
 
 const mockUser = (id: string, first: string, last: string, enabled = true): User => ({
@@ -35,7 +42,10 @@ const mockUser = (id: string, first: string, last: string, enabled = true): User
 describe('AssignTechnicianDialog', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockUserGetAll.mockResolvedValue([
+    // The server already excludes non-field-workers and disabled users; the
+    // disabled row stays in the fixture to prove the client filter still
+    // holds if one ever slipped through.
+    mockGetFieldWorkers.mockResolvedValue([
       mockUser('u1', 'Jason', 'Smith'),
       mockUser('u2', 'Maria', 'Lopez'),
       mockUser('u3', 'Disabled', 'User', false),
@@ -67,7 +77,11 @@ describe('AssignTechnicianDialog', () => {
     expect(screen.getByLabelText('Notes')).toBeInTheDocument();
   });
 
-  it('only lists enabled users in the technician picker', async () => {
+  // The picker now asks the server for field workers rather than filtering
+  // every enabled user client-side — a technician dropdown offering admins
+  // and CSRs was the bug. The disabled-user case is enforced server-side too,
+  // and the client filter stays as belt and braces.
+  it('lists field workers in the technician picker', async () => {
     renderWithProviders(
       <AssignTechnicianDialog isOpen={true} onClose={vi.fn()} workOrderId="wo-1" />
     );
@@ -78,6 +92,7 @@ describe('AssignTechnicianDialog', () => {
     });
     expect(screen.getByText('Jason Smith')).toBeInTheDocument();
     expect(screen.queryByText('Disabled User')).not.toBeInTheDocument();
+    expect(mockGetFieldWorkers).toHaveBeenCalled();
   });
 
   it('seeds window end to two hours after the default start', async () => {

@@ -278,6 +278,12 @@ export interface UserSearchParams {
   enabled?: boolean;
   invitationStatus?: InvitationStatus[];
   roleId?: string[];
+  // Filters on the RESOLVED answer — override applied over the roles — so it
+  // matches exactly who the dispatch board shows. Narrows the page, not the
+  // counts strip, same as `enabled`.
+  performsFieldWork?: boolean;
+  // The raw override, for auditing deliberate exclusions.
+  dispatchable?: Dispatchable;
   page?: number;
   size?: number;
   sort?: string;
@@ -374,6 +380,10 @@ export const userApi = {
     if (typeof params.enabled === 'boolean') sp.set('enabled', String(params.enabled));
     params.invitationStatus?.forEach((s) => sp.append('invitationStatus', s));
     params.roleId?.forEach((id) => sp.append('roleId', id));
+    if (typeof params.performsFieldWork === 'boolean') {
+      sp.set('performsFieldWork', String(params.performsFieldWork));
+    }
+    if (params.dispatchable) sp.set('dispatchable', params.dispatchable);
     if (typeof params.page === 'number') sp.set('page', String(params.page));
     if (typeof params.size === 'number') sp.set('size', String(params.size));
     if (params.sort) sp.set('sort', params.sort);
@@ -391,6 +401,19 @@ export const userApi = {
   // server-paged results directly via `searchUsers`.
   getAll: async (): Promise<User[]> => {
     const page = await userApi.searchUsers({ size: 100 });
+    return page.content;
+  },
+
+  /**
+   * Everyone who can actually be assigned work — the same predicate the
+   * dispatch board rows use, resolved server-side.
+   *
+   * For PICKERS only. Name-resolution lists must keep using `getAll`: a
+   * dispatch assigned to someone since moved off field work still has to
+   * render their name, and filtering there would blank it.
+   */
+  getFieldWorkers: async (): Promise<User[]> => {
+    const page = await userApi.searchUsers({ size: 100, performsFieldWork: true, enabled: true });
     return page.content;
   },
 
