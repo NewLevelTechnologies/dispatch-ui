@@ -28,9 +28,37 @@ vi.mock('@dispatch/api/src/client');
 const tech = (id: string, name: string, regionIds: string[]) => ({
   id,
   name,
-  performsFieldWork: true,
   regionIds,
   primaryRegionId: regionIds[0] ?? null,
+  stopCount: 0,
+});
+
+const railWorkOrder = (over: Record<string, unknown> = {}) => ({
+  workOrderId: 'wo-1',
+  workOrderNumber: 'WO-3911',
+  workOrderSummary: 'No cooling — full system',
+  workOrderTypeId: null,
+  customerId: 'c1',
+  customerName: 'Pham, A.',
+  serviceLocationId: 'l1',
+  serviceLocationCity: 'Phoenix',
+  serviceLocationState: 'AZ',
+  latitude: null,
+  longitude: null,
+  priority: 'NORMAL',
+  itemCount: 1,
+  recurring: false,
+  dispatchRegionId: 'r1',
+  divisionId: null,
+  createdAt: new Date(Date.now() - 41 * 60_000).toISOString(),
+  ...over,
+});
+
+const railWith = (rows: Record<string, unknown>[]) => ({
+  ...emptyRail,
+  content: rows,
+  totalElements: rows.length,
+  totalPages: 1,
 });
 
 const emptyRail = {
@@ -79,22 +107,27 @@ describe('DispatchBoardPage', () => {
     expect(screen.getByRole('button', { name: 'Review roles' })).toBeInTheDocument();
   });
 
-  it('shows the genuinely-empty state when techs exist but nothing is scheduled', async () => {
+  // Rows ARE the board: they're the drop targets and they say who's free.
+  // An empty state here would hide both and leave nowhere to drop work.
+  it('renders the rows, with a note, when nothing is scheduled', async () => {
     mockGetBoard.mockResolvedValue({ techs: [tech('u1', 'Maya Alvarez', ['r1'])], dispatches: [] });
 
     renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch' });
 
-    expect(await screen.findByText('Nothing scheduled')).toBeInTheDocument();
+    expect(await screen.findByText('Maya Alvarez')).toBeInTheDocument();
+    expect(screen.getByText(/are scheduled for this day/)).toBeInTheDocument();
     expect(screen.queryByText('No technicians on this board')).not.toBeInTheDocument();
   });
 
-  it('distinguishes filtered-empty from genuinely-empty', async () => {
+  it('distinguishes a filtered board from an unscheduled one, keeping the rows', async () => {
     mockGetBoard.mockResolvedValue({ techs: [tech('u1', 'Maya Alvarez', ['r1'])], dispatches: [] });
 
     renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch?region=r1' });
 
     expect(await screen.findByText('No dispatches match these filters')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Clear filters' })).toBeInTheDocument();
+    // The lanes survive the filter.
+    expect(screen.getByText('Maya Alvarez')).toBeInTheDocument();
   });
 
   it('surfaces a failed board read without blanking the rail', async () => {
@@ -120,7 +153,7 @@ describe('DispatchBoardPage', () => {
 
     renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch' });
 
-    await screen.findByText('Nothing scheduled');
+    await screen.findByText('Maya Alvarez');
     expect(screen.queryByRole('button', { name: 'Region' })).not.toBeInTheDocument();
   });
 
@@ -136,7 +169,7 @@ describe('DispatchBoardPage', () => {
 
     renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch' });
 
-    await screen.findByText('Nothing scheduled');
+    await screen.findByText('Maya Alvarez');
     expect(screen.getByRole('button', { name: 'Region' })).toBeInTheDocument();
   });
 
@@ -154,7 +187,7 @@ describe('DispatchBoardPage', () => {
 
     renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch' });
 
-    await screen.findByText('Nothing scheduled');
+    await screen.findByText('Maya Alvarez');
     expect(screen.getByRole('button', { name: 'Region' })).toBeInTheDocument();
   });
 
@@ -209,5 +242,81 @@ describe('DispatchBoardPage', () => {
     expect(mockGetBoard).toHaveBeenCalledWith(
       expect.objectContaining({ date: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/) })
     );
+  });
+});
+
+// The rail's whole job is to be the work-order picker: a count with no cards
+// is the bug this suite exists to prevent.
+describe('DispatchBoardPage unscheduled rail', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockGetBoard.mockResolvedValue({ techs: [tech('u1', 'Maya Alvarez', ['r1'])], dispatches: [] });
+    mockRegionsGetAll.mockResolvedValue([{ id: 'r1', name: 'Phoenix' }]);
+    mockGetUnscheduled.mockResolvedValue(emptyRail);
+  });
+
+  it('renders a card per work order, not just a count', async () => {
+    mockGetUnscheduled.mockResolvedValue(
+      railWith([
+        railWorkOrder(),
+        railWorkOrder({
+          workOrderId: 'wo-2',
+          workOrderNumber: 'WO-3912',
+          workOrderSummary: 'Capacitor / contactor',
+          customerName: 'Eastlake HOA',
+        }),
+      ])
+    );
+
+    renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch' });
+
+    expect(await screen.findByText('WO-3911')).toBeInTheDocument();
+    expect(screen.getByText('WO-3912')).toBeInTheDocument();
+    expect(screen.getByText('No cooling — full system')).toBeInTheDocument();
+    expect(screen.getByText('Pham, A.')).toBeInTheDocument();
+  });
+
+  it('shows the age, which is the rail\u2019s tiebreak after priority', async () => {
+    mockGetUnscheduled.mockResolvedValue(railWith([railWorkOrder()]));
+    renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch' });
+    expect(await screen.findByText('41m')).toBeInTheDocument();
+  });
+
+  it('flags an urgent card', async () => {
+    mockGetUnscheduled.mockResolvedValue(railWith([railWorkOrder({ priority: 'URGENT' })]));
+    renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch' });
+    expect(await screen.findByText('Urgent')).toBeInTheDocument();
+  });
+
+  it('joins the region id to a name client-side', async () => {
+    mockGetUnscheduled.mockResolvedValue(railWith([railWorkOrder()]));
+    renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch' });
+    expect(await screen.findByText('Phoenix')).toBeInTheDocument();
+  });
+
+  // "1 item" on every card is noise; the count only matters when it implies
+  // more than one visit might be needed.
+  it('names the item count only above one', async () => {
+    mockGetUnscheduled.mockResolvedValue(railWith([railWorkOrder({ itemCount: 1 })]));
+    const { unmount } = renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch' });
+    await screen.findByText('WO-3911');
+    expect(screen.queryByText(/item/)).not.toBeInTheDocument();
+    unmount();
+
+    mockGetUnscheduled.mockResolvedValue(railWith([railWorkOrder({ itemCount: 3 })]));
+    renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch' });
+    expect(await screen.findByText('3 items')).toBeInTheDocument();
+  });
+
+  it('falls back to the number when the summary has not synced', async () => {
+    mockGetUnscheduled.mockResolvedValue(railWith([railWorkOrder({ workOrderSummary: null })]));
+    renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch' });
+    // Once as the identifier, once as the title — never a blank card.
+    expect(await screen.findAllByText('WO-3911')).toHaveLength(2);
+  });
+
+  it('keeps the empty message when there is genuinely nothing waiting', async () => {
+    renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch' });
+    expect(await screen.findByText('Nothing unscheduled')).toBeInTheDocument();
   });
 });

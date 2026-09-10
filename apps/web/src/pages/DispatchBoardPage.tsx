@@ -18,8 +18,11 @@ import { ChevronLeftIcon, ChevronRightIcon } from '@heroicons/react/24/outline';
 import {
   dispatchBoardApi,
   dispatchRegionApi,
+  divisionsApi,
+  workOrderApi,
   type BoardDispatch,
   type BoardTech,
+  type UnscheduledWorkOrder,
 } from '../api/setup';
 import { useGlossary } from '../contexts/GlossaryContext';
 import AppLayout from '../components/AppLayout';
@@ -33,7 +36,9 @@ import { EmptyState } from '../components/ui/EmptyState';
 import { ErrorState } from '../components/ui/ErrorState';
 import { Pill } from '../components/ui/Pill';
 import DispatchDetailDrawer from '../components/DispatchDetailDrawer';
+import DispatchFormDrawer from '../components/DispatchFormDrawer';
 import DispatchTimeline from '../components/dispatch/DispatchTimeline';
+import UnscheduledRailCard from '../components/dispatch/UnscheduledRailCard';
 import {
   DENSITY_METRICS,
   autoDensityFor,
@@ -99,6 +104,7 @@ export default function DispatchBoardPage() {
   const [collapsed, setCollapsed] = useState<string[]>([]);
   const [exceptions, setExceptions] = useState<ExceptionId[]>([]);
   const [openDispatch, setOpenDispatch] = useState<BoardDispatch | null>(null);
+  const [composeFor, setComposeFor] = useState<UnscheduledWorkOrder | null>(null);
 
   const rawDate = searchParams.get('date');
   const date = isValidDate(rawDate) ? rawDate : todayLocal();
@@ -124,6 +130,13 @@ export default function DispatchBoardPage() {
     queryFn: () => dispatchRegionApi.getAll(false),
   });
 
+  // Rail cards show a division too, and like regions the board read sends
+  // only the id.
+  const { data: divisions = [] } = useQuery({
+    queryKey: ['work-order-config', 'divisions'],
+    queryFn: () => divisionsApi.getAll(),
+  });
+
   const regionIds = useMemo(() => (regionId ? [regionId] : undefined), [regionId]);
 
   const {
@@ -145,6 +158,17 @@ export default function DispatchBoardPage() {
   // in, so the axis and the day boundary can never disagree. Falls back to the
   // browser only before the first response lands.
   const timeZone = board?.timeZone || Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+
+  // §3.4: the rail carries `itemCount`, not the items, and
+  // DispatchFormDrawer requires a full WorkItemResponse[]. There is no
+  // GET /work-orders/{id}/work-items — the work-item routes are write-only —
+  // so the items come off the work-order detail read, which nests them.
+  // Fetched on click rather than per card.
+  const { data: composeWorkOrder } = useQuery({
+    queryKey: ['work-orders', composeFor?.workOrderId],
+    queryFn: () => workOrderApi.getById(composeFor!.workOrderId),
+    enabled: composeFor != null,
+  });
 
   const allTechs = useMemo(() => board?.techs ?? [], [board]);
   const allDispatches = useMemo(() => board?.dispatches ?? [], [board]);
@@ -380,27 +404,28 @@ export default function DispatchBoardPage() {
       );
     }
 
-    if (visibleDispatches.length === 0) {
-      return hasFilters ? (
-        <EmptyState
-          title={t('dispatchBoard.states.emptyFilteredTitle', { entity: dispatchesLabel })}
-          description={t('dispatchBoard.states.emptyFilteredBody')}
-          action={
-            <Button size="xs" onClick={clearFilters}>
-              {t('dispatchBoard.states.clearFilters')}
-            </Button>
-          }
-        />
-      ) : (
-        <EmptyState
-          title={t('dispatchBoard.states.emptyTitle')}
-          description={t('dispatchBoard.states.emptyBody', { entity: dispatchesLabel })}
-        />
-      );
-    }
-
+    // Deliberately NOT an empty state here. Rows ARE the board: they are the
+    // drop targets, and they tell a dispatcher who is free. Replacing the grid
+    // with "nothing scheduled" hides the two things the reader came for and
+    // leaves nowhere to drop work. The filter case says so above the grid
+    // instead, where the lanes survive.
     return (
-      <DispatchTimeline
+      <>
+        {visibleDispatches.length === 0 && (
+          <div className="flex items-center gap-2 border-b border-border bg-bg-elev-2 px-3.5 py-2 text-[11.5px] text-fg-muted">
+            <span>
+              {hasFilters
+                ? t('dispatchBoard.states.emptyFilteredTitle', { entity: dispatchesLabel })
+                : t('dispatchBoard.states.emptyBody', { entity: dispatchesLabel })}
+            </span>
+            {hasFilters && (
+              <Button plain size="xxs" onClick={clearFilters}>
+                {t('dispatchBoard.states.clearFilters')}
+              </Button>
+            )}
+          </div>
+        )}
+        <DispatchTimeline
         groups={groups}
         byTech={byTech}
         density={density}
@@ -413,9 +438,10 @@ export default function DispatchBoardPage() {
         onOpenDispatch={setOpenDispatch}
         axis={axis}
         nowHour={nowHour}
-        capacityStops={board?.defaultStopsPerDay ?? null}
-        timeZone={timeZone}
-      />
+          capacityStops={board?.defaultStopsPerDay ?? null}
+          timeZone={timeZone}
+        />
+      </>
     );
   };
 
@@ -608,7 +634,19 @@ export default function DispatchBoardPage() {
                   title={t('dispatchBoard.rail.emptyTitle')}
                   description={t('dispatchBoard.rail.emptyBody')}
                 />
-              ) : null}
+              ) : (
+                railItems.map((wo) => (
+                  <UnscheduledRailCard
+                    key={wo.workOrderId}
+                    workOrder={wo}
+                    regionName={regionName(wo.dispatchRegionId)}
+                    divisionName={
+                      divisions.find((d) => d.id === wo.divisionId)?.name ?? null
+                    }
+                    onOpen={setComposeFor}
+                  />
+                ))
+              )}
             </div>
           </aside>
 
@@ -617,6 +655,18 @@ export default function DispatchBoardPage() {
           </div>
         </div>
       </div>
+
+      {/* The rail is the board's only path into the composer — no standalone
+          Schedule button. The rail already IS the work-order picker: scoped,
+          sorted by priority then age, and on screen. */}
+      <DispatchFormDrawer
+        open={composeFor != null && composeWorkOrder != null}
+        onClose={() => setComposeFor(null)}
+        workOrderId={composeFor?.workOrderId ?? ''}
+        workItems={composeWorkOrder?.workItems ?? []}
+        workOrderNumber={composeFor?.workOrderNumber}
+        locationName={composeFor?.customerName}
+      />
 
       {/* The board owns no detail surface — it opens the existing drawer.
           Read-only for now: Release / Reassign / Reschedule are write paths
