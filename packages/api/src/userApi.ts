@@ -45,6 +45,21 @@ export interface RemovalImpact {
   deleteEndsSignIn: boolean;
 }
 
+/**
+ * Per-user override on "is this person on the dispatch board".
+ *
+ * Dispatchability is normally a property of the ROLES someone holds
+ * (`tenant_roles.performs_field_work`); this is the escape hatch for the cases
+ * roles cannot express — a working owner who occasionally drives, a tech on
+ * light duty, someone promoted to dispatcher who kept their old role.
+ *
+ * `INHERIT` is the default and correct for nearly everyone. NOTE that on a
+ * sparse PUT it is a real value, not the same as omitting the field: omitting
+ * leaves the current setting alone, sending INHERIT actively resets it to
+ * follow the roles again.
+ */
+export type Dispatchable = 'INHERIT' | 'ALWAYS' | 'NEVER';
+
 export interface User {
   id: string;
   tenantId: string;
@@ -67,6 +82,11 @@ export interface User {
   roles?: Role[];
   capabilities?: string[];
   dispatchRegionIds?: string[];
+  // The override itself (what the form edits).
+  dispatchable?: Dispatchable;
+  // The RESOLVED answer — override applied over the roles. Read this rather
+  // than re-deriving it from the role list; the server owns the precedence.
+  performsFieldWork?: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -160,6 +180,12 @@ export interface UpdateUserProfileRequest {
   firstName: string;
   lastName: string;
   phoneNumber?: string | null;
+  // Rides the same sparse PUT /users/{id}. The form ALWAYS sends its current
+  // value rather than omitting it when unchanged: on this endpoint omitting
+  // means "leave alone" while INHERIT means "reset to follow the roles", and
+  // sending it every time keeps that distinction from mattering at the
+  // callsite.
+  dispatchable?: Dispatchable;
 }
 
 export interface UpdateUserRolesRequest {

@@ -106,6 +106,7 @@ export {
   type GroupedCapabilitiesResponse,
   type CreateUserRequest,
   type UpdateUserProfileRequest,
+  type Dispatchable,
   type UpdateUserRolesRequest,
   type UpdateUserEnabledRequest,
   type CreateRoleRequest,
