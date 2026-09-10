@@ -92,10 +92,20 @@ function formatWindow(startIso: string, endIso: string): string {
   return `${stamp(startIso)} – ${stamp(endIso)}`;
 }
 
+/**
+ * What a caller needs to open the drawer. The drawer re-fetches the
+ * authoritative record by id (`full = detail ?? dispatch`), so this object is
+ * only a first-paint seed — and the dispatch board's read legitimately does
+ * not carry `notes` / `createdAt` / `updatedAt`, so they are optional here
+ * rather than being invented at the callsite.
+ */
+export type DispatchSeed = Omit<Dispatch, 'notes' | 'createdAt' | 'updatedAt'> &
+  Partial<Pick<Dispatch, 'notes' | 'createdAt' | 'updatedAt'>>;
+
 interface Props {
   /** When non-null, the drawer is open and shows this dispatch. Null closes it
    *  (parent owns open state — same pattern as EquipmentQuickViewDrawer). */
-  dispatch: Dispatch | null;
+  dispatch: DispatchSeed | null;
   /** The work order's dispatches, used to derive this visit's sequence number
    *  (Trip 1 = earliest arrival). Optional; the badge degrades without it. */
   dispatches?: Dispatch[];
@@ -150,7 +160,7 @@ export default function DispatchDetailDrawer({
 }
 
 interface ContentProps {
-  dispatch: Dispatch;
+  dispatch: DispatchSeed;
   dispatches?: Dispatch[];
   workItems?: WorkItemResponse[];
   readOnly: boolean;
@@ -183,6 +193,14 @@ function DispatchDetailContent({
     queryFn: () => dispatchesApi.getById(dispatch.id),
   });
   const full = detail ?? dispatch;
+
+  // Display reads `full`, which may be a partial seed for one frame. The WRITE
+  // paths need the authoritative record: `detail` once fetched, or the seed
+  // when the caller already handed us a complete Dispatch (the work-order
+  // detail page does). Null while a partial seed is still resolving, which is
+  // the one case where editing genuinely isn't possible yet.
+  const editable: Dispatch | null =
+    detail ?? (dispatch.createdAt != null && dispatch.updatedAt != null ? (dispatch as Dispatch) : null);
   const p = PRESENTATION[full.status];
   const done = full.status === 'COMPLETED';
 
@@ -230,7 +248,7 @@ function DispatchDetailContent({
   // Visit-timeline steps, read from lifecycle (falls back to the top-level /
   // notification data when the by-id lifecycle isn't loaded/populated yet).
   const lc: DispatchLifecycle = full.lifecycle ?? {
-    scheduled: full.createdAt,
+    scheduled: full.createdAt ?? null,
     notified: null,
     enroute: null,
     arrived: full.arrivedAt,
@@ -557,7 +575,7 @@ function DispatchDetailContent({
             isOpen={uploadOpen}
             onClose={() => setUploadOpen(false)}
             workOrderId={dispatch.workOrderId}
-            dispatches={dispatches ?? [dispatch]}
+            dispatches={dispatches ?? (editable ? [editable] : [])}
             defaultDispatchId={dispatch.id}
           />
         )}
@@ -605,19 +623,19 @@ function DispatchDetailContent({
                 : t('workOrders.dispatches.status.COMPLETED')}
             </span>
             <span className="grow" />
-            {!readOnly && (
-              <Button plain size="xs" onClick={() => onDelete(dispatch)}>
+            {!readOnly && editable && (
+              <Button plain size="xs" onClick={() => onDelete(editable)}>
                 {t('common.delete')}
               </Button>
             )}
           </>
         ) : (
-          !readOnly && (
+          !readOnly && editable && (
             <>
               {/* One edit entry — the form covers tech, window, work items, and
                   release. Step-by-step transitions live on the timeline; the
                   footer carries only Complete, the always-reachable escape hatch. */}
-              <Button plain size="xs" onClick={() => onEdit(dispatch)}>
+              <Button plain size="xs" onClick={() => onEdit(editable)}>
                 {`${t('common.edit')} ${getName('dispatch').toLowerCase()}`}
               </Button>
               <span className="grow" />
