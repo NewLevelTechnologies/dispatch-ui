@@ -18,7 +18,6 @@ import { ChevronLeftIcon, ChevronRightIcon } from '@heroicons/react/24/outline';
 import {
   dispatchBoardApi,
   dispatchRegionApi,
-  tenantSettingsApi,
   type BoardDispatch,
   type BoardTech,
 } from '../api/setup';
@@ -48,13 +47,6 @@ import { isHiddenByDefault } from '../lib/dispatchStatus';
 // outside it (an overnight emergency must not be clipped) but never narrows.
 const DAY_START = 6;
 const DAY_END = 20;
-
-// Load-bar denominator FALLBACK only — the server's
-// `app.dispatch.default-stops-per-day` wins when `defaultStopsPerDay` is on
-// the response. Aligned to the server's 8: this constant said 6 while config
-// said 8, which is precisely why one source of truth matters. Delete once the
-// field ships.
-const DEFAULT_STOPS_PER_DAY = 8;
 
 type GroupBy = 'none' | 'region';
 
@@ -124,17 +116,6 @@ export default function DispatchBoardPage() {
     );
   };
 
-  // Already fetched at app bootstrap under the same key, so this is a cache
-  // read. The timezone matters: block placement is hour-of-day, and deriving
-  // that from the browser puts every block in the wrong column for anyone
-  // outside the tenant's zone.
-  const { data: tenantSettings } = useQuery({
-    queryKey: ['tenant-settings'],
-    queryFn: () => tenantSettingsApi.getSettings(),
-  });
-  const timeZone =
-    tenantSettings?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
-
   // Region NAMES are not in scheduling-service — it holds only the
   // user↔region link. The board read returns ids; names come from here and
   // are joined client-side (handoff §2.2).
@@ -159,6 +140,11 @@ export default function DispatchBoardPage() {
     queryKey: ['dispatch-board', 'unscheduled', regionIds],
     queryFn: () => dispatchBoardApi.getUnscheduled({ regionIds }),
   });
+
+  // Straight off the response: this is the zone the server resolved `date`
+  // in, so the axis and the day boundary can never disagree. Falls back to the
+  // browser only before the first response lands.
+  const timeZone = board?.timeZone || Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
 
   const allTechs = useMemo(() => board?.techs ?? [], [board]);
   const allDispatches = useMemo(() => board?.dispatches ?? [], [board]);
@@ -427,7 +413,7 @@ export default function DispatchBoardPage() {
         onOpenDispatch={setOpenDispatch}
         axis={axis}
         nowHour={nowHour}
-        capacityStops={board?.defaultStopsPerDay ?? DEFAULT_STOPS_PER_DAY}
+        capacityStops={board?.defaultStopsPerDay ?? null}
         timeZone={timeZone}
       />
     );

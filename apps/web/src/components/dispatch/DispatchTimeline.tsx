@@ -90,18 +90,27 @@ function TechCell({
   tech: BoardTech;
   stops: number;
   density: Density;
-  capacityStops: number;
+  capacityStops: number | null;
   width: number;
   outAllDay: boolean;
   offLabel: string | null;
 }) {
   const { t } = useTranslation();
 
-  // Load is a STOP COUNT against a tenant default. No labor estimate exists
-  // platform-wide, so an hours bar would have neither numerator nor
-  // denominator. Dispatchers already think in stops.
-  const pct = capacityStops > 0 ? Math.min(100, (stops / capacityStops) * 100) : 0;
-  const loadClass = stops > capacityStops ? 'over' : stops >= capacityStops ? 'high' : '';
+  // Load is a STOP COUNT, never hours — no labor estimate exists platform-wide
+  // to be a numerator. The denominator comes from the server; without it there
+  // is no bar, only the count. A bar against a guessed capacity is decoration,
+  // the same way a fill against a guessed duration would be.
+  const pct =
+    capacityStops != null && capacityStops > 0
+      ? Math.min(100, (stops / capacityStops) * 100)
+      : null;
+  const loadClass =
+    capacityStops != null && stops > capacityStops
+      ? 'over'
+      : capacityStops != null && stops >= capacityStops
+        ? 'high'
+        : '';
 
   // A tech covering more than one region still renders in exactly ONE row
   // (their primary group); the marker says the others exist. Rendering them
@@ -130,11 +139,13 @@ function TechCell({
       {!outAllDay && (
         <div className="flex shrink-0 flex-col items-end gap-1">
           <span className="font-mono text-[10.5px] text-fg-muted">
-            {`${stops}/${capacityStops}`}
+            {capacityStops != null ? `${stops}/${capacityStops}` : String(stops)}
           </span>
-          <span className={`db-load ${loadClass}`.trim()}>
-            <i style={{ width: `${pct}%` }} />
-          </span>
+          {pct != null && (
+            <span className={`db-load ${loadClass}`.trim()}>
+              <i style={{ width: `${pct}%` }} />
+            </span>
+          )}
         </div>
       )}
     </div>
@@ -272,7 +283,7 @@ export default function DispatchTimeline({
       >
         <TechCell
           tech={tech}
-          stops={placed.length}
+          stops={tech.stopCount}
           density={density}
           capacityStops={capacityStops}
           width={techW}

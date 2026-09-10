@@ -12,7 +12,7 @@
 // `/api/v1/scheduling*` reaches scheduling-service at the ALB, so every path
 // here lives under `/scheduling`.
 import apiClient from './client';
-import type { DispatchBoardRow, DispatchStatus } from './schedulingApi';
+import type { DispatchStatus } from './schedulingApi';
 import type { WorkOrderPriority } from './workOrderApi';
 
 // Where a technician's position came from. Telematics and the mobile app
@@ -52,65 +52,102 @@ export interface TechTimeOff {
   label: string;
 }
 
-// A board row. NOT every user: the server filters to
-// `enabled && roles.any { performsFieldWork }` (dispatch-board.md §2.2), so a
-// CSR or dispatcher who merely has dispatch regions assigned is not a row.
-// `performsFieldWork` is echoed for display/debugging; do not re-filter on it.
+// A board row. NOT every user: the server filters to enabled AND
+// performsFieldWork (from tenant_roles.performs_field_work), so a CSR or
+// dispatcher who merely has dispatch regions is not a row. The flag itself is
+// not echoed — the filtering already happened.
 export interface BoardTech {
   id: string;
   name: string;
-  performsFieldWork: boolean;
-  // M:N — a tech can cover several regions but renders in exactly one group
-  // (their primary), with filtering matching on any of them.
+  // M:N. FILTERING matches any of these, so narrowing to East Valley still
+  // finds the Phoenix tech who also covers it.
   regionIds: string[];
+  // GROUPING keys off this one, so a tech renders exactly once. Null when no
+  // assignment is marked primary.
   primaryRegionId: string | null;
-  // Empty/absent = available all day. Each span hatches its own slice of the
-  // lane and rejects drops there — a tech out all morning is still bookable
-  // in the afternoon, which is the whole point of spans over a boolean.
+  // Booked stops today — the load bar's numerator. Server-computed over the
+  // whole day, NOT over whatever the exception chips currently show: counting
+  // the filtered set would shrink every bar the moment a chip is on.
+  stopCount: number;
+  // Empty = available all day. Each span hatches its own slice of the lane
+  // and rejects drops there — a tech out all morning is still bookable in the
+  // afternoon, which is the whole point of spans over a boolean.
   timeOff?: TechTimeOff[];
   // Absent = no signal at all, which must render as NOTHING — not an error,
   // not a zero state. Most fleets have techs in all three tiers.
   location?: TechLocation | null;
 }
 
-// Extends the DENORMALIZED board projection, not the bare `Dispatch`: a block
-// renders the WO number, the WO summary and the customer name, and §2.1 says
-// the board read reuses `DispatchRepository.searchBoard`, which already
-// LEFT-joins work_order_cache and user_cache for exactly those fields.
+// Mirrors BoardDispatchResponse. Deliberately NOT `extends DispatchBoardRow`:
+// that projection carries notes/createdAt/updatedAt/workOrderTypeName, none of
+// which the board read sends, and inheriting them would be a type that lies
+// about the payload.
 //
 // Region NAMES are not in scheduling-service — it holds only the user↔region
-// link. The board joins ids to names client-side from
+// link — so ids are joined to names client-side from
 // `dispatchRegionApi.getAll()` (GET /tenant/dispatch-regions).
-export interface BoardDispatch extends DispatchBoardRow {
-  // Derived server-side, never stored: straight-line distance from the
-  // previous stop × a per-region road factor. Null on a tech's first stop.
-  driveMinFromPrev: number | null;
-  // Null = staged "on deck", not yet released to the tech. ORTHOGONAL to
-  // status — a SCHEDULED and an EN_ROUTE dispatch can both be unreleased.
-  // Never derive this from status.
+export interface BoardDispatch {
+  id: string;
+  seq: number;
+  status: DispatchStatus;
+  // The block geometry is the arrival WINDOW, never a start/end time.
+  arrivalWindowStart: string;
+  arrivalWindowEnd: string;
+  // Minutes. Nullable and defaulted nowhere — null renders as an outline with
+  // no fill, which is the honest "we promised a window, we don't know how long
+  // the work takes". Never substitute a default.
+  estimatedDuration: number | null;
+  // Null = on deck, not yet handed to the tech. ORTHOGONAL to status: a
+  // dispatch can be unreleased at any status. Never derive this from status.
   releasedAt: string | null;
-  // Optimistic-concurrency token. Round-trips on PUT; a mismatch is a 409.
+  // Round-trips on PUT for stale-read protection; a mismatch is a 409.
   version: number;
-
-  // GAP (dispatch-board.md §2.2 vs §3.3): the design puts a 4px danger rail
-  // on URGENT blocks and a ⟳ glyph on agreement work, but neither field is in
-  // the specified `dispatches[]` contract. Both live on the WORK ORDER, so the
-  // board read has to denormalize them the way it already denormalizes
-  // customerName. Typed optional and rendered defensively so the board
-  // degrades quietly until they land — but URGENT is the most operationally
-  // important signal on this surface, so it should not stay missing.
-  priority?: WorkOrderPriority;
-  recurring?: boolean;
+  assignedUserId: string;
+  assignedUserName: string | null;
+  workOrderId: string;
+  workOrderNumber: string | null;
+  workOrderTypeId: string | null;
+  workOrderSummary: string | null;
+  customerId: string | null;
+  customerName: string | null;
+  priority: WorkOrderPriority | null;
+  // Agreement-generated work; the board marks it with a recurrence glyph.
+  recurring: boolean;
+  serviceLocationId: string | null;
+  serviceLocationCity: string | null;
+  serviceLocationState: string | null;
+  // Null when the site never geocoded. The map reports these via
+  // `dispatchesMissingCoordinates` rather than dropping the pins.
+  latitude: number | null;
+  longitude: number | null;
+  // Derived per read, never stored: every reschedule invalidates a route's
+  // legs. Null on the first stop, and null when either end lacks coordinates —
+  // the board suppresses the connector rather than inventing a number.
+  driveMinFromPrev: number | null;
+  arrivedAt: string | null;
+  departedAt: string | null;
+  addressedWorkItemIds: string[];
 }
 
 export interface DispatchBoard {
+  // Echoed so a client can tell a stale response from a current one after a
+  // fast date change.
+  date: string;
+  // The tenant's IANA zone, which `date` was resolved in. The axis and the
+  // now-line are drawn in it — taking the zone from the browser instead puts
+  // every block in the wrong column for anyone outside the tenant's zone.
+  timeZone: string;
   techs: BoardTech[];
   dispatches: BoardDispatch[];
+  // How many of the day's dispatches sit at a location with no coordinates.
+  // The map has to say "3 jobs have no location" rather than silently
+  // dropping those pins.
+  dispatchesMissingCoordinates: number;
   // Load-bar denominator, from scheduling-service config
-  // (`app.dispatch.default-stops-per-day`). Optional until the server echoes
-  // it; the client falls back to the same value, but a denominator with two
-  // sources of truth drifts — it already had, 6 here against 8 there — so
-  // once this is on the wire the client constant goes.
+  // (`app.dispatch.default-stops-per-day`). Absent = render the stop count
+  // with NO bar. The board's own rule is that a load bar needs a real
+  // denominator or it is decoration, and this number has already drifted
+  // twice against a hardcoded copy. Deliberately no client fallback.
   defaultStopsPerDay?: number;
 }
 
@@ -126,26 +163,30 @@ export interface GetBoardParams {
 // One rail card per WORK ORDER, not per work item: a WO with three items may
 // need two visits, and which items a visit covers is the composer's decision.
 export interface UnscheduledWorkOrder {
-  id: string;
-  workOrderNumber: string | null;
+  // `workOrderId`, NOT `id` — the row is a work order, not a dispatch.
+  workOrderId: string;
+  workOrderNumber: string;
   workOrderSummary: string | null;
-  customerId: string | null;
-  customerName: string | null;
-  locationId: string | null;
+  workOrderTypeId: string | null;
+  customerId: string;
+  customerName: string;
+  serviceLocationId: string;
+  serviceLocationCity: string;
+  serviceLocationState: string;
+  latitude: number | null;
+  longitude: number | null;
   priority: WorkOrderPriority;
-  // Count only — the rail does not carry the items themselves. Opening the
-  // composer fetches them (the drawer requires a full WorkItemResponse[]).
+  // Correct at creation and then stale until the order is next updated —
+  // work-order-service publishes no event for item add/remove. The same
+  // caveat applies to `workOrderSummary`, derived from the items.
   itemCount: number;
-  // Agreement/PM work, derived from agreementId / sourceType upstream.
   recurring: boolean;
+  // The card renders both, and the division filter applies to the rail as
+  // well as the grid. Ids only — names are joined client-side.
+  dispatchRegionId: string | null;
+  divisionId: string | null;
+  // The rail sorts on priority, then age from here.
   createdAt: string;
-  // GAP (dispatch-board.md §2.2 vs the mock): the rail CARD renders a
-  // division and a region line, and the board's division filter has to apply
-  // to the rail as well as the grid — but neither `divisionId` nor
-  // `dispatchRegionId` is in the specified contract. Both exist on
-  // `WorkOrder`. Left off the type deliberately rather than invented; add
-  // them here once BE confirms, and join ids to names client-side the same
-  // way tech regions are joined.
 }
 
 export interface UnscheduledPage {
