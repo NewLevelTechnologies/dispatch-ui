@@ -36,10 +36,7 @@ import InvoicesPage from './pages/InvoicesPage';
 import QuotesPage from './pages/QuotesPage';
 import PaymentsPage from './pages/PaymentsPage';
 import DispatchBoardPage from './pages/DispatchBoardPage';
-import DispatchesPage from './pages/DispatchesPage';
-import AvailabilityPage from './pages/AvailabilityPage';
 import RecurringOrdersPage from './pages/RecurringOrdersPage';
-import SchedulingPage from './pages/SchedulingPage';
 import UsersPage from './pages/UsersPage';
 import UserDetailPage from './pages/UserDetailPage';
 import { UserInvitePage, UserEditPage } from './pages/UserFormPage';
@@ -230,16 +227,15 @@ function App() {
       <Route path="/invoices" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<InvoicesPage />} />} />
       <Route path="/quotes" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<QuotesPage />} />} />
       <Route path="/payments" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<PaymentsPage />} />} />
-      {/* The dispatch board. Not linked from the sidebar yet: it needs
-          GET /scheduling/board, which is still in flight. The three
-          superseded routes below (/dispatches, /availability, /scheduling)
-          are deleted in the same change that links this one, so we never
-          trade a working page for a board that cannot load. */}
+      {/* The dispatch board. Supersedes /dispatches (a flat list of dispatch
+          records has no audience — a dispatch is a child of a work order),
+          /availability (implied a shift-scheduling product we declined; the
+          `availability` ENTITY stays and the board reads it), and /scheduling
+          (this board is that surface). Deleted outright rather than left as
+          <Navigate> stubs: nothing links to them and nobody has bookmarked
+          them, so redirects would be debt with no beneficiary. */}
       <Route path="/dispatch" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<DispatchBoardPage />} />} />
-      <Route path="/dispatches" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<DispatchesPage />} />} />
-      <Route path="/availability" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<AvailabilityPage />} />} />
       <Route path="/recurring-orders" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<RecurringOrdersPage />} />} />
-      <Route path="/scheduling" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<SchedulingPage />} />} />
       <Route path="/approvals" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<ApprovalsPage />} />} />
       {/* Legacy redirects: /roles moved under /settings/access */}
       <Route path="/roles" element={<Navigate to="/settings/access/roles" replace />} />

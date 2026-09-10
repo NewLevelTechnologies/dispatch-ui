@@ -19,7 +19,6 @@ import {
   CubeIcon,
   BuildingStorefrontIcon,
   ChartBarIcon,
-  ClockIcon,
   ArrowPathIcon,
   MapPinIcon,
   EllipsisHorizontalIcon,
@@ -139,8 +138,10 @@ export default function AppLayout({ children, flush }: { children: React.ReactNo
   ];
 
   const schedulingNavigation = [
-    { name: getName('dispatch', true), href: '/dispatches', icon: CalendarIcon },
-    { name: t('scheduling.entities.availability'), href: '/availability', icon: ClockIcon },
+    // SINGULAR on purpose: the board is a place, not a collection — the same
+    // reason the route is /dispatch. The label still reads from the glossary,
+    // so a tenant that calls these "Trips" gets "Trip" here.
+    { name: getName('dispatch'), href: '/dispatch', icon: CalendarIcon },
     { name: t('scheduling.entities.recurringOrders'), href: '/recurring-orders', icon: ArrowPathIcon },
   ];
 

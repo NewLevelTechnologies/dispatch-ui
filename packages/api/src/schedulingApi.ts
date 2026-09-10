@@ -406,6 +406,14 @@ export interface UpdateAvailabilityRequest {
   notes?: string;
 }
 
+// UNCONSUMED as of the dispatch-board work: AvailabilityPage was deleted with
+// the /availability route, and that deletion is the PREREQUISITE for BE's
+// §0b reshape of this entity (dispatch-board.md) — the date + startTime +
+// endTime triple below becomes startsAt / endsAt / allDay / label.
+//
+// Don't wire anything new to this shape; it is about to change. The board
+// reads time off through the board endpoint, and "Mark time off" will post
+// against the reshaped contract.
 export const availabilityApi = {
   getAll: async (params?: {
     userId?: string;

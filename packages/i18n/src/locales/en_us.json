@@ -1301,36 +1301,16 @@
     "uncategorized": "Other"
   },
   "scheduling": {
-    "description": "Manage dispatches, availability, and recurring orders",
-    "descriptionDispatches": "Schedule and manage work order dispatches",
-    "descriptionAvailability": "Manage user availability schedules",
-    "descriptionRecurringOrders": "Manage recurring maintenance schedules",
     "entities": {
-      "availability": "Availability",
-      "availabilityRecord": "Availability Record",
-      "dispatch": "Dispatch",
-      "dispatches": "Dispatches",
       "recurringOrder": "Recurring Order",
       "recurringOrders": "Recurring Orders"
     },
     "form": {
-      "assignedUser": "Assigned User",
       "customer": "Customer",
-      "date": "Date",
       "descriptionPlaceholder": "Regular maintenance service",
       "durationPlaceholder": "Minutes",
-      "endTime": "End Time",
-      "equipment": "Equipment",
-      "estimatedDuration": "Estimated Duration (minutes)",
       "frequency": "Frequency",
-      "nextScheduledDate": "Next Scheduled Date",
-      "reason": "Reason",
-      "reasonPlaceholder": "e.g., Vacation, Training, Meeting",
-      "arrivalWindowStart": "Arrival Window Start",
-      "scheduledDate": "Scheduled Date",
-      "startTime": "Start Time",
-      "user": "User",
-      "workOrder": "Work Order"
+      "nextScheduledDate": "Next Scheduled Date"
     },
     "frequency": {
       "annually": "Annually",
@@ -1338,27 +1318,10 @@
       "quarterly": "Quarterly",
       "weekly": "Weekly"
     },
-    "status": {
-      "available": "Available",
-      "busy": "Busy",
-      "tentative": "Tentative",
-      "unavailable": "Unavailable"
-    },
     "table": {
-      "assignedUser": "Assigned User",
       "customer": "Customer",
-      "date": "Date",
-      "arrivalWindowStart": "Arrival Window",
-      "endTime": "End Time",
-      "equipment": "Equipment",
-      "estimatedDuration": "Duration",
       "frequency": "Frequency",
-      "nextScheduled": "Next Scheduled",
-      "reason": "Reason",
-      "scheduledDate": "Scheduled",
-      "startTime": "Start Time",
-      "user": "User",
-      "workOrder": "Work Order"
+      "nextScheduled": "Next Scheduled"
     }
   },
   "settings": {
