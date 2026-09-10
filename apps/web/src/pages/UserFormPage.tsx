@@ -5,7 +5,14 @@ import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/rea
 import { useTranslation } from '@dispatch/i18n';
 import { ChevronRightIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import { PatternFormat } from 'react-number-format';
-import { userApi, dispatchRegionApi, tenantSettingsApi, type Role } from '../api/setup';
+import {
+  userApi,
+  dispatchRegionApi,
+  tenantSettingsApi,
+  type Dispatchable,
+  type Role,
+} from '../api/setup';
+import { ToggleGroup, ToggleGroupOption } from '../components/ui/ToggleGroup';
 import { roleAccentFromRole } from '@dispatch/utils';
 import { showError, showSuccess, extractApiError, errorStatus, errorCode, isConflict } from '../lib/toast';
 import RemovalGuardDialog, { type RemovalGuard } from '../components/users/RemovalGuardDialog';
@@ -71,6 +78,7 @@ export default function UserFormPage({ mode }: UserFormPageProps) {
     phoneNumber: '',
     roleIds: [] as string[],
     dispatchRegionIds: [] as string[],
+    dispatchable: 'INHERIT' as Dispatchable,
   });
 
   useEffect(() => {
@@ -88,6 +96,7 @@ export default function UserFormPage({ mode }: UserFormPageProps) {
       phoneNumber: existingUser.phoneNumber ?? '',
       roleIds: existingUser.roles?.map((r) => r.id) ?? [],
       dispatchRegionIds: existingUser.dispatchRegionIds ?? [],
+      dispatchable: existingUser.dispatchable ?? 'INHERIT',
     });
   }, [existingUser, isInvite]);
 
@@ -178,6 +187,10 @@ export default function UserFormPage({ mode }: UserFormPageProps) {
         firstName: formData.firstName,
         lastName: formData.lastName,
         phoneNumber: formData.phoneNumber.trim() || null,
+        // Always sent. On this sparse PUT, omitting means "leave alone" while
+        // INHERIT means "reset to follow the roles" — sending it every time
+        // keeps that distinction out of the callsite.
+        dispatchable: formData.dispatchable,
       }),
     onError: (error: unknown) => {
       showError(
@@ -396,6 +409,14 @@ export default function UserFormPage({ mode }: UserFormPageProps) {
                   setFormData((p) => ({ ...p, roleIds: [] }))
                 }
               />
+              {!isInvite && (
+                <DispatchableField
+                  value={formData.dispatchable}
+                  onChange={(v) => setFormData((p) => ({ ...p, dispatchable: v }))}
+                  roles={roles}
+                  selectedRoleIds={formData.roleIds}
+                />
+              )}
               <CapabilityPreview
                 effective={effective}
                 selectedCount={formData.roleIds.length}
@@ -479,6 +500,80 @@ export default function UserFormPage({ mode }: UserFormPageProps) {
 }
 
 // ──────────────────────────────────────────────────────────────────
+// ──────────────────────────────────────────────────────────────────
+// DispatchableField — the per-user override on "is this person on the
+// dispatch board".
+//
+// THREE states, so a segmented group rather than a checkbox: "follow the
+// roles" is a real, distinct answer from both yes and no, and it is the
+// default for nearly everyone.
+//
+// The trailing hint is the point of the control. On its own, INHERIT tells an
+// admin nothing — they would have to go read the Roles page to work out what
+// following the roles produces for this person. So the hint states the
+// OUTCOME and its CAUSE, computed live from the roles currently ticked in
+// this form rather than from the saved value, so it updates the moment
+// someone adds Technician.
+// ──────────────────────────────────────────────────────────────────
+function DispatchableField({
+  value,
+  onChange,
+  roles,
+  selectedRoleIds,
+}: {
+  value: Dispatchable;
+  onChange: (value: Dispatchable) => void;
+  roles: Role[];
+  selectedRoleIds: string[];
+}) {
+  const grantingRoles = useMemo(
+    () => roles.filter((r) => selectedRoleIds.includes(r.id) && r.performsFieldWork),
+    [roles, selectedRoleIds],
+  );
+
+  const inheritedOn = grantingRoles.length > 0;
+  const onBoard = value === 'ALWAYS' ? true : value === 'NEVER' ? false : inheritedOn;
+
+  const hint = (() => {
+    if (value === 'ALWAYS') return 'On the board, whatever the roles say';
+    if (value === 'NEVER') return 'Kept off the board, whatever the roles say';
+    return inheritedOn
+      ? `On the board — ${grantingRoles.map((r) => r.name).join(', ')}`
+      : 'Not on the board — no role here performs field work';
+  })();
+
+  return (
+    <div className="mt-3 border-t border-border-soft pt-3">
+      <div className="mb-1.5 flex items-baseline gap-2">
+        <span className="text-[10px] font-semibold uppercase tracking-[0.06em] text-fg-muted">
+          Dispatchable
+        </span>
+        <span
+          className={`text-[11px] ${onBoard ? 'text-fg' : 'text-fg-muted'}`}
+          data-testid="dispatchable-hint"
+        >
+          {hint}
+        </span>
+      </div>
+      <ToggleGroup
+        value={value}
+        onChange={onChange}
+        size="sm"
+        aria-label="Dispatchable"
+      >
+        <ToggleGroupOption value="INHERIT">Follow roles</ToggleGroupOption>
+        <ToggleGroupOption value="ALWAYS">Always</ToggleGroupOption>
+        <ToggleGroupOption value="NEVER">Never</ToggleGroupOption>
+      </ToggleGroup>
+      <p className="mt-1.5 text-[11px] text-fg-muted">
+        An override for the cases roles can’t express — a working owner who
+        drives, a tech on light duty. Regions are a different question: they
+        narrow <em>which</em> board someone appears on, not whether they appear.
+      </p>
+    </div>
+  );
+}
+
 // RoleMultiSelect — 3-col grid of role rows. Search appears only when
 // roles.length > 10; below that, the grid is the summary. The per-row
 // `<label>` wraps a Catalyst Checkbox; native label semantics forward
@@ -579,6 +674,19 @@ function RoleMultiSelect({
                   >
                     {role.name}
                   </span>
+                  {/* Ticking this role is what puts someone on the dispatch
+                      board, so say so HERE — at the moment of the decision —
+                      rather than leaving an inviter to wonder later why a new
+                      tech has no row. Present on the invite form too, where
+                      the Dispatchable override deliberately is not. */}
+                  {role.performsFieldWork && (
+                    <span
+                      title="Users in this role appear on the dispatch board"
+                      className="flex-shrink-0 rounded-sm bg-bg-active px-1 py-px font-mono text-[9.5px] font-bold tracking-wide text-fg-muted uppercase"
+                    >
+                      Field
+                    </span>
+                  )}
                 </span>
                 <span className="font-mono text-[10px] tabular-nums text-fg-dim">
                   {capCount}
