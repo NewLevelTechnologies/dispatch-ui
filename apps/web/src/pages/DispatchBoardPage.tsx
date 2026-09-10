@@ -1,39 +1,74 @@
-// Dispatch board — the page. Owns date scope, region scope, search, the
-// reads, and the drawer; hands a uniform prop bag to whichever spine is
-// mounted. Swapping the spine must never fork this file (handoff §3.2).
+// Dispatch board — the page. Owns date scope, region scope, search, density,
+// grouping, the exception filters, the reads and the drawer; hands a uniform
+// prop bag to whichever spine is mounted. Swapping the spine must never fork
+// this file (handoff §3.2).
 //
 // Full-bleed operational surface: `AppLayout flush` drops the padded,
 // max-width canvas so the three chrome bands can sit flush and only the
 // board scrolls. Height comes from the house pattern used by SettingsLayout
 // (`h-[calc(100svh-52px)]` — 52px is the desktop header).
 //
-// This commit lands the route, the chrome, the rail and the states. The
-// timeline spine renderer follows; until `GET /scheduling/board` exists
-// server-side the read 404s and the board area shows its error state, which
-// is why the route is not linked from the sidebar yet.
+// Until `GET /scheduling/board` exists server-side the read 404s and the
+// board area shows its error state.
 import { useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from '@dispatch/i18n';
 import { ChevronLeftIcon, ChevronRightIcon } from '@heroicons/react/24/outline';
-import { dispatchBoardApi, dispatchRegionApi } from '../api/setup';
+import {
+  dispatchBoardApi,
+  dispatchRegionApi,
+  tenantSettingsApi,
+  type BoardDispatch,
+  type BoardTech,
+} from '../api/setup';
 import { useGlossary } from '../contexts/GlossaryContext';
 import AppLayout from '../components/AppLayout';
 import { Heading } from '../components/catalyst/heading';
 import { Button } from '../components/catalyst/button';
+import { Badge } from '../components/catalyst/badge';
 import { ListToolbar, ListSearch } from '../components/ui/ListToolbar';
 import { FilterChipListbox, ChipListboxOption } from '../components/ui/FilterChipListbox';
 import { LoadingState } from '../components/ui/LoadingState';
 import { EmptyState } from '../components/ui/EmptyState';
 import { ErrorState } from '../components/ui/ErrorState';
 import { Pill } from '../components/ui/Pill';
+import DispatchDetailDrawer from '../components/DispatchDetailDrawer';
+import DispatchTimeline from '../components/dispatch/DispatchTimeline';
+import {
+  DENSITY_METRICS,
+  autoDensityFor,
+  type BoardGroup,
+  type Density,
+} from '../components/dispatch/spine';
+import { buildAxis, zonedDate, zonedHour } from '../lib/boardTime';
+import { isHiddenByDefault } from '../lib/dispatchStatus';
 
-// ── Date scope ───────────────────────────────────────────────────────
-// The board is day-bounded. The date rides in the URL as a plain
-// YYYY-MM-DD so "look at Thursday in East Valley" is a shareable link, and
-// the SERVER resolves it to an instant range in the TENANT's timezone
-// (handoff §2.0a). We only ever hand it a calendar date — never an instant —
-// precisely so the browser's zone can't decide where the day boundary falls.
+// The tenant's nominal working day. The axis widens to contain anything
+// outside it (an overnight emergency must not be clipped) but never narrows.
+const DAY_START = 6;
+const DAY_END = 20;
+
+// Load-bar denominator. Per §4 this belongs in scheduling-service config
+// (`app.dispatch.default-stops-per-day`) and is not on the wire yet, so the
+// board carries the same default until it is.
+const DEFAULT_STOPS_PER_DAY = 6;
+
+type GroupBy = 'none' | 'region';
+
+/** Grid filters. "Unassigned" is deliberately absent: unassigned work is not
+ *  on the grid, so it was never a grid filter — the rail header carries that
+ *  count instead. */
+type ExceptionId = 'urgent' | 'unreleased' | 'noshow' | 'cancelled' | 'longdrive' | 'recurring';
+
+const LONG_DRIVE_MINUTES = 30;
+
+/** Selected filter chips take the `accent-soft` surface; unselected ones are
+ *  outlined. Button's props are a union — color and outline are mutually
+ *  exclusive — so the variant is chosen, not merged. */
+function chipVariant(selected: boolean): { color: 'accent-soft' } | { outline: true } {
+  return selected ? { color: 'accent-soft' } : { outline: true };
+}
 
 function todayLocal(): string {
   const now = new Date();
@@ -61,9 +96,15 @@ export default function DispatchBoardPage() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
-  // Search stays local — it filters rows already on the board, so it has no
-  // business in a shareable link the way date and region scope do.
+  // Search filters rows already on the board, so it stays local — unlike
+  // date and region scope, which belong in a shareable link.
   const [search, setSearch] = useState('');
+  const [densityPref, setDensityPref] = useState<Density | 'auto'>('auto');
+  const [groupBy, setGroupBy] = useState<GroupBy>('region');
+  const [hideEmpty, setHideEmpty] = useState(false);
+  const [collapsed, setCollapsed] = useState<string[]>([]);
+  const [exceptions, setExceptions] = useState<ExceptionId[]>([]);
+  const [openDispatch, setOpenDispatch] = useState<BoardDispatch | null>(null);
 
   const rawDate = searchParams.get('date');
   const date = isValidDate(rawDate) ? rawDate : todayLocal();
@@ -80,6 +121,17 @@ export default function DispatchBoardPage() {
       { replace: false },
     );
   };
+
+  // Already fetched at app bootstrap under the same key, so this is a cache
+  // read. The timezone matters: block placement is hour-of-day, and deriving
+  // that from the browser puts every block in the wrong column for anyone
+  // outside the tenant's zone.
+  const { data: tenantSettings } = useQuery({
+    queryKey: ['tenant-settings'],
+    queryFn: () => tenantSettingsApi.getSettings(),
+  });
+  const timeZone =
+    tenantSettings?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
 
   // Region NAMES are not in scheduling-service — it holds only the
   // user↔region link. The board read returns ids; names come from here and
@@ -106,36 +158,181 @@ export default function DispatchBoardPage() {
     queryFn: () => dispatchBoardApi.getUnscheduled({ regionIds }),
   });
 
+  const allTechs = useMemo(() => board?.techs ?? [], [board]);
+  const allDispatches = useMemo(() => board?.dispatches ?? [], [board]);
+  const railItems = useMemo(() => unscheduled?.content ?? [], [unscheduled]);
+
   const techs = useMemo(() => {
-    const all = board?.techs ?? [];
-    if (!search.trim()) return all;
+    if (!search.trim()) return allTechs;
     const q = search.trim().toLowerCase();
-    return all.filter((tech) => tech.name.toLowerCase().includes(q));
-  }, [board?.techs, search]);
+    return allTechs.filter((tech) => tech.name.toLowerCase().includes(q));
+  }, [allTechs, search]);
 
-  const dispatches = board?.dispatches ?? [];
-  const railItems = unscheduled?.content ?? [];
+  const techIds = useMemo(() => new Set(techs.map((tech) => tech.id)), [techs]);
 
-  // Self-hide: the region control renders only when more than one region is
-  // COVERED by the board's techs — coverage, not primary, so filtering to a
-  // region still finds the tech who merely covers it (handoff §3.1).
-  const coveredRegionIds = useMemo(
-    () => new Set((board?.techs ?? []).flatMap((tech) => tech.regionIds)),
-    [board?.techs],
+  // Counts are computed over everything in scope, NOT over the filtered set:
+  // a chip that renumbers itself as you filter can't be used to navigate.
+  const counts = useMemo(() => {
+    const inScope = allDispatches.filter((d) => techIds.has(d.assignedUserId));
+    return {
+      urgent: inScope.filter((d) => d.priority === 'URGENT').length,
+      unreleased: inScope.filter((d) => d.releasedAt == null && d.status !== 'CANCELLED').length,
+      noshow: inScope.filter((d) => d.status === 'NO_SHOW').length,
+      cancelled: inScope.filter((d) => d.status === 'CANCELLED').length,
+      longdrive: inScope.filter((d) => (d.driveMinFromPrev ?? 0) > LONG_DRIVE_MINUTES).length,
+      recurring: inScope.filter((d) => d.recurring === true).length,
+    } satisfies Record<ExceptionId, number>;
+  }, [allDispatches, techIds]);
+
+  const visibleDispatches = useMemo(() => {
+    const showCancelled = exceptions.includes('cancelled');
+    // CANCELLED isn't work, so it's hidden until asked for — but it explains
+    // a hole in the day, so it stays reachable rather than being dropped.
+    const active = exceptions.filter((id) => id !== 'cancelled');
+
+    return allDispatches.filter((d) => {
+      if (!techIds.has(d.assignedUserId)) return false;
+      if (isHiddenByDefault(d.status) && !showCancelled) return false;
+      if (active.length === 0) return true;
+      return active.some((id) => {
+        switch (id) {
+          case 'urgent':
+            return d.priority === 'URGENT';
+          case 'unreleased':
+            return d.releasedAt == null && d.status !== 'CANCELLED';
+          case 'noshow':
+            return d.status === 'NO_SHOW';
+          case 'longdrive':
+            return (d.driveMinFromPrev ?? 0) > LONG_DRIVE_MINUTES;
+          case 'recurring':
+            return d.recurring === true;
+          default:
+            return false;
+        }
+      });
+    });
+  }, [allDispatches, techIds, exceptions]);
+
+  const byTech = useMemo(() => {
+    const map: Record<string, BoardDispatch[]> = {};
+    for (const d of visibleDispatches) {
+      (map[d.assignedUserId] ??= []).push(d);
+    }
+    return map;
+  }, [visibleDispatches]);
+
+  // The fold is for AVAILABLE techs with an empty day. A tech who is OFF
+  // already has a distinct rendered state (hatched, labelled, undroppable);
+  // folding them would conceal the operational fact that someone is out.
+  const foldableCount = useMemo(
+    () => techs.filter((tech) => !tech.availability && (byTech[tech.id] ?? []).length === 0).length,
+    [techs, byTech],
   );
+
+  const shownTechs = useMemo(
+    () =>
+      hideEmpty
+        ? techs.filter((tech) => tech.availability || (byTech[tech.id] ?? []).length > 0)
+        : techs,
+    [techs, byTech, hideEmpty],
+  );
+
+  const regionName = (id: string | null) =>
+    id ? (regions.find((r) => r.id === id)?.name ?? null) : null;
+
+  // Grouping keys off PRIMARY region, because that is what produces a row
+  // group. Filter visibility keys off coverage — the two sets are
+  // deliberately different and can disagree.
+  const primaryRegionIds = useMemo(
+    () => new Set(techs.map((tech) => tech.primaryRegionId).filter((id): id is string => !!id)),
+    [techs],
+  );
+  const coveredRegionIds = useMemo(
+    () => new Set(techs.flatMap((tech) => tech.regionIds)),
+    [techs],
+  );
+
   const regionOptions = useMemo(
     () => regions.filter((r) => coveredRegionIds.has(r.id)),
     [regions, coveredRegionIds],
   );
   const showRegionFilter = regionOptions.length > 1;
+  // Only offer grouping when more than one group would actually render.
+  const showGroupingPicker = primaryRegionIds.size > 1;
+  const showDensityPicker = shownTechs.length > 12;
+  const showHideEmpty = foldableCount > 0;
 
-  const hasFilters = Boolean(regionId || search.trim());
+  // A stale preference falls back to flat rather than silently grouping by a
+  // control the user can no longer see.
+  const effectiveGroupBy: GroupBy = showGroupingPicker ? groupBy : 'none';
+
+  const autoDensity = autoDensityFor(shownTechs.length);
+  const density: Density = densityPref === 'auto' ? autoDensity : densityPref;
+
+  const groups = useMemo<BoardGroup[]>(() => {
+    const summarize = (list: BoardTech[]) => ({
+      stops: list.reduce((n, tech) => n + (byTech[tech.id] ?? []).length, 0),
+      held: list.reduce(
+        (n, tech) => n + (byTech[tech.id] ?? []).filter((d) => d.releasedAt == null).length,
+        0,
+      ),
+    });
+
+    if (effectiveGroupBy === 'none') {
+      return [{ key: '__all', label: null, techs: shownTechs, ...summarize(shownTechs) }];
+    }
+
+    // Order follows the tenant's own region ordering, and a tech appears in
+    // exactly one group — their primary.
+    const ordered = regions.filter((r) => primaryRegionIds.has(r.id));
+    const built = ordered.map((region) => {
+      const list = shownTechs.filter((tech) => tech.primaryRegionId === region.id);
+      return { key: region.id, label: region.name, techs: list, ...summarize(list) };
+    });
+    // Techs whose primary region isn't in the registry (or is null) still
+    // need a row — never drop a person off the board.
+    const orphans = shownTechs.filter(
+      (tech) => !tech.primaryRegionId || !primaryRegionIds.has(tech.primaryRegionId),
+    );
+    if (orphans.length > 0) {
+      built.push({
+        key: '__unassigned',
+        label: t('dispatchBoard.grid.noRegion'),
+        techs: orphans,
+        ...summarize(orphans),
+      });
+    }
+    return built.filter((group) => group.techs.length > 0);
+  }, [effectiveGroupBy, shownTechs, byTech, regions, primaryRegionIds, t]);
+
+  // The axis widens to contain any window outside the working day.
+  const axis = useMemo(() => {
+    const windows = visibleDispatches
+      .map((d) => ({
+        start: zonedHour(d.arrivalWindowStart, timeZone),
+        end: zonedHour(d.arrivalWindowEnd, timeZone),
+      }))
+      .filter((w): w is { start: number; end: number } => w.start !== null && w.end !== null);
+    return buildAxis(DAY_START, DAY_END, windows);
+  }, [visibleDispatches, timeZone]);
+
+  // A now-line only means something on today's board — drawing one on
+  // Thursday's board would be a lie.
+  const nowHour = useMemo(() => {
+    const now = new Date();
+    if (zonedDate(now, timeZone) !== date) return null;
+    return zonedHour(now.toISOString(), timeZone);
+  }, [date, timeZone]);
+
+  const hasFilters = Boolean(regionId || search.trim() || exceptions.length > 0);
   const clearFilters = () => {
     setSearch('');
+    setExceptions([]);
     setParam('region', null);
   };
 
-  const regionName = regionId ? (regions.find((r) => r.id === regionId)?.name ?? null) : null;
+  const toggleException = (id: ExceptionId) =>
+    setExceptions((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
 
   const dispatchesLabel = getName('dispatch', true);
   const techLabel = getName('technician', true);
@@ -162,7 +359,7 @@ export default function DispatchBoardPage() {
     // "performs field work", so this state names that rule rather than
     // diagnosing a cause: the client cannot tell a correctly-configured
     // tenant with no field staff from a cache that hasn't synced.
-    if (techs.length === 0) {
+    if (allTechs.length === 0) {
       return (
         <EmptyState
           title={t('dispatchBoard.states.noTechsTitle', { entity: techLabel })}
@@ -178,7 +375,21 @@ export default function DispatchBoardPage() {
       );
     }
 
-    if (dispatches.length === 0) {
+    if (shownTechs.length === 0) {
+      return (
+        <EmptyState
+          title={t('dispatchBoard.states.emptyFilteredTitle', { entity: techLabel })}
+          description={t('dispatchBoard.states.emptyFilteredBody')}
+          action={
+            <Button size="xs" onClick={clearFilters}>
+              {t('dispatchBoard.states.clearFilters')}
+            </Button>
+          }
+        />
+      );
+    }
+
+    if (visibleDispatches.length === 0) {
       return hasFilters ? (
         <EmptyState
           title={t('dispatchBoard.states.emptyFilteredTitle', { entity: dispatchesLabel })}
@@ -197,9 +408,34 @@ export default function DispatchBoardPage() {
       );
     }
 
-    // Timeline spine renderer lands next.
-    return null;
+    return (
+      <DispatchTimeline
+        groups={groups}
+        byTech={byTech}
+        density={density}
+        collapsed={collapsed}
+        onToggleGroup={(key) =>
+          setCollapsed((prev) =>
+            prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key],
+          )
+        }
+        onOpenDispatch={setOpenDispatch}
+        axis={axis}
+        nowHour={nowHour}
+        capacityStops={DEFAULT_STOPS_PER_DAY}
+        timeZone={timeZone}
+      />
+    );
   };
+
+  const chips: { id: ExceptionId; label: string }[] = [
+    { id: 'urgent', label: t('dispatchBoard.chips.urgent') },
+    { id: 'unreleased', label: t('dispatchBoard.chips.unreleased') },
+    { id: 'noshow', label: t('dispatchBoard.chips.noshow') },
+    { id: 'cancelled', label: t('dispatchBoard.chips.cancelled') },
+    { id: 'longdrive', label: t('dispatchBoard.chips.longdrive') },
+    { id: 'recurring', label: t('dispatchBoard.chips.recurring') },
+  ];
 
   return (
     <AppLayout flush>
@@ -211,7 +447,7 @@ export default function DispatchBoardPage() {
               {t('dispatchBoard.title', { entity: getName('dispatch') })}
             </Heading>
             <div className="text-[11.5px] text-fg-muted">
-              {t('dispatchBoard.subtitleCount', { count: techs.length, entity: techLabel })}
+              {t('dispatchBoard.subtitleCount', { count: shownTechs.length, entity: techLabel })}
             </div>
           </div>
 
@@ -244,7 +480,9 @@ export default function DispatchBoardPage() {
             className="mb-0 flex-1"
             search={
               <ListSearch
-                placeholder={t('dispatchBoard.search.placeholder', { entity: getName('technician') })}
+                placeholder={t('dispatchBoard.search.placeholder', {
+                  entity: getName('technician'),
+                })}
                 value={search}
                 onChange={setSearch}
               />
@@ -255,7 +493,7 @@ export default function DispatchBoardPage() {
                 label={t('dispatchBoard.filter.region', { entity: getName('dispatch_region') })}
                 ariaLabel={t('dispatchBoard.filter.region', { entity: getName('dispatch_region') })}
                 value={regionId}
-                displayValue={regionName}
+                displayValue={regionName(regionId)}
                 resetLabel={t('dispatchBoard.filter.allRegions', {
                   entity: getName('dispatch_region', true),
                 })}
@@ -269,7 +507,90 @@ export default function DispatchBoardPage() {
                 ))}
               </FilterChipListbox>
             )}
+
+            {showGroupingPicker && (
+              <FilterChipListbox
+                label={t('dispatchBoard.filter.grouping')}
+                ariaLabel={t('dispatchBoard.filter.grouping')}
+                value={effectiveGroupBy}
+                displayValue={
+                  effectiveGroupBy === 'region'
+                    ? t('dispatchBoard.filter.groupByRegion', {
+                        entity: getName('dispatch_region'),
+                      })
+                    : null
+                }
+                onChange={(id) => setGroupBy((id as GroupBy) ?? 'none')}
+                onClear={() => setGroupBy('none')}
+              >
+                <ChipListboxOption value="none">
+                  {t('dispatchBoard.filter.groupByNone')}
+                </ChipListboxOption>
+                <ChipListboxOption value="region">
+                  {t('dispatchBoard.filter.groupByRegion', { entity: getName('dispatch_region') })}
+                </ChipListboxOption>
+              </FilterChipListbox>
+            )}
+
+            {showDensityPicker && (
+              <FilterChipListbox
+                label={t('dispatchBoard.filter.density')}
+                ariaLabel={t('dispatchBoard.filter.density')}
+                value={densityPref}
+                displayValue={
+                  densityPref === 'auto' ? null : t(`dispatchBoard.density.${densityPref}`)
+                }
+                onChange={(id) => setDensityPref((id as Density | 'auto') ?? 'auto')}
+                onClear={() => setDensityPref('auto')}
+              >
+                <ChipListboxOption value="auto">
+                  {t('dispatchBoard.density.auto', { mode: t(`dispatchBoard.density.${autoDensity}`) })}
+                </ChipListboxOption>
+                {(Object.keys(DENSITY_METRICS) as Density[]).map((mode) => (
+                  <ChipListboxOption key={mode} value={mode}>
+                    {t(`dispatchBoard.density.${mode}`)}
+                  </ChipListboxOption>
+                ))}
+              </FilterChipListbox>
+            )}
+
+            {showHideEmpty && (
+              <Button
+                size="xs"
+                {...chipVariant(hideEmpty)}
+                aria-pressed={hideEmpty}
+                onClick={() => setHideEmpty((v) => !v)}
+              >
+                {`${t('dispatchBoard.filter.hideEmpty', { entity: techLabel.toLowerCase() })} (${foldableCount})`}
+              </Button>
+            )}
           </ListToolbar>
+        </div>
+
+        {/* ── Band 3 — exceptions as FILTERS, never as stat cards ── */}
+        <div className="db-band sub">
+          <div className="flex flex-wrap items-center gap-1.5">
+            {chips.map((chip) => {
+              const on = exceptions.includes(chip.id);
+              return (
+                <Button
+                  key={chip.id}
+                  size="xxs"
+                  {...chipVariant(on)}
+                  aria-pressed={on}
+                  onClick={() => toggleException(chip.id)}
+                >
+                  {chip.label}
+                  <Badge color={on ? 'blue' : 'zinc'}>{String(counts[chip.id])}</Badge>
+                </Button>
+              );
+            })}
+            {exceptions.length > 0 && (
+              <Button plain size="xxs" onClick={() => setExceptions([])}>
+                {t('dispatchBoard.states.clearFilters')}
+              </Button>
+            )}
+          </div>
         </div>
 
         {/* ── Body — unscheduled rail, then the board ────────────── */}
@@ -305,6 +626,18 @@ export default function DispatchBoardPage() {
           </div>
         </div>
       </div>
+
+      {/* The board owns no detail surface — it opens the existing drawer.
+          Read-only for now: Release / Reassign / Reschedule are write paths
+          that land with the interactions commit, and a drawer offering
+          buttons that do nothing would be worse than one that doesn't. */}
+      <DispatchDetailDrawer
+        dispatch={openDispatch}
+        readOnly
+        onClose={() => setOpenDispatch(null)}
+        onEdit={() => {}}
+        onDelete={() => {}}
+      />
     </AppLayout>
   );
 }

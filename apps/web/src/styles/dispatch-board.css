@@ -137,3 +137,478 @@
   overflow: auto;
   position: relative;
 }
+
+/* ── Timeline grid (spine A) ──────────────────────────────────────
+   `min-width: max-content` lets the hour axis push wider than the
+   viewport; the tech column and hour header stick to their edges. */
+
+.db-grid {
+  min-width: max-content;
+}
+
+.db-head {
+  display: flex;
+  position: sticky;
+  top: 0;
+  z-index: 6;
+  background: var(--bg-elev-2);
+  border-bottom: 1px solid var(--border);
+}
+
+/* z-index above .db-head so the corner cell wins where the two sticky
+   axes cross. */
+.db-head .db-techcol {
+  position: sticky;
+  left: 0;
+  z-index: 7;
+  background: var(--bg-elev-2);
+  border-right: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--fg-muted);
+  height: 30px;
+}
+
+.db-hours {
+  display: flex;
+  flex: 1;
+  height: 30px;
+}
+
+/* 78px is the floor from the handoff — below it the window/estimate
+   relationship stops being readable. */
+.db-hour {
+  flex: 1;
+  min-width: 78px;
+  border-right: 1px solid var(--border-soft);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--fg-muted);
+  display: flex;
+  align-items: center;
+  padding-left: 6px;
+}
+
+/* ── Groups ───────────────────────────────────────────────────── */
+
+.db-group {
+  border-bottom: 1px solid var(--border);
+}
+
+.db-group-head {
+  position: sticky;
+  left: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 12px;
+  background: var(--bg-active);
+  border-bottom: 1px solid var(--border);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--fg-muted);
+  cursor: pointer;
+  width: 100%;
+}
+
+.db-group-head:hover {
+  color: var(--fg-strong);
+}
+
+/* ── Rows ─────────────────────────────────────────────────────── */
+
+.db-row {
+  display: flex;
+  border-bottom: 1px solid var(--border-soft);
+  background: var(--bg-elev);
+}
+
+.db-row:hover {
+  background: var(--bg-hover);
+}
+
+/* A tech who is off. Hatched and labelled, never folded away — the row
+   IS the information that someone is out. */
+.db-row.off {
+  background: repeating-linear-gradient(
+    135deg,
+    var(--bg-sunken) 0 7px,
+    transparent 7px 14px
+  );
+}
+
+.db-techcol {
+  flex-shrink: 0;
+  position: sticky;
+  left: 0;
+  z-index: 4;
+  background: inherit;
+  border-right: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 10px;
+  min-width: 0;
+}
+
+/* The sticky cell needs an opaque background of its own or blocks scroll
+   through underneath it. */
+.db-row .db-techcol {
+  background: var(--bg-elev);
+}
+
+.db-row:hover .db-techcol {
+  background: var(--bg-hover);
+}
+
+.db-tech-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--fg-strong);
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.db-tech-meta {
+  font-size: 10.5px;
+  color: var(--fg-muted);
+  font-family: var(--font-mono);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Load = STOP COUNT against a tenant default, not hours: no labor
+   estimate exists platform-wide, so an hours bar has no numerator. */
+.db-load {
+  width: 34px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--bg-active);
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.db-load i {
+  display: block;
+  height: 100%;
+  background: var(--success-500);
+}
+
+.db-load.high i {
+  background: var(--warning-500);
+}
+
+.db-load.over i {
+  background: var(--danger-500);
+}
+
+/* ── Lane ─────────────────────────────────────────────────────── */
+
+.db-lane {
+  flex: 1;
+  position: relative;
+  min-width: 0;
+}
+
+.db-lane.over {
+  background: color-mix(in oklch, var(--accent-500) 8%, transparent);
+}
+
+.db-lane-cells {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  pointer-events: none;
+}
+
+.db-lane-cells i {
+  flex: 1;
+  min-width: 78px;
+  border-right: 1px solid var(--border-soft);
+}
+
+.db-lane-cells i:nth-child(2n) {
+  background: color-mix(in oklch, var(--bg-sunken) 45%, transparent);
+}
+
+.db-now {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--danger-500);
+  z-index: 5;
+  pointer-events: none;
+}
+
+/* ── Blocks — the window is the box, the estimate is the fill ──── */
+
+/* A real <button>: the handoff requires a keyboard path to the drawer, and
+   drag-and-drop alone is not an accessible assignment mechanism. `font` and
+   `text-align` are reset because buttons don't inherit either, and this
+   stylesheet is unlayered so UA defaults would otherwise leak through. */
+.db-block {
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--border-strong);
+  border-left: 3px solid var(--info-500);
+  background: var(--bg-elev-2);
+  overflow: hidden;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: stretch;
+  padding: 0 7px;
+  margin: 0;
+  z-index: 2;
+  box-shadow: var(--shadow-sm);
+  font: inherit;
+  text-align: left;
+}
+
+.db-block:focus-visible {
+  outline: 2px solid var(--accent-500);
+  outline-offset: 1px;
+  z-index: 3;
+}
+
+.db-block:hover {
+  z-index: 3;
+  box-shadow: var(--shadow-md);
+  filter: brightness(1.02);
+}
+
+/* Rendered ONLY when estimatedDuration is present. No estimate means no
+   fill — an outline is the honest rendering of "we promised a window, we
+   don't know how long the work takes". Never substitute a default. */
+.db-block .db-fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  background: color-mix(in oklch, var(--info-500) 13%, transparent);
+  pointer-events: none;
+}
+
+/* Status tones mirror lib/dispatchStatus (and therefore the detail
+   drawer) exactly. EN_ROUTE and IN_PROGRESS share the "live" violet;
+   on site is distinguished by the pulse, NOT by hue, because
+   `--accent-*` means navigation here and never carries status. */
+.db-block.scheduled {
+  border-left-color: var(--info-500);
+}
+
+.db-block.enroute {
+  border-left-color: var(--violet-500);
+}
+
+.db-block.enroute .db-fill {
+  background: color-mix(in oklch, var(--violet-500) 15%, transparent);
+}
+
+.db-block.inprogress {
+  border-left-color: var(--violet-500);
+}
+
+.db-block.inprogress .db-fill {
+  background: color-mix(in oklch, var(--violet-500) 15%, transparent);
+}
+
+.db-block.inprogress::after {
+  content: '';
+  position: absolute;
+  right: 5px;
+  top: 5px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--violet-500);
+  animation: db-pulse 1.8s infinite;
+}
+
+.db-block.completed {
+  border-left-color: var(--success-500);
+  opacity: 0.72;
+}
+
+.db-block.completed .db-fill {
+  background: color-mix(in oklch, var(--success-500) 12%, transparent);
+}
+
+.db-block.cancelled {
+  border-left-color: var(--border-strong);
+  opacity: 0.6;
+  text-decoration: line-through;
+}
+
+.db-block.cancelled .db-fill {
+  background: transparent;
+}
+
+/* Stays on the board: a no-show consumed the slot, and someone has to
+   decide whether to reschedule. */
+.db-block.noshow {
+  border-left-color: var(--warning-500);
+  border-left-width: 4px;
+  background: color-mix(in oklch, var(--warning-500) 7%, var(--bg-elev-2));
+}
+
+.db-block.noshow .db-fill {
+  background: transparent;
+}
+
+/* Not released (releasedAt == null). ORTHOGONAL to status — a SCHEDULED
+   and an EN_ROUTE dispatch can both be held — so this is a separate
+   class that layers over any status and must not read as committed. */
+.db-block.held {
+  border-style: dashed;
+  border-left-style: solid;
+  background: repeating-linear-gradient(
+    135deg,
+    var(--bg-elev-2) 0 5px,
+    var(--bg-elev) 5px 10px
+  );
+}
+
+.db-block.held .db-fill {
+  background: transparent;
+}
+
+.db-block.urgent {
+  border-left-color: var(--danger-500);
+  border-left-width: 4px;
+}
+
+.db-block.urgent .db-fill {
+  background: color-mix(in oklch, var(--danger-500) 12%, transparent);
+}
+
+/* Overlap is allowed (dispatchers double-book deliberately) but never
+   hidden. A clashing pair splits the lane off ONE shared boundary so the
+   halves cannot claim the same pixels; z-order alone would BE the
+   hiding, not a fix. The row grows instead of the blocks shrinking. */
+.db-block.clash {
+  outline: 1.5px solid var(--warning-500);
+  outline-offset: -1.5px;
+}
+
+.db-block.clash.upper {
+  top: 3px;
+  bottom: calc(50% + 1px);
+  height: auto;
+}
+
+.db-block.clash.lower {
+  top: calc(50% + 1px);
+  bottom: 3px;
+  height: auto;
+  z-index: 3;
+}
+
+.db-row.clashrow .db-techcol {
+  position: relative;
+}
+
+.db-row.clashrow .db-techcol::after {
+  content: '⚠';
+  position: absolute;
+  right: 6px;
+  bottom: 2px;
+  font-size: 10.5px;
+  color: var(--warning-500);
+}
+
+.db-block.clash .db-block-s,
+.db-block.clash .db-block-m {
+  display: none;
+}
+
+/* position: relative so block text paints above the estimate fill. */
+.db-block-t {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--fg-strong);
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  position: relative;
+}
+
+.db-block-s {
+  font-size: 10.5px;
+  color: var(--fg-muted);
+  line-height: 1.25;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  position: relative;
+}
+
+.db-block-m {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--fg-muted);
+  position: relative;
+  white-space: nowrap;
+}
+
+/* ── Drive-time connector ─────────────────────────────────────────
+   Spans prev.windowEnd → next.windowStart. Warning-toned over 30 min.
+   `--warning-fg` already flips to `--warning-500` in dark, so this
+   needs no theme override. */
+
+.db-drive {
+  position: absolute;
+  height: 1px;
+  border-top: 1px dashed var(--border-strong);
+  z-index: 1;
+  pointer-events: none;
+}
+
+.db-drive span {
+  position: absolute;
+  top: -8px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--fg-muted);
+  background: var(--bg-elev);
+  padding: 0 3px;
+  white-space: nowrap;
+}
+
+.db-drive.long {
+  border-top-color: var(--warning-500);
+}
+
+.db-drive.long span {
+  color: var(--warning-fg);
+}
+
+/* Namespaced so it can't collide with another `pulse` in the app. */
+@keyframes db-pulse {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in oklch, var(--violet-500) 60%, transparent);
+  }
+  70% {
+    box-shadow: 0 0 0 5px color-mix(in oklch, var(--violet-500) 0%, transparent);
+  }
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in oklch, var(--violet-500) 0%, transparent);
+  }
+}

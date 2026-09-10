@@ -12,7 +12,7 @@
 // `/api/v1/scheduling*` reaches scheduling-service at the ALB, so every path
 // here lives under `/scheduling`.
 import apiClient from './client';
-import type { Dispatch, DispatchStatus } from './schedulingApi';
+import type { DispatchBoardRow, DispatchStatus } from './schedulingApi';
 import type { WorkOrderPriority } from './workOrderApi';
 
 // Where a technician's position came from. Telematics and the mobile app
@@ -54,10 +54,15 @@ export interface BoardTech {
   location?: TechLocation | null;
 }
 
+// Extends the DENORMALIZED board projection, not the bare `Dispatch`: a block
+// renders the WO number, the WO summary and the customer name, and §2.1 says
+// the board read reuses `DispatchRepository.searchBoard`, which already
+// LEFT-joins work_order_cache and user_cache for exactly those fields.
+//
 // Region NAMES are not in scheduling-service — it holds only the user↔region
 // link. The board joins ids to names client-side from
 // `dispatchRegionApi.getAll()` (GET /tenant/dispatch-regions).
-export interface BoardDispatch extends Dispatch {
+export interface BoardDispatch extends DispatchBoardRow {
   // Derived server-side, never stored: straight-line distance from the
   // previous stop × a per-region road factor. Null on a tech's first stop.
   driveMinFromPrev: number | null;
@@ -67,6 +72,16 @@ export interface BoardDispatch extends Dispatch {
   releasedAt: string | null;
   // Optimistic-concurrency token. Round-trips on PUT; a mismatch is a 409.
   version: number;
+
+  // GAP (dispatch-board.md §2.2 vs §3.3): the design puts a 4px danger rail
+  // on URGENT blocks and a ⟳ glyph on agreement work, but neither field is in
+  // the specified `dispatches[]` contract. Both live on the WORK ORDER, so the
+  // board read has to denormalize them the way it already denormalizes
+  // customerName. Typed optional and rendered defensively so the board
+  // degrades quietly until they land — but URGENT is the most operationally
+  // important signal on this surface, so it should not stay missing.
+  priority?: WorkOrderPriority;
+  recurring?: boolean;
 }
 
 export interface DispatchBoard {

@@ -2901,7 +2901,12 @@
     },
     "filter": {
       "region": "{{entity}}",
-      "allRegions": "All {{entity, lowercase}}"
+      "allRegions": "All {{entity, lowercase}}",
+      "density": "Density",
+      "grouping": "Grouping",
+      "groupByNone": "No grouping",
+      "groupByRegion": "Group by {{entity, lowercase}}",
+      "hideEmpty": "Hide unscheduled {{entity}}"
     },
     "rail": {
       "heading": "Unscheduled",
@@ -2921,6 +2926,31 @@
       "noTechsBody": "A user appears here when one of their roles is marked “{{setting}}”.",
       "noTechsAction": "Review roles",
       "clearFilters": "Clear filters"
+    },
+    "grid": {
+      "coversMoreRegions_one": "Also covers {{count}} other region",
+      "coversMoreRegions_other": "Also covers {{count}} other regions",
+      "driveMinutes": "{{minutes}}m drive",
+      "estimate": "est {{hours}}h",
+      "noEstimate": "no est.",
+      "offNotDroppable": "{{label}} — not droppable",
+      "groupSummary": " · {{stops}} {{entity}}",
+      "groupHeld": " · {{count}} not released",
+      "noRegion": "No region"
+    },
+    "chips": {
+      "cancelled": "Cancelled",
+      "longdrive": "Drive > 30m",
+      "noshow": "No-show",
+      "recurring": "Agreement",
+      "unreleased": "Not released",
+      "urgent": "Urgent"
+    },
+    "density": {
+      "auto": "Density · auto ({{mode, lowercase}})",
+      "comfortable": "Comfortable",
+      "compact": "Compact",
+      "dense": "Dense"
     }
   }
 }
