@@ -310,6 +310,13 @@ vi.mock('react-i18next', () => {
     'dispatchBoard.rail.emptyBody': 'The whole board is assigned.',
     'dispatchBoard.rail.emptyTitle': 'Nothing unscheduled',
     'dispatchBoard.rail.heading': 'Unscheduled',
+    'dispatchBoard.release.action': 'Release {{count}}',
+    'dispatchBoard.release.confirmAction': 'Release',
+    'dispatchBoard.release.confirmBody':
+      "This texts {{count}} technicians their assignments. It can't be undone.",
+    'dispatchBoard.release.confirmTitle': 'Release {{count}} dispatches?',
+    'dispatchBoard.release.done': '{{count}} dispatches released',
+    'dispatchBoard.release.failed': "Couldn't release",
     'dispatchBoard.rail.itemCount': '{{count}} items',
     'dispatchBoard.rail.recurring': 'Agreement / recurring work',
     'dispatchBoard.rail.urgent': 'Urgent',

@@ -15,18 +15,11 @@ import apiClient from './client';
 import type { DispatchStatus } from './schedulingApi';
 import type { WorkOrderPriority } from './workOrderApi';
 
-// Where a technician's position came from. Telematics and the mobile app
-// coexist in one fleet, and plenty of techs report neither — see `location`.
-export type TechLocationSource = 'telematics' | 'app';
-
-export interface TechLocation {
-  lat: number;
-  lng: number;
-  // Timestamp of the fix. The UI derives staleness from it rather than the
-  // server pre-computing "stale", so the threshold stays a display decision.
-  at: string;
-  source: TechLocationSource;
-}
+// NOTE: there is deliberately no `location` on BoardTech. Nothing in the
+// platform captures technician position, so the field would be null for every
+// tech forever — and a type that promises data no producer writes is the same
+// lie as a fabricated default. The map's position-overlay design (handoff
+// §3.5) stands for whenever a producer exists; add the field then.
 
 // One absence span from an `availability` row with status = OFF, clipped
 // server-side to the requested day — so a week of PTO arrives as that day's
@@ -73,9 +66,6 @@ export interface BoardTech {
   // and rejects drops there — a tech out all morning is still bookable in the
   // afternoon, which is the whole point of spans over a boolean.
   timeOff?: TechTimeOff[];
-  // Absent = no signal at all, which must render as NOTHING — not an error,
-  // not a zero state. Most fleets have techs in all three tiers.
-  location?: TechLocation | null;
 }
 
 // Mirrors BoardDispatchResponse. Deliberately NOT `extends DispatchBoardRow`:

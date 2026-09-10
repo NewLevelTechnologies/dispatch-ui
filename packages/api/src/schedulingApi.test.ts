@@ -2,7 +2,6 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
   dispatchesApi,
   dispatchNotesApi,
-  availabilityApi,
 } from './schedulingApi';
 import apiClient from './client';
 
@@ -169,24 +168,3 @@ describe('dispatchNotesApi', () => {
   });
 });
 
-describe('availabilityApi', () => {
-  it('covers the availability surface', async () => {
-    vi.mocked(apiClient.get).mockResolvedValue({ data: [] });
-
-    await availabilityApi.getAll({ userId: 'u-1', startDate: '2026-01-01' });
-    await availabilityApi.getById('a-1');
-    await availabilityApi.create({ userId: 'u-1' } as never);
-    await availabilityApi.update('a-1', { status: 'APPROVED' } as never);
-    await availabilityApi.delete('a-1');
-
-    expect(apiClient.get).toHaveBeenCalledWith('/scheduling/availability', {
-      params: { userId: 'u-1', startDate: '2026-01-01' },
-    });
-    expect(apiClient.get).toHaveBeenCalledWith('/scheduling/availability/a-1');
-    expect(apiClient.post).toHaveBeenCalledWith('/scheduling/availability', { userId: 'u-1' });
-    expect(apiClient.put).toHaveBeenCalledWith('/scheduling/availability/a-1', {
-      status: 'APPROVED',
-    });
-    expect(apiClient.delete).toHaveBeenCalledWith('/scheduling/availability/a-1');
-  });
-});

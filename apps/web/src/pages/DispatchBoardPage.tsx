@@ -12,7 +12,7 @@
 // board area shows its error state.
 import { useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from '@dispatch/i18n';
 import { ChevronLeftIcon, ChevronRightIcon } from '@heroicons/react/24/outline';
 import {
@@ -35,6 +35,7 @@ import { LoadingState } from '../components/ui/LoadingState';
 import { EmptyState } from '../components/ui/EmptyState';
 import { ErrorState } from '../components/ui/ErrorState';
 import { Pill } from '../components/ui/Pill';
+import ConfirmDialog from '../components/ConfirmDialog';
 import DispatchDetailDrawer from '../components/DispatchDetailDrawer';
 import DispatchFormDrawer from '../components/DispatchFormDrawer';
 import DispatchTimeline from '../components/dispatch/DispatchTimeline';
@@ -46,6 +47,8 @@ import {
   type Density,
 } from '../components/dispatch/spine';
 import { buildAxis, zonedDate, zonedHour } from '../lib/boardTime';
+import { extractApiError, showError, showSuccess } from '../lib/toast';
+import { invalidateDispatchBoard } from '../utils/invalidateRoleConsumers';
 import { isHiddenByDefault } from '../lib/dispatchStatus';
 
 // The tenant's nominal working day. The axis widens to contain anything
@@ -93,6 +96,7 @@ export default function DispatchBoardPage() {
   const { t } = useTranslation();
   const { getName } = useGlossary();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
 
   // Search filters rows already on the board, so it stays local — unlike
@@ -105,6 +109,7 @@ export default function DispatchBoardPage() {
   const [exceptions, setExceptions] = useState<ExceptionId[]>([]);
   const [openDispatch, setOpenDispatch] = useState<BoardDispatch | null>(null);
   const [composeFor, setComposeFor] = useState<UnscheduledWorkOrder | null>(null);
+  const [confirmRelease, setConfirmRelease] = useState(false);
 
   const rawDate = searchParams.get('date');
   const date = isValidDate(rawDate) ? rawDate : todayLocal();
@@ -172,6 +177,10 @@ export default function DispatchBoardPage() {
 
   const allTechs = useMemo(() => board?.techs ?? [], [board]);
   const allDispatches = useMemo(() => board?.dispatches ?? [], [board]);
+  // Server-ordered: severity CASE then createdAt ASC, in the query itself
+  // (WorkOrderCacheRepository). Deliberately NOT re-sorted here — a second
+  // implementation of one ordering rule is the drift risk, and a client sort
+  // could only ever fix the page in hand anyway.
   const railItems = useMemo(() => unscheduled?.content ?? [], [unscheduled]);
 
   const techs = useMemo(() => {
@@ -339,6 +348,18 @@ export default function DispatchBoardPage() {
     return zonedHour(now.toISOString(), timeZone);
   }, [date, timeZone]);
 
+  // Bulk release takes a SCOPE, not an id list: the server recomputes the
+  // unreleased set, so this can neither reach outside the caller's regions
+  // nor act on a board rendered ten minutes ago.
+  const releaseMutation = useMutation({
+    mutationFn: () => dispatchBoardApi.release({ date, regionIds }),
+    onSuccess: ({ released }) => {
+      invalidateDispatchBoard(queryClient);
+      showSuccess(t('dispatchBoard.release.done', { count: released }));
+    },
+    onError: (err) => showError(t('dispatchBoard.release.failed'), extractApiError(err)),
+  });
+
   const hasFilters = Boolean(regionId || search.trim() || exceptions.length > 0);
   const clearFilters = () => {
     setSearch('');
@@ -488,6 +509,18 @@ export default function DispatchBoardPage() {
             >
               <ChevronRightIcon />
             </Button>
+
+            {/* Present only when there is something to release. */}
+            {counts.unreleased > 0 && (
+              <Button
+                color="accent"
+                size="xs"
+                onClick={() => setConfirmRelease(true)}
+                disabled={releaseMutation.isPending}
+              >
+                {t('dispatchBoard.release.action', { count: counts.unreleased })}
+              </Button>
+            )}
           </div>
         </div>
 
@@ -655,6 +688,19 @@ export default function DispatchBoardPage() {
           </div>
         </div>
       </div>
+
+      {/* Releasing texts every one of those technicians and there is no
+          un-send, so this one asks first — unlike the drag operations, which
+          are reversible with a real inverse mutation. */}
+      <ConfirmDialog
+        isOpen={confirmRelease}
+        onClose={() => setConfirmRelease(false)}
+        onConfirm={() => releaseMutation.mutate()}
+        title={t('dispatchBoard.release.confirmTitle', { count: counts.unreleased })}
+        message={t('dispatchBoard.release.confirmBody', { count: counts.unreleased })}
+        confirmLabel={t('dispatchBoard.release.confirmAction')}
+        isPending={releaseMutation.isPending}
+      />
 
       {/* The rail is the board's only path into the composer — no standalone
           Schedule button. The rail already IS the work-order picker: scoped,

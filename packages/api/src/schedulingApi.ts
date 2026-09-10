@@ -371,84 +371,22 @@ export const dispatchNotesApi = {
   },
 };
 
-// ========== AVAILABILITY ==========
-
-export interface Availability {
-  id: string;
-  tenantId: string;
-  userId: string;
-  date: string;
-  startTime: string;
-  endTime: string;
-  status: string;
-  reason?: string;
-  notes?: string;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface CreateAvailabilityRequest {
-  userId: string;
-  date: string;
-  startTime: string;
-  endTime: string;
-  status?: string;
-  reason?: string;
-  notes?: string;
-}
-
-export interface UpdateAvailabilityRequest {
-  date?: string;
-  startTime?: string;
-  endTime?: string;
-  status?: string;
-  reason?: string;
-  notes?: string;
-}
-
-// UNCONSUMED as of the dispatch-board work: AvailabilityPage was deleted with
-// the /availability route, and that deletion is the PREREQUISITE for BE's
-// §0b reshape of this entity (dispatch-board.md) — the date + startTime +
-// endTime triple below becomes startsAt / endsAt / allDay / label.
+// AVAILABILITY: the client was deleted, not left stale.
 //
-// Don't wire anything new to this shape; it is about to change. The board
-// reads time off through the board endpoint, and "Mark time off" will post
-// against the reshaped contract.
-export const availabilityApi = {
-  getAll: async (params?: {
-    userId?: string;
-    status?: string;
-    startDate?: string;
-    endDate?: string;
-  }): Promise<Availability[]> => {
-    const response = await apiClient.get<Availability[]>('/scheduling/availability', { params });
-    return response.data;
-  },
-
-  getById: async (id: string): Promise<Availability> => {
-    const response = await apiClient.get<Availability>(`/scheduling/availability/${id}`);
-    return response.data;
-  },
-
-  create: async (request: CreateAvailabilityRequest): Promise<Availability> => {
-    const response = await apiClient.post<Availability>('/scheduling/availability', request);
-    return response.data;
-  },
-
-  update: async (id: string, request: UpdateAvailabilityRequest): Promise<Availability> => {
-    const response = await apiClient.put<Availability>(`/scheduling/availability/${id}`, request);
-    return response.data;
-  },
-
-  delete: async (id: string): Promise<void> => {
-    await apiClient.delete(`/scheduling/availability/${id}`);
-  },
-};
+// The §0b reshape landed — the entity is now startsAt / endsAt / allDay /
+// label, the date + startTime + endTime triple is gone, the list is paginated,
+// and from/to means OVERLAP rather than containment. The old client described
+// none of that. Nothing called it, and its test cast with `as never` so it
+// still compiled, which is exactly what makes a stale client dangerous: it
+// looks usable.
+//
+// The board reads time off through GET /scheduling/board (`techs[].timeOff`).
+// Rebuild a client here only when a time-off SURFACE needs one, against the
+// shape in FE_HANDOFF_dispatch_board_reads.md.
 
 // Export combined API
 export const allSchedulingApis = {
   dispatches: dispatchesApi,
-  availability: availabilityApi,
 };
 
 export default allSchedulingApis;

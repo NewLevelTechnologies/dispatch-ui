@@ -2955,6 +2955,18 @@
       "comfortable": "Comfortable",
       "compact": "Compact",
       "dense": "Dense"
+    },
+    "release": {
+      "action_one": "Release {{count}}",
+      "action_other": "Release {{count}}",
+      "confirmAction": "Release",
+      "confirmBody_one": "This texts {{count}} technician their assignment. It can't be undone.",
+      "confirmBody_other": "This texts {{count}} technicians their assignments. It can't be undone.",
+      "confirmTitle_one": "Release {{count}} dispatch?",
+      "confirmTitle_other": "Release {{count}} dispatches?",
+      "done_one": "{{count}} dispatch released",
+      "done_other": "{{count}} dispatches released",
+      "failed": "Couldn't release"
     }
   }
 }
