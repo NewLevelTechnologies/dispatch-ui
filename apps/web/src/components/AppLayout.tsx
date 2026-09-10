@@ -117,10 +117,17 @@ export default function AppLayout({ children, flush }: { children: React.ReactNo
     { name: getName('customer', true), href: '/customers', icon: UserGroupIcon },
     { name: getName('service_location', true), href: '/service-locations', icon: MapPinIcon },
     { name: getName('work_order', true), href: '/work-orders', icon: ClipboardDocumentListIcon },
-    // SINGULAR on purpose: the board is a place, not a collection — the same
-    // reason the route is /dispatch. Label still reads from the glossary, so a
-    // tenant that calls these "Trips" gets "Trip".
-    { name: getName('dispatch'), href: '/dispatch', icon: CalendarIcon },
+    // "Dispatch Board", not "Dispatch": `dispatch` is itself a glossary entity,
+    // so the bare noun reads as the RECORD and sets up the wrong expectation
+    // for a board. Not "Scheduling" either — that can't follow the glossary,
+    // and it would overlap the `schedule` entity, work-order scheduling and
+    // agreement visit schedules. Shares the page-heading key so the sidebar
+    // and the <h1> can't drift; a tenant on "Trip" gets "Trip Board".
+    {
+      name: t('dispatchBoard.title', { entity: getName('dispatch') }),
+      href: '/dispatch',
+      icon: CalendarIcon,
+    },
     ...(approvalsVisible
       ? [{ name: t('approvals.title'), href: '/approvals', icon: CheckBadgeIcon, badge: pendingApprovalCount }]
       : []),

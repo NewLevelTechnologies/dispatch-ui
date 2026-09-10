@@ -2888,7 +2888,7 @@
     }
   },
   "dispatchBoard": {
-    "title": "{{entity}} board",
+    "title": "{{entity}} Board",
     "subtitleCount_one": "{{count}} {{entity, lowercase}} in scope",
     "subtitleCount_other": "{{count}} {{entity, lowercase}} in scope",
     "dateNav": {

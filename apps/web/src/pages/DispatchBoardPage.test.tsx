@@ -51,9 +51,18 @@ describe('DispatchBoardPage', () => {
     mockRegionsGetAll.mockResolvedValue([]);
   });
 
-  it('renders the board title from the glossary', async () => {
+  // The sidebar item and the page heading share one i18n key, so they render
+  // the same string and cannot drift apart. Assert both by role rather than by
+  // text — a bare text query matches both, which is the point.
+  it('titles the page from the glossary and matches the nav label', async () => {
     renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch' });
-    expect(await screen.findByText('Dispatch board')).toBeInTheDocument();
+
+    expect(
+      await screen.findByRole('heading', { name: 'Dispatch Board', level: 1 })
+    ).toBeInTheDocument();
+
+    const navLink = screen.getByRole('link', { name: 'Dispatch Board' });
+    expect(navLink).toHaveAttribute('href', '/dispatch');
   });
 
   // The structural empty state: no rows at all, which is different from

@@ -306,7 +306,7 @@ vi.mock('react-i18next', () => {
     // The mock has no plural resolution, so the base key stands in for the
     // real bundle's _one/_other pair.
     'dispatchBoard.subtitleCount': '{{count}} {{entity, lowercase}} in scope',
-    'dispatchBoard.title': '{{entity}} board',
+    'dispatchBoard.title': '{{entity}} Board',
     'entities.agreement': 'Agreement',
     'entities.agreements': 'Agreements',
     'entities.customer': 'Customer',
