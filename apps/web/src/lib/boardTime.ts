@@ -129,3 +129,18 @@ export function findClashes(
   }
   return clashing;
 }
+
+/** Compact age for a rail card: how long a work order has been waiting.
+ *  The rail sorts on priority then age, so this is the tiebreak made visible.
+ *  Coarsens as it grows — minutes matter for a same-day emergency, days do
+ *  not need an hour count. */
+export function formatAge(iso: string, now: Date = new Date()): string | null {
+  const at = new Date(iso);
+  if (Number.isNaN(at.getTime())) return null;
+  const mins = Math.floor((now.getTime() - at.getTime()) / 60000);
+  if (mins < 0) return null; // Clock skew — say nothing rather than "-3m".
+  if (mins < 60) return `${mins}m`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h`;
+  return `${Math.floor(hours / 24)}d`;
+}
