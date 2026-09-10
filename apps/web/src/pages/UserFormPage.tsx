@@ -587,10 +587,7 @@ function DispatchableField({
       </p>
 
       <p className="mt-1.5 text-[11px] text-fg-muted">
-        Gates every assignment path — the board, tech pickers, and the
-        work-order dispatch drawer. Regions are a different question: they
-        narrow <em>which</em> board someone appears on, not whether they appear
-        at all.
+        Applies to the board, tech pickers, and the dispatch drawer.
       </p>
     </div>
   );
