@@ -667,3 +667,10 @@
   outline: 2px solid var(--accent-500);
   outline-offset: -2px;
 }
+
+/* Dragging: fade the source so the lane underneath stays readable — you're
+   choosing a destination, and the thing you picked up shouldn't obscure it. */
+.db-block.dragging,
+.db-wo.dragging {
+  opacity: 0.4;
+}

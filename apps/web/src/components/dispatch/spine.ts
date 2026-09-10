@@ -58,4 +58,17 @@ export interface SpineProps {
    *  against a guess. */
   capacityStops: number | null;
   timeZone: string;
+  /**
+   * A drag landed on `techId` in a window the spine already resolved and
+   * accepted. The spine owns the GEOMETRY (where in the lane) and the RULE
+   * (snap to a preset, refuse time off); the page owns what a drop DOES, so
+   * a second spine inherits both without reimplementing either.
+   *
+   * `payload` is whatever the drag source attached — the page decodes it.
+   */
+  onDrop?: (
+    techId: string,
+    window: { startHour: number; endHour: number },
+    payload: Record<string, unknown>,
+  ) => void;
 }

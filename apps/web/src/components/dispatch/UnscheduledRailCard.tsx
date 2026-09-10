@@ -9,7 +9,9 @@
 // order picker than a modal search would be, being scoped, sorted by
 // priority then age, and on screen.
 // ─────────────────────────────────────────────────────────────────────
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from '@dispatch/i18n';
+import { draggable } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
 import type { UnscheduledWorkOrder } from '../../api/setup';
 import { Pill } from '../ui/Pill';
 import { formatAge } from '../../lib/boardTime';
@@ -34,7 +36,22 @@ export default function UnscheduledRailCard({
   onOpen: (workOrder: UnscheduledWorkOrder) => void;
 }) {
   const { t } = useTranslation();
+  const ref = useRef<HTMLButtonElement>(null);
+  const [dragging, setDragging] = useState(false);
   const age = formatAge(workOrder.createdAt);
+
+  // `boardDrag` is what lanes gate on, so a stray drag from elsewhere on the
+  // page can never land on the grid.
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    return draggable({
+      element: el,
+      getInitialData: () => ({ boardDrag: true, workOrderId: workOrder.workOrderId }),
+      onDragStart: () => setDragging(true),
+      onDrop: () => setDragging(false),
+    });
+  }, [workOrder.workOrderId]);
 
   // Prefer the summary; fall back to the number so a card is never blank
   // while the work-order cache catches up.
@@ -44,8 +61,9 @@ export default function UnscheduledRailCard({
 
   return (
     <button
+      ref={ref}
       type="button"
-      className={`db-wo ${PRIORITY_CLASS[workOrder.priority] ?? ''}`.trim()}
+      className={`db-wo ${PRIORITY_CLASS[workOrder.priority] ?? ''}${dragging ? ' dragging' : ''}`.trim()}
       onClick={() => onOpen(workOrder)}
     >
       <div className="flex items-center gap-1.5">

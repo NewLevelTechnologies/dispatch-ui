@@ -10,7 +10,7 @@
 //
 // Until `GET /scheduling/board` exists server-side the read 404s and the
 // board area shows its error state.
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from '@dispatch/i18n';
@@ -35,6 +35,7 @@ import { LoadingState } from '../components/ui/LoadingState';
 import { EmptyState } from '../components/ui/EmptyState';
 import { ErrorState } from '../components/ui/ErrorState';
 import { Pill } from '../components/ui/Pill';
+import { autoScrollForElements } from '@atlaskit/pragmatic-drag-and-drop-auto-scroll/element';
 import ConfirmDialog from '../components/ConfirmDialog';
 import DispatchDetailDrawer from '../components/DispatchDetailDrawer';
 import DispatchFormDrawer from '../components/DispatchFormDrawer';
@@ -47,6 +48,8 @@ import {
   type Density,
 } from '../components/dispatch/spine';
 import { buildAxis, zonedDate, zonedHour } from '../lib/boardTime';
+import { movedWindow } from '../lib/boardDrop';
+import { useBoardMutations } from './dispatch/useBoardMutations';
 import { extractApiError, showError, showSuccess } from '../lib/toast';
 import { invalidateDispatchBoard } from '../utils/invalidateRoleConsumers';
 import { isHiddenByDefault } from '../lib/dispatchStatus';
@@ -116,6 +119,16 @@ export default function DispatchBoardPage() {
   const [openDispatch, setOpenDispatch] = useState<BoardDispatch | null>(null);
   const [composeFor, setComposeFor] = useState<UnscheduledWorkOrder | null>(null);
   const [confirmRelease, setConfirmRelease] = useState(false);
+
+  // A working day is wider than any viewport at 78px/hour, so dragging toward
+  // a late-afternoon lane means dragging off-screen. Auto-scroll is the one
+  // part of this genuinely painful to hand-roll on two axes.
+  const scrollRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    return autoScrollForElements({ element: el });
+  }, []);
 
   const rawDate = searchParams.get('date');
   const date = isValidDate(rawDate) ? rawDate : todayLocal();
@@ -372,6 +385,42 @@ export default function DispatchBoardPage() {
   // Bulk release takes a SCOPE, not an id list: the server recomputes the
   // unreleased set, so this can neither reach outside the caller's regions
   // nor act on a board rendered ten minutes ago.
+  const { assign, move } = useBoardMutations(date);
+
+  // The spine hands back a tech, an already-resolved window, and whatever the
+  // drag source attached. Decoding the payload is the page's job — the spine
+  // stays ignorant of what a work order or a dispatch is.
+  const handleDrop = useCallback(
+    (
+      techId: string,
+      window: { startHour: number; endHour: number },
+      payload: Record<string, unknown>,
+    ) => {
+      const workOrderId = payload.workOrderId as string | undefined;
+      if (workOrderId) {
+        const workOrder = railItems.find((w) => w.workOrderId === workOrderId);
+        if (workOrder) assign.mutate({ workOrder, techId, window });
+        return;
+      }
+
+      const dispatchId = payload.dispatchId as string | undefined;
+      const dispatch = allDispatches.find((d) => d.id === dispatchId);
+      if (!dispatch) return;
+
+      // Duration is preserved across a move; only the start snapped.
+      const duration = (payload.durationHours as number | undefined) ?? 2;
+      const moved = movedWindow(window.startHour, duration);
+      // Same tech, same start — nothing happened. Don't spend a write and a
+      // toast on a drag that landed where it began.
+      if (dispatch.assignedUserId === techId) {
+        const currentStart = zonedHour(dispatch.arrivalWindowStart, timeZone);
+        if (currentStart != null && Math.abs(currentStart - moved.startHour) < 0.01) return;
+      }
+      move.mutate({ dispatch, techId, window: moved });
+    },
+    [railItems, allDispatches, assign, move, timeZone],
+  );
+
   const releaseMutation = useMutation({
     mutationFn: () => dispatchBoardApi.release({ date, regionIds }),
     onSuccess: ({ released }) => {
@@ -482,6 +531,7 @@ export default function DispatchBoardPage() {
         nowHour={nowHour}
           capacityStops={board?.defaultStopsPerDay ?? null}
           timeZone={timeZone}
+          onDrop={handleDrop}
         />
       </>
     );
@@ -705,7 +755,9 @@ export default function DispatchBoardPage() {
           </aside>
 
           <div className="db-board">
-            <div className="db-scroll">{boardBody()}</div>
+            <div ref={scrollRef} className="db-scroll">
+              {boardBody()}
+            </div>
           </div>
         </div>
       </div>

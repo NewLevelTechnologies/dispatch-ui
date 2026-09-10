@@ -2968,6 +2968,14 @@
       "done_one": "{{count}} dispatch released",
       "done_other": "{{count}} dispatches released",
       "failed": "Couldn't release"
+    },
+    "drag": {
+      "assigned": "{{workOrder}} scheduled · held on deck",
+      "assignFailed": "Couldn't schedule",
+      "conflict": "Someone else changed this while you were looking. Reloading the board.",
+      "moved": "{{workOrder}} moved",
+      "moveFailed": "Couldn't move",
+      "undoFailed": "Couldn't undo — reloading the board"
     }
   }
 }
