@@ -39,16 +39,19 @@ export interface AssignmentSummary {
    */
   override: 'neutral' | 'warning' | null;
   reason: ReasonPart[];
-  /**
-   * Assignable but in no region: reachable from a picker, absent from every
-   * board. A silent failure, because the Assignment and Regions rows each
-   * look fine on their own.
-   */
-  noRegions: boolean;
 }
 
+// NOTE: there is deliberately no "assignable but has no regions" warning.
+// Regions NARROW, they do not exclude: scheduling-service applies a region
+// condition only when a filter is actually set (`findBoardTechs`' regionsSet
+// flag), so a tech with no assignments still appears on the unfiltered board.
+// They drop out only for a dispatcher who has narrowed to a specific region —
+// which is what narrowing means, not a misconfiguration. Warning about it
+// would push admins to assign regions in single-region tenants that have no
+// use for them.
+
 export function summarizeAssignment(
-  user: Pick<User, 'dispatchable' | 'performsFieldWork' | 'roles' | 'dispatchRegionIds'>,
+  user: Pick<User, 'dispatchable' | 'performsFieldWork' | 'roles'>,
 ): AssignmentSummary {
   const granting = (user.roles ?? []).filter((r) => r.performsFieldWork);
   const rolesQualify = granting.length > 0;
@@ -58,7 +61,6 @@ export function summarizeAssignment(
   // The resolved answer is the server's to give. Fall back to the roles only
   // when it hasn't been sent, so the two can't disagree on screen.
   const assignable = user.performsFieldWork ?? rolesQualify;
-  const noRegions = assignable && (user.dispatchRegionIds ?? []).length === 0;
 
   if (override === 'ALWAYS') {
     return {
@@ -75,7 +77,6 @@ export function summarizeAssignment(
           ? { text: `the ${roleNames} role already qualifies` }
           : { text: 'no role here performs field work' },
       ],
-      noRegions,
     };
   }
 
@@ -91,7 +92,6 @@ export function summarizeAssignment(
           ? [{ text: ', overriding the ' }, { text: roleNames, strong: true }, { text: ' role' }]
           : []),
       ],
-      noRegions: false,
     };
   }
 
@@ -101,7 +101,6 @@ export function summarizeAssignment(
       assignable,
       override: null,
       reason: [{ text: 'From the ' }, { text: roleNames, strong: true }, { text: ' role' }],
-      noRegions,
     };
   }
 
@@ -114,6 +113,5 @@ export function summarizeAssignment(
     reason: assignable
       ? [{ text: 'From their roles' }]
       : [{ text: 'No role here performs field work' }],
-    noRegions,
   };
 }
