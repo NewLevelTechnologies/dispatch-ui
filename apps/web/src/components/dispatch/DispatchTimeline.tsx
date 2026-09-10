@@ -43,18 +43,57 @@ function windowOf(dispatch: BoardDispatch, timeZone: string): Window | null {
   return { start, end };
 }
 
+/** Absence spans as axis coordinates. An all-day span covers the whole axis,
+ *  which reproduces the old whole-row look without special-casing it. */
+function offSpans(
+  tech: BoardTech,
+  timeZone: string,
+  axis: SpineProps['axis'],
+): { start: number; end: number; label: string; allDay: boolean }[] {
+  return (tech.timeOff ?? []).map((span) => {
+    if (span.allDay) {
+      return { start: axis.start, end: axis.end, label: span.label, allDay: true };
+    }
+    const start = zonedHour(span.startsAt, timeZone);
+    const end = zonedHour(span.endsAt, timeZone);
+    // An unplaceable span is treated as all-day rather than dropped: a row
+    // exists, so the tech is off, and rendering them available is the one
+    // error this board cannot afford to make permissively.
+    if (start === null || end === null || end <= start) {
+      return { start: axis.start, end: axis.end, label: span.label, allDay: true };
+    }
+    return {
+      start: Math.max(axis.start, start),
+      end: Math.min(axis.end, end),
+      label: span.label,
+      allDay: false,
+    };
+  });
+}
+
+/** True only when the tech is out for the WHOLE axis — that is what earns the
+ *  hatched row and the suppressed load bar. A partial absence leaves the row
+ *  a working row. */
+function isOutAllDay(spans: { start: number; end: number; allDay: boolean }[], axis: SpineProps['axis']): boolean {
+  return spans.some((s) => s.allDay || (s.start <= axis.start && s.end >= axis.end));
+}
+
 function TechCell({
   tech,
   stops,
   density,
   capacityStops,
   width,
+  outAllDay,
+  offLabel,
 }: {
   tech: BoardTech;
   stops: number;
   density: Density;
   capacityStops: number;
   width: number;
+  outAllDay: boolean;
+  offLabel: string | null;
 }) {
   const { t } = useTranslation();
 
@@ -84,11 +123,11 @@ function TechCell({
             </span>
           )}
         </div>
-        {density !== 'dense' && tech.availability && (
-          <span className="db-tech-meta">{tech.availability.label}</span>
+        {density !== 'dense' && offLabel && (
+          <span className="db-tech-meta">{offLabel}</span>
         )}
       </div>
-      {!tech.availability && (
+      {!outAllDay && (
         <div className="flex shrink-0 flex-col items-end gap-1">
           <span className="font-mono text-[10.5px] text-fg-muted">
             {`${stops}/${capacityStops}`}
@@ -217,12 +256,16 @@ export default function DispatchTimeline({
     // Alternate halves across the clashing set so two blocks that overlap
     // can never claim the same pixels.
     let clashSeen = 0;
-    const isOff = Boolean(tech.availability);
+
+    // Absences are lane overlays, not a row state: a tech out 8–12 is still
+    // bookable at 2. Only an all-day absence hatches the whole row.
+    const spans = offSpans(tech, timeZone, axis);
+    const outAllDay = isOutAllDay(spans, axis);
 
     return (
       <div
         key={tech.id}
-        className={['db-row', isOff ? 'off' : '', clashing.size > 0 ? 'clashrow' : '']
+        className={['db-row', outAllDay ? 'off' : '', clashing.size > 0 ? 'clashrow' : '']
           .filter(Boolean)
           .join(' ')}
         style={{ height: rowH }}
@@ -233,6 +276,11 @@ export default function DispatchTimeline({
           density={density}
           capacityStops={capacityStops}
           width={techW}
+          outAllDay={outAllDay}
+          // All-day only: the row is hatched and has no load bar, so the
+          // meta slot is free to carry the reason. A partial absence is a
+          // working row — its label belongs in the lane, on the span.
+          offLabel={outAllDay ? (spans[0]?.label ?? null) : null}
         />
         <div className="db-lane">
           <span className="db-lane-cells">
@@ -241,11 +289,26 @@ export default function DispatchTimeline({
             ))}
           </span>
 
-          {isOff && (
-            <span className="absolute top-1/2 left-2.5 -translate-y-1/2 text-[11px] font-semibold text-fg-muted">
-              {t('dispatchBoard.grid.offNotDroppable', { label: tech.availability?.label ?? '' })}
-            </span>
-          )}
+          {/* One overlay per absence. Each rejects drops over its own slice;
+              the rest of the lane stays a normal drop target. */}
+          {spans.map((span, i) => {
+            const left = axisPct(span.start, axis);
+            const width = axisPct(span.end, axis) - left;
+            return (
+              <span
+                key={`${span.start}-${span.end}-${i}`}
+                className={`db-off${span.allDay ? ' allday' : ''}`}
+                style={{ left: `${left}%`, width: `${width}%` }}
+                title={span.label}
+              >
+                <span className="db-off-label">
+                  {span.allDay
+                    ? t('dispatchBoard.grid.offNotDroppable', { label: span.label })
+                    : span.label}
+                </span>
+              </span>
+            );
+          })}
 
           {placed.map((entry, index) => {
             const prev = placed[index - 1];

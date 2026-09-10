@@ -612,3 +612,43 @@
     box-shadow: 0 0 0 0 color-mix(in oklch, var(--violet-500) 0%, transparent);
   }
 }
+
+/* ── Time off — per-span lane overlays ────────────────────────────
+   A LIST of absences, each hatching its own slice. A tech out 8–12 is
+   still bookable at 2, so this is not a row state; only an all-day
+   span (which covers the whole axis) also hatches the row itself. */
+
+.db-off {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  z-index: 1;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    135deg,
+    color-mix(in oklch, var(--fg-muted) 13%, transparent) 0 5px,
+    transparent 5px 10px
+  );
+  border-left: 1px solid var(--border-strong);
+  border-right: 1px solid var(--border-strong);
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+}
+
+/* All-day already hatches the row underneath, so the overlay only needs to
+   carry the label — doubling the hatch just muddies it. */
+.db-off.allday {
+  background: none;
+  border: none;
+}
+
+.db-off-label {
+  padding: 0 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--fg-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

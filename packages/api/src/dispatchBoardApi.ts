@@ -28,9 +28,26 @@ export interface TechLocation {
   source: TechLocationSource;
 }
 
-// Present only when an `availability` row with status = OFF covers the
-// requested date. Its presence is what makes the row undroppable.
+// One absence span from an `availability` row with status = OFF, clipped
+// server-side to the requested day — so a week of PTO arrives as that day's
+// slice and the client never intersects anything.
+//
+// A LIST, not one object: nothing prevents two absences on the same day
+// (no uniqueness on (user, date) at the entity or the table, and the
+// availability API permits it). A dentist appointment at 9 plus leaving at 3
+// is one tech and two rows; collapsing them would render an arbitrary label
+// over an arbitrary span.
 export interface TechTimeOff {
+  startsAt: string;
+  endsAt: string;
+  // The LABELLING distinction, not a redundancy: all-day reads "Out —
+  // Vacation" while a span reads "Out 8:00–12:00".
+  //
+  // Also set defensively by the server when a row's stored times don't
+  // overlap the requested day at all — reachable while the entity still
+  // stores a bare duration rather than instants. A row exists, so the tech
+  // is off; rendering them available is the one error this board cannot
+  // afford to make permissively. The §0b reshape removes the ambiguity.
   allDay: boolean;
   label: string;
 }
@@ -47,8 +64,10 @@ export interface BoardTech {
   // (their primary), with filtering matching on any of them.
   regionIds: string[];
   primaryRegionId: string | null;
-  // Absent = available. Present = out for the date; row hatches and rejects drops.
-  availability?: TechTimeOff | null;
+  // Empty/absent = available all day. Each span hatches its own slice of the
+  // lane and rejects drops there — a tech out all morning is still bookable
+  // in the afternoon, which is the whole point of spans over a boolean.
+  timeOff?: TechTimeOff[];
   // Absent = no signal at all, which must render as NOTHING — not an error,
   // not a zero state. Most fleets have techs in all three tiers.
   location?: TechLocation | null;
@@ -87,6 +106,12 @@ export interface BoardDispatch extends DispatchBoardRow {
 export interface DispatchBoard {
   techs: BoardTech[];
   dispatches: BoardDispatch[];
+  // Load-bar denominator, from scheduling-service config
+  // (`app.dispatch.default-stops-per-day`). Optional until the server echoes
+  // it; the client falls back to the same value, but a denominator with two
+  // sources of truth drifts — it already had, 6 here against 8 there — so
+  // once this is on the wire the client constant goes.
+  defaultStopsPerDay?: number;
 }
 
 export interface GetBoardParams {

@@ -226,22 +226,110 @@ describe('DispatchTimeline overlap', () => {
 });
 
 describe('DispatchTimeline rows', () => {
-  it('hatches an off tech, labels the row, and shows no load bar', () => {
-    renderTimeline({
-      groups: [
+  const withTimeOff = (spans: BoardTech['timeOff']) => ({
+    groups: [
+      { key: '__all', label: null, techs: [tech({ timeOff: spans })], stops: 0, held: 0 },
+    ],
+    byTech: {},
+  });
+
+  it('hatches the row and drops the load bar for an all-day absence', () => {
+    renderTimeline(
+      withTimeOff([
         {
-          key: '__all',
-          label: null,
-          techs: [tech({ availability: { allDay: true, label: 'Time off — all day' } })],
-          stops: 0,
-          held: 0,
+          startsAt: '2026-03-15T00:00:00Z',
+          endsAt: '2026-03-16T00:00:00Z',
+          allDay: true,
+          label: 'Vacation',
         },
-      ],
-      byTech: {},
-    });
+      ])
+    );
     expect(document.querySelector('.db-row')?.className).toContain('off');
-    expect(screen.getByText(/Time off — all day — not droppable/)).toBeInTheDocument();
+    expect(screen.getByText(/Vacation — not droppable/)).toBeInTheDocument();
     expect(document.querySelector('.db-load')).toBeNull();
+  });
+
+  // The point of spans over a boolean: a tech out all morning is still
+  // bookable in the afternoon, so the row stays a working row.
+  it('overlays only the absent span for a partial-day absence', () => {
+    renderTimeline(
+      withTimeOff([
+        {
+          startsAt: '2026-03-15T08:00:00Z',
+          endsAt: '2026-03-15T12:00:00Z',
+          allDay: false,
+          label: 'Dentist',
+        },
+      ])
+    );
+
+    expect(document.querySelector('.db-row')?.className).not.toContain('off');
+    // Still a working row: the load bar stays.
+    expect(document.querySelector('.db-load')).toBeTruthy();
+
+    const off = document.querySelector('.db-off') as HTMLElement;
+    // 8a–12p on a 6a–8p axis: left (8-6)/14, width 4/14.
+    expect(off.style.left).toBe('14.285714285714285%');
+    expect(off.style.width).toBe('28.57142857142857%');
+    expect(screen.getByText('Dentist')).toBeInTheDocument();
+  });
+
+  // Two absences in one day is a real shape — nothing prevents it — and
+  // collapsing them would render an arbitrary label over an arbitrary span.
+  it('renders every absence in a day, not just the first', () => {
+    renderTimeline(
+      withTimeOff([
+        {
+          startsAt: '2026-03-15T09:00:00Z',
+          endsAt: '2026-03-15T10:00:00Z',
+          allDay: false,
+          label: 'Dentist',
+        },
+        {
+          startsAt: '2026-03-15T15:00:00Z',
+          endsAt: '2026-03-15T19:00:00Z',
+          allDay: false,
+          label: 'Left early',
+        },
+      ])
+    );
+    expect(document.querySelectorAll('.db-off')).toHaveLength(2);
+    expect(screen.getByText('Dentist')).toBeInTheDocument();
+    expect(screen.getByText('Left early')).toBeInTheDocument();
+  });
+
+  it('clips a span that runs past the axis', () => {
+    renderTimeline(
+      withTimeOff([
+        {
+          startsAt: '2026-03-15T04:00:00Z',
+          endsAt: '2026-03-15T09:00:00Z',
+          allDay: false,
+          label: 'Early appt',
+        },
+      ])
+    );
+    const off = document.querySelector('.db-off') as HTMLElement;
+    expect(off.style.left).toBe('0%');
+    expect(off.style.width).toBe('21.428571428571427%');
+  });
+
+  // A row exists, so the tech is off. Rendering them available is the one
+  // error this board can't afford to make permissively.
+  it('treats an unplaceable span as all-day rather than dropping it', () => {
+    renderTimeline(
+      withTimeOff([
+        { startsAt: 'garbage', endsAt: 'garbage', allDay: false, label: 'Unknown' },
+      ])
+    );
+    expect(document.querySelector('.db-row')?.className).toContain('off');
+    expect(document.querySelector('.db-load')).toBeNull();
+  });
+
+  it('leaves a tech with no absences a plain working row', () => {
+    renderTimeline();
+    expect(document.querySelector('.db-row')?.className).not.toContain('off');
+    expect(document.querySelector('.db-off')).toBeNull();
   });
 
   // A multi-region tech renders ONCE — rendering them twice would let a

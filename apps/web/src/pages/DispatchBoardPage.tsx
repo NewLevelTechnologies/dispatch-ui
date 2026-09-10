@@ -49,10 +49,12 @@ import { isHiddenByDefault } from '../lib/dispatchStatus';
 const DAY_START = 6;
 const DAY_END = 20;
 
-// Load-bar denominator. Per §4 this belongs in scheduling-service config
-// (`app.dispatch.default-stops-per-day`) and is not on the wire yet, so the
-// board carries the same default until it is.
-const DEFAULT_STOPS_PER_DAY = 6;
+// Load-bar denominator FALLBACK only — the server's
+// `app.dispatch.default-stops-per-day` wins when `defaultStopsPerDay` is on
+// the response. Aligned to the server's 8: this constant said 6 while config
+// said 8, which is precisely why one source of truth matters. Delete once the
+// field ships.
+const DEFAULT_STOPS_PER_DAY = 8;
 
 type GroupBy = 'none' | 'region';
 
@@ -221,18 +223,21 @@ export default function DispatchBoardPage() {
     return map;
   }, [visibleDispatches]);
 
-  // The fold is for AVAILABLE techs with an empty day. A tech who is OFF
-  // already has a distinct rendered state (hatched, labelled, undroppable);
+  // The fold is for AVAILABLE techs with an empty day. A tech with any
+  // absence already has a distinct rendered state (hatched span, label);
   // folding them would conceal the operational fact that someone is out.
+  const hasTimeOff = (tech: BoardTech) => (tech.timeOff?.length ?? 0) > 0;
+
   const foldableCount = useMemo(
-    () => techs.filter((tech) => !tech.availability && (byTech[tech.id] ?? []).length === 0).length,
+    () =>
+      techs.filter((tech) => !hasTimeOff(tech) && (byTech[tech.id] ?? []).length === 0).length,
     [techs, byTech],
   );
 
   const shownTechs = useMemo(
     () =>
       hideEmpty
-        ? techs.filter((tech) => tech.availability || (byTech[tech.id] ?? []).length > 0)
+        ? techs.filter((tech) => hasTimeOff(tech) || (byTech[tech.id] ?? []).length > 0)
         : techs,
     [techs, byTech, hideEmpty],
   );
@@ -422,7 +427,7 @@ export default function DispatchBoardPage() {
         onOpenDispatch={setOpenDispatch}
         axis={axis}
         nowHour={nowHour}
-        capacityStops={DEFAULT_STOPS_PER_DAY}
+        capacityStops={board?.defaultStopsPerDay ?? DEFAULT_STOPS_PER_DAY}
         timeZone={timeZone}
       />
     );
