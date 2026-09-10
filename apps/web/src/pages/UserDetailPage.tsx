@@ -424,9 +424,19 @@ function AssignmentValue({ user }: { user: User }) {
         ) : (
           <Pill tone="neutral">Not assignable</Pill>
         )}
-        {/* Chrome that appears only when it is load-bearing. */}
-        {override === 'neutral' && <Badge>Override</Badge>}
-        {override === 'warning' && <Pill tone="warning">Override</Pill>}
+        {/* Quiet metadata, not a second status pill — one shape, two tones,
+            and it only renders when an override is actually in play. `xs`
+            already matches the intended geometry; the uppercase, weight and
+            tracking are what stop it reading as a peer of the pill. */}
+        {override && (
+          <Badge
+            size="xs"
+            color={override === 'warning' ? 'amber' : 'zinc'}
+            className="font-bold tracking-[0.05em] uppercase"
+          >
+            Override
+          </Badge>
+        )}
       </div>
 
       <span className="text-[11.5px] leading-[1.45] text-fg-muted">
