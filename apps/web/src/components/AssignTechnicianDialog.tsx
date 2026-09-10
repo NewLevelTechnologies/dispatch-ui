@@ -151,14 +151,14 @@ export default function AssignTechnicianDialog({
     }
   };
 
+  // The "future user/role refactor" this used to wait on has landed:
+  // dispatchability is `enabled && roles.any { performsFieldWork }` with a
+  // per-user override, resolved server-side. Filtered on that here, so a
+  // technician picker stops offering admins and CSRs.
   const { data: users = [] } = useQuery({
-    queryKey: ['users'],
-    queryFn: () => userApi.getAll(),
+    queryKey: ['users', 'field-work'],
+    queryFn: () => userApi.getFieldWorkers(),
   });
-
-  // Only enabled users are dispatchable. Real role-based filtering (Tech
-  // capability) lives behind a future user/role refactor; for now any active
-  // user is a valid pick.
   const techs = useMemo(
     () =>
       [...users]

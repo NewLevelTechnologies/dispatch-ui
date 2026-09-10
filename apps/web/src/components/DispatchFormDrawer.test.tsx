@@ -5,13 +5,20 @@ import DispatchFormDrawer from './DispatchFormDrawer';
 import type { Dispatch, User, WorkItemResponse } from '../api/setup';
 
 const mockUserGetAll = vi.fn();
+const mockGetFieldWorkers = vi.fn();
 const mockCreate = vi.fn();
 const mockUpdate = vi.fn();
 const mockNotify = vi.fn();
 
 vi.mock('@dispatch/api/src/userApi', () => ({
-  userApi: { getAll: (...args: unknown[]) => mockUserGetAll(...args) },
-  default: { getAll: (...args: unknown[]) => mockUserGetAll(...args) },
+  userApi: {
+    getAll: (...args: unknown[]) => mockUserGetAll(...args),
+    getFieldWorkers: (...args: unknown[]) => mockGetFieldWorkers(...args),
+  },
+  default: {
+    getAll: (...args: unknown[]) => mockUserGetAll(...args),
+    getFieldWorkers: (...args: unknown[]) => mockGetFieldWorkers(...args),
+  },
 }));
 
 vi.mock('@dispatch/api/src/schedulingApi', async () => {
@@ -81,6 +88,10 @@ describe('DispatchFormDrawer', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockUserGetAll.mockResolvedValue([tech('u-1', 'Daniel', 'Park'), tech('u-2', 'Marcus', 'Lee')]);
+    mockGetFieldWorkers.mockResolvedValue([
+      tech('u-1', 'Daniel', 'Park'),
+      tech('u-2', 'Marcus', 'Lee'),
+    ]);
     mockCreate.mockResolvedValue(editDispatch);
     mockUpdate.mockResolvedValue(editDispatch);
     mockNotify.mockResolvedValue(undefined);
@@ -203,5 +214,16 @@ describe('DispatchFormDrawer', () => {
     await user.click(screen.getByRole('button', { name: /schedule dispatch/i }));
     // Release still "now" → TECH only (no CUSTOMER/BOTH).
     await waitFor(() => expect(mockNotify).toHaveBeenCalledWith('d-1', 'TECH'));
+  });
+});
+
+// A technician picker has to offer exactly who can be assigned. Listing every
+// enabled user put admins and CSRs in the dropdown — and surfaced a second
+// account for the same person, only one of whom was dispatchable.
+describe('DispatchFormDrawer technician picker', () => {
+  it('asks for field workers, not every enabled user', async () => {
+    render();
+    await waitFor(() => expect(mockGetFieldWorkers).toHaveBeenCalled());
+    expect(mockUserGetAll).not.toHaveBeenCalled();
   });
 });
