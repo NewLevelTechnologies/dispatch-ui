@@ -62,36 +62,30 @@ export function summarizeAssignment(
   // when it hasn't been sent, so the two can't disagree on screen.
   const assignable = user.performsFieldWork ?? rolesQualify;
 
-  if (override === 'ALWAYS') {
+  // The pill already says assignable-or-not, and the badge already says an
+  // override is in play. So the reason line carries ONLY what neither can:
+  // why. Restating "set to always for this user" would spend a line repeating
+  // two things already on screen — and "for this user" is dead words on the
+  // user's own page.
+  if (override === 'ALWAYS' || override === 'NEVER') {
+    const contradicts = override === 'NEVER' && rolesQualify;
     return {
       assignable,
-      override: 'neutral',
-      reason: [
-        { text: 'Set to ' },
-        { text: 'always', strong: true },
-        { text: ' for this user · ' },
-        // A redundant override is worth saying, quietly: it tells an admin the
-        // override is doing nothing, so removing a role won't behave the way
-        // they expect.
-        rolesQualify
-          ? { text: `the ${roleNames} role already qualifies` }
-          : { text: 'no role here performs field work' },
-      ],
-    };
-  }
-
-  if (override === 'NEVER') {
-    return {
-      assignable,
-      override: rolesQualify ? 'warning' : 'neutral',
-      reason: [
-        { text: 'Set to ' },
-        { text: 'never', strong: true },
-        { text: ' for this user' },
-        ...(rolesQualify
-          ? [{ text: ', overriding the ' }, { text: roleNames, strong: true }, { text: ' role' }]
-          : []),
-      ],
+      // Loud only when NEVER overrides a role that would otherwise qualify —
+      // that's how a technician silently vanishes with nobody able to explain
+      // why. Everywhere else an override is quiet chrome.
+      override: contradicts ? 'warning' : 'neutral',
+      reason: contradicts
+        ? [{ text: 'Overrides the ' }, { text: roleNames, strong: true }, { text: ' role' }]
+        : rolesQualify
+          ? [
+              { text: 'The ' },
+              { text: roleNames, strong: true },
+              // Worth saying quietly: the override is doing nothing, so
+              // removing a role won't behave the way an admin expects.
+              { text: ' role already qualifies' },
+            ]
+          : [{ text: 'No role here performs field work' }],
     };
   }
 
@@ -103,6 +97,7 @@ export function summarizeAssignment(
       reason: [{ text: 'From the ' }, { text: roleNames, strong: true }, { text: ' role' }],
     };
   }
+
 
   // Nested role objects don't always carry the flag. When the resolved answer
   // says assignable but no visible role explains it, stay vague rather than

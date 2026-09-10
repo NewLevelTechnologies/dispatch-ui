@@ -18,7 +18,6 @@ import { Button } from '../components/catalyst/button';
 import { Card } from '../components/catalyst/card';
 import { DataRow } from '../components/catalyst/data-row';
 import { summarizeAssignment } from '../lib/dispatchable';
-import { useGlossary } from '../contexts/GlossaryContext';
 import { Heading } from '../components/catalyst/heading';
 import { Text } from '../components/catalyst/text';
 import ConfirmDialog from '../components/ConfirmDialog';
@@ -408,18 +407,12 @@ function RoleStack({ roles, max = 3 }: { roles: Role[]; max?: number }) {
 }
 
 // ──────────────────────────────────────────────────────────────────
-// Assignment value — answer, then reason, then reach. The pill carries the
-// effective outcome, the second line the derivation, the third where it
-// applies, so a reader never has to compute eligibility from a role list.
+// Assignment value — answer, then reason. The pill carries the effective
+// outcome and the line beneath carries the derivation, so a reader never has
+// to compute eligibility from a role list.
 // ──────────────────────────────────────────────────────────────────
 function AssignmentValue({ user }: { user: User }) {
-  const { getName } = useGlossary();
   const { assignable, override, reason } = summarizeAssignment(user);
-
-  const boardName = `${getName('dispatch').toLowerCase()} board`;
-  const surfaces = assignable
-    ? `${getName('dispatch')} board \u00b7 tech pickers \u00b7 work-order dispatch drawer`
-    : `Hidden from the ${boardName} and from every tech picker`;
 
   return (
     <div className="flex min-w-0 flex-col gap-1">
@@ -447,8 +440,6 @@ function AssignmentValue({ user }: { user: User }) {
           )
         )}
       </span>
-
-      <span className="text-[11px] leading-[1.4] text-fg-muted">{surfaces}</span>
     </div>
   );
 }
@@ -503,10 +494,7 @@ function RolesAndRegionsCard({
 
           Labelled "Assignment", not "Dispatch board" — the flag gates every
           assignment path, and naming one symptom would imply switching it off
-          merely hides someone from a view. The surfaces are named on the
-          third line instead, which is also where the tenant's own word for
-          the entity belongs rather than in a label column shared with Roles
-          and Regions. */}
+          merely hides someone from a view. */}
       {user.performsFieldWork !== undefined && (
         <DataRow label="Assignment" labelWidth={90}>
           <AssignmentValue user={user} />
