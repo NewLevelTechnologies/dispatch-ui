@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { screen } from '@testing-library/react';
 import { renderWithProviders, userEvent } from '../test/utils';
 import { UserEditPage, UserInvitePage } from './UserFormPage';
+import { dispatchableReason } from '../lib/dispatchable';
 
 const mockGetById = vi.fn();
 const mockGetRoles = vi.fn();
@@ -143,5 +144,45 @@ describe('Dispatchable override', () => {
     await screen.findByText('Technician');
     const marks = await screen.findAllByTitle(/appear on the dispatch board/i);
     expect(marks).toHaveLength(1);
+  });
+});
+
+// ── Read surface ───────────────────────────────────────────────────
+// The form is where you SET it; the detail page is where anyone goes to ask
+// "is this person on the board?", so it has to answer without a round trip
+// through the edit screen.
+describe('Dispatchable on user detail', () => {
+  it('states the resolved answer and its cause under INHERIT', () => {
+    expect(dispatchableReason({ dispatchable: 'INHERIT', performsFieldWork: true, roles: [TECH] })).toBe(
+      'From Technician'
+    );
+  });
+
+  it('says why someone is off the board under INHERIT', () => {
+    expect(
+      dispatchableReason({ dispatchable: 'INHERIT', performsFieldWork: false, roles: [CSR] })
+    ).toBe('No role here performs field work');
+  });
+
+  it('reports an override as an override, in both directions', () => {
+    expect(dispatchableReason({ dispatchable: 'ALWAYS', performsFieldWork: true, roles: [CSR] })).toBe(
+      'Set to Always for this user'
+    );
+    expect(dispatchableReason({ dispatchable: 'NEVER', performsFieldWork: false, roles: [TECH] })).toBe(
+      'Set to Never for this user'
+    );
+  });
+
+  // Nested roles don't always carry the flag. Claiming "no role performs
+  // field work" while the resolved answer says otherwise would be worse than
+  // staying vague about the cause.
+  it('stays vague rather than contradicting the resolved answer', () => {
+    expect(
+      dispatchableReason({
+        dispatchable: 'INHERIT',
+        performsFieldWork: true,
+        roles: [{ ...TECH, performsFieldWork: undefined }],
+      })
+    ).toBe('From their roles');
   });
 });

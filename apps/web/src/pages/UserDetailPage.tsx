@@ -17,6 +17,7 @@ import { Badge } from '../components/catalyst/badge';
 import { Button } from '../components/catalyst/button';
 import { Card } from '../components/catalyst/card';
 import { DataRow } from '../components/catalyst/data-row';
+import { dispatchableReason } from '../lib/dispatchable';
 import { Heading } from '../components/catalyst/heading';
 import { Text } from '../components/catalyst/text';
 import ConfirmDialog from '../components/ConfirmDialog';
@@ -447,6 +448,22 @@ function RolesAndRegionsCard({
           )}
         </div>
       </DataRow>
+      {/* Between Roles and Regions on purpose: this row qualifies the roles
+          above it, and it answers the prior question to the one below —
+          WHETHER someone appears on the board, before WHICH board. Omitted
+          entirely when the server hasn't sent the field, rather than guessing
+          an answer to a question this page is the place people come to ask. */}
+      {user.performsFieldWork !== undefined && (
+        <DataRow label="Dispatch board" labelWidth={90}>
+          <div className="flex flex-wrap items-center gap-1.5">
+            <Pill tone={user.performsFieldWork ? 'info' : 'neutral'}>
+              {user.performsFieldWork ? 'On the board' : 'Not on the board'}
+            </Pill>
+            <span className="text-[11.5px] text-fg-muted">{dispatchableReason(user)}</span>
+          </div>
+        </DataRow>
+      )}
+
       <DataRow label="Regions" labelWidth={90} last={capCount === 0}>
         <div className="flex flex-wrap gap-1">
           {userRegions.length === 0 ? (
