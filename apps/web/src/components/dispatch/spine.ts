@@ -53,7 +53,9 @@ export interface SpineProps {
   /** Fractional hour of "now" in tenant time, or null when the board is not
    *  showing today — a now-line on Thursday's board is a lie. */
   nowHour: number | null;
-  /** Denominator for the load bar: stops per day, not hours. */
-  capacityStops: number;
+  /** Denominator for the load bar: stops per day, not hours. Null when the
+   *  server hasn't supplied one — the bar is then omitted rather than drawn
+   *  against a guess. */
+  capacityStops: number | null;
   timeZone: string;
 }
