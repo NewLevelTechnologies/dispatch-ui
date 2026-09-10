@@ -1,0 +1,139 @@
+/* ───────────────────────────────────────────────────────────────────
+   Dispatch board — surface-specific CSS.
+
+   Ported from claude_designs/dispatch-board.css. Only the chrome bands,
+   the rail and the body split live here; the timeline grid (rows,
+   blocks, drive connectors, now-line) lands with the spine renderer
+   rather than shipping unused.
+
+   Deliberately NOT ported: the mock's `.db-seg` / `.db-sel` /
+   `.db-search` / `.db-exc` stand-ins. Those simulate ToggleGroup,
+   FilterChipListbox, ListSearch and Button color="accent-soft" — per
+   the handoff §1 the board uses the real primitives instead.
+
+   The mock's four hardcoded `oklch(50% .16 78)` literals are exactly
+   our `--warning-fg`, which its older tokens.css predated. Swapped —
+   which also removes the mock's `.theme-dark` overrides, since
+   `--warning-fg` already flips to `--warning-500` in dark
+   (tokens.css:133).
+
+   NOTE: this file is unlayered, so it beats Tailwind utilities on the
+   same element. Use the `.db-*` classes for board geometry and keep
+   Tailwind for everything else — don't mix the two on one node.
+   ─────────────────────────────────────────────────────────────────── */
+
+.db-page {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+/* ── Chrome bands ─────────────────────────────────────────────────
+   flex-shrink: 0 so only the board scrolls. Band 1 is identity and
+   date scope; bands 2 and 3 are the recessed filter rows. */
+
+.db-band {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-elev);
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+
+.db-band.sub {
+  background: var(--bg-elev-2);
+  padding: 6px 14px;
+}
+
+/* ── Body split: rail + board ─────────────────────────────────── */
+
+.db-body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+.db-rail {
+  width: 262px;
+  flex-shrink: 0;
+  border-right: 1px solid var(--border);
+  background: var(--bg-elev);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.db-rail-head {
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--border-soft);
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  background: var(--bg-elev-2);
+}
+
+.db-rail-list {
+  flex: 1;
+  overflow-y: auto;
+}
+
+/* Rail card — one per WORK ORDER. Left rail carries priority; the enum
+   is LOW | NORMAL | HIGH | URGENT and there is no EMERGENCY. */
+.db-wo {
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--border-soft);
+  border-left: 3px solid var(--info-500);
+  cursor: grab;
+  background: var(--bg-elev);
+}
+
+.db-wo:hover {
+  background: var(--bg-hover);
+}
+
+.db-wo:active {
+  cursor: grabbing;
+}
+
+.db-wo.urgent {
+  border-left-color: var(--danger-500);
+}
+
+.db-wo.high {
+  border-left-color: var(--warning-500);
+}
+
+.db-wo.dragging {
+  opacity: 0.4;
+}
+
+.db-wo-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--fg-strong);
+  line-height: 1.25;
+}
+
+.db-wo-sub {
+  font-size: 11px;
+  color: var(--fg-muted);
+  margin-top: 1px;
+}
+
+.db-board {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-sunken);
+}
+
+.db-scroll {
+  flex: 1;
+  overflow: auto;
+  position: relative;
+}

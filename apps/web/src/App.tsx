@@ -35,6 +35,7 @@ import WarehousesPage from './pages/WarehousesPage';
 import InvoicesPage from './pages/InvoicesPage';
 import QuotesPage from './pages/QuotesPage';
 import PaymentsPage from './pages/PaymentsPage';
+import DispatchBoardPage from './pages/DispatchBoardPage';
 import DispatchesPage from './pages/DispatchesPage';
 import AvailabilityPage from './pages/AvailabilityPage';
 import RecurringOrdersPage from './pages/RecurringOrdersPage';
@@ -229,6 +230,12 @@ function App() {
       <Route path="/invoices" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<InvoicesPage />} />} />
       <Route path="/quotes" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<QuotesPage />} />} />
       <Route path="/payments" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<PaymentsPage />} />} />
+      {/* The dispatch board. Not linked from the sidebar yet: it needs
+          GET /scheduling/board, which is still in flight. The three
+          superseded routes below (/dispatches, /availability, /scheduling)
+          are deleted in the same change that links this one, so we never
+          trade a working page for a board that cannot load. */}
+      <Route path="/dispatch" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<DispatchBoardPage />} />} />
       <Route path="/dispatches" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<DispatchesPage />} />} />
       <Route path="/availability" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<AvailabilityPage />} />} />
       <Route path="/recurring-orders" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<RecurringOrdersPage />} />} />

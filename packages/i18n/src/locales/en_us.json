@@ -2943,5 +2943,41 @@
       "title": "You’re not a member of this workspace",
       "yours": "Your workspaces"
     }
+  },
+  "dispatchBoard": {
+    "title": "{{entity}} board",
+    "subtitleCount_one": "{{count}} {{entity, lowercase}} in scope",
+    "subtitleCount_other": "{{count}} {{entity, lowercase}} in scope",
+    "dateNav": {
+      "previous": "Previous day",
+      "next": "Next day",
+      "today": "Today"
+    },
+    "search": {
+      "placeholder": "Find a {{entity, lowercase}}…"
+    },
+    "filter": {
+      "region": "{{entity}}",
+      "allRegions": "All {{entity, lowercase}}"
+    },
+    "rail": {
+      "heading": "Unscheduled",
+      "hint": "One card per {{entity, lowercase}} · click to schedule, or drag onto a {{tech, lowercase}}",
+      "emptyTitle": "Nothing unscheduled",
+      "emptyBody": "The whole board is assigned."
+    },
+    "states": {
+      "loading": "Loading board…",
+      "errorTitle": "Couldn't load the board",
+      "errorBody": "The board data didn't come back. Retry, or reload the page.",
+      "emptyFilteredTitle": "No {{entity, lowercase}} match these filters",
+      "emptyFilteredBody": "Clear a filter to widen the board.",
+      "emptyTitle": "Nothing scheduled",
+      "emptyBody": "No {{entity, lowercase}} are scheduled for this day.",
+      "noTechsTitle": "No {{entity, lowercase}} on this board",
+      "noTechsBody": "A user appears here when one of their roles is marked “{{setting}}”.",
+      "noTechsAction": "Review roles",
+      "clearFilters": "Clear filters"
+    }
   }
 }

@@ -468,6 +468,23 @@ export {
   type SendTestRequest,
 } from './notificationTemplateApi';
 
+// Dispatch Board API (GET /scheduling/board + the unscheduled rail)
+export {
+  dispatchBoardApi,
+  type BoardTech,
+  type BoardDispatch,
+  type DispatchBoard,
+  type GetBoardParams,
+  type TechLocation,
+  type TechLocationSource,
+  type TechTimeOff,
+  type UnscheduledWorkOrder,
+  type UnscheduledPage,
+  type GetUnscheduledParams,
+  type ReleaseRequest,
+  type ReleaseResponse,
+} from './dispatchBoardApi';
+
 // Dispatch Region API
 export {
   dispatchRegionApi,
