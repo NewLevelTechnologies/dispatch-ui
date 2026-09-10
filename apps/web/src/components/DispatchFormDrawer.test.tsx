@@ -227,3 +227,53 @@ describe('DispatchFormDrawer technician picker', () => {
     expect(mockUserGetAll).not.toHaveBeenCalled();
   });
 });
+
+// Two dispatchers on one board is the normal case. Without the version
+// precondition the second save silently overwrites the first.
+describe('DispatchFormDrawer concurrency', () => {
+  const existing = {
+    id: 'd-1',
+    workOrderId: 'wo-1',
+    assignedUserId: 'u-1',
+    arrivalWindowStart: '2026-03-15T15:00:00Z',
+    arrivalWindowEnd: '2026-03-15T17:00:00Z',
+    estimatedDuration: null,
+    status: 'SCHEDULED' as const,
+    arrivedAt: null,
+    departedAt: null,
+    notes: null,
+    createdAt: '2026-03-14T00:00:00Z',
+    updatedAt: '2026-03-14T00:00:00Z',
+    version: 7,
+  };
+
+  it('round-trips the version it opened against', async () => {
+    const u = userEvent.setup();
+    render({ dispatch: existing });
+
+    await screen.findByText('Daniel Park');
+    await u.click(screen.getAllByRole('button', { name: /save|schedule/i })[0]);
+
+    await waitFor(() => expect(mockUpdate).toHaveBeenCalled());
+    expect(mockUpdate.mock.calls[0][1]).toEqual(
+      expect.objectContaining({ version: 7 })
+    );
+  });
+
+  // A conflict isn't a validation failure — the form is fine, the record moved
+  // underneath it. Retrying into the same wall would be the wrong affordance.
+  it('explains a conflict rather than reporting a generic save error', async () => {
+    const u = userEvent.setup();
+    mockUpdate.mockRejectedValue(
+      Object.assign(new Error('conflict'), {
+        response: { status: 409, data: { code: 'DISPATCH_VERSION_CONFLICT' } },
+      })
+    );
+
+    render({ dispatch: existing });
+    await screen.findByText('Daniel Park');
+    await u.click(screen.getAllByRole('button', { name: /save|schedule/i })[0]);
+
+    expect(await screen.findByText(/Someone else changed this/)).toBeInTheDocument();
+  });
+});

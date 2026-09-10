@@ -2484,7 +2484,8 @@
         "notifyNowDescription": "Off by default — send manually from the row when you're ready to confirm.",
         "status": "Status",
         "technician": "Technician",
-        "windowEndAfterStart": "Window end must be after window start."
+        "windowEndAfterStart": "Window end must be after window start.",
+        "versionConflict": "Someone else changed this {{entity, lowercase}} while you had it open. Your changes weren't saved — reopen it to see theirs."
       },
       "markArrived": "Mark arrived",
       "markCompleted": "Mark completed",

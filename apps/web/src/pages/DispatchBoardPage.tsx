@@ -53,6 +53,12 @@ import { isHiddenByDefault } from '../lib/dispatchStatus';
 
 // The tenant's nominal working day. The axis widens to contain anything
 // outside it (an overnight emergency must not be clipped) but never narrows.
+// Poll cadence. 30s is the handoff's number: fast enough that a second
+// dispatcher's change lands before it matters, slow enough that a 60-tech
+// board isn't refetching a few hundred rows constantly. If that payload gets
+// heavy the answer is a delta endpoint, not a longer interval.
+const BOARD_POLL_MS = 30_000;
+
 const DAY_START = 6;
 const DAY_END = 20;
 
@@ -144,6 +150,13 @@ export default function DispatchBoardPage() {
 
   const regionIds = useMemo(() => (regionId ? [regionId] : undefined), [regionId]);
 
+  // Two dispatchers on one board is normal, not an edge case, and cache
+  // invalidation only ever refreshes the tab that made the change. Polling is
+  // what makes a second dispatcher's work visible at all.
+  //
+  // Paused while the tab is hidden — a board left open overnight shouldn't
+  // poll until morning — and refetched on focus so coming back is instant
+  // rather than up to 30s stale. Same shape as the approvals bell.
   const {
     data: board,
     isLoading,
@@ -152,11 +165,19 @@ export default function DispatchBoardPage() {
   } = useQuery({
     queryKey: ['dispatch-board', date, regionIds],
     queryFn: () => dispatchBoardApi.getBoard({ date, regionIds }),
+    refetchInterval: BOARD_POLL_MS,
+    refetchIntervalInBackground: false,
+    refetchOnWindowFocus: true,
   });
 
+  // The rail moves for the same reasons the grid does — someone else
+  // scheduling a job takes it out of everyone's inbox.
   const { data: unscheduled } = useQuery({
     queryKey: ['dispatch-board', 'unscheduled', regionIds],
     queryFn: () => dispatchBoardApi.getUnscheduled({ regionIds }),
+    refetchInterval: BOARD_POLL_MS,
+    refetchIntervalInBackground: false,
+    refetchOnWindowFocus: true,
   });
 
   // Straight off the response: this is the zone the server resolved `date`

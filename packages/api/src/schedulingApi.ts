@@ -54,6 +54,9 @@ export interface Dispatch {
   // Empty/absent = unscoped (the visit covers the whole work order); a populated
   // list is the specific items. Never an auto-expanded snapshot.
   addressedWorkItemIds?: string[];
+  // Optimistic-concurrency token. Round-trip it on PUT and a mismatch is a
+  // 409 DISPATCH_VERSION_CONFLICT rather than a silent overwrite.
+  version?: number;
 }
 
 export interface CreateDispatchRequest {
@@ -86,6 +89,17 @@ export interface UpdateDispatchRequest {
   label?: string;
   // Replace the addressed-work-item set. omit = unchanged; [] = clear (unscoped).
   addressedWorkItemIds?: string[];
+  /**
+   * The version the caller last read — an optimistic precondition, not a
+   * field to write. A mismatch returns 409 DISPATCH_VERSION_CONFLICT instead
+   * of quietly overwriting whoever got there first.
+   *
+   * Optional on the wire only because making it required would break callers
+   * that don't send it yet. Always send it when you have it: omitting it
+   * turns off stale-read detection, and "someone else changed this" is
+   * precisely the case two dispatchers on one board produce.
+   */
+  version?: number;
 }
 
 // ---- Resolved technician view (location detail) ----

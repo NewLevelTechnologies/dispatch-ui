@@ -16,6 +16,8 @@ import {
   type WorkItemResponse,
 } from '../api/setup';
 import { useGlossary } from '../contexts/GlossaryContext';
+import { errorCode, isConflict } from '../lib/toast';
+import { invalidateDispatchBoard } from '../utils/invalidateRoleConsumers';
 import { SlideOver } from './catalyst/slideover';
 import { Button } from './catalyst/button';
 import { Avatar } from './ui/Avatar';
@@ -183,6 +185,16 @@ export default function DispatchFormDrawer({
     queryClient.invalidateQueries({ queryKey: ['work-orders'] });
   };
   const onError = (err: unknown) => {
+    // A version conflict isn't a validation failure — the form is fine, the
+    // record moved underneath it. Refetch so the next attempt is against
+    // current data instead of retrying into the same wall.
+    if (isConflict(err) && errorCode(err) === 'DISPATCH_VERSION_CONFLICT') {
+      queryClient.invalidateQueries({ queryKey: ['dispatches'] });
+      queryClient.invalidateQueries({ queryKey: ['dispatch'] });
+      invalidateDispatchBoard(queryClient);
+      setError(t('workOrders.dispatches.form.versionConflict', { entity: getName('dispatch') }));
+      return;
+    }
     const msg =
       err instanceof Error && 'response' in err
         ? (err as { response?: { data?: { message?: string } } }).response?.data?.message
@@ -207,6 +219,10 @@ export default function DispatchFormDrawer({
           arrivalWindowStart: startIso,
           arrivalWindowEnd: endIso,
           addressedWorkItemIds: addressed,
+          // The version this form was opened against. Omitting it turns off
+          // stale-read detection, and two dispatchers on one board is the
+          // normal case, not an edge one.
+          version: dispatch.version,
         });
         if (audience) await dispatchesApi.notify(dispatch.id, audience);
       } else {
@@ -230,7 +246,10 @@ export default function DispatchFormDrawer({
   const cancelDispatch = useMutation({
     mutationFn: () => {
       if (!dispatch) throw new Error('cancel without dispatch');
-      return dispatchesApi.update(dispatch.id, { status: 'CANCELLED' });
+      return dispatchesApi.update(dispatch.id, {
+        status: 'CANCELLED',
+        version: dispatch.version,
+      });
     },
     onSuccess: () => {
       invalidate();

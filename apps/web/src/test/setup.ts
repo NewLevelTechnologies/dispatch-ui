@@ -1284,6 +1284,8 @@ vi.mock('react-i18next', () => {
     'workOrders.dispatches.drawer.workAddressed': 'Work addressed',
     'workOrders.dispatches.editTitle': 'Edit dispatch',
     'workOrders.dispatches.empty': 'No {{entity, lowercase}} assigned yet.',
+    'workOrders.dispatches.form.versionConflict':
+      "Someone else changed this {{entity, lowercase}} while you had it open. Your changes weren't saved — reopen it to see theirs.",
     'workOrders.dispatches.form.arrivalWindowEnd': 'Arrival Window End',
     'workOrders.dispatches.form.arrivalWindowStart': 'Arrival Window Start',
     'workOrders.dispatches.form.estimatedDurationOptional': 'Estimated Duration (optional, minutes)',
