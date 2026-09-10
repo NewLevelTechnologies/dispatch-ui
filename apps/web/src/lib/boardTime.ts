@@ -144,26 +144,3 @@ export function formatAge(iso: string, now: Date = new Date()): string | null {
   if (hours < 24) return `${hours}h`;
   return `${Math.floor(hours / 24)}d`;
 }
-
-/** Severity order for the unscheduled rail.
- *
- *  The server sorts `priority` ALPHABETICALLY — it's stored as a string, so
- *  its natural order is HIGH, LOW, NORMAL, URGENT, which puts LOW second and
- *  URGENT last. Ordering has to happen here. */
-const PRIORITY_RANK: Record<string, number> = {
-  URGENT: 0,
-  HIGH: 1,
-  NORMAL: 2,
-  LOW: 3,
-};
-
-/** Rail order: severity first, then age, oldest first. Age is the honest
- *  secondary signal — it's what we actually know, absent any SLA field. */
-export function compareRailOrder(
-  a: { priority: string; createdAt: string },
-  b: { priority: string; createdAt: string },
-): number {
-  const rank = (PRIORITY_RANK[a.priority] ?? 99) - (PRIORITY_RANK[b.priority] ?? 99);
-  if (rank !== 0) return rank;
-  return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
-}

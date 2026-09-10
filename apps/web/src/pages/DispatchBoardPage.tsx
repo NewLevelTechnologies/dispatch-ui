@@ -46,7 +46,7 @@ import {
   type BoardGroup,
   type Density,
 } from '../components/dispatch/spine';
-import { buildAxis, compareRailOrder, zonedDate, zonedHour } from '../lib/boardTime';
+import { buildAxis, zonedDate, zonedHour } from '../lib/boardTime';
 import { extractApiError, showError, showSuccess } from '../lib/toast';
 import { invalidateDispatchBoard } from '../utils/invalidateRoleConsumers';
 import { isHiddenByDefault } from '../lib/dispatchStatus';
@@ -177,14 +177,11 @@ export default function DispatchBoardPage() {
 
   const allTechs = useMemo(() => board?.techs ?? [], [board]);
   const allDispatches = useMemo(() => board?.dispatches ?? [], [board]);
-  // Severity first, then age. The server sorts `priority` alphabetically
-  // (string column: HIGH, LOW, NORMAL, URGENT), so ordering happens here.
-  // Only correct within the page we hold — a true fix is a severity sort
-  // server-side, since page 2's URGENT still outranks page 1's LOW.
-  const railItems = useMemo(
-    () => [...(unscheduled?.content ?? [])].sort(compareRailOrder),
-    [unscheduled],
-  );
+  // Server-ordered: severity CASE then createdAt ASC, in the query itself
+  // (WorkOrderCacheRepository). Deliberately NOT re-sorted here — a second
+  // implementation of one ordering rule is the drift risk, and a client sort
+  // could only ever fix the page in hand anyway.
+  const railItems = useMemo(() => unscheduled?.content ?? [], [unscheduled]);
 
   const techs = useMemo(() => {
     if (!search.trim()) return allTechs;
