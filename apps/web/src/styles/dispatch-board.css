@@ -652,3 +652,18 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+/* The rail card is a <button>: clicking it is the board's only path into the
+   composer, and it must be keyboard-reachable like the timeline blocks. */
+.db-wo {
+  display: block;
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+}
+
+.db-wo:focus-visible {
+  outline: 2px solid var(--accent-500);
+  outline-offset: -2px;
+}

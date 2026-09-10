@@ -310,6 +310,9 @@ vi.mock('react-i18next', () => {
     'dispatchBoard.rail.emptyBody': 'The whole board is assigned.',
     'dispatchBoard.rail.emptyTitle': 'Nothing unscheduled',
     'dispatchBoard.rail.heading': 'Unscheduled',
+    'dispatchBoard.rail.itemCount': '{{count}} items',
+    'dispatchBoard.rail.recurring': 'Agreement / recurring work',
+    'dispatchBoard.rail.urgent': 'Urgent',
     'dispatchBoard.rail.hint':
       'One card per {{entity, lowercase}} \u00b7 click to schedule, or drag onto a {{tech, lowercase}}',
     'dispatchBoard.search.placeholder': 'Find a {{entity, lowercase}}\u2026',
