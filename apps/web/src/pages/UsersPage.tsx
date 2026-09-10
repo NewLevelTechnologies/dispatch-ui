@@ -2,6 +2,7 @@ import { useEffect, useState, useDeferredValue } from 'react';
 import clsx from 'clsx';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { invalidateDispatchBoard } from '../utils/invalidateRoleConsumers';
 import { useTranslation } from '@dispatch/i18n';
 import { EllipsisVerticalIcon, UsersIcon } from '@heroicons/react/24/outline';
 import IconButton from '../components/IconButton';
@@ -300,6 +301,8 @@ export default function UsersPage() {
     mutationFn: (user: User) => userApi.enable(user.id),
     onSuccess: (_, user) => {
       queryClient.invalidateQueries({ queryKey: ['users'] });
+      // The board only lists enabled users, so this moves membership too.
+      invalidateDispatchBoard(queryClient);
       showSuccess(
         t('users.actions.restoredToast', {
           name: `${user.firstName} ${user.lastName}`,
@@ -314,6 +317,8 @@ export default function UsersPage() {
     mutationFn: (user: User) => userApi.disable(user.id),
     onSuccess: (_, user) => {
       queryClient.invalidateQueries({ queryKey: ['users'] });
+      // The board only lists enabled users, so this moves membership too.
+      invalidateDispatchBoard(queryClient);
       // Names the person AND the workspace: "removed" alone reads as deleted
       // from the platform. Undo is honest here — deactivate is reversible via
       // activate, and the row is still sitting in the list to prove it.
@@ -333,6 +338,8 @@ export default function UsersPage() {
     mutationFn: (user: User) => userApi.delete(user.id),
     onSuccess: (_, user) => {
       queryClient.invalidateQueries({ queryKey: ['users'] });
+      // The board only lists enabled users, so this moves membership too.
+      invalidateDispatchBoard(queryClient);
       // Deliberately no Undo — a deleted membership cannot be restored, and
       // offering one would be a lie the user only discovers after clicking.
       showSuccess(
