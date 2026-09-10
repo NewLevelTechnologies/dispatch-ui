@@ -72,34 +72,43 @@ describe('Dispatchable override', () => {
 
   // INHERIT alone is meaningless without saying what following the roles
   // produces — that's the whole reason the hint exists.
-  it('names the outcome and its cause under INHERIT', async () => {
+  // Outcome in the option label, cause in the line beneath — so the person
+  // choosing sees what they'd be overriding without reading elsewhere.
+  it('echoes the inherited outcome in the label and the cause beneath', async () => {
     mockGetById.mockResolvedValue(user({ roles: [TECH] }));
     renderWithProviders(<UserEditPage />, { initialPath: '/users/u1/edit' });
 
     expect(await screen.findByTestId('dispatchable-hint')).toBeInTheDocument();
-    expect(hint()).toContain('On the board');
+    expect(screen.getByRole('radio', { name: /Follow roles — assignable/ })).toBeInTheDocument();
     expect(hint()).toContain('Technician');
   });
 
-  it('says why someone is NOT on the board under INHERIT', async () => {
+  it('says why someone is not assignable under INHERIT', async () => {
     renderWithProviders(<UserEditPage />, { initialPath: '/users/u1/edit' });
     expect(await screen.findByTestId('dispatchable-hint')).toBeInTheDocument();
-    expect(hint()).toContain('no role here performs field work');
+    expect(
+      screen.getByRole('radio', { name: /Follow roles — not assignable/ })
+    ).toBeInTheDocument();
+    expect(hint()).toContain('No role here performs field work');
   });
 
   // Live against the form, not the saved value: ticking Technician should
   // answer the question immediately.
-  it('updates the hint as roles change, before saving', async () => {
+  it('updates live as roles change, before saving', async () => {
     const u = userEvent.setup();
     renderWithProviders(<UserEditPage />, { initialPath: '/users/u1/edit' });
     await screen.findByTestId('dispatchable-hint');
-    expect(hint()).toContain('Not on the board');
+    expect(
+      screen.getByRole('radio', { name: /Follow roles — not assignable/ })
+    ).toBeInTheDocument();
 
     // jsdom doesn't forward a <label> click to Headless's role=checkbox span
     // the way a real browser does, so target the control inside the row.
     const row = screen.getByText('Technician').closest('label') as HTMLElement;
     await u.click(row.querySelector('[role="checkbox"]') as HTMLElement);
-    expect(hint()).toContain('On the board');
+
+    expect(screen.getByRole('radio', { name: /Follow roles — assignable/ })).toBeInTheDocument();
+    expect(hint()).toContain('Technician');
   });
 
   it('reports the override as overriding, in both directions', async () => {
@@ -109,10 +118,10 @@ describe('Dispatchable override', () => {
     await screen.findByTestId('dispatchable-hint');
 
     await u.click(screen.getByRole('radio', { name: 'Never' }));
-    expect(hint()).toContain('Kept off the board');
+    expect(hint()).toContain('overriding the Technician role');
 
     await u.click(screen.getByRole('radio', { name: 'Always' }));
-    expect(hint()).toContain('On the board, whatever the roles say');
+    expect(hint()).toContain('already qualifies');
   });
 
   it('always sends dispatchable, so omission never means reset', async () => {

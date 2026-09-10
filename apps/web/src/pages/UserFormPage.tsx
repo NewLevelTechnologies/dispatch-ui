@@ -13,6 +13,7 @@ import {
   type Role,
 } from '../api/setup';
 import { ToggleGroup, ToggleGroupOption } from '../components/ui/ToggleGroup';
+import { summarizeAssignment } from '../lib/dispatchable';
 import { roleAccentFromRole } from '@dispatch/utils';
 import { showError, showSuccess, extractApiError, errorStatus, errorCode, isConflict } from '../lib/toast';
 import RemovalGuardDialog, { type RemovalGuard } from '../components/users/RemovalGuardDialog';
@@ -415,6 +416,7 @@ export default function UserFormPage({ mode }: UserFormPageProps) {
                   onChange={(v) => setFormData((p) => ({ ...p, dispatchable: v }))}
                   roles={roles}
                   selectedRoleIds={formData.roleIds}
+                  dispatchRegionIds={formData.dispatchRegionIds}
                 />
               )}
               <CapabilityPreview
@@ -520,55 +522,82 @@ function DispatchableField({
   onChange,
   roles,
   selectedRoleIds,
+  dispatchRegionIds,
 }: {
   value: Dispatchable;
   onChange: (value: Dispatchable) => void;
   roles: Role[];
   selectedRoleIds: string[];
+  dispatchRegionIds: string[];
 }) {
-  const grantingRoles = useMemo(
-    () => roles.filter((r) => selectedRoleIds.includes(r.id) && r.performsFieldWork),
+  const selected = useMemo(
+    () => roles.filter((r) => selectedRoleIds.includes(r.id)),
     [roles, selectedRoleIds],
   );
+  const inherited = selected.some((r) => r.performsFieldWork);
 
-  const inheritedOn = grantingRoles.length > 0;
-  const onBoard = value === 'ALWAYS' ? true : value === 'NEVER' ? false : inheritedOn;
-
-  const hint = (() => {
-    if (value === 'ALWAYS') return 'On the board, whatever the roles say';
-    if (value === 'NEVER') return 'Kept off the board, whatever the roles say';
-    return inheritedOn
-      ? `On the board — ${grantingRoles.map((r) => r.name).join(', ')}`
-      : 'Not on the board — no role here performs field work';
-  })();
+  // The same helper the detail page reads, so the two can't drift — but fed
+  // the FORM's current selections rather than the saved user, so it answers
+  // while someone is still deciding.
+  const summary = useMemo(
+    () =>
+      summarizeAssignment({
+        dispatchable: value,
+        performsFieldWork:
+          value === 'ALWAYS' ? true : value === 'NEVER' ? false : inherited,
+        roles: selected,
+        dispatchRegionIds,
+      }),
+    [value, inherited, selected, dispatchRegionIds],
+  );
 
   return (
     <div className="mt-3 border-t border-border-soft pt-3">
-      <div className="mb-1.5 flex items-baseline gap-2">
-        <span className="text-[10px] font-semibold uppercase tracking-[0.06em] text-fg-muted">
-          Dispatchable
-        </span>
-        <span
-          className={`text-[11px] ${onBoard ? 'text-fg' : 'text-fg-muted'}`}
-          data-testid="dispatchable-hint"
-        >
-          {hint}
-        </span>
+      <div className="mb-1.5 text-[10px] font-semibold tracking-[0.06em] text-fg-muted uppercase">
+        Can be assigned dispatches
       </div>
       <ToggleGroup
         value={value}
         onChange={onChange}
         size="sm"
-        aria-label="Dispatchable"
+        aria-label="Can be assigned dispatches"
       >
-        <ToggleGroupOption value="INHERIT">Follow roles</ToggleGroupOption>
+        {/* The inherited result is echoed INSIDE the label, not beside it:
+            whoever is choosing can see what they would be overriding without
+            reading elsewhere, and it updates as roles are ticked on this same
+            page. */}
+        <ToggleGroupOption value="INHERIT">
+          {`Follow roles \u2014 ${inherited ? 'assignable' : 'not assignable'}`}
+        </ToggleGroupOption>
         <ToggleGroupOption value="ALWAYS">Always</ToggleGroupOption>
         <ToggleGroupOption value="NEVER">Never</ToggleGroupOption>
       </ToggleGroup>
+
+      {/* The label carries the outcome, so this carries the cause. */}
+      <p className="mt-1.5 text-[11.5px] text-fg-muted" data-testid="dispatchable-hint">
+        {summary.reason.map((part, i) =>
+          part.strong ? (
+            <b key={i} className="font-semibold text-fg-strong">
+              {part.text}
+            </b>
+          ) : (
+            <span key={i}>{part.text}</span>
+          )
+        )}
+      </p>
+
+      {summary.noRegions && (
+        <p className="mt-1 text-[11.5px] text-warning-fg">
+          Assignable, but with no regions they won&rsquo;t appear on any
+          dispatcher&rsquo;s board.
+        </p>
+      )}
+
       <p className="mt-1.5 text-[11px] text-fg-muted">
-        An override for the cases roles can’t express — a working owner who
-        drives, a tech on light duty. Regions are a different question: they
-        narrow <em>which</em> board someone appears on, not whether they appear.
+        Gates every assignment path — the board, tech pickers, and the
+        work-order dispatch drawer. Regions are a different question: they
+        narrow <em>which</em> board someone appears on, not whether they appear
+        at all.
       </p>
     </div>
   );
