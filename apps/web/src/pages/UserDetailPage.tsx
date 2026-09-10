@@ -17,7 +17,8 @@ import { Badge } from '../components/catalyst/badge';
 import { Button } from '../components/catalyst/button';
 import { Card } from '../components/catalyst/card';
 import { DataRow } from '../components/catalyst/data-row';
-import { dispatchableReason } from '../lib/dispatchable';
+import { summarizeAssignment } from '../lib/dispatchable';
+import { useGlossary } from '../contexts/GlossaryContext';
 import { Heading } from '../components/catalyst/heading';
 import { Text } from '../components/catalyst/text';
 import ConfirmDialog from '../components/ConfirmDialog';
@@ -407,6 +408,66 @@ function RoleStack({ roles, max = 3 }: { roles: Role[]; max?: number }) {
 }
 
 // ──────────────────────────────────────────────────────────────────
+// Assignment value — answer, then reason, then reach. The pill carries the
+// effective outcome, the second line the derivation, the third where it
+// applies, so a reader never has to compute eligibility from a role list.
+// ──────────────────────────────────────────────────────────────────
+function AssignmentValue({ user }: { user: User }) {
+  const { getName } = useGlossary();
+  const { assignable, override, reason, noRegions } = summarizeAssignment(user);
+
+  const boardName = `${getName('dispatch').toLowerCase()} board`;
+  const surfaces = !assignable
+    ? `Hidden from the ${boardName} and from every tech picker`
+    : noRegions
+      ? `Reachable in tech pickers \u00b7 absent from every ${boardName}`
+      : `${getName('dispatch')} board \u00b7 tech pickers \u00b7 work-order dispatch drawer`;
+
+  return (
+    <div className="flex min-w-0 flex-col gap-1">
+      <div className="flex flex-wrap items-center gap-2">
+        {assignable ? (
+          <Pill tone="success" dot>
+            Assignable
+          </Pill>
+        ) : (
+          <Pill tone="neutral">Not assignable</Pill>
+        )}
+        {/* Chrome that appears only when it is load-bearing. */}
+        {override === 'neutral' && <Badge>Override</Badge>}
+        {override === 'warning' && <Pill tone="warning">Override</Pill>}
+        {noRegions && <Pill tone="warning">No regions</Pill>}
+      </div>
+
+      <span className="text-[11.5px] leading-[1.45] text-fg-muted">
+        {reason.map((part, i) =>
+          part.strong ? (
+            <b key={i} className="font-semibold text-fg-strong">
+              {part.text}
+            </b>
+          ) : (
+            <span key={i}>{part.text}</span>
+          )
+        )}
+        {noRegions && (
+          <>
+            {' \u2014 but with no regions assigned they will not appear on any board. '}
+            <Link
+              to={`/settings/access/users/${user.id}/edit`}
+              className="font-medium text-fg-accent hover:underline"
+            >
+              Assign regions
+            </Link>
+          </>
+        )}
+      </span>
+
+      <span className="text-[11px] leading-[1.4] text-fg-muted">{surfaces}</span>
+    </div>
+  );
+}
+
+// ──────────────────────────────────────────────────────────────────
 // Roles + Regions — combined card with capabilities expander
 // ──────────────────────────────────────────────────────────────────
 function RolesAndRegionsCard({
@@ -448,19 +509,21 @@ function RolesAndRegionsCard({
           )}
         </div>
       </DataRow>
-      {/* Between Roles and Regions on purpose: this row qualifies the roles
-          above it, and it answers the prior question to the one below —
-          WHETHER someone appears on the board, before WHICH board. Omitted
-          entirely when the server hasn't sent the field, rather than guessing
-          an answer to a question this page is the place people come to ask. */}
+      {/* Between Roles and Regions on purpose: it qualifies the roles above
+          it, and it answers the prior question to the one below — WHETHER
+          someone can be given work, before WHICH board they show up on.
+          Omitted entirely when the server hasn't sent `performsFieldWork`,
+          rather than guessing: this page is where people come to ask.
+
+          Labelled "Assignment", not "Dispatch board" — the flag gates every
+          assignment path, and naming one symptom would imply switching it off
+          merely hides someone from a view. The surfaces are named on the
+          third line instead, which is also where the tenant's own word for
+          the entity belongs rather than in a label column shared with Roles
+          and Regions. */}
       {user.performsFieldWork !== undefined && (
-        <DataRow label="Dispatch board" labelWidth={90}>
-          <div className="flex flex-wrap items-center gap-1.5">
-            <Pill tone={user.performsFieldWork ? 'info' : 'neutral'}>
-              {user.performsFieldWork ? 'On the board' : 'Not on the board'}
-            </Pill>
-            <span className="text-[11.5px] text-fg-muted">{dispatchableReason(user)}</span>
-          </div>
+        <DataRow label="Assignment" labelWidth={90}>
+          <AssignmentValue user={user} />
         </DataRow>
       )}
 

@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { screen } from '@testing-library/react';
 import { renderWithProviders, userEvent } from '../test/utils';
 import { UserEditPage, UserInvitePage } from './UserFormPage';
-import { dispatchableReason } from '../lib/dispatchable';
+import { summarizeAssignment } from '../lib/dispatchable';
 
 const mockGetById = vi.fn();
 const mockGetRoles = vi.fn();
@@ -149,40 +149,118 @@ describe('Dispatchable override', () => {
 
 // ── Read surface ───────────────────────────────────────────────────
 // The form is where you SET it; the detail page is where anyone goes to ask
-// "is this person on the board?", so it has to answer without a round trip
+// "can this person be given work?", so it has to answer without a round trip
 // through the edit screen.
-describe('Dispatchable on user detail', () => {
-  it('states the resolved answer and its cause under INHERIT', () => {
-    expect(dispatchableReason({ dispatchable: 'INHERIT', performsFieldWork: true, roles: [TECH] })).toBe(
-      'From Technician'
-    );
+const say = (parts: { text: string }[]) => parts.map((p) => p.text).join('');
+
+describe('Assignment summary on user detail', () => {
+  const base = { dispatchRegionIds: ['r1'] };
+
+  it('answers assignable and names the role under INHERIT', () => {
+    const r = summarizeAssignment({
+      ...base,
+      dispatchable: 'INHERIT',
+      performsFieldWork: true,
+      roles: [TECH],
+    });
+    expect(r.assignable).toBe(true);
+    expect(say(r.reason)).toBe('From the Technician role');
+    // Nothing about the override while inheriting — most users inherit, and
+    // for them the field should read as though it doesn't exist.
+    expect(r.override).toBeNull();
   });
 
-  it('says why someone is off the board under INHERIT', () => {
-    expect(
-      dispatchableReason({ dispatchable: 'INHERIT', performsFieldWork: false, roles: [CSR] })
-    ).toBe('No role here performs field work');
+  it('says why someone is not assignable under INHERIT', () => {
+    const r = summarizeAssignment({
+      ...base,
+      dispatchable: 'INHERIT',
+      performsFieldWork: false,
+      roles: [CSR],
+    });
+    expect(r.assignable).toBe(false);
+    expect(say(r.reason)).toBe('No role here performs field work');
   });
 
-  it('reports an override as an override, in both directions', () => {
-    expect(dispatchableReason({ dispatchable: 'ALWAYS', performsFieldWork: true, roles: [CSR] })).toBe(
-      'Set to Always for this user'
-    );
-    expect(dispatchableReason({ dispatchable: 'NEVER', performsFieldWork: false, roles: [TECH] })).toBe(
-      'Set to Never for this user'
-    );
+  // The loud case: this is how a technician silently vanishes from the board
+  // with nobody able to explain why.
+  it('shouts when NEVER contradicts a qualifying role', () => {
+    const r = summarizeAssignment({
+      ...base,
+      dispatchable: 'NEVER',
+      performsFieldWork: false,
+      roles: [TECH],
+    });
+    expect(r.override).toBe('warning');
+    expect(say(r.reason)).toBe('Set to never for this user, overriding the Technician role');
   });
 
-  // Nested roles don't always carry the flag. Claiming "no role performs
-  // field work" while the resolved answer says otherwise would be worse than
-  // staying vague about the cause.
+  it('stays quiet when NEVER contradicts nothing', () => {
+    const r = summarizeAssignment({
+      ...base,
+      dispatchable: 'NEVER',
+      performsFieldWork: false,
+      roles: [CSR],
+    });
+    expect(r.override).toBe('neutral');
+    expect(say(r.reason)).toBe('Set to never for this user');
+  });
+
+  // A redundant ALWAYS is worth saying quietly: it tells an admin the
+  // override is doing nothing, so removing a role won't behave as expected.
+  it('flags a redundant ALWAYS', () => {
+    const r = summarizeAssignment({
+      ...base,
+      dispatchable: 'ALWAYS',
+      performsFieldWork: true,
+      roles: [TECH],
+    });
+    expect(say(r.reason)).toContain('the Technician role already qualifies');
+  });
+
+  it('explains a load-bearing ALWAYS', () => {
+    const r = summarizeAssignment({
+      ...base,
+      dispatchable: 'ALWAYS',
+      performsFieldWork: true,
+      roles: [CSR],
+    });
+    expect(say(r.reason)).toContain('no role here performs field work');
+  });
+
+  // The silent failure: assignable but on nobody's board. Each row looks
+  // fine alone, which is exactly why it has to surface here.
+  it('catches assignable-with-no-regions', () => {
+    const r = summarizeAssignment({
+      dispatchRegionIds: [],
+      dispatchable: 'INHERIT',
+      performsFieldWork: true,
+      roles: [TECH],
+    });
+    expect(r.assignable).toBe(true);
+    expect(r.noRegions).toBe(true);
+  });
+
+  // Not a region problem if they can't be assigned in the first place —
+  // two warnings for one cause is noise.
+  it('does not warn about regions when not assignable', () => {
+    const r = summarizeAssignment({
+      dispatchRegionIds: [],
+      dispatchable: 'INHERIT',
+      performsFieldWork: false,
+      roles: [CSR],
+    });
+    expect(r.noRegions).toBe(false);
+  });
+
+  // Nested roles don't always carry the flag. Better vague than printing a
+  // cause that contradicts the pill beside it.
   it('stays vague rather than contradicting the resolved answer', () => {
-    expect(
-      dispatchableReason({
-        dispatchable: 'INHERIT',
-        performsFieldWork: true,
-        roles: [{ ...TECH, performsFieldWork: undefined }],
-      })
-    ).toBe('From their roles');
+    const r = summarizeAssignment({
+      ...base,
+      dispatchable: 'INHERIT',
+      performsFieldWork: true,
+      roles: [{ ...TECH, performsFieldWork: undefined }],
+    });
+    expect(say(r.reason)).toBe('From their roles');
   });
 });
