@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
+import { invalidateDispatchBoard } from '../utils/invalidateRoleConsumers';
 import { useTranslation } from '@dispatch/i18n';
 import { ChevronRightIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import { PatternFormat } from 'react-number-format';
@@ -136,6 +137,7 @@ export default function UserFormPage({ mode }: UserFormPageProps) {
       }),
     onSuccess: (created) => {
       queryClient.invalidateQueries({ queryKey: ['users'] });
+      invalidateDispatchBoard(queryClient);
       // Branch on `notificationRequested`, never on `invitationStatus` — the
       // backend keys this on who created the Cognito identity, and someone
       // another tenant invited who never signed in comes back INVITED here yet
@@ -250,6 +252,8 @@ export default function UserFormPage({ mode }: UserFormPageProps) {
       await updateRegionsMutation.mutateAsync();
       queryClient.invalidateQueries({ queryKey: ['users'] });
       queryClient.invalidateQueries({ queryKey: ['users', id] });
+      // Roles, `dispatchable` and regions all move who is on the board.
+      invalidateDispatchBoard(queryClient);
       // Role / region changes emit ROLE_ADDED / ROLE_REMOVED audit events
       // that should appear in the detail page's activity feed without a
       // hard refresh.
