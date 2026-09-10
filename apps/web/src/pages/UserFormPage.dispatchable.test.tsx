@@ -118,7 +118,7 @@ describe('Dispatchable override', () => {
     await screen.findByTestId('dispatchable-hint');
 
     await u.click(screen.getByRole('radio', { name: 'Never' }));
-    expect(hint()).toContain('overriding the Technician role');
+    expect(hint()).toContain('Overrides the Technician role');
 
     await u.click(screen.getByRole('radio', { name: 'Always' }));
     expect(hint()).toContain('already qualifies');
@@ -195,7 +195,7 @@ describe('Assignment summary on user detail', () => {
       roles: [TECH],
     });
     expect(r.override).toBe('warning');
-    expect(say(r.reason)).toBe('Set to never for this user, overriding the Technician role');
+    expect(say(r.reason)).toBe('Overrides the Technician role');
   });
 
   it('stays quiet when NEVER contradicts nothing', () => {
@@ -205,7 +205,9 @@ describe('Assignment summary on user detail', () => {
       roles: [CSR],
     });
     expect(r.override).toBe('neutral');
-    expect(say(r.reason)).toBe('Set to never for this user');
+    // The override is redundant here — they'd be off the board anyway — so the
+    // line states the cause rather than restating the badge.
+    expect(say(r.reason)).toBe('No role here performs field work');
   });
 
   // A redundant ALWAYS is worth saying quietly: it tells an admin the
@@ -216,7 +218,7 @@ describe('Assignment summary on user detail', () => {
       performsFieldWork: true,
       roles: [TECH],
     });
-    expect(say(r.reason)).toContain('the Technician role already qualifies');
+    expect(say(r.reason)).toContain('The Technician role already qualifies');
   });
 
   it('explains a load-bearing ALWAYS', () => {
@@ -225,7 +227,7 @@ describe('Assignment summary on user detail', () => {
       performsFieldWork: true,
       roles: [CSR],
     });
-    expect(say(r.reason)).toContain('no role here performs field work');
+    expect(say(r.reason)).toContain('No role here performs field work');
   });
 
   // Regions NARROW, they don't exclude: scheduling-service applies a region
