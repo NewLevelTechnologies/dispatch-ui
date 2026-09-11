@@ -2978,8 +2978,7 @@
       "undoFailed": "Couldn't undo — reloading the board",
       "removed": "Back in unscheduled",
       "removeFailed": "Couldn't remove",
-      "cannotUnschedule": "Can't drag this one back",
-      "cannotUnscheduleWhy": "The technician has already been told about it. Cancel it instead, so the reason stays on the record."
+      "cancelled": "Cancelled · back in unscheduled"
     }
   }
 }

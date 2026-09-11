@@ -252,29 +252,62 @@ export function useBoardMutations(date: string) {
   });
 
   /**
-   * Remove a dispatch outright.
+   * Take work back off the board. Always allowed — a dispatcher pulling a job
+   * back is a decision, not a mistake to be guarded against, and the same
+   * "warn and allow" rule that lets them double-book applies here.
    *
-   * Distinct from cancelling, which the drawer also offers: CANCELLED keeps
-   * the visit with a reason, which is what a customer conversation and the
-   * audit trail depend on. Delete is for a mistake that never happened — a
-   * drop on the wrong tech, a duplicate. Undo on the toast lasts seconds, so
-   * this is the durable way to unassign.
+   * WHAT it writes depends on whether anyone knows about the visit yet:
+   *
+   *   unreleased  → DELETE. Nobody was told, so there is nothing to explain
+   *                 and nothing worth keeping.
+   *   released    → CANCEL. A technician has an SMS about this job; deleting
+   *                 it would leave them holding a notification for a visit
+   *                 that no longer exists anywhere. Cancelling puts the work
+   *                 back in the rail just the same — "unscheduled" means no
+   *                 LIVE dispatch — while leaving a record that explains the
+   *                 message they already got.
+   *
+   * Either way the work order returns to the rail, which is what the gesture
+   * means.
    */
-  const removeDispatch = useMutation({
-    mutationFn: (id: string) => dispatchesApi.delete(id),
-    onMutate: async (id) => {
+  const unschedule = useMutation({
+    mutationFn: async (dispatch: BoardDispatch) => {
+      if (dispatch.releasedAt == null) {
+        await dispatchesApi.delete(dispatch.id);
+        return { cancelled: false };
+      }
+      await dispatchesApi.update(dispatch.id, {
+        status: 'CANCELLED',
+        notes: 'Unscheduled from the dispatch board',
+        version: dispatch.version,
+      });
+      return { cancelled: true };
+    },
+    onMutate: async (dispatch) => {
       await queryClient.cancelQueries({ queryKey: ['dispatch-board'] });
       const snapshot = queryClient.getQueriesData({ queryKey: ['dispatch-board'] });
       patchBoardCaches(queryClient, {
         grid: (board) => ({
           ...board,
-          dispatches: board.dispatches.filter((d) => d.id !== id),
+          dispatches: board.dispatches.filter((d) => d.id !== dispatch.id),
         }),
       });
       return { snapshot };
     },
-    onSuccess: () => showSuccess(t('dispatchBoard.drag.removed')),
-    onError: (err, _id, context) => {
+    onSuccess: ({ cancelled }, dispatch) => {
+      if (!cancelled) {
+        showSuccess(t('dispatchBoard.drag.removed'));
+        return;
+      }
+      // A cancel is reversible, so it gets an Undo where a delete can't.
+      showUndo(t('dispatchBoard.drag.cancelled'), t('common.undo'), () => {
+        dispatchesApi
+          .update(dispatch.id, { status: 'SCHEDULED' })
+          .then(refresh)
+          .catch(undoFailed);
+      });
+    },
+    onError: (err, _dispatch, context) => {
       restore(context?.snapshot);
       reportFailure(t('dispatchBoard.drag.removeFailed'))(err);
     },
@@ -284,7 +317,7 @@ export function useBoardMutations(date: string) {
   return {
     assign,
     move,
-    removeDispatch,
-    pending: assign.isPending || move.isPending || removeDispatch.isPending,
+    unschedule,
+    pending: assign.isPending || move.isPending || unschedule.isPending,
   };
 }

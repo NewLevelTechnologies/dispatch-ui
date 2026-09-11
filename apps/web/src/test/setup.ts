@@ -293,9 +293,7 @@ vi.mock('react-i18next', () => {
     'dispatchBoard.drag.assignFailed': "Couldn't schedule",
     'dispatchBoard.drag.assigned':
       '{{workOrder}} \u2192 {{tech}}, {{window}} \u00b7 held on deck',
-    'dispatchBoard.drag.cannotUnschedule': "Can't drag this one back",
-    'dispatchBoard.drag.cannotUnscheduleWhy':
-      'The technician has already been told about it. Cancel it instead, so the reason stays on the record.',
+    'dispatchBoard.drag.cancelled': 'Cancelled \u00b7 back in unscheduled',
     'dispatchBoard.drag.conflict':
       'Someone else changed this while you were looking. Reloading the board.',
     'dispatchBoard.drag.moveFailed': "Couldn't move",

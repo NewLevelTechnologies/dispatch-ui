@@ -419,7 +419,7 @@ export default function DispatchBoardPage() {
   // Bulk release takes a SCOPE, not an id list: the server recomputes the
   // unreleased set, so this can neither reach outside the caller's regions
   // nor act on a board rendered ten minutes ago.
-  const { assign, move, removeDispatch } = useBoardMutations(date);
+  const { assign, move, unschedule } = useBoardMutations(date);
 
   // Smart back: carry the board's date and scope so returning lands on the
   // board the dispatcher was actually looking at, not a reset one.
@@ -475,29 +475,17 @@ export default function DispatchBoardPage() {
     [railItems, allDispatches, allTechs, assign, move, timeZone],
   );
 
-  // Putting work back is not always a clean undo. An unreleased, untouched
-  // dispatch can just go — nobody was told about it. Once a tech has been
-  // notified or has started moving, deleting it silently would erase a visit
-  // someone is acting on, so that routes to the drawer where Cancel keeps a
-  // reason on the record.
-  const unschedule = useCallback(
+  // Pulling work back off the board is always allowed — it's a decision, not
+  // a mistake to guard against. The mutation picks delete or cancel based on
+  // whether a technician has been told yet.
+  const unscheduleFromRail = useCallback(
     (payload: Record<string, unknown>) => {
       const dispatch = allDispatches.find((d) => d.id === payload.dispatchId);
-      if (!dispatch) return;
-
-      if (dispatch.releasedAt != null || dispatch.status !== 'SCHEDULED') {
-        showError(
-          t('dispatchBoard.drag.cannotUnschedule'),
-          t('dispatchBoard.drag.cannotUnscheduleWhy'),
-        );
-        setOpenDispatch(dispatch);
-        return;
-      }
-      removeDispatch.mutate(dispatch.id);
+      if (dispatch) unschedule.mutate(dispatch);
     },
-    [allDispatches, removeDispatch, t],
+    [allDispatches, unschedule],
   );
-  unscheduleRef.current = unschedule;
+  unscheduleRef.current = unscheduleFromRail;
 
   const releaseMutation = useMutation({
     mutationFn: () => dispatchBoardApi.release({ date, regionIds }),
@@ -887,9 +875,14 @@ export default function DispatchBoardPage() {
           setOpenDispatch(null);
           setEditDispatch(d);
         }}
-        onDelete={(d) => {
+        onDelete={() => {
+          // Use the board's own row, not the drawer's callback argument —
+          // the drawer hands back a plain Dispatch, and unschedule needs
+          // `releasedAt` and `version` to decide between delete and cancel.
+          // Same path the rail drop takes, so both routes behave alike.
+          const target = openDispatch;
           setOpenDispatch(null);
-          removeDispatch.mutate(d.id);
+          if (target) unschedule.mutate(target);
         }}
         onViewWorkItems={() => {
           if (openDispatch) goToWorkOrder(openDispatch.workOrderId);
