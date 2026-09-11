@@ -13,13 +13,19 @@
 // from 9:00 to 10:30 would assert precision we do not have. The gap between
 // box and fill is visible slack. Do not "fix" this into a start–end bar.
 // ─────────────────────────────────────────────────────────────────────
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from '@dispatch/i18n';
+import {
+  draggable,
+  dropTargetForElements,
+} from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
 import { ChevronRightIcon } from '@heroicons/react/24/outline';
 import type { BoardDispatch, BoardTech } from '../../api/setup';
 import { useGlossary } from '../../contexts/GlossaryContext';
 import { Avatar } from '../ui/Avatar';
 import { statusClass } from '../../lib/dispatchStatus';
 import { DENSITY_METRICS, type Density, type SpineProps } from './spine';
+import { hourAtPointer, resolveDrop } from '../../lib/boardDrop';
 import {
   axisPct,
   findClashes,
@@ -170,6 +176,25 @@ function Block({
   onOpen: (dispatch: BoardDispatch) => void;
 }) {
   const { t } = useTranslation();
+  const ref = useRef<HTMLButtonElement>(null);
+  const [dragging, setDragging] = useState(false);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    return draggable({
+      element: el,
+      getInitialData: () => ({
+        boardDrag: true,
+        dispatchId: dispatch.id,
+        // Duration rides along so a deliberately-widened window keeps its
+        // length when it moves rows — only the start snaps.
+        durationHours: window.end - window.start,
+      }),
+      onDragStart: () => setDragging(true),
+      onDrop: () => setDragging(false),
+    });
+  }, [dispatch.id, window.start, window.end]);
 
   const left = axisPct(window.start, axis);
   const width = axisPct(window.end, axis) - left;
@@ -200,8 +225,9 @@ function Block({
 
   return (
     <button
+      ref={ref}
       type="button"
-      className={className}
+      className={dragging ? `${className} dragging` : className}
       style={{ left: `${left}%`, width: `${width}%` }}
       onClick={() => onOpen(dispatch)}
       title={[title, dispatch.customerName, windowLabel].filter(Boolean).join(' · ')}
@@ -230,6 +256,72 @@ function Block({
   );
 }
 
+/**
+ * One tech's lane, and the board's only drop target.
+ *
+ * Holds the geometry (x within the lane → an hour on the axis) and the drop
+ * RULE (snap to a preset, refuse a window overlapping time off) so both are
+ * written once and any future spine inherits them. What a drop DOES is the
+ * page's business — the resolved window goes back up.
+ */
+function Lane({
+  techId,
+  spans,
+  axis,
+  onDrop,
+  children,
+}: {
+  techId: string;
+  spans: { start: number; end: number; allDay: boolean }[];
+  axis: SpineProps['axis'];
+  onDrop: SpineProps['onDrop'];
+  children: React.ReactNode;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [over, setOver] = useState(false);
+
+  // Latest values for the drop handler without re-registering the target on
+  // every render — re-registering mid-drag drops the gesture. Written in an
+  // effect rather than during render, which React 19 forbids.
+  const latest = useRef({ spans, axis, onDrop, techId });
+  useEffect(() => {
+    latest.current = { spans, axis, onDrop, techId };
+  });
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    return dropTargetForElements({
+      element: el,
+      canDrop: ({ source }) => Boolean(latest.current.onDrop) && source.data?.boardDrag === true,
+      onDragEnter: () => setOver(true),
+      onDragLeave: () => setOver(false),
+      onDrop: ({ source, location }) => {
+        setOver(false);
+        const cur = latest.current;
+        const rect = el.getBoundingClientRect();
+        const hour = hourAtPointer(
+          location.current.input.clientX,
+          { left: rect.left, width: rect.width },
+          cur.axis,
+        );
+        const resolved = resolveDrop(hour, cur.spans, cur.axis);
+        // A refusal is silent here: `canDrop` already withheld the affordance,
+        // and a toast explaining a drop the lane visibly declined would be
+        // scolding someone for something they could already see.
+        if (!resolved.ok) return;
+        cur.onDrop?.(cur.techId, resolved.window, source.data);
+      },
+    });
+  }, []);
+
+  return (
+    <div ref={ref} className={`db-lane${over ? ' over' : ''}`}>
+      {children}
+    </div>
+  );
+}
+
 export default function DispatchTimeline({
   groups,
   byTech,
@@ -241,6 +333,7 @@ export default function DispatchTimeline({
   nowHour,
   capacityStops,
   timeZone,
+  onDrop,
 }: SpineProps) {
   const { t } = useTranslation();
   const { getName } = useGlossary();
@@ -293,7 +386,12 @@ export default function DispatchTimeline({
           // working row — its label belongs in the lane, on the span.
           offLabel={outAllDay ? (spans[0]?.label ?? null) : null}
         />
-        <div className="db-lane">
+        <Lane
+          techId={tech.id}
+          spans={spans}
+          axis={axis}
+          onDrop={onDrop}
+        >
           <span className="db-lane-cells">
             {axis.hours.map((hour) => (
               <i key={hour} />
@@ -364,7 +462,7 @@ export default function DispatchTimeline({
           {nowHour != null && nowHour >= axis.start && nowHour <= axis.end && (
             <span className="db-now" style={{ left: `${axisPct(nowHour, axis)}%` }} />
           )}
-        </div>
+        </Lane>
       </div>
     );
   };

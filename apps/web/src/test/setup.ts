@@ -290,6 +290,17 @@ vi.mock('react-i18next', () => {
     'dispatchBoard.density.comfortable': 'Comfortable',
     'dispatchBoard.density.compact': 'Compact',
     'dispatchBoard.density.dense': 'Dense',
+    'dispatchBoard.drag.assignFailed': "Couldn't schedule",
+    'dispatchBoard.drag.assigned':
+      '{{workOrder}} \u2192 {{tech}}, {{window}} \u00b7 held on deck',
+    'dispatchBoard.drag.cancelled': 'Cancelled \u00b7 back in unscheduled',
+    'dispatchBoard.drag.conflict':
+      'Someone else changed this while you were looking. Reloading the board.',
+    'dispatchBoard.drag.moveFailed': "Couldn't move",
+    'dispatchBoard.drag.moved': '{{workOrder}} \u2192 {{tech}}, {{window}}',
+    'dispatchBoard.drag.removeFailed': "Couldn't remove",
+    'dispatchBoard.drag.removed': 'Back in unscheduled',
+    'dispatchBoard.drag.undoFailed': "Couldn't undo \u2014 reloading the board",
     'dispatchBoard.filter.density': 'Density',
     'dispatchBoard.filter.groupByNone': 'No grouping',
     'dispatchBoard.filter.groupByRegion': 'Group by {{entity, lowercase}}',
