@@ -291,13 +291,17 @@ vi.mock('react-i18next', () => {
     'dispatchBoard.density.compact': 'Compact',
     'dispatchBoard.density.dense': 'Dense',
     'dispatchBoard.drag.assignFailed': "Couldn't schedule",
-    'dispatchBoard.drag.assigned': '{{workOrder}} scheduled \u00b7 held on deck',
+    'dispatchBoard.drag.assigned':
+      '{{workOrder}} \u2192 {{tech}}, {{window}} \u00b7 held on deck',
+    'dispatchBoard.drag.cannotUnschedule': "Can't drag this one back",
+    'dispatchBoard.drag.cannotUnscheduleWhy':
+      'The technician has already been told about it. Cancel it instead, so the reason stays on the record.',
     'dispatchBoard.drag.conflict':
       'Someone else changed this while you were looking. Reloading the board.',
     'dispatchBoard.drag.moveFailed': "Couldn't move",
-    'dispatchBoard.drag.moved': '{{workOrder}} moved',
+    'dispatchBoard.drag.moved': '{{workOrder}} \u2192 {{tech}}, {{window}}',
     'dispatchBoard.drag.removeFailed': "Couldn't remove",
-    'dispatchBoard.drag.removed': 'Removed from the board',
+    'dispatchBoard.drag.removed': 'Back in unscheduled',
     'dispatchBoard.drag.undoFailed': "Couldn't undo \u2014 reloading the board",
     'dispatchBoard.filter.density': 'Density',
     'dispatchBoard.filter.groupByNone': 'No grouping',

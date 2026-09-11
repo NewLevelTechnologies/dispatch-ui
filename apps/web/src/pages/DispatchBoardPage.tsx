@@ -37,6 +37,7 @@ import { EmptyState } from '../components/ui/EmptyState';
 import { ErrorState } from '../components/ui/ErrorState';
 import { Pill } from '../components/ui/Pill';
 import { autoScrollForElements } from '@atlaskit/pragmatic-drag-and-drop-auto-scroll/element';
+import { dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
 import ConfirmDialog from '../components/ConfirmDialog';
 import DispatchDetailDrawer from '../components/DispatchDetailDrawer';
 import DispatchFormDrawer from '../components/DispatchFormDrawer';
@@ -48,7 +49,7 @@ import {
   type BoardGroup,
   type Density,
 } from '../components/dispatch/spine';
-import { buildAxis, zonedDate, zonedHour } from '../lib/boardTime';
+import { buildAxis, formatWindow, zonedDate, zonedHour } from '../lib/boardTime';
 import { movedWindow } from '../lib/boardDrop';
 import { useBoardMutations } from './dispatch/useBoardMutations';
 import { extractApiError, showError, showSuccess } from '../lib/toast';
@@ -130,6 +131,29 @@ export default function DispatchBoardPage() {
     const el = scrollRef.current;
     if (!el) return;
     return autoScrollForElements({ element: el });
+  }, []);
+
+  // Dragging a block back to the rail unschedules it — the inverse of the
+  // gesture that put it on the board. Registered here rather than in the
+  // spine because the rail isn't part of any spine.
+  const railRef = useRef<HTMLElement>(null);
+  const [railOver, setRailOver] = useState(false);
+  const unscheduleRef = useRef<(payload: Record<string, unknown>) => void>(() => {});
+  useEffect(() => {
+    const el = railRef.current;
+    if (!el) return;
+    return dropTargetForElements({
+      element: el,
+      // Only a scheduled block can come back; a rail card dragged onto the
+      // rail is a no-op, not an error.
+      canDrop: ({ source }) => source.data?.dispatchId != null,
+      onDragEnter: () => setRailOver(true),
+      onDragLeave: () => setRailOver(false),
+      onDrop: ({ source }) => {
+        setRailOver(false);
+        unscheduleRef.current(source.data);
+      },
+    });
   }, []);
 
   const rawDate = searchParams.get('date');
@@ -417,10 +441,13 @@ export default function DispatchBoardPage() {
       window: { startHour: number; endHour: number },
       payload: Record<string, unknown>,
     ) => {
+      const techName = allTechs.find((tech) => tech.id === techId)?.name ?? '';
+      const windowLabel = formatWindow(window.startHour, window.endHour);
+
       const workOrderId = payload.workOrderId as string | undefined;
       if (workOrderId) {
         const workOrder = railItems.find((w) => w.workOrderId === workOrderId);
-        if (workOrder) assign.mutate({ workOrder, techId, window });
+        if (workOrder) assign.mutate({ workOrder, techId, techName, windowLabel, window });
         return;
       }
 
@@ -437,10 +464,40 @@ export default function DispatchBoardPage() {
         const currentStart = zonedHour(dispatch.arrivalWindowStart, timeZone);
         if (currentStart != null && Math.abs(currentStart - moved.startHour) < 0.01) return;
       }
-      move.mutate({ dispatch, techId, window: moved });
+      move.mutate({
+        dispatch,
+        techId,
+        techName,
+        windowLabel: formatWindow(moved.startHour, moved.endHour),
+        window: moved,
+      });
     },
-    [railItems, allDispatches, assign, move, timeZone],
+    [railItems, allDispatches, allTechs, assign, move, timeZone],
   );
+
+  // Putting work back is not always a clean undo. An unreleased, untouched
+  // dispatch can just go — nobody was told about it. Once a tech has been
+  // notified or has started moving, deleting it silently would erase a visit
+  // someone is acting on, so that routes to the drawer where Cancel keeps a
+  // reason on the record.
+  const unschedule = useCallback(
+    (payload: Record<string, unknown>) => {
+      const dispatch = allDispatches.find((d) => d.id === payload.dispatchId);
+      if (!dispatch) return;
+
+      if (dispatch.releasedAt != null || dispatch.status !== 'SCHEDULED') {
+        showError(
+          t('dispatchBoard.drag.cannotUnschedule'),
+          t('dispatchBoard.drag.cannotUnscheduleWhy'),
+        );
+        setOpenDispatch(dispatch);
+        return;
+      }
+      removeDispatch.mutate(dispatch.id);
+    },
+    [allDispatches, removeDispatch, t],
+  );
+  unscheduleRef.current = unschedule;
 
   const releaseMutation = useMutation({
     mutationFn: () => dispatchBoardApi.release({ date, regionIds }),
@@ -737,7 +794,7 @@ export default function DispatchBoardPage() {
 
         {/* ── Body — unscheduled rail, then the board ────────────── */}
         <div className="db-body">
-          <aside className="db-rail">
+          <aside ref={railRef} className={`db-rail${railOver ? ' over' : ''}`}>
             <div className="db-rail-head">
               <span className="text-[10.5px] font-bold tracking-[0.06em] text-fg-muted uppercase">
                 {t('dispatchBoard.rail.heading')}

@@ -674,3 +674,10 @@
 .db-wo.dragging {
   opacity: 0.4;
 }
+
+/* The rail accepts a block dragged back off the board — the inverse of the
+   gesture that scheduled it. */
+.db-rail.over {
+  background: color-mix(in oklch, var(--accent-500) 8%, var(--bg-elev));
+  box-shadow: inset 0 0 0 2px color-mix(in oklch, var(--accent-500) 40%, transparent);
+}

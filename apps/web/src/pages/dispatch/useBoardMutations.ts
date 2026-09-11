@@ -112,6 +112,8 @@ export function useBoardMutations(date: string) {
     mutationFn: async (input: {
       workOrder: UnscheduledWorkOrder;
       techId: string;
+      techName: string;
+      windowLabel: string;
       window: Window;
     }) =>
       dispatchesApi.create({
@@ -160,7 +162,8 @@ export function useBoardMutations(date: string) {
       showUndo(
         t('dispatchBoard.drag.assigned', {
           workOrder: input.workOrder.workOrderNumber,
-          tech: input.techId,
+          tech: input.techName,
+          window: input.windowLabel,
         }),
         t('common.undo'),
         () => {
@@ -183,6 +186,8 @@ export function useBoardMutations(date: string) {
     mutationFn: async (input: {
       dispatch: BoardDispatch;
       techId: string;
+      techName: string;
+      windowLabel: string;
       window: Window;
     }) =>
       dispatchesApi.update(input.dispatch.id, {
@@ -216,20 +221,28 @@ export function useBoardMutations(date: string) {
     },
     onSuccess: (updated, input) => {
       const before = input.dispatch;
-      showUndo(t('dispatchBoard.drag.moved', { workOrder: before.workOrderNumber }), t('common.undo'), () => {
-        dispatchesApi
-          .update(before.id, {
-            assignedUserId: before.assignedUserId,
-            arrivalWindowStart: before.arrivalWindowStart,
-            arrivalWindowEnd: before.arrivalWindowEnd,
-            // The version the SERVER just handed back, not the one we opened
-            // with — the move itself bumped it, so replaying the old one
-            // would conflict with our own write.
-            version: updated.version,
-          })
-          .then(refresh)
-          .catch(undoFailed);
-      });
+      showUndo(
+        t('dispatchBoard.drag.moved', {
+          workOrder: before.workOrderNumber,
+          tech: input.techName,
+          window: input.windowLabel,
+        }),
+        t('common.undo'),
+        () => {
+          dispatchesApi
+            .update(before.id, {
+              assignedUserId: before.assignedUserId,
+              arrivalWindowStart: before.arrivalWindowStart,
+              arrivalWindowEnd: before.arrivalWindowEnd,
+              // The version the SERVER just handed back, not the one we
+              // opened with — the move itself bumped it, so replaying the
+              // old one would conflict with our own write.
+              version: updated.version,
+            })
+            .then(refresh)
+            .catch(undoFailed);
+        },
+      );
     },
     onError: (err, _input, context) => {
       restore(context?.snapshot);

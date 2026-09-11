@@ -2970,14 +2970,16 @@
       "failed": "Couldn't release"
     },
     "drag": {
-      "assigned": "{{workOrder}} scheduled · held on deck",
+      "assigned": "{{workOrder}} → {{tech}}, {{window}} · held on deck",
       "assignFailed": "Couldn't schedule",
       "conflict": "Someone else changed this while you were looking. Reloading the board.",
-      "moved": "{{workOrder}} moved",
+      "moved": "{{workOrder}} → {{tech}}, {{window}}",
       "moveFailed": "Couldn't move",
       "undoFailed": "Couldn't undo — reloading the board",
-      "removed": "Removed from the board",
-      "removeFailed": "Couldn't remove"
+      "removed": "Back in unscheduled",
+      "removeFailed": "Couldn't remove",
+      "cannotUnschedule": "Can't drag this one back",
+      "cannotUnscheduleWhy": "The technician has already been told about it. Cancel it instead, so the reason stays on the record."
     }
   }
 }
