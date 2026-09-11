@@ -15,7 +15,14 @@ import {
   type UnscheduledWorkOrder,
 } from '../../api/setup';
 import { toIsoAt } from '../../lib/arrivalWindows';
-import { errorCode, extractApiError, isConflict, showError, showUndo } from '../../lib/toast';
+import {
+  errorCode,
+  extractApiError,
+  isConflict,
+  showError,
+  showSuccess,
+  showUndo,
+} from '../../lib/toast';
 import { invalidateDispatchBoard } from '../../utils/invalidateRoleConsumers';
 
 interface Window {
@@ -23,11 +30,64 @@ interface Window {
   endHour: number;
 }
 
+/** Fields a provisional block needs to render but a rail card can't supply.
+ *  It lives for the round-trip only — the refetch replaces it with the real
+ *  row — so these are honest blanks rather than guesses. */
+const PROVISIONAL_BASE = {
+  seq: 0,
+  status: 'SCHEDULED' as const,
+  estimatedDuration: null,
+  // Drag-assign creates on deck, so the provisional block is hatched exactly
+  // like the real one will be.
+  releasedAt: null,
+  version: 0,
+  assignedUserName: null,
+  workOrderTypeId: null,
+  serviceLocationCity: null,
+  serviceLocationState: null,
+  latitude: null,
+  longitude: null,
+  driveMinFromPrev: null,
+  arrivedAt: null,
+  departedAt: null,
+  addressedWorkItemIds: [],
+};
+
+/**
+ * Apply a change to every board cache at once — the grid and the rail are
+ * separate reads under one prefix, and a drag usually moves something between
+ * them. Detected by shape rather than by key so this doesn't need to know how
+ * either query is keyed.
+ */
+function patchBoardCaches(
+  queryClient: ReturnType<typeof useQueryClient>,
+  patch: {
+    grid?: (board: { techs: unknown[]; dispatches: BoardDispatch[] }) => unknown;
+    rail?: (page: { content: UnscheduledWorkOrder[] }) => unknown;
+  },
+) {
+  queryClient.setQueriesData({ queryKey: ['dispatch-board'] }, (old: unknown) => {
+    if (!old || typeof old !== 'object') return old;
+    if ('dispatches' in old && patch.grid) {
+      return patch.grid(old as { techs: unknown[]; dispatches: BoardDispatch[] });
+    }
+    if ('content' in old && patch.rail) {
+      return patch.rail(old as { content: UnscheduledWorkOrder[] });
+    }
+    return old;
+  });
+}
+
 export function useBoardMutations(date: string) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
 
   const refresh = () => invalidateDispatchBoard(queryClient);
+
+  /** Put every board cache back exactly as it was. */
+  const restore = (snapshot?: [readonly unknown[], unknown][]) => {
+    snapshot?.forEach(([key, data]) => queryClient.setQueryData(key, data));
+  };
 
   /** A version conflict is its own failure, not a generic one: the board was
    *  stale, so refetching is the actual remedy and the message should say so
@@ -64,8 +124,39 @@ export function useBoardMutations(date: string) {
         // deliberate act — never a side effect of scheduling.
         notifyAssignedUser: false,
       }),
+    onMutate: async (input) => {
+      await queryClient.cancelQueries({ queryKey: ['dispatch-board'] });
+      const snapshot = queryClient.getQueriesData({ queryKey: ['dispatch-board'] });
+
+      // A provisional block, so the drop lands where the pointer let go
+      // instead of springing back until the server answers. `PENDING` is a
+      // `pending-` prefixed so it can never be mistaken for a server row.
+      const provisional = {
+        ...PROVISIONAL_BASE,
+        id: `pending-${input.workOrder.workOrderId}`,
+        workOrderId: input.workOrder.workOrderId,
+        workOrderNumber: input.workOrder.workOrderNumber,
+        workOrderSummary: input.workOrder.workOrderSummary,
+        customerId: input.workOrder.customerId,
+        customerName: input.workOrder.customerName,
+        priority: input.workOrder.priority,
+        recurring: input.workOrder.recurring,
+        serviceLocationId: input.workOrder.serviceLocationId,
+        assignedUserId: input.techId,
+        arrivalWindowStart: toIsoAt(date, input.window.startHour),
+        arrivalWindowEnd: toIsoAt(date, input.window.endHour),
+      } as BoardDispatch;
+
+      patchBoardCaches(queryClient, {
+        grid: (board) => ({ ...board, dispatches: [...board.dispatches, provisional] }),
+        rail: (page) => ({
+          ...page,
+          content: page.content.filter((w) => w.workOrderId !== input.workOrder.workOrderId),
+        }),
+      });
+      return { snapshot };
+    },
     onSuccess: (created, input) => {
-      refresh();
       showUndo(
         t('dispatchBoard.drag.assigned', {
           workOrder: input.workOrder.workOrderNumber,
@@ -79,7 +170,13 @@ export function useBoardMutations(date: string) {
         },
       );
     },
-    onError: reportFailure(t('dispatchBoard.drag.assignFailed')),
+    onError: (err, _input, context) => {
+      restore(context?.snapshot);
+      reportFailure(t('dispatchBoard.drag.assignFailed'))(err);
+    },
+    // Server truth wins either way — on success it replaces the provisional
+    // row, on failure it confirms the rollback.
+    onSettled: refresh,
   });
 
   const move = useMutation({
@@ -97,8 +194,27 @@ export function useBoardMutations(date: string) {
         // case that produces one.
         version: input.dispatch.version,
       }),
+    onMutate: async (input) => {
+      await queryClient.cancelQueries({ queryKey: ['dispatch-board'] });
+      const snapshot = queryClient.getQueriesData({ queryKey: ['dispatch-board'] });
+      patchBoardCaches(queryClient, {
+        grid: (board) => ({
+          ...board,
+          dispatches: board.dispatches.map((d) =>
+            d.id === input.dispatch.id
+              ? {
+                  ...d,
+                  assignedUserId: input.techId,
+                  arrivalWindowStart: toIsoAt(date, input.window.startHour),
+                  arrivalWindowEnd: toIsoAt(date, input.window.endHour),
+                }
+              : d,
+          ),
+        }),
+      });
+      return { snapshot };
+    },
     onSuccess: (updated, input) => {
-      refresh();
       const before = input.dispatch;
       showUndo(t('dispatchBoard.drag.moved', { workOrder: before.workOrderNumber }), t('common.undo'), () => {
         dispatchesApi
@@ -115,8 +231,47 @@ export function useBoardMutations(date: string) {
           .catch(undoFailed);
       });
     },
-    onError: reportFailure(t('dispatchBoard.drag.moveFailed')),
+    onError: (err, _input, context) => {
+      restore(context?.snapshot);
+      reportFailure(t('dispatchBoard.drag.moveFailed'))(err);
+    },
+    onSettled: refresh,
   });
 
-  return { assign, move, pending: assign.isPending || move.isPending };
+  /**
+   * Remove a dispatch outright.
+   *
+   * Distinct from cancelling, which the drawer also offers: CANCELLED keeps
+   * the visit with a reason, which is what a customer conversation and the
+   * audit trail depend on. Delete is for a mistake that never happened — a
+   * drop on the wrong tech, a duplicate. Undo on the toast lasts seconds, so
+   * this is the durable way to unassign.
+   */
+  const removeDispatch = useMutation({
+    mutationFn: (id: string) => dispatchesApi.delete(id),
+    onMutate: async (id) => {
+      await queryClient.cancelQueries({ queryKey: ['dispatch-board'] });
+      const snapshot = queryClient.getQueriesData({ queryKey: ['dispatch-board'] });
+      patchBoardCaches(queryClient, {
+        grid: (board) => ({
+          ...board,
+          dispatches: board.dispatches.filter((d) => d.id !== id),
+        }),
+      });
+      return { snapshot };
+    },
+    onSuccess: () => showSuccess(t('dispatchBoard.drag.removed')),
+    onError: (err, _id, context) => {
+      restore(context?.snapshot);
+      reportFailure(t('dispatchBoard.drag.removeFailed'))(err);
+    },
+    onSettled: refresh,
+  });
+
+  return {
+    assign,
+    move,
+    removeDispatch,
+    pending: assign.isPending || move.isPending || removeDispatch.isPending,
+  };
 }

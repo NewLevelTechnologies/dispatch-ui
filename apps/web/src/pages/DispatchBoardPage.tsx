@@ -23,6 +23,7 @@ import {
   type BoardDispatch,
   type BoardTech,
   type UnscheduledWorkOrder,
+  type Dispatch,
 } from '../api/setup';
 import { useGlossary } from '../contexts/GlossaryContext';
 import AppLayout from '../components/AppLayout';
@@ -119,6 +120,7 @@ export default function DispatchBoardPage() {
   const [openDispatch, setOpenDispatch] = useState<BoardDispatch | null>(null);
   const [composeFor, setComposeFor] = useState<UnscheduledWorkOrder | null>(null);
   const [confirmRelease, setConfirmRelease] = useState(false);
+  const [editDispatch, setEditDispatch] = useState<Dispatch | null>(null);
 
   // A working day is wider than any viewport at 78px/hour, so dragging toward
   // a late-afternoon lane means dragging off-screen. Auto-scroll is the one
@@ -207,6 +209,14 @@ export default function DispatchBoardPage() {
     queryKey: ['work-orders', composeFor?.workOrderId],
     queryFn: () => workOrderApi.getById(composeFor!.workOrderId),
     enabled: composeFor != null,
+  });
+
+  // Same read for the edit path — the composer needs the full work items
+  // either way.
+  const { data: editWorkOrder } = useQuery({
+    queryKey: ['work-orders', editDispatch?.workOrderId],
+    queryFn: () => workOrderApi.getById(editDispatch!.workOrderId),
+    enabled: editDispatch != null,
   });
 
   const allTechs = useMemo(() => board?.techs ?? [], [board]);
@@ -385,7 +395,18 @@ export default function DispatchBoardPage() {
   // Bulk release takes a SCOPE, not an id list: the server recomputes the
   // unreleased set, so this can neither reach outside the caller's regions
   // nor act on a board rendered ten minutes ago.
-  const { assign, move } = useBoardMutations(date);
+  const { assign, move, removeDispatch } = useBoardMutations(date);
+
+  // Smart back: carry the board's date and scope so returning lands on the
+  // board the dispatcher was actually looking at, not a reset one.
+  const goToWorkOrder = useCallback(
+    (workOrderId: string) => {
+      const params = new URLSearchParams({ from: 'dispatch', date });
+      if (regionId) params.set('region', regionId);
+      navigate(`/work-orders/${workOrderId}?${params}`);
+    },
+    [navigate, date, regionId],
+  );
 
   // The spine hands back a tech, an already-resolved window, and whatever the
   // drag source attached. Decoding the payload is the page's job — the spine
@@ -778,6 +799,16 @@ export default function DispatchBoardPage() {
       {/* The rail is the board's only path into the composer — no standalone
           Schedule button. The rail already IS the work-order picker: scoped,
           sorted by priority then age, and on screen. */}
+      {/* Edit reuses the same composer, prefilled — the board owns no
+          scheduling form of its own. */}
+      <DispatchFormDrawer
+        open={editDispatch != null && editWorkOrder != null}
+        onClose={() => setEditDispatch(null)}
+        workOrderId={editDispatch?.workOrderId ?? ''}
+        workItems={editWorkOrder?.workItems ?? []}
+        dispatch={editDispatch}
+      />
+
       <DispatchFormDrawer
         open={composeFor != null && composeWorkOrder != null}
         onClose={() => setComposeFor(null)}
@@ -787,16 +818,25 @@ export default function DispatchBoardPage() {
         locationName={composeFor?.customerName}
       />
 
-      {/* The board owns no detail surface — it opens the existing drawer.
-          Read-only for now: Release / Reassign / Reschedule are write paths
-          that land with the interactions commit, and a drawer offering
-          buttons that do nothing would be worse than one that doesn't. */}
+      {/* The board owns no detail surface — it opens the existing drawer,
+          now with its write paths live. Undo on the toast only lasts a few
+          seconds, so this is where unassigning actually lives: Cancel keeps
+          the visit with a reason (the audit trail a customer conversation
+          depends on), Delete removes a mistake that never happened. */}
       <DispatchDetailDrawer
         dispatch={openDispatch}
-        readOnly
         onClose={() => setOpenDispatch(null)}
-        onEdit={() => {}}
-        onDelete={() => {}}
+        onEdit={(d) => {
+          setOpenDispatch(null);
+          setEditDispatch(d);
+        }}
+        onDelete={(d) => {
+          setOpenDispatch(null);
+          removeDispatch.mutate(d.id);
+        }}
+        onViewWorkItems={() => {
+          if (openDispatch) goToWorkOrder(openDispatch.workOrderId);
+        }}
       />
     </AppLayout>
   );

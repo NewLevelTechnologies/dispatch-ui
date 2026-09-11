@@ -296,6 +296,8 @@ vi.mock('react-i18next', () => {
       'Someone else changed this while you were looking. Reloading the board.',
     'dispatchBoard.drag.moveFailed': "Couldn't move",
     'dispatchBoard.drag.moved': '{{workOrder}} moved',
+    'dispatchBoard.drag.removeFailed': "Couldn't remove",
+    'dispatchBoard.drag.removed': 'Removed from the board',
     'dispatchBoard.drag.undoFailed': "Couldn't undo \u2014 reloading the board",
     'dispatchBoard.filter.density': 'Density',
     'dispatchBoard.filter.groupByNone': 'No grouping',
