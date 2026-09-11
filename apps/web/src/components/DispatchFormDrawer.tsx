@@ -17,7 +17,7 @@ import {
 } from '../api/setup';
 import { useGlossary } from '../contexts/GlossaryContext';
 import { errorCode, isConflict } from '../lib/toast';
-import { invalidateDispatchBoard } from '../utils/invalidateRoleConsumers';
+import { invalidateDispatchConsumers } from '../utils/invalidateRoleConsumers';
 import { SlideOver } from './catalyst/slideover';
 import { Button } from './catalyst/button';
 import { Avatar } from './ui/Avatar';
@@ -176,22 +176,14 @@ export default function DispatchFormDrawer({
   const blocked = addressed.some((id) => workItems.find((wi) => wi.id === id)?.statusCategory === 'BLOCKED');
   const canSave = !!assignedUserId && !!date && !!selectedWin;
 
-  const invalidate = () => {
-    queryClient.invalidateQueries({ queryKey: ['dispatches'] });
-    queryClient.invalidateQueries({ queryKey: ['dispatch'] });
-    queryClient.invalidateQueries({ queryKey: ['work-order-activity', workOrderId] });
-    queryClient.invalidateQueries({ queryKey: ['location-tech'] });
-    queryClient.invalidateQueries({ queryKey: ['work-orders-list'] });
-    queryClient.invalidateQueries({ queryKey: ['work-orders'] });
-  };
+  // Shared with the board's drag writes, so both reach the same caches.
+  const invalidate = () => invalidateDispatchConsumers(queryClient, workOrderId);
   const onError = (err: unknown) => {
     // A version conflict isn't a validation failure — the form is fine, the
     // record moved underneath it. Refetch so the next attempt is against
     // current data instead of retrying into the same wall.
     if (isConflict(err) && errorCode(err) === 'DISPATCH_VERSION_CONFLICT') {
-      queryClient.invalidateQueries({ queryKey: ['dispatches'] });
-      queryClient.invalidateQueries({ queryKey: ['dispatch'] });
-      invalidateDispatchBoard(queryClient);
+      invalidate();
       setError(t('workOrders.dispatches.form.versionConflict', { entity: getName('dispatch') }));
       return;
     }

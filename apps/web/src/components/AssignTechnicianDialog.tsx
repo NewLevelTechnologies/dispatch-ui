@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { invalidateDispatchConsumers } from '../utils/invalidateRoleConsumers';
 import { useTranslation } from '@dispatch/i18n';
 import {
   dispatchesApi,
@@ -172,7 +173,7 @@ export default function AssignTechnicianDialog({
   );
 
   const onMutationSuccess = () => {
-    queryClient.invalidateQueries({ queryKey: ['dispatches'] });
+    invalidateDispatchConsumers(queryClient);
     queryClient.invalidateQueries({
       queryKey: ['work-order-activity', workOrderId],
     });

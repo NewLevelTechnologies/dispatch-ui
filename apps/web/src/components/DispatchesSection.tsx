@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { TFunction } from 'i18next';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { invalidateDispatchConsumers } from '../utils/invalidateRoleConsumers';
 import { useTranslation } from '@dispatch/i18n';
 import {
   dispatchesApi,
@@ -356,7 +357,7 @@ function DispatchRow({
     mutationFn: (next: DispatchStatus) =>
       dispatchesApi.update(dispatch.id, { status: next }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['dispatches'] });
+      invalidateDispatchConsumers(queryClient);
       queryClient.invalidateQueries({
         queryKey: ['work-order-activity', dispatch.workOrderId],
       });
@@ -381,7 +382,7 @@ function DispatchRow({
   const deleteMutation = useMutation({
     mutationFn: () => dispatchesApi.delete(dispatch.id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['dispatches'] });
+      invalidateDispatchConsumers(queryClient);
       queryClient.invalidateQueries({
         queryKey: ['work-order-activity', dispatch.workOrderId],
       });
@@ -587,7 +588,7 @@ function PastDispatchRow({
   const deleteMutation = useMutation({
     mutationFn: () => dispatchesApi.delete(dispatch.id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['dispatches'] });
+      invalidateDispatchConsumers(queryClient);
       queryClient.invalidateQueries({
         queryKey: ['work-order-activity', dispatch.workOrderId],
       });

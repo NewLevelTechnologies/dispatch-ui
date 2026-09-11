@@ -26,6 +26,33 @@ export function invalidateDispatchBoard(qc: QueryClient) {
   qc.invalidateQueries({ queryKey: ['dispatch-board'] });
 }
 
+/**
+ * Every cache that shows a dispatch, or anything derived from one.
+ *
+ * Writing a dispatch reaches further than the board: the work order's visit
+ * list, its progress (scheduling a visit moves a work item out of
+ * awaiting-schedule), its activity feed, the work-order list's scheduled
+ * column, and the location's on-site tech summary. The board used to
+ * invalidate only its own read, so scheduling from the board left a stale
+ * work-order page behind it.
+ *
+ * One function so the next surface that writes a dispatch inherits the whole
+ * set instead of rediscovering it one bug at a time. Pass `workOrderId` to
+ * scope the activity feed; omit it when a drag could have touched any.
+ */
+export function invalidateDispatchConsumers(qc: QueryClient, workOrderId?: string) {
+  qc.invalidateQueries({ queryKey: ['dispatch-board'] });
+  qc.invalidateQueries({ queryKey: ['dispatches'] });
+  qc.invalidateQueries({ queryKey: ['dispatch'] });
+  qc.invalidateQueries({
+    queryKey: workOrderId ? ['work-order-activity', workOrderId] : ['work-order-activity'],
+  });
+  // On-site tech summary on the location page.
+  qc.invalidateQueries({ queryKey: ['location-tech'] });
+  qc.invalidateQueries({ queryKey: ['work-orders-list'] });
+  qc.invalidateQueries({ queryKey: ['work-orders'] });
+}
+
 export function invalidateRoleConsumers(qc: QueryClient, roleId?: string) {
   qc.invalidateQueries({ queryKey: ['roles'] });
   if (roleId) {

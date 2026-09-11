@@ -68,13 +68,21 @@ function sortRolesBySeniority(roles: Role[]): Role[] {
 // opening this page is doing today's work.
 type StatusValue = 'active' | 'removed' | 'all';
 type InvitationValue = '' | InvitationStatus;
+/** Empty = no filter. Named for the fact, matching the user-detail row:
+ *  it's assignability, not board visibility. */
+type AssignmentValue = '' | 'assignable' | 'not-assignable';
 
 const STATUS_VALUES: StatusValue[] = ['active', 'removed', 'all'];
 const DEFAULT_STATUS: StatusValue = 'active';
 const INVITATION_VALUES: InvitationStatus[] = ['ACTIVE', 'INVITED', 'INVITATION_EXPIRED'];
+const ASSIGNMENT_VALUES: AssignmentValue[] = ['assignable', 'not-assignable'];
 
 function readStatus(raw: string | null): StatusValue {
   return STATUS_VALUES.includes(raw as StatusValue) ? (raw as StatusValue) : DEFAULT_STATUS;
+}
+
+function readAssignment(raw: string | null): AssignmentValue {
+  return ASSIGNMENT_VALUES.includes(raw as AssignmentValue) ? (raw as AssignmentValue) : '';
 }
 
 function readInvitation(raw: string | null): InvitationValue {
@@ -108,6 +116,9 @@ export default function UsersPage() {
   const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10));
   const statusFilter = readStatus(searchParams.get('status'));
   const roleFilter = searchParams.get('role') ?? '';
+  // Filters on the RESOLVED answer — the per-user override applied over the
+  // roles — so it matches exactly who the dispatch board shows.
+  const assignmentFilter = readAssignment(searchParams.get('assignment'));
   const invitationFilter = readInvitation(searchParams.get('invitation'));
   const sortParam = searchParams.get('sort');
   const currentSort = parseSort(sortParam);
@@ -169,6 +180,7 @@ export default function UsersPage() {
       statusFilter,
       roleFilter,
       invitationFilter,
+      assignmentFilter,
       sortParam,
     ],
     queryFn: () =>
@@ -186,6 +198,12 @@ export default function UsersPage() {
               : undefined,
         roleId: roleFilter ? [roleFilter] : undefined,
         invitationStatus: invitationFilter ? [invitationFilter] : undefined,
+        performsFieldWork:
+          assignmentFilter === 'assignable'
+            ? true
+            : assignmentFilter === 'not-assignable'
+              ? false
+              : undefined,
         sort: sortParam || undefined,
       }),
   });
@@ -223,11 +241,17 @@ export default function UsersPage() {
       status?: StatusValue;
       role?: string;
       invitation?: InvitationValue;
+      assignment?: AssignmentValue;
       page?: number;
     },
     options: { replace?: boolean } = {}
   ) => {
     const next = new URLSearchParams(searchParams);
+    if (updates.assignment !== undefined) {
+      if (updates.assignment) next.set('assignment', updates.assignment);
+      else next.delete('assignment');
+      next.delete('page');
+    }
     if (updates.search !== undefined) {
       if (updates.search) next.set('search', updates.search);
       else next.delete('search');
@@ -365,7 +389,11 @@ export default function UsersPage() {
   const handleDelete = (user: User) => setPendingAction({ kind: 'delete', user });
 
   const hasFilters = Boolean(
-    deferredSearch || roleFilter || statusFilter !== DEFAULT_STATUS || invitationFilter
+    deferredSearch ||
+      roleFilter ||
+      statusFilter !== DEFAULT_STATUS ||
+      invitationFilter ||
+      assignmentFilter
   );
   const clearFilters = () => {
     setSearchQuery('');
@@ -493,6 +521,26 @@ export default function UsersPage() {
           {INVITATION_VALUES.map((value) => (
             <ChipListboxOption key={value} value={value}>
               {invitationLabel(value)}
+            </ChipListboxOption>
+          ))}
+        </FilterChipListbox>
+
+        {/* "Who can be given work?" — the direct answer to an empty dispatch
+            board, which otherwise means opening users one at a time. Filters
+            the RESOLVED answer server-side, so it matches the board's rows
+            exactly rather than re-deriving the rule here. */}
+        <FilterChipListbox
+          label={t('users.filter.assignment')}
+          ariaLabel={t('users.filter.assignment')}
+          value={assignmentFilter || null}
+          displayValue={assignmentFilter ? t(`users.filter.${assignmentFilter}`) : null}
+          resetLabel={t('users.filter.allAssignment')}
+          onChange={(id) => updateFilters({ assignment: readAssignment(id) })}
+          onClear={() => updateFilters({ assignment: '' })}
+        >
+          {ASSIGNMENT_VALUES.map((value) => (
+            <ChipListboxOption key={value} value={value}>
+              {t(`users.filter.${value}`)}
             </ChipListboxOption>
           ))}
         </FilterChipListbox>

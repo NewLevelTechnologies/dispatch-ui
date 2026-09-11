@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { invalidateDispatchConsumers } from '../utils/invalidateRoleConsumers';
 import { useTranslation } from '@dispatch/i18n';
 import {
   dispatchNotesApi,
@@ -171,7 +172,7 @@ export default function DispatchesTab({
   const advance = useMutation({
     mutationFn: ({ id, status }: { id: string; status: DispatchStatus }) => dispatchesApi.update(id, { status }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['dispatches'] });
+      invalidateDispatchConsumers(queryClient);
       queryClient.invalidateQueries({ queryKey: ['work-order-activity', workOrderId] });
     },
     onError: (err: unknown) => {
