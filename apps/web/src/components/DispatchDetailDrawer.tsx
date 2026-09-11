@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { invalidateDispatchConsumers } from '../utils/invalidateRoleConsumers';
 import { useTranslation } from '@dispatch/i18n';
 import {
   ArrowUpTrayIcon,
@@ -299,7 +300,7 @@ function DispatchDetailContent({
     mutationFn: ({ status }: { status: DispatchStatus; close?: boolean }) =>
       dispatchesApi.update(dispatch.id, { status }),
     onSuccess: (_data, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['dispatches'] });
+      invalidateDispatchConsumers(queryClient);
       queryClient.invalidateQueries({ queryKey: ['dispatch', dispatch.id] });
       queryClient.invalidateQueries({ queryKey: ['work-order-activity', dispatch.workOrderId] });
       if (variables.close) onClose();
@@ -353,7 +354,7 @@ function DispatchDetailContent({
     },
     onSuccess: () => {
       // Board rows may surface notify state; the log reconciles on reopen.
-      queryClient.invalidateQueries({ queryKey: ['dispatches'] });
+      invalidateDispatchConsumers(queryClient);
     },
   });
   // Notify-able only while on deck (SCHEDULED); live/done/cancelled hide it.

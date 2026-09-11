@@ -1267,3 +1267,50 @@ describe('UsersPage', () => {
   });
 
 });
+
+// "Who can be given work?" — the direct answer to an empty dispatch board,
+// which otherwise means opening users one at a time. Asserted at the wire,
+// because the point is that the SERVER filters on the resolved answer rather
+// than the client re-deriving the rule.
+describe('UsersPage assignment filter', () => {
+  const userUrls = () =>
+    (vi.mocked(apiClient.get).mock.calls ?? [])
+      .map((c) => (typeof c?.[0] === 'string' ? c[0] : ''))
+      .filter((u) => u.startsWith('/users?'));
+
+  // `installApiMock` is this file's per-test convention, not a global hook —
+  // without it these inherit whatever implementation the previous test left,
+  // and the call log carries its requests too.
+  beforeEach(() => {
+    installApiMock();
+    vi.mocked(apiClient.get).mockClear();
+  });
+
+  it('sends no assignment filter by default', async () => {
+    renderWithProviders(<UsersPage />);
+    await waitFor(() => expect(userUrls().length).toBeGreaterThan(0));
+    expect(userUrls().some((u) => u.includes('performsFieldWork'))).toBe(false);
+  });
+
+  it('asks the server for assignable users', async () => {
+    renderWithProviders(<UsersPage />, { initialPath: '/users?assignment=assignable' });
+    await waitFor(() =>
+      expect(userUrls().some((u) => u.includes('performsFieldWork=true'))).toBe(true)
+    );
+  });
+
+  // The complement matters as much: "who did we deliberately keep off?"
+  it('asks for the complement too, not just the positive case', async () => {
+    renderWithProviders(<UsersPage />, { initialPath: '/users?assignment=not-assignable' });
+    await waitFor(() =>
+      expect(userUrls().some((u) => u.includes('performsFieldWork=false'))).toBe(true)
+    );
+  });
+
+  // A hand-edited or stale URL shouldn't send garbage to the server.
+  it('ignores an unrecognised value', async () => {
+    renderWithProviders(<UsersPage />, { initialPath: '/users?assignment=maybe' });
+    await waitFor(() => expect(userUrls().length).toBeGreaterThan(0));
+    expect(userUrls().some((u) => u.includes('performsFieldWork'))).toBe(false);
+  });
+});

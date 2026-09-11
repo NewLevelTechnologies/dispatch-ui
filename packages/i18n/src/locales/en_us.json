@@ -1974,13 +1974,17 @@
     "filter": {
       "active": "Active",
       "all": "All",
+      "allAssignment": "Any assignment",
       "allInvitationStatuses": "Any invitation",
       "allRoles": "All roles",
+      "assignable": "Assignable",
+      "assignment": "Assignment",
       "clearFilters": "Clear filters",
       "invitationActive": "Active",
       "invitationExpired": "Invitation expired",
       "invitationInvited": "Invited",
       "invitationStatus": "Invitation",
+      "not-assignable": "Not assignable",
       "removed": "Removed",
       "role": "Role",
       "status": "Status"
@@ -2976,9 +2980,9 @@
       "moved": "{{workOrder}} → {{tech}}, {{window}}",
       "moveFailed": "Couldn't move",
       "undoFailed": "Couldn't undo — reloading the board",
-      "removed": "Back in unscheduled",
+      "removed": "{{workOrder}} → unscheduled",
       "removeFailed": "Couldn't remove",
-      "cancelled": "Cancelled · back in unscheduled"
+      "cancelled": "{{workOrder}} cancelled → unscheduled"
     }
   }
 }

@@ -23,7 +23,7 @@ import {
   showSuccess,
   showUndo,
 } from '../../lib/toast';
-import { invalidateDispatchBoard } from '../../utils/invalidateRoleConsumers';
+import { invalidateDispatchConsumers } from '../../utils/invalidateRoleConsumers';
 
 interface Window {
   startHour: number;
@@ -82,7 +82,9 @@ export function useBoardMutations(date: string) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
 
-  const refresh = () => invalidateDispatchBoard(queryClient);
+  // A dispatch write reaches the work order too — its visit list, progress
+  // and activity — not just the board's own read.
+  const refresh = () => invalidateDispatchConsumers(queryClient);
 
   /** Put every board cache back exactly as it was. */
   const restore = (snapshot?: [readonly unknown[], unknown][]) => {
@@ -295,12 +297,15 @@ export function useBoardMutations(date: string) {
       return { snapshot };
     },
     onSuccess: ({ cancelled }, dispatch) => {
+      // Name what moved and where, like every other board toast — a bare
+      // state announcement can't confirm it was the one you meant.
+      const workOrder = dispatch.workOrderNumber ?? dispatch.workOrderSummary ?? '';
       if (!cancelled) {
-        showSuccess(t('dispatchBoard.drag.removed'));
+        showSuccess(t('dispatchBoard.drag.removed', { workOrder }));
         return;
       }
       // A cancel is reversible, so it gets an Undo where a delete can't.
-      showUndo(t('dispatchBoard.drag.cancelled'), t('common.undo'), () => {
+      showUndo(t('dispatchBoard.drag.cancelled', { workOrder }), t('common.undo'), () => {
         dispatchesApi
           .update(dispatch.id, { status: 'SCHEDULED' })
           .then(refresh)

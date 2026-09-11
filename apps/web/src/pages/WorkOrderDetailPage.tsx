@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { invalidateDispatchConsumers } from '../utils/invalidateRoleConsumers';
 import { useTranslation } from '@dispatch/i18n';
 import {
   customerApi,
@@ -1085,7 +1086,7 @@ export default function WorkOrderDetailPage() {
           if (!window.confirm(t('workOrders.dispatches.deleteConfirm'))) return;
           try {
             await dispatchesApi.delete(d.id);
-            queryClient.invalidateQueries({ queryKey: ['dispatches'] });
+            invalidateDispatchConsumers(queryClient);
             queryClient.invalidateQueries({
               queryKey: ['work-order-activity', d.workOrderId],
             });
