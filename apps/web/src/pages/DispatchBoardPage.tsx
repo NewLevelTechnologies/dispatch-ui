@@ -132,6 +132,12 @@ function asUtc(date: string): Date {
   return new Date(`${date}T00:00:00Z`);
 }
 
+/** Compact form for the date nav: "Sep 13". The subtitle carries the full
+ *  "Sunday, September 13" — this one has two chevrons either side of it. */
+function formatNavDate(date: string): string {
+  return RANGE_LABEL.format(asUtc(date));
+}
+
 function formatBoardDate(date: string): string {
   return DAY_LABEL.format(asUtc(date));
 }
@@ -664,6 +670,14 @@ export default function DispatchBoardPage() {
   // width on every render for something the reader looks at once.
   const scopeLabel = isWeek ? formatDayRange(week?.days ?? []) : formatBoardDate(date);
 
+  // The week's toggle steps weeks, so "today" there means the week containing
+  // it, not the day.
+  const isToday = isWeek
+    ? todayInZone != null && weekStart === weekStartOf(todayInZone)
+    : date === todayInZone;
+  // Short, because it sits between two chevrons: "Sep 13", or the week's span.
+  const navLabel = isWeek ? scopeLabel : formatNavDate(date);
+
   const subtitle = [
     scopeLabel,
     t('dispatchBoard.subtitleCount', { count: shownTechs.length, entity: techLabel }),
@@ -849,8 +863,17 @@ export default function DispatchBoardPage() {
             >
               <ChevronLeftIcon className="size-4" />
             </IconButton>
-            <Button size="xs" onClick={() => setParam('date', null)} disabled={date === todayInZone}>
-              {t('dispatchBoard.dateNav.today')}
+            {/* One control doing two jobs: it says which day you are standing
+                on, and clicking it walks back to today. It only reads as a
+                date when it is NOT today — which is exactly when it is worth
+                width, and exactly when the click has somewhere to go. */}
+            <Button
+              size="xs"
+              onClick={() => setParam('date', null)}
+              disabled={isToday}
+              title={isToday ? undefined : t('dispatchBoard.dateNav.backToToday')}
+            >
+              {isToday ? t('dispatchBoard.dateNav.today') : navLabel}
             </Button>
             <IconButton
               aria-label={t(
@@ -979,7 +1002,7 @@ export default function DispatchBoardPage() {
 
             {showHideEmpty && (
               <FilterChip
-                size="sm"
+                variant="dense"
                 label={t('dispatchBoard.filter.hideEmpty', { entity: techLabel.toLowerCase() })}
                 count={foldableCount}
                 active={hideEmpty}
@@ -1017,7 +1040,7 @@ export default function DispatchBoardPage() {
             {chips.map((chip) => (
               <FilterChip
                 key={chip.id}
-                size="sm"
+                variant="dense"
                 dot
                 tone={chip.tone}
                 label={chip.label}

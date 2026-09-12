@@ -866,12 +866,29 @@ describe('DispatchBoardPage date label', () => {
     expect(screen.queryByText(/now /)).not.toBeInTheDocument();
   });
 
-  it('says Today rather than the date when it is today', async () => {
+  it('says Today, inert, while the board is showing today', async () => {
     renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch' });
     await screen.findByText('Maya Alvarez');
-    // Both the label and the reset button read "Today"; the reset is disabled
-    // because there is nowhere to reset to.
+    // Nowhere to walk back to, so the control has nothing to do.
     expect(screen.getByRole('button', { name: 'Today' })).toBeDisabled();
+  });
+
+  // Between two chevrons, the thing a dispatcher needs is which day they
+  // stepped onto — and that is also exactly when the button has somewhere to
+  // go.
+  it('names the day in the nav once you step off today', async () => {
+    renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch?date=2026-03-18' });
+    const back = await screen.findByRole('button', { name: 'Mar 18' });
+    expect(back).toBeEnabled();
+    expect(back).toHaveAttribute('title', 'Back to today');
+  });
+
+  it('walks back to today from it', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch?date=2026-03-18' });
+
+    await user.click(await screen.findByRole('button', { name: 'Mar 18' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Today' })).toBeDisabled());
   });
 });
 

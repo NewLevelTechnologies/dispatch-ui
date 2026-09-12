@@ -2903,6 +2903,7 @@
       "urgent": "Urgent"
     },
     "dateNav": {
+      "backToToday": "Back to today",
       "next": "Next day",
       "nextWeek": "Next week",
       "previous": "Previous day",
