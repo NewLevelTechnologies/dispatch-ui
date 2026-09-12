@@ -796,3 +796,95 @@
   border-radius: 50%;
   flex-shrink: 0;
 }
+
+/* ── Week grid ────────────────────────────────────────────────────
+
+   A different GRANULARITY on the same rows: the technician column, the
+   groups and the load ramp are shared with the day board, and only the
+   lane changes — seven aggregate cells instead of a clock axis. */
+
+.db-week-lane {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+}
+
+.db-whead {
+  flex: 1;
+  min-width: 118px;
+  border-right: 1px solid var(--border-soft);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--fg-muted);
+  display: flex;
+  align-items: center;
+  padding-left: 8px;
+}
+
+/* The column the dispatcher is standing in. */
+.db-whead.today {
+  color: var(--fg-strong);
+  font-weight: 700;
+  background: var(--bg-active);
+}
+
+/* A cell is a TARGET, not a container: it routes to that day's board, which
+   is where the work actually is. */
+.db-wcell {
+  flex: 1;
+  min-width: 118px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 3px;
+  padding: 0 8px;
+  border-right: 1px solid var(--border-soft);
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.db-wcell:hover {
+  background: var(--bg-hover);
+}
+
+.db-wcell:focus-visible {
+  outline: 2px solid var(--accent-500);
+  outline-offset: -2px;
+}
+
+.db-wcell.today {
+  background: color-mix(in oklch, var(--accent-500) 4%, transparent);
+}
+
+/* Time off overlapping the day. Hatched like the day board's off row, and
+   per CELL — a tech can be out Thursday and working Friday. */
+.db-wcell.off {
+  background: repeating-linear-gradient(
+    135deg,
+    var(--bg-sunken) 0 7px,
+    transparent 7px 14px
+  );
+  cursor: default;
+}
+
+.db-wcell.off:hover {
+  background: repeating-linear-gradient(
+    135deg,
+    var(--bg-sunken) 0 7px,
+    transparent 7px 14px
+  );
+}
+
+/* Still on deck somewhere that day. DASHED, not hatched: on the day board a
+   dashed border is what "not handed over" looks like, while hatching is what
+   "not available" looks like, and the two must not swap meanings here. */
+.db-wheld {
+  width: 7px;
+  height: 7px;
+  border: 1px dashed var(--fg-muted);
+  border-radius: 2px;
+  flex-shrink: 0;
+}

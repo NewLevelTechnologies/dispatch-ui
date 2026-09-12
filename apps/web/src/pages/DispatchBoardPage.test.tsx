@@ -5,6 +5,7 @@ import DispatchBoardPage from './DispatchBoardPage';
 
 const mockGetBoard = vi.fn();
 const mockGetUnscheduled = vi.fn();
+const mockGetWeek = vi.fn();
 const mockRegionsGetAll = vi.fn();
 const mockRelease = vi.fn();
 const mockReleaseOne = vi.fn();
@@ -21,6 +22,7 @@ vi.mock('../api/setup', async (importOriginal) => {
       ...actual.dispatchBoardApi,
       getBoard: (...a: unknown[]) => mockGetBoard(...a),
       getUnscheduled: (...a: unknown[]) => mockGetUnscheduled(...a),
+      getWeek: (...a: unknown[]) => mockGetWeek(...a),
       release: (...a: unknown[]) => mockRelease(...a),
     },
     dispatchRegionApi: {
@@ -619,5 +621,178 @@ describe('DispatchBoardPage reaching the work order', () => {
     await waitFor(() => expect(screen.queryByRole('menu')).not.toBeInTheDocument());
     expect(mockReleaseOne).not.toHaveBeenCalled();
     expect(mockDeleteDispatch).not.toHaveBeenCalled();
+  });
+});
+
+// Week is a different GRANULARITY on the same rows — a separate read, because
+// seven days of a 60-tech shop is ~2,000 dispatches and the grid renders none
+// of them individually.
+describe('DispatchBoardPage week', () => {
+  const DAYS = [
+    '2026-03-16',
+    '2026-03-17',
+    '2026-03-18',
+    '2026-03-19',
+    '2026-03-20',
+    '2026-03-21',
+    '2026-03-22',
+  ];
+
+  const weekCell = (date: string, over: Record<string, unknown> = {}) => ({
+    date,
+    stopCount: 0,
+    hasUrgent: false,
+    hasUnreleased: false,
+    off: false,
+    ...over,
+  });
+
+  const weekTech = (over: Record<string, unknown> = {}) => ({
+    id: 'u1',
+    name: 'Maya Alvarez',
+    regionIds: ['r1'],
+    primaryRegionId: 'r1',
+    cells: DAYS.map((d) => weekCell(d)),
+    ...over,
+  });
+
+  const weekResponse = (over: Record<string, unknown> = {}) => ({
+    weekStart: DAYS[0],
+    weekEnd: '2026-03-23',
+    timeZone: 'America/Phoenix',
+    days: DAYS,
+    defaultStopsPerDay: 6,
+    techs: [weekTech()],
+    ...over,
+  });
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockRegionsGetAll.mockResolvedValue([]);
+    mockGetUnscheduled.mockResolvedValue(emptyRail);
+    mockGetBoard.mockResolvedValue({ techs: [tech('u1', 'Maya Alvarez', ['r1'])], dispatches: [] });
+    mockGetWeek.mockResolvedValue(weekResponse());
+  });
+
+  // Two reads, and only ever one of them: the day grid and the week grid
+  // answer different questions at different volumes.
+  it('runs the week read instead of the day read', async () => {
+    renderWithProviders(<DispatchBoardPage />, {
+      initialPath: '/dispatch?view=week&date=2026-03-18',
+    });
+
+    await screen.findByText('Mon 16');
+    expect(mockGetBoard).not.toHaveBeenCalled();
+    expect(mockGetWeek).toHaveBeenCalledWith(
+      expect.objectContaining({ weekStart: '2026-03-16' }),
+    );
+  });
+
+  // The backend takes whatever first day it is handed, so the client owns the
+  // convention — Monday, with the weekend at the end of the work week.
+  it('snaps any day in the week back to its Monday', async () => {
+    renderWithProviders(<DispatchBoardPage />, {
+      initialPath: '/dispatch?view=week&date=2026-03-22',
+    });
+
+    await screen.findByText('Mon 16');
+    expect(mockGetWeek).toHaveBeenCalledWith(
+      expect.objectContaining({ weekStart: '2026-03-16' }),
+    );
+  });
+
+  it('stays on the day read in day view', async () => {
+    renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch' });
+    await screen.findByText('Maya Alvarez');
+    expect(mockGetWeek).not.toHaveBeenCalled();
+  });
+
+  it('switches granularity from the toggle, and keeps the date', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch?date=2026-03-18' });
+
+    await screen.findByText('Maya Alvarez');
+    await user.click(screen.getByRole('radio', { name: 'Week' }));
+
+    await waitFor(() =>
+      expect(mockGetWeek).toHaveBeenCalledWith(
+        expect.objectContaining({ weekStart: '2026-03-16' }),
+      ),
+    );
+  });
+
+  // The week's job is to route you to the right day.
+  it('opens a day’s board when its cell is clicked', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<DispatchBoardPage />, {
+      initialPath: '/dispatch?view=week&date=2026-03-18',
+    });
+
+    await screen.findByText('Mon 16');
+    await user.click(screen.getByRole('button', { name: /Maya Alvarez, Wed 18/ }));
+
+    await waitFor(() =>
+      expect(mockGetBoard).toHaveBeenCalledWith(
+        expect.objectContaining({ date: '2026-03-18' }),
+      ),
+    );
+  });
+
+  // Every chip is a predicate over individual dispatches, and release takes a
+  // single day's scope — neither can act on an aggregate.
+  it('drops the exception chips and the release action in week view', async () => {
+    mockGetBoard.mockResolvedValue({
+      techs: [tech('u1', 'Maya Alvarez', ['r1'])],
+      dispatches: [],
+    });
+    renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch?view=week' });
+
+    await screen.findByText('Mon 16');
+    expect(screen.queryByRole('button', { name: /Urgent/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Release/ })).not.toBeInTheDocument();
+  });
+
+  it('steps a week at a time', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<DispatchBoardPage />, {
+      initialPath: '/dispatch?view=week&date=2026-03-18',
+    });
+
+    await screen.findByText('Mon 16');
+    await user.click(screen.getByRole('button', { name: 'Next week' }));
+
+    await waitFor(() =>
+      expect(mockGetWeek).toHaveBeenCalledWith(
+        expect.objectContaining({ weekStart: '2026-03-23' }),
+      ),
+    );
+  });
+});
+
+// The board never said which day it was showing: stepping forward with a
+// chevron left the dispatcher guessing.
+describe('DispatchBoardPage date label', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockRegionsGetAll.mockResolvedValue([]);
+    mockGetUnscheduled.mockResolvedValue(emptyRail);
+    mockGetBoard.mockResolvedValue({
+      techs: [tech('u1', 'Maya Alvarez', ['r1'])],
+      dispatches: [],
+      timeZone: 'America/Phoenix',
+    });
+  });
+
+  it('names the day being shown', async () => {
+    renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch?date=2026-03-18' });
+    expect(await screen.findByText('Wed, Mar 18')).toBeInTheDocument();
+  });
+
+  it('says Today rather than the date when it is today', async () => {
+    renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch' });
+    await screen.findByText('Maya Alvarez');
+    // Both the label and the reset button read "Today"; the reset is disabled
+    // because there is nowhere to reset to.
+    expect(screen.getByRole('button', { name: 'Today' })).toBeDisabled();
   });
 });
