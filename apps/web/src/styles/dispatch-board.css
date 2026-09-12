@@ -81,12 +81,20 @@
   overflow-y: auto;
 }
 
-/* Rail card — one per WORK ORDER. Left rail carries priority; the enum
-   is LOW | NORMAL | HIGH | URGENT and there is no EMERGENCY. */
+/* Rail card — one per WORK ORDER.
+
+   The bottom border is the ONLY horizontal rule in the rail: it is the card
+   boundary, and an internal divider at the same weight would turn the list
+   into continuous stripes with no findable card edge. Group with space.
+
+   The left rail carries priority, and is transparent unless priority means
+   something — a coloured bar on every card (info-blue for the routine
+   majority) flattens the one distinction that has to be instant. The enum is
+   LOW | NORMAL | HIGH | URGENT and there is no EMERGENCY. */
 .db-wo {
-  padding: 9px 12px;
-  border-bottom: 1px solid var(--border-soft);
-  border-left: 3px solid var(--info-500);
+  padding: 11px 12px 10px;
+  border-bottom: 1px solid var(--border);
+  border-left: 3px solid transparent;
   cursor: grab;
   background: var(--bg-elev);
 }
@@ -122,6 +130,43 @@
   font-size: 11px;
   color: var(--fg-muted);
   margin-top: 1px;
+}
+
+/* "Who is already going near this?" — groups to the context line above it at
+   a 2px gap, well inside the 8px that separates identity from context. */
+.db-wo-near {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 2px;
+  font-size: 10.5px;
+  color: var(--fg-muted);
+}
+
+.db-wo-near b {
+  color: var(--fg-strong);
+  font-weight: 600;
+}
+
+.db-near-icon {
+  color: var(--info-500);
+  font-size: 10.5px;
+  flex-shrink: 0;
+}
+
+/* The label absorbs every bit of width pressure so the distance survives
+   intact: without this a longer first name wraps, and that one card grows
+   about 18% taller than its siblings. */
+.db-near-who {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.db-wo-near .font-mono {
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .db-board {
@@ -794,5 +839,97 @@
   width: 7px;
   height: 7px;
   border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* ── Week grid ────────────────────────────────────────────────────
+
+   A different GRANULARITY on the same rows: the technician column, the
+   groups and the load ramp are shared with the day board, and only the
+   lane changes — seven aggregate cells instead of a clock axis. */
+
+.db-week-lane {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+}
+
+.db-whead {
+  flex: 1;
+  min-width: 118px;
+  border-right: 1px solid var(--border-soft);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--fg-muted);
+  display: flex;
+  align-items: center;
+  padding-left: 8px;
+}
+
+/* The column the dispatcher is standing in. */
+.db-whead.today {
+  color: var(--fg-strong);
+  font-weight: 700;
+  background: var(--bg-active);
+}
+
+/* A cell is a TARGET, not a container: it routes to that day's board, which
+   is where the work actually is. */
+.db-wcell {
+  flex: 1;
+  min-width: 118px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 3px;
+  padding: 0 8px;
+  border-right: 1px solid var(--border-soft);
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.db-wcell:hover {
+  background: var(--bg-hover);
+}
+
+.db-wcell:focus-visible {
+  outline: 2px solid var(--accent-500);
+  outline-offset: -2px;
+}
+
+.db-wcell.today {
+  background: color-mix(in oklch, var(--accent-500) 4%, transparent);
+}
+
+/* Time off overlapping the day. Hatched like the day board's off row, and
+   per CELL — a tech can be out Thursday and working Friday. */
+.db-wcell.off {
+  background: repeating-linear-gradient(
+    135deg,
+    var(--bg-sunken) 0 7px,
+    transparent 7px 14px
+  );
+  cursor: default;
+}
+
+.db-wcell.off:hover {
+  background: repeating-linear-gradient(
+    135deg,
+    var(--bg-sunken) 0 7px,
+    transparent 7px 14px
+  );
+}
+
+/* Still on deck somewhere that day. DASHED, not hatched: on the day board a
+   dashed border is what "not handed over" looks like, while hatching is what
+   "not available" looks like, and the two must not swap meanings here. */
+.db-wheld {
+  width: 7px;
+  height: 7px;
+  border: 1px dashed var(--fg-muted);
+  border-radius: 2px;
   flex-shrink: 0;
 }

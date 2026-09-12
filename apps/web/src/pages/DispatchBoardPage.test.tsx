@@ -5,6 +5,7 @@ import DispatchBoardPage from './DispatchBoardPage';
 
 const mockGetBoard = vi.fn();
 const mockGetUnscheduled = vi.fn();
+const mockGetWeek = vi.fn();
 const mockRegionsGetAll = vi.fn();
 const mockRelease = vi.fn();
 const mockReleaseOne = vi.fn();
@@ -21,6 +22,7 @@ vi.mock('../api/setup', async (importOriginal) => {
       ...actual.dispatchBoardApi,
       getBoard: (...a: unknown[]) => mockGetBoard(...a),
       getUnscheduled: (...a: unknown[]) => mockGetUnscheduled(...a),
+      getWeek: (...a: unknown[]) => mockGetWeek(...a),
       release: (...a: unknown[]) => mockRelease(...a),
     },
     dispatchRegionApi: {
@@ -342,6 +344,68 @@ describe('DispatchBoardPage unscheduled rail', () => {
     expect(await screen.findAllByText('WO-3911')).toHaveLength(2);
   });
 
+  // A coloured bar on every card — info-blue for the routine majority —
+  // flattens the one distinction that has to be instant.
+  it('draws the priority bar only when priority means something', async () => {
+    mockGetUnscheduled.mockResolvedValue(
+      railWith([
+        railWorkOrder(),
+        railWorkOrder({ workOrderId: 'wo-2', workOrderNumber: 'WO-3912', priority: 'URGENT' }),
+        railWorkOrder({ workOrderId: 'wo-3', workOrderNumber: 'WO-3913', priority: 'HIGH' }),
+      ]),
+    );
+    renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch' });
+
+    await screen.findByText('WO-3911');
+    const cards = Array.from(document.querySelectorAll('.db-wo'));
+    expect(cards[0].className).toBe('db-wo');
+    expect(cards[1]).toHaveClass('urgent');
+    expect(cards[2]).toHaveClass('high');
+  });
+
+  // City, not street address: an address only routes for someone holding a
+  // mental map of the metro, and it answers "where is the job" rather than
+  // "who is already going near it".
+  it('shows the city on the card', async () => {
+    mockGetUnscheduled.mockResolvedValue(railWith([railWorkOrder()]));
+    renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch' });
+    expect(await screen.findByText(/Phoenix/)).toBeInTheDocument();
+  });
+
+  // Tenant region names frequently ARE city names, and "Phoenix · Phoenix"
+  // burns a slot to say one word twice.
+  it('drops the region when it only repeats the city', async () => {
+    mockGetUnscheduled.mockResolvedValue(railWith([railWorkOrder()]));
+    renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch' });
+
+    await screen.findByText('WO-3911');
+    expect(screen.queryByText(/Phoenix · Phoenix/)).not.toBeInTheDocument();
+  });
+
+  it('shows the region when it adds a word', async () => {
+    mockRegionsGetAll.mockResolvedValue([
+      { id: 'r1', name: 'East Valley' },
+      { id: 'r2', name: 'North' },
+    ]);
+    mockGetUnscheduled.mockResolvedValue(railWith([railWorkOrder()]));
+    renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch' });
+    expect(await screen.findByText(/Phoenix · East Valley/)).toBeInTheDocument();
+  });
+
+  // Printing one region on all eleven cards of an already-filtered board is
+  // noise — the board scope already said it.
+  it('drops the region entirely when the board is scoped to one', async () => {
+    mockRegionsGetAll.mockResolvedValue([
+      { id: 'r1', name: 'East Valley' },
+      { id: 'r2', name: 'North' },
+    ]);
+    mockGetUnscheduled.mockResolvedValue(railWith([railWorkOrder()]));
+    renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch?region=r1' });
+
+    await screen.findByText('WO-3911');
+    expect(screen.queryByText(/East Valley/)).not.toBeInTheDocument();
+  });
+
   it('keeps the empty message when there is genuinely nothing waiting', async () => {
     renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch' });
     expect(await screen.findByText('Nothing unscheduled')).toBeInTheDocument();
@@ -619,5 +683,280 @@ describe('DispatchBoardPage reaching the work order', () => {
     await waitFor(() => expect(screen.queryByRole('menu')).not.toBeInTheDocument());
     expect(mockReleaseOne).not.toHaveBeenCalled();
     expect(mockDeleteDispatch).not.toHaveBeenCalled();
+  });
+});
+
+// Week is a different GRANULARITY on the same rows — a separate read, because
+// seven days of a 60-tech shop is ~2,000 dispatches and the grid renders none
+// of them individually.
+describe('DispatchBoardPage week', () => {
+  const DAYS = [
+    '2026-03-16',
+    '2026-03-17',
+    '2026-03-18',
+    '2026-03-19',
+    '2026-03-20',
+    '2026-03-21',
+    '2026-03-22',
+  ];
+
+  const weekCell = (date: string, over: Record<string, unknown> = {}) => ({
+    date,
+    stopCount: 0,
+    hasUrgent: false,
+    hasUnreleased: false,
+    off: false,
+    ...over,
+  });
+
+  const weekTech = (over: Record<string, unknown> = {}) => ({
+    id: 'u1',
+    name: 'Maya Alvarez',
+    regionIds: ['r1'],
+    primaryRegionId: 'r1',
+    cells: DAYS.map((d) => weekCell(d)),
+    ...over,
+  });
+
+  const weekResponse = (over: Record<string, unknown> = {}) => ({
+    weekStart: DAYS[0],
+    weekEnd: '2026-03-23',
+    timeZone: 'America/Phoenix',
+    days: DAYS,
+    defaultStopsPerDay: 6,
+    techs: [weekTech()],
+    ...over,
+  });
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockRegionsGetAll.mockResolvedValue([]);
+    mockGetUnscheduled.mockResolvedValue(emptyRail);
+    mockGetBoard.mockResolvedValue({ techs: [tech('u1', 'Maya Alvarez', ['r1'])], dispatches: [] });
+    mockGetWeek.mockResolvedValue(weekResponse());
+  });
+
+  // Two reads, and only ever one of them: the day grid and the week grid
+  // answer different questions at different volumes.
+  it('runs the week read instead of the day read', async () => {
+    renderWithProviders(<DispatchBoardPage />, {
+      initialPath: '/dispatch?view=week&date=2026-03-18',
+    });
+
+    await screen.findByText('Mon 16');
+    expect(mockGetBoard).not.toHaveBeenCalled();
+    expect(mockGetWeek).toHaveBeenCalledWith(
+      expect.objectContaining({ weekStart: '2026-03-16' }),
+    );
+  });
+
+  // The backend takes whatever first day it is handed, so the client owns the
+  // convention — Monday, with the weekend at the end of the work week.
+  it('snaps any day in the week back to its Monday', async () => {
+    renderWithProviders(<DispatchBoardPage />, {
+      initialPath: '/dispatch?view=week&date=2026-03-22',
+    });
+
+    await screen.findByText('Mon 16');
+    expect(mockGetWeek).toHaveBeenCalledWith(
+      expect.objectContaining({ weekStart: '2026-03-16' }),
+    );
+  });
+
+  it('stays on the day read in day view', async () => {
+    renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch' });
+    await screen.findByText('Maya Alvarez');
+    expect(mockGetWeek).not.toHaveBeenCalled();
+  });
+
+  it('switches granularity from the toggle, and keeps the date', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch?date=2026-03-18' });
+
+    await screen.findByText('Maya Alvarez');
+    await user.click(screen.getByRole('radio', { name: 'Week' }));
+
+    await waitFor(() =>
+      expect(mockGetWeek).toHaveBeenCalledWith(
+        expect.objectContaining({ weekStart: '2026-03-16' }),
+      ),
+    );
+  });
+
+  // The week's job is to route you to the right day.
+  it('opens a day’s board when its cell is clicked', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<DispatchBoardPage />, {
+      initialPath: '/dispatch?view=week&date=2026-03-18',
+    });
+
+    await screen.findByText('Mon 16');
+    await user.click(screen.getByRole('button', { name: /Maya Alvarez, Wed 18/ }));
+
+    await waitFor(() =>
+      expect(mockGetBoard).toHaveBeenCalledWith(
+        expect.objectContaining({ date: '2026-03-18' }),
+      ),
+    );
+  });
+
+  // Every chip is a predicate over individual dispatches, and release takes a
+  // single day's scope — neither can act on an aggregate.
+  it('drops the exception chips and the release action in week view', async () => {
+    mockGetBoard.mockResolvedValue({
+      techs: [tech('u1', 'Maya Alvarez', ['r1'])],
+      dispatches: [],
+    });
+    renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch?view=week' });
+
+    await screen.findByText('Mon 16');
+    expect(screen.queryByRole('button', { name: /Urgent/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Release/ })).not.toBeInTheDocument();
+  });
+
+  it('steps a week at a time', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<DispatchBoardPage />, {
+      initialPath: '/dispatch?view=week&date=2026-03-18',
+    });
+
+    await screen.findByText('Mon 16');
+    await user.click(screen.getByRole('button', { name: 'Next week' }));
+
+    await waitFor(() =>
+      expect(mockGetWeek).toHaveBeenCalledWith(
+        expect.objectContaining({ weekStart: '2026-03-23' }),
+      ),
+    );
+  });
+});
+
+// The board never said which day it was showing: stepping forward with a
+// chevron left the dispatcher guessing.
+describe('DispatchBoardPage date label', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockRegionsGetAll.mockResolvedValue([]);
+    mockGetUnscheduled.mockResolvedValue(emptyRail);
+    mockGetBoard.mockResolvedValue({
+      techs: [tech('u1', 'Maya Alvarez', ['r1'])],
+      dispatches: [],
+      timeZone: 'America/Phoenix',
+    });
+  });
+
+  it('names the day being shown', async () => {
+    renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch?date=2026-03-18' });
+    expect(await screen.findByText('Wed, Mar 18')).toBeInTheDocument();
+  });
+
+  it('says Today rather than the date when it is today', async () => {
+    renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch' });
+    await screen.findByText('Maya Alvarez');
+    // Both the label and the reset button read "Today"; the reset is disabled
+    // because there is nowhere to reset to.
+    expect(screen.getByRole('button', { name: 'Today' })).toBeDisabled();
+  });
+});
+
+// The rail's routing signal: who is ALREADY going to be near this today.
+// Computed client-side, site-to-site, over the technicians in scope.
+describe('DispatchBoardPage rail proximity', () => {
+  const SITE = { latitude: 33.45, longitude: -112.07 };
+  const NEAR = { latitude: 33.4645, longitude: -112.07 };
+
+  const booked = (over: Record<string, unknown> = {}) => ({
+    id: 'd1',
+    seq: 1,
+    status: 'SCHEDULED',
+    arrivalWindowStart: '2026-03-15T12:00:00Z',
+    arrivalWindowEnd: '2026-03-15T14:00:00Z',
+    estimatedDuration: null,
+    releasedAt: '2026-03-15T07:00:00Z',
+    version: 1,
+    assignedUserId: 'u1',
+    assignedUserName: 'Jordan Wei',
+    workOrderId: 'wo-other',
+    workOrderNumber: 'WO-1',
+    workOrderTypeId: null,
+    workOrderSummary: 'Tune-up',
+    customerId: 'c2',
+    customerName: 'Other',
+    priority: 'NORMAL',
+    recurring: false,
+    serviceLocationId: 'l2',
+    serviceLocationCity: 'Phoenix',
+    serviceLocationState: 'AZ',
+    latitude: NEAR.latitude,
+    longitude: NEAR.longitude,
+    driveMinFromPrev: null,
+    arrivedAt: null,
+    departedAt: null,
+    addressedWorkItemIds: [],
+    ...over,
+  });
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockRegionsGetAll.mockResolvedValue([]);
+    mockGetUnscheduled.mockResolvedValue(
+      railWith([railWorkOrder({ latitude: SITE.latitude, longitude: SITE.longitude })]),
+    );
+    mockGetBoard.mockResolvedValue({
+      techs: [tech('u1', 'Jordan Wei', ['r1'])],
+      dispatches: [booked()],
+      timeZone: 'UTC',
+    });
+  });
+
+  it('names who is already going near the site, and when', async () => {
+    renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch?date=2026-03-15' });
+
+    expect(await screen.findByText(/Nearest/)).toBeInTheDocument();
+    expect(screen.getByText('Jordan W.')).toBeInTheDocument();
+    expect(screen.getByText(/1\.0 mi · 12p/)).toBeInTheDocument();
+  });
+
+  // Absent, not zero, not a placeholder. Early on a fresh day every card is
+  // bare, and that is the honest rendering.
+  it('shows no line when nothing is booked yet', async () => {
+    mockGetBoard.mockResolvedValue({
+      techs: [tech('u1', 'Jordan Wei', ['r1'])],
+      dispatches: [],
+      timeZone: 'UTC',
+    });
+    renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch?date=2026-03-15' });
+
+    await screen.findByText('WO-3911');
+    expect(screen.queryByText(/Nearest/)).not.toBeInTheDocument();
+  });
+
+  // The signal is honest only once the location cache carries coordinates —
+  // ship without the line rather than with a fabricated one.
+  it('shows no line when the site never geocoded', async () => {
+    mockGetUnscheduled.mockResolvedValue(
+      railWith([railWorkOrder({ latitude: null, longitude: null })]),
+    );
+    renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch?date=2026-03-15' });
+
+    await screen.findByText('WO-3911');
+    expect(screen.queryByText(/Nearest/)).not.toBeInTheDocument();
+  });
+
+  // The week read carries aggregates, not stops — there is nothing to measure
+  // against, so the line self-hides rather than going stale.
+  it('shows no line in week view', async () => {
+    mockGetWeek.mockResolvedValue({
+      weekStart: '2026-03-16',
+      weekEnd: '2026-03-23',
+      timeZone: 'UTC',
+      days: ['2026-03-16'],
+      defaultStopsPerDay: 6,
+      techs: [],
+    });
+    renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch?view=week' });
+
+    await screen.findByText('WO-3911');
+    expect(screen.queryByText(/Nearest/)).not.toBeInTheDocument();
   });
 });

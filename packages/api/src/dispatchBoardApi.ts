@@ -141,6 +141,59 @@ export interface DispatchBoard {
   defaultStopsPerDay?: number;
 }
 
+// ── Week ────────────────────────────────────────────────────────────
+// A different READ, not a different spine. Seven days of a 60-tech shop is
+// ~2,000 dispatches and the week grid renders none of them individually, so
+// the server aggregates to one cell per tech per day rather than the client
+// calling the day read seven times.
+
+/** One tech, one day. Deliberately NOT booked hours: no labor estimate exists
+ *  anywhere in the platform, which is the same reason the day board's load bar
+ *  counts stops. */
+export interface BoardWeekCell {
+  date: string;
+  // Excludes cancelled and no-show — work the tech will not drive to.
+  stopCount: number;
+  hasUrgent: boolean;
+  // Any dispatch that day still on deck. At week scale this is the "which
+  // days still have unhanded-over work" glance, which is the whole reason a
+  // dispatcher opens the week while staging.
+  hasUnreleased: boolean;
+  // Time off overlapping this day. Per CELL, not per row — a tech can be out
+  // Thursday and working Friday.
+  off: boolean;
+}
+
+export interface BoardWeekTech {
+  id: string;
+  name: string;
+  regionIds: string[];
+  primaryRegionId: string | null;
+  // Always one entry per day in `days`, zero-filled, so the grid renders
+  // without gap-handling. A tech with no work all week is still a row.
+  cells: BoardWeekCell[];
+}
+
+export interface BoardWeek {
+  weekStart: string;
+  // Exclusive — the same half-open convention as the day read.
+  weekEnd: string;
+  timeZone: string;
+  // The seven dates, in order. Rendered from the SERVER's idea of the week
+  // rather than recomputed, so a week containing a DST change still has
+  // exactly seven columns and the two sides cannot disagree.
+  days: string[];
+  defaultStopsPerDay?: number;
+  techs: BoardWeekTech[];
+}
+
+export interface GetWeekParams {
+  // Any date in the week; the server resolves the week it belongs to in the
+  // TENANT's timezone and echoes the days it used.
+  weekStart: string;
+  regionIds?: string[];
+}
+
 export interface GetBoardParams {
   // Local calendar date (YYYY-MM-DD), resolved to an instant range server-side
   // in the TENANT's timezone — not the browser's and not the server's.
@@ -211,6 +264,14 @@ export const dispatchBoardApi = {
   // "every tech has a row" premise.
   getBoard: async (params: GetBoardParams): Promise<DispatchBoard> => {
     const response = await apiClient.get<DispatchBoard>('/scheduling/board', { params });
+    return response.data;
+  },
+
+  // The week read. A separate endpoint rather than seven day reads: the
+  // aggregate is ~420 cells where the rows would be ~2,000 dispatches, and
+  // the grouping happens in one query instead of in the client.
+  getWeek: async (params: GetWeekParams): Promise<BoardWeek> => {
+    const response = await apiClient.get<BoardWeek>('/scheduling/board/week', { params });
     return response.data;
   },
 

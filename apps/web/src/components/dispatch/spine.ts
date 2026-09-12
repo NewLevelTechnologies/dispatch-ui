@@ -32,6 +32,16 @@ export function autoDensityFor(rowCount: number): Density {
   return 'dense';
 }
 
+/** One load ramp for every bar on the board, at either granularity: the day
+ *  row's stop count and the week cell's both colour the same way, against the
+ *  same server-supplied denominator. */
+export function loadClassFor(stops: number, capacityStops: number | null): string {
+  if (capacityStops == null) return '';
+  if (stops > capacityStops) return 'over';
+  if (stops >= capacityStops) return 'high';
+  return '';
+}
+
 export interface BoardGroup {
   key: string;
   /** null for the single ungrouped bucket — a lone group header never

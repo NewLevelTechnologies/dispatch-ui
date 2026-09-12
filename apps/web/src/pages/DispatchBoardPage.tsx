@@ -21,7 +21,7 @@ import {
   divisionsApi,
   workOrderApi,
   type BoardDispatch,
-  type BoardTech,
+  type BoardWeekTech,
   type UnscheduledWorkOrder,
 } from '../api/setup';
 import { useGlossary } from '../contexts/GlossaryContext';
@@ -30,6 +30,7 @@ import { Heading } from '../components/catalyst/heading';
 import { Button } from '../components/catalyst/button';
 import { Badge } from '../components/catalyst/badge';
 import { ListToolbar, ListSearch } from '../components/ui/ListToolbar';
+import { ToggleGroup, ToggleGroupOption } from '../components/ui/ToggleGroup';
 import { FilterChipListbox, ChipListboxOption } from '../components/ui/FilterChipListbox';
 import { LoadingState } from '../components/ui/LoadingState';
 import { EmptyState } from '../components/ui/EmptyState';
@@ -41,6 +42,7 @@ import ConfirmDialog from '../components/ConfirmDialog';
 import DispatchDetailDrawer, { type DispatchSeed } from '../components/DispatchDetailDrawer';
 import DispatchFormDrawer from '../components/DispatchFormDrawer';
 import DispatchTimeline from '../components/dispatch/DispatchTimeline';
+import DispatchWeek from '../components/dispatch/DispatchWeek';
 import BlockContextMenu, { type BlockMenu } from '../components/dispatch/BlockContextMenu';
 import UnscheduledRailCard from '../components/dispatch/UnscheduledRailCard';
 import {
@@ -50,6 +52,8 @@ import {
   type Density,
 } from '../components/dispatch/spine';
 import { buildAxis, formatWindow, zonedDate, zonedHour } from '../lib/boardTime';
+import { buildGroups, foldEmptyRows } from '../lib/boardGroups';
+import { nearestStops } from '../lib/nearestStop';
 import { withBackContext } from '../lib/backContext';
 import { movedWindow } from '../lib/boardDrop';
 import { useBoardMutations } from './dispatch/useBoardMutations';
@@ -98,6 +102,46 @@ function shiftDay(date: string, days: number): string {
   const t = new Date(Date.UTC(y, m - 1, d));
   t.setUTCDate(t.getUTCDate() + days);
   return t.toISOString().slice(0, 10);
+}
+
+// Weeks run Monday–Sunday: the weekend belongs at the END of a work week, and
+// the backend deliberately takes whatever first day the client hands it rather
+// than imposing one.
+function weekStartOf(date: string): string {
+  const d = new Date(`${date}T00:00:00Z`);
+  const weekday = (d.getUTCDay() + 6) % 7; // Monday = 0
+  d.setUTCDate(d.getUTCDate() - weekday);
+  return d.toISOString().slice(0, 10);
+}
+
+// Bare YYYY-MM-DD parsed as UTC and formatted in UTC: handing a bare date to
+// `new Date()` shifts it a day for anyone west of Greenwich, which would label
+// the board with the wrong day.
+const DAY_LABEL = new Intl.DateTimeFormat('en-US', {
+  weekday: 'short',
+  month: 'short',
+  day: 'numeric',
+  timeZone: 'UTC',
+});
+const RANGE_LABEL = new Intl.DateTimeFormat('en-US', {
+  month: 'short',
+  day: 'numeric',
+  timeZone: 'UTC',
+});
+
+function asUtc(date: string): Date {
+  return new Date(`${date}T00:00:00Z`);
+}
+
+function formatBoardDate(date: string): string {
+  return DAY_LABEL.format(asUtc(date));
+}
+
+function formatDayRange(days: string[]): string {
+  if (days.length === 0) return '';
+  const first = RANGE_LABEL.format(asUtc(days[0]));
+  const last = RANGE_LABEL.format(asUtc(days[days.length - 1]));
+  return `${first} – ${last}`;
 }
 
 function isValidDate(value: string | null): value is string {
@@ -161,18 +205,26 @@ export default function DispatchBoardPage() {
   const rawDate = searchParams.get('date');
   const date = isValidDate(rawDate) ? rawDate : todayLocal();
   const regionId = searchParams.get('region');
+  // Granularity, in the URL like every other scope — "show me next week in
+  // East Valley" has to be a link someone can send.
+  const isWeek = searchParams.get('view') === 'week';
+  const weekStart = weekStartOf(date);
 
-  const setParam = (key: string, value: string | null) => {
+  const setParams = (values: Record<string, string | null>) => {
     setSearchParams(
       (prev) => {
         const next = new URLSearchParams(prev);
-        if (value === null || value === '') next.delete(key);
-        else next.set(key, value);
+        for (const [key, value] of Object.entries(values)) {
+          if (value === null || value === '') next.delete(key);
+          else next.set(key, value);
+        }
         return next;
       },
       { replace: false },
     );
   };
+
+  const setParam = (key: string, value: string | null) => setParams({ [key]: value });
 
   // Region NAMES are not in scheduling-service — it holds only the
   // user↔region link. The board read returns ids; names come from here and
@@ -209,6 +261,24 @@ export default function DispatchBoardPage() {
     refetchInterval: BOARD_POLL_MS,
     refetchIntervalInBackground: false,
     refetchOnWindowFocus: true,
+    enabled: !isWeek,
+  });
+
+  // A separate endpoint, not the day read seven times: seven days of a
+  // 60-tech shop is ~2,000 dispatches and the week grid renders none of them
+  // individually, so the server aggregates to ~420 cells instead.
+  const {
+    data: week,
+    isLoading: weekLoading,
+    error: weekError,
+    refetch: refetchWeek,
+  } = useQuery({
+    queryKey: ['dispatch-board', 'week', weekStart, regionIds],
+    queryFn: () => dispatchBoardApi.getWeek({ weekStart, regionIds }),
+    refetchInterval: BOARD_POLL_MS,
+    refetchIntervalInBackground: false,
+    refetchOnWindowFocus: true,
+    enabled: isWeek,
   });
 
   // The rail moves for the same reasons the grid does — someone else
@@ -224,7 +294,10 @@ export default function DispatchBoardPage() {
   // Straight off the response: this is the zone the server resolved `date`
   // in, so the axis and the day boundary can never disagree. Falls back to the
   // browser only before the first response lands.
-  const timeZone = board?.timeZone || Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+  const timeZone =
+    (isWeek ? week?.timeZone : board?.timeZone) ||
+    Intl.DateTimeFormat().resolvedOptions().timeZone ||
+    'UTC';
 
   // §3.4: the rail carries `itemCount`, not the items, and
   // DispatchFormDrawer requires a full WorkItemResponse[]. There is no
@@ -312,23 +385,55 @@ export default function DispatchBoardPage() {
     return map;
   }, [visibleDispatches]);
 
-  // The fold is for AVAILABLE techs with an empty day. A tech with any
-  // absence already has a distinct rendered state (hatched span, label);
-  // folding them would conceal the operational fact that someone is out.
-  const hasTimeOff = (tech: BoardTech) => (tech.timeOff?.length ?? 0) > 0;
+  const weekTechs = useMemo(() => {
+    const all = week?.techs ?? [];
+    if (!search.trim()) return all;
+    const q = search.trim().toLowerCase();
+    return all.filter((tech) => tech.name.toLowerCase().includes(q));
+  }, [week, search]);
 
-  const foldableCount = useMemo(
+  // One fold rule for both granularities: available technicians with nothing
+  // booked fold; anyone with an absence never does, because their row IS the
+  // information that someone is out.
+  const day = useMemo(
     () =>
-      techs.filter((tech) => !hasTimeOff(tech) && (byTech[tech.id] ?? []).length === 0).length,
-    [techs, byTech],
+      foldEmptyRows(
+        techs,
+        hideEmpty,
+        (tech) => (byTech[tech.id] ?? []).length,
+        (tech) => (tech.timeOff?.length ?? 0) > 0,
+      ),
+    [techs, hideEmpty, byTech],
   );
 
-  const shownTechs = useMemo(
+  const weekRows = useMemo(
     () =>
-      hideEmpty
-        ? techs.filter((tech) => hasTimeOff(tech) || (byTech[tech.id] ?? []).length > 0)
-        : techs,
-    [techs, byTech, hideEmpty],
+      foldEmptyRows(
+        weekTechs,
+        hideEmpty,
+        (tech) => tech.cells.reduce((n, cell) => n + cell.stopCount, 0),
+        (tech) => tech.cells.some((cell) => cell.off),
+      ),
+    [weekTechs, hideEmpty],
+  );
+
+  // Whichever granularity is on screen drives the chrome — the density ladder,
+  // the row count in the subtitle, and whether the fold is offered at all.
+  const activeTechs = isWeek ? weekTechs : techs;
+  const shownTechs = isWeek ? weekRows.shown : day.shown;
+  const foldableCount = isWeek ? weekRows.foldable : day.foldable;
+
+  // Scope-bound by design: only technicians actually rendered are considered,
+  // so narrowing to one region legitimately changes the answer. Recomputed on
+  // any change to the queue, the visible techs or their stops — assigning one
+  // job updates the hint on every other card.
+  //
+  // Self-hiding all the way down: no coordinates, nothing booked yet, or the
+  // week's aggregate read (which carries no stops at all) each yield an empty
+  // map and a card with no line, which is the honest rendering.
+  const nearest = useMemo(
+    () => (isWeek ? {} : nearestStops(railItems, day.shown, allDispatches, timeZone)),
+    [isWeek, railItems, day.shown, allDispatches, timeZone],
   );
 
   const regionName = (id: string | null) =>
@@ -338,12 +443,13 @@ export default function DispatchBoardPage() {
   // group. Filter visibility keys off coverage — the two sets are
   // deliberately different and can disagree.
   const primaryRegionIds = useMemo(
-    () => new Set(techs.map((tech) => tech.primaryRegionId).filter((id): id is string => !!id)),
-    [techs],
+    () =>
+      new Set(activeTechs.map((tech) => tech.primaryRegionId).filter((id): id is string => !!id)),
+    [activeTechs],
   );
   const coveredRegionIds = useMemo(
-    () => new Set(techs.flatMap((tech) => tech.regionIds)),
-    [techs],
+    () => new Set(activeTechs.flatMap((tech) => tech.regionIds)),
+    [activeTechs],
   );
 
   const regionOptions = useMemo(
@@ -363,41 +469,45 @@ export default function DispatchBoardPage() {
   const autoDensity = autoDensityFor(shownTechs.length);
   const density: Density = densityPref === 'auto' ? autoDensity : densityPref;
 
-  const groups = useMemo<BoardGroup[]>(() => {
-    const summarize = (list: BoardTech[]) => ({
-      stops: list.reduce((n, tech) => n + (byTech[tech.id] ?? []).length, 0),
-      held: list.reduce(
-        (n, tech) => n + (byTech[tech.id] ?? []).filter((d) => d.releasedAt == null).length,
-        0,
-      ),
-    });
+  const groups = useMemo<BoardGroup[]>(
+    () =>
+      buildGroups(day.shown, {
+        grouped: effectiveGroupBy !== 'none',
+        regions,
+        orphanLabel: t('dispatchBoard.grid.noRegion'),
+        summarize: (list) => ({
+          stops: list.reduce((n, tech) => n + (byTech[tech.id] ?? []).length, 0),
+          held: list.reduce(
+            (n, tech) => n + (byTech[tech.id] ?? []).filter((d) => d.releasedAt == null).length,
+            0,
+          ),
+        }),
+      }),
+    [effectiveGroupBy, day.shown, byTech, regions, t],
+  );
 
-    if (effectiveGroupBy === 'none') {
-      return [{ key: '__all', label: null, techs: shownTechs, ...summarize(shownTechs) }];
-    }
-
-    // Order follows the tenant's own region ordering, and a tech appears in
-    // exactly one group — their primary.
-    const ordered = regions.filter((r) => primaryRegionIds.has(r.id));
-    const built = ordered.map((region) => {
-      const list = shownTechs.filter((tech) => tech.primaryRegionId === region.id);
-      return { key: region.id, label: region.name, techs: list, ...summarize(list) };
-    });
-    // Techs whose primary region isn't in the registry (or is null) still
-    // need a row — never drop a person off the board.
-    const orphans = shownTechs.filter(
-      (tech) => !tech.primaryRegionId || !primaryRegionIds.has(tech.primaryRegionId),
-    );
-    if (orphans.length > 0) {
-      built.push({
-        key: '__unassigned',
-        label: t('dispatchBoard.grid.noRegion'),
-        techs: orphans,
-        ...summarize(orphans),
-      });
-    }
-    return built.filter((group) => group.techs.length > 0);
-  }, [effectiveGroupBy, shownTechs, byTech, regions, primaryRegionIds, t]);
+  // Same grouping rules, different arithmetic: the week's group summary counts
+  // aggregated stops, and "held" is a count of DAYS with unhanded-over work —
+  // the aggregate carries a flag per day, never a dispatch count.
+  const weekGroups = useMemo(
+    () =>
+      buildGroups<BoardWeekTech>(weekRows.shown, {
+        grouped: effectiveGroupBy !== 'none',
+        regions,
+        orphanLabel: t('dispatchBoard.grid.noRegion'),
+        summarize: (list) => ({
+          stops: list.reduce(
+            (n, tech) => n + tech.cells.reduce((m, cell) => m + cell.stopCount, 0),
+            0,
+          ),
+          held: list.reduce(
+            (n, tech) => n + tech.cells.filter((cell) => cell.hasUnreleased).length,
+            0,
+          ),
+        }),
+      }),
+    [effectiveGroupBy, weekRows.shown, regions, t],
+  );
 
   // The axis widens to contain any window outside the working day.
   const axis = useMemo(() => {
@@ -409,6 +519,8 @@ export default function DispatchBoardPage() {
       .filter((w): w is { start: number; end: number } => w.start !== null && w.end !== null);
     return buildAxis(DAY_START, DAY_END, windows);
   }, [visibleDispatches, timeZone]);
+
+  const todayInZone = useMemo(() => zonedDate(new Date(), timeZone), [timeZone]);
 
   // A now-line only means something on today's board — drawing one on
   // Thursday's board would be a lie.
@@ -521,16 +633,26 @@ export default function DispatchBoardPage() {
   const dispatchesLabel = getName('dispatch', true);
   const techLabel = getName('technician', true);
 
-  const boardBody = () => {
-    if (isLoading) return <LoadingState label={t('dispatchBoard.states.loading')} />;
+  // Day: "Thu, Mar 19", or "Today" when it is. Week: the span the SERVER
+  // resolved, so the label can never disagree with the columns.
+  const scopeLabel = isWeek
+    ? formatDayRange(week?.days ?? [])
+    : date === todayInZone
+      ? t('dispatchBoard.dateNav.today')
+      : formatBoardDate(date);
 
-    if (error) {
+  const boardBody = () => {
+    if (isWeek ? weekLoading : isLoading) {
+      return <LoadingState label={t('dispatchBoard.states.loading')} />;
+    }
+
+    if (isWeek ? weekError : error) {
       return (
         <ErrorState
           title={t('dispatchBoard.states.errorTitle')}
           description={t('dispatchBoard.states.errorBody')}
           action={
-            <Button size="xs" onClick={() => refetch()}>
+            <Button size="xs" onClick={() => (isWeek ? refetchWeek() : refetch())}>
               {t('common.actions.tryAgain')}
             </Button>
           }
@@ -543,7 +665,7 @@ export default function DispatchBoardPage() {
     // "performs field work", so this state names that rule rather than
     // diagnosing a cause: the client cannot tell a correctly-configured
     // tenant with no field staff from a cache that hasn't synced.
-    if (allTechs.length === 0) {
+    if ((isWeek ? week?.techs ?? [] : allTechs).length === 0) {
       return (
         <EmptyState
           title={t('dispatchBoard.states.noTechsTitle', { entity: techLabel })}
@@ -569,6 +691,28 @@ export default function DispatchBoardPage() {
               {t('dispatchBoard.states.clearFilters')}
             </Button>
           }
+        />
+      );
+    }
+
+    if (isWeek) {
+      return (
+        <DispatchWeek
+          groups={weekGroups}
+          days={week?.days ?? []}
+          density={density}
+          collapsed={collapsed}
+          onToggleGroup={(key) =>
+            setCollapsed((prev) =>
+              prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key],
+            )
+          }
+          capacityStops={week?.defaultStopsPerDay ?? null}
+          today={todayInZone}
+          // The week's job is to route you to the right day, so a cell is a
+          // target: it hands the dispatcher the day board they were hunting
+          // for, scope intact.
+          onOpenDay={(day) => setParams({ date: day, view: null })}
         />
       );
     }
@@ -641,28 +785,48 @@ export default function DispatchBoardPage() {
           </div>
 
           <div className="ml-auto flex items-center gap-1">
+            {/* Day or week. Labelled by GRANULARITY, not by "Today" — the
+                toggle still says what it is once you have stepped to
+                Thursday, and it doesn't collide with the Today reset. */}
+            <ToggleGroup
+              value={isWeek ? 'week' : 'day'}
+              onChange={(value) => setParam('view', value === 'week' ? 'week' : null)}
+              size="sm"
+              aria-label={t('dispatchBoard.view.label')}
+            >
+              <ToggleGroupOption value="day">{t('dispatchBoard.view.day')}</ToggleGroupOption>
+              <ToggleGroupOption value="week">{t('dispatchBoard.view.week')}</ToggleGroupOption>
+            </ToggleGroup>
+
             <Button
               plain
               size="xs"
-              aria-label={t('dispatchBoard.dateNav.previous')}
-              onClick={() => setParam('date', shiftDay(date, -1))}
+              aria-label={t(isWeek ? 'dispatchBoard.dateNav.previousWeek' : 'dispatchBoard.dateNav.previous')}
+              onClick={() => setParam('date', shiftDay(date, isWeek ? -7 : -1))}
             >
               <ChevronLeftIcon />
             </Button>
-            <Button size="xs" onClick={() => setParam('date', null)}>
-              {t('dispatchBoard.dateNav.today')}
-            </Button>
+            {/* The board used to show no date at all: stepping forward with a
+                chevron left the dispatcher guessing which day they were on. */}
+            <span className="min-w-[92px] text-center text-[12px] font-semibold text-fg-strong">
+              {scopeLabel}
+            </span>
             <Button
               plain
               size="xs"
-              aria-label={t('dispatchBoard.dateNav.next')}
-              onClick={() => setParam('date', shiftDay(date, 1))}
+              aria-label={t(isWeek ? 'dispatchBoard.dateNav.nextWeek' : 'dispatchBoard.dateNav.next')}
+              onClick={() => setParam('date', shiftDay(date, isWeek ? 7 : 1))}
             >
               <ChevronRightIcon />
             </Button>
+            <Button size="xs" onClick={() => setParam('date', null)} disabled={date === todayInZone}>
+              {t('dispatchBoard.dateNav.today')}
+            </Button>
 
-            {/* Present only when there is something to release. */}
-            {counts.unreleased > 0 && (
+            {/* Present only when there is something to release — and only on
+                the day board, since release takes a single day's scope and a
+                count spanning the week could not act on itself. */}
+            {!isWeek && counts.unreleased > 0 && (
               <Button
                 color="accent"
                 size="xs"
@@ -768,7 +932,11 @@ export default function DispatchBoardPage() {
           </ListToolbar>
         </div>
 
-        {/* ── Band 3 — exceptions as FILTERS, never as stat cards ── */}
+        {/* ── Band 3 — exceptions as FILTERS, never as stat cards ──
+             Day only: every chip is a predicate over individual dispatches,
+             and the week read carries aggregates. Showing chips that could
+             not filter anything is what rev 3 did with "Unassigned". */}
+        {!isWeek && (
         <div className="db-band sub">
           <div className="flex flex-wrap items-center gap-1.5">
             {chips.map((chip) => {
@@ -793,6 +961,7 @@ export default function DispatchBoardPage() {
             )}
           </div>
         </div>
+        )}
 
         {/* ── Body — unscheduled rail, then the board ────────────── */}
         <div className="db-body">
@@ -804,12 +973,6 @@ export default function DispatchBoardPage() {
               <Pill tone={railItems.some((w) => w.priority === 'URGENT') ? 'danger' : 'neutral'}>
                 {String(railItems.length)}
               </Pill>
-            </div>
-            <div className="border-b border-border-soft px-3 py-1.5 text-[10.5px] text-fg-muted">
-              {t('dispatchBoard.rail.hint', {
-                entity: getName('work_order'),
-                tech: getName('technician'),
-              })}
             </div>
             <div className="db-rail-list">
               {railItems.length === 0 ? (
@@ -823,7 +986,10 @@ export default function DispatchBoardPage() {
                   <UnscheduledRailCard
                     key={wo.workOrderId}
                     workOrder={wo}
-                    regionName={regionName(wo.dispatchRegionId)}
+                    // Only when board scope is "all regions": printing one
+                    // region on every card in a filtered board is noise.
+                    regionName={regionId ? null : regionName(wo.dispatchRegionId)}
+                    nearest={nearest[wo.workOrderId]}
                     divisionName={
                       divisions.find((d) => d.id === wo.divisionId)?.name ?? null
                     }
