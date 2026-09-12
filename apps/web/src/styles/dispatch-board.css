@@ -933,3 +933,28 @@
   border-radius: 2px;
   flex-shrink: 0;
 }
+
+/* Row verbs, overlaid on the right edge of the technician cell.
+
+   Not given a slot of its own: the cell is 176px at dense, and a permanent
+   column would cost that width on every row at every density — while the
+   thing it would push out (the stop count and load bar) is the point of the
+   column. Opacity rather than display, so it stays in the tab order, and
+   revealed on focus-within as well as hover so the keyboard reaches it. */
+.db-rowmenu {
+  position: absolute;
+  right: 3px;
+  opacity: 0;
+  background: var(--bg-elev);
+  transition: opacity 90ms ease-out;
+}
+
+.db-row:hover .db-rowmenu,
+.db-row:focus-within .db-rowmenu,
+.db-rowmenu[data-open] {
+  opacity: 1;
+}
+
+.db-row:hover .db-rowmenu {
+  background: var(--bg-hover);
+}

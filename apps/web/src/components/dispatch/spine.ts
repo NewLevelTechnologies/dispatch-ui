@@ -68,6 +68,10 @@ export interface SpineProps {
    * scope so smart-back returns to the board they were looking at.
    */
   workOrderHref: (workOrderId: string) => string;
+  /** Row verbs from the technician cell. The need arises here — "Robert just
+   *  called out" is a 6:40am fact about the day on screen — so the board
+   *  writes the absence rather than sending anyone to a settings page. */
+  onMarkTimeOff?: (tech: BoardTech) => void;
   /** Right-click on a block, at viewport coordinates. The menu itself is the
    *  page's, so every spine gets it for free. */
   onContextDispatch: (dispatch: BoardDispatch, at: { x: number; y: number }) => void;
