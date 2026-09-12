@@ -7,6 +7,7 @@ const mockGetBoard = vi.fn();
 const mockGetUnscheduled = vi.fn();
 const mockGetWeek = vi.fn();
 const mockRegionsGetAll = vi.fn();
+const mockDivisionsGetAll = vi.fn();
 const mockRelease = vi.fn();
 const mockReleaseOne = vi.fn();
 const mockDeleteDispatch = vi.fn();
@@ -28,6 +29,10 @@ vi.mock('../api/setup', async (importOriginal) => {
     dispatchRegionApi: {
       ...actual.dispatchRegionApi,
       getAll: (...a: unknown[]) => mockRegionsGetAll(...a),
+    },
+    divisionsApi: {
+      ...actual.divisionsApi,
+      getAll: (...a: unknown[]) => mockDivisionsGetAll(...a),
     },
     dispatchesApi: {
       ...actual.dispatchesApi,
@@ -845,9 +850,20 @@ describe('DispatchBoardPage date label', () => {
     });
   });
 
-  it('names the day being shown', async () => {
+  // The date moved into the subtitle, where it has room to be a real date
+  // rather than a label wedged between two chevrons.
+  it('names the day, the rows and the work in the subtitle', async () => {
     renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch?date=2026-03-18' });
-    expect(await screen.findByText('Wed, Mar 18')).toBeInTheDocument();
+    expect(await screen.findByText(/Wed, Mar 18/)).toBeInTheDocument();
+    expect(screen.getByText(/in scope/)).toBeInTheDocument();
+  });
+
+  // A now-time on Thursday's board would be a lie, the same way the now-line
+  // would be.
+  it('gives the time only while the board is showing today', async () => {
+    renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch?date=2026-03-18' });
+    await screen.findByText(/Wed, Mar 18/);
+    expect(screen.queryByText(/now /)).not.toBeInTheDocument();
   });
 
   it('says Today rather than the date when it is today', async () => {
@@ -1022,5 +1038,72 @@ describe('DispatchBoardPage visit deep link', () => {
 
     await user.click(await screen.findByRole('link', { name: /No cooling/ }));
     expect(await screen.findByRole('link', { name: 'WO-1' })).toBeInTheDocument();
+  });
+});
+
+// The chrome bands: what the board is showing, what can narrow it, and what
+// the grid's ink means.
+describe('DispatchBoardPage chrome', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockRegionsGetAll.mockResolvedValue([]);
+    mockDivisionsGetAll.mockResolvedValue([]);
+    mockGetUnscheduled.mockResolvedValue(emptyRail);
+    mockGetBoard.mockResolvedValue({
+      techs: [tech('u1', 'Maya Alvarez', ['r1'])],
+      dispatches: [],
+    });
+  });
+
+  it('counts the rows on screen', async () => {
+    renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch' });
+    expect(await screen.findByText('1 rows')).toBeInTheDocument();
+  });
+
+  // A dispatcher learns the grid's encoding from here, not from a tooltip on
+  // every block.
+  it('explains the grid’s colours', async () => {
+    renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch' });
+    await screen.findByText('Maya Alvarez');
+    expect(screen.getByText('Scheduled')).toBeInTheDocument();
+    expect(screen.getByText('No estimate')).toBeInTheDocument();
+    expect(screen.getByText('On site now')).toBeInTheDocument();
+  });
+
+  // Division is a property of the WORK, so the tenant needs more than one
+  // before the filter is worth its width — same self-hiding rule as the rest.
+  it('hides the division filter for a single-division tenant', async () => {
+    mockDivisionsGetAll.mockResolvedValue([{ id: 'dv1', name: 'HVAC' }]);
+    renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch' });
+    await screen.findByText('Maya Alvarez');
+    expect(screen.queryByRole('button', { name: 'Division' })).not.toBeInTheDocument();
+  });
+
+  it('offers the division filter once there are two', async () => {
+    mockDivisionsGetAll.mockResolvedValue([
+      { id: 'dv1', name: 'HVAC' },
+      { id: 'dv2', name: 'Plumbing' },
+    ]);
+    renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch' });
+    // Closed, the picker reads as its own label — "All divisions" is the reset
+    // row inside it, per the house listbox rather than the mock's <select>.
+    expect(await screen.findByRole('button', { name: 'Division' })).toBeInTheDocument();
+  });
+
+  // It filters the WORK, not the rows — and the server is what enforces that,
+  // so the id has to reach all three reads or the rail would still offer work
+  // the grid is hiding.
+  it('scopes every read to the division in the URL', async () => {
+    mockDivisionsGetAll.mockResolvedValue([
+      { id: 'dv1', name: 'HVAC' },
+      { id: 'dv2', name: 'Plumbing' },
+    ]);
+    renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch?division=dv1' });
+
+    await screen.findByText('Maya Alvarez');
+    expect(mockGetBoard).toHaveBeenCalledWith(expect.objectContaining({ divisionIds: ['dv1'] }));
+    expect(mockGetUnscheduled).toHaveBeenCalledWith(
+      expect.objectContaining({ divisionIds: ['dv1'] }),
+    );
   });
 });

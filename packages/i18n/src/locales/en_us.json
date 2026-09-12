@@ -2927,13 +2927,17 @@
       "cancelled": "{{workOrder}} cancelled → unscheduled"
     },
     "filter": {
-      "region": "{{entity}}",
+      "allDivisions": "All {{entity, lowercase}}",
       "allRegions": "All {{entity, lowercase}}",
       "density": "Density",
-      "grouping": "Grouping",
+      "division": "{{entity}}",
       "groupByNone": "No grouping",
       "groupByRegion": "Group by {{entity, lowercase}}",
-      "hideEmpty": "Hide unscheduled {{entity}}"
+      "grouping": "Grouping",
+      "hideEmpty": "Hide unscheduled {{entity}}",
+      "hideEmptySuggestion_one": "{{count}} row is empty under this filter",
+      "hideEmptySuggestion_other": "{{count}} rows are empty under this filter",
+      "region": "{{entity}}"
     },
     "grid": {
       "coversMoreRegions_one": "Also covers {{count}} other region",
@@ -2946,6 +2950,9 @@
       "groupHeld": " · {{count}} not released",
       "noRegion": "No region",
       "blockHint": "Right-click for actions · ⌘-click to open the {{entity, lowercase}}"
+    },
+    "hint": {
+      "rightClick": "Right-click a block to open its {{entity}}"
     },
     "job": {
       "allVisits": "All {{entity, lowercase}}",
@@ -2961,6 +2968,15 @@
       "priorVisitsValue_one": "{{count}} at this site · 12 mo",
       "priorVisitsValue_other": "{{count}} at this site · 12 mo",
       "thisVisit": "this visit"
+    },
+    "legend": {
+      "completed": "Completed",
+      "live": "En route / on site",
+      "noEstimate": "No estimate",
+      "noShow": "No-show",
+      "onSiteNow": "On site now",
+      "scheduled": "Scheduled",
+      "unreleased": "Not released"
     },
     "menu": {
       "label": "{{entity}} actions",
@@ -2996,6 +3012,8 @@
       "one": "{{workOrder}} released — the {{tech, lowercase}} has been notified",
       "oneFailed": "Couldn't release that {{entity, lowercase}}"
     },
+    "rowCount_one": "{{count}} row",
+    "rowCount_other": "{{count}} rows",
     "search": {
       "placeholder": "Find a {{entity, lowercase}}…"
     },
@@ -3014,6 +3032,9 @@
     },
     "subtitleCount_one": "{{count}} {{entity, lowercase}} in scope",
     "subtitleCount_other": "{{count}} {{entity, lowercase}} in scope",
+    "subtitleDispatches_one": "{{count}} {{entity}}",
+    "subtitleDispatches_other": "{{count}} {{entity}}",
+    "subtitleNow": "now {{time}}",
     "timeOff": {
       "action": "Mark time off",
       "allDay": "All day",
