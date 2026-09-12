@@ -284,6 +284,7 @@ export default function DispatchTimeline({
   onOpenDispatch,
   workOrderHref,
   onContextDispatch,
+  onMarkTimeOff,
   axis,
   nowHour,
   capacityStops,
@@ -340,6 +341,7 @@ export default function DispatchTimeline({
           // meta slot is free to carry the reason. A partial absence is a
           // working row — its label belongs in the lane, on the span.
           offLabel={outAllDay ? (spans[0]?.label ?? null) : null}
+          onMarkTimeOff={onMarkTimeOff ? () => onMarkTimeOff(tech) : undefined}
         />
         <Lane
           techId={tech.id}

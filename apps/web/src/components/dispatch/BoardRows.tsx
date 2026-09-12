@@ -9,7 +9,15 @@
 // read as two different products.
 // ─────────────────────────────────────────────────────────────────────
 import { useTranslation } from '@dispatch/i18n';
-import { ChevronRightIcon } from '@heroicons/react/24/outline';
+import { ChevronRightIcon, EllipsisHorizontalIcon } from '@heroicons/react/24/outline';
+import {
+  Dropdown,
+  DropdownButton,
+  DropdownItem,
+  DropdownLabel,
+  DropdownMenu,
+} from '../catalyst/dropdown';
+import IconButton from '../IconButton';
 import { useGlossary } from '../../contexts/GlossaryContext';
 import { Avatar } from '../ui/Avatar';
 import type { Group, GroupableTech } from '../../lib/boardGroups';
@@ -29,12 +37,16 @@ export function TechCell({
   width,
   outAllDay,
   offLabel,
+  onMarkTimeOff,
 }: {
   tech: { name: string; regionIds: string[] };
   stops: number;
   density: Density;
   capacityStops: number | null;
   width: number;
+  /** Row verbs. Omitted where they have no meaning — the week grid spans seven
+   *  days, so "off" there would have no date to attach to. */
+  onMarkTimeOff?: () => void;
   /** Hides the load entirely: a tech who is out has no load to report, and a
    *  0/6 bar would read as "available and empty". */
   outAllDay: boolean;
@@ -85,6 +97,27 @@ export function TechCell({
             </span>
           )}
         </div>
+      )}
+
+      {/* Overlaid on the right edge rather than given a slot of its own: the
+          technician cell is 176px at dense, and a permanent column would cost
+          that width on every row at every density. Revealed on hover AND on
+          focus, so the keyboard reaches it. */}
+      {onMarkTimeOff && (
+        <Dropdown>
+          <DropdownButton
+            as={IconButton}
+            className="db-rowmenu"
+            aria-label={t('common.moreOptions')}
+          >
+            <EllipsisHorizontalIcon className="size-4" />
+          </DropdownButton>
+          <DropdownMenu anchor="bottom end">
+            <DropdownItem onClick={onMarkTimeOff}>
+              <DropdownLabel>{t('dispatchBoard.timeOff.action')}</DropdownLabel>
+            </DropdownItem>
+          </DropdownMenu>
+        </Dropdown>
       )}
     </div>
   );

@@ -480,6 +480,16 @@ export {
   type ReleaseResponse,
 } from './dispatchBoardApi';
 
+// Availability API — absence spans the dispatch board reads and writes
+export {
+  availabilityApi,
+  type Availability,
+  type AvailabilityStatus,
+  type AvailabilityPage,
+  type CreateAvailabilityRequest,
+  type ListAvailabilityParams,
+} from './availabilityApi';
+
 // Dispatch Region API
 export {
   dispatchRegionApi,

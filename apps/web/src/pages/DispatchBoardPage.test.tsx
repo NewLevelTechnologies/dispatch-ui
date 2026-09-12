@@ -960,3 +960,67 @@ describe('DispatchBoardPage rail proximity', () => {
     expect(screen.queryByText(/Nearest/)).not.toBeInTheDocument();
   });
 });
+
+// The open visit lives in the URL for the same reason the date and the region
+// do: "look at this one" has to be a link someone can send.
+describe('DispatchBoardPage visit deep link', () => {
+  const visit = (over: Record<string, unknown> = {}) => ({
+    id: 'd1',
+    seq: 1,
+    status: 'SCHEDULED',
+    arrivalWindowStart: '2026-03-15T08:00:00Z',
+    arrivalWindowEnd: '2026-03-15T10:00:00Z',
+    estimatedDuration: null,
+    releasedAt: null,
+    version: 1,
+    assignedUserId: 'u1',
+    assignedUserName: 'Maya Alvarez',
+    workOrderId: 'wo1',
+    workOrderNumber: 'WO-1',
+    workOrderTypeId: null,
+    workOrderSummary: 'No cooling',
+    customerId: 'c1',
+    customerName: 'Pham, A.',
+    priority: 'NORMAL',
+    recurring: false,
+    serviceLocationId: 'l1',
+    serviceLocationCity: null,
+    serviceLocationState: null,
+    latitude: null,
+    longitude: null,
+    driveMinFromPrev: null,
+    arrivedAt: null,
+    departedAt: null,
+    addressedWorkItemIds: [],
+    ...over,
+  });
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockRegionsGetAll.mockResolvedValue([]);
+    mockGetUnscheduled.mockResolvedValue(emptyRail);
+    mockGetBoard.mockResolvedValue({
+      techs: [tech('u1', 'Maya Alvarez', ['r1'])],
+      dispatches: [visit()],
+    });
+  });
+
+  it('opens the drawer straight from the link', async () => {
+    renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch?d=d1' });
+    expect(await screen.findByRole('link', { name: 'WO-1' })).toBeInTheDocument();
+  });
+
+  it('leaves the drawer shut for a visit that is not on this board', async () => {
+    renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch?d=nope' });
+    await screen.findByText('Maya Alvarez');
+    expect(screen.queryByRole('link', { name: 'WO-1' })).not.toBeInTheDocument();
+  });
+
+  it('puts the visit in the URL when a block is opened', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch' });
+
+    await user.click(await screen.findByRole('link', { name: /No cooling/ }));
+    expect(await screen.findByRole('link', { name: 'WO-1' })).toBeInTheDocument();
+  });
+});

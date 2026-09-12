@@ -21,6 +21,7 @@ import {
   divisionsApi,
   workOrderApi,
   type BoardDispatch,
+  type BoardTech,
   type BoardWeekTech,
   type UnscheduledWorkOrder,
 } from '../api/setup';
@@ -43,6 +44,7 @@ import DispatchDetailDrawer, { type DispatchSeed } from '../components/DispatchD
 import DispatchFormDrawer from '../components/DispatchFormDrawer';
 import DispatchTimeline from '../components/dispatch/DispatchTimeline';
 import DispatchWeek from '../components/dispatch/DispatchWeek';
+import TimeOffDialog from '../components/dispatch/TimeOffDialog';
 import BlockContextMenu, { type BlockMenu } from '../components/dispatch/BlockContextMenu';
 import UnscheduledRailCard from '../components/dispatch/UnscheduledRailCard';
 import {
@@ -163,8 +165,8 @@ export default function DispatchBoardPage() {
   const [hideEmpty, setHideEmpty] = useState(false);
   const [collapsed, setCollapsed] = useState<string[]>([]);
   const [exceptions, setExceptions] = useState<ExceptionId[]>([]);
-  const [openDispatch, setOpenDispatch] = useState<BoardDispatch | null>(null);
   const [menu, setMenu] = useState<BlockMenu | null>(null);
+  const [timeOffTech, setTimeOffTech] = useState<BoardTech | null>(null);
   const [composeFor, setComposeFor] = useState<UnscheduledWorkOrder | null>(null);
   const [confirmRelease, setConfirmRelease] = useState(false);
   const [editDispatch, setEditDispatch] = useState<DispatchSeed | null>(null);
@@ -208,6 +210,9 @@ export default function DispatchBoardPage() {
   // Granularity, in the URL like every other scope — "show me next week in
   // East Valley" has to be a link someone can send.
   const isWeek = searchParams.get('view') === 'week';
+  // Which visit is open, in the URL rather than in state: the drawer is part
+  // of the view someone shares, and it makes the back button work.
+  const openDispatchId = searchParams.get('d');
   const weekStart = weekStartOf(date);
 
   const setParams = (values: Record<string, string | null>) => {
@@ -435,6 +440,15 @@ export default function DispatchBoardPage() {
     () => (isWeek ? {} : nearestStops(railItems, day.shown, allDispatches, timeZone)),
     [isWeek, railItems, day.shown, allDispatches, timeZone],
   );
+
+  // Derived, never stored: a drawer opened from a stale copy of the row would
+  // keep showing it after a poll refreshed the board underneath.
+  const openDispatch = useMemo(
+    () => allDispatches.find((d) => d.id === openDispatchId) ?? null,
+    [allDispatches, openDispatchId],
+  );
+
+  const openVisit = (dispatch: BoardDispatch | null) => setParam('d', dispatch?.id ?? null);
 
   const regionName = (id: string | null) =>
     id ? (regions.find((r) => r.id === id)?.name ?? null) : null;
@@ -748,9 +762,10 @@ export default function DispatchBoardPage() {
             prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key],
           )
         }
-        onOpenDispatch={setOpenDispatch}
+        onOpenDispatch={openVisit}
         workOrderHref={workOrderHref}
         onContextDispatch={(dispatch, at) => setMenu({ dispatch, ...at })}
+        onMarkTimeOff={setTimeOffTech}
         axis={axis}
         nowHour={nowHour}
           capacityStops={board?.defaultStopsPerDay ?? null}
@@ -1044,6 +1059,21 @@ export default function DispatchBoardPage() {
         locationName={composeFor?.customerName}
       />
 
+      {/* Marking someone off never moves their work — the dialog says what is
+          left booked instead, because a system that silently relocates a
+          commitment is worse than one that tells you to deal with it. */}
+      <TimeOffDialog
+        tech={timeOffTech}
+        date={date}
+        bookedVisits={
+          timeOffTech
+            ? (byTech[timeOffTech.id] ?? []).filter((d) => d.status !== 'CANCELLED').length
+            : 0
+        }
+        timeZone={timeZone}
+        onClose={() => setTimeOffTech(null)}
+      />
+
       {/* Right-click is the fast path on a board: it reaches the work order —
           the one thing the dispatch drawer cannot give a dispatcher — and the
           common verbs, without a drawer round-trip. */}
@@ -1051,7 +1081,7 @@ export default function DispatchBoardPage() {
         menu={menu}
         workOrderHref={workOrderHref}
         onClose={() => setMenu(null)}
-        onOpenDetail={setOpenDispatch}
+        onOpenDetail={openVisit}
         onRelease={(d) => release.mutate(d)}
         onReassign={setEditDispatch}
         onUnschedule={(d) => unschedule.mutate(d)}
@@ -1064,9 +1094,9 @@ export default function DispatchBoardPage() {
           depends on), Delete removes a mistake that never happened. */}
       <DispatchDetailDrawer
         dispatch={openDispatch}
-        onClose={() => setOpenDispatch(null)}
+        onClose={() => openVisit(null)}
         onEdit={(d) => {
-          setOpenDispatch(null);
+          openVisit(null);
           setEditDispatch(d);
         }}
         onDelete={() => {
@@ -1075,7 +1105,7 @@ export default function DispatchBoardPage() {
           // `releasedAt` and `version` to decide between delete and cancel.
           // Same path the rail drop takes, so both routes behave alike.
           const target = openDispatch;
-          setOpenDispatch(null);
+          openVisit(null);
           if (target) unschedule.mutate(target);
         }}
         onViewWorkItems={() => {
