@@ -547,7 +547,7 @@ export default function DispatchBoardPage() {
   // Bulk release takes a SCOPE, not an id list: the server recomputes the
   // unreleased set, so this can neither reach outside the caller's regions
   // nor act on a board rendered ten minutes ago.
-  const { assign, move, unschedule, release } = useBoardMutations(date);
+  const { assign, move, unschedule, release } = useBoardMutations(date, timeZone);
 
   // A dispatch is a visit; the work order is the job — and "what is actually
   // happening with this job" is a question the board gets constantly, usually
