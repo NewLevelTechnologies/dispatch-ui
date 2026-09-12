@@ -2893,16 +2893,36 @@
     }
   },
   "dispatchBoard": {
-    "title": "{{entity}} Board",
-    "subtitleCount_one": "{{count}} {{entity, lowercase}} in scope",
-    "subtitleCount_other": "{{count}} {{entity, lowercase}} in scope",
+    "backTarget": "the board",
+    "chips": {
+      "cancelled": "Cancelled",
+      "longdrive": "Drive > 30m",
+      "noshow": "No-show",
+      "recurring": "Agreement",
+      "unreleased": "Not released",
+      "urgent": "Urgent"
+    },
     "dateNav": {
       "previous": "Previous day",
       "next": "Next day",
       "today": "Today"
     },
-    "search": {
-      "placeholder": "Find a {{entity, lowercase}}…"
+    "density": {
+      "auto": "Density · auto ({{mode, lowercase}})",
+      "comfortable": "Comfortable",
+      "compact": "Compact",
+      "dense": "Dense"
+    },
+    "drag": {
+      "assigned": "{{workOrder}} → {{tech}}, {{window}} · held on deck",
+      "assignFailed": "Couldn't schedule",
+      "conflict": "Someone else changed this while you were looking. Reloading the board.",
+      "moved": "{{workOrder}} → {{tech}}, {{window}}",
+      "moveFailed": "Couldn't move",
+      "undoFailed": "Couldn't undo — reloading the board",
+      "removed": "{{workOrder}} → unscheduled",
+      "removeFailed": "Couldn't remove",
+      "cancelled": "{{workOrder}} cancelled → unscheduled"
     },
     "filter": {
       "region": "{{entity}}",
@@ -2913,6 +2933,41 @@
       "groupByRegion": "Group by {{entity, lowercase}}",
       "hideEmpty": "Hide unscheduled {{entity}}"
     },
+    "grid": {
+      "coversMoreRegions_one": "Also covers {{count}} other region",
+      "coversMoreRegions_other": "Also covers {{count}} other regions",
+      "driveMinutes": "{{minutes}}m drive",
+      "estimate": "est {{hours}}h",
+      "noEstimate": "no est.",
+      "offNotDroppable": "{{label}} — not droppable",
+      "groupSummary": " · {{stops}} {{entity}}",
+      "groupHeld": " · {{count}} not released",
+      "noRegion": "No region",
+      "blockHint": "Right-click for actions · ⌘-click to open the {{entity, lowercase}}"
+    },
+    "job": {
+      "allVisits": "All {{entity, lowercase}}",
+      "balance": "{{amount}} outstanding",
+      "contact": "Contact",
+      "heading": "{{entity}}",
+      "moreNotes_one": "{{count}} more note",
+      "moreNotes_other": "{{count}} more notes",
+      "note": "{{entity}} note",
+      "open": "Open {{number}}",
+      "opened": "Opened",
+      "priorVisits": "Prior visits",
+      "priorVisitsValue_one": "{{count}} at this site · 12 mo",
+      "priorVisitsValue_other": "{{count}} at this site · 12 mo",
+      "thisVisit": "this visit"
+    },
+    "menu": {
+      "label": "{{entity}} actions",
+      "openWorkOrder": "Open {{entity}}",
+      "details": "{{entity}} details…",
+      "release": "Release to {{tech, lowercase}}",
+      "reassign": "Reassign or reschedule…",
+      "unschedule": "Unschedule"
+    },
     "rail": {
       "heading": "Unscheduled",
       "hint": "One card per {{entity, lowercase}} · click to schedule, or drag onto a {{tech, lowercase}}",
@@ -2921,7 +2976,25 @@
       "urgent": "Urgent",
       "recurring": "Agreement / recurring work",
       "itemCount_one": "{{count}} item",
-      "itemCount_other": "{{count}} items"
+      "itemCount_other": "{{count}} items",
+      "openWorkOrder": "Open {{number}}"
+    },
+    "release": {
+      "action_one": "Release {{count}}",
+      "action_other": "Release {{count}}",
+      "confirmAction": "Release",
+      "confirmBody_one": "This texts {{count}} technician their assignment. It can't be undone.",
+      "confirmBody_other": "This texts {{count}} technicians their assignments. It can't be undone.",
+      "confirmTitle_one": "Release {{count}} dispatch?",
+      "confirmTitle_other": "Release {{count}} dispatches?",
+      "done_one": "{{count}} dispatch released",
+      "done_other": "{{count}} dispatches released",
+      "failed": "Couldn't release",
+      "one": "{{workOrder}} released — the {{tech, lowercase}} has been notified",
+      "oneFailed": "Couldn't release that {{entity, lowercase}}"
+    },
+    "search": {
+      "placeholder": "Find a {{entity, lowercase}}…"
     },
     "states": {
       "loading": "Loading board…",
@@ -2936,53 +3009,8 @@
       "noTechsAction": "Review roles",
       "clearFilters": "Clear filters"
     },
-    "grid": {
-      "coversMoreRegions_one": "Also covers {{count}} other region",
-      "coversMoreRegions_other": "Also covers {{count}} other regions",
-      "driveMinutes": "{{minutes}}m drive",
-      "estimate": "est {{hours}}h",
-      "noEstimate": "no est.",
-      "offNotDroppable": "{{label}} — not droppable",
-      "groupSummary": " · {{stops}} {{entity}}",
-      "groupHeld": " · {{count}} not released",
-      "noRegion": "No region"
-    },
-    "chips": {
-      "cancelled": "Cancelled",
-      "longdrive": "Drive > 30m",
-      "noshow": "No-show",
-      "recurring": "Agreement",
-      "unreleased": "Not released",
-      "urgent": "Urgent"
-    },
-    "density": {
-      "auto": "Density · auto ({{mode, lowercase}})",
-      "comfortable": "Comfortable",
-      "compact": "Compact",
-      "dense": "Dense"
-    },
-    "release": {
-      "action_one": "Release {{count}}",
-      "action_other": "Release {{count}}",
-      "confirmAction": "Release",
-      "confirmBody_one": "This texts {{count}} technician their assignment. It can't be undone.",
-      "confirmBody_other": "This texts {{count}} technicians their assignments. It can't be undone.",
-      "confirmTitle_one": "Release {{count}} dispatch?",
-      "confirmTitle_other": "Release {{count}} dispatches?",
-      "done_one": "{{count}} dispatch released",
-      "done_other": "{{count}} dispatches released",
-      "failed": "Couldn't release"
-    },
-    "drag": {
-      "assigned": "{{workOrder}} → {{tech}}, {{window}} · held on deck",
-      "assignFailed": "Couldn't schedule",
-      "conflict": "Someone else changed this while you were looking. Reloading the board.",
-      "moved": "{{workOrder}} → {{tech}}, {{window}}",
-      "moveFailed": "Couldn't move",
-      "undoFailed": "Couldn't undo — reloading the board",
-      "removed": "{{workOrder}} → unscheduled",
-      "removeFailed": "Couldn't remove",
-      "cancelled": "{{workOrder}} cancelled → unscheduled"
-    }
+    "subtitleCount_one": "{{count}} {{entity, lowercase}} in scope",
+    "subtitleCount_other": "{{count}} {{entity, lowercase}} in scope",
+    "title": "{{entity}} Board"
   }
 }

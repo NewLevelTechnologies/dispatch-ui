@@ -7,6 +7,9 @@ const mockGetBoard = vi.fn();
 const mockGetUnscheduled = vi.fn();
 const mockRegionsGetAll = vi.fn();
 const mockRelease = vi.fn();
+const mockReleaseOne = vi.fn();
+const mockDeleteDispatch = vi.fn();
+const mockGetWorkOrder = vi.fn();
 const mockShowSuccess = vi.fn();
 const mockShowError = vi.fn();
 
@@ -23,6 +26,15 @@ vi.mock('../api/setup', async (importOriginal) => {
     dispatchRegionApi: {
       ...actual.dispatchRegionApi,
       getAll: (...a: unknown[]) => mockRegionsGetAll(...a),
+    },
+    dispatchesApi: {
+      ...actual.dispatchesApi,
+      release: (...a: unknown[]) => mockReleaseOne(...a),
+      delete: (...a: unknown[]) => mockDeleteDispatch(...a),
+    },
+    workOrderApi: {
+      ...actual.workOrderApi,
+      getById: (...a: unknown[]) => mockGetWorkOrder(...a),
     },
   };
 });
@@ -447,5 +459,165 @@ describe('DispatchBoardPage release', () => {
     await waitFor(() =>
       expect(mockShowError).toHaveBeenCalledWith("Couldn't release", expect.anything())
     );
+  });
+});
+
+// A dispatch is a VISIT; the work order is the job — and "what is actually
+// happening with this job" is a question the board gets constantly, usually
+// with a customer on the phone. So the job is one action away from every place
+// a dispatch appears, and always as a real link.
+describe('DispatchBoardPage reaching the work order', () => {
+  const scheduled = (over: Record<string, unknown> = {}) => ({
+    id: 'd1',
+    seq: 1,
+    status: 'SCHEDULED',
+    arrivalWindowStart: '2026-03-15T08:00:00Z',
+    arrivalWindowEnd: '2026-03-15T10:00:00Z',
+    estimatedDuration: null,
+    releasedAt: null,
+    version: 1,
+    assignedUserId: 'u1',
+    assignedUserName: 'Maya Alvarez',
+    workOrderId: 'wo1',
+    workOrderNumber: 'WO-1',
+    workOrderTypeId: null,
+    workOrderSummary: 'No cooling',
+    customerId: 'c1',
+    customerName: 'Pham, A.',
+    priority: 'NORMAL',
+    recurring: false,
+    serviceLocationId: 'l1',
+    serviceLocationCity: null,
+    serviceLocationState: null,
+    latitude: null,
+    longitude: null,
+    driveMinFromPrev: null,
+    arrivedAt: null,
+    departedAt: null,
+    addressedWorkItemIds: [],
+    ...over,
+  });
+
+  const block = () => screen.findByRole('link', { name: /No cooling/ });
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockRegionsGetAll.mockResolvedValue([]);
+    mockGetUnscheduled.mockResolvedValue(railWith([railWorkOrder()]));
+    mockReleaseOne.mockResolvedValue({});
+    mockDeleteDispatch.mockResolvedValue(undefined);
+    mockGetWorkOrder.mockResolvedValue({ id: 'wo-1', workItems: [] });
+    mockGetBoard.mockResolvedValue({
+      techs: [tech('u1', 'Maya Alvarez', ['r1'])],
+      dispatches: [scheduled()],
+    });
+  });
+
+  // Smart back carries the board's own query, so the dispatcher returns to the
+  // day and scope they were working rather than a reset board.
+  it('links a block to its work order and carries the board back', async () => {
+    renderWithProviders(<DispatchBoardPage />, {
+      initialPath: '/dispatch?date=2026-03-15&region=r1',
+    });
+    expect(await block()).toHaveAttribute(
+      'href',
+      '/work-orders/wo1?from=dispatch&back=date%3D2026-03-15%26region%3Dr1',
+    );
+  });
+
+  it('links the rail card number to the work order', async () => {
+    renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch' });
+    expect(await screen.findByRole('link', { name: 'WO-3911' })).toHaveAttribute(
+      'href',
+      '/work-orders/wo-1?from=dispatch',
+    );
+  });
+
+  // The card body still schedules — the number is the only part that navigates.
+  it('keeps the rail card itself opening the composer, from the keyboard too', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch' });
+
+    const card = (await screen.findByText('No cooling — full system')).closest(
+      '[role="button"]',
+    ) as HTMLElement;
+    card.focus();
+    await user.keyboard('{Enter}');
+    await waitFor(() => expect(mockGetWorkOrder).toHaveBeenCalledWith('wo-1'));
+  });
+
+  it('opens the work order first in the right-click menu', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch' });
+
+    await user.pointer({ keys: '[MouseRight]', target: await block() });
+
+    const items = await screen.findAllByRole('menuitem');
+    expect(items[0]).toHaveTextContent('Open Work Order');
+    expect(items[0]).toHaveAttribute('href', '/work-orders/wo1?from=dispatch');
+  });
+
+  it('releases just that visit from the menu', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch' });
+
+    await user.pointer({ keys: '[MouseRight]', target: await block() });
+    await user.click(await screen.findByRole('menuitem', { name: /Release to/ }));
+
+    await waitFor(() => expect(mockReleaseOne).toHaveBeenCalledWith('d1'));
+    // Never the bulk endpoint: that one takes a scope and would release the
+    // whole day.
+    expect(mockRelease).not.toHaveBeenCalled();
+  });
+
+  it('drops release from the menu once the visit is already released', async () => {
+    const user = userEvent.setup();
+    mockGetBoard.mockResolvedValue({
+      techs: [tech('u1', 'Maya Alvarez', ['r1'])],
+      dispatches: [scheduled({ releasedAt: '2026-03-15T07:00:00Z' })],
+    });
+    renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch' });
+
+    await user.pointer({ keys: '[MouseRight]', target: await block() });
+    await screen.findByRole('menu');
+    expect(screen.queryByRole('menuitem', { name: /Release to/ })).not.toBeInTheDocument();
+  });
+
+  // A tech already driving has a real-world commitment; retracting it is a
+  // cancellation, which is a different verb with different consequences.
+  it('drops unschedule from the menu once the tech is en route', async () => {
+    const user = userEvent.setup();
+    mockGetBoard.mockResolvedValue({
+      techs: [tech('u1', 'Maya Alvarez', ['r1'])],
+      dispatches: [scheduled({ status: 'EN_ROUTE' })],
+    });
+    renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch' });
+
+    await user.pointer({ keys: '[MouseRight]', target: await block() });
+    await screen.findByRole('menu');
+    expect(screen.queryByRole('menuitem', { name: 'Unschedule' })).not.toBeInTheDocument();
+  });
+
+  it('unschedules from the menu', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch' });
+
+    await user.pointer({ keys: '[MouseRight]', target: await block() });
+    await user.click(await screen.findByRole('menuitem', { name: 'Unschedule' }));
+
+    await waitFor(() => expect(mockDeleteDispatch).toHaveBeenCalledWith('d1'));
+  });
+
+  it('closes the menu on Escape without acting', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch' });
+
+    await user.pointer({ keys: '[MouseRight]', target: await block() });
+    await screen.findByRole('menu');
+    await user.keyboard('{Escape}');
+
+    await waitFor(() => expect(screen.queryByRole('menu')).not.toBeInTheDocument());
+    expect(mockReleaseOne).not.toHaveBeenCalled();
+    expect(mockDeleteDispatch).not.toHaveBeenCalled();
   });
 });

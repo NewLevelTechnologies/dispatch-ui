@@ -8,12 +8,14 @@ import type { BoardDispatch, UnscheduledWorkOrder } from '../../api/setup';
 const mockCreate = vi.fn();
 const mockUpdate = vi.fn();
 const mockDelete = vi.fn();
+const mockReleaseOne = vi.fn();
 
 vi.mock('@dispatch/api/src/schedulingApi', () => ({
   dispatchesApi: {
     create: (...a: unknown[]) => mockCreate(...a),
     update: (...a: unknown[]) => mockUpdate(...a),
     delete: (...a: unknown[]) => mockDelete(...a),
+    release: (...a: unknown[]) => mockReleaseOne(...a),
   },
 }));
 vi.mock('@dispatch/api/src/client');
@@ -140,6 +142,7 @@ beforeEach(() => {
   mockCreate.mockResolvedValue({ id: 'd-new', version: 1 });
   mockUpdate.mockResolvedValue({ id: 'd-1', version: 8 });
   mockDelete.mockResolvedValue(undefined);
+  mockReleaseOne.mockResolvedValue({ id: 'd-1', releasedAt: '2026-03-15T07:00:00Z' });
 });
 
 describe('assign', () => {
@@ -330,5 +333,42 @@ describe('unschedule', () => {
 
     await waitFor(() => expect(mockShowError).toHaveBeenCalled());
     expect(board(queryClient).dispatches).toHaveLength(1);
+  });
+});
+
+describe('release', () => {
+  // Release is the one board write whose whole point is a change of
+  // appearance, so the hatch clears on the click rather than on the round-trip.
+  it('clears the hatch optimistically', async () => {
+    const { result, queryClient } = setup();
+    seedCaches(queryClient, [dispatch({ id: 'd-1', releasedAt: null })]);
+
+    act(() => result.current.release.mutate(dispatch({ id: 'd-1', releasedAt: null })));
+
+    await waitFor(() => expect(board(queryClient).dispatches[0].releasedAt).not.toBeNull());
+    expect(mockReleaseOne).toHaveBeenCalledWith('d-1');
+  });
+
+  // Releasing texts the technician and there is no un-send, so this write —
+  // alone among the board's — offers no Undo it couldn't honour.
+  it('offers no undo', async () => {
+    const { result, queryClient } = setup();
+    seedCaches(queryClient, [dispatch({ id: 'd-1', releasedAt: null })]);
+
+    act(() => result.current.release.mutate(dispatch({ id: 'd-1', releasedAt: null })));
+
+    await waitFor(() => expect(mockShowSuccess).toHaveBeenCalled());
+    expect(mockShowUndo).not.toHaveBeenCalled();
+  });
+
+  it('puts the hatch back when the release fails', async () => {
+    mockReleaseOne.mockRejectedValue(new Error('nope'));
+    const { result, queryClient } = setup();
+    seedCaches(queryClient, [dispatch({ id: 'd-1', releasedAt: null })]);
+
+    act(() => result.current.release.mutate(dispatch({ id: 'd-1', releasedAt: null })));
+
+    await waitFor(() => expect(mockShowError).toHaveBeenCalled());
+    expect(board(queryClient).dispatches[0].releasedAt).toBeNull();
   });
 });

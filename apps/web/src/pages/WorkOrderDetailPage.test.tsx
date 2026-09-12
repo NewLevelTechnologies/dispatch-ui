@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { renderWithProviders } from '../test/utils';
 import WorkOrderDetailPage from './WorkOrderDetailPage';
 import { apiClient } from '../api/setup';
-import type { RouteObject } from 'react-router-dom';
+import { useLocation, type RouteObject } from 'react-router-dom';
 import type {
   ServiceLocationDetailDto,
   WorkItemResponse,
@@ -109,6 +109,14 @@ const WORK_ITEM: WorkItemResponse = {
   createdAt: '2026-04-21T13:40:00Z',
   updatedAt: '2026-04-21T13:40:00Z',
 };
+
+/** Stand-in for the dispatch board that reports the query it was handed, so a
+ *  back-link can be checked for carrying the date and scope, not just the
+ *  path. */
+function BoardProbe() {
+  const { search } = useLocation();
+  return <div>{`Dispatch Board${search}`}</div>;
+}
 
 describe('WorkOrderDetailPage', () => {
   beforeEach(() => {
@@ -233,6 +241,7 @@ describe('WorkOrderDetailPage', () => {
     const routes: RouteObject[] = [
       { path: '/work-orders/:id', element: <WorkOrderDetailPage /> },
       { path: '/work-orders', element: <div>Work Orders List</div> },
+      { path: '/dispatch', element: <BoardProbe /> },
       { path: '/customers/:id', element: <div>Customer Detail</div> },
       { path: '/service-locations/:id', element: <div>Service Location Detail</div> },
     ];
@@ -243,6 +252,20 @@ describe('WorkOrderDetailPage', () => {
       initialPath: `/work-orders/${id}${search}`,
     });
   };
+
+  // The dispatch board is a place, not a list: a dispatcher who opened a job
+  // from it is mid-triage, so back returns to the day and scope they left
+  // rather than dropping them on the work order list.
+  it('returns to the dispatch board, restoring its date and scope', async () => {
+    const user = userEvent.setup();
+    mockApiResponses();
+    renderPage('wo-1', '?from=dispatch&back=date%3D2026-03-15%26region%3Dr1');
+
+    await user.click(await screen.findByRole('button', { name: /back to the board/i }));
+    expect(
+      await screen.findByText('Dispatch Board?date=2026-03-15&region=r1'),
+    ).toBeInTheDocument();
+  });
 
   it('displays loading state', async () => {
     vi.mocked(apiClient.get).mockImplementation(() => new Promise(() => {}));

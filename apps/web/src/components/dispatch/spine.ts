@@ -49,6 +49,18 @@ export interface SpineProps {
   collapsed: string[];
   onToggleGroup: (key: string) => void;
   onOpenDispatch: (dispatch: BoardDispatch) => void;
+  /**
+   * The work order behind a dispatch, as an href rather than a handler: a
+   * dispatch is a visit and the work order is the job, so reaching it is a
+   * first-class path from every place a dispatch appears — and dispatchers
+   * keep the board loaded behind it with cmd-click and middle-click, which a
+   * JS-only navigation silently removes. Carries the board's own date and
+   * scope so smart-back returns to the board they were looking at.
+   */
+  workOrderHref: (workOrderId: string) => string;
+  /** Right-click on a block, at viewport coordinates. The menu itself is the
+   *  page's, so every spine gets it for free. */
+  onContextDispatch: (dispatch: BoardDispatch, at: { x: number; y: number }) => void;
   axis: BoardAxis;
   /** Fractional hour of "now" in tenant time, or null when the board is not
    *  showing today — a now-line on Thursday's board is a lie. */

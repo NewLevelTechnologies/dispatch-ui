@@ -37,6 +37,7 @@ import { Button } from './catalyst/button';
 import { SlideOver } from './catalyst/slideover';
 import WorkOrderFileUploadDialog from './WorkOrderFileUploadDialog';
 import { FileLightbox } from './WorkOrderFilesTab';
+import DispatchJobSection from './dispatch/DispatchJobSection';
 import { formatPhone, workItemLabel } from '@dispatch/utils';
 import { DISPATCH_PRESENTATION, type PillTone } from '../lib/dispatchStatus';
 
@@ -119,6 +120,20 @@ interface Props {
   onDelete: (dispatch: Dispatch) => void;
   /** Link out from an addressed work item (opens the Work items tab). */
   onViewWorkItems?: () => void;
+  /**
+   * The parent work order, as an href. A dispatch is a VISIT and the work
+   * order is the job, so a caller that reached this drawer from somewhere
+   * other than the job itself — the dispatch board — passes the way back to
+   * it. Omitted where the work order is already on screen, which is why
+   * nothing renders without it.
+   */
+  workOrder?: {
+    number: string | null;
+    href: string;
+    /** Lets the job section count this site's visit history without a
+     *  round-trip through the work order read. */
+    serviceLocationId?: string | null;
+  };
 }
 
 /**
@@ -141,6 +156,7 @@ export default function DispatchDetailDrawer({
   onEdit,
   onDelete,
   onViewWorkItems,
+  workOrder,
 }: Props) {
   return (
     <SlideOver open={dispatch !== null} onClose={onClose} className="!max-w-[480px]">
@@ -154,6 +170,7 @@ export default function DispatchDetailDrawer({
           onEdit={onEdit}
           onDelete={onDelete}
           onViewWorkItems={onViewWorkItems}
+          workOrder={workOrder}
         />
       )}
     </SlideOver>
@@ -169,6 +186,11 @@ interface ContentProps {
   onEdit: (dispatch: Dispatch) => void;
   onDelete: (dispatch: Dispatch) => void;
   onViewWorkItems?: () => void;
+  workOrder?: {
+    number: string | null;
+    href: string;
+    serviceLocationId?: string | null;
+  };
 }
 
 function DispatchDetailContent({
@@ -180,6 +202,7 @@ function DispatchDetailContent({
   onEdit,
   onDelete,
   onViewWorkItems,
+  workOrder,
 }: ContentProps) {
   const { t } = useTranslation();
   const { getName, getAbbrev } = useGlossary();
@@ -405,6 +428,14 @@ function DispatchDetailContent({
           </div>
           <span className="mt-0.5 block text-[12px] text-fg-muted">
             {full.label ? `${full.label} · ${windowStr}` : windowStr}
+            {workOrder && (
+              <>
+                {' · '}
+                <a className="db-wolink font-mono" href={workOrder.href}>
+                  {workOrder.number ?? t('workOrders.detail.title')}
+                </a>
+              </>
+            )}
           </span>
         </div>
         <Button plain onClick={onClose} aria-label={t('common.close')}>
@@ -590,7 +621,7 @@ function DispatchDetailContent({
         />
 
         {/* 6 · Customer notifications — the notification_logs trail */}
-        <Section title={t('workOrders.dispatches.drawer.notifications')} last>
+        <Section title={t('workOrders.dispatches.drawer.notifications')} last={!workOrder}>
           {notifLoading && (
             <div className="text-[12.5px] text-fg-muted">
               {t('workOrders.dispatches.drawer.notificationsLoading')}
@@ -612,10 +643,32 @@ function DispatchDetailContent({
             ))}
           </div>
         </Section>
+
+        {/* 6 · The JOB — the half a dispatch-only drawer cannot answer, and
+            the reason a dispatcher opened this with a customer on the phone.
+            Present only when the caller came from somewhere other than the
+            work order itself. */}
+        {workOrder && (
+          <DispatchJobSection
+            workOrderId={dispatch.workOrderId}
+            workOrderNumber={workOrder.number}
+            href={workOrder.href}
+            serviceLocationId={workOrder.serviceLocationId}
+            currentDispatchId={dispatch.id}
+            currentWindowStart={dispatch.arrivalWindowStart}
+          />
+        )}
       </div>
 
       {/* 7 · State-aware footer */}
       <div className="flex flex-wrap items-center gap-2 border-t border-border-soft bg-bg-elev-2 px-4 py-3">
+        {/* Ahead of the state-aware verbs, and in every state: the job outlives
+            the visit, so a completed or cancelled dispatch still links to it. */}
+        {workOrder && (
+          <a className="db-wolink text-[12px]" href={workOrder.href}>
+            {`${t('dispatchBoard.menu.openWorkOrder', { entity: getName('work_order') })} →`}
+          </a>
+        )}
         {done ? (
           <>
             <span className="text-[11.5px] text-fg-muted">

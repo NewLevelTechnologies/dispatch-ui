@@ -148,6 +148,7 @@ const renderDrawer = (dispatch: Dispatch | null, props: Partial<React.ComponentP
       onEdit={props.onEdit ?? vi.fn()}
       onDelete={props.onDelete ?? vi.fn()}
       onViewWorkItems={props.onViewWorkItems}
+      workOrder={props.workOrder}
     />,
   );
 };
@@ -498,5 +499,48 @@ describe('DispatchDetailDrawer', () => {
     renderDrawer(mockDispatch(), { onClose });
     await user.click(await screen.findByRole('button', { name: /close/i }));
     expect(onClose).toHaveBeenCalledTimes(1);
+  });
+});
+
+// A dispatch is a visit; the work order is the job. A caller that reached this
+// drawer from somewhere other than the job — the dispatch board — hands it the
+// way back, and nothing renders for callers already on the work order.
+describe('DispatchDetailDrawer work order link', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockUserGetAll.mockResolvedValue([mockUser('u1', 'Jason', 'Smith')]);
+    mockGetNotificationLogs.mockResolvedValue(emptyLogsPage);
+    mockFilesList.mockResolvedValue(filesPage([]));
+    mockGetById.mockResolvedValue(mockDispatch());
+    mockNotesList.mockResolvedValue([]);
+  });
+
+  it('renders no work order link when the caller is already on the work order', async () => {
+    renderDrawer(mockDispatch());
+    await screen.findByText('Jason Smith');
+    expect(screen.queryByRole('link', { name: /WO-1/ })).not.toBeInTheDocument();
+  });
+
+  it('links the header number and the footer to the work order', async () => {
+    renderDrawer(mockDispatch(), {
+      workOrder: { number: 'WO-1', href: '/work-orders/wo1?from=dispatch' },
+    });
+
+    const header = await screen.findByRole('link', { name: 'WO-1' });
+    expect(header).toHaveAttribute('href', '/work-orders/wo1?from=dispatch');
+    expect(screen.getByRole('link', { name: /Open Work Order/ })).toHaveAttribute(
+      'href',
+      '/work-orders/wo1?from=dispatch',
+    );
+  });
+
+  // The job outlives the visit, so a completed dispatch still links to it —
+  // that footer is state-aware and the link must not be trapped in one branch.
+  it('keeps the link on a completed visit', async () => {
+    const done = mockDispatch({ status: 'COMPLETED' });
+    renderDrawer(done, {
+      workOrder: { number: 'WO-1', href: '/work-orders/wo1?from=dispatch' },
+    });
+    expect(await screen.findByRole('link', { name: /Open Work Order/ })).toBeInTheDocument();
   });
 });

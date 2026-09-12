@@ -328,6 +328,17 @@ export const dispatchesApi = {
     await apiClient.delete(`/scheduling/dispatches/${id}`);
   },
 
+  // Release one dispatch to its technician: stamps `releasedAt` and sends the
+  // tech notification. Release is the deliberate hand-over, never a side effect
+  // of create or edit — which is why a drag-assign leaves a dispatch on deck.
+  // Idempotent: releasing an already-released dispatch returns the unchanged
+  // timestamp and sends no second notification. The bulk, scope-based sibling
+  // lives on dispatchBoardApi.
+  release: async (id: string): Promise<Dispatch> => {
+    const response = await apiClient.post<Dispatch>(`/scheduling/dispatches/${id}/release`);
+    return response.data;
+  },
+
   // Trigger a dispatch SMS. `audience` picks who: TECH (default — the assigned
   // technician, back-compat), CUSTOMER (their arrival window, respecting the
   // customer's per-type opt-in), or BOTH. Explicit + logged, not a side effect
