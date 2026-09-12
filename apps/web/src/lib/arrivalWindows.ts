@@ -16,6 +16,8 @@
 // 4-hour windows or a 7am start has no way to say so today.
 // ─────────────────────────────────────────────────────────────────────
 
+import { zonedIso } from './zonedTime';
+
 export interface PresetWindow {
   key: string;
   label: string;
@@ -32,12 +34,16 @@ export const PRESET_WINDOWS: readonly PresetWindow[] = [
   { key: '16-18', label: '4:00 – 6:00 PM', startHour: 16, endHour: 18 },
 ] as const;
 
-/** Local wall-clock hour/minute → an ISO instant on `date` (YYYY-MM-DD).
- *  The board only ever sends windows built from a tenant-local calendar date
- *  plus a preset hour, never a raw browser instant. */
-export function toIsoAt(date: string, hour: number): string {
-  const [y, m, d] = date.split('-').map(Number);
-  const h = Math.floor(hour);
-  const min = Math.round((hour - h) * 60);
-  return new Date(y, m - 1, d, h, min, 0, 0).toISOString();
+/**
+ * Wall-clock hour on `date` (YYYY-MM-DD) in the TENANT's zone → an ISO
+ * instant.
+ *
+ * The zone is required, not optional. This used to build the instant in the
+ * browser's zone while the board read the day back in the tenant's, so the
+ * two halves agreed only when those zones happened to match — a window
+ * dragged to "8–10a" from a UTC browser landed at 1am for a Phoenix tenant,
+ * on the previous day's board.
+ */
+export function toIsoAt(date: string, hour: number, timeZone: string): string {
+  return zonedIso(date, hour, timeZone);
 }

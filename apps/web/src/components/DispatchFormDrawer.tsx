@@ -22,6 +22,8 @@ import { SlideOver } from './catalyst/slideover';
 import { Button } from './catalyst/button';
 import { Avatar } from './ui/Avatar';
 import ConfirmDialog from './ConfirmDialog';
+import { useTenantTimeZone } from '../hooks/useTenantTimeZone';
+import { zonedDateOf, zonedHourOf, zonedIso } from '../lib/zonedTime';
 import type { DispatchSeed } from './DispatchDetailDrawer';
 import { workItemLabel } from '@dispatch/utils';
 
@@ -72,13 +74,21 @@ function localDate(d: Date): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
-function toIso(dateStr: string, h: number, m: number): string {
-  const [y, mo, d] = dateStr.split('-').map(Number);
-  return new Date(y, mo - 1, d, h, m, 0, 0).toISOString();
+// Every conversion here runs through the TENANT's zone, not the browser's.
+// An arrival window of "8–10a" means 8am where the truck is going; built from
+// browser-local midnight it lands at whatever hour the offset makes of it,
+// and the board — which reads the day back in the tenant's zone — then draws
+// it on the wrong row.
+function toIso(dateStr: string, h: number, m: number, timeZone: string): string {
+  return zonedIso(dateStr, h + m / 60, timeZone);
 }
 
-function fmtTime(d: Date): string {
-  return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+function fmtTime(hour: number): string {
+  const h = Math.floor(hour);
+  const m = Math.round((hour - h) * 60);
+  const suffix = h >= 12 ? 'PM' : 'AM';
+  const h12 = h % 12 === 0 ? 12 : h % 12;
+  return `${h12}:${pad(m)} ${suffix}`;
 }
 
 // Match an existing window to a preset (or build a "current" option for it).
@@ -86,17 +96,27 @@ function fmtTime(d: Date): string {
 // the board row the grid already holds.
 function windowFromDispatch(
   d: Pick<Dispatch, 'arrivalWindowStart' | 'arrivalWindowEnd'>,
+  timeZone: string,
 ): { date: string; win: Win } {
-  const start = new Date(d.arrivalWindowStart);
-  const end = new Date(d.arrivalWindowEnd);
-  const sh = start.getHours();
-  const sm = start.getMinutes();
-  const eh = end.getHours();
-  const em = end.getMinutes();
+  // Read back through the same zone it was written in, or editing a dispatch
+  // would silently shift its window by the offset every time it was saved.
+  const startHour = zonedHourOf(d.arrivalWindowStart, timeZone) ?? 0;
+  const endHour = zonedHourOf(d.arrivalWindowEnd, timeZone) ?? 0;
+  const sh = Math.floor(startHour);
+  const sm = Math.round((startHour - sh) * 60);
+  const eh = Math.floor(endHour);
+  const em = Math.round((endHour - eh) * 60);
   const preset = PRESETS.find((w) => w.sh === sh && w.sm === sm && w.eh === eh && w.em === em);
   return {
-    date: localDate(start),
-    win: preset ?? { key: 'current', label: `${fmtTime(start)} – ${fmtTime(end)}`, sh, sm, eh, em },
+    date: zonedDateOf(d.arrivalWindowStart, timeZone) ?? localDate(new Date()),
+    win: preset ?? {
+      key: 'current',
+      label: `${fmtTime(startHour)} – ${fmtTime(endHour)}`,
+      sh,
+      sm,
+      eh,
+      em,
+    },
   };
 }
 
@@ -116,6 +136,8 @@ export default function DispatchFormDrawer({
   dispatch,
 }: Props) {
   const { t } = useTranslation();
+  // Windows are tenant-local: "8–10a" means 8am where the truck is going.
+  const timeZone = useTenantTimeZone();
   const { getName, getAbbrev } = useGlossary();
   const queryClient = useQueryClient();
   const editing = !!dispatch;
@@ -134,18 +156,18 @@ export default function DispatchFormDrawer({
   // A non-standard existing window becomes a selectable "current" option.
   const winOptions = useMemo<Win[]>(() => {
     if (editing && dispatch) {
-      const { win } = windowFromDispatch(dispatch);
+      const { win } = windowFromDispatch(dispatch, timeZone);
       if (win.key === 'current') return [win, ...PRESETS];
     }
     return PRESETS;
-  }, [editing, dispatch]);
+  }, [editing, dispatch, timeZone]);
 
   /* eslint-disable react-hooks/set-state-in-effect -- re-seed transient form state on open (same pattern as the other *FormDialog components). */
   useEffect(() => {
     if (!open) return;
     setError(null);
     if (dispatch) {
-      const { date: d, win } = windowFromDispatch(dispatch);
+      const { date: d, win } = windowFromDispatch(dispatch, timeZone);
       setAssignedUserId(dispatch.assignedUserId);
       setDate(d);
       setWinKey(win.key);
@@ -162,7 +184,7 @@ export default function DispatchFormDrawer({
       setRelease('now');
       setNotifyCustomer(true);
     }
-  }, [open, dispatch, workItems]);
+  }, [open, dispatch, workItems, timeZone]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
   // Field workers only. This is a PICKER, so it must offer exactly who can be
@@ -206,8 +228,8 @@ export default function DispatchFormDrawer({
 
   const save = useMutation({
     mutationFn: async () => {
-      const startIso = toIso(date, selectedWin.sh, selectedWin.sm);
-      const endIso = toIso(date, selectedWin.eh, selectedWin.em);
+      const startIso = toIso(date, selectedWin.sh, selectedWin.sm, timeZone);
+      const endIso = toIso(date, selectedWin.eh, selectedWin.em, timeZone);
       // One notification path for both create + edit: an explicit, logged
       // notify by audience (never a create/update side effect). Doing the tech
       // notify via /notify — not the create `notifyAssignedUser` flag — so it

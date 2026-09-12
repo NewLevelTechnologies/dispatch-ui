@@ -29,10 +29,19 @@ import { invalidateDispatchBoard } from '../../utils/invalidateRoleConsumers';
 
 /** Midnight to midnight, so an all-day absence covers the whole day and a
  *  multi-day one is a single row rather than one per day. */
-function allDaySpan(from: string, through: string): { startsAt: string; endsAt: string } {
-  const end = new Date(`${through}T00:00:00`);
-  end.setDate(end.getDate() + 1);
-  return { startsAt: toIsoAt(from, 0), endsAt: toIsoAt(end.toISOString().slice(0, 10), 0) };
+function allDaySpan(
+  from: string,
+  through: string,
+  timeZone: string,
+): { startsAt: string; endsAt: string } {
+  // Half-open: through the 22nd means up to midnight starting the 23rd. Date
+  // arithmetic on the calendar parts, so a DST day is still one day.
+  const [y, m, d] = through.split('-').map(Number);
+  const end = new Date(Date.UTC(y, m - 1, d + 1));
+  return {
+    startsAt: toIsoAt(from, 0, timeZone),
+    endsAt: toIsoAt(end.toISOString().slice(0, 10), 0, timeZone),
+  };
 }
 
 /** "8a–12p" in the TENANT's zone. */
@@ -100,8 +109,8 @@ export default function TimeOffDialog({
     queryFn: () =>
       availabilityApi.list({
         userId: tech!.id,
-        from: toIsoAt(date, 0),
-        to: toIsoAt(date, 24),
+        from: toIsoAt(date, 0, timeZone),
+        to: toIsoAt(date, 24, timeZone),
         size: 20,
       }),
     enabled: tech != null,
@@ -117,10 +126,10 @@ export default function TimeOffDialog({
   const create = useMutation({
     mutationFn: () => {
       const span = allDay
-        ? allDaySpan(from, through)
+        ? allDaySpan(from, through, timeZone)
         : {
-            startsAt: toIsoAt(from, hourOf(startTime)),
-            endsAt: toIsoAt(from, hourOf(endTime)),
+            startsAt: toIsoAt(from, hourOf(startTime), timeZone),
+            endsAt: toIsoAt(from, hourOf(endTime), timeZone),
           };
       return availabilityApi.create({
         userId: tech!.id,
