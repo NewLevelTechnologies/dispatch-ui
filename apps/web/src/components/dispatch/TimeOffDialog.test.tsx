@@ -259,3 +259,30 @@ describe('TimeOffDialog', () => {
     expect(onClose).not.toHaveBeenCalled();
   });
 });
+
+// An absence is tenant-local too: "all day" means midnight to midnight where
+// the technician works, not where the dispatcher's laptop is.
+describe('TimeOffDialog tenant timezone', () => {
+  it('bounds an all-day span by the tenant’s midnight', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(
+      <TimeOffDialog
+        tech={tech}
+        date={DATE}
+        bookedVisits={0}
+        timeZone="America/Phoenix"
+        onClose={vi.fn()}
+      />,
+    );
+
+    await user.type(await screen.findByPlaceholderText('Sick day'), 'Called out');
+    await user.click(screen.getByRole('button', { name: 'Mark time off' }));
+
+    await waitFor(() => expect(mockCreate).toHaveBeenCalled());
+    // Phoenix is UTC-7 year round: midnight on the 18th is 07:00Z.
+    expect(mockCreate.mock.calls[0][0]).toMatchObject({
+      startsAt: '2026-03-18T07:00:00.000Z',
+      endsAt: '2026-03-19T07:00:00.000Z',
+    });
+  });
+});

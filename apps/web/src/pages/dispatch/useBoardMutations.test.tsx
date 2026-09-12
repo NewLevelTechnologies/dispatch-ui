@@ -35,6 +35,9 @@ vi.mock('../../lib/toast', async (importOriginal) => {
 });
 
 const DATE = '2026-03-15';
+// Deliberately NOT the runner's zone: windows are tenant-local, and building
+// them from the browser's clock is the bug these assertions exist to catch.
+const TZ = 'America/Phoenix';
 
 const workOrder: UnscheduledWorkOrder = {
   workOrderId: 'wo-1',
@@ -98,7 +101,7 @@ function setup() {
   const wrapper = ({ children }: { children: ReactNode }) => (
     <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
   );
-  const { result } = renderHook(() => useBoardMutations(DATE), { wrapper });
+  const { result } = renderHook(() => useBoardMutations(DATE, TZ), { wrapper });
   return { result, queryClient };
 }
 
@@ -370,5 +373,49 @@ describe('release', () => {
 
     await waitFor(() => expect(mockShowError).toHaveBeenCalled());
     expect(board(queryClient).dispatches[0].releasedAt).toBeNull();
+  });
+});
+
+// The board reads its day back in the TENANT's zone. If a write builds the
+// instant from the browser's clock instead, the two halves agree only when
+// those zones happen to match — and a window dragged to "8–10a" from a UTC
+// browser lands at 1am for a Phoenix tenant, on the previous day's board.
+//
+// These assertions are absolute instants, so they hold whatever zone the test
+// runner is in — and fail on any runner that is not in Phoenix if the
+// conversion goes back to browser-local.
+describe('tenant timezone', () => {
+  it('writes an assigned window in the tenant’s zone', async () => {
+    const { result, queryClient } = setup();
+    seedCaches(queryClient);
+
+    act(() => result.current.assign.mutate(assignInput));
+
+    await waitFor(() => expect(mockCreate).toHaveBeenCalled());
+    // 10am Phoenix is 17:00Z, year round.
+    expect(mockCreate.mock.calls[0][0]).toMatchObject({
+      arrivalWindowStart: '2026-03-15T17:00:00.000Z',
+      arrivalWindowEnd: '2026-03-15T19:00:00.000Z',
+    });
+  });
+
+  it('writes a moved window in the tenant’s zone', async () => {
+    const { result, queryClient } = setup();
+    seedCaches(queryClient, [dispatch({ id: 'd-1' })]);
+
+    act(() =>
+      result.current.move.mutate({
+        dispatch: dispatch({ id: 'd-1' }),
+        techId: 'u-2',
+        techName: 'Kenji Tran',
+        windowLabel: '10a–12p',
+        window: WINDOW,
+      }),
+    );
+
+    await waitFor(() => expect(mockUpdate).toHaveBeenCalled());
+    expect(mockUpdate.mock.calls[0][1]).toMatchObject({
+      arrivalWindowStart: '2026-03-15T17:00:00.000Z',
+    });
   });
 });

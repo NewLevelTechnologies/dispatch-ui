@@ -79,7 +79,7 @@ function patchBoardCaches(
   });
 }
 
-export function useBoardMutations(date: string) {
+export function useBoardMutations(date: string, timeZone: string) {
   const { t } = useTranslation();
   const { getName } = useGlossary();
   const queryClient = useQueryClient();
@@ -123,8 +123,8 @@ export function useBoardMutations(date: string) {
       dispatchesApi.create({
         workOrderId: input.workOrder.workOrderId,
         assignedUserId: input.techId,
-        arrivalWindowStart: toIsoAt(date, input.window.startHour),
-        arrivalWindowEnd: toIsoAt(date, input.window.endHour),
+        arrivalWindowStart: toIsoAt(date, input.window.startHour, timeZone),
+        arrivalWindowEnd: toIsoAt(date, input.window.endHour, timeZone),
         // Drag-assign creates ON DECK. Dispatchers stage the morning and
         // release together, so handing the tech their day is a separate,
         // deliberate act — never a side effect of scheduling.
@@ -149,8 +149,8 @@ export function useBoardMutations(date: string) {
         recurring: input.workOrder.recurring,
         serviceLocationId: input.workOrder.serviceLocationId,
         assignedUserId: input.techId,
-        arrivalWindowStart: toIsoAt(date, input.window.startHour),
-        arrivalWindowEnd: toIsoAt(date, input.window.endHour),
+        arrivalWindowStart: toIsoAt(date, input.window.startHour, timeZone),
+        arrivalWindowEnd: toIsoAt(date, input.window.endHour, timeZone),
       } as BoardDispatch;
 
       patchBoardCaches(queryClient, {
@@ -196,8 +196,8 @@ export function useBoardMutations(date: string) {
     }) =>
       dispatchesApi.update(input.dispatch.id, {
         assignedUserId: input.techId,
-        arrivalWindowStart: toIsoAt(date, input.window.startHour),
-        arrivalWindowEnd: toIsoAt(date, input.window.endHour),
+        arrivalWindowStart: toIsoAt(date, input.window.startHour, timeZone),
+        arrivalWindowEnd: toIsoAt(date, input.window.endHour, timeZone),
         // Always sent: omitting it turns off stale-read detection, and a
         // board someone has been staring at for ten minutes is exactly the
         // case that produces one.
@@ -214,8 +214,8 @@ export function useBoardMutations(date: string) {
               ? {
                   ...d,
                   assignedUserId: input.techId,
-                  arrivalWindowStart: toIsoAt(date, input.window.startHour),
-                  arrivalWindowEnd: toIsoAt(date, input.window.endHour),
+                  arrivalWindowStart: toIsoAt(date, input.window.startHour, timeZone),
+                  arrivalWindowEnd: toIsoAt(date, input.window.endHour, timeZone),
                 }
               : d,
           ),

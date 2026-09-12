@@ -9,6 +9,7 @@ const mockGetFieldWorkers = vi.fn();
 const mockCreate = vi.fn();
 const mockUpdate = vi.fn();
 const mockNotify = vi.fn();
+const mockTenantSettings = vi.fn();
 
 vi.mock('@dispatch/api/src/userApi', () => ({
   userApi: {
@@ -20,6 +21,16 @@ vi.mock('@dispatch/api/src/userApi', () => ({
     getFieldWorkers: (...args: unknown[]) => mockGetFieldWorkers(...args),
   },
 }));
+
+vi.mock('@dispatch/api/src/tenantSettingsApi', async () => {
+  const actual = await vi.importActual<typeof import('@dispatch/api/src/tenantSettingsApi')>(
+    '@dispatch/api/src/tenantSettingsApi',
+  );
+  return {
+    ...actual,
+    tenantSettingsApi: { ...actual.tenantSettingsApi, getSettings: () => mockTenantSettings() },
+  };
+});
 
 vi.mock('@dispatch/api/src/schedulingApi', async () => {
   const actual = await vi.importActual<typeof import('../api/setup')>('@dispatch/api/src/schedulingApi');
@@ -92,6 +103,7 @@ describe('DispatchFormDrawer', () => {
       tech('u-1', 'Daniel', 'Park'),
       tech('u-2', 'Marcus', 'Lee'),
     ]);
+    mockTenantSettings.mockResolvedValue({ timezone: 'America/Phoenix' });
     mockCreate.mockResolvedValue(editDispatch);
     mockUpdate.mockResolvedValue(editDispatch);
     mockNotify.mockResolvedValue(undefined);
@@ -275,5 +287,41 @@ describe('DispatchFormDrawer concurrency', () => {
     await u.click(screen.getAllByRole('button', { name: /save|schedule/i })[0]);
 
     expect(await screen.findByText(/Someone else changed this/)).toBeInTheDocument();
+  });
+});
+
+// An arrival window is tenant-local: "9–11a" means 9am where the truck is
+// going. Read back through the browser's clock instead, editing a dispatch
+// silently shifts its window by the offset every time it is saved — and a
+// preset window stops matching its own preset.
+describe('DispatchFormDrawer tenant timezone', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockUserGetAll.mockResolvedValue([tech('u-1', 'Daniel', 'Park')]);
+    mockGetFieldWorkers.mockResolvedValue([tech('u-1', 'Daniel', 'Park')]);
+    mockTenantSettings.mockResolvedValue({ timezone: 'America/Phoenix' });
+    mockUpdate.mockResolvedValue(editDispatch);
+  });
+
+  // 16:00Z is 9am in Phoenix, which IS a preset. Read in any other zone it is
+  // some other hour, and the drawer would offer a synthetic "current" window
+  // instead of the preset the dispatcher actually booked.
+  it('matches an existing window to its preset in the tenant’s zone', async () => {
+    render({ dispatch: editDispatch });
+    expect(await screen.findByDisplayValue('9:00 – 11:00 AM')).toBeInTheDocument();
+  });
+
+  it('writes the window back unchanged when nothing is edited', async () => {
+    const user = userEvent.setup();
+    render({ dispatch: editDispatch });
+
+    await screen.findByDisplayValue('9:00 – 11:00 AM');
+    await user.click(screen.getByRole('button', { name: /save|update/i }));
+
+    await waitFor(() => expect(mockUpdate).toHaveBeenCalled());
+    expect(mockUpdate.mock.calls[0][1]).toMatchObject({
+      arrivalWindowStart: '2026-05-18T16:00:00.000Z',
+      arrivalWindowEnd: '2026-05-18T18:00:00.000Z',
+    });
   });
 });
