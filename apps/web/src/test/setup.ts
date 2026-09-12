@@ -347,6 +347,8 @@ vi.mock('react-i18next', () => {
     'dispatchBoard.week.cellLabel': '{{name}}, {{day}} \u2014 {{count}} {{entity}}',
     'dispatchBoard.rail.emptyTitle': 'Nothing unscheduled',
     'dispatchBoard.rail.heading': 'Unscheduled',
+    'dispatchBoard.rail.nearest': 'Nearest',
+    'dispatchBoard.rail.nearestDistance': '{{miles}} mi \u00b7 {{at}}',
     'dispatchBoard.rail.openWorkOrder': 'Open {{number}}',
     'dispatchBoard.release.action': 'Release {{count}}',
     'dispatchBoard.release.confirmAction': 'Release',

@@ -19,10 +19,15 @@ import { draggable } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
 import type { UnscheduledWorkOrder } from '../../api/setup';
 import { Pill } from '../ui/Pill';
 import { formatAge } from '../../lib/boardTime';
+import { formatMiles, type NearestStop } from '../../lib/nearestStop';
 
-/** Priority drives the card's left rail. The enum is LOW | NORMAL | HIGH |
- *  URGENT and there is no EMERGENCY — a tenant that calls its top tier
- *  "emergency" says so with a tag, which the card does not render here. */
+/** Priority drives the card's left rail, and ONLY when it means something:
+ *  URGENT and HIGH get a tone, NORMAL and LOW get nothing. A coloured bar on
+ *  every card flattens the one distinction that has to be instant.
+ *
+ *  The enum is LOW | NORMAL | HIGH | URGENT and there is no EMERGENCY — a
+ *  tenant that calls its top tier "emergency" says so with a tag, which the
+ *  card does not render here. */
 const PRIORITY_CLASS: Record<string, string> = {
   URGENT: 'urgent',
   HIGH: 'high',
@@ -32,12 +37,18 @@ export default function UnscheduledRailCard({
   workOrder,
   regionName,
   divisionName,
+  nearest,
   workOrderHref,
   onOpen,
 }: {
   workOrder: UnscheduledWorkOrder;
+  /** Already guarded by the caller: null unless board scope is "all regions".
+   *  Printing one region on all eleven cards is noise. */
   regionName: string | null;
   divisionName: string | null;
+  /** Who is already going near this site today. Absent when nothing is
+   *  booked nearby, or when the location never geocoded. */
+  nearest?: NearestStop;
   workOrderHref: (workOrderId: string) => string;
   onOpen: (workOrder: UnscheduledWorkOrder) => void;
 }) {
@@ -63,7 +74,22 @@ export default function UnscheduledRailCard({
   // while the work-order cache catches up.
   const title = workOrder.workOrderSummary || workOrder.workOrderNumber;
 
-  const meta = [divisionName, regionName].filter(Boolean).join(' · ');
+  // City, not street address. An address only routes for a dispatcher holding
+  // a mental map of the metro — it survives neither a new hire nor a 262px
+  // rail — and it answers "where is the job" rather than "who is already
+  // going near it". The street address lives in the composer, where the
+  // decision has already been made.
+  //
+  // Region is dropped when it repeats the city, which tenant region names
+  // frequently do (Phoenix, Tucson): "HVAC · Phoenix · Phoenix" burns a slot
+  // to say one word twice.
+  const meta = [
+    divisionName,
+    workOrder.serviceLocationCity,
+    regionName && regionName !== workOrder.serviceLocationCity ? regionName : null,
+  ]
+    .filter(Boolean)
+    .join(' · ');
 
   return (
     <div
@@ -111,8 +137,12 @@ export default function UnscheduledRailCard({
       <div className="db-wo-title">{title}</div>
       {workOrder.customerName && <div className="db-wo-sub">{workOrder.customerName}</div>}
 
+      {/* The context block. Separated from the identity above by SPACE, never
+          a rule: an internal divider reads at the same weight as the card
+          separator and turns the rail into continuous stripes with no
+          findable card edge. */}
       {(meta || workOrder.itemCount > 1) && (
-        <div className="mt-1 flex items-center gap-1.5">
+        <div className="mt-2 flex items-center gap-1.5">
           {meta && <span className="text-[10.5px] text-fg-muted">{meta}</span>}
           <span className="grow" />
           {/* Only worth saying when it implies more than one visit might be
@@ -122,6 +152,30 @@ export default function UnscheduledRailCard({
               {t('dispatchBoard.rail.itemCount', { count: workOrder.itemCount })}
             </span>
           )}
+        </div>
+      )}
+
+      {/* The routing signal: who is ALREADY going to be near this today. A
+          fact for comparison, never a recommendation — it names one stop and
+          ranks nothing, because auto-assign is out of scope and this must not
+          imply it. */}
+      {nearest && (
+        <div className="db-wo-near">
+          <span className="db-near-icon">{'◉'}</span>
+          <span className="db-near-who grow">
+            {t('dispatchBoard.rail.nearest')}
+            {' · '}
+            <b>{nearest.techName}</b>
+          </span>
+          {/* The distance never truncates; the label absorbs all the width
+              pressure. Otherwise a longer first name wraps and that one card
+              grows taller than its siblings. */}
+          <span className="font-mono">
+            {t('dispatchBoard.rail.nearestDistance', {
+              miles: formatMiles(nearest.miles),
+              at: nearest.at,
+            })}
+          </span>
         </div>
       )}
     </div>

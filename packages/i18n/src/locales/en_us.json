@@ -2971,14 +2971,16 @@
       "unschedule": "Unschedule"
     },
     "rail": {
-      "heading": "Unscheduled",
-      "emptyTitle": "Nothing unscheduled",
       "emptyBody": "The whole board is assigned.",
-      "urgent": "Urgent",
-      "recurring": "Agreement / recurring work",
+      "emptyTitle": "Nothing unscheduled",
+      "heading": "Unscheduled",
       "itemCount_one": "{{count}} item",
       "itemCount_other": "{{count}} items",
-      "openWorkOrder": "Open {{number}}"
+      "nearest": "Nearest",
+      "nearestDistance": "{{miles}} mi · {{at}}",
+      "openWorkOrder": "Open {{number}}",
+      "recurring": "Agreement / recurring work",
+      "urgent": "Urgent"
     },
     "release": {
       "action_one": "Release {{count}}",

@@ -53,6 +53,7 @@ import {
 } from '../components/dispatch/spine';
 import { buildAxis, formatWindow, zonedDate, zonedHour } from '../lib/boardTime';
 import { buildGroups, foldEmptyRows } from '../lib/boardGroups';
+import { nearestStops } from '../lib/nearestStop';
 import { withBackContext } from '../lib/backContext';
 import { movedWindow } from '../lib/boardDrop';
 import { useBoardMutations } from './dispatch/useBoardMutations';
@@ -421,6 +422,19 @@ export default function DispatchBoardPage() {
   const activeTechs = isWeek ? weekTechs : techs;
   const shownTechs = isWeek ? weekRows.shown : day.shown;
   const foldableCount = isWeek ? weekRows.foldable : day.foldable;
+
+  // Scope-bound by design: only technicians actually rendered are considered,
+  // so narrowing to one region legitimately changes the answer. Recomputed on
+  // any change to the queue, the visible techs or their stops — assigning one
+  // job updates the hint on every other card.
+  //
+  // Self-hiding all the way down: no coordinates, nothing booked yet, or the
+  // week's aggregate read (which carries no stops at all) each yield an empty
+  // map and a card with no line, which is the honest rendering.
+  const nearest = useMemo(
+    () => (isWeek ? {} : nearestStops(railItems, day.shown, allDispatches, timeZone)),
+    [isWeek, railItems, day.shown, allDispatches, timeZone],
+  );
 
   const regionName = (id: string | null) =>
     id ? (regions.find((r) => r.id === id)?.name ?? null) : null;
@@ -972,7 +986,10 @@ export default function DispatchBoardPage() {
                   <UnscheduledRailCard
                     key={wo.workOrderId}
                     workOrder={wo}
-                    regionName={regionName(wo.dispatchRegionId)}
+                    // Only when board scope is "all regions": printing one
+                    // region on every card in a filtered board is noise.
+                    regionName={regionId ? null : regionName(wo.dispatchRegionId)}
+                    nearest={nearest[wo.workOrderId]}
                     divisionName={
                       divisions.find((d) => d.id === wo.divisionId)?.name ?? null
                     }
