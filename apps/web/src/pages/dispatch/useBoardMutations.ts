@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────────────
-// The board's writes: assign from the rail, move a block.
+// The board's writes: assign from the rail, move a block, release a visit.
 //
 // Both commit IMMEDIATELY — no confirm, no modal. The safety net is Undo,
 // and Undo is a real inverse mutation rather than a UI illusion: a create is
@@ -9,6 +9,7 @@
 // ─────────────────────────────────────────────────────────────────────
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from '@dispatch/i18n';
+import { useGlossary } from '../../contexts/GlossaryContext';
 import {
   dispatchesApi,
   type BoardDispatch,
@@ -80,6 +81,7 @@ function patchBoardCaches(
 
 export function useBoardMutations(date: string) {
   const { t } = useTranslation();
+  const { getName } = useGlossary();
   const queryClient = useQueryClient();
 
   // A dispatch write reaches the work order too — its visit list, progress
@@ -319,10 +321,52 @@ export function useBoardMutations(date: string) {
     onSettled: refresh,
   });
 
+  /**
+   * Release ONE dispatch — the right-click verb, and the single-visit sibling
+   * of the band-1 bulk release.
+   *
+   * No Undo here, unlike every other board write: release texts the
+   * technician and there is no un-send, so the inverse this toast would
+   * promise does not exist. The server is idempotent, so a double-click
+   * cannot double-notify.
+   */
+  const release = useMutation({
+    mutationFn: (dispatch: BoardDispatch) => dispatchesApi.release(dispatch.id),
+    onMutate: async (dispatch) => {
+      await queryClient.cancelQueries({ queryKey: ['dispatch-board'] });
+      const snapshot = queryClient.getQueriesData({ queryKey: ['dispatch-board'] });
+      // The hatch clears on the click, not on the round-trip: release is the
+      // one board write whose whole point is a change of appearance.
+      const releasedAt = new Date().toISOString();
+      patchBoardCaches(queryClient, {
+        grid: (board) => ({
+          ...board,
+          dispatches: board.dispatches.map((d) =>
+            d.id === dispatch.id ? { ...d, releasedAt } : d,
+          ),
+        }),
+      });
+      return { snapshot };
+    },
+    onSuccess: (_result, dispatch) => {
+      const workOrder = dispatch.workOrderNumber ?? dispatch.workOrderSummary ?? '';
+      showSuccess(
+        t('dispatchBoard.release.one', { workOrder, tech: getName('technician') }),
+      );
+    },
+    onError: (err, _dispatch, context) => {
+      restore(context?.snapshot);
+      reportFailure(t('dispatchBoard.release.oneFailed', { entity: getName('dispatch') }))(err);
+    },
+    onSettled: refresh,
+  });
+
   return {
     assign,
     move,
     unschedule,
-    pending: assign.isPending || move.isPending || unschedule.isPending,
+    release,
+    pending:
+      assign.isPending || move.isPending || unschedule.isPending || release.isPending,
   };
 }

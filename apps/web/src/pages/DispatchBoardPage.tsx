@@ -23,7 +23,6 @@ import {
   type BoardDispatch,
   type BoardTech,
   type UnscheduledWorkOrder,
-  type Dispatch,
 } from '../api/setup';
 import { useGlossary } from '../contexts/GlossaryContext';
 import AppLayout from '../components/AppLayout';
@@ -39,9 +38,10 @@ import { Pill } from '../components/ui/Pill';
 import { autoScrollForElements } from '@atlaskit/pragmatic-drag-and-drop-auto-scroll/element';
 import { dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
 import ConfirmDialog from '../components/ConfirmDialog';
-import DispatchDetailDrawer from '../components/DispatchDetailDrawer';
+import DispatchDetailDrawer, { type DispatchSeed } from '../components/DispatchDetailDrawer';
 import DispatchFormDrawer from '../components/DispatchFormDrawer';
 import DispatchTimeline from '../components/dispatch/DispatchTimeline';
+import BlockContextMenu, { type BlockMenu } from '../components/dispatch/BlockContextMenu';
 import UnscheduledRailCard from '../components/dispatch/UnscheduledRailCard';
 import {
   DENSITY_METRICS,
@@ -50,6 +50,7 @@ import {
   type Density,
 } from '../components/dispatch/spine';
 import { buildAxis, formatWindow, zonedDate, zonedHour } from '../lib/boardTime';
+import { withBackContext } from '../lib/backContext';
 import { movedWindow } from '../lib/boardDrop';
 import { useBoardMutations } from './dispatch/useBoardMutations';
 import { extractApiError, showError, showSuccess } from '../lib/toast';
@@ -119,9 +120,10 @@ export default function DispatchBoardPage() {
   const [collapsed, setCollapsed] = useState<string[]>([]);
   const [exceptions, setExceptions] = useState<ExceptionId[]>([]);
   const [openDispatch, setOpenDispatch] = useState<BoardDispatch | null>(null);
+  const [menu, setMenu] = useState<BlockMenu | null>(null);
   const [composeFor, setComposeFor] = useState<UnscheduledWorkOrder | null>(null);
   const [confirmRelease, setConfirmRelease] = useState(false);
-  const [editDispatch, setEditDispatch] = useState<Dispatch | null>(null);
+  const [editDispatch, setEditDispatch] = useState<DispatchSeed | null>(null);
 
   // A working day is wider than any viewport at 78px/hour, so dragging toward
   // a late-afternoon lane means dragging off-screen. Auto-scroll is the one
@@ -419,17 +421,27 @@ export default function DispatchBoardPage() {
   // Bulk release takes a SCOPE, not an id list: the server recomputes the
   // unreleased set, so this can neither reach outside the caller's regions
   // nor act on a board rendered ten minutes ago.
-  const { assign, move, unschedule } = useBoardMutations(date);
+  const { assign, move, unschedule, release } = useBoardMutations(date);
 
-  // Smart back: carry the board's date and scope so returning lands on the
-  // board the dispatcher was actually looking at, not a reset one.
+  // A dispatch is a visit; the work order is the job — and "what is actually
+  // happening with this job" is a question the board gets constantly, usually
+  // with a customer on the phone. So the work order is one action away from
+  // every place a dispatch appears, and always as a real href: cmd-click and
+  // middle-click are how a dispatcher reads a job with the board still loaded
+  // behind it, and a click handler silently takes that away.
+  //
+  // Smart back rides along in the house `?from=&back=` shape, carrying the
+  // board's own query — date and scope — so returning lands on the board they
+  // were actually looking at rather than a reset one.
+  const workOrderHref = useCallback(
+    (workOrderId: string) =>
+      withBackContext(`/work-orders/${workOrderId}`, 'dispatch', searchParams.toString()),
+    [searchParams],
+  );
+
   const goToWorkOrder = useCallback(
-    (workOrderId: string) => {
-      const params = new URLSearchParams({ from: 'dispatch', date });
-      if (regionId) params.set('region', regionId);
-      navigate(`/work-orders/${workOrderId}?${params}`);
-    },
-    [navigate, date, regionId],
+    (workOrderId: string) => navigate(workOrderHref(workOrderId)),
+    [navigate, workOrderHref],
   );
 
   // The spine hands back a tech, an already-resolved window, and whatever the
@@ -593,6 +605,8 @@ export default function DispatchBoardPage() {
           )
         }
         onOpenDispatch={setOpenDispatch}
+        workOrderHref={workOrderHref}
+        onContextDispatch={(dispatch, at) => setMenu({ dispatch, ...at })}
         axis={axis}
         nowHour={nowHour}
           capacityStops={board?.defaultStopsPerDay ?? null}
@@ -813,6 +827,7 @@ export default function DispatchBoardPage() {
                     divisionName={
                       divisions.find((d) => d.id === wo.divisionId)?.name ?? null
                     }
+                    workOrderHref={workOrderHref}
                     onOpen={setComposeFor}
                   />
                 ))
@@ -863,6 +878,19 @@ export default function DispatchBoardPage() {
         locationName={composeFor?.customerName}
       />
 
+      {/* Right-click is the fast path on a board: it reaches the work order —
+          the one thing the dispatch drawer cannot give a dispatcher — and the
+          common verbs, without a drawer round-trip. */}
+      <BlockContextMenu
+        menu={menu}
+        workOrderHref={workOrderHref}
+        onClose={() => setMenu(null)}
+        onOpenDetail={setOpenDispatch}
+        onRelease={(d) => release.mutate(d)}
+        onReassign={setEditDispatch}
+        onUnschedule={(d) => unschedule.mutate(d)}
+      />
+
       {/* The board owns no detail surface — it opens the existing drawer,
           now with its write paths live. Undo on the toast only lasts a few
           seconds, so this is where unassigning actually lives: Cancel keeps
@@ -887,6 +915,17 @@ export default function DispatchBoardPage() {
         onViewWorkItems={() => {
           if (openDispatch) goToWorkOrder(openDispatch.workOrderId);
         }}
+        // The drawer is a visit; the board reached it from somewhere other
+        // than the job, so it carries the way back to the job.
+        workOrder={
+          openDispatch
+            ? {
+                number: openDispatch.workOrderNumber,
+                href: workOrderHref(openDispatch.workOrderId),
+                serviceLocationId: openDispatch.serviceLocationId,
+              }
+            : undefined
+        }
       />
     </AppLayout>
   );

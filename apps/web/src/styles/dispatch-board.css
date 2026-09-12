@@ -353,10 +353,13 @@
 
 /* ── Blocks — the window is the box, the estimate is the fill ──── */
 
-/* A real <button>: the handoff requires a keyboard path to the drawer, and
-   drag-and-drop alone is not an accessible assignment mechanism. `font` and
-   `text-align` are reset because buttons don't inherit either, and this
-   stylesheet is unlayered so UA defaults would otherwise leak through. */
+/* A real <a href> to the work order: cmd-click and middle-click open the job
+   in a new tab with the board still loaded behind it, which a click handler
+   silently takes away. A plain click is intercepted for the drawer. It is also
+   the keyboard path — Enter on a focused block fires that same click — because
+   drag-and-drop alone is not an accessible assignment mechanism. `font`,
+   `text-align` and `color` are reset because anchors don't inherit them, and
+   this stylesheet is unlayered so UA defaults would otherwise leak through. */
 .db-block {
   position: absolute;
   top: 4px;
@@ -377,6 +380,8 @@
   box-shadow: var(--shadow-sm);
   font: inherit;
   text-align: left;
+  color: inherit;
+  text-decoration: none;
 }
 
 .db-block:focus-visible {
@@ -653,8 +658,11 @@
   text-overflow: ellipsis;
 }
 
-/* The rail card is a <button>: clicking it is the board's only path into the
-   composer, and it must be keyboard-reachable like the timeline blocks. */
+/* The rail card acts as a button — clicking it is the board's only path into
+   the composer, and it must be keyboard-reachable like the timeline blocks —
+   but it cannot BE one, because it carries a link to the work order and an
+   anchor inside a button is neither valid nor operable. Hence role/tabindex
+   and an explicit Enter/Space handler. */
 .db-wo {
   display: block;
   width: 100%;
@@ -680,4 +688,111 @@
 .db-rail.over {
   background: color-mix(in oklch, var(--accent-500) 8%, var(--bg-elev));
   box-shadow: inset 0 0 0 2px color-mix(in oklch, var(--accent-500) 40%, transparent);
+}
+
+/* ── Reaching the work order ──────────────────────────────────────
+
+   A dispatch is a visit; the work order is the job — and "what is actually
+   happening with this job" is a question the board gets constantly, usually
+   with a customer on the phone. So the parent record is one action away from
+   every place a dispatch appears, and always as a real link. */
+
+.db-wolink {
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--fg-accent);
+  text-decoration: none;
+}
+
+.db-wolink:hover {
+  text-decoration: underline;
+}
+
+/* Right-click menu on a block. Right-click is the fast path on a board:
+   scheduling tools have taught dispatchers to try it, it costs no screen
+   space, and it hosts the other verbs without a drawer round-trip. */
+.db-ctx {
+  position: fixed;
+  z-index: 95;
+  min-width: 196px;
+  padding: 4px;
+  background: var(--bg-elev);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-lg);
+}
+
+.db-ctx-head {
+  padding: 6px 9px 7px;
+  font-size: 10.5px;
+  color: var(--fg-muted);
+  border-bottom: 1px solid var(--border-soft);
+  margin-bottom: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.db-ctx-item {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  text-align: left;
+  padding: 6px 9px;
+  border: none;
+  background: none;
+  font-family: inherit;
+  font-size: 12px;
+  color: var(--fg-strong);
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.db-ctx-item:hover,
+.db-ctx-item:focus-visible {
+  background: var(--bg-hover);
+  outline: none;
+}
+
+.db-ctx-sep {
+  height: 1px;
+  background: var(--border-soft);
+  margin: 4px 0;
+}
+
+/* The seam in the dispatch drawer where it stops describing the VISIT and
+   starts describing the JOB. A tinted band rather than another plain section
+   heading, because the change of subject is the point. */
+.db-jobhead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 16px;
+  background: var(--bg-active);
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border-soft);
+}
+
+/* One sibling visit on the same job. Read-only — the visit is usually on
+   another day, so "go there" means the work order. */
+.db-visit {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 5px 7px;
+  border-radius: var(--r-sm);
+  text-align: left;
+}
+
+.db-visit.current {
+  background: var(--bg-active);
+}
+
+.db-visit-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
 }

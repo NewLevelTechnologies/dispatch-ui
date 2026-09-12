@@ -8,6 +8,10 @@
 // standalone "Schedule dispatch" button — the rail is already a better work
 // order picker than a modal search would be, being scoped, sorted by
 // priority then age, and on screen.
+//
+// The work-order NUMBER is a link out to the job itself. Scheduling it and
+// reading it are different intents, so they get different targets: the card
+// body composes, the number navigates.
 // ─────────────────────────────────────────────────────────────────────
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from '@dispatch/i18n';
@@ -28,15 +32,17 @@ export default function UnscheduledRailCard({
   workOrder,
   regionName,
   divisionName,
+  workOrderHref,
   onOpen,
 }: {
   workOrder: UnscheduledWorkOrder;
   regionName: string | null;
   divisionName: string | null;
+  workOrderHref: (workOrderId: string) => string;
   onOpen: (workOrder: UnscheduledWorkOrder) => void;
 }) {
   const { t } = useTranslation();
-  const ref = useRef<HTMLButtonElement>(null);
+  const ref = useRef<HTMLDivElement>(null);
   const [dragging, setDragging] = useState(false);
   const age = formatAge(workOrder.createdAt);
 
@@ -60,16 +66,30 @@ export default function UnscheduledRailCard({
   const meta = [divisionName, regionName].filter(Boolean).join(' · ');
 
   return (
-    <button
+    <div
       ref={ref}
-      type="button"
+      role="button"
+      tabIndex={0}
       className={`db-wo ${PRIORITY_CLASS[workOrder.priority] ?? ''}${dragging ? ' dragging' : ''}`.trim()}
       onClick={() => onOpen(workOrder)}
+      onKeyDown={(e) => {
+        if (e.key !== 'Enter' && e.key !== ' ') return;
+        e.preventDefault();
+        onOpen(workOrder);
+      }}
     >
       <div className="flex items-center gap-1.5">
-        <span className="font-mono text-[10.5px] font-semibold text-fg-strong">
+        {/* stopPropagation, so the number opens the job while the card around
+            it still opens the composer. */}
+        <a
+          className="db-wolink font-mono"
+          href={workOrderHref(workOrder.workOrderId)}
+          onClick={(e) => e.stopPropagation()}
+          onKeyDown={(e) => e.stopPropagation()}
+          title={t('dispatchBoard.rail.openWorkOrder', { number: workOrder.workOrderNumber })}
+        >
           {workOrder.workOrderNumber}
-        </span>
+        </a>
         {workOrder.priority === 'URGENT' && (
           <Pill tone="danger" dot>
             {t('dispatchBoard.rail.urgent')}
@@ -104,6 +124,6 @@ export default function UnscheduledRailCard({
           )}
         </div>
       )}
-    </button>
+    </div>
   );
 }

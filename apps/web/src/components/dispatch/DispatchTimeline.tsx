@@ -166,6 +166,8 @@ function Block({
   clash,
   half,
   onOpen,
+  workOrderHref,
+  onContext,
 }: {
   dispatch: BoardDispatch;
   window: Window;
@@ -174,9 +176,12 @@ function Block({
   clash: boolean;
   half: 'upper' | 'lower' | null;
   onOpen: (dispatch: BoardDispatch) => void;
+  workOrderHref: SpineProps['workOrderHref'];
+  onContext: SpineProps['onContextDispatch'];
 }) {
   const { t } = useTranslation();
-  const ref = useRef<HTMLButtonElement>(null);
+  const { getName } = useGlossary();
+  const ref = useRef<HTMLAnchorElement>(null);
   const [dragging, setDragging] = useState(false);
 
   useEffect(() => {
@@ -224,13 +229,36 @@ function Block({
   const title = dispatch.workOrderSummary ?? dispatch.workOrderNumber ?? '';
 
   return (
-    <button
+    // The block IS a link to its work order, so cmd-click and middle-click get
+    // native new-tab behaviour — that is how a dispatcher reads a job without
+    // losing the board. A plain click is intercepted for the drawer, which is
+    // also what Enter does on a focused block. Dragging is unaffected: the
+    // drag source attaches its own payload.
+    <a
       ref={ref}
-      type="button"
+      href={workOrderHref(dispatch.workOrderId)}
       className={dragging ? `${className} dragging` : className}
       style={{ left: `${left}%`, width: `${width}%` }}
-      onClick={() => onOpen(dispatch)}
-      title={[title, dispatch.customerName, windowLabel].filter(Boolean).join(' · ')}
+      onClick={(e) => {
+        if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+        e.preventDefault();
+        onOpen(dispatch);
+      }}
+      onContextMenu={(e) => {
+        e.preventDefault();
+        // Shift-F10 and the menu key fire this too, with no pointer behind it
+        // — anchor to the block itself rather than the top-left of the screen.
+        const rect = e.currentTarget.getBoundingClientRect();
+        const keyboard = e.clientX === 0 && e.clientY === 0;
+        onContext(dispatch, {
+          x: keyboard ? rect.left : e.clientX,
+          y: keyboard ? rect.bottom : e.clientY,
+        });
+      }}
+      title={[
+        [title, dispatch.customerName, windowLabel].filter(Boolean).join(' · '),
+        t('dispatchBoard.grid.blockHint', { entity: getName('work_order') }),
+      ].join('\n')}
     >
       {fillPct != null && <span className="db-fill" style={{ width: `${fillPct}%` }} />}
       <span className="db-block-t">
@@ -252,7 +280,7 @@ function Block({
             : ` · ${t('dispatchBoard.grid.noEstimate')}`}
         </span>
       )}
-    </button>
+    </a>
   );
 }
 
@@ -329,6 +357,8 @@ export default function DispatchTimeline({
   collapsed,
   onToggleGroup,
   onOpenDispatch,
+  workOrderHref,
+  onContextDispatch,
   axis,
   nowHour,
   capacityStops,
@@ -454,6 +484,8 @@ export default function DispatchTimeline({
                   clash={clash}
                   half={half}
                   onOpen={onOpenDispatch}
+                  workOrderHref={workOrderHref}
+                  onContext={onContextDispatch}
                 />
               </div>
             );

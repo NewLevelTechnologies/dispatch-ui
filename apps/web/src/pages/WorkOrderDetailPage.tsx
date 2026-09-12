@@ -29,6 +29,7 @@ import { useGlossary } from '../contexts/GlossaryContext';
 import ActivityButton from '../components/ActivityButton';
 import ActivityDrawer from '../components/ActivityDrawer';
 import ActivityStream from '../components/ActivityStream';
+import { resolveBack } from '../lib/backContext';
 import AppLayout from '../components/AppLayout';
 import ConfirmDialog from '../components/ConfirmDialog';
 import DispatchFormDrawer from '../components/DispatchFormDrawer';
@@ -145,6 +146,27 @@ export default function WorkOrderDetailPage() {
   const fromPurchasing = searchParams.get('from') === 'purchasing';
   const { t } = useTranslation();
   const { getName } = useGlossary();
+
+  // Where "back" goes. The dispatch board is a place, not a list, and a
+  // dispatcher who opened a job from it is mid-triage — dropping them on the
+  // Work Orders list loses the date and scope they were working. `back`
+  // carries the board's own query, so they land on the board they left.
+  const back =
+    searchParams.get('from') === 'dispatch'
+      ? {
+          href: resolveBack('/dispatch', searchParams.get('back')),
+          label: t('common.actions.backTo', { entities: t('dispatchBoard.backTarget') }),
+        }
+      : fromPurchasing
+        ? {
+            href: '/purchasing',
+            label: t('common.actions.backTo', { entities: t('entities.purchasing') }),
+          }
+        : {
+            href: '/work-orders',
+            label: t('common.actions.backTo', { entities: getName('work_order', true) }),
+          };
+
   const [copied, setCopied] = useState<'phone' | 'address' | null>(null);
   const [activityDrawerOpen, setActivityDrawerOpen] = useState(false);
   const [tab, setTab] = useUrlTab<WorkOrderTab>(TAB_IDS, 'overview');
@@ -602,11 +624,9 @@ export default function WorkOrderDetailPage() {
               {error && `: ${(error as Error).message}`}
             </Text>
           </div>
-          <Button className="mt-4" onClick={() => navigate(fromPurchasing ? '/purchasing' : '/work-orders')}>
+          <Button className="mt-4" onClick={() => navigate(back.href)}>
             <ArrowLeftIcon className="size-4" />
-            {fromPurchasing
-              ? t('common.actions.backTo', { entities: t('entities.purchasing') })
-              : t('common.actions.backTo', { entities: getName('work_order', true) })}
+            {back.label}
           </Button>
         </div>
       </AppLayout>
@@ -693,11 +713,9 @@ export default function WorkOrderDetailPage() {
     <AppLayout>
       <div className="mx-auto max-w-[1240px]">
         {/* Smart back */}
-        <Button plain onClick={() => navigate(fromPurchasing ? '/purchasing' : '/work-orders')} className="mb-2">
+        <Button plain onClick={() => navigate(back.href)} className="mb-2">
           <ArrowLeftIcon className="size-4" />
-          {fromPurchasing
-            ? t('common.actions.backTo', { entities: t('entities.purchasing') })
-            : t('common.actions.backTo', { entities: getName('work_order', true) })}
+          {back.label}
         </Button>
 
         {/* Header — location-led identity + classification + actions. */}

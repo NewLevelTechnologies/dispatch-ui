@@ -147,6 +147,16 @@ describe('dispatchesApi.notify', () => {
   });
 });
 
+describe('dispatchesApi.release', () => {
+  // The per-dispatch verb. Its bulk sibling on dispatchBoardApi takes a SCOPE
+  // and would release the whole day, so these must not be confused.
+  it('posts to the dispatch\u2019s own release path with no body', async () => {
+    await dispatchesApi.release('d-1');
+
+    expect(apiClient.post).toHaveBeenCalledWith('/scheduling/dispatches/d-1/release');
+  });
+});
+
 describe('dispatchNotesApi', () => {
   it('nests the visit-note collection under its dispatch', async () => {
     vi.mocked(apiClient.get).mockResolvedValue({ data: [] });

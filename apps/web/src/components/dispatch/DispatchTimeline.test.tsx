@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import DispatchTimeline from './DispatchTimeline';
 import type { BoardGroup, SpineProps } from './spine';
@@ -73,6 +73,8 @@ function renderTimeline(over: Partial<SpineProps> = {}) {
     collapsed: [],
     onToggleGroup: vi.fn(),
     onOpenDispatch: vi.fn(),
+    workOrderHref: (id: string) => `/work-orders/${id}?from=dispatch`,
+    onContextDispatch: vi.fn(),
     axis: buildAxis(6, 20, windows),
     nowHour: null,
     capacityStops: 6,
@@ -427,14 +429,16 @@ describe('DispatchTimeline groups', () => {
 });
 
 describe('DispatchTimeline interaction', () => {
-  // Blocks are real buttons: drag alone is not an accessible assignment
-  // mechanism, so every block has to be reachable and activatable by keyboard.
+  // Blocks are real links to the work order: drag alone is not an accessible
+  // assignment mechanism, so every block has to be reachable and activatable
+  // by keyboard — and a dispatcher must be able to open the job in a tab with
+  // the board still loaded behind it.
   it('opens a dispatch on click', async () => {
     const user = userEvent.setup();
     const onOpenDispatch = vi.fn();
     renderTimeline({ onOpenDispatch });
 
-    await user.click(screen.getByRole('button', { name: /No cooling/ }));
+    await user.click(screen.getByRole('link', { name: /No cooling/ }));
     expect(onOpenDispatch).toHaveBeenCalledWith(expect.objectContaining({ id: 'd1' }));
   });
 
@@ -448,8 +452,70 @@ describe('DispatchTimeline interaction', () => {
     expect(onOpenDispatch).toHaveBeenCalled();
   });
 
+  // A dispatch is a visit; the work order is the job. The block links to the
+  // job so cmd-click and middle-click behave the way they do everywhere else.
+  it('links the block to its work order', () => {
+    renderTimeline();
+    expect(screen.getByRole('link', { name: /No cooling/ })).toHaveAttribute(
+      'href',
+      '/work-orders/wo1?from=dispatch',
+    );
+  });
+
+  // The whole point of the anchor: a modified click belongs to the browser.
+  // Intercepting it would silently remove new-tab from the board.
+  it('leaves a modified click to the browser', async () => {
+    const user = userEvent.setup();
+    const onOpenDispatch = vi.fn();
+    renderTimeline({ onOpenDispatch });
+
+    await user.keyboard('{Meta>}');
+    await user.click(screen.getByRole('link', { name: /No cooling/ }));
+    await user.keyboard('{/Meta}');
+    expect(onOpenDispatch).not.toHaveBeenCalled();
+  });
+
+  it('raises the context menu on right-click instead of navigating', async () => {
+    const user = userEvent.setup();
+    const onContextDispatch = vi.fn();
+    const onOpenDispatch = vi.fn();
+    renderTimeline({ onContextDispatch, onOpenDispatch });
+
+    await user.pointer({
+      keys: '[MouseRight]',
+      target: screen.getByRole('link', { name: /No cooling/ }),
+    });
+    expect(onContextDispatch).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'd1' }),
+      expect.objectContaining({ x: expect.any(Number), y: expect.any(Number) }),
+    );
+    expect(onOpenDispatch).not.toHaveBeenCalled();
+  });
+
   // An unplaceable window is skipped rather than drawn at the axis origin,
   // where it would read as a real 6am job.
+  // Shift-F10 and the menu key raise the same event with no pointer behind
+  // it. Anchoring at 0,0 would park the menu in the corner of the screen.
+  it('anchors a keyboard-raised menu to the block, not the corner', () => {
+    const onContextDispatch = vi.fn();
+    // jsdom has no layout, so the block has to be given one for this to mean
+    // anything.
+    const rect = vi
+      .spyOn(HTMLElement.prototype, 'getBoundingClientRect')
+      .mockReturnValue({ left: 120, bottom: 48 } as DOMRect);
+    renderTimeline({ onContextDispatch });
+
+    fireEvent.contextMenu(screen.getByRole('link', { name: /No cooling/ }), {
+      clientX: 0,
+      clientY: 0,
+    });
+    expect(onContextDispatch).toHaveBeenCalledWith(expect.objectContaining({ id: 'd1' }), {
+      x: 120,
+      y: 48,
+    });
+    rect.mockRestore();
+  });
+
   it('skips a dispatch whose window cannot be placed', () => {
     renderTimeline({
       byTech: {

@@ -22,6 +22,7 @@ import { SlideOver } from './catalyst/slideover';
 import { Button } from './catalyst/button';
 import { Avatar } from './ui/Avatar';
 import ConfirmDialog from './ConfirmDialog';
+import type { DispatchSeed } from './DispatchDetailDrawer';
 import { workItemLabel } from '@dispatch/utils';
 
 interface Props {
@@ -32,7 +33,12 @@ interface Props {
   locationName?: string;
   workOrderNumber?: string;
   // Present = edit mode (prefilled); absent = create.
-  dispatch?: Dispatch | null;
+  /** The visit being edited. A SEED rather than a full `Dispatch`: the form
+   *  reads only the assignment, the window, the addressed items and the
+   *  version, all of which a board row carries — so the board can open this
+   *  straight off the grid without a round-trip for notes/createdAt/updatedAt
+   *  it would never look at. */
+  dispatch?: DispatchSeed | null;
 }
 
 // Work items that still want a trip — pre-selected on create.
@@ -76,7 +82,11 @@ function fmtTime(d: Date): string {
 }
 
 // Match an existing window to a preset (or build a "current" option for it).
-function windowFromDispatch(d: Dispatch): { date: string; win: Win } {
+// Takes only the two fields it reads, so it works on a full dispatch and on
+// the board row the grid already holds.
+function windowFromDispatch(
+  d: Pick<Dispatch, 'arrivalWindowStart' | 'arrivalWindowEnd'>,
+): { date: string; win: Win } {
   const start = new Date(d.arrivalWindowStart);
   const end = new Date(d.arrivalWindowEnd);
   const sh = start.getHours();
