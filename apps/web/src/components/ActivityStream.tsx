@@ -152,8 +152,8 @@ export default function ActivityStream({ workOrderId }: Props) {
                 aria-pressed={selected}
                 className={
                   selected
-                    ? 'rounded-md bg-blue-600 px-2 py-1 text-xs font-medium text-white'
-                    : 'rounded-md bg-zinc-100 px-2 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700'
+                    ? 'rounded-md bg-blue-600 px-2 py-1 !text-xs !font-medium text-white'
+                    : 'rounded-md bg-zinc-100 px-2 py-1 !text-xs !font-medium text-zinc-700 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700'
                 }
               >
                 {f.label}

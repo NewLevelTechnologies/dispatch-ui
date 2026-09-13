@@ -29,10 +29,11 @@ import { useGlossary } from '../contexts/GlossaryContext';
 import AppLayout from '../components/AppLayout';
 import { Heading } from '../components/catalyst/heading';
 import { Button } from '../components/catalyst/button';
-import { Badge } from '../components/catalyst/badge';
-import { ListToolbar, ListSearch } from '../components/ui/ListToolbar';
+import { Select } from '../components/catalyst/select';
+import { ListSearch } from '../components/ui/ListToolbar';
 import { ToggleGroup, ToggleGroupOption } from '../components/ui/ToggleGroup';
-import { FilterChipListbox, ChipListboxOption } from '../components/ui/FilterChipListbox';
+import { FilterChip, FilterChipRow } from '../components/ui/FilterChipRow';
+import BoardLegend from '../components/dispatch/BoardLegend';
 import { LoadingState } from '../components/ui/LoadingState';
 import { EmptyState } from '../components/ui/EmptyState';
 import { ErrorState } from '../components/ui/ErrorState';
@@ -53,7 +54,7 @@ import {
   type BoardGroup,
   type Density,
 } from '../components/dispatch/spine';
-import { buildAxis, formatWindow, zonedDate, zonedHour } from '../lib/boardTime';
+import { buildAxis, formatHour, formatWindow, zonedDate, zonedHour } from '../lib/boardTime';
 import { buildGroups, foldEmptyRows } from '../lib/boardGroups';
 import { nearestStops } from '../lib/nearestStop';
 import { withBackContext } from '../lib/backContext';
@@ -79,16 +80,11 @@ type GroupBy = 'none' | 'region';
 /** Grid filters. "Unassigned" is deliberately absent: unassigned work is not
  *  on the grid, so it was never a grid filter — the rail header carries that
  *  count instead. */
+type ChipTone = 'neutral' | 'warning' | 'danger' | 'violet';
+
 type ExceptionId = 'urgent' | 'unreleased' | 'noshow' | 'cancelled' | 'longdrive' | 'recurring';
 
 const LONG_DRIVE_MINUTES = 30;
-
-/** Selected filter chips take the `accent-soft` surface; unselected ones are
- *  outlined. Button's props are a union — color and outline are mutually
- *  exclusive — so the variant is chosen, not merged. */
-function chipVariant(selected: boolean): { color: 'accent-soft' } | { outline: true } {
-  return selected ? { color: 'accent-soft' } : { outline: true };
-}
 
 function todayLocal(): string {
   const now = new Date();
@@ -133,6 +129,12 @@ const RANGE_LABEL = new Intl.DateTimeFormat('en-US', {
 
 function asUtc(date: string): Date {
   return new Date(`${date}T00:00:00Z`);
+}
+
+/** Compact form for the date nav: "Sep 13". The subtitle carries the full
+ *  "Sunday, September 13" — this one has two chevrons either side of it. */
+function formatNavDate(date: string): string {
+  return RANGE_LABEL.format(asUtc(date));
 }
 
 function formatBoardDate(date: string): string {
@@ -207,6 +209,7 @@ export default function DispatchBoardPage() {
   const rawDate = searchParams.get('date');
   const date = isValidDate(rawDate) ? rawDate : todayLocal();
   const regionId = searchParams.get('region');
+  const divisionId = searchParams.get('division');
   // Granularity, in the URL like every other scope — "show me next week in
   // East Valley" has to be a link someone can send.
   const isWeek = searchParams.get('view') === 'week';
@@ -247,6 +250,7 @@ export default function DispatchBoardPage() {
   });
 
   const regionIds = useMemo(() => (regionId ? [regionId] : undefined), [regionId]);
+  const divisionIds = useMemo(() => (divisionId ? [divisionId] : undefined), [divisionId]);
 
   // Two dispatchers on one board is normal, not an edge case, and cache
   // invalidation only ever refreshes the tab that made the change. Polling is
@@ -261,8 +265,8 @@ export default function DispatchBoardPage() {
     error,
     refetch,
   } = useQuery({
-    queryKey: ['dispatch-board', date, regionIds],
-    queryFn: () => dispatchBoardApi.getBoard({ date, regionIds }),
+    queryKey: ['dispatch-board', date, regionIds, divisionIds],
+    queryFn: () => dispatchBoardApi.getBoard({ date, regionIds, divisionIds }),
     refetchInterval: BOARD_POLL_MS,
     refetchIntervalInBackground: false,
     refetchOnWindowFocus: true,
@@ -278,8 +282,8 @@ export default function DispatchBoardPage() {
     error: weekError,
     refetch: refetchWeek,
   } = useQuery({
-    queryKey: ['dispatch-board', 'week', weekStart, regionIds],
-    queryFn: () => dispatchBoardApi.getWeek({ weekStart, regionIds }),
+    queryKey: ['dispatch-board', 'week', weekStart, regionIds, divisionIds],
+    queryFn: () => dispatchBoardApi.getWeek({ weekStart, regionIds, divisionIds }),
     refetchInterval: BOARD_POLL_MS,
     refetchIntervalInBackground: false,
     refetchOnWindowFocus: true,
@@ -289,8 +293,8 @@ export default function DispatchBoardPage() {
   // The rail moves for the same reasons the grid does — someone else
   // scheduling a job takes it out of everyone's inbox.
   const { data: unscheduled } = useQuery({
-    queryKey: ['dispatch-board', 'unscheduled', regionIds],
-    queryFn: () => dispatchBoardApi.getUnscheduled({ regionIds }),
+    queryKey: ['dispatch-board', 'unscheduled', regionIds, divisionIds],
+    queryFn: () => dispatchBoardApi.getUnscheduled({ regionIds, divisionIds }),
     refetchInterval: BOARD_POLL_MS,
     refetchIntervalInBackground: false,
     refetchOnWindowFocus: true,
@@ -471,10 +475,24 @@ export default function DispatchBoardPage() {
     [regions, coveredRegionIds],
   );
   const showRegionFilter = regionOptions.length > 1;
+  // Division is a property of the WORK, never of a technician — so it filters
+  // blocks and leaves every row standing. Offered only where the tenant
+  // actually runs more than one.
+  const showDivisionFilter = divisions.length > 1;
   // Only offer grouping when more than one group would actually render.
   const showGroupingPicker = primaryRegionIds.size > 1;
   const showDensityPicker = shownTechs.length > 12;
   const showHideEmpty = foldableCount > 0;
+  // Zero-count chips STAY — "Urgent 0" is information, and chips that appear
+  // and vanish make the band jump. But an all-zeros row with nothing active is
+  // six controls that do nothing, so the band itself goes.
+  const showExceptionBand =
+    exceptions.length > 0 || Object.values(counts).some((n) => n > 0);
+  // A division filter empties blocks and leaves the rows — correct, and at 60
+  // rows it reads as a broken board. Suggest the fold once it has taken out
+  // more than half of them.
+  const suggestHideEmpty =
+    !hideEmpty && divisionId != null && foldableCount > shownTechs.length / 2;
 
   // A stale preference falls back to flat rather than silently grouping by a
   // control the user can no longer see.
@@ -638,7 +656,7 @@ export default function DispatchBoardPage() {
   const clearFilters = () => {
     setSearch('');
     setExceptions([]);
-    setParam('region', null);
+    setParams({ region: null, division: null });
   };
 
   const toggleException = (id: ExceptionId) =>
@@ -647,13 +665,40 @@ export default function DispatchBoardPage() {
   const dispatchesLabel = getName('dispatch', true);
   const techLabel = getName('technician', true);
 
-  // Day: "Thu, Mar 19", or "Today" when it is. Week: the span the SERVER
-  // resolved, so the label can never disagree with the columns.
-  const scopeLabel = isWeek
-    ? formatDayRange(week?.days ?? [])
-    : date === todayInZone
-      ? t('dispatchBoard.dateNav.today')
-      : formatBoardDate(date);
+  // What the board is showing, spelled out: the day, how many technicians are
+  // in scope, how much work is on them, and — only when it means something —
+  // what time it is where the work is happening.
+  //
+  // The date lives here rather than in the nav because it has room to be a
+  // real date. A chevron with "Thu, Mar 19" wedged between the arrows costs
+  // width on every render for something the reader looks at once.
+  const scopeLabel = isWeek ? formatDayRange(week?.days ?? []) : formatBoardDate(date);
+
+  // The week's toggle steps weeks, so "today" there means the week containing
+  // it, not the day.
+  const isToday = isWeek
+    ? todayInZone != null && weekStart === weekStartOf(todayInZone)
+    : date === todayInZone;
+  // Short, because it sits between two chevrons: "Sep 13", or the week's span.
+  const navLabel = isWeek ? scopeLabel : formatNavDate(date);
+
+  const subtitle = [
+    scopeLabel,
+    t('dispatchBoard.subtitleCount', {
+      count: shownTechs.length,
+      entity: techLabel.toLowerCase(),
+    }),
+    !isWeek &&
+      t('dispatchBoard.subtitleDispatches', {
+        count: visibleDispatches.length,
+        entity: getName('dispatch', true).toLowerCase(),
+      }),
+    // A now-time on Thursday's board would be a lie, the same way the now-line
+    // would be.
+    !isWeek && nowHour != null && t('dispatchBoard.subtitleNow', { time: formatHour(nowHour) }),
+  ]
+    .filter(Boolean)
+    .join(' · ');
 
   const boardBody = () => {
     if (isWeek ? weekLoading : isLoading) {
@@ -738,18 +783,18 @@ export default function DispatchBoardPage() {
     // instead, where the lanes survive.
     return (
       <>
-        {visibleDispatches.length === 0 && (
+        {/* Only the FILTERED empty gets a line, because it offers a fix the
+            grid cannot. An empty day is a legitimate board — the rows are the
+            drop targets, and saying "nothing is scheduled" above a grid that
+            already shows nothing scheduled is the same sentence twice. */}
+        {visibleDispatches.length === 0 && hasFilters && (
           <div className="flex items-center gap-2 border-b border-border bg-bg-elev-2 px-3.5 py-2 text-[11.5px] text-fg-muted">
             <span>
-              {hasFilters
-                ? t('dispatchBoard.states.emptyFilteredTitle', { entity: dispatchesLabel })
-                : t('dispatchBoard.states.emptyBody', { entity: dispatchesLabel })}
+              {t('dispatchBoard.states.emptyFilteredTitle', { entity: dispatchesLabel })}
             </span>
-            {hasFilters && (
-              <Button plain size="xxs" onClick={clearFilters}>
-                {t('dispatchBoard.states.clearFilters')}
-              </Button>
-            )}
+            <Button plain size="xxs" onClick={clearFilters}>
+              {t('dispatchBoard.states.clearFilters')}
+            </Button>
           </div>
         )}
         <DispatchTimeline
@@ -776,13 +821,17 @@ export default function DispatchBoardPage() {
     );
   };
 
-  const chips: { id: ExceptionId; label: string }[] = [
-    { id: 'urgent', label: t('dispatchBoard.chips.urgent') },
-    { id: 'unreleased', label: t('dispatchBoard.chips.unreleased') },
-    { id: 'noshow', label: t('dispatchBoard.chips.noshow') },
-    { id: 'cancelled', label: t('dispatchBoard.chips.cancelled') },
-    { id: 'longdrive', label: t('dispatchBoard.chips.longdrive') },
-    { id: 'recurring', label: t('dispatchBoard.chips.recurring') },
+  // The swatch on each chip is the tone the GRID gives that thing, which is
+  // what ties a chip to the blocks it filters. Unreleased and cancelled are
+  // deliberately un-toned: neither is a status hue out there either — one is
+  // a dashed border, the other a struck-through outline.
+  const chips: { id: ExceptionId; label: string; tone: ChipTone }[] = [
+    { id: 'urgent', label: t('dispatchBoard.chips.urgent'), tone: 'danger' },
+    { id: 'unreleased', label: t('dispatchBoard.chips.unreleased'), tone: 'neutral' },
+    { id: 'noshow', label: t('dispatchBoard.chips.noshow'), tone: 'warning' },
+    { id: 'cancelled', label: t('dispatchBoard.chips.cancelled'), tone: 'neutral' },
+    { id: 'longdrive', label: t('dispatchBoard.chips.longdrive'), tone: 'warning' },
+    { id: 'recurring', label: t('dispatchBoard.chips.recurring'), tone: 'violet' },
   ];
 
   return (
@@ -794,9 +843,7 @@ export default function DispatchBoardPage() {
             <Heading size="page-sm">
               {t('dispatchBoard.title', { entity: getName('dispatch') })}
             </Heading>
-            <div className="text-[11.5px] text-fg-muted">
-              {t('dispatchBoard.subtitleCount', { count: shownTechs.length, entity: techLabel })}
-            </div>
+            <div className="text-[11.5px] text-fg-muted">{subtitle}</div>
           </div>
 
           <div className="ml-auto flex items-center gap-1">
@@ -813,30 +860,51 @@ export default function DispatchBoardPage() {
               <ToggleGroupOption value="week">{t('dispatchBoard.view.week')}</ToggleGroupOption>
             </ToggleGroup>
 
+            {/* Prev · date · next, then Today only when there is a today to
+                go back to — the same self-hiding discipline as the filters,
+                and the clearest possible cue that the board is showing another
+                day. Every control here is 26px, matching the fields below. */}
             <Button
               plain
-              size="xs"
-              aria-label={t(isWeek ? 'dispatchBoard.dateNav.previousWeek' : 'dispatchBoard.dateNav.previous')}
+              size="xxs"
+              aria-label={t(
+                isWeek ? 'dispatchBoard.dateNav.previousWeek' : 'dispatchBoard.dateNav.previous',
+              )}
               onClick={() => setParam('date', shiftDay(date, isWeek ? -7 : -1))}
             >
               <ChevronLeftIcon />
             </Button>
-            {/* The board used to show no date at all: stepping forward with a
-                chevron left the dispatcher guessing which day they were on. */}
-            <span className="min-w-[92px] text-center text-[12px] font-semibold text-fg-strong">
-              {scopeLabel}
+            {/* The date itself, and the way to reach an arbitrary one. The
+                min-width keeps the cluster from resizing between "Sep 9" and
+                "Sep 12". Secondary, never a filled pill — a solid fill means
+                primary action or selected, and the date is neither. */}
+            <span className="relative inline-flex">
+              <Button outline size="xxs" className="min-w-[68px] justify-center">
+                {navLabel}
+              </Button>
+              <input
+                type="date"
+                aria-label={t('dispatchBoard.dateNav.pick')}
+                value={date}
+                onChange={(e) => setParam('date', e.target.value || null)}
+                className="absolute inset-0 cursor-pointer opacity-0"
+              />
             </span>
             <Button
               plain
-              size="xs"
-              aria-label={t(isWeek ? 'dispatchBoard.dateNav.nextWeek' : 'dispatchBoard.dateNav.next')}
+              size="xxs"
+              aria-label={t(
+                isWeek ? 'dispatchBoard.dateNav.nextWeek' : 'dispatchBoard.dateNav.next',
+              )}
               onClick={() => setParam('date', shiftDay(date, isWeek ? 7 : 1))}
             >
               <ChevronRightIcon />
             </Button>
-            <Button size="xs" onClick={() => setParam('date', null)} disabled={date === todayInZone}>
-              {t('dispatchBoard.dateNav.today')}
-            </Button>
+            {!isToday && (
+              <Button outline size="xxs" onClick={() => setParam('date', null)}>
+                {t('dispatchBoard.dateNav.today')}
+              </Button>
+            )}
 
             {/* Present only when there is something to release — and only on
                 the day board, since release takes a single day's scope and a
@@ -844,7 +912,7 @@ export default function DispatchBoardPage() {
             {!isWeek && counts.unreleased > 0 && (
               <Button
                 color="accent"
-                size="xs"
+                size="xxs"
                 onClick={() => setConfirmRelease(true)}
                 disabled={releaseMutation.isPending}
               >
@@ -856,124 +924,154 @@ export default function DispatchBoardPage() {
 
         {/* ── Band 2 — who is on the board. Controls self-hide. ──── */}
         <div className="db-band sub">
-          <ListToolbar
-            className="mb-0 flex-1"
-            search={
-              <ListSearch
-                placeholder={t('dispatchBoard.search.placeholder', {
-                  entity: getName('technician'),
-                })}
-                value={search}
-                onChange={setSearch}
-              />
-            }
-          >
+          {/* No toolbar wrapper: the band is already the flex row, and its
+              single 8px gap does all the horizontal spacing. Nesting a
+              ListToolbar here brought its own margins and an items-end
+              baseline into a row of equal-height chrome. */}
+          <ListSearch
+            compact
+            placeholder={t('dispatchBoard.search.placeholder', {
+              entity: getName('technician').toLowerCase(),
+            })}
+            value={search}
+            onChange={setSearch}
+          />
+            {/* Filters are selects, not caret buttons. A bordered button with
+                a chevron reads as a menu that performs an action, and it made
+                two filters look like two different kinds of control — they
+                should be identical to each other and distinct from toggles. */}
             {showRegionFilter && (
-              <FilterChipListbox
-                label={t('dispatchBoard.filter.region', { entity: getName('dispatch_region') })}
-                ariaLabel={t('dispatchBoard.filter.region', { entity: getName('dispatch_region') })}
-                value={regionId}
-                displayValue={regionName(regionId)}
-                resetLabel={t('dispatchBoard.filter.allRegions', {
-                  entity: getName('dispatch_region', true),
-                })}
-                onChange={(id) => setParam('region', id)}
-                onClear={() => setParam('region', null)}
+              <Select
+                size="xxs"
+                aria-label={t('dispatchBoard.filter.region', { entity: getName('dispatch_region') })}
+                value={regionId ?? ''}
+                onChange={(e) => setParam('region', e.target.value || null)}
               >
+                <option value="">
+                  {t('dispatchBoard.filter.allRegions', {
+                    entity: getName('dispatch_region', true),
+                  })}
+                </option>
                 {regionOptions.map((region) => (
-                  <ChipListboxOption key={region.id} value={region.id}>
+                  <option key={region.id} value={region.id}>
                     {region.name}
-                  </ChipListboxOption>
+                  </option>
                 ))}
-              </FilterChipListbox>
+              </Select>
+            )}
+
+            {showDivisionFilter && (
+              <Select
+                size="xxs"
+                aria-label={t('dispatchBoard.filter.division', { entity: getName('division') })}
+                value={divisionId ?? ''}
+                onChange={(e) => setParam('division', e.target.value || null)}
+              >
+                <option value="">
+                  {t('dispatchBoard.filter.allDivisions', { entity: getName('division', true) })}
+                </option>
+                {divisions.map((division) => (
+                  <option key={division.id} value={division.id}>
+                    {division.name}
+                  </option>
+                ))}
+              </Select>
             )}
 
             {showGroupingPicker && (
-              <FilterChipListbox
-                label={t('dispatchBoard.filter.grouping')}
-                ariaLabel={t('dispatchBoard.filter.grouping')}
+              <Select
+                size="xxs"
+                aria-label={t('dispatchBoard.filter.grouping')}
                 value={effectiveGroupBy}
-                displayValue={
-                  effectiveGroupBy === 'region'
-                    ? t('dispatchBoard.filter.groupByRegion', {
-                        entity: getName('dispatch_region'),
-                      })
-                    : null
-                }
-                onChange={(id) => setGroupBy((id as GroupBy) ?? 'none')}
-                onClear={() => setGroupBy('none')}
+                onChange={(e) => setGroupBy(e.target.value as GroupBy)}
               >
-                <ChipListboxOption value="none">
-                  {t('dispatchBoard.filter.groupByNone')}
-                </ChipListboxOption>
-                <ChipListboxOption value="region">
+                <option value="none">{t('dispatchBoard.filter.groupByNone')}</option>
+                <option value="region">
                   {t('dispatchBoard.filter.groupByRegion', { entity: getName('dispatch_region') })}
-                </ChipListboxOption>
-              </FilterChipListbox>
+                </option>
+              </Select>
             )}
 
             {showDensityPicker && (
-              <FilterChipListbox
-                label={t('dispatchBoard.filter.density')}
-                ariaLabel={t('dispatchBoard.filter.density')}
+              <Select
+                size="xxs"
+                aria-label={t('dispatchBoard.filter.density')}
                 value={densityPref}
-                displayValue={
-                  densityPref === 'auto' ? null : t(`dispatchBoard.density.${densityPref}`)
-                }
-                onChange={(id) => setDensityPref((id as Density | 'auto') ?? 'auto')}
-                onClear={() => setDensityPref('auto')}
+                onChange={(e) => setDensityPref(e.target.value as Density | 'auto')}
               >
-                <ChipListboxOption value="auto">
-                  {t('dispatchBoard.density.auto', { mode: t(`dispatchBoard.density.${autoDensity}`) })}
-                </ChipListboxOption>
+                <option value="auto">
+                  {t('dispatchBoard.density.auto', {
+                    mode: t(`dispatchBoard.density.${autoDensity}`),
+                  })}
+                </option>
                 {(Object.keys(DENSITY_METRICS) as Density[]).map((mode) => (
-                  <ChipListboxOption key={mode} value={mode}>
+                  <option key={mode} value={mode}>
                     {t(`dispatchBoard.density.${mode}`)}
-                  </ChipListboxOption>
+                  </option>
                 ))}
-              </FilterChipListbox>
+              </Select>
             )}
 
             {showHideEmpty && (
-              <Button
-                size="xs"
-                {...chipVariant(hideEmpty)}
-                aria-pressed={hideEmpty}
-                onClick={() => setHideEmpty((v) => !v)}
-              >
-                {`${t('dispatchBoard.filter.hideEmpty', { entity: techLabel.toLowerCase() })} (${foldableCount})`}
-              </Button>
+              <FilterChip
+                variant="dense"
+                label={t('dispatchBoard.filter.hideEmpty', { entity: techLabel.toLowerCase() })}
+                count={foldableCount}
+                active={hideEmpty}
+                onToggle={() => setHideEmpty((v) => !v)}
+              />
             )}
-          </ListToolbar>
+
+            {/* Suggested, never applied for them: a division filter emptying
+                most of the rows is correct behaviour that looks broken, and
+                the dispatcher should be the one to decide the rows can go. */}
+            {suggestHideEmpty && (
+              <span className="text-[10.5px] text-fg-muted">
+                {t('dispatchBoard.filter.hideEmptySuggestion', { count: foldableCount })}
+              </span>
+            )}
+
+            <span className="grow" />
+            {/* The one board gesture nothing else advertises. */}
+            <span className="hidden text-[10.5px] text-fg-muted xl:inline">
+              {t('dispatchBoard.hint.rightClick', { entity: getName('work_order').toLowerCase() })}
+            </span>
+            <span className="text-[10.5px] text-fg-muted">
+              {t('dispatchBoard.rowCount', { count: shownTechs.length })}
+            </span>
         </div>
 
         {/* ── Band 3 — exceptions as FILTERS, never as stat cards ──
              Day only: every chip is a predicate over individual dispatches,
              and the week read carries aggregates. Showing chips that could
              not filter anything is what rev 3 did with "Unassigned". */}
-        {!isWeek && (
+        {!isWeek && showExceptionBand && (
         <div className="db-band sub">
-          <div className="flex flex-wrap items-center gap-1.5">
-            {chips.map((chip) => {
-              const on = exceptions.includes(chip.id);
-              return (
-                <Button
-                  key={chip.id}
-                  size="xxs"
-                  {...chipVariant(on)}
-                  aria-pressed={on}
-                  onClick={() => toggleException(chip.id)}
-                >
-                  {chip.label}
-                  <Badge color={on ? 'blue' : 'zinc'}>{String(counts[chip.id])}</Badge>
-                </Button>
-              );
-            })}
+          <FilterChipRow className="gap-1.5">
+            {chips.map((chip) => (
+              <FilterChip
+                key={chip.id}
+                variant="dense"
+                dot
+                tone={chip.tone}
+                label={chip.label}
+                count={counts[chip.id]}
+                active={exceptions.includes(chip.id)}
+                onToggle={() => toggleException(chip.id)}
+              />
+            ))}
             {exceptions.length > 0 && (
               <Button plain size="xxs" onClick={() => setExceptions([])}>
                 {t('dispatchBoard.states.clearFilters')}
               </Button>
             )}
+          </FilterChipRow>
+          <span className="grow" />
+          {/* Below ~1100px it drops entirely rather than shrinking: the chip
+              row already carries the colour vocabulary, and a clipped legend
+              is worse than no legend. */}
+          <div className="hidden min-[1100px]:block">
+            <BoardLegend />
           </div>
         </div>
         )}

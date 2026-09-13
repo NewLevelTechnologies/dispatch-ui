@@ -19,7 +19,7 @@ export default function TabNavigation({ tabs, activeTab, onTabChange }: TabNavig
             key={tab.id}
             onClick={() => onTabChange(tab.id)}
             className={`
-              whitespace-nowrap border-b-2 px-1 py-2 text-sm font-medium transition
+              whitespace-nowrap border-b-2 px-1 py-2 !text-sm !font-medium transition
               ${
                 activeTab === tab.id
                   ? 'border-zinc-950 text-zinc-950 dark:border-white dark:text-white'

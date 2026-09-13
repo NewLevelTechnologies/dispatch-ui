@@ -609,7 +609,7 @@ export default function WorkOrdersPage() {
                 onClick={() => updateParams({ assigned: myId, page: null })}
                 aria-pressed={scopeMine}
                 className={clsx(
-                  'flex items-center px-3 text-[12px] font-semibold',
+                  'flex items-center px-3 !text-[12px] !font-semibold',
                   scopeMine ? 'bg-accent-500/10 text-fg-accent' : 'bg-bg-elev text-fg-muted'
                 )}
               >
@@ -620,7 +620,7 @@ export default function WorkOrdersPage() {
                 onClick={() => updateParams({ assigned: null, page: null })}
                 aria-pressed={!scopeMine}
                 className={clsx(
-                  'flex items-center border-l border-border px-3 text-[12px] font-semibold',
+                  'flex items-center border-l border-border px-3 !text-[12px] !font-semibold',
                   !scopeMine ? 'bg-accent-500/10 text-fg-accent' : 'bg-bg-elev text-fg-muted'
                 )}
               >
@@ -817,7 +817,7 @@ export default function WorkOrdersPage() {
                 <button
                   type="button"
                   onClick={clearAllFilters}
-                  className="ml-1 text-[11.5px] font-medium text-fg-muted underline-offset-2 hover:underline hover:text-fg-strong"
+                  className="ml-1 !text-[11.5px] !font-medium text-fg-muted underline-offset-2 hover:underline hover:text-fg-strong"
                 >
                   {t('workOrders.filters.clearAll')}
                 </button>

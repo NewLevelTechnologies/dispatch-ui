@@ -191,6 +191,13 @@
   min-width: max-content;
 }
 
+/* The grid only draws as far as its last row. Everything below it is the
+   board's own sunken ground — on an elevated background that empty space
+   reads as more rows, and the row count stops being obvious. */
+.db-scroll {
+  background: var(--bg-sunken);
+}
+
 .db-head {
   display: flex;
   position: sticky;

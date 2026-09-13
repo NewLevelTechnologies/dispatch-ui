@@ -1348,7 +1348,7 @@ export default function EquipmentDetailPage() {
                             // Inline font-size — a bare <button> otherwise picks up the
                             // 13px global, overriding Tailwind's text-[11px].
                             style={{ fontSize: '11px' }}
-                            className="rounded-full border border-dashed border-border-strong px-2 py-0.5 font-mono font-semibold text-fg-accent hover:bg-bg-elev-2"
+                            className="rounded-full border border-dashed border-border-strong px-2 py-0.5 font-mono !font-semibold text-fg-accent hover:bg-bg-elev-2"
                           >
                             + {formatFilterSize(s)}
                           </button>
@@ -1368,7 +1368,7 @@ export default function EquipmentDetailPage() {
                           type="button"
                           onClick={openCreateFilter}
                           style={{ fontSize: '11px' }}
-                          className="rounded-full border border-border px-2 py-0.5 font-medium text-fg-muted hover:text-fg-strong"
+                          className="rounded-full border border-border px-2 py-0.5 !font-medium text-fg-muted hover:text-fg-strong"
                         >
                           Custom…
                         </button>

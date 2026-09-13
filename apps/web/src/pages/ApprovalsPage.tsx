@@ -352,7 +352,7 @@ export default function ApprovalsPage() {
               aria-selected={currentTab === tab.id}
               onClick={() => setCurrentTab(tab.id)}
               className={clsx(
-                '-mb-px inline-flex shrink-0 items-center gap-1.5 border-b-2 border-transparent px-3.5 py-2 text-[12.5px] font-semibold whitespace-nowrap transition-colors',
+                '-mb-px inline-flex shrink-0 items-center gap-1.5 border-b-2 border-transparent px-3.5 py-2 !text-[12.5px] !font-semibold whitespace-nowrap transition-colors',
                 currentTab === tab.id
                   ? 'border-accent-500 text-fg-accent'
                   : 'text-fg-muted hover:text-fg-strong',

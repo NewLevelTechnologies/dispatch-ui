@@ -192,6 +192,7 @@ export interface GetWeekParams {
   // TENANT's timezone and echoes the days it used.
   weekStart: string;
   regionIds?: string[];
+  divisionIds?: string[];
 }
 
 export interface GetBoardParams {
@@ -201,6 +202,11 @@ export interface GetBoardParams {
   // Narrows within what the server already allows. Scope is enforced
   // server-side from the caller's own regions; this only ever subtracts.
   regionIds?: string[];
+  // Filters the WORK, not the rows: division is a property of a work order and
+  // never of a technician, so this empties blocks while every row stays in
+  // place. That is correct, and at 60 rows it looks broken — which is what the
+  // hide-empty toggle is for.
+  divisionIds?: string[];
 }
 
 // One rail card per WORK ORDER, not per work item: a WO with three items may
@@ -244,6 +250,7 @@ export interface UnscheduledPage {
 
 export interface GetUnscheduledParams {
   regionIds?: string[];
+  divisionIds?: string[];
   q?: string;
   page?: number;
   size?: number;

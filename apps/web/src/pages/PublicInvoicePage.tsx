@@ -120,7 +120,7 @@ const InvoiceLoadingState = ({ onRetry }: { onRetry: () => void }) => {
           <button
             type="button"
             onClick={onRetry}
-            className="text-sm font-medium text-zinc-700 underline underline-offset-2 hover:text-zinc-900"
+            className="!text-sm !font-medium text-zinc-700 underline underline-offset-2 hover:text-zinc-900"
           >
             {t('public.common.retry')}
           </button>

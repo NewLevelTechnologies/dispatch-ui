@@ -369,7 +369,7 @@ export default function FinancialQuotesTab({
           <button
             type="button"
             onClick={() => setActionBanner(null)}
-            className="text-xs underline hover:no-underline"
+            className="!text-xs underline hover:no-underline"
             aria-label={t('common.dismiss')}
           >
             {t('common.dismiss')}

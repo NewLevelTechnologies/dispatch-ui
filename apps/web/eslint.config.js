@@ -5,6 +5,7 @@ import reactRefresh from 'eslint-plugin-react-refresh'
 import i18next from 'eslint-plugin-i18next'
 import tseslint from 'typescript-eslint'
 import { defineConfig, globalIgnores } from 'eslint/config'
+import inheritedFontOnFormControl from './eslint-rules/inherited-font-on-form-control.js'
 
 export default defineConfig([
   globalIgnores(['dist', 'coverage', 'handoff', 'claude_designs']),
@@ -22,8 +23,17 @@ export default defineConfig([
     },
     plugins: {
       i18next,
+      // Local rules live in ./eslint-rules and are wired inline — flat config
+      // takes a plugin object directly, so this needs no extra dependency.
+      local: { rules: { 'inherited-font-on-form-control': inheritedFontOnFormControl } },
     },
     rules: {
+      // Preflight is unlayered here, so `font: inherit` on form controls beats
+      // any layered size or weight utility. Four separate corrections on the
+      // dispatch board's chrome came from this before the pattern was spotted;
+      // it fails silently and looks like a style choice.
+      'local/inherited-font-on-form-control': 'error',
+
       // Enforce internationalization - no hardcoded strings in JSX
       'i18next/no-literal-string': ['error', {
         markupOnly: true, // Only check JSX markup, not all strings

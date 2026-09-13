@@ -640,7 +640,7 @@ function RoleMultiSelect({
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder={`Search ${roles.length} roles…`}
-            className="block h-7 w-full rounded-md border border-border bg-bg-elev pl-7 pr-2.5 text-[12px] text-fg-strong outline-none focus:border-accent-500"
+            className="block h-7 w-full rounded-md border border-border bg-bg-elev pl-7 pr-2.5 !text-[12px] text-fg-strong outline-none focus:border-accent-500"
           />
         </div>
       )}
@@ -724,7 +724,7 @@ function RoleMultiSelect({
           <button
             type="button"
             onClick={onClear}
-            className="bg-transparent p-0 text-[11px] text-fg-muted hover:text-fg-strong"
+            className="bg-transparent p-0 !text-[11px] text-fg-muted hover:text-fg-strong"
           >
             Clear all {selected.length}
           </button>
@@ -787,7 +787,7 @@ function CapabilityPreview({
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="flex w-full items-center gap-2 px-2.5 py-2 text-left text-[11.5px]"
+        className="flex w-full items-center gap-2 px-2.5 py-2 text-left !text-[11.5px]"
       >
         <ChevronRightIcon
           className={`size-3.5 text-fg-dim transition-transform ${open ? 'rotate-90' : ''}`}

@@ -296,7 +296,7 @@ export default function CategoryFieldsDrawer({ category, onClose }: Props) {
               <button
                 type="button"
                 onClick={() => openEditor('new')}
-                className="mt-1 flex items-center gap-1.5 rounded-md border border-dashed border-border-strong px-3 py-2 text-[12.5px] text-fg-muted hover:border-fg-muted hover:bg-bg-elev hover:text-fg-strong"
+                className="mt-1 flex items-center gap-1.5 rounded-md border border-dashed border-border-strong px-3 py-2 !text-[12.5px] text-fg-muted hover:border-fg-muted hover:bg-bg-elev hover:text-fg-strong"
               >
                 <PlusIcon className="size-4" />
                 Add field
@@ -446,7 +446,7 @@ function FieldEditor({
           <button
             type="button"
             onClick={() => setShowAdvanced((v) => !v)}
-            className="flex items-center gap-1 text-[11.5px] font-medium text-fg-muted hover:text-fg-strong"
+            className="flex items-center gap-1 !text-[11.5px] !font-medium text-fg-muted hover:text-fg-strong"
           >
             <ChevronRightIcon className={`size-3.5 transition-transform ${showAdvanced ? 'rotate-90' : ''}`} />
             Advanced

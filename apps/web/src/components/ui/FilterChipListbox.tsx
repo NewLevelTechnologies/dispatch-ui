@@ -115,7 +115,7 @@ export function FilterChipListbox(props: Props) {
       >
         <Headless.ListboxButton
           aria-label={ariaLabel}
-          className="flex h-full items-center gap-1.5 px-2.5 font-medium text-fg outline-none focus:outline-none"
+          className="flex h-full items-center gap-1.5 px-2.5 !font-medium text-fg outline-none focus:outline-none"
         >
           <span className="text-fg-muted">{label}</span>
           {isSet ? (

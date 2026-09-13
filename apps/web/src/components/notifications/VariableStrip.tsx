@@ -30,7 +30,7 @@ export function VariableStrip({ hint, chips, onInsert }: Props) {
           type="button"
           onClick={() => onInsert(v.name)}
           title={v.description}
-          className="inline-flex items-center gap-0.5 rounded border border-border-soft bg-bg-elev-2 px-1.5 py-0.5 font-mono text-[11px] text-fg-muted hover:bg-bg-hover hover:text-fg-strong"
+          className="inline-flex items-center gap-0.5 rounded border border-border-soft bg-bg-elev-2 px-1.5 py-0.5 font-mono !text-[11px] text-fg-muted hover:bg-bg-hover hover:text-fg-strong"
         >
           <PlusIcon className="size-2.5" />
           {`{{${v.name}}}`}

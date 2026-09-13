@@ -222,7 +222,7 @@ export default function WorkItemEquipmentBlock({
                 key={u.id}
                 type="button"
                 onClick={() => onSelectSubUnit?.({ id: u.id, name: u.name })}
-                className="inline-flex items-center gap-1.5 rounded-full border border-border bg-bg-elev py-0.5 pl-1 pr-2 text-[12px] font-medium text-fg-strong hover:text-fg-accent"
+                className="inline-flex items-center gap-1.5 rounded-full border border-border bg-bg-elev py-0.5 pl-1 pr-2 !text-[12px] !font-medium text-fg-strong hover:text-fg-accent"
               >
                 <EquipmentThumbnail
                   url={u.profileImageUrl}
@@ -271,7 +271,7 @@ export default function WorkItemEquipmentBlock({
               <button
                 type="button"
                 onClick={() => setLightboxIndex(4)}
-                className="flex size-[34px] items-center justify-center rounded text-[10.5px] font-semibold text-fg-muted ring-1 ring-border hover:text-fg-accent"
+                className="flex size-[34px] items-center justify-center rounded !text-[10.5px] !font-semibold text-fg-muted ring-1 ring-border hover:text-fg-accent"
               >
                 {'+' + (orderedImages.length - 4)}
               </button>

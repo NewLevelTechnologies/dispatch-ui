@@ -120,7 +120,7 @@ export function DateRangeChip({
                     onChange(rangeForPreset(p.id));
                     close();
                   }}
-                  className="h-7 rounded-md border border-border bg-bg-elev px-2 text-[11.5px] font-medium text-fg hover:bg-bg-hover"
+                  className="h-7 rounded-md border border-border bg-bg-elev px-2 !text-[11.5px] !font-medium text-fg hover:bg-bg-hover"
                 >
                   {t(p.labelKey)}
                 </button>
@@ -131,7 +131,7 @@ export function DateRangeChip({
                   onChange(EMPTY_DATE_RANGE);
                   close();
                 }}
-                className="h-7 rounded-md border border-border bg-bg-elev px-2 text-[11.5px] font-medium text-fg hover:bg-bg-hover"
+                className="h-7 rounded-md border border-border bg-bg-elev px-2 !text-[11.5px] !font-medium text-fg hover:bg-bg-hover"
               >
                 {t('workOrders.dates.allTime')}
               </button>
@@ -173,7 +173,7 @@ export function DateRangeChip({
                 onChange(EMPTY_DATE_RANGE);
                 close();
               }}
-              className="self-start text-[11.5px] font-medium text-fg-muted underline-offset-2 hover:text-fg-strong hover:underline"
+              className="self-start !text-[11.5px] !font-medium text-fg-muted underline-offset-2 hover:text-fg-strong hover:underline"
             >
               {t('common.clear')}
             </button>

@@ -31,7 +31,7 @@
 import type { ReactNode } from 'react';
 import clsx from 'clsx';
 
-type Tone = 'neutral' | 'info' | 'warning' | 'success' | 'danger';
+type Tone = 'neutral' | 'info' | 'warning' | 'success' | 'danger' | 'violet';
 
 export function FilterChipRow({
   children,
@@ -51,6 +51,8 @@ export function FilterChip({
   label,
   count,
   tone = 'neutral',
+  dot,
+  variant,
   active,
   onToggle,
   ariaLabel,
@@ -58,6 +60,17 @@ export function FilterChip({
   label: string;
   count?: number;
   tone?: Tone;
+  /** A tone swatch before the label. Use it when the chip filters something
+   *  the surface behind it already colours the same way — the dot is what
+   *  ties "No-show" here to the no-show blocks out on the grid. */
+  dot?: boolean;
+  /**
+   * `dense` for operational bands where a row of chips is chrome rather than
+   * the page's main control: a full pill at 24px, the label quiet until you
+   * reach for it, and the count as a bare mono figure instead of a badge —
+   * a badge inside chrome competes with the counts out on the surface itself.
+   */
+  variant?: 'dense';
   active: boolean;
   onToggle: () => void;
   ariaLabel?: string;
@@ -69,20 +82,38 @@ export function FilterChip({
       aria-pressed={active}
       aria-label={ariaLabel ?? label}
       className={clsx(
-        'inline-flex h-8 items-center gap-1.5 rounded-md border px-2.5 text-[12px] font-medium transition-colors',
+        'inline-flex items-center gap-1.5 border transition-colors',
+        // !text- and !font-: Preflight's unlayered `button { font: inherit }`
+        // flows the body's SIZE AND WEIGHT onto the button, and layered
+        // utilities cannot beat either — the same trap Button carries a note
+        // about. Without the important modifier a chip renders two pixels too
+        // large at weight 400, which reads as a deliberately quiet style
+        // rather than as the bug it is.
+        variant === 'dense'
+          ? 'h-6 rounded-full px-[9px] !text-[11.5px] !font-semibold'
+          : 'h-8 rounded-md px-2.5 !text-[12px] !font-medium',
         active
           ? 'border-accent-500/45 bg-accent-500/10 text-fg-accent hover:bg-[color-mix(in_oklch,var(--accent-500)_14%,var(--bg-elev))]'
-          : 'border-border bg-bg-elev text-fg hover:bg-bg-hover'
+          : variant === 'dense'
+            ? 'border-border bg-bg-elev text-fg-muted hover:bg-bg-hover hover:text-fg-strong'
+            : 'border-border bg-bg-elev text-fg hover:bg-bg-hover'
       )}
     >
-      <span>{label}</span>
+      {dot && <span className={clsx('size-[7px] shrink-0 rounded-[2px]', dotToneClass(tone))} />}
+      <span className={variant === 'dense' ? 'leading-none' : undefined}>{label}</span>
       {typeof count === 'number' && (
         <span
           className={clsx(
-            'rounded px-1.5 py-px font-mono text-[10.5px] font-semibold tabular-nums',
-            active
-              ? 'bg-accent-500/20 text-fg-accent'
-              : countToneClass(tone)
+            // leading-none on both halves: a mono figure and a sans label have
+            // different line boxes, and centring two unequal boxes is what
+            // leaves the number sitting off the label's baseline.
+            'font-mono leading-none tabular-nums',
+            variant === 'dense'
+              ? clsx('text-[10.5px]', active ? 'text-fg-accent' : 'text-fg-strong')
+              : clsx(
+                  'rounded px-1.5 py-px text-[10.5px] font-semibold',
+                  active ? 'bg-accent-500/20 text-fg-accent' : countToneClass(tone),
+                ),
           )}
         >
           {count.toLocaleString()}
@@ -92,10 +123,32 @@ export function FilterChip({
   );
 }
 
+/** The swatch is a flat fill in the tone, so it reads as the same colour the
+ *  grid uses rather than a tinted wash of it. */
+function dotToneClass(tone: Tone): string {
+  switch (tone) {
+    case 'info':
+      return 'bg-info-500';
+    case 'warning':
+      return 'bg-warning-500';
+    case 'success':
+      return 'bg-success-500';
+    case 'danger':
+      return 'bg-danger-500';
+    case 'violet':
+      return 'bg-violet-500';
+    case 'neutral':
+    default:
+      return 'bg-fg-muted';
+  }
+}
+
 function countToneClass(tone: Tone): string {
   switch (tone) {
     case 'info':
       return 'bg-info-500/12 text-info-500';
+    case 'violet':
+      return 'bg-violet-500/12 text-violet-500';
     case 'warning':
       return 'bg-warning-500/14 text-warning-500';
     case 'success':

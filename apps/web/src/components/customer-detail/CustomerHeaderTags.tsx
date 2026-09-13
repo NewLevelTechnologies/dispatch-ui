@@ -110,7 +110,7 @@ export default function CustomerHeaderTags({
             type="button"
             onClick={() => setPicking(true)}
             aria-label={t('tags.showAll', { count: tags.length })}
-            className="cursor-pointer text-[11px] font-semibold text-fg-muted hover:text-fg"
+            className="cursor-pointer !text-[11px] !font-semibold text-fg-muted hover:text-fg"
           >
             +{overflow}
           </button>
@@ -120,7 +120,7 @@ export default function CustomerHeaderTags({
             type="button"
             onClick={() => setPicking(true)}
             aria-label={t('tags.addTag')}
-            className="flex h-[19px] w-[19px] cursor-pointer items-center justify-center rounded-full border border-dashed border-border text-[12px] leading-none text-fg-muted hover:border-border-strong hover:text-fg"
+            className="flex h-[19px] w-[19px] cursor-pointer items-center justify-center rounded-full border border-dashed border-border !text-[12px] leading-none text-fg-muted hover:border-border-strong hover:text-fg"
           >
             +
           </button>

@@ -375,11 +375,23 @@
 }
 
 /* `sm` — inline placements (e.g. beside a field label). */
-.toggle-group--sm { padding: 2px; gap: 2px; border-radius: 7px; }
+/* The dense variant sits in operational chrome beside 26px fields, so its
+   height is DECLARED rather than derived from its own text — a content-sized
+   track lands a couple of pixels taller than everything next to it, which is
+   how one band ends up with three heights. */
+.toggle-group--sm {
+  box-sizing: border-box;
+  height: 26px;
+  padding: 2px;
+  gap: 2px;
+  border-radius: 7px;
+}
 .toggle-group--sm .toggle-group-option {
-  padding: 2px 8px;
+  display: grid;
+  place-items: center;
+  padding: 0 10px;
   gap: 4px;
-  font-size: 11px;
+  font-size: 11.5px;
   border-radius: 5px;
 }
 

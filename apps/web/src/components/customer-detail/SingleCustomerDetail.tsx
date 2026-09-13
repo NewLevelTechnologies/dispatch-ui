@@ -107,7 +107,7 @@ function PremisePill({
           type="button"
           onClick={() => setEditing(false)}
           disabled={saveMutation.isPending}
-          className="bg-transparent p-0 text-[11px] text-fg-muted hover:text-fg-strong"
+          className="bg-transparent p-0 !text-[11px] text-fg-muted hover:text-fg-strong"
         >
           Cancel
         </button>

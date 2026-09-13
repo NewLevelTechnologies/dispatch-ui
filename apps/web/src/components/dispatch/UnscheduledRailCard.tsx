@@ -18,6 +18,7 @@ import { useTranslation } from '@dispatch/i18n';
 import { draggable } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
 import type { UnscheduledWorkOrder } from '../../api/setup';
 import { Pill } from '../ui/Pill';
+import { titleCaseAddress } from '@dispatch/utils';
 import { formatAge } from '../../lib/boardTime';
 import { formatMiles, type NearestStop } from '../../lib/nearestStop';
 
@@ -85,8 +86,10 @@ export default function UnscheduledRailCard({
   // to say one word twice.
   const meta = [
     divisionName,
-    workOrder.serviceLocationCity,
-    regionName && regionName !== workOrder.serviceLocationCity ? regionName : null,
+    titleCaseAddress(workOrder.serviceLocationCity),
+    regionName && regionName.toUpperCase() !== (workOrder.serviceLocationCity ?? '').toUpperCase()
+      ? regionName
+      : null,
   ]
     .filter(Boolean)
     .join(' · ');

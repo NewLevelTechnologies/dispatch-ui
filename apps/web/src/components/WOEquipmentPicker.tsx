@@ -159,7 +159,7 @@ export default function WOEquipmentPicker({
         <button
           type="button"
           onClick={onAddNew}
-          className="flex w-full items-center gap-1.5 px-[11px] py-2.5 text-[12px] leading-none !font-semibold text-fg-accent hover:underline"
+          className="flex w-full items-center gap-1.5 px-[11px] py-2.5 !text-[12px] leading-none !font-semibold text-fg-accent hover:underline"
         >
           <PlusIcon className="size-3.5" />
           {addNewLabel ?? t('workOrders.workItems.addEquipmentOnSite', { entity: getName('equipment') })}
@@ -172,7 +172,7 @@ export default function WOEquipmentPicker({
         <button
           type="button"
           onClick={onNotNeeded}
-          className="block w-full border-t border-border-soft px-[11px] py-2.5 text-center text-[12px] text-fg-muted hover:text-fg"
+          className="block w-full border-t border-border-soft px-[11px] py-2.5 text-center !text-[12px] text-fg-muted hover:text-fg"
         >
           {t('workOrders.workItems.noEquipmentNeededSet', {
             entity: getName('work_item'),

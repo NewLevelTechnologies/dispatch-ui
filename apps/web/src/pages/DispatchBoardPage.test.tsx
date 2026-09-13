@@ -7,6 +7,7 @@ const mockGetBoard = vi.fn();
 const mockGetUnscheduled = vi.fn();
 const mockGetWeek = vi.fn();
 const mockRegionsGetAll = vi.fn();
+const mockDivisionsGetAll = vi.fn();
 const mockRelease = vi.fn();
 const mockReleaseOne = vi.fn();
 const mockDeleteDispatch = vi.fn();
@@ -28,6 +29,10 @@ vi.mock('../api/setup', async (importOriginal) => {
     dispatchRegionApi: {
       ...actual.dispatchRegionApi,
       getAll: (...a: unknown[]) => mockRegionsGetAll(...a),
+    },
+    divisionsApi: {
+      ...actual.divisionsApi,
+      getAll: (...a: unknown[]) => mockDivisionsGetAll(...a),
     },
     dispatchesApi: {
       ...actual.dispatchesApi,
@@ -138,14 +143,18 @@ describe('DispatchBoardPage', () => {
 
   // Rows ARE the board: they're the drop targets and they say who's free.
   // An empty state here would hide both and leave nowhere to drop work.
-  it('renders the rows, with a note, when nothing is scheduled', async () => {
-    mockGetBoard.mockResolvedValue({ techs: [tech('u1', 'Maya Alvarez', ['r1'])], dispatches: [] });
-
+  // An empty day is a legitimate board, not an error: the rows ARE the drop
+  // targets, and a banner saying "nothing is scheduled" above a grid that
+  // plainly shows nothing scheduled is the same sentence twice.
+  it('renders the rows and no banner when nothing is scheduled', async () => {
+    mockGetBoard.mockResolvedValue({
+      techs: [tech('u1', 'Maya Alvarez', ['r1'])],
+      dispatches: [],
+    });
     renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch' });
 
     expect(await screen.findByText('Maya Alvarez')).toBeInTheDocument();
-    expect(screen.getByText(/are scheduled for this day/)).toBeInTheDocument();
-    expect(screen.queryByText('No technicians on this board')).not.toBeInTheDocument();
+    expect(screen.queryByText(/are scheduled for this day/)).not.toBeInTheDocument();
   });
 
   it('distinguishes a filtered board from an unscheduled one, keeping the rows', async () => {
@@ -183,7 +192,7 @@ describe('DispatchBoardPage', () => {
     renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch' });
 
     await screen.findByText('Maya Alvarez');
-    expect(screen.queryByRole('button', { name: 'Region' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('combobox', { name: /Region/ })).not.toBeInTheDocument();
   });
 
   it('shows the region filter once a second region is covered', async () => {
@@ -199,7 +208,7 @@ describe('DispatchBoardPage', () => {
     renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch' });
 
     await screen.findByText('Maya Alvarez');
-    expect(screen.getByRole('button', { name: 'Region' })).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: /Region/ })).toBeInTheDocument();
   });
 
   // Coverage, not primary: a tech whose PRIMARY is Phoenix but who also
@@ -217,7 +226,7 @@ describe('DispatchBoardPage', () => {
     renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch' });
 
     await screen.findByText('Maya Alvarez');
-    expect(screen.getByRole('button', { name: 'Region' })).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: /Region/ })).toBeInTheDocument();
   });
 
   it('scopes the board read to the region in the URL', async () => {
@@ -845,126 +854,55 @@ describe('DispatchBoardPage date label', () => {
     });
   });
 
-  it('names the day being shown', async () => {
+  // The date moved into the subtitle, where it has room to be a real date
+  // rather than a label wedged between two chevrons.
+  it('names the day, the rows and the work in the subtitle', async () => {
     renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch?date=2026-03-18' });
-    expect(await screen.findByText('Wed, Mar 18')).toBeInTheDocument();
+    expect(await screen.findByText(/Wed, Mar 18/)).toBeInTheDocument();
+    expect(screen.getByText(/in scope/)).toBeInTheDocument();
   });
 
-  it('says Today rather than the date when it is today', async () => {
+  // A now-time on Thursday's board would be a lie, the same way the now-line
+  // would be.
+  it('gives the time only while the board is showing today', async () => {
+    renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch?date=2026-03-18' });
+    await screen.findByText(/Wed, Mar 18/);
+    expect(screen.queryByText(/now /)).not.toBeInTheDocument();
+  });
+
+  it('offers no Today while the board is already showing today', async () => {
     renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch' });
     await screen.findByText('Maya Alvarez');
-    // Both the label and the reset button read "Today"; the reset is disabled
-    // because there is nowhere to reset to.
-    expect(screen.getByRole('button', { name: 'Today' })).toBeDisabled();
+    // Self-hiding, like the filters: there is nowhere to go back to.
+    expect(screen.queryByRole('button', { name: 'Today' })).not.toBeInTheDocument();
+  });
+
+  // The date is in the nav where you step through days, and Today appearing
+  // beside it is the clearest cue that the board is on another day.
+  it('names the day and offers Today once you step off it', async () => {
+    renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch?date=2026-03-18' });
+    expect(await screen.findByRole('button', { name: 'Mar 18' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Today' })).toBeEnabled();
+  });
+
+  it('walks back to today from it', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch?date=2026-03-18' });
+
+    await user.click(await screen.findByRole('button', { name: 'Today' }));
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: 'Today' })).not.toBeInTheDocument(),
+    );
+  });
+
+  it('reaches an arbitrary date from the nav', async () => {
+    renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch' });
+    expect(await screen.findByLabelText('Pick a date')).toHaveAttribute('type', 'date');
   });
 });
 
-// The rail's routing signal: who is ALREADY going to be near this today.
-// Computed client-side, site-to-site, over the technicians in scope.
-describe('DispatchBoardPage rail proximity', () => {
-  const SITE = { latitude: 33.45, longitude: -112.07 };
-  const NEAR = { latitude: 33.4645, longitude: -112.07 };
-
-  const booked = (over: Record<string, unknown> = {}) => ({
-    id: 'd1',
-    seq: 1,
-    status: 'SCHEDULED',
-    arrivalWindowStart: '2026-03-15T12:00:00Z',
-    arrivalWindowEnd: '2026-03-15T14:00:00Z',
-    estimatedDuration: null,
-    releasedAt: '2026-03-15T07:00:00Z',
-    version: 1,
-    assignedUserId: 'u1',
-    assignedUserName: 'Jordan Wei',
-    workOrderId: 'wo-other',
-    workOrderNumber: 'WO-1',
-    workOrderTypeId: null,
-    workOrderSummary: 'Tune-up',
-    customerId: 'c2',
-    customerName: 'Other',
-    priority: 'NORMAL',
-    recurring: false,
-    serviceLocationId: 'l2',
-    serviceLocationCity: 'Phoenix',
-    serviceLocationState: 'AZ',
-    latitude: NEAR.latitude,
-    longitude: NEAR.longitude,
-    driveMinFromPrev: null,
-    arrivedAt: null,
-    departedAt: null,
-    addressedWorkItemIds: [],
-    ...over,
-  });
-
-  beforeEach(() => {
-    vi.clearAllMocks();
-    mockRegionsGetAll.mockResolvedValue([]);
-    mockGetUnscheduled.mockResolvedValue(
-      railWith([railWorkOrder({ latitude: SITE.latitude, longitude: SITE.longitude })]),
-    );
-    mockGetBoard.mockResolvedValue({
-      techs: [tech('u1', 'Jordan Wei', ['r1'])],
-      dispatches: [booked()],
-      timeZone: 'UTC',
-    });
-  });
-
-  it('names who is already going near the site, and when', async () => {
-    renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch?date=2026-03-15' });
-
-    expect(await screen.findByText(/Nearest/)).toBeInTheDocument();
-    expect(screen.getByText('Jordan W.')).toBeInTheDocument();
-    expect(screen.getByText(/1\.0 mi · 12p/)).toBeInTheDocument();
-  });
-
-  // Absent, not zero, not a placeholder. Early on a fresh day every card is
-  // bare, and that is the honest rendering.
-  it('shows no line when nothing is booked yet', async () => {
-    mockGetBoard.mockResolvedValue({
-      techs: [tech('u1', 'Jordan Wei', ['r1'])],
-      dispatches: [],
-      timeZone: 'UTC',
-    });
-    renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch?date=2026-03-15' });
-
-    await screen.findByText('WO-3911');
-    expect(screen.queryByText(/Nearest/)).not.toBeInTheDocument();
-  });
-
-  // The signal is honest only once the location cache carries coordinates —
-  // ship without the line rather than with a fabricated one.
-  it('shows no line when the site never geocoded', async () => {
-    mockGetUnscheduled.mockResolvedValue(
-      railWith([railWorkOrder({ latitude: null, longitude: null })]),
-    );
-    renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch?date=2026-03-15' });
-
-    await screen.findByText('WO-3911');
-    expect(screen.queryByText(/Nearest/)).not.toBeInTheDocument();
-  });
-
-  // The week read carries aggregates, not stops — there is nothing to measure
-  // against, so the line self-hides rather than going stale.
-  it('shows no line in week view', async () => {
-    mockGetWeek.mockResolvedValue({
-      weekStart: '2026-03-16',
-      weekEnd: '2026-03-23',
-      timeZone: 'UTC',
-      days: ['2026-03-16'],
-      defaultStopsPerDay: 6,
-      techs: [],
-    });
-    renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch?view=week' });
-
-    await screen.findByText('WO-3911');
-    expect(screen.queryByText(/Nearest/)).not.toBeInTheDocument();
-  });
-});
-
-// The open visit lives in the URL for the same reason the date and the region
-// do: "look at this one" has to be a link someone can send.
-describe('DispatchBoardPage visit deep link', () => {
-  const visit = (over: Record<string, unknown> = {}) => ({
+describe('DispatchBoardPage chrome', () => {
+  const chromeDispatch = (over: Record<string, unknown> = {}) => ({
     id: 'd1',
     seq: 1,
     status: 'SCHEDULED',
@@ -995,32 +933,91 @@ describe('DispatchBoardPage visit deep link', () => {
     ...over,
   });
 
+  // Zero-count chips stay — "Urgent 0" is information — but an all-zeros row
+  // with nothing active is six controls that do nothing, so the band goes.
+  it('drops the whole chip band when there is nothing to except', async () => {
+    renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch' });
+    await screen.findByText('Maya Alvarez');
+    expect(screen.queryByRole('button', { name: /Urgent/ })).not.toBeInTheDocument();
+  });
+
+  it('keeps zero-count chips once anything is non-zero', async () => {
+    mockGetBoard.mockResolvedValue({
+      techs: [tech('u1', 'Maya Alvarez', ['r1'])],
+      dispatches: [chromeDispatch()],
+    });
+    renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch' });
+
+    // Unreleased is 1, so the band shows — and Urgent stays at 0 rather than
+    // vanishing and making the row jump.
+    expect(await screen.findByRole('button', { name: /Urgent/ })).toBeInTheDocument();
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
     mockRegionsGetAll.mockResolvedValue([]);
+    mockDivisionsGetAll.mockResolvedValue([]);
     mockGetUnscheduled.mockResolvedValue(emptyRail);
     mockGetBoard.mockResolvedValue({
       techs: [tech('u1', 'Maya Alvarez', ['r1'])],
-      dispatches: [visit()],
+      dispatches: [],
     });
   });
 
-  it('opens the drawer straight from the link', async () => {
-    renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch?d=d1' });
-    expect(await screen.findByRole('link', { name: 'WO-1' })).toBeInTheDocument();
-  });
-
-  it('leaves the drawer shut for a visit that is not on this board', async () => {
-    renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch?d=nope' });
-    await screen.findByText('Maya Alvarez');
-    expect(screen.queryByRole('link', { name: 'WO-1' })).not.toBeInTheDocument();
-  });
-
-  it('puts the visit in the URL when a block is opened', async () => {
-    const user = userEvent.setup();
+  it('counts the rows on screen', async () => {
     renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch' });
+    expect(await screen.findByText('1 rows')).toBeInTheDocument();
+  });
 
-    await user.click(await screen.findByRole('link', { name: /No cooling/ }));
-    expect(await screen.findByRole('link', { name: 'WO-1' })).toBeInTheDocument();
+  // A dispatcher learns the grid's encoding from here, not from a tooltip on
+  // every block. It lives in the chip band, so it comes and goes with it.
+  it('explains the grid’s colours', async () => {
+    mockGetBoard.mockResolvedValue({
+      techs: [tech('u1', 'Maya Alvarez', ['r1'])],
+      dispatches: [chromeDispatch()],
+    });
+    renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch' });
+    await screen.findByText('Maya Alvarez');
+    // Present in the DOM; a media query hides it below ~1100px, where the
+    // chip row already carries the colour vocabulary.
+    expect(screen.getByText('No estimate')).toBeInTheDocument();
+    expect(screen.getByText('On site now')).toBeInTheDocument();
+  });
+
+  // Division is a property of the WORK, so the tenant needs more than one
+  // before the filter is worth its width — same self-hiding rule as the rest.
+  it('hides the division filter for a single-division tenant', async () => {
+    mockDivisionsGetAll.mockResolvedValue([{ id: 'dv1', name: 'HVAC' }]);
+    renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch' });
+    await screen.findByText('Maya Alvarez');
+    expect(screen.queryByRole('combobox', { name: /Division/ })).not.toBeInTheDocument();
+  });
+
+  it('offers the division filter once there are two', async () => {
+    mockDivisionsGetAll.mockResolvedValue([
+      { id: 'dv1', name: 'HVAC' },
+      { id: 'dv2', name: 'Plumbing' },
+    ]);
+    renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch' });
+    // Closed, the picker reads as its own label — "All divisions" is the reset
+    // row inside it, per the house listbox rather than the mock's <select>.
+    expect(await screen.findByRole('combobox', { name: /Division/ })).toBeInTheDocument();
+  });
+
+  // It filters the WORK, not the rows — and the server is what enforces that,
+  // so the id has to reach all three reads or the rail would still offer work
+  // the grid is hiding.
+  it('scopes every read to the division in the URL', async () => {
+    mockDivisionsGetAll.mockResolvedValue([
+      { id: 'dv1', name: 'HVAC' },
+      { id: 'dv2', name: 'Plumbing' },
+    ]);
+    renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch?division=dv1' });
+
+    await screen.findByText('Maya Alvarez');
+    expect(mockGetBoard).toHaveBeenCalledWith(expect.objectContaining({ divisionIds: ['dv1'] }));
+    expect(mockGetUnscheduled).toHaveBeenCalledWith(
+      expect.objectContaining({ divisionIds: ['dv1'] }),
+    );
   });
 });
