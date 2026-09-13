@@ -98,13 +98,16 @@ export function FilterChip({
       )}
     >
       {dot && <span className={clsx('size-[7px] shrink-0 rounded-[2px]', dotToneClass(tone))} />}
-      <span>{label}</span>
+      <span className={variant === 'dense' ? 'leading-none' : undefined}>{label}</span>
       {typeof count === 'number' && (
         <span
           className={clsx(
-            'font-mono tabular-nums',
+            // leading-none on both halves: a mono figure and a sans label have
+            // different line boxes, and centring two unequal boxes is what
+            // leaves the number sitting off the label's baseline.
+            'font-mono leading-none tabular-nums',
             variant === 'dense'
-              ? clsx('text-[11px]', active ? 'text-fg-accent' : 'text-fg-strong')
+              ? clsx('text-[10.5px]', active ? 'text-fg-accent' : 'text-fg-strong')
               : clsx(
                   'rounded px-1.5 py-px text-[10.5px] font-semibold',
                   active ? 'bg-accent-500/20 text-fg-accent' : countToneClass(tone),

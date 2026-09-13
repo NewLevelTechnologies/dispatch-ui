@@ -61,9 +61,10 @@ export function ListSearch({
     <InputGroup
       className={
         compact
-          ? // The icon is positioned for a 32px field; at 26 it lands flush
-            // with the bottom edge, so centre it explicitly.
-            'w-[200px] shrink-0 [&>[data-slot=icon]]:top-[5px]!'
+          ? // The icon is sized and positioned for a 32px field: 16px lands
+            // flush with the bottom edge of a 26px one and reads heavy beside
+            // 11.5px type. 14px, centred on the smaller field.
+            'w-[200px] shrink-0 [&>[data-slot=icon]]:size-3.5! [&>[data-slot=icon]]:top-[6px]!'
           : 'min-w-[260px] flex-1'
       }
     >
