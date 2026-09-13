@@ -511,7 +511,7 @@ export default function FinancialInvoicesTab({
           <button
             type="button"
             onClick={() => setActionBanner(null)}
-            className="text-xs underline hover:no-underline"
+            className="!text-xs underline hover:no-underline"
             aria-label={t('common.dismiss')}
           >
             {t('common.dismiss')}
@@ -961,7 +961,7 @@ function PaymentsSubsection({
           <button
             type="button"
             onClick={onAddPayment}
-            className="inline-flex cursor-pointer items-center gap-1 rounded-md border border-dashed border-zinc-300 px-2 py-0.5 text-xs text-zinc-600 hover:border-zinc-400 hover:text-zinc-800 dark:border-zinc-600 dark:text-zinc-400 dark:hover:border-zinc-500 dark:hover:text-zinc-200"
+            className="inline-flex cursor-pointer items-center gap-1 rounded-md border border-dashed border-zinc-300 px-2 py-0.5 !text-xs text-zinc-600 hover:border-zinc-400 hover:text-zinc-800 dark:border-zinc-600 dark:text-zinc-400 dark:hover:border-zinc-500 dark:hover:text-zinc-200"
           >
             <PlusIcon className="size-3" />
             {t('workOrders.financialDrawer.invoicesTab.addPayment', {

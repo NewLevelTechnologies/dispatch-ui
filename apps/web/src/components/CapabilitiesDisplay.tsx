@@ -111,10 +111,10 @@ export default function CapabilitiesDisplay({
       {/* Expand/Collapse All buttons */}
       {displayGroups.length > 3 && (
         <div className="mb-4 flex gap-2">
-          <Button plain onClick={expandAll} className="text-sm">
+          <Button plain onClick={expandAll} className="!text-sm">
             {t('capabilities.expandAll')}
           </Button>
-          <Button plain onClick={collapseAll} className="text-sm">
+          <Button plain onClick={collapseAll} className="!text-sm">
             {t('capabilities.collapseAll')}
           </Button>
         </div>

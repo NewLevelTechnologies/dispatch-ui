@@ -861,7 +861,7 @@ export function ContactCard({
             <button
               type="button"
               onClick={onViewAll}
-              className="mt-2.5 block w-full border-t border-border-soft pt-2 text-left text-[11px] font-medium text-fg-accent hover:underline"
+              className="mt-2.5 block w-full border-t border-border-soft pt-2 text-left !text-[11px] !font-medium text-fg-accent hover:underline"
             >
               View all {all.length} →
             </button>

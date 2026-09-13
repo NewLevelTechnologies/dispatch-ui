@@ -115,13 +115,13 @@ export default function EquipmentServiceHistoryTab({ equipmentId }: { equipmentI
             value={search}
             onChange={(e) => setSearchAndReset(e.target.value)}
             placeholder="Search work, tech, WO#…"
-            className="min-w-0 flex-1 bg-transparent text-[12.5px] text-fg outline-none placeholder:text-fg-dim"
+            className="min-w-0 flex-1 bg-transparent !text-[12.5px] text-fg outline-none placeholder:text-fg-dim"
           />
           {search && (
             <button
               type="button"
               onClick={() => setSearchAndReset('')}
-              className="px-1 text-[11px] text-fg-dim hover:text-fg-strong"
+              className="px-1 !text-[11px] text-fg-dim hover:text-fg-strong"
               aria-label="Clear search"
             >
               ×
@@ -135,7 +135,7 @@ export default function EquipmentServiceHistoryTab({ equipmentId }: { equipmentI
             resetPage();
           }}
           aria-label="Date range"
-          className="h-8 rounded-md border border-border bg-bg-elev px-2 text-[12px] text-fg"
+          className="h-8 rounded-md border border-border bg-bg-elev px-2 !text-[12px] text-fg"
         >
           <option value="all">All time</option>
           <option value="1y">Past year</option>

@@ -308,7 +308,7 @@ export default function LocationFilesTab({
                 key={c.id}
                 onClick={() => setType(c.id)}
                 aria-pressed={active}
-                className={`inline-flex h-[30px] items-center gap-1.5 rounded-md border px-2.5 text-[12px] font-medium ${
+                className={`inline-flex h-[30px] items-center gap-1.5 rounded-md border px-2.5 !text-[12px] !font-medium ${
                   active
                     ? 'border-[color-mix(in_oklch,var(--accent-500)_45%,var(--border))] bg-[color-mix(in_oklch,var(--accent-500)_9%,var(--bg-elev))] text-fg-accent'
                     : 'border-border bg-bg-elev text-fg'
@@ -809,7 +809,7 @@ function LightboxInner({
                     onClick={() => profileMutation.mutate(false)}
                     disabled={profileMutation.isPending}
                     title="Remove site photo"
-                    className="group inline-flex items-center gap-1.5 rounded-full bg-amber-500/20 px-3 py-1.5 text-sm font-medium text-amber-200 ring-1 ring-inset ring-amber-400/30 hover:bg-amber-500/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-white disabled:cursor-not-allowed disabled:opacity-50"
+                    className="group inline-flex items-center gap-1.5 rounded-full bg-amber-500/20 px-3 py-1.5 !text-sm !font-medium text-amber-200 ring-1 ring-inset ring-amber-400/30 hover:bg-amber-500/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-white disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     <StarIconSolid className="size-4" />
                     Site photo
@@ -820,7 +820,7 @@ function LightboxInner({
                     type="button"
                     onClick={() => profileMutation.mutate(true)}
                     disabled={profileMutation.isPending}
-                    className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5 text-sm text-white hover:bg-white/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-white disabled:cursor-not-allowed disabled:opacity-50"
+                    className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5 !text-sm text-white hover:bg-white/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-white disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     <StarIcon className="size-4" />
                     Set as site photo
@@ -833,7 +833,7 @@ function LightboxInner({
                   }}
                   disabled={deleteMutation.isPending}
                   aria-label="Delete"
-                  className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5 text-sm text-white hover:bg-rose-500/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-white disabled:cursor-not-allowed disabled:opacity-50"
+                  className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5 !text-sm text-white hover:bg-rose-500/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-white disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <TrashIcon className="size-4" />
                   Delete

@@ -293,7 +293,7 @@ export default function DispatchesSection({
                   type="button"
                   onClick={() => setShowPast((s) => !s)}
                   aria-expanded={showPast}
-                  className="inline-flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200"
+                  className="inline-flex items-center gap-1 !text-xs !font-semibold uppercase tracking-wide text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200"
                 >
                   <ChevronRightIcon
                     className={`size-3 transition-transform ${showPast ? 'rotate-90' : ''}`}

@@ -79,7 +79,7 @@ export default function EquipmentQuickViewDrawer({
         <button
           type="button"
           onClick={handleBack}
-          className="inline-flex items-center gap-1.5 rounded-md p-1 text-sm text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
+          className="inline-flex items-center gap-1.5 rounded-md p-1 !text-sm text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
           aria-label={
             parent
               ? t('workOrders.workItems.backToEntity', { entity: parent.name })

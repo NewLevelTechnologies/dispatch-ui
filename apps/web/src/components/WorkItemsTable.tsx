@@ -848,7 +848,7 @@ function SubUnitsRow({
             key={d.id}
             type="button"
             onClick={() => onSelectSubUnit({ id: d.id, name: d.name })}
-            className="inline-flex items-center gap-1.5 rounded-full bg-zinc-100 py-0.5 pl-1 pr-2.5 text-xs text-zinc-700 ring-1 ring-inset ring-zinc-200 hover:bg-zinc-200 hover:text-blue-600 dark:bg-zinc-800 dark:text-zinc-200 dark:ring-zinc-700 dark:hover:bg-zinc-700 dark:hover:text-blue-400"
+            className="inline-flex items-center gap-1.5 rounded-full bg-zinc-100 py-0.5 pl-1 pr-2.5 !text-xs text-zinc-700 ring-1 ring-inset ring-zinc-200 hover:bg-zinc-200 hover:text-blue-600 dark:bg-zinc-800 dark:text-zinc-200 dark:ring-zinc-700 dark:hover:bg-zinc-700 dark:hover:text-blue-400"
           >
             <EquipmentThumbnail
               url={d.profileImageUrl}
@@ -882,7 +882,7 @@ function SubUnitsRow({
         <button
           type="button"
           onClick={() => onAddSubUnit({ id: equipmentId, name: equipmentName })}
-          className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs text-blue-600 ring-1 ring-inset ring-blue-200 hover:bg-blue-50 dark:text-blue-400 dark:ring-blue-900 dark:hover:bg-blue-950/30"
+          className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 !text-xs text-blue-600 ring-1 ring-inset ring-blue-200 hover:bg-blue-50 dark:text-blue-400 dark:ring-blue-900 dark:hover:bg-blue-950/30"
         >
           <PlusIcon className="size-3.5" />
           {t('common.actions.add', { entity: getName('equipment_component') })}
@@ -1006,7 +1006,7 @@ function PhotoStrip({ images, onSelect }: PhotoStripProps) {
         <button
           type="button"
           onClick={() => onSelect(visible.length)}
-          className="flex size-8 items-center justify-center rounded text-xs font-medium text-zinc-700 ring-1 ring-zinc-950/10 hover:bg-zinc-50 hover:text-blue-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:text-zinc-300 dark:ring-white/10 dark:hover:bg-white/5 dark:hover:text-blue-400"
+          className="flex size-8 items-center justify-center rounded !text-xs !font-medium text-zinc-700 ring-1 ring-zinc-950/10 hover:bg-zinc-50 hover:text-blue-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:text-zinc-300 dark:ring-white/10 dark:hover:bg-white/5 dark:hover:text-blue-400"
         >
           +{overflow}
         </button>

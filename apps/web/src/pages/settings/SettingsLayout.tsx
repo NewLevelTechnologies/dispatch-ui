@@ -59,7 +59,7 @@ function RailContent({
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder={t('settings.searchPlaceholder')}
-            className="block h-7 w-full rounded-md border border-border bg-bg-elev pl-7 pr-2 text-[12px] text-fg placeholder:text-fg-dim focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500/30"
+            className="block h-7 w-full rounded-md border border-border bg-bg-elev pl-7 pr-2 !text-[12px] text-fg placeholder:text-fg-dim focus:border-accent-500 focus:outline-none focus:ring-1 focus:ring-accent-500/30"
           />
         </div>
       </div>

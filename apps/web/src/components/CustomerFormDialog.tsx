@@ -816,7 +816,7 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
                 <button
                   type="button"
                   onClick={() => setShowSiteContact(!showSiteContact)}
-                  className="flex w-full items-center gap-2 text-sm font-medium text-zinc-700 hover:text-zinc-900 dark:text-zinc-300 dark:hover:text-zinc-100"
+                  className="flex w-full items-center gap-2 !text-sm !font-medium text-zinc-700 hover:text-zinc-900 dark:text-zinc-300 dark:hover:text-zinc-100"
                 >
                   <svg className={`h-4 w-4 transition-transform ${showSiteContact ? 'rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -862,7 +862,7 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
                 <button
                   type="button"
                   onClick={() => setShowAccessInstructions(!showAccessInstructions)}
-                  className="flex w-full items-center gap-2 text-sm font-medium text-zinc-700 hover:text-zinc-900 dark:text-zinc-300 dark:hover:text-zinc-100"
+                  className="flex w-full items-center gap-2 !text-sm !font-medium text-zinc-700 hover:text-zinc-900 dark:text-zinc-300 dark:hover:text-zinc-100"
                 >
                   <svg className={`h-4 w-4 transition-transform ${showAccessInstructions ? 'rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -888,7 +888,7 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
                 <button
                   type="button"
                   onClick={() => setShowBusinessTerms(!showBusinessTerms)}
-                  className="flex w-full items-center gap-2 text-sm font-medium text-zinc-700 hover:text-zinc-900 dark:text-zinc-300 dark:hover:text-zinc-100"
+                  className="flex w-full items-center gap-2 !text-sm !font-medium text-zinc-700 hover:text-zinc-900 dark:text-zinc-300 dark:hover:text-zinc-100"
                 >
                   <svg className={`h-4 w-4 transition-transform ${showBusinessTerms ? 'rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -1160,7 +1160,7 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
                 <button
                   type="button"
                   onClick={() => setShowBusinessTerms(!showBusinessTerms)}
-                  className="flex w-full items-center gap-2 text-sm font-medium text-zinc-700 hover:text-zinc-900 dark:text-zinc-300 dark:hover:text-zinc-100"
+                  className="flex w-full items-center gap-2 !text-sm !font-medium text-zinc-700 hover:text-zinc-900 dark:text-zinc-300 dark:hover:text-zinc-100"
                 >
                   <svg className={`h-4 w-4 transition-transform ${showBusinessTerms ? 'rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />

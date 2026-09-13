@@ -133,7 +133,7 @@ export const OtpInput = forwardRef<OtpInputHandle, OtpInputProps>(function OtpIn
           disabled={disabled}
           onChange={(e) => handleDigit(i, e.target.value)}
           onKeyDown={(e) => handleKeyDown(i, e)}
-          className="h-[50px] w-[42px] rounded-md border-[1.5px] border-border bg-bg-elev text-center font-mono text-[22px] font-semibold text-fg-strong outline-none focus:border-accent-500 focus:ring-3 focus:ring-accent-500/20 disabled:opacity-50"
+          className="h-[50px] w-[42px] rounded-md border-[1.5px] border-border bg-bg-elev text-center font-mono !text-[22px] !font-semibold text-fg-strong outline-none focus:border-accent-500 focus:ring-3 focus:ring-accent-500/20 disabled:opacity-50"
         />
       ))}
     </div>

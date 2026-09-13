@@ -633,7 +633,7 @@ function VendorField({
                 onPick(v);
                 setOpen(false);
               }}
-              className="block w-full border-b border-border-soft px-2.5 py-1.5 text-left text-[12.5px] text-fg-strong last:border-b-0 hover:bg-bg-hover"
+              className="block w-full border-b border-border-soft px-2.5 py-1.5 text-left !text-[12.5px] text-fg-strong last:border-b-0 hover:bg-bg-hover"
             >
               {v.name}
             </button>

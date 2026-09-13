@@ -96,7 +96,7 @@ export default function AdditionalContactsList({
       <div className="flex items-center justify-between mb-2">
         <Subheading>{t('contacts.title')}</Subheading>
         {canEdit && showAddButton && (
-          <Button plain onClick={handleAdd} className="text-sm">
+          <Button plain onClick={handleAdd} className="!text-sm">
             <PlusIcon className="size-4" />
             {t('contacts.actions.add')}
           </Button>

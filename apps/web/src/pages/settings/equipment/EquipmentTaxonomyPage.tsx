@@ -441,7 +441,7 @@ export default function EquipmentTaxonomyPage() {
               <button
                 type="button"
                 onClick={() => setDialog({ kind: 'addType' })}
-                className="flex items-center justify-center gap-1.5 rounded-lg border border-dashed border-border-strong px-3.5 py-3 text-[12.5px] text-fg-muted hover:border-fg-muted hover:bg-bg-elev hover:text-fg-strong"
+                className="flex items-center justify-center gap-1.5 rounded-lg border border-dashed border-border-strong px-3.5 py-3 !text-[12.5px] text-fg-muted hover:border-fg-muted hover:bg-bg-elev hover:text-fg-strong"
               >
                 <PlusIcon className="size-4" />
                 {t('settings.equipmentTaxonomy.addType')}
@@ -773,7 +773,7 @@ function TaxonomyBlock({
             <button
               type="button"
               onClick={onAddCategory}
-              className="mx-2.5 my-1 flex items-center gap-1.5 rounded-md border border-dashed border-border-strong px-2.5 py-2 text-[12px] text-fg-muted hover:border-fg-muted hover:bg-bg-elev hover:text-fg-strong"
+              className="mx-2.5 my-1 flex items-center gap-1.5 rounded-md border border-dashed border-border-strong px-2.5 py-2 !text-[12px] text-fg-muted hover:border-fg-muted hover:bg-bg-elev hover:text-fg-strong"
             >
               <PlusIcon className="size-3.5" />
               {t('settings.equipmentTaxonomy.addCategoryTo', { name: type.name })}

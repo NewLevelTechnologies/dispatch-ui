@@ -1047,7 +1047,7 @@ function DuplicateGuard({
         <button
           type="button"
           onClick={onDismiss}
-          className="text-[11.5px] text-fg-muted underline decoration-border-strong underline-offset-2 hover:text-fg"
+          className="!text-[11.5px] text-fg-muted underline decoration-border-strong underline-offset-2 hover:text-fg"
         >
           Not a duplicate — keep adding
         </button>

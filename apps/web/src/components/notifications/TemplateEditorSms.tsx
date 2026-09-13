@@ -84,7 +84,7 @@ export function TemplateEditorSms({
           <Textarea
             ref={bodyRef}
             rows={6}
-            className="font-mono text-[12px] leading-[1.55]"
+            className="font-mono !text-[12px] leading-[1.55]"
             value={form.bodyTemplate}
             onChange={(e) => onChange({ bodyTemplate: e.target.value })}
             aria-label="SMS message"

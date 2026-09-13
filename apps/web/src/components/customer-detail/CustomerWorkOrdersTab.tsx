@@ -183,7 +183,7 @@ export default function CustomerWorkOrdersTab({
               resetPage();
             }}
             placeholder="Search WO#, summary, tech, equipment…"
-            className="min-w-0 flex-1 bg-transparent text-[12.5px] text-fg outline-none placeholder:text-fg-dim"
+            className="min-w-0 flex-1 bg-transparent !text-[12.5px] text-fg outline-none placeholder:text-fg-dim"
           />
           {search && (
             <button
@@ -191,7 +191,7 @@ export default function CustomerWorkOrdersTab({
                 setSearch('');
                 resetPage();
               }}
-              className="px-1 text-[11px] text-fg-dim hover:text-fg-strong"
+              className="px-1 !text-[11px] text-fg-dim hover:text-fg-strong"
             >
               ×
             </button>

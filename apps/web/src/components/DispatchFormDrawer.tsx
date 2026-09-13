@@ -372,7 +372,7 @@ export default function DispatchFormDrawer({
                   aria-label="Date"
                   value={date}
                   onChange={(e) => setDate(e.target.value)}
-                  className="h-[34px] w-full rounded-sm border border-border bg-bg px-2.5 text-[12.5px] text-fg-strong outline-none focus:border-accent-500"
+                  className="h-[34px] w-full rounded-sm border border-border bg-bg px-2.5 !text-[12.5px] text-fg-strong outline-none focus:border-accent-500"
                 />
               </label>
               <label className="flex-[1.2]">
@@ -383,7 +383,7 @@ export default function DispatchFormDrawer({
                   aria-label="Arrival window"
                   value={winKey}
                   onChange={(e) => setWinKey(e.target.value)}
-                  className="h-[34px] w-full rounded-sm border border-border bg-bg px-2.5 text-[12.5px] text-fg-strong outline-none focus:border-accent-500"
+                  className="h-[34px] w-full rounded-sm border border-border bg-bg px-2.5 !text-[12.5px] text-fg-strong outline-none focus:border-accent-500"
                 >
                   {winOptions.map((w) => (
                     <option key={w.key} value={w.key}>
@@ -594,7 +594,7 @@ function TechPicker({
               onChange={(e) => setQ(e.target.value)}
               placeholder={`Search ${techWord}s…`}
               aria-label={`Search ${techWord}s`}
-              className="h-8 w-full rounded-sm border border-border bg-bg px-2.5 text-[12.5px] text-fg-strong outline-none focus:border-accent-500"
+              className="h-8 w-full rounded-sm border border-border bg-bg px-2.5 !text-[12.5px] text-fg-strong outline-none focus:border-accent-500"
             />
           </div>
           <div role="listbox" className="max-h-[240px] overflow-y-auto">

@@ -371,7 +371,7 @@ function MediaThumbs({ media, onOpen }: { media: WorkOrderFile[]; onOpen: (index
         <button
           type="button"
           onClick={() => onOpen(shown.length)}
-          className="grid size-14 shrink-0 place-items-center rounded-sm border border-border bg-bg-elev-2 text-[11px] font-semibold text-fg-muted hover:bg-bg-hover"
+          className="grid size-14 shrink-0 place-items-center rounded-sm border border-border bg-bg-elev-2 !text-[11px] !font-semibold text-fg-muted hover:bg-bg-hover"
         >
           {`+${overflow}`}
         </button>

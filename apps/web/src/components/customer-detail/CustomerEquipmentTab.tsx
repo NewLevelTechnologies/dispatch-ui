@@ -127,10 +127,10 @@ export default function CustomerEquipmentTab({
               resetPage();
             }}
             placeholder="Search by ID, make, model, serial…"
-            className="min-w-0 flex-1 bg-transparent text-[12.5px] text-fg outline-none placeholder:text-fg-dim"
+            className="min-w-0 flex-1 bg-transparent !text-[12.5px] text-fg outline-none placeholder:text-fg-dim"
           />
           {q && (
-            <button onClick={() => { setQ(''); resetPage(); }} className="px-1 text-[11px] text-fg-dim hover:text-fg-strong">
+            <button onClick={() => { setQ(''); resetPage(); }} className="px-1 !text-[11px] text-fg-dim hover:text-fg-strong">
               ×
             </button>
           )}
@@ -142,7 +142,7 @@ export default function CustomerEquipmentTab({
             <button
               key={c.id}
               onClick={() => { setFilter(active ? null : c.id); resetPage(); }}
-              className={`inline-flex h-[30px] items-center gap-1.5 rounded-md border px-2.5 text-[12px] font-medium ${
+              className={`inline-flex h-[30px] items-center gap-1.5 rounded-md border px-2.5 !text-[12px] !font-medium ${
                 active
                   ? 'border-[color-mix(in_oklch,var(--accent-500)_45%,var(--border))] bg-[color-mix(in_oklch,var(--accent-500)_9%,var(--bg-elev))] text-fg-accent'
                   : 'border-border bg-bg-elev text-fg'

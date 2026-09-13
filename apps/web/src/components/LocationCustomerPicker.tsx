@@ -129,7 +129,7 @@ export default function LocationCustomerPicker({
           <button
             type="button"
             onClick={() => navigate('/customers/new')}
-            className="flex w-full items-center gap-1.5 border-t border-border-soft bg-bg-elev-2 px-3 py-2 text-left text-[12px] font-medium text-fg-accent hover:bg-bg-hover"
+            className="flex w-full items-center gap-1.5 border-t border-border-soft bg-bg-elev-2 px-3 py-2 text-left !text-[12px] !font-medium text-fg-accent hover:bg-bg-hover"
           >
             <span className="text-[14px] leading-none">+</span>
             {t('common.actions.new', { entity: getName('customer') })}

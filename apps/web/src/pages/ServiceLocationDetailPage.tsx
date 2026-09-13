@@ -1587,7 +1587,7 @@ function SitePhotoBanner({ location, canEdit }: { location: ServiceLocationDetai
           type="button"
           onClick={() => fileInputRef.current?.click()}
           disabled={uploadMutation.isPending}
-          className="flex w-full items-center justify-center gap-1.5 border border-dashed border-transparent bg-bg-elev-2 px-3.5 py-2.5 text-[11.5px] font-medium text-fg-muted hover:text-fg-strong disabled:cursor-not-allowed"
+          className="flex w-full items-center justify-center gap-1.5 border border-dashed border-transparent bg-bg-elev-2 px-3.5 py-2.5 !text-[11.5px] !font-medium text-fg-muted hover:text-fg-strong disabled:cursor-not-allowed"
         >
           <PhotoIcon className="size-4 text-fg-dim" />
           {uploadMutation.isPending ? 'Uploading…' : 'Add site photo'}
@@ -1737,7 +1737,7 @@ export function SiteInstructionsCard({ location, canEdit }: { location: ServiceL
             {canEdit && hasNotes && !editingNotes && (
               <button
                 onClick={() => setEditingNotes(true)}
-                className="text-[11px] font-medium text-fg-accent opacity-0 transition-opacity hover:underline group-hover/notes:opacity-100 focus-visible:opacity-100"
+                className="!text-[11px] !font-medium text-fg-accent opacity-0 transition-opacity hover:underline group-hover/notes:opacity-100 focus-visible:opacity-100"
               >
                 Edit
               </button>
@@ -2300,7 +2300,7 @@ export function SiteContactCard({
           {hiddenCount > 0 && (
             <button
               onClick={onViewAll}
-              className="mt-2.5 block w-full border-t border-border-soft pt-2 text-left text-[11px] font-medium text-fg-accent hover:underline"
+              className="mt-2.5 block w-full border-t border-border-soft pt-2 text-left !text-[11px] !font-medium text-fg-accent hover:underline"
             >
               {t('contacts.viewAll', { count: list.length })} →
             </button>
@@ -2853,7 +2853,7 @@ function HeaderTags({ location, canEdit }: { location: ServiceLocationDetailDto;
             type="button"
             onClick={() => setPicking(true)}
             aria-label={t('tags.showAll', { count: tags.length })}
-            className="cursor-pointer text-[11px] font-semibold text-fg-muted hover:text-fg"
+            className="cursor-pointer !text-[11px] !font-semibold text-fg-muted hover:text-fg"
           >
             +{overflow}
           </button>
@@ -2863,7 +2863,7 @@ function HeaderTags({ location, canEdit }: { location: ServiceLocationDetailDto;
             type="button"
             onClick={() => setPicking(true)}
             aria-label={t('tags.addTag')}
-            className="flex h-[19px] w-[19px] cursor-pointer items-center justify-center rounded-full border border-dashed border-border text-[12px] leading-none text-fg-muted hover:border-border-strong hover:text-fg"
+            className="flex h-[19px] w-[19px] cursor-pointer items-center justify-center rounded-full border border-dashed border-border !text-[12px] leading-none text-fg-muted hover:border-border-strong hover:text-fg"
           >
             +
           </button>
@@ -2984,10 +2984,10 @@ function EquipmentTab({
               resetPage();
             }}
             placeholder="Search by ID, make, model, serial…"
-            className="min-w-0 flex-1 bg-transparent text-[12.5px] text-fg outline-none placeholder:text-fg-dim"
+            className="min-w-0 flex-1 bg-transparent !text-[12.5px] text-fg outline-none placeholder:text-fg-dim"
           />
           {q && (
-            <button onClick={() => { setQ(''); resetPage(); }} className="px-1 text-[11px] text-fg-dim hover:text-fg-strong">
+            <button onClick={() => { setQ(''); resetPage(); }} className="px-1 !text-[11px] text-fg-dim hover:text-fg-strong">
               ×
             </button>
           )}
@@ -2999,7 +2999,7 @@ function EquipmentTab({
             <button
               key={c.id}
               onClick={() => { setFilter(active ? null : c.id); resetPage(); }}
-              className={`inline-flex h-[30px] items-center gap-1.5 rounded-md border px-2.5 text-[12px] font-medium ${
+              className={`inline-flex h-[30px] items-center gap-1.5 rounded-md border px-2.5 !text-[12px] !font-medium ${
                 active
                   ? 'border-[color-mix(in_oklch,var(--accent-500)_45%,var(--border))] bg-[color-mix(in_oklch,var(--accent-500)_9%,var(--bg-elev))] text-fg-accent'
                   : 'border-border bg-bg-elev text-fg'
@@ -3364,7 +3364,7 @@ function InvoicesTab({ location }: { location: ServiceLocationDetailDto }) {
               resetPage();
             }}
             placeholder="Search invoice #…"
-            className="min-w-0 flex-1 bg-transparent text-[12.5px] text-fg outline-none placeholder:text-fg-dim"
+            className="min-w-0 flex-1 bg-transparent !text-[12.5px] text-fg outline-none placeholder:text-fg-dim"
           />
           {search && (
             <button
@@ -3372,7 +3372,7 @@ function InvoicesTab({ location }: { location: ServiceLocationDetailDto }) {
                 setSearch('');
                 resetPage();
               }}
-              className="px-1 text-[11px] text-fg-dim hover:text-fg-strong"
+              className="px-1 !text-[11px] text-fg-dim hover:text-fg-strong"
             >
               ×
             </button>
@@ -3695,7 +3695,7 @@ export function DispatchesTab({ location }: { location: ServiceLocationDetailDto
               resetPage();
             }}
             placeholder="Search by tech or work order…"
-            className="min-w-0 flex-1 bg-transparent text-[12.5px] text-fg outline-none placeholder:text-fg-dim"
+            className="min-w-0 flex-1 bg-transparent !text-[12.5px] text-fg outline-none placeholder:text-fg-dim"
           />
           {search && (
             <button
@@ -3703,7 +3703,7 @@ export function DispatchesTab({ location }: { location: ServiceLocationDetailDto
                 setSearch('');
                 resetPage();
               }}
-              className="px-1 text-[11px] text-fg-dim hover:text-fg-strong"
+              className="px-1 !text-[11px] text-fg-dim hover:text-fg-strong"
             >
               ×
             </button>
@@ -4091,7 +4091,7 @@ function JobsTab({ location, onNewJob }: { location: ServiceLocationDetailDto; o
               resetPage();
             }}
             placeholder="Search WO#, summary, tech, equipment…"
-            className="min-w-0 flex-1 bg-transparent text-[12.5px] text-fg outline-none placeholder:text-fg-dim"
+            className="min-w-0 flex-1 bg-transparent !text-[12.5px] text-fg outline-none placeholder:text-fg-dim"
           />
           {search && (
             <button
@@ -4099,7 +4099,7 @@ function JobsTab({ location, onNewJob }: { location: ServiceLocationDetailDto; o
                 setSearch('');
                 resetPage();
               }}
-              className="px-1 text-[11px] text-fg-dim hover:text-fg-strong"
+              className="px-1 !text-[11px] text-fg-dim hover:text-fg-strong"
             >
               ×
             </button>

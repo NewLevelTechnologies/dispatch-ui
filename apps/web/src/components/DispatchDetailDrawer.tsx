@@ -764,7 +764,7 @@ function VisitNotesSection({ dispatchId, readOnly }: { dispatchId: string; readO
               rows={2}
               placeholder={t('workOrders.dispatches.drawer.addNotePlaceholder')}
               aria-label={t('workOrders.dispatches.drawer.addNotePlaceholder')}
-              className="w-full resize-none border-0 bg-transparent text-[12.5px] leading-relaxed text-fg-strong outline-none"
+              className="w-full resize-none border-0 bg-transparent !text-[12.5px] leading-relaxed text-fg-strong outline-none"
             />
             <div className="mt-1 flex items-center gap-2">
               <span className="text-[10.5px] text-fg-dim">{t('workOrders.dispatches.drawer.officeNoteHint')}</span>

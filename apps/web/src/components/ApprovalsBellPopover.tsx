@@ -410,9 +410,9 @@ function TabButton({
       type="button"
       onClick={onClick}
       className={clsx(
-        'cursor-pointer rounded-[5px] px-2 py-[3px] text-[11px] font-medium transition-colors',
+        'cursor-pointer rounded-[5px] px-2 py-[3px] !text-[11px] !font-medium transition-colors',
         active
-          ? 'bg-bg-active font-semibold text-fg-strong'
+          ? 'bg-bg-active !font-semibold text-fg-strong'
           : 'text-fg-muted hover:bg-bg-hover hover:text-fg-strong',
       )}
     >
