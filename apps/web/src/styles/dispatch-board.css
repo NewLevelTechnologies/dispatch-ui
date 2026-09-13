@@ -965,3 +965,156 @@
 .db-row:hover .db-rowmenu {
   background: var(--bg-hover);
 }
+
+/* ── Map view ───────────────────────────────────────────────────────
+   Markers are DOM elements, not canvas drawings — which is the whole
+   reason the pins are numbered circles in ordinary HTML and CSS, and
+   why drag-to-assign can reuse the board's existing drag rather than
+   bridging into a rendering context.
+
+   Ported from the mock's `.db-pin*` rules rather than re-derived, per
+   `Map Pin Spec.html`. The one intentional rename: the sheet's `onsite`
+   is `inprogress` here, because that is what the shared `statusClass()`
+   already emits for the timeline blocks and one vocabulary across both
+   surfaces beats matching the sheet's spelling. Same violet either way —
+   "live" is not its own hue. */
+.db-pin-wrap {
+  background: none;
+  border: none;
+}
+
+.db-pin {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 700;
+  color: #fff;
+  background: var(--info-500);
+  border: 2px solid var(--bg-elev);
+  box-shadow: 0 1px 4px rgb(0 0 0 / 35%);
+  cursor: pointer;
+}
+
+.db-pin.enroute,
+.db-pin.inprogress {
+  background: var(--violet-500);
+}
+
+.db-pin.completed {
+  background: var(--success-500);
+}
+
+.db-pin.noshow {
+  background: var(--warning-500);
+  border-color: var(--bg-elev);
+}
+
+.db-pin.cancelled {
+  background: var(--bg-elev);
+  color: var(--fg-muted);
+  border: 2px solid var(--border-strong);
+}
+
+/* Release state, orthogonal to status: this can land on any fill above. */
+.db-pin.held {
+  background: var(--bg-elev);
+  color: var(--fg-muted);
+  border: 2px dashed var(--fg-muted);
+}
+
+.db-pin.pri-urgent {
+  background: var(--danger-500);
+  box-shadow: 0 0 0 4px color-mix(in oklch, var(--danger-500) 28%, transparent);
+}
+
+/* Unassigned work needs no location signal to be useful, and has no status
+   to report — so the ring is dashed and the content is a question mark
+   rather than a sequence number. */
+.db-pin.un {
+  background: var(--bg-elev);
+  color: var(--info-500);
+  border: 2px dashed var(--info-500);
+  cursor: grab;
+}
+
+.db-pin.un.urgent {
+  color: var(--danger-500);
+  border-color: var(--danger-500);
+}
+
+.db-pin.un.high {
+  color: oklch(50% 0.16 78);
+  border-color: var(--warning-500);
+}
+
+.db-pin.on {
+  transform: scale(1.15);
+}
+
+/* The SAME ring the timeline block uses. One selection, two surfaces. */
+.db-pin.sel {
+  outline: 2px solid var(--accent-500);
+  outline-offset: 2px;
+  transform: scale(1.2);
+  z-index: 9;
+}
+
+.db-pin.dim {
+  opacity: 0.42;
+}
+
+.db-map {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+}
+
+.db-map-canvas {
+  position: absolute;
+  inset: 0;
+}
+
+/* Sits over the map, so it carries its own surface rather than inheriting
+   whatever the basemap happens to be underneath it. */
+.db-maplegend {
+  position: absolute;
+  left: 10px;
+  bottom: 10px;
+  z-index: 2;
+  max-width: calc(100% - 20px);
+  padding: 7px 9px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: color-mix(in oklch, var(--bg-elev) 92%, transparent);
+  backdrop-filter: blur(3px);
+  box-shadow: var(--shadow-sm);
+}
+
+/* A job you cannot see is a job that does not get scheduled, so this is
+   persistent rather than a dismissible toast. */
+.db-mapmissing {
+  position: absolute;
+  right: 10px;
+  top: 10px;
+  z-index: 2;
+  max-width: 260px;
+  padding: 6px 9px;
+  border: 1px solid color-mix(in oklch, var(--warning-500) 45%, var(--border));
+  border-radius: var(--r-md);
+  background: color-mix(in oklch, var(--warning-500) 12%, var(--bg-elev));
+  box-shadow: var(--shadow-sm);
+}
+
+/* MapLibre paints its own controls and attribution; give them the board's
+   type scale so they don't read as a third-party widget dropped in. */
+.db-map .maplibregl-ctrl-attrib {
+  font-size: 10px;
+}
+
+.db-map .maplibregl-ctrl-attrib a {
+  color: var(--fg-muted);
+}

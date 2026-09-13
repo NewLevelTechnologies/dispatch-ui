@@ -325,3 +325,79 @@ describe('DispatchFormDrawer tenant timezone', () => {
     });
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────
+// Map prefill.
+//
+// A map drop carries a PERSON and a DAY and nothing else. Since every window
+// the board creates has to be one of the tenant's presets, auto-picking one
+// would quote a customer an arrival window no dispatcher ever chose — and an
+// undo toast does not undo a phone call. So the window arrives unset, and the
+// form refuses to submit until someone answers it.
+// ─────────────────────────────────────────────────────────────────────
+describe('DispatchFormDrawer — opened from a map drop', () => {
+  const prefill = { assignedUserId: 'u-2', date: '2026-03-15' };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockUserGetAll.mockResolvedValue([tech('u-1', 'Daniel', 'Park'), tech('u-2', 'Marcus', 'Lee')]);
+    mockGetFieldWorkers.mockResolvedValue([
+      tech('u-1', 'Daniel', 'Park'),
+      tech('u-2', 'Marcus', 'Lee'),
+    ]);
+    mockTenantSettings.mockResolvedValue({ timezone: 'America/Phoenix' });
+    mockCreate.mockResolvedValue(editDispatch);
+    mockNotify.mockResolvedValue(undefined);
+  });
+
+  it('prefills the technician the drop resolved to', async () => {
+    render({ dispatch: null, prefill });
+    await waitFor(() => expect(mockGetFieldWorkers).toHaveBeenCalled());
+    expect(await screen.findByText('Prefilled from the map')).toBeInTheDocument();
+  });
+
+  it('prefills the VIEWED date, not tomorrow', async () => {
+    // The default create path opens on tomorrow. A drop on Thursday's board
+    // that scheduled Friday would be a quiet, expensive bug.
+    render({ dispatch: null, prefill });
+    expect(await screen.findByDisplayValue('2026-03-15')).toBeInTheDocument();
+  });
+
+  it('leaves the arrival window unchosen', async () => {
+    render({ dispatch: null, prefill });
+    const select = await screen.findByLabelText('Arrival window');
+    expect((select as HTMLSelectElement).value).toBe('');
+  });
+
+  it('cannot be submitted until a window is chosen', async () => {
+    const user = userEvent.setup();
+    render({ dispatch: null, prefill });
+    const submit = await screen.findByRole('button', { name: /Schedule/ });
+    expect(submit).toBeDisabled();
+
+    await user.selectOptions(await screen.findByLabelText('Arrival window'), '9:00 – 11:00 AM');
+    await waitFor(() => expect(submit).toBeEnabled());
+    expect(mockCreate).not.toHaveBeenCalled();
+  });
+
+  it('drops the placeholder once a real window is picked', async () => {
+    const user = userEvent.setup();
+    render({ dispatch: null, prefill });
+    const select = await screen.findByLabelText('Arrival window');
+    await user.selectOptions(select, '9:00 – 11:00 AM');
+    // An empty option that stays in the list reads as a valid answer.
+    expect(within(select).queryByRole('option', { name: 'Select…' })).not.toBeInTheDocument();
+  });
+
+  it('still defaults the window when opened WITHOUT a map drop', async () => {
+    // The rail path is unchanged: a dispatcher who opened the form on purpose
+    // gets a sensible default to accept or change. Both paths still start
+    // disabled, but for different reasons — this one has no technician yet,
+    // which is precisely the field a map drop is able to answer.
+    render({ dispatch: null });
+    const select = await screen.findByLabelText('Arrival window');
+    expect((select as HTMLSelectElement).value).not.toBe('');
+    expect(within(select).queryByRole('option', { name: 'Select…' })).not.toBeInTheDocument();
+    expect(screen.queryByText('Prefilled from the map')).not.toBeInTheDocument();
+  });
+});

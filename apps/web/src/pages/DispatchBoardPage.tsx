@@ -14,7 +14,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from '@dispatch/i18n';
-import { ChevronLeftIcon, ChevronRightIcon } from '@heroicons/react/24/outline';
+import { ChevronLeftIcon, ChevronRightIcon, MapIcon } from '@heroicons/react/24/outline';
 import {
   dispatchBoardApi,
   dispatchRegionApi,
@@ -42,6 +42,8 @@ import { autoScrollForElements } from '@atlaskit/pragmatic-drag-and-drop-auto-sc
 import { dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
 import ConfirmDialog from '../components/ConfirmDialog';
 import DispatchDetailDrawer, { type DispatchSeed } from '../components/DispatchDetailDrawer';
+import DispatchMapView from '../components/dispatch/DispatchMapView';
+import type { MapPrefill } from '../components/DispatchFormDrawer';
 import DispatchFormDrawer from '../components/DispatchFormDrawer';
 import DispatchTimeline from '../components/dispatch/DispatchTimeline';
 import DispatchWeek from '../components/dispatch/DispatchWeek';
@@ -170,6 +172,9 @@ export default function DispatchBoardPage() {
   const [menu, setMenu] = useState<BlockMenu | null>(null);
   const [timeOffTech, setTimeOffTech] = useState<BoardTech | null>(null);
   const [composeFor, setComposeFor] = useState<UnscheduledWorkOrder | null>(null);
+  // Set only by a map drop. Present = the composer opens knowing WHO and
+  // WHICH DAY but deliberately not the window.
+  const [mapPrefill, setMapPrefill] = useState<MapPrefill | null>(null);
   const [confirmRelease, setConfirmRelease] = useState(false);
   const [editDispatch, setEditDispatch] = useState<DispatchSeed | null>(null);
 
@@ -213,6 +218,11 @@ export default function DispatchBoardPage() {
   // Granularity, in the URL like every other scope — "show me next week in
   // East Valley" has to be a link someone can send.
   const isWeek = searchParams.get('view') === 'week';
+  // A third value of the same param rather than a second one. The map is
+  // inherently a DAY view — routes are a day's sequence — so entering it from
+  // the week drops the horizon back to Day rather than creating a "map of a
+  // week" state that has no meaning.
+  const isMap = searchParams.get('view') === 'map';
   // Which visit is open, in the URL rather than in state: the drawer is part
   // of the view someone shares, and it makes the back button work.
   const openDispatchId = searchParams.get('d');
@@ -453,6 +463,22 @@ export default function DispatchBoardPage() {
   );
 
   const openVisit = (dispatch: BoardDispatch | null) => setParam('d', dispatch?.id ?? null);
+
+  // A map drop resolves to a PERSON and a DAY. It opens the composer with
+  // those filled and the window left blank — it does not commit, and it is
+  // the one drag on this board that doesn't. The gesture carries no time,
+  // and every window the board creates must be a tenant preset, so picking
+  // one here would quote a customer an arrival window nobody chose.
+  const assignFromMap = (workOrderId: string, techId: string) => {
+    const workOrder = railItems.find((w) => w.workOrderId === workOrderId);
+    if (!workOrder) return;
+    setMapPrefill({ assignedUserId: techId, date });
+    setComposeFor(workOrder);
+  };
+
+  // What is ON the map, as opposed to how it is drawn. Reframing keys off
+  // this so a layer toggle never throws away the dispatcher's panning.
+  const scopeKey = [date, regionId ?? '', divisionId ?? '', search].join('|');
 
   const regionName = (id: string | null) =>
     id ? (regions.find((r) => r.id === id)?.name ?? null) : null;
@@ -700,7 +726,10 @@ export default function DispatchBoardPage() {
     .filter(Boolean)
     .join(' · ');
 
-  const boardBody = () => {
+  // Loading, error and the two empty states are facts about the board READ,
+  // not about how it is drawn — so every view mode shares them rather than
+  // each re-deciding what an empty day looks like.
+  const boardGuard = () => {
     if (isWeek ? weekLoading : isLoading) {
       return <LoadingState label={t('dispatchBoard.states.loading')} />;
     }
@@ -753,6 +782,37 @@ export default function DispatchBoardPage() {
         />
       );
     }
+
+    return null;
+  };
+
+  const mapBody = () => {
+    const guard = boardGuard();
+    // Same guards, but inside a scroll container: LoadingState and EmptyState
+    // want a normal block, and the map's own container is a positioned canvas.
+    if (guard) return <div className="db-scroll">{guard}</div>;
+    return (
+      <DispatchMapView
+        // `day.shown`, not `shownTechs`: the map is always a day view, so it
+        // reads the day's rows even if the horizon param still says week.
+        techs={day.shown}
+        byTech={byTech}
+        unscheduled={railItems}
+        // The rail read is a PAGE. The map has to say so, because 50 dashed
+        // pins look like all of them in a way a scrolling list never does.
+        unscheduledTotal={unscheduled?.totalElements ?? railItems.length}
+        missingCoordinates={board?.dispatchesMissingCoordinates ?? 0}
+        selectedId={openDispatchId}
+        onOpenDispatch={openVisit}
+        onAssign={assignFromMap}
+        scopeKey={scopeKey}
+      />
+    );
+  };
+
+  const boardBody = () => {
+    const guard = boardGuard();
+    if (guard) return guard;
 
     if (isWeek) {
       return (
@@ -905,6 +965,20 @@ export default function DispatchBoardPage() {
                 {t('dispatchBoard.dateNav.today')}
               </Button>
             )}
+
+            {/* Its own control rather than a third segment in the horizon
+                toggle: that toggle answers "how much time", and the map
+                answers "drawn how". Turning it on from the week view lands on
+                Day, since a route is a day's sequence. */}
+            <Button
+              outline
+              size="xxs"
+              aria-pressed={isMap}
+              onClick={() => setParam('view', isMap ? null : 'map')}
+            >
+              <MapIcon />
+              {t('dispatchBoard.map.label')}
+            </Button>
 
             {/* Present only when there is something to release — and only on
                 the day board, since release takes a single day's scope and a
@@ -1115,9 +1189,13 @@ export default function DispatchBoardPage() {
           </aside>
 
           <div className="db-board">
-            <div ref={scrollRef} className="db-scroll">
-              {boardBody()}
-            </div>
+            {isMap ? (
+              mapBody()
+            ) : (
+              <div ref={scrollRef} className="db-scroll">
+                {boardBody()}
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -1150,7 +1228,11 @@ export default function DispatchBoardPage() {
 
       <DispatchFormDrawer
         open={composeFor != null && composeWorkOrder != null}
-        onClose={() => setComposeFor(null)}
+        onClose={() => {
+          setComposeFor(null);
+          setMapPrefill(null);
+        }}
+        prefill={mapPrefill}
         workOrderId={composeFor?.workOrderId ?? ''}
         workItems={composeWorkOrder?.workItems ?? []}
         workOrderNumber={composeFor?.workOrderNumber}
