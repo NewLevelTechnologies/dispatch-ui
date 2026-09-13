@@ -30,7 +30,7 @@ import AppLayout from '../components/AppLayout';
 import { Heading } from '../components/catalyst/heading';
 import { Button } from '../components/catalyst/button';
 import { Select } from '../components/catalyst/select';
-import { ListToolbar, ListSearch } from '../components/ui/ListToolbar';
+import { ListSearch } from '../components/ui/ListToolbar';
 import { ToggleGroup, ToggleGroupOption } from '../components/ui/ToggleGroup';
 import { FilterChip, FilterChipRow } from '../components/ui/FilterChipRow';
 import BoardLegend from '../components/dispatch/BoardLegend';
@@ -924,18 +924,18 @@ export default function DispatchBoardPage() {
 
         {/* ── Band 2 — who is on the board. Controls self-hide. ──── */}
         <div className="db-band sub">
-          <ListToolbar
-            className="mb-0 flex-1"
-            search={
-              <ListSearch
-                placeholder={t('dispatchBoard.search.placeholder', {
-                  entity: getName('technician'),
-                })}
-                value={search}
-                onChange={setSearch}
-              />
-            }
-          >
+          {/* No toolbar wrapper: the band is already the flex row, and its
+              single 8px gap does all the horizontal spacing. Nesting a
+              ListToolbar here brought its own margins and an items-end
+              baseline into a row of equal-height chrome. */}
+          <ListSearch
+            compact
+            placeholder={t('dispatchBoard.search.placeholder', {
+              entity: getName('technician').toLowerCase(),
+            })}
+            value={search}
+            onChange={setSearch}
+          />
             {/* Filters are selects, not caret buttons. A bordered button with
                 a chevron reads as a menu that performs an action, and it made
                 two filters look like two different kinds of control — they
@@ -1039,7 +1039,6 @@ export default function DispatchBoardPage() {
             <span className="text-[10.5px] text-fg-muted">
               {t('dispatchBoard.rowCount', { count: shownTechs.length })}
             </span>
-          </ListToolbar>
         </div>
 
         {/* ── Band 3 — exceptions as FILTERS, never as stat cards ──
