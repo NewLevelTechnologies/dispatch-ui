@@ -29,9 +29,9 @@ import { useGlossary } from '../contexts/GlossaryContext';
 import AppLayout from '../components/AppLayout';
 import { Heading } from '../components/catalyst/heading';
 import { Button } from '../components/catalyst/button';
+import { Select } from '../components/catalyst/select';
 import { ListToolbar, ListSearch } from '../components/ui/ListToolbar';
 import { ToggleGroup, ToggleGroupOption } from '../components/ui/ToggleGroup';
-import { FilterChipListbox, ChipListboxOption } from '../components/ui/FilterChipListbox';
 import { FilterChip, FilterChipRow } from '../components/ui/FilterChipRow';
 import BoardLegend from '../components/dispatch/BoardLegend';
 import { LoadingState } from '../components/ui/LoadingState';
@@ -41,7 +41,6 @@ import { Pill } from '../components/ui/Pill';
 import { autoScrollForElements } from '@atlaskit/pragmatic-drag-and-drop-auto-scroll/element';
 import { dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
 import ConfirmDialog from '../components/ConfirmDialog';
-import IconButton from '../components/IconButton';
 import DispatchDetailDrawer, { type DispatchSeed } from '../components/DispatchDetailDrawer';
 import DispatchFormDrawer from '../components/DispatchFormDrawer';
 import DispatchTimeline from '../components/dispatch/DispatchTimeline';
@@ -484,6 +483,11 @@ export default function DispatchBoardPage() {
   const showGroupingPicker = primaryRegionIds.size > 1;
   const showDensityPicker = shownTechs.length > 12;
   const showHideEmpty = foldableCount > 0;
+  // Zero-count chips STAY — "Urgent 0" is information, and chips that appear
+  // and vanish make the band jump. But an all-zeros row with nothing active is
+  // six controls that do nothing, so the band itself goes.
+  const showExceptionBand =
+    exceptions.length > 0 || Object.values(counts).some((n) => n > 0);
   // A division filter empties blocks and leaves the rows — correct, and at 60
   // rows it reads as a broken board. Suggest the fold once it has taken out
   // more than half of them.
@@ -680,7 +684,10 @@ export default function DispatchBoardPage() {
 
   const subtitle = [
     scopeLabel,
-    t('dispatchBoard.subtitleCount', { count: shownTechs.length, entity: techLabel }),
+    t('dispatchBoard.subtitleCount', {
+      count: shownTechs.length,
+      entity: techLabel.toLowerCase(),
+    }),
     !isWeek &&
       t('dispatchBoard.subtitleDispatches', {
         count: visibleDispatches.length,
@@ -776,18 +783,18 @@ export default function DispatchBoardPage() {
     // instead, where the lanes survive.
     return (
       <>
-        {visibleDispatches.length === 0 && (
+        {/* Only the FILTERED empty gets a line, because it offers a fix the
+            grid cannot. An empty day is a legitimate board — the rows are the
+            drop targets, and saying "nothing is scheduled" above a grid that
+            already shows nothing scheduled is the same sentence twice. */}
+        {visibleDispatches.length === 0 && hasFilters && (
           <div className="flex items-center gap-2 border-b border-border bg-bg-elev-2 px-3.5 py-2 text-[11.5px] text-fg-muted">
             <span>
-              {hasFilters
-                ? t('dispatchBoard.states.emptyFilteredTitle', { entity: dispatchesLabel })
-                : t('dispatchBoard.states.emptyBody', { entity: dispatchesLabel })}
+              {t('dispatchBoard.states.emptyFilteredTitle', { entity: dispatchesLabel })}
             </span>
-            {hasFilters && (
-              <Button plain size="xxs" onClick={clearFilters}>
-                {t('dispatchBoard.states.clearFilters')}
-              </Button>
-            )}
+            <Button plain size="xxs" onClick={clearFilters}>
+              {t('dispatchBoard.states.clearFilters')}
+            </Button>
           </div>
         )}
         <DispatchTimeline
@@ -853,36 +860,51 @@ export default function DispatchBoardPage() {
               <ToggleGroupOption value="week">{t('dispatchBoard.view.week')}</ToggleGroupOption>
             </ToggleGroup>
 
-            {/* Prev · Today · next, tight. The date itself is in the
-                subtitle, so nothing here has to reserve width for a label. */}
-            <IconButton
+            {/* Prev · date · next, then Today only when there is a today to
+                go back to — the same self-hiding discipline as the filters,
+                and the clearest possible cue that the board is showing another
+                day. Every control here is 26px, matching the fields below. */}
+            <Button
+              plain
+              size="xxs"
               aria-label={t(
                 isWeek ? 'dispatchBoard.dateNav.previousWeek' : 'dispatchBoard.dateNav.previous',
               )}
               onClick={() => setParam('date', shiftDay(date, isWeek ? -7 : -1))}
             >
-              <ChevronLeftIcon className="size-4" />
-            </IconButton>
-            {/* One control doing two jobs: it says which day you are standing
-                on, and clicking it walks back to today. It only reads as a
-                date when it is NOT today — which is exactly when it is worth
-                width, and exactly when the click has somewhere to go. */}
-            <Button
-              size="xs"
-              onClick={() => setParam('date', null)}
-              disabled={isToday}
-              title={isToday ? undefined : t('dispatchBoard.dateNav.backToToday')}
-            >
-              {isToday ? t('dispatchBoard.dateNav.today') : navLabel}
+              <ChevronLeftIcon />
             </Button>
-            <IconButton
+            {/* The date itself, and the way to reach an arbitrary one. The
+                min-width keeps the cluster from resizing between "Sep 9" and
+                "Sep 12". Secondary, never a filled pill — a solid fill means
+                primary action or selected, and the date is neither. */}
+            <span className="relative inline-flex">
+              <Button outline size="xxs" className="min-w-[68px] justify-center">
+                {navLabel}
+              </Button>
+              <input
+                type="date"
+                aria-label={t('dispatchBoard.dateNav.pick')}
+                value={date}
+                onChange={(e) => setParam('date', e.target.value || null)}
+                className="absolute inset-0 cursor-pointer opacity-0"
+              />
+            </span>
+            <Button
+              plain
+              size="xxs"
               aria-label={t(
                 isWeek ? 'dispatchBoard.dateNav.nextWeek' : 'dispatchBoard.dateNav.next',
               )}
               onClick={() => setParam('date', shiftDay(date, isWeek ? 7 : 1))}
             >
-              <ChevronRightIcon className="size-4" />
-            </IconButton>
+              <ChevronRightIcon />
+            </Button>
+            {!isToday && (
+              <Button outline size="xxs" onClick={() => setParam('date', null)}>
+                {t('dispatchBoard.dateNav.today')}
+              </Button>
+            )}
 
             {/* Present only when there is something to release — and only on
                 the day board, since release takes a single day's scope and a
@@ -890,7 +912,7 @@ export default function DispatchBoardPage() {
             {!isWeek && counts.unreleased > 0 && (
               <Button
                 color="accent"
-                size="xs"
+                size="xxs"
                 onClick={() => setConfirmRelease(true)}
                 disabled={releaseMutation.isPending}
               >
@@ -914,90 +936,80 @@ export default function DispatchBoardPage() {
               />
             }
           >
+            {/* Filters are selects, not caret buttons. A bordered button with
+                a chevron reads as a menu that performs an action, and it made
+                two filters look like two different kinds of control — they
+                should be identical to each other and distinct from toggles. */}
             {showRegionFilter && (
-              <FilterChipListbox
-                label={t('dispatchBoard.filter.region', { entity: getName('dispatch_region') })}
-                ariaLabel={t('dispatchBoard.filter.region', { entity: getName('dispatch_region') })}
-                value={regionId}
-                displayValue={regionName(regionId)}
-                resetLabel={t('dispatchBoard.filter.allRegions', {
-                  entity: getName('dispatch_region', true),
-                })}
-                onChange={(id) => setParam('region', id)}
-                onClear={() => setParam('region', null)}
+              <Select
+                size="xxs"
+                aria-label={t('dispatchBoard.filter.region', { entity: getName('dispatch_region') })}
+                value={regionId ?? ''}
+                onChange={(e) => setParam('region', e.target.value || null)}
               >
+                <option value="">
+                  {t('dispatchBoard.filter.allRegions', {
+                    entity: getName('dispatch_region', true),
+                  })}
+                </option>
                 {regionOptions.map((region) => (
-                  <ChipListboxOption key={region.id} value={region.id}>
+                  <option key={region.id} value={region.id}>
                     {region.name}
-                  </ChipListboxOption>
+                  </option>
                 ))}
-              </FilterChipListbox>
+              </Select>
             )}
 
             {showDivisionFilter && (
-              <FilterChipListbox
-                label={t('dispatchBoard.filter.division', { entity: getName('division') })}
-                ariaLabel={t('dispatchBoard.filter.division', { entity: getName('division') })}
-                value={divisionId}
-                displayValue={divisions.find((d) => d.id === divisionId)?.name ?? null}
-                resetLabel={t('dispatchBoard.filter.allDivisions', {
-                  entity: getName('division', true),
-                })}
-                onChange={(id) => setParam('division', id)}
-                onClear={() => setParam('division', null)}
+              <Select
+                size="xxs"
+                aria-label={t('dispatchBoard.filter.division', { entity: getName('division') })}
+                value={divisionId ?? ''}
+                onChange={(e) => setParam('division', e.target.value || null)}
               >
+                <option value="">
+                  {t('dispatchBoard.filter.allDivisions', { entity: getName('division', true) })}
+                </option>
                 {divisions.map((division) => (
-                  <ChipListboxOption key={division.id} value={division.id}>
+                  <option key={division.id} value={division.id}>
                     {division.name}
-                  </ChipListboxOption>
+                  </option>
                 ))}
-              </FilterChipListbox>
+              </Select>
             )}
 
             {showGroupingPicker && (
-              <FilterChipListbox
-                label={t('dispatchBoard.filter.grouping')}
-                ariaLabel={t('dispatchBoard.filter.grouping')}
+              <Select
+                size="xxs"
+                aria-label={t('dispatchBoard.filter.grouping')}
                 value={effectiveGroupBy}
-                displayValue={
-                  effectiveGroupBy === 'region'
-                    ? t('dispatchBoard.filter.groupByRegion', {
-                        entity: getName('dispatch_region'),
-                      })
-                    : null
-                }
-                onChange={(id) => setGroupBy((id as GroupBy) ?? 'none')}
-                onClear={() => setGroupBy('none')}
+                onChange={(e) => setGroupBy(e.target.value as GroupBy)}
               >
-                <ChipListboxOption value="none">
-                  {t('dispatchBoard.filter.groupByNone')}
-                </ChipListboxOption>
-                <ChipListboxOption value="region">
+                <option value="none">{t('dispatchBoard.filter.groupByNone')}</option>
+                <option value="region">
                   {t('dispatchBoard.filter.groupByRegion', { entity: getName('dispatch_region') })}
-                </ChipListboxOption>
-              </FilterChipListbox>
+                </option>
+              </Select>
             )}
 
             {showDensityPicker && (
-              <FilterChipListbox
-                label={t('dispatchBoard.filter.density')}
-                ariaLabel={t('dispatchBoard.filter.density')}
+              <Select
+                size="xxs"
+                aria-label={t('dispatchBoard.filter.density')}
                 value={densityPref}
-                displayValue={
-                  densityPref === 'auto' ? null : t(`dispatchBoard.density.${densityPref}`)
-                }
-                onChange={(id) => setDensityPref((id as Density | 'auto') ?? 'auto')}
-                onClear={() => setDensityPref('auto')}
+                onChange={(e) => setDensityPref(e.target.value as Density | 'auto')}
               >
-                <ChipListboxOption value="auto">
-                  {t('dispatchBoard.density.auto', { mode: t(`dispatchBoard.density.${autoDensity}`) })}
-                </ChipListboxOption>
+                <option value="auto">
+                  {t('dispatchBoard.density.auto', {
+                    mode: t(`dispatchBoard.density.${autoDensity}`),
+                  })}
+                </option>
                 {(Object.keys(DENSITY_METRICS) as Density[]).map((mode) => (
-                  <ChipListboxOption key={mode} value={mode}>
+                  <option key={mode} value={mode}>
                     {t(`dispatchBoard.density.${mode}`)}
-                  </ChipListboxOption>
+                  </option>
                 ))}
-              </FilterChipListbox>
+              </Select>
             )}
 
             {showHideEmpty && (
@@ -1034,7 +1046,7 @@ export default function DispatchBoardPage() {
              Day only: every chip is a predicate over individual dispatches,
              and the week read carries aggregates. Showing chips that could
              not filter anything is what rev 3 did with "Unassigned". */}
-        {!isWeek && (
+        {!isWeek && showExceptionBand && (
         <div className="db-band sub">
           <FilterChipRow className="gap-1.5">
             {chips.map((chip) => (
@@ -1056,9 +1068,12 @@ export default function DispatchBoardPage() {
             )}
           </FilterChipRow>
           <span className="grow" />
-          {/* The grid encodes a lot in very little ink; this is where a
-              dispatcher learns it, rather than from a tooltip per block. */}
-          <BoardLegend />
+          {/* Below ~1100px it drops entirely rather than shrinking: the chip
+              row already carries the colour vocabulary, and a clipped legend
+              is worse than no legend. */}
+          <div className="hidden min-[1100px]:block">
+            <BoardLegend />
+          </div>
         </div>
         )}
 

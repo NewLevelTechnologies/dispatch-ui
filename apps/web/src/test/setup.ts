@@ -286,7 +286,7 @@ vi.mock('react-i18next', () => {
     'dispatchBoard.chips.recurring': 'Agreement',
     'dispatchBoard.chips.unreleased': 'Not released',
     'dispatchBoard.chips.urgent': 'Urgent',
-    'dispatchBoard.dateNav.backToToday': 'Back to today',
+    'dispatchBoard.dateNav.pick': 'Pick a date',
     'dispatchBoard.dateNav.next': 'Next day',
     'dispatchBoard.dateNav.nextWeek': 'Next week',
     'dispatchBoard.dateNav.previousWeek': 'Previous week',

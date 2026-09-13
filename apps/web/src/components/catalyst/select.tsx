@@ -4,9 +4,17 @@ import React, { forwardRef } from 'react'
 
 // Sizing variants. `md` is the stock Catalyst sizing (responsive). `xs` is the
 // dense variant — ~32px tall, 12.5px text — mirroring the Input `xs` size.
+//
+// `xxs` is the operational-chrome token: 26px and 11.5px, the same numbers as
+// Button `xxs`, so a filter sits at exactly the height of the search field and
+// the toggle track beside it. Height is DECLARED rather than derived from
+// padding, because a content-sized control is how one band ends up with three
+// heights. It also sizes to its content instead of filling the row — this one
+// lives inline in a band, not in a form column.
 const sizes = {
   md: ['py-[calc(--spacing(2.5)-1px)] sm:py-[calc(--spacing(1.5)-1px)]', 'text-base/6 sm:text-sm/6'],
   xs: ['py-[calc(--spacing(1.5)-1px)]', 'text-[12.5px]/[18px]'],
+  xxs: ['h-[26px] py-0', 'text-[11.5px]/[24px]'],
 }
 
 export const Select = forwardRef(function Select(
@@ -19,7 +27,7 @@ export const Select = forwardRef(function Select(
       className={clsx([
         className,
         // Basic layout
-        'group relative block w-full',
+        size === 'xxs' ? 'group relative inline-block w-auto' : 'group relative block w-full',
         // Background color + shadow applied to inset pseudo element, so shadow blends with border in light mode
         'before:absolute before:inset-px before:rounded-[calc(var(--radius-lg)-1px)] before:bg-white before:shadow-sm',
         // Background color is moved to control and shadow is removed in dark mode so hide `before` pseudo
@@ -36,12 +44,17 @@ export const Select = forwardRef(function Select(
         {...props}
         className={clsx([
           // Basic layout
-          'relative block w-full appearance-none rounded-lg',
+          size === 'xxs'
+            ? 'relative block w-auto appearance-none rounded-md'
+            : 'relative block w-full appearance-none rounded-lg',
           sizes[size ?? 'md'][0],
-          // Horizontal padding
-          multiple
-            ? 'px-[calc(--spacing(3.5)-1px)] sm:px-[calc(--spacing(3)-1px)]'
-            : 'pr-[calc(--spacing(10)-1px)] pl-[calc(--spacing(3.5)-1px)] sm:pr-[calc(--spacing(9)-1px)] sm:pl-[calc(--spacing(3)-1px)]',
+          // Horizontal padding — the chrome token is tighter on both sides,
+          // since it sits in a band where gap does the spacing.
+          size === 'xxs'
+            ? 'pr-7 pl-2'
+            : multiple
+              ? 'px-[calc(--spacing(3.5)-1px)] sm:px-[calc(--spacing(3)-1px)]'
+              : 'pr-[calc(--spacing(10)-1px)] pl-[calc(--spacing(3.5)-1px)] sm:pr-[calc(--spacing(9)-1px)] sm:pl-[calc(--spacing(3)-1px)]',
           // Options (multi-select)
           '[&_optgroup]:font-semibold',
           // Typography

@@ -2903,9 +2903,9 @@
       "urgent": "Urgent"
     },
     "dateNav": {
-      "backToToday": "Back to today",
       "next": "Next day",
       "nextWeek": "Next week",
+      "pick": "Pick a date",
       "previous": "Previous day",
       "previousWeek": "Previous week",
       "today": "Today"
