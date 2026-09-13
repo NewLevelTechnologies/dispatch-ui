@@ -83,13 +83,15 @@ export function FilterChip({
       aria-label={ariaLabel ?? label}
       className={clsx(
         'inline-flex items-center gap-1.5 border transition-colors',
-        // !text-: Preflight's unlayered `button { font: inherit }` flows the
-        // body's 13px onto the button, and a layered text-size utility cannot
-        // beat it — the same trap Button carries a note about. Without the
-        // important modifier every chip renders two pixels too large.
+        // !text- and !font-: Preflight's unlayered `button { font: inherit }`
+        // flows the body's SIZE AND WEIGHT onto the button, and layered
+        // utilities cannot beat either — the same trap Button carries a note
+        // about. Without the important modifier a chip renders two pixels too
+        // large at weight 400, which reads as a deliberately quiet style
+        // rather than as the bug it is.
         variant === 'dense'
-          ? 'h-6 rounded-full px-[9px] !text-[11.5px] font-semibold'
-          : 'h-8 rounded-md px-2.5 !text-[12px] font-medium',
+          ? 'h-6 rounded-full px-[9px] !text-[11.5px] !font-semibold'
+          : 'h-8 rounded-md px-2.5 !text-[12px] !font-medium',
         active
           ? 'border-accent-500/45 bg-accent-500/10 text-fg-accent hover:bg-[color-mix(in_oklch,var(--accent-500)_14%,var(--bg-elev))]'
           : variant === 'dense'

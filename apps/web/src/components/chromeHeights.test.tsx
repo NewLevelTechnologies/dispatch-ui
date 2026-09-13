@@ -57,10 +57,14 @@ describe('chrome band type sizes', () => {
     expect(container.querySelector('select')?.className).toContain('!text-[11.5px]');
   });
 
-  it('forces it past the inherited font on the chip', () => {
+  // Size AND weight: `font: inherit` carries both, so a plain font-semibold
+  // renders 400 and looks like a deliberately quiet style rather than a bug.
+  it('forces size and weight past the inherited font on the chip', () => {
     const { container } = render(
       <FilterChip variant="dense" label="Urgent" count={0} active={false} onToggle={() => {}} />,
     );
-    expect(container.querySelector('button')?.className).toContain('!text-[11.5px]');
+    const cls = container.querySelector('button')?.className;
+    expect(cls).toContain('!text-[11.5px]');
+    expect(cls).toContain('!font-semibold');
   });
 });
