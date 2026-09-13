@@ -14,7 +14,7 @@ import React, { forwardRef } from 'react'
 const sizes = {
   md: ['py-[calc(--spacing(2.5)-1px)] sm:py-[calc(--spacing(1.5)-1px)]', 'text-base/6 sm:text-sm/6'],
   xs: ['py-[calc(--spacing(1.5)-1px)]', 'text-[12.5px]/[18px]'],
-  xxs: ['h-[26px] py-0', 'text-[11.5px]/[24px]'],
+  xxs: ['h-[26px] py-0', '!text-[11.5px]/[24px]'],
 }
 
 export const Select = forwardRef(function Select(

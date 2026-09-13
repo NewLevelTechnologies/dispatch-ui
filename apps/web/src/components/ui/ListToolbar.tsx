@@ -58,7 +58,15 @@ export function ListSearch({
   compact?: boolean;
 }) {
   return (
-    <InputGroup className={compact ? 'w-[200px] shrink-0' : 'min-w-[260px] flex-1'}>
+    <InputGroup
+      className={
+        compact
+          ? // The icon is positioned for a 32px field; at 26 it lands flush
+            // with the bottom edge, so centre it explicitly.
+            'w-[200px] shrink-0 [&>[data-slot=icon]]:top-[5px]!'
+          : 'min-w-[260px] flex-1'
+      }
+    >
       <MagnifyingGlassIcon data-slot="icon" />
       <Input
         type="text"
