@@ -10,21 +10,35 @@
 // without a bridge into a rendering context.
 // ─────────────────────────────────────────────────────────────────────
 import { useEffect, useMemo, useRef } from 'react';
-// Pinned to maplibre-gl v5. VERIFIED — do not bump without re-testing.
+// Pinned to maplibre-gl v5. The reason is mechanical, not superstition.
 //
-// v6 does not invoke a protocol registered with `addProtocol`: no request is
-// issued and no error is raised, so a pmtiles basemap renders blank with an
-// empty console.
+// v6 calls a protocol registered with `addProtocol` for the source's TileJSON
+// but never for a single tile, so the map stays blank and silent.
 //
-// This was first bisected while a CSS bug was independently collapsing the
-// canvas host to 0 height, which made the result untrustworthy. It has since
-// been re-tested against a working canvas, on identical code and the same
-// archive: v5.24.0 renders, v6.9.0 is blank. The pin is justified.
+// `addProtocol` writes into `config.REGISTERED_PROTOCOLS`, a module-level
+// object in maplibre-gl-shared. The worker loads its OWN instance of that
+// module, so it gets its own empty table — which is why v6 also exposes
+// `self.addProtocol` and `importScriptInWorkers`. Source metadata is fetched on
+// the main thread, where our registration lives, so the TileJSON resolves.
+// Tiles are fetched from the worker, whose table is empty; v6's fallback there
 //
-// The cost is real and should be weighed periodically: v5.24.0 (April 2026) is
-// the last v5 release, v6.0.0 shipped that July, and pmtiles 4.5.0 is the
-// latest pmtiles and declares no maplibre peer range — so nothing warns at
-// install time. Re-test when pmtiles next publishes.
+//   if (isWorker(self) && self.worker?.actor)
+//     actor.sendAsync({type:'GR', targetMapId: GLOBAL_DISPATCHER_ID}, ...)
+//
+// is meant to hand the request back to the main thread, and does not. No
+// handler is found, nothing throws, and every tile silently resolves to
+// nothing.
+//
+// Confirmed by instrumenting the protocol on both versions, against the same
+// archive and a known-good canvas:
+//   v5.24.0 -> "CALLED json", then "/7/34/50 -> 200094" and every other tile
+//   v6.9.0  -> "CALLED json", then nothing at all
+//
+// Fixing it on v6 means registering the protocol inside the worker via
+// `importScriptInWorkers`, which MapLibre documents as "experimental and can
+// break at any point". pmtiles 4.5.0 is the latest release and declares no
+// maplibre peer range, so nothing warns at install time. Re-test when pmtiles
+// next publishes.
 // Named imports (v5 and v6 both export these).
 import {
   Map as MapLibreMap,
