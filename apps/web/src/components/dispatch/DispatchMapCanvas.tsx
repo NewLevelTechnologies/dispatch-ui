@@ -10,12 +10,21 @@
 // without a bridge into a rendering context.
 // ─────────────────────────────────────────────────────────────────────
 import { useEffect, useMemo, useRef } from 'react';
-// maplibre-gl v6 is ESM with no default export — named imports only.
+// Pinned to maplibre-gl v5 deliberately. v6 never invokes a protocol
+// registered with `addProtocol` — it issues no request and raises no error, so
+// a pmtiles basemap renders as a blank canvas with an empty console. Verified
+// by bisect: identical page, same pmtiles 4.5.0 and same archive, v6.9.0 made
+// 0 fetches while v5.6.1 made 11 and rendered. v6 splits the worker into its
+// own bundle and exposes `importScriptInWorkers` to register protocols there;
+// pmtiles 4.x does not do that and declares no maplibre peer range, so nothing
+// catches this at install time. Do not bump to v6 until pmtiles supports it.
+// Named imports (v5 exports these too).
 import {
   Map as MapLibreMap,
   Marker,
   NavigationControl,
   addProtocol,
+  removeProtocol,
   type GeoJSONSource,
   type LayerSpecification,
   type StyleSpecification,
@@ -60,13 +69,30 @@ interface Props {
   attribution: string;
 }
 
-// Registered once per page, not per mount: `addProtocol` is global state and
-// re-registering on every map open leaks handlers.
+// One Protocol instance per map, NOT one per page.
+//
+// `Protocol` holds a SharedPromiseCache that memoizes the archive header and
+// directory lookups as *promises*. `map.remove()` aborts every request the map
+// has in flight, which rejects those cached promises — and a rejected promise
+// stays in the cache. Any later map handed the same Protocol gets the rejected
+// promise straight back, so its source never loads and nothing is thrown,
+// because the rejection was already handled. The map renders blank with an
+// empty console.
+//
+// StrictMode makes this the default path in development, not an edge case: it
+// mounts, tears down and remounts every effect, so map #1 always poisons the
+// cache for map #2. Pairing add/removeProtocol per map keeps each one on a
+// clean cache while still leaving exactly one handler registered at a time.
 let protocolRegistered = false;
 function registerPmtiles() {
   if (protocolRegistered) return;
   addProtocol('pmtiles', new Protocol().tile);
   protocolRegistered = true;
+}
+function unregisterPmtiles() {
+  if (!protocolRegistered) return;
+  removeProtocol('pmtiles');
+  protocolRegistered = false;
 }
 
 /**
@@ -88,7 +114,13 @@ function buildStyle(pmtilesUrl: string, dark: boolean, attribution: string): Sty
         attribution,
       },
     },
-    layers: protomapsLayers('protomaps', namedTheme(dark ? 'dark' : 'light')) as LayerSpecification[],
+    // `lang` is required, not optional: protomaps-themes-base only appends the
+    // label layers when it is passed. Without it `layers()` returns 57 layers
+    // instead of 68 and the basemap renders with no place names, road shields
+    // or POI text at all — silently, since a missing option is not an error.
+    layers: protomapsLayers('protomaps', namedTheme(dark ? 'dark' : 'light'), {
+      lang: 'en',
+    }) as LayerSpecification[],
   };
 }
 
@@ -145,6 +177,20 @@ export default function DispatchMapCanvas({
     map.addControl(new NavigationControl({ showCompass: false }), 'top-right');
     mapRef.current = map;
 
+    // MapLibre routes style, source, glyph, sprite and tile failures through
+    // its event bus rather than throwing. With no listener attached, a basemap
+    // that fails to load renders as a blank canvas with nothing in the console
+    // — which is indistinguishable from "the tiles are fine but nothing is in
+    // view", and sends you debugging the wrong layer entirely.
+    map.on('error', (e) => {
+      const err = (e as { error?: Error }).error;
+      console.error('[dispatch-map]', err?.message ?? e, err);
+    });
+
+    if (import.meta.env.DEV) {
+      (window as unknown as { __dbMap?: MapLibreMap }).__dbMap = map;
+    }
+
     map.on('load', () => {
       loadedRef.current = true;
       map.addSource(ROUTE_SOURCE, {
@@ -194,6 +240,9 @@ export default function DispatchMapCanvas({
       loadedRef.current = false;
       map.remove();
       mapRef.current = null;
+      // Drop the Protocol with the map: its promise cache now holds the
+      // rejections produced by map.remove() aborting in-flight range reads.
+      unregisterPmtiles();
     };
     // `style` is intentionally not a dependency: the view remounts this
     // component on theme change rather than swapping the style in place,
