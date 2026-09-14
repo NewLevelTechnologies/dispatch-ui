@@ -89,6 +89,7 @@ function registerPmtiles() {
   addProtocol('pmtiles', new Protocol().tile);
   protocolRegistered = true;
 }
+
 function unregisterPmtiles() {
   if (!protocolRegistered) return;
   removeProtocol('pmtiles');
@@ -158,7 +159,9 @@ export default function DispatchMapCanvas({
 
   const style = useMemo(() => {
     if (!styleUrl.endsWith('.pmtiles')) return styleUrl;
-    registerPmtiles();
+    // NB: the protocol is registered in the map effect, not here. `useMemo`
+    // runs during render and will not re-run after the effect tears down, so
+    // registering here leaves a remounted map with no `pmtiles://` handler.
     return buildStyle(styleUrl, dark, attribution);
   }, [styleUrl, dark, attribution]);
 
@@ -166,6 +169,13 @@ export default function DispatchMapCanvas({
   useEffect(() => {
     const host = hostRef.current;
     if (!host || mapRef.current) return undefined;
+
+    // Register BEFORE constructing the map and unregister with it, so the two
+    // are symmetric across a remount. MapLibre resolves a source URL through
+    // the protocol table at construction; with no handler registered it falls
+    // back to plain fetch and fails with `URL scheme "pmtiles" is not
+    // supported`.
+    if (typeof style !== 'string') registerPmtiles();
 
     const map = new MapLibreMap({
       container: host,
