@@ -2979,6 +2979,28 @@
       "scheduled": "Scheduled",
       "unreleased": "Not released"
     },
+    "map": {
+      "attribution": "© OpenStreetMap contributors · Protomaps",
+      "clearFocus": "Clear focus",
+      "fit": "Fit to work",
+      "label": "Map",
+      "loading": "Loading the map…",
+      "missingCoordinates_one": "1 job has no location",
+      "missingCoordinates_other": "{{count}} jobs have no location",
+      "noSignalNeeded": "Stops and routes need no location signal.",
+      "notConfiguredBody": "No basemap is configured for this environment, so there is nothing to draw pins on. Every other view of the board works normally. Setting a basemap URL fills this in — nothing else has to change.",
+      "notConfiguredTitle": "The map isn't configured yet",
+      "prefilledTech": "Prefilled from the map",
+      "railCapped": "Showing {{shown}} of {{total}} unassigned",
+      "routes": "Routes",
+      "routesAll": "All",
+      "routesOff": "Off",
+      "routesSelected": "Selected",
+      "unassigned": "Unassigned",
+      "unassignedUnlocated_one": "1 unassigned job has no location",
+      "unassignedUnlocated_other": "{{count}} unassigned jobs have no location",
+      "windowUnset": "A map drop carries a person, not a time — so the arrival window is the one thing it cannot infer. Nothing is promised to the customer until you choose one."
+    },
     "menu": {
       "label": "{{entity}} actions",
       "openWorkOrder": "Open {{entity}}",

@@ -24,6 +24,7 @@ import { Avatar } from './ui/Avatar';
 import ConfirmDialog from './ConfirmDialog';
 import { useTenantTimeZone } from '../hooks/useTenantTimeZone';
 import { zonedDateOf, zonedHourOf, zonedIso } from '../lib/zonedTime';
+import { Pill } from './ui/Pill';
 import type { DispatchSeed } from './DispatchDetailDrawer';
 import { workItemLabel } from '@dispatch/utils';
 
@@ -41,6 +42,23 @@ interface Props {
    *  straight off the grid without a round-trip for notes/createdAt/updatedAt
    *  it would never look at. */
   dispatch?: DispatchSeed | null;
+  /** Create-mode seed from a surface that knows WHO and WHICH DAY but not the
+   *  window — today, only the dispatch board's map.
+   *
+   *  The window is deliberately left unchosen. Every window the board creates
+   *  must be one of the tenant's presets, so auto-picking one here would
+   *  fabricate a promise to a customer that nobody made — and an undo toast
+   *  does not undo a phone call. The general rule the board follows: a drag
+   *  commits silently only where the gesture itself carries a time. The
+   *  timeline lane does (x is the clock); a map drop carries a person and
+   *  nothing else. */
+  prefill?: MapPrefill | null;
+}
+
+export interface MapPrefill {
+  assignedUserId: string;
+  /** The date the board is VIEWING, not tomorrow. */
+  date: string;
 }
 
 // Work items that still want a trip — pre-selected on create.
@@ -134,6 +152,7 @@ export default function DispatchFormDrawer({
   locationName,
   workOrderNumber,
   dispatch,
+  prefill,
 }: Props) {
   const { t } = useTranslation();
   // Windows are tenant-local: "8–10a" means 8am where the truck is going.
@@ -176,6 +195,16 @@ export default function DispatchFormDrawer({
       // save. Switching either on is an explicit release/re-notify action.
       setRelease('deck');
       setNotifyCustomer(false);
+    } else if (prefill) {
+      setAssignedUserId(prefill.assignedUserId);
+      setDate(prefill.date);
+      // Empty, not a preset — see `MapPrefill`. `canSave` is false until the
+      // dispatcher picks, so the form cannot be submitted with an invented
+      // window even by mashing the primary button.
+      setWinKey('');
+      setAddressed(workItems.filter((wi) => NEEDY.has(wi.statusCategory)).map((wi) => wi.id));
+      setRelease('now');
+      setNotifyCustomer(true);
     } else {
       setAssignedUserId('');
       setDate(defaultDate());
@@ -184,7 +213,7 @@ export default function DispatchFormDrawer({
       setRelease('now');
       setNotifyCustomer(true);
     }
-  }, [open, dispatch, workItems, timeZone]);
+  }, [open, dispatch, prefill, workItems, timeZone]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
   // Field workers only. This is a PICKER, so it must offer exactly who can be
@@ -204,7 +233,10 @@ export default function DispatchFormDrawer({
         ),
     [users],
   );
-  const selectedWin = winOptions.find((w) => w.key === winKey) ?? winOptions[0];
+  // No `?? winOptions[0]` fallback: an unset key means unset, and resolving it
+  // to the first preset is exactly the invented promise the map path exists to
+  // avoid. `canSave` already gates on this being present.
+  const selectedWin = winOptions.find((w) => w.key === winKey) ?? null;
   const blocked = addressed.some((id) => workItems.find((wi) => wi.id === id)?.statusCategory === 'BLOCKED');
   const canSave = !!assignedUserId && !!date && !!selectedWin;
 
@@ -228,6 +260,11 @@ export default function DispatchFormDrawer({
 
   const save = useMutation({
     mutationFn: async () => {
+      // Not defensive noise: the map path opens this form with NO window
+      // chosen, so an unset window is a reachable state rather than an
+      // impossible one. Refusing here means the invariant holds even if a
+      // future caller bypasses the disabled button.
+      if (!selectedWin) throw new Error('An arrival window must be chosen.');
       const startIso = toIso(date, selectedWin.sh, selectedWin.sm, timeZone);
       const endIso = toIso(date, selectedWin.eh, selectedWin.em, timeZone);
       // One notification path for both create + edit: an explicit, logged
@@ -385,6 +422,10 @@ export default function DispatchFormDrawer({
                   onChange={(e) => setWinKey(e.target.value)}
                   className="h-[34px] w-full rounded-sm border border-border bg-bg px-2.5 !text-[12.5px] text-fg-strong outline-none focus:border-accent-500"
                 >
+                  {/* Only present while nothing is chosen, and it cannot be
+                      re-selected once a window is: an empty option that stays
+                      in the list reads as a valid answer. */}
+                  {!winKey && <option value="">{t('common.form.select')}</option>}
                   {winOptions.map((w) => (
                     <option key={w.key} value={w.key}>
                       {w.label}
@@ -393,10 +434,22 @@ export default function DispatchFormDrawer({
                 </select>
               </label>
             </div>
+            {prefill && !winKey && (
+              <p className="mt-1.5 text-[11px] leading-snug text-fg-muted">
+                {t('dispatchBoard.map.windowUnset')}
+              </p>
+            )}
           </Section>
 
           {/* Assign tech */}
           <Section title={`Assign ${techWord}`}>
+            {/* Says where the selection came from. A picker that arrives
+                pre-answered with no explanation reads as a bug. */}
+            {prefill && (
+              <Pill tone="info" className="mb-2">
+                {t('dispatchBoard.map.prefilledTech')}
+              </Pill>
+            )}
             <TechPicker techs={techs} value={assignedUserId} onChange={setAssignedUserId} techWord={techWord} />
             {!assignedUserId && (
               <div className="mt-1.5 text-[11px] text-fg-dim">
