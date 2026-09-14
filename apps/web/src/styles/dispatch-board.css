@@ -1194,17 +1194,37 @@
   border-bottom-color: var(--bg-elev);
 }
 
+/* Same blocks as the rail card, in the same order, with the same gaps — a
+   dispatcher reading a pin and reading its card is reading one thing twice,
+   so the two must not parse differently. No uniform `gap` here: even spacing
+   is exactly what stopped the who-and-where pair from reading as a pair. */
 .db-pintip {
   display: flex;
   flex-direction: column;
-  gap: 1px;
   max-width: 230px;
+}
+
+/* Identifier and age share a row, as they do on the card. Age was a line of
+   its own below the address, which put a piece of the identity block inside
+   the where block and left an orphan line under it. */
+.db-pintip-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
 }
 
 .db-pintip-num {
   font-family: var(--font-mono);
   font-size: 10.5px;
   color: var(--fg-muted);
+}
+
+.db-pintip-age {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--fg-muted);
+  white-space: nowrap;
 }
 
 .db-pintip-title {
@@ -1214,14 +1234,29 @@
   line-height: 1.3;
 }
 
-.db-pintip-line {
+/* The site name and its address are ONE pair — who and where — so 4px opens
+   the block and 1px binds the two inside it. Identical to `.db-wo-sub` /
+   `.db-wo-addr`: proximity is the grouping cue, and even spacing overrides it
+   silently. */
+.db-pintip-name {
+  margin-top: 4px;
   font-size: 11px;
   color: var(--fg-muted);
 }
 
+.db-pintip-addr {
+  margin-top: 1px;
+  font-size: 11px;
+  line-height: 1.35;
+  color: var(--fg-muted);
+  text-wrap: pretty;
+}
+
+/* An affordance note, not content — so it sits well clear of the block above
+   and carries a rule, the one place on this surface a rule is warranted. */
 .db-pintip-hint {
-  margin-top: 3px;
-  padding-top: 3px;
+  margin-top: 8px;
+  padding-top: 5px;
   border-top: 1px solid var(--border-soft);
   font-size: 10.5px;
   font-style: italic;
