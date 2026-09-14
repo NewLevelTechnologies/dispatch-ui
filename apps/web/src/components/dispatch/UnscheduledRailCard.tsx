@@ -36,7 +36,7 @@ const PRIORITY_CLASS: Record<string, string> = {
 
 export default function UnscheduledRailCard({
   workOrder,
-  regionName,
+  regionAbbreviation,
   divisionName,
   nearest,
   workOrderHref,
@@ -45,9 +45,12 @@ export default function UnscheduledRailCard({
   onHover,
 }: {
   workOrder: UnscheduledWorkOrder;
-  /** Already guarded by the caller: null unless board scope is "all regions".
-   *  Printing one region on all eleven cards is noise. */
-  regionName: string | null;
+  /** The region's ABBREVIATION, not its name: on the identity row it competes
+   *  with the identifier and the age for a fixed width, and the full name buys
+   *  nothing there. Already guarded by the caller — null unless board scope is
+   *  "all regions", since printing one region on all eleven cards of a
+   *  narrowed board is noise. */
+  regionAbbreviation: string | null;
   divisionName: string | null;
   /** Who is already going near this site today. Absent when nothing is
    *  booked nearby, or when the location never geocoded. */
@@ -123,7 +126,27 @@ export default function UnscheduledRailCard({
   // duplication was possible. On the meta row beside division it cannot occur,
   // and a content-dependent guard on a card's shape costs more in scanning
   // than it saves in words.
-  const showMeta = Boolean(divisionName || regionName) || workOrder.itemCount > 1;
+  // Division, region and item count are RECORD metadata — the same class of
+  // fact as the identifier and the age they now sit between — so they ride the
+  // identity row rather than a row of their own. That row ran half empty while
+  // a dedicated one cost a full line plus its 12px separator, roughly 27px per
+  // card, to print one or two short words.
+  //
+  // The order is a TRUNCATION PRIORITY, not a reading order: the group is the
+  // row's only elastic element and clips from the end, so region goes last
+  // because it is the one fact recoverable from the card — the address line
+  // directly below already says "Phoenix, AZ". Division and item count appear
+  // nowhere else, so they survive the clip.
+  //
+  // "×2" rather than "2 items": five characters cheaper on the row where width
+  // is scarcest, which decides whether it survives on an urgent multi-item card.
+  const facets = [
+    divisionName,
+    workOrder.itemCount > 1 ? t('dispatchBoard.rail.itemsShort', { count: workOrder.itemCount }) : null,
+    regionAbbreviation,
+  ]
+    .filter(Boolean)
+    .join(' · ');
 
   return (
     <div
@@ -175,40 +198,14 @@ export default function UnscheduledRailCard({
           </span>
         )}
         <span className="grow" />
+        {facets && <span className="db-wo-facets">{facets}</span>}
         {/* Age is the rail's tiebreak after priority, so it earns a slot. */}
-        {age && <span className="font-mono text-[10.5px] text-fg-muted">{age}</span>}
+        {age && <span className="db-wo-age font-mono">{age}</span>}
       </div>
 
       <div className="db-wo-title">{title}</div>
       {siteLabel && <div className="db-wo-sub">{siteLabel}</div>}
       {address && <div className="db-wo-addr">{address}</div>}
-
-      {/* The context block. Separated from the identity above by SPACE, never
-          a rule: an internal divider reads at the same weight as the card
-          separator and turns the rail into continuous stripes with no
-          findable card edge.
-
-          12px, and load-bearing. Intra-block gaps are 1px (address) and 2px
-          (Nearest), so the separator has to stay several times larger than
-          either — at 8px, with the address making identity four lines tall,
-          the card stopped reading as two groups and became four evenly
-          stacked lines. Re-check the ratio, not the number, if either block
-          gains content. */}
-      {showMeta && (
-        <div className="mt-3 flex items-center gap-1.5">
-          {divisionName && <span className="text-[10.5px] text-fg-muted">{divisionName}</span>}
-          {divisionName && regionName && <span className="text-border-strong">·</span>}
-          {regionName && <span className="text-[10.5px] text-fg-muted">{regionName}</span>}
-          <span className="grow" />
-          {/* Only worth saying when it implies more than one visit might be
-              needed — "1 item" is noise on every card. */}
-          {workOrder.itemCount > 1 && (
-            <span className="font-mono text-[10.5px] text-fg-muted">
-              {t('dispatchBoard.rail.itemCount', { count: workOrder.itemCount })}
-            </span>
-          )}
-        </div>
-      )}
 
       {/* The routing signal: who is ALREADY going to be near this today. A
           fact for comparison, never a recommendation — it names one stop and

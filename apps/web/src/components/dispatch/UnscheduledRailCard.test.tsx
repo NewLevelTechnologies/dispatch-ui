@@ -34,7 +34,7 @@ function renderCard(over: Partial<React.ComponentProps<typeof UnscheduledRailCar
   return render(
     <UnscheduledRailCard
       workOrder={workOrder()}
-      regionName={null}
+      regionAbbreviation={null}
       divisionName={null}
       workOrderHref={(id) => `/work-orders/${id}`}
       onOpen={vi.fn()}
@@ -136,53 +136,65 @@ describe('UnscheduledRailCard — where the job is', () => {
   it('keeps the region OFF the address line', () => {
     // Region is scope metadata, not a piece of the address — a different kind
     // of fact, not a shorter version of the same one.
-    renderCard({ workOrder: workOrder(located), regionName: 'Georgia' });
+    renderCard({ workOrder: workOrder(located), regionAbbreviation: 'GA' });
     expect(screen.getByText('1847 Peachtree Rd NE · Atlanta, GA 30309')).toBeInTheDocument();
-    expect(screen.getByText('Georgia')).toBeInTheDocument();
-  });
-
-  it('no longer suppresses a region that matches the city', () => {
-    // The old guard lived on the address line where the duplication was
-    // possible. On the meta row beside division it cannot occur, and a
-    // content-dependent guard on a card's shape costs more than it saves.
-    renderCard({ workOrder: workOrder(located), regionName: 'Atlanta' });
-    expect(screen.getByText('Atlanta')).toBeInTheDocument();
+    expect(screen.getByText('GA')).toBeInTheDocument();
   });
 });
 
-// Each element self-hides independently, and on many tenants the row never
-// renders at all — which is what keeps the address line's extra line
-// affordable against a budget of ~5 visible cards.
-describe('UnscheduledRailCard — the conditional meta row', () => {
-  it('is absent entirely when nothing applies', () => {
+// Division, region and item count are RECORD metadata — the same class of fact
+// as the identifier and the age they sit between — so they ride the identity
+// row. A row of their own cost a full line plus its 12px separator, roughly
+// 27px per card, to print one or two short words.
+describe('UnscheduledRailCard — facets on the identity row', () => {
+  it('has no row of its own', () => {
+    const { container } = renderCard({ divisionName: 'HVAC', regionAbbreviation: 'EV' });
+    // One identity row, and the facets are inside it rather than below.
+    const facets = container.querySelector('.db-wo-facets');
+    expect(facets).not.toBeNull();
+    expect(facets?.parentElement?.querySelector('.db-wolink')).not.toBeNull();
+  });
+
+  it('orders by truncation priority, not reading order', () => {
+    // The group clips from the END, so region goes last: it is the only one of
+    // the three recoverable from the card, since the address line below
+    // already says the city and state. Division and item count appear nowhere
+    // else, so they survive the clip.
+    renderCard({
+      divisionName: 'HVAC',
+      regionAbbreviation: 'EV',
+      workOrder: workOrder({ itemCount: 2 }),
+    });
+    expect(screen.getByText('HVAC · ×2 · EV')).toBeInTheDocument();
+  });
+
+  it('spends five fewer characters on the count than "2 items" would', () => {
+    renderCard({ workOrder: workOrder({ itemCount: 3 }) });
+    expect(screen.getByText('×3')).toBeInTheDocument();
+    expect(screen.queryByText(/3 items/)).not.toBeInTheDocument();
+  });
+
+  it('omits the count when it implies nothing about a second visit', () => {
+    renderCard({ workOrder: workOrder({ itemCount: 1 }), divisionName: 'HVAC' });
+    expect(screen.getByText('HVAC')).toBeInTheDocument();
+  });
+
+  it('renders nothing at all when no facet applies', () => {
     const { container } = renderCard({
       workOrder: workOrder({ itemCount: 1 }),
-      regionName: null,
       divisionName: null,
+      regionAbbreviation: null,
     });
-    // Never an empty spacer to keep heights uniform: reach down the queue is
-    // worth more than uniformity, and these conditions are tenant-level, so
-    // the cards stay uniform anyway.
-    expect(container.querySelector('.mt-3')).toBeNull();
+    expect(container.querySelector('.db-wo-facets')).toBeNull();
   });
 
-  it('renders for division alone', () => {
-    renderCard({ divisionName: 'HVAC' });
-    expect(screen.getByText('HVAC')).toBeInTheDocument();
-  });
-
-  it('separates division and region when both apply', () => {
-    renderCard({ divisionName: 'HVAC', regionName: 'East Valley' });
-    expect(screen.getByText('HVAC')).toBeInTheDocument();
-    expect(screen.getByText('East Valley')).toBeInTheDocument();
-  });
-
-  it('says the item count only when it implies more than one visit', () => {
-    renderCard({ workOrder: workOrder({ itemCount: 1 }) });
-    expect(screen.queryByText(/item/)).not.toBeInTheDocument();
-
-    renderCard({ workOrder: workOrder({ itemCount: 3 }) });
-    expect(screen.getByText(/3 items/)).toBeInTheDocument();
+  it('never lets the identifier absorb the width shortfall', () => {
+    // A record identifier must never wrap or ellipsize: the facet group is the
+    // row's only elastic element, and without that the browser breaks
+    // "WO-3911" across two lines on exactly the cards this change shortened.
+    const { container } = renderCard({ divisionName: 'Refrigeration & Controls' });
+    expect(container.querySelector('.db-wolink')).not.toBeNull();
+    expect(container.querySelector('.db-wo-age')).not.toBeNull();
   });
 });
 

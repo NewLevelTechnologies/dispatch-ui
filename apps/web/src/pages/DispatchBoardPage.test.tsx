@@ -336,17 +336,18 @@ describe('DispatchBoardPage unscheduled rail', () => {
   });
 
   // "1 item" on every card is noise; the count only matters when it implies
-  // more than one visit might be needed.
+  // more than one visit might be needed. It rides the identity row as "×3" —
+  // five characters cheaper than "3 items" on the row where width is scarcest.
   it('names the item count only above one', async () => {
     mockGetUnscheduled.mockResolvedValue(railWith([railWorkOrder({ itemCount: 1 })]));
     const { unmount } = renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch' });
     await screen.findByText('WO-3911');
-    expect(screen.queryByText(/item/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/×/)).not.toBeInTheDocument();
     unmount();
 
     mockGetUnscheduled.mockResolvedValue(railWith([railWorkOrder({ itemCount: 3 })]));
     renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch' });
-    expect(await screen.findByText('3 items')).toBeInTheDocument();
+    expect(await screen.findByText(/×3/)).toBeInTheDocument();
   });
 
   it('falls back to the number when the summary has not synced', async () => {

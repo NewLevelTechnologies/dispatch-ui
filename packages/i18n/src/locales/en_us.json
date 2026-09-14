@@ -3015,6 +3015,7 @@
       "heading": "Unscheduled",
       "itemCount_one": "{{count}} item",
       "itemCount_other": "{{count}} items",
+      "itemsShort": "×{{count}}",
       "nearest": "Nearest",
       "nearestDistance": "{{miles}} mi · {{at}}",
       "openWorkOrder": "Open {{number}}",

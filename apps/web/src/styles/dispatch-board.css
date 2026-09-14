@@ -169,13 +169,40 @@
   text-wrap: pretty;
 }
 
+/* Division, region and item count ride the IDENTITY row rather than a row of
+   their own. They are record metadata — the same class of fact as the id and
+   the age they sit between — and a dedicated row cost a full line plus its
+   12px separator, roughly 27px per card, to print one or two short words
+   while this row ran half empty. At ~5 visible cards that is most of a sixth
+   card given away.
+
+   The row's ONLY elastic element, so it is what clips when width runs short. */
+.db-wo-facets {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 10.5px;
+  color: var(--fg-muted);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.db-wo-age {
+  flex-shrink: 0;
+  font-size: 10.5px;
+  color: var(--fg-muted);
+  white-space: nowrap;
+}
+
 /* "Who is already going near this?" — groups to the context line above it at
    a 2px gap, well inside the 8px that separates identity from context. */
 .db-wo-near {
   display: flex;
   align-items: center;
   gap: 5px;
-  margin-top: 2px;
+  /* The card's whole context block now that the meta row is gone, so this
+     carries the 12px identity/context separator itself. Grouped by space,
+     never a rule. */
+  margin-top: 12px;
   font-size: 10.5px;
   color: var(--fg-muted);
 }
@@ -786,7 +813,14 @@
    with a customer on the phone. So the parent record is one action away from
    every place a dispatch appears, and always as a real link. */
 
+/* A record identifier must never wrap or ellipsize. The facet group beside it
+   is the identity row's only elastic element; without this the browser hands
+   the shortfall to the id and breaks WO-3911 across two lines — a taller card
+   and an unreadable identifier, on exactly the cards that were meant to get
+   shorter. */
 .db-wolink {
+  flex-shrink: 0;
+  white-space: nowrap;
   font-size: 10.5px;
   font-weight: 600;
   color: var(--fg-accent);
