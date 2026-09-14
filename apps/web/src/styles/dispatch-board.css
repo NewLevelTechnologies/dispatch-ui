@@ -1073,7 +1073,20 @@
   position: relative;
 }
 
-.db-map-canvas {
+/* Two classes, deliberately — this must outrank `.maplibregl-map`.
+ *
+ * MapLibre adds `.maplibregl-map` to this element, and maplibre-gl.css sets
+ * `.maplibregl-map { position: relative }`. That stylesheet is imported from
+ * DispatchMapCanvas, which is React.lazy-loaded, so it is injected AFTER this
+ * file. At equal specificity the later rule wins, so a single `.db-map-canvas`
+ * loses: the element flips to position:relative, `inset: 0` stops stretching
+ * it (it only offsets a relative box), the height collapses to 0, and
+ * `overflow: hidden` clips the canvas away entirely.
+ *
+ * The failure is invisible — MapLibre fetches tiles, parses them and reports
+ * everything healthy while painting into a box with no height. Do not reduce
+ * this back to one class. */
+.db-map .db-map-canvas {
   position: absolute;
   inset: 0;
 }
