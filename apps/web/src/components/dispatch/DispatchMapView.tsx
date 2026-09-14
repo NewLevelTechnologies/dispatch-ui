@@ -147,10 +147,12 @@ export default function DispatchMapView({
           <ToggleGroupOption value="all">{t('dispatchBoard.map.routesAll')}</ToggleGroupOption>
         </ToggleGroup>
 
+        {/* Same pressed treatment as the Map toggle that got here. */}
         <Button
           outline
           size="xxs"
           aria-pressed={showUnassigned}
+          className="aria-pressed:bg-bg-active aria-pressed:text-fg-strong"
           onClick={() => setShowUnassigned((v) => !v)}
         >
           {`${t('dispatchBoard.map.unassigned')} ${unscheduled.length}`}
