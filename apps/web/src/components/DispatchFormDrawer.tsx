@@ -25,6 +25,7 @@ import ConfirmDialog from './ConfirmDialog';
 import { useTenantTimeZone } from '../hooks/useTenantTimeZone';
 import { zonedDateOf, zonedHourOf, zonedIso } from '../lib/zonedTime';
 import { Pill } from './ui/Pill';
+import DispatchJobSection from './dispatch/DispatchJobSection';
 import type { DispatchSeed } from './DispatchDetailDrawer';
 import { workItemLabel } from '@dispatch/utils';
 
@@ -35,6 +36,14 @@ interface Props {
   workItems: WorkItemResponse[];
   locationName?: string;
   workOrderNumber?: string;
+  /** The job behind the visit, when the caller is somewhere the job is NOT
+   *  already on screen — the dispatch board, today. Omitted by the work
+   *  order's own page, where a link back to the page you are standing on is
+   *  noise.
+   *
+   *  A real href, not a click handler: middle-click and cmd-click to a new tab
+   *  are how a dispatcher reads a job without losing the board. */
+  workOrderHref?: string;
   // Present = edit mode (prefilled); absent = create.
   /** The visit being edited. A SEED rather than a full `Dispatch`: the form
    *  reads only the assignment, the window, the addressed items and the
@@ -151,6 +160,7 @@ export default function DispatchFormDrawer({
   workItems,
   locationName,
   workOrderNumber,
+  workOrderHref,
   dispatch,
   prefill,
 }: Props) {
@@ -516,6 +526,28 @@ export default function DispatchFormDrawer({
               </span>
             </button>
           </Section>
+
+          {/* The job behind the visit — the SAME section the detail drawer
+              renders, not a smaller copy of it. A dispatcher about to promise
+              a customer an arrival window is asking exactly what a dispatcher
+              looking at a booked visit asks: is this job blocked, is there a
+              balance, have we been to this site before, did the last tech
+              leave a note. Two answers to one question is how they drift.
+
+              Reads are shared by query key with the board and the drawer, so
+              opening this usually hits a warm cache rather than a new fetch. */}
+          {workOrderHref && (
+            <DispatchJobSection
+              workOrderId={workOrderId}
+              workOrderNumber={workOrderNumber ?? null}
+              href={workOrderHref}
+              // No dispatch id or window: on the create path the visit does
+              // not exist yet, so nothing is "this visit" and the site count
+              // runs to now.
+              currentDispatchId={dispatch?.id}
+              currentWindowStart={dispatch?.arrivalWindowStart}
+            />
+          )}
         </div>
 
         {/* Footer */}

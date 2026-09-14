@@ -13,6 +13,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from '@dispatch/i18n';
 import type { BoardDispatch } from '../../api/setup';
 import { useGlossary } from '../../contexts/GlossaryContext';
+import { siteLabel } from '../../lib/siteLabel';
 
 export type BlockMenu = {
   dispatch: BoardDispatch;
@@ -135,7 +136,7 @@ export default function BlockContextMenu({
       onKeyDown={onKeyDown}
     >
       <div className="db-ctx-head">
-        {[dispatch.workOrderNumber, dispatch.customerName].filter(Boolean).join(' · ')}
+        {[dispatch.workOrderNumber, siteLabel(dispatch)].filter(Boolean).join(' · ')}
       </div>
 
       <a className="db-ctx-item" role="menuitem" href={workOrderHref(dispatch.workOrderId)} onClick={onClose}>

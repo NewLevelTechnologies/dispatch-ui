@@ -32,6 +32,7 @@ import {
   formatWindow,
   zonedHour,
 } from '../../lib/boardTime';
+import { siteLabel } from '../../lib/siteLabel';
 
 interface Window {
   start: number;
@@ -181,7 +182,7 @@ function Block({
         });
       }}
       title={[
-        [title, dispatch.customerName, windowLabel].filter(Boolean).join(' · '),
+        [title, siteLabel(dispatch), windowLabel].filter(Boolean).join(' · '),
         t('dispatchBoard.grid.blockHint', { entity: getName('work_order') }),
       ].join('\n')}
     >
@@ -194,8 +195,8 @@ function Block({
         {dispatch.recurring && <span className="text-violet-500">{'⟳ '}</span>}
         {title}
       </span>
-      {density === 'comfortable' && dispatch.customerName && (
-        <span className="db-block-s">{dispatch.customerName}</span>
+      {density === 'comfortable' && siteLabel(dispatch) && (
+        <span className="db-block-s">{siteLabel(dispatch)}</span>
       )}
       {density !== 'dense' && (
         <span className="db-block-m">

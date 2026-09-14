@@ -65,6 +65,7 @@ import { useBoardMutations } from './dispatch/useBoardMutations';
 import { extractApiError, showError, showSuccess } from '../lib/toast';
 import { invalidateDispatchBoard } from '../utils/invalidateRoleConsumers';
 import { isHiddenByDefault } from '../lib/dispatchStatus';
+import { siteLabel } from '../lib/siteLabel';
 
 // The tenant's nominal working day. The axis widens to contain anything
 // outside it (an overnight emergency must not be clipped) but never narrows.
@@ -464,6 +465,14 @@ export default function DispatchBoardPage() {
   const openDispatch = useMemo(
     () => allDispatches.find((d) => d.id === openDispatchId) ?? null,
     [allDispatches, openDispatchId],
+  );
+
+  // The board's own row for the visit being edited. `DispatchSeed` carries
+  // only what the form itself reads, and the job band needs the work order's
+  // number and summary — which the board already has in hand.
+  const editBoardRow = useMemo(
+    () => allDispatches.find((d) => d.id === editDispatch?.id) ?? null,
+    [allDispatches, editDispatch],
   );
 
   const openVisit = (dispatch: BoardDispatch | null) => setParam('d', dispatch?.id ?? null);
@@ -1255,6 +1264,10 @@ export default function DispatchBoardPage() {
         onClose={() => setEditDispatch(null)}
         workOrderId={editDispatch?.workOrderId ?? ''}
         workItems={editWorkOrder?.workItems ?? []}
+        // Same reasoning on the edit path: the composer covers the board, so
+        // the job it belongs to is not reachable behind it either.
+        workOrderNumber={editBoardRow?.workOrderNumber ?? undefined}
+        workOrderHref={editDispatch ? workOrderHref(editDispatch.workOrderId) : undefined}
         dispatch={editDispatch}
       />
 
@@ -1268,7 +1281,10 @@ export default function DispatchBoardPage() {
         workOrderId={composeFor?.workOrderId ?? ''}
         workItems={composeWorkOrder?.workItems ?? []}
         workOrderNumber={composeFor?.workOrderNumber}
-        locationName={composeFor?.customerName}
+        locationName={composeFor ? siteLabel(composeFor) : undefined}
+        // The job is not on screen anywhere else here — the rail card carries
+        // its own link, but the composer covers the rail when open.
+        workOrderHref={composeFor ? workOrderHref(composeFor.workOrderId) : undefined}
       />
 
       {/* Marking someone off never moves their work — the dialog says what is
