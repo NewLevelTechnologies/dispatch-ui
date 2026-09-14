@@ -466,6 +466,14 @@ export default function DispatchBoardPage() {
     [allDispatches, openDispatchId],
   );
 
+  // The board's own row for the visit being edited. `DispatchSeed` carries
+  // only what the form itself reads, and the job band needs the work order's
+  // number and summary — which the board already has in hand.
+  const editBoardRow = useMemo(
+    () => allDispatches.find((d) => d.id === editDispatch?.id) ?? null,
+    [allDispatches, editDispatch],
+  );
+
   const openVisit = (dispatch: BoardDispatch | null) => setParam('d', dispatch?.id ?? null);
 
   // A map drop resolves to a PERSON and a DAY. It opens the composer with
@@ -1255,6 +1263,11 @@ export default function DispatchBoardPage() {
         onClose={() => setEditDispatch(null)}
         workOrderId={editDispatch?.workOrderId ?? ''}
         workItems={editWorkOrder?.workItems ?? []}
+        // Same reasoning on the edit path: the composer covers the board, so
+        // the job it belongs to is not reachable behind it either.
+        workOrderNumber={editBoardRow?.workOrderNumber ?? undefined}
+        workOrderHref={editDispatch ? workOrderHref(editDispatch.workOrderId) : undefined}
+        workOrderSummary={editBoardRow?.workOrderSummary}
         dispatch={editDispatch}
       />
 
@@ -1269,6 +1282,10 @@ export default function DispatchBoardPage() {
         workItems={composeWorkOrder?.workItems ?? []}
         workOrderNumber={composeFor?.workOrderNumber}
         locationName={composeFor?.customerName}
+        // The job is not on screen anywhere else here — the rail card carries
+        // its own link, but the composer covers the rail when open.
+        workOrderHref={composeFor ? workOrderHref(composeFor.workOrderId) : undefined}
+        workOrderSummary={composeFor?.workOrderSummary}
       />
 
       {/* Marking someone off never moves their work — the dialog says what is

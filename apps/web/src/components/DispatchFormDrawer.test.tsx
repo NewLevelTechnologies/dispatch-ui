@@ -401,3 +401,55 @@ describe('DispatchFormDrawer — opened from a map drop', () => {
     expect(screen.queryByText('Prefilled from the map')).not.toBeInTheDocument();
   });
 });
+
+// The composer covers the rail when it is open, so the card's own work-order
+// link goes with it. A dispatcher scheduling a 95-day-old job usually wants to
+// read the job before promising a window.
+describe('DispatchFormDrawer — the job behind the visit', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockUserGetAll.mockResolvedValue([tech('u-1', 'Daniel', 'Park')]);
+    mockGetFieldWorkers.mockResolvedValue([tech('u-1', 'Daniel', 'Park')]);
+    mockTenantSettings.mockResolvedValue({ timezone: 'America/Phoenix' });
+  });
+
+  it('links to the work order by number', async () => {
+    render({
+      dispatch: null,
+      workOrderNumber: 'WO-3911',
+      workOrderHref: '/work-orders/wo-1?from=dispatch',
+    });
+    const link = await screen.findByRole('link', { name: /WO-3911/ });
+    expect(link).toHaveAttribute('href', '/work-orders/wo-1?from=dispatch');
+  });
+
+  it('is a real href, so middle-click and cmd-click reach a new tab', async () => {
+    // A JS-only navigation silently removes the way dispatchers read a job
+    // without losing the board.
+    render({ dispatch: null, workOrderNumber: 'WO-3911', workOrderHref: '/work-orders/wo-1' });
+    expect((await screen.findByRole('link', { name: /WO-3911/ })).tagName).toBe('A');
+  });
+
+  it('says WHICH job, not just that one exists', async () => {
+    render({
+      dispatch: null,
+      workOrderNumber: 'WO-3911',
+      workOrderHref: '/work-orders/wo-1',
+      workOrderSummary: 'No cooling — full system',
+    });
+    expect(await screen.findByText('No cooling — full system')).toBeInTheDocument();
+  });
+
+  it('still links when the summary has not synced', async () => {
+    render({ dispatch: null, workOrderNumber: 'WO-3911', workOrderHref: '/work-orders/wo-1', workOrderSummary: null });
+    expect(await screen.findByRole('link', { name: /WO-3911/ })).toBeInTheDocument();
+  });
+
+  it('renders nothing when the caller is already on the work order', async () => {
+    // The work order's own page opens this too, and a link back to the page
+    // you are standing on is noise.
+    render({ dispatch: null, workOrderNumber: 'WO-3911' });
+    await screen.findByLabelText('Arrival window');
+    expect(screen.queryByRole('link', { name: /WO-3911/ })).not.toBeInTheDocument();
+  });
+});

@@ -35,6 +35,17 @@ interface Props {
   workItems: WorkItemResponse[];
   locationName?: string;
   workOrderNumber?: string;
+  /** The job behind the visit, when the caller is somewhere the job is NOT
+   *  already on screen — the dispatch board, today. Omitted by the work
+   *  order's own page, where a link back to the page you are standing on is
+   *  noise.
+   *
+   *  A real href, not a click handler: middle-click and cmd-click to a new tab
+   *  are how a dispatcher reads a job without losing the board. */
+  workOrderHref?: string;
+  /** Printed beside the link so the drawer says WHICH job, not just that one
+   *  exists. Falls back to the number alone when the summary has not synced. */
+  workOrderSummary?: string | null;
   // Present = edit mode (prefilled); absent = create.
   /** The visit being edited. A SEED rather than a full `Dispatch`: the form
    *  reads only the assignment, the window, the addressed items and the
@@ -151,6 +162,8 @@ export default function DispatchFormDrawer({
   workItems,
   locationName,
   workOrderNumber,
+  workOrderHref,
+  workOrderSummary,
   dispatch,
   prefill,
 }: Props) {
@@ -516,6 +529,33 @@ export default function DispatchFormDrawer({
               </span>
             </button>
           </Section>
+
+          {/* The job behind the visit. Same band, same link treatment as the
+              detail drawer, because it answers the same question from the same
+              place — "what is this actually about" — and a dispatcher scheduling
+              a 95-day-old job usually wants to read it before promising a
+              window. The band is the seam where the drawer stops describing the
+              visit and starts describing the job. */}
+          {workOrderHref && (
+            <>
+              <div className="db-jobhead">
+                <span className="label-tiny text-fg">
+                  {t('dispatchBoard.job.heading', { entity: getName('work_order') })}
+                </span>
+                <span className="grow" />
+                <a className="db-wolink" href={workOrderHref}>
+                  {workOrderNumber
+                    ? `${t('dispatchBoard.job.open', { number: workOrderNumber })} →`
+                    : `${t('dispatchBoard.menu.openWorkOrder', { entity: getName('work_order') })} →`}
+                </a>
+              </div>
+              {workOrderSummary && (
+                <div className="px-4 py-3 text-[13px] leading-snug font-semibold text-fg-strong">
+                  {workOrderSummary}
+                </div>
+              )}
+            </>
+          )}
         </div>
 
         {/* Footer */}
