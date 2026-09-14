@@ -119,6 +119,13 @@
   opacity: 0.4;
 }
 
+/* The map is pointing back. Same treatment as :hover, because it IS the same
+   fact arriving from the other surface — a dispatcher pointing at a pin and a
+   dispatcher pointing at its card are identifying the same job. */
+.db-wo.hot {
+  background: var(--bg-hover);
+}
+
 .db-wo-title {
   font-size: 12px;
   font-weight: 600;
@@ -735,6 +742,13 @@
   opacity: 0.4;
 }
 
+/* The map is pointing back. Same treatment as :hover, because it IS the same
+   fact arriving from the other surface — a dispatcher pointing at a pin and a
+   dispatcher pointing at its card are identifying the same job. */
+.db-wo.hot {
+  background: var(--bg-hover);
+}
+
 /* The rail accepts a block dragged back off the board — the inverse of the
    gesture that scheduled it. */
 .db-rail.over {
@@ -1019,11 +1033,18 @@
   border: 2px solid var(--border-strong);
 }
 
-/* Release state, orthogonal to status: this can land on any fill above. */
+/* Release state owns the RING; status owns the FILL.
+   A 22px pin has exactly ONE fill channel, so spending it on release state
+   makes status invisible on the map — a scheduled-but-held pin has to still
+   read blue. This is a deliberate divergence from `.db-block`, where
+   unreleased work drops its tint for a hatch: a 200px block has border, fill
+   and text to work with and can afford that; a pin cannot.
+
+   Ported wrong the first time — the mock's stylesheet replaced the fill here
+   while its own prose said release is orthogonal to status, and the
+   stylesheet won. Fixed at the source in the mock's rev 9. */
 .db-pin.held {
-  background: var(--bg-elev);
-  color: var(--fg-muted);
-  border: 2px dashed var(--fg-muted);
+  border-style: dashed;
 }
 
 .db-pin.pri-urgent {
@@ -1065,6 +1086,17 @@
 
 .db-pin.dim {
   opacity: 0.42;
+}
+
+/* Cross-surface hover: the dispatcher is pointing at this job's rail card.
+   Size and elevation ONLY — never colour (accent means selection, and a
+   transient hover must not look like a persistent one) and never the border
+   style (the dashed ring is HOW you know a pin is unassigned, so flipping it
+   solid would strip the identifying mark at the moment it is being read). */
+.db-pin.hot {
+  transform: scale(1.45);
+  box-shadow: 0 3px 12px rgb(0 0 0 / 45%);
+  z-index: 8;
 }
 
 .db-map {
@@ -1120,6 +1152,57 @@
   border-radius: var(--r-md);
   background: color-mix(in oklch, var(--warning-500) 12%, var(--bg-elev));
   box-shadow: var(--shadow-sm);
+}
+
+/* Pin tooltip. A 22px target has nowhere to put text, so this is the only
+   place an unassigned job can say what it is — which is what makes the map
+   and the rail one list rather than the same seven jobs drawn twice. */
+.db-pintip-wrap .maplibregl-popup-content {
+  padding: 7px 9px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--bg-elev);
+  box-shadow: var(--shadow-md);
+  pointer-events: none;
+}
+
+.db-pintip-wrap .maplibregl-popup-tip {
+  border-top-color: var(--bg-elev);
+  border-bottom-color: var(--bg-elev);
+}
+
+.db-pintip {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  max-width: 230px;
+}
+
+.db-pintip-num {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--fg-muted);
+}
+
+.db-pintip-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--fg-strong);
+  line-height: 1.3;
+}
+
+.db-pintip-line {
+  font-size: 11px;
+  color: var(--fg-muted);
+}
+
+.db-pintip-hint {
+  margin-top: 3px;
+  padding-top: 3px;
+  border-top: 1px solid var(--border-soft);
+  font-size: 10.5px;
+  font-style: italic;
+  color: var(--fg-dim, var(--fg-muted));
 }
 
 /* MapLibre paints its own controls and attribution; give them the board's

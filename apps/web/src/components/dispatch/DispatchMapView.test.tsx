@@ -56,6 +56,9 @@ function renderMap(over: Partial<React.ComponentProps<typeof DispatchMapView>> =
       selectedId={null}
       onOpenDispatch={vi.fn()}
       onAssign={vi.fn()}
+      onOpenUnassigned={vi.fn()}
+      hoverWorkOrderId={null}
+      onHoverWorkOrder={vi.fn()}
       scopeKey="2026-03-15||"
       {...over}
     />,
