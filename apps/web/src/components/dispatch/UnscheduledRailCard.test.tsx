@@ -13,6 +13,7 @@ function workOrder(over: Partial<UnscheduledWorkOrder> = {}): UnscheduledWorkOrd
     customerId: 'c1',
     customerName: 'Pham, A.',
     serviceLocationId: 'l1',
+    serviceLocationName: null,
     serviceLocationStreet: null,
     serviceLocationCity: 'ATLANTA',
     serviceLocationState: 'GA',
@@ -95,50 +96,138 @@ describe('UnscheduledRailCard — cross-surface hover', () => {
   });
 });
 
-// The rail is the densest element on the board, so its third line has to earn
-// the slot. "Atlanta · Georgia" is the city and the REGION name — for a
-// single-metro tenant both are constants on every card.
+// The rail is the densest element on the board, so its lines have to earn the
+// slot — and its SHAPE has to stay constant, because scanning a queue depends
+// on the same datum sitting in the same place on every card.
 describe('UnscheduledRailCard — where the job is', () => {
-  it('shows the street, which is what tells two jobs apart', () => {
-    renderCard({
-      workOrder: workOrder({ serviceLocationStreet: '1847 PEACHTREE RD NE' }),
-    });
-    expect(screen.getByText(/1847 Peachtree Rd NE/)).toBeInTheDocument();
+  const located = {
+    serviceLocationName: null,
+    serviceLocationStreet: '1847 PEACHTREE RD NE',
+    serviceLocationCity: 'ATLANTA',
+    serviceLocationState: 'GA',
+    serviceLocationZip: '30309',
+  };
+
+  it('prints the complete address, not just the street', () => {
+    renderCard({ workOrder: workOrder(located) });
+    expect(screen.getByText('1847 Peachtree Rd NE · Atlanta, GA 30309')).toBeInTheDocument();
   });
 
-  it('keeps directionals uppercase and title-cases the rest', () => {
-    renderCard({ workOrder: workOrder({ serviceLocationStreet: '12 SW MAIN ST' }) });
+  it('keeps directionals uppercase and the state code uppercase', () => {
+    renderCard({ workOrder: workOrder({ ...located, serviceLocationStreet: '12 SW MAIN ST' }) });
     expect(screen.getByText(/12 SW Main St/)).toBeInTheDocument();
+    expect(screen.getByText(/GA 30309/)).toBeInTheDocument();
   });
 
-  it('does not spend the slot on the city once the street is there', () => {
+  it('still prints city and state when the site has no street on file', () => {
+    // The shape does not change with the content: a card missing a street
+    // shows the place it knows, in the same slot, rather than a shorter card.
+    renderCard({ workOrder: workOrder({ ...located, serviceLocationStreet: null }) });
+    expect(screen.getByText('Atlanta, GA 30309')).toBeInTheDocument();
+  });
+
+  it('leaves no dangling separator when parts are missing', () => {
     renderCard({
-      workOrder: workOrder({ serviceLocationStreet: '1847 PEACHTREE RD NE' }),
-      regionName: 'Georgia',
+      workOrder: workOrder({ ...located, serviceLocationStreet: null, serviceLocationZip: null }),
     });
-    expect(screen.queryByText(/Atlanta/)).not.toBeInTheDocument();
-    expect(screen.queryByText(/Georgia/)).not.toBeInTheDocument();
+    expect(screen.getByText('Atlanta, GA')).toBeInTheDocument();
   });
 
-  it('falls back to the old city line when the site has no street on file', () => {
-    // Null means "no street recorded", not "lookup failed" — so the card
-    // shows what it always showed rather than a gap or a placeholder.
-    renderCard({ workOrder: workOrder({ serviceLocationStreet: null }), regionName: 'Georgia' });
-    expect(screen.getByText(/Atlanta · Georgia/)).toBeInTheDocument();
+  it('keeps the region OFF the address line', () => {
+    // Region is scope metadata, not a piece of the address — a different kind
+    // of fact, not a shorter version of the same one.
+    renderCard({ workOrder: workOrder(located), regionName: 'Georgia' });
+    expect(screen.getByText('1847 Peachtree Rd NE · Atlanta, GA 30309')).toBeInTheDocument();
+    expect(screen.getByText('Georgia')).toBeInTheDocument();
   });
 
-  it('never promotes zip into the street slot', () => {
-    // Zip separates same-named streets across a metro — a tooltip's job, not
-    // a 262px card's.
-    renderCard({
-      workOrder: workOrder({ serviceLocationStreet: null, serviceLocationZip: '30309' }),
-    });
-    expect(screen.queryByText(/30309/)).not.toBeInTheDocument();
-  });
-
-  it('still drops a region that merely repeats the city', () => {
-    renderCard({ workOrder: workOrder({ serviceLocationStreet: null }), regionName: 'Atlanta' });
+  it('no longer suppresses a region that matches the city', () => {
+    // The old guard lived on the address line where the duplication was
+    // possible. On the meta row beside division it cannot occur, and a
+    // content-dependent guard on a card's shape costs more than it saves.
+    renderCard({ workOrder: workOrder(located), regionName: 'Atlanta' });
     expect(screen.getByText('Atlanta')).toBeInTheDocument();
-    expect(screen.queryByText(/Atlanta · Atlanta/)).not.toBeInTheDocument();
+  });
+});
+
+// Each element self-hides independently, and on many tenants the row never
+// renders at all — which is what keeps the address line's extra line
+// affordable against a budget of ~5 visible cards.
+describe('UnscheduledRailCard — the conditional meta row', () => {
+  it('is absent entirely when nothing applies', () => {
+    const { container } = renderCard({
+      workOrder: workOrder({ itemCount: 1 }),
+      regionName: null,
+      divisionName: null,
+    });
+    // Never an empty spacer to keep heights uniform: reach down the queue is
+    // worth more than uniformity, and these conditions are tenant-level, so
+    // the cards stay uniform anyway.
+    expect(container.querySelector('.mt-3')).toBeNull();
+  });
+
+  it('renders for division alone', () => {
+    renderCard({ divisionName: 'HVAC' });
+    expect(screen.getByText('HVAC')).toBeInTheDocument();
+  });
+
+  it('separates division and region when both apply', () => {
+    renderCard({ divisionName: 'HVAC', regionName: 'East Valley' });
+    expect(screen.getByText('HVAC')).toBeInTheDocument();
+    expect(screen.getByText('East Valley')).toBeInTheDocument();
+  });
+
+  it('says the item count only when it implies more than one visit', () => {
+    renderCard({ workOrder: workOrder({ itemCount: 1 }) });
+    expect(screen.queryByText(/item/)).not.toBeInTheDocument();
+
+    renderCard({ workOrder: workOrder({ itemCount: 3 }) });
+    expect(screen.getByText(/3 items/)).toBeInTheDocument();
+  });
+});
+
+// What the board routes TO. "Kroger Co." on eleven cards is eleven different
+// stores; "Store #4412" is the one the truck is going to.
+describe('UnscheduledRailCard — what the job is called', () => {
+  it('names the site when the site has a name', () => {
+    renderCard({
+      workOrder: workOrder({ serviceLocationName: 'Store #4412', customerName: 'Kroger Co.' }),
+    });
+    expect(screen.getByText('Store #4412')).toBeInTheDocument();
+    expect(screen.queryByText('Kroger Co.')).not.toBeInTheDocument();
+  });
+
+  it('falls back to the customer when it does not — most houses have no name', () => {
+    renderCard({
+      workOrder: workOrder({ serviceLocationName: null, customerName: 'Pham, A.' }),
+    });
+    expect(screen.getByText('Pham, A.')).toBeInTheDocument();
+  });
+
+  it('falls back on an empty name too, rather than rendering a blank line', () => {
+    renderCard({ workOrder: workOrder({ serviceLocationName: '', customerName: 'Pham, A.' }) });
+    expect(screen.getByText('Pham, A.')).toBeInTheDocument();
+  });
+
+  it('renders a job whose location has no cache row at all', () => {
+    // Live case since the join fix: such a job used to vanish from the board
+    // entirely. It now appears with the customer name, no address and no pin —
+    // degraded, visible, correct.
+    const { container } = renderCard({
+      workOrder: workOrder({
+        serviceLocationName: null,
+        serviceLocationStreet: null,
+        serviceLocationCity: '',
+        serviceLocationState: '',
+        serviceLocationZip: null,
+        latitude: null,
+        longitude: null,
+        customerName: 'Pham, A.',
+      }),
+    });
+    expect(screen.getByText('Pham, A.')).toBeInTheDocument();
+    // No empty address element holding layout, and no placeholder.
+    expect(container.querySelector('.db-wo-addr')).toBeNull();
+    expect(screen.queryByText(/N\/A|unknown/i)).not.toBeInTheDocument();
   });
 });

@@ -1195,8 +1195,14 @@ export default function DispatchBoardPage() {
                     // region on every card in a filtered board is noise.
                     regionName={regionId ? null : regionName(wo.dispatchRegionId)}
                     nearest={nearest[wo.workOrderId]}
+                    // Self-hiding, like every other scale affordance: a
+                    // single-division tenant sees it on every card, which is
+                    // the same defect as printing the state, and a division
+                    // filter already answers the question for the whole rail.
                     divisionName={
-                      divisions.find((d) => d.id === wo.divisionId)?.name ?? null
+                      showDivisionFilter && !divisionId
+                        ? divisions.find((d) => d.id === wo.divisionId)?.name ?? null
+                        : null
                     }
                     workOrderHref={workOrderHref}
                     onOpen={setComposeFor}

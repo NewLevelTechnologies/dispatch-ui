@@ -28,14 +28,38 @@ export interface SiteAddressParts {
  * surfaces want different amounts of it: a tooltip wants the whole line, a
  * 262px rail card wants the street alone.
  */
-export function formatSiteAddress(parts: SiteAddressParts): string {
+export interface SiteAddressOptions {
+  /**
+   * What separates the STREET from the city/state/zip group. Defaults to the
+   * canonical comma.
+   *
+   * The dispatch rail passes `' · '`: at 262px the address wraps to a second
+   * line, and an interpunct marks where the street ends so a wrapped address
+   * still parses as street-then-place rather than one run-on string. The
+   * comma form stays on surfaces with room for the whole line on one row,
+   * where matching the customer's notification verbatim is the point.
+   *
+   * City, state and zip always join the same way regardless — they are one
+   * place, and splitting them would be a different address, not a restyled one.
+   */
+  separator?: string;
+}
+
+export function formatSiteAddress(
+  parts: SiteAddressParts,
+  options: SiteAddressOptions = {},
+): string {
   const stateAndZip = [parts.state, parts.zip]
     .map((part) => part?.trim())
     .filter(Boolean)
     .join(' ');
 
-  return [titleCaseAddress(parts.street), titleCaseAddress(parts.city), stateAndZip]
+  const place = [titleCaseAddress(parts.city), stateAndZip]
     .map((segment) => segment.trim())
     .filter(Boolean)
     .join(', ');
+
+  return [titleCaseAddress(parts.street).trim(), place]
+    .filter(Boolean)
+    .join(options.separator ?? ', ');
 }

@@ -104,6 +104,15 @@ export interface BoardDispatch {
   // Agreement-generated work; the board marks it with a recurrence glyph.
   recurring: boolean;
   serviceLocationId: string | null;
+  // The operative label: what the board actually routes TO. `Kroger Co.` on
+  // eleven cards is eleven different stores; `Store #4412` is the one you are
+  // going to. Rendered as `serviceLocationName || customerName`, the rule
+  // `ServiceLocationSearchResponse` states and `ServiceLocationPicker` already
+  // implements — many sites have no name (residential usually doesn't), and
+  // the customer is the right fallback, not a placeholder.
+  //
+  // Nullable, never padded: a site with no name is normal, not a failure.
+  serviceLocationName: string | null;
   // `Street`, not `Address`: this is the name the value already ships under
   // on WorkOrderSummaryResponse and the WorkOrder* events. One concept, one
   // wire name.
@@ -229,6 +238,15 @@ export interface UnscheduledWorkOrder {
   customerId: string;
   customerName: string;
   serviceLocationId: string;
+  // The operative label: what the board actually routes TO. `Kroger Co.` on
+  // eleven cards is eleven different stores; `Store #4412` is the one you are
+  // going to. Rendered as `serviceLocationName || customerName`, the rule
+  // `ServiceLocationSearchResponse` states and `ServiceLocationPicker` already
+  // implements — many sites have no name (residential usually doesn't), and
+  // the customer is the right fallback, not a placeholder.
+  //
+  // Nullable, never padded: a site with no name is normal, not a failure.
+  serviceLocationName: string | null;
   // Nullable here while city/state are not: a cached site always has the
   // latter two, and may legitimately have neither street nor zip.
   serviceLocationStreet: string | null;

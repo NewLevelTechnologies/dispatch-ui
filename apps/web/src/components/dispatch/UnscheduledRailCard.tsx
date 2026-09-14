@@ -18,7 +18,7 @@ import { useTranslation } from '@dispatch/i18n';
 import { draggable } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
 import type { UnscheduledWorkOrder } from '../../api/setup';
 import { Pill } from '../ui/Pill';
-import { titleCaseAddress } from '@dispatch/utils';
+import { formatSiteAddress } from '@dispatch/utils';
 import { formatAge } from '../../lib/boardTime';
 import { formatMiles, type NearestStop } from '../../lib/nearestStop';
 
@@ -82,36 +82,48 @@ export default function UnscheduledRailCard({
   // while the work-order cache catches up.
   const title = workOrder.workOrderSummary || workOrder.workOrderNumber;
 
-  // The STREET, now that the board has a map.
-  //
-  // This reverses an earlier call here that the city was enough. That was
-  // right when the rail was the only place unscheduled work appeared: an
-  // address routes only for someone holding a mental map of the metro. The
-  // map changed the premise — proximity reasoning is now visual, the card's
-  // pin is one hover away, and the street is what tells two jobs apart.
-  //
-  // It also reclaims the slot. "Atlanta · Georgia" is city plus REGION name
-  // (not state), and for a single-metro tenant both are constants — the
-  // densest element on the board spending a line to say nothing.
-  //
-  // Falls back to the old line rather than promoting zip: zip distinguishes
-  // streets across a metro, which is a tooltip's job, not a 262px card's.
-  const street = titleCaseAddress(workOrder.serviceLocationStreet);
-  const place =
-    street ||
-    [
-      titleCaseAddress(workOrder.serviceLocationCity),
-      // Region is dropped when it repeats the city, which tenant region names
-      // frequently do (Phoenix, Tucson): saying one word twice burns the slot
-      // this change exists to reclaim.
-      regionName && regionName.toUpperCase() !== (workOrder.serviceLocationCity ?? '').toUpperCase()
-        ? regionName
-        : null,
-    ]
-      .filter(Boolean)
-      .join(' · ');
+  // The site's own name when it has one, the customer's otherwise — the rule
+  // `ServiceLocationSearchResponse` states and `ServiceLocationPicker`
+  // implements. This is what the board routes TO: `Kroger Co.` on eleven cards
+  // is eleven different stores, while `Store #4412` is the one the truck is
+  // going to. Most residential sites have no name, so the customer is the
+  // right fallback rather than a placeholder.
+  const siteLabel = workOrder.serviceLocationName || workOrder.customerName;
 
-  const meta = [divisionName, place].filter(Boolean).join(' · ');
+  // The COMPLETE address, on every card, always.
+  //
+  // Two earlier versions of this line were wrong in the same way. It printed
+  // the city alone, then the street alone with a city fallback — both made the
+  // card's shape depend on its content, and scanning a queue depends on the
+  // same datum sitting in the same place on every card. It is also the datum a
+  // dispatcher reads aloud, verifies against what a customer just said, and
+  // reasons about proximity with; a partial address is one they have to open
+  // the work order to trust.
+  //
+  // It wraps rather than truncates — half an address is not an address.
+  const address = formatSiteAddress(
+    {
+      street: workOrder.serviceLocationStreet,
+      city: workOrder.serviceLocationCity,
+      state: workOrder.serviceLocationState,
+      zip: workOrder.serviceLocationZip,
+    },
+    { separator: ' · ' },
+  );
+
+  // Scope metadata, not part of the address — a different kind of fact, not a
+  // shorter version of the same one. Each element self-hides independently and
+  // on many tenants the whole row is absent, which is the point: the address
+  // line cost the card a line, and the rail's budget is about five visible
+  // cards. Never rendered as an empty spacer to keep heights uniform — reach
+  // down the queue is worth more than uniformity, and these conditions are
+  // tenant- and scope-level anyway, so the cards stay uniform regardless.
+  //
+  // No `region !== city` guard: it used to sit on the address line where the
+  // duplication was possible. On the meta row beside division it cannot occur,
+  // and a content-dependent guard on a card's shape costs more in scanning
+  // than it saves in words.
+  const showMeta = Boolean(divisionName || regionName) || workOrder.itemCount > 1;
 
   return (
     <div
@@ -155,7 +167,9 @@ export default function UnscheduledRailCard({
         {workOrder.recurring && (
           <span
             title={t('dispatchBoard.rail.recurring')}
-            className="text-[11px] text-violet-500"
+            // Info, not violet: violet is the board's "live" tone (en route
+            // / on site), and an agreement glyph is not a live state.
+            className="text-[11px] text-info-500"
           >
             {'⟳'}
           </span>
@@ -166,15 +180,25 @@ export default function UnscheduledRailCard({
       </div>
 
       <div className="db-wo-title">{title}</div>
-      {workOrder.customerName && <div className="db-wo-sub">{workOrder.customerName}</div>}
+      {siteLabel && <div className="db-wo-sub">{siteLabel}</div>}
+      {address && <div className="db-wo-addr">{address}</div>}
 
       {/* The context block. Separated from the identity above by SPACE, never
           a rule: an internal divider reads at the same weight as the card
           separator and turns the rail into continuous stripes with no
-          findable card edge. */}
-      {(meta || workOrder.itemCount > 1) && (
-        <div className="mt-2 flex items-center gap-1.5">
-          {meta && <span className="text-[10.5px] text-fg-muted">{meta}</span>}
+          findable card edge.
+
+          12px, and load-bearing. Intra-block gaps are 1px (address) and 2px
+          (Nearest), so the separator has to stay several times larger than
+          either — at 8px, with the address making identity four lines tall,
+          the card stopped reading as two groups and became four evenly
+          stacked lines. Re-check the ratio, not the number, if either block
+          gains content. */}
+      {showMeta && (
+        <div className="mt-3 flex items-center gap-1.5">
+          {divisionName && <span className="text-[10.5px] text-fg-muted">{divisionName}</span>}
+          {divisionName && regionName && <span className="text-border-strong">·</span>}
+          {regionName && <span className="text-[10.5px] text-fg-muted">{regionName}</span>}
           <span className="grow" />
           {/* Only worth saying when it implies more than one visit might be
               needed — "1 item" is noise on every card. */}

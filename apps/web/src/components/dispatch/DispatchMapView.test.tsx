@@ -30,6 +30,7 @@ function workOrder(over: Partial<UnscheduledWorkOrder> = {}): UnscheduledWorkOrd
     customerId: 'c1',
     customerName: 'Pham, A.',
     serviceLocationId: 'l1',
+    serviceLocationName: null,
     serviceLocationStreet: null,
     serviceLocationCity: 'Phoenix',
     serviceLocationState: 'AZ',

@@ -30,6 +30,7 @@ function stop(over: Partial<BoardDispatch> = {}): BoardDispatch {
     priority: 'NORMAL',
     recurring: false,
     serviceLocationId: 'l1',
+    serviceLocationName: null,
     serviceLocationStreet: null,
     serviceLocationCity: 'Phoenix',
     serviceLocationState: 'AZ',

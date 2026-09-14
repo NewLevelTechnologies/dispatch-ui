@@ -91,15 +91,22 @@
    something — a coloured bar on every card (info-blue for the routine
    majority) flattens the one distinction that has to be instant. The enum is
    LOW | NORMAL | HIGH | URGENT and there is no EMERGENCY. */
+/* 9/8, not 11/10. The address line made the card six lines and the
+   identity/context separator had to grow to 12px to keep the two blocks
+   reading as two; the 4px came back out of the padding rather than being
+   added to the card. The interior now has real structure, so the boundary and
+   the accent bar can carry delimitation on their own — and the rail's
+   scarcest resource is reach down the queue, not whitespace. */
 .db-wo {
-  padding: 11px 12px 10px;
+  padding: 9px 12px 8px;
   border-bottom: 1px solid var(--border);
   border-left: 3px solid transparent;
   cursor: grab;
   background: var(--bg-elev);
 }
 
-.db-wo:hover {
+.db-wo:hover,
+.db-wo.hot {
   background: var(--bg-hover);
 }
 
@@ -119,11 +126,12 @@
   opacity: 0.4;
 }
 
-/* The map is pointing back. Same treatment as :hover, because it IS the same
-   fact arriving from the other surface — a dispatcher pointing at a pin and a
-   dispatcher pointing at its card are identifying the same job. */
+/* The map is pointing back. It shares :hover's fill because it IS the same
+   fact arriving from the other surface, and adds an inset ring: a pointer
+   hover has a cursor sitting on the card to say where it came from, and a
+   hover driven from the map has nothing. */
 .db-wo.hot {
-  background: var(--bg-hover);
+  box-shadow: inset 0 0 0 1px var(--border-strong);
 }
 
 .db-wo-title {
@@ -133,10 +141,32 @@
   line-height: 1.25;
 }
 
+/* Customer and address bind to EACH OTHER, not to the summary: the customer
+   is the address's owner, so the pair groups — 4px above the customer, 1px
+   between the two, 12px to the context row. Before the address line existed
+   the customer was a subtitle of the summary and 1px below it was right;
+   adding the address changed what it belongs to. Proximity is a stronger
+   grouping cue than tone and will silently override it. */
 .db-wo-sub {
   font-size: 11px;
   color: var(--fg-muted);
+  margin-top: 4px;
+}
+
+/* Wraps, never truncates: unlike the Nearest label, half an address is worse
+   than a tall card — "1284 W Thomas Rd · Phoenix, A…" is not an address. Two
+   lines at rail width fits real US addresses.
+
+   Same tone as .db-wo-sub because customer and address are PEERS — one
+   who-and-where block, and the card's single emphasis belongs to the summary
+   line. Giving this --fg made it outrank the customer name at identical size
+   and inverted the card's hierarchy. */
+.db-wo-addr {
+  font-size: 11px;
+  color: var(--fg-muted);
   margin-top: 1px;
+  line-height: 1.35;
+  text-wrap: pretty;
 }
 
 /* "Who is already going near this?" — groups to the context line above it at
@@ -740,13 +770,6 @@
 .db-block.dragging,
 .db-wo.dragging {
   opacity: 0.4;
-}
-
-/* The map is pointing back. Same treatment as :hover, because it IS the same
-   fact arriving from the other surface — a dispatcher pointing at a pin and a
-   dispatcher pointing at its card are identifying the same job. */
-.db-wo.hot {
-  background: var(--bg-hover);
 }
 
 /* The rail accepts a block dragged back off the board — the inverse of the

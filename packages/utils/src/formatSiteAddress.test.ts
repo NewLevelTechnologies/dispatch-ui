@@ -62,3 +62,30 @@ describe('formatSiteAddress', () => {
     expect(formatSiteAddress({ street: '1847 PEACHTREE RD NE' })).toBe('1847 Peachtree Rd NE');
   });
 });
+
+// The rail card separates street from place with an interpunct because the
+// address wraps at 262px and the break has to stay readable. City, state and
+// zip never change shape — they are one place.
+describe('formatSiteAddress — rail separator', () => {
+  it('marks the street/place boundary so a wrapped address still parses', () => {
+    expect(formatSiteAddress(FULL, { separator: ' · ' })).toBe(
+      '1847 Peachtree Rd NE · Atlanta, GA 30309',
+    );
+  });
+
+  it('keeps city, state and zip comma-joined regardless of separator', () => {
+    expect(formatSiteAddress(FULL, { separator: ' · ' })).toContain('Atlanta, GA 30309');
+  });
+
+  it('leaves no dangling separator when the street is absent', () => {
+    expect(formatSiteAddress({ ...FULL, street: null }, { separator: ' · ' })).toBe(
+      'Atlanta, GA 30309',
+    );
+  });
+
+  it('leaves no dangling separator when only the street is known', () => {
+    expect(
+      formatSiteAddress({ street: '1847 PEACHTREE RD NE' }, { separator: ' · ' }),
+    ).toBe('1847 Peachtree Rd NE');
+  });
+});

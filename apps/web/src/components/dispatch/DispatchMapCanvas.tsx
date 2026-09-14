@@ -169,7 +169,9 @@ function unassignedTooltip(workOrder: UnscheduledWorkOrder): HTMLElement {
   }
 
   [
-    workOrder.customerName,
+    // The site's name when it has one — what the board routes to. Same rule
+    // the rail card follows, so a pin and its card name the job identically.
+    workOrder.serviceLocationName || workOrder.customerName,
     formatSiteAddress({
       street: workOrder.serviceLocationStreet,
       city: workOrder.serviceLocationCity,

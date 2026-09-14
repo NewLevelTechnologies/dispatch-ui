@@ -75,10 +75,11 @@ const railWorkOrder = (over: Record<string, unknown> = {}) => ({
   customerId: 'c1',
   customerName: 'Pham, A.',
   serviceLocationId: 'l1',
-  serviceLocationStreet: null,
+  serviceLocationName: null,
+  serviceLocationStreet: '1284 W THOMAS RD',
   serviceLocationCity: 'Phoenix',
   serviceLocationState: 'AZ',
-  serviceLocationZip: null,
+  serviceLocationZip: '85015',
   latitude: null,
   longitude: null,
   priority: 'NORMAL',
@@ -374,33 +375,34 @@ describe('DispatchBoardPage unscheduled rail', () => {
     expect(cards[2]).toHaveClass('high');
   });
 
-  // City, not street address: an address only routes for someone holding a
-  // mental map of the metro, and it answers "where is the job" rather than
-  // "who is already going near it".
-  it('shows the city on the card', async () => {
+  // The complete address on every card. A card whose shape changes with its
+  // content is harder to scan than one that repeats a word, and this is the
+  // datum a dispatcher reads aloud and verifies against what a customer just
+  // said — a partial one is one they must open the work order to trust.
+  it('shows the complete address on the card', async () => {
     mockGetUnscheduled.mockResolvedValue(railWith([railWorkOrder()]));
     renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch' });
-    expect(await screen.findByText(/Phoenix/)).toBeInTheDocument();
+    expect(
+      await screen.findByText('1284 W Thomas Rd · Phoenix, AZ 85015'),
+    ).toBeInTheDocument();
   });
 
-  // Tenant region names frequently ARE city names, and "Phoenix · Phoenix"
-  // burns a slot to say one word twice.
-  it('drops the region when it only repeats the city', async () => {
-    mockGetUnscheduled.mockResolvedValue(railWith([railWorkOrder()]));
-    renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch' });
-
-    await screen.findByText('WO-3911');
-    expect(screen.queryByText(/Phoenix · Phoenix/)).not.toBeInTheDocument();
-  });
-
-  it('shows the region when it adds a word', async () => {
+  // Region is scope metadata, not part of the address — a different kind of
+  // fact, not a shorter version of the same one. It sits on the meta row with
+  // division, which is why the old `region !== city` guard is gone: on that
+  // row the duplication it protected against cannot occur.
+  it('keeps the region off the address line', async () => {
     mockRegionsGetAll.mockResolvedValue([
       { id: 'r1', name: 'East Valley' },
       { id: 'r2', name: 'North' },
     ]);
     mockGetUnscheduled.mockResolvedValue(railWith([railWorkOrder()]));
     renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch' });
-    expect(await screen.findByText(/Phoenix · East Valley/)).toBeInTheDocument();
+
+    expect(
+      await screen.findByText('1284 W Thomas Rd · Phoenix, AZ 85015'),
+    ).toBeInTheDocument();
+    expect(screen.getByText('East Valley')).toBeInTheDocument();
   });
 
   // Printing one region on all eleven cards of an already-filtered board is
@@ -446,6 +448,7 @@ describe('DispatchBoardPage release', () => {
     priority: 'NORMAL',
     recurring: false,
     serviceLocationId: 'l1',
+    serviceLocationName: null,
     serviceLocationStreet: null,
     serviceLocationCity: null,
     serviceLocationState: null,
@@ -564,6 +567,7 @@ describe('DispatchBoardPage reaching the work order', () => {
     priority: 'NORMAL',
     recurring: false,
     serviceLocationId: 'l1',
+    serviceLocationName: null,
     serviceLocationStreet: null,
     serviceLocationCity: null,
     serviceLocationState: null,
@@ -928,6 +932,7 @@ describe('DispatchBoardPage chrome', () => {
     priority: 'NORMAL',
     recurring: false,
     serviceLocationId: 'l1',
+    serviceLocationName: null,
     serviceLocationStreet: null,
     serviceLocationCity: null,
     serviceLocationState: null,

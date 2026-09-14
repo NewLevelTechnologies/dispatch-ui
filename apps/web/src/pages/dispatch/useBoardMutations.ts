@@ -148,6 +148,7 @@ export function useBoardMutations(date: string, timeZone: string) {
         priority: input.workOrder.priority,
         recurring: input.workOrder.recurring,
         serviceLocationId: input.workOrder.serviceLocationId,
+        serviceLocationName: input.workOrder.serviceLocationName,
         serviceLocationStreet: input.workOrder.serviceLocationStreet,
         serviceLocationCity: input.workOrder.serviceLocationCity,
         serviceLocationState: input.workOrder.serviceLocationState,
