@@ -73,3 +73,37 @@ describe('status fills stay on the shared vocabulary', () => {
     expect(declarationsFor('.db-pin.sel')).toMatch(/outline:\s*2px solid var\(--accent-500\)/);
   });
 });
+
+// The pin tooltip and the rail card show one job twice. They have to parse
+// into the same blocks, and the thing that breaks that is even spacing —
+// proximity is the grouping cue and it overrides tone silently.
+describe('pin tooltip — who and where are one pair', () => {
+  it('binds the address to the site name more tightly than the name to what precedes it', () => {
+    const nameGap = Number(/margin-top:\s*(\d+)px/.exec(declarationsFor('.db-pintip-name'))?.[1]);
+    const addressGap = Number(
+      /margin-top:\s*(\d+)px/.exec(declarationsFor('.db-pintip-addr'))?.[1],
+    );
+    expect(addressGap).toBeLessThan(nameGap);
+  });
+
+  it('matches the rail card exactly, so the two surfaces cannot drift apart', () => {
+    const gapOf = (selector: string) =>
+      /margin-top:\s*(\d+)px/.exec(declarationsFor(selector))?.[1];
+    expect(gapOf('.db-pintip-name')).toBe(gapOf('.db-wo-sub'));
+    expect(gapOf('.db-pintip-addr')).toBe(gapOf('.db-wo-addr'));
+  });
+
+  it('does not distribute spacing evenly across the whole tooltip', () => {
+    // A uniform `gap` on the container would silently win over every
+    // margin above and flatten the blocks back into a list of lines.
+    expect(declarationsFor('.db-pintip')).not.toMatch(/(^|[^-])gap:/);
+  });
+
+  it('separates the affordance hint further than any gap inside a block', () => {
+    const hintGap = Number(/margin-top:\s*(\d+)px/.exec(declarationsFor('.db-pintip-hint'))?.[1]);
+    const addressGap = Number(
+      /margin-top:\s*(\d+)px/.exec(declarationsFor('.db-pintip-addr'))?.[1],
+    );
+    expect(hintGap).toBeGreaterThan(addressGap * 3);
+  });
+});

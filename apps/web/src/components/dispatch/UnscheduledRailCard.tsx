@@ -18,7 +18,7 @@ import { useTranslation } from '@dispatch/i18n';
 import { draggable } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
 import type { UnscheduledWorkOrder } from '../../api/setup';
 import { Pill } from '../ui/Pill';
-import { titleCaseAddress } from '@dispatch/utils';
+import { formatSiteAddress } from '@dispatch/utils';
 import { formatAge } from '../../lib/boardTime';
 import { formatMiles, type NearestStop } from '../../lib/nearestStop';
 
@@ -36,7 +36,7 @@ const PRIORITY_CLASS: Record<string, string> = {
 
 export default function UnscheduledRailCard({
   workOrder,
-  regionName,
+  regionAbbreviation,
   divisionName,
   nearest,
   workOrderHref,
@@ -45,9 +45,12 @@ export default function UnscheduledRailCard({
   onHover,
 }: {
   workOrder: UnscheduledWorkOrder;
-  /** Already guarded by the caller: null unless board scope is "all regions".
-   *  Printing one region on all eleven cards is noise. */
-  regionName: string | null;
+  /** The region's ABBREVIATION, not its name: on the identity row it competes
+   *  with the identifier and the age for a fixed width, and the full name buys
+   *  nothing there. Already guarded by the caller — null unless board scope is
+   *  "all regions", since printing one region on all eleven cards of a
+   *  narrowed board is noise. */
+  regionAbbreviation: string | null;
   divisionName: string | null;
   /** Who is already going near this site today. Absent when nothing is
    *  booked nearby, or when the location never geocoded. */
@@ -82,21 +85,65 @@ export default function UnscheduledRailCard({
   // while the work-order cache catches up.
   const title = workOrder.workOrderSummary || workOrder.workOrderNumber;
 
-  // City, not street address. An address only routes for a dispatcher holding
-  // a mental map of the metro — it survives neither a new hire nor a 262px
-  // rail — and it answers "where is the job" rather than "who is already
-  // going near it". The street address lives in the composer, where the
-  // decision has already been made.
+  // The site's own name when it has one, the customer's otherwise — the rule
+  // `ServiceLocationSearchResponse` states and `ServiceLocationPicker`
+  // implements. This is what the board routes TO: `Kroger Co.` on eleven cards
+  // is eleven different stores, while `Store #4412` is the one the truck is
+  // going to. Most residential sites have no name, so the customer is the
+  // right fallback rather than a placeholder.
+  const siteLabel = workOrder.serviceLocationName || workOrder.customerName;
+
+  // The COMPLETE address, on every card, always.
   //
-  // Region is dropped when it repeats the city, which tenant region names
-  // frequently do (Phoenix, Tucson): "HVAC · Phoenix · Phoenix" burns a slot
-  // to say one word twice.
-  const meta = [
+  // Two earlier versions of this line were wrong in the same way. It printed
+  // the city alone, then the street alone with a city fallback — both made the
+  // card's shape depend on its content, and scanning a queue depends on the
+  // same datum sitting in the same place on every card. It is also the datum a
+  // dispatcher reads aloud, verifies against what a customer just said, and
+  // reasons about proximity with; a partial address is one they have to open
+  // the work order to trust.
+  //
+  // It wraps rather than truncates — half an address is not an address.
+  const address = formatSiteAddress(
+    {
+      street: workOrder.serviceLocationStreet,
+      city: workOrder.serviceLocationCity,
+      state: workOrder.serviceLocationState,
+      zip: workOrder.serviceLocationZip,
+    },
+    { separator: ' · ' },
+  );
+
+  // Scope metadata, not part of the address — a different kind of fact, not a
+  // shorter version of the same one. Each element self-hides independently and
+  // on many tenants the whole row is absent, which is the point: the address
+  // line cost the card a line, and the rail's budget is about five visible
+  // cards. Never rendered as an empty spacer to keep heights uniform — reach
+  // down the queue is worth more than uniformity, and these conditions are
+  // tenant- and scope-level anyway, so the cards stay uniform regardless.
+  //
+  // No `region !== city` guard: it used to sit on the address line where the
+  // duplication was possible. On the meta row beside division it cannot occur,
+  // and a content-dependent guard on a card's shape costs more in scanning
+  // than it saves in words.
+  // Division, region and item count are RECORD metadata — the same class of
+  // fact as the identifier and the age they now sit between — so they ride the
+  // identity row rather than a row of their own. That row ran half empty while
+  // a dedicated one cost a full line plus its 12px separator, roughly 27px per
+  // card, to print one or two short words.
+  //
+  // The order is a TRUNCATION PRIORITY, not a reading order: the group is the
+  // row's only elastic element and clips from the end, so region goes last
+  // because it is the one fact recoverable from the card — the address line
+  // directly below already says "Phoenix, AZ". Division and item count appear
+  // nowhere else, so they survive the clip.
+  //
+  // "×2" rather than "2 items": five characters cheaper on the row where width
+  // is scarcest, which decides whether it survives on an urgent multi-item card.
+  const facets = [
     divisionName,
-    titleCaseAddress(workOrder.serviceLocationCity),
-    regionName && regionName.toUpperCase() !== (workOrder.serviceLocationCity ?? '').toUpperCase()
-      ? regionName
-      : null,
+    workOrder.itemCount > 1 ? t('dispatchBoard.rail.itemsShort', { count: workOrder.itemCount }) : null,
+    regionAbbreviation,
   ]
     .filter(Boolean)
     .join(' · ');
@@ -143,36 +190,22 @@ export default function UnscheduledRailCard({
         {workOrder.recurring && (
           <span
             title={t('dispatchBoard.rail.recurring')}
-            className="text-[11px] text-violet-500"
+            // Info, not violet: violet is the board's "live" tone (en route
+            // / on site), and an agreement glyph is not a live state.
+            className="text-[11px] text-info-500"
           >
             {'⟳'}
           </span>
         )}
         <span className="grow" />
+        {facets && <span className="db-wo-facets">{facets}</span>}
         {/* Age is the rail's tiebreak after priority, so it earns a slot. */}
-        {age && <span className="font-mono text-[10.5px] text-fg-muted">{age}</span>}
+        {age && <span className="db-wo-age font-mono">{age}</span>}
       </div>
 
       <div className="db-wo-title">{title}</div>
-      {workOrder.customerName && <div className="db-wo-sub">{workOrder.customerName}</div>}
-
-      {/* The context block. Separated from the identity above by SPACE, never
-          a rule: an internal divider reads at the same weight as the card
-          separator and turns the rail into continuous stripes with no
-          findable card edge. */}
-      {(meta || workOrder.itemCount > 1) && (
-        <div className="mt-2 flex items-center gap-1.5">
-          {meta && <span className="text-[10.5px] text-fg-muted">{meta}</span>}
-          <span className="grow" />
-          {/* Only worth saying when it implies more than one visit might be
-              needed — "1 item" is noise on every card. */}
-          {workOrder.itemCount > 1 && (
-            <span className="font-mono text-[10.5px] text-fg-muted">
-              {t('dispatchBoard.rail.itemCount', { count: workOrder.itemCount })}
-            </span>
-          )}
-        </div>
-      )}
+      {siteLabel && <div className="db-wo-sub">{siteLabel}</div>}
+      {address && <div className="db-wo-addr">{address}</div>}
 
       {/* The routing signal: who is ALREADY going to be near this today. A
           fact for comparison, never a recommendation — it names one stop and

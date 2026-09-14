@@ -495,8 +495,14 @@ export default function DispatchBoardPage() {
   // this so a layer toggle never throws away the dispatcher's panning.
   const scopeKey = [date, regionId ?? '', divisionId ?? '', search].join('|');
 
-  const regionName = (id: string | null) =>
-    id ? (regions.find((r) => r.id === id)?.name ?? null) : null;
+  // Rail cards print the ABBREVIATION: on the identity row it competes with
+  // the identifier and the age for a fixed width, and the full name buys
+  // nothing there. Falls back to the name for a region that has none.
+  const regionAbbrev = (id: string | null) => {
+    if (!id) return null;
+    const region = regions.find((r) => r.id === id);
+    return region ? region.abbreviation || region.name : null;
+  };
 
   // Grouping keys off PRIMARY region, because that is what produces a row
   // group. Filter visibility keys off coverage — the two sets are
@@ -1193,10 +1199,16 @@ export default function DispatchBoardPage() {
                     workOrder={wo}
                     // Only when board scope is "all regions": printing one
                     // region on every card in a filtered board is noise.
-                    regionName={regionId ? null : regionName(wo.dispatchRegionId)}
+                    regionAbbreviation={regionId ? null : regionAbbrev(wo.dispatchRegionId)}
                     nearest={nearest[wo.workOrderId]}
+                    // Self-hiding, like every other scale affordance: a
+                    // single-division tenant sees it on every card, which is
+                    // the same defect as printing the state, and a division
+                    // filter already answers the question for the whole rail.
                     divisionName={
-                      divisions.find((d) => d.id === wo.divisionId)?.name ?? null
+                      showDivisionFilter && !divisionId
+                        ? divisions.find((d) => d.id === wo.divisionId)?.name ?? null
+                        : null
                     }
                     workOrderHref={workOrderHref}
                     onOpen={setComposeFor}

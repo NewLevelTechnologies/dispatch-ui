@@ -44,10 +44,10 @@ const PROVISIONAL_BASE = {
   version: 0,
   assignedUserName: null,
   workOrderTypeId: null,
-  serviceLocationCity: null,
-  serviceLocationState: null,
-  latitude: null,
-  longitude: null,
+  // Site fields are copied from the rail card at construction, not nulled
+  // here: the card already knows the address and the coordinates, so a
+  // provisional block that claimed otherwise would render a pin-less job the
+  // dispatcher could see was on the map a second earlier.
   driveMinFromPrev: null,
   arrivedAt: null,
   departedAt: null,
@@ -148,6 +148,13 @@ export function useBoardMutations(date: string, timeZone: string) {
         priority: input.workOrder.priority,
         recurring: input.workOrder.recurring,
         serviceLocationId: input.workOrder.serviceLocationId,
+        serviceLocationName: input.workOrder.serviceLocationName,
+        serviceLocationStreet: input.workOrder.serviceLocationStreet,
+        serviceLocationCity: input.workOrder.serviceLocationCity,
+        serviceLocationState: input.workOrder.serviceLocationState,
+        serviceLocationZip: input.workOrder.serviceLocationZip,
+        latitude: input.workOrder.latitude,
+        longitude: input.workOrder.longitude,
         assignedUserId: input.techId,
         arrivalWindowStart: toIsoAt(date, input.window.startHour, timeZone),
         arrivalWindowEnd: toIsoAt(date, input.window.endHour, timeZone),

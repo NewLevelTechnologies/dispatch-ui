@@ -38,7 +38,7 @@ import { Protocol } from 'pmtiles';
 import { layers as protomapsLayers, namedTheme } from 'protomaps-themes-base';
 import { dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
 import { formatAge } from '../../lib/boardTime';
-import { titleCaseAddress } from '@dispatch/utils';
+import { formatSiteAddress } from '@dispatch/utils';
 import type { BoardDispatch, BoardTech, UnscheduledWorkOrder } from '../../api/setup';
 import {
   boundsOf,
@@ -148,45 +148,52 @@ const ROUTE_SOURCE = 'db-routes';
  * What an unassigned pin says on hover. Built as DOM rather than an HTML
  * string so customer and summary text cannot inject markup.
  *
- * NOTE: the street address belongs here and is not on the wire — neither
- * `UnscheduledWorkOrder` nor `BoardDispatch` carries one, only city and
- * state. Filed as a backend ask; the line appears here the day the field
- * does. City plus age still answers "which job is this", which is the gap
- * the tooltip exists to close.
+ * The address is the CANONICAL full line — the same string the customer's
+ * notification carries — because zip is what tells two same-named streets
+ * apart across a metro, and a tooltip is the one surface with room for it.
  */
 function unassignedTooltip(workOrder: UnscheduledWorkOrder): HTMLElement {
   const root = document.createElement('div');
   root.className = 'db-pintip';
 
-  const number = document.createElement('div');
-  number.className = 'db-pintip-num';
-  number.textContent = workOrder.workOrderNumber;
-  root.append(number);
+  const line = (className: string, text: string) => {
+    const el = document.createElement('div');
+    el.className = className;
+    el.textContent = text;
+    return el;
+  };
+
+  // Identifier and age share the top row, as they do on the rail card.
+  const head = document.createElement('div');
+  head.className = 'db-pintip-head';
+  head.append(line('db-pintip-num', workOrder.workOrderNumber));
+  const age = formatAge(workOrder.createdAt);
+  if (age) head.append(line('db-pintip-age', age));
+  root.append(head);
 
   if (workOrder.workOrderSummary) {
-    const title = document.createElement('div');
-    title.className = 'db-pintip-title';
-    title.textContent = workOrder.workOrderSummary;
-    root.append(title);
+    root.append(line('db-pintip-title', workOrder.workOrderSummary));
   }
 
-  [
-    workOrder.customerName,
-    titleCaseAddress(workOrder.serviceLocationCity),
-    formatAge(workOrder.createdAt),
-  ]
-    .filter((line): line is string => Boolean(line))
-    .forEach((line) => {
-      const row = document.createElement('div');
-      row.className = 'db-pintip-line';
-      row.textContent = line;
-      root.append(row);
-    });
+  // The site's name when it has one — what the board routes to. Same rule the
+  // rail card follows, so a pin and its card name the job identically.
+  const siteLabel = workOrder.serviceLocationName || workOrder.customerName;
+  if (siteLabel) root.append(line('db-pintip-name', siteLabel));
 
-  const hint = document.createElement('div');
-  hint.className = 'db-pintip-hint';
-  hint.textContent = 'Click to schedule · drag onto a route to pick a technician';
-  root.append(hint);
+  const address = formatSiteAddress({
+    street: workOrder.serviceLocationStreet,
+    city: workOrder.serviceLocationCity,
+    state: workOrder.serviceLocationState,
+    zip: workOrder.serviceLocationZip,
+  });
+  if (address) root.append(line('db-pintip-addr', address));
+
+  root.append(
+    line(
+      'db-pintip-hint',
+      'Click to schedule · drag onto a route to pick a technician',
+    ),
+  );
 
   return root;
 }

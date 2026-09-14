@@ -410,6 +410,7 @@ vi.mock('react-i18next', () => {
     'dispatchBoard.release.one':
       '{{workOrder}} released \u2014 the {{tech, lowercase}} has been notified',
     'dispatchBoard.release.oneFailed': "Couldn't release that {{entity, lowercase}}",
+    'dispatchBoard.rail.itemsShort': '×{{count}}',
     'dispatchBoard.rail.itemCount': '{{count}} items',
     'dispatchBoard.rail.recurring': 'Agreement / recurring work',
     'dispatchBoard.rail.urgent': 'Urgent',
