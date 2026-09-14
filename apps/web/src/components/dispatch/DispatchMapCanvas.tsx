@@ -10,15 +10,18 @@
 // without a bridge into a rendering context.
 // ─────────────────────────────────────────────────────────────────────
 import { useEffect, useMemo, useRef } from 'react';
-// Pinned to maplibre-gl v5 deliberately. v6 never invokes a protocol
-// registered with `addProtocol` — it issues no request and raises no error, so
-// a pmtiles basemap renders as a blank canvas with an empty console. Verified
-// by bisect: identical page, same pmtiles 4.5.0 and same archive, v6.9.0 made
-// 0 fetches while v5.6.1 made 11 and rendered. v6 splits the worker into its
-// own bundle and exposes `importScriptInWorkers` to register protocols there;
-// pmtiles 4.x does not do that and declares no maplibre peer range, so nothing
-// catches this at install time. Do not bump to v6 until pmtiles supports it.
-// Named imports (v5 exports these too).
+// Pinned to maplibre-gl v5. TREAT THIS AS UNVERIFIED — it may be removable.
+//
+// The pin came from a bisect during a long blank-map hunt: an isolated page
+// with the same pmtiles 4.5.0 and the same archive made 0 fetches on v6.9.0
+// and 11 on v5.24.0. But the actual cause of the blank map turned out to be a
+// CSS collision that collapsed the canvas host to 0 height, and that bisect
+// was run before it was found, so the v6 result is not trustworthy.
+//
+// Worth re-testing: bump to ^6.9.0, load the board, and check the map renders.
+// v5.24.0 is the last v5 release (April 2026, before v6.0.0 shipped in July),
+// so this line receives no further work and staying on it is a real cost.
+// Named imports (v5 and v6 both export these).
 import {
   Map as MapLibreMap,
   Marker,
