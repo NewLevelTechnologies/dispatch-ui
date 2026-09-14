@@ -38,7 +38,7 @@ import { Protocol } from 'pmtiles';
 import { layers as protomapsLayers, namedTheme } from 'protomaps-themes-base';
 import { dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
 import { formatAge } from '../../lib/boardTime';
-import { titleCaseAddress } from '@dispatch/utils';
+import { formatSiteAddress } from '@dispatch/utils';
 import type { BoardDispatch, BoardTech, UnscheduledWorkOrder } from '../../api/setup';
 import {
   boundsOf,
@@ -148,11 +148,9 @@ const ROUTE_SOURCE = 'db-routes';
  * What an unassigned pin says on hover. Built as DOM rather than an HTML
  * string so customer and summary text cannot inject markup.
  *
- * NOTE: the street address belongs here and is not on the wire — neither
- * `UnscheduledWorkOrder` nor `BoardDispatch` carries one, only city and
- * state. Filed as a backend ask; the line appears here the day the field
- * does. City plus age still answers "which job is this", which is the gap
- * the tooltip exists to close.
+ * The address is the CANONICAL full line — the same string the customer's
+ * notification carries — because zip is what tells two same-named streets
+ * apart across a metro, and a tooltip is the one surface with room for it.
  */
 function unassignedTooltip(workOrder: UnscheduledWorkOrder): HTMLElement {
   const root = document.createElement('div');
@@ -172,7 +170,12 @@ function unassignedTooltip(workOrder: UnscheduledWorkOrder): HTMLElement {
 
   [
     workOrder.customerName,
-    titleCaseAddress(workOrder.serviceLocationCity),
+    formatSiteAddress({
+      street: workOrder.serviceLocationStreet,
+      city: workOrder.serviceLocationCity,
+      state: workOrder.serviceLocationState,
+      zip: workOrder.serviceLocationZip,
+    }),
     formatAge(workOrder.createdAt),
   ]
     .filter((line): line is string => Boolean(line))

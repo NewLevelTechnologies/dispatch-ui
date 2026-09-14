@@ -104,8 +104,17 @@ export interface BoardDispatch {
   // Agreement-generated work; the board marks it with a recurrence glyph.
   recurring: boolean;
   serviceLocationId: string | null;
+  // `Street`, not `Address`: this is the name the value already ships under
+  // on WorkOrderSummaryResponse and the WorkOrder* events. One concept, one
+  // wire name.
+  //
+  // Null means the site has no street on file — NOT that a lookup failed. So
+  // it renders as absence: the line is composed from the parts that exist and
+  // nothing stands in for the ones that don't.
+  serviceLocationStreet: string | null;
   serviceLocationCity: string | null;
   serviceLocationState: string | null;
+  serviceLocationZip: string | null;
   // Null when the site never geocoded. The map reports these via
   // `dispatchesMissingCoordinates` rather than dropping the pins.
   latitude: number | null;
@@ -220,8 +229,12 @@ export interface UnscheduledWorkOrder {
   customerId: string;
   customerName: string;
   serviceLocationId: string;
+  // Nullable here while city/state are not: a cached site always has the
+  // latter two, and may legitimately have neither street nor zip.
+  serviceLocationStreet: string | null;
   serviceLocationCity: string;
   serviceLocationState: string;
+  serviceLocationZip: string | null;
   latitude: number | null;
   longitude: number | null;
   priority: WorkOrderPriority;

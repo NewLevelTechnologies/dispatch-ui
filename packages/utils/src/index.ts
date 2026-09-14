@@ -13,6 +13,7 @@ export { validateEmail } from './validation';
 
 // Address helpers
 export { titleCaseAddress } from './titleCaseAddress';
+export { formatSiteAddress, type SiteAddressParts } from './formatSiteAddress';
 
 // Domain display helpers
 export { workItemLabel } from './workItemLabel';

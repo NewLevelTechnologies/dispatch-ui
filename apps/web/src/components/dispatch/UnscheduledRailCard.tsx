@@ -82,24 +82,36 @@ export default function UnscheduledRailCard({
   // while the work-order cache catches up.
   const title = workOrder.workOrderSummary || workOrder.workOrderNumber;
 
-  // City, not street address. An address only routes for a dispatcher holding
-  // a mental map of the metro — it survives neither a new hire nor a 262px
-  // rail — and it answers "where is the job" rather than "who is already
-  // going near it". The street address lives in the composer, where the
-  // decision has already been made.
+  // The STREET, now that the board has a map.
   //
-  // Region is dropped when it repeats the city, which tenant region names
-  // frequently do (Phoenix, Tucson): "HVAC · Phoenix · Phoenix" burns a slot
-  // to say one word twice.
-  const meta = [
-    divisionName,
-    titleCaseAddress(workOrder.serviceLocationCity),
-    regionName && regionName.toUpperCase() !== (workOrder.serviceLocationCity ?? '').toUpperCase()
-      ? regionName
-      : null,
-  ]
-    .filter(Boolean)
-    .join(' · ');
+  // This reverses an earlier call here that the city was enough. That was
+  // right when the rail was the only place unscheduled work appeared: an
+  // address routes only for someone holding a mental map of the metro. The
+  // map changed the premise — proximity reasoning is now visual, the card's
+  // pin is one hover away, and the street is what tells two jobs apart.
+  //
+  // It also reclaims the slot. "Atlanta · Georgia" is city plus REGION name
+  // (not state), and for a single-metro tenant both are constants — the
+  // densest element on the board spending a line to say nothing.
+  //
+  // Falls back to the old line rather than promoting zip: zip distinguishes
+  // streets across a metro, which is a tooltip's job, not a 262px card's.
+  const street = titleCaseAddress(workOrder.serviceLocationStreet);
+  const place =
+    street ||
+    [
+      titleCaseAddress(workOrder.serviceLocationCity),
+      // Region is dropped when it repeats the city, which tenant region names
+      // frequently do (Phoenix, Tucson): saying one word twice burns the slot
+      // this change exists to reclaim.
+      regionName && regionName.toUpperCase() !== (workOrder.serviceLocationCity ?? '').toUpperCase()
+        ? regionName
+        : null,
+    ]
+      .filter(Boolean)
+      .join(' · ');
+
+  const meta = [divisionName, place].filter(Boolean).join(' · ');
 
   return (
     <div
