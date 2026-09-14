@@ -1035,3 +1035,40 @@ describe('DispatchBoardPage chrome', () => {
     );
   });
 });
+
+// The map is a view mode, and the control that entered it has to keep saying
+// so — aria-pressed alone announced the state to a screen reader and rendered
+// identically for everyone else, because Catalyst's Button has no pressed
+// styling of its own.
+describe('DispatchBoardPage map toggle', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockGetBoard.mockResolvedValue({
+      techs: [tech('u1', 'Maya Alvarez', ['r1'])],
+      dispatches: [],
+    });
+    mockGetUnscheduled.mockResolvedValue(emptyRail);
+    mockRegionsGetAll.mockResolvedValue([]);
+  });
+
+  it('is unpressed on the day board', async () => {
+    renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch' });
+    const button = await screen.findByRole('button', { name: /Map/ });
+    expect(button).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  it('stays pressed while the map is up, and carries the styling with it', async () => {
+    renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch?view=map' });
+    const button = await screen.findByRole('button', { name: /Map/ });
+    expect(button).toHaveAttribute('aria-pressed', 'true');
+    // The visual state rides on the same attribute rather than a second
+    // source of truth, so the two cannot disagree.
+    expect(button.className).toContain('aria-pressed:bg-bg-active');
+  });
+
+  it('shows Day on the horizon toggle, since a route is a day of work', async () => {
+    renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch?view=map' });
+    await screen.findByRole('button', { name: /Map/ });
+    expect(screen.getByRole('radio', { name: 'Day' })).toBeChecked();
+  });
+});

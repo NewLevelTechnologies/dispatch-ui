@@ -1003,10 +1003,16 @@ export default function DispatchBoardPage() {
                 toggle: that toggle answers "how much time", and the map
                 answers "drawn how". Turning it on from the week view lands on
                 Day, since a route is a day's sequence. */}
+            {/* aria-pressed alone announced the state to a screen reader and
+                showed nothing to everyone else — Catalyst's Button has no
+                pressed styling of its own. The mock's treatment: the active
+                SURFACE, not an accent fill, because accent means selection and
+                navigation in this system and a view toggle is neither. */}
             <Button
               outline
               size="xxs"
               aria-pressed={isMap}
+              className="aria-pressed:bg-bg-active aria-pressed:text-fg-strong"
               onClick={() => setParam('view', isMap ? null : 'map')}
             >
               <MapIcon />
