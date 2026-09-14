@@ -25,6 +25,7 @@ import ConfirmDialog from './ConfirmDialog';
 import { useTenantTimeZone } from '../hooks/useTenantTimeZone';
 import { zonedDateOf, zonedHourOf, zonedIso } from '../lib/zonedTime';
 import { Pill } from './ui/Pill';
+import DispatchJobSection from './dispatch/DispatchJobSection';
 import type { DispatchSeed } from './DispatchDetailDrawer';
 import { workItemLabel } from '@dispatch/utils';
 
@@ -43,9 +44,6 @@ interface Props {
    *  A real href, not a click handler: middle-click and cmd-click to a new tab
    *  are how a dispatcher reads a job without losing the board. */
   workOrderHref?: string;
-  /** Printed beside the link so the drawer says WHICH job, not just that one
-   *  exists. Falls back to the number alone when the summary has not synced. */
-  workOrderSummary?: string | null;
   // Present = edit mode (prefilled); absent = create.
   /** The visit being edited. A SEED rather than a full `Dispatch`: the form
    *  reads only the assignment, the window, the addressed items and the
@@ -163,7 +161,6 @@ export default function DispatchFormDrawer({
   locationName,
   workOrderNumber,
   workOrderHref,
-  workOrderSummary,
   dispatch,
   prefill,
 }: Props) {
@@ -530,31 +527,26 @@ export default function DispatchFormDrawer({
             </button>
           </Section>
 
-          {/* The job behind the visit. Same band, same link treatment as the
-              detail drawer, because it answers the same question from the same
-              place — "what is this actually about" — and a dispatcher scheduling
-              a 95-day-old job usually wants to read it before promising a
-              window. The band is the seam where the drawer stops describing the
-              visit and starts describing the job. */}
+          {/* The job behind the visit — the SAME section the detail drawer
+              renders, not a smaller copy of it. A dispatcher about to promise
+              a customer an arrival window is asking exactly what a dispatcher
+              looking at a booked visit asks: is this job blocked, is there a
+              balance, have we been to this site before, did the last tech
+              leave a note. Two answers to one question is how they drift.
+
+              Reads are shared by query key with the board and the drawer, so
+              opening this usually hits a warm cache rather than a new fetch. */}
           {workOrderHref && (
-            <>
-              <div className="db-jobhead">
-                <span className="label-tiny text-fg">
-                  {t('dispatchBoard.job.heading', { entity: getName('work_order') })}
-                </span>
-                <span className="grow" />
-                <a className="db-wolink" href={workOrderHref}>
-                  {workOrderNumber
-                    ? `${t('dispatchBoard.job.open', { number: workOrderNumber })} →`
-                    : `${t('dispatchBoard.menu.openWorkOrder', { entity: getName('work_order') })} →`}
-                </a>
-              </div>
-              {workOrderSummary && (
-                <div className="px-4 py-3 text-[13px] leading-snug font-semibold text-fg-strong">
-                  {workOrderSummary}
-                </div>
-              )}
-            </>
+            <DispatchJobSection
+              workOrderId={workOrderId}
+              workOrderNumber={workOrderNumber ?? null}
+              href={workOrderHref}
+              // No dispatch id or window: on the create path the visit does
+              // not exist yet, so nothing is "this visit" and the site count
+              // runs to now.
+              currentDispatchId={dispatch?.id}
+              currentWindowStart={dispatch?.arrivalWindowStart}
+            />
           )}
         </div>
 

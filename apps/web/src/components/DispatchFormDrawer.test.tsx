@@ -10,6 +10,12 @@ const mockCreate = vi.fn();
 const mockUpdate = vi.fn();
 const mockNotify = vi.fn();
 const mockTenantSettings = vi.fn();
+// The job section the composer now renders reads the work order and its
+// context. All of it shares query keys with the board, so these stand in for
+// caches that are usually already warm.
+const mockWorkOrderGetById = vi.fn();
+const mockListForWorkOrder = vi.fn();
+const mockListForServiceLocation = vi.fn();
 
 vi.mock('@dispatch/api/src/userApi', () => ({
   userApi: {
@@ -41,7 +47,46 @@ vi.mock('@dispatch/api/src/schedulingApi', async () => {
       create: (...args: unknown[]) => mockCreate(...args),
       update: (...args: unknown[]) => mockUpdate(...args),
       notify: (...args: unknown[]) => mockNotify(...args),
+      listForWorkOrder: (...args: unknown[]) => mockListForWorkOrder(...args),
+      listForServiceLocation: (...args: unknown[]) => mockListForServiceLocation(...args),
     },
+  };
+});
+
+vi.mock('@dispatch/api/src/financialApi', async () => {
+  const actual = await vi.importActual<typeof import('@dispatch/api/src/financialApi')>(
+    '@dispatch/api/src/financialApi',
+  );
+  return {
+    ...actual,
+    financialSummaryApi: {
+      ...actual.financialSummaryApi,
+      getByWorkOrder: () => Promise.resolve({ balance: '0' }),
+    },
+  };
+});
+
+vi.mock('@dispatch/api/src/notesApi', async () => {
+  const actual = await vi.importActual<typeof import('@dispatch/api/src/notesApi')>(
+    '@dispatch/api/src/notesApi',
+  );
+  return { ...actual, notesApi: { ...actual.notesApi, list: () => Promise.resolve([]) } };
+});
+
+vi.mock('@dispatch/api/src/workOrderConfigApi', async () => {
+  const actual = await vi.importActual<typeof import('@dispatch/api/src/workOrderConfigApi')>(
+    '@dispatch/api/src/workOrderConfigApi',
+  );
+  return { ...actual, divisionsApi: { ...actual.divisionsApi, getAll: () => Promise.resolve([]) } };
+});
+
+vi.mock('@dispatch/api/src/workOrderApi', async () => {
+  const actual = await vi.importActual<typeof import('@dispatch/api/src/workOrderApi')>(
+    '@dispatch/api/src/workOrderApi',
+  );
+  return {
+    ...actual,
+    workOrderApi: { ...actual.workOrderApi, getById: (...a: unknown[]) => mockWorkOrderGetById(...a) },
   };
 });
 
@@ -411,6 +456,9 @@ describe('DispatchFormDrawer — the job behind the visit', () => {
     mockUserGetAll.mockResolvedValue([tech('u-1', 'Daniel', 'Park')]);
     mockGetFieldWorkers.mockResolvedValue([tech('u-1', 'Daniel', 'Park')]);
     mockTenantSettings.mockResolvedValue({ timezone: 'America/Phoenix' });
+    mockWorkOrderGetById.mockResolvedValue({ id: 'wo-1', workItems: [], customer: { name: 'Pham, A.' } });
+    mockListForWorkOrder.mockResolvedValue([]);
+    mockListForServiceLocation.mockResolvedValue({ content: [], totalElements: 0 });
   });
 
   it('links to the work order by number', async () => {
@@ -431,18 +479,41 @@ describe('DispatchFormDrawer — the job behind the visit', () => {
   });
 
   it('says WHICH job, not just that one exists', async () => {
-    render({
-      dispatch: null,
-      workOrderNumber: 'WO-3911',
-      workOrderHref: '/work-orders/wo-1',
-      workOrderSummary: 'No cooling — full system',
+    // The section reads the work order itself, so the summary comes from the
+    // same cache the board and the detail drawer already share.
+    mockWorkOrderGetById.mockResolvedValue({
+      id: 'wo-1',
+      summary: 'No cooling — full system',
+      workItems: [],
+      customer: { name: 'Pham, A.' },
     });
+    render({ dispatch: null, workOrderNumber: 'WO-3911', workOrderHref: '/work-orders/wo-1' });
     expect(await screen.findByText('No cooling — full system')).toBeInTheDocument();
   });
 
-  it('still links when the summary has not synced', async () => {
-    render({ dispatch: null, workOrderNumber: 'WO-3911', workOrderHref: '/work-orders/wo-1', workOrderSummary: null });
-    expect(await screen.findByRole('link', { name: /WO-3911/ })).toBeInTheDocument();
+  it('names the SITE, not the customer who is billed', async () => {
+    mockWorkOrderGetById.mockResolvedValue({
+      id: 'wo-1',
+      summary: 'No cooling',
+      workItems: [],
+      customer: { name: 'Kroger Co.' },
+      serviceLocation: { id: 'l1', locationName: 'Store #4412' },
+    });
+    render({ dispatch: null, workOrderNumber: 'WO-3911', workOrderHref: '/work-orders/wo-1' });
+    expect(await screen.findByText(/Store #4412/)).toBeInTheDocument();
+    expect(screen.queryByText(/Kroger Co\./)).not.toBeInTheDocument();
+  });
+
+  it('falls back to the customer for a site with no name', async () => {
+    mockWorkOrderGetById.mockResolvedValue({
+      id: 'wo-1',
+      summary: 'No cooling',
+      workItems: [],
+      customer: { name: 'Pham, A.' },
+      serviceLocation: { id: 'l1' },
+    });
+    render({ dispatch: null, workOrderNumber: 'WO-3911', workOrderHref: '/work-orders/wo-1' });
+    expect(await screen.findByText(/Pham, A\./)).toBeInTheDocument();
   });
 
   it('renders nothing when the caller is already on the work order', async () => {

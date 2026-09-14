@@ -21,6 +21,7 @@ import { Pill } from '../ui/Pill';
 import { formatSiteAddress } from '@dispatch/utils';
 import { formatAge } from '../../lib/boardTime';
 import { formatMiles, type NearestStop } from '../../lib/nearestStop';
+import { siteLabel } from '../../lib/siteLabel';
 
 /** Priority drives the card's left rail, and ONLY when it means something:
  *  URGENT and HIGH get a tone, NORMAL and LOW get nothing. A coloured bar on
@@ -91,7 +92,7 @@ export default function UnscheduledRailCard({
   // is eleven different stores, while `Store #4412` is the one the truck is
   // going to. Most residential sites have no name, so the customer is the
   // right fallback rather than a placeholder.
-  const siteLabel = workOrder.serviceLocationName || workOrder.customerName;
+  const label = siteLabel(workOrder);
 
   // The COMPLETE address, on every card, always.
   //
@@ -204,7 +205,7 @@ export default function UnscheduledRailCard({
       </div>
 
       <div className="db-wo-title">{title}</div>
-      {siteLabel && <div className="db-wo-sub">{siteLabel}</div>}
+      {label && <div className="db-wo-sub">{label}</div>}
       {address && <div className="db-wo-addr">{address}</div>}
 
       {/* The routing signal: who is ALREADY going to be near this today. A

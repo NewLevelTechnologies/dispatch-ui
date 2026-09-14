@@ -49,6 +49,7 @@ import {
   techRouteColor,
   unassignedPinClassName,
 } from '../../lib/mapPins';
+import { siteLabel } from '../../lib/siteLabel';
 import 'maplibre-gl/dist/maplibre-gl.css';
 
 export type RoutesMode = 'none' | 'selected' | 'all';
@@ -447,7 +448,7 @@ export default function DispatchMapCanvas({
           el.textContent = String(stop.seq);
           el.title = [
             stop.workOrderSummary || stop.workOrderNumber || '',
-            stop.customerName ?? '',
+            siteLabel(stop),
             tech.name,
             stop.releasedAt == null ? 'not released' : '',
           ]

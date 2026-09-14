@@ -65,6 +65,7 @@ import { useBoardMutations } from './dispatch/useBoardMutations';
 import { extractApiError, showError, showSuccess } from '../lib/toast';
 import { invalidateDispatchBoard } from '../utils/invalidateRoleConsumers';
 import { isHiddenByDefault } from '../lib/dispatchStatus';
+import { siteLabel } from '../lib/siteLabel';
 
 // The tenant's nominal working day. The axis widens to contain anything
 // outside it (an overnight emergency must not be clipped) but never narrows.
@@ -1267,7 +1268,6 @@ export default function DispatchBoardPage() {
         // the job it belongs to is not reachable behind it either.
         workOrderNumber={editBoardRow?.workOrderNumber ?? undefined}
         workOrderHref={editDispatch ? workOrderHref(editDispatch.workOrderId) : undefined}
-        workOrderSummary={editBoardRow?.workOrderSummary}
         dispatch={editDispatch}
       />
 
@@ -1281,11 +1281,10 @@ export default function DispatchBoardPage() {
         workOrderId={composeFor?.workOrderId ?? ''}
         workItems={composeWorkOrder?.workItems ?? []}
         workOrderNumber={composeFor?.workOrderNumber}
-        locationName={composeFor?.customerName}
+        locationName={composeFor ? siteLabel(composeFor) : undefined}
         // The job is not on screen anywhere else here — the rail card carries
         // its own link, but the composer covers the rail when open.
         workOrderHref={composeFor ? workOrderHref(composeFor.workOrderId) : undefined}
-        workOrderSummary={composeFor?.workOrderSummary}
       />
 
       {/* Marking someone off never moves their work — the dialog says what is

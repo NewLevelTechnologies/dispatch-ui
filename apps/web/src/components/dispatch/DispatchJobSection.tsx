@@ -28,6 +28,7 @@ import {
   type ProgressCategory,
 } from '../../api/setup';
 import { useGlossary } from '../../contexts/GlossaryContext';
+import { siteLabel } from '../../lib/siteLabel';
 import { Pill } from '../ui/Pill';
 
 /** Progress → tone. BLOCKED is the one that has to read as a warning: it is
@@ -83,10 +84,14 @@ export default function DispatchJobSection({
   href: string;
   /** Lets the site-history count skip a round-trip through the work order. */
   serviceLocationId?: string | null;
-  currentDispatchId: string;
+  /** Absent when no visit exists yet — the composer renders this while
+   *  scheduling the FIRST one, and there is nothing to mark as "this visit". */
+  currentDispatchId?: string;
   /** This visit's arrival window start. The site count runs strictly before
-   *  it, so "prior" never quietly includes this visit or a later one. */
-  currentWindowStart: string;
+   *  it, so "prior" never quietly includes this visit or a later one. Absent
+   *  from the composer, where the window is the field being chosen — the count
+   *  then runs to now, which is every visit that has actually happened. */
+  currentWindowStart?: string;
 }) {
   const { t } = useTranslation();
   const { getName } = useGlossary();
@@ -128,22 +133,33 @@ export default function DispatchJobSection({
 
   // "Have we been here before?" — the callback question. Server-ordered and
   // paged, so size:1 buys the count without the rows.
+  // Falls back to the id on the work order itself, so a caller that only has
+  // a work order (the composer) still gets the count. The prop stays as the
+  // optimisation it was — it skips waiting on that read — rather than a
+  // requirement.
+  const siteId = serviceLocationId ?? workOrder?.serviceLocation?.id ?? null;
+  const historyTo = currentWindowStart ?? new Date().toISOString();
   const { data: siteHistory } = useQuery({
-    queryKey: ['dispatch-site-history', serviceLocationId, currentWindowStart],
+    queryKey: ['dispatch-site-history', siteId, historyTo],
     queryFn: () =>
-      dispatchesApi.listForServiceLocation(serviceLocationId!, {
-        from: new Date(new Date(currentWindowStart).getTime() - YEAR_MS).toISOString(),
-        to: currentWindowStart,
+      dispatchesApi.listForServiceLocation(siteId!, {
+        from: new Date(new Date(historyTo).getTime() - YEAR_MS).toISOString(),
+        to: historyTo,
         size: 1,
       }),
-    enabled: !!serviceLocationId,
+    enabled: !!siteId,
   });
 
   const summary =
     workOrder?.summary || workOrder?.workItems?.[0]?.description || workOrderNumber || '';
-  const customerName = workOrder?.customer?.name;
+  // The SITE's name, falling back to the customer's — what the board routes
+  // to. Same rule every other board surface follows.
+  const name = siteLabel({
+    serviceLocationName: workOrder?.serviceLocation?.locationName,
+    customerName: workOrder?.customer?.name,
+  });
   const divisionName = divisions.find((d) => d.id === workOrder?.divisionId)?.name;
-  const subtitle = [customerName, divisionName].filter(Boolean).join(' · ');
+  const subtitle = [name, divisionName].filter(Boolean).join(' · ');
 
   // The site contact is who is actually there; the customer is who is billed.
   // Prefer the one a dispatcher would call about this visit.
@@ -219,7 +235,7 @@ export default function DispatchJobSection({
 
       {/* Only worth a list when there is more than this visit — otherwise it
           is a one-row list of the thing already on screen. */}
-      {openVisits.length > 1 && (
+      {openVisits.length > (currentDispatchId ? 1 : 0) && (
         <section className="border-b border-border-soft px-4 py-3">
           <div className="mb-2 flex items-center gap-1.5">
             <span className="label-tiny text-fg">
