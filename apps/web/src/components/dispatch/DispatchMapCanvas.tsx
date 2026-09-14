@@ -34,11 +34,24 @@ import { useEffect, useMemo, useRef } from 'react';
 //   v5.24.0 -> "CALLED json", then "/7/34/50 -> 200094" and every other tile
 //   v6.9.0  -> "CALLED json", then nothing at all
 //
-// Fixing it on v6 means registering the protocol inside the worker via
-// `importScriptInWorkers`, which MapLibre documents as "experimental and can
-// break at any point". pmtiles 4.5.0 is the latest release and declares no
-// maplibre peer range, so nothing warns at install time. Re-test when pmtiles
-// next publishes.
+// The documented escape hatch is registering the protocol inside the worker
+// via `importScriptInWorkers`. THIS WAS TRIED AND DOES NOT WORK — don't spend
+// the afternoon on it again:
+//
+//   - `importScriptInWorkers` awaits `broadcast("IS", url)` across the pool,
+//     so any worker that cannot load the script leaves the promise pending
+//     forever. Gating map construction on it means no map is built at all,
+//     with nothing thrown.
+//   - MapLibre's `loadScript` fetches the URL and, for a body with top-level
+//     import/export, imports it through a blob URL. A Vite `?worker&url`
+//     module in dev still references `/node_modules/.vite/deps/...`, and those
+//     specifiers cannot resolve from a blob's opaque origin. It would only
+//     stand a chance in a production build, which is the worst split to ship.
+//   - MapLibre calls the API "experimental and can break at any point".
+//
+// So this needs fixing upstream, not here. pmtiles 4.5.0 is the latest release
+// and declares no maplibre peer range, so nothing warns at install time.
+// Re-test when pmtiles next publishes.
 // Named imports (v5 and v6 both export these).
 import {
   Map as MapLibreMap,
