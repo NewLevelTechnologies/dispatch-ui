@@ -10,17 +10,21 @@
 // without a bridge into a rendering context.
 // ─────────────────────────────────────────────────────────────────────
 import { useEffect, useMemo, useRef } from 'react';
-// Pinned to maplibre-gl v5. TREAT THIS AS UNVERIFIED — it may be removable.
+// Pinned to maplibre-gl v5. VERIFIED — do not bump without re-testing.
 //
-// The pin came from a bisect during a long blank-map hunt: an isolated page
-// with the same pmtiles 4.5.0 and the same archive made 0 fetches on v6.9.0
-// and 11 on v5.24.0. But the actual cause of the blank map turned out to be a
-// CSS collision that collapsed the canvas host to 0 height, and that bisect
-// was run before it was found, so the v6 result is not trustworthy.
+// v6 does not invoke a protocol registered with `addProtocol`: no request is
+// issued and no error is raised, so a pmtiles basemap renders blank with an
+// empty console.
 //
-// Worth re-testing: bump to ^6.9.0, load the board, and check the map renders.
-// v5.24.0 is the last v5 release (April 2026, before v6.0.0 shipped in July),
-// so this line receives no further work and staying on it is a real cost.
+// This was first bisected while a CSS bug was independently collapsing the
+// canvas host to 0 height, which made the result untrustworthy. It has since
+// been re-tested against a working canvas, on identical code and the same
+// archive: v5.24.0 renders, v6.9.0 is blank. The pin is justified.
+//
+// The cost is real and should be weighed periodically: v5.24.0 (April 2026) is
+// the last v5 release, v6.0.0 shipped that July, and pmtiles 4.5.0 is the
+// latest pmtiles and declares no maplibre peer range — so nothing warns at
+// install time. Re-test when pmtiles next publishes.
 // Named imports (v5 and v6 both export these).
 import {
   Map as MapLibreMap,
