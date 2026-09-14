@@ -41,6 +41,8 @@ export default function UnscheduledRailCard({
   nearest,
   workOrderHref,
   onOpen,
+  hovered,
+  onHover,
 }: {
   workOrder: UnscheduledWorkOrder;
   /** Already guarded by the caller: null unless board scope is "all regions".
@@ -52,6 +54,11 @@ export default function UnscheduledRailCard({
   nearest?: NearestStop;
   workOrderHref: (workOrderId: string) => string;
   onOpen: (workOrder: UnscheduledWorkOrder) => void;
+  /** This job is being pointed at — possibly at its pin on the map rather
+   *  than at this card. The highlight is symmetric because the page owns one
+   *  hover id for both surfaces. */
+  hovered?: boolean;
+  onHover?: (workOrderId: string | null) => void;
 }) {
   const { t } = useTranslation();
   const ref = useRef<HTMLDivElement>(null);
@@ -99,7 +106,16 @@ export default function UnscheduledRailCard({
       ref={ref}
       role="button"
       tabIndex={0}
-      className={`db-wo ${PRIORITY_CLASS[workOrder.priority] ?? ''}${dragging ? ' dragging' : ''}`.trim()}
+      className={`db-wo ${PRIORITY_CLASS[workOrder.priority] ?? ''}${dragging ? ' dragging' : ''}${
+        hovered ? ' hot' : ''
+      }`.trim()}
+      // Answers "this job has been sitting 95 days — is it anywhere near
+      // anyone I already have out there?" without a click-through: pointing
+      // at the card grows its pin on the map.
+      onMouseEnter={() => onHover?.(workOrder.workOrderId)}
+      onMouseLeave={() => onHover?.(null)}
+      onFocus={() => onHover?.(workOrder.workOrderId)}
+      onBlur={() => onHover?.(null)}
       onClick={() => onOpen(workOrder)}
       onKeyDown={(e) => {
         if (e.key !== 'Enter' && e.key !== ' ') return;

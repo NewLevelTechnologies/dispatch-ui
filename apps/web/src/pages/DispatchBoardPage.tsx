@@ -175,6 +175,10 @@ export default function DispatchBoardPage() {
   // Set only by a map drop. Present = the composer opens knowing WHO and
   // WHICH DAY but deliberately not the window.
   const [mapPrefill, setMapPrefill] = useState<MapPrefill | null>(null);
+  // The unscheduled job the dispatcher is pointing at, wherever they are
+  // pointing. ONE id, owned here, so the rail card and its map pin cannot
+  // hold different answers about what is being identified.
+  const [hoverWorkOrderId, setHoverWorkOrderId] = useState<string | null>(null);
   const [confirmRelease, setConfirmRelease] = useState(false);
   const [editDispatch, setEditDispatch] = useState<DispatchSeed | null>(null);
 
@@ -473,6 +477,17 @@ export default function DispatchBoardPage() {
     const workOrder = railItems.find((w) => w.workOrderId === workOrderId);
     if (!workOrder) return;
     setMapPrefill({ assignedUserId: techId, date });
+    setComposeFor(workOrder);
+  };
+
+  // Clicking a pin, as opposed to dragging one. Same destination as clicking
+  // a rail card and deliberately UNPREFILLED: a click asks "what is this",
+  // and answering it must not require starting a drag the dispatcher would
+  // then have to abort.
+  const openUnassignedFromMap = (workOrderId: string) => {
+    const workOrder = railItems.find((w) => w.workOrderId === workOrderId);
+    if (!workOrder) return;
+    setMapPrefill(null);
     setComposeFor(workOrder);
   };
 
@@ -805,6 +820,9 @@ export default function DispatchBoardPage() {
         selectedId={openDispatchId}
         onOpenDispatch={openVisit}
         onAssign={assignFromMap}
+        onOpenUnassigned={openUnassignedFromMap}
+        hoverWorkOrderId={hoverWorkOrderId}
+        onHoverWorkOrder={setHoverWorkOrderId}
         scopeKey={scopeKey}
       />
     );
@@ -1182,6 +1200,8 @@ export default function DispatchBoardPage() {
                     }
                     workOrderHref={workOrderHref}
                     onOpen={setComposeFor}
+                    hovered={hoverWorkOrderId === wo.workOrderId}
+                    onHover={setHoverWorkOrderId}
                   />
                 ))
               )}

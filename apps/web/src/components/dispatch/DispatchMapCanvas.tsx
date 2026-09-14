@@ -26,6 +26,7 @@ import {
   Map as MapLibreMap,
   Marker,
   NavigationControl,
+  Popup,
   addProtocol,
   removeProtocol,
   type GeoJSONSource,
@@ -36,6 +37,8 @@ import type { Feature } from 'geojson';
 import { Protocol } from 'pmtiles';
 import { layers as protomapsLayers, namedTheme } from 'protomaps-themes-base';
 import { dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
+import { formatAge } from '../../lib/boardTime';
+import { titleCaseAddress } from '@dispatch/utils';
 import type { BoardDispatch, BoardTech, UnscheduledWorkOrder } from '../../api/setup';
 import {
   boundsOf,
@@ -63,8 +66,19 @@ interface Props {
   showUnassigned: boolean;
   onOpenDispatch: (dispatch: BoardDispatch) => void;
   onFocusTech: (techId: string | null) => void;
-  /** A drop resolved to a person. Opens the composer — it does NOT commit. */
+  /** A DRAG resolved to a person. Opens the composer with that technician —
+   *  it does not commit. */
   onAssign: (workOrderId: string, techId: string) => void;
+  /** A CLICK on an unassigned pin. Opens the composer with nobody chosen: a
+   *  click expresses "what is this / let me schedule it", not "give it to
+   *  someone". Identification must never require starting a drag, because a
+   *  drag on the wrong job has to be aborted and abort-a-drag is a worse
+   *  gesture than a hover. */
+  onOpenUnassigned: (workOrderId: string) => void;
+  /** The unscheduled job the dispatcher is pointing at, on EITHER surface.
+   *  One id owned by the page drives both directions so they cannot disagree. */
+  hoverWorkOrderId: string | null;
+  onHoverWorkOrder: (workOrderId: string | null) => void;
   /** Changes when the SCOPE changes (region/division/search/date). Reframes. */
   scopeKey: string;
   /** Bumped by the "Fit to work" button. */
@@ -130,6 +144,53 @@ function buildStyle(pmtilesUrl: string, dark: boolean, attribution: string): Sty
 
 const ROUTE_SOURCE = 'db-routes';
 
+/**
+ * What an unassigned pin says on hover. Built as DOM rather than an HTML
+ * string so customer and summary text cannot inject markup.
+ *
+ * NOTE: the street address belongs here and is not on the wire — neither
+ * `UnscheduledWorkOrder` nor `BoardDispatch` carries one, only city and
+ * state. Filed as a backend ask; the line appears here the day the field
+ * does. City plus age still answers "which job is this", which is the gap
+ * the tooltip exists to close.
+ */
+function unassignedTooltip(workOrder: UnscheduledWorkOrder): HTMLElement {
+  const root = document.createElement('div');
+  root.className = 'db-pintip';
+
+  const number = document.createElement('div');
+  number.className = 'db-pintip-num';
+  number.textContent = workOrder.workOrderNumber;
+  root.append(number);
+
+  if (workOrder.workOrderSummary) {
+    const title = document.createElement('div');
+    title.className = 'db-pintip-title';
+    title.textContent = workOrder.workOrderSummary;
+    root.append(title);
+  }
+
+  [
+    workOrder.customerName,
+    titleCaseAddress(workOrder.serviceLocationCity),
+    formatAge(workOrder.createdAt),
+  ]
+    .filter((line): line is string => Boolean(line))
+    .forEach((line) => {
+      const row = document.createElement('div');
+      row.className = 'db-pintip-line';
+      row.textContent = line;
+      root.append(row);
+    });
+
+  const hint = document.createElement('div');
+  hint.className = 'db-pintip-hint';
+  hint.textContent = 'Click to schedule · drag onto a route to pick a technician';
+  root.append(hint);
+
+  return root;
+}
+
 export default function DispatchMapCanvas({
   styleUrl,
   dark,
@@ -143,6 +204,9 @@ export default function DispatchMapCanvas({
   onOpenDispatch,
   onFocusTech,
   onAssign,
+  onOpenUnassigned,
+  hoverWorkOrderId,
+  onHoverWorkOrder,
   scopeKey,
   fitSignal,
   attribution,
@@ -150,6 +214,10 @@ export default function DispatchMapCanvas({
   const hostRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const markersRef = useRef<Marker[]>([]);
+  // Unassigned markers by work-order id, so the hover effect can reach one
+  // marker without rebuilding the layer.
+  const unassignedMarkersRef = useRef<Record<string, Marker>>({});
+  const popupRef = useRef<Popup | null>(null);
   const loadedRef = useRef(false);
   // Whether this scope has been framed yet. Reset on scope change only —
   // reframing on a layer toggle would throw away the dispatcher's panning.
@@ -157,8 +225,22 @@ export default function DispatchMapCanvas({
 
   // Handlers read through a ref so the draw effect doesn't have to re-run
   // (and rebuild every marker) each time the page re-renders a new closure.
-  const latest = useRef({ onOpenDispatch, onFocusTech, onAssign, byTech });
-  latest.current = { onOpenDispatch, onFocusTech, onAssign, byTech };
+  const latest = useRef({
+    onOpenDispatch,
+    onFocusTech,
+    onAssign,
+    onOpenUnassigned,
+    onHoverWorkOrder,
+    byTech,
+  });
+  latest.current = {
+    onOpenDispatch,
+    onFocusTech,
+    onAssign,
+    onOpenUnassigned,
+    onHoverWorkOrder,
+    byTech,
+  };
 
   const style = useMemo(() => {
     if (!styleUrl.endsWith('.pmtiles')) return styleUrl;
@@ -188,6 +270,14 @@ export default function DispatchMapCanvas({
       attributionControl: { compact: true },
     });
     map.addControl(new NavigationControl({ showCompass: false }), 'top-right');
+    // One reused popup, not one per pin: this is a transient tooltip, and a
+    // hundred Popup instances would each carry their own DOM.
+    popupRef.current = new Popup({
+      closeButton: false,
+      closeOnClick: false,
+      offset: 14,
+      className: 'db-pintip-wrap',
+    });
     mapRef.current = map;
 
     // MapLibre routes style, source, glyph, sprite and tile failures through
@@ -250,6 +340,9 @@ export default function DispatchMapCanvas({
       observer.disconnect();
       markersRef.current.forEach((m) => m.remove());
       markersRef.current = [];
+      unassignedMarkersRef.current = {};
+      popupRef.current?.remove();
+      popupRef.current = null;
       loadedRef.current = false;
       map.remove();
       mapRef.current = null;
@@ -300,6 +393,7 @@ export default function DispatchMapCanvas({
     const draw = () => {
       markersRef.current.forEach((m) => m.remove());
       markersRef.current = [];
+      unassignedMarkersRef.current = {};
 
       const features: Feature[] = [];
       const framePoints: { latitude: number | null; longitude: number | null }[] = [];
@@ -372,10 +466,32 @@ export default function DispatchMapCanvas({
           const el = document.createElement('span');
           el.className = unassignedPinClassName(workOrder.priority);
           el.textContent = '?';
-          el.title = `${workOrder.workOrderNumber} · ${workOrder.customerName}`;
           const marker = new Marker({ element: el, draggable: true })
             .setLngLat([workOrder.longitude, workOrder.latitude])
             .addTo(map);
+          unassignedMarkersRef.current[workOrder.workOrderId] = marker;
+
+          // A 22px `?` is not an identification. Seven of them and seven rail
+          // cards are the same seven jobs rendered twice with no way to tell
+          // which is which — both halves of the routing decision on screen and
+          // unjoinable. A tooltip is the native idiom at this size: there is
+          // nowhere else on a pin to put text.
+          el.addEventListener('mouseenter', () => {
+            latest.current.onHoverWorkOrder(workOrder.workOrderId);
+            popupRef.current
+              ?.setLngLat([workOrder.longitude!, workOrder.latitude!])
+              .setDOMContent(unassignedTooltip(workOrder))
+              .addTo(map);
+          });
+          el.addEventListener('mouseleave', () => {
+            latest.current.onHoverWorkOrder(null);
+            popupRef.current?.remove();
+          });
+          el.addEventListener('click', (event) => {
+            event.stopPropagation();
+            latest.current.onOpenUnassigned(workOrder.workOrderId);
+          });
+
           marker.on('dragend', () => {
             const point = marker.getLngLat();
             const techId = nearestTechToPoint(
@@ -423,6 +539,16 @@ export default function DispatchMapCanvas({
     scopeKey,
     fitSignal,
   ]);
+
+  // ── Cross-surface hover ─────────────────────────────────────────
+  // Its own effect, keyed on `hoverWorkOrderId` ALONE. Folding this into the
+  // draw effect above would tear down and rebuild every marker on the map on
+  // every mouse move across the rail.
+  useEffect(() => {
+    Object.entries(unassignedMarkersRef.current).forEach(([id, marker]) => {
+      marker.getElement()?.classList.toggle('hot', id === hoverWorkOrderId);
+    });
+  }, [hoverWorkOrderId, unscheduled, showUnassigned]);
 
   return <div ref={hostRef} className="db-map-canvas" data-testid="dispatch-map-canvas" />;
 }

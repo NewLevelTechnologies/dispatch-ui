@@ -45,6 +45,12 @@ interface Props {
   selectedId: string | null;
   onOpenDispatch: (dispatch: BoardDispatch) => void;
   onAssign: (workOrderId: string, techId: string) => void;
+  /** Clicking an unassigned pin: composer, nobody chosen. */
+  onOpenUnassigned: (workOrderId: string) => void;
+  /** The unscheduled job being pointed at, on the rail OR the map. Owned by
+   *  the page so the two surfaces cannot hold different answers. */
+  hoverWorkOrderId: string | null;
+  onHoverWorkOrder: (workOrderId: string | null) => void;
   /** Region/division/search/date — anything that changes WHAT is on the map. */
   scopeKey: string;
 }
@@ -86,6 +92,9 @@ export default function DispatchMapView({
   selectedId,
   onOpenDispatch,
   onAssign,
+  onOpenUnassigned,
+  hoverWorkOrderId,
+  onHoverWorkOrder,
   scopeKey,
 }: Props) {
   const { t } = useTranslation();
@@ -180,6 +189,9 @@ export default function DispatchMapView({
             onOpenDispatch={onOpenDispatch}
             onFocusTech={setFocusedTechId}
             onAssign={onAssign}
+            onOpenUnassigned={onOpenUnassigned}
+            hoverWorkOrderId={hoverWorkOrderId}
+            onHoverWorkOrder={onHoverWorkOrder}
             scopeKey={scopeKey}
             fitSignal={fitSignal}
             attribution={t('dispatchBoard.map.attribution')}
