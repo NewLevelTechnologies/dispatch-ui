@@ -1,15 +1,13 @@
 // ─────────────────────────────────────────────────────────────────────
-// Row chrome shared by every board granularity: the sticky technician cell
-// and the collapsible region groups.
+// The sticky technician cell, shared by every board granularity.
 //
-// Extracted rather than copied because these carry rules, not just markup —
-// the load bar counts STOPS against a server-supplied denominator, a
-// multi-region tech renders once with a marker, and a lone group header never
-// renders. A day grid and a week grid that disagreed about any of those would
-// read as two different products.
+// Extracted rather than copied because it carries rules, not just markup: the
+// load bar counts STOPS against a server-supplied denominator, and coverage is
+// named rather than counted. A day grid and a week grid that disagreed about
+// either would read as two different products.
 // ─────────────────────────────────────────────────────────────────────
 import { useTranslation } from '@dispatch/i18n';
-import { ChevronRightIcon, EllipsisHorizontalIcon } from '@heroicons/react/24/outline';
+import { EllipsisHorizontalIcon } from '@heroicons/react/24/outline';
 import {
   Dropdown,
   DropdownButton,
@@ -18,9 +16,7 @@ import {
   DropdownMenu,
 } from '../catalyst/dropdown';
 import IconButton from '../IconButton';
-import { useGlossary } from '../../contexts/GlossaryContext';
 import { Avatar } from '../ui/Avatar';
-import type { Group, GroupableTech } from '../../lib/boardGroups';
 import { loadClassFor, type Density } from './spine';
 
 /**
@@ -31,6 +27,7 @@ import { loadClassFor, type Density } from './spine';
  */
 export function TechCell({
   tech,
+  regionLabel,
   stops,
   density,
   capacityStops,
@@ -40,6 +37,11 @@ export function TechCell({
   onMarkTimeOff,
 }: {
   tech: { name: string; regionIds: string[] };
+  /** The regions this tech covers, by NAME, already joined — or null when the
+   *  fact is a constant (a single-region tenant) and would print the same word
+   *  on every row. Replaces the old `+N` badge, which said how MANY regions
+   *  without saying which, and so never changed a decision. */
+  regionLabel: string | null;
   stops: number;
   density: Density;
   capacityStops: number | null;
@@ -64,27 +66,20 @@ export function TechCell({
       : null;
   const loadClass = loadClassFor(stops, capacityStops);
 
-  // A tech covering more than one region still renders in exactly ONE row
-  // (their primary group); the marker says the others exist. Rendering them
-  // twice would let a double-book hide in plain sight.
-  const extraRegions = Math.max(0, tech.regionIds.length - 1);
 
   return (
     <div className="db-techcol" style={{ width }}>
       {density === 'comfortable' && <Avatar name={tech.name} size="sm" />}
       <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-1.5">
-          <span className="db-tech-name">{tech.name}</span>
-          {extraRegions > 0 && (
-            <span
-              className="shrink-0 text-[10.5px] font-bold text-fg-muted"
-              title={t('dispatchBoard.grid.coversMoreRegions', { count: extraRegions })}
-            >
-              {`+${extraRegions}`}
-            </span>
-          )}
-        </div>
-        {density !== 'dense' && offLabel && <span className="db-tech-meta">{offLabel}</span>}
+        <span className="db-tech-name">{tech.name}</span>
+        {/* Coverage by name, not a count. "+2" said how many regions without
+            saying which, so it could never be acted on; "Phoenix · East Valley"
+            is the same cost in pixels and is the actual fact. The absence
+            shows through here too: a tech NOT covering the scope you narrowed
+            to is visible at a glance. */}
+        {density !== 'dense' && (offLabel || regionLabel) && (
+          <span className="db-tech-meta">{[offLabel, regionLabel].filter(Boolean).join(' · ')}</span>
+        )}
       </div>
       {!outAllDay && (
         <div className="flex shrink-0 flex-col items-end gap-1">
@@ -120,68 +115,5 @@ export function TechCell({
         </Dropdown>
       )}
     </div>
-  );
-}
-
-/**
- * The collapsible region groups, and the rows inside them.
- *
- * Collapsed groups still have to answer "is there anything in there I need to
- * deal with", so the header carries the stop and on-deck counts.
- */
-export function BoardGroups<T extends GroupableTech>({
-  groups,
-  collapsed,
-  onToggleGroup,
-  renderRow,
-}: {
-  groups: Group<T>[];
-  collapsed: string[];
-  onToggleGroup: (key: string) => void;
-  renderRow: (tech: T) => React.ReactNode;
-}) {
-  const { t } = useTranslation();
-  const { getName } = useGlossary();
-
-  return (
-    <>
-      {groups.map((group) => {
-        const isCollapsed = collapsed.includes(group.key);
-        return (
-          <div className="db-group" key={group.key}>
-            {/* No lone group header: one group means no grouping, which is
-                precisely the chrome the self-hide rules suppress. */}
-            {group.label != null && (
-              <button
-                type="button"
-                className="db-group-head"
-                aria-expanded={!isCollapsed}
-                onClick={() => onToggleGroup(group.key)}
-              >
-                <ChevronRightIcon
-                  className={`size-3 transition-transform ${isCollapsed ? '' : 'rotate-90'}`}
-                />
-                {group.label}
-                <span className="font-mono font-semibold text-fg-muted">
-                  {String(group.techs.length)}
-                </span>
-                {isCollapsed && (
-                  <span className="font-medium normal-case tracking-normal text-fg-muted">
-                    {t('dispatchBoard.grid.groupSummary', {
-                      stops: group.stops,
-                      entity: getName('dispatch', true).toLowerCase(),
-                    })}
-                    {group.held > 0
-                      ? t('dispatchBoard.grid.groupHeld', { count: group.held })
-                      : ''}
-                  </span>
-                )}
-              </button>
-            )}
-            {!isCollapsed && group.techs.map(renderRow)}
-          </div>
-        );
-      })}
-    </>
   );
 }

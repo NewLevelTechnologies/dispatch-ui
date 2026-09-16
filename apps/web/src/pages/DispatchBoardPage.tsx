@@ -22,7 +22,6 @@ import {
   workOrderApi,
   type BoardDispatch,
   type BoardTech,
-  type BoardWeekTech,
   type UnscheduledWorkOrder,
 } from '../api/setup';
 import { useGlossary } from '../contexts/GlossaryContext';
@@ -53,11 +52,10 @@ import UnscheduledRailCard from '../components/dispatch/UnscheduledRailCard';
 import {
   DENSITY_METRICS,
   autoDensityFor,
-  type BoardGroup,
   type Density,
 } from '../components/dispatch/spine';
 import { buildAxis, formatHour, formatWindow, zonedDate, zonedHour } from '../lib/boardTime';
-import { buildGroups, foldEmptyRows } from '../lib/boardGroups';
+import { foldEmptyRows } from '../lib/boardRows';
 import { nearestStops } from '../lib/nearestStop';
 import { withBackContext } from '../lib/backContext';
 import { movedWindow } from '../lib/boardDrop';
@@ -77,8 +75,6 @@ const BOARD_POLL_MS = 30_000;
 
 const DAY_START = 6;
 const DAY_END = 20;
-
-type GroupBy = 'none' | 'region';
 
 /** Grid filters. "Unassigned" is deliberately absent: unassigned work is not
  *  on the grid, so it was never a grid filter — the rail header carries that
@@ -166,9 +162,7 @@ export default function DispatchBoardPage() {
   // date and region scope, which belong in a shareable link.
   const [search, setSearch] = useState('');
   const [densityPref, setDensityPref] = useState<Density | 'auto'>('auto');
-  const [groupBy, setGroupBy] = useState<GroupBy>('region');
   const [hideEmpty, setHideEmpty] = useState(false);
-  const [collapsed, setCollapsed] = useState<string[]>([]);
   const [exceptions, setExceptions] = useState<ExceptionId[]>([]);
   const [menu, setMenu] = useState<BlockMenu | null>(null);
   const [timeOffTech, setTimeOffTech] = useState<BoardTech | null>(null);
@@ -513,14 +507,6 @@ export default function DispatchBoardPage() {
     return region ? region.abbreviation || region.name : null;
   };
 
-  // Grouping keys off PRIMARY region, because that is what produces a row
-  // group. Filter visibility keys off coverage — the two sets are
-  // deliberately different and can disagree.
-  const primaryRegionIds = useMemo(
-    () =>
-      new Set(activeTechs.map((tech) => tech.primaryRegionId).filter((id): id is string => !!id)),
-    [activeTechs],
-  );
   const coveredRegionIds = useMemo(
     () => new Set(activeTechs.flatMap((tech) => tech.regionIds)),
     [activeTechs],
@@ -535,8 +521,6 @@ export default function DispatchBoardPage() {
   // blocks and leaves every row standing. Offered only where the tenant
   // actually runs more than one.
   const showDivisionFilter = divisions.length > 1;
-  // Only offer grouping when more than one group would actually render.
-  const showGroupingPicker = primaryRegionIds.size > 1;
   const showDensityPicker = shownTechs.length > 12;
   const showHideEmpty = foldableCount > 0;
   // Zero-count chips STAY — "Urgent 0" is information, and chips that appear
@@ -552,50 +536,21 @@ export default function DispatchBoardPage() {
 
   // A stale preference falls back to flat rather than silently grouping by a
   // control the user can no longer see.
-  const effectiveGroupBy: GroupBy = showGroupingPicker ? groupBy : 'none';
-
   const autoDensity = autoDensityFor(shownTechs.length);
   const density: Density = densityPref === 'auto' ? autoDensity : densityPref;
 
-  const groups = useMemo<BoardGroup[]>(
-    () =>
-      buildGroups(day.shown, {
-        grouped: effectiveGroupBy !== 'none',
-        regions,
-        orphanLabel: t('dispatchBoard.grid.noRegion'),
-        summarize: (list) => ({
-          stops: list.reduce((n, tech) => n + (byTech[tech.id] ?? []).length, 0),
-          held: list.reduce(
-            (n, tech) => n + (byTech[tech.id] ?? []).filter((d) => d.releasedAt == null).length,
-            0,
-          ),
-        }),
-      }),
-    [effectiveGroupBy, day.shown, byTech, regions, t],
-  );
-
-  // Same grouping rules, different arithmetic: the week's group summary counts
-  // aggregated stops, and "held" is a count of DAYS with unhanded-over work —
-  // the aggregate carries a flag per day, never a dispatch count.
-  const weekGroups = useMemo(
-    () =>
-      buildGroups<BoardWeekTech>(weekRows.shown, {
-        grouped: effectiveGroupBy !== 'none',
-        regions,
-        orphanLabel: t('dispatchBoard.grid.noRegion'),
-        summarize: (list) => ({
-          stops: list.reduce(
-            (n, tech) => n + tech.cells.reduce((m, cell) => m + cell.stopCount, 0),
-            0,
-          ),
-          held: list.reduce(
-            (n, tech) => n + tech.cells.filter((cell) => cell.hasUnreleased).length,
-            0,
-          ),
-        }),
-      }),
-    [effectiveGroupBy, weekRows.shown, regions, t],
-  );
+  // Coverage by NAME for the tech cell's meta line, and null when every row
+  // would print the same word. A single-region tenant states nothing; a
+  // multi-region one says which regions this person covers — the fact the old
+  // "+2" badge gestured at without ever supplying.
+  const regionLabel = useMemo(() => {
+    const byId = new Map(regions.map((r) => [r.id, r.name]));
+    return (regionIds: string[]) => {
+      if (!showRegionFilter) return null;
+      const names = regionIds.map((id) => byId.get(id)).filter(Boolean);
+      return names.length > 0 ? names.join(' · ') : null;
+    };
+  }, [regions, showRegionFilter]);
 
   // The axis widens to contain any window outside the working day.
   const axis = useMemo(() => {
@@ -850,15 +805,10 @@ export default function DispatchBoardPage() {
     if (isWeek) {
       return (
         <DispatchWeek
-          groups={weekGroups}
+          techs={weekRows.shown}
+          regionLabel={regionLabel}
           days={week?.days ?? []}
           density={density}
-          collapsed={collapsed}
-          onToggleGroup={(key) =>
-            setCollapsed((prev) =>
-              prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key],
-            )
-          }
           capacityStops={week?.defaultStopsPerDay ?? null}
           today={todayInZone}
           // The week's job is to route you to the right day, so a cell is a
@@ -891,15 +841,10 @@ export default function DispatchBoardPage() {
           </div>
         )}
         <DispatchTimeline
-        groups={groups}
+        techs={day.shown}
+        regionLabel={regionLabel}
         byTech={byTech}
         density={density}
-        collapsed={collapsed}
-        onToggleGroup={(key) =>
-          setCollapsed((prev) =>
-            prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key],
-          )
-        }
         onOpenDispatch={openVisit}
         workOrderHref={workOrderHref}
         onContextDispatch={(dispatch, at) => setMenu({ dispatch, ...at })}
@@ -1088,20 +1033,6 @@ export default function DispatchBoardPage() {
                     {division.name}
                   </option>
                 ))}
-              </Select>
-            )}
-
-            {showGroupingPicker && (
-              <Select
-                size="xxs"
-                aria-label={t('dispatchBoard.filter.grouping')}
-                value={effectiveGroupBy}
-                onChange={(e) => setGroupBy(e.target.value as GroupBy)}
-              >
-                <option value="none">{t('dispatchBoard.filter.groupByNone')}</option>
-                <option value="region">
-                  {t('dispatchBoard.filter.groupByRegion', { entity: getName('dispatch_region') })}
-                </option>
               </Select>
             )}
 

@@ -22,7 +22,7 @@ import {
 import type { BoardDispatch, BoardTech } from '../../api/setup';
 import { useGlossary } from '../../contexts/GlossaryContext';
 import { statusClass } from '../../lib/dispatchStatus';
-import { BoardGroups, TechCell } from './BoardRows';
+import { TechCell } from './BoardRows';
 import { DENSITY_METRICS, type Density, type SpineProps } from './spine';
 import { hourAtPointer, resolveDrop } from '../../lib/boardDrop';
 import {
@@ -277,11 +277,10 @@ function Lane({
 }
 
 export default function DispatchTimeline({
-  groups,
+  techs,
   byTech,
   density,
-  collapsed,
-  onToggleGroup,
+  regionLabel,
   onOpenDispatch,
   workOrderHref,
   onContextDispatch,
@@ -333,6 +332,7 @@ export default function DispatchTimeline({
       >
         <TechCell
           tech={tech}
+          regionLabel={regionLabel(tech.regionIds)}
           stops={tech.stopCount}
           density={density}
           capacityStops={capacityStops}
@@ -442,12 +442,7 @@ export default function DispatchTimeline({
         </div>
       </div>
 
-      <BoardGroups
-        groups={groups}
-        collapsed={collapsed}
-        onToggleGroup={onToggleGroup}
-        renderRow={renderRow}
-      />
+      {techs.map(renderRow)}
     </div>
   );
 }

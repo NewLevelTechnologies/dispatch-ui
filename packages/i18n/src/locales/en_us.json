@@ -2932,24 +2932,16 @@
       "allRegions": "All {{entity, lowercase}}",
       "density": "Density",
       "division": "{{entity}}",
-      "groupByNone": "No grouping",
-      "groupByRegion": "Group by {{entity, lowercase}}",
-      "grouping": "Grouping",
       "hideEmpty": "Hide unscheduled {{entity}}",
       "hideEmptySuggestion_one": "{{count}} row is empty under this filter",
       "hideEmptySuggestion_other": "{{count}} rows are empty under this filter",
       "region": "{{entity}}"
     },
     "grid": {
-      "coversMoreRegions_one": "Also covers {{count}} other region",
-      "coversMoreRegions_other": "Also covers {{count}} other regions",
       "driveMinutes": "{{minutes}}m drive",
       "estimate": "est {{hours}}h",
       "noEstimate": "no est.",
       "offNotDroppable": "{{label}} — not droppable",
-      "groupSummary": " · {{stops}} {{entity}}",
-      "groupHeld": " · {{count}} not released",
-      "noRegion": "No region",
       "blockHint": "Right-click for actions · ⌘-click to open the {{entity, lowercase}}"
     },
     "hint": {
