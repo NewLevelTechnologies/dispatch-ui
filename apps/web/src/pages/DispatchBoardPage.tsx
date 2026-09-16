@@ -549,11 +549,23 @@ export default function DispatchBoardPage() {
   //
   // Null when every row would print the same thing: a single-region tenant
   // states nothing, the same self-hiding discipline as the chrome controls.
+  // Ordered by the REGISTRY, never by the user's own array. A tech's
+  // `regionIds` arrive in whatever order an admin ticked the boxes, so two
+  // people covering the same four regions rendered as two different sets —
+  // "GA · NC · FL · SC" above "SC · FL · NC · GA". Walking the tenant's
+  // ordered list and keeping the members makes the line identical for
+  // identical coverage, and honours a tenant who arranged their regions
+  // north-to-south rather than imposing the alphabet on them.
   const regionLabel = useMemo(() => {
-    const byId = new Map(regions.map((r) => [r.id, r.abbreviation || r.name]));
+    const ordered = [...regions].sort(
+      (a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name),
+    );
     return (regionIds: string[]) => {
       if (!showRegionFilter) return null;
-      const labels = regionIds.map((id) => byId.get(id)).filter(Boolean);
+      const covered = new Set(regionIds);
+      const labels = ordered
+        .filter((region) => covered.has(region.id))
+        .map((region) => region.abbreviation || region.name);
       return labels.length > 0 ? labels.join(' · ') : null;
     };
   }, [regions, showRegionFilter]);

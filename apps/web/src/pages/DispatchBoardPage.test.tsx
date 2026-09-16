@@ -1072,3 +1072,62 @@ describe('DispatchBoardPage map toggle', () => {
     expect(screen.getByRole('radio', { name: 'Day' })).toBeChecked();
   });
 });
+
+// Two technicians covering the same regions must read as covering the same
+// regions. A tech's `regionIds` arrive in whatever order an admin ticked the
+// boxes — the same artifact that made primaryRegionId meaningless.
+describe('DispatchBoardPage technician coverage', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockGetUnscheduled.mockResolvedValue(emptyRail);
+    mockRegionsGetAll.mockResolvedValue([
+      { id: 'r1', name: 'Georgia', abbreviation: 'GA', sortOrder: 1 },
+      { id: 'r2', name: 'North Carolina', abbreviation: 'NC', sortOrder: 2 },
+      { id: 'r3', name: 'Florida', abbreviation: 'FL', sortOrder: 3 },
+    ]);
+  });
+
+  it('orders coverage by the tenant registry, not the user array', async () => {
+    mockGetBoard.mockResolvedValue({
+      techs: [
+        tech('u1', 'Maya Alvarez', ['r3', 'r1', 'r2']),
+        tech('u2', 'Kenji Tran', ['r2', 'r3', 'r1']),
+      ],
+      dispatches: [],
+    });
+    renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch' });
+
+    await screen.findByText('Maya Alvarez');
+    // Identical coverage, identical line — regardless of how each was stored.
+    expect(screen.getAllByText('GA · NC · FL')).toHaveLength(2);
+  });
+
+  it('honours a tenant that ordered its regions north-to-south', async () => {
+    // sortOrder is tenant data. Alphabetising it would be the board imposing
+    // its own idea of order on someone who already expressed one.
+    mockRegionsGetAll.mockResolvedValue([
+      { id: 'r1', name: 'Alpha', abbreviation: 'AL', sortOrder: 9 },
+      { id: 'r2', name: 'Beta', abbreviation: 'BE', sortOrder: 1 },
+    ]);
+    mockGetBoard.mockResolvedValue({
+      techs: [tech('u1', 'Maya Alvarez', ['r1', 'r2'])],
+      dispatches: [],
+    });
+    renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch' });
+    expect(await screen.findByText('BE · AL')).toBeInTheDocument();
+  });
+
+  it('says nothing when the tenant has one region', async () => {
+    mockRegionsGetAll.mockResolvedValue([
+      { id: 'r1', name: 'Georgia', abbreviation: 'GA', sortOrder: 1 },
+    ]);
+    mockGetBoard.mockResolvedValue({
+      techs: [tech('u1', 'Maya Alvarez', ['r1'])],
+      dispatches: [],
+    });
+    renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch' });
+
+    await screen.findByText('Maya Alvarez');
+    expect(screen.queryByText('GA')).not.toBeInTheDocument();
+  });
+});
