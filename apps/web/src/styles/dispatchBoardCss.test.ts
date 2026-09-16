@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────────────
-// Invariants on the map pin stylesheet.
+// Invariants on dispatch-board.css.
 //
 // These exist because this exact class of bug has now happened twice in the
 // design source: a CSS rule quietly contradicting the prose it sits under,
@@ -105,5 +105,23 @@ describe('pin tooltip — who and where are one pair', () => {
       /margin-top:\s*(\d+)px/.exec(declarationsFor('.db-pintip-addr'))?.[1],
     );
     expect(hintGap).toBeGreaterThan(addressGap * 3);
+  });
+});
+
+
+// The technician column is sticky and 176px wide. Text that escapes it paints
+// across the timeline lanes, which is what happened the moment the tech cell's
+// two lines stopped being wrapped in a block of their own.
+describe('the technician cell stays inside its column', () => {
+  it('gives both lines a block box, or their ellipsis does nothing', () => {
+    // `text-overflow` has no effect on an inline box. These are spans, so
+    // without an explicit display they sit on ONE line and overflow instead of
+    // truncating — silently, and only for the long values nobody tests with.
+    ['.db-tech-name', '.db-tech-meta'].forEach((selector) => {
+      const rule = declarationsFor(selector);
+      expect(rule).toMatch(/text-overflow:\s*ellipsis/);
+      expect(rule).toMatch(/display:\s*block/);
+      expect(rule).toMatch(/overflow:\s*hidden/);
+    });
   });
 });

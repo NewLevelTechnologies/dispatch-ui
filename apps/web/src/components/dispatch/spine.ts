@@ -42,22 +42,19 @@ export function loadClassFor(stops: number, capacityStops: number | null): strin
   return '';
 }
 
-export interface BoardGroup {
-  key: string;
-  /** null for the single ungrouped bucket — a lone group header never
-   *  renders, because one group means no grouping. */
-  label: string | null;
-  techs: BoardTech[];
-  stops: number;
-  held: number;
-}
-
 export interface SpineProps {
-  groups: BoardGroup[];
+  /** A flat list. Region was the board's only grouping axis and it is gone:
+   *  it is set-valued, so a tech covering two regions had no honest single
+   *  group, and "primary" turned out to be whichever checkbox an admin ticked
+   *  first. Grouping also never solved the problem it was introduced for —
+   *  60 techs in four bands is still 60 rows plus four headers. Narrowing the
+   *  scope is what reduces rows. */
+  techs: BoardTech[];
   byTech: Record<string, BoardDispatch[]>;
   density: Density;
-  collapsed: string[];
-  onToggleGroup: (key: string) => void;
+  /** Covered regions by name for one tech's meta line, or null when every row
+   *  would say the same thing. */
+  regionLabel: (regionIds: string[]) => string | null;
   onOpenDispatch: (dispatch: BoardDispatch) => void;
   /**
    * The work order behind a dispatch, as an href rather than a handler: a

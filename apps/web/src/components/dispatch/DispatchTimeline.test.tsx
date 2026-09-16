@@ -1,8 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import { render, screen } from '@testing-library/react';
 import DispatchTimeline from './DispatchTimeline';
-import type { BoardGroup, SpineProps } from './spine';
+import type { SpineProps } from './spine';
 import { buildAxis } from '../../lib/boardTime';
 import type { BoardDispatch, BoardTech } from '../../api/setup';
 
@@ -59,22 +58,17 @@ function dispatch(over: Partial<BoardDispatch> = {}): BoardDispatch {
 }
 
 function renderTimeline(over: Partial<SpineProps> = {}) {
-  const techs = over.groups?.flatMap((g) => g.techs) ?? [tech()];
   const byTech = over.byTech ?? { u1: [dispatch()] };
   // Fixtures all sit inside the working day, so the axis never has to widen.
   const windows = Object.values(byTech)
     .flat()
     .map(() => ({ start: 8, end: 10 }));
 
-  const groups: BoardGroup[] =
-    over.groups ?? [{ key: '__all', label: null, techs, stops: 1, held: 0 }];
-
   const props: SpineProps = {
-    groups,
+    techs: over.techs ?? [tech()],
     byTech,
     density: 'comfortable',
-    collapsed: [],
-    onToggleGroup: vi.fn(),
+    regionLabel: () => null,
     onOpenDispatch: vi.fn(),
     workOrderHref: (id: string) => `/work-orders/${id}?from=dispatch`,
     onContextDispatch: vi.fn(),
@@ -232,9 +226,7 @@ describe('DispatchTimeline overlap', () => {
 
 describe('DispatchTimeline rows', () => {
   const withTimeOff = (spans: BoardTech['timeOff']) => ({
-    groups: [
-      { key: '__all', label: null, techs: [tech({ timeOff: spans })], stops: 0, held: 0 },
-    ],
+    techs: [tech({ timeOff: spans })],
     byTech: {},
   });
 
@@ -337,194 +329,49 @@ describe('DispatchTimeline rows', () => {
     expect(document.querySelector('.db-off')).toBeNull();
   });
 
-  // A multi-region tech renders ONCE — rendering them twice would let a
-  // double-book hide in plain sight.
-  it('marks a tech who covers more than one region', () => {
+  // Coverage is NAMED, never counted. "+2" said how many regions without
+  // saying which, so a dispatcher could not act on it; the names cost the same
+  // pixels and are the actual fact.
+  it('names the regions a tech covers', () => {
     renderTimeline({
-      groups: [
-        {
-          key: 'r1',
-          label: 'Phoenix',
-          techs: [tech({ regionIds: ['r1', 'r2'] })],
-          stops: 1,
-          held: 0,
-        },
-      ],
+      techs: [tech({ regionIds: ['r1', 'r2'] })],
+      regionLabel: () => 'PHX · EV',
     });
-    expect(screen.getAllByText('Maya Alvarez')).toHaveLength(1);
-    expect(screen.getByText('+1')).toBeInTheDocument();
+    expect(screen.getByText('PHX · EV')).toBeInTheDocument();
+    expect(screen.queryByText('+1')).not.toBeInTheDocument();
   });
 
-  it('shows the stop count against the tenant capacity', () => {
-    renderTimeline({ capacityStops: 6 });
-    expect(screen.getByText('1/6')).toBeInTheDocument();
+  it('keeps coverage on its own line, below the name', () => {
+    // Inline, the two run together and escape the sticky column — the tech
+    // name and the region list are separate elements for exactly this reason.
+    const { container } = renderTimeline({
+      techs: [tech({ regionIds: ['r1', 'r2'] })],
+      regionLabel: () => 'GA · NC · FL · SC',
+    });
+    const name = container.querySelector('.db-tech-name');
+    const meta = container.querySelector('.db-tech-meta');
+    expect(name?.textContent).toBe('Maya Alvarez');
+    expect(meta?.textContent).toBe('GA · NC · FL · SC');
+    expect(name?.contains(meta ?? null)).toBe(false);
   });
 
-  it('drops the avatar at compact and the block meta at dense', () => {
-    const { unmount } = renderTimeline({ density: 'compact' });
-    expect(document.querySelector('.db-block-s')).toBeNull();
-    unmount();
-
-    renderTimeline({ density: 'dense' });
-    expect(document.querySelector('.db-block-m')).toBeNull();
-  });
-});
-
-describe('DispatchTimeline axis and now-line', () => {
-  it('draws the working-day axis', () => {
-    renderTimeline();
-    expect(screen.getByText('6a')).toBeInTheDocument();
-    expect(screen.getByText('12p')).toBeInTheDocument();
-    expect(screen.getByText('7p')).toBeInTheDocument();
+  it('says nothing about regions when every row would say the same thing', () => {
+    // A single-region tenant states nothing — the same self-hiding discipline
+    // the chrome controls use, applied to a row's meta line.
+    renderTimeline({ techs: [tech({ regionIds: ['r1'] })], regionLabel: () => null });
+    expect(screen.queryByText(/Phoenix/)).not.toBeInTheDocument();
   });
 
-  it('draws a now-line when the board is showing today', () => {
-    renderTimeline({ nowHour: 13 });
-    const now = document.querySelector('.db-now') as HTMLElement;
-    expect(now).toBeTruthy();
-    expect(now.style.left).toBe('50%');
-  });
-
-  // A now-line on another day's board would be a lie.
-  it('draws no now-line when the board is not today', () => {
-    renderTimeline({ nowHour: null });
-    expect(document.querySelector('.db-now')).toBeNull();
-  });
-
-  it('draws no now-line when now falls outside the axis', () => {
-    renderTimeline({ nowHour: 3 });
-    expect(document.querySelector('.db-now')).toBeNull();
-  });
-});
-
-describe('DispatchTimeline groups', () => {
-  it('renders no header for a single ungrouped bucket', () => {
-    renderTimeline();
-    expect(document.querySelector('.db-group-head')).toBeNull();
-  });
-
-  it('renders a header per group and collapses on click', async () => {
-    const user = userEvent.setup();
-    const onToggleGroup = vi.fn();
+  // Grouping is gone: region is set-valued, so a tech covering two regions had
+  // no honest single group — and bands never reduced row count anyway.
+  it('renders every tech as a flat row, with no group header', () => {
     renderTimeline({
-      groups: [
-        { key: 'r1', label: 'Phoenix', techs: [tech()], stops: 1, held: 0 },
-        { key: 'r2', label: 'Tucson', techs: [tech({ id: 'u2', name: 'Kenji Tran' })], stops: 0, held: 0 },
-      ],
+      techs: [tech(), tech({ id: 'u2', name: 'Kenji Tran', regionIds: ['r2'] })],
       byTech: { u1: [dispatch()] },
-      onToggleGroup,
     });
-
-    expect(screen.getByText('Phoenix')).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { expanded: true, name: /Phoenix/ }));
-    expect(onToggleGroup).toHaveBeenCalledWith('r1');
-  });
-
-  it('summarises a collapsed group and hides its rows', () => {
-    renderTimeline({
-      groups: [{ key: 'r1', label: 'Phoenix', techs: [tech()], stops: 4, held: 2 }],
-      collapsed: ['r1'],
-    });
-    expect(screen.queryByText('Maya Alvarez')).not.toBeInTheDocument();
-    expect(screen.getByText(/4 dispatches/)).toBeInTheDocument();
-    expect(screen.getByText(/2 not released/)).toBeInTheDocument();
-  });
-});
-
-describe('DispatchTimeline interaction', () => {
-  // Blocks are real links to the work order: drag alone is not an accessible
-  // assignment mechanism, so every block has to be reachable and activatable
-  // by keyboard — and a dispatcher must be able to open the job in a tab with
-  // the board still loaded behind it.
-  it('opens a dispatch on click', async () => {
-    const user = userEvent.setup();
-    const onOpenDispatch = vi.fn();
-    renderTimeline({ onOpenDispatch });
-
-    await user.click(screen.getByRole('link', { name: /No cooling/ }));
-    expect(onOpenDispatch).toHaveBeenCalledWith(expect.objectContaining({ id: 'd1' }));
-  });
-
-  it('opens a dispatch from the keyboard', async () => {
-    const user = userEvent.setup();
-    const onOpenDispatch = vi.fn();
-    renderTimeline({ onOpenDispatch });
-
-    await user.tab();
-    await user.keyboard('{Enter}');
-    expect(onOpenDispatch).toHaveBeenCalled();
-  });
-
-  // A dispatch is a visit; the work order is the job. The block links to the
-  // job so cmd-click and middle-click behave the way they do everywhere else.
-  it('links the block to its work order', () => {
-    renderTimeline();
-    expect(screen.getByRole('link', { name: /No cooling/ })).toHaveAttribute(
-      'href',
-      '/work-orders/wo1?from=dispatch',
-    );
-  });
-
-  // The whole point of the anchor: a modified click belongs to the browser.
-  // Intercepting it would silently remove new-tab from the board.
-  it('leaves a modified click to the browser', async () => {
-    const user = userEvent.setup();
-    const onOpenDispatch = vi.fn();
-    renderTimeline({ onOpenDispatch });
-
-    await user.keyboard('{Meta>}');
-    await user.click(screen.getByRole('link', { name: /No cooling/ }));
-    await user.keyboard('{/Meta}');
-    expect(onOpenDispatch).not.toHaveBeenCalled();
-  });
-
-  it('raises the context menu on right-click instead of navigating', async () => {
-    const user = userEvent.setup();
-    const onContextDispatch = vi.fn();
-    const onOpenDispatch = vi.fn();
-    renderTimeline({ onContextDispatch, onOpenDispatch });
-
-    await user.pointer({
-      keys: '[MouseRight]',
-      target: screen.getByRole('link', { name: /No cooling/ }),
-    });
-    expect(onContextDispatch).toHaveBeenCalledWith(
-      expect.objectContaining({ id: 'd1' }),
-      expect.objectContaining({ x: expect.any(Number), y: expect.any(Number) }),
-    );
-    expect(onOpenDispatch).not.toHaveBeenCalled();
-  });
-
-  // An unplaceable window is skipped rather than drawn at the axis origin,
-  // where it would read as a real 6am job.
-  // Shift-F10 and the menu key raise the same event with no pointer behind
-  // it. Anchoring at 0,0 would park the menu in the corner of the screen.
-  it('anchors a keyboard-raised menu to the block, not the corner', () => {
-    const onContextDispatch = vi.fn();
-    // jsdom has no layout, so the block has to be given one for this to mean
-    // anything.
-    const rect = vi
-      .spyOn(HTMLElement.prototype, 'getBoundingClientRect')
-      .mockReturnValue({ left: 120, bottom: 48 } as DOMRect);
-    renderTimeline({ onContextDispatch });
-
-    fireEvent.contextMenu(screen.getByRole('link', { name: /No cooling/ }), {
-      clientX: 0,
-      clientY: 0,
-    });
-    expect(onContextDispatch).toHaveBeenCalledWith(expect.objectContaining({ id: 'd1' }), {
-      x: 120,
-      y: 48,
-    });
-    rect.mockRestore();
-  });
-
-  it('skips a dispatch whose window cannot be placed', () => {
-    renderTimeline({
-      byTech: {
-        u1: [dispatch({ arrivalWindowStart: 'garbage', arrivalWindowEnd: 'garbage' })],
-      },
-    });
-    expect(document.querySelector('.db-block')).toBeNull();
+    expect(screen.getByText('Maya Alvarez')).toBeInTheDocument();
+    expect(screen.getByText('Kenji Tran')).toBeInTheDocument();
+    expect(document.querySelector('.db-group-head')).toBeNull();
+    expect(document.querySelectorAll('.db-row')).toHaveLength(2);
   });
 });

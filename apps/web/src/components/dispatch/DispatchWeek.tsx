@@ -14,18 +14,16 @@
 import { useTranslation } from '@dispatch/i18n';
 import type { BoardWeekCell, BoardWeekTech } from '../../api/setup';
 import { useGlossary } from '../../contexts/GlossaryContext';
-import type { Group } from '../../lib/boardGroups';
-import { BoardGroups, TechCell } from './BoardRows';
+import { TechCell } from './BoardRows';
 import { DENSITY_METRICS, loadClassFor, type Density } from './spine';
 
 export interface WeekProps {
-  groups: Group<BoardWeekTech>[];
+  techs: BoardWeekTech[];
+  regionLabel: (regionIds: string[]) => string | null;
   /** The seven dates, from the server — never recomputed here, so a week
    *  containing a DST change still has exactly seven columns. */
   days: string[];
   density: Density;
-  collapsed: string[];
-  onToggleGroup: (key: string) => void;
   capacityStops: number | null;
   /** Today in the TENANT's timezone, or null when the current week isn't on
    *  screen. Highlights the column a dispatcher is standing in. */
@@ -101,11 +99,10 @@ function WeekCell({
 }
 
 export default function DispatchWeek({
-  groups,
+  techs,
+  regionLabel,
   days,
   density,
-  collapsed,
-  onToggleGroup,
   capacityStops,
   today,
   onOpenDay,
@@ -124,6 +121,7 @@ export default function DispatchWeek({
       <div className="db-row" key={tech.id} style={{ height: rowH }}>
         <TechCell
           tech={tech}
+          regionLabel={regionLabel(tech.regionIds)}
           stops={stops}
           density={density}
           // The denominator is per DAY, so a week total against it would say
@@ -169,12 +167,7 @@ export default function DispatchWeek({
         </div>
       </div>
 
-      <BoardGroups
-        groups={groups}
-        collapsed={collapsed}
-        onToggleGroup={onToggleGroup}
-        renderRow={renderRow}
-      />
+      {techs.map(renderRow)}
     </div>
   );
 }

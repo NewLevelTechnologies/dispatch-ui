@@ -30,15 +30,11 @@ function tech(over: Partial<BoardWeekTech> = {}): BoardWeekTech {
 }
 
 function renderWeek(over: Partial<WeekProps> = {}) {
-  const techs = over.groups?.flatMap((g) => g.techs) ?? [tech()];
   const props: WeekProps = {
-    groups: over.groups ?? [
-      { key: '__all', label: null, techs, stops: 0, held: 0 },
-    ],
+    techs: over.techs ?? [tech()],
+    regionLabel: () => null,
     days: DAYS,
     density: 'comfortable',
-    collapsed: [],
-    onToggleGroup: vi.fn(),
     capacityStops: 6,
     today: null,
     onOpenDay: vi.fn(),
@@ -70,19 +66,11 @@ describe('DispatchWeek columns', () => {
 describe('DispatchWeek cells', () => {
   it('shows the stop count per day', () => {
     renderWeek({
-      groups: [
-        {
-          key: '__all',
-          label: null,
-          stops: 4,
-          held: 0,
-          techs: [
+      techs: [
             tech({
               cells: DAYS.map((d, i) => cell(d, { stopCount: i === 1 ? 4 : 0 })),
             }),
           ],
-        },
-      ],
     });
     expect(cells()[1]).toHaveTextContent('4');
   });
@@ -91,19 +79,11 @@ describe('DispatchWeek cells', () => {
   // has been told about.
   it('flags a day with unhanded-over work', () => {
     renderWeek({
-      groups: [
-        {
-          key: '__all',
-          label: null,
-          stops: 1,
-          held: 1,
-          techs: [
+      techs: [
             tech({
               cells: DAYS.map((d, i) => cell(d, { stopCount: 1, hasUnreleased: i === 3 })),
             }),
           ],
-        },
-      ],
     });
     expect(cells()[3].querySelector('.db-wheld')).toBeTruthy();
     expect(cells()[0].querySelector('.db-wheld')).toBeNull();
@@ -111,17 +91,9 @@ describe('DispatchWeek cells', () => {
 
   it('flags a day carrying urgent work', () => {
     renderWeek({
-      groups: [
-        {
-          key: '__all',
-          label: null,
-          stops: 1,
-          held: 0,
-          techs: [
+      techs: [
             tech({ cells: DAYS.map((d, i) => cell(d, { stopCount: 1, hasUrgent: i === 2 })) }),
           ],
-        },
-      ],
     });
     expect(cells()[2]).toHaveTextContent('▲');
     expect(cells()[1]).not.toHaveTextContent('▲');
@@ -131,15 +103,7 @@ describe('DispatchWeek cells', () => {
   // opposite of what an absence means.
   it('renders time off as a dash with no load bar', () => {
     renderWeek({
-      groups: [
-        {
-          key: '__all',
-          label: null,
-          stops: 0,
-          held: 0,
-          techs: [tech({ cells: DAYS.map((d, i) => cell(d, { off: i === 0 })) })],
-        },
-      ],
+      techs: [tech({ cells: DAYS.map((d, i) => cell(d, { off: i === 0 })) })],
     });
     expect(cells()[0]).toHaveTextContent('—');
     expect(cells()[0]).toHaveClass('off');
@@ -149,19 +113,11 @@ describe('DispatchWeek cells', () => {
   // Same ramp as the day board's row: one load language across granularities.
   it('colours the bar against the tenant capacity', () => {
     renderWeek({
-      groups: [
-        {
-          key: '__all',
-          label: null,
-          stops: 8,
-          held: 0,
-          techs: [
+      techs: [
             tech({
               cells: DAYS.map((d, i) => cell(d, { stopCount: i === 0 ? 8 : i === 1 ? 6 : 2 })),
             }),
           ],
-        },
-      ],
     });
     expect(cells()[0].querySelector('.db-load')).toHaveClass('over');
     expect(cells()[1].querySelector('.db-load')).toHaveClass('high');
@@ -199,15 +155,7 @@ describe('DispatchWeek navigation', () => {
   // working tech is catastrophically over capacity.
   it('totals the week in the tech column without a capacity bar', () => {
     renderWeek({
-      groups: [
-        {
-          key: '__all',
-          label: null,
-          stops: 7,
-          held: 0,
-          techs: [tech({ cells: DAYS.map((d) => cell(d, { stopCount: 1 })) })],
-        },
-      ],
+      techs: [tech({ cells: DAYS.map((d) => cell(d, { stopCount: 1 })) })],
     });
     const techCol = document.querySelector('.db-techcol:not(.db-head .db-techcol)');
     expect(techCol).toHaveTextContent('7');
