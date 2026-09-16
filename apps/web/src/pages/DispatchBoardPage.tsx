@@ -521,6 +521,11 @@ export default function DispatchBoardPage() {
   // blocks and leaves every row standing. Offered only where the tenant
   // actually runs more than one.
   const showDivisionFilter = divisions.length > 1;
+  // Server-counted, because the rows themselves never arrive — that is the
+  // point of withholding them.
+  const hiddenByDivision = isWeek
+    ? (week?.techsHiddenByDivisionFilter ?? 0)
+    : (board?.techsHiddenByDivisionFilter ?? 0);
   const showDensityPicker = shownTechs.length > 12;
   const showHideEmpty = foldableCount > 0;
   // Zero-count chips STAY — "Urgent 0" is information, and chips that appear
@@ -861,6 +866,8 @@ export default function DispatchBoardPage() {
         <DispatchTimeline
         techs={day.shown}
         regionLabel={regionLabel}
+        commitments={board?.commitments ?? []}
+        divisionFilter={divisionId}
         isToday={isToday}
         byTech={byTech}
         density={density}
@@ -1085,9 +1092,27 @@ export default function DispatchBoardPage() {
               />
             )}
 
-            {/* Suggested, never applied for them: a division filter emptying
-                most of the rows is correct behaviour that looks broken, and
-                the dispatcher should be the one to decide the rows can go. */}
+            {/* A filter that silently removes a technician who is free has
+                taken an option away. So it says how many and offers them
+                back — and "show" is a re-request rather than a hidden payload
+                sitting in every response, because the unfiltered board is
+                usually still cached from before the filter was applied. */}
+            {hiddenByDivision > 0 && (
+              <button
+                type="button"
+                onClick={() => setParam('division', null)}
+                className="!text-[10.5px] text-fg-muted hover:text-fg-strong"
+              >
+                {t('dispatchBoard.filter.hiddenByDivision', { count: hiddenByDivision })}
+                <span className="ml-1 !font-medium text-fg-accent underline">
+                  {t('dispatchBoard.filter.showHidden')}
+                </span>
+              </button>
+            )}
+
+            {/* Suggested, never applied for them: rows emptied by a narrowing
+                are correct behaviour that looks broken, and the dispatcher
+                should be the one to decide the rows can go. */}
             {suggestHideEmpty && (
               <span className="text-[10.5px] text-fg-muted">
                 {t('dispatchBoard.filter.hideEmptySuggestion', { count: foldableCount })}

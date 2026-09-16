@@ -394,10 +394,37 @@
   flex-shrink: 0;
 }
 
+/* ONE hatch, one meaning, on every surface that prints a count or draws a
+   bar: this time is committed, just not to the work you are looking at. The
+   lane ghost and the load bar use the same gradient so the column and the
+   lane cannot disagree about the same technician's day. */
+:root {
+  --db-hatch: repeating-linear-gradient(
+    135deg,
+    color-mix(in oklch, var(--fg-muted) 45%, transparent) 0 2px,
+    transparent 2px 4px
+  );
+}
+
+.db-load {
+  display: flex;
+}
+
 .db-load i {
   display: block;
   height: 100%;
   background: var(--success-500);
+}
+
+/* Work committed outside the narrowing. Deriving the bar from in-scope work
+   alone is a capacity lie in the one column a dispatcher scans: a tech whose
+   whole day sits in another region would print 0/6 with an empty bar and read
+   as the most available person on the board. */
+.db-load u {
+  display: block;
+  height: 100%;
+  background: var(--db-hatch);
+  background-color: color-mix(in oklch, var(--fg-muted) 12%, transparent);
 }
 
 .db-load.high i {
@@ -782,6 +809,40 @@
 .db-block.dragging,
 .db-wo.dragging {
   opacity: 0.4;
+}
+
+/* Outside the active division filter. Dimmed, never hidden: the slot is
+   still occupied, and the dispatcher is entitled to this job — they asked to
+   look at HVAC, not to be prevented from seeing the plumbing. Lifts on hover
+   so reading one costs nothing. Same idiom the map uses for a non-focused
+   technician's route. */
+.db-block.otherdiv {
+  opacity: 0.4;
+}
+
+.db-block.otherdiv:hover,
+.db-block.otherdiv:focus-visible {
+  opacity: 1;
+}
+
+/* Committed elsewhere. Occupies its slot so a narrowed board cannot invite
+   booking into time that is already gone — but carries no text, no hover
+   target and no drop, because three fields is all that arrives and all that
+   should.
+
+   Hatched rather than dashed: the board's two lane vocabularies answer one
+   question, "can I drop here". Hatch means not yours to book (time off, and
+   this); dashed means yours but not yet handed over. */
+.db-ghost {
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  z-index: 1;
+  border-radius: var(--r-sm);
+  border: 1px solid color-mix(in oklch, var(--fg-muted) 30%, transparent);
+  background: var(--db-hatch);
+  background-color: color-mix(in oklch, var(--fg-muted) 8%, transparent);
+  pointer-events: none;
 }
 
 /* The rail accepts a block dragged back off the board — the inverse of the

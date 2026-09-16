@@ -90,6 +90,7 @@ function Block({
   axis,
   density,
   isToday,
+  outOfDivision,
   clash,
   half,
   onOpen,
@@ -102,6 +103,9 @@ function Block({
   density: Density;
   /** Whether the board is showing today. Gates the "right now" pulse. */
   isToday: boolean;
+  /** A real job, outside the active division filter. Still clickable, still
+   *  droppable — the filter narrows attention, not entitlement. */
+  outOfDivision: boolean;
   clash: boolean;
   half: 'upper' | 'lower' | null;
   onOpen: (dispatch: BoardDispatch) => void;
@@ -150,6 +154,11 @@ function Block({
     // board. A dispatch left IN_PROGRESS from last Tuesday would otherwise
     // pulse on every future date it is dragged to.
     presentationFor(dispatch.status, { isToday }).live ? 'live' : '',
+    // DIMMED, not ghosted. Division is a lens, not a permission: the
+    // dispatcher is fully entitled to this job and merely asked to look
+    // elsewhere, so redacting it would hide data from someone permitted to
+    // see it — and would teach that the hatch means two different things.
+    outOfDivision ? 'otherdiv' : '',
     released ? '' : 'held',
     urgent ? 'urgent' : '',
     clash ? 'clash' : '',
@@ -286,6 +295,8 @@ function Lane({
 export default function DispatchTimeline({
   techs,
   byTech,
+  commitments,
+  divisionFilter,
   density,
   isToday,
   regionLabel,
@@ -328,6 +339,7 @@ export default function DispatchTimeline({
     // Absences are lane overlays, not a row state: a tech out 8–12 is still
     // bookable at 2. Only an all-day absence hatches the whole row.
     const spans = offSpans(tech, timeZone, axis);
+    const ghosts = commitments.filter((c) => c.assignedUserId === tech.id);
     const outAllDay = isOutAllDay(spans, axis);
 
     return (
@@ -342,6 +354,7 @@ export default function DispatchTimeline({
           tech={tech}
           regionLabel={regionLabel(tech.regionIds)}
           stops={tech.stopCount}
+          committedCount={tech.committedCount}
           density={density}
           capacityStops={capacityStops}
           width={techW}
@@ -385,6 +398,31 @@ export default function DispatchTimeline({
             );
           })}
 
+          {/* Work committed outside the REGION scope. Three fields arrive —
+              who, start, end — and nothing else, because the redaction is
+              structural on the server rather than a nulling rule here.
+
+              It occupies its slot on purpose: a narrowed board that hides
+              these invites booking into time that is already gone. Hatched
+              because it means exactly what time off means to this dispatcher —
+              not yours to book — and the hatch/dashed split is the board's one
+              answer to "can I drop here". */}
+          {ghosts.map((commitment) => {
+            const start = zonedHour(commitment.start, timeZone) ?? axis.start;
+            const end = zonedHour(commitment.end, timeZone) ?? start;
+            const left = axisPct(start, axis);
+            const width = Math.max(0, axisPct(end, axis) - left);
+            if (width <= 0) return null;
+            return (
+              <span
+                key={`${commitment.start}-${commitment.end}`}
+                className="db-ghost"
+                style={{ left: `${left}%`, width: `${width}%` }}
+                title={t('dispatchBoard.grid.committedElsewhere')}
+              />
+            );
+          })}
+
           {placed.map((entry, index) => {
             const prev = placed[index - 1];
             const drive = entry.dispatch.driveMinFromPrev;
@@ -418,6 +456,11 @@ export default function DispatchTimeline({
                   axis={axis}
                   density={density}
                   isToday={isToday}
+                  outOfDivision={
+                    divisionFilter != null &&
+                    entry.dispatch.divisionId !== null &&
+                    entry.dispatch.divisionId !== divisionFilter
+                  }
                   clash={clash}
                   half={half}
                   onOpen={onOpenDispatch}

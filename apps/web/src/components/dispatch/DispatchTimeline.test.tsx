@@ -70,6 +70,8 @@ function renderTimeline(over: Partial<SpineProps> = {}) {
     techs: over.techs ?? [tech()],
     byTech,
     density: 'comfortable',
+    commitments: [],
+    divisionFilter: null,
     isToday: true,
     regionLabel: () => null,
     onOpenDispatch: vi.fn(),
@@ -409,5 +411,107 @@ describe('DispatchTimeline live statuses', () => {
       byTech: { u1: [dispatch({ status: 'SCHEDULED' })] },
     });
     expect(container.querySelector('.db-block.live')).toBeNull();
+  });
+});
+
+// A narrowed board must not lie about capacity. Region and division get
+// DIFFERENT treatments, and conflating them is a data-disclosure bug.
+describe('DispatchTimeline narrowing', () => {
+  it('occupies the slot for work committed outside the region scope', () => {
+    const { container } = renderTimeline({
+      byTech: {},
+      commitments: [
+        { assignedUserId: 'u1', start: '2026-03-15T16:00:00Z', end: '2026-03-15T18:00:00Z' },
+      ],
+    });
+    // Hidden, the row reads as free and invites booking into time that is gone.
+    expect(container.querySelector('.db-ghost')).not.toBeNull();
+  });
+
+  it('gives a ghost no text and no drop target', () => {
+    // Three fields arrive — who, start, end. There is nothing else to show,
+    // and nothing here should imply otherwise.
+    const { container } = renderTimeline({
+      byTech: {},
+      commitments: [
+        { assignedUserId: 'u1', start: '2026-03-15T16:00:00Z', end: '2026-03-15T18:00:00Z' },
+      ],
+    });
+    const ghost = container.querySelector('.db-ghost') as HTMLElement;
+    expect(ghost.textContent).toBe('');
+    expect(ghost.querySelector('a')).toBeNull();
+  });
+
+  it('draws no ghost for another technician’s commitment', () => {
+    const { container } = renderTimeline({
+      byTech: {},
+      commitments: [
+        { assignedUserId: 'someone-else', start: '2026-03-15T16:00:00Z', end: '2026-03-15T18:00:00Z' },
+      ],
+    });
+    expect(container.querySelector('.db-ghost')).toBeNull();
+  });
+
+  it('dims out-of-division work instead of redacting it', () => {
+    // Division is a lens, not a permission: the dispatcher is entitled to this
+    // job and merely asked to look elsewhere. Redacting it would hide data
+    // from someone permitted to see it, and would teach that the hatch means
+    // two different things.
+    const { container } = renderTimeline({
+      divisionFilter: 'div-hvac',
+      byTech: { u1: [dispatch({ divisionId: 'div-plumbing' })] },
+    });
+    const block = container.querySelector('.db-block') as HTMLElement;
+    expect(block.className).toContain('otherdiv');
+    // Still a real block: clickable, with its customer and work order intact.
+    expect(block.tagName).toBe('A');
+    expect(block.textContent).not.toBe('');
+  });
+
+  it('leaves in-division work undimmed', () => {
+    const { container } = renderTimeline({
+      divisionFilter: 'div-hvac',
+      byTech: { u1: [dispatch({ divisionId: 'div-hvac' })] },
+    });
+    expect(container.querySelector('.db-block')!.className).not.toContain('otherdiv');
+  });
+
+  it('never dims when no division filter is active', () => {
+    const { container } = renderTimeline({
+      divisionFilter: null,
+      byTech: { u1: [dispatch({ divisionId: 'div-plumbing' })] },
+    });
+    expect(container.querySelector('.db-block')!.className).not.toContain('otherdiv');
+  });
+});
+
+// The column and the lane must agree about the same technician's day.
+describe('DispatchTimeline load', () => {
+  it('reports committed work, not in-scope work', () => {
+    // A tech whose whole day sits in another region would otherwise print 0/6
+    // with an empty bar and read as the most available person on the board.
+    renderTimeline({
+      techs: [tech({ stopCount: 0, committedCount: 4 })],
+      byTech: {},
+      capacityStops: 6,
+    });
+    expect(screen.getByText('4/6')).toBeInTheDocument();
+  });
+
+  it('splits the bar into an in-scope fill and a committed-elsewhere hatch', () => {
+    const { container } = renderTimeline({
+      techs: [tech({ stopCount: 2, committedCount: 3 })],
+      capacityStops: 6,
+    });
+    expect(container.querySelector('.db-load i')).not.toBeNull();
+    expect(container.querySelector('.db-load u')).not.toBeNull();
+  });
+
+  it('draws no hatch when everything is in scope', () => {
+    const { container } = renderTimeline({
+      techs: [tech({ stopCount: 3, committedCount: 3 })],
+      capacityStops: 6,
+    });
+    expect(container.querySelector('.db-load u')).toBeNull();
   });
 });
