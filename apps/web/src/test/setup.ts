@@ -309,6 +309,8 @@ vi.mock('react-i18next', () => {
     'dispatchBoard.filter.density': 'Density',
     'dispatchBoard.filter.division': '{{entity}}',
     'dispatchBoard.filter.hideEmptySuggestion': '{{count}} rows are empty under this filter',
+    'dispatchBoard.filter.hiddenByDivision': '{{count}} more could take it',
+    'dispatchBoard.filter.showHidden': 'show',
     'dispatchBoard.filter.hideEmpty': 'Hide unscheduled {{entity}}',
     'dispatchBoard.hint.rightClick': 'Right-click a block to open its {{entity}}',
     'dispatchBoard.legend.completed': 'Completed',
@@ -344,6 +346,10 @@ vi.mock('react-i18next', () => {
     'dispatchBoard.dateNav.today': 'Today',
     'dispatchBoard.filter.allRegions': 'All {{entity, lowercase}}',
     'dispatchBoard.filter.region': '{{entity}}',
+    'dispatchBoard.grid.cellOfCommitted': '{{inScope}} of {{committed}}',
+    'dispatchBoard.grid.committedElsewhere': 'Committed elsewhere',
+    'dispatchBoard.grid.committedBreakdown':
+      '{{inScope}} in scope \u00b7 {{elsewhere}} committed elsewhere',
     'dispatchBoard.grid.driveMinutes': '{{minutes}}m drive',
     'dispatchBoard.grid.estimate': 'est {{hours}}h',
     'dispatchBoard.grid.blockHint':

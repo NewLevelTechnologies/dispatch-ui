@@ -10,7 +10,7 @@
 // The shared shapes live here rather than beside a renderer so no spine owns
 // the contract, and so a component file exports only components.
 // ─────────────────────────────────────────────────────────────────────
-import type { BoardDispatch, BoardTech } from '../../api/setup';
+import type { BoardCommitment, BoardDispatch, BoardTech } from '../../api/setup';
 import type { BoardAxis } from '../../lib/boardTime';
 
 export type Density = 'comfortable' | 'compact' | 'dense';
@@ -52,6 +52,14 @@ export interface SpineProps {
   techs: BoardTech[];
   byTech: Record<string, BoardDispatch[]>;
   density: Density;
+  /** Work committed outside the REGION scope, redacted to who/start/end.
+   *  Drawn as hatched, undroppable ghosts so a narrowed board cannot invite
+   *  booking into time that is already gone. */
+  commitments: BoardCommitment[];
+  /** The active division filter, or null. Work outside it is DIMMED rather
+   *  than hidden or redacted — the slot stays occupied either way, or you
+   *  book into time that is gone. */
+  divisionFilter: string | null;
   /** Whether the viewed date IS today. Gates the "on site right now" pulse:
    *  the claim is about now, so it cannot be true on any other date. */
   isToday: boolean;

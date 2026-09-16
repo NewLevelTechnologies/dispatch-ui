@@ -76,8 +76,19 @@ function WeekCell({
       <span className="flex items-center gap-1">
         {/* A tech who is out has no count to report — an explicit dash, not a
             zero, which would read as "available and empty". */}
+        {/* "3 of 5" only where they differ. The in-scope figure stays first
+            because the week has to respond to the filter — that is why anyone
+            filters — but a day that is fuller than the filter shows must say
+            so, or a dispatcher picks the day that looks lightest and is not. */}
         <span className="font-mono text-[10.5px] font-semibold text-fg-strong">
-          {cell.off ? '—' : String(cell.stopCount)}
+          {cell.off
+            ? '—'
+            : cell.committedCount > cell.stopCount
+              ? t('dispatchBoard.grid.cellOfCommitted', {
+                  inScope: cell.stopCount,
+                  committed: cell.committedCount,
+                })
+              : String(cell.stopCount)}
         </span>
         <span className="grow" />
         {cell.hasUnreleased && (
@@ -115,6 +126,7 @@ export default function DispatchWeek({
     // The week's own total, so the tech column reads as the week's load
     // rather than borrowing a day's.
     const stops = tech.cells.reduce((n, cell) => n + cell.stopCount, 0);
+    const committed = tech.cells.reduce((n, cell) => n + cell.committedCount, 0);
     const outAllWeek = tech.cells.every((cell) => cell.off);
 
     return (
@@ -123,6 +135,7 @@ export default function DispatchWeek({
           tech={tech}
           regionLabel={regionLabel(tech.regionIds)}
           stops={stops}
+          committedCount={committed}
           density={density}
           // The denominator is per DAY, so a week total against it would say
           // every working tech is catastrophically over capacity.

@@ -2933,17 +2933,23 @@
       "allRegions": "All {{entity, lowercase}}",
       "density": "Density",
       "division": "{{entity}}",
+      "hiddenByDivision_one": "{{count}} more could take it",
+      "hiddenByDivision_other": "{{count}} more could take it",
       "hideEmpty": "Hide unscheduled {{entity}}",
       "hideEmptySuggestion_one": "{{count}} row is empty under this filter",
       "hideEmptySuggestion_other": "{{count}} rows are empty under this filter",
-      "region": "{{entity}}"
+      "region": "{{entity}}",
+      "showHidden": "show"
     },
     "grid": {
+      "blockHint": "Right-click for actions · ⌘-click to open the {{entity, lowercase}}",
+      "cellOfCommitted": "{{inScope}} of {{committed}}",
+      "committedBreakdown": "{{inScope}} in scope · {{elsewhere}} committed elsewhere",
+      "committedElsewhere": "Committed elsewhere",
       "driveMinutes": "{{minutes}}m drive",
       "estimate": "est {{hours}}h",
       "noEstimate": "no est.",
-      "offNotDroppable": "{{label}} — not droppable",
-      "blockHint": "Right-click for actions · ⌘-click to open the {{entity, lowercase}}"
+      "offNotDroppable": "{{label}} — not droppable"
     },
     "hint": {
       "rightClick": "Right-click a block to open its {{entity}}"

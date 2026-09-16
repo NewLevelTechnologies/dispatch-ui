@@ -29,6 +29,7 @@ export function TechCell({
   tech,
   regionLabel,
   stops,
+  committedCount,
   density,
   capacityStops,
   width,
@@ -43,6 +44,8 @@ export function TechCell({
    *  without saying which, and so never changed a decision. */
   regionLabel: string | null;
   stops: number;
+  /** Total committed, in scope or not. Never below `stops`. */
+  committedCount: number;
   density: Density;
   capacityStops: number | null;
   width: number;
@@ -60,11 +63,17 @@ export function TechCell({
   // to be a numerator. The denominator comes from the server; without it there
   // is no bar, only the count. A bar against a guessed capacity is decoration,
   // the same way a fill against a guessed duration would be.
-  const pct =
-    capacityStops != null && capacityStops > 0
-      ? Math.min(100, (stops / capacityStops) * 100)
-      : null;
-  const loadClass = loadClassFor(stops, capacityStops);
+  // The figure and the bar report COMMITTED work, not in-scope work. A
+  // technician whose entire day sits in another region has a full day; saying
+  // 0/6 because none of it is in the current scope is the one lie this column
+  // cannot afford, because nobody reads 36 lanes to find out who is free.
+  const committed = Math.max(stops, committedCount);
+  const elsewhere = committed - stops;
+  const scale =
+    capacityStops != null && capacityStops > 0 ? 100 / Math.max(capacityStops, committed) : null;
+  const inScopePct = scale == null ? null : stops * scale;
+  const elsewherePct = scale == null ? null : elsewhere * scale;
+  const loadClass = loadClassFor(committed, capacityStops);
 
 
   return (
@@ -83,12 +92,25 @@ export function TechCell({
       </div>
       {!outAllDay && (
         <div className="flex shrink-0 flex-col items-end gap-1">
-          <span className="font-mono text-[10.5px] text-fg-muted">
-            {capacityStops != null ? `${stops}/${capacityStops}` : String(stops)}
+          <span
+            className="font-mono text-[10.5px] text-fg-muted"
+            // Only when the two differ — on an unfiltered board every row
+            // would otherwise carry a tooltip restating its own number.
+            title={
+              elsewhere > 0
+                ? t('dispatchBoard.grid.committedBreakdown', {
+                    inScope: stops,
+                    elsewhere,
+                  })
+                : undefined
+            }
+          >
+            {capacityStops != null ? `${committed}/${capacityStops}` : String(committed)}
           </span>
-          {pct != null && (
+          {inScopePct != null && (
             <span className={`db-load ${loadClass}`.trim()}>
-              <i style={{ width: `${pct}%` }} />
+              <i style={{ width: `${inScopePct}%` }} />
+              {elsewherePct! > 0 && <u style={{ width: `${elsewherePct}%` }} />}
             </span>
           )}
         </div>
