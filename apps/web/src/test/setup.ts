@@ -971,6 +971,7 @@ vi.mock('react-i18next', () => {
     'users.detail.created': 'Created',
     'users.detail.lastUpdated': 'Last Updated',
     'users.detail.noCapabilities': 'No capabilities assigned',
+    'users.detail.allDivisions': 'Offered for all work',
     'users.detail.noRegionsAssigned': 'No regions assigned',
     'users.detail.recentActivity': 'Recent Activity',
     'users.detail.rolePermissions': 'Role & Permissions',

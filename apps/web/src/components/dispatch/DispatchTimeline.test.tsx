@@ -14,8 +14,9 @@ function tech(over: Partial<BoardTech> = {}): BoardTech {
     id: 'u1',
     name: 'Maya Alvarez',
     regionIds: ['r1'],
-    primaryRegionId: 'r1',
     stopCount: 1,
+    committedCount: 1,
+    divisionIds: [],
     ...over,
   };
 }
@@ -52,6 +53,7 @@ function dispatch(over: Partial<BoardDispatch> = {}): BoardDispatch {
     addressedWorkItemIds: [],
     driveMinFromPrev: null,
     releasedAt: '2026-03-15T07:00:00Z',
+    divisionId: null,
     version: 1,
     ...over,
   };

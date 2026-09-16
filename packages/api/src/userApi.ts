@@ -82,6 +82,20 @@ export interface User {
   roles?: Role[];
   capabilities?: string[];
   dispatchRegionIds?: string[];
+  // What kinds of work this person is good at taking on — a STRENGTH, never a
+  // qualification. Not a certification, not a licence, not a gate: any tech can
+  // be given any job, and the words "qualified", "certified", "eligible" and
+  // "not allowed" must stay out of this feature's UI, because certifications
+  // are a separate real model WITH blocking semantics.
+  //
+  // Empty means nothing stated, therefore shown for everything — never "good at
+  // nothing". Optional here only because it arrives on a later deploy than this
+  // type; read it as `?? []`.
+  //
+  // No primary, and array order carries no meaning anywhere — the lesson of
+  // `primaryRegionId`, which the backend derived from index 0 of an array the
+  // UI appended to in checkbox-click order.
+  divisionIds?: string[];
   // The override itself (what the form edits).
   dispatchable?: Dispatchable;
   // The RESOLVED answer — override applied over the roles. Read this rather
@@ -194,6 +208,25 @@ export interface UpdateUserRolesRequest {
 
 export interface UpdateUserRegionsRequest {
   dispatchRegionIds: string[];
+}
+
+export interface UpdateUserDivisionsRequest {
+  /** Empty clears. */
+  divisionIds: string[];
+}
+
+/** REQUIRED, with no default: a default would make the destructive mode
+ *  reachable by omission. */
+export type BulkDivisionMode = 'ADD' | 'REMOVE' | 'REPLACE';
+
+export interface BulkUserDivisionsRequest {
+  userIds: string[];
+  divisionIds: string[];
+  mode: BulkDivisionMode;
+}
+
+export interface BulkUserDivisionsResponse {
+  users: { userId: string; divisionIds: string[] }[];
 }
 
 export interface UpdateUserEnabledRequest {
@@ -497,6 +530,23 @@ export const userApi = {
 
   updateRegions: async (id: string, request: UpdateUserRegionsRequest): Promise<User> => {
     const response = await apiClient.put<User>(`/users/${id}/dispatch-regions`, request);
+    return response.data;
+  },
+
+  updateDivisions: async (id: string, request: UpdateUserDivisionsRequest): Promise<User> => {
+    const response = await apiClient.put<User>(`/users/${id}/divisions`, request);
+    return response.data;
+  },
+
+  // The board's row filter only starts helping once someone has assigned 60
+  // people; without this the feature ships correct and unused.
+  bulkUpdateDivisions: async (
+    request: BulkUserDivisionsRequest,
+  ): Promise<BulkUserDivisionsResponse> => {
+    const response = await apiClient.post<BulkUserDivisionsResponse>(
+      '/users/divisions/bulk',
+      request,
+    );
     return response.data;
   },
 

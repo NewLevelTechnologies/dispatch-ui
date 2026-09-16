@@ -40,8 +40,9 @@ function tech(over: Partial<BoardTech> = {}): BoardTech {
     id: 'u1',
     name: 'Jordan Wei',
     regionIds: ['r1'],
-    primaryRegionId: 'r1',
     stopCount: 1,
+    committedCount: 1,
+    divisionIds: [],
     ...over,
   };
 }
@@ -55,6 +56,7 @@ function stop(over: Partial<BoardDispatch> = {}): BoardDispatch {
     arrivalWindowEnd: '2026-03-15T14:00:00Z',
     estimatedDuration: null,
     releasedAt: null,
+    divisionId: null,
     version: 1,
     assignedUserId: 'u1',
     assignedUserName: 'Jordan Wei',

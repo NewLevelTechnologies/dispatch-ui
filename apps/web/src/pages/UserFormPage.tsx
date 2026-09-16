@@ -7,11 +7,12 @@ import { useTranslation } from '@dispatch/i18n';
 import { ChevronRightIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import { PatternFormat } from 'react-number-format';
 import {
-  userApi,
-  dispatchRegionApi,
-  tenantSettingsApi,
   type Dispatchable,
   type Role,
+  dispatchRegionApi,
+  divisionsApi,
+  tenantSettingsApi,
+  userApi,
 } from '../api/setup';
 import { ToggleGroup, ToggleGroupOption } from '../components/ui/ToggleGroup';
 import { summarizeAssignment } from '../lib/dispatchable';
@@ -61,6 +62,12 @@ export default function UserFormPage({ mode }: UserFormPageProps) {
     queryFn: () => dispatchRegionApi.getAll(false),
   });
 
+  // Same query key the dispatch board uses, so this usually costs nothing.
+  const { data: divisions = [] } = useQuery({
+    queryKey: ['work-order-config', 'divisions'],
+    queryFn: () => divisionsApi.getAll(),
+  });
+
   // Names the workspace in the invite result and the lockout dialog. Shared
   // cache key with App.tsx, so this costs no extra request.
   const { data: tenantSettings } = useQuery({
@@ -81,6 +88,7 @@ export default function UserFormPage({ mode }: UserFormPageProps) {
     phoneNumber: '',
     roleIds: [] as string[],
     dispatchRegionIds: [] as string[],
+    divisionIds: [] as string[],
     dispatchable: 'INHERIT' as Dispatchable,
   });
 
@@ -99,6 +107,7 @@ export default function UserFormPage({ mode }: UserFormPageProps) {
       phoneNumber: existingUser.phoneNumber ?? '',
       roleIds: existingUser.roles?.map((r) => r.id) ?? [],
       dispatchRegionIds: existingUser.dispatchRegionIds ?? [],
+      divisionIds: existingUser.divisionIds ?? [],
       dispatchable: existingUser.dispatchable ?? 'INHERIT',
     });
   }, [existingUser, isInvite]);
@@ -136,7 +145,20 @@ export default function UserFormPage({ mode }: UserFormPageProps) {
         dispatchRegionIds: formData.dispatchRegionIds,
         phoneNumber: formData.phoneNumber.trim() || null,
       }),
-    onSuccess: (created) => {
+    onSuccess: async (created) => {
+      // Divisions are not accepted on create — the contract exposes them only
+      // through their own endpoint — so an invite that selected some needs a
+      // follow-up. Skipped entirely when none were chosen, which is the common
+      // case and keeps the invite a single request.
+      if (formData.divisionIds.length > 0) {
+        try {
+          await userApi.updateDivisions(created.id, { divisionIds: formData.divisionIds });
+        } catch (err) {
+          // The user exists and the invite went out; only the divisions are
+          // missing, so this must not read as a failed invite.
+          showError("Invited, but couldn't save divisions", extractApiError(err));
+        }
+      }
       queryClient.invalidateQueries({ queryKey: ['users'] });
       invalidateDispatchBoard(queryClient);
       // Branch on `notificationRequested`, never on `invitationStatus` — the
@@ -225,11 +247,19 @@ export default function UserFormPage({ mode }: UserFormPageProps) {
     onError: (err) => showError("Couldn't update regions", extractApiError(err)),
   });
 
+  // Its own endpoint rather than a field on the profile PUT, matching how
+  // roles and regions already save from this form.
+  const updateDivisionsMutation = useMutation({
+    mutationFn: () => userApi.updateDivisions(id!, { divisionIds: formData.divisionIds }),
+    onError: (err) => showError("Couldn't update divisions", extractApiError(err)),
+  });
+
   const submitting =
     createMutation.isPending ||
     updateProfileMutation.isPending ||
     updateRolesMutation.isPending ||
-    updateRegionsMutation.isPending;
+    updateRegionsMutation.isPending ||
+    updateDivisionsMutation.isPending;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -251,9 +281,11 @@ export default function UserFormPage({ mode }: UserFormPageProps) {
       await updateProfileMutation.mutateAsync();
       await updateRolesMutation.mutateAsync();
       await updateRegionsMutation.mutateAsync();
+      await updateDivisionsMutation.mutateAsync();
       queryClient.invalidateQueries({ queryKey: ['users'] });
       queryClient.invalidateQueries({ queryKey: ['users', id] });
-      // Roles, `dispatchable` and regions all move who is on the board.
+      // Roles, `dispatchable`, regions and divisions all move who is on the
+      // board — divisions because the filter narrows ROWS, not just work.
       invalidateDispatchBoard(queryClient);
       // Role / region changes emit ROLE_ADDED / ROLE_REMOVED audit events
       // that should appear in the detail page's activity feed without a
@@ -272,6 +304,15 @@ export default function UserFormPage({ mode }: UserFormPageProps) {
       roleIds: prev.roleIds.includes(roleId)
         ? prev.roleIds.filter((r) => r !== roleId)
         : [...prev.roleIds, roleId],
+    }));
+  };
+
+  const toggleDivision = (divisionId: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      divisionIds: prev.divisionIds.includes(divisionId)
+        ? prev.divisionIds.filter((d) => d !== divisionId)
+        : [...prev.divisionIds, divisionId],
     }));
   };
 
@@ -434,10 +475,53 @@ export default function UserFormPage({ mode }: UserFormPageProps) {
               subtitle="Where in the world this user works. Limits which records they see."
               className="mb-3"
             >
-              <RegionMultiSelect
-                regions={activeRegions}
+              <MultiSelectGrid
+                items={activeRegions}
                 selected={formData.dispatchRegionIds}
                 onToggle={toggleRegion}
+                empty={
+                  <>
+                    No active dispatch regions configured.{' '}
+                    <Link
+                      to="/settings/dispatch-regions"
+                      className="font-medium text-fg-accent hover:underline"
+                    >
+                      Manage regions →
+                    </Link>
+                  </>
+                }
+              />
+            </Card>
+
+            {/* A separate card from Regions on purpose: one is a PERMISSION and
+                the other is a STRENGTH, and stating them as two questions makes
+                that difference visible rather than implied.
+
+                Deliberately not "qualified for" or "certified in" — divisions
+                here are not a gate, and any tech can be given any job.
+                Certifications are a separate model with real blocking
+                semantics; borrowing their language would turn a preference into
+                something that looks like a compliance control. */}
+            <Card
+              title="Divisions"
+              subtitle="The kinds of work they're good at taking on. Leave empty and they're offered for everything."
+              className="mb-3"
+            >
+              <MultiSelectGrid
+                items={divisions}
+                selected={formData.divisionIds}
+                onToggle={toggleDivision}
+                empty={
+                  <>
+                    No divisions configured.{' '}
+                    <Link
+                      to="/settings/work-orders"
+                      className="font-medium text-fg-accent hover:underline"
+                    >
+                      Manage divisions →
+                    </Link>
+                  </>
+                }
               />
             </Card>
 
@@ -832,30 +916,27 @@ function CapabilityPreview({
 }
 
 // ──────────────────────────────────────────────────────────────────
-// RegionMultiSelect — chip-style toggles. Selected chips fill with
-// accent; unselected sit on the nested-card surface.
+// MultiSelectGrid — the selectable multi-select for this page, used for
+// both regions and divisions. One pattern rather than two: the questions
+// differ (permission vs strength) but the gesture is identical, and a
+// second visual language for the card below would read as a different
+// KIND of answer.
 // ──────────────────────────────────────────────────────────────────
-function RegionMultiSelect({
-  regions,
+function MultiSelectGrid({
+  items,
   selected,
   onToggle,
+  empty,
 }: {
-  regions: { id: string; name: string }[];
+  items: { id: string; name: string }[];
   selected: string[];
   onToggle: (id: string) => void;
+  /** Says where to go and configure them — an empty grid with no way out is
+   *  a dead end on a form someone is trying to finish. */
+  empty: React.ReactNode;
 }) {
-  if (regions.length === 0) {
-    return (
-      <div className="text-[11.5px] text-fg-muted">
-        No active dispatch regions configured.{' '}
-        <Link
-          to="/settings/dispatch-regions"
-          className="font-medium text-fg-accent hover:underline"
-        >
-          Manage regions →
-        </Link>
-      </div>
-    );
+  if (items.length === 0) {
+    return <div className="text-[11.5px] text-fg-muted">{empty}</div>;
   }
 
   // 3-col checkbox grid — same shape as RoleMultiSelect. The selectable
@@ -865,7 +946,7 @@ function RegionMultiSelect({
   // when we have one to surface; today it stays empty.
   return (
     <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2 lg:grid-cols-3">
-      {regions.map((r) => {
+      {items.map((r) => {
         const on = selected.includes(r.id);
         return (
           <label

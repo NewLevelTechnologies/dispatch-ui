@@ -4,7 +4,14 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from '@dispatch/i18n';
 import { ArrowLeftIcon } from '@heroicons/react/24/outline';
-import { userApi, dispatchRegionApi, tenantSettingsApi, type User, type Role } from '../api/setup';
+import {
+  userApi,
+  dispatchRegionApi,
+  divisionsApi,
+  tenantSettingsApi,
+  type User,
+  type Role,
+} from '../api/setup';
 import { RoleChip } from '../components/RoleChip';
 import { formatPhone, roleAccent } from '@dispatch/utils';
 import { auditApi, type AccountActivityEvent } from '../api/setup';
@@ -91,6 +98,12 @@ export default function UserDetailPage() {
   const { data: allRegions } = useQuery({
     queryKey: ['dispatch-regions'],
     queryFn: () => dispatchRegionApi.getAll(true),
+  });
+
+  // Same key the dispatch board and the user form use, so this is usually warm.
+  const { data: allDivisions } = useQuery({
+    queryKey: ['work-order-config', 'divisions'],
+    queryFn: () => divisionsApi.getAll(),
   });
 
   const [lifecycleConfirm, setLifecycleConfirm] = useState<'deactivate' | 'activate' | null>(null);
@@ -218,7 +231,12 @@ export default function UserDetailPage() {
       />
 
       <div className="mt-3">
-        <RolesAndRegionsCard user={user} regions={allRegions ?? []} onEditAccess={canEditUsers ? handleEdit : undefined} />
+        <AccessCard
+          user={user}
+          regions={allRegions ?? []}
+          divisions={allDivisions ?? []}
+          onEditAccess={canEditUsers ? handleEdit : undefined}
+        />
       </div>
 
       <div className="mt-3">
@@ -455,15 +473,20 @@ function AssignmentValue({ user }: { user: User }) {
 }
 
 // ──────────────────────────────────────────────────────────────────
-// Roles + Regions — combined card with capabilities expander
+// How work reaches this person: what they can do, whether they can be
+// given any, which board they appear on, and what kind they're offered.
+// Named for the action it carries — "Edit access" — which is the one
+// button for all four.
 // ──────────────────────────────────────────────────────────────────
-function RolesAndRegionsCard({
+function AccessCard({
   user,
   regions,
+  divisions,
   onEditAccess,
 }: {
   user: User;
   regions: { id: string; name: string }[];
+  divisions: { id: string; name: string }[];
   onEditAccess?: () => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -471,6 +494,12 @@ function RolesAndRegionsCard({
   const userRegions = (user.dispatchRegionIds ?? [])
     .map((id) => regions.find((r) => r.id === id))
     .filter((r): r is { id: string; name: string } => !!r);
+  // Resolved against the tenant's catalogue, so an id that no longer exists
+  // renders as nothing rather than a raw uuid. The backend does not validate
+  // these against work-order-service, so a stale id is a real possibility.
+  const userDivisions = (user.divisionIds ?? [])
+    .map((id) => divisions.find((d) => d.id === id))
+    .filter((d): d is { id: string; name: string } => !!d);
   const capCount = user.capabilities?.length ?? 0;
 
   return (
@@ -511,7 +540,11 @@ function RolesAndRegionsCard({
         </DataRow>
       )}
 
-      <DataRow label="Regions" labelWidth={90} last={capCount === 0}>
+      <DataRow
+        label="Regions"
+        labelWidth={90}
+        last={capCount === 0 && divisions.length === 0}
+      >
         <div className="flex flex-wrap gap-1">
           {userRegions.length === 0 ? (
             <span className="text-[11.5px] italic text-fg-muted">
@@ -522,6 +555,29 @@ function RolesAndRegionsCard({
           )}
         </div>
       </DataRow>
+
+      {/* After Regions, because the progression is whether → where → what.
+          Hidden entirely for a tenant with no divisions configured: a row
+          about a feature they do not use is noise on every user.
+
+          Empty reads as "offered for all work", never "none assigned". The
+          two say opposite things — empty means nothing was stated, so this
+          person is offered for everything, and a deficit-shaped label would
+          invite an admin to "fix" it by narrowing someone who is available
+          for anything. */}
+      {divisions.length > 0 && (
+        <DataRow label="Divisions" labelWidth={90} last={capCount === 0}>
+          <div className="flex flex-wrap gap-1">
+            {userDivisions.length === 0 ? (
+              <span className="text-[11.5px] text-fg-muted">
+                {t('users.detail.allDivisions')}
+              </span>
+            ) : (
+              userDivisions.map((d) => <Badge key={d.id}>{d.name}</Badge>)
+            )}
+          </div>
+        </DataRow>
+      )}
 
       {capCount > 0 && (
         <div className="flex items-center gap-2.5 px-3.5 py-2.5 text-[11px] text-fg-muted">

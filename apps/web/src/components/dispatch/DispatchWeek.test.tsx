@@ -15,7 +15,15 @@ const DAYS = [
 ];
 
 function cell(date: string, over: Partial<BoardWeekCell> = {}): BoardWeekCell {
-  return { date, stopCount: 0, hasUrgent: false, hasUnreleased: false, off: false, ...over };
+  return {
+    date,
+    stopCount: 0,
+    committedCount: 0,
+    hasUrgent: false,
+    hasUnreleased: false,
+    off: false,
+    ...over,
+  };
 }
 
 function tech(over: Partial<BoardWeekTech> = {}): BoardWeekTech {
@@ -23,7 +31,7 @@ function tech(over: Partial<BoardWeekTech> = {}): BoardWeekTech {
     id: 'u1',
     name: 'Maya Alvarez',
     regionIds: ['r1'],
-    primaryRegionId: 'r1',
+    divisionIds: [],
     cells: DAYS.map((d) => cell(d)),
     ...over,
   };

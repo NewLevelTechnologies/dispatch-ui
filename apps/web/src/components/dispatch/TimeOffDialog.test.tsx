@@ -37,8 +37,9 @@ const tech: BoardTech = {
   id: 'u1',
   name: 'Robert Chen',
   regionIds: ['r1'],
-  primaryRegionId: 'r1',
   stopCount: 3,
+  committedCount: 3,
+  divisionIds: [],
 };
 
 const DATE = '2026-03-18';

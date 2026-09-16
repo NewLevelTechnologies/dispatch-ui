@@ -55,13 +55,22 @@ export interface BoardTech {
   // M:N. FILTERING matches any of these, so narrowing to East Valley still
   // finds the Phoenix tech who also covers it.
   regionIds: string[];
-  // GROUPING keys off this one, so a tech renders exactly once. Null when no
-  // assignment is marked primary.
-  primaryRegionId: string | null;
   // Booked stops today — the load bar's numerator. Server-computed over the
   // whole day, NOT over whatever the exception chips currently show: counting
   // the filtered set would shrink every bar the moment a chip is on.
+  //
+  // IN-SCOPE: responds to the active region and division narrowing, which is
+  // the whole reason anyone filters.
   stopCount: number;
+  // TOTAL committed, including work outside the narrowing. The tech cell
+  // reports THIS, with the in-scope share solid and the remainder hatched —
+  // deriving load from in-scope work alone is a capacity lie in the one column
+  // a dispatcher scans: a tech whose whole day sits in another region prints
+  // 0/6 and reads as the most available person on the board.
+  committedCount: number;
+  // What kinds of work this person is good at taking on. A STRENGTH, never a
+  // qualification — empty means nothing stated, therefore matches every filter.
+  divisionIds: string[];
   // Empty = available all day. Each span hatches its own slice of the lane
   // and rejects drops there — a tech out all morning is still bookable in the
   // afternoon, which is the whole point of spans over a boolean.
@@ -90,6 +99,11 @@ export interface BoardDispatch {
   // Null = on deck, not yet handed to the tech. ORTHOGONAL to status: a
   // dispatch can be unreleased at any status. Never derive this from status.
   releasedAt: string | null;
+  // Present so the board can DIM work outside the active division filter
+  // rather than hide it. Division is a lens, not a permission: the dispatcher
+  // is entitled to that job and merely asked to look elsewhere, so redacting
+  // it would hide data from someone permitted to see it.
+  divisionId: string | null;
   // Round-trips on PUT for stale-read protection; a mismatch is a 409.
   version: number;
   assignedUserId: string;
@@ -137,6 +151,15 @@ export interface BoardDispatch {
   addressedWorkItemIds: string[];
 }
 
+/** Three fields. No customer, no work order, no title, no address, no
+ *  coordinates, no status — the redaction is STRUCTURAL rather than a nulling
+ *  rule, so nothing can leak a field somebody forgot. */
+export interface BoardCommitment {
+  assignedUserId: string;
+  start: string;
+  end: string;
+}
+
 export interface DispatchBoard {
   // Echoed so a client can tell a stale response from a current one after a
   // fast date change.
@@ -147,6 +170,19 @@ export interface DispatchBoard {
   timeZone: string;
   techs: BoardTech[];
   dispatches: BoardDispatch[];
+  // Rows the division filter withheld. A filter that silently removes a
+  // technician who is free has taken an option away — so the board says how
+  // many and offers them back. Revealing them is a RE-REQUEST (refetch with no
+  // division filter), not a hidden payload: shipping them on every board would
+  // make every board pay for rows nobody asked to see.
+  techsHiddenByDivisionFilter: number;
+  // Work outside the REGION scope, redacted to three fields. Not customer
+  // data — an availability fact about a technician the dispatcher already sees
+  // as a row, exactly what a calendar free/busy lookup returns across
+  // organisational boundaries.
+  //
+  // Region only. Division never redacts (see `BoardDispatch.divisionId`).
+  commitments: BoardCommitment[];
   // How many of the day's dispatches sit at a location with no coordinates.
   // The map has to say "3 jobs have no location" rather than silently
   // dropping those pins.
@@ -171,7 +207,15 @@ export interface DispatchBoard {
 export interface BoardWeekCell {
   date: string;
   // Excludes cancelled and no-show — work the tech will not drive to.
+  //
+  // In-scope, so the week responds to the filter. Deliberately NOT redefined
+  // as committed: a week that ignores the active filter is a different bug.
   stopCount: number;
+  committedCount: number;
+  // Deliberately still IN-SCOPE, unlike the counts: saying a redacted
+  // commitment is urgent would disclose a priority the caller is not entitled
+  // to. A count of occupied slots discloses nothing about the other region's
+  // customer, which is why committedCount is safe and this is not.
   hasUrgent: boolean;
   // Any dispatch that day still on deck. At week scale this is the "which
   // days still have unhanded-over work" glance, which is the whole reason a
@@ -186,13 +230,14 @@ export interface BoardWeekTech {
   id: string;
   name: string;
   regionIds: string[];
-  primaryRegionId: string | null;
+  divisionIds: string[];
   // Always one entry per day in `days`, zero-filled, so the grid renders
   // without gap-handling. A tech with no work all week is still a row.
   cells: BoardWeekCell[];
 }
 
 export interface BoardWeek {
+  techsHiddenByDivisionFilter: number;
   weekStart: string;
   // Exclusive — the same half-open convention as the day read.
   weekEnd: string;
