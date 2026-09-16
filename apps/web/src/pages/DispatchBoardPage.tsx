@@ -539,16 +539,22 @@ export default function DispatchBoardPage() {
   const autoDensity = autoDensityFor(shownTechs.length);
   const density: Density = densityPref === 'auto' ? autoDensity : densityPref;
 
-  // Coverage by NAME for the tech cell's meta line, and null when every row
-  // would print the same word. A single-region tenant states nothing; a
-  // multi-region one says which regions this person covers — the fact the old
-  // "+2" badge gestured at without ever supplying.
+  // Coverage on the tech cell's meta line, ABBREVIATED. The technician column
+  // is 176px at dense and the line already carries the absence reason, so full
+  // names do not fit: "Georgia · North Carolina · Florida · South Carolina" is
+  // four regions on one row of a four-region tenant. The same argument the
+  // rail card's facet row settled — here it competes with the name and the
+  // load bar for a fixed width, and the full name buys nothing a tenant who
+  // wrote the abbreviations does not already read.
+  //
+  // Null when every row would print the same thing: a single-region tenant
+  // states nothing, the same self-hiding discipline as the chrome controls.
   const regionLabel = useMemo(() => {
-    const byId = new Map(regions.map((r) => [r.id, r.name]));
+    const byId = new Map(regions.map((r) => [r.id, r.abbreviation || r.name]));
     return (regionIds: string[]) => {
       if (!showRegionFilter) return null;
-      const names = regionIds.map((id) => byId.get(id)).filter(Boolean);
-      return names.length > 0 ? names.join(' · ') : null;
+      const labels = regionIds.map((id) => byId.get(id)).filter(Boolean);
+      return labels.length > 0 ? labels.join(' · ') : null;
     };
   }, [regions, showRegionFilter]);
 

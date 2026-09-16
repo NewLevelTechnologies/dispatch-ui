@@ -359,7 +359,11 @@
   background: var(--bg-hover);
 }
 
+/* Block, not inline: these are two stacked lines, and `text-overflow` has no
+   effect on an inline box — an over-long name or region list escapes the
+   sticky column and paints across the timeline lanes. */
 .db-tech-name {
+  display: block;
   font-size: 12px;
   font-weight: 600;
   color: var(--fg-strong);
@@ -370,6 +374,7 @@
 }
 
 .db-tech-meta {
+  display: block;
   font-size: 10.5px;
   color: var(--fg-muted);
   font-family: var(--font-mono);

@@ -335,10 +335,24 @@ describe('DispatchTimeline rows', () => {
   it('names the regions a tech covers', () => {
     renderTimeline({
       techs: [tech({ regionIds: ['r1', 'r2'] })],
-      regionLabel: () => 'Phoenix · East Valley',
+      regionLabel: () => 'PHX · EV',
     });
-    expect(screen.getByText('Phoenix · East Valley')).toBeInTheDocument();
+    expect(screen.getByText('PHX · EV')).toBeInTheDocument();
     expect(screen.queryByText('+1')).not.toBeInTheDocument();
+  });
+
+  it('keeps coverage on its own line, below the name', () => {
+    // Inline, the two run together and escape the sticky column — the tech
+    // name and the region list are separate elements for exactly this reason.
+    const { container } = renderTimeline({
+      techs: [tech({ regionIds: ['r1', 'r2'] })],
+      regionLabel: () => 'GA · NC · FL · SC',
+    });
+    const name = container.querySelector('.db-tech-name');
+    const meta = container.querySelector('.db-tech-meta');
+    expect(name?.textContent).toBe('Maya Alvarez');
+    expect(meta?.textContent).toBe('GA · NC · FL · SC');
+    expect(name?.contains(meta ?? null)).toBe(false);
   });
 
   it('says nothing about regions when every row would say the same thing', () => {
