@@ -215,20 +215,6 @@ export interface UpdateUserDivisionsRequest {
   divisionIds: string[];
 }
 
-/** REQUIRED, with no default: a default would make the destructive mode
- *  reachable by omission. */
-export type BulkDivisionMode = 'ADD' | 'REMOVE' | 'REPLACE';
-
-export interface BulkUserDivisionsRequest {
-  userIds: string[];
-  divisionIds: string[];
-  mode: BulkDivisionMode;
-}
-
-export interface BulkUserDivisionsResponse {
-  users: { userId: string; divisionIds: string[] }[];
-}
-
 export interface UpdateUserEnabledRequest {
   enabled: boolean;
 }
@@ -538,17 +524,12 @@ export const userApi = {
     return response.data;
   },
 
-  // The board's row filter only starts helping once someone has assigned 60
-  // people; without this the feature ships correct and unused.
-  bulkUpdateDivisions: async (
-    request: BulkUserDivisionsRequest,
-  ): Promise<BulkUserDivisionsResponse> => {
-    const response = await apiClient.post<BulkUserDivisionsResponse>(
-      '/users/divisions/bulk',
-      request,
-    );
-    return response.data;
-  },
+  // NOTE: POST /users/divisions/bulk exists server-side, with a required
+  // `mode` of ADD | REMOVE | REPLACE. Deliberately not wrapped here: bulk
+  // assignment is a one-time backfill for techs who already exist the day the
+  // feature turns on — new users get divisions at invite time — and a REPLACE
+  // across sixty people is a lot of risk for a tool used once. Wrap it if the
+  // backfill turns out to hurt, or when a tenant adds a whole new division.
 
   // Backend dropped the `enabled` field from PUT /users/{id} — sending it
   // is silently ignored now. Activation/deactivation goes through the
