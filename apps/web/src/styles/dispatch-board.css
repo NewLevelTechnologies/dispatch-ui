@@ -528,7 +528,12 @@
   background: color-mix(in oklch, var(--violet-500) 15%, transparent);
 }
 
-.db-block.inprogress::after {
+/* Gated on `.live`, which the renderer adds only on today's board. "On site
+   right now" is a claim about NOW — a dispatch left IN_PROGRESS from last
+   Tuesday would otherwise pulse on every future date, reading as a technician
+   currently on a job on a day that has not happened. The hue stays: the board
+   reports the status it was given and does not invent an outcome. */
+.db-block.inprogress.live::after {
   content: '';
   position: absolute;
   right: 5px;

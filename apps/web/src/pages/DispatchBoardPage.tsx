@@ -861,6 +861,7 @@ export default function DispatchBoardPage() {
         <DispatchTimeline
         techs={day.shown}
         regionLabel={regionLabel}
+        isToday={isToday}
         byTech={byTech}
         density={density}
         onOpenDispatch={openVisit}

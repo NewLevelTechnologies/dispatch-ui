@@ -52,6 +52,9 @@ export interface SpineProps {
   techs: BoardTech[];
   byTech: Record<string, BoardDispatch[]>;
   density: Density;
+  /** Whether the viewed date IS today. Gates the "on site right now" pulse:
+   *  the claim is about now, so it cannot be true on any other date. */
+  isToday: boolean;
   /** Covered regions by name for one tech's meta line, or null when every row
    *  would say the same thing. */
   regionLabel: (regionIds: string[]) => string | null;

@@ -43,6 +43,28 @@ export const DISPATCH_PRESENTATION: Record<DispatchStatus, StatusPresentation> =
   CANCELLED: { tone: 'neutral', accent: 'var(--border-strong)' },
 };
 
+/**
+ * "Right now" is a claim about NOW, so it cannot be true on any date but
+ * today. A dispatch left `IN_PROGRESS` from last Tuesday — the ordinary case,
+ * because closing a job out is the step techs forget — would otherwise paint a
+ * pulsing violet dot on next Thursday's board and read as a technician
+ * currently on site on a day that has not happened.
+ *
+ * Only the MOTION is dropped, not the hue. The board does not remap the status
+ * itself: a record that says `IN_PROGRESS` on a past day is reporting a real
+ * anomaly (nobody closed it out), and repainting it as `SCHEDULED` would trade
+ * one lie for a worse one by hiding it. The server is the place that should
+ * settle what a stale record means; the board's job is only to stop asserting
+ * the one thing it can prove false.
+ */
+export function presentationFor(
+  status: DispatchStatus,
+  { isToday }: { isToday: boolean },
+): StatusPresentation {
+  const base = DISPATCH_PRESENTATION[status];
+  return base.live && !isToday ? { ...base, live: false } : base;
+}
+
 /** Lowercase status, for the `.db-block.<status>` CSS hook. */
 export function statusClass(status: DispatchStatus): string {
   return status.toLowerCase().replace('_', '');

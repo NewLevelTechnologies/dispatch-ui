@@ -21,7 +21,7 @@ import {
 } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
 import type { BoardDispatch, BoardTech } from '../../api/setup';
 import { useGlossary } from '../../contexts/GlossaryContext';
-import { statusClass } from '../../lib/dispatchStatus';
+import { presentationFor, statusClass } from '../../lib/dispatchStatus';
 import { TechCell } from './BoardRows';
 import { DENSITY_METRICS, type Density, type SpineProps } from './spine';
 import { hourAtPointer, resolveDrop } from '../../lib/boardDrop';
@@ -89,6 +89,7 @@ function Block({
   window,
   axis,
   density,
+  isToday,
   clash,
   half,
   onOpen,
@@ -99,6 +100,8 @@ function Block({
   window: Window;
   axis: SpineProps['axis'];
   density: Density;
+  /** Whether the board is showing today. Gates the "right now" pulse. */
+  isToday: boolean;
   clash: boolean;
   half: 'upper' | 'lower' | null;
   onOpen: (dispatch: BoardDispatch) => void;
@@ -143,6 +146,10 @@ function Block({
   const className = [
     'db-block',
     statusClass(dispatch.status),
+    // The pulse is a claim about RIGHT NOW, so it is only ever true on today's
+    // board. A dispatch left IN_PROGRESS from last Tuesday would otherwise
+    // pulse on every future date it is dragged to.
+    presentationFor(dispatch.status, { isToday }).live ? 'live' : '',
     released ? '' : 'held',
     urgent ? 'urgent' : '',
     clash ? 'clash' : '',
@@ -280,6 +287,7 @@ export default function DispatchTimeline({
   techs,
   byTech,
   density,
+  isToday,
   regionLabel,
   onOpenDispatch,
   workOrderHref,
@@ -409,6 +417,7 @@ export default function DispatchTimeline({
                   window={entry.window}
                   axis={axis}
                   density={density}
+                  isToday={isToday}
                   clash={clash}
                   half={half}
                   onOpen={onOpenDispatch}
