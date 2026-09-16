@@ -68,6 +68,7 @@ function renderTimeline(over: Partial<SpineProps> = {}) {
     techs: over.techs ?? [tech()],
     byTech,
     density: 'comfortable',
+    isToday: true,
     regionLabel: () => null,
     onOpenDispatch: vi.fn(),
     workOrderHref: (id: string) => `/work-orders/${id}?from=dispatch`,
@@ -373,5 +374,38 @@ describe('DispatchTimeline rows', () => {
     expect(screen.getByText('Kenji Tran')).toBeInTheDocument();
     expect(document.querySelector('.db-group-head')).toBeNull();
     expect(document.querySelectorAll('.db-row')).toHaveLength(2);
+  });
+});
+
+// The pulse says "a technician is on this job RIGHT NOW". Leaving a dispatch
+// IN_PROGRESS is the ordinary case — closing out is the step techs forget — so
+// without this the board claims someone is on site on days that have not
+// happened, every time a dispatcher steps forward a day.
+describe('DispatchTimeline live statuses', () => {
+  it('pulses an in-progress block on today', () => {
+    const { container } = renderTimeline({
+      isToday: true,
+      byTech: { u1: [dispatch({ status: 'IN_PROGRESS' })] },
+    });
+    expect(container.querySelector('.db-block.inprogress.live')).not.toBeNull();
+  });
+
+  it('does not pulse it on another day', () => {
+    const { container } = renderTimeline({
+      isToday: false,
+      byTech: { u1: [dispatch({ status: 'IN_PROGRESS' })] },
+    });
+    expect(container.querySelector('.db-block.inprogress')).not.toBeNull();
+    // Status kept, motion dropped: the board reports what it was given and
+    // does not invent an outcome for a record nobody closed out.
+    expect(container.querySelector('.db-block.live')).toBeNull();
+  });
+
+  it('never marks a non-live status live, even on today', () => {
+    const { container } = renderTimeline({
+      isToday: true,
+      byTech: { u1: [dispatch({ status: 'SCHEDULED' })] },
+    });
+    expect(container.querySelector('.db-block.live')).toBeNull();
   });
 });
