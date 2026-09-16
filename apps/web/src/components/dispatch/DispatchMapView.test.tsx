@@ -18,7 +18,15 @@ vi.mock('./DispatchMapCanvas', () => ({
 vi.mock('../ThemeProvider', () => ({ useTheme: () => ({ mode: 'light' }) }));
 
 function tech(over: Partial<BoardTech> = {}): BoardTech {
-  return { id: 'u1', name: 'Jordan Wei', regionIds: [], primaryRegionId: null, stopCount: 1, ...over };
+  return {
+    id: 'u1',
+    name: 'Jordan Wei',
+    regionIds: [],
+    divisionIds: [],
+    stopCount: 1,
+    committedCount: 1,
+    ...over,
+  };
 }
 
 function workOrder(over: Partial<UnscheduledWorkOrder> = {}): UnscheduledWorkOrder {

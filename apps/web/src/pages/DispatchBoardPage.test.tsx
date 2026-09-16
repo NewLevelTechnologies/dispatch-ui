@@ -63,8 +63,9 @@ const tech = (id: string, name: string, regionIds: string[]) => ({
   id,
   name,
   regionIds,
-  primaryRegionId: regionIds[0] ?? null,
   stopCount: 0,
+  committedCount: 0,
+  divisionIds: [],
 });
 
 const railWorkOrder = (over: Record<string, unknown> = {}) => ({
@@ -437,6 +438,7 @@ describe('DispatchBoardPage release', () => {
     arrivalWindowEnd: '2026-03-15T10:00:00Z',
     estimatedDuration: null,
     releasedAt: null,
+    divisionId: null,
     version: 1,
     assignedUserId: 'u1',
     assignedUserName: 'Maya Alvarez',
@@ -556,6 +558,7 @@ describe('DispatchBoardPage reaching the work order', () => {
     arrivalWindowEnd: '2026-03-15T10:00:00Z',
     estimatedDuration: null,
     releasedAt: null,
+    divisionId: null,
     version: 1,
     assignedUserId: 'u1',
     assignedUserName: 'Maya Alvarez',
@@ -723,6 +726,8 @@ describe('DispatchBoardPage week', () => {
   const weekCell = (date: string, over: Record<string, unknown> = {}) => ({
     date,
     stopCount: 0,
+    committedCount: 0,
+    divisionIds: [],
     hasUrgent: false,
     hasUnreleased: false,
     off: false,
@@ -733,7 +738,6 @@ describe('DispatchBoardPage week', () => {
     id: 'u1',
     name: 'Maya Alvarez',
     regionIds: ['r1'],
-    primaryRegionId: 'r1',
     cells: DAYS.map((d) => weekCell(d)),
     ...over,
   });
@@ -921,6 +925,7 @@ describe('DispatchBoardPage chrome', () => {
     arrivalWindowEnd: '2026-03-15T10:00:00Z',
     estimatedDuration: null,
     releasedAt: null,
+    divisionId: null,
     version: 1,
     assignedUserId: 'u1',
     assignedUserName: 'Maya Alvarez',

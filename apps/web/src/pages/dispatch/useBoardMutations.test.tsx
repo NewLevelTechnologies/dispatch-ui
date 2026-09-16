@@ -71,6 +71,7 @@ function dispatch(over: Partial<BoardDispatch> = {}): BoardDispatch {
     arrivalWindowEnd: '2026-03-15T17:00:00Z',
     estimatedDuration: null,
     releasedAt: null,
+    divisionId: null,
     version: 7,
     assignedUserId: 'u-1',
     assignedUserName: 'Maya Alvarez',

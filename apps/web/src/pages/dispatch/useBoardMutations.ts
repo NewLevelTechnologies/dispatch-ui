@@ -148,6 +148,9 @@ export function useBoardMutations(date: string, timeZone: string) {
         priority: input.workOrder.priority,
         recurring: input.workOrder.recurring,
         serviceLocationId: input.workOrder.serviceLocationId,
+        // Carried so the provisional block dims correctly under an active
+        // division filter, rather than reading as in-scope for a moment.
+        divisionId: input.workOrder.divisionId,
         serviceLocationName: input.workOrder.serviceLocationName,
         serviceLocationStreet: input.workOrder.serviceLocationStreet,
         serviceLocationCity: input.workOrder.serviceLocationCity,

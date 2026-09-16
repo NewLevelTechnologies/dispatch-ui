@@ -78,6 +78,14 @@ function defaultGetMock(url: string) {
   if (url.startsWith('/tenant/dispatch-regions')) {
     return Promise.resolve({ data: mockRegions });
   }
+  if (url.endsWith('/divisions')) {
+    return Promise.resolve({
+      data: [
+        { id: 'div-1', name: 'HVAC' },
+        { id: 'div-2', name: 'Plumbing' },
+      ],
+    });
+  }
   if (url === '/users/capabilities/grouped') {
     return Promise.resolve({ data: mockGroupedCapabilities });
   }
@@ -518,4 +526,76 @@ describe('UserFormPage', () => {
     });
   });
 
+});
+
+// Divisions are a STRENGTH — what someone is good at taking on — not a
+// qualification. The board never blocks on them; the filter is a lens.
+describe('UserFormPage divisions', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockNavigate.mockClear();
+    vi.mocked(apiClient.get).mockImplementation(defaultGetMock);
+    vi.mocked(apiClient.post).mockResolvedValue({ data: mockUser });
+    vi.mocked(apiClient.put).mockResolvedValue({ data: mockUser });
+  });
+
+  it('offers the tenant’s divisions as its own question, separate from regions', async () => {
+    renderWithProviders(<UserEditPage />);
+    // Two cards, because one is a permission and the other is a strength —
+    // stating them separately makes that difference visible.
+    expect(await screen.findByText('Divisions')).toBeInTheDocument();
+    expect(screen.getByText('Regions')).toBeInTheDocument();
+    expect(screen.getByText('HVAC')).toBeInTheDocument();
+  });
+
+  it('says empty means offered for everything, never "good at nothing"', async () => {
+    renderWithProviders(<UserEditPage />);
+    expect(
+      await screen.findByText(/Leave empty and they're offered for everything/i),
+    ).toBeInTheDocument();
+  });
+
+  it('never borrows the language of certification', async () => {
+    // Certifications are a separate model WITH blocking semantics. Using their
+    // words here would make a preference look like a compliance control, and
+    // that misreading is expensive to undo once dispatchers believe it.
+    renderWithProviders(<UserEditPage />);
+    await screen.findByText('Divisions');
+    const page = document.body.textContent ?? '';
+    expect(page).not.toMatch(/qualified|certified|not allowed|ineligible/i);
+  });
+
+  it('saves the selection to its own endpoint', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<UserEditPage />);
+
+    // Catalyst's Checkbox is button-role-with-aria-checked, not a native
+    // input, so a label-forwarded click doesn't fire in jsdom.
+    const hvac = (await screen.findByText('HVAC'))
+      .closest('label')!
+      .querySelector('[role="checkbox"]') as HTMLElement;
+    await user.click(hvac);
+    await user.click(screen.getByRole('button', { name: /save changes/i }));
+
+    await waitFor(() => {
+      expect(apiClient.put).toHaveBeenCalledWith(
+        '/users/user-1/divisions',
+        { divisionIds: ['div-1'] },
+      );
+    });
+  });
+
+  it('saves an empty list, so a selection can be cleared', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<UserEditPage />);
+
+    await screen.findByText('Divisions');
+    await user.click(screen.getByRole('button', { name: /save changes/i }));
+
+    await waitFor(() => {
+      expect(apiClient.put).toHaveBeenCalledWith('/users/user-1/divisions', {
+        divisionIds: [],
+      });
+    });
+  });
 });

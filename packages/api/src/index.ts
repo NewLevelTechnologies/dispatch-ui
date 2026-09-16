@@ -108,6 +108,10 @@ export {
   type UpdateUserProfileRequest,
   type Dispatchable,
   type UpdateUserRolesRequest,
+  type UpdateUserDivisionsRequest,
+  type BulkDivisionMode,
+  type BulkUserDivisionsRequest,
+  type BulkUserDivisionsResponse,
   type UpdateUserEnabledRequest,
   type CreateRoleRequest,
   type UpdateRoleRequest,
@@ -465,6 +469,7 @@ export {
 export {
   dispatchBoardApi,
   type BoardTech,
+  type BoardCommitment,
   type BoardDispatch,
   type DispatchBoard,
   type GetBoardParams,

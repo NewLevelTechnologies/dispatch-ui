@@ -18,6 +18,7 @@ function stop(over: Partial<BoardDispatch> = {}): BoardDispatch {
     arrivalWindowEnd: '2026-03-15T14:00:00Z',
     estimatedDuration: null,
     releasedAt: '2026-03-15T07:00:00Z',
+    divisionId: null,
     version: 1,
     assignedUserId: 'u1',
     assignedUserName: 'Jordan Wei',
