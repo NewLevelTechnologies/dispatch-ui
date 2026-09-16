@@ -79,6 +79,14 @@ describe('UserDetailPage', () => {
       if (url === '/tenant/dispatch-regions?includeInactive=true') {
         return Promise.resolve({ data: mockDispatchRegions });
       }
+      if (url.endsWith('/config/divisions')) {
+        return Promise.resolve({
+          data: [
+            { id: 'div-1', name: 'HVAC' },
+            { id: 'div-2', name: 'Plumbing' },
+          ],
+        });
+      }
       // v1.5 backs the activity card with the new curated feed at
       // /audit/account-activity/{userId}. Keep the legacy entity-history
       // URLs mocked too in case some path still touches them.
@@ -1105,4 +1113,67 @@ describe('UserDetailPage', () => {
     });
   });
 
+  // Divisions are a STRENGTH — what someone is good at taking on. Empty means
+  // nothing was stated, so the board offers them for everything.
+  describe('UserDetailPage divisions', () => {
+    it('names the divisions a user is assigned to', async () => {
+      setupStandardMocks({ user: { ...mockUser, divisionIds: ['div-1'] } });
+      renderWithProviders(<UserDetailPage />, {
+      initialEntries: ['/users/user-123'],
+      path: '/users/:id',
+    });
+
+      expect(await screen.findByText('Divisions')).toBeInTheDocument();
+      expect(screen.getByText('HVAC')).toBeInTheDocument();
+      expect(screen.queryByText('Plumbing')).not.toBeInTheDocument();
+    });
+
+    it('reads an empty assignment as offered for everything, not as a gap', async () => {
+      // "None assigned" and "offered for all work" say opposite things. A
+      // deficit-shaped label would invite an admin to "fix" it by narrowing
+      // someone who is in fact available for anything.
+      setupStandardMocks({ user: { ...mockUser, divisionIds: [] } });
+      renderWithProviders(<UserDetailPage />, {
+      initialEntries: ['/users/user-123'],
+      path: '/users/:id',
+    });
+
+      expect(await screen.findByText('Offered for all work')).toBeInTheDocument();
+      expect(screen.queryByText(/none assigned/i)).not.toBeInTheDocument();
+    });
+
+    it('drops an id the tenant no longer has, rather than printing a uuid', async () => {
+      // The backend does not validate these against work-order-service, so a
+      // stale id is reachable and inert.
+      setupStandardMocks({ user: { ...mockUser, divisionIds: ['div-1', 'gone'] } });
+      renderWithProviders(<UserDetailPage />, {
+      initialEntries: ['/users/user-123'],
+      path: '/users/:id',
+    });
+
+      expect(await screen.findByText('HVAC')).toBeInTheDocument();
+      expect(screen.queryByText('gone')).not.toBeInTheDocument();
+    });
+
+    it('hides the row entirely for a tenant with no divisions configured', async () => {
+      setupStandardMocks({ user: { ...mockUser, divisionIds: [] } });
+      vi.mocked(apiClient.get).mockImplementation((url: string) => {
+        if (url === `/users/${mockUser.id}`) return Promise.resolve({ data: mockUser });
+        if (url === '/users/roles') return Promise.resolve({ data: mockRoles });
+        if (url === '/tenant/dispatch-regions?includeInactive=true') {
+          return Promise.resolve({ data: mockDispatchRegions });
+        }
+        if (url.endsWith('/config/divisions')) return Promise.resolve({ data: [] });
+        return Promise.resolve({ data: [] });
+      });
+      renderWithProviders(<UserDetailPage />, {
+      initialEntries: ['/users/user-123'],
+      path: '/users/:id',
+    });
+
+      // A row about a feature this tenant does not use is noise on every user.
+      await screen.findByText('Regions');
+      expect(screen.queryByText('Divisions')).not.toBeInTheDocument();
+    });
+  });
 });
