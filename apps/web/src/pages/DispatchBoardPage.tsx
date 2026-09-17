@@ -1249,6 +1249,10 @@ export default function DispatchBoardPage() {
         // the job it belongs to is not reachable behind it either.
         workOrderNumber={editBoardRow?.workOrderNumber ?? undefined}
         workOrderHref={editDispatch ? workOrderHref(editDispatch.workOrderId) : undefined}
+        // From the job, not the board row: a row only exists while it is in
+        // scope, and the composer has to order its picker the same way whether
+        // the dispatcher reached it from a visible row or not.
+        divisionId={editWorkOrder?.divisionId}
         dispatch={editDispatch}
       />
 
@@ -1266,6 +1270,7 @@ export default function DispatchBoardPage() {
         // The job is not on screen anywhere else here — the rail card carries
         // its own link, but the composer covers the rail when open.
         workOrderHref={composeFor ? workOrderHref(composeFor.workOrderId) : undefined}
+        divisionId={composeWorkOrder?.divisionId}
       />
 
       {/* Marking someone off never moves their work — the dialog says what is
