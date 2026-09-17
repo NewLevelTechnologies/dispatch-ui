@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { screen } from '@testing-library/react';
+import { screen, waitFor } from '@testing-library/react';
 import { renderWithProviders } from '../../test/utils';
 import DispatchJobSection from './DispatchJobSection';
 
@@ -226,5 +226,34 @@ describe('DispatchJobSection', () => {
     render();
     await screen.findByText('No cooling — RTU 2');
     expect(screen.queryByText(/note/i)).not.toBeInTheDocument();
+  });
+});
+
+// The composer's CREATE path has no dispatch, so there is no arrival window to
+// key the site-history read on and it falls back to "now". That fallback is
+// part of the query key: a fresh timestamp every render is a fresh query every
+// render, and React Query answers a fresh query by fetching — an unbounded
+// request loop against scheduling-service for a number nobody is watching
+// change. Shipped once already; it does not get to ship twice.
+describe('DispatchJobSection — site history with no window to key on', () => {
+  it('asks once, not once per render', async () => {
+    render({ currentWindowStart: undefined });
+    await waitFor(() => expect(mockListForLocation).toHaveBeenCalled());
+
+    const settled = mockListForLocation.mock.calls.length;
+    await new Promise((resolve) => setTimeout(resolve, 150));
+    expect(mockListForLocation.mock.calls.length).toBe(settled);
+  });
+
+  it('quantises the fallback instead of carrying a millisecond', async () => {
+    render({ currentWindowStart: undefined });
+    await waitFor(() => expect(mockListForLocation).toHaveBeenCalled());
+
+    // A stable value is what keeps the key stable; it also makes reopening the
+    // drawer a cache hit rather than a fresh read of the same twelve months.
+    expect(mockListForLocation).toHaveBeenLastCalledWith(
+      'l1',
+      expect.objectContaining({ to: expect.stringMatching(/T23:59:59\.999Z$/) }),
+    );
   });
 });

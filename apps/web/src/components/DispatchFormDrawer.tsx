@@ -244,9 +244,10 @@ export default function DispatchFormDrawer({
     queryKey: ['users', 'field-work'],
     queryFn: () => userApi.getFieldWorkers(),
   });
-  // Only to NAME the group in the picker. Shared query key with the board, the
-  // work order list and the job section below, so it is a cache read wherever
-  // any of them has been open.
+  // Only to NAME the group in the picker. Shares the board's and the work order
+  // list's key, so it is a cache read wherever either has been open. (Note the
+  // job section below reads the same divisions under `['work-order-config',
+  // 'divisions']` — a second entry for identical data, predating this.)
   const { data: divisions } = useQuery({
     queryKey: ['divisions'],
     queryFn: () => divisionsApi.getAll(),
