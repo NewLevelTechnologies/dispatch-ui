@@ -1136,6 +1136,7 @@ export default function WorkOrderDetailPage() {
         workItems={workOrder.workItems ?? []}
         locationName={location?.locationName}
         workOrderNumber={woDisplayNumber}
+        divisionId={workOrder.divisionId}
         dispatch={editingDispatch}
       />
 

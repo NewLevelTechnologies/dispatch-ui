@@ -15,6 +15,7 @@
 // does not exist, so this composes the reads that do, each on the same query
 // key its other consumers use so the caches are shared rather than doubled.
 // ─────────────────────────────────────────────────────────────────────
+import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from '@dispatch/i18n';
 import { formatCurrency, formatPhone, formatTimestamp } from '@dispatch/utils';
@@ -138,7 +139,19 @@ export default function DispatchJobSection({
   // optimisation it was — it skips waiting on that read — rather than a
   // requirement.
   const siteId = serviceLocationId ?? workOrder?.serviceLocation?.id ?? null;
-  const historyTo = currentWindowStart ?? new Date().toISOString();
+  // This value is a QUERY KEY, so it must not move between renders. A bare
+  // `new Date().toISOString()` here is a different key every render, which
+  // React Query answers by fetching again — an unbounded request loop against
+  // scheduling-service on the composer's create path, where there is no
+  // dispatch and therefore no window to key on.
+  //
+  // Quantised to the end of the UTC day rather than merely memoised: a
+  // millisecond is meaningless on a twelve-month window, and a stable value
+  // makes reopening the drawer a cache hit instead of a fresh read.
+  const historyTo = useMemo(
+    () => currentWindowStart ?? `${new Date().toISOString().slice(0, 10)}T23:59:59.999Z`,
+    [currentWindowStart],
+  );
   const { data: siteHistory } = useQuery({
     queryKey: ['dispatch-site-history', siteId, historyTo],
     queryFn: () =>

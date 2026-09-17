@@ -140,6 +140,110 @@ describe('DispatchWeek cells', () => {
   });
 });
 
+// The week is the surface a dispatcher scans to CHOOSE a day, so an
+// understated cell doesn't merely look wrong — it routes the work. A narrowed
+// board (region scope or division filter) knows a tech is committed elsewhere
+// and must say so, or the fullest day on the board reads as the lightest.
+describe('DispatchWeek committed work', () => {
+  const bar = (el: HTMLElement) => el.querySelector('.db-load');
+  const widths = (el: HTMLElement) => {
+    const solid = el.querySelector('.db-load i') as HTMLElement | null;
+    const hatch = el.querySelector('.db-load u') as HTMLElement | null;
+    return {
+      solid: solid ? parseFloat(solid.style.width) : null,
+      hatch: hatch ? parseFloat(hatch.style.width) : null,
+    };
+  };
+
+  it('prints "3 of 5" where the in-scope and committed counts differ', () => {
+    renderWeek({
+      techs: [
+        tech({
+          cells: DAYS.map((d, i) =>
+            cell(d, { stopCount: 3, committedCount: i === 0 ? 5 : 3 }),
+          ),
+        }),
+      ],
+    });
+    expect(cells()[0]).toHaveTextContent('3 of 5');
+    // Not "3 of 3" on an unfiltered day — a cell restating itself is noise.
+    expect(cells()[1]).toHaveTextContent('3');
+    expect(cells()[1]).not.toHaveTextContent('of');
+  });
+
+  // The count and the bar are one claim. Printing "3 of 5" above a bar filled
+  // to three sixths says both things at once and the dispatcher believes the
+  // picture, not the digits.
+  it('draws the committed-elsewhere share as a hatched remainder', () => {
+    renderWeek({
+      techs: [tech({ cells: DAYS.map((d) => cell(d, { stopCount: 3, committedCount: 5 })) })],
+    });
+    const { solid, hatch } = widths(cells()[0]);
+    expect(solid).toBeCloseTo(50, 5); // 3 of 6
+    expect(hatch).toBeCloseTo(100 / 3, 5); // the other 2 of 6
+    expect(solid! + hatch!).toBeCloseTo((5 / 6) * 100, 5);
+  });
+
+  // The regression this guards: a bar derived from in-scope work alone paints
+  // a tech whose whole day sits in another region as the most available person
+  // on the board — green, nearly empty, and the obvious place to put the job.
+  it('does not read as a light day when every stop is committed elsewhere', () => {
+    renderWeek({
+      techs: [tech({ cells: DAYS.map((d) => cell(d, { stopCount: 0, committedCount: 6 })) })],
+    });
+    const { solid, hatch } = widths(cells()[0]);
+    expect(solid).toBe(0);
+    expect(hatch).toBeCloseTo(100, 5);
+    // Colour follows committed work too, or the fullest day stays green.
+    expect(bar(cells()[0])).toHaveClass('high');
+  });
+
+  it('colours an over-committed day over capacity', () => {
+    renderWeek({
+      techs: [tech({ cells: DAYS.map((d) => cell(d, { stopCount: 1, committedCount: 8 })) })],
+    });
+    expect(bar(cells()[0])).toHaveClass('over');
+    // Denominated by the larger of capacity and committed, so the overage
+    // stays visible instead of being clamped flush with a full day.
+    expect(widths(cells()[0]).solid).toBeCloseTo(12.5, 5);
+  });
+
+  it('draws no hatch when nothing is committed elsewhere', () => {
+    renderWeek({
+      techs: [tech({ cells: DAYS.map((d) => cell(d, { stopCount: 2, committedCount: 2 })) })],
+    });
+    expect(widths(cells()[0]).hatch).toBeNull();
+  });
+
+  it('explains the split on hover only where the two differ', () => {
+    renderWeek({
+      techs: [
+        tech({
+          cells: DAYS.map((d, i) =>
+            cell(d, { stopCount: 2, committedCount: i === 0 ? 5 : 2 }),
+          ),
+        }),
+      ],
+    });
+    expect(cells()[0].querySelector('[title]')).toHaveAttribute(
+      'title',
+      '2 in scope \u00b7 3 committed elsewhere',
+    );
+    expect(cells()[1].querySelector('[title]')).toBeNull();
+  });
+
+  // An absence is an absence. A tech who is out has no committed work to
+  // report and no bar to draw, whatever the server sent alongside it.
+  it('still renders time off as a bare dash', () => {
+    renderWeek({
+      techs: [tech({ cells: DAYS.map((d) => cell(d, { stopCount: 0, committedCount: 4, off: true })) })],
+    });
+    expect(cells()[0]).toHaveTextContent('\u2014');
+    expect(bar(cells()[0])).toBeNull();
+    expect(cells()[0].querySelector('[title]')).toBeNull();
+  });
+});
+
 describe('DispatchWeek navigation', () => {
   // The week answers "which day should I be looking at" — so a cell is a
   // target, not a container.

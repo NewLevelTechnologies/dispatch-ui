@@ -1,14 +1,15 @@
 /* eslint-disable i18next/no-literal-string -- dense operational composer; short scheduling labels stay literal (same convention as WorkOrderFileUploadDialog / WorkOrderFilesTab). Entity names still route through getName(). */
 // Dispatch create / edit — the compose+edit counterpart to the read-only trip
 // drawer (DispatchDetailDrawer). Same right-side SlideOver chrome, so scheduling
-// or editing a dispatch feels like the same object you view. Replaces the legacy
-// AssignTechnicianDialog. Sections: Work addressed → When → Assign tech → Release.
+// or editing a dispatch feels like the same object you view. Sections: Work
+// addressed → When → Assign tech → Release.
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from '@dispatch/i18n';
 import { CalendarDaysIcon, CheckIcon, ChevronUpDownIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import {
   dispatchesApi,
+  divisionsApi,
   userApi,
   type Dispatch,
   type ProgressCategory,
@@ -62,6 +63,14 @@ interface Props {
    *  timeline lane does (x is the clock); a map drop carries a person and
    *  nothing else. */
   prefill?: MapPrefill | null;
+  /** The job's division, when the caller knows it — every caller does today.
+   *
+   *  It ORDERS the technician picker and nothing else. A tech's divisions are a
+   *  strength ("the kinds of work they're good at taking on"), not a
+   *  qualification: no row is hidden, no row is disabled, and assigning across
+   *  divisions raises no warning and no confirm. Certification is a separate
+   *  model with real blocking semantics, and this must not be mistaken for it. */
+  divisionId?: string | null;
 }
 
 export interface MapPrefill {
@@ -163,6 +172,7 @@ export default function DispatchFormDrawer({
   workOrderHref,
   dispatch,
   prefill,
+  divisionId,
 }: Props) {
   const { t } = useTranslation();
   // Windows are tenant-local: "8–10a" means 8am where the truck is going.
@@ -234,15 +244,55 @@ export default function DispatchFormDrawer({
     queryKey: ['users', 'field-work'],
     queryFn: () => userApi.getFieldWorkers(),
   });
+  // Only to NAME the group in the picker. Shares the board's and the work order
+  // list's key, so it is a cache read wherever either has been open. (Note the
+  // job section below reads the same divisions under `['work-order-config',
+  // 'divisions']` — a second entry for identical data, predating this.)
+  const { data: divisions } = useQuery({
+    queryKey: ['divisions'],
+    queryFn: () => divisionsApi.getAll(),
+    enabled: !!divisionId,
+  });
+
+  // The techs who SAY they do this kind of work. Empty divisions is "nothing
+  // stated", never "good at nothing" — so an unset tech is not marked (the
+  // record doesn't support the claim) and is not hidden either. The practical
+  // consequence: a tenant that has configured no divisions gets an empty set
+  // here and therefore the plain alphabetical list it has always had.
+  const preferredIds = useMemo(() => {
+    if (!divisionId) return new Set<string>();
+    // Enabled only, so this set and `techs` below are counted against the same
+    // population — the heading suppression compares their sizes.
+    return new Set(
+      users
+        .filter((u) => u.enabled && (u.divisionIds ?? []).includes(divisionId))
+        .map((u) => u.id),
+    );
+  }, [users, divisionId]);
+
   const techs = useMemo(
     () =>
       [...users]
         .filter((u) => u.enabled)
-        .sort((a, b) =>
-          `${a.lastName} ${a.firstName}`.trim().localeCompare(`${b.lastName} ${b.firstName}`.trim()),
-        ),
-    [users],
+        // Preferred first, alphabetical inside each group. This is the whole
+        // extent of the feature in this picker: an ordering, never a gate.
+        .sort((a, b) => {
+          const rank = Number(preferredIds.has(b.id)) - Number(preferredIds.has(a.id));
+          if (rank !== 0) return rank;
+          return `${a.lastName} ${a.firstName}`
+            .trim()
+            .localeCompare(`${b.lastName} ${b.firstName}`.trim());
+        }),
+    [users, preferredIds],
   );
+
+  // Headed only when the split says something. All-preferred or none-preferred
+  // is a constant on every row — the same defect as printing the state on an
+  // address — so the picker falls back to one unlabelled list.
+  const preferredLabel =
+    divisionId && preferredIds.size > 0 && preferredIds.size < techs.length
+      ? (divisions?.find((d) => d.id === divisionId)?.name ?? null)
+      : null;
   // No `?? winOptions[0]` fallback: an unset key means unset, and resolving it
   // to the first preset is exactly the invented promise the map path exists to
   // avoid. `canSave` already gates on this being present.
@@ -460,7 +510,14 @@ export default function DispatchFormDrawer({
                 {t('dispatchBoard.map.prefilledTech')}
               </Pill>
             )}
-            <TechPicker techs={techs} value={assignedUserId} onChange={setAssignedUserId} techWord={techWord} />
+            <TechPicker
+              techs={techs}
+              value={assignedUserId}
+              onChange={setAssignedUserId}
+              techWord={techWord}
+              preferredIds={preferredIds}
+              preferredLabel={preferredLabel}
+            />
             {!assignedUserId && (
               <div className="mt-1.5 text-[11px] text-fg-dim">
                 A {techWord} is required — an unassigned {dispatchWord} is just unscheduled work.
@@ -612,11 +669,17 @@ function TechPicker({
   value,
   onChange,
   techWord,
+  preferredIds,
+  preferredLabel,
 }: {
   techs: User[];
   value: string;
   onChange: (id: string) => void;
   techWord: string;
+  /** Who states this job's kind of work. Marks and orders; never gates. */
+  preferredIds: Set<string>;
+  /** The division's name, or null to render one unlabelled list. */
+  preferredLabel: string | null;
 }) {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState('');
@@ -642,6 +705,23 @@ function TechPicker({
   const filtered = q.trim()
     ? techs.filter((u) => techName(u).toLowerCase().includes(q.trim().toLowerCase()))
     : techs;
+
+  // The mark is a heading printed ONCE, not a chip repeated down the list: the
+  // dispatcher already knows what kind of job this is — it is why they opened
+  // the drawer — so stamping the division on twelve rows restates the question
+  // instead of answering it. Printed once, it also explains why the order
+  // isn't alphabetical, which an unexplained reshuffle reads as a bug.
+  // A group empties itself out of existence under search rather than leaving a
+  // heading with nothing beneath it.
+  const groups: { label: string | null; items: User[] }[] = preferredLabel
+    ? [
+        // "Takes", not "Does": the division name is the TENANT's word, and
+        // "Does Plumbing work" reads as a question. "Takes" survives every
+        // name and is the spec's own framing — work they're good at taking on.
+        { label: `Takes ${preferredLabel} work`, items: filtered.filter((u) => preferredIds.has(u.id)) },
+        { label: `Other ${techWord}s`, items: filtered.filter((u) => !preferredIds.has(u.id)) },
+      ].filter((g) => g.items.length > 0)
+    : [{ label: null, items: filtered }];
 
   return (
     <div ref={ref} className="relative">
@@ -683,26 +763,46 @@ function TechPicker({
             />
           </div>
           <div role="listbox" className="max-h-[240px] overflow-y-auto">
-            {filtered.map((u) => (
-              <button
-                key={u.id}
-                type="button"
-                role="option"
-                aria-selected={u.id === value}
-                onClick={() => {
-                  onChange(u.id);
-                  setOpen(false);
-                  setQ('');
-                }}
-                className="flex w-full items-center gap-2.5 border-b border-border-soft px-2.5 py-2 text-left last:border-b-0 hover:bg-bg-hover aria-selected:bg-accent-500/8"
+            {groups.map((group, gi) => (
+              // `presentation` on the unlabelled case so a single flat list
+              // doesn't grow a pointless group wrapper in the a11y tree.
+              <div
+                key={group.label ?? 'all'}
+                role={group.label ? 'group' : 'presentation'}
+                aria-label={group.label ?? undefined}
               >
-                <Avatar name={techName(u)} size="sm" />
-                <div className="min-w-0 grow">
-                  <div className="truncate text-[12.5px] font-semibold text-fg-strong">{techName(u)}</div>
-                  {techMeta(u) && <div className="truncate text-[11px] text-fg-muted">{techMeta(u)}</div>}
-                </div>
-                {u.id === value && <CheckIcon className="size-4 shrink-0 text-fg-accent" />}
-              </button>
+                {group.label && (
+                  <div
+                    className={[
+                      'bg-bg px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-fg-dim',
+                      gi > 0 ? 'border-y border-border-soft' : 'border-b border-border-soft',
+                    ].join(' ')}
+                  >
+                    {group.label}
+                  </div>
+                )}
+                {group.items.map((u) => (
+                  <button
+                    key={u.id}
+                    type="button"
+                    role="option"
+                    aria-selected={u.id === value}
+                    onClick={() => {
+                      onChange(u.id);
+                      setOpen(false);
+                      setQ('');
+                    }}
+                    className="flex w-full items-center gap-2.5 border-b border-border-soft px-2.5 py-2 text-left last:border-b-0 hover:bg-bg-hover aria-selected:bg-accent-500/8"
+                  >
+                    <Avatar name={techName(u)} size="sm" />
+                    <div className="min-w-0 grow">
+                      <div className="truncate text-[12.5px] font-semibold text-fg-strong">{techName(u)}</div>
+                      {techMeta(u) && <div className="truncate text-[11px] text-fg-muted">{techMeta(u)}</div>}
+                    </div>
+                    {u.id === value && <CheckIcon className="size-4 shrink-0 text-fg-accent" />}
+                  </button>
+                ))}
+              </div>
             ))}
             {filtered.length === 0 && (
               <div className="px-3 py-4 text-center text-[12px] text-fg-muted">No {techWord}s match “{q}”.</div>
