@@ -61,10 +61,19 @@ function WeekCell({
 }) {
   const { t } = useTranslation();
 
-  const pct =
-    capacityStops != null && capacityStops > 0
-      ? Math.min(100, (cell.stopCount / capacityStops) * 100)
-      : null;
+  // Identical arithmetic to the tech cell's bar (BoardRows), and deliberately
+  // so: the bar read ACROSS seven days and the bar read DOWN one column are
+  // about the same technician, and a week that draws a lighter day than the
+  // day board does is worse than either being wrong alone — it makes the
+  // dispatcher distrust both. Denominating by `max(capacity, committed)` also
+  // keeps an over-committed day inside the track without a clamp that would
+  // silently hide the overage.
+  const committed = Math.max(cell.stopCount, cell.committedCount);
+  const elsewhere = committed - cell.stopCount;
+  const scale =
+    capacityStops != null && capacityStops > 0 ? 100 / Math.max(capacityStops, committed) : null;
+  const inScopePct = scale == null ? null : cell.stopCount * scale;
+  const elsewherePct = scale == null ? null : elsewhere * scale;
 
   return (
     <button
@@ -80,7 +89,19 @@ function WeekCell({
             because the week has to respond to the filter — that is why anyone
             filters — but a day that is fuller than the filter shows must say
             so, or a dispatcher picks the day that looks lightest and is not. */}
-        <span className="font-mono text-[10.5px] font-semibold text-fg-strong">
+        <span
+          className="font-mono text-[10.5px] font-semibold text-fg-strong"
+          // Only where the two differ, same as the tech cell: on an unfiltered
+          // board every cell would otherwise carry a tooltip restating itself.
+          title={
+            !cell.off && elsewhere > 0
+              ? t('dispatchBoard.grid.committedBreakdown', {
+                  inScope: cell.stopCount,
+                  elsewhere,
+                })
+              : undefined
+          }
+        >
           {cell.off
             ? '—'
             : cell.committedCount > cell.stopCount
@@ -100,9 +121,13 @@ function WeekCell({
           </span>
         )}
       </span>
-      {!cell.off && pct != null && (
-        <span className={`db-load ${loadClassFor(cell.stopCount, capacityStops)}`.trim()}>
-          <i style={{ width: `${pct}%` }} />
+      {!cell.off && inScopePct != null && (
+        // The load class comes off COMMITTED, not in-scope work: a tech whose
+        // day is full in another region is not having a light day, and the
+        // week is the surface a dispatcher scans to choose one.
+        <span className={`db-load ${loadClassFor(committed, capacityStops)}`.trim()}>
+          <i style={{ width: `${inScopePct}%` }} />
+          {elsewherePct! > 0 && <u style={{ width: `${elsewherePct}%` }} />}
         </span>
       )}
     </button>
