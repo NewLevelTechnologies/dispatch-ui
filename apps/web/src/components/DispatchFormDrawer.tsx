@@ -1,8 +1,8 @@
 /* eslint-disable i18next/no-literal-string -- dense operational composer; short scheduling labels stay literal (same convention as WorkOrderFileUploadDialog / WorkOrderFilesTab). Entity names still route through getName(). */
 // Dispatch create / edit — the compose+edit counterpart to the read-only trip
 // drawer (DispatchDetailDrawer). Same right-side SlideOver chrome, so scheduling
-// or editing a dispatch feels like the same object you view. Replaces the legacy
-// AssignTechnicianDialog. Sections: Work addressed → When → Assign tech → Release.
+// or editing a dispatch feels like the same object you view. Sections: Work
+// addressed → When → Assign tech → Release.
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from '@dispatch/i18n';

@@ -271,9 +271,10 @@ export default function WorkOrdersPage() {
     queryKey: ['work-item-statuses'],
     queryFn: () => workItemStatusesApi.getAll(),
   });
-  // Assigned-user filter options. Same source as AssignTechnicianDialog: every
-  // enabled user is assignable (techs, sales, estimators) until role-based
-  // filtering exists.
+  // Assigned-user filter options — every enabled user, NOT just field workers,
+  // and deliberately not the picker's `getFieldWorkers`. A filter searches what
+  // was assigned, not what is assignable: narrowing it would make the work of
+  // anyone since moved off field work unreachable from this page.
   const { data: users } = useQuery({
     queryKey: ['users'],
     queryFn: () => userApi.getAll(),
