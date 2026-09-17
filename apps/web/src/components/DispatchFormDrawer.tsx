@@ -714,7 +714,10 @@ function TechPicker({
   // heading with nothing beneath it.
   const groups: { label: string | null; items: User[] }[] = preferredLabel
     ? [
-        { label: `Does ${preferredLabel} work`, items: filtered.filter((u) => preferredIds.has(u.id)) },
+        // "Takes", not "Does": the division name is the TENANT's word, and
+        // "Does Plumbing work" reads as a question. "Takes" survives every
+        // name and is the spec's own framing — work they're good at taking on.
+        { label: `Takes ${preferredLabel} work`, items: filtered.filter((u) => preferredIds.has(u.id)) },
         { label: `Other ${techWord}s`, items: filtered.filter((u) => !preferredIds.has(u.id)) },
       ].filter((g) => g.items.length > 0)
     : [{ label: null, items: filtered }];

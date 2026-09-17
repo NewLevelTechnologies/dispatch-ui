@@ -350,11 +350,25 @@ describe('DispatchFormDrawer technician picker — division preference', () => {
     render({ dispatch: null, divisionId: HVAC });
     await openPicker(user);
 
-    expect(screen.getByText('Does HVAC work')).toBeInTheDocument();
+    expect(screen.getByText('Takes HVAC work')).toBeInTheDocument();
     expect(screen.getByText('Other technicians')).toBeInTheDocument();
     // Printed once as a heading, never stamped on the rows: the dispatcher
     // already knows the job is HVAC — it is why they opened the drawer.
-    expect(screen.getAllByText('Does HVAC work')).toHaveLength(1);
+    expect(screen.getAllByText('Takes HVAC work')).toHaveLength(1);
+  });
+
+  // The heading is the TENANT's word for the division, not a fixed string —
+  // and the verb has to survive every name they might choose. "Does Plumbing
+  // work" reads as a question; "Takes" does not.
+  it('names the job\u2019s own division in the heading', async () => {
+    const user = userEvent.setup();
+    render({ dispatch: null, divisionId: PLUMBING });
+    await openPicker(user);
+
+    expect(screen.getByText('Takes Plumbing work')).toBeInTheDocument();
+    expect(screen.queryByText(/HVAC/)).not.toBeInTheDocument();
+    // Adams and Vega state plumbing; Lee (HVAC) and Park (nothing) do not.
+    expect(optionNames()).toEqual(['Ana Adams', 'Rosa Vega', 'Marcus Lee', 'Daniel Park']);
   });
 
   // The whole point. A plumber on an HVAC job is a normal assignment.
@@ -382,7 +396,7 @@ describe('DispatchFormDrawer technician picker — division preference', () => {
       'Daniel Park',
       'Rosa Vega',
     ]);
-    expect(screen.queryByText(/Does .* work/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Takes .* work/)).not.toBeInTheDocument();
   });
 
   // The permissive property that keeps a half-configured tenant usable: if
@@ -401,7 +415,7 @@ describe('DispatchFormDrawer technician picker — division preference', () => {
       'Ana Adams',
       'Daniel Park',
     ]);
-    expect(screen.queryByText(/Does .* work/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Takes .* work/)).not.toBeInTheDocument();
   });
 
   // A heading true of every row is a constant, and a constant is noise — the
@@ -416,7 +430,7 @@ describe('DispatchFormDrawer technician picker — division preference', () => {
     await openPicker(user);
 
     expect(techOptions()).toHaveLength(2);
-    expect(screen.queryByText('Does HVAC work')).not.toBeInTheDocument();
+    expect(screen.queryByText('Takes HVAC work')).not.toBeInTheDocument();
     expect(screen.queryByText('Other technicians')).not.toBeInTheDocument();
   });
 
@@ -428,7 +442,7 @@ describe('DispatchFormDrawer technician picker — division preference', () => {
 
     await user.type(screen.getByRole('textbox', { name: /search technicians/i }), 'Ana');
     expect(screen.getByRole('option', { name: /Ana Adams/ })).toBeInTheDocument();
-    expect(screen.queryByText('Does HVAC work')).not.toBeInTheDocument();
+    expect(screen.queryByText('Takes HVAC work')).not.toBeInTheDocument();
     expect(screen.getByText('Other technicians')).toBeInTheDocument();
   });
 });
