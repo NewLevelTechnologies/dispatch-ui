@@ -73,6 +73,7 @@ function dispatch(over: Partial<BoardDispatch> = {}): BoardDispatch {
     releasedAt: null,
     divisionId: null,
     version: 7,
+    windowChangedAt: null,
     assignedUserId: 'u-1',
     assignedUserName: 'Maya Alvarez',
     workOrderId: 'wo-1',

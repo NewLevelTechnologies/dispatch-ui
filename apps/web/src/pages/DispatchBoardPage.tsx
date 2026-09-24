@@ -16,10 +16,13 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from '@dispatch/i18n';
 import { ChevronLeftIcon, ChevronRightIcon, MapIcon } from '@heroicons/react/24/outline';
 import {
+  availabilityApi,
   dispatchBoardApi,
   dispatchRegionApi,
   divisionsApi,
+  notificationApi,
   workOrderApi,
+  type Availability,
   type BoardDispatch,
   type BoardTech,
   type UnscheduledWorkOrder,
@@ -29,6 +32,8 @@ import AppLayout from '../components/AppLayout';
 import { Heading } from '../components/catalyst/heading';
 import { Button } from '../components/catalyst/button';
 import { Select } from '../components/catalyst/select';
+import { Checkbox, CheckboxField } from '../components/catalyst/checkbox';
+import { Label } from '../components/catalyst/fieldset';
 import { ListSearch } from '../components/ui/ListToolbar';
 import { ToggleGroup, ToggleGroupOption } from '../components/ui/ToggleGroup';
 import { FilterChip, FilterChipRow } from '../components/ui/FilterChipRow';
@@ -59,8 +64,12 @@ import { foldEmptyRows } from '../lib/boardRows';
 import { nearestStops } from '../lib/nearestStop';
 import { withBackContext } from '../lib/backContext';
 import { movedWindow } from '../lib/boardDrop';
+import { canMoveTo, formatMoveDay, preservedWindow, shiftDay } from '../lib/boardMove';
+import { toIsoAt } from '../lib/arrivalWindows';
+import { customerEverNotified, customerNotifiedAt } from '../lib/customerNotified';
+import { hitsTimeOff } from '../lib/timeOff';
 import { useBoardMutations } from './dispatch/useBoardMutations';
-import { extractApiError, showError, showSuccess } from '../lib/toast';
+import { extractApiError, showError, showSuccess, showUndo } from '../lib/toast';
 import { invalidateDispatchBoard } from '../utils/invalidateRoleConsumers';
 import { isHiddenByDefault } from '../lib/dispatchStatus';
 import { siteLabel } from '../lib/siteLabel';
@@ -81,7 +90,26 @@ const DAY_END = 20;
  *  count instead. */
 type ChipTone = 'neutral' | 'warning' | 'danger' | 'violet';
 
-type ExceptionId = 'urgent' | 'unreleased' | 'noshow' | 'cancelled' | 'longdrive' | 'recurring';
+type ExceptionId =
+  | 'urgent'
+  | 'unreleased'
+  | 'noshow'
+  | 'offtech'
+  | 'cancelled'
+  | 'longdrive'
+  | 'recurring';
+
+/** A move of a visit the customer was already told about, awaiting confirm. */
+interface PendingMove {
+  dispatch: BoardDispatch;
+  toDate: string;
+  window: { startHour: number; endHour: number };
+  notify: boolean;
+  /** `current`: the customer was told THIS date. `earlier`: they were told a
+   *  date before it and never heard about this one — still a promise they
+   *  hold, just not the one on the board. */
+  told: 'current' | 'earlier';
+}
 
 const LONG_DRIVE_MINUTES = 30;
 
@@ -90,15 +118,6 @@ function todayLocal(): string {
   const m = String(now.getMonth() + 1).padStart(2, '0');
   const d = String(now.getDate()).padStart(2, '0');
   return `${now.getFullYear()}-${m}-${d}`;
-}
-
-// Day math on the date PARTS, via UTC, so a DST boundary can't shift the
-// result by a day the way local-midnight arithmetic can.
-function shiftDay(date: string, days: number): string {
-  const [y, m, d] = date.split('-').map(Number);
-  const t = new Date(Date.UTC(y, m - 1, d));
-  t.setUTCDate(t.getUTCDate() + days);
-  return t.toISOString().slice(0, 10);
 }
 
 // Weeks run Monday–Sunday: the weekend belongs at the END of a work week, and
@@ -175,6 +194,7 @@ export default function DispatchBoardPage() {
   // hold different answers about what is being identified.
   const [hoverWorkOrderId, setHoverWorkOrderId] = useState<string | null>(null);
   const [confirmRelease, setConfirmRelease] = useState(false);
+  const [pendingMove, setPendingMove] = useState<PendingMove | null>(null);
   const [editDispatch, setEditDispatch] = useState<DispatchSeed | null>(null);
 
   // A working day is wider than any viewport at 78px/hour, so dragging toward
@@ -352,6 +372,18 @@ export default function DispatchBoardPage() {
 
   const techIds = useMemo(() => new Set(techs.map((tech) => tech.id)), [techs]);
 
+  // Live work stranded on someone who is out. Never moved automatically — a
+  // system that silently relocates someone's work is worse than one that
+  // tells you to — so it is outlined in place and gets its own chip.
+  const offTechDispatchIds = useMemo(() => {
+    const byId = new Map(allTechs.map((tech) => [tech.id, tech]));
+    return new Set(
+      allDispatches
+        .filter((d) => hitsTimeOff(d, byId.get(d.assignedUserId)?.timeOff))
+        .map((d) => d.id),
+    );
+  }, [allTechs, allDispatches]);
+
   // Counts are computed over everything in scope, NOT over the filtered set:
   // a chip that renumbers itself as you filter can't be used to navigate.
   const counts = useMemo(() => {
@@ -360,11 +392,12 @@ export default function DispatchBoardPage() {
       urgent: inScope.filter((d) => d.priority === 'URGENT').length,
       unreleased: inScope.filter((d) => d.releasedAt == null && d.status !== 'CANCELLED').length,
       noshow: inScope.filter((d) => d.status === 'NO_SHOW').length,
+      offtech: inScope.filter((d) => offTechDispatchIds.has(d.id)).length,
       cancelled: inScope.filter((d) => d.status === 'CANCELLED').length,
       longdrive: inScope.filter((d) => (d.driveMinFromPrev ?? 0) > LONG_DRIVE_MINUTES).length,
       recurring: inScope.filter((d) => d.recurring === true).length,
     } satisfies Record<ExceptionId, number>;
-  }, [allDispatches, techIds]);
+  }, [allDispatches, techIds, offTechDispatchIds]);
 
   const visibleDispatches = useMemo(() => {
     const showCancelled = exceptions.includes('cancelled');
@@ -384,6 +417,8 @@ export default function DispatchBoardPage() {
             return d.releasedAt == null && d.status !== 'CANCELLED';
           case 'noshow':
             return d.status === 'NO_SHOW';
+          case 'offtech':
+            return offTechDispatchIds.has(d.id);
           case 'longdrive':
             return (d.driveMinFromPrev ?? 0) > LONG_DRIVE_MINUTES;
           case 'recurring':
@@ -393,7 +428,7 @@ export default function DispatchBoardPage() {
         }
       });
     });
-  }, [allDispatches, techIds, exceptions]);
+  }, [allDispatches, techIds, exceptions, offTechDispatchIds]);
 
   const byTech = useMemo(() => {
     const map: Record<string, BoardDispatch[]> = {};
@@ -599,7 +634,7 @@ export default function DispatchBoardPage() {
   // Bulk release takes a SCOPE, not an id list: the server recomputes the
   // unreleased set, so this can neither reach outside the caller's regions
   // nor act on a board rendered ten minutes ago.
-  const { assign, move, unschedule, release } = useBoardMutations(date, timeZone);
+  const { assign, move, moveDay, unschedule, release } = useBoardMutations(date, timeZone);
 
   // A dispatch is a visit; the work order is the job — and "what is actually
   // happening with this job" is a question the board gets constantly, usually
@@ -676,6 +711,153 @@ export default function DispatchBoardPage() {
     [allDispatches, unschedule],
   );
   unscheduleRef.current = unscheduleFromRail;
+
+  // ── Move to another day (§3.6) ────────────────────────────────────
+  // Same tech, same window, new date. The window is what makes a date-only
+  // move legal — it invents no promise — so the only question is who has
+  // already been told, and that decides what the move costs:
+  //
+  //   unreleased                → silent commit + Undo
+  //   released, customer untold → commit + Undo, toast names the tech
+  //   released, customer told   → CONFIRM, never silent
+  //
+  // "Customer told" is not on the board read: it lives in the notification
+  // log, which is also where the drawer reads it. Fetched on the gesture, for
+  // this one visit, under the drawer's own cache key — and only when the
+  // visit is released, since an unreleased one has told nobody. A notice
+  // counts as being about THIS date only if it post-dates `windowChangedAt`
+  // (lib/customerNotified), the same rule the drawer uses.
+  const requestMove = async (dispatch: BoardDispatch, toDate: string) => {
+    const window = preservedWindow(dispatch, timeZone);
+    if (!window || !canMoveTo(date, toDate, todayInZone ?? date)) return;
+    // The drawer would otherwise follow `?d=` to the new date, taking the
+    // whole board with it.
+    if (openDispatchId === dispatch.id) openVisit(null);
+
+    const techName = allTechs.find((tech) => tech.id === dispatch.assignedUserId)?.name ?? '';
+    const base = {
+      dispatch,
+      toDate,
+      toDateLabel: formatMoveDay(toDate),
+      window,
+      windowLabel: formatWindow(window.startHour, window.endHour),
+      techName,
+    };
+    if (dispatch.releasedAt == null) {
+      moveDay.mutate({ ...base, mode: 'quiet' });
+      return;
+    }
+
+    let told: PendingMove['told'] | null;
+    try {
+      const logs = await queryClient.fetchQuery({
+        queryKey: ['notification-logs', { entityType: 'DISPATCH', entityId: dispatch.id }],
+        queryFn: () =>
+          notificationApi.getNotificationLogs({
+            entityType: 'DISPATCH',
+            entityId: dispatch.id,
+            size: 25,
+            sort: 'createdAt,desc',
+          }),
+      });
+      told = customerNotifiedAt(logs.content, dispatch.windowChangedAt)
+        ? 'current'
+        : customerEverNotified(logs.content)
+          ? 'earlier'
+          : null;
+    } catch {
+      // Unknown is treated as told. Asking once too often costs a click;
+      // silently breaking a promise to a customer costs the customer.
+      told = 'current';
+    }
+
+    if (told) {
+      setPendingMove({ dispatch, toDate, window, notify: true, told });
+      return;
+    }
+    moveDay.mutate({ ...base, mode: 'techTold' });
+  };
+
+  const confirmMove = () => {
+    if (!pendingMove) return;
+    const { dispatch, toDate, window, notify } = pendingMove;
+    moveDay.mutate({
+      dispatch,
+      toDate,
+      toDateLabel: formatMoveDay(toDate),
+      window,
+      windowLabel: formatWindow(window.startHour, window.endHour),
+      techName: allTechs.find((tech) => tech.id === dispatch.assignedUserId)?.name ?? '',
+      mode: notify ? 'notify' : 'customerStale',
+    });
+    setPendingMove(null);
+  };
+
+  // ── Clear time off ────────────────────────────────────────────────
+  // Every OFF span touching the viewed day goes, and Undo writes them back.
+  // A span is one row however many days it covers, so clearing Wednesday of
+  // a week off clears the week — the toast names the range so that is never
+  // a surprise.
+  const clearTimeOff = useMutation({
+    mutationFn: async (tech: BoardTech) => {
+      const page = await availabilityApi.list({
+        userId: tech.id,
+        status: 'OFF',
+        from: toIsoAt(date, 0, timeZone),
+        to: toIsoAt(shiftDay(date, 1), 0, timeZone),
+        size: 20,
+      });
+      const spans = page.content.filter((span) => span.status === 'OFF');
+      await Promise.all(spans.map((span) => availabilityApi.delete(span.id)));
+      return spans;
+    },
+    onSuccess: (spans: Availability[], tech) => {
+      invalidateDispatchBoard(queryClient);
+      queryClient.invalidateQueries({ queryKey: ['availability'] });
+      if (spans.length === 0) return;
+      // Half-open end: a span through the 26th ends at midnight on the 27th.
+      const first = spans.map((s) => zonedDate(s.startsAt, timeZone) ?? date).sort()[0];
+      const last = spans
+        .map((s) => zonedDate(new Date(Date.parse(s.endsAt) - 1), timeZone) ?? date)
+        .sort()
+        .at(-1)!;
+      const message =
+        first === date && last === date
+          ? t('dispatchBoard.timeOff.cleared', { name: tech.name })
+          : t('dispatchBoard.timeOff.clearedRange', {
+              name: tech.name,
+              range: `${formatMoveDay(first)} – ${formatMoveDay(last)}`,
+            });
+      showUndo(message, t('common.undo'), () => {
+        Promise.all(
+          spans.map((span) =>
+            availabilityApi.create({
+              userId: span.userId,
+              startsAt: span.startsAt,
+              endsAt: span.endsAt,
+              allDay: span.allDay,
+              status: span.status,
+              label: span.label,
+              reason: span.reason,
+              notes: span.notes,
+            }),
+          ),
+        )
+          .catch(() => showError(t('dispatchBoard.drag.undoFailed')))
+          .finally(() => invalidateDispatchBoard(queryClient));
+      });
+    },
+    onError: (err) => {
+      invalidateDispatchBoard(queryClient);
+      showError(t('dispatchBoard.timeOff.clearFailed'), extractApiError(err));
+    },
+  });
+
+  const userHref = useCallback(
+    (userId: string) =>
+      withBackContext(`/settings/access/users/${userId}`, 'dispatch', searchParams.toString()),
+    [searchParams],
+  );
 
   const releaseMutation = useMutation({
     mutationFn: () => dispatchBoardApi.release({ date, regionIds }),
@@ -875,6 +1057,21 @@ export default function DispatchBoardPage() {
         workOrderHref={workOrderHref}
         onContextDispatch={(dispatch, at) => setMenu({ dispatch, ...at })}
         onMarkTimeOff={setTimeOffTech}
+        onClearTimeOff={(tech) => clearTimeOff.mutate(tech)}
+        userHref={userHref}
+        offTechDispatchIds={offTechDispatchIds}
+        // A part-day absence rejects a drop whose SNAPPED window overlaps it —
+        // the window is what would be promised — and says which two times
+        // collided, since the pointer itself may have been well clear of it.
+        onDropOnTimeOff={(techId, window, off) =>
+          showError(
+            t('dispatchBoard.drag.offOverlap', {
+              tech: allTechs.find((tech) => tech.id === techId)?.name ?? '',
+              off: formatWindow(off.start, off.end),
+              window: formatWindow(window.startHour, window.endHour),
+            }),
+          )
+        }
         axis={axis}
         nowHour={nowHour}
           capacityStops={board?.defaultStopsPerDay ?? null}
@@ -893,6 +1090,11 @@ export default function DispatchBoardPage() {
     { id: 'urgent', label: t('dispatchBoard.chips.urgent'), tone: 'danger' },
     { id: 'unreleased', label: t('dispatchBoard.chips.unreleased'), tone: 'neutral' },
     { id: 'noshow', label: t('dispatchBoard.chips.noshow'), tone: 'warning' },
+    {
+      id: 'offtech',
+      label: t('dispatchBoard.chips.offtech', { tech: getName('technician') }),
+      tone: 'warning',
+    },
     { id: 'cancelled', label: t('dispatchBoard.chips.cancelled'), tone: 'neutral' },
     { id: 'longdrive', label: t('dispatchBoard.chips.longdrive'), tone: 'warning' },
     { id: 'recurring', label: t('dispatchBoard.chips.recurring'), tone: 'violet' },
@@ -1279,10 +1481,10 @@ export default function DispatchBoardPage() {
       <TimeOffDialog
         tech={timeOffTech}
         date={date}
-        bookedVisits={
-          timeOffTech
-            ? (byTech[timeOffTech.id] ?? []).filter((d) => d.status !== 'CANCELLED').length
-            : 0
+        // Everything on them today, not just what the current chips happen
+        // to show — the dialog works out what the absence would strand.
+        visits={
+          timeOffTech ? allDispatches.filter((d) => d.assignedUserId === timeOffTech.id) : []
         }
         timeZone={timeZone}
         onClose={() => setTimeOffTech(null)}
@@ -1299,7 +1501,63 @@ export default function DispatchBoardPage() {
         onRelease={(d) => release.mutate(d)}
         onReassign={setEditDispatch}
         onUnschedule={(d) => unschedule.mutate(d)}
+        date={date}
+        today={todayInZone ?? date}
+        timeZone={timeZone}
+        onMove={(d, toDate) => void requestMove(d, toDate)}
       />
+
+      {/* A move of a visit the customer was already told about. A dialog, not
+          a toast: the date is a stated commitment, and Undo cannot un-ring a
+          phone. Named in the customer's terms — what they were told. */}
+      {pendingMove && (
+        <ConfirmDialog
+          isOpen
+          onClose={() => setPendingMove(null)}
+          onConfirm={confirmMove}
+          title={t('dispatchBoard.move.confirmTitle')}
+          message={t(
+            pendingMove.told === 'current'
+              ? 'dispatchBoard.move.confirmBody'
+              : 'dispatchBoard.move.confirmBodyEarlier',
+            {
+            customer:
+              pendingMove.dispatch.customerName ||
+              siteLabel(pendingMove.dispatch) ||
+              getName('customer'),
+            from: formatMoveDay(date),
+            window: formatWindow(pendingMove.window.startHour, pendingMove.window.endHour),
+            to: formatMoveDay(pendingMove.toDate),
+            },
+          )}
+          cancelLabel={t('dispatchBoard.move.keep', { day: formatMoveDay(date) })}
+          confirmLabel={t('dispatchBoard.move.confirmAction', {
+            day: formatMoveDay(pendingMove.toDate),
+          })}
+        >
+          <CheckboxField>
+            <Checkbox
+              checked={pendingMove.notify}
+              onChange={(notify) => setPendingMove({ ...pendingMove, notify })}
+            />
+            <Label>
+              {t('dispatchBoard.move.notifyCustomer', {
+                customer:
+                  pendingMove.dispatch.customerName || getName('customer').toLowerCase(),
+              })}
+            </Label>
+          </CheckboxField>
+          {/* Declining is allowed — sometimes the office calls instead — but
+              it is said out loud before they commit, not discovered later. */}
+          {!pendingMove.notify && (
+            <p className="mt-3 text-[12px] leading-relaxed text-fg">
+              {pendingMove.told === 'current'
+                ? t('dispatchBoard.move.staleWarning', { day: formatMoveDay(date) })
+                : t('dispatchBoard.move.staleWarningEarlier')}
+            </p>
+          )}
+        </ConfirmDialog>
+      )}
 
       {/* The board owns no detail surface — it opens the existing drawer,
           now with its write paths live. Undo on the toast only lasts a few
@@ -1324,6 +1582,13 @@ export default function DispatchBoardPage() {
         }}
         onViewWorkItems={() => {
           if (openDispatch) goToWorkOrder(openDispatch.workOrderId);
+        }}
+        // The same move the block menu offers, from the drawer's footer —
+        // no separate reschedule surface.
+        moveFrom={date}
+        moveToday={todayInZone ?? date}
+        onMoveTo={(toDate) => {
+          if (openDispatch) void requestMove(openDispatch, toDate);
         }}
         // The drawer is a visit; the board reached it from somewhere other
         // than the job, so it carries the way back to the job.

@@ -42,6 +42,8 @@ const PROVISIONAL_BASE = {
   // like the real one will be.
   releasedAt: null,
   version: 0,
+  // A create has never had its window changed.
+  windowChangedAt: null,
   assignedUserName: null,
   workOrderTypeId: null,
   // Site fields are copied from the rail card at construction, not nulled
@@ -266,6 +268,114 @@ export function useBoardMutations(date: string, timeZone: string) {
   });
 
   /**
+   * Move a visit to another DAY — same tech, same window, new date (§3.6).
+   *
+   * What it costs is decided by who has already been told, and the caller
+   * resolves that before calling (the customer half needs a read the board
+   * doesn't carry):
+   *
+   *   quiet         unreleased — nobody knows. Commit + Undo, like any drag.
+   *   techTold      released, customer not told. Same, but the toast names
+   *                 the tech: their day changed under them.
+   *   notify        the customer was told and the dispatcher chose to tell
+   *                 them again. NO Undo — an Undo that can't un-send a text
+   *                 is a lie.
+   *   customerStale the customer was told and the dispatcher declined to
+   *                 notify. Undoable, and the toast says the customer still
+   *                 expects the old date.
+   *
+   * The visit leaves this day's board on the click: a moved dispatch belongs
+   * to exactly one day.
+   */
+  const moveDay = useMutation({
+    mutationFn: async (input: {
+      dispatch: BoardDispatch;
+      toDate: string;
+      toDateLabel: string;
+      window: Window;
+      windowLabel: string;
+      techName: string;
+      mode: 'quiet' | 'techTold' | 'notify' | 'customerStale';
+    }) => {
+      const updated = await dispatchesApi.update(input.dispatch.id, {
+        arrivalWindowStart: toIsoAt(input.toDate, input.window.startHour, timeZone),
+        arrivalWindowEnd: toIsoAt(input.toDate, input.window.endHour, timeZone),
+        version: input.dispatch.version,
+      });
+      // The date is moved either way; a failed text is reported on its own
+      // rather than rolling back a move the dispatcher did want.
+      let notifyFailed = false;
+      if (input.mode === 'notify') {
+        await dispatchesApi.notify(input.dispatch.id, 'CUSTOMER').catch(() => {
+          notifyFailed = true;
+        });
+      }
+      return { updated, notifyFailed };
+    },
+    onMutate: async (input) => {
+      await queryClient.cancelQueries({ queryKey: ['dispatch-board'] });
+      const snapshot = queryClient.getQueriesData({ queryKey: ['dispatch-board'] });
+      patchBoardCaches(queryClient, {
+        grid: (board) => ({
+          ...board,
+          dispatches: board.dispatches.filter((d) => d.id !== input.dispatch.id),
+        }),
+      });
+      return { snapshot };
+    },
+    onSuccess: ({ updated, notifyFailed }, input) => {
+      const before = input.dispatch;
+      // The PUT moved windowChangedAt, so every earlier customer notice now
+      // reads as "not about this date" — the drawer has to re-read the log
+      // rather than keep a cached "notified".
+      queryClient.invalidateQueries({
+        queryKey: ['notification-logs', { entityType: 'DISPATCH', entityId: before.id }],
+      });
+      const workOrder = before.workOrderNumber ?? before.workOrderSummary ?? '';
+      const where = { workOrder, day: input.toDateLabel, window: input.windowLabel };
+
+      if (input.mode === 'notify') {
+        if (notifyFailed) {
+          showError(t('dispatchBoard.move.notifyFailed', where));
+          return;
+        }
+        showSuccess(
+          t('dispatchBoard.move.notified', {
+            ...where,
+            customer: before.customerName ?? getName('customer').toLowerCase(),
+          }),
+        );
+        return;
+      }
+
+      const message =
+        input.mode === 'techTold'
+          ? t('dispatchBoard.move.movedTechTold', { ...where, tech: input.techName })
+          : input.mode === 'customerStale'
+            ? t('dispatchBoard.move.movedCustomerStale', where)
+            : t('dispatchBoard.move.moved', where);
+
+      showUndo(message, t('common.undo'), () => {
+        dispatchesApi
+          .update(before.id, {
+            arrivalWindowStart: before.arrivalWindowStart,
+            arrivalWindowEnd: before.arrivalWindowEnd,
+            // The move bumped it; replaying the old one would conflict with
+            // our own write.
+            version: updated.version,
+          })
+          .then(refresh)
+          .catch(undoFailed);
+      });
+    },
+    onError: (err, _input, context) => {
+      restore(context?.snapshot);
+      reportFailure(t('dispatchBoard.move.failed'))(err);
+    },
+    onSettled: refresh,
+  });
+
+  /**
    * Take work back off the board. Always allowed — a dispatcher pulling a job
    * back is a decision, not a mistake to be guarded against, and the same
    * "warn and allow" rule that lets them double-book applies here.
@@ -374,9 +484,14 @@ export function useBoardMutations(date: string, timeZone: string) {
   return {
     assign,
     move,
+    moveDay,
     unschedule,
     release,
     pending:
-      assign.isPending || move.isPending || unschedule.isPending || release.isPending,
+      assign.isPending ||
+      move.isPending ||
+      moveDay.isPending ||
+      unschedule.isPending ||
+      release.isPending,
   };
 }

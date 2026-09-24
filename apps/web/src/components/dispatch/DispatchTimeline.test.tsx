@@ -55,6 +55,7 @@ function dispatch(over: Partial<BoardDispatch> = {}): BoardDispatch {
     releasedAt: '2026-03-15T07:00:00Z',
     divisionId: null,
     version: 1,
+    windowChangedAt: null,
     ...over,
   };
 }

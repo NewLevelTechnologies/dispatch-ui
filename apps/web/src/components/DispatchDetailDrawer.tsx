@@ -34,6 +34,19 @@ import { useGlossary } from '../contexts/GlossaryContext';
 import { Avatar } from './ui/Avatar';
 import { Pill, Tag } from './ui/Pill';
 import { Button } from './catalyst/button';
+import {
+  Dropdown,
+  DropdownButton,
+  DropdownDescription,
+  DropdownHeading,
+  DropdownItem,
+  DropdownLabel,
+  DropdownMenu,
+  DropdownSection,
+} from './catalyst/dropdown';
+import { Input } from './catalyst/input';
+import { canMoveTo, defaultPick, formatMoveDay, moveTargets } from '../lib/boardMove';
+import { customerNotifiedAt as noticeForWindow } from '../lib/customerNotified';
 import { SlideOver } from './catalyst/slideover';
 import WorkOrderFileUploadDialog from './WorkOrderFileUploadDialog';
 import { FileLightbox } from './WorkOrderFilesTab';
@@ -71,12 +84,13 @@ const TIME_ONLY = new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2
 const stamp = (iso: string): string => `${MONTH_DAY.format(new Date(iso))} · ${TIME_ONLY.format(new Date(iso))}`;
 const titleCase = (s: string): string => s.charAt(0) + s.slice(1).toLowerCase();
 
-// The Tech/Customer-notified timeline steps derive from the notification log
-// (the earliest actually-sent row for that audience), NOT trip.lifecycle —
-// only the four operational steps come from lifecycle.
-function earliestNotified(logs: NotificationLogDto[], audience: 'TECH' | 'CUSTOMER'): string | null {
+// The Tech-notified timeline step derives from the notification log (the
+// earliest actually-sent row), NOT trip.lifecycle — only the four operational
+// steps come from lifecycle. Customer-notified has its own rule: it has to be
+// about the CURRENT window (lib/customerNotified).
+function earliestTechNotified(logs: NotificationLogDto[]): string | null {
   const times = logs
-    .filter((n) => n.audience === audience && (n.status === 'SENT' || n.status === 'DELIVERED'))
+    .filter((n) => n.audience === 'TECH' && (n.status === 'SENT' || n.status === 'DELIVERED'))
     .map((n) => n.sentAt ?? n.createdAt)
     .filter((s): s is string => Boolean(s))
     .sort();
@@ -134,6 +148,16 @@ interface Props {
      *  round-trip through the work order read. */
     serviceLocationId?: string | null;
   };
+  /**
+   * Move this visit to another day, keeping its window (dispatch board §3.6).
+   * Board-only: the board knows which day the visit is on (`moveFrom`) and
+   * owns the cost rules — undo vs. confirm — so the drawer just offers the
+   * targets. Omitted everywhere else, which hides the control.
+   */
+  moveFrom?: string;
+  /** Today in the tenant's zone — the earliest day the visit may move to. */
+  moveToday?: string;
+  onMoveTo?: (toDate: string) => void;
 }
 
 /**
@@ -157,6 +181,9 @@ export default function DispatchDetailDrawer({
   onDelete,
   onViewWorkItems,
   workOrder,
+  moveFrom,
+  moveToday,
+  onMoveTo,
 }: Props) {
   return (
     <SlideOver open={dispatch !== null} onClose={onClose} className="!max-w-[480px]">
@@ -171,6 +198,9 @@ export default function DispatchDetailDrawer({
           onDelete={onDelete}
           onViewWorkItems={onViewWorkItems}
           workOrder={workOrder}
+          moveFrom={moveFrom}
+          moveToday={moveToday}
+          onMoveTo={onMoveTo}
         />
       )}
     </SlideOver>
@@ -191,6 +221,9 @@ interface ContentProps {
     href: string;
     serviceLocationId?: string | null;
   };
+  moveFrom?: string;
+  moveToday?: string;
+  onMoveTo?: (toDate: string) => void;
 }
 
 function DispatchDetailContent({
@@ -203,6 +236,9 @@ function DispatchDetailContent({
   onDelete,
   onViewWorkItems,
   workOrder,
+  moveFrom,
+  moveToday,
+  onMoveTo,
 }: ContentProps) {
   const { t } = useTranslation();
   const { getName, getAbbrev } = useGlossary();
@@ -253,8 +289,13 @@ function DispatchDetailContent({
       }),
   });
   const notifications = useMemo<NotificationLogDto[]>(() => notifPage?.content ?? [], [notifPage]);
-  const techNotifiedAt = useMemo(() => earliestNotified(notifications, 'TECH'), [notifications]);
-  const customerNotifiedAt = useMemo(() => earliestNotified(notifications, 'CUSTOMER'), [notifications]);
+  const techNotifiedAt = useMemo(() => earliestTechNotified(notifications), [notifications]);
+  // From `full`, the by-id read, not the seed: a board row cached before a
+  // move would carry the old windowChangedAt and count the stale notice.
+  const customerNotifiedAt = useMemo(
+    () => noticeForWindow(notifications, full.windowChangedAt),
+    [notifications, full.windowChangedAt],
+  );
 
   // Captured this visit — media keyed by dispatchId (same source + key as the tab).
   const { data: filesPage } = useQuery({
@@ -692,6 +733,11 @@ function DispatchDetailContent({
               <Button plain size="xs" onClick={() => onEdit(editable)}>
                 {`${t('common.edit')} ${getName('dispatch').toLowerCase()}`}
               </Button>
+              {/* Only SCHEDULED work moves — anything started is happening
+                  now, and anything finished is history. */}
+              {onMoveTo && moveFrom && full.status === 'SCHEDULED' && (
+                <MoveToControl from={moveFrom} today={moveToday ?? moveFrom} onMove={onMoveTo} />
+              )}
               <span className="grow" />
               {canComplete && (
                 <Button
@@ -708,6 +754,83 @@ function DispatchDetailContent({
         )}
       </div>
     </>
+  );
+}
+
+/**
+ * The drawer's copy of the block menu's Move to section. A menu of its own
+ * rather than the board's: the drawer is a modal surface, so the board's
+ * floating menu would sit behind it. Same targets, same order, from the same
+ * helper — only the container differs.
+ */
+function MoveToControl({
+  from,
+  today,
+  onMove,
+}: {
+  from: string;
+  today: string;
+  onMove: (toDate: string) => void;
+}) {
+  const { t } = useTranslation();
+  const [picking, setPicking] = useState(false);
+  const [picked, setPicked] = useState(() => defaultPick(from, today));
+  const targets = moveTargets(from, today);
+  const pickable = canMoveTo(from, picked, today);
+
+  if (picking) {
+    return (
+      <form
+        className="flex items-center gap-1.5"
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (pickable) onMove(picked);
+        }}
+      >
+        <Input
+          type="date"
+          autoFocus
+          min={today}
+          value={picked}
+          aria-label={t('dispatchBoard.move.pickDate')}
+          onChange={(e) => setPicked(e.target.value)}
+        />
+        <Button type="submit" size="xs" color="accent" disabled={!pickable}>
+          {t('dispatchBoard.move.go')}
+        </Button>
+        <Button plain size="xs" onClick={() => setPicking(false)}>
+          {t('common.cancel')}
+        </Button>
+      </form>
+    );
+  }
+
+  return (
+    <Dropdown>
+      <DropdownButton plain size="xs">
+        {t('dispatchBoard.move.drawerAction')}
+      </DropdownButton>
+      <DropdownMenu anchor="top start">
+        <DropdownSection>
+          <DropdownHeading>{t('dispatchBoard.move.drawerHeading')}</DropdownHeading>
+          {targets.nextBusiness && (
+            <DropdownItem onClick={() => onMove(targets.nextBusiness!)}>
+              <DropdownLabel>{t('dispatchBoard.move.nextBusinessDay')}</DropdownLabel>
+              <DropdownDescription>{formatMoveDay(targets.nextBusiness)}</DropdownDescription>
+            </DropdownItem>
+          )}
+          {targets.tomorrow && (
+            <DropdownItem onClick={() => onMove(targets.tomorrow!)}>
+              <DropdownLabel>{t('dispatchBoard.move.tomorrow')}</DropdownLabel>
+              <DropdownDescription>{formatMoveDay(targets.tomorrow)}</DropdownDescription>
+            </DropdownItem>
+          )}
+          <DropdownItem onClick={() => setPicking(true)}>
+            <DropdownLabel>{t('dispatchBoard.move.pickDate')}</DropdownLabel>
+          </DropdownItem>
+        </DropdownSection>
+      </DropdownMenu>
+    </Dropdown>
   );
 }
 

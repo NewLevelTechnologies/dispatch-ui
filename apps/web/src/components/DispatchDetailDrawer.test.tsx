@@ -149,6 +149,8 @@ const renderDrawer = (dispatch: Dispatch | null, props: Partial<React.ComponentP
       onDelete={props.onDelete ?? vi.fn()}
       onViewWorkItems={props.onViewWorkItems}
       workOrder={props.workOrder}
+      moveFrom={props.moveFrom}
+      onMoveTo={props.onMoveTo}
     />,
   );
 };
@@ -543,4 +545,62 @@ describe('DispatchDetailDrawer work order link', () => {
     });
     expect(await screen.findByRole('link', { name: /Open Work Order/ })).toBeInTheDocument();
   });
+
+  // Board-only: the WO page's Dispatches tab passes no move handler.
+  it('offers Move to only where a caller handles it', async () => {
+    renderDrawer(mockDispatch());
+    await screen.findByText('Jason Smith');
+    expect(screen.queryByRole('button', { name: 'Move to…' })).not.toBeInTheDocument();
+  });
+
+  it('moves from the footer to the next business day', async () => {
+    const user = userEvent.setup();
+    const onMoveTo = vi.fn();
+    // A Friday: next business day is the Monday.
+    renderDrawer(mockDispatch(), { moveFrom: '2026-03-20', onMoveTo });
+
+    await user.click(await screen.findByRole('button', { name: 'Move to…' }));
+    const next = await screen.findByRole('menuitem', { name: /Next business day/ });
+    expect(next).toHaveTextContent('Mon, Mar 23');
+    expect(screen.getByRole('menuitem', { name: /Tomorrow/ })).toHaveTextContent('Sat, Mar 21');
+    await user.click(next);
+    expect(onMoveTo).toHaveBeenCalledWith('2026-03-23');
+  });
+
+  it('only moves SCHEDULED work', async () => {
+    renderDrawer(mockDispatch({ status: 'EN_ROUTE' }), { moveFrom: '2026-03-20', onMoveTo: vi.fn() });
+    await screen.findByText('Jason Smith');
+    expect(screen.queryByRole('button', { name: 'Move to…' })).not.toBeInTheDocument();
+  });
+
+  // A notice about the old date says nothing about the new one: after a move
+  // the customer step goes back to pending and offers the notify again.
+  it('treats a customer notice from before the window changed as not notified', async () => {
+    mockGetNotificationLogs.mockResolvedValue({
+      ...emptyLogsPage,
+      empty: false,
+      numberOfElements: 1,
+      totalElements: 1,
+      content: [
+        {
+          id: 'nc',
+          notificationId: 'x',
+          notificationTypeId: 'x',
+          notificationTypeName: 'T',
+          channel: 'SMS',
+          recipientName: 'R',
+          status: 'DELIVERED',
+          entityType: 'DISPATCH',
+          entityId: 'd1',
+          audience: 'CUSTOMER',
+          createdAt: '2099-05-14T16:00:00Z',
+          sentAt: '2099-05-14T16:02:00Z',
+          retryCount: 0,
+        },
+      ],
+    });
+    renderDrawer(mockDispatch({ windowChangedAt: '2099-05-14T18:00:00Z' }));
+    expect(await screen.findByRole('button', { name: /notify customer/i })).toBeInTheDocument();
+  });
 });
+
