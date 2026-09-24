@@ -6,74 +6,57 @@
 // the availability entity, not its owner: no shift templates, no approval
 // workflow, no accrual. A span exists or it does not.
 //
-// One surface for both directions, because the entity allows several spans on
-// one day (a dentist appointment at 9 plus leaving at 3 is two rows, and
-// collapsing them would print an arbitrary label over an arbitrary span). So
-// the dialog lists what is already there, each removable, above the form that
-// adds another.
+// Two shapes, both ONE row (§0b): all day across a range — "out all next
+// week" is a span, never five rows — or part of a single day. The lane draws
+// a part-day span as its own hatched slice and refuses drops only there, so
+// the rest of that tech's day stays bookable.
+//
+// Clearing lives on the row menu, not in here: this dialog does one thing.
 // ─────────────────────────────────────────────────────────────────────
 import { useEffect, useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from '@dispatch/i18n';
 import { availabilityApi, type BoardTech } from '../../api/setup';
 import { useGlossary } from '../../contexts/GlossaryContext';
 import { Dialog, DialogActions, DialogBody, DialogTitle } from '../catalyst/dialog';
 import { Button } from '../catalyst/button';
-import { Field, FieldGroup, Label } from '../catalyst/fieldset';
+import { Description, Field, FieldGroup, Label } from '../catalyst/fieldset';
 import { Input } from '../catalyst/input';
-import { Switch } from '../catalyst/switch';
-import { toIsoAt } from '../../lib/arrivalWindows';
-import { formatHour, zonedHour } from '../../lib/boardTime';
-import { extractApiError, showError, showSuccess } from '../../lib/toast';
+import { Select } from '../catalyst/select';
+import { Callout } from '../ui/Callout';
+import { ToggleGroup, ToggleGroupOption } from '../ui/ToggleGroup';
+import { formatMoveDay } from '../../lib/boardMove';
+import { formatHour, formatWindow } from '../../lib/boardTime';
+import {
+  allDaySpan,
+  hitsTimeOff,
+  partialSpan,
+  TIME_OFF_HOURS,
+  TIME_OFF_REASONS,
+  type TimeOffReason,
+} from '../../lib/timeOff';
+import { extractApiError, showError, showUndo } from '../../lib/toast';
 import { invalidateDispatchBoard } from '../../utils/invalidateRoleConsumers';
-
-/** Midnight to midnight, so an all-day absence covers the whole day and a
- *  multi-day one is a single row rather than one per day. */
-function allDaySpan(
-  from: string,
-  through: string,
-  timeZone: string,
-): { startsAt: string; endsAt: string } {
-  // Half-open: through the 22nd means up to midnight starting the 23rd. Date
-  // arithmetic on the calendar parts, so a DST day is still one day.
-  const [y, m, d] = through.split('-').map(Number);
-  const end = new Date(Date.UTC(y, m - 1, d + 1));
-  return {
-    startsAt: toIsoAt(from, 0, timeZone),
-    endsAt: toIsoAt(end.toISOString().slice(0, 10), 0, timeZone),
-  };
-}
-
-/** "8a–12p" in the TENANT's zone. */
-function spanHours(span: { startsAt: string; endsAt: string }, timeZone: string): string {
-  const start = zonedHour(span.startsAt, timeZone);
-  const end = zonedHour(span.endsAt, timeZone);
-  if (start == null || end == null) return '';
-  return `${formatHour(start)}–${formatHour(end)}`;
-}
-
-function hourOf(time: string): number {
-  const [h, m] = time.split(':').map(Number);
-  return (h || 0) + (m || 0) / 60;
-}
 
 export default function TimeOffDialog({
   tech,
   date,
-  bookedVisits,
+  visits,
   timeZone,
   onClose,
 }: {
   /** Null closes it — parent owns open state, like the other board surfaces. */
   tech: BoardTech | null;
-  /** The day being viewed, which is what a call-out almost always means. */
+  /** The day being viewed, which is what a call-out almost always means. It
+   *  is the start of the span; only the end is chosen. */
   date: string;
-  /** Visits already booked on this technician for `date`. Marking someone off
-   *  never moves their work: a system that silently relocates a commitment is
-   *  worse than one that tells you to deal with it. */
-  bookedVisits: number;
-  /** The tenant's zone, from the board read. Slicing the hours out of the ISO
-   *  string instead would print an 8am absence as whatever UTC makes of it. */
+  /** Visits still live on this technician today. Marking someone off never
+   *  moves their work — the dialog says so BEFORE saving, because a system
+   *  that silently relocates a commitment is worse than one that tells you.
+   *  The visits, not a count: a part-day absence strands only what it
+   *  overlaps. */
+  visits: { status: string; arrivalWindowStart: string; arrivalWindowEnd: string }[];
+  /** The tenant's zone, from the board read. */
   timeZone: string;
   onClose: () => void;
 }) {
@@ -81,178 +64,200 @@ export default function TimeOffDialog({
   const { getName } = useGlossary();
   const queryClient = useQueryClient();
 
-  const [label, setLabel] = useState('');
-  const [allDay, setAllDay] = useState(true);
-  const [from, setFrom] = useState(date);
+  const [reason, setReason] = useState<TimeOffReason>('TIME_OFF');
   const [through, setThrough] = useState(date);
-  const [startTime, setStartTime] = useState('08:00');
-  const [endTime, setEndTime] = useState('12:00');
+  const [partDay, setPartDay] = useState(false);
+  const [startHour, setStartHour] = useState(8);
+  const [endHour, setEndHour] = useState(12);
 
   /* eslint-disable react-hooks/set-state-in-effect -- re-seed transient form
      state on open, the same pattern as the other dialogs. */
   useEffect(() => {
     if (!tech) return;
-    setLabel('');
-    setAllDay(true);
-    setFrom(date);
+    setReason('TIME_OFF');
     setThrough(date);
-    setStartTime('08:00');
-    setEndTime('12:00');
+    setPartDay(false);
+    setStartHour(8);
+    setEndHour(12);
   }, [tech, date]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
-  // The authoritative spans, with their ids — the board's own `timeOff` is a
-  // display projection and carries none, so removal reads them here rather
-  // than matching on timestamps.
-  const { data: existing } = useQuery({
-    queryKey: ['availability', tech?.id, date],
-    queryFn: () =>
-      availabilityApi.list({
-        userId: tech!.id,
-        from: toIsoAt(date, 0, timeZone),
-        to: toIsoAt(date, 24, timeZone),
-        size: 20,
-      }),
-    enabled: tech != null,
-  });
+  const reasonLabel = (code: TimeOffReason) => t(`dispatchBoard.timeOff.reasons.${code}`);
 
-  const spans = (existing?.content ?? []).filter((span) => span.status === 'OFF');
-
-  const done = () => {
+  const refresh = () => {
     invalidateDispatchBoard(queryClient);
     queryClient.invalidateQueries({ queryKey: ['availability'] });
   };
 
+  // Part of day is one day at a time, so a range forces all day.
+  const multiDay = through > date;
+  const part = partDay && !multiDay;
+  const span = part
+    ? { ...partialSpan(date, startHour, endHour, timeZone), allDay: false }
+    : { ...allDaySpan(date, through, timeZone), allDay: true };
+  // Same predicate as the chip and the outline, so the dialog's number is
+  // the number that will be under the chip once this saves.
+  const liveVisits = visits.filter((visit) => hitsTimeOff(visit, [span])).length;
+
   const create = useMutation({
-    mutationFn: () => {
-      const span = allDay
-        ? allDaySpan(from, through, timeZone)
-        : {
-            startsAt: toIsoAt(from, hourOf(startTime), timeZone),
-            endsAt: toIsoAt(from, hourOf(endTime), timeZone),
-          };
-      return availabilityApi.create({
+    mutationFn: () =>
+      availabilityApi.create({
         userId: tech!.id,
         ...span,
-        allDay,
         status: 'OFF',
-        label: label.trim(),
-      });
-    },
-    onSuccess: () => {
-      done();
+        label: reasonLabel(reason),
+        reason,
+      }),
+    onSuccess: (created) => {
+      refresh();
+      const name = tech?.name ?? '';
       // Name what is left behind rather than just confirming the write: the
-      // dispatcher now has work to reassign and nothing else will say so.
-      showSuccess(
-        bookedVisits > 0
+      // dispatcher now has work to reassign, and the chip is where it waits.
+      showUndo(
+        liveVisits > 0
           ? t('dispatchBoard.timeOff.savedWithWork', {
-              name: tech?.name ?? '',
-              count: bookedVisits,
-              entity: getName('dispatch', true).toLowerCase(),
+              name,
+              count: liveVisits,
+              entity: getName('dispatch', liveVisits !== 1).toLowerCase(),
+              chip: t('dispatchBoard.chips.offtech', { tech: getName('technician') }),
             })
-          : t('dispatchBoard.timeOff.saved', { name: tech?.name ?? '' }),
+          : t('dispatchBoard.timeOff.saved', { name }),
+        t('common.undo'),
+        () => {
+          availabilityApi
+            .delete(created.id)
+            .then(refresh)
+            .catch(() => {
+              refresh();
+              showError(t('dispatchBoard.drag.undoFailed'));
+            });
+        },
       );
       onClose();
     },
     onError: (err) => showError(t('dispatchBoard.timeOff.failed'), extractApiError(err)),
   });
 
-  const remove = useMutation({
-    mutationFn: (id: string) => availabilityApi.delete(id),
-    onSuccess: () => {
-      done();
-      showSuccess(t('dispatchBoard.timeOff.cleared', { name: tech?.name ?? '' }));
-    },
-    onError: (err) => showError(t('dispatchBoard.timeOff.clearFailed'), extractApiError(err)),
-  });
-
   if (!tech) return null;
 
-  const valid = label.trim().length > 0 && (allDay ? through >= from : endTime > startTime);
+  const firstName = tech.name.split(' ')[0] || tech.name;
 
   return (
-    <Dialog open onClose={onClose} size="lg">
+    <Dialog open onClose={onClose} size="md">
       <DialogTitle>{t('dispatchBoard.timeOff.title', { name: tech.name })}</DialogTitle>
       <DialogBody>
-        {spans.length > 0 && (
-          <div className="mb-4 flex flex-col gap-1.5">
-            {spans.map((span) => (
-              <div
-                key={span.id}
-                className="flex items-center gap-2 rounded-md border border-border-soft bg-bg-elev-2 px-2.5 py-1.5"
-              >
-                <span className="text-[12.5px] font-medium text-fg-strong">{span.label}</span>
-                <span className="text-[11.5px] text-fg-muted">
-                  {span.allDay ? t('dispatchBoard.timeOff.allDay') : spanHours(span, timeZone)}
-                </span>
-                <span className="grow" />
-                <Button
-                  plain
-                  size="xs"
-                  disabled={remove.isPending}
-                  onClick={() => remove.mutate(span.id)}
-                >
-                  {t('dispatchBoard.timeOff.clear')}
-                </Button>
-              </div>
-            ))}
-          </div>
-        )}
-
         <FieldGroup>
           <Field>
-            {/* Required by the server on purpose, so a hatched row always says
-                something rather than being a silent gap in the day. */}
-            <Label>{t('dispatchBoard.timeOff.label')}</Label>
-            <Input
-              autoFocus
-              value={label}
-              onChange={(e) => setLabel(e.target.value)}
-              placeholder={t('dispatchBoard.timeOff.labelPlaceholder')}
-            />
+            <Label>{t('dispatchBoard.timeOff.reason')}</Label>
+            <ToggleGroup
+              value={reason}
+              onChange={setReason}
+              size="sm"
+              className="mt-2"
+              aria-label={t('dispatchBoard.timeOff.reason')}
+            >
+              {TIME_OFF_REASONS.map((code) => (
+                <ToggleGroupOption key={code} value={code}>
+                  {reasonLabel(code)}
+                </ToggleGroupOption>
+              ))}
+            </ToggleGroup>
           </Field>
 
           <Field>
-            <Label>{t('dispatchBoard.timeOff.allDay')}</Label>
-            <Switch checked={allDay} onChange={setAllDay} />
+            <Label>{t('dispatchBoard.timeOff.howLong')}</Label>
+            <ToggleGroup
+              value={part ? 'part' : 'allDay'}
+              onChange={(value) => setPartDay(value === 'part')}
+              size="sm"
+              className="mt-2"
+              aria-label={t('dispatchBoard.timeOff.howLong')}
+            >
+              <ToggleGroupOption value="allDay">{t('dispatchBoard.timeOff.allDay')}</ToggleGroupOption>
+              <ToggleGroupOption value="part" disabled={multiDay}>
+                {t('dispatchBoard.timeOff.partOfDay')}
+              </ToggleGroupOption>
+            </ToggleGroup>
+            {multiDay && <Description>{t('dispatchBoard.timeOff.partOneDay')}</Description>}
           </Field>
 
-          {/* All-day spans run across days — "out all next week" is ONE row,
-              which is the whole point of the span shape. A partial day across
-              several days is incoherent, so the through-date only appears
-              here. */}
-          <div className="grid grid-cols-2 gap-3">
+          {part ? (
             <Field>
-              <Label>{t('dispatchBoard.timeOff.date')}</Label>
-              <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
+              <Label>{t('dispatchBoard.timeOff.between')}</Label>
+              <div className="mt-2 flex items-center gap-2">
+                <div className="w-28">
+                  <Select
+                    aria-label={t('dispatchBoard.timeOff.from')}
+                    value={String(startHour)}
+                    onChange={(e) => {
+                      const next = Number(e.target.value);
+                      setStartHour(next);
+                      // Keep the span non-empty rather than raising an error
+                      // the dispatcher then has to go and fix.
+                      if (endHour <= next) setEndHour(next + 0.5);
+                    }}
+                  >
+                    {TIME_OFF_HOURS.slice(0, -1).map((hour) => (
+                      <option key={hour} value={hour}>
+                        {formatHour(hour)}
+                      </option>
+                    ))}
+                  </Select>
+                </div>
+                <span className="text-[11.5px] text-fg-muted">{t('dispatchBoard.timeOff.to')}</span>
+                <div className="w-28">
+                  <Select
+                    aria-label={t('dispatchBoard.timeOff.until')}
+                    value={String(endHour)}
+                    onChange={(e) => setEndHour(Number(e.target.value))}
+                  >
+                    {TIME_OFF_HOURS.filter((hour) => hour > startHour).map((hour) => (
+                      <option key={hour} value={hour}>
+                        {formatHour(hour)}
+                      </option>
+                    ))}
+                  </Select>
+                </div>
+                <span className="text-[11.5px] text-fg-muted">
+                  {`${formatMoveDay(date)}, ${formatWindow(startHour, endHour)}`}
+                </span>
+              </div>
             </Field>
-            {allDay ? (
-              <Field>
-                <Label>{t('dispatchBoard.timeOff.through')}</Label>
+          ) : (
+          <Field>
+            <Label>{t('dispatchBoard.timeOff.through')}</Label>
+            <div className="mt-2 flex items-center gap-3">
+              <div className="w-44">
                 <Input
                   type="date"
-                  min={from}
+                  min={date}
                   value={through}
-                  onChange={(e) => setThrough(e.target.value)}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    // Never before the viewed day: the span starts there.
+                    if (value) setThrough(value < date ? date : value);
+                  }}
                 />
-              </Field>
-            ) : (
-              <div className="grid grid-cols-2 gap-3">
-                <Field>
-                  <Label>{t('dispatchBoard.timeOff.start')}</Label>
-                  <Input
-                    type="time"
-                    value={startTime}
-                    onChange={(e) => setStartTime(e.target.value)}
-                  />
-                </Field>
-                <Field>
-                  <Label>{t('dispatchBoard.timeOff.end')}</Label>
-                  <Input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} />
-                </Field>
               </div>
-            )}
-          </div>
+              <span className="text-[11.5px] text-fg-muted">
+                {multiDay
+                  ? `${formatMoveDay(date)} – ${formatMoveDay(through)}`
+                  : t('dispatchBoard.timeOff.allDayOn', { day: formatMoveDay(date) })}
+              </span>
+            </div>
+          </Field>
+          )}
+
+          {liveVisits > 0 && (
+            <Callout kind="warning">
+              {t('dispatchBoard.timeOff.liveWork', {
+                count: liveVisits,
+                entity: getName('dispatch', liveVisits !== 1).toLowerCase(),
+                name: firstName,
+                chip: t('dispatchBoard.chips.offtech', { tech: getName('technician') }),
+              })}
+            </Callout>
+          )}
         </FieldGroup>
       </DialogBody>
 
@@ -260,12 +265,8 @@ export default function TimeOffDialog({
         <Button plain onClick={onClose}>
           {t('common.cancel')}
         </Button>
-        <Button
-          color="accent"
-          disabled={!valid || create.isPending}
-          onClick={() => create.mutate()}
-        >
-          {t('dispatchBoard.timeOff.action')}
+        <Button color="accent" disabled={create.isPending} onClick={() => create.mutate()}>
+          {t('dispatchBoard.timeOff.save')}
         </Button>
       </DialogActions>
     </Dialog>

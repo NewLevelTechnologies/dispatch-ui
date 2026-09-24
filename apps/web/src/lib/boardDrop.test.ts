@@ -74,7 +74,7 @@ describe('resolveDrop', () => {
   // client's, so it has to hold where the gesture happens.
   it('rejects a drop that overlaps time off', () => {
     const r = resolveDrop(9.6, [{ start: 8, end: 12 }], axis);
-    expect(r).toEqual({ ok: false, reason: 'time-off' });
+    expect(r).toMatchObject({ ok: false, reason: 'time-off' });
   });
 
   // Partial absence is the whole reason time off carries a span: a tech out
@@ -132,3 +132,26 @@ describe('preset list', () => {
     }
   });
 });
+
+describe('resolveDrop against a part-day absence', () => {
+  const axis = { start: 6, end: 20 };
+
+  // The window is what would be promised, so that is what must be free —
+  // a pointer at 12:40 snaps to 12–2p, which hits a 1–3p absence.
+  it('rejects on the SNAPPED window and reports both times', () => {
+    expect(resolveDrop(12.6, [{ start: 13, end: 15 }], axis)).toEqual({
+      ok: false,
+      reason: 'time-off',
+      window: { startHour: 12, endHour: 14 },
+      off: { start: 13, end: 15 },
+    });
+  });
+
+  it('checks a moved block at its own length', () => {
+    // A 3-hour visit snapped to 10 runs to 1p and grazes a 12:30 absence;
+    // the 2-hour preset alone would not.
+    expect(resolveDrop(10, [{ start: 12.5, end: 14 }], axis).ok).toBe(true);
+    expect(resolveDrop(10, [{ start: 12.5, end: 14 }], axis, undefined, 3).ok).toBe(false);
+  });
+});
+

@@ -36,6 +36,8 @@ export function TechCell({
   outAllDay,
   offLabel,
   onMarkTimeOff,
+  onClearTimeOff,
+  profileHref,
 }: {
   tech: { name: string; regionIds: string[] };
   /** The regions this tech covers, by NAME, already joined — or null when the
@@ -52,6 +54,9 @@ export function TechCell({
   /** Row verbs. Omitted where they have no meaning — the week grid spans seven
    *  days, so "off" there would have no date to attach to. */
   onMarkTimeOff?: () => void;
+  /** Offered whenever the row has an absence on this day. */
+  onClearTimeOff?: () => void;
+  profileHref?: string;
   /** Hides the load entirely: a tech who is out has no load to report, and a
    *  0/6 bar would read as "available and empty". */
   outAllDay: boolean;
@@ -87,7 +92,7 @@ export function TechCell({
             shows through here too: a tech NOT covering the scope you narrowed
             to is visible at a glance. */}
         {density !== 'dense' && (offLabel || regionLabel) && (
-          <span className="db-tech-meta">{[offLabel, regionLabel].filter(Boolean).join(' · ')}</span>
+          <span className="db-tech-meta">{offLabel ?? regionLabel}</span>
         )}
       </div>
       {!outAllDay && (
@@ -120,19 +125,34 @@ export function TechCell({
           technician cell is 176px at dense, and a permanent column would cost
           that width on every row at every density. Revealed on hover AND on
           focus, so the keyboard reaches it. */}
-      {onMarkTimeOff && (
+      {(onMarkTimeOff || onClearTimeOff || profileHref) && (
         <Dropdown>
           <DropdownButton
             as={IconButton}
             className="db-rowmenu"
-            aria-label={t('common.moreOptions')}
+            aria-label={t('dispatchBoard.timeOff.rowMenu', { name: tech.name })}
           >
             <EllipsisHorizontalIcon className="size-4" />
           </DropdownButton>
           <DropdownMenu anchor="bottom end">
-            <DropdownItem onClick={onMarkTimeOff}>
-              <DropdownLabel>{t('dispatchBoard.timeOff.action')}</DropdownLabel>
-            </DropdownItem>
+            {/* Out 9–11 and leaving at 3 is two spans, so a partly-off row
+                can still take another. Only an all-day absence leaves nothing
+                to mark. */}
+            {onMarkTimeOff && !outAllDay && (
+              <DropdownItem onClick={onMarkTimeOff}>
+                <DropdownLabel>{t('dispatchBoard.timeOff.action')}</DropdownLabel>
+              </DropdownItem>
+            )}
+            {onClearTimeOff && (
+              <DropdownItem onClick={onClearTimeOff}>
+                <DropdownLabel>{t('dispatchBoard.timeOff.clearAction')}</DropdownLabel>
+              </DropdownItem>
+            )}
+            {profileHref && (
+              <DropdownItem href={profileHref}>
+                <DropdownLabel>{t('dispatchBoard.timeOff.openProfile')}</DropdownLabel>
+              </DropdownItem>
+            )}
           </DropdownMenu>
         </Dropdown>
       )}

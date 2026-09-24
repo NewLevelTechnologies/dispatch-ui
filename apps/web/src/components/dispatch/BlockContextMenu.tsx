@@ -14,6 +14,16 @@ import { useTranslation } from '@dispatch/i18n';
 import type { BoardDispatch } from '../../api/setup';
 import { useGlossary } from '../../contexts/GlossaryContext';
 import { siteLabel } from '../../lib/siteLabel';
+import { formatWindow } from '../../lib/boardTime';
+import {
+  canMoveTo,
+  defaultPick,
+  formatMoveDay,
+  moveTargets,
+  preservedWindow,
+} from '../../lib/boardMove';
+import { Button } from '../catalyst/button';
+import { Input } from '../catalyst/input';
 
 export type BlockMenu = {
   dispatch: BoardDispatch;
@@ -25,20 +35,31 @@ const MARGIN = 8;
 
 export default function BlockContextMenu({
   menu,
+  date,
+  today,
+  timeZone,
   workOrderHref,
   onClose,
   onOpenDetail,
   onRelease,
   onReassign,
   onUnschedule,
+  onMove,
 }: {
   menu: BlockMenu | null;
+  /** The day being viewed — which is the dispatch's own day, since the board
+   *  only shows one. Move targets count forward from it. */
+  date: string;
+  /** Today in the tenant's zone — the earliest day a visit may move to. */
+  today: string;
+  timeZone: string;
   workOrderHref: (workOrderId: string) => string;
   onClose: () => void;
   onOpenDetail: (dispatch: BoardDispatch) => void;
   onRelease: (dispatch: BoardDispatch) => void;
   onReassign: (dispatch: BoardDispatch) => void;
   onUnschedule: (dispatch: BoardDispatch) => void;
+  onMove: (dispatch: BoardDispatch, toDate: string) => void;
 }) {
   const { t } = useTranslation();
   // Never "work order" or "dispatch" in the menu: a tenant that calls them
@@ -46,6 +67,10 @@ export default function BlockContextMenu({
   const { getName } = useGlossary();
   const ref = useRef<HTMLDivElement | null>(null);
   const [offset, setOffset] = useState<{ left: number; top: number } | null>(null);
+  // "Pick a date…" expands in place rather than opening a second surface, so
+  // the menu stays the one place a move happens.
+  const [picking, setPicking] = useState(false);
+  const [picked, setPicked] = useState('');
 
   // Measured on attach, not guessed: the menu's height depends on which verbs
   // apply to this dispatch, so a fixed clamp would either clip it near the
@@ -55,6 +80,8 @@ export default function BlockContextMenu({
   const attach = useCallback(
     (el: HTMLDivElement | null) => {
       ref.current = el;
+      setPicking(false);
+      setPicked('');
       if (!el || !menu) {
         setOffset(null);
         return;
@@ -108,6 +135,8 @@ export default function BlockContextMenu({
   const onKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLDivElement>) => {
       if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+      // Arrow keys step the date field's own segments.
+      if ((e.target as HTMLElement).tagName === 'INPUT') return;
       e.preventDefault();
       move(e.target as HTMLElement, e.key === 'ArrowDown' ? 1 : -1);
     },
@@ -120,6 +149,18 @@ export default function BlockContextMenu({
   const act = (fn: (d: BoardDispatch) => void) => () => {
     onClose();
     fn(dispatch);
+  };
+
+  // Only SCHEDULED work moves. En route and on site are happening now;
+  // completed, no-show and cancelled are history — rescheduling those is a
+  // NEW visit through the composer, not a move. A window that can't be placed
+  // can't be preserved, so it doesn't offer a move either.
+  const kept = dispatch.status === 'SCHEDULED' ? preservedWindow(dispatch, timeZone) : null;
+  const targets = moveTargets(date, today);
+  const pickable = canMoveTo(date, picked, today);
+  const go = (toDate: string) => () => {
+    onClose();
+    onMove(dispatch, toDate);
   };
 
   return (
@@ -165,6 +206,70 @@ export default function BlockContextMenu({
         <button type="button" className="db-ctx-item" role="menuitem" onClick={act(onUnschedule)}>
           {t('dispatchBoard.menu.unschedule')}
         </button>
+      )}
+
+      {kept && (
+        <>
+          <div className="db-ctx-sep" />
+          {/* The label states the window being kept, because that
+              preservation is the whole contract of a move. */}
+          <div className="db-ctx-label" role="presentation">
+            {t('dispatchBoard.move.heading', {
+              window: formatWindow(kept.startHour, kept.endHour),
+            })}
+          </div>
+          {/* Next business day leads: bumping Friday's work to Saturday is
+              almost never the intent. Tomorrow appears only when it is a
+              different day, and always names its weekday so a weekend shows. */}
+          {targets.nextBusiness && (
+            <button type="button" className="db-ctx-item" role="menuitem" onClick={go(targets.nextBusiness)}>
+              {t('dispatchBoard.move.nextBusinessDay')}
+              <span className="db-ctx-meta">{formatMoveDay(targets.nextBusiness)}</span>
+            </button>
+          )}
+          {targets.tomorrow && (
+            <button type="button" className="db-ctx-item" role="menuitem" onClick={go(targets.tomorrow)}>
+              {t('dispatchBoard.move.tomorrow')}
+              <span className="db-ctx-meta">{formatMoveDay(targets.tomorrow)}</span>
+            </button>
+          )}
+          {picking ? (
+            <form
+              className="db-ctx-pick"
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (pickable) go(picked)();
+              }}
+            >
+              <Input
+                type="date"
+                autoFocus
+                min={today}
+                value={picked}
+                aria-label={t('dispatchBoard.move.pickDate')}
+                onChange={(e) => setPicked(e.target.value)}
+              />
+              <Button type="submit" size="xs" color="accent" disabled={!pickable}>
+                {t('dispatchBoard.move.go')}
+              </Button>
+            </form>
+          ) : (
+            <button
+              type="button"
+              className="db-ctx-item"
+              role="menuitem"
+              onClick={() => {
+                setPicked(defaultPick(date, today));
+                setPicking(true);
+              }}
+            >
+              {t('dispatchBoard.move.pickDate')}
+            </button>
+          )}
+          {/* "Not sure when" is an unschedule, not a move — picking a date
+              nobody has decided on is worse than no date at all. */}
+          <div className="db-ctx-hint">{t('dispatchBoard.move.hint')}</div>
+        </>
       )}
     </div>
   );

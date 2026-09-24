@@ -106,6 +106,9 @@ export interface BoardDispatch {
   divisionId: string | null;
   // Round-trips on PUT for stale-read protection; a mismatch is a 409.
   version: number;
+  // When the arrival window last changed; null = never since create. The
+  // move confirm counts only customer notices sent after it.
+  windowChangedAt: string | null;
   assignedUserId: string;
   assignedUserName: string | null;
   workOrderId: string;

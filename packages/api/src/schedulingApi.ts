@@ -57,6 +57,10 @@ export interface Dispatch {
   // Optimistic-concurrency token. Round-trip it on PUT and a mismatch is a
   // 409 DISPATCH_VERSION_CONFLICT rather than a silent overwrite.
   version?: number;
+  // When a PUT last actually changed the arrival window. Null = unchanged
+  // since create. "Customer notified" means a CUSTOMER notice sent AFTER this
+  // — a notice about the old date says nothing about the new one.
+  windowChangedAt?: string | null;
 }
 
 export interface CreateDispatchRequest {

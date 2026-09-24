@@ -13,11 +13,16 @@ export interface OffSpan {
   end: number;
 }
 
-export type DropRejection = 'time-off' | 'outside-day';
-
 export type DropResolution =
   | { ok: true; window: PresetWindow }
-  | { ok: false; reason: DropRejection };
+  | { ok: false; reason: 'outside-day' }
+  | {
+      ok: false;
+      reason: 'time-off';
+      /** The window that was checked, and the absence it hit. */
+      window: { startHour: number; endHour: number };
+      off: OffSpan;
+    };
 
 /** Fractional hour under the pointer, from its x within the lane. */
 export function hourAtPointer(
@@ -74,6 +79,9 @@ export function resolveDrop(
   timeOff: readonly OffSpan[],
   axis: { start: number; end: number },
   presets: readonly PresetWindow[] = PRESET_WINDOWS,
+  /** A moved block keeps its length (see `movedWindow`), so a 3-hour visit
+   *  is checked as 3 hours, not as the 2-hour preset it snapped from. */
+  durationHours?: number,
 ): DropResolution {
   const window = snapToPreset(hour, presets);
 
@@ -83,9 +91,18 @@ export function resolveDrop(
     return { ok: false, reason: 'outside-day' };
   }
 
-  const span = { start: window.startHour, end: window.endHour };
-  if (timeOff.some((off) => overlaps(span, off))) {
-    return { ok: false, reason: 'time-off' };
+  const span = {
+    start: window.startHour,
+    end: durationHours != null ? window.startHour + durationHours : window.endHour,
+  };
+  const hit = timeOff.find((off) => overlaps(span, off));
+  if (hit) {
+    return {
+      ok: false,
+      reason: 'time-off',
+      window: { startHour: span.start, endHour: span.end },
+      off: { start: hit.start, end: hit.end },
+    };
   }
 
   return { ok: true, window };

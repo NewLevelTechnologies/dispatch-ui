@@ -80,6 +80,23 @@ export interface SpineProps {
    *  called out" is a 6:40am fact about the day on screen — so the board
    *  writes the absence rather than sending anyone to a settings page. */
   onMarkTimeOff?: (tech: BoardTech) => void;
+  /** Offered instead of Mark when the row already carries an absence today. */
+  onClearTimeOff?: (tech: BoardTech) => void;
+  /** The technician's user record, as a real href like every other way off
+   *  the board. */
+  userHref?: (userId: string) => string;
+  /** Live visits booked on a technician who is off at that time. They stay
+   *  exactly where they are — nothing is auto-moved — and carry a warning
+   *  outline so they can't be missed (§0b). */
+  offTechDispatchIds?: ReadonlySet<string>;
+  /** A drop refused because its snapped window overlaps a PART-day absence.
+   *  All-day rows are visibly undroppable and stay silent; a slice can be
+   *  missed by the pointer yet hit by the snapped window, so that says why. */
+  onDropOnTimeOff?: (
+    techId: string,
+    window: { startHour: number; endHour: number },
+    off: { start: number; end: number },
+  ) => void;
   /** Right-click on a block, at viewport coordinates. The menu itself is the
    *  page's, so every spine gets it for free. */
   onContextDispatch: (dispatch: BoardDispatch, at: { x: number; y: number }) => void;

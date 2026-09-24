@@ -20,6 +20,7 @@ function stop(over: Partial<BoardDispatch> = {}): BoardDispatch {
     releasedAt: '2026-03-15T07:00:00Z',
     divisionId: null,
     version: 1,
+    windowChangedAt: null,
     assignedUserId: 'u1',
     assignedUserName: 'Jordan Wei',
     workOrderId: 'wo-1',

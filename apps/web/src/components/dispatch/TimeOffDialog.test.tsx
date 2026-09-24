@@ -1,13 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, fireEvent } from '@testing-library/react';
 import { renderWithProviders, userEvent } from '../../test/utils';
 import TimeOffDialog from './TimeOffDialog';
+import { allDaySpan } from '../../lib/timeOff';
 import type { BoardTech } from '../../api/setup';
 
-const mockList = vi.fn();
 const mockCreate = vi.fn();
 const mockDelete = vi.fn();
-const mockShowSuccess = vi.fn();
+const mockShowUndo = vi.fn();
 const mockShowError = vi.fn();
 
 vi.mock('../../api/setup', async (importOriginal) => {
@@ -15,7 +15,7 @@ vi.mock('../../api/setup', async (importOriginal) => {
   return {
     ...actual,
     availabilityApi: {
-      list: (...a: unknown[]) => mockList(...a),
+      list: vi.fn(),
       create: (...a: unknown[]) => mockCreate(...a),
       delete: (...a: unknown[]) => mockDelete(...a),
     },
@@ -28,7 +28,7 @@ vi.mock('../../lib/toast', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../lib/toast')>();
   return {
     ...actual,
-    showSuccess: (...a: unknown[]) => mockShowSuccess(...a),
+    showUndo: (...a: unknown[]) => mockShowUndo(...a),
     showError: (...a: unknown[]) => mockShowError(...a),
   };
 });
@@ -42,31 +42,14 @@ const tech: BoardTech = {
   divisionIds: [],
 };
 
+// A Wednesday.
 const DATE = '2026-03-18';
 
-const emptyPage = {
-  content: [],
-  page: 0,
-  size: 20,
-  totalElements: 0,
-  totalPages: 0,
-  first: true,
-  last: true,
-};
-
-const span = (over: Record<string, unknown> = {}) => ({
-  id: 'a1',
-  userId: 'u1',
-  startsAt: '2026-03-18T07:00:00Z',
-  endsAt: '2026-03-19T07:00:00Z',
-  allDay: true,
-  status: 'OFF',
-  label: 'Vacation',
-  reason: null,
-  notes: null,
-  createdAt: '2026-03-01T00:00:00Z',
-  updatedAt: '2026-03-01T00:00:00Z',
-  ...over,
+/** A live visit on the viewed day, in UTC hours. */
+const visit = (startHour: number, endHour: number, status = 'SCHEDULED') => ({
+  status,
+  arrivalWindowStart: `${DATE}T${String(startHour).padStart(2, '0')}:00:00Z`,
+  arrivalWindowEnd: `${DATE}T${String(endHour).padStart(2, '0')}:00:00Z`,
 });
 
 const render = (over: Record<string, unknown> = {}) =>
@@ -74,7 +57,7 @@ const render = (over: Record<string, unknown> = {}) =>
     <TimeOffDialog
       tech={tech}
       date={DATE}
-      bookedVisits={0}
+      visits={[]}
       timeZone="UTC"
       onClose={vi.fn()}
       {...over}
@@ -83,207 +66,182 @@ const render = (over: Record<string, unknown> = {}) =>
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mockList.mockResolvedValue(emptyPage);
-  mockCreate.mockResolvedValue(span());
+  mockCreate.mockResolvedValue({ id: 'a1' });
   mockDelete.mockResolvedValue(undefined);
+});
+
+describe('allDaySpan', () => {
+  it('is half-open: through the 20th ends at midnight on the 21st', () => {
+    expect(allDaySpan('2026-03-18', '2026-03-20', 'UTC')).toEqual({
+      startsAt: '2026-03-18T00:00:00.000Z',
+      endsAt: '2026-03-21T00:00:00.000Z',
+    });
+  });
+
+  it('lands on the TENANT midnight, not UTC', () => {
+    // Phoenix is UTC-7 year-round.
+    expect(allDaySpan('2026-03-18', '2026-03-18', 'America/Phoenix')).toEqual({
+      startsAt: '2026-03-18T07:00:00.000Z',
+      endsAt: '2026-03-19T07:00:00.000Z',
+    });
+  });
 });
 
 describe('TimeOffDialog', () => {
   it('renders nothing without a technician', () => {
     render({ tech: null });
-    expect(screen.queryByText(/Time off/)).not.toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
-  // The label is required by the server on purpose: a hatched row has to say
-  // something rather than being a silent gap in the day.
-  it('will not save without a reason', async () => {
-    render();
-    await screen.findByText(/Time off · Robert Chen/);
-    expect(screen.getByRole('button', { name: 'Mark time off' })).toBeDisabled();
-  });
-
-  // The 6:40am case: someone called out, they are gone for the day.
-  it('marks an all-day absence for the viewed date', async () => {
+  // The 6:40am case: someone called out, they are gone for the day. One click.
+  it('marks the viewed day off with the default reason', async () => {
     const user = userEvent.setup();
     const onClose = vi.fn();
     render({ onClose });
 
-    await user.type(await screen.findByPlaceholderText('Sick day'), 'Called out');
-    await user.click(screen.getByRole('button', { name: 'Mark time off' }));
+    await screen.findByText('Mark Robert Chen off');
+    expect(screen.getByText('All day, Wed, Mar 18')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Mark off' }));
 
-    await waitFor(() => expect(mockCreate).toHaveBeenCalled());
-    expect(mockCreate.mock.calls[0][0]).toMatchObject({
-      userId: 'u1',
-      allDay: true,
-      status: 'OFF',
-      label: 'Called out',
-    });
+    await waitFor(() =>
+      expect(mockCreate).toHaveBeenCalledWith({
+        userId: 'u1',
+        startsAt: '2026-03-18T00:00:00.000Z',
+        endsAt: '2026-03-19T00:00:00.000Z',
+        allDay: true,
+        status: 'OFF',
+        label: 'Time off',
+        reason: 'TIME_OFF',
+      }),
+    );
     expect(onClose).toHaveBeenCalled();
   });
 
-  // "Out all next week" is ONE row — the whole point of the span shape, and
-  // the reason the entity was reshaped.
-  it('spans several days in a single row', async () => {
+  it('prints the chosen reason as the row label', async () => {
     const user = userEvent.setup();
     render();
-
-    await user.type(await screen.findByPlaceholderText('Sick day'), 'Vacation');
-    const through = screen.getByLabelText('Through');
-    await user.clear(through);
-    await user.type(through, '2026-03-22');
-    await user.click(screen.getByRole('button', { name: 'Mark time off' }));
-
-    await waitFor(() => expect(mockCreate).toHaveBeenCalled());
-    const { startsAt, endsAt } = mockCreate.mock.calls[0][0];
-    // Half-open: through the 22nd means up to the start of the 23rd.
-    expect(startsAt.slice(0, 10) <= '2026-03-18').toBe(true);
-    expect(new Date(endsAt).getTime()).toBeGreaterThan(new Date('2026-03-22T12:00:00').getTime());
+    await user.click(await screen.findByRole('radio', { name: 'Sick' }));
+    await user.click(screen.getByRole('button', { name: 'Mark off' }));
+    await waitFor(() =>
+      expect(mockCreate).toHaveBeenCalledWith(
+        expect.objectContaining({ label: 'Sick', reason: 'SICK' }),
+      ),
+    );
   });
 
-  it('marks a partial day when all-day is switched off', async () => {
+  // "Out all next week" is ONE row — the whole point of the span shape.
+  it('saves a multi-day range as a single span', async () => {
     const user = userEvent.setup();
     render();
+    const through = await screen.findByLabelText('Through');
+    fireEvent.change(through, { target: { value: '2026-03-20' } });
+    expect(screen.getByText('Wed, Mar 18 – Fri, Mar 20')).toBeInTheDocument();
 
-    await user.type(await screen.findByPlaceholderText('Sick day'), 'Dentist');
-    await user.click(screen.getByRole('switch'));
-    await user.click(screen.getByRole('button', { name: 'Mark time off' }));
-
-    await waitFor(() => expect(mockCreate).toHaveBeenCalled());
-    expect(mockCreate.mock.calls[0][0].allDay).toBe(false);
+    await user.click(screen.getByRole('button', { name: 'Mark off' }));
+    await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1));
+    expect(mockCreate.mock.calls[0][0]).toMatchObject({
+      startsAt: '2026-03-18T00:00:00.000Z',
+      endsAt: '2026-03-21T00:00:00.000Z',
+    });
   });
 
-  // The date field and the start-time field both read "From" until they were
-  // named apart, which made the partial-day form ambiguous to say out loud.
-  it('names the date and the start time apart', async () => {
+  it('never lets the range end before the viewed day', async () => {
+    render();
+    const through = await screen.findByLabelText('Through');
+    fireEvent.change(through, { target: { value: '2026-03-10' } });
+    expect(through).toHaveValue(DATE);
+  });
+
+  // "Dentist 9–11": one row with real instants, the rest of the day bookable.
+  it('saves part of the day as a single timed span', async () => {
     const user = userEvent.setup();
     render();
-    await user.click(await screen.findByRole('switch'));
+    await user.click(await screen.findByRole('radio', { name: 'Part of day' }));
+    await user.selectOptions(screen.getByLabelText('From'), '9');
+    await user.selectOptions(screen.getByLabelText('Until'), '10.5');
+    expect(screen.getByText('Wed, Mar 18, 9a–10:30a')).toBeInTheDocument();
+    // Single-day: no through-date to widen it with.
+    expect(screen.queryByLabelText('Through')).not.toBeInTheDocument();
 
-    expect(screen.getByLabelText('Date')).toHaveAttribute('type', 'date');
-    expect(screen.getByLabelText('From')).toHaveAttribute('type', 'time');
-    expect(screen.getByLabelText('To')).toHaveAttribute('type', 'time');
+    await user.click(screen.getByRole('button', { name: 'Mark off' }));
+    await waitFor(() =>
+      expect(mockCreate).toHaveBeenCalledWith({
+        userId: 'u1',
+        startsAt: '2026-03-18T09:00:00.000Z',
+        endsAt: '2026-03-18T10:30:00.000Z',
+        allDay: false,
+        status: 'OFF',
+        label: 'Time off',
+        reason: 'TIME_OFF',
+      }),
+    );
   });
 
-  it('refuses a span that ends before it starts', async () => {
+  it('never offers an end at or before the start', async () => {
     const user = userEvent.setup();
     render();
-
-    await user.type(await screen.findByPlaceholderText('Sick day'), 'Dentist');
-    await user.click(screen.getByRole('switch'));
-    const end = screen.getByLabelText('To');
-    await user.clear(end);
-    await user.type(end, '07:00');
-
-    expect(screen.getByRole('button', { name: 'Mark time off' })).toBeDisabled();
+    await user.click(await screen.findByRole('radio', { name: 'Part of day' }));
+    await user.selectOptions(screen.getByLabelText('From'), '13');
+    const until = screen.getByLabelText('Until') as HTMLSelectElement;
+    expect(until.value).toBe('13.5');
+    expect(Array.from(until.options).every((o) => Number(o.value) > 13)).toBe(true);
   });
 
-  // Marking someone off never moves their work: the dispatcher has jobs to
-  // reassign and nothing else on the board will say so.
-  it('says what is still booked on the row', async () => {
-    const user = userEvent.setup();
-    render({ bookedVisits: 3 });
-
-    await user.type(await screen.findByPlaceholderText('Sick day'), 'Called out');
-    await user.click(screen.getByRole('button', { name: 'Mark time off' }));
-
-    await waitFor(() => expect(mockShowSuccess).toHaveBeenCalled());
-    expect(mockShowSuccess.mock.calls[0][0]).toContain('3');
-    expect(mockShowSuccess.mock.calls[0][0]).toMatch(/reassign/);
-  });
-
-  it('just confirms when the row is empty', async () => {
-    const user = userEvent.setup();
+  // "Every afternoon this week" is a recurrence, not a span.
+  it('disables part of day, and says why, when the range spans days', async () => {
     render();
-
-    await user.type(await screen.findByPlaceholderText('Sick day'), 'Called out');
-    await user.click(screen.getByRole('button', { name: 'Mark time off' }));
-
-    await waitFor(() => expect(mockShowSuccess).toHaveBeenCalled());
-    expect(mockShowSuccess.mock.calls[0][0]).not.toMatch(/reassign/);
+    fireEvent.change(await screen.findByLabelText('Through'), { target: { value: '2026-03-20' } });
+    expect(screen.getByRole('radio', { name: 'Part of day' })).toHaveAttribute('aria-disabled', 'true');
+    expect(screen.getByText(/one day at a time/)).toBeInTheDocument();
   });
 
-  // A 6:40am mis-click has to be reversible on the surface that made it.
-  it('lists what is already there and clears it by id', async () => {
+  it('counts only the visits a part-day absence overlaps', async () => {
     const user = userEvent.setup();
-    mockList.mockResolvedValue({ ...emptyPage, content: [span()], totalElements: 1 });
+    render({ visits: [visit(8, 10), visit(10, 12), visit(14, 16)] });
+    expect(await screen.findByText(/^3 dispatches stay assigned/)).toBeInTheDocument();
+    await user.click(screen.getByRole('radio', { name: 'Part of day' }));
+    await user.selectOptions(screen.getByLabelText('From'), '9');
+    await user.selectOptions(screen.getByLabelText('Until'), '11');
+    expect(screen.getByText(/^2 dispatches stay assigned/)).toBeInTheDocument();
+    await user.selectOptions(screen.getByLabelText('From'), '17');
+    await user.selectOptions(screen.getByLabelText('Until'), '18');
+    expect(screen.queryByText(/stay assigned/)).not.toBeInTheDocument();
+  });
+
+  // Said BEFORE saving: nothing is moved automatically.
+  it('warns about live work before saving', async () => {
+    render({ visits: [visit(8, 10), visit(10, 12), visit(14, 16), visit(12, 14, 'COMPLETED')] });
+    expect(
+      await screen.findByText(/3 dispatches stay assigned to Robert — nothing is moved automatically/),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/Technician is off/)).toBeInTheDocument();
+  });
+
+  it('says nothing about work when there is none', async () => {
     render();
+    await screen.findByText('Mark Robert Chen off');
+    expect(screen.queryByText(/nothing is moved automatically/)).not.toBeInTheDocument();
+  });
 
-    expect(await screen.findByText('Vacation')).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Clear' }));
+  it('Undo deletes the span it just created', async () => {
+    const user = userEvent.setup();
+    render({ visits: [visit(8, 10), visit(14, 16)] });
+    await user.click(await screen.findByRole('button', { name: 'Mark off' }));
 
+    await waitFor(() => expect(mockShowUndo).toHaveBeenCalled());
+    const [message, , onUndo] = mockShowUndo.mock.calls[0];
+    expect(message).toMatch(/Robert Chen marked off · 2 dispatches still assigned/);
+    onUndo();
     await waitFor(() => expect(mockDelete).toHaveBeenCalledWith('a1'));
   });
 
-  // Sliced straight out of the ISO string, an 8am absence would print as
-  // whatever UTC makes of it.
-  it('shows a partial span in the tenant’s own hours', async () => {
-    mockList.mockResolvedValue({
-      ...emptyPage,
-      content: [
-        span({
-          allDay: false,
-          startsAt: '2026-03-18T08:00:00Z',
-          endsAt: '2026-03-18T12:00:00Z',
-          label: 'Dentist',
-        }),
-      ],
-      totalElements: 1,
-    });
-    render();
-    expect(await screen.findByText('8a–12p')).toBeInTheDocument();
-  });
-
-  // Only OFF makes someone unavailable; the rest of the enum predates the
-  // board and must not show up as an absence.
-  it('ignores availability rows that are not absences', async () => {
-    mockList.mockResolvedValue({
-      ...emptyPage,
-      content: [span({ id: 'a2', status: 'BUSY', label: 'Training' })],
-      totalElements: 1,
-    });
-    render();
-
-    await screen.findByText(/Time off · Robert Chen/);
-    expect(screen.queryByText('Training')).not.toBeInTheDocument();
-  });
-
-  it('surfaces a failure instead of closing on it', async () => {
+  it('reports a failed save and stays open', async () => {
     const user = userEvent.setup();
     const onClose = vi.fn();
-    mockCreate.mockRejectedValue(new Error('nope'));
+    mockCreate.mockRejectedValueOnce(new Error('nope'));
     render({ onClose });
-
-    await user.type(await screen.findByPlaceholderText('Sick day'), 'Called out');
-    await user.click(screen.getByRole('button', { name: 'Mark time off' }));
-
+    await user.click(await screen.findByRole('button', { name: 'Mark off' }));
     await waitFor(() => expect(mockShowError).toHaveBeenCalled());
     expect(onClose).not.toHaveBeenCalled();
-  });
-});
-
-// An absence is tenant-local too: "all day" means midnight to midnight where
-// the technician works, not where the dispatcher's laptop is.
-describe('TimeOffDialog tenant timezone', () => {
-  it('bounds an all-day span by the tenant’s midnight', async () => {
-    const user = userEvent.setup();
-    renderWithProviders(
-      <TimeOffDialog
-        tech={tech}
-        date={DATE}
-        bookedVisits={0}
-        timeZone="America/Phoenix"
-        onClose={vi.fn()}
-      />,
-    );
-
-    await user.type(await screen.findByPlaceholderText('Sick day'), 'Called out');
-    await user.click(screen.getByRole('button', { name: 'Mark time off' }));
-
-    await waitFor(() => expect(mockCreate).toHaveBeenCalled());
-    // Phoenix is UTC-7 year round: midnight on the 18th is 07:00Z.
-    expect(mockCreate.mock.calls[0][0]).toMatchObject({
-      startsAt: '2026-03-18T07:00:00.000Z',
-      endsAt: '2026-03-19T07:00:00.000Z',
-    });
   });
 });

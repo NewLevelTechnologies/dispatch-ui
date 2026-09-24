@@ -91,6 +91,7 @@ function Block({
   density,
   isToday,
   outOfDivision,
+  onOffTech,
   clash,
   half,
   onOpen,
@@ -106,6 +107,8 @@ function Block({
   /** A real job, outside the active division filter. Still clickable, still
    *  droppable — the filter narrows attention, not entitlement. */
   outOfDivision: boolean;
+  /** Booked on a technician who is off at this time. */
+  onOffTech: boolean;
   clash: boolean;
   half: 'upper' | 'lower' | null;
   onOpen: (dispatch: BoardDispatch) => void;
@@ -159,6 +162,7 @@ function Block({
     // elsewhere, so redacting it would hide data from someone permitted to
     // see it — and would teach that the hatch means two different things.
     outOfDivision ? 'otherdiv' : '',
+    onOffTech ? 'offtech' : '',
     released ? '' : 'held',
     urgent ? 'urgent' : '',
     clash ? 'clash' : '',
@@ -239,12 +243,14 @@ function Lane({
   spans,
   axis,
   onDrop,
+  onDropOnTimeOff,
   children,
 }: {
   techId: string;
   spans: { start: number; end: number; allDay: boolean }[];
   axis: SpineProps['axis'];
   onDrop: SpineProps['onDrop'];
+  onDropOnTimeOff: SpineProps['onDropOnTimeOff'];
   children: React.ReactNode;
 }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -253,9 +259,9 @@ function Lane({
   // Latest values for the drop handler without re-registering the target on
   // every render — re-registering mid-drag drops the gesture. Written in an
   // effect rather than during render, which React 19 forbids.
-  const latest = useRef({ spans, axis, onDrop, techId });
+  const latest = useRef({ spans, axis, onDrop, onDropOnTimeOff, techId });
   useEffect(() => {
-    latest.current = { spans, axis, onDrop, techId };
+    latest.current = { spans, axis, onDrop, onDropOnTimeOff, techId };
   });
 
   useEffect(() => {
@@ -275,11 +281,18 @@ function Lane({
           { left: rect.left, width: rect.width },
           cur.axis,
         );
-        const resolved = resolveDrop(hour, cur.spans, cur.axis);
-        // A refusal is silent here: `canDrop` already withheld the affordance,
-        // and a toast explaining a drop the lane visibly declined would be
-        // scolding someone for something they could already see.
-        if (!resolved.ok) return;
+        const duration = source.data?.durationHours as number | undefined;
+        const resolved = resolveDrop(hour, cur.spans, cur.axis, undefined, duration);
+        if (!resolved.ok) {
+          // An all-day row is visibly undroppable, so refusing it silently is
+          // right — a toast would scold someone for what they could see. A
+          // part-day slice is different: the pointer can be clear of it while
+          // the snapped window still lands on it, so say which times collided.
+          if (resolved.reason === 'time-off' && !cur.spans.some((s) => s.allDay)) {
+            cur.onDropOnTimeOff?.(cur.techId, resolved.window, resolved.off);
+          }
+          return;
+        }
         cur.onDrop?.(cur.techId, resolved.window, source.data);
       },
     });
@@ -304,6 +317,10 @@ export default function DispatchTimeline({
   workOrderHref,
   onContextDispatch,
   onMarkTimeOff,
+  onClearTimeOff,
+  userHref,
+  offTechDispatchIds,
+  onDropOnTimeOff,
   axis,
   nowHour,
   capacityStops,
@@ -359,17 +376,28 @@ export default function DispatchTimeline({
           capacityStops={capacityStops}
           width={techW}
           outAllDay={outAllDay}
-          // All-day only: the row is hatched and has no load bar, so the
-          // meta slot is free to carry the reason. A partial absence is a
-          // working row — its label belongs in the lane, on the span.
-          offLabel={outAllDay ? (spans[0]?.label ?? null) : null}
+          // The absence takes the second line INSTEAD of the region list:
+          // "Sick" for a whole day, "Sick 1p–3p" for part of one. Which
+          // regions someone covers matters less than the fact they are out.
+          offLabel={
+            outAllDay
+              ? (spans[0]?.label ?? null)
+              : spans[0]
+                ? `${spans[0].label} ${formatWindow(spans[0].start, spans[0].end)}`
+                : null
+          }
           onMarkTimeOff={onMarkTimeOff ? () => onMarkTimeOff(tech) : undefined}
+          onClearTimeOff={
+            onClearTimeOff && spans.length > 0 ? () => onClearTimeOff(tech) : undefined
+          }
+          profileHref={userHref?.(tech.id)}
         />
         <Lane
           techId={tech.id}
           spans={spans}
           axis={axis}
           onDrop={onDrop}
+          onDropOnTimeOff={onDropOnTimeOff}
         >
           <span className="db-lane-cells">
             {axis.hours.map((hour) => (
@@ -461,6 +489,7 @@ export default function DispatchTimeline({
                     entry.dispatch.divisionId !== null &&
                     entry.dispatch.divisionId !== divisionFilter
                   }
+                  onOffTech={offTechDispatchIds?.has(entry.dispatch.id) ?? false}
                   clash={clash}
                   half={half}
                   onOpen={onOpenDispatch}

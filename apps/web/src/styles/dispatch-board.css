@@ -638,6 +638,14 @@
   outline-offset: -1.5px;
 }
 
+/* Booked on a technician who is now off (§0b). Never auto-moved — a system
+   that silently relocates someone's work is worse than one that tells you
+   to — so the block keeps its place and asks to be dealt with instead. */
+.db-block.offtech {
+  outline: 1.5px solid var(--warning-500);
+  outline-offset: -1.5px;
+}
+
 .db-block.clash.upper {
   top: 3px;
   bottom: calc(50% + 1px);
@@ -928,6 +936,40 @@
   height: 1px;
   background: var(--border-soft);
   margin: 4px 0;
+}
+
+/* Move to (§3.6). The section label names the window being kept — that
+   preservation is the whole contract of a date-only move. */
+.db-ctx-label {
+  padding: 5px 9px 3px;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--fg-muted);
+}
+
+.db-ctx-item .db-ctx-meta {
+  float: right;
+  margin-left: 14px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--fg-muted);
+}
+
+.db-ctx-pick {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 9px;
+}
+
+.db-ctx-hint {
+  max-width: 220px;
+  padding: 4px 9px 5px;
+  font-size: 10.5px;
+  line-height: 1.4;
+  color: var(--fg-muted);
 }
 
 /* The seam in the dispatch drawer where it stops describing the VISIT and
