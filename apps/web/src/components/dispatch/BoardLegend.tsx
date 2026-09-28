@@ -35,11 +35,13 @@ export default function BoardLegend() {
       <Item swatch={<Fill color="var(--violet-500)" />} label={t('dispatchBoard.legend.live')} />
       <Item swatch={<Fill color="var(--success-500)" />} label={t('dispatchBoard.legend.completed')} />
       <Item swatch={<Fill color="var(--warning-500)" />} label={t('dispatchBoard.legend.noShow')} />
-      {/* Dashed, not filled: "not handed over" is orthogonal to status, so it
-          cannot be another hue without colliding with one. */}
+      {/* Hollow and dashed, exactly like the blocks: filled = released,
+          hollow = not released. Never a hatch — that now means unavailable
+          time. Neutral rather than a hue, because release state is orthogonal
+          to status and every status can be held. */}
       <Item
         swatch={
-          <span className="size-2 shrink-0 rounded-[2px] border border-dashed border-fg-muted" />
+          <span className="h-2 w-3 shrink-0 rounded-[2px] border-[1.5px] border-dashed border-fg-muted" />
         }
         label={t('dispatchBoard.legend.unreleased')}
       />

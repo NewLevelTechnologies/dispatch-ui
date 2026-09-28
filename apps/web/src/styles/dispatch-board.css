@@ -560,7 +560,8 @@
    Tuesday would otherwise pulse on every future date, reading as a technician
    currently on a job on a day that has not happened. The hue stays: the board
    reports the status it was given and does not invent an outcome. */
-.db-block.inprogress.live::after {
+.db-block.inprogress.live::after,
+.db-block.held-onsite.live::after {
   content: '';
   position: absolute;
   right: 5px;
@@ -603,21 +604,46 @@
   background: transparent;
 }
 
-/* Not released (releasedAt == null). ORTHOGONAL to status — a SCHEDULED
-   and an EN_ROUTE dispatch can both be held — so this is a separate
-   class that layers over any status and must not read as committed. */
+/* Not released (releasedAt == null): HOLLOW. Filled = released, hollow =
+   not released, and the hatch now means only UNAVAILABLE (time off, busy
+   elsewhere) — both reject drops, held work accepts them, so they must not
+   share a texture. The old grey dash over a two-surface hatch had to be
+   leaned into to see, worst in light mode.
+
+   Orthogonal to status, which still owns the hue: `--hc` is set inline from
+   the shared status map (urgent → danger). The renderer gives a held block
+   NO status or priority classes, so nothing below can paint a fill or tint
+   over it whatever the source order — that decision is made in code. */
 .db-block.held {
-  border-style: dashed;
-  border-left-style: solid;
-  background: repeating-linear-gradient(
-    135deg,
-    var(--bg-elev-2) 0 5px,
-    var(--bg-elev) 5px 10px
-  );
+  --held-w: 1.5px;
+  --rail-w: 3px;
+  background: var(--bg-elev);
+  border: var(--held-w) dashed var(--hc);
+  border-left: var(--rail-w) dashed var(--hc);
+  box-shadow: none;
 }
 
-.db-block.held .db-fill {
-  background: transparent;
+.db-block.held:hover {
+  box-shadow: none;
+}
+
+.db-block.held-urgent {
+  --rail-w: 4px;
+}
+
+/* Light mode's lane is near-white, so the outline needs the extra half
+   pixel to hold its own at dense row height. */
+.theme-light .db-block.held {
+  --held-w: 2px;
+}
+
+.db-block.held-done {
+  opacity: 0.72;
+}
+
+.db-block.held-cancelled {
+  opacity: 0.6;
+  text-decoration: line-through;
 }
 
 .db-block.urgent {
@@ -627,6 +653,34 @@
 
 .db-block.urgent .db-fill {
   background: color-mix(in oklch, var(--danger-500) 12%, transparent);
+}
+
+/* Light mode only: "filled" has to actually look filled. There the block
+   base (--bg-elev-2) is nearly the lane's own white, so a released block with
+   no estimate read as hollow too and filled-vs-hollow collapsed into a border
+   style. A status-hue wash over the surface fixes it. Dark needs nothing —
+   --bg-elev-2 already sits a step above the lane there. Board styling only;
+   no .theme-light token changes.
+
+   oklab, not oklch: oklch interpolation against a near-neutral surface
+   drifts toward red, which turned amber pink on this board. Held blocks never
+   carry these status classes (see .db-block.held), so none of this can reach
+   one. Urgent comes last so it wins over the status wash. */
+.theme-light .db-block.scheduled {
+  background: color-mix(in oklab, var(--info-500) 10%, var(--bg-elev));
+}
+
+.theme-light .db-block.enroute,
+.theme-light .db-block.inprogress {
+  background: color-mix(in oklab, var(--violet-500) 10%, var(--bg-elev));
+}
+
+.theme-light .db-block.completed {
+  background: color-mix(in oklab, var(--success-500) 8%, var(--bg-elev));
+}
+
+.theme-light .db-block.urgent {
+  background: color-mix(in oklab, var(--danger-500) 9%, var(--bg-elev));
 }
 
 /* Overlap is allowed (dispatchers double-book deliberately) but never
