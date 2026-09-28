@@ -339,8 +339,13 @@ export function useBoardMutations(date: string, timeZone: string) {
       windowLabel: string;
       techName: string;
       mode: 'quiet' | 'techTold' | 'notify' | 'customerStale';
+      /** A week drop onto ANOTHER tech's cell moves and reassigns in one
+       *  write. Omitted = same tech. */
+      techId?: string;
     }) => {
+      const reassign = input.techId != null && input.techId !== input.dispatch.assignedUserId;
       const updated = await dispatchesApi.update(input.dispatch.id, {
+        ...(reassign ? { assignedUserId: input.techId } : {}),
         arrivalWindowStart: toIsoAt(input.toDate, input.window.startHour, timeZone),
         arrivalWindowEnd: toIsoAt(input.toDate, input.window.endHour, timeZone),
         version: input.dispatch.version,
@@ -375,10 +380,17 @@ export function useBoardMutations(date: string, timeZone: string) {
         queryKey: ['notification-logs', { entityType: 'DISPATCH', entityId: before.id }],
       });
       const workOrder = before.workOrderNumber ?? before.workOrderSummary ?? '';
-      const where = { workOrder, day: input.toDateLabel, window: input.windowLabel };
+      const reassigned = input.techId != null && input.techId !== before.assignedUserId;
+      // On a reassignment the toast names who it went to, alongside the day.
+      const day = reassigned
+        ? t('dispatchBoard.move.techDay', { tech: input.techName, day: input.toDateLabel })
+        : input.toDateLabel;
+      const where = { workOrder, day, window: input.windowLabel };
 
       const after: BoardDispatch = {
         ...before,
+        assignedUserId: reassigned ? input.techId! : before.assignedUserId,
+        assignedUserName: reassigned ? input.techName : before.assignedUserName,
         arrivalWindowStart: toIsoAt(input.toDate, input.window.startHour, timeZone),
         arrivalWindowEnd: toIsoAt(input.toDate, input.window.endHour, timeZone),
         releaseState: techHasCopy(before) ? 'CHANGED' : 'UNRELEASED',
@@ -408,7 +420,9 @@ export function useBoardMutations(date: string, timeZone: string) {
 
       const message =
         input.mode === 'techTold'
-          ? t('dispatchBoard.move.movedNotSent', { ...where, tech: input.techName })
+          ? reassigned
+            ? t('dispatchBoard.move.movedReassignedNotSent', where)
+            : t('dispatchBoard.move.movedNotSent', { ...where, tech: input.techName })
           : input.mode === 'customerStale'
             ? t('dispatchBoard.move.movedCustomerStale', { ...where, tech: input.techName })
             : t('dispatchBoard.move.moved', where);
@@ -416,6 +430,7 @@ export function useBoardMutations(date: string, timeZone: string) {
       toastEdit(message, () => {
         dispatchesApi
           .update(before.id, {
+            ...(reassigned ? { assignedUserId: before.assignedUserId } : {}),
             arrivalWindowStart: before.arrivalWindowStart,
             arrivalWindowEnd: before.arrivalWindowEnd,
             // The move bumped it; replaying the old one would conflict with

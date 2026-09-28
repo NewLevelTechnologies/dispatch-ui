@@ -3034,6 +3034,7 @@
       "moved": "{{workOrder}} → {{day}}, {{window}}",
       "movedCustomerStale": "{{workOrder}} → {{day}}, {{window}} · customer and {{tech}} not told yet",
       "movedNotSent": "{{workOrder}} → {{day}}, {{window}} · not sent to {{tech}} yet",
+      "movedReassignedNotSent": "{{workOrder}} → {{day}}, {{window}} · not sent yet",
       "nextBusinessDay": "Next business day",
       "notified": "{{customer}} notified · {{workOrder}} → {{day}}, {{window}} · not sent to {{tech}} yet",
       "notifyCustomer": "Notify {{customer}} of the new date",
@@ -3041,6 +3042,7 @@
       "pickDate": "Pick a date…",
       "staleWarning": "The customer will still expect {{day}} until someone tells them.",
       "staleWarningEarlier": "The customer still won't know the date until someone tells them.",
+      "techDay": "{{tech}}, {{day}}",
       "tomorrow": "Tomorrow"
     },
     "rail": {
@@ -3144,7 +3146,16 @@
       "week": "Week"
     },
     "week": {
-      "cellLabel": "{{name}}, {{day}} — {{count}} {{entity}}"
+      "cellLabel": "{{name}}, {{day}} — {{count}} {{entity}}",
+      "openDay": "Open day →",
+      "openDayTitle": "Open {{day}} on the day board",
+      "pastTitle": "Past — read only",
+      "peekEmpty": "Nothing booked",
+      "peekHint": "Drag a stop onto another day",
+      "peekLoading": "Loading…",
+      "pendingTitle": "Has work not yet sent to the technician",
+      "preview": "{{from}} → {{to}} of {{cap}}",
+      "previewOver": "{{from}} → {{to}} of {{cap}} · over"
     }
   }
 }

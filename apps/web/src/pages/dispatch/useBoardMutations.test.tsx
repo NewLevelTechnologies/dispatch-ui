@@ -555,5 +555,42 @@ describe('useBoardMutations — editing released work', () => {
       "WO-3841 cancelled → unscheduled · still on Maya Alvarez's schedule, not sent",
     );
   });
+
+  // A week drop onto another tech's cell moves AND reassigns in one write.
+  it('reassigns while moving the day, and Undo puts both back', async () => {
+    at('2026-03-10T17:00:00Z');
+    const { result } = setup();
+    act(() =>
+      result.current.moveDay.mutate({
+        dispatch: released(),
+        toDate: '2026-03-17',
+        toDateLabel: 'Tue, Mar 17',
+        window: { startHour: 8, endHour: 10 },
+        windowLabel: '8a–10a',
+        techName: 'Kenji Tran',
+        techId: 'u-2',
+        mode: 'techTold',
+      }),
+    );
+
+    await waitFor(() =>
+      expect(mockUpdate).toHaveBeenCalledWith('d-1', {
+        assignedUserId: 'u-2',
+        arrivalWindowStart: '2026-03-17T15:00:00.000Z',
+        arrivalWindowEnd: '2026-03-17T17:00:00.000Z',
+        version: 7,
+      }),
+    );
+    await waitFor(() => expect(mockShowUndo).toHaveBeenCalled());
+    const [message, , onUndo] = mockShowUndo.mock.calls[0];
+    expect(message).toBe('WO-3841 → Kenji Tran, Tue, Mar 17, 8a–10a · not sent yet');
+    onUndo();
+    await waitFor(() =>
+      expect(mockUpdate).toHaveBeenLastCalledWith(
+        'd-1',
+        expect.objectContaining({ assignedUserId: 'u-1', version: 8 }),
+      ),
+    );
+  });
 });
 
