@@ -45,7 +45,17 @@ function renderWeek(over: Partial<WeekProps> = {}) {
     density: 'comfortable',
     capacityStops: 6,
     today: null,
+    // Before the whole fixture week, so nothing reads as past unless a test
+    // says so.
+    todayDate: '2026-03-01',
+    timeZone: 'UTC',
     onOpenDay: vi.fn(),
+    peek: null,
+    peekStops: undefined,
+    onPeek: vi.fn(),
+    onOpenDispatch: vi.fn(),
+    onDropDispatch: vi.fn(),
+    onDropWorkOrder: vi.fn(),
     ...over,
   };
   return { ...render(<DispatchWeek {...props} />), props };
@@ -245,15 +255,32 @@ describe('DispatchWeek committed work', () => {
 });
 
 describe('DispatchWeek navigation', () => {
-  // The week answers "which day should I be looking at" — so a cell is a
-  // target, not a container.
-  it('opens that day’s board when a cell is clicked', async () => {
+  // A cell opens a PEEK of that tech-day; the column header opens the day.
+  it('peeks at a tech-day when a cell with work is clicked', async () => {
     const user = userEvent.setup();
-    const onOpenDay = vi.fn();
-    renderWeek({ onOpenDay });
+    const { props } = renderWeek({
+      techs: [tech({ cells: DAYS.map((d, i) => cell(d, { stopCount: i === 3 ? 2 : 0 })) })],
+    });
 
-    await user.click(cells()[4]);
-    expect(onOpenDay).toHaveBeenCalledWith('2026-03-20');
+    await user.click(cells()[3]);
+    expect(props.onPeek).toHaveBeenCalledWith(
+      expect.objectContaining({ techId: 'u1', date: '2026-03-19' }),
+    );
+    expect(props.onOpenDay).not.toHaveBeenCalled();
+  });
+
+  it('peeks at nothing on an empty day', async () => {
+    const user = userEvent.setup();
+    const { props } = renderWeek();
+    await user.click(cells()[3]);
+    expect(props.onPeek).not.toHaveBeenCalled();
+  });
+
+  it('opens that day’s board from the column header', async () => {
+    const user = userEvent.setup();
+    const { props } = renderWeek();
+    await user.click(document.querySelectorAll('.db-whead')[4] as HTMLElement);
+    expect(props.onOpenDay).toHaveBeenCalledWith('2026-03-20');
   });
 
   it('names each cell for a screen reader', () => {
@@ -274,3 +301,90 @@ describe('DispatchWeek navigation', () => {
     expect(techCol?.querySelector('.db-load')).toBeNull();
   });
 });
+
+// "Which day has room" is a column question — the header answers it.
+describe('DispatchWeek day totals', () => {
+  const two = (a: Partial<BoardWeekCell>, b: Partial<BoardWeekCell>) => [
+    tech({ id: 'u1', cells: DAYS.map((d, i) => cell(d, i === 0 ? a : {})) }),
+    tech({ id: 'u2', name: 'Kenji Tran', cells: DAYS.map((d, i) => cell(d, i === 0 ? b : {})) }),
+  ];
+
+  it('totals committed work against the capacity of the techs working', () => {
+    renderWeek({ techs: two({ stopCount: 2, committedCount: 3 }, { stopCount: 1, committedCount: 1 }) });
+    expect(document.querySelectorAll('.db-whead')[0]).toHaveTextContent('4/12');
+  });
+
+  // Someone who is off adds no capacity, and no load.
+  it('leaves an off tech out of the day’s capacity', () => {
+    renderWeek({ techs: two({ stopCount: 6, committedCount: 6 }, { off: true }) });
+    const head = document.querySelectorAll('.db-whead')[0];
+    expect(head).toHaveTextContent('6/6');
+    expect(head.querySelector('.db-wtotal')).toHaveClass('warning');
+  });
+
+  it('turns danger past capacity', () => {
+    renderWeek({ techs: two({ stopCount: 7, committedCount: 7 }, { stopCount: 6, committedCount: 6 }) });
+    expect(document.querySelectorAll('.db-whead')[0].querySelector('.db-wtotal')).toHaveClass('danger');
+  });
+});
+
+describe('DispatchWeek states', () => {
+  it('dims past days and shades weekends', () => {
+    renderWeek({ todayDate: '2026-03-18' });
+    expect(cells()[0]).toHaveClass('past');
+    expect(cells()[2]).not.toHaveClass('past');
+    expect(cells()[5]).toHaveClass('weekend');
+    expect(cells()[4]).not.toHaveClass('weekend');
+  });
+});
+
+describe('DispatchWeek peek', () => {
+  const stop = (over: Record<string, unknown> = {}) =>
+    ({
+      id: 'd1',
+      status: 'SCHEDULED',
+      arrivalWindowStart: '2026-03-19T09:00:00Z',
+      arrivalWindowEnd: '2026-03-19T11:00:00Z',
+      priority: 'NORMAL',
+      workOrderSummary: 'No cooling',
+      workOrderNumber: 'WO-1',
+      assignedUserId: 'u1',
+      releaseState: 'RELEASED',
+      ...over,
+    }) as never;
+  const peek = { techId: 'u1', date: '2026-03-19', x: 0, y: 0 };
+
+  it('lists the tech-day’s stops, hollow when not sent', () => {
+    renderWeek({
+      peek,
+      peekStops: [stop(), stop({ id: 'd2', workOrderSummary: 'Leak', releaseState: 'CHANGED' })],
+    });
+    const dialog = screen.getByRole('dialog', { name: /Maya Alvarez · Thu 19/ });
+    expect(dialog).toHaveTextContent('9a–11a');
+    const rows = dialog.querySelectorAll('.db-wpeek-row');
+    expect(rows[0]).not.toHaveClass('held');
+    expect(rows[1]).toHaveClass('held');
+  });
+
+  it('opens a stop in the drawer, and the day from the footer', async () => {
+    const user = userEvent.setup();
+    const { props } = renderWeek({ peek, peekStops: [stop()] });
+    await user.click(screen.getByRole('button', { name: /No cooling/ }));
+    expect(props.onOpenDispatch).toHaveBeenCalledWith(expect.objectContaining({ id: 'd1' }));
+    await user.click(screen.getByRole('button', { name: 'Open day →' }));
+    expect(props.onOpenDay).toHaveBeenCalledWith('2026-03-19');
+  });
+
+  it('closes on Escape', async () => {
+    const user = userEvent.setup();
+    const { props } = renderWeek({ peek, peekStops: [stop()] });
+    await user.keyboard('{Escape}');
+    expect(props.onPeek).toHaveBeenCalledWith(null);
+  });
+
+  it('says a past day is read-only', () => {
+    renderWeek({ peek, peekStops: [stop()], todayDate: '2026-03-25' });
+    expect(screen.getByText('Past — read only')).toBeInTheDocument();
+  });
+});
+

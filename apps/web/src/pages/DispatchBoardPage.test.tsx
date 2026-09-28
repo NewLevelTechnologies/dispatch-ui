@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import { renderWithProviders, userEvent } from '../test/utils';
 import DispatchBoardPage from './DispatchBoardPage';
 
@@ -855,14 +855,58 @@ describe('DispatchBoardPage week', () => {
   });
 
   // The week's job is to route you to the right day.
-  it('opens a day’s board when its cell is clicked', async () => {
+  // The peek reads ONE day — that day's board, on open — never seven days of
+  // dispatches to draw counts.
+  it('peeks at a tech-day by reading just that day', async () => {
+    const user = userEvent.setup();
+    mockGetWeek.mockResolvedValue(
+      weekResponse({
+        techs: [weekTech({ cells: DAYS.map((d) => weekCell(d, d === '2026-03-18' ? { stopCount: 1, committedCount: 1 } : {})) })],
+      }),
+    );
+    mockGetBoard.mockResolvedValue({
+      date: '2026-03-18',
+      timeZone: 'America/Phoenix',
+      techs: [tech('u1', 'Maya Alvarez', ['r1'])],
+      dispatches: [
+        withRelease({
+          id: 'd1',
+          status: 'SCHEDULED',
+          arrivalWindowStart: '2026-03-18T16:00:00Z',
+          arrivalWindowEnd: '2026-03-18T18:00:00Z',
+          releasedAt: null,
+          assignedUserId: 'u1',
+          workOrderId: 'wo1',
+          workOrderNumber: 'WO-1',
+          workOrderSummary: 'No cooling',
+          priority: 'NORMAL',
+        }),
+      ],
+      commitments: [],
+    });
+    renderWithProviders(<DispatchBoardPage />, {
+      initialPath: '/dispatch?view=week&date=2026-03-18',
+    });
+
+    await user.click(await screen.findByRole('button', { name: /Maya Alvarez, Wed 18/ }));
+    await waitFor(() =>
+      expect(mockGetBoard).toHaveBeenCalledWith(expect.objectContaining({ date: '2026-03-18' })),
+    );
+    const peek = await screen.findByRole('dialog', { name: /Maya Alvarez · Wed 18/ });
+    // 16:00Z is 9am in Phoenix — the tenant's zone, not the runner's.
+    expect(await within(peek).findByText('9a–11a')).toBeInTheDocument();
+    expect(within(peek).getByText('No cooling')).toBeInTheDocument();
+  });
+
+  // The column header opens the day; a cell opens a peek of that tech-day.
+  it('opens a day’s board from its column header', async () => {
     const user = userEvent.setup();
     renderWithProviders(<DispatchBoardPage />, {
       initialPath: '/dispatch?view=week&date=2026-03-18',
     });
 
     await screen.findByText('Mon 16');
-    await user.click(screen.getByRole('button', { name: /Maya Alvarez, Wed 18/ }));
+    await user.click(screen.getByRole('button', { name: /^Wed 18/ }));
 
     await waitFor(() =>
       expect(mockGetBoard).toHaveBeenCalledWith(

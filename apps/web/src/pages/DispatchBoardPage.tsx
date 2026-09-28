@@ -50,7 +50,7 @@ import DispatchMapView from '../components/dispatch/DispatchMapView';
 import type { MapPrefill } from '../components/DispatchFormDrawer';
 import DispatchFormDrawer from '../components/DispatchFormDrawer';
 import DispatchTimeline from '../components/dispatch/DispatchTimeline';
-import DispatchWeek from '../components/dispatch/DispatchWeek';
+import DispatchWeek, { type WeekPeek } from '../components/dispatch/DispatchWeek';
 import TimeOffDialog from '../components/dispatch/TimeOffDialog';
 import BlockContextMenu, { type BlockMenu } from '../components/dispatch/BlockContextMenu';
 import UnscheduledRailCard from '../components/dispatch/UnscheduledRailCard';
@@ -104,6 +104,10 @@ type ExceptionId =
 /** A move of a visit the customer was already told about, awaiting confirm. */
 interface PendingMove {
   dispatch: BoardDispatch;
+  /** The day the visit is on now — the promise the customer holds. */
+  fromDate: string;
+  /** Set when a week drop also reassigns. */
+  techId?: string;
   toDate: string;
   window: { startHour: number; endHour: number };
   notify: boolean;
@@ -215,6 +219,11 @@ export default function DispatchBoardPage() {
   const [hoverWorkOrderId, setHoverWorkOrderId] = useState<string | null>(null);
   const [confirmRelease, setConfirmRelease] = useState(false);
   const [pendingMove, setPendingMove] = useState<PendingMove | null>(null);
+  // Week mode: the tech-day being looked at — by the peek, and by the drawer
+  // opened from it. Kept separately from the peek so closing the peek to open
+  // the drawer doesn't drop the read the drawer is showing.
+  const [weekPeek, setWeekPeek] = useState<WeekPeek | null>(null);
+  const [weekDay, setWeekDay] = useState<string | null>(null);
   const [editDispatch, setEditDispatch] = useState<DispatchSeed | null>(null);
 
   // A working day is wider than any viewport at 78px/hour, so dragging toward
@@ -376,6 +385,15 @@ export default function DispatchBoardPage() {
     enabled: editDispatch != null,
   });
 
+  // The peek's read: that one day's board, under the day view's own query key,
+  // so opening the day afterwards is instant and a drop's refresh updates
+  // both. One day on open — never seven days of dispatches to draw counts.
+  const { data: weekDayBoard } = useQuery({
+    queryKey: ['dispatch-board', weekDay, regionIds, divisionIds],
+    queryFn: () => dispatchBoardApi.getBoard({ date: weekDay!, regionIds, divisionIds }),
+    enabled: isWeek && weekDay != null,
+  });
+
   const allTechs = useMemo(() => board?.techs ?? [], [board]);
   const allDispatches = useMemo(() => board?.dispatches ?? [], [board]);
   // Server-ordered: severity CASE then createdAt ASC, in the query itself
@@ -520,9 +538,13 @@ export default function DispatchBoardPage() {
 
   // Derived, never stored: a drawer opened from a stale copy of the row would
   // keep showing it after a poll refreshed the board underneath.
+  // In week mode the visit came from the peek's day read, not the day board.
   const openDispatch = useMemo(
-    () => allDispatches.find((d) => d.id === openDispatchId) ?? null,
-    [allDispatches, openDispatchId],
+    () =>
+      allDispatches.find((d) => d.id === openDispatchId) ??
+      (isWeek ? weekDayBoard?.dispatches.find((d) => d.id === openDispatchId) : undefined) ??
+      null,
+    [allDispatches, openDispatchId, isWeek, weekDayBoard],
   );
 
   // The board's own row for the visit being edited. `DispatchSeed` carries
@@ -532,6 +554,9 @@ export default function DispatchBoardPage() {
     () => allDispatches.find((d) => d.id === editDispatch?.id) ?? null,
     [allDispatches, editDispatch],
   );
+
+  const openDispatchDay =
+    (openDispatch && zonedDate(openDispatch.arrivalWindowStart, timeZone)) || date;
 
   const openVisit = (dispatch: BoardDispatch | null) => setParam('d', dispatch?.id ?? null);
 
@@ -734,10 +759,16 @@ export default function DispatchBoardPage() {
   // whether a technician has been told yet.
   const unscheduleFromRail = useCallback(
     (payload: Record<string, unknown>) => {
-      const dispatch = allDispatches.find((d) => d.id === payload.dispatchId);
-      if (dispatch) unschedule.mutate(dispatch);
+      // A peek stop can be dragged back to the rail too.
+      const dispatch =
+        allDispatches.find((d) => d.id === payload.dispatchId) ??
+        weekDayBoard?.dispatches.find((d) => d.id === payload.dispatchId);
+      if (dispatch) {
+        setWeekPeek(null);
+        unschedule.mutate(dispatch);
+      }
     },
-    [allDispatches, unschedule],
+    [allDispatches, weekDayBoard, unschedule],
   );
   unscheduleRef.current = unscheduleFromRail;
 
@@ -756,21 +787,42 @@ export default function DispatchBoardPage() {
   // visit is released, since an unreleased one has told nobody. A notice
   // counts as being about THIS date only if it post-dates `windowChangedAt`
   // (lib/customerNotified), the same rule the drawer uses.
-  const requestMove = async (dispatch: BoardDispatch, toDate: string) => {
+  // Names from whichever read is on screen: in week mode the day read is off,
+  // so the day board's techs are empty.
+  const techNameOf = (id: string) =>
+    allTechs.find((tech) => tech.id === id)?.name ??
+    (week?.techs ?? []).find((tech) => tech.id === id)?.name ??
+    '';
+
+  const requestMove = async (
+    dispatch: BoardDispatch,
+    toDate: string,
+    // The week moves visits that aren't on the viewed day, and can drop one
+    // on another tech's cell. The day board passes neither.
+    opts: { fromDate?: string; techId?: string } = {},
+  ) => {
+    const fromDate = opts.fromDate ?? date;
+    const techId = opts.techId ?? dispatch.assignedUserId;
+    const reassign = techId !== dispatch.assignedUserId;
     const window = preservedWindow(dispatch, timeZone);
-    if (!window || !canMoveTo(date, toDate, todayInZone ?? date)) return;
+    if (!window) return;
+    // Same day is only a move when it changes the tech (a week drop onto a
+    // colleague's cell); the past is never a target.
+    const today = todayInZone ?? date;
+    if (!(canMoveTo(fromDate, toDate, today) || (reassign && toDate === fromDate && toDate >= today)))
+      return;
     // The drawer would otherwise follow `?d=` to the new date, taking the
     // whole board with it.
     if (openDispatchId === dispatch.id) openVisit(null);
 
-    const techName = allTechs.find((tech) => tech.id === dispatch.assignedUserId)?.name ?? '';
     const base = {
       dispatch,
       toDate,
       toDateLabel: formatMoveDay(toDate),
       window,
       windowLabel: formatWindow(window.startHour, window.endHour),
-      techName,
+      techName: techNameOf(techId) || dispatch.assignedUserName || '',
+      techId: reassign ? techId : undefined,
     };
     if (!techHasCopy(dispatch)) {
       moveDay.mutate({ ...base, mode: 'quiet' });
@@ -801,7 +853,15 @@ export default function DispatchBoardPage() {
     }
 
     if (told) {
-      setPendingMove({ dispatch, toDate, window, notify: true, told });
+      setPendingMove({
+        dispatch,
+        fromDate,
+        techId: reassign ? techId : undefined,
+        toDate,
+        window,
+        notify: true,
+        told,
+      });
       return;
     }
     moveDay.mutate({ ...base, mode: 'techTold' });
@@ -809,14 +869,15 @@ export default function DispatchBoardPage() {
 
   const confirmMove = () => {
     if (!pendingMove) return;
-    const { dispatch, toDate, window, notify } = pendingMove;
+    const { dispatch, toDate, window, notify, techId } = pendingMove;
     moveDay.mutate({
       dispatch,
       toDate,
       toDateLabel: formatMoveDay(toDate),
       window,
       windowLabel: formatWindow(window.startHour, window.endHour),
-      techName: allTechs.find((tech) => tech.id === dispatch.assignedUserId)?.name ?? '',
+      techName: techNameOf(techId ?? dispatch.assignedUserId) || dispatch.assignedUserName || '',
+      techId,
       mode: notify ? 'notify' : 'customerStale',
     });
     setPendingMove(null);
@@ -1058,10 +1119,46 @@ export default function DispatchBoardPage() {
           density={density}
           capacityStops={week?.defaultStopsPerDay ?? null}
           today={todayInZone}
-          // The week's job is to route you to the right day, so a cell is a
-          // target: it hands the dispatcher the day board they were hunting
-          // for, scope intact.
-          onOpenDay={(day) => setParams({ date: day, view: null })}
+          todayDate={todayInZone ?? date}
+          timeZone={timeZone}
+          // The column header and the peek's footer hand the dispatcher that
+          // day's board, scope intact.
+          onOpenDay={(day) => {
+            setWeekPeek(null);
+            setParams({ date: day, view: null });
+          }}
+          peek={weekPeek}
+          peekStops={
+            weekPeek && weekDayBoard && weekDayBoard.date === weekPeek.date
+              ? weekDayBoard.dispatches
+                  .filter((d) => d.assignedUserId === weekPeek.techId && d.status !== 'CANCELLED')
+                  .sort((a, b) => a.arrivalWindowStart.localeCompare(b.arrivalWindowStart))
+              : undefined
+          }
+          onPeek={(next) => {
+            setWeekPeek(next);
+            if (next) setWeekDay(next.date);
+          }}
+          onOpenDispatch={(dispatch) => {
+            setWeekPeek(null);
+            openVisit(dispatch);
+          }}
+          // Same move as the day board's Move to, from the week: the window is
+          // kept, the release rules and the notified-customer confirm apply,
+          // and a drop on another tech's cell reassigns too.
+          onDropDispatch={(dispatchId, fromDate, toTechId, toDate) => {
+            const dispatch = weekDayBoard?.dispatches.find((d) => d.id === dispatchId);
+            setWeekPeek(null);
+            if (dispatch) void requestMove(dispatch, toDate, { fromDate, techId: toTechId });
+          }}
+          // A week drop carries a person and a day but no time — the same
+          // rule as the map drop. Open the composer; never invent a window.
+          onDropWorkOrder={(workOrderId, techId, day) => {
+            const workOrder = railItems.find((w) => w.workOrderId === workOrderId);
+            if (!workOrder) return;
+            setMapPrefill({ assignedUserId: techId, date: day });
+            setComposeFor(workOrder);
+          }}
         />
       );
     }
@@ -1578,12 +1675,12 @@ export default function DispatchBoardPage() {
               pendingMove.dispatch.customerName ||
               siteLabel(pendingMove.dispatch) ||
               getName('customer'),
-            from: formatMoveDay(date),
+            from: formatMoveDay(pendingMove.fromDate),
             window: formatWindow(pendingMove.window.startHour, pendingMove.window.endHour),
             to: formatMoveDay(pendingMove.toDate),
             },
           )}
-          cancelLabel={t('dispatchBoard.move.keep', { day: formatMoveDay(date) })}
+          cancelLabel={t('dispatchBoard.move.keep', { day: formatMoveDay(pendingMove.fromDate) })}
           confirmLabel={t('dispatchBoard.move.confirmAction', {
             day: formatMoveDay(pendingMove.toDate),
           })}
@@ -1605,7 +1702,7 @@ export default function DispatchBoardPage() {
           {!pendingMove.notify && (
             <p className="mt-3 text-[12px] leading-relaxed text-fg">
               {pendingMove.told === 'current'
-                ? t('dispatchBoard.move.staleWarning', { day: formatMoveDay(date) })
+                ? t('dispatchBoard.move.staleWarning', { day: formatMoveDay(pendingMove.fromDate) })
                 : t('dispatchBoard.move.staleWarningEarlier')}
             </p>
           )}
@@ -1649,10 +1746,11 @@ export default function DispatchBoardPage() {
               }
             : undefined
         }
-        moveFrom={date}
+        // The visit's own day — from the week it is not the viewed date.
+        moveFrom={openDispatchDay}
         moveToday={todayInZone ?? date}
         onMoveTo={(toDate) => {
-          if (openDispatch) void requestMove(openDispatch, toDate);
+          if (openDispatch) void requestMove(openDispatch, toDate, { fromDate: openDispatchDay });
         }}
         // The drawer is a visit; the board reached it from somewhere other
         // than the job, so it carries the way back to the job.
