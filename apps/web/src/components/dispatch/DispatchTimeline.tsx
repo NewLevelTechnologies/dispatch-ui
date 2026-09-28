@@ -21,7 +21,7 @@ import {
 } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
 import type { BoardDispatch, BoardTech } from '../../api/setup';
 import { useGlossary } from '../../contexts/GlossaryContext';
-import { presentationFor, statusClass } from '../../lib/dispatchStatus';
+import { DISPATCH_PRESENTATION, presentationFor, statusClass } from '../../lib/dispatchStatus';
 import { TechCell } from './BoardRows';
 import { DENSITY_METRICS, type Density, type SpineProps } from './spine';
 import { hourAtPointer, resolveDrop } from '../../lib/boardDrop';
@@ -149,22 +149,44 @@ function Block({
 
   const released = dispatch.releasedAt != null;
   const urgent = dispatch.priority === 'URGENT';
+  const live = presentationFor(dispatch.status, { isToday }).live;
+
+  // Release state is decided HERE, first, and not left to the stylesheet.
+  // Filled = released, hollow = not released. A held block gets none of the
+  // status or priority classes that paint a fill or a tint — only `held` and
+  // the modifiers it genuinely needs — so no rule that happens to sit later
+  // in the cascade can colour it in. That is exactly how the mock rendered an
+  // unreleased URGENT job with a pink fill, and an urgent job nobody has sent
+  // is the one a dispatcher can least afford to misread as handed over.
+  //
+  // The outline hue comes from the shared status map, like every other
+  // surface; urgent overrides it with danger.
+  const heldHue = urgent ? 'var(--danger-500)' : DISPATCH_PRESENTATION[dispatch.status].accent;
+  const stateClasses = released
+    ? [statusClass(dispatch.status), urgent ? 'urgent' : '']
+    : [
+        'held',
+        urgent ? 'held-urgent' : '',
+        // What status still means on a hollow block: history fades or strikes
+        // through, and on site right now still pulses. No colour.
+        dispatch.status === 'COMPLETED' ? 'held-done' : '',
+        dispatch.status === 'CANCELLED' ? 'held-cancelled' : '',
+        dispatch.status === 'IN_PROGRESS' ? 'held-onsite' : '',
+      ];
 
   const className = [
     'db-block',
-    statusClass(dispatch.status),
+    ...stateClasses,
     // The pulse is a claim about RIGHT NOW, so it is only ever true on today's
     // board. A dispatch left IN_PROGRESS from last Tuesday would otherwise
     // pulse on every future date it is dragged to.
-    presentationFor(dispatch.status, { isToday }).live ? 'live' : '',
+    live ? 'live' : '',
     // DIMMED, not ghosted. Division is a lens, not a permission: the
     // dispatcher is fully entitled to this job and merely asked to look
     // elsewhere, so redacting it would hide data from someone permitted to
     // see it — and would teach that the hatch means two different things.
     outOfDivision ? 'otherdiv' : '',
     onOffTech ? 'offtech' : '',
-    released ? '' : 'held',
-    urgent ? 'urgent' : '',
     clash ? 'clash' : '',
     clash && half ? half : '',
   ]
@@ -184,7 +206,11 @@ function Block({
       ref={ref}
       href={workOrderHref(dispatch.workOrderId)}
       className={dragging ? `${className} dragging` : className}
-      style={{ left: `${left}%`, width: `${width}%` }}
+      style={{
+        left: `${left}%`,
+        width: `${width}%`,
+        ...(released ? {} : ({ '--hc': heldHue } as React.CSSProperties)),
+      }}
       onClick={(e) => {
         if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
         e.preventDefault();
@@ -206,7 +232,10 @@ function Block({
         t('dispatchBoard.grid.blockHint', { entity: getName('work_order') }),
       ].join('\n')}
     >
-      {fillPct != null && <span className="db-fill" style={{ width: `${fillPct}%` }} />}
+      {/* Hollow means hollow: no estimate fill on held work either. */}
+      {released && fillPct != null && (
+        <span className="db-fill" style={{ width: `${fillPct}%` }} />
+      )}
       <span className="db-block-t">
         {dispatch.status === 'NO_SHOW' && <span className="text-danger-500">{'⊘ '}</span>}
         {urgent && dispatch.status !== 'NO_SHOW' && (

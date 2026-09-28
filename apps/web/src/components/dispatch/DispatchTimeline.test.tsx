@@ -128,13 +128,50 @@ describe('DispatchTimeline status and release', () => {
     expect(block().className).toContain('inprogress');
   });
 
-  // Release is ORTHOGONAL to status: both must be able to show at once.
-  it('marks an unreleased dispatch held, at any status', () => {
+  // Release is ORTHOGONAL to status: the status still owns the hue, now as
+  // the dashed outline of a hollow block rather than a fill.
+  it('renders an unreleased dispatch hollow, outlined in its status hue', () => {
     renderTimeline({
       byTech: { u1: [dispatch({ status: 'EN_ROUTE', releasedAt: null })] },
     });
-    expect(block().className).toContain('enroute');
     expect(block().className).toContain('held');
+    expect(block().style.getPropertyValue('--hc')).toBe('var(--violet-500)');
+    // No status class: nothing in the stylesheet may colour a held block in.
+    expect(block().className).not.toContain('enroute');
+  });
+
+  it('draws no estimate fill on held work', () => {
+    renderTimeline({
+      byTech: { u1: [dispatch({ releasedAt: null, estimatedDuration: 60 })] },
+    });
+    expect(document.querySelector('.db-fill')).toBeNull();
+  });
+
+  // The bug the mock hit: an unreleased urgent job rendered a pink fill,
+  // because the urgent rule won on source order. Decided in code instead.
+  it('keeps an unreleased URGENT block hollow, with a danger outline', () => {
+    renderTimeline({
+      byTech: {
+        u1: [dispatch({ releasedAt: null, priority: 'URGENT', estimatedDuration: 60 })],
+      },
+    });
+    const cls = block().className.split(' ');
+    expect(cls).toContain('held');
+    expect(cls).toContain('held-urgent');
+    expect(cls).not.toContain('urgent');
+    expect(block().style.getPropertyValue('--hc')).toBe('var(--danger-500)');
+    expect(document.querySelector('.db-fill')).toBeNull();
+    // The glyph still says urgent.
+    expect(screen.getByText(/▲/)).toBeInTheDocument();
+  });
+
+  it('keeps the on-site pulse on held work, on today only', () => {
+    renderTimeline({
+      isToday: true,
+      byTech: { u1: [dispatch({ status: 'IN_PROGRESS', releasedAt: null })] },
+    });
+    expect(block().className).toContain('held-onsite');
+    expect(block().className).toContain('live');
   });
 
   it('does not mark a released dispatch held', () => {
