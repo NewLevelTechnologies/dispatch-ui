@@ -51,6 +51,7 @@ import {
 } from '../../lib/mapPins';
 import { siteLabel } from '../../lib/siteLabel';
 import 'maplibre-gl/dist/maplibre-gl.css';
+import { isOutOfDate } from '../../lib/releaseState';
 
 export type RoutesMode = 'none' | 'selected' | 'all';
 
@@ -439,7 +440,7 @@ export default function DispatchMapCanvas({
           const el = document.createElement('span');
           el.className = pinClassName({
             status: stop.status,
-            released: stop.releasedAt != null,
+            released: !isOutOfDate(stop),
             priority: stop.priority,
             dimmed,
             focused: focusedTechId === tech.id,
@@ -450,7 +451,7 @@ export default function DispatchMapCanvas({
             stop.workOrderSummary || stop.workOrderNumber || '',
             siteLabel(stop),
             tech.name,
-            stop.releasedAt == null ? 'not released' : '',
+            isOutOfDate(stop) ? 'not sent' : '',
           ]
             .filter(Boolean)
             .join(' · ');

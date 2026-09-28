@@ -243,3 +243,26 @@ describe('UnscheduledRailCard — what the job is called', () => {
     expect(screen.queryByText(/N\/A|unknown/i)).not.toBeInTheDocument();
   });
 });
+
+// Released work pulled back to the rail: the tech still has it on their phone.
+describe('UnscheduledRailCard — a removal owed', () => {
+  const copy = (name: string | null, id = 'd-9') => ({
+    dispatchId: id,
+    assignedUserId: 'u-1',
+    assignedUserName: name,
+    arrivalWindowStart: '2026-03-15T15:00:00Z',
+    arrivalWindowEnd: '2026-03-15T17:00:00Z',
+    sentAt: '2026-03-15T14:02:00Z',
+  });
+
+  it('says whose schedule it is still on, and that nothing was sent', () => {
+    renderCard({ workOrder: workOrder({ stillWithTechs: [copy('Maya Alvarez')] }) });
+    expect(screen.getByText("Still on Maya's schedule · not sent")).toBeInTheDocument();
+  });
+
+  it('says nothing when no removal is owed', () => {
+    renderCard();
+    expect(screen.queryByText(/Still on/)).not.toBeInTheDocument();
+  });
+});
+

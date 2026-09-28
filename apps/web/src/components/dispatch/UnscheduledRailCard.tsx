@@ -93,6 +93,15 @@ export default function UnscheduledRailCard({
   // going to. Most residential sites have no name, so the customer is the
   // right fallback rather than a placeholder.
   const label = siteLabel(workOrder);
+  // Distinct first names of whoever still has a copy — usually one.
+  const stillWith =
+    [
+      ...new Set(
+        (workOrder.stillWithTechs ?? []).map(
+          (copy) => copy.assignedUserName?.split(' ')[0] ?? t('dispatchBoard.rail.theTech'),
+        ),
+      ),
+    ].join(', ') || null;
 
   // The COMPLETE address, on every card, always.
   //
@@ -205,6 +214,11 @@ export default function UnscheduledRailCard({
       </div>
 
       <div className="db-wo-title">{title}</div>
+      {/* Released work pulled back to the rail: no block is left to show the
+          tech's stale copy, so the card carries it until the removal is sent. */}
+      {stillWith && (
+        <div className="db-wo-still">{t('dispatchBoard.rail.stillWith', { names: stillWith })}</div>
+      )}
       {label && <div className="db-wo-sub">{label}</div>}
       {address && <div className="db-wo-addr">{address}</div>}
 

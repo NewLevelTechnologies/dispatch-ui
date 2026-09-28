@@ -22,6 +22,7 @@ import {
 import type { BoardDispatch, BoardTech } from '../../api/setup';
 import { useGlossary } from '../../contexts/GlossaryContext';
 import { DISPATCH_PRESENTATION, presentationFor, statusClass } from '../../lib/dispatchStatus';
+import { isOutOfDate } from '../../lib/releaseState';
 import { TechCell } from './BoardRows';
 import { DENSITY_METRICS, type Density, type SpineProps } from './spine';
 import { hourAtPointer, resolveDrop } from '../../lib/boardDrop';
@@ -147,7 +148,8 @@ function Block({
   const fillPct =
     estHours != null ? Math.min(100, (estHours / (window.end - window.start)) * 100) : null;
 
-  const released = dispatch.releasedAt != null;
+  // Hollow = the tech's copy is out of date: never sent, OR changed since.
+  const released = !isOutOfDate(dispatch);
   const urgent = dispatch.priority === 'URGENT';
   const live = presentationFor(dispatch.status, { isToday }).live;
 

@@ -480,6 +480,9 @@ export {
   type GetUnscheduledParams,
   type ReleaseRequest,
   type ReleaseResponse,
+  type DispatchReleaseState,
+  type ReleasedCopy,
+  type PendingRelease,
 } from './dispatchBoardApi';
 
 // Availability API — absence spans the dispatch board reads and writes

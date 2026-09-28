@@ -23,7 +23,9 @@ import {
   showError,
   showSuccess,
   showUndo,
+  showUndoWithAction,
 } from '../../lib/toast';
+import { editTouchesToday, previousHolder, techHasCopy } from '../../lib/releaseState';
 import { invalidateDispatchConsumers } from '../../utils/invalidateRoleConsumers';
 
 interface Window {
@@ -38,9 +40,11 @@ const PROVISIONAL_BASE = {
   seq: 0,
   status: 'SCHEDULED' as const,
   estimatedDuration: null,
-  // Drag-assign creates on deck, so the provisional block is hatched exactly
+  // Drag-assign creates on deck, so the provisional block is hollow exactly
   // like the real one will be.
   releasedAt: null,
+  releaseState: 'UNRELEASED' as const,
+  released: null,
   version: 0,
   // A create has never had its window changed.
   windowChangedAt: null,
@@ -112,6 +116,30 @@ export function useBoardMutations(date: string, timeZone: string) {
   const undoFailed = () => {
     refresh();
     showError(t('dispatchBoard.drag.undoFailed'));
+  };
+
+  /**
+   * Toast for an edit. Editing released work sends NOTHING — the tech keeps
+   * their old copy until the next release — so the toast says so. When the
+   * tech's copy or the new window is today, they may already be driving, and
+   * the toast offers Send update beside Undo: one click, still deliberate.
+   */
+  const toastEdit = (
+    message: string,
+    onUndo: () => void,
+    before: BoardDispatch,
+    after: BoardDispatch,
+  ) => {
+    if (editTouchesToday(before, after.arrivalWindowStart, timeZone)) {
+      showUndoWithAction(
+        message,
+        { label: t('common.undo'), onClick: onUndo },
+        // `release` is declared below; this only runs on click, long after.
+        { label: t('dispatchBoard.release.sendUpdate'), onClick: () => release.mutate(after) },
+      );
+      return;
+    }
+    showUndo(message, t('common.undo'), onUndo);
   };
 
   const assign = useMutation({
@@ -237,13 +265,25 @@ export function useBoardMutations(date: string, timeZone: string) {
     },
     onSuccess: (updated, input) => {
       const before = input.dispatch;
-      showUndo(
-        t('dispatchBoard.drag.moved', {
-          workOrder: before.workOrderNumber,
-          tech: input.techName,
-          window: input.windowLabel,
-        }),
-        t('common.undo'),
+      const where = {
+        workOrder: before.workOrderNumber,
+        tech: input.techName,
+        window: input.windowLabel,
+      };
+      // What the board will show once the refetch lands: same copy, new tech
+      // and window — which is what Send update has to describe.
+      const after: BoardDispatch = {
+        ...before,
+        assignedUserId: input.techId,
+        arrivalWindowStart: toIsoAt(date, input.window.startHour, timeZone),
+        arrivalWindowEnd: toIsoAt(date, input.window.endHour, timeZone),
+        releaseState: techHasCopy(before) ? 'CHANGED' : 'UNRELEASED',
+        version: updated.version ?? before.version,
+      };
+      toastEdit(
+        techHasCopy(before)
+          ? t('dispatchBoard.drag.movedNotSent', where)
+          : t('dispatchBoard.drag.moved', where),
         () => {
           dispatchesApi
             .update(before.id, {
@@ -258,6 +298,8 @@ export function useBoardMutations(date: string, timeZone: string) {
             .then(refresh)
             .catch(undoFailed);
         },
+        before,
+        after,
       );
     },
     onError: (err, _input, context) => {
@@ -275,8 +317,9 @@ export function useBoardMutations(date: string, timeZone: string) {
    * doesn't carry):
    *
    *   quiet         unreleased — nobody knows. Commit + Undo, like any drag.
-   *   techTold      released, customer not told. Same, but the toast names
-   *                 the tech: their day changed under them.
+   *   techTold      released, customer not told. Same, but the toast says the
+   *                 tech hasn't been sent the change — editing never contacts
+   *                 anyone; the next release does.
    *   notify        the customer was told and the dispatcher chose to tell
    *                 them again. NO Undo — an Undo that can't un-send a text
    *                 is a lie.
@@ -334,28 +377,43 @@ export function useBoardMutations(date: string, timeZone: string) {
       const workOrder = before.workOrderNumber ?? before.workOrderSummary ?? '';
       const where = { workOrder, day: input.toDateLabel, window: input.windowLabel };
 
+      const after: BoardDispatch = {
+        ...before,
+        arrivalWindowStart: toIsoAt(input.toDate, input.window.startHour, timeZone),
+        arrivalWindowEnd: toIsoAt(input.toDate, input.window.endHour, timeZone),
+        releaseState: techHasCopy(before) ? 'CHANGED' : 'UNRELEASED',
+        version: updated.version ?? before.version,
+      };
+
       if (input.mode === 'notify') {
         if (notifyFailed) {
           showError(t('dispatchBoard.move.notifyFailed', where));
           return;
         }
-        showSuccess(
-          t('dispatchBoard.move.notified', {
-            ...where,
-            customer: before.customerName ?? getName('customer').toLowerCase(),
-          }),
-        );
+        const message = t('dispatchBoard.move.notified', {
+          ...where,
+          customer: before.customerName ?? getName('customer').toLowerCase(),
+          tech: input.techName,
+        });
+        // No Undo — the customer text can't be un-sent. Send update still
+        // applies to the TECH, who hasn't been told.
+        if (editTouchesToday(before, after.arrivalWindowStart, timeZone)) {
+          // One forward action only: there is nothing here to undo.
+          showUndo(message, t('dispatchBoard.release.sendUpdate'), () => release.mutate(after));
+        } else {
+          showSuccess(message);
+        }
         return;
       }
 
       const message =
         input.mode === 'techTold'
-          ? t('dispatchBoard.move.movedTechTold', { ...where, tech: input.techName })
+          ? t('dispatchBoard.move.movedNotSent', { ...where, tech: input.techName })
           : input.mode === 'customerStale'
-            ? t('dispatchBoard.move.movedCustomerStale', where)
+            ? t('dispatchBoard.move.movedCustomerStale', { ...where, tech: input.techName })
             : t('dispatchBoard.move.moved', where);
 
-      showUndo(message, t('common.undo'), () => {
+      toastEdit(message, () => {
         dispatchesApi
           .update(before.id, {
             arrivalWindowStart: before.arrivalWindowStart,
@@ -366,7 +424,7 @@ export function useBoardMutations(date: string, timeZone: string) {
           })
           .then(refresh)
           .catch(undoFailed);
-      });
+      }, before, after);
     },
     onError: (err, _input, context) => {
       restore(context?.snapshot);
@@ -384,19 +442,18 @@ export function useBoardMutations(date: string, timeZone: string) {
    *
    *   unreleased  → DELETE. Nobody was told, so there is nothing to explain
    *                 and nothing worth keeping.
-   *   released    → CANCEL. A technician has an SMS about this job; deleting
-   *                 it would leave them holding a notification for a visit
-   *                 that no longer exists anywhere. Cancelling puts the work
-   *                 back in the rail just the same — "unscheduled" means no
-   *                 LIVE dispatch — while leaving a record that explains the
-   *                 message they already got.
+   *   released    → CANCEL. A technician has a copy of this job, so the
+   *                 cancel leaves a record that explains it. Nothing is sent:
+   *                 the server holds a REMOVAL owed, the rail card reads
+   *                 "Still on Maya's schedule · not sent", and the next
+   *                 release (or Send update, for today) tells them.
    *
    * Either way the work order returns to the rail, which is what the gesture
    * means.
    */
   const unschedule = useMutation({
     mutationFn: async (dispatch: BoardDispatch) => {
-      if (dispatch.releasedAt == null) {
+      if (!techHasCopy(dispatch)) {
         await dispatchesApi.delete(dispatch.id);
         return { cancelled: false };
       }
@@ -427,12 +484,34 @@ export function useBoardMutations(date: string, timeZone: string) {
         return;
       }
       // A cancel is reversible, so it gets an Undo where a delete can't.
-      showUndo(t('dispatchBoard.drag.cancelled', { workOrder }), t('common.undo'), () => {
+      const holder = dispatch.released?.assignedUserName ?? dispatch.assignedUserName ?? '';
+      const onUndo = () => {
         dispatchesApi
           .update(dispatch.id, { status: 'SCHEDULED' })
           .then(refresh)
           .catch(undoFailed);
-      });
+      };
+      const message = t('dispatchBoard.drag.cancelledNotSent', { workOrder, tech: holder });
+      if (editTouchesToday(dispatch, null, timeZone)) {
+        showUndoWithAction(
+          message,
+          { label: t('common.undo'), onClick: onUndo },
+          {
+            label: t('dispatchBoard.release.sendUpdate'),
+            onClick: () => {
+              dispatchesApi
+                .release(dispatch.id)
+                .then(() => {
+                  refresh();
+                  showSuccess(t('dispatchBoard.release.removalSent', { workOrder, tech: holder }));
+                })
+                .catch((err) => showError(t('dispatchBoard.release.failed'), extractApiError(err)));
+            },
+          },
+        );
+        return;
+      }
+      showUndo(message, t('common.undo'), onUndo);
     },
     onError: (err, _dispatch, context) => {
       restore(context?.snapshot);
@@ -442,13 +521,14 @@ export function useBoardMutations(date: string, timeZone: string) {
   });
 
   /**
-   * Release ONE dispatch — the right-click verb, and the single-visit sibling
-   * of the band-1 bulk release.
+   * Release ONE dispatch — the right-click verb, the drawer's primary action,
+   * and every "Send update". The server sends whatever brings the tech's copy
+   * in line: a new assignment, a schedule change, or on a reassignment a
+   * removal to the old tech and an assignment to the new one.
    *
-   * No Undo here, unlike every other board write: release texts the
-   * technician and there is no un-send, so the inverse this toast would
-   * promise does not exist. The server is idempotent, so a double-click
-   * cannot double-notify.
+   * No Undo here, unlike every other board write: release texts a technician
+   * and there is no un-send, so the inverse this toast would promise does not
+   * exist. Safe to repeat — nothing is sent when the copy already matches.
    */
   const release = useMutation({
     mutationFn: (dispatch: BoardDispatch) => dispatchesApi.release(dispatch.id),
@@ -457,12 +537,14 @@ export function useBoardMutations(date: string, timeZone: string) {
       const snapshot = queryClient.getQueriesData({ queryKey: ['dispatch-board'] });
       // The hatch clears on the click, not on the round-trip: release is the
       // one board write whose whole point is a change of appearance.
-      const releasedAt = new Date().toISOString();
+      const now = new Date().toISOString();
       patchBoardCaches(queryClient, {
         grid: (board) => ({
           ...board,
           dispatches: board.dispatches.map((d) =>
-            d.id === dispatch.id ? { ...d, releasedAt } : d,
+            d.id === dispatch.id
+              ? { ...d, releasedAt: d.releasedAt ?? now, releaseState: 'RELEASED' as const }
+              : d,
           ),
         }),
       });
@@ -470,8 +552,18 @@ export function useBoardMutations(date: string, timeZone: string) {
     },
     onSuccess: (_result, dispatch) => {
       const workOrder = dispatch.workOrderNumber ?? dispatch.workOrderSummary ?? '';
+      const tech = dispatch.assignedUserName ?? getName('technician');
+      // Say what actually went out — the three are different messages on the
+      // technician's phone, and "released" would describe only the first.
+      if (!techHasCopy(dispatch)) {
+        showSuccess(t('dispatchBoard.release.one', { workOrder, tech: getName('technician') }));
+        return;
+      }
+      const previous = previousHolder(dispatch);
       showSuccess(
-        t('dispatchBoard.release.one', { workOrder, tech: getName('technician') }),
+        previous
+          ? t('dispatchBoard.release.reassignedSent', { workOrder, tech, previous })
+          : t('dispatchBoard.release.updateSent', { workOrder, tech }),
       );
     },
     onError: (err, _dispatch, context) => {

@@ -70,6 +70,20 @@ export function showUndo(message: string, undoLabel: string, onUndo: () => void)
   toast(message, { action: { label: undoLabel, onClick: onUndo } });
 }
 
+// Undoable, plus one forward action — "Send update" beside Undo on a board
+// edit that the technician may already be acting on. The forward action is the
+// primary button; Undo sits beside it as the secondary.
+export function showUndoWithAction(
+  message: string,
+  undo: { label: string; onClick: () => void },
+  action: { label: string; onClick: () => void },
+) {
+  toast(message, {
+    action: { label: action.label, onClick: action.onClick },
+    cancel: { label: undo.label, onClick: undo.onClick },
+  });
+}
+
 // Promise-based — auto-renders loading → success/error. Use for long-running
 // mutations where the user benefits from seeing the in-flight state.
 export function showMutation<T>(
