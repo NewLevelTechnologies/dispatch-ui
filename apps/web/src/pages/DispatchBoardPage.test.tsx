@@ -3,6 +3,13 @@ import { screen, waitFor } from '@testing-library/react';
 import { renderWithProviders, userEvent } from '../test/utils';
 import DispatchBoardPage from './DispatchBoardPage';
 
+/** Release state follows releasedAt unless a test sets it. */
+const withRelease = (d: Record<string, unknown>) => ({
+  released: null,
+  ...d,
+  releaseState: d.releaseState ?? (d.releasedAt == null ? 'UNRELEASED' : 'RELEASED'),
+});
+
 const mockGetBoard = vi.fn();
 const mockGetUnscheduled = vi.fn();
 const mockGetWeek = vi.fn();
@@ -430,7 +437,7 @@ describe('DispatchBoardPage unscheduled rail', () => {
 // "Stage the morning, release at 7am" — the reason on-deck is first-class,
 // and the one thing the board could render but not act on.
 describe('DispatchBoardPage release', () => {
-  const held = (over: Record<string, unknown> = {}) => ({
+  const held = (over: Record<string, unknown> = {}) => withRelease({
     id: 'd1',
     seq: 1,
     status: 'SCHEDULED',
@@ -469,22 +476,42 @@ describe('DispatchBoardPage release', () => {
     vi.clearAllMocks();
     mockRegionsGetAll.mockResolvedValue([]);
     mockGetUnscheduled.mockResolvedValue(emptyRail);
-    mockRelease.mockResolvedValue({ released: 2 });
+    mockRelease.mockResolvedValue({ released: 2, newCount: 2, changedCount: 0, removedCount: 0 });
     mockGetBoard.mockResolvedValue({
       techs: [tech('u1', 'Maya Alvarez', ['r1'])],
       dispatches: [held(), held({ id: 'd2' })],
+      pendingRelease: { newCount: 2, changedCount: 0, removedCount: 0, total: 2 },
     });
   });
 
-  it('offers the action only when something is unreleased', async () => {
+  it('offers the action only when something is owed', async () => {
     renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch' });
     expect(await screen.findByRole('button', { name: 'Release 2' })).toBeInTheDocument();
   });
 
-  it('hides the action when everything is released', async () => {
+  // The server's count, not a count of blocks: a removal has no block, and a
+  // name search is a lens on screen the release knows nothing about.
+  it('counts what the server says is owed, removals included', async () => {
+    mockGetBoard.mockResolvedValue({
+      techs: [tech('u1', 'Maya Alvarez', ['r1'])],
+      dispatches: [held()],
+      pendingRelease: { newCount: 1, changedCount: 2, removedCount: 1, total: 4 },
+    });
+    renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch' });
+    const button = await screen.findByRole('button', { name: 'Release 4' });
+    expect(button).toHaveAttribute(
+      'title',
+      '1 new · 2 changed · 1 removed — every technician row showing',
+    );
+    // "Changed, not sent" = changes + removals.
+    expect(screen.getByRole('button', { name: /Changed, not sent/ })).toHaveTextContent('3');
+  });
+
+  it('hides the action when nothing is owed', async () => {
     mockGetBoard.mockResolvedValue({
       techs: [tech('u1', 'Maya Alvarez', ['r1'])],
       dispatches: [held({ releasedAt: '2026-03-15T07:00:00Z' })],
+      pendingRelease: { newCount: 0, changedCount: 0, removedCount: 0, total: 0 },
     });
     renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch' });
     await screen.findByText('Maya Alvarez');
@@ -498,7 +525,8 @@ describe('DispatchBoardPage release', () => {
     renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch' });
 
     await u.click(await screen.findByRole('button', { name: 'Release 2' }));
-    expect(await screen.findByText('Release 2 dispatches?')).toBeInTheDocument();
+    expect(await screen.findByText('Release 2 changes?')).toBeInTheDocument();
+    expect(screen.getByText(/This sends 2 new/)).toBeInTheDocument();
     expect(screen.getByText(/can't be undone/)).toBeInTheDocument();
 
     await u.click(screen.getByRole('button', { name: 'Cancel' }));
@@ -507,28 +535,34 @@ describe('DispatchBoardPage release', () => {
 
   // Scope, not an id list — the server recomputes the unreleased set, so this
   // can't reach outside the caller's regions or act on a stale board.
-  it('sends the date and scope, never a list of ids', async () => {
+  // Same regionIds AND divisionIds the board read used, so it releases
+  // exactly the tech rows the board draws.
+  it('sends the date and the board scope, never a list of ids', async () => {
     const u = userEvent.setup();
     renderWithProviders(<DispatchBoardPage />, {
-      initialPath: '/dispatch?date=2026-03-15&region=r1',
+      initialPath: '/dispatch?date=2026-03-15&region=r1&division=dv1',
     });
 
     await u.click(await screen.findByRole('button', { name: 'Release 2' }));
     await u.click(screen.getByRole('button', { name: 'Release' }));
 
-    expect(mockRelease).toHaveBeenCalledWith({ date: '2026-03-15', regionIds: ['r1'] });
+    expect(mockRelease).toHaveBeenCalledWith({
+      date: '2026-03-15',
+      regionIds: ['r1'],
+      divisionIds: ['dv1'],
+    });
   });
 
   it('reports the count the SERVER released, not the one on screen', async () => {
     const u = userEvent.setup();
     // The server recomputes, so its answer can differ from a stale board.
-    mockRelease.mockResolvedValue({ released: 5 });
+    mockRelease.mockResolvedValue({ released: 5, newCount: 3, changedCount: 1, removedCount: 1 });
     renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch' });
 
     await u.click(await screen.findByRole('button', { name: 'Release 2' }));
     await u.click(screen.getByRole('button', { name: 'Release' }));
 
-    await waitFor(() => expect(mockShowSuccess).toHaveBeenCalledWith('5 dispatches released'));
+    await waitFor(() => expect(mockShowSuccess).toHaveBeenCalledWith('Released 3 new · 1 changed · 1 removed'));
   });
 
   it('surfaces a failure instead of pretending it worked', async () => {
@@ -550,7 +584,7 @@ describe('DispatchBoardPage release', () => {
 // with a customer on the phone. So the job is one action away from every place
 // a dispatch appears, and always as a real link.
 describe('DispatchBoardPage reaching the work order', () => {
-  const scheduled = (over: Record<string, unknown> = {}) => ({
+  const scheduled = (over: Record<string, unknown> = {}) => withRelease({
     id: 'd1',
     seq: 1,
     status: 'SCHEDULED',
@@ -683,6 +717,19 @@ describe('DispatchBoardPage reaching the work order', () => {
     await user.pointer({ keys: '[MouseRight]', target: await block() });
     await screen.findByRole('menu');
     expect(screen.queryByRole('menuitem', { name: 'Unschedule' })).not.toBeInTheDocument();
+  });
+
+  // Changed since release: same verb, but it sends a change.
+  it('offers Send update for a changed visit, and nothing for one that matches', async () => {
+    const user = userEvent.setup();
+    mockGetBoard.mockResolvedValue({
+      techs: [tech('u1', 'Maya Alvarez', ['r1'])],
+      dispatches: [scheduled({ releasedAt: '2026-03-15T07:00:00Z', releaseState: 'CHANGED' })],
+    });
+    renderWithProviders(<DispatchBoardPage />, { initialPath: '/dispatch' });
+    await user.pointer({ keys: '[MouseRight]', target: await block() });
+    await user.click(await screen.findByRole('menuitem', { name: 'Send update' }));
+    await waitFor(() => expect(mockReleaseOne).toHaveBeenCalledWith('d1'));
   });
 
   it('unschedules from the menu', async () => {
@@ -917,7 +964,7 @@ describe('DispatchBoardPage date label', () => {
 });
 
 describe('DispatchBoardPage chrome', () => {
-  const chromeDispatch = (over: Record<string, unknown> = {}) => ({
+  const chromeDispatch = (over: Record<string, unknown> = {}) => withRelease({
     id: 'd1',
     seq: 1,
     status: 'SCHEDULED',

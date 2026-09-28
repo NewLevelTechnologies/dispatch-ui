@@ -22,7 +22,7 @@ function tech(over: Partial<BoardTech> = {}): BoardTech {
 }
 
 function dispatch(over: Partial<BoardDispatch> = {}): BoardDispatch {
-  return {
+  const base: Omit<BoardDispatch, 'releaseState' | 'released'> & Partial<BoardDispatch> = {
     id: 'd1',
     workOrderId: 'wo1',
     assignedUserId: 'u1',
@@ -57,6 +57,13 @@ function dispatch(over: Partial<BoardDispatch> = {}): BoardDispatch {
     version: 1,
     windowChangedAt: null,
     ...over,
+  };
+  // Release state follows releasedAt unless a test sets it: most fixtures only
+  // care whether the tech has ever been sent the job.
+  return {
+    released: null,
+    ...base,
+    releaseState: over.releaseState ?? (base.releasedAt == null ? 'UNRELEASED' : 'RELEASED'),
   };
 }
 
@@ -172,6 +179,13 @@ describe('DispatchTimeline status and release', () => {
     });
     expect(block().className).toContain('held-onsite');
     expect(block().className).toContain('live');
+  });
+
+  // Hollow means the tech's copy is out of date — changed since release is
+  // exactly as hollow as never sent, even though releasedAt is set.
+  it('renders a changed-since-release dispatch hollow', () => {
+    renderTimeline({ byTech: { u1: [dispatch({ releaseState: 'CHANGED' })] } });
+    expect(block().className).toContain('held');
   });
 
   it('does not mark a released dispatch held', () => {

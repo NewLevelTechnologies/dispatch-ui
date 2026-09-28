@@ -6,6 +6,13 @@ import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { renderWithProviders, userEvent } from '../test/utils';
 import DispatchBoardPage from './DispatchBoardPage';
 
+/** Release state follows releasedAt unless a test sets it. */
+const withRelease = (d: Record<string, unknown>) => ({
+  released: null,
+  ...d,
+  releaseState: d.releaseState ?? (d.releasedAt == null ? 'UNRELEASED' : 'RELEASED'),
+});
+
 const mockGetBoard = vi.fn();
 const mockUpdate = vi.fn();
 const mockNotify = vi.fn();
@@ -79,7 +86,7 @@ const tech = (over: Record<string, unknown> = {}) => ({
   ...over,
 });
 
-const visit = (over: Record<string, unknown> = {}) => ({
+const visit = (over: Record<string, unknown> = {}) => withRelease({
   id: 'd1',
   seq: 1,
   status: 'SCHEDULED',
@@ -254,7 +261,7 @@ describe('Move to another day', () => {
     );
   });
 
-  it('names the tech when a released visit moves and the customer was never told', async () => {
+  it('says the tech has not been sent the change — editing contacts no one', async () => {
     const user = userEvent.setup();
     mockGetBoard.mockResolvedValue(
       board([tech()], [visit({ releasedAt: `${FRIDAY}T07:00:00Z` })]),
@@ -266,7 +273,7 @@ describe('Move to another day', () => {
 
     await waitFor(() => expect(mockShowUndo).toHaveBeenCalled());
     expect(mockShowUndo.mock.calls[0][0]).toBe(
-      "WO-1 → Mon, Mar 23, 9a–11a · Robert Chen's schedule updated",
+      'WO-1 → Mon, Mar 23, 9a–11a · not sent to Robert Chen yet',
     );
     expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
   });
@@ -314,7 +321,7 @@ describe('Move to another day', () => {
       await waitFor(() => expect(mockNotify).toHaveBeenCalledWith('d1', 'CUSTOMER'));
       await waitFor(() =>
         expect(mockShowSuccess).toHaveBeenCalledWith(
-          'Reyes Residence notified · WO-1 → Mon, Mar 23, 9a–11a',
+          'Reyes Residence notified · WO-1 → Mon, Mar 23, 9a–11a · not sent to Robert Chen yet',
         ),
       );
       expect(mockShowUndo).not.toHaveBeenCalled();
@@ -330,7 +337,7 @@ describe('Move to another day', () => {
 
       await waitFor(() => expect(mockShowUndo).toHaveBeenCalled());
       expect(mockShowUndo.mock.calls[0][0]).toBe(
-        'WO-1 → Mon, Mar 23, 9a–11a · customer not yet told',
+        'WO-1 → Mon, Mar 23, 9a–11a · customer and Robert Chen not told yet',
       );
       expect(mockNotify).not.toHaveBeenCalled();
     });

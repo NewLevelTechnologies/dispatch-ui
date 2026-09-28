@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { renderHook, waitFor, act } from '@testing-library/react';
 import type { ReactNode } from 'react';
@@ -23,6 +23,7 @@ vi.mock('@dispatch/api/src/client');
 const mockShowUndo = vi.fn();
 const mockShowError = vi.fn();
 const mockShowSuccess = vi.fn();
+const mockShowUndoWithAction = vi.fn();
 
 vi.mock('../../lib/toast', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../lib/toast')>();
@@ -31,6 +32,7 @@ vi.mock('../../lib/toast', async (importOriginal) => {
     showUndo: (...a: unknown[]) => mockShowUndo(...a),
     showError: (...a: unknown[]) => mockShowError(...a),
     showSuccess: (...a: unknown[]) => mockShowSuccess(...a),
+    showUndoWithAction: (...a: unknown[]) => mockShowUndoWithAction(...a),
   };
 });
 
@@ -63,7 +65,7 @@ const workOrder: UnscheduledWorkOrder = {
 };
 
 function dispatch(over: Partial<BoardDispatch> = {}): BoardDispatch {
-  return {
+  const base: Omit<BoardDispatch, 'releaseState' | 'released'> & Partial<BoardDispatch> = {
     id: 'd-1',
     seq: 1,
     status: 'SCHEDULED',
@@ -97,6 +99,13 @@ function dispatch(over: Partial<BoardDispatch> = {}): BoardDispatch {
     departedAt: null,
     addressedWorkItemIds: [],
     ...over,
+  };
+  // Release state follows releasedAt unless a test sets it: most fixtures only
+  // care whether the tech has ever been sent the job.
+  return {
+    released: null,
+    ...base,
+    releaseState: over.releaseState ?? (base.releasedAt == null ? 'UNRELEASED' : 'RELEASED'),
   };
 }
 
@@ -427,3 +436,124 @@ describe('tenant timezone', () => {
     });
   });
 });
+
+// Rev 13: editing released work never contacts anyone. The tech keeps their
+// copy until the next release — the toasts say so, and offer Send update only
+// where the tech may already be acting on the old copy (today).
+describe('useBoardMutations — editing released work', () => {
+  const copy = {
+    dispatchId: 'd-1',
+    assignedUserId: 'u-1',
+    assignedUserName: 'Maya Alvarez',
+    arrivalWindowStart: '2026-03-15T15:00:00Z',
+    arrivalWindowEnd: '2026-03-15T17:00:00Z',
+    sentAt: '2026-03-15T14:02:00Z',
+  };
+  const released = (over: Partial<BoardDispatch> = {}) =>
+    dispatch({ releasedAt: '2026-03-15T14:02:00Z', releaseState: 'RELEASED', released: copy, ...over });
+
+  const moveInput = (d: BoardDispatch, techId = 'u-1') => ({
+    dispatch: d,
+    techId,
+    techName: techId === 'u-1' ? 'Maya Alvarez' : 'Kenji Tran',
+    windowLabel: '10a–12p',
+    window: WINDOW,
+  });
+
+  const at = (iso: string) => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date(iso));
+  };
+  afterEach(() => vi.useRealTimers());
+
+  beforeEach(() => {
+    mockUpdate.mockResolvedValue({ id: 'd-1', version: 8 });
+  });
+
+  it('says nothing was sent, and offers Send update, when the move touches today', async () => {
+    // 10am in Phoenix on the board's own day.
+    at('2026-03-15T17:00:00Z');
+    const { result } = setup();
+    act(() => result.current.move.mutate(moveInput(released())));
+
+    await waitFor(() => expect(mockShowUndoWithAction).toHaveBeenCalled());
+    const [message, undo, action] = mockShowUndoWithAction.mock.calls[0];
+    expect(message).toBe('WO-3841 → Maya Alvarez, 10a–12p · not sent yet');
+    expect(undo.label).toBe('Undo');
+    expect(action.label).toBe('Send update');
+    expect(mockReleaseOne).not.toHaveBeenCalled();
+
+    mockReleaseOne.mockResolvedValue({ id: 'd-1' });
+    act(() => action.onClick());
+    await waitFor(() => expect(mockReleaseOne).toHaveBeenCalledWith('d-1'));
+  });
+
+  it('only offers Undo when nothing about the move is today', async () => {
+    at('2026-03-10T17:00:00Z');
+    const { result } = setup();
+    act(() => result.current.move.mutate(moveInput(released())));
+
+    await waitFor(() => expect(mockShowUndo).toHaveBeenCalled());
+    expect(mockShowUndo.mock.calls[0][0]).toBe('WO-3841 → Maya Alvarez, 10a–12p · not sent yet');
+    expect(mockShowUndoWithAction).not.toHaveBeenCalled();
+  });
+
+  it('says nothing about sending when the tech never had it', async () => {
+    at('2026-03-15T17:00:00Z');
+    const { result } = setup();
+    act(() => result.current.move.mutate(moveInput(dispatch())));
+
+    await waitFor(() => expect(mockShowUndo).toHaveBeenCalled());
+    expect(mockShowUndo.mock.calls[0][0]).toBe('WO-3841 → Maya Alvarez, 10a–12p');
+    expect(mockShowUndoWithAction).not.toHaveBeenCalled();
+  });
+
+  it('names the update when releasing a changed dispatch', async () => {
+    const { result } = setup();
+    mockReleaseOne.mockResolvedValue({ id: 'd-1' });
+    act(() => result.current.release.mutate(released({ releaseState: 'CHANGED' })));
+    await waitFor(() =>
+      expect(mockShowSuccess).toHaveBeenCalledWith('WO-3841 · update sent to Maya Alvarez'),
+    );
+  });
+
+  // Reassigned: the old tech is told it's off their schedule.
+  it('names both techs when releasing a reassignment', async () => {
+    const { result } = setup();
+    mockReleaseOne.mockResolvedValue({ id: 'd-1' });
+    act(() =>
+      result.current.release.mutate(
+        released({ releaseState: 'CHANGED', assignedUserId: 'u-2', assignedUserName: 'Kenji Tran' }),
+      ),
+    );
+    await waitFor(() =>
+      expect(mockShowSuccess).toHaveBeenCalledWith(
+        "WO-3841 sent to Kenji Tran · Maya Alvarez told it's off their schedule",
+      ),
+    );
+  });
+
+  it('turns a released block filled again the moment it is released', async () => {
+    const { result, queryClient } = setup();
+    seedCaches(queryClient, [released({ releaseState: 'CHANGED' })]);
+    mockReleaseOne.mockReturnValue(new Promise(() => {}));
+    act(() => result.current.release.mutate(released({ releaseState: 'CHANGED' })));
+    await waitFor(() => expect(board(queryClient).dispatches[0].releaseState).toBe('RELEASED'));
+  });
+
+  // A changed dispatch still has a copy on the tech's phone, so unscheduling
+  // it is a cancel (a removal owed), not a delete — and it says not sent.
+  it('cancels changed work, and says the removal has not been sent', async () => {
+    at('2026-03-10T17:00:00Z');
+    const { result } = setup();
+    act(() => result.current.unschedule.mutate(released({ releaseState: 'CHANGED' })));
+
+    await waitFor(() => expect(mockShowUndo).toHaveBeenCalled());
+    expect(mockUpdate).toHaveBeenCalledWith('d-1', expect.objectContaining({ status: 'CANCELLED' }));
+    expect(mockDelete).not.toHaveBeenCalled();
+    expect(mockShowUndo.mock.calls[0][0]).toBe(
+      "WO-3841 cancelled → unscheduled · still on Maya Alvarez's schedule, not sent",
+    );
+  });
+});
+

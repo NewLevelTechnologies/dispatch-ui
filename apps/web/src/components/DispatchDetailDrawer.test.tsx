@@ -151,6 +151,7 @@ const renderDrawer = (dispatch: Dispatch | null, props: Partial<React.ComponentP
       workOrder={props.workOrder}
       moveFrom={props.moveFrom}
       onMoveTo={props.onMoveTo}
+      release={props.release}
     />,
   );
 };
@@ -601,6 +602,52 @@ describe('DispatchDetailDrawer work order link', () => {
     });
     renderDrawer(mockDispatch({ windowChangedAt: '2099-05-14T18:00:00Z' }));
     expect(await screen.findByRole('button', { name: /notify customer/i })).toBeInTheDocument();
+  });
+
+  describe('release state (board only)', () => {
+    const copy = {
+      dispatchId: 'd1',
+      assignedUserId: 'u1',
+      assignedUserName: 'Jason Smith',
+      arrivalWindowStart: '2099-05-15T09:00:00Z',
+      arrivalWindowEnd: '2099-05-15T11:00:00Z',
+      sentAt: '2099-05-15T07:02:00Z',
+    };
+    const release = (over = {}) => ({
+      state: 'CHANGED' as const,
+      copy,
+      timeZone: 'UTC',
+      pending: false,
+      onRelease: vi.fn(),
+      ...over,
+    });
+
+    it('says what the tech still has, and offers Send update', async () => {
+      const user = userEvent.setup();
+      const r = release();
+      renderDrawer(mockDispatch(), { release: r });
+      expect(await screen.findByText('Released 7:02a · Jason Smith still has 9a–11a')).toBeInTheDocument();
+      await user.click(screen.getByRole('button', { name: 'Send update' }));
+      expect(r.onRelease).toHaveBeenCalled();
+    });
+
+    it('warns that sending takes it off the previous tech’s schedule', async () => {
+      renderDrawer(mockDispatch(), {
+        release: release({ copy: { ...copy, assignedUserId: 'u-previous', assignedUserName: 'Robert Chen' } }),
+      });
+      expect(
+        await screen.findByText(/Robert Chen still has 9a–11a — sending tells them it's off their schedule/),
+      ).toBeInTheDocument();
+    });
+
+    it('offers Release to tech for never-sent work, and nothing once it matches', async () => {
+      const { unmount } = renderDrawer(mockDispatch(), { release: release({ state: 'UNRELEASED', copy: null }) });
+      expect(await screen.findByRole('button', { name: /Release to/ })).toBeInTheDocument();
+      unmount();
+      renderDrawer(mockDispatch(), { release: release({ state: 'RELEASED' }) });
+      await screen.findByText('Jason Smith');
+      expect(screen.queryByRole('button', { name: /Release to|Send update/ })).not.toBeInTheDocument();
+    });
   });
 });
 

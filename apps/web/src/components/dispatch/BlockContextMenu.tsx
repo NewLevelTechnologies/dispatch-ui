@@ -14,6 +14,7 @@ import { useTranslation } from '@dispatch/i18n';
 import type { BoardDispatch } from '../../api/setup';
 import { useGlossary } from '../../contexts/GlossaryContext';
 import { siteLabel } from '../../lib/siteLabel';
+import { isOutOfDate } from '../../lib/releaseState';
 import { formatWindow } from '../../lib/boardTime';
 import {
   canMoveTo,
@@ -189,11 +190,14 @@ export default function BlockContextMenu({
 
       <div className="db-ctx-sep" />
 
-      {/* Release is offered only while it would do something — releasing an
-          already-released dispatch is a no-op the dispatcher can't see. */}
-      {dispatch.releasedAt == null && dispatch.status !== 'CANCELLED' && (
+      {/* Offered only while the tech's copy is out of date — never sent, or
+          changed since. A changed one is "Send update": the same verb, but it
+          sends a change, not a first assignment. */}
+      {isOutOfDate(dispatch) && dispatch.status !== 'CANCELLED' && (
         <button type="button" className="db-ctx-item" role="menuitem" onClick={act(onRelease)}>
-          {t('dispatchBoard.menu.release', { tech: getName('technician') })}
+          {dispatch.releaseState === 'CHANGED'
+            ? t('dispatchBoard.release.sendUpdate')
+            : t('dispatchBoard.menu.release', { tech: getName('technician') })}
         </button>
       )}
       <button type="button" className="db-ctx-item" role="menuitem" onClick={act(onReassign)}>

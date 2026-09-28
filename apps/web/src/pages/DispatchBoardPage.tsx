@@ -68,6 +68,7 @@ import { canMoveTo, formatMoveDay, preservedWindow, shiftDay } from '../lib/boar
 import { toIsoAt } from '../lib/arrivalWindows';
 import { customerEverNotified, customerNotifiedAt } from '../lib/customerNotified';
 import { hitsTimeOff } from '../lib/timeOff';
+import { techHasCopy } from '../lib/releaseState';
 import { useBoardMutations } from './dispatch/useBoardMutations';
 import { extractApiError, showError, showSuccess, showUndo } from '../lib/toast';
 import { invalidateDispatchBoard } from '../utils/invalidateRoleConsumers';
@@ -93,6 +94,7 @@ type ChipTone = 'neutral' | 'warning' | 'danger' | 'violet';
 type ExceptionId =
   | 'urgent'
   | 'unreleased'
+  | 'changed'
   | 'noshow'
   | 'offtech'
   | 'cancelled'
@@ -170,10 +172,28 @@ function isValidDate(value: string | null): value is string {
   return !!value && /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(Date.parse(value));
 }
 
+/** "3 new · 2 changed · 1 removed", skipping zero parts. */
+function useReleaseParts() {
+  const { t } = useTranslation();
+  return (counts?: { newCount: number; changedCount: number; removedCount: number } | null) =>
+    counts
+      ? [
+          counts.newCount > 0 && t('dispatchBoard.release.partNew', { count: counts.newCount }),
+          counts.changedCount > 0 &&
+            t('dispatchBoard.release.partChanged', { count: counts.changedCount }),
+          counts.removedCount > 0 &&
+            t('dispatchBoard.release.partRemoved', { count: counts.removedCount }),
+        ]
+          .filter(Boolean)
+          .join(' · ')
+      : '';
+}
+
 export default function DispatchBoardPage() {
   const { t } = useTranslation();
   const { getName } = useGlossary();
   const navigate = useNavigate();
+  const releaseParts = useReleaseParts();
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -390,14 +410,19 @@ export default function DispatchBoardPage() {
     const inScope = allDispatches.filter((d) => techIds.has(d.assignedUserId));
     return {
       urgent: inScope.filter((d) => d.priority === 'URGENT').length,
-      unreleased: inScope.filter((d) => d.releasedAt == null && d.status !== 'CANCELLED').length,
+      unreleased: inScope.filter((d) => d.releaseState === 'UNRELEASED' && d.status !== 'CANCELLED')
+        .length,
+      // Server-counted: removals owed have no block to count, and the number
+      // has to match what Release actually sends.
+      changed:
+        (board?.pendingRelease?.changedCount ?? 0) + (board?.pendingRelease?.removedCount ?? 0),
       noshow: inScope.filter((d) => d.status === 'NO_SHOW').length,
       offtech: inScope.filter((d) => offTechDispatchIds.has(d.id)).length,
       cancelled: inScope.filter((d) => d.status === 'CANCELLED').length,
       longdrive: inScope.filter((d) => (d.driveMinFromPrev ?? 0) > LONG_DRIVE_MINUTES).length,
       recurring: inScope.filter((d) => d.recurring === true).length,
     } satisfies Record<ExceptionId, number>;
-  }, [allDispatches, techIds, offTechDispatchIds]);
+  }, [allDispatches, techIds, offTechDispatchIds, board]);
 
   const visibleDispatches = useMemo(() => {
     const showCancelled = exceptions.includes('cancelled');
@@ -414,7 +439,11 @@ export default function DispatchBoardPage() {
           case 'urgent':
             return d.priority === 'URGENT';
           case 'unreleased':
-            return d.releasedAt == null && d.status !== 'CANCELLED';
+            return d.releaseState === 'UNRELEASED' && d.status !== 'CANCELLED';
+          // Removals have no block, so the filter can only show the changes;
+          // the rail card carries the rest ("Still on Maya's schedule").
+          case 'changed':
+            return d.releaseState === 'CHANGED';
           case 'noshow':
             return d.status === 'NO_SHOW';
           case 'offtech':
@@ -743,7 +772,7 @@ export default function DispatchBoardPage() {
       windowLabel: formatWindow(window.startHour, window.endHour),
       techName,
     };
-    if (dispatch.releasedAt == null) {
+    if (!techHasCopy(dispatch)) {
       moveDay.mutate({ ...base, mode: 'quiet' });
       return;
     }
@@ -859,14 +888,27 @@ export default function DispatchBoardPage() {
     [searchParams],
   );
 
+  // Same regionIds AND divisionIds as the board read: the release narrows rows
+  // exactly as the read does, so it sends what `pendingRelease` counted.
   const releaseMutation = useMutation({
-    mutationFn: () => dispatchBoardApi.release({ date, regionIds }),
-    onSuccess: ({ released }) => {
+    mutationFn: () => dispatchBoardApi.release({ date, regionIds, divisionIds }),
+    onSuccess: (result) => {
       invalidateDispatchBoard(queryClient);
-      showSuccess(t('dispatchBoard.release.done', { count: released }));
+      showSuccess(
+        t('dispatchBoard.release.doneSplit', {
+          count: result.released,
+          parts: releaseParts(result) || String(result.released),
+        }),
+      );
     },
     onError: (err) => showError(t('dispatchBoard.release.failed'), extractApiError(err)),
   });
+
+  const pendingTotal = board?.pendingRelease
+    ? board.pendingRelease.newCount +
+      board.pendingRelease.changedCount +
+      board.pendingRelease.removedCount
+    : 0;
 
   const hasFilters = Boolean(regionId || search.trim() || exceptions.length > 0);
   const clearFilters = () => {
@@ -1089,6 +1131,8 @@ export default function DispatchBoardPage() {
   const chips: { id: ExceptionId; label: string; tone: ChipTone }[] = [
     { id: 'urgent', label: t('dispatchBoard.chips.urgent'), tone: 'danger' },
     { id: 'unreleased', label: t('dispatchBoard.chips.unreleased'), tone: 'neutral' },
+    // Released, then edited or unscheduled — the tech's copy is out of date.
+    { id: 'changed', label: t('dispatchBoard.chips.changed'), tone: 'neutral' },
     { id: 'noshow', label: t('dispatchBoard.chips.noshow'), tone: 'warning' },
     {
       id: 'offtech',
@@ -1195,14 +1239,20 @@ export default function DispatchBoardPage() {
             {/* Present only when there is something to release — and only on
                 the day board, since release takes a single day's scope and a
                 count spanning the week could not act on itself. */}
-            {!isWeek && counts.unreleased > 0 && (
+            {/* The server's number, not a count of blocks: removals have no
+                block, and it is the number the release acts on. Every tech row
+                showing — a name search is a lens on screen only. */}
+            {!isWeek && pendingTotal > 0 && (
               <Button
                 color="accent"
                 size="xxs"
                 onClick={() => setConfirmRelease(true)}
                 disabled={releaseMutation.isPending}
+                title={t('dispatchBoard.release.tooltip', {
+                  parts: releaseParts(board?.pendingRelease),
+                })}
               >
-                {t('dispatchBoard.release.action', { count: counts.unreleased })}
+                {t('dispatchBoard.release.action', { count: pendingTotal })}
               </Button>
             )}
           </div>
@@ -1431,8 +1481,11 @@ export default function DispatchBoardPage() {
         isOpen={confirmRelease}
         onClose={() => setConfirmRelease(false)}
         onConfirm={() => releaseMutation.mutate()}
-        title={t('dispatchBoard.release.confirmTitle', { count: counts.unreleased })}
-        message={t('dispatchBoard.release.confirmBody', { count: counts.unreleased })}
+        title={t('dispatchBoard.release.confirmTitle', { count: pendingTotal })}
+        message={t('dispatchBoard.release.confirmBody', {
+          count: pendingTotal,
+          parts: releaseParts(board?.pendingRelease),
+        })}
         confirmLabel={t('dispatchBoard.release.confirmAction')}
         isPending={releaseMutation.isPending}
       />
@@ -1585,6 +1638,17 @@ export default function DispatchBoardPage() {
         }}
         // The same move the block menu offers, from the drawer's footer —
         // no separate reschedule surface.
+        release={
+          openDispatch
+            ? {
+                state: openDispatch.releaseState,
+                copy: openDispatch.released,
+                timeZone,
+                pending: release.isPending,
+                onRelease: () => release.mutate(openDispatch),
+              }
+            : undefined
+        }
         moveFrom={date}
         moveToday={todayInZone ?? date}
         onMoveTo={(toDate) => {

@@ -96,9 +96,19 @@ export interface BoardDispatch {
   // no fill, which is the honest "we promised a window, we don't know how long
   // the work takes". Never substitute a default.
   estimatedDuration: number | null;
-  // Null = on deck, not yet handed to the tech. ORTHOGONAL to status: a
-  // dispatch can be unreleased at any status. Never derive this from status.
+  // When the job was FIRST handed over. Not what drives hollow any more — a
+  // released-then-moved block still carries it. Use `releaseState`.
   releasedAt: string | null;
+  // Whether the tech's copy matches the board. UNRELEASED and CHANGED both
+  // render hollow on purpose: either way the tech is working from an
+  // out-of-date copy and the next step is the same — release. A comparison on
+  // the server, not a flag set on edit, so dragging away and back (or Undo)
+  // returns it to RELEASED with no request from us.
+  releaseState: DispatchReleaseState;
+  // What the tech was last sent; null while UNRELEASED. After a reassignment
+  // `released.assignedUserId` is the PREVIOUS tech — which is how the drawer
+  // knows sending will tell them it's off their schedule.
+  released: ReleasedCopy | null;
   // Present so the board can DIM work outside the active division filter
   // rather than hide it. Division is a lens, not a permission: the dispatcher
   // is entitled to that job and merely asked to look elsewhere, so redacting
@@ -163,6 +173,33 @@ export interface BoardCommitment {
   end: string;
 }
 
+export type DispatchReleaseState = 'UNRELEASED' | 'RELEASED' | 'CHANGED';
+
+/** A tech's copy of a dispatch — what they were last sent. On a block it is
+ *  the drawer's "Maya still has 9–11a"; on a rail card it is a removal owed. */
+export interface ReleasedCopy {
+  dispatchId: string;
+  assignedUserId: string;
+  // Null when scheduling's user cache has no row for them yet.
+  assignedUserName: string | null;
+  arrivalWindowStart: string;
+  arrivalWindowEnd: string;
+  sentAt: string;
+}
+
+/** What the day's release would send, split the way the button labels it.
+ *  Computed from the same queries the release runs, so it is the number the
+ *  button acts on — render this rather than counting blocks: removals have
+ *  no block, and dimmed out-of-division work on a showing row is included. */
+export interface PendingRelease {
+  newCount: number;
+  // Includes reassignments.
+  changedCount: number;
+  // Released, then unscheduled or cancelled — still on the tech's phone.
+  removedCount: number;
+  total: number;
+}
+
 export interface DispatchBoard {
   // Echoed so a client can tell a stale response from a current one after a
   // fast date change.
@@ -196,6 +233,7 @@ export interface DispatchBoard {
   // denominator or it is decoration, and this number has already drifted
   // twice against a hardcoded copy. Deliberately no client fallback.
   defaultStopsPerDay?: number;
+  pendingRelease: PendingRelease;
 }
 
 // ── Week ────────────────────────────────────────────────────────────
@@ -315,6 +353,11 @@ export interface UnscheduledWorkOrder {
   divisionId: string | null;
   // The rail sorts on priority, then age from here.
   createdAt: string;
+  // Visits of this order that were released and then unscheduled or
+  // cancelled, whose tech hasn't been told yet — "Still on Maya's schedule ·
+  // not sent". Usually empty. Clears when the removal goes out, by the day's
+  // release or `POST /scheduling/dispatches/{dispatchId}/release`.
+  stillWithTechs?: ReleasedCopy[];
 }
 
 export interface UnscheduledPage {
@@ -338,10 +381,16 @@ export interface GetUnscheduledParams {
 export interface ReleaseRequest {
   date: string;
   regionIds?: string[];
+  // The board's division filter, sent exactly as the board read used it: the
+  // release hands a tech their day, so it narrows ROWS the way the read does.
+  divisionIds?: string[];
 }
 
 export interface ReleaseResponse {
   released: number;
+  newCount: number;
+  changedCount: number;
+  removedCount: number;
 }
 
 export const dispatchBoardApi = {
@@ -373,8 +422,8 @@ export const dispatchBoardApi = {
 
   // Bulk release takes a SCOPE, not an id list: an id list would let a client
   // release dispatches outside its own regions, and scope is a permission.
-  // The server recomputes the unreleased set, so the button can't act on a
-  // stale board either.
+  // The server recomputes what is owed — new work, changes and removals — so
+  // the button can't act on a stale board either.
   release: async (request: ReleaseRequest): Promise<ReleaseResponse> => {
     const response = await apiClient.post<ReleaseResponse>(
       '/scheduling/dispatches/release',

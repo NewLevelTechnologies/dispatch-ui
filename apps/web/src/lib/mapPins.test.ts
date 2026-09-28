@@ -10,7 +10,7 @@ import {
 import type { BoardDispatch } from '../api/setup';
 
 function stop(over: Partial<BoardDispatch> = {}): BoardDispatch {
-  return {
+  const base: Omit<BoardDispatch, 'releaseState' | 'released'> & Partial<BoardDispatch> = {
     id: 'd1',
     seq: 1,
     status: 'SCHEDULED',
@@ -44,6 +44,13 @@ function stop(over: Partial<BoardDispatch> = {}): BoardDispatch {
     departedAt: null,
     addressedWorkItemIds: [],
     ...over,
+  };
+  // Release state follows releasedAt unless a test sets it: most fixtures only
+  // care whether the tech has ever been sent the job.
+  return {
+    released: null,
+    ...base,
+    releaseState: over.releaseState ?? (base.releasedAt == null ? 'UNRELEASED' : 'RELEASED'),
   };
 }
 

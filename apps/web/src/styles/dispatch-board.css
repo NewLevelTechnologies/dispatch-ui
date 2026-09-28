@@ -153,6 +153,25 @@
   margin-top: 4px;
 }
 
+/* Released work pulled back to the rail whose removal hasn't gone out. The
+   technician still has it on their phone, so this is the one warning-toned
+   line a card can carry. */
+/* The drawer's "Released 7:02a · Maya still has 9–11a": what the tech is
+   working from, since editing never told them. */
+.db-drawer-stale {
+  display: block;
+  margin-top: 3px;
+  font-size: 11.5px;
+  color: var(--warning-fg);
+}
+
+.db-wo-still {
+  margin-top: 1px;
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--warning-fg);
+}
+
 /* Wraps, never truncates: unlike the Nearest label, half an address is worse
    than a tall card — "1284 W Thomas Rd · Phoenix, A…" is not an address. Two
    lines at rail width fits real US addresses.
@@ -885,6 +904,12 @@
 .db-block.otherdiv:hover,
 .db-block.otherdiv:focus-visible {
   opacity: 1;
+}
+
+/* A dimmed held block must still read as hollow: Release N counts it, so the
+   division dim can't wash its outline out. */
+.db-block.otherdiv.held {
+  opacity: 0.7;
 }
 
 /* Committed elsewhere. Occupies its slot so a narrowed board cannot invite

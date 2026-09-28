@@ -332,15 +332,17 @@ export const dispatchesApi = {
     await apiClient.delete(`/scheduling/dispatches/${id}`);
   },
 
-  // Release one dispatch to its technician: stamps `releasedAt` and sends the
-  // tech notification. Release is the deliberate hand-over, never a side effect
-  // of create or edit — which is why a drag-assign leaves a dispatch on deck.
-  // Idempotent: releasing an already-released dispatch returns the unchanged
-  // timestamp and sends no second notification. The bulk, scope-based sibling
-  // lives on dispatchBoardApi.
-  release: async (id: string): Promise<Dispatch> => {
+  // Release one dispatch: sends whatever brings the tech's copy back in line —
+  // a new assignment, a "schedule change", or (reassigned) a removal to the old
+  // tech and an assignment to the new one. Release is the ONE hand-over verb:
+  // editing never contacts anyone. Safe to repeat — nothing is sent when the
+  // copy already matches. This is also the drawer's and toast's Send update.
+  //
+  // Null for a 204: the dispatch was deleted and this sent its tech the
+  // removal. The bulk, scope-based sibling lives on dispatchBoardApi.
+  release: async (id: string): Promise<Dispatch | null> => {
     const response = await apiClient.post<Dispatch>(`/scheduling/dispatches/${id}/release`);
-    return response.data;
+    return response.status === 204 ? null : response.data;
   },
 
   // Trigger a dispatch SMS. `audience` picks who: TECH (default — the assigned

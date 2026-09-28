@@ -25,6 +25,8 @@ import {
   type Dispatch,
   type DispatchLifecycle,
   type DispatchStatus,
+  type DispatchReleaseState,
+  type ReleasedCopy,
   type ProgressCategory,
   type User,
   type WorkItemResponse,
@@ -46,6 +48,7 @@ import {
 } from './catalyst/dropdown';
 import { Input } from './catalyst/input';
 import { canMoveTo, defaultPick, formatMoveDay, moveTargets } from '../lib/boardMove';
+import { formatHour, formatWindow as boardWindow, zonedDate, zonedHour } from '../lib/boardTime';
 import { customerNotifiedAt as noticeForWindow } from '../lib/customerNotified';
 import { SlideOver } from './catalyst/slideover';
 import WorkOrderFileUploadDialog from './WorkOrderFileUploadDialog';
@@ -158,6 +161,22 @@ interface Props {
   /** Today in the tenant's zone — the earliest day the visit may move to. */
   moveToday?: string;
   onMoveTo?: (toDate: string) => void;
+  /**
+   * Board-only release state. Editing released work never contacts the tech,
+   * so the drawer says what they still have and offers the one verb that
+   * tells them: "Release to tech" when never sent, "Send update" when the
+   * copy has drifted. Omitted elsewhere, which hides both.
+   */
+  release?: DrawerRelease;
+}
+
+export interface DrawerRelease {
+  state: DispatchReleaseState;
+  copy: ReleasedCopy | null;
+  /** The tenant's zone, for "Released 7:02a" and the window the tech has. */
+  timeZone: string;
+  pending: boolean;
+  onRelease: () => void;
 }
 
 /**
@@ -184,6 +203,7 @@ export default function DispatchDetailDrawer({
   moveFrom,
   moveToday,
   onMoveTo,
+  release,
 }: Props) {
   return (
     <SlideOver open={dispatch !== null} onClose={onClose} className="!max-w-[480px]">
@@ -201,6 +221,7 @@ export default function DispatchDetailDrawer({
           moveFrom={moveFrom}
           moveToday={moveToday}
           onMoveTo={onMoveTo}
+          release={release}
         />
       )}
     </SlideOver>
@@ -224,6 +245,7 @@ interface ContentProps {
   moveFrom?: string;
   moveToday?: string;
   onMoveTo?: (toDate: string) => void;
+  release?: DrawerRelease;
 }
 
 function DispatchDetailContent({
@@ -239,6 +261,7 @@ function DispatchDetailContent({
   moveFrom,
   moveToday,
   onMoveTo,
+  release,
 }: ContentProps) {
   const { t } = useTranslation();
   const { getName, getAbbrev } = useGlossary();
@@ -423,6 +446,12 @@ function DispatchDetailContent({
   });
   // Notify-able only while on deck (SCHEDULED); live/done/cancelled hide it.
   const canNotify = !readOnly && full.status === 'SCHEDULED';
+  // Board-only: the tech's copy is out of date and there is still something
+  // they could be told about.
+  const owesRelease =
+    release != null && release.state !== 'RELEASED' && full.status !== 'CANCELLED'
+      ? release
+      : null;
 
   // Complete is the terminal escape hatch — always reachable from a non-terminal
   // state via the footer, regardless of where the timeline got stuck (a tech
@@ -466,7 +495,21 @@ function DispatchDetailContent({
                 ? t('workOrders.dispatches.onSite')
                 : t(`workOrders.dispatches.status.${full.status}`)}
             </Pill>
+            {release?.state === 'UNRELEASED' && (
+              <Pill tone="neutral">{t('dispatchBoard.chips.unreleased')}</Pill>
+            )}
+            {release?.state === 'CHANGED' && (
+              <Pill tone="warning">{t('dispatchBoard.drawer.changedPill')}</Pill>
+            )}
           </div>
+          {release?.state === 'CHANGED' && release.copy && (
+            <StaleCopyLine
+              copy={release.copy}
+              assignedUserId={full.assignedUserId}
+              currentStart={full.arrivalWindowStart}
+              timeZone={release.timeZone}
+            />
+          )}
           <span className="mt-0.5 block text-[12px] text-fg-muted">
             {full.label ? `${full.label} · ${windowStr}` : windowStr}
             {workOrder && (
@@ -739,9 +782,23 @@ function DispatchDetailContent({
                 <MoveToControl from={moveFrom} today={moveToday ?? moveFrom} onMove={onMoveTo} />
               )}
               <span className="grow" />
-              {canComplete && (
+              {/* The one verb that tells the tech anything. Primary while their
+                  copy is out of date, which is exactly when it is shown. */}
+              {owesRelease && (
                 <Button
                   color="accent"
+                  size="xs"
+                  disabled={owesRelease.pending}
+                  onClick={owesRelease.onRelease}
+                >
+                  {owesRelease.state === 'CHANGED'
+                    ? t('dispatchBoard.release.sendUpdate')
+                    : t('dispatchBoard.menu.release', { tech: getName('technician') })}
+                </Button>
+              )}
+              {canComplete && (
+                <Button
+                  {...(owesRelease ? { outline: true as const } : { color: 'accent' as const })}
                   size="xs"
                   disabled={statusMutation.isPending}
                   onClick={() => statusMutation.mutate({ status: 'COMPLETED', close: true })}
@@ -755,6 +812,43 @@ function DispatchDetailContent({
       </div>
     </>
   );
+}
+
+/**
+ * "Released 7:02a · Maya still has 9–11a" — what the tech is working from,
+ * since editing never told them. On a different day it says so, and after a
+ * reassignment it warns that sending tells the previous tech it's off their
+ * schedule.
+ */
+function StaleCopyLine({
+  copy,
+  assignedUserId,
+  currentStart,
+  timeZone,
+}: {
+  copy: ReleasedCopy;
+  assignedUserId: string;
+  currentStart: string;
+  timeZone: string;
+}) {
+  const { t } = useTranslation();
+  const { getName } = useGlossary();
+  const sentHour = zonedHour(copy.sentAt, timeZone);
+  const start = zonedHour(copy.arrivalWindowStart, timeZone);
+  const end = zonedHour(copy.arrivalWindowEnd, timeZone);
+  const sentDay = zonedDate(copy.arrivalWindowStart, timeZone);
+  const line = t('dispatchBoard.drawer.stillHas', {
+    sent: sentHour != null ? formatHour(sentHour) : '',
+    name: copy.assignedUserName ?? getName('technician'),
+    window: start != null && end != null ? boardWindow(start, end) : '',
+  });
+  const otherDay =
+    sentDay && sentDay !== zonedDate(currentStart, timeZone)
+      ? ` ${t('dispatchBoard.drawer.onDay', { day: formatMoveDay(sentDay) })}`
+      : '';
+  const reassigned =
+    copy.assignedUserId !== assignedUserId ? t('dispatchBoard.drawer.reassignWarning') : '';
+  return <span className="db-drawer-stale">{`${line}${otherDay}${reassigned}`}</span>;
 }
 
 /**
