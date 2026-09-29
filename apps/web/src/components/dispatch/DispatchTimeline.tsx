@@ -25,7 +25,7 @@ import { DISPATCH_PRESENTATION, presentationFor, statusClass } from '../../lib/d
 import { isOutOfDate } from '../../lib/releaseState';
 import { TechCell } from './BoardRows';
 import { DENSITY_METRICS, type Density, type SpineProps } from './spine';
-import { hourAtPointer, resolveDrop } from '../../lib/boardDrop';
+import { aimedHour, resolveDrop, type DropResolution } from '../../lib/boardDrop';
 import {
   axisPct,
   findClashes,
@@ -126,12 +126,15 @@ function Block({
     if (!el) return;
     return draggable({
       element: el,
-      getInitialData: () => ({
+      getInitialData: ({ input, element }) => ({
         boardDrag: true,
         dispatchId: dispatch.id,
         // Duration rides along so a deliberately-widened window keeps its
         // length when it moves rows — only the start snaps.
         durationHours: window.end - window.start,
+        // Where on the block it was grabbed, so the drop snaps on the block's
+        // left edge rather than on the pointer (see `aimedHour`).
+        grabOffsetPx: input.clientX - element.getBoundingClientRect().left,
       }),
       onDragStart: () => setDragging(true),
       onDrop: () => setDragging(false),
@@ -286,6 +289,12 @@ function Lane({
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const [over, setOver] = useState(false);
+  // The window the drop will book, drawn while dragging. Once windows start
+  // every hour the snap is to the hour, not to the pixel, so without this the
+  // board looks like it ignored where you let go.
+  const [preview, setPreview] = useState<{ start: number; end: number; ok: boolean } | null>(
+    null,
+  );
 
   // Latest values for the drop handler without re-registering the target on
   // every render — re-registering mid-drag drops the gesture. Written in an
@@ -298,22 +307,66 @@ function Lane({
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
+
+    // One reading of the gesture, shared by the preview and the drop, so what
+    // the outline promised is exactly what gets booked.
+    const resolve = (
+      data: Record<string | symbol, unknown>,
+      clientX: number,
+    ): DropResolution => {
+      const cur = latest.current;
+      const rect = el.getBoundingClientRect();
+      const hour = aimedHour(
+        clientX,
+        { left: rect.left, width: rect.width },
+        cur.axis,
+        data.grabOffsetPx as number | undefined,
+      );
+      const duration = data.durationHours as number | undefined;
+      return resolveDrop(hour, cur.spans, cur.axis, undefined, duration);
+    };
+
+    const show = (data: Record<string | symbol, unknown>, clientX: number) => {
+      const resolved = resolve(data, clientX);
+      const duration = data.durationHours as number | undefined;
+      const next = resolved.ok
+        ? {
+            start: resolved.window.startHour,
+            end:
+              duration != null
+                ? resolved.window.startHour + duration
+                : resolved.window.endHour,
+            ok: true,
+          }
+        : // An all-day row is visibly undroppable already; outside the day
+          // there's nothing to outline.
+          resolved.reason === 'time-off' && !latest.current.spans.some((sp) => sp.allDay)
+          ? { start: resolved.window.startHour, end: resolved.window.endHour, ok: false }
+          : null;
+      setPreview((prev) =>
+        prev?.start === next?.start && prev?.end === next?.end && prev?.ok === next?.ok
+          ? prev
+          : next,
+      );
+    };
+
     return dropTargetForElements({
       element: el,
       canDrop: ({ source }) => Boolean(latest.current.onDrop) && source.data?.boardDrag === true,
-      onDragEnter: () => setOver(true),
-      onDragLeave: () => setOver(false),
+      onDragEnter: ({ source, location }) => {
+        setOver(true);
+        show(source.data, location.current.input.clientX);
+      },
+      onDrag: ({ source, location }) => show(source.data, location.current.input.clientX),
+      onDragLeave: () => {
+        setOver(false);
+        setPreview(null);
+      },
       onDrop: ({ source, location }) => {
         setOver(false);
+        setPreview(null);
         const cur = latest.current;
-        const rect = el.getBoundingClientRect();
-        const hour = hourAtPointer(
-          location.current.input.clientX,
-          { left: rect.left, width: rect.width },
-          cur.axis,
-        );
-        const duration = source.data?.durationHours as number | undefined;
-        const resolved = resolveDrop(hour, cur.spans, cur.axis, undefined, duration);
+        const resolved = resolve(source.data, location.current.input.clientX);
         if (!resolved.ok) {
           // An all-day row is visibly undroppable, so refusing it silently is
           // right — a toast would scold someone for what they could see. A
@@ -329,9 +382,23 @@ function Lane({
     });
   }, []);
 
+  const previewLeft = preview ? axisPct(preview.start, axis) : 0;
   return (
     <div ref={ref} className={`db-lane${over ? ' over' : ''}`}>
       {children}
+      {preview && (
+        <span
+          className={`db-drop-preview${preview.ok ? '' : ' refused'}`}
+          style={{
+            left: `${previewLeft}%`,
+            width: `${axisPct(preview.end, axis) - previewLeft}%`,
+          }}
+          data-testid="drop-preview"
+          aria-hidden="true"
+        >
+          {formatWindow(preview.start, preview.end)}
+        </span>
+      )}
     </div>
   );
 }
