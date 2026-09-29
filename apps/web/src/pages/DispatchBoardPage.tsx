@@ -70,6 +70,7 @@ import { customerEverNotified, customerNotifiedAt } from '../lib/customerNotifie
 import { hitsTimeOff, overlappingAbsence } from '../lib/timeOff';
 import { techHasCopy } from '../lib/releaseState';
 import { useBoardMutations } from './dispatch/useBoardMutations';
+import { useTenantTimeZone } from '../hooks/useTenantTimeZone';
 import { extractApiError, showError, showSuccess, showUndo } from '../lib/toast';
 import { invalidateDispatchBoard } from '../utils/invalidateRoleConsumers';
 import { isHiddenByDefault } from '../lib/dispatchStatus';
@@ -119,12 +120,6 @@ interface PendingMove {
 
 const LONG_DRIVE_MINUTES = 30;
 
-function todayLocal(): string {
-  const now = new Date();
-  const m = String(now.getMonth() + 1).padStart(2, '0');
-  const d = String(now.getDate()).padStart(2, '0');
-  return `${now.getFullYear()}-${m}-${d}`;
-}
 
 // Weeks run Monday–Sunday: the weekend belongs at the END of a work week, and
 // the backend deliberately takes whatever first day the client hands it rather
@@ -170,6 +165,11 @@ function formatDayRange(days: string[]): string {
   const first = RANGE_LABEL.format(asUtc(days[0]));
   const last = RANGE_LABEL.format(asUtc(days[days.length - 1]));
   return `${first} – ${last}`;
+}
+
+/** Last resort only — when a zone string can't be formatted at all. */
+function todayUtc(): string {
+  return new Date().toISOString().slice(0, 10);
 }
 
 function isValidDate(value: string | null): value is string {
@@ -259,8 +259,20 @@ export default function DispatchBoardPage() {
     });
   }, []);
 
+  // "Today" is the TENANT's today, never the browser's. A dispatcher in
+  // another zone — or anyone after 5pm in Phoenix, when UTC has already
+  // rolled over — would otherwise land on the wrong day, and see a Today
+  // button while already looking at today.
+  //
+  // Settings give the zone before any board read; once a read reports the
+  // zone it resolved in, that one is remembered. Remembered, not re-derived
+  // per render: the read is keyed by the date, so deriving the date from the
+  // read in flight would flip it back while the new day loads.
+  const settingsZone = useTenantTimeZone();
+  const [readZone, setReadZone] = useState<string | null>(null);
+  const tenantZone = readZone ?? settingsZone;
   const rawDate = searchParams.get('date');
-  const date = isValidDate(rawDate) ? rawDate : todayLocal();
+  const date = isValidDate(rawDate) ? rawDate : (zonedDate(new Date(), tenantZone) ?? todayUtc());
   const regionId = searchParams.get('region');
   const divisionId = searchParams.get('division');
   // Granularity, in the URL like every other scope — "show me next week in
@@ -361,10 +373,14 @@ export default function DispatchBoardPage() {
   // Straight off the response: this is the zone the server resolved `date`
   // in, so the axis and the day boundary can never disagree. Falls back to the
   // browser only before the first response lands.
-  const timeZone =
-    (isWeek ? week?.timeZone : board?.timeZone) ||
-    Intl.DateTimeFormat().resolvedOptions().timeZone ||
-    'UTC';
+  const timeZone = (isWeek ? week?.timeZone : board?.timeZone) || tenantZone;
+
+  const responseZone = isWeek ? week?.timeZone : board?.timeZone;
+  // Remember the zone a read resolved in, so the default date stops depending
+  // on the read in flight.
+  useEffect(() => {
+    if (responseZone && responseZone !== readZone) setReadZone(responseZone);
+  }, [responseZone, readZone]);
 
   // §3.4: the rail carries `itemCount`, not the items, and
   // DispatchFormDrawer requires a full WorkItemResponse[]. There is no
