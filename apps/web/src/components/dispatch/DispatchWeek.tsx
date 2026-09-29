@@ -27,6 +27,7 @@ import { useGlossary } from '../../contexts/GlossaryContext';
 import { DISPATCH_PRESENTATION } from '../../lib/dispatchStatus';
 import { isOutOfDate } from '../../lib/releaseState';
 import { formatWindow, zonedHour } from '../../lib/boardTime';
+import { isOutAllDay } from '../../lib/timeOff';
 import { TechCell } from './BoardRows';
 import { DENSITY_METRICS, loadClassFor, type Density } from './spine';
 
@@ -89,6 +90,13 @@ function isWeekend(date: string): boolean {
   return day === 0 || day === 6;
 }
 
+/** "Dentist 9a–11a", in the tenant's zone. */
+function partLabel(span: { startsAt: string; endsAt: string; label: string }, timeZone: string): string {
+  const start = zonedHour(span.startsAt, timeZone);
+  const end = zonedHour(span.endsAt, timeZone);
+  return start != null && end != null ? `${span.label} ${formatWindow(start, end)}` : span.label;
+}
+
 /** Committed work on a cell — in scope plus committed elsewhere. The load a
  *  dispatcher must see, never the in-scope count alone. */
 function committedOf(cell: BoardWeekCell): number {
@@ -99,6 +107,7 @@ function WeekCell({
   cell,
   techId,
   capacityStops,
+  timeZone,
   isToday,
   isPast,
   label,
@@ -109,6 +118,7 @@ function WeekCell({
   cell: BoardWeekCell;
   techId: string;
   capacityStops: number | null;
+  timeZone: string;
   isToday: boolean;
   isPast: boolean;
   label: string;
@@ -121,8 +131,12 @@ function WeekCell({
   const [over, setOver] = useState(false);
 
   // Past days are history and an all-day absence is not yours to book, so
-  // neither offers a drop at all — no affordance, not a refusal toast.
-  const droppable = !isPast && !cell.off;
+  // neither offers a drop at all — no affordance, not a refusal toast. A
+  // part-day absence leaves the cell droppable: the page refuses only a
+  // window that lands in it.
+  const outAllDay = isOutAllDay(cell);
+  const partDay = outAllDay ? [] : cell.timeOff;
+  const droppable = !isPast && !outAllDay;
 
   const latest = useRef({ droppable, techId, date: cell.date, onDropDispatch, onDropWorkOrder });
   useEffect(() => {
@@ -182,7 +196,7 @@ function WeekCell({
         isToday ? 'today' : '',
         isPast ? 'past' : '',
         isWeekend(cell.date) ? 'weekend' : '',
-        cell.off ? 'off' : '',
+        outAllDay ? 'off' : '',
         over ? 'over' : '',
       ]
         .filter(Boolean)
@@ -192,7 +206,13 @@ function WeekCell({
         onClick({ x: rect.left, y: rect.bottom + 4 });
       }}
       aria-label={label}
-      title={cell.off ? undefined : isPast ? t('dispatchBoard.week.pastTitle') : undefined}
+      title={
+        outAllDay
+          ? cell.timeOff.map((span) => span.label).join(' · ')
+          : isPast
+            ? t('dispatchBoard.week.pastTitle')
+            : undefined
+      }
     >
       <span className="flex items-center gap-1">
         {over ? (
@@ -213,7 +233,7 @@ function WeekCell({
             <span
               className="font-mono text-[10.5px] font-semibold text-fg-strong"
               title={
-                !cell.off && elsewhere > 0
+                !outAllDay && elsewhere > 0
                   ? t('dispatchBoard.grid.committedBreakdown', {
                       inScope: cell.stopCount,
                       elsewhere,
@@ -221,7 +241,7 @@ function WeekCell({
                   : undefined
               }
             >
-              {cell.off
+              {outAllDay
                 ? '—'
                 : cell.committedCount > cell.stopCount
                   ? t('dispatchBoard.grid.cellOfCommitted', {
@@ -231,6 +251,15 @@ function WeekCell({
                   : String(cell.stopCount)}
             </span>
             <span className="grow" />
+            {/* Out for part of the day: the day's own "not yours to book"
+                hatch, small, naming the hours — the cell still takes work. */}
+            {partDay.length > 0 && (
+              <span
+                className="db-woffpart"
+                title={partDay.map((span) => partLabel(span, timeZone)).join(' · ')}
+                aria-label={partDay.map((span) => partLabel(span, timeZone)).join(' · ')}
+              />
+            )}
             {/* The block's hollow idiom at 7px: something here is new or
                 changed and not yet sent — the same "not sent" at both zooms. */}
             {cell.hasUnreleased && (
@@ -244,7 +273,7 @@ function WeekCell({
           </>
         )}
       </span>
-      {!cell.off && inScopePct != null && (
+      {!outAllDay && inScopePct != null && (
         <span className={`db-load ${loadClassFor(committed, capacityStops)}`.trim()}>
           <i style={{ width: `${inScopePct}%` }} />
           {elsewherePct! > 0 && <u style={{ width: `${elsewherePct}%` }} />}
@@ -431,7 +460,9 @@ export default function DispatchWeek({
     let working = 0;
     for (const tech of techs) {
       const cell = tech.cells.find((c) => c.date === date);
-      if (!cell || cell.off) continue;
+      // Out all day adds no capacity and no load. Part of the day still
+      // counts in full: capacity is stops, not hours (§0b).
+      if (!cell || isOutAllDay(cell)) continue;
       working += 1;
       used += committedOf(cell);
     }
@@ -443,7 +474,7 @@ export default function DispatchWeek({
     // rather than borrowing a day's.
     const stops = tech.cells.reduce((n, cell) => n + cell.stopCount, 0);
     const committed = tech.cells.reduce((n, cell) => n + cell.committedCount, 0);
-    const outAllWeek = tech.cells.every((cell) => cell.off);
+    const outAllWeek = tech.cells.every((cell) => isOutAllDay(cell));
 
     return (
       <div className="db-row" key={tech.id} style={{ height: rowH }}>
@@ -467,6 +498,7 @@ export default function DispatchWeek({
               cell={cell}
               techId={tech.id}
               capacityStops={capacityStops}
+              timeZone={timeZone}
               isToday={cell.date === today}
               isPast={cell.date < todayDate}
               onClick={(anchor) => {

@@ -65,3 +65,31 @@ export function hitsTimeOff(
     (span) => span.allDay || (Date.parse(span.startsAt) < end && start < Date.parse(span.endsAt)),
   );
 }
+
+/** The week cell is out for the WHOLE day — hatched, labelled, undroppable.
+ *  A part-day absence is not: the rest of that day stays bookable. */
+export function isOutAllDay(cell: { timeOff: readonly { allDay: boolean }[] }): boolean {
+  return cell.timeOff.some((span) => span.allDay);
+}
+
+/**
+ * The part-day absence a moved visit would land in, or null.
+ *
+ * Checked against the PRESERVED window on the target date — the window is
+ * what would be promised, so that is what has to be free. Touching edges
+ * don't count: a visit starting as the absence ends is fine.
+ */
+export function overlappingAbsence<T extends { startsAt: string; endsAt: string; allDay: boolean }>(
+  window: { startHour: number; endHour: number },
+  date: string,
+  spans: readonly T[],
+  timeZone: string,
+): T | null {
+  const start = Date.parse(toIsoAt(date, window.startHour, timeZone));
+  const end = Date.parse(toIsoAt(date, window.endHour, timeZone));
+  return (
+    spans.find(
+      (span) => span.allDay || (Date.parse(span.startsAt) < end && start < Date.parse(span.endsAt)),
+    ) ?? null
+  );
+}

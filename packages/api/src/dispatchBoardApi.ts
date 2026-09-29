@@ -263,8 +263,14 @@ export interface BoardWeekCell {
   // dispatcher opens the week while staging.
   hasUnreleased: boolean;
   // Time off overlapping this day. Per CELL, not per row — a tech can be out
-  // Thursday and working Friday.
+  // Thursday and working Friday. True whenever `timeOff` is non-empty.
   off: boolean;
+  // The absences behind `off`, clipped to this day — the day read's shape.
+  // An `allDay` span makes the cell undroppable; a part-day span leaves it
+  // droppable and refuses only a window that overlaps it. A multi-day absence
+  // is `allDay` on the days it covers end to end and a partial slice on its
+  // first and last days.
+  timeOff: TechTimeOff[];
 }
 
 export interface BoardWeekTech {
