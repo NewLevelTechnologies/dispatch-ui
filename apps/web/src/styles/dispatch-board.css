@@ -1846,3 +1846,32 @@
 .db-rel-by {
   color: var(--fg-muted);
 }
+
+/* ── Week: per-day release (§3.8a) ────────────────────────────────
+   A second row inside the sticky header, so the counts stay on screen
+   while 60 rows scroll. Release is per day — there is no week-wide one. */
+
+.db-head.stack {
+  flex-direction: column;
+}
+
+.db-head-row {
+  display: flex;
+}
+
+.db-wrel-row {
+  height: 30px;
+  border-top: 1px solid var(--border-soft);
+}
+
+/* Same width rule as the column header above it, so each button sits
+   under its own day. */
+.db-wrel-cell {
+  flex: 1;
+  min-width: 118px;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  padding: 0 5px;
+  border-right: 1px solid var(--border-soft);
+}

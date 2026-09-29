@@ -19,6 +19,7 @@ const mockRelease = vi.fn();
 const mockReleaseOne = vi.fn();
 const mockScheduleRelease = vi.fn();
 const mockCancelScheduled = vi.fn();
+const mockReleaseScheduled = vi.fn();
 const mockDeleteDispatch = vi.fn();
 const mockGetWorkOrder = vi.fn();
 const mockShowSuccess = vi.fn();
@@ -36,6 +37,7 @@ vi.mock('../api/setup', async (importOriginal) => {
       release: (...a: unknown[]) => mockRelease(...a),
       scheduleRelease: (...a: unknown[]) => mockScheduleRelease(...a),
       cancelScheduledRelease: (...a: unknown[]) => mockCancelScheduled(...a),
+      releaseScheduled: (...a: unknown[]) => mockReleaseScheduled(...a),
     },
 
     dispatchRegionApi: {
@@ -729,10 +731,23 @@ describe('DispatchBoardPage scheduled release', () => {
     );
   });
 
-  // Nothing retries an overdue run, so it escalates out of the pill.
-  it('raises the overdue strip with Release now as the recovery', async () => {
+  // Nothing retries an overdue run, so it escalates out of the pill. Its
+  // count and its send are the RECORD's scope, not the view's.
+  it('raises the overdue strip, and Release now sends the record, not the view', async () => {
     const u = userEvent.setup();
-    mockGetBoard.mockResolvedValue(board([record({ status: 'FAILED', overdue: true })]));
+    mockReleaseScheduled.mockResolvedValue(
+      record({ status: 'SENT', sentBy: 'MANUAL', newCount: 3, changedCount: 0, removedCount: 0 }),
+    );
+    mockGetBoard.mockResolvedValue(
+      board([
+        record({
+          status: 'FAILED',
+          overdue: true,
+          pendingRelease: { newCount: 3, changedCount: 0, removedCount: 0, total: 3, techCount: 2 },
+          callerCoversScope: false,
+        }),
+      ]),
+    );
     renderWithProviders(<DispatchBoardPage />, { initialPath: `/dispatch?date=${DAY}` });
 
     const strip = await screen.findByRole('alert');
@@ -740,17 +755,50 @@ describe('DispatchBoardPage scheduled release', () => {
     expect(strip).toHaveTextContent('Set by Dana Ortiz.');
     expect(screen.getByText('Scheduled for 7a · not sent')).toBeInTheDocument();
 
-    await u.click(within(strip).getByRole('button', { name: 'Release now · 2' }));
-    expect(await screen.findByText('Release 2 changes?')).toBeInTheDocument();
+    // 3 for the record, though the view has 2 pending.
+    await u.click(within(strip).getByRole('button', { name: 'Release now · 3' }));
+    expect(await screen.findByText('Release 3 changes?')).toBeInTheDocument();
+    expect(screen.getByText(/the rest stays not sent/)).toBeInTheDocument();
+    await u.click(screen.getByRole('button', { name: 'Release' }));
+
+    await waitFor(() => expect(mockReleaseScheduled).toHaveBeenCalledWith('sr1'));
+    expect(mockRelease).not.toHaveBeenCalled();
   });
 
-  it('says so, and offers nothing, when an overdue run left nothing pending', async () => {
-    mockGetBoard.mockResolvedValue(board([record({ status: 'MISSED', overdue: true })], 0));
+  // It never outlives the problem.
+  it('drops the strip once nothing is pending for the record', async () => {
+    mockGetBoard.mockResolvedValue(
+      board([
+        record({
+          status: 'MISSED',
+          overdue: true,
+          pendingRelease: { newCount: 0, changedCount: 0, removedCount: 0, total: 0, techCount: 0 },
+        }),
+      ]),
+    );
     renderWithProviders(<DispatchBoardPage />, { initialPath: `/dispatch?date=${DAY}` });
 
-    const strip = await screen.findByRole('alert');
-    expect(strip).toHaveTextContent('Nothing is pending now');
-    expect(within(strip).queryByRole('button')).not.toBeInTheDocument();
+    expect(await screen.findByText('Scheduled for 7a · not sent')).toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('says a release sent by hand was not the schedule', async () => {
+    mockGetBoard.mockResolvedValue(
+      board([
+        record({
+          status: 'SENT',
+          sentBy: 'MANUAL',
+          sentAt: '2099-03-15T17:32:00Z',
+          newCount: 4,
+          changedCount: 0,
+          removedCount: 0,
+        }),
+      ]),
+    );
+    renderWithProviders(<DispatchBoardPage />, { initialPath: `/dispatch?date=${DAY}` });
+
+    expect(await screen.findByText(/Released at 10:32a · 4 new/)).toBeInTheDocument();
+    expect(screen.getByText('· released by hand · due 7a')).toBeInTheDocument();
   });
 
   it('shows the real time of a late send, and when it was due', async () => {
@@ -1150,6 +1198,45 @@ describe('DispatchBoardPage week', () => {
       expect(mockGetWeek).toHaveBeenCalledWith(
         expect.objectContaining({ weekStart: '2026-03-23' }),
       ),
+    );
+  });
+
+  // Release is per day from the week (§3.8a), and it confirms first: the
+  // dispatcher isn't looking at that day's work.
+  it("releases one column's day through the day endpoint, after a confirm", async () => {
+    const u = userEvent.setup();
+    const FUTURE = DAYS.map((d) => d.replace('2026', '2099'));
+    mockRelease.mockResolvedValue({ released: 5, newCount: 3, changedCount: 2, removedCount: 0 });
+    mockGetWeek.mockResolvedValue(
+      weekResponse({
+        weekStart: FUTURE[0],
+        days: FUTURE,
+        techs: [weekTech({ cells: FUTURE.map((d) => weekCell(d)) })],
+        pendingReleaseByDay: FUTURE.map((date, i) => ({
+          date,
+          pendingRelease:
+            i === 1
+              ? { newCount: 3, changedCount: 2, removedCount: 0, total: 5, techCount: 4 }
+              : { newCount: 0, changedCount: 0, removedCount: 0, total: 0, techCount: 0 },
+        })),
+      }),
+    );
+    renderWithProviders(<DispatchBoardPage />, {
+      initialPath: `/dispatch?view=week&date=${FUTURE[0]}&division=dv1`,
+    });
+
+    await u.click(await screen.findByRole('button', { name: 'Release 5' }));
+    expect(await screen.findByText(/^Release Tue, Mar 17 to 4 /)).toBeInTheDocument();
+    expect(screen.getByText(/3 new · 2 changed — for Tue only/)).toBeInTheDocument();
+    // The whole dialog's own button, not the column's.
+    await u.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Release 5' }));
+
+    await waitFor(() =>
+      expect(mockRelease).toHaveBeenCalledWith({
+        date: FUTURE[1],
+        regionIds: undefined,
+        divisionIds: ['dv1'],
+      }),
     );
   });
 });
