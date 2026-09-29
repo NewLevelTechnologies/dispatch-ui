@@ -136,10 +136,12 @@ const logsPage = (content: unknown[]) => ({ content, totalElements: content.leng
 const renderBoard = () =>
   renderWithProviders(<DispatchBoardPage />, { initialPath: `/dispatch?date=${FRIDAY}` });
 
+// The first render of this file pays the board's cold import and the board
+// read together; on a loaded CI runner that can outlast findBy's 1s default.
 const openMenu = async (user: ReturnType<typeof userEvent.setup>) => {
   await user.pointer({
     keys: '[MouseRight]',
-    target: await screen.findByRole('link', { name: /No cooling/ }),
+    target: await screen.findByRole('link', { name: /No cooling/ }, { timeout: 5000 }),
   });
   return screen.findByRole('menu');
 };
