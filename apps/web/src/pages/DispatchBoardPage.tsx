@@ -67,7 +67,7 @@ import { movedWindow } from '../lib/boardDrop';
 import { canMoveTo, formatMoveDay, preservedWindow, shiftDay } from '../lib/boardMove';
 import { toIsoAt } from '../lib/arrivalWindows';
 import { customerEverNotified, customerNotifiedAt } from '../lib/customerNotified';
-import { hitsTimeOff } from '../lib/timeOff';
+import { hitsTimeOff, overlappingAbsence } from '../lib/timeOff';
 import { techHasCopy } from '../lib/releaseState';
 import { useBoardMutations } from './dispatch/useBoardMutations';
 import { extractApiError, showError, showSuccess, showUndo } from '../lib/toast';
@@ -1149,7 +1149,28 @@ export default function DispatchBoardPage() {
           onDropDispatch={(dispatchId, fromDate, toTechId, toDate) => {
             const dispatch = weekDayBoard?.dispatches.find((d) => d.id === dispatchId);
             setWeekPeek(null);
-            if (dispatch) void requestMove(dispatch, toDate, { fromDate, techId: toTechId });
+            if (!dispatch) return;
+            // A part-day absence on the target day refuses a visit whose KEPT
+            // window lands in it — with the day board's toast, naming both
+            // times, since the cell itself looked open.
+            const window = preservedWindow(dispatch, timeZone);
+            const target = week?.techs
+              .find((tech) => tech.id === toTechId)
+              ?.cells.find((cell) => cell.date === toDate);
+            const hit = window && target ? overlappingAbsence(window, toDate, target.timeOff, timeZone) : null;
+            if (window && hit) {
+              const start = zonedHour(hit.startsAt, timeZone);
+              const end = zonedHour(hit.endsAt, timeZone);
+              showError(
+                t('dispatchBoard.drag.offOverlap', {
+                  tech: techNameOf(toTechId),
+                  off: start != null && end != null ? formatWindow(start, end) : hit.label,
+                  window: formatWindow(window.startHour, window.endHour),
+                }),
+              );
+              return;
+            }
+            void requestMove(dispatch, toDate, { fromDate, techId: toTechId });
           }}
           // A week drop carries a person and a day but no time — the same
           // rule as the map drop. Open the composer; never invent a window.

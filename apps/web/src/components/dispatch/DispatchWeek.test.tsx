@@ -14,6 +14,11 @@ const DAYS = [
   '2026-03-22',
 ];
 
+/** Out all day — what `off` used to mean on its own. */
+const allDay = (date: string) => [
+  { startsAt: `${date}T00:00:00Z`, endsAt: `${date}T23:59:59Z`, allDay: true, label: 'Vacation' },
+];
+
 function cell(date: string, over: Partial<BoardWeekCell> = {}): BoardWeekCell {
   return {
     date,
@@ -22,6 +27,7 @@ function cell(date: string, over: Partial<BoardWeekCell> = {}): BoardWeekCell {
     hasUrgent: false,
     hasUnreleased: false,
     off: false,
+    timeOff: [],
     ...over,
   };
 }
@@ -121,7 +127,7 @@ describe('DispatchWeek cells', () => {
   // opposite of what an absence means.
   it('renders time off as a dash with no load bar', () => {
     renderWeek({
-      techs: [tech({ cells: DAYS.map((d, i) => cell(d, { off: i === 0 })) })],
+      techs: [tech({ cells: DAYS.map((d, i) => cell(d, i === 0 ? { off: true, timeOff: allDay(d) } : {})) })],
     });
     expect(cells()[0]).toHaveTextContent('—');
     expect(cells()[0]).toHaveClass('off');
@@ -246,7 +252,7 @@ describe('DispatchWeek committed work', () => {
   // report and no bar to draw, whatever the server sent alongside it.
   it('still renders time off as a bare dash', () => {
     renderWeek({
-      techs: [tech({ cells: DAYS.map((d) => cell(d, { stopCount: 0, committedCount: 4, off: true })) })],
+      techs: [tech({ cells: DAYS.map((d) => cell(d, { stopCount: 0, committedCount: 4, off: true, timeOff: allDay(d) })) })],
     });
     expect(cells()[0]).toHaveTextContent('\u2014');
     expect(bar(cells()[0])).toBeNull();
@@ -316,7 +322,7 @@ describe('DispatchWeek day totals', () => {
 
   // Someone who is off adds no capacity, and no load.
   it('leaves an off tech out of the day’s capacity', () => {
-    renderWeek({ techs: two({ stopCount: 6, committedCount: 6 }, { off: true }) });
+    renderWeek({ techs: two({ stopCount: 6, committedCount: 6 }, { off: true, timeOff: allDay(DAYS[0]) }) });
     const head = document.querySelectorAll('.db-whead')[0];
     expect(head).toHaveTextContent('6/6');
     expect(head.querySelector('.db-wtotal')).toHaveClass('warning');
@@ -385,6 +391,39 @@ describe('DispatchWeek peek', () => {
   it('says a past day is read-only', () => {
     renderWeek({ peek, peekStops: [stop()], todayDate: '2026-03-25' });
     expect(screen.getByText('Past — read only')).toBeInTheDocument();
+  });
+});
+
+// Part-day time off: the cell stays a working day. Only all-day is "off".
+describe('DispatchWeek part-day time off', () => {
+  const dentist = (date: string) => [
+    { startsAt: `${date}T09:00:00Z`, endsAt: `${date}T11:00:00Z`, allDay: false, label: 'Dentist' },
+  ];
+  const partly = (over: Partial<BoardWeekCell> = {}) =>
+    tech({
+      cells: DAYS.map((d, i) =>
+        cell(d, i === 3 ? { stopCount: 2, committedCount: 2, off: true, timeOff: dentist(d), ...over } : {}),
+      ),
+    });
+
+  it('keeps its count and bar, and names the hours', () => {
+    renderWeek({ techs: [partly()] });
+    const c = cells()[3];
+    expect(c).not.toHaveClass('off');
+    expect(c).toHaveTextContent('2');
+    expect(c.querySelector('.db-load')).not.toBeNull();
+    expect(c.querySelector('.db-woffpart')).toHaveAttribute('title', 'Dentist 9a–11a');
+  });
+
+  it('still counts toward the day’s capacity — capacity is stops, not hours', () => {
+    renderWeek({ techs: [partly()] });
+    expect(document.querySelectorAll('.db-whead')[3]).toHaveTextContent('2/6');
+  });
+
+  it('reads as off once any span is all day', () => {
+    renderWeek({ techs: [partly({ timeOff: [...dentist(DAYS[3]), ...allDay(DAYS[3])] })] });
+    expect(cells()[3]).toHaveClass('off');
+    expect(cells()[3].querySelector('.db-woffpart')).toBeNull();
   });
 });
 

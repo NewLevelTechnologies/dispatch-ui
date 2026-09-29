@@ -1204,6 +1204,23 @@
   );
 }
 
+/* Out for PART of the day. The day board's "not yours to book" hatch at
+   marker size, so a partly-off day never reads as fully off — the cell keeps
+   its count and bar and still takes work outside the absence. */
+.db-woffpart {
+  width: 9px;
+  height: 7px;
+  flex-shrink: 0;
+  box-sizing: border-box;
+  border: 1px solid var(--border-strong);
+  border-radius: 2px;
+  background: repeating-linear-gradient(
+    135deg,
+    var(--fg-muted) 0 1px,
+    transparent 1px 3px
+  );
+}
+
 /* Weekends are shaded, never refused — tenants have no working-days setting
    yet, and a Saturday call-out is still bookable. */
 .db-wcell.weekend {

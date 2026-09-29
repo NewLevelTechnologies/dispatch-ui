@@ -778,6 +778,7 @@ describe('DispatchBoardPage week', () => {
     hasUrgent: false,
     hasUnreleased: false,
     off: false,
+    timeOff: [],
     ...over,
   });
 
