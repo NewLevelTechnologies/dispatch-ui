@@ -17,19 +17,22 @@ import {
   DropdownLabel,
   DropdownMenu,
 } from '../catalyst/dropdown';
-import { Select } from '../catalyst/select';
+import { Input } from '../catalyst/input';
 import { ToggleGroup, ToggleGroupOption } from '../ui/ToggleGroup';
 import { toIsoAt } from '../../lib/arrivalWindows';
 import { shiftDay } from '../../lib/boardMove';
 import { formatHour, zonedHour } from '../../lib/boardTime';
 import {
   canReleaseDayBefore,
-  defaultSlot,
+  defaultReleaseHour,
+  hourFromTimeValue,
   isLateSend,
   isPendingSchedule,
-  releaseSlots,
+  releasePicks,
+  releaseTimeProblem,
   releaseWhen,
   scheduledFor,
+  timeValueFromHour,
   weekdayOf,
 } from '../../lib/scheduledRelease';
 
@@ -217,18 +220,35 @@ function ReleaseAtPanel({
 }) {
   const { t } = useTranslation();
   const ref = useRef<HTMLDivElement>(null);
-  // Read once: the panel is open for seconds, and a floor that moved under
-  // the select would change the options mid-pick.
+  // Read once: the panel is open for seconds, and picks that dropped out
+  // under the pointer would change the options mid-choice.
   const [now] = useState(() => new Date());
   const withDayBefore = canReleaseDayBefore(date, now, timeZone);
   const initial = mine ? scheduledFor(mine, date, timeZone) : null;
   const [dayBefore, setDayBefore] = useState(withDayBefore && (initial?.dayBefore ?? false));
-  const slots = releaseSlots(date, dayBefore, now, timeZone);
-  const [picked, setPicked] = useState<number | null>(() =>
-    initial && slots.includes(initial.hour) ? initial.hour : defaultSlot(slots),
+  const picks = releasePicks(date, dayBefore, now, timeZone);
+
+  // One time, from either control: a pick, or what was typed. An existing
+  // time that is a pick highlights it; any other fills the field.
+  const openingHour = initial?.hour ?? defaultReleaseHour(date, dayBefore, now, timeZone);
+  const [hour, setHour] = useState<number | null>(openingHour);
+  const [typed, setTyped] = useState(
+    openingHour != null && !picks.includes(openingHour) ? timeValueFromHour(openingHour) : '',
   );
-  // Switching segment keeps the pick when the other side offers it.
-  const hour = picked != null && slots.includes(picked) ? picked : defaultSlot(slots);
+  const pickValue = !typed && hour != null && picks.includes(hour) ? String(hour) : '';
+
+  const problem =
+    hour == null ? null : releaseTimeProblem(hour, date, dayBefore, now, timeZone);
+
+  const switchDay = (next: boolean) => {
+    setDayBefore(next);
+    // Each side has its own picks; land on that side's default, not a time
+    // the other side made sense of.
+    const fresh = defaultReleaseHour(date, next, now, timeZone);
+    const freshPicks = releasePicks(date, next, now, timeZone);
+    setHour(fresh);
+    setTyped(fresh != null && !freshPicks.includes(fresh) ? timeValueFromHour(fresh) : '');
+  };
 
   const prevDay = weekdayOf(shiftDay(date, -1), timeZone);
   const dayLabel = new Date(toIsoAt(date, 12, timeZone)).toLocaleDateString('en-US', {
@@ -256,32 +276,24 @@ function ReleaseAtPanel({
   }, [onClose]);
 
   const save = () => {
-    if (hour == null) return;
+    if (hour == null || problem) return;
     onSave(toIsoAt(dayBefore ? shiftDay(date, -1) : date, hour, timeZone)).catch(() => {
       // The mutation toasts the failure; the panel stays open to retry.
     });
   };
 
+  const title = t(
+    mine ? 'dispatchBoard.scheduledRelease.titleMove' : 'dispatchBoard.scheduledRelease.title',
+    { day: dayLabel },
+  );
+
   return (
-    <div
-      ref={ref}
-      className="db-rel-pop"
-      role="dialog"
-      aria-label={t(
-        mine ? 'dispatchBoard.scheduledRelease.titleMove' : 'dispatchBoard.scheduledRelease.title',
-        { day: dayLabel },
-      )}
-    >
-      <div className="db-rel-pop-h">
-        {t(
-          mine ? 'dispatchBoard.scheduledRelease.titleMove' : 'dispatchBoard.scheduledRelease.title',
-          { day: dayLabel },
-        )}
-      </div>
+    <div ref={ref} className="db-rel-pop" role="dialog" aria-label={title}>
+      <div className="db-rel-pop-h">{title}</div>
       {withDayBefore && (
         <ToggleGroup
           value={dayBefore ? 'before' : 'day'}
-          onChange={(value) => setDayBefore(value === 'before')}
+          onChange={(value) => switchDay(value === 'before')}
           size="sm"
           aria-label={t('dispatchBoard.scheduledRelease.whichDay')}
         >
@@ -291,26 +303,58 @@ function ReleaseAtPanel({
           <ToggleGroupOption value="day">{dayLabel}</ToggleGroupOption>
         </ToggleGroup>
       )}
-      {slots.length > 0 ? (
-        <label className="db-rel-row">
-          <span>{t('dispatchBoard.scheduledRelease.time')}</span>
-          <Select
-            size="xxs"
-            value={hour ?? ''}
-            onChange={(e) => setPicked(Number(e.target.value))}
-          >
-            {slots.map((slot) => (
-              <option key={slot} value={slot}>
-                {formatHour(slot)}
-              </option>
-            ))}
-          </Select>
-          <span className="db-rel-tz">
-            {t('dispatchBoard.scheduledRelease.boardTime', { zone: zoneAbbrev(timeZone, date) })}
-          </span>
-        </label>
-      ) : (
-        <div className="db-rel-note">{t('dispatchBoard.scheduledRelease.noSlots')}</div>
+      {/* A radio group, so the picks work from the keyboard. */}
+      {picks.length > 0 && (
+        <ToggleGroup
+          value={pickValue}
+          onChange={(value) => {
+            setHour(Number(value));
+            setTyped('');
+          }}
+          size="sm"
+          aria-label={t('dispatchBoard.scheduledRelease.picks')}
+        >
+          {picks.map((pick) => (
+            <ToggleGroupOption key={pick} value={String(pick)}>
+              {formatHour(pick)}
+            </ToggleGroupOption>
+          ))}
+        </ToggleGroup>
+      )}
+      <label className="db-rel-row">
+        <span>
+          {t(
+            picks.length > 0
+              ? 'dispatchBoard.scheduledRelease.otherTime'
+              : 'dispatchBoard.scheduledRelease.time',
+          )}
+        </span>
+        {/* step is the spinner's increment only. Any minute is valid, so a
+            7:10 the browser calls a step mismatch is never refused — only
+            the range rule disables Schedule. */}
+        <Input
+          type="time"
+          step={900}
+          size="xs"
+          className="db-rel-time"
+          value={typed}
+          onChange={(e) => {
+            setTyped(e.target.value);
+            setHour(hourFromTimeValue(e.target.value));
+          }}
+        />
+        <span className="db-rel-tz">
+          {t('dispatchBoard.scheduledRelease.boardTime', { zone: zoneAbbrev(timeZone, date) })}
+        </span>
+      </label>
+      {problem && (
+        <div className="db-rel-err">
+          {t(
+            problem === 'beforeEvening'
+              ? 'dispatchBoard.scheduledRelease.beforeEvening'
+              : 'dispatchBoard.scheduledRelease.passed',
+          )}
+        </div>
       )}
       <div className="db-rel-note">
         {t('dispatchBoard.scheduledRelease.note')}{' '}
@@ -320,11 +364,20 @@ function ReleaseAtPanel({
         <Button plain size="xxs" onClick={onClose}>
           {t('common.cancel')}
         </Button>
-        <Button color="accent" size="xxs" onClick={save} disabled={hour == null || saving}>
-          {t(
-            mine ? 'dispatchBoard.scheduledRelease.moveTo' : 'dispatchBoard.scheduledRelease.scheduleFor',
-            { when },
-          )}
+        <Button
+          color="accent"
+          size="xxs"
+          onClick={save}
+          disabled={hour == null || problem != null || saving}
+        >
+          {hour == null
+            ? t('dispatchBoard.scheduledRelease.pickTime')
+            : t(
+                mine
+                  ? 'dispatchBoard.scheduledRelease.moveTo'
+                  : 'dispatchBoard.scheduledRelease.scheduleFor',
+                { when },
+              )}
         </Button>
       </div>
     </div>

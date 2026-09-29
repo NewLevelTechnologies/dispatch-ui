@@ -10,11 +10,13 @@ import { formatHour, zonedDate, zonedHour } from './boardTime';
  *  constant, like the axis's working day — the tenant has no setting for it. */
 export const USUAL_START_HOUR = 7;
 
-// Earliest offered slot on the day itself, and on the evening before. A 3am
-// release texts techs in their sleep; a 4pm "evening before" is an afternoon.
-const DAY_FLOOR_HOUR = 4;
+// The evening-before tab starts at 5p: a 4pm "evening before" is an afternoon.
 const EVENING_FLOOR_HOUR = 17;
-const QUARTERS_PER_DAY = 96;
+
+// One click covers nearly every release: the morning around the usual start,
+// or a round hour the evening before. Anything else is typed.
+const DAY_PICKS = [6, 6.5, 7, 7.5, 8];
+const EVENING_PICKS = [17, 19, 21];
 
 // A send this far past its time is late enough to say so ("· due 7a").
 const LATE_AFTER_MS = 15 * 60 * 1000;
@@ -26,37 +28,75 @@ export function canReleaseDayBefore(date: string, now: Date, timeZone: string): 
   return today != null && date > today;
 }
 
+export type ReleaseTimeProblem = 'past' | 'beforeEvening';
+
 /**
- * The times "Release at…" offers, as fractional hours in 15-minute steps, on
- * `date` or on the evening before it. None before now, none after the day
- * ends — the server refuses both.
+ * Why a wall-clock hour can't be a release time, or null when it can.
+ *
+ * Validity is a RANGE — after now, before the day ends — never a list. Any
+ * minute is valid: the picker's 15-minute step is only its spinner increment,
+ * and the server has no step rule. A time before the day ends is the whole
+ * day, since an hour is always below 24.
  */
-export function releaseSlots(
+export function releaseTimeProblem(
+  hour: number,
+  date: string,
+  dayBefore: boolean,
+  now: Date,
+  timeZone: string,
+): ReleaseTimeProblem | null {
+  if (dayBefore && hour < EVENING_FLOOR_HOUR) return 'beforeEvening';
+  const on = dayBefore ? shiftDay(date, -1) : date;
+  // The minute the request lands has already passed, so now itself is out.
+  if (Date.parse(toIsoAt(on, hour, timeZone)) <= now.getTime()) return 'past';
+  return null;
+}
+
+/** The one-click times still on offer: passed ones drop out. */
+export function releasePicks(
   date: string,
   dayBefore: boolean,
   now: Date,
   timeZone: string,
 ): number[] {
-  const today = zonedDate(now, timeZone);
-  const on = dayBefore ? shiftDay(date, -1) : date;
-  if (today == null || on < today) return [];
-  // Whole quarters, so the steps never drift in floating point.
-  let first = (dayBefore ? EVENING_FLOOR_HOUR : DAY_FLOOR_HOUR) * 4;
-  if (on === today) {
-    const hour = zonedHour(now.toISOString(), timeZone) ?? 0;
-    // Strictly after now: a slot at the current minute is already past by
-    // the time the request lands.
-    first = Math.max(first, Math.floor(hour * 4) + 1);
-  }
-  const slots: number[] = [];
-  for (let q = first; q < QUARTERS_PER_DAY; q++) slots.push(q / 4);
-  return slots;
+  return (dayBefore ? EVENING_PICKS : DAY_PICKS).filter(
+    (hour) => releaseTimeProblem(hour, date, dayBefore, now, timeZone) == null,
+  );
 }
 
-/** The usual start when it's still on offer; otherwise the next slot. */
-export function defaultSlot(slots: number[]): number | null {
-  if (slots.includes(USUAL_START_HOUR)) return USUAL_START_HOUR;
-  return slots[0] ?? null;
+/**
+ * The time "Release at…" opens on: the usual start when it's still a pick,
+ * else the first pick left, else — late on today, every pick gone — the next
+ * quarter-hour after now. Null when the day has nothing left at all.
+ */
+export function defaultReleaseHour(
+  date: string,
+  dayBefore: boolean,
+  now: Date,
+  timeZone: string,
+): number | null {
+  const picks = releasePicks(date, dayBefore, now, timeZone);
+  if (picks.includes(USUAL_START_HOUR)) return USUAL_START_HOUR;
+  if (picks.length > 0) return picks[0];
+  const on = dayBefore ? shiftDay(date, -1) : date;
+  if (zonedDate(now, timeZone) !== on) return null;
+  const next = (Math.floor((zonedHour(now.toISOString(), timeZone) ?? 0) * 4) + 1) / 4;
+  return next < 24 && releaseTimeProblem(next, date, dayBefore, now, timeZone) == null
+    ? next
+    : null;
+}
+
+/** "07:15" ⇄ 7.25 — the native time field's value, in whole minutes. */
+export function hourFromTimeValue(value: string): number | null {
+  const m = /^(\d{2}):(\d{2})/.exec(value);
+  if (!m) return null;
+  const hour = Number(m[1]) + Number(m[2]) / 60;
+  return hour < 24 ? hour : null;
+}
+
+export function timeValueFromHour(hour: number): string {
+  const minutes = Math.round(hour * 60);
+  return `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`;
 }
 
 /** When a record runs, as the board reads it: an hour, and whether that hour

@@ -1,51 +1,18 @@
 import { describe, it, expect } from 'vitest';
 import {
   canReleaseDayBefore,
-  defaultSlot,
+  defaultReleaseHour,
+  hourFromTimeValue,
   isLateSend,
-  releaseSlots,
+  releasePicks,
+  releaseTimeProblem,
   scheduledFor,
+  timeValueFromHour,
 } from './scheduledRelease';
 
 // Phoenix: UTC-7 all year, so the arithmetic below is fixed.
 const TZ = 'America/Phoenix';
 const at = (iso: string) => new Date(iso);
-
-describe('releaseSlots', () => {
-  it('offers the whole morning of a future day, in 15-minute steps', () => {
-    const slots = releaseSlots('2026-05-16', false, at('2026-05-15T17:00:00Z'), TZ);
-    expect(slots[0]).toBe(4);
-    expect(slots[1]).toBe(4.25);
-    expect(slots.at(-1)).toBe(23.75);
-  });
-
-  it('offers nothing before now on today', () => {
-    // 9:07a Phoenix
-    const slots = releaseSlots('2026-05-15', false, at('2026-05-15T16:07:00Z'), TZ);
-    expect(slots[0]).toBe(9.25);
-  });
-
-  it('never offers the current quarter itself', () => {
-    // 9:00a exactly
-    expect(releaseSlots('2026-05-15', false, at('2026-05-15T16:00:00Z'), TZ)[0]).toBe(9.25);
-  });
-
-  it('offers the evening before from 5p', () => {
-    const slots = releaseSlots('2026-05-16', true, at('2026-05-15T15:00:00Z'), TZ);
-    expect(slots[0]).toBe(17);
-    expect(slots.at(-1)).toBe(23.75);
-  });
-
-  it('floors the evening before at now when that evening is tonight', () => {
-    // 8:10p Phoenix on the 15th
-    const slots = releaseSlots('2026-05-16', true, at('2026-05-16T03:10:00Z'), TZ);
-    expect(slots[0]).toBe(20.25);
-  });
-
-  it('offers nothing on a past day', () => {
-    expect(releaseSlots('2026-05-14', false, at('2026-05-15T16:00:00Z'), TZ)).toEqual([]);
-  });
-});
 
 describe('canReleaseDayBefore', () => {
   it('is only for a future day', () => {
@@ -55,14 +22,77 @@ describe('canReleaseDayBefore', () => {
   });
 });
 
-describe('defaultSlot', () => {
-  it('picks the usual start when it is still on offer', () => {
-    expect(defaultSlot([6, 7, 8])).toBe(7);
+describe('releaseTimeProblem', () => {
+  it('accepts any minute on a future day — the 15-minute step is only a spinner', () => {
+    const now = at('2026-05-15T17:00:00Z');
+    expect(releaseTimeProblem(7 + 10 / 60, '2026-05-16', false, now, TZ)).toBeNull();
+    expect(releaseTimeProblem(0.5, '2026-05-16', false, now, TZ)).toBeNull();
   });
 
-  it('falls to the next slot once the usual start has passed', () => {
-    expect(defaultSlot([9.25, 9.5])).toBe(9.25);
-    expect(defaultSlot([])).toBeNull();
+  it('refuses a time already passed on today, and now itself', () => {
+    // 9:07a Phoenix
+    const now = at('2026-05-15T16:07:00Z');
+    expect(releaseTimeProblem(9, '2026-05-15', false, now, TZ)).toBe('past');
+    expect(releaseTimeProblem(9 + 7 / 60, '2026-05-15', false, now, TZ)).toBe('past');
+    expect(releaseTimeProblem(9 + 8 / 60, '2026-05-15', false, now, TZ)).toBeNull();
+  });
+
+  it('starts the evening before at 5p', () => {
+    const now = at('2026-05-15T15:00:00Z');
+    expect(releaseTimeProblem(16.5, '2026-05-16', true, now, TZ)).toBe('beforeEvening');
+    expect(releaseTimeProblem(17, '2026-05-16', true, now, TZ)).toBeNull();
+  });
+
+  it('refuses a passed time on the evening before when that evening is tonight', () => {
+    // 8:10p Phoenix on the 15th
+    const now = at('2026-05-16T03:10:00Z');
+    expect(releaseTimeProblem(19, '2026-05-16', true, now, TZ)).toBe('past');
+    expect(releaseTimeProblem(21, '2026-05-16', true, now, TZ)).toBeNull();
+  });
+});
+
+describe('releasePicks', () => {
+  it('centres the morning picks on the usual start', () => {
+    expect(releasePicks('2026-05-16', false, at('2026-05-15T17:00:00Z'), TZ)).toEqual([
+      6, 6.5, 7, 7.5, 8,
+    ]);
+  });
+
+  it('switches to round evening hours the evening before', () => {
+    expect(releasePicks('2026-05-16', true, at('2026-05-15T15:00:00Z'), TZ)).toEqual([17, 19, 21]);
+  });
+
+  it('drops the picks that have passed', () => {
+    // 7:05a Phoenix
+    expect(releasePicks('2026-05-15', false, at('2026-05-15T14:05:00Z'), TZ)).toEqual([7.5, 8]);
+  });
+});
+
+describe('defaultReleaseHour', () => {
+  it('opens on the usual start while it is still a pick', () => {
+    expect(defaultReleaseHour('2026-05-16', false, at('2026-05-15T17:00:00Z'), TZ)).toBe(7);
+  });
+
+  it('falls to the first pick left once the usual start has passed', () => {
+    // 7:05a Phoenix
+    expect(defaultReleaseHour('2026-05-15', false, at('2026-05-15T14:05:00Z'), TZ)).toBe(7.5);
+  });
+
+  it('offers the next quarter-hour once every pick has passed', () => {
+    // 9:07a Phoenix
+    expect(defaultReleaseHour('2026-05-15', false, at('2026-05-15T16:07:00Z'), TZ)).toBe(9.25);
+  });
+
+  it('has nothing on a past day', () => {
+    expect(defaultReleaseHour('2026-05-14', false, at('2026-05-15T16:00:00Z'), TZ)).toBeNull();
+  });
+});
+
+describe('time field values', () => {
+  it('round-trips a whole-minute time', () => {
+    expect(hourFromTimeValue('07:10')).toBeCloseTo(7 + 10 / 60);
+    expect(timeValueFromHour(7 + 10 / 60)).toBe('07:10');
+    expect(hourFromTimeValue('')).toBeNull();
   });
 });
 

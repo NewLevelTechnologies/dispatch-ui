@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { renderWithProviders, userEvent } from '../test/utils';
 import DispatchBoardPage from './DispatchBoardPage';
 
@@ -684,7 +684,9 @@ describe('DispatchBoardPage scheduled release', () => {
     expect(within(panel).getByRole('radio', { name: 'Sat evening' })).toBeInTheDocument();
     expect(within(panel).getByText('HVAC')).toBeInTheDocument();
     expect(within(panel).getByText('Board time · MST')).toBeInTheDocument();
-    expect(within(panel).getByText('Time')).toBeInTheDocument();
+    expect(within(panel).getByText('Other time')).toBeInTheDocument();
+    // The usual start is the pick it opens on.
+    expect(within(panel).getByRole('radio', { name: '7a' })).toBeChecked();
 
     await u.click(within(panel).getByRole('button', { name: 'Schedule for 7a' }));
     await waitFor(() =>
@@ -708,7 +710,9 @@ describe('DispatchBoardPage scheduled release', () => {
     await u.click(await screen.findByRole('button', { name: 'Release at a scheduled time' }));
     const panel = screen.getByRole('dialog');
     await u.click(within(panel).getByRole('radio', { name: 'Sat evening' }));
-    await u.selectOptions(within(panel).getByRole('combobox'), '21');
+    // Evening picks replace the morning ones.
+    expect(within(panel).queryByRole('radio', { name: '7a' })).not.toBeInTheDocument();
+    await u.click(within(panel).getByRole('radio', { name: '9p' }));
     await u.click(within(panel).getByRole('button', { name: 'Schedule for Sat 9p' }));
 
     await waitFor(() =>
@@ -716,6 +720,43 @@ describe('DispatchBoardPage scheduled release', () => {
         expect.objectContaining({ date: DAY, releaseAt: '2099-03-15T04:00:00.000Z' }),
       ),
     );
+  });
+
+  // The 15-minute step is the spinner's increment, not a rule: any minute
+  // schedules. Only the range — after now — refuses.
+  it('schedules any typed minute, and refuses only a time that has passed', async () => {
+    const u = userEvent.setup();
+    mockGetBoard.mockResolvedValue(board([]));
+    renderWithProviders(<DispatchBoardPage />, { initialPath: `/dispatch?date=${DAY}` });
+
+    await u.click(await screen.findByRole('button', { name: 'Release at a scheduled time' }));
+    const panel = screen.getByRole('dialog');
+    const field = panel.querySelector('input[type="time"]') as HTMLInputElement;
+
+    fireEvent.change(field, { target: { value: '07:10' } });
+    expect(within(panel).getByRole('radio', { name: '7a' })).not.toBeChecked();
+    await u.click(within(panel).getByRole('button', { name: 'Schedule for 7:10a' }));
+    await waitFor(() =>
+      expect(mockScheduleRelease).toHaveBeenCalledWith(
+        expect.objectContaining({ releaseAt: '2099-03-15T14:10:00.000Z' }),
+      ),
+    );
+  });
+
+  it('says why the evening before refuses an afternoon time', async () => {
+    const u = userEvent.setup();
+    mockGetBoard.mockResolvedValue(board([]));
+    renderWithProviders(<DispatchBoardPage />, { initialPath: `/dispatch?date=${DAY}` });
+
+    await u.click(await screen.findByRole('button', { name: 'Release at a scheduled time' }));
+    const panel = screen.getByRole('dialog');
+    await u.click(within(panel).getByRole('radio', { name: 'Sat evening' }));
+    fireEvent.change(panel.querySelector('input[type="time"]') as HTMLInputElement, {
+      target: { value: '15:00' },
+    });
+
+    expect(within(panel).getByText('Evening-before releases start at 5p.')).toBeInTheDocument();
+    expect(within(panel).getByRole('button', { name: 'Schedule for Sat 3p' })).toBeDisabled();
   });
 
   it('says it moved your release when you schedule again', async () => {

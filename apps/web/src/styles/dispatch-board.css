@@ -1875,3 +1875,15 @@
   padding: 0 5px;
   border-right: 1px solid var(--border-soft);
 }
+
+/* Release at…: the typed time sits beside the picks' label, and an
+   out-of-range time says why right under it. */
+.db-rel-time {
+  width: 116px;
+}
+
+.db-rel-err {
+  margin-top: -4px;
+  font-size: 11.5px;
+  color: var(--danger-500);
+}
