@@ -684,6 +684,7 @@ describe('DispatchBoardPage scheduled release', () => {
     expect(within(panel).getByRole('radio', { name: 'Sat evening' })).toBeInTheDocument();
     expect(within(panel).getByText('HVAC')).toBeInTheDocument();
     expect(within(panel).getByText('Board time · MST')).toBeInTheDocument();
+    expect(within(panel).getByText('Time')).toBeInTheDocument();
 
     await u.click(within(panel).getByRole('button', { name: 'Schedule for 7a' }));
     await waitFor(() =>

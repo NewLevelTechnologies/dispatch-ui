@@ -522,6 +522,7 @@ vi.mock('react-i18next', () => {
     'dispatchBoard.scheduledRelease.sending': 'Sending the {{when}} release…',
     'dispatchBoard.scheduledRelease.sent': 'Released at {{time}} · {{parts}}',
     'dispatchBoard.scheduledRelease.setBy': 'Set by {{name}} · sends what’s pending then',
+    'dispatchBoard.scheduledRelease.time': 'Time',
     'dispatchBoard.scheduledRelease.title': 'Release {{day}} at…',
     'dispatchBoard.scheduledRelease.titleMove': 'Move your scheduled release',
     'dispatchBoard.scheduledRelease.whichDay': 'Which day',

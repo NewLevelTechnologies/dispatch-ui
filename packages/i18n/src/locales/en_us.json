@@ -3123,6 +3123,7 @@
       "sending": "Sending the {{when}} release…",
       "sent": "Released at {{time}} · {{parts}}",
       "setBy": "Set by {{name}} · sends what’s pending then",
+      "time": "Time",
       "title": "Release {{day}} at…",
       "titleMove": "Move your scheduled release",
       "whichDay": "Which day",
