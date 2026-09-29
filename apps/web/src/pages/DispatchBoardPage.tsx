@@ -47,6 +47,10 @@ import { dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/element
 import ConfirmDialog from '../components/ConfirmDialog';
 import DispatchDetailDrawer, { type DispatchSeed } from '../components/DispatchDetailDrawer';
 import DispatchMapView from '../components/dispatch/DispatchMapView';
+import { OverdueReleaseStrip, ReleaseControls } from '../components/dispatch/ScheduledRelease';
+import { releaseWhen } from '../lib/scheduledRelease';
+import { useCurrentUser } from '../hooks/useCurrentUser';
+import type { ScheduledRelease } from '../api/setup';
 import type { MapPrefill } from '../components/DispatchFormDrawer';
 import DispatchFormDrawer from '../components/DispatchFormDrawer';
 import DispatchTimeline from '../components/dispatch/DispatchTimeline';
@@ -989,6 +993,85 @@ export default function DispatchBoardPage() {
       board.pendingRelease.removedCount
     : 0;
 
+  // ── Scheduled release (§2.3b) ─────────────────────────────────────
+  // Listed for the DATE, every dispatcher's, whatever scope they were set
+  // from — so each pill carries its own scope when it is narrower.
+  const { data: currentUser } = useCurrentUser();
+  const scheduledReleases = useMemo(
+    () => (isWeek ? [] : (board?.scheduledReleases ?? [])),
+    [isWeek, board?.scheduledReleases],
+  );
+  const isPastDay = todayInZone != null && date < todayInZone;
+  const overdueRelease = scheduledReleases.find((r) => r.overdue) ?? null;
+
+  const viewScopeLabel =
+    [
+      regionId ? regions.find((r) => r.id === regionId)?.name : null,
+      divisionId ? divisions.find((d) => d.id === divisionId)?.name : null,
+    ]
+      .filter(Boolean)
+      .join(' · ') || t('dispatchBoard.scheduledRelease.scopeAll');
+
+  const recordScope = (record: ScheduledRelease): string | null => {
+    const parts: string[] = [];
+    // Null is every region; so is a list naming all of them.
+    if (record.regionIds && record.regionIds.length < regions.length) {
+      const names = record.regionIds
+        .map((id) => regions.find((r) => r.id === id)?.name)
+        .filter((name): name is string => Boolean(name));
+      parts.push(
+        names.length > 2
+          ? t('dispatchBoard.scheduledRelease.scopeRegions', { count: names.length })
+          : names.join(', '),
+      );
+    }
+    for (const id of record.divisionIds) {
+      const name = divisions.find((d) => d.id === id)?.name;
+      if (name) parts.push(name);
+    }
+    return parts.filter(Boolean).join(' · ') || null;
+  };
+
+  // Scheduling again for the same day MOVES the caller's record; the server
+  // replaces it, so the toast only has to say which happened.
+  const scheduleReleaseMutation = useMutation({
+    mutationFn: (vars: { releaseAt: string; moving: boolean }) =>
+      dispatchBoardApi.scheduleRelease({ date, releaseAt: vars.releaseAt, regionIds, divisionIds }),
+    onSuccess: (record, vars) => {
+      invalidateDispatchBoard(queryClient);
+      showSuccess(
+        t(
+          vars.moving
+            ? 'dispatchBoard.scheduledRelease.moved'
+            : 'dispatchBoard.scheduledRelease.scheduledToast',
+          { when: releaseWhen(record, date, timeZone) },
+        ),
+      );
+    },
+    onError: (err) =>
+      showError(t('dispatchBoard.scheduledRelease.scheduleFailed'), extractApiError(err)),
+  });
+
+  const cancelReleaseMutation = useMutation({
+    mutationFn: (record: ScheduledRelease) => dispatchBoardApi.cancelScheduledRelease(record.id),
+    onSuccess: () => {
+      invalidateDispatchBoard(queryClient);
+      showSuccess(t('dispatchBoard.scheduledRelease.cancelled'));
+    },
+    onError: (err) => {
+      // Started sending between the render and the click: say so, and let
+      // the refetch show what it became.
+      invalidateDispatchBoard(queryClient);
+      const code = (err as { response?: { data?: { code?: string } } })?.response?.data?.code;
+      showError(
+        code === 'SCHEDULED_RELEASE_NOT_CANCELLABLE'
+          ? t('dispatchBoard.scheduledRelease.alreadySending')
+          : t('dispatchBoard.scheduledRelease.cancelFailed'),
+        code === 'SCHEDULED_RELEASE_NOT_CANCELLABLE' ? undefined : extractApiError(err),
+      );
+    },
+  });
+
   const hasFilters = Boolean(regionId || search.trim() || exceptions.length > 0);
   const clearFilters = () => {
     setSearch('');
@@ -1372,27 +1455,57 @@ export default function DispatchBoardPage() {
               {t('dispatchBoard.map.label')}
             </Button>
 
-            {/* Present only when there is something to release — and only on
-                the day board, since release takes a single day's scope and a
-                count spanning the week could not act on itself. */}
-            {/* The server's number, not a count of blocks: removals have no
-                block, and it is the number the release acts on. Every tech row
-                showing — a name search is a lens on screen only. */}
-            {!isWeek && pendingTotal > 0 && (
-              <Button
-                color="accent"
-                size="xxs"
-                onClick={() => setConfirmRelease(true)}
-                disabled={releaseMutation.isPending}
-                title={t('dispatchBoard.release.tooltip', {
-                  parts: releaseParts(board?.pendingRelease),
+            {/* Day board only: release takes a single day's scope, and a
+                count spanning the week could not act on itself. The server's
+                number, not a count of blocks — removals have no block. */}
+            {!isWeek && board && (
+              <ReleaseControls
+                date={date}
+                timeZone={timeZone}
+                pendingTotal={pendingTotal}
+                tooltip={t('dispatchBoard.release.tooltip', {
+                  parts: releaseParts(board.pendingRelease),
                 })}
-              >
-                {t('dispatchBoard.release.action', { count: pendingTotal })}
-              </Button>
+                releasing={releaseMutation.isPending}
+                urgent={overdueRelease != null && !isPastDay && pendingTotal > 0}
+                canRelease={!isPastDay}
+                canSchedule={!isPastDay}
+                records={scheduledReleases}
+                currentUserId={currentUser?.id}
+                scopeLabel={viewScopeLabel}
+                recordScope={recordScope}
+                onRelease={() => setConfirmRelease(true)}
+                onSchedule={(releaseAt) =>
+                  scheduleReleaseMutation.mutateAsync({
+                    releaseAt,
+                    moving: scheduledReleases.some(
+                      (r) =>
+                        r.status === 'SCHEDULED' &&
+                        !r.overdue &&
+                        r.createdByUserId === currentUser?.id,
+                    ),
+                  })
+                }
+                scheduling={scheduleReleaseMutation.isPending}
+                onCancel={(record) => cancelReleaseMutation.mutate(record)}
+              />
             )}
           </div>
         </div>
+
+        {/* Directly under band 1. On a past day there is nothing left to
+            send, so an overdue record is the pill alone. */}
+        {!isWeek && !isPastDay && overdueRelease && (
+          <OverdueReleaseStrip
+            record={overdueRelease}
+            date={date}
+            timeZone={timeZone}
+            mine={currentUser?.id != null && overdueRelease.createdByUserId === currentUser.id}
+            pendingTotal={pendingTotal}
+            releasing={releaseMutation.isPending}
+            onReleaseNow={() => setConfirmRelease(true)}
+          />
+        )}
 
         {/* ── Band 2 — who is on the board. Controls self-hide. ──── */}
         <div className="db-band sub">

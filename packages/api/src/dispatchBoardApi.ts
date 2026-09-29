@@ -234,6 +234,48 @@ export interface DispatchBoard {
   // twice against a hardcoded copy. Deliberately no client fallback.
   defaultStopsPerDay?: number;
   pendingRelease: PendingRelease;
+  // The day's scheduled releases, every dispatcher's, earliest first.
+  // Cancelled ones are left out. Listed for the DATE, not the view's scope, so
+  // a record set from another filter shows here too and has to say its scope.
+  scheduledReleases: ScheduledRelease[];
+}
+
+// SENDING is mid-run; FAILED and MISSED (the day ended first) never retry,
+// because a retry after a partial send would text the same techs again.
+export type ScheduledReleaseStatus = 'SCHEDULED' | 'SENDING' | 'SENT' | 'FAILED' | 'MISSED';
+
+/** A bulk release set to run later. A timer on the Release button, not a
+ *  snapshot: it sends whatever is pending when it runs, in the scope it was
+ *  set from. */
+export interface ScheduledRelease {
+  id: string;
+  date: string;
+  releaseAt: string;
+  status: ScheduledReleaseStatus;
+  // Due and nothing went out: still waiting or stuck mid-send past its time,
+  // FAILED, or MISSED. The dispatcher's Release is the recovery, and it is
+  // safe — a run that goes out afterwards finds nothing left to send.
+  overdue: boolean;
+  // Null = every region. Stored at scheduling time, resolved against the
+  // caller's own regions.
+  regionIds: string[] | null;
+  divisionIds: string[];
+  createdByUserId: string | null;
+  createdByName: string | null;
+  // Set once SENT. Later than `releaseAt` when the service was down.
+  sentAt: string | null;
+  newCount: number | null;
+  changedCount: number | null;
+  removedCount: number | null;
+}
+
+export interface ScheduleReleaseRequest {
+  date: string;
+  // An instant, built from the dispatcher's wall-clock pick in the BOARD's
+  // zone. After now, and before `date` ends; the evening before is allowed.
+  releaseAt: string;
+  regionIds?: string[];
+  divisionIds?: string[];
 }
 
 // ── Week ────────────────────────────────────────────────────────────
@@ -436,6 +478,22 @@ export const dispatchBoardApi = {
       request,
     );
     return response.data;
+  },
+
+  // Scheduling again for the same date REPLACES the caller's pending one, so
+  // "move it to 6:30" is this same call. Other dispatchers' are separate.
+  scheduleRelease: async (request: ScheduleReleaseRequest): Promise<ScheduledRelease> => {
+    const response = await apiClient.post<ScheduledRelease>(
+      '/scheduling/scheduled-releases',
+      request,
+    );
+    return response.data;
+  },
+
+  // Anyone may cancel a pending one. 409 SCHEDULED_RELEASE_NOT_CANCELLABLE
+  // once it has started sending.
+  cancelScheduledRelease: async (id: string): Promise<void> => {
+    await apiClient.delete(`/scheduling/scheduled-releases/${id}`);
   },
 };
 
