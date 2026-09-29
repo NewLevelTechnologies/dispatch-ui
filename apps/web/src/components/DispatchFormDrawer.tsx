@@ -25,6 +25,7 @@ import { Avatar } from './ui/Avatar';
 import ConfirmDialog from './ConfirmDialog';
 import { useTenantTimeZone } from '../hooks/useTenantTimeZone';
 import { zonedDateOf, zonedHourOf, zonedIso } from '../lib/zonedTime';
+import { PRESET_WINDOWS } from '../lib/arrivalWindows';
 import { Pill } from './ui/Pill';
 import DispatchJobSection from './dispatch/DispatchJobSection';
 import type { DispatchSeed } from './DispatchDetailDrawer';
@@ -91,16 +92,20 @@ interface Win {
   em: number;
 }
 
-// Standard 2-hour arrival windows. Fast, CSR-friendly picking; a non-standard
-// existing window is preserved on edit via a synthetic "current" option.
-const PRESETS: Win[] = [
-  { key: '08-10', label: '8:00 – 10:00 AM', sh: 8, sm: 0, eh: 10, em: 0 },
-  { key: '09-11', label: '9:00 – 11:00 AM', sh: 9, sm: 0, eh: 11, em: 0 },
-  { key: '10-12', label: '10:00 AM – 12:00 PM', sh: 10, sm: 0, eh: 12, em: 0 },
-  { key: '12-14', label: '12:00 – 2:00 PM', sh: 12, sm: 0, eh: 14, em: 0 },
-  { key: '14-16', label: '2:00 – 4:00 PM', sh: 14, sm: 0, eh: 16, em: 0 },
-  { key: '16-18', label: '4:00 – 6:00 PM', sh: 16, sm: 0, eh: 18, em: 0 },
-];
+// The tenant's arrival windows — the same list the board snaps drops to, so
+// anything dragged there can be picked here. A non-standard existing window is
+// preserved on edit via a synthetic "current" option.
+const PRESETS: Win[] = PRESET_WINDOWS.map((w) => ({
+  key: w.key,
+  label: w.label,
+  sh: w.startHour,
+  sm: 0,
+  eh: w.endHour,
+  em: 0,
+}));
+
+// The window a new visit opens on.
+const DEFAULT_WIN_KEY = '09-11';
 
 function pad(n: number): string {
   return String(n).padStart(2, '0');
@@ -185,7 +190,7 @@ export default function DispatchFormDrawer({
 
   const [assignedUserId, setAssignedUserId] = useState('');
   const [date, setDate] = useState(defaultDate);
-  const [winKey, setWinKey] = useState(PRESETS[1].key);
+  const [winKey, setWinKey] = useState(DEFAULT_WIN_KEY);
   const [addressed, setAddressed] = useState<string[]>([]);
   const [release, setRelease] = useState<'now' | 'deck'>('now');
   const [notifyCustomer, setNotifyCustomer] = useState(true);
@@ -228,7 +233,7 @@ export default function DispatchFormDrawer({
     } else {
       setAssignedUserId('');
       setDate(defaultDate());
-      setWinKey(PRESETS[1].key);
+      setWinKey(DEFAULT_WIN_KEY);
       setAddressed(workItems.filter((wi) => NEEDY.has(wi.statusCategory)).map((wi) => wi.id));
       setRelease('now');
       setNotifyCustomer(true);

@@ -25,14 +25,42 @@ export interface PresetWindow {
   endHour: number;
 }
 
-export const PRESET_WINDOWS: readonly PresetWindow[] = [
-  { key: '08-10', label: '8:00 – 10:00 AM', startHour: 8, endHour: 10 },
-  { key: '09-11', label: '9:00 – 11:00 AM', startHour: 9, endHour: 11 },
-  { key: '10-12', label: '10:00 AM – 12:00 PM', startHour: 10, endHour: 12 },
-  { key: '12-14', label: '12:00 – 2:00 PM', startHour: 12, endHour: 14 },
-  { key: '14-16', label: '2:00 – 4:00 PM', startHour: 14, endHour: 16 },
-  { key: '16-18', label: '4:00 – 6:00 PM', startHour: 16, endHour: 18 },
-] as const;
+// Every hour of the working day starts a window, so a drop lands on the hour
+// it's aimed at. An every-other-hour list made 11 and 1 unreachable — from the
+// board AND the drawer, since both book from here.
+const FIRST_START_HOUR = 7;
+const LAST_START_HOUR = 16;
+const WINDOW_HOURS = 2;
+
+function clockLabel(hour: number): { time: string; meridiem: string } {
+  const h12 = hour % 12 === 0 ? 12 : hour % 12;
+  return { time: `${h12}:00`, meridiem: hour >= 12 ? 'PM' : 'AM' };
+}
+
+/** "8:00 – 10:00 AM", or "11:00 AM – 1:00 PM" across noon. */
+function windowLabel(startHour: number, endHour: number): string {
+  const a = clockLabel(startHour);
+  const b = clockLabel(endHour);
+  return a.meridiem === b.meridiem
+    ? `${a.time} – ${b.time} ${b.meridiem}`
+    : `${a.time} ${a.meridiem} – ${b.time} ${b.meridiem}`;
+}
+
+const pad2 = (n: number) => String(n).padStart(2, '0');
+
+export const PRESET_WINDOWS: readonly PresetWindow[] = Array.from(
+  { length: LAST_START_HOUR - FIRST_START_HOUR + 1 },
+  (_, i) => {
+    const startHour = FIRST_START_HOUR + i;
+    const endHour = startHour + WINDOW_HOURS;
+    return {
+      key: `${pad2(startHour)}-${pad2(endHour)}`,
+      label: windowLabel(startHour, endHour),
+      startHour,
+      endHour,
+    };
+  },
+);
 
 /**
  * Wall-clock hour on `date` (YYYY-MM-DD) in the TENANT's zone → an ISO

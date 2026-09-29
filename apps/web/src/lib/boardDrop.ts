@@ -36,6 +36,28 @@ export function hourAtPointer(
 }
 
 /**
+ * The hour a drop is AIMED at.
+ *
+ * A block on the lane is aimed by its left edge — that's what the dispatcher
+ * lines up with the axis, and the pointer sits wherever they happened to grab
+ * it. Snapping on the pointer booked a 2-hour block grabbed in the middle an
+ * hour late. `grabOffsetPx` is how far right of the block's left edge it was
+ * grabbed; the leading edge is then rounded to the nearest start.
+ *
+ * A rail card has no edge on the axis, so it's aimed by the pointer, and the
+ * hour column the pointer is in is the hour it means: anywhere over 1p is 1–3.
+ */
+export function aimedHour(
+  clientX: number,
+  lane: { left: number; width: number },
+  axis: { start: number; span: number },
+  grabOffsetPx?: number,
+): number {
+  if (grabOffsetPx != null) return hourAtPointer(clientX - grabOffsetPx, lane, axis);
+  return Math.floor(hourAtPointer(clientX, lane, axis));
+}
+
+/**
  * Nearest preset arrival window to a dropped hour, chosen by START time.
  *
  * Snapping is a CLIENT rule, not a server constraint — the backend

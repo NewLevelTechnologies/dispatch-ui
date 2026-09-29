@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
+  aimedHour,
   hourAtPointer,
   snapToPreset,
   overlaps,
@@ -35,14 +36,39 @@ describe('snapToPreset', () => {
   });
 
   it('clamps to the first and last preset outside their range', () => {
-    expect(snapToPreset(2).key).toBe('08-10');
+    expect(snapToPreset(2).key).toBe('07-09');
     expect(snapToPreset(23).key).toBe('16-18');
   });
 
-  // Presets aren't evenly spaced — there's a gap between 10–12 and 12–2.
-  it('handles the gap in the preset list', () => {
-    expect(snapToPreset(11).key).toBe('10-12');
-    expect(snapToPreset(11.6).key).toBe('12-14');
+  // The old every-other-hour list skipped 11 and 1: a drop there always
+  // landed an hour off, from the board and the drawer alike.
+  it('lands on the odd hours too', () => {
+    expect(snapToPreset(11).key).toBe('11-13');
+    expect(snapToPreset(13).key).toBe('13-15');
+    expect(snapToPreset(15).key).toBe('15-17');
+  });
+});
+
+describe('aimedHour', () => {
+  // A 2-hour block (200px here) grabbed in its middle, left edge lined up on
+  // 11a: the pointer is over noon. Snapping on the pointer booked 12–2.
+  it('aims a block by its left edge, not the pointer', () => {
+    const pointerX = 100 + 6 * 100; // noon
+    const hour = aimedHour(pointerX, lane, axis, 100);
+    expect(hour).toBe(11);
+    expect(snapToPreset(hour).key).toBe('11-13');
+  });
+
+  it('rounds the left edge to the nearest start', () => {
+    expect(snapToPreset(aimedHour(100 + 5.6 * 100 + 40, lane, axis, 40)).key).toBe('12-14');
+    expect(snapToPreset(aimedHour(100 + 5.4 * 100 + 40, lane, axis, 40)).key).toBe('11-13');
+  });
+
+  // A rail card has no edge on the axis: the hour column under the pointer
+  // is the hour it means — anywhere over 1p is 1–3, even at 1:50.
+  it('aims a rail card by the hour column under the pointer', () => {
+    expect(aimedHour(100 + 7.1 * 100, lane, axis)).toBe(13);
+    expect(aimedHour(100 + 7.9 * 100, lane, axis)).toBe(13);
   });
 });
 
@@ -125,11 +151,19 @@ describe('movedWindow', () => {
 describe('preset list', () => {
   // The composer books from this same list. If they ever diverge, a drag
   // creates windows the composer cannot reproduce.
-  it('is 2-hour windows across the working day', () => {
-    expect(PRESET_WINDOWS).toHaveLength(6);
+  it('is a 2-hour window starting on every hour, 7a to 4p', () => {
+    expect(PRESET_WINDOWS.map((w) => w.startHour)).toEqual([7, 8, 9, 10, 11, 12, 13, 14, 15, 16]);
     for (const w of PRESET_WINDOWS) {
       expect(w.endHour - w.startHour).toBe(2);
     }
+  });
+
+  it('labels a window once, or on both sides across noon', () => {
+    const label = (key: string) => PRESET_WINDOWS.find((w) => w.key === key)?.label;
+    expect(label('08-10')).toBe('8:00 – 10:00 AM');
+    expect(label('10-12')).toBe('10:00 AM – 12:00 PM');
+    expect(label('11-13')).toBe('11:00 AM – 1:00 PM');
+    expect(label('12-14')).toBe('12:00 – 2:00 PM');
   });
 });
 
@@ -137,9 +171,9 @@ describe('resolveDrop against a part-day absence', () => {
   const axis = { start: 6, end: 20 };
 
   // The window is what would be promised, so that is what must be free —
-  // a pointer at 12:40 snaps to 12–2p, which hits a 1–3p absence.
+  // a drop at 12:20 snaps to 12–2p, which hits a 1–3p absence.
   it('rejects on the SNAPPED window and reports both times', () => {
-    expect(resolveDrop(12.6, [{ start: 13, end: 15 }], axis)).toEqual({
+    expect(resolveDrop(12.3, [{ start: 13, end: 15 }], axis)).toEqual({
       ok: false,
       reason: 'time-off',
       window: { startHour: 12, endHour: 14 },
