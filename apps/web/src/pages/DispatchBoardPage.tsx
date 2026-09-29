@@ -80,8 +80,10 @@ import { siteLabel } from '../lib/siteLabel';
 // outside it (an overnight emergency must not be clipped) but never narrows.
 // Poll cadence. 30s is the handoff's number: fast enough that a second
 // dispatcher's change lands before it matters, slow enough that a 60-tech
-// board isn't refetching a few hundred rows constantly. If that payload gets
-// heavy the answer is a delta endpoint, not a longer interval.
+// board isn't refetching a few hundred rows constantly. There is no delta
+// endpoint to reach for: much of the read is computed across rows
+// (pendingRelease, drive times, load), so one move changes other rows anyway.
+// Responses are gzipped, and the server logs each read's size and time.
 const BOARD_POLL_MS = 30_000;
 
 const DAY_START = 6;
