@@ -3086,8 +3086,10 @@
     "rowCount_one": "{{count}} row",
     "rowCount_other": "{{count}} rows",
     "scheduledRelease": {
+      "alreadyReleased": "That release already went out",
       "alreadySending": "That release has already started sending",
       "boardTime": "Board time · {{zone}}",
+      "byHand": "· released by hand · due {{time}}",
       "cancelFailed": "Couldn't cancel the scheduled release",
       "cancelMine": "Cancel my scheduled release",
       "cancelTheirs": "Cancel {{name}}’s scheduled release",
@@ -3105,10 +3107,10 @@
       "overdue": "Scheduled for {{when}} · not sent",
       "overdueBy": "Set by {{name}}.",
       "overdueNoRetry": "It won't retry on its own.",
-      "overdueNothing": "Nothing is pending now, so there is nothing left to send.",
       "overduePending_one": "{{count}} change is still pending — that technician may not have their schedule.",
       "overduePending_other": "{{count}} changes are still pending — those technicians may not have their schedule.",
       "overdueTitle": "The {{when}} scheduled release didn't send.",
+      "partialScope": "It sends only your regions; the rest stays not sent.",
       "releaseNow": "Release now · {{count}}",
       "scheduleFailed": "Couldn't schedule the release",
       "scheduleFor": "Schedule for {{when}}",
@@ -3190,6 +3192,8 @@
     },
     "week": {
       "cellLabel": "{{name}}, {{day}} — {{count}} {{entity}}",
+      "notSent": "Not sent",
+      "notYet": "Not yet",
       "openDay": "Open day →",
       "openDayTitle": "Open {{day}} on the day board",
       "pastTitle": "Past — read only",
@@ -3198,7 +3202,13 @@
       "peekLoading": "Loading…",
       "pendingTitle": "Has work not yet sent to the technician",
       "preview": "{{from}} → {{to}} of {{cap}}",
-      "previewOver": "{{from}} → {{to}} of {{cap}} · over"
+      "previewOver": "{{from}} → {{to}} of {{cap}} · over",
+      "releaseConfirmBody_one": "Sends {{count}} {{entity}} — {{parts}} — for {{day}} only. Other days are untouched. Anything you move on {{day}} after this goes out as a change with the next release.",
+      "releaseConfirmBody_other": "Sends {{count}} {{entity}} — {{parts}} — for {{day}} only. Other days are untouched. Anything you move on {{day}} after this goes out as a change with the next release.",
+      "releaseConfirmTitle_one": "Release {{day}} to {{count}} {{techs}}?",
+      "releaseConfirmTitle_other": "Release {{day}} to {{count}} {{techs}}?",
+      "releaseDayTitle_one": "Release {{day}} · {{count}} not sent",
+      "releaseDayTitle_other": "Release {{day}} · {{count}} not sent"
     }
   }
 }

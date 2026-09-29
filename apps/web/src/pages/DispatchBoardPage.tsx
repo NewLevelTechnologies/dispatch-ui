@@ -50,7 +50,7 @@ import DispatchMapView from '../components/dispatch/DispatchMapView';
 import { OverdueReleaseStrip, ReleaseControls } from '../components/dispatch/ScheduledRelease';
 import { releaseWhen } from '../lib/scheduledRelease';
 import { useCurrentUser } from '../hooks/useCurrentUser';
-import type { ScheduledRelease } from '../api/setup';
+import type { PendingRelease, ScheduledRelease } from '../api/setup';
 import type { MapPrefill } from '../components/DispatchFormDrawer';
 import DispatchFormDrawer from '../components/DispatchFormDrawer';
 import DispatchTimeline from '../components/dispatch/DispatchTimeline';
@@ -178,6 +178,28 @@ function todayUtc(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
+// Board dates are calendar dates, so they're read in UTC: a bare YYYY-MM-DD
+// handed to the browser's zone shifts a day for anyone west of Greenwich.
+function utcDay(date: string): Date {
+  const [y, m, d] = date.split('-').map(Number);
+  return new Date(Date.UTC(y, (m ?? 1) - 1, d ?? 1));
+}
+
+/** "Tue, May 20" — the week confirm names the day it releases. */
+function longDayLabel(date: string): string {
+  return utcDay(date).toLocaleDateString('en-US', {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+    timeZone: 'UTC',
+  });
+}
+
+/** "Tue" */
+function shortWeekday(date: string): string {
+  return utcDay(date).toLocaleDateString('en-US', { weekday: 'short', timeZone: 'UTC' });
+}
+
 function isValidDate(value: string | null): value is string {
   return !!value && /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(Date.parse(value));
 }
@@ -224,6 +246,12 @@ export default function DispatchBoardPage() {
   // hold different answers about what is being identified.
   const [hoverWorkOrderId, setHoverWorkOrderId] = useState<string | null>(null);
   const [confirmRelease, setConfirmRelease] = useState(false);
+  // The week's per-day Release, awaiting its confirm.
+  const [releaseDay, setReleaseDay] = useState<{ date: string; pending: PendingRelease } | null>(
+    null,
+  );
+  // The overdue strip's Release now, awaiting its confirm.
+  const [releaseOverdue, setReleaseOverdue] = useState<ScheduledRelease | null>(null);
   const [pendingMove, setPendingMove] = useState<PendingMove | null>(null);
   // Week mode: the tech-day being looked at — by the peek, and by the drawer
   // opened from it. Kept separately from the peek so closing the peek to open
@@ -974,9 +1002,12 @@ export default function DispatchBoardPage() {
   // Same regionIds AND divisionIds as the board read: the release narrows rows
   // exactly as the read does, so it sends what `pendingRelease` counted.
   const releaseMutation = useMutation({
-    mutationFn: () => dispatchBoardApi.release({ date, regionIds, divisionIds }),
+    // The day is a parameter: the week releases one of its columns through
+    // the same endpoint the day board uses, with that column's date.
+    mutationFn: (day: string) => dispatchBoardApi.release({ date: day, regionIds, divisionIds }),
     onSuccess: (result) => {
       invalidateDispatchBoard(queryClient);
+      setReleaseDay(null);
       showSuccess(
         t('dispatchBoard.release.doneSplit', {
           count: result.released,
@@ -1002,7 +1033,42 @@ export default function DispatchBoardPage() {
     [isWeek, board?.scheduledReleases],
   );
   const isPastDay = todayInZone != null && date < todayInZone;
-  const overdueRelease = scheduledReleases.find((r) => r.overdue) ?? null;
+  // The strip shows only while something is still pending for the record's
+  // own scope; it never outlives the problem.
+  const overdueRelease =
+    scheduledReleases.find((r) => r.overdue && (r.pendingRelease?.total ?? 0) > 0) ?? null;
+
+  // Release now sends the RECORD's stored scope, not the view's — the record
+  // may be another dispatcher's, or the filter may have changed since.
+  const releaseOverdueMutation = useMutation({
+    mutationFn: (record: ScheduledRelease) => dispatchBoardApi.releaseScheduled(record.id),
+    onSuccess: (result) => {
+      invalidateDispatchBoard(queryClient);
+      setReleaseOverdue(null);
+      showSuccess(
+        t('dispatchBoard.release.doneSplit', {
+          count: (result.newCount ?? 0) + (result.changedCount ?? 0) + (result.removedCount ?? 0),
+          parts:
+            releaseParts({
+              newCount: result.newCount ?? 0,
+              changedCount: result.changedCount ?? 0,
+              removedCount: result.removedCount ?? 0,
+            }) || t('dispatchBoard.scheduledRelease.nothingSent'),
+        }),
+      );
+    },
+    onError: (err) => {
+      invalidateDispatchBoard(queryClient);
+      setReleaseOverdue(null);
+      const code = (err as { response?: { data?: { code?: string } } })?.response?.data?.code;
+      showError(
+        code === 'SCHEDULED_RELEASE_NOT_RELEASABLE'
+          ? t('dispatchBoard.scheduledRelease.alreadyReleased')
+          : t('dispatchBoard.release.failed'),
+        code === 'SCHEDULED_RELEASE_NOT_RELEASABLE' ? undefined : extractApiError(err),
+      );
+    },
+  });
 
   const viewScopeLabel =
     [
@@ -1281,6 +1347,8 @@ export default function DispatchBoardPage() {
             setMapPrefill({ assignedUserId: techId, date: day });
             setComposeFor(workOrder);
           }}
+          pendingByDay={week?.pendingReleaseByDay ?? []}
+          onReleaseDay={(day, pending) => setReleaseDay({ date: day, pending })}
         />
       );
     }
@@ -1467,7 +1535,7 @@ export default function DispatchBoardPage() {
                   parts: releaseParts(board.pendingRelease),
                 })}
                 releasing={releaseMutation.isPending}
-                urgent={overdueRelease != null && !isPastDay && pendingTotal > 0}
+                urgent={overdueRelease != null && !isPastDay}
                 canRelease={!isPastDay}
                 canSchedule={!isPastDay}
                 records={scheduledReleases}
@@ -1501,9 +1569,8 @@ export default function DispatchBoardPage() {
             date={date}
             timeZone={timeZone}
             mine={currentUser?.id != null && overdueRelease.createdByUserId === currentUser.id}
-            pendingTotal={pendingTotal}
-            releasing={releaseMutation.isPending}
-            onReleaseNow={() => setConfirmRelease(true)}
+            releasing={releaseOverdueMutation.isPending}
+            onReleaseNow={() => setReleaseOverdue(overdueRelease)}
           />
         )}
 
@@ -1729,7 +1796,7 @@ export default function DispatchBoardPage() {
       <ConfirmDialog
         isOpen={confirmRelease}
         onClose={() => setConfirmRelease(false)}
-        onConfirm={() => releaseMutation.mutate()}
+        onConfirm={() => releaseMutation.mutate(date)}
         title={t('dispatchBoard.release.confirmTitle', { count: pendingTotal })}
         message={t('dispatchBoard.release.confirmBody', {
           count: pendingTotal,
@@ -1737,6 +1804,71 @@ export default function DispatchBoardPage() {
         })}
         confirmLabel={t('dispatchBoard.release.confirmAction')}
         isPending={releaseMutation.isPending}
+      />
+
+      {/* From the week, the dispatcher isn't looking at the day's work — so
+          unlike the day board this names the day, the people and the count,
+          and says the other days are untouched. */}
+      <ConfirmDialog
+        isOpen={releaseDay != null}
+        onClose={() => setReleaseDay(null)}
+        onConfirm={() => releaseDay && releaseMutation.mutate(releaseDay.date)}
+        title={
+          releaseDay
+            ? t('dispatchBoard.week.releaseConfirmTitle', {
+                day: longDayLabel(releaseDay.date),
+                count: releaseDay.pending.techCount,
+                techs: (releaseDay.pending.techCount === 1
+                  ? getName('technician')
+                  : getName('technician', true)
+                ).toLowerCase(),
+              })
+            : ''
+        }
+        message={
+          releaseDay
+            ? t('dispatchBoard.week.releaseConfirmBody', {
+                count: releaseDay.pending.total,
+                entity: (releaseDay.pending.total === 1
+                  ? getName('dispatch')
+                  : getName('dispatch', true)
+                ).toLowerCase(),
+                parts: releaseParts(releaseDay.pending),
+                day: shortWeekday(releaseDay.date),
+              })
+            : ''
+        }
+        confirmLabel={
+          releaseDay
+            ? t('dispatchBoard.release.action', { count: releaseDay.pending.total })
+            : ''
+        }
+        cancelLabel={t('dispatchBoard.week.notYet')}
+        isPending={releaseMutation.isPending}
+      />
+
+      {/* The strip's recovery: the record's own scope and count. When the
+          caller holds only part of it, say that the rest stays unsent. */}
+      <ConfirmDialog
+        isOpen={releaseOverdue != null}
+        onClose={() => setReleaseOverdue(null)}
+        onConfirm={() => releaseOverdue && releaseOverdueMutation.mutate(releaseOverdue)}
+        title={t('dispatchBoard.release.confirmTitle', {
+          count: releaseOverdue?.pendingRelease?.total ?? 0,
+        })}
+        message={[
+          t('dispatchBoard.release.confirmBody', {
+            count: releaseOverdue?.pendingRelease?.total ?? 0,
+            parts: releaseParts(releaseOverdue?.pendingRelease),
+          }),
+          releaseOverdue?.callerCoversScope === false
+            ? t('dispatchBoard.scheduledRelease.partialScope')
+            : null,
+        ]
+          .filter(Boolean)
+          .join(' ')}
+        confirmLabel={t('dispatchBoard.release.confirmAction')}
+        isPending={releaseOverdueMutation.isPending}
       />
 
       {/* The rail is the board's only path into the composer — no standalone

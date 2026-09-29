@@ -473,6 +473,7 @@ export {
   type BoardWeek,
   type BoardWeekTech,
   type BoardWeekCell,
+  type BoardWeekDayPending,
   type GetWeekParams,
   type TechTimeOff,
   type UnscheduledWorkOrder,

@@ -366,10 +366,18 @@ function ReleasePill({
         })}
         {/* The only explanation a dispatcher gets for why techs were texted
             at 10:32: the service was down at 7. */}
-        {late && (
+        {/* Released by hand after the schedule failed: the schedule didn't
+            send it, so the pill doesn't pretend it did. */}
+        {record.sentBy === 'MANUAL' ? (
           <span className="db-rel-late">
-            {t('dispatchBoard.scheduledRelease.due', { time: when })}
+            {t('dispatchBoard.scheduledRelease.byHand', { time: when })}
           </span>
+        ) : (
+          late && (
+            <span className="db-rel-late">
+              {t('dispatchBoard.scheduledRelease.due', { time: when })}
+            </span>
+          )
         )}
       </span>
     );
@@ -452,7 +460,6 @@ export function OverdueReleaseStrip({
   date,
   timeZone,
   mine,
-  pendingTotal,
   releasing,
   onReleaseNow,
 }: {
@@ -460,11 +467,13 @@ export function OverdueReleaseStrip({
   date: string;
   timeZone: string;
   mine: boolean;
-  pendingTotal: number;
   releasing: boolean;
   onReleaseNow: () => void;
 }) {
   const { t } = useTranslation();
+  // The RECORD's count, for its stored scope — not the view's. Release now
+  // sends exactly that, whatever the board is filtered to.
+  const pending = record.pendingRelease?.total ?? 0;
   return (
     <div className="db-rel-overdue" role="alert">
       <ExclamationTriangleIcon className="db-rel-overdue-ic" aria-hidden="true" />
@@ -474,9 +483,7 @@ export function OverdueReleaseStrip({
             when: releaseWhen(record, date, timeZone),
           })}
         </b>{' '}
-        {pendingTotal > 0
-          ? t('dispatchBoard.scheduledRelease.overduePending', { count: pendingTotal })
-          : t('dispatchBoard.scheduledRelease.overdueNothing')}{' '}
+        {t('dispatchBoard.scheduledRelease.overduePending', { count: pending })}{' '}
         {t('dispatchBoard.scheduledRelease.overdueNoRetry')}{' '}
         <span className="db-rel-by">
           {t('dispatchBoard.scheduledRelease.overdueBy', {
@@ -484,12 +491,10 @@ export function OverdueReleaseStrip({
           })}
         </span>
       </span>
-      {pendingTotal > 0 && (
-        <Button color="accent" size="xxs" onClick={onReleaseNow} disabled={releasing}>
-          <CheckIcon />
-          {t('dispatchBoard.scheduledRelease.releaseNow', { count: pendingTotal })}
-        </Button>
-      )}
+      <Button color="accent" size="xxs" onClick={onReleaseNow} disabled={releasing}>
+        <CheckIcon />
+        {t('dispatchBoard.scheduledRelease.releaseNow', { count: pending })}
+      </Button>
     </div>
   );
 }

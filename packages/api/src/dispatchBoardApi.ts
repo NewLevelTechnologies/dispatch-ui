@@ -198,6 +198,9 @@ export interface PendingRelease {
   // Released, then unscheduled or cancelled — still on the tech's phone.
   removedCount: number;
   total: number;
+  // Techs who get a message, for a confirm's "to 4 techs". A reassignment
+  // reaches two: the old tech's removal and the new one's assignment.
+  techCount: number;
 }
 
 export interface DispatchBoard {
@@ -267,6 +270,16 @@ export interface ScheduledRelease {
   newCount: number | null;
   changedCount: number | null;
   removedCount: number | null;
+  // Set once SENT. MANUAL = it was overdue and someone released it by hand
+  // (or a board release covered it); the pill can't credit the schedule.
+  sentBy: 'SCHEDULE' | 'MANUAL' | null;
+  // Only when overdue: what `releaseScheduled` would send now, counted for
+  // the RECORD's stored scope — not the view's. The strip's count and its
+  // confirm read this, never the board's `pendingRelease`.
+  pendingRelease: PendingRelease | null;
+  // Only when overdue. False = the caller holds only some of the record's
+  // regions: releasing sends their part, and the strip stays for the rest.
+  callerCoversScope: boolean | null;
 }
 
 export interface ScheduleReleaseRequest {
@@ -337,6 +350,17 @@ export interface BoardWeek {
   days: string[];
   defaultStopsPerDay?: number;
   techs: BoardWeekTech[];
+  // What Release would send for each day, one entry per day, zero-filled.
+  // Each equals the day board's `pendingRelease` for that date and scope, and
+  // releasing one is the day endpoint with that date. There is deliberately
+  // no week-wide release: it would text Monday about Friday's jobs, and every
+  // later move of those becomes another text.
+  pendingReleaseByDay: BoardWeekDayPending[];
+}
+
+export interface BoardWeekDayPending {
+  date: string;
+  pendingRelease: PendingRelease;
 }
 
 export interface GetWeekParams {
@@ -486,6 +510,16 @@ export const dispatchBoardApi = {
     const response = await apiClient.post<ScheduledRelease>(
       '/scheduling/scheduled-releases',
       request,
+    );
+    return response.data;
+  },
+
+  // The overdue strip's Release now: sends the record's OWN stored scope and
+  // marks it SENT (sentBy MANUAL). 409 SCHEDULED_RELEASE_NOT_RELEASABLE when it
+  // was already sent or cancelled, or the job is sending it right now.
+  releaseScheduled: async (id: string): Promise<ScheduledRelease> => {
+    const response = await apiClient.post<ScheduledRelease>(
+      `/scheduling/scheduled-releases/${id}/release`,
     );
     return response.data;
   },

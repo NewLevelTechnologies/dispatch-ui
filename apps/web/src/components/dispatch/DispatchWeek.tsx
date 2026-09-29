@@ -22,7 +22,14 @@ import {
   draggable,
   dropTargetForElements,
 } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
-import type { BoardDispatch, BoardWeekCell, BoardWeekTech } from '../../api/setup';
+import type {
+  BoardDispatch,
+  BoardWeekCell,
+  BoardWeekDayPending,
+  BoardWeekTech,
+  PendingRelease,
+} from '../../api/setup';
+import { Button } from '../catalyst/button';
 import { useGlossary } from '../../contexts/GlossaryContext';
 import { DISPATCH_PRESENTATION } from '../../lib/dispatchStatus';
 import { isOutOfDate } from '../../lib/releaseState';
@@ -64,6 +71,10 @@ export interface WeekProps {
   onDropDispatch: (dispatchId: string, fromDate: string, toTechId: string, toDate: string) => void;
   /** A rail card dropped on a cell: the composer, prefilled — no window. */
   onDropWorkOrder: (workOrderId: string, techId: string, date: string) => void;
+  /** What each day's Release would send — the day board's number for that
+   *  date. Release is per day; there is no week-wide release. */
+  pendingByDay: BoardWeekDayPending[];
+  onReleaseDay: (date: string, pending: PendingRelease) => void;
 }
 
 // Same convention as the shared formatters: only en-US ships today, and the
@@ -447,6 +458,8 @@ export default function DispatchWeek({
   onOpenDispatch,
   onDropDispatch,
   onDropWorkOrder,
+  pendingByDay,
+  onReleaseDay,
 }: WeekProps) {
   const { t } = useTranslation();
   const { getName } = useGlossary();
@@ -468,6 +481,11 @@ export default function DispatchWeek({
     }
     return { used, cap: capacityStops != null ? working * capacityStops : null };
   });
+
+  // Past columns never release: nothing handed over now reaches that day.
+  const pendingOn = (date: string) =>
+    date < todayDate ? null : (pendingByDay.find((p) => p.date === date)?.pendingRelease ?? null);
+  const anyPending = days.some((date) => (pendingOn(date)?.total ?? 0) > 0);
 
   const renderRow = (tech: BoardWeekTech) => {
     // The week's own total, so the tech column reads as the week's load
@@ -526,31 +544,66 @@ export default function DispatchWeek({
 
   return (
     <div className="db-grid">
-      <div className="db-head">
-        <div className="db-techcol" style={{ width: techW }}>
-          {getName('technician')}
+      <div className="db-head stack">
+        <div className="db-head-row">
+          <div className="db-techcol" style={{ width: techW }}>
+            {getName('technician')}
+          </div>
+          <div className="db-week-lane">
+            {days.map((date, i) => {
+              const { used, cap } = totals[i];
+              const ratio = cap ? used / cap : 0;
+              const tone = ratio > 1 ? ' danger' : ratio >= 0.85 ? ' warning' : '';
+              return (
+                <button
+                  type="button"
+                  className={`db-whead${date === today ? ' today' : ''}${date < todayDate ? ' past' : ''}`}
+                  key={date}
+                  onClick={() => onOpenDay(date)}
+                  title={t('dispatchBoard.week.openDayTitle', { day: dayLabel(date) })}
+                >
+                  <span>{dayLabel(date)}</span>
+                  <span className={`db-wtotal font-mono${tone}`}>
+                    {cap != null ? `${used}/${cap}` : String(used)}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
         </div>
-        <div className="db-week-lane">
-          {days.map((date, i) => {
-            const { used, cap } = totals[i];
-            const ratio = cap ? used / cap : 0;
-            const tone = ratio > 1 ? ' danger' : ratio >= 0.85 ? ' warning' : '';
-            return (
-              <button
-                type="button"
-                className={`db-whead${date === today ? ' today' : ''}${date < todayDate ? ' past' : ''}`}
-                key={date}
-                onClick={() => onOpenDay(date)}
-                title={t('dispatchBoard.week.openDayTitle', { day: dayLabel(date) })}
-              >
-                <span>{dayLabel(date)}</span>
-                <span className={`db-wtotal font-mono${tone}`}>
-                  {cap != null ? `${used}/${cap}` : String(used)}
-                </span>
-              </button>
-            );
-          })}
-        </div>
+
+        {/* The count lives on the COLUMN: a per-cell count at 60 rows is
+            noise, and the cell's hollow dot already says which techs. The
+            row self-hides when no day in view has anything waiting. */}
+        {anyPending && (
+          <div className="db-head-row db-wrel-row">
+            <div className="db-techcol" style={{ width: techW }}>
+              {t('dispatchBoard.week.notSent')}
+            </div>
+            <div className="db-week-lane">
+              {days.map((date) => {
+                const pending = pendingOn(date);
+                return (
+                  <div className="db-wrel-cell" key={date}>
+                    {pending && pending.total > 0 && (
+                      <Button
+                        outline
+                        size="xxs"
+                        onClick={() => onReleaseDay(date, pending)}
+                        title={t('dispatchBoard.week.releaseDayTitle', {
+                          day: dayLabel(date),
+                          count: pending.total,
+                        })}
+                      >
+                        {t('dispatchBoard.release.action', { count: pending.total })}
+                      </Button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </div>
 
       {techs.map(renderRow)}

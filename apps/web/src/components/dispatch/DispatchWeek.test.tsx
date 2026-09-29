@@ -62,6 +62,8 @@ function renderWeek(over: Partial<WeekProps> = {}) {
     onOpenDispatch: vi.fn(),
     onDropDispatch: vi.fn(),
     onDropWorkOrder: vi.fn(),
+    pendingByDay: [],
+    onReleaseDay: vi.fn(),
     ...over,
   };
   return { ...render(<DispatchWeek {...props} />), props };
@@ -427,3 +429,42 @@ describe('DispatchWeek part-day time off', () => {
   });
 });
 
+
+// Release is per day (§3.8a): the count lives on the column, never the cell,
+// and there is no week-wide release.
+describe('DispatchWeek release per day', () => {
+  const pending = (total: number) => ({
+    newCount: total,
+    changedCount: 0,
+    removedCount: 0,
+    total,
+    techCount: 1,
+  });
+
+  it('self-hides the Not sent row when no day in view has anything waiting', () => {
+    renderWeek({ pendingByDay: DAYS.map((date) => ({ date, pendingRelease: pending(0) })) });
+    expect(screen.queryByText('Not sent')).not.toBeInTheDocument();
+  });
+
+  it('offers Release N on each day with pending work, and releases that day', async () => {
+    const user = userEvent.setup();
+    const { props } = renderWeek({
+      pendingByDay: DAYS.map((date, i) => ({ date, pendingRelease: pending(i === 2 ? 5 : 0) })),
+    });
+
+    expect(screen.getByText('Not sent')).toBeInTheDocument();
+    const buttons = screen.getAllByRole('button', { name: /^Release \d/ });
+    expect(buttons).toHaveLength(1);
+    await user.click(buttons[0]);
+    expect(props.onReleaseDay).toHaveBeenCalledWith(DAYS[2], pending(5));
+  });
+
+  it('never offers a release on a past day', () => {
+    renderWeek({
+      todayDate: DAYS[3],
+      pendingByDay: DAYS.map((date) => ({ date, pendingRelease: pending(2) })),
+    });
+    // Today and the three days after it; the three before are past.
+    expect(screen.getAllByRole('button', { name: /^Release \d/ })).toHaveLength(4);
+  });
+});
