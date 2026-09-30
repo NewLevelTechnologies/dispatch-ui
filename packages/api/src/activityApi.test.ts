@@ -34,3 +34,21 @@ describe('activityApi.listForCustomer', () => {
     });
   });
 });
+
+describe('activityApi.listForTenant', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('GETs the tenant-wide stream with the shared query contract', async () => {
+    const page = { content: [], nextCursor: 'c1', hasMore: true };
+    vi.mocked(apiClient.get).mockResolvedValue({ data: page });
+
+    const out = await activityApi.listForTenant({ limit: 20, categories: ['DISPATCH'], classification: 'BUSINESS' });
+
+    expect(apiClient.get).toHaveBeenCalledWith('/work-orders/activity', {
+      params: { cursor: undefined, limit: 20, categories: 'DISPATCH', classification: 'BUSINESS' },
+    });
+    expect(out).toEqual(page);
+  });
+});

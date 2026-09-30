@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { invoicesApi, quotesApi, financialActivityApi } from './financialApi';
+import { invoicesApi, quotesApi, financialActivityApi, financialDashboardApi } from './financialApi';
 import apiClient from './client';
 
 vi.mock('./client');
@@ -149,5 +149,37 @@ describe('financialActivityApi.getForLocation', () => {
     vi.mocked(apiClient.get).mockResolvedValue({ data: [row] });
     const out = await financialActivityApi.getForLocation('sl-1');
     expect(out).toEqual({ content: [row], nextCursor: null, hasMore: false });
+  });
+});
+
+describe('financialActivityApi.getForTenant', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('GETs the tenant-wide financial stream, passing cursor params through', async () => {
+    const page = { content: [], nextCursor: null, hasMore: false };
+    vi.mocked(apiClient.get).mockResolvedValue({ data: page });
+    const out = await financialActivityApi.getForTenant({ cursor: 'c0', limit: 20 });
+    expect(apiClient.get).toHaveBeenCalledWith('/financial/activity', { params: { cursor: 'c0', limit: 20 } });
+    expect(out).toEqual(page);
+  });
+});
+
+describe('financialDashboardApi', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(apiClient.get).mockResolvedValue({ data: { currency: 'USD' } });
+  });
+
+  it.each([
+    ['getAttention', '/financial/dashboard/attention'],
+    ['getRevenue', '/financial/dashboard/revenue'],
+    ['getReceivables', '/financial/dashboard/receivables'],
+    ['getQuotes', '/financial/dashboard/quotes'],
+  ] as const)('%s GETs %s', async (fn, path) => {
+    const out = await financialDashboardApi[fn]();
+    expect(apiClient.get).toHaveBeenCalledWith(path);
+    expect(out).toEqual({ currency: 'USD' });
   });
 });

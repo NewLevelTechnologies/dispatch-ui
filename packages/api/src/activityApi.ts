@@ -22,6 +22,7 @@ export type ActivityKind =
   | 'WORK_ITEM_STATUS_CHANGED'
   | 'WORK_ITEM_DELETED'
   | 'DISPATCH_ASSIGNED'
+  | 'DISPATCH_EN_ROUTE'
   | 'DISPATCH_DEPARTED'
   | 'DISPATCH_ARRIVED'
   | 'DISPATCH_CHECKED_OUT'
@@ -169,6 +170,23 @@ export const activityApi = {
         },
       }
     );
+    return response.data;
+  },
+
+  /**
+   * The tenant-wide work-order activity stream (home dashboard). Identical
+   * row/page shape and query contract to {@link listForLocation}; the FE
+   * interleaves it with `financialActivityApi.getForTenant` by timestamp.
+   */
+  listForTenant: async (params?: ListActivityParams): Promise<LocationActivityPage> => {
+    const response = await apiClient.get<LocationActivityPage>('/work-orders/activity', {
+      params: {
+        cursor: params?.cursor,
+        limit: params?.limit,
+        categories: params?.categories?.length ? params.categories.join(',') : undefined,
+        classification: params?.classification,
+      },
+    });
     return response.data;
   },
 };

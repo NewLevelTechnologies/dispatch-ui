@@ -2141,6 +2141,7 @@
         "dispatchCancelled": "{{entity}} cancelled",
         "dispatchCheckedOut": "{{assignedUserName}} checked out",
         "dispatchDeparted": "{{assignedUserName}} departed",
+        "dispatchEnRoute": "{{assignedUserName}} en route",
         "dispatchNoShow": "{{assignedUserName}} no-show",
         "invoiceIssued": "{{entity}} {{invoiceNumber}} issued for {{amount}}",
         "invoicePaid": "{{entity}} {{invoiceNumber}} paid",

@@ -224,6 +224,9 @@ interface ListPurchaseOrdersParams {
   // Case-insensitive substring across PO#, vendor, WO#, and site (WO#/site
   // depend on the work-order cache being populated).
   q?: string;
+  // Still-expected POs (ORDERED / PARTIALLY_RECEIVED) whose eta is before the
+  // tenant's today. On `summary`, `openCount` is then the past-ETA count.
+  overdue?: boolean;
   page?: number;
   size?: number;
 }

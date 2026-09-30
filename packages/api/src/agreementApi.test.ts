@@ -185,6 +185,19 @@ describe('agreementApi', () => {
     expect(apiClient.delete).toHaveBeenCalledWith('/work-orders/agreements/a-1/coverage/locations/sl-1');
   });
 
+  it('getOverview GETs the tenant-wide overview', async () => {
+    const overview = {
+      asOf: '2026-09-30', activeAgreementCount: 128, recurringMonthly: 18400,
+      renewingSoon: { withinDays: 30, count: 6, monthlyValue: 900 },
+      visitsThisMonth: { planned: 42, completed: 31, missed: 1, unscheduled: 4 },
+      visitsDueSoonUnscheduled: { withinDays: 7, count: 3 }, currency: 'USD',
+    };
+    vi.mocked(apiClient.get).mockResolvedValue({ data: overview });
+    const out = await agreementApi.getOverview();
+    expect(apiClient.get).toHaveBeenCalledWith('/work-orders/agreements/overview');
+    expect(out).toEqual(overview);
+  });
+
   it('getCustomerSummary GETs the per-customer rollup (AG-1)', async () => {
     const summary = {
       arr: 2400, activeAgreementCount: 2, coveredLocations: 3,
