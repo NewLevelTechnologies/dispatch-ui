@@ -97,6 +97,23 @@
 .kpi-delta.up   { color: var(--success-500); }
 .kpi-delta.down { color: var(--danger-500); }
 .kpi-meta { font-size: 11px; color: var(--fg-muted); }
+.kpi-sub {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--fg-muted);
+  letter-spacing: 0;
+  margin-left: 4px;
+}
+.kpi-foot { display: flex; align-items: center; gap: 8px; }
+/* Reserve the sparkline's corner so delta/meta never run under it. */
+.kpi-foot.has-spark { padding-right: 76px; }
+.kpi-spark {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  opacity: 0.85;
+  pointer-events: none;
+}
 
 /* ── Pills / status badges ──────────────────────────────────────── */
 .pill {

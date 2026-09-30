@@ -39,4 +39,24 @@ describe('KPI', () => {
     const root = container.querySelector('.kpi') as HTMLElement;
     expect(root.style.getPropertyValue('--bar')).toBe('var(--accent-500)');
   });
+
+  it('renders a muted sub suffix inside the value', () => {
+    const { container } = render(<KPI label="Techs on the road" value="14" sub="of 16" />);
+    const sub = container.querySelector('.kpi-value .kpi-sub');
+    expect(sub?.textContent).toBe('of 16');
+  });
+
+  it('draws a sparkline and reserves its corner when spark has 2+ points', () => {
+    const { container } = render(
+      <KPI label="Jobs today" value={38} meta="vs last Tue" spark={[31, 34, 29, 38]} />,
+    );
+    expect(container.querySelector('svg.kpi-spark')).not.toBeNull();
+    expect(container.querySelector('.kpi-foot')?.classList.contains('has-spark')).toBe(true);
+  });
+
+  it('skips the sparkline and the reserved corner when spark has fewer than 2 points', () => {
+    const { container } = render(<KPI label="Jobs today" value={38} spark={[38]} />);
+    expect(container.querySelector('svg.kpi-spark')).toBeNull();
+    expect(container.querySelector('.kpi-foot')?.classList.contains('has-spark')).toBe(false);
+  });
 });
