@@ -1,19 +1,11 @@
 import { useState, type MouseEvent, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from '@dispatch/i18n';
 import { formatCurrency } from '@dispatch/utils';
 import { ExclamationTriangleIcon } from '@heroicons/react/16/solid';
-import {
-  agreementApi,
-  approvalsApi,
-  dispatchBoardApi,
-  financialDashboardApi,
-  purchaseOrderApi,
-  type DispatchBoard,
-} from '../../api/setup';
+import { dispatchBoardApi } from '../../api/setup';
 import { useGlossary } from '../../contexts/GlossaryContext';
-import { useHasCapability } from '../../hooks/useCurrentUser';
 import { Button } from '../../components/catalyst/button';
 import { Card, CardBody, CardHead, CardTitle } from '../../components/ui/Card';
 import { Pill } from '../../components/ui/Pill';
@@ -23,6 +15,7 @@ import ConfirmDialog from '../../components/ConfirmDialog';
 import { extractApiError, showError, showSuccess } from '../../lib/toast';
 import { useReleaseParts } from '../../lib/releaseParts';
 import { invalidateDispatchBoard } from '../../utils/invalidateRoleConsumers';
+import type { AttentionCounts } from './useAttention';
 
 type Tone = 'accent' | 'warning' | 'danger' | 'neutral';
 
@@ -38,9 +31,7 @@ interface AttentionRow {
 }
 
 interface Props {
-  board: DispatchBoard | undefined;
-  boardLoading: boolean;
-  boardError: boolean;
+  attention: AttentionCounts;
   today: string;
   regionIds: string[] | undefined;
 }
@@ -52,42 +43,13 @@ interface Props {
  * than vanishing — the owner has to be told the page loaded and there's
  * nothing to do. Rows the user can't act on are hidden, never disabled.
  */
-export function NeedsAttentionCard({ board, boardLoading, boardError, today, regionIds }: Props) {
+export function NeedsAttentionCard({ attention: a, today, regionIds }: Props) {
   const { t } = useTranslation();
   const { getName } = useGlossary();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const releaseParts = useReleaseParts();
   const [confirmRelease, setConfirmRelease] = useState(false);
-
-  const canDispatch = useHasCapability('EDIT_DISPATCHES');
-  const canApprove = useHasCapability('APPROVE_WORK_ITEM_TRANSITIONS');
-  const canInvoices = useHasCapability('VIEW_ALL_INVOICES');
-
-  // Same key and fetcher as the sidebar bell, so this is a cache hit.
-  const approvals = useQuery({
-    queryKey: ['approvals', 'bell-summary'],
-    queryFn: () => approvalsApi.getBellSummary(),
-    enabled: canApprove,
-  });
-  const unscheduled = useQuery({
-    queryKey: ['dispatch-board', 'home-unscheduled', regionIds],
-    queryFn: () => dispatchBoardApi.getUnscheduled({ regionIds, size: 1 }).then((p) => p.totalElements),
-    enabled: canDispatch,
-  });
-  const financial = useQuery({
-    queryKey: ['financial-dashboard', 'attention'],
-    queryFn: () => financialDashboardApi.getAttention(),
-    enabled: canInvoices,
-  });
-  const agreements = useQuery({
-    queryKey: ['agreements', 'overview'],
-    queryFn: () => agreementApi.getOverview(),
-  });
-  const poLate = useQuery({
-    queryKey: ['purchase-orders', 'overdue-count'],
-    queryFn: () => purchaseOrderApi.summary({ overdue: true }).then((s) => s.openCount),
-  });
 
   // The release sends the same scope the board read used, so it sends exactly
   // what `pendingRelease` counted — new, changed and removed alike.
@@ -108,13 +70,13 @@ export function NeedsAttentionCard({ board, boardLoading, boardError, today, reg
   });
 
   const plural = (code: string, count: number) => (count === 1 ? getName(code) : getName(code, true));
-  const pending = board?.pendingRelease;
-  const pendingTotal = pending?.total ?? 0;
+  const pending = a.pending;
+  const pendingTotal = a.canDispatch ? (pending?.total ?? 0) : 0;
 
   const todayRows: AttentionRow[] = [];
   const weekRows: AttentionRow[] = [];
 
-  if (canDispatch && pendingTotal > 0) {
+  if (pendingTotal > 0) {
     todayRows.push({
       id: 'unreleased',
       count: pendingTotal,
@@ -129,98 +91,73 @@ export function NeedsAttentionCard({ board, boardLoading, boardError, today, reg
       ),
     });
   }
-  const approvalCount = approvals.data?.pendingForMe ?? 0;
-  if (canApprove && approvalCount > 0) {
+  if (a.approvals > 0) {
     todayRows.push({
       id: 'approvals',
-      count: approvalCount,
+      count: a.approvals,
       tone: 'accent',
-      label: t('dashboard.attention.rows.approvals', { count: approvalCount }),
+      label: t('dashboard.attention.rows.approvals', { count: a.approvals }),
       href: '/approvals',
       action: t('dashboard.attention.actions.review'),
     });
   }
-  const unscheduledCount = unscheduled.data ?? 0;
-  if (canDispatch && unscheduledCount > 0) {
+  if (a.unscheduled > 0) {
     weekRows.push({
       id: 'unscheduled',
-      count: unscheduledCount,
+      count: a.unscheduled,
       tone: 'warning',
       label: t('dashboard.attention.rows.unscheduled', {
-        count: unscheduledCount,
-        entity: plural('work_order', unscheduledCount),
+        count: a.unscheduled,
+        entity: plural('work_order', a.unscheduled),
       }),
       href: '/dispatch',
       action: t('dashboard.attention.actions.schedule'),
     });
   }
-  const overdue = financial.data?.overdue;
-  if (canInvoices && overdue && overdue.count > 0) {
+  if (a.overdue.count > 0) {
     weekRows.push({
       id: 'overdue',
-      count: overdue.count,
+      count: a.overdue.count,
       tone: 'danger',
-      label: t('dashboard.attention.rows.overdue', { count: overdue.count, entity: plural('invoice', overdue.count) }),
-      meta: t('dashboard.attention.rows.overdueMeta', { amount: formatCurrency(overdue.amount) }),
+      label: t('dashboard.attention.rows.overdue', { count: a.overdue.count, entity: plural('invoice', a.overdue.count) }),
+      meta: t('dashboard.attention.rows.overdueMeta', { amount: formatCurrency(a.overdue.amount) }),
       href: '/invoices?status=overdue',
       action: t('dashboard.attention.actions.view'),
     });
   }
-  const unbilled = financial.data?.unbilledWorkOrderCount ?? 0;
-  if (canInvoices && unbilled > 0) {
+  if (a.unbilled > 0) {
     weekRows.push({
       id: 'unbilled',
-      count: unbilled,
+      count: a.unbilled,
       tone: 'warning',
-      label: t('dashboard.attention.rows.unbilled', { count: unbilled, entity: plural('work_order', unbilled) }),
+      label: t('dashboard.attention.rows.unbilled', { count: a.unbilled, entity: plural('work_order', a.unbilled) }),
       // No list filter for exactly this set yet; completed is the superset.
       href: '/work-orders?status=COMPLETED',
       action: t('dashboard.attention.actions.view'),
     });
   }
-  const visits = agreements.data?.visitsDueSoonUnscheduled;
-  if (visits && visits.count > 0) {
+  if (a.visits.count > 0) {
     weekRows.push({
       id: 'visits',
-      count: visits.count,
+      count: a.visits.count,
       tone: 'warning',
-      label: t('dashboard.attention.rows.visits', { count: visits.count, entity: getName('agreement') }),
-      meta: t('dashboard.attention.rows.visitsMeta', { days: visits.withinDays }),
+      label: t('dashboard.attention.rows.visits', { count: a.visits.count, entity: getName('agreement') }),
+      meta: t('dashboard.attention.rows.visitsMeta', { days: a.visits.withinDays }),
       // No tenant-wide agreements list to send this to yet.
     });
   }
-  const poLateCount = poLate.data ?? 0;
-  if (poLateCount > 0) {
+  if (a.poLate > 0) {
     weekRows.push({
       id: 'po-late',
-      count: poLateCount,
+      count: a.poLate,
       tone: 'warning',
-      label: t('dashboard.attention.rows.poLate', { count: poLateCount }),
+      label: t('dashboard.attention.rows.poLate', { count: a.poLate }),
       href: '/purchasing?overdue=true',
       action: t('dashboard.attention.actions.view'),
     });
   }
 
-  const sources = [
-    { enabled: canDispatch, loading: boardLoading, error: boardError },
-    { enabled: canApprove, loading: approvals.isLoading, error: approvals.isError },
-    { enabled: canDispatch, loading: unscheduled.isLoading, error: unscheduled.isError },
-    { enabled: canInvoices, loading: financial.isLoading, error: financial.isError },
-    { enabled: true, loading: agreements.isLoading, error: agreements.isError },
-    { enabled: true, loading: poLate.isLoading, error: poLate.isError },
-  ].filter((s) => s.enabled);
-  const anyLoading = sources.some((s) => s.loading);
-  const anyError = sources.some((s) => s.error);
-  const total = [...todayRows, ...weekRows].reduce((sum, r) => sum + r.count, 0);
-
-  const retry = () => {
-    void approvals.refetch();
-    void unscheduled.refetch();
-    void financial.refetch();
-    void agreements.refetch();
-    void poLate.refetch();
-    void queryClient.invalidateQueries({ queryKey: ['dispatch-board', 'home'] });
-  };
+  const { total, anyLoading, anyError, retry } = a;
 
   let body: ReactNode;
   if (total === 0 && anyLoading) {

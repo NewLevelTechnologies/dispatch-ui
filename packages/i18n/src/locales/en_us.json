@@ -497,14 +497,66 @@
       "vsLastWeek": "vs last {{weekday}}"
     },
     "newWorkOrder": "New {{entity, lowercase}}",
+    "revenue": {
+      "agreements": {
+        "active": "Active",
+        "perMonthValue": "{{amount}}/mo",
+        "planned": "Planned visits this month",
+        "recurring": "Recurring / mo",
+        "remaining": "{{remaining}} remaining · {{unscheduled}} unscheduled",
+        "renewing": "Renewing · {{days}}d"
+      },
+      "aging": {
+        "avgDaysToPay": "Avg days to pay · 30d",
+        "current": "Current",
+        "days1To30": "1–30 days",
+        "days31To60": "31–60 days",
+        "days61Plus": "61+ days",
+        "days_one": "{{count}} day",
+        "days_other": "{{count}} days",
+        "title": "Receivables aging"
+      },
+      "byWeek": {
+        "empty": "Nothing invoiced yet this month.",
+        "soFar": "so far",
+        "title": "Revenue by week"
+      },
+      "error": "Couldn't load",
+      "kpis": {
+        "active": "{{count}} active {{entities, lowercase}}",
+        "agreementRevenue": "{{entity}} revenue",
+        "collectedMtd": "Collected MTD",
+        "collectedPct": "{{pct}}% of invoiced",
+        "openQuotes": "Open {{entities, lowercase}}",
+        "openQuotesCount": "{{count}} {{entities, lowercase}}",
+        "openQuotesMeta": "{{count}} {{entities, lowercase}} · {{rate}}% win rate, 30d",
+        "outstandingAr": "Outstanding AR",
+        "overdueDelta": "{{amount}} overdue",
+        "pastDue": "{{count}} {{entities, lowercase}} past due",
+        "perMonth": "/mo",
+        "revenueMtd": "Revenue MTD",
+        "vsLastMonth": "vs same days last month"
+      },
+      "quotes": {
+        "accepted": "Accepted",
+        "all": "All {{entities, lowercase}}",
+        "avgDecision": "Avg time to decision",
+        "declined": "Declined",
+        "sent": "Sent",
+        "title": "{{entities}} · last 30 days",
+        "viewed": "Viewed"
+      }
+    },
     "scope": {
       "all": "Whole company",
       "label": "Scope",
       "labelAll": "Scope: Whole company"
     },
     "sub": "{{date}} · Today",
+    "subMonth": "{{month}}, month to date",
     "tabs": {
-      "operations": "Operations"
+      "operations": "Operations",
+      "revenue": "Revenue & productivity"
     }
   },
   "entities": {
