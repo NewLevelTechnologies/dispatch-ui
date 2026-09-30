@@ -178,6 +178,22 @@ export interface CustomerAgreementSummaryResponse {
   currency: string;
 }
 
+// Tenant-wide agreement overview (home dashboard) — GET /work-orders/agreements/overview.
+// Revenue, plan and renewal numbers cover ACTIVE CONTRACT agreements; visit
+// numbers cover every ACTIVE agreement (internal included). Money is decimal dollars.
+export interface AgreementOverviewResponse {
+  asOf: string; // ISO date yyyy-MM-dd, tenant zone
+  activeAgreementCount: number;
+  recurringMonthly: number; // annualized active billing ÷ 12
+  renewingSoon: { withinDays: number; count: number; monthlyValue: number };
+  // Visits whose window starts this month (waived excluded). Remaining =
+  // planned − completed − missed. Unscheduled = open with no live dispatch.
+  visitsThisMonth: { planned: number; completed: number; missed: number; unscheduled: number };
+  // Open visits with no live dispatch starting within `withinDays`, overdue included.
+  visitsDueSoonUnscheduled: { withinDays: number; count: number };
+  currency: string;
+}
+
 // Create body. New agreements are created status DRAFT — generation + billing
 // only run once PATCHed to ACTIVE (after coverage + visit templates are set).
 // v1 only creates kind VISIT / classification CONTRACT.
@@ -462,6 +478,12 @@ export const agreementApi = {
       '/work-orders/agreements/summary',
       { params: { customerId } },
     );
+    return response.data;
+  },
+
+  // Tenant-wide overview (home dashboard). See {@link AgreementOverviewResponse}.
+  getOverview: async (): Promise<AgreementOverviewResponse> => {
+    const response = await apiClient.get<AgreementOverviewResponse>('/work-orders/agreements/overview');
     return response.data;
   },
 

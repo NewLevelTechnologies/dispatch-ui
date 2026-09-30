@@ -21,6 +21,7 @@ const KIND_TEMPLATE_KEYS: Record<ActivityKind, string> = {
   WORK_ITEM_STATUS_CHANGED: 'workOrders.activity.kind.workItemStatusChanged',
   WORK_ITEM_DELETED: 'workOrders.activity.kind.workItemDeleted',
   DISPATCH_ASSIGNED: 'workOrders.activity.kind.dispatchAssigned',
+  DISPATCH_EN_ROUTE: 'workOrders.activity.kind.dispatchEnRoute',
   DISPATCH_DEPARTED: 'workOrders.activity.kind.dispatchDeparted',
   DISPATCH_ARRIVED: 'workOrders.activity.kind.dispatchArrived',
   DISPATCH_CHECKED_OUT: 'workOrders.activity.kind.dispatchCheckedOut',

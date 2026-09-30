@@ -27,6 +27,7 @@ const KIND_GLYPH: Partial<Record<ActivityKind, { glyph: string; tone: ActivityTo
   WORK_ITEM_STATUS_CHANGED: { glyph: '✓', tone: 'success' },
   WORK_ITEM_DELETED: { glyph: '✕', tone: 'neutral' },
   DISPATCH_ASSIGNED: { glyph: '→', tone: 'info' },
+  DISPATCH_EN_ROUTE: { glyph: '→', tone: 'info' },
   DISPATCH_DEPARTED: { glyph: '→', tone: 'info' },
   DISPATCH_ARRIVED: { glyph: '→', tone: 'info' },
   DISPATCH_CHECKED_OUT: { glyph: '✓', tone: 'success' },

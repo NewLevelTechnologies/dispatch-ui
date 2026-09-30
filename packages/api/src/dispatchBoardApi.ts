@@ -450,6 +450,32 @@ export interface GetUnscheduledParams {
   size?: number;
 }
 
+/** One local day: visits booked (cancelled / no-show excluded), how many the
+ * tech has arrived at, and how many of those arrived by the window's end
+ * (early counts as on time). */
+export interface BoardSummaryDay {
+  date: string; // ISO date yyyy-MM-dd
+  jobCount: number;
+  arrivedCount: number;
+  onTimeCount: number;
+}
+
+/** Home dashboard scheduling trends, in the caller's region scope. `days` is the
+ * last 14 local days, oldest first, zero-filled: `days[13]` is today and
+ * `days[6]` the same weekday last week. `arrivalWindow` rolls up the last 7
+ * days; `onTimeRate` is 0–1, null when nothing has an arrival. Today's live
+ * counts come from the day board, not here. */
+export interface BoardSummary {
+  asOf: string;
+  timeZone: string;
+  days: BoardSummaryDay[];
+  arrivalWindow: {
+    arrivedCount: number;
+    onTimeCount: number;
+    onTimeRate: number | null;
+  };
+}
+
 export interface ReleaseRequest {
   date: string;
   regionIds?: string[];
@@ -479,6 +505,13 @@ export const dispatchBoardApi = {
   // the grouping happens in one query instead of in the client.
   getWeek: async (params: GetWeekParams): Promise<BoardWeek> => {
     const response = await apiClient.get<BoardWeek>('/scheduling/board/week', { params });
+    return response.data;
+  },
+
+  // Home dashboard trends. Omitting regionIds means all of the caller's regions
+  // (the whole company for a caller with none assigned).
+  getSummary: async (params: { regionIds?: string[] } = {}): Promise<BoardSummary> => {
+    const response = await apiClient.get<BoardSummary>('/scheduling/board/summary', { params });
     return response.data;
   },
 

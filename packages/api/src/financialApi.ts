@@ -835,6 +835,106 @@ export const financialActivityApi = {
     const data = response.data;
     return Array.isArray(data) ? { content: data, nextCursor: null, hasMore: false } : data;
   },
+
+  /** Tenant-wide financial milestones (home dashboard), newest-first. Same row
+   * shape and cursor envelope as {@link getForCustomer}, so it co-paginates with
+   * `activityApi.listForTenant`. */
+  getForTenant: async (
+    params?: { cursor?: string; limit?: number },
+  ): Promise<FinancialActivityPage> => {
+    const response = await apiClient.get<FinancialActivityPage>('/financial/activity', { params });
+    return response.data;
+  },
+};
+
+// ========== HOME DASHBOARD ==========
+// Tenant-wide aggregates, one endpoint per card so each card loads on its own.
+// Whole-company only (invoices carry no dispatch region). Dates are the
+// tenant's zone; money is decimal dollars.
+
+/** "Needs attention" rows owned by financial-service. `overdue` is open invoices
+ * past due, net of payments. `unbilledWorkOrderCount` is completed hand-entered
+ * work orders with no non-void invoice (a draft counts as invoiced; agreement-
+ * generated orders never count). */
+export interface FinancialDashboardAttention {
+  overdue: ArAgingBucket;
+  unbilledWorkOrderCount: number;
+  currency: string;
+}
+
+export interface DailyAmount {
+  date: string; // ISO date yyyy-MM-dd
+  amount: number;
+}
+
+/** Month to date. `billed` = issued invoices (not DRAFT/VOID/CANCELLED) by
+ * invoice date; `collected` = received payments by payment date. `*PreviousPeriod`
+ * covers the same days of last month. `billedByDay` runs `periodStart`..`asOf`,
+ * zero-filled — group it into weeks client-side. */
+export interface FinancialDashboardRevenue {
+  periodStart: string;
+  asOf: string;
+  billed: number;
+  billedPreviousPeriod: number;
+  collected: number;
+  collectedPreviousPeriod: number;
+  billedByDay: DailyAmount[];
+  currency: string;
+}
+
+/** Open AR, **net of payments applied** (the customer ar-summary is face value,
+ * so the two can differ). Bucket counts match the invoice list's `agingBucket`
+ * filter; `overdue` is the four past-due buckets. `averageDaysToPay` is invoice
+ * date → payment over the last 30 days, null when nothing was paid. */
+export interface FinancialDashboardReceivables {
+  asOf: string;
+  outstanding: number;
+  overdue: ArAgingBucket;
+  current: ArAgingBucket;
+  days1To30: ArAgingBucket;
+  days31To60: ArAgingBucket;
+  days61To90: ArAgingBucket;
+  days91Plus: ArAgingBucket;
+  averageDaysToPay: number | null;
+  currency: string;
+}
+
+/** `open*` = sent and not yet expired. The funnel is quotes FIRST SENT in the
+ * last 30 days, by current status. `winRate` is 0–1 (accepted ÷ decided), null
+ * when none decided. `viewed` and `averageDaysToDecision` only count from the
+ * backend deploy onward, so they under-count for the first 30 days. */
+export interface FinancialDashboardQuotes {
+  openCount: number;
+  openAmount: number;
+  sent: ArAgingBucket;
+  viewed: ArAgingBucket;
+  accepted: ArAgingBucket;
+  declined: ArAgingBucket;
+  winRate: number | null;
+  averageDaysToDecision: number | null;
+  currency: string;
+}
+
+export const financialDashboardApi = {
+  getAttention: async (): Promise<FinancialDashboardAttention> => {
+    const response = await apiClient.get<FinancialDashboardAttention>('/financial/dashboard/attention');
+    return response.data;
+  },
+
+  getRevenue: async (): Promise<FinancialDashboardRevenue> => {
+    const response = await apiClient.get<FinancialDashboardRevenue>('/financial/dashboard/revenue');
+    return response.data;
+  },
+
+  getReceivables: async (): Promise<FinancialDashboardReceivables> => {
+    const response = await apiClient.get<FinancialDashboardReceivables>('/financial/dashboard/receivables');
+    return response.data;
+  },
+
+  getQuotes: async (): Promise<FinancialDashboardQuotes> => {
+    const response = await apiClient.get<FinancialDashboardQuotes>('/financial/dashboard/quotes');
+    return response.data;
+  },
 };
 
 // Export combined API
@@ -844,6 +944,7 @@ export const financialApi = {
   payments: paymentsApi,
   summary: financialSummaryApi,
   activity: financialActivityApi,
+  dashboard: financialDashboardApi,
 };
 
 export default financialApi;
