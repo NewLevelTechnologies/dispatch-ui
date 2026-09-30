@@ -50,6 +50,8 @@ export default function PurchasingPage() {
   // Status is multi (repeated ?status=…); memoize so the query key is stable per URL.
   const statusSel = useMemo(() => searchParams.getAll('status') as PurchaseOrderStatus[], [searchParams]);
   const type = (searchParams.get('type') as PurchaseOrderType | null) || null;
+  // Still-expected POs past their ETA — the home dashboard links here with it.
+  const overdue = searchParams.get('overdue') === 'true';
 
   const [searchQuery, setSearchQuery] = useState(urlSearch);
   useEffect(() => {
@@ -84,15 +86,16 @@ export default function PurchasingPage() {
     q: deferredSearch || undefined,
     status: statusSel.length ? statusSel : undefined,
     type: type || undefined,
+    overdue: overdue || undefined,
   };
 
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ['purchase-orders', 'list', page, deferredSearch, statusSel, type],
+    queryKey: ['purchase-orders', 'list', page, deferredSearch, statusSel, type, overdue],
     queryFn: () => purchaseOrderApi.list({ page: page - 1, size: PAGE_SIZE, ...filterArgs }),
   });
   // Header aggregate over the whole filtered set (open count + committed cost).
   const { data: summary } = useQuery({
-    queryKey: ['purchase-orders', 'summary', deferredSearch, statusSel, type],
+    queryKey: ['purchase-orders', 'summary', deferredSearch, statusSel, type, overdue],
     queryFn: () => purchaseOrderApi.summary(filterArgs),
   });
 
@@ -105,6 +108,10 @@ export default function PurchasingPage() {
   const { data: fieldCount } = useQuery({
     queryKey: ['purchase-orders', 'chip-count', 'field'],
     queryFn: () => purchaseOrderApi.list({ type: 'FIELD', size: 1 }).then((p) => p.totalElements),
+  });
+  const { data: overdueCount } = useQuery({
+    queryKey: ['purchase-orders', 'overdue-count'],
+    queryFn: () => purchaseOrderApi.summary({ overdue: true }).then((s) => s.openCount),
   });
   const { data: toBillCount } = useQuery({
     queryKey: ['purchase-orders', 'chip-count', 'tobill'],
@@ -120,7 +127,7 @@ export default function PurchasingPage() {
   const awaitingActive = sameSet(statusSel, AWAITING);
   const toBillActive = sameSet(statusSel, TO_BILL);
 
-  const hasFilters = !!deferredSearch || statusSel.length > 0 || !!type;
+  const hasFilters = !!deferredSearch || statusSel.length > 0 || !!type || overdue;
   const clearFilters = () => {
     setSearchQuery('');
     setSearchParams(new URLSearchParams(), { replace: false });
@@ -216,6 +223,12 @@ export default function PurchasingPage() {
               count={fieldCount}
               active={type === 'FIELD'}
               onToggle={() => setParam('type', type === 'FIELD' ? null : 'FIELD')}
+            />
+            <FilterChip
+              label="Past ETA"
+              count={overdueCount}
+              active={overdue}
+              onToggle={() => setParam('overdue', overdue ? null : 'true')}
             />
             <FilterChip
               label="To bill"

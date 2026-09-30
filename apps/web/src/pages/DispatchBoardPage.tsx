@@ -77,6 +77,7 @@ import { useBoardMutations } from './dispatch/useBoardMutations';
 import { useTenantTimeZone } from '../hooks/useTenantTimeZone';
 import { extractApiError, showError, showSuccess, showUndo } from '../lib/toast';
 import { invalidateDispatchBoard } from '../utils/invalidateRoleConsumers';
+import { useReleaseParts } from '../lib/releaseParts';
 import { isHiddenByDefault } from '../lib/dispatchStatus';
 import { siteLabel } from '../lib/siteLabel';
 
@@ -202,23 +203,6 @@ function shortWeekday(date: string): string {
 
 function isValidDate(value: string | null): value is string {
   return !!value && /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(Date.parse(value));
-}
-
-/** "3 new · 2 changed · 1 removed", skipping zero parts. */
-function useReleaseParts() {
-  const { t } = useTranslation();
-  return (counts?: { newCount: number; changedCount: number; removedCount: number } | null) =>
-    counts
-      ? [
-          counts.newCount > 0 && t('dispatchBoard.release.partNew', { count: counts.newCount }),
-          counts.changedCount > 0 &&
-            t('dispatchBoard.release.partChanged', { count: counts.changedCount }),
-          counts.removedCount > 0 &&
-            t('dispatchBoard.release.partRemoved', { count: counts.removedCount }),
-        ]
-          .filter(Boolean)
-          .join(' · ')
-      : '';
 }
 
 export default function DispatchBoardPage() {

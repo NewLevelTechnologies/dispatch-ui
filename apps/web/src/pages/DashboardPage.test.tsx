@@ -1,0 +1,237 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { screen, waitFor, within } from '@testing-library/react';
+import { renderWithProviders, userEvent } from '../test/utils';
+import { useCurrentUser, useHasCapability } from '../hooks/useCurrentUser';
+import DashboardPage from './DashboardPage';
+
+const mockGetBoard = vi.fn();
+const mockGetSummary = vi.fn();
+const mockGetUnscheduled = vi.fn();
+const mockRelease = vi.fn();
+const mockBell = vi.fn();
+const mockAttention = vi.fn();
+const mockOverview = vi.fn();
+const mockPoSummary = vi.fn();
+const mockActivity = vi.fn();
+const mockFinancialActivity = vi.fn();
+const mockRegions = vi.fn();
+const mockShowSuccess = vi.fn();
+
+vi.mock('../api/setup', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../api/setup')>();
+  return {
+    ...actual,
+    dispatchBoardApi: {
+      ...actual.dispatchBoardApi,
+      getBoard: (...a: unknown[]) => mockGetBoard(...a),
+      getSummary: (...a: unknown[]) => mockGetSummary(...a),
+      getUnscheduled: (...a: unknown[]) => mockGetUnscheduled(...a),
+      release: (...a: unknown[]) => mockRelease(...a),
+    },
+    approvalsApi: { ...actual.approvalsApi, getBellSummary: () => mockBell() },
+    financialDashboardApi: { ...actual.financialDashboardApi, getAttention: () => mockAttention() },
+    agreementApi: { ...actual.agreementApi, getOverview: () => mockOverview() },
+    purchaseOrderApi: { ...actual.purchaseOrderApi, summary: (...a: unknown[]) => mockPoSummary(...a) },
+    activityApi: { ...actual.activityApi, listForTenant: (...a: unknown[]) => mockActivity(...a) },
+    financialActivityApi: {
+      ...actual.financialActivityApi,
+      getForTenant: (...a: unknown[]) => mockFinancialActivity(...a),
+    },
+    dispatchRegionApi: { ...actual.dispatchRegionApi, getAll: (...a: unknown[]) => mockRegions(...a) },
+  };
+});
+
+vi.mock('@dispatch/api/src/client');
+
+vi.mock('../lib/toast', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../lib/toast')>();
+  return { ...actual, showSuccess: (...a: unknown[]) => mockShowSuccess(...a) };
+});
+
+const OFFICE_CAPS = ['EDIT_DISPATCHES', 'APPROVE_WORK_ITEM_TRANSITIONS', 'VIEW_ALL_INVOICES', 'CREATE_WORK_ORDERS'];
+
+function grant(caps: string[]) {
+  vi.mocked(useHasCapability).mockImplementation((cap: string) => caps.includes(cap));
+}
+
+const pending = (total: number) => ({
+  newCount: total,
+  changedCount: 0,
+  removedCount: 0,
+  total,
+  techCount: total > 0 ? 1 : 0,
+});
+
+const board = (over: Record<string, unknown> = {}) => ({
+  date: '2026-09-30',
+  timeZone: 'UTC',
+  techs: [
+    { id: 't1', name: 'Maya Ortiz', regionIds: [], stopCount: 2, committedCount: 2, divisionIds: [], timeOff: [] },
+    {
+      id: 't2',
+      name: 'Dev Patel',
+      regionIds: [],
+      stopCount: 0,
+      committedCount: 0,
+      divisionIds: [],
+      timeOff: [{ startsAt: '', endsAt: '', allDay: true, label: 'PTO' }],
+    },
+  ],
+  dispatches: [
+    {
+      id: 'd1',
+      assignedUserId: 't1',
+      status: 'IN_PROGRESS',
+      arrivalWindowStart: '2026-09-30T09:00:00Z',
+      arrivalWindowEnd: '2026-09-30T11:00:00Z',
+      arrivedAt: '2026-09-30T09:42:00Z',
+      departedAt: null,
+      serviceLocationName: 'Pham Residence',
+      customerName: 'Pham, A.',
+      serviceLocationCity: 'PHOENIX',
+      workOrderNumber: 'WO-1',
+    },
+    {
+      id: 'd2',
+      assignedUserId: 't1',
+      status: 'SCHEDULED',
+      arrivalWindowStart: '2026-09-30T13:00:00Z',
+      arrivalWindowEnd: '2026-09-30T15:00:00Z',
+      arrivedAt: null,
+      departedAt: null,
+      serviceLocationName: null,
+      customerName: 'Joe’s Pizza',
+      serviceLocationCity: null,
+      workOrderNumber: 'WO-2',
+    },
+  ],
+  pendingRelease: pending(0),
+  ...over,
+});
+
+const emptyPage = { content: [], nextCursor: null, hasMore: false };
+
+function allQuiet() {
+  mockGetBoard.mockResolvedValue(board());
+  mockGetSummary.mockResolvedValue({ asOf: '2026-09-30', timeZone: 'UTC', days: [], arrivalWindow: { arrivedCount: 0, onTimeCount: 0, onTimeRate: null } });
+  mockGetUnscheduled.mockResolvedValue({ content: [], totalElements: 0 });
+  mockBell.mockResolvedValue({ pendingForMe: 0, recentlyResolvedMine: 0 });
+  mockAttention.mockResolvedValue({ overdue: { amount: 0, count: 0 }, unbilledWorkOrderCount: 0, currency: 'USD' });
+  mockOverview.mockResolvedValue({
+    asOf: '2026-09-30',
+    activeAgreementCount: 0,
+    recurringMonthly: 0,
+    renewingSoon: { withinDays: 30, count: 0, monthlyValue: 0 },
+    visitsThisMonth: { planned: 0, completed: 0, missed: 0, unscheduled: 0 },
+    visitsDueSoonUnscheduled: { withinDays: 7, count: 0 },
+    currency: 'USD',
+  });
+  mockPoSummary.mockResolvedValue({ openCount: 0, committedCost: 0 });
+  mockActivity.mockResolvedValue(emptyPage);
+  mockFinancialActivity.mockResolvedValue(emptyPage);
+  mockRegions.mockResolvedValue([]);
+}
+
+describe('DashboardPage — Operations', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    grant(OFFICE_CAPS);
+    vi.mocked(useCurrentUser).mockReturnValue({
+      data: { id: 'u1', firstName: 'Sam', lastName: 'Lee', capabilities: OFFICE_CAPS },
+      isLoading: false,
+      error: null,
+    } as unknown as ReturnType<typeof useCurrentUser>);
+    allQuiet();
+  });
+
+  it('greets the user by first name', async () => {
+    renderWithProviders(<DashboardPage />);
+    expect(await screen.findByRole('heading', { level: 1, name: /Sam$/ })).toBeInTheDocument();
+  });
+
+  it('says so explicitly when nothing needs attention', async () => {
+    renderWithProviders(<DashboardPage />);
+    expect(await screen.findByText('Nothing needs you right now')).toBeInTheDocument();
+    expect(screen.queryByTestId(/^attention-/)).toBeNull();
+  });
+
+  it('shows only the rows with a count, each with its count', async () => {
+    mockBell.mockResolvedValue({ pendingForMe: 2, recentlyResolvedMine: 0 });
+    mockAttention.mockResolvedValue({ overdue: { amount: 1240, count: 5 }, unbilledWorkOrderCount: 0, currency: 'USD' });
+    mockPoSummary.mockResolvedValue({ openCount: 3, committedCost: 0 });
+
+    renderWithProviders(<DashboardPage />);
+
+    expect(await screen.findByTestId('attention-approvals')).toHaveTextContent('2');
+    expect(await screen.findByTestId('attention-overdue')).toHaveTextContent('5');
+    expect(screen.getByTestId('attention-po-late')).toHaveTextContent('3');
+    expect(screen.queryByTestId('attention-unbilled')).toBeNull();
+    expect(screen.queryByTestId('attention-unscheduled')).toBeNull();
+    expect(screen.queryByText('Nothing needs you right now')).toBeNull();
+    expect(mockPoSummary).toHaveBeenCalledWith({ overdue: true });
+  });
+
+  it('hides rows the user lacks the capability for instead of disabling them', async () => {
+    grant(['EDIT_DISPATCHES']);
+    mockBell.mockResolvedValue({ pendingForMe: 2, recentlyResolvedMine: 0 });
+    mockAttention.mockResolvedValue({ overdue: { amount: 1240, count: 5 }, unbilledWorkOrderCount: 4, currency: 'USD' });
+    mockGetUnscheduled.mockResolvedValue({ content: [], totalElements: 6 });
+
+    renderWithProviders(<DashboardPage />);
+
+    expect(await screen.findByTestId('attention-unscheduled')).toHaveTextContent('6');
+    expect(screen.queryByTestId('attention-approvals')).toBeNull();
+    expect(screen.queryByTestId('attention-overdue')).toBeNull();
+    expect(screen.queryByTestId('attention-unbilled')).toBeNull();
+    expect(mockBell).not.toHaveBeenCalled();
+    expect(mockAttention).not.toHaveBeenCalled();
+  });
+
+  it('releases exactly what the board counts after confirming, with no Undo', async () => {
+    const user = userEvent.setup();
+    mockGetBoard.mockResolvedValue(board({ pendingRelease: { newCount: 3, changedCount: 2, removedCount: 0, total: 5, techCount: 2 } }));
+    mockRelease.mockResolvedValue({ released: 5, newCount: 3, changedCount: 2, removedCount: 0 });
+
+    renderWithProviders(<DashboardPage />);
+
+    const row = await screen.findByTestId('attention-unreleased');
+    expect(row).toHaveTextContent('5');
+    await user.click(within(row).getByRole('button', { name: 'Release 5' }));
+    const dialog = await screen.findByRole('dialog');
+    await user.click(within(dialog).getByRole('button', { name: 'Release' }));
+
+    await waitFor(() => expect(mockRelease).toHaveBeenCalledTimes(1));
+    expect(mockRelease.mock.calls[0][0]).toEqual({ date: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/), regionIds: undefined });
+    await waitFor(() => expect(mockShowSuccess).toHaveBeenCalledTimes(1));
+  });
+
+  it('hides the scope chip with one region and scopes scheduling reads when one is picked', async () => {
+    mockRegions.mockResolvedValue([{ id: 'r1', name: 'East Valley', abbreviation: 'EV', isActive: true, sortOrder: 0 }]);
+    const { unmount } = renderWithProviders(<DashboardPage />);
+    await screen.findByText('Nothing needs you right now');
+    expect(screen.queryByRole('button', { name: 'dashboard.scope.label' })).toBeNull();
+    unmount();
+
+    mockRegions.mockResolvedValue([
+      { id: 'r1', name: 'East Valley', abbreviation: 'EV', isActive: true, sortOrder: 0 },
+      { id: 'r2', name: 'West Valley', abbreviation: 'WV', isActive: true, sortOrder: 1 },
+    ]);
+    renderWithProviders(<DashboardPage />, { initialPath: '/?region=r2' });
+    expect(await screen.findByText('West Valley')).toBeInTheDocument();
+    await waitFor(() => expect(mockGetBoard).toHaveBeenLastCalledWith(expect.objectContaining({ regionIds: ['r2'] })));
+    expect(mockGetSummary).toHaveBeenLastCalledWith({ regionIds: ['r2'] });
+    expect(mockGetUnscheduled).toHaveBeenLastCalledWith({ regionIds: ['r2'], size: 1 });
+  });
+
+  it('fills the Today KPIs and Who’s where from the day board', async () => {
+    renderWithProviders(<DashboardPage />);
+
+    // 1 working (Maya), Dev is off.
+    expect(await screen.findByText('dashboard.kpis.techsMeta')).toBeInTheDocument();
+    const maya = await screen.findByTestId('tech-t1');
+    expect(maya).toHaveTextContent('Maya Ortiz');
+    expect(maya).toHaveTextContent('Pham Residence · Phoenix');
+    expect(maya).toHaveTextContent('0 / 2');
+    expect(screen.queryByTestId('tech-t2')).toBeNull();
+  });
+});
