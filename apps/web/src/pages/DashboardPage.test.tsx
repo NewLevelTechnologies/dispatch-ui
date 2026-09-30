@@ -10,6 +10,9 @@ const mockGetUnscheduled = vi.fn();
 const mockRelease = vi.fn();
 const mockBell = vi.fn();
 const mockAttention = vi.fn();
+const mockRevenue = vi.fn();
+const mockReceivables = vi.fn();
+const mockQuotes = vi.fn();
 const mockOverview = vi.fn();
 const mockPoSummary = vi.fn();
 const mockActivity = vi.fn();
@@ -29,7 +32,13 @@ vi.mock('../api/setup', async (importOriginal) => {
       release: (...a: unknown[]) => mockRelease(...a),
     },
     approvalsApi: { ...actual.approvalsApi, getBellSummary: () => mockBell() },
-    financialDashboardApi: { ...actual.financialDashboardApi, getAttention: () => mockAttention() },
+    financialDashboardApi: {
+      ...actual.financialDashboardApi,
+      getAttention: () => mockAttention(),
+      getRevenue: () => mockRevenue(),
+      getReceivables: () => mockReceivables(),
+      getQuotes: () => mockQuotes(),
+    },
     agreementApi: { ...actual.agreementApi, getOverview: () => mockOverview() },
     purchaseOrderApi: { ...actual.purchaseOrderApi, summary: (...a: unknown[]) => mockPoSummary(...a) },
     activityApi: { ...actual.activityApi, listForTenant: (...a: unknown[]) => mockActivity(...a) },
@@ -233,5 +242,100 @@ describe('DashboardPage — Operations', () => {
     expect(maya).toHaveTextContent('Pham Residence · Phoenix');
     expect(maya).toHaveTextContent('0 / 2');
     expect(screen.queryByTestId('tech-t2')).toBeNull();
+  });
+});
+
+const bucket = (amount: number, count: number) => ({ amount, count });
+
+describe('DashboardPage — Revenue & productivity', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    grant(OFFICE_CAPS);
+    vi.mocked(useCurrentUser).mockReturnValue({
+      data: { id: 'u1', firstName: 'Sam', lastName: 'Lee', capabilities: OFFICE_CAPS },
+      isLoading: false,
+      error: null,
+    } as unknown as ReturnType<typeof useCurrentUser>);
+    allQuiet();
+    mockRevenue.mockResolvedValue({
+      periodStart: '2026-09-01',
+      asOf: '2026-09-10',
+      billed: 48920,
+      billedPreviousPeriod: 40000,
+      collected: 24460,
+      collectedPreviousPeriod: 20000,
+      billedByDay: Array.from({ length: 10 }, (_, i) => ({ date: `2026-09-${String(i + 1).padStart(2, '0')}`, amount: 4892 })),
+      currency: 'USD',
+    });
+    mockReceivables.mockResolvedValue({
+      asOf: '2026-09-10',
+      outstanding: 1000,
+      overdue: bucket(600, 5),
+      current: bucket(400, 4),
+      days1To30: bucket(300, 3),
+      days31To60: bucket(100, 1),
+      days61To90: bucket(150, 1),
+      days91Plus: bucket(50, 1),
+      averageDaysToPay: null,
+      currency: 'USD',
+    });
+    mockQuotes.mockResolvedValue({
+      openCount: 23,
+      openAmount: 81000,
+      sent: bucket(20000, 10),
+      viewed: bucket(15000, 8),
+      accepted: bucket(8000, 4),
+      declined: bucket(2000, 1),
+      winRate: 0.8,
+      averageDaysToDecision: null,
+      currency: 'USD',
+    });
+  });
+
+  it('hides the tab bar and ignores ?view=rev without the invoice capability', async () => {
+    grant(['EDIT_DISPATCHES']);
+    renderWithProviders(<DashboardPage />, { initialPath: '/?view=rev' });
+
+    expect(await screen.findByText('Nothing needs you right now')).toBeInTheDocument();
+    expect(screen.queryByRole('tablist')).toBeNull();
+    expect(mockRevenue).not.toHaveBeenCalled();
+  });
+
+  it('carries the attention total on the Operations tab', async () => {
+    mockBell.mockResolvedValue({ pendingForMe: 2, recentlyResolvedMine: 0 });
+    mockPoSummary.mockResolvedValue({ openCount: 3, committedCost: 0 });
+    renderWithProviders(<DashboardPage />);
+
+    const ops = await screen.findByRole('tab', { name: /dashboard.tabs.operations/ });
+    await waitFor(() => expect(ops).toHaveTextContent('5'));
+    expect(ops).toHaveAttribute('aria-selected', 'true');
+  });
+
+  it('deep-links to the Revenue tab and renders its cards from the dashboard reads', async () => {
+    renderWithProviders(<DashboardPage />, { initialPath: '/?view=rev' });
+
+    expect(await screen.findByRole('tab', { name: 'dashboard.tabs.revenue' })).toHaveAttribute('aria-selected', 'true');
+    expect(await screen.findByText('$48,920')).toBeInTheDocument();
+    // Two 7-day buckets through the 10th; the second is still in progress.
+    const weeks = await screen.findAllByTestId('revenue-week');
+    expect(weeks).toHaveLength(2);
+    expect(weeks[1]).toHaveTextContent('dashboard.revenue.byWeek.soFar');
+    // 61+ folds 61–90 and 91+.
+    expect(await screen.findByTestId('aging-days61Plus')).toHaveTextContent('$200');
+    // Funnel counts, relative to sent.
+    expect(screen.getByTestId('funnel-accepted')).toHaveTextContent('4');
+    // Null decision time → the footer is hidden, not "0 days".
+    expect(screen.queryByText('dashboard.revenue.quotes.avgDecision')).toBeNull();
+    // Scope doesn't apply to anything on this tab.
+    expect(screen.queryByRole('button', { name: 'dashboard.scope.label' })).toBeNull();
+  });
+
+  it('switches tabs through the URL', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<DashboardPage />);
+
+    await user.click(await screen.findByRole('tab', { name: 'dashboard.tabs.revenue' }));
+    expect(await screen.findByText('$48,920')).toBeInTheDocument();
+    expect(screen.queryByText('Nothing needs you right now')).toBeNull();
   });
 });

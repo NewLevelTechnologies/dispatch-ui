@@ -17,7 +17,14 @@ import { TodayKpis } from '../features/home/TodayKpis';
 import { TodayBoardCard } from '../features/home/TodayBoardCard';
 import { ActivityCard } from '../features/home/ActivityCard';
 import { useHomeBoard, useHomeBoardSummary } from '../features/home/useHomeBoard';
+import { useAttention } from '../features/home/useAttention';
+import { RevenueView } from '../features/home/RevenueView';
+import { useUrlTab } from '../hooks/useUrlTab';
+import { ViewTabs } from '../components/ui/Tabs';
 import { greetingPart } from '../features/home/opsSelectors';
+
+const VIEWS = ['ops', 'rev'] as const;
+type View = (typeof VIEWS)[number];
 
 /**
  * Home — the office's landing page. Operations (today) reads in a deliberate
@@ -55,26 +62,43 @@ export default function DashboardPage() {
 
   const board = useHomeBoard(today, regionIds);
   const summary = useHomeBoardSummary(regionIds);
+  const attention = useAttention(board, regionIds);
+
+  // Revenue is invoice money, so the tab follows the invoice capability; the
+  // backend doesn't gate these reads, so this is the only line.
+  const canRevenue = useHasCapability('VIEW_ALL_INVOICES');
+  const [urlView, setView] = useUrlTab(VIEWS, 'ops', 'view');
+  const view = canRevenue ? urlView : 'ops';
 
   const part = greetingPart(new Date());
   const title = user?.firstName
     ? t(`dashboard.greeting.${part}Named`, { name: user.firstName })
     : t(`dashboard.greeting.${part}`);
-  const dateLabel = new Date(`${today}T12:00:00Z`).toLocaleDateString('en-US', {
+  const todayAt = new Date(`${today}T12:00:00Z`);
+  const dateLabel = todayAt.toLocaleDateString('en-US', {
     weekday: 'long',
     month: 'long',
     day: 'numeric',
     timeZone: 'UTC',
   });
+  // The sub line is the active tab's data scope, not marketing copy.
+  const sub =
+    view === 'rev'
+      ? t('dashboard.subMonth', {
+          month: todayAt.toLocaleDateString('en-US', { month: 'long', timeZone: 'UTC' }),
+        })
+      : t('dashboard.sub', { date: dateLabel });
 
   return (
     <AppLayout>
       <PageHead
         title={title}
-        sub={t('dashboard.sub', { date: dateLabel })}
+        sub={sub}
         actions={
           <>
-            {regions.length > 1 && (
+            {/* Nothing on the Revenue tab carries a region, so the chip would
+                be a control that changes nothing there. */}
+            {view === 'ops' && regions.length > 1 && (
               <FilterChipListbox
                 label={regionId ? t('dashboard.scope.label') : t('dashboard.scope.labelAll')}
                 ariaLabel={t('dashboard.scope.label')}
@@ -101,25 +125,40 @@ export default function DashboardPage() {
         }
       />
 
-      <div className="home-view">
-        <NeedsAttentionCard
-          board={board.data}
-          boardLoading={board.isLoading}
-          boardError={board.isError}
-          today={today}
-          regionIds={regionIds}
+      {canRevenue && (
+        <ViewTabs
+          className="mb-3"
+          value={view}
+          onChange={(id) => setView(id as View)}
+          tabs={[
+            {
+              id: 'ops',
+              label: t('dashboard.tabs.operations'),
+              count: attention.total > 0 ? attention.total : undefined,
+              tone: attention.total > 0 ? 'danger' : undefined,
+            },
+            { id: 'rev', label: t('dashboard.tabs.revenue') },
+          ]}
         />
-        <TodayKpis board={board.data} boardError={board.isError} summary={summary.data} />
-        <div className="home-2col">
-          <TodayBoardCard
-            board={board.data}
-            isLoading={board.isLoading}
-            error={board.isError}
-            onRetry={() => void queryClient.invalidateQueries({ queryKey: ['dispatch-board', 'home'] })}
-          />
-          <ActivityCard />
+      )}
+
+      {view === 'rev' ? (
+        <RevenueView />
+      ) : (
+        <div className="home-view">
+          <NeedsAttentionCard attention={attention} today={today} regionIds={regionIds} />
+          <TodayKpis board={board.data} boardError={board.isError} summary={summary.data} />
+          <div className="home-2col">
+            <TodayBoardCard
+              board={board.data}
+              isLoading={board.isLoading}
+              error={board.isError}
+              onRetry={() => void queryClient.invalidateQueries({ queryKey: ['dispatch-board', 'home'] })}
+            />
+            <ActivityCard />
+          </div>
         </div>
-      </div>
+      )}
     </AppLayout>
   );
 }
