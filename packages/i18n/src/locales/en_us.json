@@ -426,19 +426,93 @@
     }
   },
   "dashboard": {
-    "stats": {
-      "activeWorkOrders": "Active work orders",
-      "thisMonth": "This month",
-      "totalCustomers": "Total customers"
+    "activity": {
+      "empty": "No activity yet.",
+      "error": "Couldn't load activity",
+      "title": "Activity"
     },
-    "welcome": "Welcome to Dispatch"
+    "attention": {
+      "actions": {
+        "review": "Review",
+        "schedule": "Schedule",
+        "view": "View"
+      },
+      "partialError": "Some counts couldn't load.",
+      "quietBody": "Today's work is released, and nothing is waiting on you or past due.",
+      "quietTitle": "Nothing needs you right now",
+      "releaseConfirmBody": "This sends {{parts}} to {{techs, lowercase}} working today. It can't be undone.",
+      "rows": {
+        "approvals_one": "approval waiting on you",
+        "approvals_other": "approvals waiting on you",
+        "overdueMeta": "{{amount}} past due",
+        "overdue_one": "{{entity, lowercase}} overdue",
+        "overdue_other": "{{entity, lowercase}} overdue",
+        "poLate_one": "purchase order past ETA",
+        "poLate_other": "purchase orders past ETA",
+        "unbilled_one": "completed {{entity, lowercase}} not yet invoiced",
+        "unbilled_other": "completed {{entity, lowercase}} not yet invoiced",
+        "unreleased_one": "{{entity, lowercase}} staged but not released",
+        "unreleased_other": "{{entity, lowercase}} staged but not released",
+        "unscheduled_one": "{{entity, lowercase}} waiting to be scheduled",
+        "unscheduled_other": "{{entity, lowercase}} waiting to be scheduled",
+        "visitsMeta": "Window starts within {{days}} days, overdue included",
+        "visits_one": "{{entity, lowercase}} visit due soon, unscheduled",
+        "visits_other": "{{entity, lowercase}} visits due soon, unscheduled"
+      },
+      "thisWeek": "This week",
+      "title": "Needs attention",
+      "today": "Today"
+    },
+    "board": {
+      "all": "All {{entities, lowercase}}",
+      "done": "Done",
+      "empty": "No {{entities, lowercase}} are booked today.",
+      "error": "Couldn't load today's board",
+      "next": "next {{time}}",
+      "openBoard": "Open board",
+      "showing": "Showing {{shown}} of {{total}}",
+      "since": "since {{time}}",
+      "title": "Today's board",
+      "whosWhere": "Who's where"
+    },
+    "greeting": {
+      "afternoon": "Good afternoon",
+      "afternoonNamed": "Good afternoon, {{name}}",
+      "evening": "Good evening",
+      "eveningNamed": "Good evening, {{name}}",
+      "morning": "Good morning",
+      "morningNamed": "Good morning, {{name}}"
+    },
+    "kpis": {
+      "arrivalHit": "Arrival window hit",
+      "completed": "Completed",
+      "error": "Couldn't load",
+      "jobsToday": "Jobs today",
+      "last7Days": "last 7 days",
+      "noArrivals": "no arrivals in 7 days",
+      "of": "of {{count}}",
+      "sameAsLastWeek": "same as last {{weekday}}",
+      "techsMeta": "{{off}} off · {{idle}} idle",
+      "techsOnRoad": "{{entities}} on the road",
+      "vsLastWeek": "vs last {{weekday}}"
+    },
+    "newWorkOrder": "New {{entity, lowercase}}",
+    "scope": {
+      "all": "Whole company",
+      "label": "Scope",
+      "labelAll": "Scope: Whole company"
+    },
+    "sub": "{{date}} · Today",
+    "tabs": {
+      "operations": "Operations"
+    }
   },
   "entities": {
     "agreement": "Agreement",
     "agreements": "Agreements",
     "customer": "Customer",
     "customers": "Customers",
-    "dashboard": "Dashboard",
+    "dashboard": "Home",
     "dispatch": "Dispatch",
     "dispatches": "Dispatches",
     "division": "Division",

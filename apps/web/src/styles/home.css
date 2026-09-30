@@ -1,0 +1,95 @@
+/* ───────────────────────────────────────────────────────────────────
+   Home dashboard — surface-specific CSS.
+
+   Ported from claude_designs/Home Dashboard.html (`.hd-*`). Only layout
+   and the few bespoke marks live here (count tile, status bar, tech
+   progress); cards, pills, KPIs and the timeline are the shared
+   primitives. Tints mix into `transparent`, never `--bg-elev`.
+   ─────────────────────────────────────────────────────────────────── */
+
+.home-view { display: flex; flex-direction: column; gap: 12px; }
+
+.home-kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+
+.home-2col { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); gap: 12px; align-items: start; }
+
+/* ── Needs attention ───────────────────────────────────────────── */
+.home-att-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.home-att-grid > div + div { border-left: 1px solid var(--border-soft); }
+.home-att-group {
+  padding: 6px 14px;
+  background: var(--bg-elev-2);
+  border-bottom: 1px solid var(--border-soft);
+}
+.home-att-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--border-soft);
+}
+.home-att-row:last-child { border-bottom: none; }
+.home-att-row.is-link { cursor: pointer; }
+.home-att-row.is-link:hover { background: var(--bg-hover); }
+/* The count tile borrows the pill's tone pairs (and their dark-mode lifts),
+   reshaped into a square. */
+.pill.home-att-count {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  justify-content: center;
+  border-radius: var(--r-md);
+  font-size: 14px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.home-att-label { font-size: 12.5px; font-weight: 600; color: var(--fg-strong); }
+.home-att-meta { font-size: 11.5px; color: var(--fg-muted); }
+
+/* ── Today's board ─────────────────────────────────────────────── */
+.home-statusbar { display: flex; gap: 2px; height: 10px; }
+.home-statusbar > span { border-radius: 2px; min-width: 4px; }
+.home-statusbar.is-empty { background: var(--bg-active); border-radius: 2px; }
+.home-legend { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: 8px; }
+.home-legend-item { display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--fg-muted); }
+.home-legend-item .swatch { width: 8px; height: 8px; border-radius: 2px; }
+.home-legend-item .n { color: var(--fg-strong); font-weight: 600; font-variant-numeric: tabular-nums; }
+
+.home-tech-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) 150px 110px;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px;
+  border-top: 1px solid var(--border-soft);
+}
+.home-tech-name { font-size: 12.5px; font-weight: 600; color: var(--fg-strong); }
+.home-tech-stop { font-size: 11.5px; color: var(--fg-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.home-tech-when { font-family: var(--font-mono); font-size: 11px; color: var(--fg-muted); }
+.home-tech-prog { display: flex; flex-direction: column; gap: 4px; font-size: 11px; color: var(--fg-muted); font-variant-numeric: tabular-nums; }
+.home-tech-prog .track { height: 4px; border-radius: 999px; background: var(--bg-active); overflow: hidden; }
+.home-tech-prog .fill { height: 100%; background: var(--success-500); }
+.home-card-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 14px;
+  border-top: 1px solid var(--border-soft);
+}
+
+@media (max-width: 1180px) {
+  .home-2col { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 900px) {
+  .home-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .home-att-grid { grid-template-columns: minmax(0, 1fr); }
+  .home-att-grid > div + div { border-left: none; border-top: 1px solid var(--border-soft); }
+  .home-tech-row { grid-template-columns: auto minmax(0, 1fr) 130px; }
+  .home-tech-prog { display: none; }
+}
+@media (max-width: 640px) {
+  .home-kpis { grid-template-columns: minmax(0, 1fr); }
+  .home-att-row { grid-template-columns: auto minmax(0, 1fr); }
+  .home-att-row > :last-child:not(:nth-child(2)) { grid-column: 2; justify-self: start; }
+}
