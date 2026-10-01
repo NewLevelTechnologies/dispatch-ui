@@ -16,6 +16,7 @@ import { KPI } from '../../components/ui/KPI';
 import { LoadingState } from '../../components/ui/LoadingState';
 import { ErrorState } from '../../components/ui/ErrorState';
 import { EmptyState } from '../../components/ui/EmptyState';
+import { TechProductivityCard } from './TechProductivityCard';
 import { agingBuckets, cumulative, money, percentChange, revenueWeeks } from './revenueSelectors';
 
 const DASH = '—';
@@ -23,8 +24,7 @@ const DASH = '—';
 /**
  * Month to date. Each card calls the service that owns its numbers and loads
  * on its own. There is no revenue target anywhere in the platform, so no
- * "of target" meta and no target rule; Tech productivity is out of v1 (no
- * invoice→tech attribution, no timesheets).
+ * "of target" meta and no target rule.
  */
 export function RevenueView() {
   const revenue = useQuery({
@@ -57,6 +57,7 @@ export function RevenueView() {
         <RevenueByWeekCard query={revenue} />
         <ReceivablesCard query={receivables} />
       </div>
+      <TechProductivityCard revenue={revenue} />
       <div className="home-2col even">
         <QuotesCard query={quotes} />
         <AgreementsCard query={agreements} />

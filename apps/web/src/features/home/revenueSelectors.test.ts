@@ -1,5 +1,14 @@
 import { describe, it, expect } from 'vitest';
-import { agingBuckets, cumulative, money, percentChange, revenueWeeks } from './revenueSelectors';
+import {
+  agingBuckets,
+  cumulative,
+  hours,
+  matchesRevenueMtd,
+  money,
+  percentChange,
+  revenueWeeks,
+  shortDate,
+} from './revenueSelectors';
 
 const days = (asOf: string, amounts: number[]) =>
   amounts.map((amount, i) => ({ date: `${asOf.slice(0, 8)}${String(i + 1).padStart(2, '0')}`, amount }));
@@ -63,5 +72,22 @@ describe('agingBuckets', () => {
       ['days31To60', 100, 1, 'danger'],
       ['days61Plus', 200, 2, 'danger'],
     ]);
+  });
+});
+
+describe('tech productivity formatting', () => {
+  it('shows hours to one decimal without a trailing zero', () => {
+    expect(hours(42)).toBe('42');
+    expect(hours(6.54)).toBe('6.5');
+  });
+
+  it('compares the card total to Revenue MTD to the cent', () => {
+    expect(matchesRevenueMtd(48920.1, 48920.1)).toBe(true);
+    expect(matchesRevenueMtd(0.1 + 0.2, 0.3)).toBe(true);
+    expect(matchesRevenueMtd(48920.1, 48920.11)).toBe(false);
+  });
+
+  it('formats an invoice date without shifting the day', () => {
+    expect(shortDate('2026-09-01')).toBe('Sep 1');
   });
 });
