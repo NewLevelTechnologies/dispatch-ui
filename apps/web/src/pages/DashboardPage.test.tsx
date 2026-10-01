@@ -18,6 +18,7 @@ const mockPoSummary = vi.fn();
 const mockActivity = vi.fn();
 const mockFinancialActivity = vi.fn();
 const mockRegions = vi.fn();
+const mockWorkOrders = vi.fn();
 const mockShowSuccess = vi.fn();
 
 vi.mock('../api/setup', async (importOriginal) => {
@@ -47,6 +48,7 @@ vi.mock('../api/setup', async (importOriginal) => {
       getForTenant: (...a: unknown[]) => mockFinancialActivity(...a),
     },
     dispatchRegionApi: { ...actual.dispatchRegionApi, getAll: (...a: unknown[]) => mockRegions(...a) },
+    workOrderApi: { ...actual.workOrderApi, getAll: (...a: unknown[]) => mockWorkOrders(...a) },
   };
 });
 
@@ -139,6 +141,7 @@ function allQuiet() {
   mockActivity.mockResolvedValue(emptyPage);
   mockFinancialActivity.mockResolvedValue(emptyPage);
   mockRegions.mockResolvedValue([]);
+  mockWorkOrders.mockResolvedValue({ content: [], totalElements: 0 });
 }
 
 describe('DashboardPage — Operations', () => {
@@ -183,7 +186,8 @@ describe('DashboardPage — Operations', () => {
   it('hides rows the user lacks the capability for instead of disabling them', async () => {
     grant(['EDIT_DISPATCHES']);
     mockBell.mockResolvedValue({ pendingForMe: 2, recentlyResolvedMine: 0 });
-    mockAttention.mockResolvedValue({ overdue: { amount: 1240, count: 5 }, unbilledWorkOrderCount: 4, currency: 'USD' });
+    mockAttention.mockResolvedValue({ overdue: { amount: 1240, count: 5 }, unbilledWorkOrderCount: 0, currency: 'USD' });
+    mockWorkOrders.mockResolvedValue({ content: [], totalElements: 4 });
     mockGetUnscheduled.mockResolvedValue({ content: [], totalElements: 6 });
 
     renderWithProviders(<DashboardPage />);
@@ -194,6 +198,21 @@ describe('DashboardPage — Operations', () => {
     expect(screen.queryByTestId('attention-unbilled')).toBeNull();
     expect(mockBell).not.toHaveBeenCalled();
     expect(mockAttention).not.toHaveBeenCalled();
+    expect(mockWorkOrders).not.toHaveBeenCalled();
+  });
+
+  it('counts "completed, not invoiced" from the same query as the list it opens', async () => {
+    // The deprecated financial count is ignored even when it disagrees.
+    mockAttention.mockResolvedValue({ overdue: { amount: 0, count: 0 }, unbilledWorkOrderCount: 99, currency: 'USD' });
+    mockWorkOrders.mockResolvedValue({ content: [], totalElements: 4 });
+
+    const { router } = renderWithProviders(<DashboardPage />);
+
+    const row = await screen.findByTestId('attention-unbilled');
+    expect(row).toHaveTextContent('4');
+    expect(mockWorkOrders).toHaveBeenCalledWith({ unbilled: true, size: 1 });
+    await userEvent.setup().click(row);
+    await waitFor(() => expect(router.state.location.search).toBe('?status=COMPLETED&unbilled=true'));
   });
 
   it('releases exactly what the board counts after confirming, with no Undo', async () => {

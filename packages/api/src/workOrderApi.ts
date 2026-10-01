@@ -373,6 +373,11 @@ export interface ListWorkOrdersParams {
   priority?: WorkOrderPriority | WorkOrderPriority[];
   unassigned?: boolean;
   onSite?: boolean;
+  // "Completed, not invoiced": completed, ACTIVE, hand-entered work orders
+  // with no live invoice (a draft counts as invoiced; void/cancelled don't).
+  // Agreement-generated orders never match. ANDs with everything else, so pair
+  // it with progressCategory=COMPLETED — an Open status filter empties it.
+  unbilled?: boolean;
 
   // Scheduled date range — ISO yyyy-mm-dd. From is inclusive at 00:00,
   // To is exclusive at 00:00 of the next day (handled server-side).
