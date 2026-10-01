@@ -1,6 +1,10 @@
 // Pure selectors for the Revenue & productivity view. The backend owns every
 // sum; these only reshape its answers for display.
-import type { DailyAmount, FinancialDashboardReceivables } from '../../api/setup';
+import type {
+  DailyAmount,
+  FinancialDashboardReceivables,
+  TechnicianProductivityResponse,
+} from '../../api/setup';
 
 /** Whole dollars for headline figures ("$48,920"); compact for labels ("$12.4K"). */
 export function money(amount: number, { compact = false }: { compact?: boolean } = {}): string {
@@ -97,4 +101,32 @@ export function agingBuckets(r: FinancialDashboardReceivables): AgingBucketRow[]
       tone: 'danger',
     },
   ];
+}
+
+/** Hours to one decimal, dropping a trailing ".0" ("42", "6.5"). */
+export function hours(value: number): string {
+  return new Intl.NumberFormat('en-US', { maximumFractionDigits: 1 }).format(value);
+}
+
+/** Both unattributed buckets; the tech rows plus this make `totalRevenue`. */
+export function unattributedAmount(r: TechnicianProductivityResponse): number {
+  return r.unattributed.noWorkOrder.amount + r.unattributed.noTechArrived.amount;
+}
+
+/**
+ * Whether the card's total equals Revenue MTD to the cent. The two come from
+ * different services, so they can disagree for a few seconds after an
+ * invoice is written.
+ */
+export function matchesRevenueMtd(totalRevenue: number, billed: number): boolean {
+  return Math.round(totalRevenue * 100) === Math.round(billed * 100);
+}
+
+/** "Sep 14" from a LocalDate, without a timezone shift. */
+export function shortDate(date: string): string {
+  return new Date(`${date}T12:00:00Z`).toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    timeZone: 'UTC',
+  });
 }

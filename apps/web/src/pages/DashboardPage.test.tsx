@@ -20,6 +20,9 @@ const mockFinancialActivity = vi.fn();
 const mockRegions = vi.fn();
 const mockWorkOrders = vi.fn();
 const mockShowSuccess = vi.fn();
+const mockProductivity = vi.fn();
+const mockCredited = vi.fn();
+const mockUsers = vi.fn();
 
 vi.mock('../api/setup', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../api/setup')>();
@@ -49,6 +52,12 @@ vi.mock('../api/setup', async (importOriginal) => {
     },
     dispatchRegionApi: { ...actual.dispatchRegionApi, getAll: (...a: unknown[]) => mockRegions(...a) },
     workOrderApi: { ...actual.workOrderApi, getAll: (...a: unknown[]) => mockWorkOrders(...a) },
+    technicianProductivityApi: {
+      ...actual.technicianProductivityApi,
+      get: () => mockProductivity(),
+      getCreditedInvoices: (...a: unknown[]) => mockCredited(...a),
+    },
+    userApi: { ...actual.userApi, getAll: () => mockUsers() },
   };
 });
 
@@ -142,6 +151,38 @@ function allQuiet() {
   mockFinancialActivity.mockResolvedValue(emptyPage);
   mockRegions.mockResolvedValue([]);
   mockWorkOrders.mockResolvedValue({ content: [], totalElements: 0 });
+  mockProductivity.mockResolvedValue(productivity());
+  mockCredited.mockResolvedValue({ content: [], totalElements: 0, totalPages: 0, number: 0, size: 25 });
+  mockUsers.mockResolvedValue([]);
+}
+
+function techRow(over: Record<string, unknown> = {}) {
+  return {
+    userId: 't1',
+    name: 'Dana Cruz',
+    jobs: 12,
+    revenue: 30000.01,
+    averageTicket: 2500,
+    onSiteHours: 48.5,
+    invoicedHours: 40,
+    revenuePerInvoicedHour: 750,
+    excludedHours: { agreement: 6, notBilled: 2.5 },
+    firstVisit: { eligible: 10, completed: 7, rate: 0.7 },
+    callbacks: 3,
+    ...over,
+  };
+}
+
+function productivity(over: Record<string, unknown> = {}) {
+  return {
+    periodStart: '2026-09-01',
+    asOf: '2026-09-10',
+    technicians: [],
+    unattributed: { noWorkOrder: { count: 0, amount: 0 }, noTechArrived: { count: 0, amount: 0 } },
+    totalRevenue: 0,
+    currency: 'USD',
+    ...over,
+  };
 }
 
 describe('DashboardPage — Operations', () => {
@@ -347,6 +388,82 @@ describe('DashboardPage — Revenue & productivity', () => {
     expect(screen.queryByText('dashboard.revenue.quotes.avgDecision')).toBeNull();
     // Scope doesn't apply to anything on this tab.
     expect(screen.queryByRole('button', { name: 'dashboard.scope.label' })).toBeNull();
+  });
+
+  it('lists each tech with the backend’s numbers and checks the total against Revenue MTD', async () => {
+    mockProductivity.mockResolvedValue(
+      productivity({
+        technicians: [
+          techRow(),
+          techRow({
+            userId: 't2',
+            name: null,
+            revenue: 15000,
+            averageTicket: null,
+            excludedHours: { agreement: 0, notBilled: 0 },
+            firstVisit: { eligible: 0, completed: 0, rate: null },
+            revenuePerInvoicedHour: null,
+            callbacks: 0,
+          }),
+        ],
+        unattributed: { noWorkOrder: { count: 2, amount: 2919.99 }, noTechArrived: { count: 1, amount: 1000 } },
+        totalRevenue: 48920,
+      }),
+    );
+    mockUsers.mockResolvedValue([{ id: 't2', firstName: 'Lee', lastName: 'Park' }]);
+    renderWithProviders(<DashboardPage />, { initialPath: '/?view=rev' });
+
+    const rows = await screen.findAllByTestId('tech-row');
+    expect(rows[0]).toHaveTextContent('Dana Cruz');
+    expect(rows[0]).toHaveTextContent('$30,000.01');
+    expect(rows[0]).toHaveTextContent('70%');
+    // A missing server name resolves through the users list.
+    expect(await within(rows[1]).findByText('Lee Park')).toBeInTheDocument();
+    expect(rows[1]).toHaveTextContent('—');
+    // Danger at 3+ callbacks, warning under 80% first visit.
+    expect(within(rows[0]).getByText('3')).toHaveClass('home-danger');
+    expect(within(rows[0]).getByText('70%')).toHaveClass('home-warn');
+    expect(screen.getByTestId('unattributed-row')).toHaveTextContent('$3,919.99');
+    expect(await screen.findByTestId('techs-check')).toHaveTextContent('dashboard.revenue.techs.matches');
+  });
+
+  it('says so when the total disagrees with Revenue MTD instead of claiming a match', async () => {
+    mockProductivity.mockResolvedValue(productivity({ technicians: [techRow()], totalRevenue: 30000.01 }));
+    renderWithProviders(<DashboardPage />, { initialPath: '/?view=rev' });
+
+    expect(await screen.findByTestId('techs-check')).toHaveTextContent('dashboard.revenue.techs.differs');
+  });
+
+  it('opens a tech’s credited invoices from the row, with who wrote each one', async () => {
+    const user = userEvent.setup();
+    mockProductivity.mockResolvedValue(productivity({ technicians: [techRow()], totalRevenue: 30000.01 }));
+    mockCredited.mockResolvedValue({
+      content: [
+        {
+          invoiceId: 'i1', invoiceNumber: 'INV-1001', invoiceDate: '2026-09-08', workOrderId: 'w1',
+          invoiceTotal: 900, technicianCount: 3, creditedAmount: 300, writtenByUserId: 'u9', writtenByName: 'Pat Moss',
+        },
+        {
+          invoiceId: 'i2', invoiceNumber: 'INV-1000', invoiceDate: '2026-09-02', workOrderId: 'w2',
+          invoiceTotal: 450, technicianCount: 1, creditedAmount: 450, writtenByUserId: null, writtenByName: null,
+        },
+      ],
+      totalElements: 2,
+      totalPages: 1,
+      number: 0,
+      size: 25,
+    });
+    renderWithProviders(<DashboardPage />, { initialPath: '/?view=rev' });
+
+    await user.click(await screen.findByTestId('tech-row'));
+    const lines = await screen.findAllByTestId('credited-invoice');
+    expect(mockCredited).toHaveBeenCalledWith('t1', { page: 0, size: 25 });
+    expect(lines[0]).toHaveTextContent('INV-1001');
+    expect(lines[0]).toHaveTextContent('dashboard.revenue.techs.drawer.share');
+    expect(lines[0]).toHaveTextContent('Pat Moss');
+    expect(within(lines[0]).getByRole('link', { name: 'INV-1001' })).toHaveAttribute('href', '/work-orders/w1?tab=estimate');
+    expect(lines[1]).toHaveTextContent('dashboard.revenue.techs.drawer.solo');
+    expect(lines[1]).toHaveTextContent('dashboard.revenue.techs.drawer.notRecorded');
   });
 
   it('switches tabs through the URL', async () => {

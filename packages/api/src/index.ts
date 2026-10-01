@@ -325,6 +325,15 @@ export {
   type PatchWorkOrderFileRequest,
 } from './filesApi';
 
+// Technician productivity (home dashboard)
+export {
+  technicianProductivityApi,
+  type TechnicianProductivityResponse,
+  type TechnicianProductivityRow,
+  type RevenueBucket,
+  type CreditedInvoice,
+} from './technicianProductivityApi';
+
 // Financial APIs
 export {
   invoicesApi,
