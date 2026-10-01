@@ -59,4 +59,11 @@ describe('KPI', () => {
     expect(container.querySelector('svg.kpi-spark')).toBeNull();
     expect(container.querySelector('.kpi-foot')?.classList.contains('has-spark')).toBe(false);
   });
+
+  it('renders a tag after the label only when given one', () => {
+    const { rerender } = render(<KPI label="Outstanding AR" value="$1" tag="As of today" />);
+    expect(screen.getByText('As of today')).toHaveClass('tag-tiny');
+    rerender(<KPI label="Outstanding AR" value="$1" />);
+    expect(screen.queryByText('As of today')).toBeNull();
+  });
 });

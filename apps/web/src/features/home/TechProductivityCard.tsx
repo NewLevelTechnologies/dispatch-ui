@@ -5,7 +5,6 @@ import { formatCurrency } from '@dispatch/utils';
 import { ChevronRightIcon, ReceiptPercentIcon } from '@heroicons/react/16/solid';
 import {
   technicianProductivityApi,
-  userApi,
   type FinancialDashboardRevenue,
   type TechnicianProductivityRow,
 } from '../../api/setup';
@@ -14,46 +13,53 @@ import { Button } from '../../components/catalyst/button';
 import { Card, CardBody, CardHead, CardTitle } from '../../components/ui/Card';
 import { CellStack, CellSub, CellTop, DenseRow, DenseTable, DenseTHead } from '../../components/ui/DenseTable';
 import { Avatar } from '../../components/ui/Avatar';
+import { Pill } from '../../components/ui/Pill';
 import { LoadingState } from '../../components/ui/LoadingState';
 import { ErrorState } from '../../components/ui/ErrorState';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { hours, matchesRevenueMtd, money, unattributedAmount } from './revenueSelectors';
 import { TechCreditDrawer, TECH_PAGE_PARAM, TECH_PARAM } from './TechCreditDrawer';
+import { periodName } from './period';
+import type { PeriodContext } from './RevenueView';
 
 const DASH = '—';
 const LOW_FIRST_VISIT = 0.8;
 const MANY_CALLBACKS = 3;
 
-/** The display name for a row, falling back to the users list when the server had none. */
-function useTechName(rows: TechnicianProductivityRow[] | undefined) {
-  const { t } = useTranslation();
-  const needsLookup = !!rows?.some((r) => !r.name);
-  const users = useQuery({
-    queryKey: ['users'],
-    queryFn: () => userApi.getAll(),
-    enabled: needsLookup,
-  });
-  return (userId: string, name: string | null) => {
-    if (name) return name;
-    const user = users.data?.find((u) => u.id === userId);
-    return user ? `${user.firstName} ${user.lastName}`.trim() : t('dashboard.revenue.techs.unknown');
-  };
+type Excluded = TechnicianProductivityRow['excludedHours'];
+// The handoff's order; zero parts are left out.
+const EXCLUDED_PARTS = ['billedLater', 'billedEarlier', 'notBilled', 'agreement'] as const satisfies readonly (keyof Excluded)[];
+
+/** The non-zero excluded-hour parts, in display order. */
+function excludedParts(e: Excluded) {
+  return EXCLUDED_PARTS.filter((k) => e[k] > 0).map((k) => ({ key: k, hours: e[k] }));
 }
 
 /**
- * Month to date, whole company (invoices carry no region). Every number is
- * the backend's; the card only lays it out. The total row says whether it
- * agrees with Revenue MTD, because the two come from different services.
+ * The selected period, whole company (invoices carry no region). Every
+ * number is the backend's; the card only lays it out. The total row says
+ * whether it agrees with the period's revenue, because the two come from
+ * different services.
  */
-export function TechProductivityCard({ revenue }: { revenue: UseQueryResult<FinancialDashboardRevenue> }) {
+export function TechProductivityCard({
+  revenue,
+  ctx,
+}: {
+  revenue: UseQueryResult<FinancialDashboardRevenue>;
+  ctx: PeriodContext;
+}) {
   const { t } = useTranslation();
   const { getName } = useGlossary();
   const [searchParams, setSearchParams] = useSearchParams();
   const query = useQuery({
-    queryKey: ['technician-productivity'],
-    queryFn: () => technicianProductivityApi.get(),
+    queryKey: ['technician-productivity', ctx.apiPeriod ?? 'current'],
+    queryFn: () => technicianProductivityApi.get({ period: ctx.apiPeriod }),
   });
-  const nameOf = useTechName(query.data?.technicians);
+  // Deactivated users keep their name; only a deleted user comes back null.
+  const nameOf = (name: string | null) => name ?? t('dashboard.revenue.techs.formerUser');
+  const periodLabel = ctx.isCurrent
+    ? t(`dashboard.period.toDateTitle.${ctx.period.kind}`)
+    : periodName(ctx.period);
 
   const openId = searchParams.get(TECH_PARAM);
   const open = (userId: string) =>
@@ -120,8 +126,8 @@ export function TechProductivityCard({ revenue }: { revenue: UseQueryResult<Fina
           </DenseTHead>
           <tbody>
             {p.technicians.map((r) => {
-              const name = nameOf(r.userId, r.name);
-              const { agreement, notBilled } = r.excludedHours;
+              const name = nameOf(r.name);
+              const parts = excludedParts(r.excludedHours);
               const rate = r.firstVisit.rate;
               return (
                 <DenseRow key={r.userId} onClick={() => open(r.userId)} data-testid="tech-row">
@@ -141,20 +147,15 @@ export function TechProductivityCard({ revenue }: { revenue: UseQueryResult<Fina
                   <td className="right num" data-label={t('dashboard.revenue.techs.onSite')}>
                     <CellStack>
                       <span>{hours(r.onSiteHours)}</span>
-                      {agreement + notBilled > 0 && (
+                      {parts.length > 0 && (
                         <span
                           className="muted home-col-opt whitespace-nowrap"
-                          title={t('dashboard.revenue.techs.excludedHint', {
-                            ...words,
-                            agreementHours: hours(agreement),
-                            notBilledHours: hours(notBilled),
-                          })}
+                          title={`${t('dashboard.revenue.techs.excludedHint')} ${parts
+                            .map((x) => t(`dashboard.revenue.techs.excludedLong.${x.key}`, { ...words, hours: hours(x.hours) }))
+                            .join(', ')}`}
                         >
-                          {[
-                            agreement > 0 && t('dashboard.revenue.techs.excludedAgreement', { ...words, hours: hours(agreement) }),
-                            notBilled > 0 && t('dashboard.revenue.techs.excludedNotBilled', { hours: hours(notBilled) }),
-                          ]
-                            .filter(Boolean)
+                          {parts
+                            .map((x) => t(`dashboard.revenue.techs.excluded.${x.key}`, { ...words, hours: hours(x.hours) }))
                             .join(' · ')}
                         </span>
                       )}
@@ -231,8 +232,8 @@ export function TechProductivityCard({ revenue }: { revenue: UseQueryResult<Fina
                 {billed === undefined
                   ? null
                   : matchesRevenueMtd(p.totalRevenue, billed)
-                    ? t('dashboard.revenue.techs.matches')
-                    : t('dashboard.revenue.techs.differs', { amount: formatCurrency(billed) })}
+                    ? t('dashboard.revenue.techs.matches', { label: ctx.revenueLabel })
+                    : t('dashboard.revenue.techs.differs', { label: ctx.revenueLabel, amount: formatCurrency(billed) })}
               </td>
             </tr>
           </tfoot>
@@ -240,7 +241,9 @@ export function TechProductivityCard({ revenue }: { revenue: UseQueryResult<Fina
         <div className="home-card-note">{t('dashboard.revenue.techs.foot', words)}</div>
         <TechCreditDrawer
           row={openRow}
-          name={openRow ? nameOf(openRow.userId, openRow.name) : ''}
+          name={openRow ? nameOf(openRow.name) : ''}
+          period={ctx.apiPeriod}
+          periodLabel={periodLabel}
           onClose={close}
         />
       </>
@@ -251,6 +254,7 @@ export function TechProductivityCard({ revenue }: { revenue: UseQueryResult<Fina
     <Card>
       <CardHead>
         <CardTitle>{t('dashboard.revenue.techs.title', words)}</CardTitle>
+        <Pill tone="neutral">{periodLabel}</Pill>
       </CardHead>
       <CardBody flush>{body}</CardBody>
     </Card>

@@ -27,11 +27,16 @@ const DASH = '—';
 export function TechCreditDrawer({
   row,
   name,
+  period,
+  periodLabel,
   onClose,
 }: {
   /** The open tech's card row; undefined closes the drawer. */
   row: TechnicianProductivityRow | undefined;
   name: string;
+  /** The card's period as sent to the backend; undefined = this month. */
+  period: string | undefined;
+  periodLabel: string;
   onClose: () => void;
 }) {
   const { t } = useTranslation();
@@ -46,13 +51,17 @@ export function TechCreditDrawer({
     workOrders: getName('work_order', true),
   };
   const invoices = useQuery({
-    queryKey: ['technician-productivity', 'invoices', row?.userId, page],
-    queryFn: () => technicianProductivityApi.getCreditedInvoices(row?.userId ?? '', { page: page - 1, size: PAGE_SIZE }),
+    queryKey: ['technician-productivity', 'invoices', row?.userId, period ?? 'current', page],
+    queryFn: () =>
+      technicianProductivityApi.getCreditedInvoices(row?.userId ?? '', { period, page: page - 1, size: PAGE_SIZE }),
     enabled: !!row,
   });
 
-  const excludedAgreement = row?.excludedHours.agreement ?? 0;
-  const excludedNotBilled = row?.excludedHours.notBilled ?? 0;
+  const excluded = row
+    ? (['billedLater', 'billedEarlier', 'notBilled', 'agreement'] as const)
+        .filter((k) => row.excludedHours[k] > 0)
+        .map((k) => t(`dashboard.revenue.techs.excludedLong.${k}`, { ...words, hours: hours(row.excludedHours[k]) }))
+    : [];
 
   let table;
   if (invoices.isLoading) table = <LoadingState />;
@@ -142,7 +151,7 @@ export function TechCreditDrawer({
           <Avatar name={name || ' '} size="md" />
           <div>
             <SlideOverTitle>{name}</SlideOverTitle>
-            <div className="home-att-meta">{t('dashboard.revenue.techs.drawer.period')}</div>
+            <div className="home-att-meta">{t('dashboard.revenue.techs.drawer.period', { period: periodLabel })}</div>
           </div>
         </div>
       </SlideOverHeader>
@@ -171,12 +180,7 @@ export function TechCreditDrawer({
             </div>
             <p className="home-att-meta">
               {t('dashboard.revenue.techs.drawer.note', words)}
-              {excludedAgreement + excludedNotBilled > 0 &&
-                ` ${t('dashboard.revenue.techs.drawer.excluded', {
-                  ...words,
-                  agreementHours: hours(excludedAgreement),
-                  notBilledHours: hours(excludedNotBilled),
-                })}`}
+              {excluded.length > 0 && ` ${t('dashboard.revenue.techs.drawer.excluded', { parts: excluded.join(', ') })}`}
             </p>
             {table}
           </div>

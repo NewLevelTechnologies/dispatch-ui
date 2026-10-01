@@ -102,6 +102,10 @@
   font-variant-numeric: tabular-nums;
 }
 .home-chart-label { font-size: 11px; color: var(--fg-muted); white-space: nowrap; }
+/* A year's 12 monthly bars. */
+.home-chart.dense { gap: 6px; }
+.home-chart.dense .home-chart-bar { width: 84%; }
+.home-chart.dense .home-chart-val { font-size: 10px; }
 .home-chart-sofar { color: var(--fg-dim); }
 
 .home-split { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }

@@ -18,18 +18,44 @@ import { ErrorState } from '../../components/ui/ErrorState';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { TechProductivityCard } from './TechProductivityCard';
 import { agingBuckets, cumulative, money, percentChange, revenueWeeks } from './revenueSelectors';
+import { comparisonLabel, periodName, revenueMonths, toDateSuffix, type Period } from './period';
 
 const DASH = '—';
 
+/** What the period-following figures and cards need to label themselves. */
+export interface PeriodContext {
+  period: Period;
+  /** The period contains today ("to date"). */
+  isCurrent: boolean;
+  /** What to send the backend; undefined for the current month (its default). */
+  apiPeriod: string | undefined;
+  /** "Revenue MTD" in a current period, "Revenue" in a past one. */
+  revenueLabel: string;
+}
+
 /**
- * Month to date. Each card calls the service that owns its numbers and loads
- * on its own. There is no revenue target anywhere in the platform, so no
- * "of target" meta and no target rule.
+ * One reporting period (default: this month to date). Revenue, Collected, the
+ * chart and Tech productivity follow it; receivables, quotes and agreements
+ * are current-only on the backend, so in a past period they say "As of
+ * today" rather than pretending to be historical. Each card calls the service
+ * that owns its numbers and loads on its own. There is no revenue target
+ * anywhere in the platform, so no "of target" meta and no target rule.
  */
-export function RevenueView() {
+export function RevenueView({ period, isCurrent }: { period: Period; isCurrent: boolean }) {
+  const { t } = useTranslation();
+  const apiPeriod = period.kind === 'month' && isCurrent ? undefined : period.id;
+  const ctx: PeriodContext = {
+    period,
+    isCurrent,
+    apiPeriod,
+    revenueLabel: isCurrent
+      ? t('dashboard.revenue.kpis.revenueToDate', { suffix: toDateSuffix(period) })
+      : t('dashboard.revenue.kpis.revenue'),
+  };
+  const asOfTag = isCurrent ? undefined : t('dashboard.revenue.asOfToday');
   const revenue = useQuery({
-    queryKey: ['financial-dashboard', 'revenue'],
-    queryFn: () => financialDashboardApi.getRevenue(),
+    queryKey: ['financial-dashboard', 'revenue', apiPeriod ?? 'current'],
+    queryFn: () => financialDashboardApi.getRevenue({ period: apiPeriod }),
   });
   const receivables = useQuery({
     queryKey: ['financial-dashboard', 'receivables'],
@@ -48,30 +74,36 @@ export function RevenueView() {
   return (
     <div className="home-view">
       <RevenueKpis
+        ctx={ctx}
+        asOfTag={asOfTag}
         revenue={revenue.data}
         receivables={receivables.data}
         quotes={quotes.data}
         agreements={agreements.data}
       />
       <div className="home-2col">
-        <RevenueByWeekCard query={revenue} />
-        <ReceivablesCard query={receivables} />
+        <RevenueChartCard query={revenue} period={period} />
+        <ReceivablesCard query={receivables} tag={asOfTag} />
       </div>
-      <TechProductivityCard revenue={revenue} />
+      <TechProductivityCard revenue={revenue} ctx={ctx} />
       <div className="home-2col even">
-        <QuotesCard query={quotes} />
-        <AgreementsCard query={agreements} />
+        <QuotesCard query={quotes} tag={asOfTag} />
+        <AgreementsCard query={agreements} tag={asOfTag} />
       </div>
     </div>
   );
 }
 
 function RevenueKpis({
+  ctx,
+  asOfTag,
   revenue,
   receivables,
   quotes,
   agreements,
 }: {
+  ctx: PeriodContext;
+  asOfTag: string | undefined;
   revenue?: FinancialDashboardRevenue;
   receivables?: FinancialDashboardReceivables;
   quotes?: FinancialDashboardQuotes;
@@ -81,29 +113,49 @@ function RevenueKpis({
   const { getName } = useGlossary();
   const plural = (code: string, count: number) => (count === 1 ? getName(code) : getName(code, true));
 
-  const change = revenue ? percentChange(revenue.billed, revenue.billedPreviousPeriod) : null;
+  // The delta is against whatever the backend says it's comparing to
+  // (last year first, for seasonality); no basis → no delta, said plainly.
+  // `comparison` is optional-chained so a backend without the period change
+  // degrades to "no comparison" instead of taking the tab down.
+  const comparison = revenue?.comparison;
+  const vs = revenue ? comparisonLabel(ctx.period, comparison?.basis ?? null) : null;
+  const change =
+    revenue && vs && comparison?.billed != null ? percentChange(revenue.billed, comparison.billed) : null;
   const collectedPct = revenue && revenue.billed > 0 ? Math.round((revenue.collected / revenue.billed) * 100) : null;
   const overdue = receivables?.overdue;
 
   return (
     <div className="home-kpis five">
       <KPI
-        label={t('dashboard.revenue.kpis.revenueMtd')}
+        label={ctx.revenueLabel}
         value={revenue ? money(revenue.billed) : DASH}
         delta={change != null && change !== 0 ? `${Math.abs(change)}%` : undefined}
         deltaDir={change != null && change < 0 ? 'down' : 'up'}
-        meta={revenue ? t('dashboard.revenue.kpis.vsLastMonth') : undefined}
+        meta={
+          revenue
+            ? vs
+              ? t(vs.kind === 'sameDays' ? 'dashboard.revenue.kpis.vsSameDays' : 'dashboard.revenue.kpis.vs', {
+                  label: vs.label,
+                })
+              : t('dashboard.revenue.kpis.noComparison')
+            : undefined
+        }
         bar="var(--success-500)"
         spark={revenue ? cumulative(revenue.billedByDay) : undefined}
       />
       <KPI
-        label={t('dashboard.revenue.kpis.collectedMtd')}
+        label={
+          ctx.isCurrent
+            ? t('dashboard.revenue.kpis.collectedToDate', { suffix: toDateSuffix(ctx.period) })
+            : t('dashboard.revenue.kpis.collected')
+        }
         value={revenue ? money(revenue.collected) : DASH}
         meta={collectedPct != null ? t('dashboard.revenue.kpis.collectedPct', { pct: collectedPct }) : undefined}
         bar="var(--accent-500)"
       />
       <KPI
         label={t('dashboard.revenue.kpis.outstandingAr')}
+        tag={asOfTag}
         value={receivables ? money(receivables.outstanding) : DASH}
         delta={
           overdue && overdue.amount > 0
@@ -120,6 +172,7 @@ function RevenueKpis({
       />
       <KPI
         label={t('dashboard.revenue.kpis.openQuotes', { entities: getName('quote', true) })}
+        tag={asOfTag}
         value={quotes ? money(quotes.openAmount) : DASH}
         meta={
           quotes
@@ -139,6 +192,7 @@ function RevenueKpis({
       />
       <KPI
         label={t('dashboard.revenue.kpis.agreementRevenue', { entity: getName('agreement') })}
+        tag={asOfTag}
         value={agreements ? money(agreements.recurringMonthly) : DASH}
         sub={agreements ? t('dashboard.revenue.kpis.perMonth') : undefined}
         meta={
@@ -158,11 +212,14 @@ function RevenueKpis({
 /** Loading / error / body for one card, so every card fails on its own. */
 function QueryCard<T>({
   title,
+  tag,
   action,
   query,
   children,
 }: {
   title: string;
+  /** "As of today" on a current-only card while a past period is selected. */
+  tag?: string;
   action?: ReactNode;
   query: UseQueryResult<T>;
   children: (data: T) => ReactNode;
@@ -185,7 +242,10 @@ function QueryCard<T>({
   return (
     <Card>
       <CardHead>
-        <CardTitle>{title}</CardTitle>
+        <CardTitle>
+          {title}
+          {tag && <span className="tag-tiny">{tag}</span>}
+        </CardTitle>
         {action}
       </CardHead>
       <CardBody>{body}</CardBody>
@@ -198,17 +258,34 @@ const CHART_H = 150;
 // label never rides up into the card's padding.
 const LABEL_H = 18;
 
-function RevenueByWeekCard({ query }: { query: UseQueryResult<FinancialDashboardRevenue> }) {
+function RevenueChartCard({
+  query,
+  period,
+}: {
+  query: UseQueryResult<FinancialDashboardRevenue>;
+  period: Period;
+}) {
   const { t } = useTranslation();
+  const byWeek = period.kind === 'month';
   return (
-    <QueryCard title={t('dashboard.revenue.byWeek.title')} query={query}>
+    <QueryCard title={t(byWeek ? 'dashboard.revenue.byWeek.title' : 'dashboard.revenue.byMonth.title')} query={query}>
       {(r) => {
-        const weeks = revenueWeeks(r.billedByDay, r.asOf);
-        const max = Math.max(0, ...weeks.map((w) => w.amount));
-        if (max === 0) return <EmptyState compact title={t('dashboard.revenue.byWeek.empty')} />;
+        // Weeks from the 1st for a month; calendar months for a quarter or year.
+        // The partial "so far" bar only exists in a period that's still running.
+        const bars = byWeek
+          ? revenueWeeks(r.billedByDay, r.asOf).map((w) => ({ ...w, partial: w.partial && r.isCurrent }))
+          : revenueMonths(r.billedByDay, r.asOf, r.isCurrent);
+        const max = Math.max(0, ...bars.map((w) => w.amount));
+        if (max === 0)
+          return (
+            <EmptyState
+              compact
+              title={t('dashboard.revenue.byWeek.empty', { period: periodName(period) })}
+            />
+          );
         return (
-          <div className="home-chart" style={{ height: CHART_H + 26 }}>
-            {weeks.map((w) => {
+          <div className={`home-chart${bars.length > 6 ? ' dense' : ''}`} style={{ height: CHART_H + 26 }}>
+            {bars.map((w) => {
               const h = Math.round((w.amount / max) * (CHART_H - LABEL_H));
               return (
                 <div key={w.label} className="home-chart-col" data-testid="revenue-week">
@@ -232,12 +309,13 @@ function RevenueByWeekCard({ query }: { query: UseQueryResult<FinancialDashboard
   );
 }
 
-function ReceivablesCard({ query }: { query: UseQueryResult<FinancialDashboardReceivables> }) {
+function ReceivablesCard({ query, tag }: { query: UseQueryResult<FinancialDashboardReceivables>; tag?: string }) {
   const { t } = useTranslation();
   const { getName } = useGlossary();
   return (
     <QueryCard
       title={t('dashboard.revenue.aging.title')}
+      tag={tag}
       query={query}
       action={
         <Button plain size="xxs" href="/invoices">
@@ -286,13 +364,14 @@ const FUNNEL = [
   { id: 'declined', color: 'var(--border-strong)' },
 ] as const;
 
-function QuotesCard({ query }: { query: UseQueryResult<FinancialDashboardQuotes> }) {
+function QuotesCard({ query, tag }: { query: UseQueryResult<FinancialDashboardQuotes>; tag?: string }) {
   const { t } = useTranslation();
   const { getName } = useGlossary();
   const quotes = getName('quote', true);
   return (
     <QueryCard
       title={t('dashboard.revenue.quotes.title', { entities: quotes })}
+      tag={tag}
       query={query}
       action={
         <Button plain size="xxs" href="/quotes">
@@ -332,11 +411,11 @@ function QuotesCard({ query }: { query: UseQueryResult<FinancialDashboardQuotes>
   );
 }
 
-function AgreementsCard({ query }: { query: UseQueryResult<AgreementOverviewResponse> }) {
+function AgreementsCard({ query, tag }: { query: UseQueryResult<AgreementOverviewResponse>; tag?: string }) {
   const { t } = useTranslation();
   const { getName } = useGlossary();
   return (
-    <QueryCard title={getName('agreement', true)} query={query}>
+    <QueryCard title={getName('agreement', true)} tag={tag} query={query}>
       {(a) => {
         const v = a.visitsThisMonth;
         const pct = v.planned > 0 ? Math.round((v.completed / v.planned) * 100) : 0;

@@ -344,6 +344,8 @@ export {
   financialDashboardApi,
   type FinancialDashboardAttention,
   type FinancialDashboardRevenue,
+  type ReportingPeriodParam,
+  type RevenueComparisonBasis,
   type FinancialDashboardReceivables,
   type FinancialDashboardQuotes,
   type DailyAmount,
