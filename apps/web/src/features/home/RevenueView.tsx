@@ -193,6 +193,9 @@ function QueryCard<T>({
 }
 
 const CHART_H = 150;
+// Headroom inside the plot for the value label above the tallest bar, so the
+// label never rides up into the card's padding.
+const LABEL_H = 18;
 
 function RevenueByWeekCard({ query }: { query: UseQueryResult<FinancialDashboardRevenue> }) {
   const { t } = useTranslation();
@@ -205,7 +208,7 @@ function RevenueByWeekCard({ query }: { query: UseQueryResult<FinancialDashboard
         return (
           <div className="home-chart" style={{ height: CHART_H + 26 }}>
             {weeks.map((w) => {
-              const h = Math.round((w.amount / max) * CHART_H);
+              const h = Math.round((w.amount / max) * (CHART_H - LABEL_H));
               return (
                 <div key={w.label} className="home-chart-col" data-testid="revenue-week">
                   <div className="home-chart-plot" style={{ height: CHART_H }}>
