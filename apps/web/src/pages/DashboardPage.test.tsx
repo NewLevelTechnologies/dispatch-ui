@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { screen, waitFor, within } from '@testing-library/react';
 import { renderWithProviders, userEvent } from '../test/utils';
 import { useCurrentUser, useHasCapability } from '../hooks/useCurrentUser';
@@ -22,7 +22,6 @@ const mockWorkOrders = vi.fn();
 const mockShowSuccess = vi.fn();
 const mockProductivity = vi.fn();
 const mockCredited = vi.fn();
-const mockUsers = vi.fn();
 
 vi.mock('../api/setup', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../api/setup')>();
@@ -57,7 +56,6 @@ vi.mock('../api/setup', async (importOriginal) => {
       get: () => mockProductivity(),
       getCreditedInvoices: (...a: unknown[]) => mockCredited(...a),
     },
-    userApi: { ...actual.userApi, getAll: () => mockUsers() },
   };
 });
 
@@ -153,7 +151,6 @@ function allQuiet() {
   mockWorkOrders.mockResolvedValue({ content: [], totalElements: 0 });
   mockProductivity.mockResolvedValue(productivity());
   mockCredited.mockResolvedValue({ content: [], totalElements: 0, totalPages: 0, number: 0, size: 25 });
-  mockUsers.mockResolvedValue([]);
 }
 
 function techRow(over: Record<string, unknown> = {}) {
@@ -325,6 +322,9 @@ describe('DashboardPage — Revenue & productivity', () => {
       collected: 24460,
       collectedPreviousPeriod: 20000,
       billedByDay: Array.from({ length: 10 }, (_, i) => ({ date: `2026-09-${String(i + 1).padStart(2, '0')}`, amount: 4892 })),
+      periodEnd: '2026-09-30',
+      isCurrent: true,
+      comparison: { basis: 'sameDaysLastYear', billed: 40000 },
       currency: 'USD',
     });
     mockReceivables.mockResolvedValue({
@@ -410,15 +410,14 @@ describe('DashboardPage — Revenue & productivity', () => {
         totalRevenue: 48920,
       }),
     );
-    mockUsers.mockResolvedValue([{ id: 't2', firstName: 'Lee', lastName: 'Park' }]);
     renderWithProviders(<DashboardPage />, { initialPath: '/?view=rev' });
 
     const rows = await screen.findAllByTestId('tech-row');
     expect(rows[0]).toHaveTextContent('Dana Cruz');
     expect(rows[0]).toHaveTextContent('$30,000.01');
     expect(rows[0]).toHaveTextContent('70%');
-    // A missing server name resolves through the users list.
-    expect(await within(rows[1]).findByText('Lee Park')).toBeInTheDocument();
+    // Only a deleted user comes back without a name.
+    expect(within(rows[1]).getByText('dashboard.revenue.techs.formerUser')).toBeInTheDocument();
     expect(rows[1]).toHaveTextContent('—');
     // Danger at 3+ callbacks, warning under 80% first visit.
     expect(within(rows[0]).getByText('3')).toHaveClass('home-danger');
@@ -464,6 +463,88 @@ describe('DashboardPage — Revenue & productivity', () => {
     expect(within(lines[0]).getByRole('link', { name: 'INV-1001' })).toHaveAttribute('href', '/work-orders/w1?tab=estimate');
     expect(lines[1]).toHaveTextContent('dashboard.revenue.techs.drawer.solo');
     expect(lines[1]).toHaveTextContent('dashboard.revenue.techs.drawer.notRecorded');
+  });
+
+  describe('period', () => {
+    beforeEach(() => {
+      vi.useFakeTimers({ toFake: ['Date'] });
+      vi.setSystemTime(new Date('2026-10-14T15:00:00Z'));
+    });
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('sends nothing for this month and labels it to date, with no as-of tags', async () => {
+      renderWithProviders(<DashboardPage />, { initialPath: '/?view=rev' });
+
+      expect(await screen.findByText('$48,920')).toBeInTheDocument();
+      expect(mockProductivity).toHaveBeenCalled();
+      expect(screen.getByText('dashboard.subToDate')).toBeInTheDocument();
+      expect(screen.getByText('dashboard.revenue.kpis.revenueToDate')).toBeInTheDocument();
+      expect(screen.getByText('dashboard.revenue.kpis.vsSameDays')).toBeInTheDocument();
+      expect(screen.queryByText('dashboard.revenue.asOfToday')).toBeNull();
+    });
+
+    it('reads a past period from the URL, sends it to every period read and tags the current-only cards', async () => {
+      const { financialDashboardApi, technicianProductivityApi } = await import('../api/setup');
+      const getRevenue = vi.spyOn(financialDashboardApi, 'getRevenue');
+      const getProductivity = vi.spyOn(technicianProductivityApi, 'get');
+      mockRevenue.mockResolvedValue({
+        periodStart: '2026-07-01',
+        asOf: '2026-09-30',
+        periodEnd: '2026-09-30',
+        isCurrent: false,
+        billed: 300,
+        billedPreviousPeriod: 0,
+        collected: 0,
+        collectedPreviousPeriod: 0,
+        billedByDay: [
+          { date: '2026-07-03', amount: 100 },
+          { date: '2026-08-03', amount: 100 },
+          { date: '2026-09-30', amount: 100 },
+        ],
+        comparison: { basis: null, billed: null },
+        currency: 'USD',
+      });
+      renderWithProviders(<DashboardPage />, { initialPath: '/?view=rev&period=2026-Q3' });
+
+      // Last quarter: the sub line is just its name.
+      expect((await screen.findAllByText('Q3 2026')).length).toBeGreaterThan(0);
+      await waitFor(() => expect(getRevenue).toHaveBeenCalledWith({ period: '2026-Q3' }));
+      expect(getProductivity).toHaveBeenCalledWith({ period: '2026-Q3' });
+      // Monthly bars, none partial in a past period.
+      const bars = await screen.findAllByTestId('revenue-week');
+      expect(bars.map((b) => b.textContent)).toEqual(['$100Jul', '$100Aug', '$100Sep']);
+      expect(screen.getByText('dashboard.revenue.byMonth.title')).toBeInTheDocument();
+      // No MTD suffix, no delta, and the reason said plainly.
+      expect(screen.getByText('dashboard.revenue.kpis.revenue')).toBeInTheDocument();
+      expect(screen.getByText('dashboard.revenue.kpis.noComparison')).toBeInTheDocument();
+      // AR, quotes, agreements (KPIs + cards) don't follow the period.
+      expect(await screen.findAllByText('dashboard.revenue.asOfToday')).toHaveLength(6);
+    });
+
+    it('picks a period from the chip into the URL and refetches for it', async () => {
+      const user = userEvent.setup();
+      const { financialDashboardApi } = await import('../api/setup');
+      const getRevenue = vi.spyOn(financialDashboardApi, 'getRevenue');
+      renderWithProviders(<DashboardPage />, { initialPath: '/?view=rev' });
+
+      await user.click(await screen.findByRole('button', { name: /dashboard.period.label/ }));
+      await user.click(await screen.findByRole('option', { name: /September 2026/ }));
+      await waitFor(() => expect(getRevenue).toHaveBeenCalledWith({ period: '2026-09' }));
+      // Operations ignores it; the chip is Revenue-only.
+      await user.click(screen.getByRole('tab', { name: 'dashboard.tabs.operations' }));
+      expect(screen.queryByRole('button', { name: /dashboard.period.label/ })).toBeNull();
+    });
+
+    it('falls back to this month for a period the picker doesn’t offer', async () => {
+      const { financialDashboardApi } = await import('../api/setup');
+      const getRevenue = vi.spyOn(financialDashboardApi, 'getRevenue');
+      renderWithProviders(<DashboardPage />, { initialPath: '/?view=rev&period=2019-03' });
+
+      expect(await screen.findByText('$48,920')).toBeInTheDocument();
+      expect(getRevenue).toHaveBeenCalledWith({ period: undefined });
+    });
   });
 
   it('switches tabs through the URL', async () => {

@@ -13,6 +13,10 @@ describe('technicianProductivityApi', () => {
   it('get GETs the month-to-date card', async () => {
     await technicianProductivityApi.get();
     expect(apiClient.get).toHaveBeenCalledWith('/work-orders/technician-productivity');
+    await technicianProductivityApi.get({ period: '2026-Q2' });
+    expect(apiClient.get).toHaveBeenLastCalledWith('/work-orders/technician-productivity', {
+      params: { period: '2026-Q2' },
+    });
   });
 
   it('getCreditedInvoices pages one tech, defaulting to the first 25', async () => {
@@ -20,9 +24,9 @@ describe('technicianProductivityApi', () => {
     expect(apiClient.get).toHaveBeenCalledWith('/work-orders/technician-productivity/u-1/invoices', {
       params: { page: 0, size: 25 },
     });
-    await technicianProductivityApi.getCreditedInvoices('u-1', { page: 2 });
+    await technicianProductivityApi.getCreditedInvoices('u-1', { period: '2026-08', page: 2 });
     expect(apiClient.get).toHaveBeenLastCalledWith('/work-orders/technician-productivity/u-1/invoices', {
-      params: { page: 2, size: 25 },
+      params: { period: '2026-08', page: 2, size: 25 },
     });
   });
 });

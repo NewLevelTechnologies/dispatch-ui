@@ -497,6 +497,34 @@
       "vsLastWeek": "vs last {{weekday}}"
     },
     "newWorkOrder": "New {{entity, lowercase}}",
+    "period": {
+      "groups": {
+        "month": "Month",
+        "quarter": "Quarter",
+        "year": "Year"
+      },
+      "hints": {
+        "lastMonth": "Last month",
+        "lastQuarter": "Last quarter",
+        "lastYear": "Last year",
+        "thisMonth": "This month",
+        "thisQuarter": "This quarter",
+        "yearToDate": "Year to date"
+      },
+      "label": "Period",
+      "toDate": {
+        "month": "month to date",
+        "quarter": "quarter to date",
+        "year": "year to date",
+        "ytd": "year to date"
+      },
+      "toDateTitle": {
+        "month": "Month to date",
+        "quarter": "Quarter to date",
+        "year": "Year to date",
+        "ytd": "Year to date"
+      }
+    },
     "revenue": {
       "aging": {
         "avgDaysToPay": "Avg days to pay · 30d",
@@ -516,8 +544,12 @@
         "remaining": "{{remaining}} remaining · {{unscheduled}} unscheduled",
         "renewing": "Renewing · {{days}}d"
       },
+      "asOfToday": "As of today",
+      "byMonth": {
+        "title": "Revenue by month"
+      },
       "byWeek": {
-        "empty": "Nothing invoiced yet this month.",
+        "empty": "Nothing invoiced in {{period}}.",
         "soFar": "so far",
         "title": "Revenue by week"
       },
@@ -525,8 +557,10 @@
       "kpis": {
         "active": "{{count}} active {{entities, lowercase}}",
         "agreementRevenue": "{{entity}} revenue",
-        "collectedMtd": "Collected MTD",
+        "collected": "Collected",
         "collectedPct": "{{pct}}% of invoiced",
+        "collectedToDate": "Collected {{suffix}}",
+        "noComparison": "No prior-year data",
         "openQuotes": "Open {{entities, lowercase}}",
         "openQuotesCount": "{{count}} {{entities, lowercase}}",
         "openQuotesMeta": "{{count}} {{entities, lowercase}} · {{rate}}% win rate, 30d",
@@ -534,8 +568,10 @@
         "overdueDelta": "{{amount}} overdue",
         "pastDue": "{{count}} {{entities, lowercase}} past due",
         "perMonth": "/mo",
-        "revenueMtd": "Revenue MTD",
-        "vsLastMonth": "vs same days last month"
+        "revenue": "Revenue",
+        "revenueToDate": "Revenue {{suffix}}",
+        "vs": "vs {{label}}",
+        "vsSameDays": "vs same days {{label}}"
       },
       "quotes": {
         "accepted": "Accepted",
@@ -549,39 +585,49 @@
       "techs": {
         "avgTicket": "Avg ticket",
         "callbacks": "Callbacks",
-        "differs": "Revenue MTD shows {{amount}}",
+        "differs": "{{label}} shows {{amount}}",
         "drawer": {
           "credited": "Credited",
           "creditedRevenue": "Credited revenue",
-          "excluded": "Not included: {{agreementHours}}h on {{agreement, lowercase}} visits and {{notBilledHours}}h on {{workOrders, lowercase}} not yet invoiced.",
+          "excluded": "Not included: {{parts}}.",
           "invoiceTotal": "{{invoice}} total",
           "invoicedHours": "Invoiced-job hours",
           "issued": "Issued",
           "notRecorded": "Not recorded",
           "note": "Each {{invoice, lowercase}}'s total is split equally among the {{techs, lowercase}} who arrived on its {{workOrder, lowercase}}. Revenue per hour uses all of this {{tech, lowercase}}'s on-site time on those {{workOrders, lowercase}}, whenever it happened.",
           "perHour": "Per invoiced hr",
-          "period": "Month to date · whole company",
+          "period": "{{period}} · whole company",
           "share": "1 of {{count}} · {{pct}}%",
           "solo": "Solo",
           "split": "Split",
           "writtenBy": "Written by"
         },
         "empty": "No {{invoices, lowercase}} this month yet.",
-        "excludedAgreement": "{{hours}} {{agreement, lowercase}}",
-        "excludedHint": "Not counted in revenue per hour: {{agreementHours}}h on {{agreement, lowercase}} visits, {{notBilledHours}}h on {{workOrders, lowercase}} not yet invoiced",
-        "excludedNotBilled": "{{hours}} not billed",
+        "excluded": {
+          "agreement": "{{hours}} {{agreement, lowercase}}",
+          "billedEarlier": "{{hours}} billed earlier",
+          "billedLater": "{{hours}} billed later",
+          "notBilled": "{{hours}} not billed"
+        },
+        "excludedHint": "Not counted in revenue per hour:",
+        "excludedLong": {
+          "agreement": "{{hours}}h on {{agreement, lowercase}} visits",
+          "billedEarlier": "{{hours}}h on {{workOrders, lowercase}} invoiced before this period",
+          "billedLater": "{{hours}}h on {{workOrders, lowercase}} invoiced after this period",
+          "notBilled": "{{hours}}h on {{workOrders, lowercase}} not yet invoiced"
+        },
         "firstVisit": "First-visit complete",
         "foot": "Revenue is each {{invoice, lowercase}}'s total, split equally among the {{techs, lowercase}} who arrived on its {{workOrder, lowercase}}. Revenue per hour uses the hours on those same {{workOrders, lowercase}}, so {{agreement, lowercase}} visits and unbilled work don't count against anyone. First-visit complete excludes {{agreement, lowercase}} visits; callbacks count only links confirmed on the {{workOrder, lowercase}}.",
+        "formerUser": "Former user",
         "jobs": "Jobs",
-        "matches": "Matches Revenue MTD",
+        "matches": "Matches {{label}}",
         "onSite": "On-site hrs",
         "perHour": "Revenue / invoiced hr",
         "revenue": "Revenue",
         "title": "{{tech}} productivity",
         "total": "Total",
         "unattributed": "Unattributed",
-        "unattributedSub": "{{noWorkOrder}} with no {{workOrder, lowercase}} · {{noTechArrived}} where no {{tech, lowercase}} arrived",
-        "unknown": "Unknown user"
+        "unattributedSub": "{{noWorkOrder}} with no {{workOrder, lowercase}} · {{noTechArrived}} where no {{tech, lowercase}} arrived"
       }
     },
     "scope": {
@@ -590,7 +636,7 @@
       "labelAll": "Scope: Whole company"
     },
     "sub": "{{date}} · Today",
-    "subMonth": "{{month}}, month to date",
+    "subToDate": "{{period}} · {{toDate}}",
     "tabs": {
       "operations": "Operations",
       "revenue": "Revenue & productivity"

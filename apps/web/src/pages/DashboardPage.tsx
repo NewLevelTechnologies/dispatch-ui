@@ -10,7 +10,7 @@ import { useTenantTimeZone } from '../hooks/useTenantTimeZone';
 import AppLayout from '../components/AppLayout';
 import { Button } from '../components/catalyst/button';
 import { PageHead } from '../components/ui/PageHead';
-import { ChipListboxOption, FilterChipListbox } from '../components/ui/FilterChipListbox';
+import { ChipListboxOption, ChipListboxSection, FilterChipListbox } from '../components/ui/FilterChipListbox';
 import { zonedDate } from '../lib/boardTime';
 import { NeedsAttentionCard } from '../features/home/NeedsAttentionCard';
 import { TodayKpis } from '../features/home/TodayKpis';
@@ -22,6 +22,14 @@ import { RevenueView } from '../features/home/RevenueView';
 import { useUrlTab } from '../hooks/useUrlTab';
 import { ViewTabs } from '../components/ui/Tabs';
 import { greetingPart } from '../features/home/opsSelectors';
+import {
+  currentMonthId,
+  isCurrentPeriod,
+  parsePeriod,
+  periodGroups,
+  periodName,
+  resolvePeriod,
+} from '../features/home/period';
 
 const VIEWS = ['ops', 'rev'] as const;
 type View = (typeof VIEWS)[number];
@@ -70,12 +78,23 @@ export default function DashboardPage() {
   const [urlView, setView] = useUrlTab(VIEWS, 'ops', 'view');
   const view = canRevenue ? urlView : 'ops';
 
+  // The Revenue tab's period. In the URL so it survives tab switches and can
+  // be shared; the current month drops the param, matching the backend's
+  // default. Operations ignores it.
+  const period = resolvePeriod(searchParams.get('period'), today);
+  const periodIsCurrent = isCurrentPeriod(period, today);
+  const setPeriod = (id: string | null) => {
+    const next = new URLSearchParams(searchParams);
+    if (id && id !== currentMonthId(today)) next.set('period', id);
+    else next.delete('period');
+    setSearchParams(next);
+  };
+
   const part = greetingPart(new Date());
   const title = user?.firstName
     ? t(`dashboard.greeting.${part}Named`, { name: user.firstName })
     : t(`dashboard.greeting.${part}`);
-  const todayAt = new Date(`${today}T12:00:00Z`);
-  const dateLabel = todayAt.toLocaleDateString('en-US', {
+  const dateLabel = new Date(`${today}T12:00:00Z`).toLocaleDateString('en-US', {
     weekday: 'long',
     month: 'long',
     day: 'numeric',
@@ -84,9 +103,9 @@ export default function DashboardPage() {
   // The sub line is the active tab's data scope, not marketing copy.
   const sub =
     view === 'rev'
-      ? t('dashboard.subMonth', {
-          month: todayAt.toLocaleDateString('en-US', { month: 'long', timeZone: 'UTC' }),
-        })
+      ? periodIsCurrent
+        ? t('dashboard.subToDate', { period: periodName(period), toDate: t(`dashboard.period.toDate.${period.kind}`) })
+        : periodName(period)
       : t('dashboard.sub', { date: dateLabel });
 
   return (
@@ -112,6 +131,28 @@ export default function DashboardPage() {
                   <ChipListboxOption key={r.id} value={r.id}>
                     {r.name}
                   </ChipListboxOption>
+                ))}
+              </FilterChipListbox>
+            )}
+            {view === 'rev' && (
+              <FilterChipListbox
+                label={t('dashboard.period.label')}
+                ariaLabel={t('dashboard.period.label')}
+                value={period.id}
+                displayValue={periodName(period)}
+                onChange={setPeriod}
+              >
+                {periodGroups(today).map((group) => (
+                  <ChipListboxSection key={group.id} label={t(`dashboard.period.groups.${group.id}`)}>
+                    {group.options.map((option) => (
+                      <ChipListboxOption key={option.id} value={option.id}>
+                        {periodName(parsePeriod(option.id)!)}
+                        {option.hint && (
+                          <span className="text-fg-muted"> · {t(`dashboard.period.hints.${option.hint}`)}</span>
+                        )}
+                      </ChipListboxOption>
+                    ))}
+                  </ChipListboxSection>
                 ))}
               </FilterChipListbox>
             )}
@@ -143,7 +184,7 @@ export default function DashboardPage() {
       )}
 
       {view === 'rev' ? (
-        <RevenueView />
+        <RevenueView period={period} isCurrent={periodIsCurrent} />
       ) : (
         <div className="home-view">
           <NeedsAttentionCard attention={attention} today={today} regionIds={regionIds} />

@@ -102,6 +102,10 @@
   font-variant-numeric: tabular-nums;
 }
 .home-chart-label { font-size: 11px; color: var(--fg-muted); white-space: nowrap; }
+/* A year's 12 monthly bars. */
+.home-chart.dense { gap: 6px; }
+.home-chart.dense .home-chart-bar { width: 84%; }
+.home-chart.dense .home-chart-val { font-size: 10px; }
 .home-chart-sofar { color: var(--fg-dim); }
 
 .home-split { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
@@ -146,7 +150,8 @@
   color: var(--fg-muted);
   background: var(--bg-active);
 }
-.home-techs tfoot td { border-top: 1px solid var(--border); padding-top: 8px; padding-bottom: 8px; }
+/* The dense table only pads thead/tbody cells; the total row matches them. */
+.home-techs tfoot td { padding: 9px 12px; border-top: 1px solid var(--border); color: var(--fg); }
 .home-card-note {
   padding: 8px 14px;
   border-top: 1px solid var(--border-soft);

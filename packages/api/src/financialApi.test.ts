@@ -182,4 +182,9 @@ describe('financialDashboardApi', () => {
     expect(apiClient.get).toHaveBeenCalledWith(path);
     expect(out).toEqual({ currency: 'USD' });
   });
+
+  it('getRevenue passes a reporting period through', async () => {
+    await financialDashboardApi.getRevenue({ period: '2026-YTD' });
+    expect(apiClient.get).toHaveBeenCalledWith('/financial/dashboard/revenue', { params: { period: '2026-YTD' } });
+  });
 });

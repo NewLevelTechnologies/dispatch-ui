@@ -874,14 +874,34 @@ export interface DailyAmount {
  * invoice date; `collected` = received payments by payment date. `*PreviousPeriod`
  * covers the same days of last month. `billedByDay` runs `periodStart`..`asOf`,
  * zero-filled — group it into weeks client-side. */
+/**
+ * A Revenue-tab reporting period: `YYYY-MM` (month), `YYYY-Qn` (quarter),
+ * `YYYY-YTD` (year to date; a past year's is the whole year) or `YYYY` (full
+ * year). Omit for the current month to date. Tenant-local; a period that
+ * contains today stops at today; a future one or a bad format is a 400.
+ */
+export type ReportingPeriodParam = string;
+
+/** What the billed delta is measured against; `basis` null (and `billed` null) when nothing is. */
+export type RevenueComparisonBasis = 'sameDaysLastYear' | 'samePeriodLastYear' | 'previousMonth';
+
 export interface FinancialDashboardRevenue {
   periodStart: string;
+  /** Last day counted: today for a current period, else the period's last day. */
   asOf: string;
+  /** Where the period ends if it runs its course; equals `asOf` for a past period. */
+  periodEnd: string;
+  /** The period contains today. */
+  isCurrent: boolean;
+  /** Issued invoices by invoice date, total including tax. */
   billed: number;
+  /** The previous period of the same kind, like for like. */
   billedPreviousPeriod: number;
   collected: number;
   collectedPreviousPeriod: number;
+  /** One per day from `periodStart` to `asOf`, zero-filled. */
   billedByDay: DailyAmount[];
+  comparison: { basis: RevenueComparisonBasis | null; billed: number | null };
   currency: string;
 }
 
@@ -924,8 +944,11 @@ export const financialDashboardApi = {
     return response.data;
   },
 
-  getRevenue: async (): Promise<FinancialDashboardRevenue> => {
-    const response = await apiClient.get<FinancialDashboardRevenue>('/financial/dashboard/revenue');
+  getRevenue: async (params: { period?: ReportingPeriodParam } = {}): Promise<FinancialDashboardRevenue> => {
+    // No param at all for the default, so today's request is unchanged.
+    const response = params.period
+      ? await apiClient.get<FinancialDashboardRevenue>('/financial/dashboard/revenue', { params: { period: params.period } })
+      : await apiClient.get<FinancialDashboardRevenue>('/financial/dashboard/revenue');
     return response.data;
   },
 
