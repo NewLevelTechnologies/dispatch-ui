@@ -131,8 +131,9 @@ export function NeedsAttentionCard({ attention: a, today, regionIds }: Props) {
       count: a.unbilled,
       tone: 'warning',
       label: t('dashboard.attention.rows.unbilled', { count: a.unbilled, entity: plural('work_order', a.unbilled) }),
-      // No list filter for exactly this set yet; completed is the superset.
-      href: '/work-orders?status=COMPLETED',
+      // `unbilled` ANDs onto the list's status filter, so the link carries
+      // COMPLETED — the list's Open default would empty it.
+      href: '/work-orders?status=COMPLETED&unbilled=true',
       action: t('dashboard.attention.actions.view'),
     });
   }

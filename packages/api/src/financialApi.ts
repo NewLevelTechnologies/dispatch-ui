@@ -858,6 +858,9 @@ export const financialActivityApi = {
  * generated orders never count). */
 export interface FinancialDashboardAttention {
   overdue: ArAgingBucket;
+  /** @deprecated Use `workOrderApi.getAll({ unbilled: true, size: 1 })` →
+   *  `totalElements`, which matches the list it opens and drops deleted work
+   *  orders. Will be removed by the backend. */
   unbilledWorkOrderCount: number;
   currency: string;
 }

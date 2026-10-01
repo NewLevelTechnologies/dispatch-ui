@@ -212,6 +212,8 @@ export default function WorkOrdersPage() {
   const priorityIds = useMemo(() => searchParams.getAll('priority'), [searchParams]);
   const onSiteOnly = searchParams.get('onSite') === 'true';
   const unassignedOnly = searchParams.get('unassigned') === 'true';
+  // The home dashboard's billing queue lands here with status=COMPLETED.
+  const unbilledOnly = searchParams.get('unbilled') === 'true';
   const pageNumber = Math.max(1, parseInt(searchParams.get('page') ?? '1', 10) || 1);
 
   // Local search input state — mirrors URL for instant feedback. Written to the
@@ -326,13 +328,14 @@ export default function WorkOrdersPage() {
       priority: priorityIds.length > 0 ? (priorityIds as WorkOrderPriority[]) : undefined,
       unassigned: unassignedOnly || undefined,
       onSite: onSiteOnly || undefined,
+      unbilled: unbilledOnly || undefined,
       scheduledDateFrom: dateRange.from || undefined,
       scheduledDateTo: dateRange.to || undefined,
       includeArchived: includeArchived || undefined,
       page: pageNumber - 1, // URL is 1-based; backend Spring Page is 0-based
       size: PAGE_SIZE,
     }),
-    [statusIds, cancelledView, deferredSearch, typeIds, divisionIds, regionIds, itemStatusIds, assignedId, priorityIds, unassignedOnly, onSiteOnly, dateRange, includeArchived, pageNumber]
+    [statusIds, cancelledView, deferredSearch, typeIds, divisionIds, regionIds, itemStatusIds, assignedId, priorityIds, unassignedOnly, onSiteOnly, unbilledOnly, dateRange, includeArchived, pageNumber]
   );
 
   const { data: pageData, isLoading, error } = useQuery({
@@ -531,7 +534,7 @@ export default function WorkOrdersPage() {
   // `activeChips` summary), but they still count as "a filter is on" for the
   // clear-all affordance and the empty-state copy. WO status counts only when
   // it's off its "Open" default.
-  const hasQuickFilter = onSiteOnly || unassignedOnly || priorityIds.length > 0;
+  const hasQuickFilter = onSiteOnly || unassignedOnly || unbilledOnly || priorityIds.length > 0;
   const statusChanged = !isOpenDefault(statusIds);
   const anyFilter = activeChips.length > 0 || hasQuickFilter || statusChanged;
 
@@ -812,6 +815,16 @@ export default function WorkOrdersPage() {
                     updateParams({ priority: priorityIds.length > 0 ? [] : ['URGENT', 'HIGH'], page: null })
                   }
                 />
+                {/* Only reachable from the home dashboard's billing queue, so it
+                    shows only while on — a way to see and drop it, not a new
+                    triage bucket. */}
+                {unbilledOnly && (
+                  <FilterChip
+                    label={t('workOrders.filters.notInvoiced')}
+                    active
+                    onToggle={() => updateParams({ unbilled: null, page: null })}
+                  />
+                )}
               </FilterChipRow>
 
               {anyFilter && (

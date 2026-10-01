@@ -592,6 +592,25 @@ describe('WorkOrdersPage', () => {
       });
     });
 
+    it('reads ?unbilled=true (the home dashboard billing queue) and lets it be cleared', async () => {
+      mockGets(mockWorkOrders);
+      const user = userEvent.setup();
+      const { router } = renderWithProviders(<WorkOrdersPage />, { initialPath: '/?status=COMPLETED&unbilled=true' });
+
+      await waitFor(() => {
+        const listCall = vi.mocked(apiClient.get).mock.calls.find(([url, cfg]) => {
+          const p = cfg?.params as { unbilled?: boolean; progressCategory?: string[]; size?: number } | undefined;
+          return String(url) === '/work-orders' && p?.unbilled === true && p?.size !== 1;
+        });
+        expect(listCall).toBeTruthy();
+        expect((listCall![1]!.params as { progressCategory?: string[] }).progressCategory).toEqual(['COMPLETED']);
+      });
+
+      await user.click(await screen.findByRole('button', { name: /workOrders\.filters\.notInvoiced/ }));
+      await waitFor(() => expect(router.state.location.search).not.toContain('unbilled'));
+      expect(router.state.location.search).toContain('status=COMPLETED');
+    });
+
     it('the Urgent / High quick chip filters on priority=[URGENT,HIGH]', async () => {
       mockGets(mockWorkOrders);
       const user = userEvent.setup();

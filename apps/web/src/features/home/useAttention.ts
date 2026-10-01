@@ -5,6 +5,7 @@ import {
   dispatchBoardApi,
   financialDashboardApi,
   purchaseOrderApi,
+  workOrderApi,
   type DispatchBoard,
 } from '../../api/setup';
 import { useHasCapability } from '../../hooks/useCurrentUser';
@@ -58,6 +59,13 @@ export function useAttention(
     queryFn: () => financialDashboardApi.getAttention(),
     enabled: canInvoices,
   });
+  // Same query as the list the row opens (`?status=COMPLETED&unbilled=true`),
+  // so the count and the list always agree.
+  const unbilled = useQuery({
+    queryKey: ['work-orders', 'unbilled-count'],
+    queryFn: () => workOrderApi.getAll({ unbilled: true, size: 1 }).then((p) => p.totalElements),
+    enabled: canInvoices,
+  });
   const agreements = useQuery({
     queryKey: ['agreements', 'overview'],
     queryFn: () => agreementApi.getOverview(),
@@ -73,7 +81,7 @@ export function useAttention(
     approvals: canApprove ? (approvals.data?.pendingForMe ?? 0) : 0,
     unscheduled: canDispatch ? (unscheduled.data ?? 0) : 0,
     overdue: canInvoices ? (financial.data?.overdue ?? { count: 0, amount: 0 }) : { count: 0, amount: 0 },
-    unbilled: canInvoices ? (financial.data?.unbilledWorkOrderCount ?? 0) : 0,
+    unbilled: canInvoices ? (unbilled.data ?? 0) : 0,
     visits: agreements.data?.visitsDueSoonUnscheduled ?? { count: 0, withinDays: 7 },
     poLate: poLate.data ?? 0,
   };
@@ -83,6 +91,7 @@ export function useAttention(
     { enabled: canApprove, loading: approvals.isLoading, error: approvals.isError },
     { enabled: canDispatch, loading: unscheduled.isLoading, error: unscheduled.isError },
     { enabled: canInvoices, loading: financial.isLoading, error: financial.isError },
+    { enabled: canInvoices, loading: unbilled.isLoading, error: unbilled.isError },
     { enabled: true, loading: agreements.isLoading, error: agreements.isError },
     { enabled: true, loading: poLate.isLoading, error: poLate.isError },
   ].filter((s) => s.enabled);
@@ -112,6 +121,7 @@ export function useAttention(
       void approvals.refetch();
       void unscheduled.refetch();
       void financial.refetch();
+      void unbilled.refetch();
       void agreements.refetch();
       void poLate.refetch();
       void queryClient.invalidateQueries({ queryKey: ['dispatch-board', 'home'] });
