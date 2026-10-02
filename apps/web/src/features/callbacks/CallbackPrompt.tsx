@@ -75,7 +75,8 @@ export function CallbackPrompt({
   // Null = follow the type hint; a click pins an explicit mode.
   const [chosen, setChosen] = useState<Mode | null>(initialMode ?? null);
   const auto: Mode = isCallbackType && value.state === 'unset' ? (cands.length ? 'open' : 'search') : 'collapsed';
-  const mode = chosen ?? auto;
+  // "Open" with nothing suggested would be an empty list — go to the search.
+  const mode = chosen === 'open' && !cands.length && !candidates.isLoading ? 'search' : chosen ?? auto;
 
   const link = (job: LinkedJob) => {
     onChange({ state: 'linked', job });
@@ -169,6 +170,18 @@ export function CallbackPrompt({
         <span className="grow text-[12.5px] text-fg">{tc('callbacks.notLinkedYet')}</span>
         <Button outline size="xs" onClick={() => setChosen('search')}>
           {tc('callbacks.linkWorkOrder')}
+        </Button>
+      </div>
+    );
+  } else {
+    // Nothing suggested and not the Callback type: one muted line, so a CSR
+    // who knows it's a late callback (day 35, typed Warranty) can still link
+    // it here instead of having to remember the work order page.
+    body = (
+      <div className="cb-quiet" data-testid="callback-quiet-entry">
+        <span>{tc('callbacks.quietQuestion')}</span>
+        <Button plain size="xxs" onClick={() => setChosen('search')}>
+          {tc('callbacks.linkIt')}
         </Button>
       </div>
     );

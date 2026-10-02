@@ -2,7 +2,7 @@
 // Callback card (Change reuses the intake prompt; Unlink is instant with
 // Undo), and — on the ORIGINAL job — the list of callbacks that point to it,
 // so whoever opens it sees the work didn't hold.
-import { useState, type ReactNode } from 'react';
+import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from '@dispatch/i18n';
@@ -34,28 +34,39 @@ function useSetCallback(workOrderId: string) {
   return useMutation({
     mutationFn: (originalId: string | null) =>
       workOrderApi.update(workOrderId, { callbackOfWorkOrderId: originalId }),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['work-orders'] });
-      void queryClient.invalidateQueries({ queryKey: ['work-order-activity', workOrderId] });
-    },
+    // Wait for the refetch, so a card that only exists while linked doesn't
+    // blink out between the PATCH and the fresh work order.
+    onSuccess: () =>
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['work-orders'] }),
+        queryClient.invalidateQueries({ queryKey: ['work-order-activity', workOrderId] }),
+      ]),
   });
 }
 
+/**
+ * Shown only on a linked work order, or while linking one from the header
+ * menu — not on every Overview. `editing` is owned by the page so the menu
+ * can open it.
+ */
 export function WorkOrderCallbackCard({
   workOrder,
   typeName,
   isCallbackType,
   frozen,
+  editing,
+  onEditingChange,
 }: {
   workOrder: WorkOrder;
   typeName: string | null;
   isCallbackType: boolean;
   frozen: boolean;
+  editing: boolean;
+  onEditingChange: (editing: boolean) => void;
 }) {
   const { t } = useTranslation();
   const tc = useCallbackT();
   const { getName } = useGlossary();
-  const [editing, setEditing] = useState(false);
   const setCallback = useSetCallback(workOrder.id);
   const linked = workOrder.callbackOf ?? null;
   const locationId = workOrder.serviceLocation?.id ?? workOrder.serviceLocationId;
@@ -78,11 +89,11 @@ export function WorkOrderCallbackCard({
 
   const onPromptChange = (value: CallbackValue) => {
     if (value.state === 'linked') {
-      if (value.job.id !== linked?.id) setCallback.mutate(value.job.id, { onError: fail });
-      setEditing(false);
+      if (value.job.id === linked?.id) onEditingChange(false);
+      else setCallback.mutate(value.job.id, { onSuccess: () => onEditingChange(false), onError: fail });
     } else if (value.state === 'dismissed') {
       if (linked) unlink();
-      setEditing(false);
+      onEditingChange(false);
     }
     // 'unset' (Change / Unlink inside the prompt) keeps the prompt open.
   };
@@ -93,7 +104,7 @@ export function WorkOrderCallbackCard({
       action={
         !editing &&
         !frozen && (
-          <Button plain size="xxs" onClick={() => setEditing(true)}>
+          <Button plain size="xxs" onClick={() => onEditingChange(true)}>
             {linked ? tc('callbacks.change') : tc('callbacks.link')}
           </Button>
         )
