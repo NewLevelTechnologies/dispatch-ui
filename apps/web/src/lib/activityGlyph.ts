@@ -42,6 +42,11 @@ const KIND_GLYPH: Partial<Record<ActivityKind, { glyph: string; tone: ActivityTo
   INVOICE_PAID: { glyph: '$', tone: 'success' },
   PAYMENT_RECEIVED: { glyph: '$', tone: 'success' },
   PO_CREATED: { glyph: '+', tone: 'neutral' },
+  // A callback charges a named tech, so linking reads as a warning moment;
+  // unlinking/changing is an audit edit.
+  CALLBACK_LINKED: { glyph: '↩', tone: 'warning' },
+  CALLBACK_UNLINKED: { glyph: '✕', tone: 'neutral' },
+  CALLBACK_CHANGED: { glyph: '✎', tone: 'neutral' },
 };
 
 const CATEGORY_GLYPH: Record<ActivityCategory, { glyph: string; tone: ActivityTone }> = {

@@ -13,6 +13,12 @@ export interface WorkOrderType {
   accentId: string;
   isActive: boolean;
   sortOrder: number;
+  /**
+   * A fixed marker on a seeded type, never settable through the API and
+   * unaffected by renaming the type or its code. "CALLBACK" on the seeded
+   * Callback type; null on types a tenant creates. Hints only — never a rule.
+   */
+  systemKey?: string | null;
   createdAt: string;
   updatedAt: string;
 }

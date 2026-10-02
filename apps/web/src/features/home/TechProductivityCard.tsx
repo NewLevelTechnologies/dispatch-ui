@@ -17,7 +17,7 @@ import { Pill } from '../../components/ui/Pill';
 import { LoadingState } from '../../components/ui/LoadingState';
 import { ErrorState } from '../../components/ui/ErrorState';
 import { EmptyState } from '../../components/ui/EmptyState';
-import { hours, matchesRevenueMtd, money, unattributedAmount } from './revenueSelectors';
+import { hours, longDate, matchesRevenueMtd, money, unattributedAmount } from './revenueSelectors';
 import { TechCreditDrawer, TECH_PAGE_PARAM, TECH_PARAM } from './TechCreditDrawer';
 import { periodName } from './period';
 import type { PeriodContext } from './RevenueView';
@@ -25,6 +25,18 @@ import type { PeriodContext } from './RevenueView';
 const DASH = '—';
 const LOW_FIRST_VISIT = 0.8;
 const MANY_CALLBACKS = 3;
+
+/**
+ * Callbacks only exist once a CSR links one, from `trackedSince` on (no
+ * backfill). A period entirely before it has no data ("—", not 0); one that
+ * straddles it says so in the header.
+ */
+function callbacksCoverage(periodStart: string, asOf: string, trackedSince: string | undefined) {
+  if (!trackedSince) return 'full' as const;
+  if (asOf < trackedSince) return 'none' as const;
+  if (periodStart < trackedSince) return 'partial' as const;
+  return 'full' as const;
+}
 
 type Excluded = TechnicianProductivityRow['excludedHours'];
 // The handoff's order; zero parts are left out.
@@ -108,6 +120,7 @@ export function TechProductivityCard({
     const maxPerHour = Math.max(0, ...p.technicians.map((r) => r.revenuePerInvoicedHour ?? 0));
     const billed = revenue.data?.billed;
     const openRow = openId ? p.technicians.find((r) => r.userId === openId) : undefined;
+    const callbacks = callbacksCoverage(p.periodStart, p.asOf, p.callbacksTrackedSince);
     body = (
       <>
         <DenseTable className="home-techs">
@@ -120,7 +133,11 @@ export function TechProductivityCard({
               <th className="right">{t('dashboard.revenue.techs.onSite')}</th>
               <th>{t('dashboard.revenue.techs.perHour')}</th>
               <th className="right">{t('dashboard.revenue.techs.firstVisit')}</th>
-              <th className="right">{t('dashboard.revenue.techs.callbacks')}</th>
+              <th className="right">
+                {callbacks === 'partial' && p.callbacksTrackedSince
+                  ? t('dashboard.revenue.techs.callbacksSince', { date: longDate(p.callbacksTrackedSince) })
+                  : t('dashboard.revenue.techs.callbacks')}
+              </th>
               <th aria-hidden />
             </tr>
           </DenseTHead>
@@ -185,10 +202,10 @@ export function TechProductivityCard({
                     {rate != null ? `${Math.round(rate * 100)}%` : DASH}
                   </td>
                   <td
-                    className={`right num${r.callbacks >= MANY_CALLBACKS ? ' home-danger' : ''}`}
+                    className={`right num${callbacks !== 'none' && r.callbacks >= MANY_CALLBACKS ? ' home-danger' : ''}`}
                     data-label={t('dashboard.revenue.techs.callbacks')}
                   >
-                    {r.callbacks}
+                    {callbacks === 'none' ? DASH : r.callbacks}
                   </td>
                   <td className="home-chev">
                     <ChevronRightIcon className="size-3" />

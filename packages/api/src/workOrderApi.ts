@@ -241,6 +241,67 @@ export interface WorkOrder extends WorkOrderSummary {
   // WorkItemResponse is a structural superset of WorkItemSummaryProjection,
   // so this narrows the inherited property type at the detail level.
   workItems: WorkItemResponse[];
+  /** The earlier job this is a confirmed callback of; null when it isn't one. */
+  callbackOf?: CallbackOf | null;
+  /** Work orders linked to this one as callbacks, newest first. */
+  callbacks?: CallbackBackRef[];
+}
+
+/** A minimal pointer to another work order. */
+export interface WorkOrderRef {
+  id: string;
+  workOrderNumber: string;
+}
+
+/** `name` is null only for a user deleted from the tenant. */
+export interface CallbackTechnician {
+  userId: string;
+  name: string | null;
+}
+
+/**
+ * The confirmed link on a callback work order. A link charges every tech who
+ * arrived on the original job, once each (the backend's one rule).
+ */
+export interface CallbackOf extends WorkOrderRef {
+  summary: string | null;
+  completedDate: string | null;
+  chargedTechnicians: CallbackTechnician[];
+  /** Null for links made before 2026-10-02. */
+  linkedByUserId: string | null;
+  linkedByName: string | null;
+  linkedAt: string | null;
+}
+
+/** A work order that links to this one as a callback. */
+export interface CallbackBackRef extends WorkOrderRef {
+  summary: string | null;
+  createdAt: string;
+  createdByUserId: string | null;
+  createdByName: string | null;
+  lifecycleState: string;
+  progressCategory: ProgressCategory;
+}
+
+/**
+ * A recently completed work order the one being raised might be a callback
+ * of. Only a suggestion — nothing is linked until a CSR confirms it.
+ * Equipment matches come first, then newest.
+ */
+export interface CallbackCandidate {
+  id: string;
+  workOrderNumber: string;
+  completedDate: string | null;
+  summary: string | null;
+  matchedOn: { location: boolean; equipment: boolean };
+  /** Same as matchedOn.location; kept for compatibility. */
+  sameLocation: boolean;
+  /** The shared equipment; empty for a location-only match. */
+  equipment: { id: string; name: string }[];
+  /** Generated from a service agreement. */
+  isAgreementVisit: boolean;
+  /** Who a link would charge. */
+  technicians: CallbackTechnician[];
 }
 
 // Spring Data Page<T> response wrapper
@@ -291,6 +352,8 @@ export interface CreateWorkOrderRequest {
   customerOrderNumber?: string;
   /** Required by the atomic-create contract — must contain at least one item. */
   workItems: CreateWorkItemRequest[];
+  /** A confirmed callback of this earlier work order (same customer, created before). */
+  callbackOfWorkOrderId?: string;
 }
 
 // `status` is no longer updatable. Use /cancel for cancellation; progress is derived.
@@ -307,6 +370,9 @@ export interface UpdateWorkOrderRequest {
   customerOrderNumber?: string;
   // JsonNullable on the backend: omit = no change, null = clear, value = set.
   notToExceed?: number | null;
+  // JsonNullable: an id links it as a callback, null unlinks, omit = no change.
+  // 400 unless the original is the same customer's and was created before this one.
+  callbackOfWorkOrderId?: string | null;
 }
 
 export interface CancelWorkOrderRequest {
@@ -464,6 +530,35 @@ export const workOrderApi = {
 
   delete: async (id: string): Promise<void> => {
     await apiClient.delete(`/work-orders/${id}`);
+  },
+
+  /** Who linking to this work order would charge, for a job found by search. 404 if unknown. */
+  getCallbackCharge: async (id: string): Promise<{ chargedTechnicians: CallbackTechnician[] }> => {
+    const response = await apiClient.get<{ chargedTechnicians: CallbackTechnician[] }>(
+      `/work-orders/${id}/callback-charge`,
+    );
+    return response.data;
+  },
+
+  /**
+   * Up to 10 active work orders completed in the last 30 days at this location
+   * or on any of this equipment; equipment matches first, then newest. Pass
+   * `excludeWorkOrderId` when editing so a work order doesn't suggest itself.
+   */
+  getCallbackCandidates: async (params: {
+    serviceLocationId: string;
+    equipmentIds?: string[];
+    excludeWorkOrderId?: string;
+  }): Promise<CallbackCandidate[]> => {
+    const response = await apiClient.get<CallbackCandidate[]>('/work-orders/callback-candidates', {
+      params: {
+        serviceLocationId: params.serviceLocationId,
+        // Comma-separated; the backend caps it at 50.
+        ...(params.equipmentIds?.length ? { equipmentIds: params.equipmentIds.slice(0, 50).join(',') } : {}),
+        ...(params.excludeWorkOrderId ? { excludeWorkOrderId: params.excludeWorkOrderId } : {}),
+      },
+    });
+    return response.data;
   },
 
   cancel: async (id: string, request: CancelWorkOrderRequest): Promise<WorkOrder> => {

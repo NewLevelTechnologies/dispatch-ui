@@ -29,4 +29,11 @@ describe('technicianProductivityApi', () => {
       params: { period: '2026-08', page: 2, size: 25 },
     });
   });
+
+  it('getChargedCallbacks pages one tech’s callbacks for the period', async () => {
+    await technicianProductivityApi.getChargedCallbacks('u-1', { period: '2026-Q3' });
+    expect(apiClient.get).toHaveBeenLastCalledWith('/work-orders/technician-productivity/u-1/callbacks', {
+      params: { period: '2026-Q3', page: 0, size: 25 },
+    });
+  });
 });

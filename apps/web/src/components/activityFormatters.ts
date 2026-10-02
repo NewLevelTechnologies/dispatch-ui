@@ -36,6 +36,9 @@ const KIND_TEMPLATE_KEYS: Record<ActivityKind, string> = {
   INVOICE_PAID: 'workOrders.activity.kind.invoicePaid',
   PAYMENT_RECEIVED: 'workOrders.activity.kind.paymentReceived',
   PO_CREATED: 'workOrders.activity.kind.poCreated',
+  CALLBACK_LINKED: 'workOrders.activity.kind.callbackLinked',
+  CALLBACK_UNLINKED: 'workOrders.activity.kind.callbackUnlinked',
+  CALLBACK_CHANGED: 'workOrders.activity.kind.callbackChanged',
 };
 
 export const FALLBACK_TEMPLATE_KEY = 'workOrders.activity.kind.unknown';

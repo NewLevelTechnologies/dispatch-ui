@@ -134,6 +134,11 @@ export {
 // Work Order API
 export {
   workOrderApi,
+  type CallbackCandidate,
+  type CallbackOf,
+  type CallbackBackRef,
+  type CallbackTechnician,
+  type WorkOrderRef,
   LifecycleState,
   ProgressCategory,
   WorkOrderPriority,
@@ -332,6 +337,7 @@ export {
   type TechnicianProductivityRow,
   type RevenueBucket,
   type CreditedInvoice,
+  type ChargedCallback,
 } from './technicianProductivityApi';
 
 // Financial APIs

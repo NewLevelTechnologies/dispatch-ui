@@ -22,6 +22,8 @@ import { hours, money, shortDate } from './revenueSelectors';
 export const TECH_PARAM = 'tech';
 export const TECH_PAGE_PARAM = 'techPage';
 const PAGE_SIZE = 25;
+// The drill-in lists the most recent callbacks; the count is on the card.
+const CALLBACKS_SIZE = 50;
 const DASH = '—';
 
 export function TechCreditDrawer({
@@ -183,9 +185,69 @@ export function TechCreditDrawer({
               {excluded.length > 0 && ` ${t('dashboard.revenue.techs.drawer.excluded', { parts: excluded.join(', ') })}`}
             </p>
             {table}
+            {row.callbacks > 0 && <ChargedCallbacks userId={row.userId} period={period} />}
           </div>
         )}
       </SlideOverBody>
     </SlideOver>
+  );
+}
+
+/**
+ * The callbacks charged to this tech in the period: each callback job and the
+ * original it points back to. A callback charges every tech who arrived on
+ * the original, once each.
+ */
+function ChargedCallbacks({ userId, period }: { userId: string; period: string | undefined }) {
+  const { t } = useTranslation();
+  const { getName } = useGlossary();
+  const callbacks = useQuery({
+    queryKey: ['technician-productivity', 'callbacks', userId, period ?? 'current'],
+    queryFn: () => technicianProductivityApi.getChargedCallbacks(userId, { period, size: CALLBACKS_SIZE }),
+  });
+  if (callbacks.isLoading) return <LoadingState />;
+  if (callbacks.isError || !callbacks.data) return null;
+  const data = callbacks.data;
+  return (
+    <div className="flex flex-col gap-2" data-testid="charged-callbacks">
+      <div className="label-tiny">{t('dashboard.revenue.techs.callbacks')}</div>
+      <div className="home-drawer-table">
+        <DenseTable>
+          <DenseTHead>
+            <tr>
+              <th>{t('dashboard.revenue.techs.drawer.callback')}</th>
+              <th>{t('dashboard.revenue.techs.drawer.opened')}</th>
+              <th>{t('dashboard.revenue.techs.drawer.original', { entity: getName('work_order') })}</th>
+            </tr>
+          </DenseTHead>
+          <tbody>
+            {data.content.map((c) => (
+              <DenseRow key={c.workOrderId} data-testid="charged-callback">
+                <td className="font-mono">
+                  <Link className="text-fg-accent hover:underline" to={`/work-orders/${c.workOrderId}`}>
+                    {c.workOrderNumber}
+                  </Link>
+                </td>
+                <td className="num">{shortDate(c.createdAt.slice(0, 10))}</td>
+                <td className="font-mono">
+                  {c.original.workOrderNumber ? (
+                    <Link className="text-fg-accent hover:underline" to={`/work-orders/${c.original.id}`}>
+                      {c.original.workOrderNumber}
+                    </Link>
+                  ) : (
+                    DASH
+                  )}
+                </td>
+              </DenseRow>
+            ))}
+          </tbody>
+        </DenseTable>
+        {data.totalElements > data.content.length && (
+          <ListFooter
+            left={t('common.pagination.showing', { start: 1, end: data.content.length, total: data.totalElements })}
+          />
+        )}
+      </div>
+    </div>
   );
 }
