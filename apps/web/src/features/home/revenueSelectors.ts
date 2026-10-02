@@ -130,3 +130,13 @@ export function shortDate(date: string): string {
     timeZone: 'UTC',
   });
 }
+
+/** "Oct 1, 2026" from a LocalDate, without a timezone shift. */
+export function longDate(date: string): string {
+  return new Date(`${date}T12:00:00Z`).toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    timeZone: 'UTC',
+  });
+}

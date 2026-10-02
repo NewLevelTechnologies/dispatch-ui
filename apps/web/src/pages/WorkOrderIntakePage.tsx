@@ -54,6 +54,8 @@ import {
   HomeIcon,
   BuildingOffice2Icon,
 } from '@heroicons/react/24/outline';
+import { CallbackPrompt } from '../features/callbacks/CallbackPrompt';
+import { isSeededCallbackType, UNSET, type CallbackValue } from '../features/callbacks/callbackModel';
 
 // New Work Order intake (mock: New Job.html / screen-wo-intake.jsx). A CSR
 // books this while on the phone, so it's one dense form — location-led (the
@@ -297,6 +299,14 @@ export default function WorkOrderIntakePage() {
   });
   const equipName = (id: string) => locEquip?.content.find((e) => e.id === id)?.name ?? null;
 
+  // Callback link — only for a real location (a new one has no history).
+  // Held against the location it was chosen for, so changing location drops
+  // it rather than carrying a link to another site's job.
+  const [callback, setCallback] = useState<{ locationId: string; value: CallbackValue } | null>(null);
+  const callbackValue: CallbackValue =
+    callback && callback.locationId === activeLocationId ? callback.value : UNSET;
+  const draftEquipmentIds = [...new Set(drafts.map((d) => d.equipmentId).filter((id): id is string => !!id))];
+
   // ── Validation ────────────────────────────────────────────────────────
   const newCustomerReady =
     newName.trim() !== '' &&
@@ -386,6 +396,8 @@ export default function WorkOrderIntakePage() {
         ...base,
         customerId: selectedLocation.customerId,
         serviceLocationId: selectedLocation.id,
+        // Unset or "not a callback" both mean no link; the prompt never blocks.
+        ...(callbackValue.state === 'linked' ? { callbackOfWorkOrderId: callbackValue.job.id } : {}),
       });
       return;
     }
@@ -645,6 +657,18 @@ export default function WorkOrderIntakePage() {
                       </ToggleGroup>
                     </div>
                   </div>
+                  {activeLocationId && selectedLocation && (
+                    <CallbackPrompt
+                      // Remount per location so the panel's open/closed state resets with it.
+                      key={activeLocationId}
+                      serviceLocationId={activeLocationId}
+                      customerId={selectedLocation.customerId}
+                      equipmentIds={draftEquipmentIds}
+                      isCallbackType={isSeededCallbackType(activeTypes.find((tx) => tx.id === workOrderTypeId))}
+                      value={callbackValue}
+                      onChange={(value) => setCallback({ locationId: activeLocationId, value })}
+                    />
+                  )}
                 </Card>
 
                 {/* Work items — repeatable drafts. */}

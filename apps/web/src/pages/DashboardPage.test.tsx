@@ -22,6 +22,7 @@ const mockWorkOrders = vi.fn();
 const mockShowSuccess = vi.fn();
 const mockProductivity = vi.fn();
 const mockCredited = vi.fn();
+const mockChargedCallbacks = vi.fn();
 
 vi.mock('../api/setup', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../api/setup')>();
@@ -55,6 +56,7 @@ vi.mock('../api/setup', async (importOriginal) => {
       ...actual.technicianProductivityApi,
       get: () => mockProductivity(),
       getCreditedInvoices: (...a: unknown[]) => mockCredited(...a),
+      getChargedCallbacks: (...a: unknown[]) => mockChargedCallbacks(...a),
     },
   };
 });
@@ -151,6 +153,7 @@ function allQuiet() {
   mockWorkOrders.mockResolvedValue({ content: [], totalElements: 0 });
   mockProductivity.mockResolvedValue(productivity());
   mockCredited.mockResolvedValue({ content: [], totalElements: 0, totalPages: 0, number: 0, size: 25 });
+  mockChargedCallbacks.mockResolvedValue({ content: [], totalElements: 0, totalPages: 0, number: 0, size: 50 });
 }
 
 function techRow(over: Record<string, unknown> = {}) {
@@ -426,6 +429,36 @@ describe('DashboardPage — Revenue & productivity', () => {
     expect(await screen.findByTestId('techs-check')).toHaveTextContent('dashboard.revenue.techs.matches');
   });
 
+  it('shows "—" for callbacks before tracking started, and dates the header when a period straddles it', async () => {
+    mockProductivity.mockResolvedValue(
+      productivity({
+        periodStart: '2026-09-01',
+        asOf: '2026-09-30',
+        callbacksTrackedSince: '2026-10-02',
+        technicians: [techRow({ callbacks: 0 })],
+        totalRevenue: 30000.01,
+      }),
+    );
+    const { unmount } = renderWithProviders(<DashboardPage />, { initialPath: '/?view=rev' });
+    const row = await screen.findByTestId('tech-row');
+    expect(within(row).getAllByText('—').length).toBeGreaterThan(0);
+    expect(screen.getByText('dashboard.revenue.techs.callbacks')).toBeInTheDocument();
+    unmount();
+
+    mockProductivity.mockResolvedValue(
+      productivity({
+        periodStart: '2026-07-01',
+        asOf: '2026-10-14',
+        callbacksTrackedSince: '2026-10-02',
+        technicians: [techRow({ callbacks: 4 })],
+        totalRevenue: 30000.01,
+      }),
+    );
+    renderWithProviders(<DashboardPage />, { initialPath: '/?view=rev' });
+    expect(await screen.findByText('dashboard.revenue.techs.callbacksSince')).toBeInTheDocument();
+    expect(within(await screen.findByTestId('tech-row')).getByText('4')).toHaveClass('home-danger');
+  });
+
   it('says so when the total disagrees with Revenue MTD instead of claiming a match', async () => {
     mockProductivity.mockResolvedValue(productivity({ technicians: [techRow()], totalRevenue: 30000.01 }));
     renderWithProviders(<DashboardPage />, { initialPath: '/?view=rev' });
@@ -452,6 +485,15 @@ describe('DashboardPage — Revenue & productivity', () => {
       number: 0,
       size: 25,
     });
+    mockChargedCallbacks.mockResolvedValue({
+      content: [
+        { workOrderId: 'w9', workOrderNumber: 'WO-1302', createdAt: '2026-09-29T10:00:00Z', original: { id: 'w1', workOrderNumber: 'WO-1234' } },
+      ],
+      totalElements: 1,
+      totalPages: 1,
+      number: 0,
+      size: 50,
+    });
     renderWithProviders(<DashboardPage />, { initialPath: '/?view=rev' });
 
     await user.click(await screen.findByTestId('tech-row'));
@@ -463,6 +505,11 @@ describe('DashboardPage — Revenue & productivity', () => {
     expect(within(lines[0]).getByRole('link', { name: 'INV-1001' })).toHaveAttribute('href', '/work-orders/w1?tab=estimate');
     expect(lines[1]).toHaveTextContent('dashboard.revenue.techs.drawer.solo');
     expect(lines[1]).toHaveTextContent('dashboard.revenue.techs.drawer.notRecorded');
+    // The row's 3 callbacks, each with the original job it calls back to.
+    expect(mockChargedCallbacks).toHaveBeenCalledWith('t1', { period: undefined, size: 50 });
+    const callback = await screen.findByTestId('charged-callback');
+    expect(within(callback).getByRole('link', { name: 'WO-1302' })).toHaveAttribute('href', '/work-orders/w9');
+    expect(within(callback).getByRole('link', { name: 'WO-1234' })).toHaveAttribute('href', '/work-orders/w1');
   });
 
   describe('period', () => {

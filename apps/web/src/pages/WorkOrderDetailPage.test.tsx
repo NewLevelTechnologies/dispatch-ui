@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderWithProviders } from '../test/utils';
 import WorkOrderDetailPage from './WorkOrderDetailPage';
@@ -13,6 +13,12 @@ import type {
 } from '../api/setup';
 
 vi.mock('@dispatch/api/src/client');
+
+const mockShowUndo = vi.fn();
+vi.mock('../lib/toast', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../lib/toast')>();
+  return { ...actual, showUndo: (...a: unknown[]) => mockShowUndo(...a) };
+});
 
 const mockWorkOrder: WorkOrder = {
   id: 'wo-1',
@@ -562,5 +568,75 @@ describe('WorkOrderDetailPage', () => {
     await waitFor(() => {
       expect(screen.getByRole('heading', { name: 'WO-00010' })).toBeInTheDocument();
     });
+  });
+
+  // ── Callback link ────────────────────────────────────────────────────
+  const callbackOf = {
+    id: 'wo-orig',
+    workOrderNumber: 'WO-1234',
+    summary: 'No cooling — upstairs unit',
+    completedDate: '2026-09-18',
+    chargedTechnicians: [{ userId: 't1', name: 'Daniel Park' }],
+    linkedByUserId: 'u1',
+    linkedByName: 'Ana Ruiz',
+    linkedAt: '2026-09-29T13:58:00Z',
+  };
+
+  it('shows a linked callback in the header and its card, naming who it counts for', async () => {
+    mockApiResponses({ ...mockWorkOrder, callbackOf });
+    renderPage();
+
+    expect(await screen.findByRole('link', { name: 'callbacks.chipLabel' })).toHaveAttribute('href', '/work-orders/wo-orig');
+    const card = await screen.findByTestId('callback-card-linked');
+    expect(card).toHaveTextContent('WO-1234');
+    expect(card).toHaveTextContent('Daniel Park');
+    expect(card).toHaveTextContent('callbacks.linkedBy');
+  });
+
+  it('unlinks instantly and offers Undo, which restores the link', async () => {
+    const user = userEvent.setup();
+    mockApiResponses({ ...mockWorkOrder, callbackOf });
+    vi.mocked(apiClient.patch).mockResolvedValue({ data: { ...mockWorkOrder, callbackOf: null } });
+    renderPage();
+
+    const card = await screen.findByTestId('callback-card-linked');
+    await user.click(within(card).getByRole('button', { name: 'callbacks.unlink' }));
+    await waitFor(() =>
+      expect(apiClient.patch).toHaveBeenCalledWith(expect.stringMatching(/\/work-orders\/wo-1$/), {
+        callbackOfWorkOrderId: null,
+      }),
+    );
+    await waitFor(() => expect(mockShowUndo).toHaveBeenCalled());
+    const undo = mockShowUndo.mock.calls[0][2] as () => void;
+    undo();
+    await waitFor(() =>
+      expect(apiClient.patch).toHaveBeenLastCalledWith(expect.stringMatching(/\/work-orders\/wo-1$/), {
+        callbackOfWorkOrderId: 'wo-orig',
+      }),
+    );
+  });
+
+  it('lists the callbacks that point to an original job', async () => {
+    mockApiResponses({
+      ...mockWorkOrder,
+      completedDate: '2026-09-18',
+      callbacks: [
+        {
+          id: 'wo-cb',
+          workOrderNumber: 'WO-1302',
+          summary: 'No cooling again',
+          createdAt: '2026-09-29T13:58:00Z',
+          createdByUserId: 'u1',
+          createdByName: 'Ana Ruiz',
+          lifecycleState: 'ACTIVE',
+          progressCategory: 'AWAITING_SCHEDULE',
+        },
+      ],
+    });
+    renderPage();
+
+    const row = await screen.findByTestId('callback-backref');
+    expect(row).toHaveTextContent('WO-1302');
+    expect(row).toHaveTextContent('callbacks.daysAfter');
   });
 });

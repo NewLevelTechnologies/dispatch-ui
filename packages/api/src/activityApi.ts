@@ -36,7 +36,10 @@ export type ActivityKind =
   | 'INVOICE_ISSUED'
   | 'INVOICE_PAID'
   | 'PAYMENT_RECEIVED'
-  | 'PO_CREATED';
+  | 'PO_CREATED'
+  | 'CALLBACK_LINKED'
+  | 'CALLBACK_UNLINKED'
+  | 'CALLBACK_CHANGED';
 
 export interface ActivityActor {
   userId: string;

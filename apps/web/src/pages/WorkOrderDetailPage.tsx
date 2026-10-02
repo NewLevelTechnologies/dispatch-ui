@@ -56,6 +56,8 @@ import { Tabs } from '../components/ui/Tabs';
 import { Pill, Tag } from '../components/ui/Pill';
 import { Card } from '../components/catalyst/card';
 import { CardTitle } from '../components/customer-detail/shared';
+import { CallbackChip, WorkOrderCallbackCard, WorkOrderCallbacksBackCard } from '../features/callbacks/CallbackCards';
+import { isSeededCallbackType } from '../features/callbacks/callbackModel';
 import { Button } from '../components/catalyst/button';
 import {
   Dropdown,
@@ -782,6 +784,7 @@ export default function WorkOrderDetailPage() {
                     {woType.name}
                   </span>
                 )}
+                {workOrder.callbackOf && <CallbackChip callbackOf={workOrder.callbackOf} />}
               </div>
 
               {/* Meta line — render only populated items. */}
@@ -911,87 +914,105 @@ export default function WorkOrderDetailPage() {
                 setAssignDispatchDialogOpen(true);
               }}
               extraRail={
-                <Card title={<CardTitle>{t('workOrders.detail.info', { entity: getName('work_order') })}</CardTitle>} padding="none">
-                  <div className="px-3.5 py-3">
-                    <DescriptionList>
-                      <DescriptionTerm>{t('workOrders.detail.created')}</DescriptionTerm>
-                      <DescriptionDetails><TimeAgo iso={workOrder.createdAt} /></DescriptionDetails>
-
-                      <DescriptionTerm>{t('workOrders.form.customerOrderNumber')}</DescriptionTerm>
-                      <DescriptionDetails>
-                        <EditableField
-                          value={workOrder.customerOrderNumber ?? ''}
-                          onSave={(v) => handleSaveWorkOrderField('customerOrderNumber', v || undefined)}
-                          disabled={frozen}
-                          placeholder={t('workOrders.form.customerOrderNumberPlaceholder')}
-                          ariaLabel={t('workOrders.form.customerOrderNumber')}
-                          className="font-mono"
-                        />
-                      </DescriptionDetails>
-
-                      <DescriptionTerm>{t('workOrders.form.notToExceed')}</DescriptionTerm>
-                      <DescriptionDetails>
-                        <EditableField
-                          value={workOrder.notToExceed != null ? String(workOrder.notToExceed) : ''}
-                          onSave={async (raw) => {
-                            const trimmed = raw.trim().replace(/[$,\s]/g, '');
-                            if (trimmed === '') {
-                              await handleSaveWorkOrderField('notToExceed', null);
-                              return;
-                            }
-                            const n = Number(trimmed);
-                            if (!Number.isFinite(n) || n < 0) {
-                              alert(t('workOrders.form.notToExceedInvalid'));
-                              throw new Error('invalid NTE');
-                            }
-                            await handleSaveWorkOrderField('notToExceed', n);
-                          }}
-                          disabled={frozen}
-                          placeholder={t('workOrders.form.notToExceedPlaceholder')}
-                          ariaLabel={t('workOrders.form.notToExceed')}
-                          renderDisplay={(v) => (v ? currencyFormatter.format(Number(v)) : '-')}
-                        />
-                      </DescriptionDetails>
-
-                      <DescriptionTerm>{getName('division')}</DescriptionTerm>
-                      <DescriptionDetails>
-                        <EditableField
-                          as="select"
-                          value={workOrder.divisionId ?? ''}
-                          options={[
-                            { value: '', label: t('workOrders.form.divisionPlaceholder') },
-                            ...((divisions ?? []).filter((d) => d.isActive).map((d) => ({ value: d.id, label: d.name }))),
-                          ]}
-                          onSave={(v) => handleSaveWorkOrderField('divisionId', v || null)}
-                          disabled={frozen}
-                          ariaLabel={getName('division')}
-                        />
-                      </DescriptionDetails>
-
-                      <DescriptionTerm>{t('workOrders.form.type')}</DescriptionTerm>
-                      <DescriptionDetails>
-                        <EditableField
-                          as="select"
-                          value={workOrder.workOrderTypeId ?? ''}
-                          options={[
-                            { value: '', label: t('workOrders.form.typePlaceholder') },
-                            ...((workOrderTypes ?? []).filter((wt) => wt.isActive).map((wt) => ({ value: wt.id, label: wt.name }))),
-                          ]}
-                          onSave={(v) => handleSaveWorkOrderField('workOrderTypeId', v || null)}
-                          disabled={frozen}
-                          ariaLabel={t('workOrders.form.type')}
-                        />
-                      </DescriptionDetails>
-
-                      {workOrder.completedDate && (
-                        <>
-                          <DescriptionTerm>{t('workOrders.detail.completed')}</DescriptionTerm>
-                          <DescriptionDetails><TimeAgo iso={workOrder.completedDate} /></DescriptionDetails>
+                <>
+                  <WorkOrderCallbackCard
+                    workOrder={workOrder}
+                    typeName={woType?.name ?? null}
+                    isCallbackType={isSeededCallbackType(woType)}
+                    frozen={frozen}
+                  />
+                  <WorkOrderCallbacksBackCard
+                    workOrderId={workOrder.id}
+                    callbacks={workOrder.callbacks ?? []}
+                    completedDate={workOrder.completedDate}
+                    statusPill={(c) => (
+                      <Pill tone={PROGRESS_PILL_TONE[c.progressCategory]} dot>
+                        {t(`workOrders.progress.${PROGRESS_TRANSLATION_KEYS[c.progressCategory]}`)}
+                      </Pill>
+                    )}
+                  />
+                  <Card title={<CardTitle>{t('workOrders.detail.info', { entity: getName('work_order') })}</CardTitle>} padding="none">
+                    <div className="px-3.5 py-3">
+                      <DescriptionList>
+                        <DescriptionTerm>{t('workOrders.detail.created')}</DescriptionTerm>
+                        <DescriptionDetails><TimeAgo iso={workOrder.createdAt} /></DescriptionDetails>
+  
+                        <DescriptionTerm>{t('workOrders.form.customerOrderNumber')}</DescriptionTerm>
+                        <DescriptionDetails>
+                          <EditableField
+                            value={workOrder.customerOrderNumber ?? ''}
+                            onSave={(v) => handleSaveWorkOrderField('customerOrderNumber', v || undefined)}
+                            disabled={frozen}
+                            placeholder={t('workOrders.form.customerOrderNumberPlaceholder')}
+                            ariaLabel={t('workOrders.form.customerOrderNumber')}
+                            className="font-mono"
+                          />
+                        </DescriptionDetails>
+  
+                        <DescriptionTerm>{t('workOrders.form.notToExceed')}</DescriptionTerm>
+                        <DescriptionDetails>
+                          <EditableField
+                            value={workOrder.notToExceed != null ? String(workOrder.notToExceed) : ''}
+                            onSave={async (raw) => {
+                              const trimmed = raw.trim().replace(/[$,\s]/g, '');
+                              if (trimmed === '') {
+                                await handleSaveWorkOrderField('notToExceed', null);
+                                return;
+                              }
+                              const n = Number(trimmed);
+                              if (!Number.isFinite(n) || n < 0) {
+                                alert(t('workOrders.form.notToExceedInvalid'));
+                                throw new Error('invalid NTE');
+                              }
+                              await handleSaveWorkOrderField('notToExceed', n);
+                            }}
+                            disabled={frozen}
+                            placeholder={t('workOrders.form.notToExceedPlaceholder')}
+                            ariaLabel={t('workOrders.form.notToExceed')}
+                            renderDisplay={(v) => (v ? currencyFormatter.format(Number(v)) : '-')}
+                          />
+                        </DescriptionDetails>
+  
+                        <DescriptionTerm>{getName('division')}</DescriptionTerm>
+                        <DescriptionDetails>
+                          <EditableField
+                            as="select"
+                            value={workOrder.divisionId ?? ''}
+                            options={[
+                              { value: '', label: t('workOrders.form.divisionPlaceholder') },
+                              ...((divisions ?? []).filter((d) => d.isActive).map((d) => ({ value: d.id, label: d.name }))),
+                            ]}
+                            onSave={(v) => handleSaveWorkOrderField('divisionId', v || null)}
+                            disabled={frozen}
+                            ariaLabel={getName('division')}
+                          />
+                        </DescriptionDetails>
+  
+                        <DescriptionTerm>{t('workOrders.form.type')}</DescriptionTerm>
+                        <DescriptionDetails>
+                          <EditableField
+                            as="select"
+                            value={workOrder.workOrderTypeId ?? ''}
+                            options={[
+                              { value: '', label: t('workOrders.form.typePlaceholder') },
+                              ...((workOrderTypes ?? []).filter((wt) => wt.isActive).map((wt) => ({ value: wt.id, label: wt.name }))),
+                            ]}
+                            onSave={(v) => handleSaveWorkOrderField('workOrderTypeId', v || null)}
+                            disabled={frozen}
+                            ariaLabel={t('workOrders.form.type')}
+                          />
+                        </DescriptionDetails>
+  
+                        {workOrder.completedDate && (
+                          <>
+                            <DescriptionTerm>{t('workOrders.detail.completed')}</DescriptionTerm>
+                            <DescriptionDetails><TimeAgo iso={workOrder.completedDate} /></DescriptionDetails>
                         </>
                       )}
                     </DescriptionList>
                   </div>
                 </Card>
+                </>
               }
             />
           )}

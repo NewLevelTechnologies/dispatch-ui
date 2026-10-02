@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { getFieldLabel, getEventContext } from './activityFormatters';
+import { getFieldLabel, getEventContext, resolveEventSummary } from './activityFormatters';
 import type { ActivityEvent } from '../api/setup';
 
 const makeEvent = (overrides: Partial<ActivityEvent>): ActivityEvent => ({
@@ -64,3 +64,27 @@ describe('getEventContext', () => {
     expect(getEventContext(event)).toBeNull();
   });
 });
+
+describe('callback events', () => {
+  // A tiny stand-in for i18next: fill {{name}} from params.
+  const t = (key: string, params: Record<string, unknown> = {}) =>
+    ({
+      'workOrders.activity.kind.callbackLinked': 'Linked as a callback of {{toWorkOrderNumber}}',
+      'workOrders.activity.kind.callbackChanged': 'Callback changed from {{fromWorkOrderNumber}} to {{toWorkOrderNumber}}',
+    })[key]?.replace(/\{\{(\w+)\}\}/g, (_, k: string) => String(params[k] ?? `{{${k}}}`)) ?? key;
+  const getName = (code: string) => code;
+
+  it('names the original job on link and change', () => {
+    expect(
+      resolveEventSummary(makeEvent({ kind: 'CALLBACK_LINKED', data: { toWorkOrderNumber: 'WO-1234' } }), t, getName),
+    ).toBe('Linked as a callback of WO-1234');
+    expect(
+      resolveEventSummary(
+        makeEvent({ kind: 'CALLBACK_CHANGED', data: { fromWorkOrderNumber: 'WO-1', toWorkOrderNumber: 'WO-2' } }),
+        t,
+        getName,
+      ),
+    ).toBe('Callback changed from WO-1 to WO-2');
+  });
+});
+

@@ -55,7 +55,20 @@ export interface TechnicianProductivityResponse {
   };
   /** Tech rows + both unattributed amounts; matches revenue's `billed` for the same period. */
   totalRevenue: number;
+  /**
+   * Tenant-local date callback linking started (the later of its go-live and
+   * the tenant joining); the same for every period. No backfill before it.
+   */
+  callbacksTrackedSince?: string;
   currency: string;
+}
+
+/** A callback charged to a tech in the period, and the job it calls back to. */
+export interface ChargedCallback {
+  workOrderId: string;
+  workOrderNumber: string;
+  createdAt: string;
+  original: { id: string; workOrderNumber: string | null };
 }
 
 export interface CreditedInvoice {
@@ -90,6 +103,24 @@ export const technicianProductivityApi = {
   ): Promise<Page<CreditedInvoice>> => {
     const response = await apiClient.get<Page<CreditedInvoice>>(
       `/work-orders/technician-productivity/${userId}/invoices`,
+      {
+        params: {
+          ...(params.period ? { period: params.period } : {}),
+          page: params.page ?? 0,
+          size: params.size ?? 25,
+        },
+      },
+    );
+    return response.data;
+  },
+
+  /** The callbacks charged to one tech in the period, newest first. */
+  getChargedCallbacks: async (
+    userId: string,
+    params: { period?: ReportingPeriodParam; page?: number; size?: number } = {},
+  ): Promise<Page<ChargedCallback>> => {
+    const response = await apiClient.get<Page<ChargedCallback>>(
+      `/work-orders/technician-productivity/${userId}/callbacks`,
       {
         params: {
           ...(params.period ? { period: params.period } : {}),
