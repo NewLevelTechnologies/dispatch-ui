@@ -172,6 +172,8 @@ export default function WorkOrderDetailPage() {
   const [copied, setCopied] = useState<'phone' | 'address' | null>(null);
   const [activityDrawerOpen, setActivityDrawerOpen] = useState(false);
   const [tab, setTab] = useUrlTab<WorkOrderTab>(TAB_IDS, 'overview');
+  // Linking a callback from the header menu opens the Callback card on Overview.
+  const [callbackEditing, setCallbackEditing] = useState(false);
   // Bumped by the "Add work item" affordances (header button, overview card,
   // the W shortcut) to open the inline composer on the Items tab. All work-item
   // editing is inline on the card (complaint / diagnosis / equipment) — there
@@ -870,6 +872,16 @@ export default function WorkOrderDetailPage() {
                   <EllipsisHorizontalIcon className="size-4" />
                 </DropdownButton>
                 <DropdownMenu anchor="bottom end">
+                  {!workOrder.callbackOf && !frozen && (
+                    <DropdownItem
+                      onClick={() => {
+                        setTab('overview');
+                        setCallbackEditing(true);
+                      }}
+                    >
+                      <DropdownLabel>{t('callbacks.linkAsCallback')}</DropdownLabel>
+                    </DropdownItem>
+                  )}
                   <DropdownItem disabled>
                     <DropdownLabel>{t('workOrders.detail.print')}</DropdownLabel>
                   </DropdownItem>
@@ -915,12 +927,16 @@ export default function WorkOrderDetailPage() {
               }}
               extraRail={
                 <>
-                  <WorkOrderCallbackCard
-                    workOrder={workOrder}
-                    typeName={woType?.name ?? null}
-                    isCallbackType={isSeededCallbackType(woType)}
-                    frozen={frozen}
-                  />
+                  {(workOrder.callbackOf || callbackEditing) && (
+                    <WorkOrderCallbackCard
+                      workOrder={workOrder}
+                      typeName={woType?.name ?? null}
+                      isCallbackType={isSeededCallbackType(woType)}
+                      frozen={frozen}
+                      editing={callbackEditing}
+                      onEditingChange={setCallbackEditing}
+                    />
+                  )}
                   <WorkOrderCallbacksBackCard
                     workOrderId={workOrder.id}
                     callbacks={workOrder.callbacks ?? []}

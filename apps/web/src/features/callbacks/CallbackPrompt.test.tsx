@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { useState } from 'react';
-import { screen, waitFor, within } from '@testing-library/react';
+import { screen, within } from '@testing-library/react';
 import { renderWithProviders, userEvent } from '../../test/utils';
 import { CallbackPrompt } from './CallbackPrompt';
 import { UNSET, type CallbackValue } from './callbackModel';
@@ -62,14 +62,18 @@ beforeEach(() => {
 });
 
 describe('CallbackPrompt', () => {
-  it('renders nothing with no suggestions unless the seeded callback type is picked', async () => {
+  it('offers one quiet line when nothing is suggested, which opens the search', async () => {
+    const user = userEvent.setup();
     renderWithProviders(<Harness />);
-    await waitFor(() => expect(mockCandidates).toHaveBeenCalledWith({
+    const quiet = await screen.findByTestId('callback-quiet-entry');
+    expect(mockCandidates).toHaveBeenCalledWith({
       serviceLocationId: 'sl-1',
       equipmentIds: ['eq-1'],
       excludeWorkOrderId: undefined,
-    }));
-    expect(screen.queryByTestId('callback-prompt')).toBeNull();
+    });
+    // A late callback typed Warranty can still be linked at intake.
+    await user.click(within(quiet).getByRole('button', { name: 'callbacks.linkIt' }));
+    expect(screen.getByRole('textbox', { name: 'callbacks.searchTitle' })).toBeInTheDocument();
   });
 
   it('offers recent jobs, and linking one names who it charges before save', async () => {

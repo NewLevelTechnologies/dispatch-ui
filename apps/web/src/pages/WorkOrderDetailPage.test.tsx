@@ -233,6 +233,9 @@ describe('WorkOrderDetailPage', () => {
           },
         });
       }
+      if (url.endsWith('/work-orders/callback-candidates')) {
+        return Promise.resolve({ data: [] });
+      }
       if (url.match(/\/work-orders\/[^/]+$/)) {
         return workOrder
           ? Promise.resolve({ data: workOrder })
@@ -614,6 +617,21 @@ describe('WorkOrderDetailPage', () => {
         callbackOfWorkOrderId: 'wo-orig',
       }),
     );
+  });
+
+  it('keeps the Callback card off an unlinked work order until it is linked from the header menu', async () => {
+    const user = userEvent.setup();
+    mockApiResponses({ ...mockWorkOrder, callbackOf: null });
+    renderPage();
+
+    // The Overview has rendered (the Details card), but no Callback card.
+    await waitFor(() => expect(screen.getAllByText('PO-12345').length).toBeGreaterThan(0));
+    expect(screen.queryByText('callbacks.notACallback')).toBeNull();
+    expect(screen.queryByTestId('callback-prompt')).toBeNull();
+
+    await user.click(await screen.findByRole('button', { name: 'More options' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'callbacks.linkAsCallback' }));
+    expect(await screen.findByTestId('callback-prompt')).toBeInTheDocument();
   });
 
   it('lists the callbacks that point to an original job', async () => {
