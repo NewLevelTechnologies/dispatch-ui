@@ -101,9 +101,9 @@ export function CallbackPrompt({
       <div className="cb-quiet">
         <CheckIcon className="size-3.5" />
         <span>{tc('callbacks.notACallback')}</span>
-        <Button plain size="xxs" onClick={reopen}>
+        <button type="button" className="card-action" onClick={reopen}>
           {tc('callbacks.change')}
-        </Button>
+        </button>
       </div>
     );
   } else if (mode === 'search') {
@@ -134,9 +134,9 @@ export function CallbackPrompt({
             {tc('callbacks.newWork')}
           </Button>
           <span className="grow" />
-          <Button plain size="xxs" onClick={() => setChosen('search')}>
+          <button type="button" className="card-action" onClick={() => setChosen('search')}>
             {tc('callbacks.linkOther')}
-          </Button>
+          </button>
         </div>
       </div>
     );
@@ -180,9 +180,11 @@ export function CallbackPrompt({
     body = (
       <div className="cb-quiet" data-testid="callback-quiet-entry">
         <span>{tc('callbacks.quietQuestion')}</span>
-        <Button plain size="xxs" onClick={() => setChosen('search')}>
+        {/* An inline text link, not a padded button, so it sits on the
+            sentence's baseline. */}
+        <button type="button" className="card-action" onClick={() => setChosen('search')}>
           {tc('callbacks.linkIt')}
-        </Button>
+        </button>
       </div>
     );
   }
