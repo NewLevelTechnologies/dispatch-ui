@@ -269,7 +269,10 @@ function SearchPanel({
       workOrderApi.getAll({
         customerId,
         q: query,
+        // Same "completed" as the suggestions: cancelling doesn't reset a job's
+        // progress, so pin ACTIVE or a completed-then-cancelled job shows up.
         progressCategory: 'COMPLETED',
+        lifecycleState: 'ACTIVE',
         size: SEARCH_SIZE,
         sort: 'createdAt,desc',
       }),
