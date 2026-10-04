@@ -134,7 +134,7 @@ describe('CallbackPrompt', () => {
     await user.type(screen.getByRole('textbox', { name: 'callbacks.searchTitle' }), 'fan');
     const result = await screen.findByTestId('callback-search-result');
     expect(mockSearch).toHaveBeenLastCalledWith(
-      expect.objectContaining({ customerId: 'c-1', q: 'fan', progressCategory: 'COMPLETED' }),
+      expect.objectContaining({ customerId: 'c-1', q: 'fan', progressCategory: 'COMPLETED', lifecycleState: 'ACTIVE' }),
     );
     expect(result).toHaveTextContent('Reyes Rental');
 
