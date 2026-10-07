@@ -173,6 +173,8 @@ export function comparisonLabel(
 }
 
 export interface RevenueMonth {
+  /** 1–12. */
+  month: number;
   /** "Jan". */
   label: string;
   amount: number;
@@ -197,6 +199,7 @@ export function revenueMonths(billedByDay: DailyAmount[], asOf: string, isCurren
   return [...buckets.entries()]
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([key, amount]) => ({
+      month: Number(key.slice(5, 7)),
       label: monthShort(Number(key.slice(5, 7))),
       amount,
       partial: isCurrent && key === asOfKey && ad < lastDay,

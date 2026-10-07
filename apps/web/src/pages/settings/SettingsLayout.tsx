@@ -119,6 +119,7 @@ export default function SettingsLayout() {
   const { t } = useTranslation();
   const { getName } = useGlossary();
   const canViewUsers = useHasAnyCapability('VIEW_USERS');
+  const canManageTargets = useHasAnyCapability('MANAGE_REVENUE_TARGETS');
   const { data: currentUser } = useCurrentUser();
   const [query, setQuery] = useState('');
   const [navOpen, setNavOpen] = useState(false);
@@ -128,6 +129,7 @@ export default function SettingsLayout() {
       label: t('settings.sections.organization'),
       items: [
         { label: t('settings.nav.companyProfile'), to: '/settings/company-profile' },
+        ...(canManageTargets ? [{ label: t('settings.nav.revenueTargets'), to: '/settings/revenue-targets' }] : []),
         { label: t('settings.nav.terminology'), to: '/settings/terminology' },
         { label: t('settings.nav.notificationTemplates'), to: '/settings/notifications' },
       ],
@@ -169,7 +171,7 @@ export default function SettingsLayout() {
         { label: getName('role', true), to: '/settings/access/roles' },
       ],
     },
-  ], [t, getName, canViewUsers]);
+  ], [t, getName, canViewUsers, canManageTargets]);
 
   const filteredSections = useMemo(() => {
     const q = query.trim().toLowerCase();

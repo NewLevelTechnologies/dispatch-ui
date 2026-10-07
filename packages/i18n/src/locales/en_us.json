@@ -606,6 +606,15 @@
         "soFar": "so far",
         "title": "Revenue by week"
       },
+      "chart": {
+        "invoiced": "Invoiced",
+        "monthsHit_one": "{{hit}} of {{count}} month hit target",
+        "monthsHit_other": "{{hit}} of {{count}} months hit target",
+        "setTargets": "Set targets",
+        "target": "Target",
+        "weeksHit_one": "{{hit}} of {{count}} week hit target",
+        "weeksHit_other": "{{hit}} of {{count}} weeks hit target"
+      },
       "error": "Couldn't load",
       "kpis": {
         "active": "{{count}} active {{entities, lowercase}}",
@@ -614,6 +623,7 @@
         "collectedPct": "{{pct}}% of invoiced",
         "collectedToDate": "Collected {{suffix}}",
         "noComparison": "No prior-year data",
+        "ofTarget": "of {{amount}} target",
         "openQuotes": "Open {{entities, lowercase}}",
         "openQuotesCount": "{{count}} {{entities, lowercase}}",
         "openQuotesMeta": "{{count}} {{entities, lowercase}} · {{rate}}% win rate, 30d",
@@ -1849,6 +1859,7 @@
       "itemStatuses": "Item Statuses",
       "notificationTemplates": "Notification Templates",
       "plans": "Plans",
+      "revenueTargets": "Revenue Targets",
       "terminology": "Terminology",
       "types": "Types",
       "workflows": "Workflows"
@@ -2046,6 +2057,73 @@
       "transitionSummary_one": "1 transition · {{approvals}} approval gates",
       "transitionSummary_other": "{{count}} transitions · {{approvals}} approval gates",
       "transitionSummary_zero": "No transitions defined"
+    },
+    "revenueTargets": {
+      "cardTitle": "{{year}} targets",
+      "changed": "Changed",
+      "closed": "Closed",
+      "closedWarning_one": "You changed {{months}}, which has already closed. Home will re-score it against the new target.",
+      "closedWarning_other": "You changed {{months}}, which have already closed. Home will re-score them against the new targets.",
+      "cols": {
+        "actual": "{{year}} actual",
+        "month": "Month",
+        "result": "Result",
+        "target": "Target",
+        "vs": "vs {{year}}"
+      },
+      "editHint": "Leave a month blank for no target. A blank month is not the same as $0.",
+      "empty": {
+        "body": "Start from {{prev}} and adjust. Months you leave blank show no target line on Home.",
+        "pastBody": "You can still add them. Home will then show which {{year}} months hit target.",
+        "pastTitle": "No targets were set for {{year}}",
+        "start": "Set {{year}} targets",
+        "title": "No targets for {{year}} yet"
+      },
+      "errors": {
+        "tooLarge": "At most $1,000,000,000",
+        "zero": "Leave it blank for no target"
+      },
+      "fill": {
+        "apply": "Fill months",
+        "fromYear": "From {{year}}",
+        "gapsActual": "{{year}} has no actuals for {{months}}. Those months are left as they are.",
+        "gapsTargets": "{{year}} has no targets for {{months}}. Those months are left as they are.",
+        "growth": "Growth percent",
+        "label": "Quick fill",
+        "onlyOpen": "Only months that haven't closed",
+        "plus": "plus",
+        "shape": "Shape",
+        "shapeEven": "Split evenly",
+        "shapeLast": "Shaped like {{year}}'s seasons",
+        "source": "Fill from",
+        "sourceActual": "{{year}} actual revenue",
+        "sourceTargets": "{{year}} targets",
+        "sourceTargetsNone": "{{year}} targets (none set)",
+        "spread": "Spread a yearly total",
+        "total": "Yearly total"
+      },
+      "footer": "{{count}} of 12 months set · {{amount}} for the year",
+      "formerUser": "Former user",
+      "hit": "Hit",
+      "inProgress": "In progress",
+      "inputLabel": "{{month}} target",
+      "lastChanged": "Last changed by {{name}} · {{date}}",
+      "loadFailed": "Couldn't load the targets",
+      "missed": "Missed",
+      "monthsSet": "{{count}} of 12 months set",
+      "noTarget": "No target",
+      "notSet": "Not set",
+      "pctSoFar": "{{pct}}% so far",
+      "save": "Save targets",
+      "saveFailed": "Couldn't save the targets",
+      "saved": "{{year}} targets saved",
+      "soFar": "so far",
+      "sub": "Monthly goals for invoiced revenue, the same number as Revenue on Home. They draw the target line on Home's revenue chart, and they're company-wide.",
+      "thisMonth": "This month",
+      "title": "Revenue Targets",
+      "toDate": "to date",
+      "yearLabel": "Year",
+      "yearRow": "Year"
     }
   },
   "tags": {

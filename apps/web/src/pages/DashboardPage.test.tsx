@@ -23,6 +23,7 @@ const mockShowSuccess = vi.fn();
 const mockProductivity = vi.fn();
 const mockCredited = vi.fn();
 const mockChargedCallbacks = vi.fn();
+const mockTargets = vi.fn();
 
 vi.mock('../api/setup', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../api/setup')>();
@@ -58,6 +59,7 @@ vi.mock('../api/setup', async (importOriginal) => {
       getCreditedInvoices: (...a: unknown[]) => mockCredited(...a),
       getChargedCallbacks: (...a: unknown[]) => mockChargedCallbacks(...a),
     },
+    revenueTargetsApi: { ...actual.revenueTargetsApi, get: (...a: unknown[]) => mockTargets(...a) },
   };
 });
 
@@ -154,6 +156,19 @@ function allQuiet() {
   mockProductivity.mockResolvedValue(productivity());
   mockCredited.mockResolvedValue({ content: [], totalElements: 0, totalPages: 0, number: 0, size: 25 });
   mockChargedCallbacks.mockResolvedValue({ content: [], totalElements: 0, totalPages: 0, number: 0, size: 50 });
+  mockTargets.mockResolvedValue(targets({}));
+}
+
+/** A year of targets: `byMonth` maps 1–12 to an amount; the rest have none. */
+function targets(byMonth: Record<number, number>) {
+  return {
+    year: 2026,
+    months: Array.from({ length: 12 }, (_, i) => ({ month: i + 1, amount: byMonth[i + 1] ?? null })),
+    updatedBy: null,
+    updatedByName: null,
+    updatedAt: null,
+    firstInvoiceYear: 2025,
+  };
 }
 
 function techRow(over: Record<string, unknown> = {}) {
@@ -391,6 +406,46 @@ describe('DashboardPage — Revenue & productivity', () => {
     expect(screen.queryByText('dashboard.revenue.quotes.avgDecision')).toBeNull();
     // Scope doesn't apply to anything on this tab.
     expect(screen.queryByRole('button', { name: 'dashboard.scope.label' })).toBeNull();
+  });
+
+  describe('targets', () => {
+    // The targets read is for the period's year, so pin the clock.
+    beforeEach(() => {
+      vi.useFakeTimers({ toFake: ['Date'] });
+      vi.setSystemTime(new Date('2026-10-14T15:00:00Z'));
+    });
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('draws a prorated target rule per week and puts the month’s target beside Revenue', async () => {
+      // September has 30 days: the 1st–7th is 7/30 of the month's target.
+      mockTargets.mockResolvedValue(targets({ 9: 150000 }));
+      renderWithProviders(<DashboardPage />, { initialPath: '/?view=rev' });
+
+      expect(await screen.findAllByTestId('revenue-target-rule')).toHaveLength(2);
+      expect(mockTargets).toHaveBeenCalledWith(2026);
+      expect(screen.getByText('dashboard.revenue.kpis.ofTarget')).toBeInTheDocument();
+      // The one complete week is scored; the week in progress isn't.
+      expect(screen.getByText('dashboard.revenue.chart.weeksHit')).toBeInTheDocument();
+      expect(screen.getByText('dashboard.revenue.chart.target')).toBeInTheDocument();
+      expect(screen.queryByText('dashboard.revenue.chart.setTargets')).toBeNull();
+    });
+
+    it('offers "Set targets" only to someone who can set them, when the period has none', async () => {
+      grant([...OFFICE_CAPS, 'MANAGE_REVENUE_TARGETS']);
+      const { unmount } = renderWithProviders(<DashboardPage />, { initialPath: '/?view=rev' });
+      const link = await screen.findByRole('link', { name: 'dashboard.revenue.chart.setTargets' });
+      expect(link).toHaveAttribute('href', '/settings/revenue-targets?year=2026');
+      expect(screen.queryByTestId('revenue-target-rule')).toBeNull();
+      expect(screen.queryByText('dashboard.revenue.kpis.ofTarget')).toBeNull();
+      unmount();
+
+      grant(OFFICE_CAPS);
+      renderWithProviders(<DashboardPage />, { initialPath: '/?view=rev' });
+      expect(await screen.findAllByTestId('revenue-week')).toHaveLength(2);
+      expect(screen.queryByText('dashboard.revenue.chart.setTargets')).toBeNull();
+    });
   });
 
   it('lists each tech with the backend’s numbers and checks the total against Revenue MTD', async () => {

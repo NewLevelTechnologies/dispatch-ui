@@ -107,6 +107,21 @@
 .home-chart.dense .home-chart-bar { width: 84%; }
 .home-chart.dense .home-chart-val { font-size: 10px; }
 .home-chart-sofar { color: var(--fg-dim); }
+/* Revenue targets: a dashed rule per bucket that has one. Green means "hit"
+   once any bar has a target, so the rest take the tint. */
+.home-chart-bar.missed { background: color-mix(in oklch, var(--success-500) 45%, transparent); }
+.home-chart-val.hit { color: var(--success-500); }
+.home-chart-target {
+  position: absolute;
+  left: 6%;
+  right: 6%;
+  border-top: 2px dashed var(--fg-muted);
+  pointer-events: none;
+}
+.home-chart-legend { display: inline-flex; align-items: center; gap: 12px; font-size: 11.5px; color: var(--fg-muted); }
+.home-chart-legend > span { display: inline-flex; align-items: center; gap: 5px; }
+.home-chart-key.bar { width: 10px; height: 8px; border-radius: 2px; background: var(--success-500); }
+.home-chart-key.rule { width: 10px; border-top: 2px dashed var(--fg-muted); }
 
 .home-split { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
 .home-foot-rule { padding-top: 8px; border-top: 1px solid var(--border-soft); }

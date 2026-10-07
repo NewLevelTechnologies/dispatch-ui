@@ -963,6 +963,53 @@ export const financialDashboardApi = {
   },
 };
 
+/** One calendar month's target. `amount` null = no target (never 0). */
+export interface MonthlyRevenueTarget {
+  /** 1–12. */
+  month: number;
+  amount: number | null;
+}
+
+/**
+ * A year of company-wide revenue targets: always 12 months, January first.
+ * Reading needs `VIEW_ALL_INVOICES` or `MANAGE_REVENUE_TARGETS`; a year never
+ * set comes back as 12 nulls, not a 404.
+ */
+export interface RevenueTargets {
+  year: number;
+  months: MonthlyRevenueTarget[];
+  /** Who last saved the year; null if never saved. */
+  updatedBy: string | null;
+  updatedByName: string | null;
+  updatedAt: string | null;
+  /** Year of the first billed invoice; null with none yet. Targets can be set
+   *  from it (this year when null) through next year. */
+  firstInvoiceYear: number | null;
+}
+
+/** A PUT's 400: `field` is `months.<1-12>.amount`, `months` or `year`. */
+export type RevenueTargetErrorCode =
+  | 'TARGET_ZERO'
+  | 'TARGET_NOT_POSITIVE'
+  | 'TARGET_TOO_LARGE'
+  | 'TARGET_TOO_PRECISE'
+  | 'INVALID_MONTHS'
+  | 'YEAR_OUT_OF_RANGE';
+
+export const revenueTargetsApi = {
+  get: async (year: number): Promise<RevenueTargets> => {
+    const response = await apiClient.get<RevenueTargets>('/financial/revenue-targets', { params: { year } });
+    return response.data;
+  },
+
+  /** Replaces the whole year (all 12 months; null clears one, all null clears
+   *  the year). Needs `MANAGE_REVENUE_TARGETS`. Returns the year as saved. */
+  replace: async (year: number, months: MonthlyRevenueTarget[]): Promise<RevenueTargets> => {
+    const response = await apiClient.put<RevenueTargets>(`/financial/revenue-targets/${year}`, { months });
+    return response.data;
+  },
+};
+
 // Export combined API
 export const financialApi = {
   invoices: invoicesApi,
@@ -971,6 +1018,7 @@ export const financialApi = {
   summary: financialSummaryApi,
   activity: financialActivityApi,
   dashboard: financialDashboardApi,
+  revenueTargets: revenueTargetsApi,
 };
 
 export default financialApi;
