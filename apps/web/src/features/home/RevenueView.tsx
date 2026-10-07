@@ -4,21 +4,31 @@ import { useTranslation } from '@dispatch/i18n';
 import {
   agreementApi,
   financialDashboardApi,
+  revenueTargetsApi,
   type AgreementOverviewResponse,
   type FinancialDashboardQuotes,
   type FinancialDashboardReceivables,
   type FinancialDashboardRevenue,
 } from '../../api/setup';
 import { useGlossary } from '../../contexts/GlossaryContext';
+import { useHasCapability } from '../../hooks/useCurrentUser';
 import { Button } from '../../components/catalyst/button';
 import { Card, CardBody, CardHead, CardTitle } from '../../components/ui/Card';
 import { KPI } from '../../components/ui/KPI';
 import { LoadingState } from '../../components/ui/LoadingState';
 import { ErrorState } from '../../components/ui/ErrorState';
 import { EmptyState } from '../../components/ui/EmptyState';
+import { Pill } from '../../components/ui/Pill';
 import { TechProductivityCard } from './TechProductivityCard';
 import { agingBuckets, cumulative, money, percentChange, revenueWeeks } from './revenueSelectors';
 import { comparisonLabel, periodName, revenueMonths, toDateSuffix, type Period } from './period';
+import {
+  hitCount,
+  periodTarget,
+  targetAmounts,
+  weekTarget,
+  type MonthAmounts,
+} from '../revenueTargets/targetModel';
 
 const DASH = '—';
 
@@ -38,8 +48,9 @@ export interface PeriodContext {
  * chart and Tech productivity follow it; receivables, quotes and agreements
  * are current-only on the backend, so in a past period they say "As of
  * today" rather than pretending to be historical. Each card calls the service
- * that owns its numbers and loads on its own. There is no revenue target
- * anywhere in the platform, so no "of target" meta and no target rule.
+ * that owns its numbers and loads on its own. Targets are company-wide and
+ * monthly: the period's months come from one year (no period crosses one),
+ * and a month without a target draws no rule and scores nothing.
  */
 export function RevenueView({ period, isCurrent }: { period: Period; isCurrent: boolean }) {
   const { t } = useTranslation();
@@ -70,6 +81,12 @@ export function RevenueView({ period, isCurrent }: { period: Period; isCurrent: 
     queryKey: ['agreements', 'overview'],
     queryFn: () => agreementApi.getOverview(),
   });
+  // A failed or slow read just means no target line; the chart never waits on it.
+  const targets = useQuery({
+    queryKey: ['revenue-targets', period.year],
+    queryFn: () => revenueTargetsApi.get(period.year),
+  });
+  const targetMonths = targets.data ? targetAmounts(targets.data) : undefined;
 
   return (
     <div className="home-view">
@@ -77,12 +94,13 @@ export function RevenueView({ period, isCurrent }: { period: Period; isCurrent: 
         ctx={ctx}
         asOfTag={asOfTag}
         revenue={revenue.data}
+        targets={targetMonths}
         receivables={receivables.data}
         quotes={quotes.data}
         agreements={agreements.data}
       />
       <div className="home-2col">
-        <RevenueChartCard query={revenue} period={period} />
+        <RevenueChartCard query={revenue} period={period} targets={targetMonths} />
         <ReceivablesCard query={receivables} tag={asOfTag} />
       </div>
       <TechProductivityCard revenue={revenue} ctx={ctx} />
@@ -98,6 +116,7 @@ function RevenueKpis({
   ctx,
   asOfTag,
   revenue,
+  targets,
   receivables,
   quotes,
   agreements,
@@ -105,6 +124,7 @@ function RevenueKpis({
   ctx: PeriodContext;
   asOfTag: string | undefined;
   revenue?: FinancialDashboardRevenue;
+  targets?: MonthAmounts;
   receivables?: FinancialDashboardReceivables;
   quotes?: FinancialDashboardQuotes;
   agreements?: AgreementOverviewResponse;
@@ -123,12 +143,20 @@ function RevenueKpis({
     revenue && vs && comparison?.billed != null ? percentChange(revenue.billed, comparison.billed) : null;
   const collectedPct = revenue && revenue.billed > 0 ? Math.round((revenue.collected / revenue.billed) * 100) : null;
   const overdue = receivables?.overdue;
+  // The whole period's target beside the figure; the meta stays the delta's
+  // label, so the % never reads as "% of target".
+  const target = revenue && targets ? periodTarget(revenue.periodStart, revenue.periodEnd, targets) : null;
 
   return (
     <div className="home-kpis five">
       <KPI
         label={ctx.revenueLabel}
         value={revenue ? money(revenue.billed) : DASH}
+        sub={
+          target != null
+            ? t('dashboard.revenue.kpis.ofTarget', { amount: money(target, { compact: true }) })
+            : undefined
+        }
         delta={change != null && change !== 0 ? `${Math.abs(change)}%` : undefined}
         deltaDir={change != null && change < 0 ? 'down' : 'up'}
         meta={
@@ -213,6 +241,7 @@ function RevenueKpis({
 function QueryCard<T>({
   title,
   tag,
+  pill,
   action,
   query,
   children,
@@ -220,6 +249,8 @@ function QueryCard<T>({
   title: string;
   /** "As of today" on a current-only card while a past period is selected. */
   tag?: string;
+  /** Beside the title, e.g. the chart's "N of M weeks hit target". */
+  pill?: ReactNode;
   action?: ReactNode;
   query: UseQueryResult<T>;
   children: (data: T) => ReactNode;
@@ -245,6 +276,7 @@ function QueryCard<T>({
         <CardTitle>
           {title}
           {tag && <span className="tag-tiny">{tag}</span>}
+          {pill}
         </CardTitle>
         {action}
       </CardHead>
@@ -258,24 +290,91 @@ const CHART_H = 150;
 // label never rides up into the card's padding.
 const LABEL_H = 18;
 
+interface ChartBar {
+  label: string;
+  amount: number;
+  partial: boolean;
+  target: number | null;
+}
+
+/**
+ * Weeks from the 1st for a month; calendar months for a quarter or year. The
+ * partial "so far" bar only exists in a period that's still running. A week's
+ * target is its month's, prorated by days.
+ */
+function chartBars(r: FinancialDashboardRevenue, byWeek: boolean, targets: MonthAmounts | undefined): ChartBar[] {
+  if (byWeek) {
+    const monthAmount = targets?.[Number(r.asOf.slice(5, 7)) - 1] ?? null;
+    return revenueWeeks(r.billedByDay, r.asOf).map((w, i) => ({
+      ...w,
+      partial: w.partial && r.isCurrent,
+      target: weekTarget(i, r.asOf, monthAmount),
+    }));
+  }
+  return revenueMonths(r.billedByDay, r.asOf, r.isCurrent).map((m) => ({
+    label: m.label,
+    amount: m.amount,
+    partial: m.partial,
+    target: targets?.[m.month - 1] ?? null,
+  }));
+}
+
 function RevenueChartCard({
   query,
   period,
+  targets,
 }: {
   query: UseQueryResult<FinancialDashboardRevenue>;
   period: Period;
+  /** Undefined while loading or when the read failed: no target line. */
+  targets: MonthAmounts | undefined;
 }) {
   const { t } = useTranslation();
+  const canManage = useHasCapability('MANAGE_REVENUE_TARGETS');
   const byWeek = period.kind === 'month';
+  const bars = query.data ? chartBars(query.data, byWeek, targets) : [];
+  const hasTarget = bars.some((b) => b.target != null);
+  const score = hitCount(bars);
+
+  let action: ReactNode = null;
+  if (hasTarget)
+    action = (
+      <span className="home-chart-legend">
+        <span>
+          <span className="home-chart-key bar" />
+          {t('dashboard.revenue.chart.invoiced')}
+        </span>
+        <span>
+          <span className="home-chart-key rule" />
+          {t('dashboard.revenue.chart.target')}
+        </span>
+      </span>
+    );
+  else if (canManage && targets && query.data)
+    action = (
+      <Button plain size="xxs" href={`/settings/revenue-targets?year=${period.year}`}>
+        {t('dashboard.revenue.chart.setTargets')}
+      </Button>
+    );
+
   return (
-    <QueryCard title={t(byWeek ? 'dashboard.revenue.byWeek.title' : 'dashboard.revenue.byMonth.title')} query={query}>
-      {(r) => {
-        // Weeks from the 1st for a month; calendar months for a quarter or year.
-        // The partial "so far" bar only exists in a period that's still running.
-        const bars = byWeek
-          ? revenueWeeks(r.billedByDay, r.asOf).map((w) => ({ ...w, partial: w.partial && r.isCurrent }))
-          : revenueMonths(r.billedByDay, r.asOf, r.isCurrent);
-        const max = Math.max(0, ...bars.map((w) => w.amount));
+    <QueryCard
+      title={t(byWeek ? 'dashboard.revenue.byWeek.title' : 'dashboard.revenue.byMonth.title')}
+      pill={
+        score.of > 0 && (
+          <Pill tone="neutral">
+            {t(byWeek ? 'dashboard.revenue.chart.weeksHit' : 'dashboard.revenue.chart.monthsHit', {
+              hit: score.hit,
+              count: score.of,
+            })}
+          </Pill>
+        )
+      }
+      action={action}
+      query={query}
+    >
+      {() => {
+        const max = Math.max(0, ...bars.map((w) => Math.max(w.amount, w.target ?? 0)));
         if (max === 0)
           return (
             <EmptyState
@@ -283,17 +382,24 @@ function RevenueChartCard({
               title={t('dashboard.revenue.byWeek.empty', { period: periodName(period) })}
             />
           );
+        const px = (n: number) => Math.round((n / max) * (CHART_H - LABEL_H));
         return (
           <div className={`home-chart${bars.length > 6 ? ' dense' : ''}`} style={{ height: CHART_H + 26 }}>
             {bars.map((w) => {
-              const h = Math.round((w.amount / max) * (CHART_H - LABEL_H));
+              const h = px(w.amount);
+              const th = w.target != null ? px(w.target) : null;
+              const hit = w.target != null && w.amount >= w.target;
+              // Once any bar has a target, green means "hit": the rest take the
+              // tint, including bars whose month has no target.
+              const tone = hasTarget ? (hit ? ' hit' : ' missed') : '';
               return (
                 <div key={w.label} className="home-chart-col" data-testid="revenue-week">
                   <div className="home-chart-plot" style={{ height: CHART_H }}>
-                    <span className="home-chart-val" style={{ bottom: h + 4 }}>
+                    <span className={`home-chart-val${hit ? ' hit' : ''}`} style={{ bottom: Math.max(h, th ?? 0) + 4 }}>
                       {money(w.amount, { compact: true })}
                     </span>
-                    <span className={`home-chart-bar${w.partial ? ' partial' : ''}`} style={{ height: h }} />
+                    {th != null && <span className="home-chart-target" style={{ bottom: th }} data-testid="revenue-target-rule" />}
+                    <span className={`home-chart-bar${w.partial ? ' partial' : tone}`} style={{ height: h }} />
                   </div>
                   <span className="home-chart-label">
                     {w.label}

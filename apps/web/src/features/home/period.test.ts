@@ -66,8 +66,8 @@ describe('revenueMonths', () => {
 
   it('sums days into calendar months and marks the running month partial', () => {
     expect(revenueMonths(days, '2026-08-14', true)).toEqual([
-      { label: 'Jul', amount: 15, partial: false },
-      { label: 'Aug', amount: 20, partial: true },
+      { month: 7, label: 'Jul', amount: 15, partial: false },
+      { month: 8, label: 'Aug', amount: 20, partial: true },
     ]);
   });
 

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { invoicesApi, quotesApi, financialActivityApi, financialDashboardApi } from './financialApi';
+import { invoicesApi, quotesApi, financialActivityApi, financialDashboardApi, revenueTargetsApi } from './financialApi';
 import apiClient from './client';
 
 vi.mock('./client');
@@ -186,5 +186,22 @@ describe('financialDashboardApi', () => {
   it('getRevenue passes a reporting period through', async () => {
     await financialDashboardApi.getRevenue({ period: '2026-YTD' });
     expect(apiClient.get).toHaveBeenCalledWith('/financial/dashboard/revenue', { params: { period: '2026-YTD' } });
+  });
+});
+
+describe('revenueTargetsApi', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('GETs a year by query param', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({ data: { year: 2026 } });
+    await revenueTargetsApi.get(2026);
+    expect(apiClient.get).toHaveBeenCalledWith('/financial/revenue-targets', { params: { year: 2026 } });
+  });
+
+  it('PUTs all twelve months for the year, nulls included', async () => {
+    vi.mocked(apiClient.put).mockResolvedValue({ data: { year: 2027 } });
+    const months = Array.from({ length: 12 }, (_, i) => ({ month: i + 1, amount: i === 0 ? 150000 : null }));
+    await revenueTargetsApi.replace(2027, months);
+    expect(apiClient.put).toHaveBeenCalledWith('/financial/revenue-targets/2027', { months });
   });
 });
