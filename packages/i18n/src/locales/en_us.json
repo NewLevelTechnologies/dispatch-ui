@@ -243,6 +243,68 @@
     "update": "Update",
     "updateStatus": "Update {{entity, lowercase}} status"
   },
+  "agreements": {
+    "list": {
+      "emptyHint": "Add one from a {{customer}}'s {{agreements}} tab.",
+      "filters": {
+        "clear": "Clear filters",
+        "renewing": "Renewing in {{days}} days",
+        "statusCount": "{{count}} statuses"
+      },
+      "search": "Search by number, name or {{customer}}…",
+      "status": {
+        "ACTIVE": "Active",
+        "CANCELLED": "Cancelled",
+        "DRAFT": "Draft",
+        "EXPIRED": "Expired",
+        "SUSPENDED": "Suspended"
+      },
+      "table": {
+        "autoRenews": "Auto-renews",
+        "monthly": "Monthly",
+        "nextVisit": "Next visit",
+        "openEnded": "Open-ended",
+        "overdue": "Overdue visits",
+        "status": "Status",
+        "term": "Term ends"
+      }
+    },
+    "page": {
+      "active_one": "{{count}} active",
+      "active_other": "{{count}} active",
+      "recurring": "{{amount}}/mo recurring",
+      "renewing_one": "{{count}} renewing in {{days}} days",
+      "renewing_other": "{{count}} renewing in {{days}} days",
+      "visitsTab": "Visits to schedule"
+    },
+    "visits": {
+      "empty": {
+        "body": "No visit due in the next {{days}} days is waiting on a {{dispatch}}.",
+        "title": "Every visit due soon is scheduled"
+      },
+      "filters": {
+        "days_one": "Next {{count}} day",
+        "days_other": "Next {{count}} days",
+        "within": "Due"
+      },
+      "loadFailed": "Couldn't load the visits to schedule.",
+      "pending": "{{workOrder}} not created yet",
+      "pendingHint": "The nightly job creates each visit's {{workOrder}} and will retry. If this stays, tell support.",
+      "schedule": "Schedule",
+      "state": {
+        "open_one": "Window closes tomorrow",
+        "open_other": "Window open · {{count}} days left",
+        "overdue_one": "Overdue 1 day",
+        "overdue_other": "Overdue {{count}} days",
+        "upcoming_one": "Opens tomorrow",
+        "upcoming_other": "Opens in {{count}} days"
+      },
+      "table": {
+        "visit": "Visit",
+        "window": "Window"
+      }
+    }
+  },
   "approvals": {
     "title": "Approvals",
     "subtitle": "Work item transitions waiting on your sign-off · expiries auto-reject if untouched",
@@ -592,6 +654,7 @@
       },
       "agreements": {
         "active": "Active",
+        "all": "All {{entities, lowercase}}",
         "perMonthValue": "{{amount}}/mo",
         "planned": "Planned visits this month",
         "recurring": "Recurring / mo",

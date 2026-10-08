@@ -14,6 +14,7 @@ import PayerFormPage from './pages/PayerFormPage';
 import CustomerDetailPage from './pages/CustomerDetailPage';
 import CustomerFormPage from './pages/CustomerFormPage';
 import AgreementDetailPage from './pages/AgreementDetailPage';
+import AgreementsPage from './pages/AgreementsPage';
 import ServiceLocationsPage from './pages/ServiceLocationsPage';
 import ServiceLocationDetailPage from './pages/ServiceLocationDetailPage';
 import WorkOrdersPage from './pages/WorkOrdersPage';
@@ -200,6 +201,7 @@ function App() {
       <Route path="/customers/new" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<CustomerFormPage />} />} />
       <Route path="/customers/:id" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<CustomerDetailPage />} />} />
       <Route path="/customers/:customerId/service-locations/new" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<AddLocationPage />} />} />
+      <Route path="/agreements" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<AgreementsPage />} />} />
       <Route path="/agreements/:id" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<AgreementDetailPage />} />} />
       <Route path="/service-locations" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<ServiceLocationsPage />} />} />
       <Route path="/service-locations/new" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<AddLocationPage />} />} />

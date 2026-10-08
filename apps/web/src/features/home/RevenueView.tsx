@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { useQuery, type UseQueryResult } from '@tanstack/react-query';
+import { Link } from 'react-router-dom';
 import { useTranslation } from '@dispatch/i18n';
 import {
   agreementApi,
@@ -142,7 +143,7 @@ export function RevenueView({
       <TechProductivityCard revenue={revenue} ctx={ctx} />
       <div className="home-2col even">
         <QuotesCard query={quotes} tag={asOfTag} />
-        <AgreementsCard query={agreements} tag={asOfTag} />
+        <AgreementsCard query={agreements} tag={asOfTag} regionIds={regionIds} />
       </div>
     </div>
   );
@@ -571,11 +572,33 @@ function QuotesCard({ query, tag }: { query: UseQueryResult<FinancialDashboardQu
   );
 }
 
-function AgreementsCard({ query, tag }: { query: UseQueryResult<AgreementOverviewResponse>; tag?: string }) {
+function AgreementsCard({
+  query,
+  tag,
+  regionIds,
+}: {
+  query: UseQueryResult<AgreementOverviewResponse>;
+  tag?: string;
+  regionIds: string[] | undefined;
+}) {
   const { t } = useTranslation();
   const { getName } = useGlossary();
+  // The Agreements page under the same rules and scope, so its totals are these.
+  const href = (extra: Record<string, string> = {}) => {
+    const qs = new URLSearchParams({ ...extra, ...(regionIds?.length ? { region: regionIds[0] } : {}) }).toString();
+    return qs ? `/agreements?${qs}` : '/agreements';
+  };
   return (
-    <QueryCard title={getName('agreement', true)} tag={tag} query={query}>
+    <QueryCard
+      title={getName('agreement', true)}
+      tag={tag}
+      query={query}
+      action={
+        <Button plain size="xxs" href={href()}>
+          {t('dashboard.revenue.agreements.all', { entities: getName('agreement', true) })}
+        </Button>
+      }
+    >
       {(a) => {
         const v = a.visitsThisMonth;
         const pct = v.planned > 0 ? Math.round((v.completed / v.planned) * 100) : 0;
@@ -596,7 +619,17 @@ function AgreementsCard({ query, tag }: { query: UseQueryResult<AgreementOvervie
                   {t('dashboard.revenue.agreements.renewing', { days: a.renewingSoon.withinDays })}
                 </div>
                 <div className="home-stat">
-                  {a.renewingSoon.count}{' '}
+                  {a.renewingSoon.count > 0 ? (
+                    <Link
+                      to={href({ renewing: String(a.renewingSoon.withinDays) })}
+                      className="hover:underline"
+                      data-testid="agreements-renewing"
+                    >
+                      {a.renewingSoon.count}
+                    </Link>
+                  ) : (
+                    a.renewingSoon.count
+                  )}{' '}
                   <span className="home-row-muted">
                     · {t('dashboard.revenue.agreements.perMonthValue', { amount: money(a.renewingSoon.monthlyValue, { compact: true }) })}
                   </span>

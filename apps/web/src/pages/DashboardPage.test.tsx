@@ -276,6 +276,25 @@ describe('DashboardPage — Operations', () => {
     await waitFor(() => expect(router.state.location.search).toBe('?status=COMPLETED&unbilled=true'));
   });
 
+  it('sends agreement visits waiting on a dispatch to the queue that holds them', async () => {
+    mockOverview.mockResolvedValue({
+      asOf: '2026-09-30',
+      activeAgreementCount: 3,
+      recurringMonthly: 900,
+      renewingSoon: { withinDays: 30, count: 0, monthlyValue: 0 },
+      visitsThisMonth: { planned: 0, completed: 0, missed: 0, unscheduled: 0 },
+      visitsDueSoonUnscheduled: { withinDays: 7, count: 2 },
+      currency: 'USD',
+    });
+    const { router } = renderWithProviders(<DashboardPage />);
+
+    const row = await screen.findByTestId('attention-visits');
+    expect(row).toHaveTextContent('2');
+    await userEvent.setup().click(row);
+    await waitFor(() => expect(router.state.location.pathname).toBe('/agreements'));
+    expect(router.state.location.search).toBe('?view=visits');
+  });
+
   it('releases exactly what the board counts after confirming, with no Undo', async () => {
     const user = userEvent.setup();
     mockGetBoard.mockResolvedValue(board({ pendingRelease: { newCount: 3, changedCount: 2, removedCount: 0, total: 5, techCount: 2 } }));
@@ -496,6 +515,10 @@ describe('DashboardPage — Revenue & productivity', () => {
       expect(screen.getByRole('link', { name: 'dashboard.revenue.techs.report' })).toHaveAttribute(
         'href',
         '/reports/tech-productivity?range=2026-08&from=home&region=r2',
+      );
+      expect(screen.getByRole('link', { name: 'dashboard.revenue.agreements.all' })).toHaveAttribute(
+        'href',
+        '/agreements?region=r2',
       );
       // Receivables are current-only on Home, so the report opens as of today.
       expect(screen.getByRole('link', { name: 'dashboard.revenue.aging.report' })).toHaveAttribute(

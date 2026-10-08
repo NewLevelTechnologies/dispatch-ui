@@ -14,6 +14,7 @@
 import apiClient from './client';
 import type { CreateNoteRequest, NoteDto, UpdateNoteRequest } from './noteApi';
 import type { RecognitionBasis } from './tenantSettingsApi';
+import type { Page } from './workOrderApi';
 
 // ---- Enums (string unions matching the BE) ----------------------------------
 
@@ -150,6 +151,58 @@ export interface AgreementSummaryResponse {
   autoRenew?: boolean;
   createdAt: string;
   updatedAt: string;
+}
+
+// Company-wide list row (GET /work-orders/agreements with no customerId or
+// serviceLocationId — paged). Same rules and region scope as the overview, so
+// Home's counts equal the list's totalElements.
+export interface AgreementListRow extends AgreementSummaryResponse {
+  /** Annualized billing ÷ 12, to the cent; null unless ACTIVE with an active billing schedule. */
+  monthlyValue: number | null;
+  coverageLocationCount: number;
+  /** Start of the next open visit window not yet closed; null when none generated (~6 months ahead). */
+  nextVisitDue: string | null;
+  /** Visits whose window closed unfulfilled and unwaived. */
+  overdueVisitCount: number;
+}
+
+export type AgreementListSort = 'customerName' | 'termEnd' | 'monthlyValue' | 'agreementNumber';
+
+export interface ListAgreementsParams {
+  q?: string;
+  status?: AgreementStatus[];
+  classification?: AgreementClassification;
+  regionIds?: string[];
+  /** The overview's renewing-soon rule: ACTIVE, term ending today … today + N. */
+  renewingWithinDays?: number;
+  /** Nulls last either way; ties by agreement number. */
+  sort?: `${AgreementListSort},${'asc' | 'desc'}`;
+  page?: number;
+  size?: number;
+}
+
+// The visits-to-schedule queue: the overview's visitsDueSoonUnscheduled set —
+// open visits on ACTIVE agreements with no live dispatch, window starting by
+// today + withinDays (overdue included), oldest window first.
+export interface UnscheduledVisit {
+  obligationId: string;
+  agreementId: string;
+  agreementNumber: string;
+  agreementName: string;
+  customer: AgreementCustomerRef;
+  /** Fields null until the location syncs; `name` null for an unnamed location. */
+  serviceLocation: { id: string; name: string | null; streetAddress: string | null; city: string | null };
+  visitTemplateLabel: string | null;
+  windowStart: string;
+  windowEnd: string;
+  /**
+   * MATERIALIZED with a work order to schedule; PENDING (workOrderId null)
+   * means the nightly job failed to create it and will retry. Never create
+   * one from the frontend.
+   */
+  status: 'MATERIALIZED' | 'PENDING' | string;
+  workOrderId: string | null;
+  workOrderNumber: string | null;
 }
 
 // Per-location PM visit status (LOC-1 Phase 3) — GET /work-orders/agreements/visit-status?customerId={id}.
@@ -466,6 +519,31 @@ export const agreementApi = {
     }
     const response = await apiClient.get<AgreementSummaryResponse[]>('/work-orders/agreements', {
       params: apiParams,
+    });
+    return response.data;
+  },
+
+  // Company-wide, paged. See {@link AgreementListRow}.
+  listPage: async ({ status, regionIds, ...params }: ListAgreementsParams = {}): Promise<Page<AgreementListRow>> => {
+    const response = await apiClient.get<Page<AgreementListRow>>('/work-orders/agreements', {
+      params: {
+        ...Object.fromEntries(Object.entries(params).filter(([, v]) => v !== undefined && v !== '')),
+        ...(status?.length ? { status: status.join(',') } : {}),
+        ...(regionIds?.length ? { regionIds } : {}),
+      },
+    });
+    return response.data;
+  },
+
+  // See {@link UnscheduledVisit}. withinDays defaults to 7 (Home's window).
+  unscheduledVisits: async ({
+    regionIds,
+    ...params
+  }: { withinDays?: number; regionIds?: string[]; page?: number; size?: number } = {}): Promise<
+    Page<UnscheduledVisit>
+  > => {
+    const response = await apiClient.get<Page<UnscheduledVisit>>('/work-orders/agreements/visits/unscheduled', {
+      params: { ...params, ...(regionIds?.length ? { regionIds } : {}) },
     });
     return response.data;
   },

@@ -153,21 +153,28 @@ export default function WorkOrderDetailPage() {
   // dispatcher who opened a job from it is mid-triage — dropping them on the
   // Work Orders list loses the date and scope they were working. `back`
   // carries the board's own query, so they land on the board they left.
+  // The agreements queue works the same way: back lands on the queue's tab.
+  const from = searchParams.get('from');
   const back =
-    searchParams.get('from') === 'dispatch'
+    from === 'dispatch'
       ? {
           href: resolveBack('/dispatch', searchParams.get('back')),
           label: t('common.actions.backTo', { entities: t('dispatchBoard.backTarget') }),
         }
-      : fromPurchasing
+      : from === 'agreements'
         ? {
-            href: '/purchasing',
-            label: t('common.actions.backTo', { entities: t('entities.purchasing') }),
+            href: resolveBack('/agreements', searchParams.get('back')),
+            label: t('common.actions.backTo', { entities: getName('agreement', true) }),
           }
-        : {
-            href: '/work-orders',
-            label: t('common.actions.backTo', { entities: getName('work_order', true) }),
-          };
+        : fromPurchasing
+          ? {
+              href: '/purchasing',
+              label: t('common.actions.backTo', { entities: t('entities.purchasing') }),
+            }
+          : {
+              href: '/work-orders',
+              label: t('common.actions.backTo', { entities: getName('work_order', true) }),
+            };
 
   const [copied, setCopied] = useState<'phone' | 'address' | null>(null);
   const [activityDrawerOpen, setActivityDrawerOpen] = useState(false);
@@ -180,7 +187,11 @@ export default function WorkOrderDetailPage() {
   // is no add or edit modal.
   const [composeWorkItemSignal, setComposeWorkItemSignal] = useState(0);
   const [editWorkOrderDialogOpen, setEditWorkOrderDialogOpen] = useState(false);
-  const [assignDispatchDialogOpen, setAssignDispatchDialogOpen] = useState(false);
+  // `?schedule=new` opens the dispatch form on arrival: a queue's Schedule
+  // button lands straight on booking. The param is dropped when it closes.
+  const [assignDispatchDialogOpen, setAssignDispatchDialogOpen] = useState(
+    () => searchParams.get('schedule') === 'new',
+  );
   // Same dialog handles edit — when set, the dialog opens prefilled in PUT mode.
   const [editingDispatch, setEditingDispatch] = useState<Dispatch | null>(null);
   // Row click opens the read+manage drawer (lifecycle audit, notification
@@ -1164,10 +1175,19 @@ export default function WorkOrderDetailPage() {
       />
 
       <DispatchFormDrawer
-        open={assignDispatchDialogOpen}
+        open={assignDispatchDialogOpen && !frozen}
         onClose={() => {
           setAssignDispatchDialogOpen(false);
           setEditingDispatch(null);
+          if (searchParams.has('schedule'))
+            setSearchParams(
+              (prev) => {
+                const next = new URLSearchParams(prev);
+                next.delete('schedule');
+                return next;
+              },
+              { replace: true },
+            );
         }}
         workOrderId={workOrder.id}
         workItems={workOrder.workItems ?? []}

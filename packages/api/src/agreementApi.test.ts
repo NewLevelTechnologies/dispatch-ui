@@ -21,6 +21,38 @@ describe('agreementApi', () => {
     });
   });
 
+  it('listPage sends the filters, joins statuses and drops empty ones', async () => {
+    await agreementApi.listPage({
+      q: 'acme',
+      status: ['ACTIVE', 'SUSPENDED'],
+      regionIds: ['r1'],
+      renewingWithinDays: 30,
+      sort: 'monthlyValue,desc',
+      page: 1,
+      size: 50,
+    });
+    expect(apiClient.get).toHaveBeenLastCalledWith('/work-orders/agreements', {
+      params: {
+        q: 'acme',
+        renewingWithinDays: 30,
+        sort: 'monthlyValue,desc',
+        page: 1,
+        size: 50,
+        status: 'ACTIVE,SUSPENDED',
+        regionIds: ['r1'],
+      },
+    });
+    await agreementApi.listPage({ q: '', status: [], regionIds: [] });
+    expect(apiClient.get).toHaveBeenLastCalledWith('/work-orders/agreements', { params: {} });
+  });
+
+  it('unscheduledVisits reads the queue in a scope', async () => {
+    await agreementApi.unscheduledVisits({ withinDays: 7, regionIds: ['r1'], page: 0, size: 25 });
+    expect(apiClient.get).toHaveBeenLastCalledWith('/work-orders/agreements/visits/unscheduled', {
+      params: { withinDays: 7, page: 0, size: 25, regionIds: ['r1'] },
+    });
+  });
+
   it('list scopes to a customer and keeps the default classification', async () => {
     await agreementApi.list({ customerId: 'c-1' });
     expect(apiClient.get).toHaveBeenCalledWith('/work-orders/agreements', {
