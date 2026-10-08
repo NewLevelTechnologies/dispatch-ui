@@ -39,12 +39,12 @@ vi.mock('../api/setup', async (importOriginal) => {
     approvalsApi: { ...actual.approvalsApi, getBellSummary: () => mockBell() },
     financialDashboardApi: {
       ...actual.financialDashboardApi,
-      getAttention: () => mockAttention(),
-      getRevenue: () => mockRevenue(),
-      getReceivables: () => mockReceivables(),
-      getQuotes: () => mockQuotes(),
+      getAttention: (...a: unknown[]) => mockAttention(...a),
+      getRevenue: (...a: unknown[]) => mockRevenue(...a),
+      getReceivables: (...a: unknown[]) => mockReceivables(...a),
+      getQuotes: (...a: unknown[]) => mockQuotes(...a),
     },
-    agreementApi: { ...actual.agreementApi, getOverview: () => mockOverview() },
+    agreementApi: { ...actual.agreementApi, getOverview: (...a: unknown[]) => mockOverview(...a) },
     purchaseOrderApi: { ...actual.purchaseOrderApi, summary: (...a: unknown[]) => mockPoSummary(...a) },
     activityApi: { ...actual.activityApi, listForTenant: (...a: unknown[]) => mockActivity(...a) },
     financialActivityApi: {
@@ -55,7 +55,7 @@ vi.mock('../api/setup', async (importOriginal) => {
     workOrderApi: { ...actual.workOrderApi, getAll: (...a: unknown[]) => mockWorkOrders(...a) },
     technicianProductivityApi: {
       ...actual.technicianProductivityApi,
-      get: () => mockProductivity(),
+      get: (...a: unknown[]) => mockProductivity(...a),
       getCreditedInvoices: (...a: unknown[]) => mockCredited(...a),
       getChargedCallbacks: (...a: unknown[]) => mockChargedCallbacks(...a),
     },
@@ -69,6 +69,11 @@ vi.mock('../lib/toast', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../lib/toast')>();
   return { ...actual, showSuccess: (...a: unknown[]) => mockShowSuccess(...a) };
 });
+
+const TWO_REGIONS = [
+  { id: 'r1', name: 'East Valley', abbreviation: 'EV', isActive: true, sortOrder: 0 },
+  { id: 'r2', name: 'West Valley', abbreviation: 'WV', isActive: true, sortOrder: 1 },
+];
 
 const OFFICE_CAPS = ['EDIT_DISPATCHES', 'APPROVE_WORK_ITEM_TRANSITIONS', 'VIEW_ALL_INVOICES', 'CREATE_WORK_ORDERS'];
 
@@ -307,6 +312,24 @@ describe('DashboardPage — Operations', () => {
     expect(mockGetUnscheduled).toHaveBeenLastCalledWith({ regionIds: ['r2'], size: 1 });
   });
 
+  it('scopes invoices, agreements and activity with the chip, and carries it into the list it opens', async () => {
+    mockRegions.mockResolvedValue(TWO_REGIONS);
+    mockWorkOrders.mockResolvedValue({ content: [], totalElements: 2 });
+    const { router } = renderWithProviders(<DashboardPage />, { initialPath: '/?region=r2' });
+
+    const row = await screen.findByTestId('attention-unbilled');
+    expect(mockWorkOrders).toHaveBeenLastCalledWith({ unbilled: true, dispatchRegionIds: ['r2'], size: 1 });
+    expect(mockAttention).toHaveBeenLastCalledWith({ regionIds: ['r2'] });
+    expect(mockOverview).toHaveBeenLastCalledWith({ regionIds: ['r2'] });
+    await waitFor(() => expect(mockActivity).toHaveBeenLastCalledWith(expect.objectContaining({ regionIds: ['r2'] })));
+    expect(mockFinancialActivity).toHaveBeenLastCalledWith(expect.objectContaining({ regionIds: ['r2'] }));
+    // POs carry no location: always whole-company.
+    expect(mockPoSummary).toHaveBeenLastCalledWith({ overdue: true });
+
+    await userEvent.setup().click(row);
+    await waitFor(() => expect(router.state.location.search).toBe('?status=COMPLETED&unbilled=true&region=r2'));
+  });
+
   it('fills the Today KPIs and Who’s where from the day board', async () => {
     renderWithProviders(<DashboardPage />);
 
@@ -446,6 +469,34 @@ describe('DashboardPage — Revenue & productivity', () => {
       expect(await screen.findAllByTestId('revenue-week')).toHaveLength(2);
       expect(screen.queryByText('dashboard.revenue.chart.setTargets')).toBeNull();
     });
+
+    it('shows no targets when the revenue covers regions rather than the whole company', async () => {
+      grant([...OFFICE_CAPS, 'MANAGE_REVENUE_TARGETS']);
+      mockTargets.mockResolvedValue(targets({ 9: 150000 }));
+      // A user held to their own regions gets a regional answer with no chip set.
+      mockRevenue.mockResolvedValue({ ...(await mockRevenue()), regionIds: ['r1'] });
+      renderWithProviders(<DashboardPage />, { initialPath: '/?view=rev' });
+
+      expect(await screen.findAllByTestId('revenue-week')).toHaveLength(2);
+      expect(screen.queryByTestId('revenue-target-rule')).toBeNull();
+      expect(screen.queryByText('dashboard.revenue.kpis.ofTarget')).toBeNull();
+      expect(screen.queryByText('dashboard.revenue.chart.weeksHit')).toBeNull();
+      expect(screen.queryByText('dashboard.revenue.chart.setTargets')).toBeNull();
+    });
+  });
+
+  it('keeps the scope chip on this tab and sends it to every read', async () => {
+    mockRegions.mockResolvedValue(TWO_REGIONS);
+    renderWithProviders(<DashboardPage />, { initialPath: '/?view=rev&region=r2' });
+
+    expect(await screen.findByText('West Valley')).toBeInTheDocument();
+    await waitFor(() => expect(mockRevenue).toHaveBeenLastCalledWith({ period: undefined, regionIds: ['r2'] }));
+    expect(mockReceivables).toHaveBeenLastCalledWith({ regionIds: ['r2'] });
+    expect(mockQuotes).toHaveBeenLastCalledWith({ regionIds: ['r2'] });
+    expect(mockOverview).toHaveBeenLastCalledWith({ regionIds: ['r2'] });
+    expect(mockProductivity).toHaveBeenLastCalledWith({ period: undefined, regionIds: ['r2'] });
+    // Targets are company-wide: not even fetched for a region.
+    expect(mockTargets).not.toHaveBeenCalled();
   });
 
   it('lists each tech with the backend’s numbers and checks the total against Revenue MTD', async () => {

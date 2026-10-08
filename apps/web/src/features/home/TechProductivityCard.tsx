@@ -48,7 +48,7 @@ function excludedParts(e: Excluded) {
 }
 
 /**
- * The selected period, whole company (invoices carry no region). Every
+ * The selected period, in the scope chip's regions. Every
  * number is the backend's; the card only lays it out. The total row says
  * whether it agrees with the period's revenue, because the two come from
  * different services.
@@ -64,8 +64,8 @@ export function TechProductivityCard({
   const { getName } = useGlossary();
   const [searchParams, setSearchParams] = useSearchParams();
   const query = useQuery({
-    queryKey: ['technician-productivity', ctx.apiPeriod ?? 'current'],
-    queryFn: () => technicianProductivityApi.get({ period: ctx.apiPeriod }),
+    queryKey: ['technician-productivity', ctx.apiPeriod ?? 'current', ctx.regionIds],
+    queryFn: () => technicianProductivityApi.get({ period: ctx.apiPeriod, regionIds: ctx.regionIds }),
   });
   // Deactivated users keep their name; only a deleted user comes back null.
   const nameOf = (name: string | null) => name ?? t('dashboard.revenue.techs.formerUser');
@@ -260,6 +260,7 @@ export function TechProductivityCard({
           row={openRow}
           name={openRow ? nameOf(openRow.name) : ''}
           period={ctx.apiPeriod}
+          regionIds={ctx.regionIds}
           periodLabel={periodLabel}
           onClose={close}
         />

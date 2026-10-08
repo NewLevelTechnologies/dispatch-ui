@@ -81,6 +81,11 @@ export interface ListActivityParams {
   classification?: ActivityClassification | 'ALL';
 }
 
+/** The tenant feed also takes a scope: work orders at locations in these regions. */
+export interface ListTenantActivityParams extends ListActivityParams {
+  regionIds?: string[];
+}
+
 /**
  * The work order an event belongs to, denormalized onto each row of the
  * location-scoped feed. Drives the WO-collapse grouping: events sharing an
@@ -181,13 +186,14 @@ export const activityApi = {
    * row/page shape and query contract to {@link listForLocation}; the FE
    * interleaves it with `financialActivityApi.getForTenant` by timestamp.
    */
-  listForTenant: async (params?: ListActivityParams): Promise<LocationActivityPage> => {
+  listForTenant: async (params?: ListTenantActivityParams): Promise<LocationActivityPage> => {
     const response = await apiClient.get<LocationActivityPage>('/work-orders/activity', {
       params: {
         cursor: params?.cursor,
         limit: params?.limit,
         categories: params?.categories?.length ? params.categories.join(',') : undefined,
         classification: params?.classification,
+        regionIds: params?.regionIds?.length ? params.regionIds : undefined,
       },
     });
     return response.data;

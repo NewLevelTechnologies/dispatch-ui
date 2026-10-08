@@ -36,4 +36,19 @@ describe('technicianProductivityApi', () => {
       params: { period: '2026-Q3', page: 0, size: 25 },
     });
   });
+
+  it('passes the card’s regions to the card and both drill-ins', async () => {
+    await technicianProductivityApi.get({ regionIds: ['r1'] });
+    expect(apiClient.get).toHaveBeenLastCalledWith('/work-orders/technician-productivity', {
+      params: { regionIds: ['r1'] },
+    });
+    await technicianProductivityApi.getCreditedInvoices('u-1', { regionIds: ['r1'] });
+    expect(apiClient.get).toHaveBeenLastCalledWith('/work-orders/technician-productivity/u-1/invoices', {
+      params: { regionIds: ['r1'], page: 0, size: 25 },
+    });
+    await technicianProductivityApi.getChargedCallbacks('u-1', { period: '2026-Q3', regionIds: ['r1'] });
+    expect(apiClient.get).toHaveBeenLastCalledWith('/work-orders/technician-productivity/u-1/callbacks', {
+      params: { period: '2026-Q3', regionIds: ['r1'], page: 0, size: 25 },
+    });
+  });
 });

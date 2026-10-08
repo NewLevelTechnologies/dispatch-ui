@@ -41,6 +41,8 @@ export interface PeriodContext {
   apiPeriod: string | undefined;
   /** "Revenue MTD" in a current period, "Revenue" in a past one. */
   revenueLabel: string;
+  /** The scope chip's regions; undefined = the whole company. */
+  regionIds: string[] | undefined;
 }
 
 /**
@@ -48,11 +50,21 @@ export interface PeriodContext {
  * chart and Tech productivity follow it; receivables, quotes and agreements
  * are current-only on the backend, so in a past period they say "As of
  * today" rather than pretending to be historical. Each card calls the service
- * that owns its numbers and loads on its own. Targets are company-wide and
- * monthly: the period's months come from one year (no period crosses one),
- * and a month without a target draws no rule and scores nothing.
+ * that owns its numbers and loads on its own, all in the scope chip's
+ * regions. Targets are company-wide and monthly: they show only when the
+ * revenue covers the whole company, the period's months come from one year
+ * (no period crosses one), and a month without a target draws no rule and
+ * scores nothing.
  */
-export function RevenueView({ period, isCurrent }: { period: Period; isCurrent: boolean }) {
+export function RevenueView({
+  period,
+  isCurrent,
+  regionIds,
+}: {
+  period: Period;
+  isCurrent: boolean;
+  regionIds: string[] | undefined;
+}) {
   const { t } = useTranslation();
   const apiPeriod = period.kind === 'month' && isCurrent ? undefined : period.id;
   const ctx: PeriodContext = {
@@ -62,31 +74,38 @@ export function RevenueView({ period, isCurrent }: { period: Period; isCurrent: 
     revenueLabel: isCurrent
       ? t('dashboard.revenue.kpis.revenueToDate', { suffix: toDateSuffix(period) })
       : t('dashboard.revenue.kpis.revenue'),
+    regionIds,
   };
   const asOfTag = isCurrent ? undefined : t('dashboard.revenue.asOfToday');
   const revenue = useQuery({
-    queryKey: ['financial-dashboard', 'revenue', apiPeriod ?? 'current'],
-    queryFn: () => financialDashboardApi.getRevenue({ period: apiPeriod }),
+    // The unscoped key matches the targets setting's actuals read.
+    queryKey: ['financial-dashboard', 'revenue', apiPeriod ?? 'current', ...(regionIds ? [regionIds] : [])],
+    queryFn: () => financialDashboardApi.getRevenue({ period: apiPeriod, regionIds }),
   });
   const receivables = useQuery({
-    queryKey: ['financial-dashboard', 'receivables'],
-    queryFn: () => financialDashboardApi.getReceivables(),
+    queryKey: ['financial-dashboard', 'receivables', regionIds],
+    queryFn: () => financialDashboardApi.getReceivables({ regionIds }),
   });
   const quotes = useQuery({
-    queryKey: ['financial-dashboard', 'quotes'],
-    queryFn: () => financialDashboardApi.getQuotes(),
+    queryKey: ['financial-dashboard', 'quotes', regionIds],
+    queryFn: () => financialDashboardApi.getQuotes({ regionIds }),
   });
   // Same key as the attention row, so switching tabs is a cache hit.
   const agreements = useQuery({
-    queryKey: ['agreements', 'overview'],
-    queryFn: () => agreementApi.getOverview(),
+    queryKey: ['agreements', 'overview', regionIds],
+    queryFn: () => agreementApi.getOverview({ regionIds }),
   });
   // A failed or slow read just means no target line; the chart never waits on it.
   const targets = useQuery({
     queryKey: ['revenue-targets', period.year],
     queryFn: () => revenueTargetsApi.get(period.year),
+    enabled: !regionIds,
   });
-  const targetMonths = targets.data ? targetAmounts(targets.data) : undefined;
+  // Targets are company-wide, so they apply only to whole-company revenue. The
+  // response says what it covers: a user held to their own regions gets a
+  // regional answer even with no chip set.
+  const wholeCompany = revenue.data ? revenue.data.regionIds == null : !regionIds;
+  const targetMonths = targets.data && wholeCompany ? targetAmounts(targets.data) : undefined;
 
   return (
     <div className="home-view">

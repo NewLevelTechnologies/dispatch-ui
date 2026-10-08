@@ -192,6 +192,9 @@ export interface AgreementOverviewResponse {
   // Open visits with no live dispatch starting within `withinDays`, overdue included.
   visitsDueSoonUnscheduled: { withinDays: number; count: number };
   currency: string;
+  // The regions these figures cover; null = the whole company. An agreement
+  // counts only under a scope that includes every location it covers.
+  regionIds: string[] | null;
 }
 
 // Create body. New agreements are created status DRAFT — generation + billing
@@ -482,8 +485,12 @@ export const agreementApi = {
   },
 
   // Tenant-wide overview (home dashboard). See {@link AgreementOverviewResponse}.
-  getOverview: async (): Promise<AgreementOverviewResponse> => {
-    const response = await apiClient.get<AgreementOverviewResponse>('/work-orders/agreements/overview');
+  getOverview: async (params: { regionIds?: string[] } = {}): Promise<AgreementOverviewResponse> => {
+    const response = params.regionIds?.length
+      ? await apiClient.get<AgreementOverviewResponse>('/work-orders/agreements/overview', {
+          params: { regionIds: params.regionIds },
+        })
+      : await apiClient.get<AgreementOverviewResponse>('/work-orders/agreements/overview');
     return response.data;
   },
 

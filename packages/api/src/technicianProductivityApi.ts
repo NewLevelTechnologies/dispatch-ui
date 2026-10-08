@@ -61,6 +61,8 @@ export interface TechnicianProductivityResponse {
    */
   callbacksTrackedSince?: string;
   currency: string;
+  /** The regions these figures cover; null = the whole company. */
+  regionIds: string[] | null;
 }
 
 /** A callback charged to a tech in the period, and the job it calls back to. */
@@ -86,12 +88,21 @@ export interface CreditedInvoice {
   writtenByName: string | null;
 }
 
+/** The card's period (omit for this month) and regions (omit for the whole company). */
+type ScopeParams = { period?: ReportingPeriodParam; regionIds?: string[] };
+
+const scopeQuery = ({ period, regionIds }: ScopeParams) => ({
+  ...(period ? { period } : {}),
+  ...(regionIds?.length ? { regionIds } : {}),
+});
+
 export const technicianProductivityApi = {
   /** Omit `period` for the current month to date. */
-  get: async (params: { period?: ReportingPeriodParam } = {}): Promise<TechnicianProductivityResponse> => {
+  get: async (params: ScopeParams = {}): Promise<TechnicianProductivityResponse> => {
     // No param at all for the default, so today's request is unchanged.
-    const response = params.period
-      ? await apiClient.get<TechnicianProductivityResponse>('/work-orders/technician-productivity', { params: { period: params.period } })
+    const query = scopeQuery(params);
+    const response = Object.keys(query).length
+      ? await apiClient.get<TechnicianProductivityResponse>('/work-orders/technician-productivity', { params: query })
       : await apiClient.get<TechnicianProductivityResponse>('/work-orders/technician-productivity');
     return response.data;
   },
@@ -99,13 +110,13 @@ export const technicianProductivityApi = {
   /** The invoices credited to one tech in the period, newest first. `size` max 200. */
   getCreditedInvoices: async (
     userId: string,
-    params: { period?: ReportingPeriodParam; page?: number; size?: number } = {},
+    params: ScopeParams & { page?: number; size?: number } = {},
   ): Promise<Page<CreditedInvoice>> => {
     const response = await apiClient.get<Page<CreditedInvoice>>(
       `/work-orders/technician-productivity/${userId}/invoices`,
       {
         params: {
-          ...(params.period ? { period: params.period } : {}),
+          ...scopeQuery(params),
           page: params.page ?? 0,
           size: params.size ?? 25,
         },
@@ -117,13 +128,13 @@ export const technicianProductivityApi = {
   /** The callbacks charged to one tech in the period, newest first. */
   getChargedCallbacks: async (
     userId: string,
-    params: { period?: ReportingPeriodParam; page?: number; size?: number } = {},
+    params: ScopeParams & { page?: number; size?: number } = {},
   ): Promise<Page<ChargedCallback>> => {
     const response = await apiClient.get<Page<ChargedCallback>>(
       `/work-orders/technician-productivity/${userId}/callbacks`,
       {
         params: {
-          ...(params.period ? { period: params.period } : {}),
+          ...scopeQuery(params),
           page: params.page ?? 0,
           size: params.size ?? 25,
         },

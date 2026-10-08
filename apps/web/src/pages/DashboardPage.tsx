@@ -52,9 +52,11 @@ export default function DashboardPage() {
   const zone = useTenantTimeZone();
   const today = zonedDate(new Date(), zone) ?? new Date().toISOString().slice(0, 10);
 
-  // Scope narrows scheduling reads only (board, board summary, unscheduled,
-  // release). Invoices, agreements and POs carry no region, so those numbers
-  // are always whole-company. In the URL so a scoped view can be shared.
+  // Scope narrows every read that has a region: scheduling (board, summary,
+  // unscheduled, release), invoices and quotes (through their service
+  // location), agreements, tech productivity and activity. Approvals are the
+  // user's own and POs carry no location, so those stay whole-company. In the
+  // URL so a scoped view can be shared, and it holds across both tabs.
   const regionId = searchParams.get('region');
   const regionIds = useMemo(() => (regionId ? [regionId] : undefined), [regionId]);
   const { data: regions = [] } = useQuery({
@@ -115,9 +117,7 @@ export default function DashboardPage() {
         sub={sub}
         actions={
           <>
-            {/* Nothing on the Revenue tab carries a region, so the chip would
-                be a control that changes nothing there. */}
-            {view === 'ops' && regions.length > 1 && (
+            {regions.length > 1 && (
               <FilterChipListbox
                 label={regionId ? t('dashboard.scope.label') : t('dashboard.scope.labelAll')}
                 ariaLabel={t('dashboard.scope.label')}
@@ -184,7 +184,7 @@ export default function DashboardPage() {
       )}
 
       {view === 'rev' ? (
-        <RevenueView period={period} isCurrent={periodIsCurrent} />
+        <RevenueView period={period} isCurrent={periodIsCurrent} regionIds={regionIds} />
       ) : (
         <div className="home-view">
           <NeedsAttentionCard attention={attention} today={today} regionIds={regionIds} />
@@ -196,7 +196,7 @@ export default function DashboardPage() {
               error={board.isError}
               onRetry={() => void queryClient.invalidateQueries({ queryKey: ['dispatch-board', 'home'] })}
             />
-            <ActivityCard />
+            <ActivityCard regionIds={regionIds} />
           </div>
         </div>
       )}

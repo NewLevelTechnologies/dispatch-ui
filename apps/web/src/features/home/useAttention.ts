@@ -55,21 +55,24 @@ export function useAttention(
     enabled: canDispatch,
   });
   const financial = useQuery({
-    queryKey: ['financial-dashboard', 'attention'],
-    queryFn: () => financialDashboardApi.getAttention(),
+    queryKey: ['financial-dashboard', 'attention', regionIds],
+    queryFn: () => financialDashboardApi.getAttention({ regionIds }),
     enabled: canInvoices,
   });
-  // Same query as the list the row opens (`?status=COMPLETED&unbilled=true`),
-  // so the count and the list always agree.
+  // Same query as the list the row opens (`?status=COMPLETED&unbilled=true`,
+  // plus `&region=` when scoped), so the count and the list always agree.
   const unbilled = useQuery({
-    queryKey: ['work-orders', 'unbilled-count'],
-    queryFn: () => workOrderApi.getAll({ unbilled: true, size: 1 }).then((p) => p.totalElements),
+    queryKey: ['work-orders', 'unbilled-count', regionIds],
+    queryFn: () =>
+      workOrderApi.getAll({ unbilled: true, dispatchRegionIds: regionIds, size: 1 }).then((p) => p.totalElements),
     enabled: canInvoices,
   });
+  // Same key as the Revenue tab's agreements card, so switching tabs is a cache hit.
   const agreements = useQuery({
-    queryKey: ['agreements', 'overview'],
-    queryFn: () => agreementApi.getOverview(),
+    queryKey: ['agreements', 'overview', regionIds],
+    queryFn: () => agreementApi.getOverview({ regionIds }),
   });
+  // POs carry no location, so this one is always whole-company.
   const poLate = useQuery({
     queryKey: ['purchase-orders', 'overdue-count'],
     queryFn: () => purchaseOrderApi.summary({ overdue: true }).then((s) => s.openCount),
