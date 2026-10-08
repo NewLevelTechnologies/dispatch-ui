@@ -186,7 +186,7 @@ export function TechCreditDrawer({
                 <div className="home-stat">{invoices.data?.totalElements ?? DASH}</div>
               </div>
               <div>
-                <div className="label-tiny">{t('dashboard.revenue.techs.drawer.invoicedHours')}</div>
+                <div className="label-tiny">{t('dashboard.revenue.techs.drawer.invoicedHours', words)}</div>
                 <div className="home-stat">{hours(row.invoicedHours)}</div>
               </div>
               <div>

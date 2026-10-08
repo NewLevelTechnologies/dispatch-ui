@@ -20,9 +20,13 @@ export default function ReportsPage() {
   const { data: user } = useCurrentUser();
   // Glossary names the catalog's copy may use.
   const words = {
+    dispatches: getName('dispatch', true),
+    division: getName('division'),
     invoices: getName('invoice', true),
+    region: getName('dispatch_region'),
     tech: getName('technician'),
     techs: getName('technician', true),
+    workOrder: getName('work_order'),
     workOrders: getName('work_order', true),
   };
   const can = (cap: string | undefined) => !cap || (user?.capabilities?.includes(cap) ?? false);

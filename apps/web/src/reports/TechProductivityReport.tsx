@@ -63,11 +63,11 @@ export default function TechProductivityReport() {
       const csv = techCsv(data, {
         headers: [
           getName('technician'),
-          t('dashboard.revenue.techs.jobs'),
+          t('dashboard.revenue.techs.jobs', { workOrders: getName('work_order', true) }),
           t('dashboard.revenue.techs.revenue'),
           t('dashboard.revenue.techs.avgTicket'),
           t('reports.techs.csv.onSiteHours'),
-          t('reports.techs.csv.invoicedHours'),
+          t('reports.techs.csv.invoicedHours', { workOrders: getName('work_order', true) }),
           t('dashboard.revenue.techs.perHour'),
           t('reports.techs.csv.firstVisitEligible'),
           t('reports.techs.csv.firstVisitCompleted'),
@@ -78,7 +78,7 @@ export default function TechProductivityReport() {
           t('reports.techs.csv.agreement', { agreement: getName('agreement') }),
         ],
         comparisonHeaders: ['jobs', 'revenue', 'onSiteHours', 'callbacks'].map((k) =>
-          t(`reports.techs.csv.comparison.${k}`, { window: comparisonName }),
+          t(`reports.techs.csv.comparison.${k}`, { window: comparisonName, workOrders: getName('work_order', true) }),
         ),
         name: nameOf,
         unattributed: {

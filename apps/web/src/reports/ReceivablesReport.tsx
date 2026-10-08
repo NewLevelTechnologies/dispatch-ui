@@ -165,6 +165,7 @@ export default function ReceivablesReport() {
   const sub = t('reports.receivables.sub', {
     date: longDay(asOf.date),
     invoices: getName('invoice', true).toLowerCase(),
+    payments: getName('payment', true).toLowerCase(),
   });
 
   let body;
@@ -451,7 +452,9 @@ function OpenInvoices({
                 <th>{getName('customer')}</th>
                 <th>{getName('work_order')}</th>
                 <th className="right">{t('reports.revenue.table.total')}</th>
-                <th className="right" title={t('reports.receivables.table.balanceTodayHint')}>
+                <th className="right" title={t('reports.receivables.table.balanceTodayHint', {
+                  payments: getName('payment', true).toLowerCase(),
+                })}>
                   {t('reports.receivables.table.balanceToday')}
                 </th>
               </tr>

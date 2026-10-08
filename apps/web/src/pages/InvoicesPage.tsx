@@ -403,10 +403,10 @@ export default function InvoicesPage() {
           )}
           {(types.length > 1 || typeId) && (
             <AssignmentChip
-              label={t('invoices.filters.type')}
+              label={t('invoices.filters.type', { workOrder: getName('work_order') })}
               value={typeId}
               options={types}
-              unassignedLabel={t('invoices.filters.noType')}
+              unassignedLabel={t('invoices.filters.noType', { workOrder: getName('work_order') })}
               anyLabel={t('invoices.filters.any')}
               onChange={(v) => setFilterParam('type', v)}
             />

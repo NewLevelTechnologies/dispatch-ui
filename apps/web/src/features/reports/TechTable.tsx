@@ -27,13 +27,20 @@ function Change({ current, previous }: { current: number; previous: number | nul
 /** One tech's bars on the table's shared scale, so heights compare across rows. */
 function Trend({ bars, max }: { bars: TrendBar[]; max: number }) {
   const { t } = useTranslation();
+  const { getName } = useGlossary();
   if (bars.length < 2) return <span className="text-fg-muted">{DASH}</span>;
   return (
     <span className="tp-trend" style={{ height: TREND_H }} aria-hidden data-testid="tech-trend">
       {bars.map((b, i) => (
         <span
           key={i}
-          title={t('reports.techs.table.trendBar', { window: b.title, revenue: money(b.revenue), count: b.jobs })}
+          title={t('reports.techs.table.trendBar', {
+            window: b.title,
+            revenue: money(b.revenue),
+            count: b.jobs,
+            workOrder: getName('work_order'),
+            workOrders: getName('work_order', true),
+          })}
           style={{ height: b.revenue > 0 ? Math.max(1, Math.round((b.revenue / max) * TREND_H)) : 0 }}
         />
       ))}
@@ -87,7 +94,7 @@ export function TechTable({
               <tr>
                 <th>{getName('technician')}</th>
                 {showTrend && <th>{t('reports.techs.table.trend')}</th>}
-                <th className="right">{t('dashboard.revenue.techs.jobs')}</th>
+                <th className="right">{t('dashboard.revenue.techs.jobs', words)}</th>
                 <th className="right">{t('dashboard.revenue.techs.revenue')}</th>
                 {hasCmp && <th className="right">{comparisonLabel}</th>}
                 {hasCmp && <th className="right">{t('reports.revenue.table.change')}</th>}
@@ -121,7 +128,7 @@ export function TechTable({
                         <Trend bars={trends[i]} max={trendMax} />
                       </td>
                     )}
-                    <td className="right num" data-label={t('dashboard.revenue.techs.jobs')}>
+                    <td className="right num" data-label={t('dashboard.revenue.techs.jobs', words)}>
                       {r.jobs}
                     </td>
                     <td className="right num strong" data-label={t('dashboard.revenue.techs.revenue')}>

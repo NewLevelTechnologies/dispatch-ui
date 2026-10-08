@@ -100,7 +100,7 @@ export default function RevenueReport() {
       : g === 'region'
         ? getName('dispatch_region')
         : g === 'workOrderType'
-          ? t('reports.revenue.groupBy.workOrderType')
+          ? t('reports.revenue.groupBy.workOrderType', { workOrder: getName('work_order') })
           : t('reports.revenue.groupBy.none');
   const nameIn = (g: Exclude<RevenueReportGroupBy, 'none'>) => (id: string | null) =>
     id
@@ -132,7 +132,7 @@ export default function RevenueReport() {
           getName('customer'),
           getName('work_order'),
           getName('division'),
-          t('reports.revenue.groupBy.workOrderType'),
+          t('reports.revenue.groupBy.workOrderType', { workOrder: getName('work_order') }),
           getName('dispatch_region'),
           t('reports.revenue.csv.subtotal'),
           t('reports.revenue.csv.tax'),
@@ -158,6 +158,7 @@ export default function RevenueReport() {
     ? t(toDate ? 'reports.revenue.subToDate' : 'reports.revenue.sub', {
         range: rangeName(range),
         dates: formatSpan(report.from, report.to),
+        invoices: getName('invoice', true),
       })
     : rangeName(range);
 
