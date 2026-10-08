@@ -129,7 +129,15 @@ export function RevenueView({
             ...(regionIds ? { region: regionIds[0] } : {}),
           }).toString()}`}
         />
-        <ReceivablesCard query={receivables} tag={asOfTag} />
+        <ReceivablesCard
+          query={receivables}
+          tag={asOfTag}
+          reportHref={`/reports/receivables?${new URLSearchParams({
+            asOf: 'today',
+            from: 'home',
+            ...(regionIds ? { region: regionIds[0] } : {}),
+          }).toString()}`}
+        />
       </div>
       <TechProductivityCard revenue={revenue} ctx={ctx} />
       <div className="home-2col even">
@@ -453,17 +461,25 @@ function RevenueChartCard({
   );
 }
 
-function ReceivablesCard({ query, tag }: { query: UseQueryResult<FinancialDashboardReceivables>; tag?: string }) {
+function ReceivablesCard({
+  query,
+  tag,
+  reportHref,
+}: {
+  query: UseQueryResult<FinancialDashboardReceivables>;
+  tag?: string;
+  /** The Receivables report as of today, in the same scope: every open invoice by bucket. */
+  reportHref: string;
+}) {
   const { t } = useTranslation();
-  const { getName } = useGlossary();
   return (
     <QueryCard
       title={t('dashboard.revenue.aging.title')}
       tag={tag}
       query={query}
       action={
-        <Button plain size="xxs" href="/invoices">
-          {getName('invoice', true)}
+        <Button plain size="xxs" href={reportHref}>
+          {t('dashboard.revenue.aging.report')}
         </Button>
       }
     >
