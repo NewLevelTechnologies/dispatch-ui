@@ -8,8 +8,10 @@ import {
   agreementPlanApi,
   type AgreementResponse,
   type AgreementClassification,
+  type CustomerSearchResult,
   type UpdateAgreementRequest,
 } from '../api/setup';
+import CustomerPicker from './CustomerPicker';
 import { Dialog, DialogActions, DialogBody, DialogDescription, DialogTitle } from './catalyst/dialog';
 import { Button } from './catalyst/button';
 import { Checkbox, CheckboxField } from './catalyst/checkbox';
@@ -30,7 +32,8 @@ function addMonths(isoDate: string, months: number): string {
 interface AgreementFormDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  // Edit mode — pass the agreement. Create mode — pass customerId instead.
+  // Edit mode — pass the agreement. Create mode — pass customerId instead, or
+  // neither to pick the customer in the form (the company-wide list).
   agreement?: AgreementResponse;
   customerId?: string;
   // Edit-where-you-see-it: scope the edit to the card that opened it. 'identity'
@@ -52,6 +55,9 @@ export default function AgreementFormDialog({ isOpen, onClose, agreement, custom
   // Create shows the whole form; edit shows only the opening card's fields.
   const showIdentity = !isEdit || section === 'identity';
   const showTerm = !isEdit || section === 'term';
+  const pickCustomer = !isEdit && !customerId;
+  const [customer, setCustomer] = useState<CustomerSearchResult | null>(null);
+  const forCustomerId = customerId ?? customer?.id;
 
   const [name, setName] = useState('');
   const [termStart, setTermStart] = useState('');
@@ -88,6 +94,7 @@ export default function AgreementFormDialog({ isOpen, onClose, agreement, custom
     setPlanId(agreement?.planId ?? '');
     setClassification(agreement?.classification ?? 'CONTRACT');
     setPlanTermMonths(null);
+    setCustomer(null);
   }, [isOpen, agreement]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
@@ -119,7 +126,7 @@ export default function AgreementFormDialog({ isOpen, onClose, agreement, custom
   const createMutation = useMutation({
     mutationFn: () =>
       agreementApi.create({
-        customerId: customerId!,
+        customerId: forCustomerId!,
         name: name.trim(),
         kind: 'VISIT',
         classification,
@@ -135,8 +142,9 @@ export default function AgreementFormDialog({ isOpen, onClose, agreement, custom
       queryClient.invalidateQueries({ queryKey: ['agreements'] });
       showSuccess(t('common.form.successCreate', { entity: getName('agreement'), defaultValue: `${getName('agreement')} created` }));
       onClose();
-      // Land on the new DRAFT so the user can configure + activate it.
-      navigate(`/agreements/${created.id}?from=customer`);
+      // Land on the new DRAFT so the user can configure + activate it; back
+      // goes where it was sold from.
+      navigate(`/agreements/${created.id}?from=${pickCustomer ? 'agreements' : 'customer'}`);
     },
     onError: (err) =>
       setErrorMessage(extractApiError(err) ?? t('common.form.errorCreate', { entity: getName('agreement') })),
@@ -158,12 +166,14 @@ export default function AgreementFormDialog({ isOpen, onClose, agreement, custom
   const trimmedName = name.trim();
   // Name is required wherever it's shown (create + identity edit), not on the
   // term-only edit.
-  const canSubmit = (!showIdentity || trimmedName.length > 0) && !isSaving;
+  const canSubmit =
+    (!showIdentity || trimmedName.length > 0) && (!pickCustomer || Boolean(customer)) && !isSaving;
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
     if (showIdentity && !trimmedName) return;
+    if (pickCustomer && !customer) return;
     if (!isEdit) {
       createMutation.mutate();
       return;
@@ -212,6 +222,13 @@ export default function AgreementFormDialog({ isOpen, onClose, agreement, custom
           )}
           <Fieldset>
             <FieldGroup className="!space-y-3">
+              {pickCustomer && (
+                <Field size="xs">
+                  <Label size="xs" required>{getName('customer')}</Label>
+                  <CustomerPicker value={customer} onChange={setCustomer} ariaLabel={getName('customer')} />
+                </Field>
+              )}
+
               {!isEdit && (activePlans?.length ?? 0) > 0 && (
                 <Field size="xs">
                   <Label size="xs">{t('agreements.plan', { defaultValue: 'Plan' })}</Label>
@@ -239,7 +256,7 @@ export default function AgreementFormDialog({ isOpen, onClose, agreement, custom
                     onChange={(e) => setName(e.target.value)}
                     maxLength={255}
                     required
-                    autoFocus
+                    autoFocus={!pickCustomer}
                   />
                 </Field>
               )}

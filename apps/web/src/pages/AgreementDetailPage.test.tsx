@@ -88,10 +88,10 @@ const agreement = {
   updatedAt: '',
 };
 
-function renderPage() {
+function renderPage(query = '') {
   return renderWithProviders(<AgreementDetailPage />, {
     routes: [{ path: '/agreements/:id', element: <AgreementDetailPage /> }],
-    initialPath: '/agreements/a-1',
+    initialPath: `/agreements/a-1${query}`,
   });
 }
 
@@ -157,6 +157,12 @@ describe('AgreementDetailPage', () => {
     expect(screen.getByRole('tab', { name: /overview/i })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: /coverage/i })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: /schedule/i })).toBeInTheDocument();
+  });
+
+  it('arrives from the list with billing setup open, and back returns to the list as it was', async () => {
+    renderPage(`?from=agreements&back=${encodeURIComponent('status=any&plan=p1')}&billing=setup`);
+    expect(await screen.findByRole('dialog', { name: 'Set up billing' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /all agreements/i })).toHaveAttribute('href', '/agreements?status=any&plan=p1');
   });
 
   it('hides ARR and the compliance headline when billing + compliance 404', async () => {

@@ -117,9 +117,10 @@ export default function AppLayout({ children, flush }: { children: React.ReactNo
     { name: t('entities.dashboard'), href: '/dashboard', icon: HomeIcon },
     { name: getName('customer', true), href: '/customers', icon: UserGroupIcon },
     { name: getName('service_location', true), href: '/service-locations', icon: MapPinIcon },
-    { name: getName('work_order', true), href: '/work-orders', icon: ClipboardDocumentListIcon },
-    // Recurring work: the agreements and the visits on them still to dispatch.
+    // A record kept on customers, so it sits with them: the agreements and
+    // the visits on them still to dispatch.
     { name: getName('agreement', true), href: '/agreements', icon: ArrowPathRoundedSquareIcon },
+    { name: getName('work_order', true), href: '/work-orders', icon: ClipboardDocumentListIcon },
     // "Dispatch Board", not "Dispatch": `dispatch` is itself a glossary entity,
     // so the bare noun reads as the RECORD and sets up the wrong expectation
     // for a board. Not "Scheduling" either — that can't follow the glossary,

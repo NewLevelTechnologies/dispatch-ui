@@ -1,5 +1,14 @@
 import { describe, it, expect } from 'vitest';
-import { formatWindowDates, listParams, parseSort, parseStatuses, windowState } from './agreementListModel';
+import {
+  cadenceSuffix,
+  formatWindowDates,
+  hasNarrowing,
+  listParams,
+  parseFilters,
+  parseSort,
+  parseStatuses,
+  windowState,
+} from './agreementListModel';
 
 const TODAY = '2026-10-08';
 
@@ -16,18 +25,52 @@ describe('list params', () => {
     expect(parseSort('bogus,desc')).toEqual({ key: 'customerName', dir: 'asc' });
   });
 
-  it('asks for the renewing-soon set by its rule alone, which is active only', () => {
-    const base = { q: '', statuses: ['SUSPENDED' as const], scope: ['r1'], sort: null, page: 2, size: 50 };
-    expect(listParams({ ...base, renewing: false })).toEqual({
+  it('sorts soonest renewal first when narrowed to the renewing', () => {
+    expect(parseSort(null, true)).toEqual({ key: 'termEnd', dir: 'asc' });
+    expect(parseSort('monthlyValue,desc', true)).toEqual({ key: 'monthlyValue', dir: 'desc' });
+  });
+
+  it('reads the chips from the URL', () => {
+    const f = parseFilters(new URLSearchParams('status=any&plan=none&renewing=30&visits=behind&billing=none'));
+    expect(f).toEqual({
+      q: '',
+      statuses: [],
+      plan: 'none',
+      renewing: true,
+      visitsBehind: true,
+      noBilling: true,
+    });
+    expect(hasNarrowing(f)).toBe(true);
+    expect(hasNarrowing(parseFilters(new URLSearchParams('status=DRAFT')))).toBe(false);
+  });
+
+  it('keeps the status beside the renewing window, so Home’s Active count matches', () => {
+    const page = { scope: ['r1'], sort: null, page: 2, size: 50 };
+    expect(listParams(parseFilters(new URLSearchParams('renewing=30')), page)).toEqual({
       q: undefined,
-      status: ['SUSPENDED'],
-      renewingWithinDays: undefined,
+      status: ['ACTIVE'],
+      planId: undefined,
+      noPlan: undefined,
+      renewingWithinDays: 30,
+      visitsBehind: undefined,
+      noBilling: undefined,
       regionIds: ['r1'],
-      sort: 'customerName,asc',
+      sort: 'termEnd,asc',
       page: 1,
       size: 50,
     });
-    expect(listParams({ ...base, renewing: true })).toMatchObject({ status: undefined, renewingWithinDays: 30 });
+  });
+
+  it('asks for one plan, or the custom ones', () => {
+    const page = { scope: undefined, sort: null, page: 1, size: 50 };
+    expect(listParams(parseFilters(new URLSearchParams('plan=p1')), page)).toMatchObject({ planId: ['p1'], noPlan: undefined });
+    expect(listParams(parseFilters(new URLSearchParams('plan=none')), page)).toMatchObject({ planId: undefined, noPlan: true });
+  });
+
+  it('writes the real cadence under the monthly figure', () => {
+    expect(cadenceSuffix('QUARTER', 1)).toBe('/ qtr');
+    expect(cadenceSuffix('MONTH', 2)).toBe('/ 2 mo');
+    expect(cadenceSuffix('YEAR', 1)).toBe('/ yr');
   });
 });
 
