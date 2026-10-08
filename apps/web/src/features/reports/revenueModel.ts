@@ -10,6 +10,7 @@ import type {
   RevenueReportGroupBy,
 } from '../../api/setup';
 import { monthShort, parsePeriod, periodGroups, periodName, type Period } from '../home/period';
+import { csvCell } from './csv';
 
 export const COMPARES: RevenueReportCompare[] = ['sameDatesLastYear', 'previousPeriod', 'none'];
 export const GROUP_BYS: RevenueReportGroupBy[] = ['division', 'workOrderType', 'region', 'none'];
@@ -248,11 +249,6 @@ export interface CsvLabels {
   type: (id: string | null) => string;
   region: (id: string | null) => string;
 }
-
-const csvCell = (v: string | number | null) => {
-  const s = v == null ? '' : String(v);
-  return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-};
 
 const amount = (n: number) => n.toFixed(2);
 

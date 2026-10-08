@@ -55,7 +55,7 @@ export function SidebarLayout({
   return (
     <div className="relative isolate flex min-h-svh w-full bg-bg-sunken text-fg max-lg:flex-col">
       {/* Sidebar on desktop */}
-      <div className="fixed inset-y-0 left-0 w-[220px] max-lg:hidden">{sidebar}</div>
+      <div className="fixed inset-y-0 left-0 w-[220px] max-lg:hidden print:hidden">{sidebar}</div>
 
       {/* Sidebar on mobile */}
       <MobileSidebar open={showSidebar} close={() => setShowSidebar(false)}>
@@ -65,7 +65,7 @@ export function SidebarLayout({
       {/* Navbar on mobile. `viewport-fit=cover` lets the page extend under the
           status bar / notch, so pad the header by the top safe-area inset
           (0 on devices without one) to keep the title clear of the clock. */}
-      <header className="flex items-center bg-bg border-b border-border px-4 pt-[env(safe-area-inset-top)] lg:hidden">
+      <header className="flex items-center bg-bg border-b border-border px-4 pt-[env(safe-area-inset-top)] lg:hidden print:hidden">
         <div className="py-2.5">
           <NavbarItem onClick={() => setShowSidebar(true)} aria-label="Open navigation">
             <OpenMenuIcon />
@@ -75,12 +75,14 @@ export function SidebarLayout({
       </header>
 
       {/* Content column */}
-      <main className="flex flex-1 flex-col min-w-0 lg:pl-[220px]">
+      <main className="flex flex-1 flex-col min-w-0 lg:pl-[220px] print:pl-0">
         {/* Desktop topbar */}
-        <header className="sticky top-0 z-10 hidden h-[52px] shrink-0 items-center bg-bg border-b border-border px-4 lg:flex">
+        <header className="sticky top-0 z-10 hidden h-[52px] shrink-0 items-center bg-bg border-b border-border px-4 lg:flex print:hidden">
           <div className="min-w-0 flex-1">{navbar}</div>
         </header>
 
+        {/* Printing drops the sidebar, both topbars and the canvas padding,
+            so a page prints as its content alone. */}
         {/* Canvas — cards float on bg-bg-sunken. text-[13px] baseline matches
             the design system's calibration; explicit Tailwind text utilities
             on descendants still override per-element.
@@ -91,7 +93,7 @@ export function SidebarLayout({
         {flush ? (
           <div className="grow text-[13px] leading-[1.45] min-h-0">{children}</div>
         ) : (
-          <div className="grow px-5 py-5 text-[13px] leading-[1.45]">
+          <div className="grow px-5 py-5 text-[13px] leading-[1.45] print:p-0">
             <div className="mx-auto max-w-screen-2xl">{children}</div>
           </div>
         )}

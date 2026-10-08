@@ -1560,7 +1560,7 @@
     "backToReports": "Back to Reports",
     "catalog": {
       "filter-pull-list": {
-        "description": "Filter sizes and quantities needed for scheduled work orders. Print and tape to the truck before heading out.",
+        "description": "The filters each tech pulls for tomorrow's route, from the board, with a company total. Print and tape to the truck before heading out.",
         "name": "Filter Pull List"
       },
       "revenue": {
@@ -1571,23 +1571,6 @@
     },
     "description": "Fixed reports with filters and export. Their numbers match Home.",
     "empty": "No reports are available yet.",
-    "errorLoading": "Error loading report",
-    "filterPullList": {
-      "date": "Date",
-      "description": "Filter sizes and quantities needed for scheduled work orders. Print and tape to the truck before heading out.",
-      "empty": "No filters needed for {{date}}.",
-      "equipmentCount": "Equipment",
-      "from": "From",
-      "mode": "Date mode",
-      "mode_range": "Range",
-      "mode_single": "Single day",
-      "printContext": "For scheduled work on {{date}}",
-      "quantity": "Quantity",
-      "size": "Size",
-      "title": "Filter Pull List",
-      "to": "To",
-      "total": "Total filters: {{count}}"
-    },
     "groups": {
       "money": "Money",
       "people": "People",
@@ -1596,8 +1579,69 @@
     },
     "loading": "Loading report…",
     "notFound": "That report does not exist.",
-    "print": "Print",
     "printList": "Print list",
+    "pullList": {
+      "companyTotal": "Company total",
+      "counts": {
+        "filters_one": "{{count}} filter",
+        "filters_other": "{{count}} filters",
+        "stops_one": "{{count}} stop",
+        "stops_other": "{{count}} stops",
+        "techs_one": "{{count}} tech",
+        "techs_other": "{{count}} techs"
+      },
+      "csv": {
+        "address": "Address",
+        "city": "City",
+        "date": "Date",
+        "tech": "Tech"
+      },
+      "days": {
+        "custom": "Dates",
+        "customOption": "Pick dates…",
+        "today": "Today",
+        "tomorrow": "Tomorrow"
+      },
+      "empty": {
+        "body": "The list is built from {{entities}} on the board. Nothing is dispatched for these days yet.",
+        "title": "Nothing on the board for {{days}}"
+      },
+      "export": "Export CSV",
+      "exportFailed": "Couldn't export the list. Try again.",
+      "exported": "Exported {{file}}",
+      "filters": {
+        "anyDivision": "Any {{division}}",
+        "anyType": "Any type",
+        "days": "Day",
+        "from": "From",
+        "problem": {
+          "order": "The end date is before the start date.",
+          "tooLong": "Pick a month or less."
+        },
+        "through": "through",
+        "to": "Through",
+        "type": "Type"
+      },
+      "loadFailed": "Couldn't load the pull list.",
+      "noFiltersAll": "None of these {{entities}} have filters on file.",
+      "noFiltersStop": "No filters on file",
+      "noFiltersTech": "No filters on file for this route.",
+      "print": "Print",
+      "pull": "Pull",
+      "regionTotal": "{{region}} total",
+      "stops": "Stops",
+      "table": {
+        "filters": "Filters",
+        "pulled": "Pulled",
+        "qty": "Qty",
+        "size": "Size",
+        "total": "Total",
+        "window": "Window"
+      },
+      "title": "Filter Pull List",
+      "totalHint": "Each {{entity}} counted once, however many techs are on it.",
+      "unnamed": "Unnamed tech"
+    },
     "revenue": {
       "backHome": "Home",
       "chart": {
@@ -1677,8 +1721,7 @@
       "unknown": "Unknown",
       "vs": "vs {{window}}"
     },
-    "title": "Reports",
-    "uncategorized": "Other"
+    "title": "Reports"
   },
   "scheduling": {
     "form": {
