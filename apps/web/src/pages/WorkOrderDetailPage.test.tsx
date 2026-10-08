@@ -124,6 +124,11 @@ function BoardProbe() {
   return <div>{`Dispatch Board${search}`}</div>;
 }
 
+function AgreementsProbe() {
+  const { search } = useLocation();
+  return <div>{`Agreements${search}`}</div>;
+}
+
 describe('WorkOrderDetailPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -251,6 +256,7 @@ describe('WorkOrderDetailPage', () => {
       { path: '/work-orders/:id', element: <WorkOrderDetailPage /> },
       { path: '/work-orders', element: <div>Work Orders List</div> },
       { path: '/dispatch', element: <BoardProbe /> },
+      { path: '/agreements', element: <AgreementsProbe /> },
       { path: '/customers/:id', element: <div>Customer Detail</div> },
       { path: '/service-locations/:id', element: <div>Service Location Detail</div> },
     ];
@@ -274,6 +280,18 @@ describe('WorkOrderDetailPage', () => {
     expect(
       await screen.findByText('Dispatch Board?date=2026-03-15&region=r1'),
     ).toBeInTheDocument();
+  });
+
+  // The agreements queue's Schedule button lands straight on booking, and back
+  // returns to the queue it came from.
+  it('opens the dispatch form from the agreements queue, and goes back to it', async () => {
+    const user = userEvent.setup();
+    mockApiResponses();
+    renderPage('wo-1', `?from=agreements&back=${encodeURIComponent('view=visits')}&schedule=new`);
+
+    expect(await screen.findByText('Work addressed')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /back to agreements/i }));
+    expect(await screen.findByText('Agreements?view=visits')).toBeInTheDocument();
   });
 
   it('displays loading state', async () => {

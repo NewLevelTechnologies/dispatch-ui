@@ -144,7 +144,9 @@ export function NeedsAttentionCard({ attention: a, today, regionIds }: Props) {
       tone: 'warning',
       label: t('dashboard.attention.rows.visits', { count: a.visits.count, entity: getName('agreement') }),
       meta: t('dashboard.attention.rows.visitsMeta', { days: a.visits.withinDays }),
-      // No tenant-wide agreements list to send this to yet.
+      // The queue under the same rule and scope, so its total is this count.
+      href: `/agreements?view=visits${regionIds?.length ? `&region=${regionIds[0]}` : ''}`,
+      action: t('dashboard.attention.actions.schedule'),
     });
   }
   if (a.poLate > 0) {
