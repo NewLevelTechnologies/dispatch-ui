@@ -6,7 +6,6 @@ import { ChevronRightIcon, ReceiptPercentIcon } from '@heroicons/react/16/solid'
 import {
   technicianProductivityApi,
   type FinancialDashboardRevenue,
-  type TechnicianProductivityRow,
 } from '../../api/setup';
 import { useGlossary } from '../../contexts/GlossaryContext';
 import { Button } from '../../components/catalyst/button';
@@ -17,7 +16,15 @@ import { Pill } from '../../components/ui/Pill';
 import { LoadingState } from '../../components/ui/LoadingState';
 import { ErrorState } from '../../components/ui/ErrorState';
 import { EmptyState } from '../../components/ui/EmptyState';
-import { hours, longDate, matchesRevenueMtd, money, unattributedAmount } from './revenueSelectors';
+import {
+  callbacksCoverage,
+  excludedParts,
+  hours,
+  longDate,
+  matchesRevenueMtd,
+  money,
+  unattributedAmount,
+} from './revenueSelectors';
 import { TechCreditDrawer, TECH_PAGE_PARAM, TECH_PARAM } from './TechCreditDrawer';
 import { periodName } from './period';
 import type { PeriodContext } from './RevenueView';
@@ -25,27 +32,6 @@ import type { PeriodContext } from './RevenueView';
 const DASH = '—';
 const LOW_FIRST_VISIT = 0.8;
 const MANY_CALLBACKS = 3;
-
-/**
- * Callbacks only exist once a CSR links one, from `trackedSince` on (no
- * backfill). A period entirely before it has no data ("—", not 0); one that
- * straddles it says so in the header.
- */
-function callbacksCoverage(periodStart: string, asOf: string, trackedSince: string | undefined) {
-  if (!trackedSince) return 'full' as const;
-  if (asOf < trackedSince) return 'none' as const;
-  if (periodStart < trackedSince) return 'partial' as const;
-  return 'full' as const;
-}
-
-type Excluded = TechnicianProductivityRow['excludedHours'];
-// The handoff's order; zero parts are left out.
-const EXCLUDED_PARTS = ['billedLater', 'billedEarlier', 'notBilled', 'agreement'] as const satisfies readonly (keyof Excluded)[];
-
-/** The non-zero excluded-hour parts, in display order. */
-function excludedParts(e: Excluded) {
-  return EXCLUDED_PARTS.filter((k) => e[k] > 0).map((k) => ({ key: k, hours: e[k] }));
-}
 
 /**
  * The selected period, in the scope chip's regions. Every
@@ -272,7 +258,20 @@ export function TechProductivityCard({
     <Card>
       <CardHead>
         <CardTitle>{t('dashboard.revenue.techs.title', words)}</CardTitle>
-        <Pill tone="neutral">{periodLabel}</Pill>
+        <span className="home-chart-actions">
+          <Pill tone="neutral">{periodLabel}</Pill>
+          <Button
+            plain
+            size="xxs"
+            href={`/reports/tech-productivity?${new URLSearchParams({
+              range: ctx.period.id,
+              from: 'home',
+              ...(ctx.regionIds ? { region: ctx.regionIds[0] } : {}),
+            }).toString()}`}
+          >
+            {t('dashboard.revenue.techs.report', words)}
+          </Button>
+        </span>
       </CardHead>
       <CardBody flush>{body}</CardBody>
     </Card>

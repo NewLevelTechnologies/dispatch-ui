@@ -35,6 +35,7 @@ export interface ReportDefinition {
 
 const FilterPullListReport = lazy(() => import('./FilterPullListReport'));
 const RevenueReport = lazy(() => import('./RevenueReport'));
+const TechProductivityReport = lazy(() => import('./TechProductivityReport'));
 
 export const reports: ReportDefinition[] = [
   {
@@ -42,6 +43,14 @@ export const reports: ReportDefinition[] = [
     group: 'money',
     fromHome: true,
     Component: RevenueReport,
+    requiresCapability: 'VIEW_ALL_INVOICES',
+  },
+  {
+    slug: 'tech-productivity',
+    group: 'people',
+    fromHome: true,
+    Component: TechProductivityReport,
+    // Home's Revenue tab and this card follow the invoice capability.
     requiresCapability: 'VIEW_ALL_INVOICES',
   },
   {

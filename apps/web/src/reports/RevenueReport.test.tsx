@@ -164,7 +164,7 @@ describe('RevenueReport', () => {
     );
     // 92 days: weekly bars.
     expect(screen.getAllByTestId('report-bar')).toHaveLength(14);
-    expect(screen.getByRole('link', { name: 'reports.revenue.backHome' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'reports.range.backHome' })).toHaveAttribute(
       'href',
       '/dashboard?view=rev&period=2026-Q3&region=r2',
     );
@@ -187,7 +187,7 @@ describe('RevenueReport', () => {
     expect(await screen.findByText('reports.revenue.empty.title')).toBeInTheDocument();
     expect(within(screen.getByTestId('report-summary')).getAllByText('$0')).toHaveLength(3);
     expect(screen.queryAllByTestId('report-bar')).toHaveLength(0);
-    expect(screen.getAllByText('reports.revenue.noComparison.sameDatesLastYear').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('reports.range.noComparison.sameDatesLastYear').length).toBeGreaterThan(0);
   });
 
   it('exports every invoice in the report, a page at a time', async () => {

@@ -691,6 +691,7 @@
         "matches": "Matches {{label}}",
         "onSite": "On-site hrs",
         "perHour": "Revenue / invoiced hr",
+        "report": "{{tech}} productivity report",
         "revenue": "Revenue",
         "title": "{{tech}} productivity",
         "total": "Total",
@@ -1567,6 +1568,11 @@
         "description": "Billed revenue over any range, by division, job type or region, compared with last year or the period before.",
         "fromHome": "Revenue chart",
         "name": "Revenue"
+      },
+      "tech-productivity": {
+        "description": "Home's {{tech, lowercase}} scorecard over any range, compared with last year or the period before, with a weekly trend per {{tech, lowercase}}.",
+        "fromHome": "{{tech}} productivity card",
+        "name": "{{tech}} productivity"
       }
     },
     "description": "Fixed reports with filters and export. Their numbers match Home.",
@@ -1642,18 +1648,39 @@
       "totalHint": "Each {{entity}} counted once, however many techs are on it.",
       "unnamed": "Unnamed tech"
     },
-    "revenue": {
+    "range": {
       "backHome": "Home",
+      "compare": {
+        "none": "No comparison",
+        "previousPeriod": "Previous period",
+        "sameDatesLastYear": "Same period last year"
+      },
+      "filters": {
+        "compare": "Compare",
+        "custom": "Custom",
+        "customGroup": "Custom",
+        "customOption": "Custom range…",
+        "dates": "Dates",
+        "problem": {
+          "future": "The range starts after today.",
+          "order": "The end date is before the start date.",
+          "tooLong": "A range can be at most 3 years long."
+        },
+        "range": "Range"
+      },
+      "noComparison": {
+        "previousPeriod": "No data for the previous period",
+        "sameDatesLastYear": "No {{year}} data to compare"
+      },
+      "noComparisonPicked": "No comparison",
+      "vs": "vs {{window}}"
+    },
+    "revenue": {
       "chart": {
         "day": "Daily revenue",
         "month": "Monthly revenue",
         "sameWeekdays": "{{window}}, same weekdays",
         "week": "Weekly revenue"
-      },
-      "compare": {
-        "none": "No comparison",
-        "previousPeriod": "Previous period",
-        "sameDatesLastYear": "Same period last year"
       },
       "csv": {
         "date": "Date",
@@ -1671,18 +1698,7 @@
       "exported": "Exported {{file}} · {{count}} {{entities}}",
       "exporting": "Exporting…",
       "filters": {
-        "compare": "Compare",
-        "custom": "Custom",
-        "customGroup": "Custom",
-        "customOption": "Custom range…",
-        "dates": "Dates",
-        "groupBy": "Group by",
-        "problem": {
-          "future": "The range starts after today.",
-          "order": "The end date is before the start date.",
-          "tooLong": "A range can be at most 3 years long."
-        },
-        "range": "Range"
+        "groupBy": "Group by"
       },
       "groupBy": {
         "none": "None",
@@ -1690,11 +1706,6 @@
         "workOrderType": "Job type"
       },
       "loadFailed": "Couldn't load the report",
-      "noComparison": {
-        "previousPeriod": "No data for the previous period",
-        "sameDatesLastYear": "No {{year}} data to compare"
-      },
-      "noComparisonPicked": "No comparison",
       "sub": "{{range}} · {{dates}}. Issued invoices including tax; drafts and voided excluded.",
       "subToDate": "{{range}} · {{dates}} · to date. Issued invoices including tax; drafts and voided excluded.",
       "summary": {
@@ -1718,8 +1729,53 @@
       },
       "title": "Revenue",
       "unassigned": "No {{group}}",
-      "unknown": "Unknown",
-      "vs": "vs {{window}}"
+      "unknown": "Unknown"
+    },
+    "techs": {
+      "csv": {
+        "agreement": "Hours on {{agreement, lowercase}} visits",
+        "billedEarlier": "Hours billed earlier",
+        "billedLater": "Hours billed later",
+        "comparison": {
+          "callbacks": "Callbacks, {{window}}",
+          "jobs": "Jobs, {{window}}",
+          "onSiteHours": "On-site hours, {{window}}",
+          "revenue": "Revenue, {{window}}"
+        },
+        "firstVisitCompleted": "First-visit completed",
+        "firstVisitEligible": "First-visit eligible",
+        "invoicedHours": "Invoiced-job hours",
+        "noTechArrived": "Unattributed: no {{tech, lowercase}} arrived",
+        "noWorkOrder": "Unattributed: no {{workOrder, lowercase}}",
+        "notBilled": "Hours not billed",
+        "onSiteHours": "On-site hours"
+      },
+      "empty": {
+        "body": "Nothing was billed in {{range}}.",
+        "title": "No {{invoices}} in this range"
+      },
+      "exportFailed": "Couldn't export the report. Try again.",
+      "exported": "Exported {{file}}",
+      "loadFailed": "Couldn't load the report.",
+      "sub": "{{range}} · {{dates}}. Each {{invoice, lowercase}}'s total split among the {{techs, lowercase}} who arrived; same numbers as Home.",
+      "subToDate": "{{range}} · {{dates}} · to date. Each {{invoice, lowercase}}'s total split among the {{techs, lowercase}} who arrived; same numbers as Home.",
+      "summary": {
+        "callbacksNone": "Tracked from {{date}}",
+        "callbacksSince": "Since {{date}}, when tracking started",
+        "callbacksSub": "Charged to {{techs, lowercase}}",
+        "credited": "Credited to {{techs, lowercase}}",
+        "creditedSub_one": "{{pct}}% of revenue · {{count}} {{tech, lowercase}}",
+        "creditedSub_other": "{{pct}}% of revenue · {{count}} {{techs, lowercase}}",
+        "unattributedSub": "No {{workOrder, lowercase}}, or no {{tech, lowercase}} arrived"
+      },
+      "table": {
+        "hint": "Open a {{tech, lowercase}} for the {{invoices, lowercase}} behind their figure.",
+        "title": "By {{tech, lowercase}}",
+        "trend": "Trend",
+        "trendBar_one": "{{window}}: {{revenue}} · {{count}} job",
+        "trendBar_other": "{{window}}: {{revenue}} · {{count}} jobs"
+      },
+      "title": "{{tech}} productivity"
     },
     "title": "Reports"
   },

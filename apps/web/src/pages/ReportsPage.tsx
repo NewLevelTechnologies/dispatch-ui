@@ -6,6 +6,7 @@ import { PageHead } from '../components/ui/PageHead';
 import { Pill } from '../components/ui/Pill';
 import { EmptyState } from '../components/ui/EmptyState';
 import { useCurrentUser } from '../hooks/useCurrentUser';
+import { useGlossary } from '../contexts/GlossaryContext';
 import { REPORT_GROUPS, reports } from '../reports/registry';
 
 /**
@@ -15,7 +16,15 @@ import { REPORT_GROUPS, reports } from '../reports/registry';
  */
 export default function ReportsPage() {
   const { t } = useTranslation();
+  const { getName } = useGlossary();
   const { data: user } = useCurrentUser();
+  // Glossary names the catalog's copy may use.
+  const words = {
+    invoices: getName('invoice', true),
+    tech: getName('technician'),
+    techs: getName('technician', true),
+    workOrders: getName('work_order', true),
+  };
   const can = (cap: string | undefined) => !cap || (user?.capabilities?.includes(cap) ?? false);
   const visible = reports.filter((r) => can(r.requiresCapability));
   const groups = REPORT_GROUPS.map((g) => ({ id: g, items: visible.filter((r) => r.group === g) })).filter(
@@ -38,13 +47,13 @@ export default function ReportsPage() {
                 <RouterLink key={r.slug} to={`/reports/${r.slug}`} className="rp-cat-row">
                   <span className="rp-cat-text">
                     <span className="rp-cat-name">
-                      {t(`reports.catalog.${r.slug}.name`)}
+                      {t(`reports.catalog.${r.slug}.name`, words)}
                       {r.kind === 'list' && <Pill tone="neutral">{t('reports.printList')}</Pill>}
                     </span>
-                    <span className="rp-cat-desc">{t(`reports.catalog.${r.slug}.description`)}</span>
+                    <span className="rp-cat-desc">{t(`reports.catalog.${r.slug}.description`, words)}</span>
                     {r.fromHome && (
                       <span className="rp-cat-from">
-                        {t('reports.alsoFromHome', { where: t(`reports.catalog.${r.slug}.fromHome`) })}
+                        {t('reports.alsoFromHome', { where: t(`reports.catalog.${r.slug}.fromHome`, words) })}
                       </span>
                     )}
                   </span>

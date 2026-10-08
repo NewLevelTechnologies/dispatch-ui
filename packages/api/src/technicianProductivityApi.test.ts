@@ -17,6 +17,10 @@ describe('technicianProductivityApi', () => {
     expect(apiClient.get).toHaveBeenLastCalledWith('/work-orders/technician-productivity', {
       params: { period: '2026-Q2' },
     });
+    await technicianProductivityApi.get({ from: '2026-09-08', to: '2026-10-04', compare: 'previousPeriod', regionIds: ['r1'] });
+    expect(apiClient.get).toHaveBeenLastCalledWith('/work-orders/technician-productivity', {
+      params: { from: '2026-09-08', to: '2026-10-04', regionIds: ['r1'], compare: 'previousPeriod' },
+    });
   });
 
   it('getCreditedInvoices pages one tech, defaulting to the first 25', async () => {
