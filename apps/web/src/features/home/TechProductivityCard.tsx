@@ -113,7 +113,7 @@ export function TechProductivityCard({
           <DenseTHead>
             <tr>
               <th>{getName('technician')}</th>
-              <th className="right">{t('dashboard.revenue.techs.jobs')}</th>
+              <th className="right">{t('dashboard.revenue.techs.jobs', words)}</th>
               <th className="right">{t('dashboard.revenue.techs.revenue')}</th>
               <th className="right home-col-opt">{t('dashboard.revenue.techs.avgTicket')}</th>
               <th className="right">{t('dashboard.revenue.techs.onSite')}</th>
@@ -140,7 +140,7 @@ export function TechProductivityCard({
                       <span className="strong">{name}</span>
                     </div>
                   </td>
-                  <td className="right num" data-label={t('dashboard.revenue.techs.jobs')}>{r.jobs}</td>
+                  <td className="right num" data-label={t('dashboard.revenue.techs.jobs', words)}>{r.jobs}</td>
                   <td className="right num strong" data-label={t('dashboard.revenue.techs.revenue')}>
                     {formatCurrency(r.revenue)}
                   </td>

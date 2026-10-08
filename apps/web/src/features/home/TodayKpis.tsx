@@ -55,7 +55,7 @@ export function TodayKpis({ board, boardError, summary }: Props) {
   return (
     <div className="home-kpis">
       <KPI
-        label={t('dashboard.kpis.jobsToday')}
+        label={t('dashboard.kpis.jobsToday', { dispatches: getName('dispatch', true) })}
         value={jobs ?? DASH}
         delta={jobsDelta}
         deltaDir={jobsDir}

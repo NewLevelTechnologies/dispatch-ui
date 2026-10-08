@@ -119,7 +119,13 @@ export default function FilterPullListReport() {
 
   const daysLabel = formatDays(days.date, days.dateTo, today);
   const daysTitle = days.kind === 'custom' ? daysLabel : `${t(`reports.pullList.days.${days.kind}`)}, ${daysLabel}`;
-  const techName = (name: string | null) => name ?? t('reports.pullList.unnamed');
+  // Glossary names the list's copy uses.
+  const words = {
+    tech: getName('technician'),
+    techs: getName('technician', true),
+    dispatches: getName('dispatch', true),
+  };
+  const techName = (name: string | null) => name ?? t('reports.pullList.unnamed', words);
   const windowLabel = (startIso: string, endIso: string | null) => {
     const start = zonedHour(startIso, zone);
     const end = endIso ? zonedHour(endIso, zone) : null;
@@ -134,7 +140,7 @@ export default function FilterPullListReport() {
     try {
       const csv = pullListCsv(list, {
         headers: [
-          t('reports.pullList.csv.tech'),
+          getName('technician'),
           t('reports.pullList.csv.date'),
           t('reports.pullList.table.window'),
           getName('work_order'),
@@ -162,7 +168,7 @@ export default function FilterPullListReport() {
     ? [
         daysTitle,
         regionName,
-        t('reports.pullList.counts.techs', { count: list.techs.length }),
+        t('reports.pullList.counts.techs', { count: list.techs.length, ...words }),
         t('reports.pullList.counts.stops', { count: stopCount(list) }),
         t('reports.pullList.counts.filters', { count: filterCount(list.totals) }),
       ]
@@ -371,7 +377,9 @@ function TechCard({
             <section className="pl-pull" aria-label={t('reports.pullList.pull')}>
               <h3 className="pl-section">{t('reports.pullList.pull')}</h3>
               {tech.totals.length === 0 ? (
-                <p className="pl-none">{t('reports.pullList.noFiltersTech')}</p>
+                <p className="pl-none">
+                  {t('reports.pullList.noFiltersTech', { dispatches: getName('dispatch', true) })}
+                </p>
               ) : (
                 <SizeTable sizes={tech.totals} />
               )}
@@ -517,7 +525,12 @@ function TotalsCard({
           <CardTitle>
             {regionName ? t('reports.pullList.regionTotal', { region: regionName }) : t('reports.pullList.companyTotal')}
           </CardTitle>
-          <CardSub>{t('reports.pullList.totalHint', { entity: getName('work_order').toLowerCase() })}</CardSub>
+          <CardSub>
+            {t('reports.pullList.totalHint', {
+              entity: getName('work_order').toLowerCase(),
+              techs: getName('technician', true),
+            })}
+          </CardSub>
         </CardHead>
         <CardBody flush>
           {list.totals.length === 0 ? (
