@@ -1,28 +1,24 @@
-// The Agreements page's pure parts: URL state to list params, and how a
-// visit's window reads against today.
-import type { AgreementListSort, AgreementStatus, ListAgreementsParams } from '../../api/setup';
+// The Agreements page's pure parts: URL state to list params, how amounts and
+// dates read on a row, and how a visit's window reads against today.
+import type { AgreementListSort, AgreementStatus, CadenceUnit, ListAgreementsParams } from '../../api/setup';
 
 export const STATUSES: AgreementStatus[] = ['ACTIVE', 'SUSPENDED', 'DRAFT', 'EXPIRED', 'CANCELLED'];
 
 /** What the list shows with no `status` in the URL: the agreements in force. */
 export const DEFAULT_STATUSES: AgreementStatus[] = ['ACTIVE'];
-/** `?status=any` means every status (the chip's reset). */
+/** `?status=any` means every status (the picker's "All"). */
 export const ANY_STATUS = 'any';
-
-export const STATUS_TONE: Record<AgreementStatus, 'success' | 'neutral' | 'warning' | 'danger'> = {
-  ACTIVE: 'success',
-  DRAFT: 'neutral',
-  SUSPENDED: 'warning',
-  EXPIRED: 'neutral',
-  CANCELLED: 'danger',
-};
+/** `?plan=none` means custom agreements, sold from no plan. */
+export const NO_PLAN = 'none';
 
 /** Home's renewing-soon window. */
 export const RENEWING_DAYS = 30;
 
 export const SORTS: AgreementListSort[] = ['customerName', 'agreementNumber', 'termEnd', 'monthlyValue'];
-/** Amounts and dates read best soonest/largest first on a first click. */
+/** Amounts read best largest first on a first click. */
 export const DESC_FIRST = new Set<string>(['monthlyValue']);
+
+export const isEnded = (s: AgreementStatus) => s === 'EXPIRED' || s === 'CANCELLED';
 
 /** `?status=` (repeated) to the statuses asked for; [] means all. */
 export function parseStatuses(raw: string[]): AgreementStatus[] {
@@ -31,33 +27,76 @@ export function parseStatuses(raw: string[]): AgreementStatus[] {
   return picked.length ? picked : DEFAULT_STATUSES;
 }
 
-export function parseSort(raw: string | null): { key: AgreementListSort; dir: 'asc' | 'desc' } {
+/**
+ * The sort asked for, else Customer A–Z — or soonest renewal first when the
+ * list is narrowed to the ones renewing, since that's the order to work them.
+ */
+export function parseSort(
+  raw: string | null,
+  renewing = false,
+): { key: AgreementListSort; dir: 'asc' | 'desc' } {
   const [key, dir] = (raw ?? '').split(',');
   if ((SORTS as string[]).includes(key)) return { key: key as AgreementListSort, dir: dir === 'desc' ? 'desc' : 'asc' };
-  return { key: 'customerName', dir: 'asc' };
+  return { key: renewing ? 'termEnd' : 'customerName', dir: 'asc' };
 }
 
-export function listParams(p: {
+export interface ListFilters {
   q: string;
   statuses: AgreementStatus[];
+  /** A plan id, NO_PLAN, or null for any plan. */
+  plan: string | null;
   renewing: boolean;
-  scope: string[] | undefined;
-  sort: string | null;
-  page: number;
-  size: number;
-}): ListAgreementsParams {
-  const sort = parseSort(p.sort);
+  visitsBehind: boolean;
+  noBilling: boolean;
+}
+
+/** The list's URL state. Flags read `renewing=30`, `visits=behind`, `billing=none`. */
+export function parseFilters(params: URLSearchParams, q = params.get('q') ?? ''): ListFilters {
   return {
-    q: p.q || undefined,
-    // Renewing soon is the overview's rule, which is ACTIVE only.
-    status: p.renewing ? undefined : p.statuses,
-    renewingWithinDays: p.renewing ? RENEWING_DAYS : undefined,
+    q,
+    statuses: parseStatuses(params.getAll('status')),
+    plan: params.get('plan') || null,
+    renewing: params.get('renewing') === String(RENEWING_DAYS),
+    visitsBehind: params.get('visits') === 'behind',
+    noBilling: params.get('billing') === 'none',
+  };
+}
+
+/** Anything narrowing the list past the default status. */
+export const hasNarrowing = (f: ListFilters) => Boolean(f.q || f.plan || f.renewing || f.visitsBehind || f.noBilling);
+
+/** The params that clear every filter but status. */
+export const CLEAR_FILTERS = { q: null, plan: null, renewing: null, visits: null, billing: null } as const;
+
+export function listParams(
+  f: ListFilters,
+  p: { scope: string[] | undefined; sort: string | null; page: number; size: number },
+): ListAgreementsParams {
+  const sort = parseSort(p.sort, f.renewing);
+  return {
+    q: f.q || undefined,
+    status: f.statuses,
+    planId: f.plan && f.plan !== NO_PLAN ? [f.plan] : undefined,
+    noPlan: f.plan === NO_PLAN || undefined,
+    renewingWithinDays: f.renewing ? RENEWING_DAYS : undefined,
+    visitsBehind: f.visitsBehind || undefined,
+    noBilling: f.noBilling || undefined,
     regionIds: p.scope,
     sort: `${sort.key},${sort.dir}`,
     page: p.page - 1,
     size: p.size,
   };
 }
+
+const CADENCE_SHORT: Record<CadenceUnit, string> = { WEEK: 'wk', MONTH: 'mo', QUARTER: 'qtr', YEAR: 'yr' };
+
+/** The real cadence beneath the /mo figure: "/ qtr", "/ 2 mo". */
+export function cadenceSuffix(unit: CadenceUnit, interval: number): string {
+  return interval > 1 ? `/ ${interval} ${CADENCE_SHORT[unit]}` : `/ ${CADENCE_SHORT[unit]}`;
+}
+
+/** Days from today to a term end; negative once it has passed. */
+export const daysUntil = (day: string, today: string) => daysBetween(today, day);
 
 const utc = (day: string) => Date.parse(`${day}T00:00:00Z`);
 const daysBetween = (from: string, to: string) => Math.round((utc(to) - utc(from)) / 86_400_000);

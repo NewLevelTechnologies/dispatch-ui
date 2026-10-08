@@ -245,13 +245,71 @@
   },
   "agreements": {
     "list": {
+      "cell": {
+        "behind_one": "{{count}} behind",
+        "behind_other": "{{count}} behind",
+        "cancelledOn": "Cancelled {{date}}",
+        "dueBy": "Due by {{date}}",
+        "endedOn": "Ended {{date}}",
+        "finalTerm": "Final term",
+        "locations_one": "{{count}} {{locations}}",
+        "locations_other": "{{count}} {{locations}}",
+        "manualRenewal": "Manual renewal",
+        "noBilling": "No billing set up",
+        "noPlannedVisits": "No planned visits",
+        "notGenerated": "Not yet generated",
+        "onTrack": "On track",
+        "perMonth": "/mo",
+        "plan": "{{plan}} plan",
+        "renewsIn_one": "in {{count}} day",
+        "renewsIn_other": "in {{count}} days",
+        "started": "Started {{date}}",
+        "startedBy": "Started by {{name}}, {{date}}",
+        "termPassed": "Past its term end",
+        "unassigned": "Unassigned",
+        "unscheduled": "Unscheduled",
+        "visitsOf": "of {{planned}}"
+      },
+      "csv": {
+        "billingAmount": "Billing amount",
+        "billingCadence": "Billing cadence",
+        "endedOn": "Ended on",
+        "export": "Export",
+        "exporting": "Exporting…",
+        "failed": "Couldn't export",
+        "monthly": "Monthly value",
+        "name": "Name",
+        "nextWorkOrder": "Next visit {{workOrder}}",
+        "no": "No",
+        "number": "Number",
+        "termEnd": "Term end",
+        "visitsCompleted": "Visits completed",
+        "visitsPlanned": "Visits planned",
+        "yes": "Yes"
+      },
       "emptyHint": "Add one from a {{customer}}'s {{agreements}} tab.",
       "filters": {
         "clear": "Clear filters",
+        "noBilling": "No billing set up",
+        "plan": "Plan",
+        "planAny": "Any plan",
+        "planCustom": "Custom (no plan)",
         "renewing": "Renewing in {{days}} days",
-        "statusCount": "{{count}} statuses"
+        "statusAll": "All",
+        "statusAllShortcut": "All {{agreements}}",
+        "visitsBehind": "Visits behind"
       },
-      "search": "Search by number, name or {{customer}}…",
+      "menu": {
+        "cancel": "Cancel…",
+        "cancelBody": "Ends the {{agreement}} mid-term. {{workOrder}} and invoice history are kept; new {{workOrders}} stop generating.",
+        "cancelConfirm": "Cancel {{agreement}}",
+        "cancelFailed": "Couldn't cancel the {{agreement}}",
+        "cancelTitle": "Cancel {{number}}?",
+        "cancelled": "{{number}} cancelled",
+        "open": "Open",
+        "setUpBilling": "Set up billing"
+      },
+      "search": "Search by {{agreement}}, {{customer}} or {{location}}…",
       "status": {
         "ACTIVE": "Active",
         "CANCELLED": "Cancelled",
@@ -261,12 +319,12 @@
       },
       "table": {
         "autoRenews": "Auto-renews",
-        "monthly": "Monthly",
         "nextVisit": "Next visit",
         "openEnded": "Open-ended",
-        "overdue": "Overdue visits",
+        "renews": "Renews",
         "status": "Status",
-        "term": "Term ends"
+        "value": "Value",
+        "visits": "Visits this term"
       }
     },
     "page": {

@@ -28,6 +28,7 @@ import {
   type VisitTemplateResponse,
 } from '../api/setup';
 import { useGlossary } from '../contexts/GlossaryContext';
+import { resolveBack } from '../lib/backContext';
 import { extractApiError, showError, showSuccess } from '../lib/toast';
 import AppLayout from '../components/AppLayout';
 import ConfirmDialog from '../components/ConfirmDialog';
@@ -75,7 +76,8 @@ function useBackContext(agreement: AgreementResponse): { label: string; href: st
   const [params] = useSearchParams();
   const { getName } = useGlossary();
   const from = (params.get('from') || '').toLowerCase();
-  if (from === 'agreements') return { label: `All ${getName('agreement', true).toLowerCase()}`, href: '/agreements' };
+  if (from === 'agreements')
+    return { label: `All ${getName('agreement', true).toLowerCase()}`, href: resolveBack('/agreements', params.get('back')) };
   if (from === 'search') {
     const q = params.get('q');
     return { label: q ? `Search results · “${q}”` : 'Search results', href: '/search' };
@@ -809,7 +811,17 @@ function FinancialSnapshotCard({ agreement }: { agreement: AgreementResponse }) 
   // setting — so the labels always describe the numbers on screen. Absent ⇒
   // straight-line (the BE default / fail-safe).
   const perVisitBasis = revenue?.basis === 'PER_VISIT';
-  const [setupOpen, setSetupOpen] = useState(false);
+  // `?billing=setup` (the list's "Set up billing") arrives with it open.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [setupOpen, setSetupOpen] = useState(() => searchParams.get('billing') === 'setup');
+  const closeSetup = () => {
+    setSetupOpen(false);
+    if (searchParams.has('billing')) {
+      const next = new URLSearchParams(searchParams);
+      next.delete('billing');
+      setSearchParams(next, { replace: true });
+    }
+  };
 
   const arr = billing ? computeArr(billing) : null;
   const perYear = billing ? periodsPerYear(billing.cadenceUnit, billing.cadenceInterval) : 0;
@@ -957,7 +969,7 @@ function FinancialSnapshotCard({ agreement }: { agreement: AgreementResponse }) 
       </Card>
       <BillingSetupDialog
         isOpen={setupOpen}
-        onClose={() => setSetupOpen(false)}
+        onClose={closeSetup}
         agreementId={agreement.id}
         billing={billing ?? undefined}
         defaultAnchorDate={agreement.termStart}

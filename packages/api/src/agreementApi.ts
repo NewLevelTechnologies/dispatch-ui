@@ -162,8 +162,50 @@ export interface AgreementListRow extends AgreementSummaryResponse {
   coverageLocationCount: number;
   /** Start of the next open visit window not yet closed; null when none generated (~6 months ahead). */
   nextVisitDue: string | null;
-  /** Visits whose window closed unfulfilled and unwaived. */
+  /** Visits whose window closed unfulfilled and unwaived, all time. */
   overdueVisitCount: number;
+  /** The plan it was sold from; null for a custom agreement. */
+  plan: { id: string; name: string } | null;
+  /** The active billing schedule: `amount` every `cadenceInterval` × `cadenceUnit`; null when none. */
+  billing: AgreementListBilling | null;
+  /** The covered location when coverageLocationCount is exactly 1; fields null until it syncs. */
+  primaryLocation: { streetAddress: string | null; city: string | null } | null;
+  /** Visits in [termStart, termEnd), waived excluded; null with no templates or an open term. */
+  visitsThisTerm: { planned: number; completed: number } | null;
+  /** The visit nextVisitDue names. workOrderId null = not generated yet; dispatch null = unscheduled. */
+  nextVisit: AgreementNextVisit | null;
+  /** termEnd when EXPIRED; the tenant-local cancel day when CANCELLED; else null. */
+  endedOn: string | null;
+  /** Who created it; null when unknown (older agreements). */
+  createdByName: string | null;
+}
+
+export interface AgreementListBilling {
+  mode: BillingMode;
+  /** Never null: PER_VISIT is invoiced like a fixed schedule today. */
+  amount: number;
+  cadenceUnit: CadenceUnit;
+  cadenceInterval: number;
+}
+
+export interface AgreementNextVisit {
+  windowStart: string;
+  windowEnd: string;
+  workOrderId: string | null;
+  workOrderNumber: string | null;
+  /** The earliest dispatch not yet completed (else the latest); scheduledStart = arrival window start. */
+  dispatch: { scheduledStart: string; technicianName: string | null } | null;
+}
+
+/** GET /work-orders/agreements/facets — counts for the list's chips. */
+export interface AgreementListFacets {
+  /** Every status, under all the current filters except status. */
+  statusCounts: Record<AgreementStatus, number>;
+  /** Each flag on its own, under status/q/classification/plan/region. */
+  renewing: number;
+  renewingWithinDays: number;
+  visitsBehind: number;
+  noBilling: number;
 }
 
 export type AgreementListSort = 'customerName' | 'termEnd' | 'monthlyValue' | 'agreementNumber';
@@ -175,6 +217,14 @@ export interface ListAgreementsParams {
   regionIds?: string[];
   /** The overview's renewing-soon rule: ACTIVE, term ending today … today + N. */
   renewingWithinDays?: number;
+  /** Matched plans; OR-ed with noPlan. */
+  planId?: string[];
+  /** Custom agreements (no plan). */
+  noPlan?: boolean;
+  /** overdueVisitCount > 0. */
+  visitsBehind?: boolean;
+  /** ACTIVE or DRAFT with no active billing schedule. */
+  noBilling?: boolean;
   /** Nulls last either way; ties by agreement number. */
   sort?: `${AgreementListSort},${'asc' | 'desc'}`;
   page?: number;
@@ -499,6 +549,16 @@ export interface ListAgreementPlansParams {
   size?: number;
 }
 
+// Lists go comma-joined; false flags and empty values are left off.
+function listWireParams({ status, regionIds, planId, ...params }: ListAgreementsParams) {
+  return {
+    ...Object.fromEntries(Object.entries(params).filter(([, v]) => v !== undefined && v !== '' && v !== false)),
+    ...(status?.length ? { status: status.join(',') } : {}),
+    ...(planId?.length ? { planId: planId.join(',') } : {}),
+    ...(regionIds?.length ? { regionIds } : {}),
+  };
+}
+
 export const agreementApi = {
   // List — `classification` defaults to CONTRACT (the commercial-agreements
   // list). `customerId` scopes to one customer's Agreements tab.
@@ -524,13 +584,17 @@ export const agreementApi = {
   },
 
   // Company-wide, paged. See {@link AgreementListRow}.
-  listPage: async ({ status, regionIds, ...params }: ListAgreementsParams = {}): Promise<Page<AgreementListRow>> => {
+  listPage: async (params: ListAgreementsParams = {}): Promise<Page<AgreementListRow>> => {
     const response = await apiClient.get<Page<AgreementListRow>>('/work-orders/agreements', {
-      params: {
-        ...Object.fromEntries(Object.entries(params).filter(([, v]) => v !== undefined && v !== '')),
-        ...(status?.length ? { status: status.join(',') } : {}),
-        ...(regionIds?.length ? { regionIds } : {}),
-      },
+      params: listWireParams(params),
+    });
+    return response.data;
+  },
+
+  // The list's chip counts, for the same filters (paging and sort ignored).
+  facets: async (params: ListAgreementsParams = {}): Promise<AgreementListFacets> => {
+    const response = await apiClient.get<AgreementListFacets>('/work-orders/agreements/facets', {
+      params: listWireParams({ ...params, sort: undefined, page: undefined, size: undefined }),
     });
     return response.data;
   },

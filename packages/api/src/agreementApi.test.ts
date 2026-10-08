@@ -46,6 +46,20 @@ describe('agreementApi', () => {
     expect(apiClient.get).toHaveBeenLastCalledWith('/work-orders/agreements', { params: {} });
   });
 
+  it('listPage joins plans and sends only the flags that are on', async () => {
+    await agreementApi.listPage({ planId: ['p1', 'p2'], noPlan: true, visitsBehind: false, noBilling: true });
+    expect(apiClient.get).toHaveBeenLastCalledWith('/work-orders/agreements', {
+      params: { noPlan: true, noBilling: true, planId: 'p1,p2' },
+    });
+  });
+
+  it('facets sends the list filters without paging or sort', async () => {
+    await agreementApi.facets({ q: 'acme', status: ['ACTIVE'], sort: 'termEnd,asc', page: 2, size: 50 });
+    expect(apiClient.get).toHaveBeenLastCalledWith('/work-orders/agreements/facets', {
+      params: { q: 'acme', status: 'ACTIVE' },
+    });
+  });
+
   it('unscheduledVisits reads the queue in a scope', async () => {
     await agreementApi.unscheduledVisits({ withinDays: 7, regionIds: ['r1'], page: 0, size: 25 });
     expect(apiClient.get).toHaveBeenLastCalledWith('/work-orders/agreements/visits/unscheduled', {
