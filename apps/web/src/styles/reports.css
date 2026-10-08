@@ -103,6 +103,8 @@
   color: var(--fg);
 }
 .rp-group { cursor: pointer; }
+.rp-selected td { background: var(--bg-active); }
+.rp-dot { display: inline-block; width: 8px; height: 8px; border-radius: 2px; }
 .rp-group-name { display: inline-flex; align-items: center; gap: 6px; }
 .rp-caret { color: var(--fg-muted); transition: transform 120ms; }
 .rp-caret.open { transform: rotate(90deg); }

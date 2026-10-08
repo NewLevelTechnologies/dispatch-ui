@@ -318,6 +318,11 @@ export interface ListInvoicesParams {
   to?: string; // YYYY-MM-DD, invoiceDate <= to (inclusive — no +1-day trick)
   overdue?: boolean; // true = open + strictly past due
   agingBucket?: InvoiceAgingBucket; // open invoices by days past dueDate; pairs with customerId. Don't also send a conflicting status.
+  // Receivables drill-down: open at the end of that tenant-local day (issued
+  // by then, not voided or cancelled by then, a balance left after payments
+  // dated by then). With it, `agingBucket` ages from that date. Rows'
+  // amountPaid/balanceDue stay as of now.
+  openAsOf?: string;
   q?: string; // case-insensitive substring on invoiceNumber OR customerName
   regionIds?: string[]; // the invoice's service location's region; a user's own regions bound it either way
   // Revenue report drill-down. `billed` = issued (not DRAFT/VOID/CANCELLED),
@@ -922,6 +927,34 @@ export interface RevenueReport {
   /** The regions these figures cover; null = the whole company. */
   regionIds: string[] | null;
 }
+
+/**
+ * GET /financial/reports/receivables: what was open at the end of `asOf`
+ * (tenant-local, default today), aged from that date. Same buckets as the
+ * dashboard's receivables; `overdue` is the four past-due ones. Each bucket's
+ * count is the invoice list's `totalElements` with `openAsOf` and that bucket.
+ */
+export interface ReceivablesReport {
+  asOf: string;
+  outstanding: number;
+  overdue: ArAgingBucket;
+  current: ArAgingBucket;
+  days1To30: ArAgingBucket;
+  days31To60: ArAgingBucket;
+  days61To90: ArAgingBucket;
+  days91Plus: ArAgingBucket;
+  currency: string;
+  regionIds: string[] | null;
+}
+
+export const receivablesReportApi = {
+  get: async ({ asOf, regionIds }: { asOf?: string; regionIds?: string[] } = {}): Promise<ReceivablesReport> => {
+    const response = await apiClient.get<ReceivablesReport>('/financial/reports/receivables', {
+      params: { ...(asOf ? { asOf } : {}), ...(regionIds?.length ? { regionIds } : {}) },
+    });
+    return response.data;
+  },
+};
 
 export const revenueReportApi = {
   get: async ({ regionIds, ...params }: RevenueReportParams): Promise<RevenueReport> => {

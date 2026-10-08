@@ -485,7 +485,7 @@ describe('DashboardPage — Revenue & productivity', () => {
     });
   });
 
-  it('opens the Revenue and Tech productivity reports for the same period and scope', async () => {
+  it('opens the Revenue, Tech productivity and Receivables reports in the same scope', async () => {
     // The picker only offers recent periods, so pin the clock.
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(new Date('2026-10-14T15:00:00Z'));
@@ -496,6 +496,11 @@ describe('DashboardPage — Revenue & productivity', () => {
       expect(screen.getByRole('link', { name: 'dashboard.revenue.techs.report' })).toHaveAttribute(
         'href',
         '/reports/tech-productivity?range=2026-08&from=home&region=r2',
+      );
+      // Receivables are current-only on Home, so the report opens as of today.
+      expect(screen.getByRole('link', { name: 'dashboard.revenue.aging.report' })).toHaveAttribute(
+        'href',
+        '/reports/receivables?asOf=today&from=home&region=r2',
       );
     } finally {
       vi.useRealTimers();

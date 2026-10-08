@@ -354,6 +354,8 @@ export {
   financialDashboardApi,
   revenueTargetsApi,
   revenueReportApi,
+  receivablesReportApi,
+  type ReceivablesReport,
   type MonthlyRevenueTarget,
   type RevenueTargets,
   type RevenueTargetErrorCode,

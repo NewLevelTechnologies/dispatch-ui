@@ -587,6 +587,7 @@
         "days61Plus": "61+ days",
         "days_one": "{{count}} day",
         "days_other": "{{count}} days",
+        "report": "Aging report",
         "title": "Receivables aging"
       },
       "agreements": {
@@ -1564,6 +1565,11 @@
         "description": "The filters each tech pulls for tomorrow's route, from the board, with a company total. Print and tape to the truck before heading out.",
         "name": "Filter Pull List"
       },
+      "receivables": {
+        "description": "What was owed at the end of any day, aged from that day, with every open {{invoices, lowercase}} behind it. For month-end close.",
+        "fromHome": "Receivables aging card",
+        "name": "Receivables as of a date"
+      },
       "revenue": {
         "description": "Billed revenue over any range, by division, job type or region, compared with last year or the period before.",
         "fromHome": "Revenue chart",
@@ -1674,6 +1680,60 @@
       },
       "noComparisonPicked": "No comparison",
       "vs": "vs {{window}}"
+    },
+    "receivables": {
+      "asOf": {
+        "lastMonthEnd": "End of last month",
+        "lastQuarterEnd": "End of last quarter",
+        "lastYearEnd": "End of last year",
+        "pick": "Pick a date…",
+        "today": "Today"
+      },
+      "buckets": {
+        "current": "Current",
+        "days1To30": "1–30 days",
+        "days31To60": "31–60 days",
+        "days61To90": "61–90 days",
+        "days91Plus": "91+ days"
+      },
+      "csv": {
+        "bucket": "Age on {{date}}",
+        "daysPastDue": "Days past due on {{date}}",
+        "due": "Due",
+        "issued": "Issued"
+      },
+      "empty": {
+        "body": "Every {{invoice}} issued by {{date}} had been paid, voided or cancelled by the end of that day.",
+        "title": "Nothing was owed"
+      },
+      "filters": {
+        "asOf": "As of",
+        "date": "Date",
+        "future": "Pick today or an earlier day."
+      },
+      "list": {
+        "all": "Open {{invoices, lowercase}}",
+        "bucket": "Open {{invoices, lowercase}} · {{bucket}}"
+      },
+      "loadFailed": "Couldn't load receivables.",
+      "sub": "Owed at the end of {{date}}, aged from that day: {{invoices}} issued by then, less payments dated by then. Voids and cancellations count from the day they happened.",
+      "summary": {
+        "count_one": "{{count}} {{invoice}}",
+        "count_other": "{{count}} {{invoices}}",
+        "outstanding": "Outstanding",
+        "overdue": "Overdue",
+        "share": "{{pct}}% · {{detail}}"
+      },
+      "table": {
+        "age": "Age",
+        "amount": "Owed",
+        "balanceToday": "Balance today",
+        "balanceTodayHint": "What's still owed now, after any payments since",
+        "daysPastDue": "Days past due",
+        "hint": "Open a row for its {{invoices}}; open it again for all of them.",
+        "title": "Aging"
+      },
+      "title": "Receivables"
     },
     "revenue": {
       "chart": {

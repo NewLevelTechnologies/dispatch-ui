@@ -487,16 +487,20 @@ export default function InvoicesPage() {
                       </td>
                       <td>{getStatusBadge(invoice)}</td>
                       <td>
-                        <Button
-                          plain
-                          onClick={() => {
-                            setSelectedInvoice(invoice);
-                            setNewStatus(invoice.status);
-                            setIsStatusOpen(true);
-                          }}
-                        >
-                          {t('common.edit')}
-                        </Button>
+                        {/* Void and cancelled are final (the server refuses any
+                            change out of them), and Edit only changes status. */}
+                        {!voided && (
+                          <Button
+                            plain
+                            onClick={() => {
+                              setSelectedInvoice(invoice);
+                              setNewStatus(invoice.status);
+                              setIsStatusOpen(true);
+                            }}
+                          >
+                            {t('common.edit')}
+                          </Button>
+                        )}
                       </td>
                     </DenseRow>
                     );

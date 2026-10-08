@@ -62,6 +62,23 @@ describe('InvoicesPage', () => {
     expect(screen.getByText('Acme Co')).toBeInTheDocument();
   });
 
+  it('offers no status change on a void or cancelled invoice, which are final', async () => {
+    vi.mocked(apiClient.get).mockImplementation((url: string) => {
+      if (url === '/financial/invoices' || url.startsWith('/financial/invoices?'))
+        return Promise.resolve({
+          data: invoicePage([
+            invoiceRow,
+            { ...invoiceRow, id: 'inv-2', invoiceNumber: 'INV-1002', status: 'VOID' },
+            { ...invoiceRow, id: 'inv-3', invoiceNumber: 'INV-1003', status: 'CANCELLED' },
+          ]),
+        });
+      return Promise.resolve({ data: [] });
+    });
+    renderWithProviders(<InvoicesPage />);
+    await waitFor(() => expect(screen.getByText('INV-1003')).toBeInTheDocument());
+    expect(screen.getAllByRole('button', { name: 'Edit' })).toHaveLength(1);
+  });
+
   it('drives the status chip server-side — Overdue sends overdue=true, not status=OVERDUE', async () => {
     const user = userEvent.setup();
     renderWithProviders(<InvoicesPage />);
