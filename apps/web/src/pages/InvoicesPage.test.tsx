@@ -42,6 +42,9 @@ describe('InvoicesPage', () => {
       if (url === '/financial/invoices' || url.startsWith('/financial/invoices?')) {
         return Promise.resolve({ data: invoicePage([invoiceRow]) });
       }
+      if (url.includes('/config/') || url.startsWith('/tenant/dispatch-regions')) {
+        return Promise.resolve({ data: [] });
+      }
       if (url.includes('/customers')) {
         return Promise.resolve({ data: { content: [], totalElements: 0, totalPages: 0, number: 0, size: 200 } });
       }
@@ -78,6 +81,28 @@ describe('InvoicesPage', () => {
         );
       expect(sent).toBe(true);
     });
+  });
+
+  it('opens on a Revenue report drill-down: billed invoices in a group', async () => {
+    renderWithProviders(<InvoicesPage />, {
+      initialPath: '/invoices?status=billed&from=2026-09-01&to=2026-09-30&division=none&region=r1',
+    });
+    await waitFor(() => expect(screen.getByText('INV-1001')).toBeInTheDocument());
+    const params = vi
+      .mocked(apiClient.get)
+      .mock.calls.filter(([u]) => u === '/financial/invoices')
+      .map(([, cfg]) => (cfg as { params: Record<string, unknown> }).params);
+    expect(params).toContainEqual(
+      expect.objectContaining({
+        billed: true,
+        from: '2026-09-01',
+        to: '2026-09-30',
+        noDivision: true,
+        regionIds: ['r1'],
+      }),
+    );
+    // A link-set filter shows its chip even before the lists load.
+    expect(screen.getByRole('button', { name: 'Division' })).toBeInTheDocument();
   });
 
   it('drives search server-side via the q param', async () => {

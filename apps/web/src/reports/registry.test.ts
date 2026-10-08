@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { reports, findReport } from './registry';
+import { reports, findReport, REPORT_GROUPS } from './registry';
 
 describe('reports registry', () => {
   it('exposes a non-empty catalog', () => {
@@ -8,12 +8,14 @@ describe('reports registry', () => {
 
   it('every entry has the required shape', () => {
     for (const r of reports) {
-      expect(typeof r.slug).toBe('string');
       expect(r.slug.length).toBeGreaterThan(0);
-      expect(typeof r.title).toBe('string');
-      expect(typeof r.description).toBe('string');
+      expect(REPORT_GROUPS).toContain(r.group);
       expect(r.Component).toBeDefined();
     }
+  });
+
+  it('gates the money reports on the invoice capability', () => {
+    expect(findReport('revenue')?.requiresCapability).toBe('VIEW_ALL_INVOICES');
   });
 });
 

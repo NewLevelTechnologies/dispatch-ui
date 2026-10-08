@@ -121,7 +121,7 @@ export function NeedsAttentionCard({ attention: a, today, regionIds }: Props) {
       tone: 'danger',
       label: t('dashboard.attention.rows.overdue', { count: a.overdue.count, entity: plural('invoice', a.overdue.count) }),
       meta: t('dashboard.attention.rows.overdueMeta', { amount: formatCurrency(a.overdue.amount) }),
-      href: '/invoices?status=overdue',
+      href: `/invoices?status=overdue${regionIds?.length ? `&region=${regionIds[0]}` : ''}`,
       action: t('dashboard.attention.actions.view'),
     });
   }

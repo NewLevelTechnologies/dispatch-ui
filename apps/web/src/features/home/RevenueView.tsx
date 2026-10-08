@@ -119,7 +119,16 @@ export function RevenueView({
         agreements={agreements.data}
       />
       <div className="home-2col">
-        <RevenueChartCard query={revenue} period={period} targets={targetMonths} />
+        <RevenueChartCard
+          query={revenue}
+          period={period}
+          targets={targetMonths}
+          reportHref={`/reports/revenue?${new URLSearchParams({
+            range: period.id,
+            from: 'home',
+            ...(regionIds ? { region: regionIds[0] } : {}),
+          }).toString()}`}
+        />
         <ReceivablesCard query={receivables} tag={asOfTag} />
       </div>
       <TechProductivityCard revenue={revenue} ctx={ctx} />
@@ -342,11 +351,14 @@ function RevenueChartCard({
   query,
   period,
   targets,
+  reportHref,
 }: {
   query: UseQueryResult<FinancialDashboardRevenue>;
   period: Period;
   /** Undefined while loading or when the read failed: no target line. */
   targets: MonthAmounts | undefined;
+  /** The Revenue report for this period and scope. */
+  reportHref: string;
 }) {
   const { t } = useTranslation();
   const canManage = useHasCapability('MANAGE_REVENUE_TARGETS');
@@ -389,7 +401,14 @@ function RevenueChartCard({
           </Pill>
         )
       }
-      action={action}
+      action={
+        <span className="home-chart-actions">
+          {action}
+          <Button plain size="xxs" href={reportHref}>
+            {t('dashboard.revenue.chart.report')}
+          </Button>
+        </span>
+      }
       query={query}
     >
       {() => {

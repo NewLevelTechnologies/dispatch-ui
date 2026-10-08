@@ -243,7 +243,7 @@ describe('AgreementDetailPage', () => {
         {
           id: 'inv-1', invoiceNumber: 'INV-9001', status: 'PAID', customerId: 'c-1', customerName: 'Iverson',
           serviceLocationId: null, workOrderId: null, agreementId: 'a-1', billingPeriodKey: '2026-P1',
-          invoiceDate: '2026-09-01', dueDate: '2026-09-30', totalAmount: 27000, amountPaid: 27000,
+          invoiceDate: '2026-09-01', dueDate: '2026-09-30', totalAmount: 27000, subtotal: 27000, taxAmount: 0, workOrderNumber: null, divisionId: null, workOrderTypeId: null, regionId: null, amountPaid: 27000,
           balanceDue: 0, overdue: false, lastSentAt: null, createdAt: '', updatedAt: '',
         },
       ],

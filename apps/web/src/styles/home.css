@@ -119,6 +119,7 @@
   pointer-events: none;
 }
 .home-chart-legend { display: inline-flex; align-items: center; gap: 12px; font-size: 11.5px; color: var(--fg-muted); }
+.home-chart-actions { display: inline-flex; align-items: center; gap: 12px; }
 .home-chart-legend > span { display: inline-flex; align-items: center; gap: 5px; }
 .home-chart-key.bar { width: 10px; height: 8px; border-radius: 2px; background: var(--success-500); }
 .home-chart-key.rule { width: 10px; border-top: 2px dashed var(--fg-muted); }

@@ -31,7 +31,7 @@ const row = (over: Partial<InvoiceListPage['content'][number]>): InvoiceListPage
   billingPeriodKey: null,
   invoiceDate: '2026-05-01',
   dueDate: '2026-05-31',
-  totalAmount: 1250,
+  totalAmount: 1250, subtotal: 1250, taxAmount: 0, workOrderNumber: null, divisionId: null, workOrderTypeId: null, regionId: null,
   amountPaid: 0,
   balanceDue: 1250,
   overdue: false,

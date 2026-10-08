@@ -17,6 +17,7 @@ import {
 } from '../components/catalyst/dropdown';
 import ConfirmDialog from '../components/ConfirmDialog';
 import { Pill } from '../components/ui/Pill';
+import { SummaryCell } from '../components/ui/SummaryCell';
 import { Card, CardBody } from '../components/ui/Card';
 import { DenseTable, DenseTHead, DenseRow } from '../components/ui/DenseTable';
 import { PageHead } from '../components/ui/PageHead';
@@ -573,35 +574,6 @@ export default function RolesPage() {
         isDestructive
         isPending={restoreAllMutation.isPending}
       />
-    </div>
-  );
-}
-
-function SummaryCell({
-  label,
-  value,
-  last,
-}: {
-  label: string;
-  value: number;
-  last?: boolean;
-}) {
-  // The vertical dividers only line up in the desktop 5-col layout. In
-  // the 2-col mobile layout they'd land between odd/even cells where
-  // they don't belong — hide below sm, restore at sm:.
-  return (
-    <div
-      className={
-        'px-4 py-[11px]' +
-        (last ? '' : ' sm:border-r sm:border-border-soft')
-      }
-    >
-      <div className="text-[10px] font-bold uppercase tracking-[0.06em] text-fg-muted">
-        {label}
-      </div>
-      <div className="mt-0.5 text-[20px] font-bold leading-none tracking-[-0.02em] text-fg-strong tabular-nums">
-        {value}
-      </div>
     </div>
   );
 }

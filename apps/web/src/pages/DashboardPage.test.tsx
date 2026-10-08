@@ -485,6 +485,19 @@ describe('DashboardPage — Revenue & productivity', () => {
     });
   });
 
+  it('opens the Revenue report for the same period and scope from the chart', async () => {
+    // The picker only offers recent periods, so pin the clock.
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-10-14T15:00:00Z'));
+    try {
+      renderWithProviders(<DashboardPage />, { initialPath: '/?view=rev&period=2026-08&region=r2' });
+      const link = await screen.findByRole('link', { name: 'dashboard.revenue.chart.report' });
+      expect(link).toHaveAttribute('href', '/reports/revenue?range=2026-08&from=home&region=r2');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('keeps the scope chip on this tab and sends it to every read', async () => {
     mockRegions.mockResolvedValue(TWO_REGIONS);
     renderWithProviders(<DashboardPage />, { initialPath: '/?view=rev&region=r2' });
