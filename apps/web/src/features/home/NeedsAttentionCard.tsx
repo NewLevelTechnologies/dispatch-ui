@@ -133,7 +133,7 @@ export function NeedsAttentionCard({ attention: a, today, regionIds }: Props) {
       label: t('dashboard.attention.rows.unbilled', { count: a.unbilled, entity: plural('work_order', a.unbilled) }),
       // `unbilled` ANDs onto the list's status filter, so the link carries
       // COMPLETED — the list's Open default would empty it.
-      href: '/work-orders?status=COMPLETED&unbilled=true',
+      href: `/work-orders?status=COMPLETED&unbilled=true${regionIds?.length ? `&region=${regionIds[0]}` : ''}`,
       action: t('dashboard.attention.actions.view'),
     });
   }

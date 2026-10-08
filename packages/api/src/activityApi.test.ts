@@ -51,4 +51,12 @@ describe('activityApi.listForTenant', () => {
     });
     expect(out).toEqual(page);
   });
+
+  it('narrows to regions when asked', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({ data: { content: [], nextCursor: null, hasMore: false } });
+    await activityApi.listForTenant({ limit: 9, regionIds: ['r1'] });
+    expect(apiClient.get).toHaveBeenCalledWith('/work-orders/activity', {
+      params: expect.objectContaining({ limit: 9, regionIds: ['r1'] }),
+    });
+  });
 });

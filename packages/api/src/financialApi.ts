@@ -838,19 +838,44 @@ export const financialActivityApi = {
 
   /** Tenant-wide financial milestones (home dashboard), newest-first. Same row
    * shape and cursor envelope as {@link getForCustomer}, so it co-paginates with
-   * `activityApi.listForTenant`. */
+   * `activityApi.listForTenant`. `regionIds` narrows to invoices in those regions. */
   getForTenant: async (
-    params?: { cursor?: string; limit?: number },
+    params?: { cursor?: string; limit?: number; regionIds?: string[] },
   ): Promise<FinancialActivityPage> => {
-    const response = await apiClient.get<FinancialActivityPage>('/financial/activity', { params });
+    const { regionIds, ...rest } = params ?? {};
+    const response = await apiClient.get<FinancialActivityPage>('/financial/activity', {
+      params: { ...rest, ...(regionIds?.length ? { regionIds } : {}) },
+    });
     return response.data;
   },
 };
 
 // ========== HOME DASHBOARD ==========
 // Tenant-wide aggregates, one endpoint per card so each card loads on its own.
-// Whole-company only (invoices carry no dispatch region). Dates are the
-// tenant's zone; money is decimal dollars.
+// Each takes optional `regionIds`: an invoice is in its service location's
+// region, a quote in its work order's location's. Invoices and quotes with no
+// location count only in whole-company figures. A user with assigned regions
+// sees only theirs either way; the response's `regionIds` is what the figures
+// cover (null = whole company). Dates are the tenant's zone; money is decimal
+// dollars.
+
+/** Optional dashboard scope; omit (or empty) for the whole company. */
+export interface DashboardScopeParams {
+  regionIds?: string[];
+}
+
+/** A dashboard read. No params at all for the default, so an unscoped
+ * current-month request is unchanged. */
+async function dashboardGet<T>(path: string, params: { period?: string; regionIds?: string[] }): Promise<T> {
+  const query = {
+    ...(params.period ? { period: params.period } : {}),
+    ...(params.regionIds?.length ? { regionIds: params.regionIds } : {}),
+  };
+  const response = Object.keys(query).length
+    ? await apiClient.get<T>(path, { params: query })
+    : await apiClient.get<T>(path);
+  return response.data;
+}
 
 /** "Needs attention" rows owned by financial-service. `overdue` is open invoices
  * past due, net of payments. `unbilledWorkOrderCount` is completed hand-entered
@@ -863,6 +888,8 @@ export interface FinancialDashboardAttention {
    *  orders. Will be removed by the backend. */
   unbilledWorkOrderCount: number;
   currency: string;
+  /** The regions these figures cover; null = the whole company. */
+  regionIds: string[] | null;
 }
 
 export interface DailyAmount {
@@ -903,6 +930,8 @@ export interface FinancialDashboardRevenue {
   billedByDay: DailyAmount[];
   comparison: { basis: RevenueComparisonBasis | null; billed: number | null };
   currency: string;
+  /** The regions these figures cover; null = the whole company. */
+  regionIds: string[] | null;
 }
 
 /** Open AR, **net of payments applied** (the customer ar-summary is face value,
@@ -920,6 +949,8 @@ export interface FinancialDashboardReceivables {
   days91Plus: ArAgingBucket;
   averageDaysToPay: number | null;
   currency: string;
+  /** The regions these figures cover; null = the whole company. */
+  regionIds: string[] | null;
 }
 
 /** `open*` = sent and not yet expired. The funnel is quotes FIRST SENT in the
@@ -936,31 +967,22 @@ export interface FinancialDashboardQuotes {
   winRate: number | null;
   averageDaysToDecision: number | null;
   currency: string;
+  /** The regions these figures cover; null = the whole company. */
+  regionIds: string[] | null;
 }
 
 export const financialDashboardApi = {
-  getAttention: async (): Promise<FinancialDashboardAttention> => {
-    const response = await apiClient.get<FinancialDashboardAttention>('/financial/dashboard/attention');
-    return response.data;
-  },
+  getAttention: (params: DashboardScopeParams = {}) =>
+    dashboardGet<FinancialDashboardAttention>('/financial/dashboard/attention', params),
 
-  getRevenue: async (params: { period?: ReportingPeriodParam } = {}): Promise<FinancialDashboardRevenue> => {
-    // No param at all for the default, so today's request is unchanged.
-    const response = params.period
-      ? await apiClient.get<FinancialDashboardRevenue>('/financial/dashboard/revenue', { params: { period: params.period } })
-      : await apiClient.get<FinancialDashboardRevenue>('/financial/dashboard/revenue');
-    return response.data;
-  },
+  getRevenue: (params: { period?: ReportingPeriodParam } & DashboardScopeParams = {}) =>
+    dashboardGet<FinancialDashboardRevenue>('/financial/dashboard/revenue', params),
 
-  getReceivables: async (): Promise<FinancialDashboardReceivables> => {
-    const response = await apiClient.get<FinancialDashboardReceivables>('/financial/dashboard/receivables');
-    return response.data;
-  },
+  getReceivables: (params: DashboardScopeParams = {}) =>
+    dashboardGet<FinancialDashboardReceivables>('/financial/dashboard/receivables', params),
 
-  getQuotes: async (): Promise<FinancialDashboardQuotes> => {
-    const response = await apiClient.get<FinancialDashboardQuotes>('/financial/dashboard/quotes');
-    return response.data;
-  },
+  getQuotes: (params: DashboardScopeParams = {}) =>
+    dashboardGet<FinancialDashboardQuotes>('/financial/dashboard/quotes', params),
 };
 
 /** One calendar month's target. `amount` null = no target (never 0). */

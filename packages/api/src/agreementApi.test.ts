@@ -198,6 +198,12 @@ describe('agreementApi', () => {
     expect(out).toEqual(overview);
   });
 
+  it('getOverview narrows to regions when asked', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({ data: {} });
+    await agreementApi.getOverview({ regionIds: ['r1'] });
+    expect(apiClient.get).toHaveBeenCalledWith('/work-orders/agreements/overview', { params: { regionIds: ['r1'] } });
+  });
+
   it('getCustomerSummary GETs the per-customer rollup (AG-1)', async () => {
     const summary = {
       arr: 2400, activeAgreementCount: 2, coveredLocations: 3,

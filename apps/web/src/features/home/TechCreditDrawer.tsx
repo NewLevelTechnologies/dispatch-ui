@@ -30,6 +30,7 @@ export function TechCreditDrawer({
   row,
   name,
   period,
+  regionIds,
   periodLabel,
   onClose,
 }: {
@@ -38,6 +39,8 @@ export function TechCreditDrawer({
   name: string;
   /** The card's period as sent to the backend; undefined = this month. */
   period: string | undefined;
+  /** The card's regions, so the drill-in adds up to its row. */
+  regionIds: string[] | undefined;
   periodLabel: string;
   onClose: () => void;
 }) {
@@ -53,9 +56,14 @@ export function TechCreditDrawer({
     workOrders: getName('work_order', true),
   };
   const invoices = useQuery({
-    queryKey: ['technician-productivity', 'invoices', row?.userId, period ?? 'current', page],
+    queryKey: ['technician-productivity', 'invoices', row?.userId, period ?? 'current', regionIds, page],
     queryFn: () =>
-      technicianProductivityApi.getCreditedInvoices(row?.userId ?? '', { period, page: page - 1, size: PAGE_SIZE }),
+      technicianProductivityApi.getCreditedInvoices(row?.userId ?? '', {
+        period,
+        regionIds,
+        page: page - 1,
+        size: PAGE_SIZE,
+      }),
     enabled: !!row,
   });
 
@@ -185,7 +193,7 @@ export function TechCreditDrawer({
               {excluded.length > 0 && ` ${t('dashboard.revenue.techs.drawer.excluded', { parts: excluded.join(', ') })}`}
             </p>
             {table}
-            {row.callbacks > 0 && <ChargedCallbacks userId={row.userId} period={period} />}
+            {row.callbacks > 0 && <ChargedCallbacks userId={row.userId} period={period} regionIds={regionIds} />}
           </div>
         )}
       </SlideOverBody>
@@ -198,12 +206,20 @@ export function TechCreditDrawer({
  * original it points back to. A callback charges every tech who arrived on
  * the original, once each.
  */
-function ChargedCallbacks({ userId, period }: { userId: string; period: string | undefined }) {
+function ChargedCallbacks({
+  userId,
+  period,
+  regionIds,
+}: {
+  userId: string;
+  period: string | undefined;
+  regionIds: string[] | undefined;
+}) {
   const { t } = useTranslation();
   const { getName } = useGlossary();
   const callbacks = useQuery({
-    queryKey: ['technician-productivity', 'callbacks', userId, period ?? 'current'],
-    queryFn: () => technicianProductivityApi.getChargedCallbacks(userId, { period, size: CALLBACKS_SIZE }),
+    queryKey: ['technician-productivity', 'callbacks', userId, period ?? 'current', regionIds],
+    queryFn: () => technicianProductivityApi.getChargedCallbacks(userId, { period, regionIds, size: CALLBACKS_SIZE }),
   });
   if (callbacks.isLoading) return <LoadingState />;
   if (callbacks.isError || !callbacks.data) return null;

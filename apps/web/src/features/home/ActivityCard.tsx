@@ -24,24 +24,24 @@ const DOT: Record<ActivityTone, TimelineEntry['dot']> = {
 };
 
 /**
- * The most recent tenant-wide events: the work-order stream and the financial
+ * The most recent events in scope: the work-order stream and the financial
  * stream merged by timestamp, through the same row models the location and
  * customer Activity tabs use, so an event reads identically everywhere. Not
  * polled, so no "Live" pill.
  */
-export function ActivityCard() {
+export function ActivityCard({ regionIds }: { regionIds: string[] | undefined }) {
   const { t } = useTranslation();
   const { getName } = useGlossary();
   const canInvoices = useHasCapability('VIEW_ALL_INVOICES');
 
   const business = useQuery({
-    queryKey: ['home-activity', 'work-orders'],
-    queryFn: () => activityApi.listForTenant({ limit: SHOWN }),
+    queryKey: ['home-activity', 'work-orders', regionIds],
+    queryFn: () => activityApi.listForTenant({ limit: SHOWN, regionIds }),
   });
   // Invoice amounts ride this stream, so it follows the invoice capability.
   const financial = useQuery({
-    queryKey: ['home-activity', 'financial'],
-    queryFn: () => financialActivityApi.getForTenant({ limit: SHOWN }),
+    queryKey: ['home-activity', 'financial', regionIds],
+    queryFn: () => financialActivityApi.getForTenant({ limit: SHOWN, regionIds }),
     enabled: canInvoices,
   });
 

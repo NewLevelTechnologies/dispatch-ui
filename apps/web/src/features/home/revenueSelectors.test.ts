@@ -65,6 +65,7 @@ describe('agingBuckets', () => {
       days91Plus: b(50, 1),
       averageDaysToPay: 18.5,
       currency: 'USD',
+      regionIds: null,
     });
     expect(rows.map((r) => [r.id, r.amount, r.count, r.tone])).toEqual([
       ['current', 400, 4, 'success'],

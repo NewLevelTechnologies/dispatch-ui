@@ -164,6 +164,12 @@ describe('financialActivityApi.getForTenant', () => {
     expect(apiClient.get).toHaveBeenCalledWith('/financial/activity', { params: { cursor: 'c0', limit: 20 } });
     expect(out).toEqual(page);
   });
+
+  it('narrows to regions when asked', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({ data: { content: [], nextCursor: null, hasMore: false } });
+    await financialActivityApi.getForTenant({ limit: 9, regionIds: ['r1'] });
+    expect(apiClient.get).toHaveBeenCalledWith('/financial/activity', { params: { limit: 9, regionIds: ['r1'] } });
+  });
 });
 
 describe('financialDashboardApi', () => {
@@ -186,6 +192,19 @@ describe('financialDashboardApi', () => {
   it('getRevenue passes a reporting period through', async () => {
     await financialDashboardApi.getRevenue({ period: '2026-YTD' });
     expect(apiClient.get).toHaveBeenCalledWith('/financial/dashboard/revenue', { params: { period: '2026-YTD' } });
+  });
+
+  it('passes a region scope and drops an empty one', async () => {
+    await financialDashboardApi.getRevenue({ period: '2026-Q3', regionIds: ['r1'] });
+    expect(apiClient.get).toHaveBeenLastCalledWith('/financial/dashboard/revenue', {
+      params: { period: '2026-Q3', regionIds: ['r1'] },
+    });
+    await financialDashboardApi.getReceivables({ regionIds: ['r1', 'r2'] });
+    expect(apiClient.get).toHaveBeenLastCalledWith('/financial/dashboard/receivables', {
+      params: { regionIds: ['r1', 'r2'] },
+    });
+    await financialDashboardApi.getQuotes({ regionIds: [] });
+    expect(apiClient.get).toHaveBeenLastCalledWith('/financial/dashboard/quotes');
   });
 });
 
