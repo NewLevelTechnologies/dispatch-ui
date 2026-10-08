@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { invoicesApi, quotesApi, financialActivityApi, financialDashboardApi, revenueTargetsApi } from './financialApi';
+import { invoicesApi, quotesApi, financialActivityApi, financialDashboardApi, revenueTargetsApi,
+  revenueReportApi } from './financialApi';
 import apiClient from './client';
 
 vi.mock('./client');
@@ -205,6 +206,22 @@ describe('financialDashboardApi', () => {
     });
     await financialDashboardApi.getQuotes({ regionIds: [] });
     expect(apiClient.get).toHaveBeenLastCalledWith('/financial/dashboard/quotes');
+  });
+});
+
+describe('revenueReportApi', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('GETs the report, dropping an empty region scope', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({ data: { billed: 1 } });
+    await revenueReportApi.get({ from: '2026-09-01', to: '2026-09-30', compare: 'previousPeriod', groupBy: 'division', regionIds: [] });
+    expect(apiClient.get).toHaveBeenLastCalledWith('/financial/reports/revenue', {
+      params: { from: '2026-09-01', to: '2026-09-30', compare: 'previousPeriod', groupBy: 'division' },
+    });
+    await revenueReportApi.get({ from: '2026-09-01', to: '2026-09-30', regionIds: ['r1'] });
+    expect(apiClient.get).toHaveBeenLastCalledWith('/financial/reports/revenue', {
+      params: { from: '2026-09-01', to: '2026-09-30', regionIds: ['r1'] },
+    });
   });
 });
 

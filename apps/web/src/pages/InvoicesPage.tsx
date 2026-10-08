@@ -28,6 +28,20 @@ import { InvoiceStatus, invoicesApi } from '../api/setup';
 import type { InvoiceListItemRow, CreateInvoiceRequest, CreateInvoiceLineItemRequest, ListInvoicesParams } from '../api/setup';
 import { customerApi } from '../api/setup';
 import { workOrderApi } from '../api/setup';
+import { dispatchRegionApi, divisionsApi, workOrderTypesApi } from '../api/setup';
+
+// Division, type and region chips: an id, or `none` for invoices with none
+// (no work order or location, or nothing set). The work order's and the
+// location's current values, the way the Revenue report groups them.
+const UNASSIGNED = 'none';
+function assignmentParams(
+  value: string,
+  ids: 'divisionIds' | 'workOrderTypeIds' | 'regionIds',
+  none: 'noDivision' | 'noWorkOrderType' | 'noRegion',
+): Partial<ListInvoicesParams> {
+  if (!value) return {};
+  return value === UNASSIGNED ? { [none]: true } : { [ids]: [value] };
+}
 
 const PAGE_SIZE = 25;
 
@@ -35,7 +49,10 @@ const PAGE_SIZE = 25;
 // rides the server-derived `overdue=true` (open + strictly past due) rather than
 // `status=OVERDUE`, so a SENT invoice past its due date matches even before the
 // stored status flips. Same filter set as the location detail Invoices tab.
+// "Billed" is every issued invoice (not draft, void or cancelled): the set the
+// Revenue report counts, so its drill-downs land on the same list.
 const INVOICE_STATUS_FILTERS: { id: string; labelKey: string; params: Partial<ListInvoicesParams> }[] = [
+  { id: 'billed', labelKey: 'invoices.status.billed', params: { billed: true } },
   { id: 'overdue', labelKey: 'invoices.status.overdue', params: { overdue: true } },
   { id: 'draft', labelKey: 'invoices.status.draft', params: { status: InvoiceStatus.DRAFT } },
   { id: 'sent', labelKey: 'invoices.status.sent', params: { status: InvoiceStatus.SENT } },
@@ -126,13 +143,26 @@ export default function InvoicesPage() {
   const [submitting, setSubmitting] = useState(false);
 
   const statusParams = INVOICE_STATUS_FILTERS.find((s) => s.id === statusId)?.params ?? {};
+  const divisionId = searchParams.get('division') ?? '';
+  const typeId = searchParams.get('type') ?? '';
+  const regionId = searchParams.get('region') ?? '';
+
+  const { data: divisions = [] } = useQuery({ queryKey: ['divisions'], queryFn: () => divisionsApi.getAll() });
+  const { data: types = [] } = useQuery({ queryKey: ['work-order-types'], queryFn: () => workOrderTypesApi.getAll() });
+  const { data: regions = [] } = useQuery({
+    queryKey: ['dispatch-regions', 'active'],
+    queryFn: () => dispatchRegionApi.getAll(false),
+  });
 
   const { data: invoicePage, isLoading: invoicesLoading } = useQuery({
-    queryKey: ['invoices', page, deferredSearch, statusId, dateRange.from, dateRange.to],
+    queryKey: ['invoices', page, deferredSearch, statusId, dateRange.from, dateRange.to, divisionId, typeId, regionId],
     queryFn: () =>
       invoicesApi.getAll({
         q: deferredSearch || undefined,
         ...statusParams,
+        ...assignmentParams(divisionId, 'divisionIds', 'noDivision'),
+        ...assignmentParams(typeId, 'workOrderTypeIds', 'noWorkOrderType'),
+        ...assignmentParams(regionId, 'regionIds', 'noRegion'),
         // The chip's inclusive day strings pass through as-is.
         from: dateRange.from || undefined,
         to: dateRange.to || undefined, // inclusive on the backend — no +1-day trick
@@ -359,6 +389,38 @@ export default function InvoicesPage() {
             value={dateRange}
             onChange={(r) => setFilterParams({ from: r.from || null, to: r.to || null, date: null })}
           />
+
+          {/* Shown when the tenant has more than one to pick from, or a link set one. */}
+          {(divisions.length > 1 || divisionId) && (
+            <AssignmentChip
+              label={getName('division')}
+              value={divisionId}
+              options={divisions}
+              unassignedLabel={t('invoices.filters.noDivision', { division: getName('division').toLowerCase() })}
+              anyLabel={t('invoices.filters.any')}
+              onChange={(v) => setFilterParam('division', v)}
+            />
+          )}
+          {(types.length > 1 || typeId) && (
+            <AssignmentChip
+              label={t('invoices.filters.type')}
+              value={typeId}
+              options={types}
+              unassignedLabel={t('invoices.filters.noType')}
+              anyLabel={t('invoices.filters.any')}
+              onChange={(v) => setFilterParam('type', v)}
+            />
+          )}
+          {(regions.length > 1 || regionId) && (
+            <AssignmentChip
+              label={getName('dispatch_region')}
+              value={regionId}
+              options={regions}
+              unassignedLabel={t('invoices.filters.noRegion', { region: getName('dispatch_region').toLowerCase() })}
+              anyLabel={t('invoices.filters.any')}
+              onChange={(v) => setFilterParam('region', v)}
+            />
+          )}
         </ListToolbar>
 
         {invoicesLoading ? (
@@ -618,5 +680,41 @@ export default function InvoicesPage() {
         </DialogActions>
       </Dialog>
     </AppLayout>
+  );
+}
+
+function AssignmentChip({
+  label,
+  value,
+  options,
+  unassignedLabel,
+  anyLabel,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  options: { id: string; name: string }[];
+  unassignedLabel: string;
+  anyLabel: string;
+  onChange: (value: string | null) => void;
+}) {
+  const display = value === UNASSIGNED ? unassignedLabel : (options.find((o) => o.id === value)?.name ?? null);
+  return (
+    <FilterChipListbox
+      label={label}
+      ariaLabel={label}
+      value={value || null}
+      displayValue={value ? display : null}
+      onChange={onChange}
+      onClear={() => onChange(null)}
+      resetLabel={anyLabel}
+    >
+      {options.map((o) => (
+        <ChipListboxOption key={o.id} value={o.id}>
+          {o.name}
+        </ChipListboxOption>
+      ))}
+      <ChipListboxOption value={UNASSIGNED}>{unassignedLabel}</ChipListboxOption>
+    </FilterChipListbox>
   );
 }

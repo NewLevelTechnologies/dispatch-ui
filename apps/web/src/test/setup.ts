@@ -835,7 +835,7 @@ vi.mock('react-i18next', () => {
     'quotes.description': 'Create and manage customer quotes',
     'quotes.search.placeholder': 'Search by quote #, customer, or amount…',
     'reports.backToReports': 'Back to Reports',
-    'reports.description': 'Operational, financial, and equipment reports.',
+    'reports.description': 'Fixed reports with filters and export. Their numbers match Home.',
     'reports.empty': 'No reports are available yet.',
     'reports.errorLoading': 'Error loading report',
     'reports.filterPullList.date': 'Date',

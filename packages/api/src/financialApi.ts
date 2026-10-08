@@ -258,11 +258,19 @@ export interface InvoiceListItemRow {
   billingPeriodKey: string | null;
   invoiceDate: string;
   dueDate: string;
+  subtotal: number;
+  taxAmount: number;
   totalAmount: number;
   amountPaid: number;
   balanceDue: number;
   overdue: boolean;
   lastSentAt: string | null;
+  // What the revenue report groups by, current values; null when there's no
+  // work order or location, or none is set.
+  workOrderNumber: string | null;
+  divisionId: string | null;
+  workOrderTypeId: string | null;
+  regionId: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -311,6 +319,16 @@ export interface ListInvoicesParams {
   overdue?: boolean; // true = open + strictly past due
   agingBucket?: InvoiceAgingBucket; // open invoices by days past dueDate; pairs with customerId. Don't also send a conflicting status.
   q?: string; // case-insensitive substring on invoiceNumber OR customerName
+  regionIds?: string[]; // the invoice's service location's region; a user's own regions bound it either way
+  // Revenue report drill-down. `billed` = issued (not DRAFT/VOID/CANCELLED),
+  // the report's billed set. Division and type are the work order's current
+  // ones; each `no…` flag is that grouping's unassigned group, OR-ed with its ids.
+  billed?: boolean;
+  divisionIds?: string[];
+  noDivision?: boolean;
+  workOrderTypeIds?: string[];
+  noWorkOrderType?: boolean;
+  noRegion?: boolean;
   page?: number; // 0-indexed
   size?: number; // server-clamped to 1..200
   sort?: `${InvoiceSortField},${'asc' | 'desc'}`;
@@ -845,6 +863,70 @@ export const financialActivityApi = {
     const { regionIds, ...rest } = params ?? {};
     const response = await apiClient.get<FinancialActivityPage>('/financial/activity', {
       params: { ...rest, ...(regionIds?.length ? { regionIds } : {}) },
+    });
+    return response.data;
+  },
+};
+
+// ========== REPORTS ==========
+// The Revenue report. Same billed/collected definitions as the dashboard
+// revenue read (a whole calendar month or quarter matches it to the cent).
+
+export type RevenueReportCompare = 'sameDatesLastYear' | 'previousPeriod' | 'none';
+export type RevenueReportGroupBy = 'division' | 'workOrderType' | 'region' | 'none';
+
+export interface RevenueReportParams {
+  /** Tenant-local YYYY-MM-DD; at most 3 years apart. */
+  from: string;
+  /** Cut off at today by the server; read the response's `to`. */
+  to: string;
+  compare?: RevenueReportCompare;
+  groupBy?: RevenueReportGroupBy;
+  regionIds?: string[];
+}
+
+export interface RevenueReportComparison {
+  basis: Exclude<RevenueReportCompare, 'none'>;
+  from: string;
+  to: string;
+  billed: number;
+  invoiceCount: number;
+  collected: number;
+}
+
+/** One group's share. `id` null = unassigned (no work order or location, or none set). */
+export interface RevenueReportGroup {
+  id: string | null;
+  billed: number;
+  invoiceCount: number;
+  /** Null when the report has no comparison. */
+  comparisonBilled: number | null;
+  comparisonInvoiceCount: number | null;
+}
+
+export interface RevenueReport {
+  from: string;
+  /** The day the figures actually end on. */
+  to: string;
+  billed: number;
+  invoiceCount: number;
+  collected: number;
+  /** Every day from `from` to `to`, zero-filled. */
+  billedByDay: DailyAmount[];
+  /** Null with `compare=none`, or when billing in scope began after the comparison window's start. */
+  comparison: RevenueReportComparison | null;
+  groupBy: RevenueReportGroupBy;
+  /** Add up to `billed` and `invoiceCount` exactly; the null group is last, the rest by billed. */
+  groups: RevenueReportGroup[];
+  currency: string;
+  /** The regions these figures cover; null = the whole company. */
+  regionIds: string[] | null;
+}
+
+export const revenueReportApi = {
+  get: async ({ regionIds, ...params }: RevenueReportParams): Promise<RevenueReport> => {
+    const response = await apiClient.get<RevenueReport>('/financial/reports/revenue', {
+      params: { ...params, ...(regionIds?.length ? { regionIds } : {}) },
     });
     return response.data;
   },

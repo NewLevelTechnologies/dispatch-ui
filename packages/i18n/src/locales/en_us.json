@@ -610,6 +610,7 @@
         "invoiced": "Invoiced",
         "monthsHit_one": "{{hit}} of {{count}} month hit target",
         "monthsHit_other": "{{hit}} of {{count}} months hit target",
+        "report": "Revenue report",
         "setTargets": "Set targets",
         "target": "Target",
         "weeksHit_one": "{{hit}} of {{count}} week hit target",
@@ -1078,8 +1079,13 @@
   "invoices": {
     "description": "Manage customer invoices and billing",
     "filters": {
+      "any": "Any",
       "anyStatus": "Any status",
-      "issued": "Issued"
+      "issued": "Issued",
+      "noDivision": "No {{division}}",
+      "noRegion": "No {{region}}",
+      "noType": "No job type",
+      "type": "Job type"
     },
     "search": {
       "placeholder": "Search by {{entity, lowercase}} #, {{customer, lowercase}}, or amount…"
@@ -1104,6 +1110,7 @@
     },
     "status": {
       "all": "All",
+      "billed": "Billed",
       "cancelled": "Cancelled",
       "draft": "Draft",
       "overdue": "Overdue",
@@ -1549,8 +1556,20 @@
     }
   },
   "reports": {
+    "alsoFromHome": "Also opens from Home: {{where}}",
     "backToReports": "Back to Reports",
-    "description": "Operational, financial, and equipment reports.",
+    "catalog": {
+      "filter-pull-list": {
+        "description": "Filter sizes and quantities needed for scheduled work orders. Print and tape to the truck before heading out.",
+        "name": "Filter Pull List"
+      },
+      "revenue": {
+        "description": "Billed revenue over any range, by division, job type or region, compared with last year or the period before.",
+        "fromHome": "Revenue chart",
+        "name": "Revenue"
+      }
+    },
+    "description": "Fixed reports with filters and export. Their numbers match Home.",
     "empty": "No reports are available yet.",
     "errorLoading": "Error loading report",
     "filterPullList": {
@@ -1569,9 +1588,95 @@
       "to": "To",
       "total": "Total filters: {{count}}"
     },
+    "groups": {
+      "money": "Money",
+      "people": "People",
+      "sales": "Sales",
+      "work": "Work"
+    },
     "loading": "Loading report…",
     "notFound": "That report does not exist.",
     "print": "Print",
+    "printList": "Print list",
+    "revenue": {
+      "backHome": "Home",
+      "chart": {
+        "day": "Daily revenue",
+        "month": "Monthly revenue",
+        "sameWeekdays": "{{window}}, same weekdays",
+        "week": "Weekly revenue"
+      },
+      "compare": {
+        "none": "No comparison",
+        "previousPeriod": "Previous period",
+        "sameDatesLastYear": "Same period last year"
+      },
+      "csv": {
+        "date": "Date",
+        "number": "{{entity}} number",
+        "subtotal": "Subtotal",
+        "tax": "Tax",
+        "total": "Total"
+      },
+      "empty": {
+        "body": "Nothing was billed in {{range}}.",
+        "title": "No {{entities}} in this range"
+      },
+      "export": "Export CSV",
+      "exportFailed": "Couldn't export the report",
+      "exported": "Exported {{file}} · {{count}} {{entities}}",
+      "exporting": "Exporting…",
+      "filters": {
+        "compare": "Compare",
+        "custom": "Custom",
+        "customGroup": "Custom",
+        "customOption": "Custom range…",
+        "dates": "Dates",
+        "groupBy": "Group by",
+        "problem": {
+          "future": "The range starts after today.",
+          "order": "The end date is before the start date.",
+          "tooLong": "A range can be at most 3 years long."
+        },
+        "range": "Range"
+      },
+      "groupBy": {
+        "none": "None",
+        "noneOption": "None (list {{entities}})",
+        "workOrderType": "Job type"
+      },
+      "loadFailed": "Couldn't load the report",
+      "noComparison": {
+        "previousPeriod": "No data for the previous period",
+        "sameDatesLastYear": "No {{year}} data to compare"
+      },
+      "noComparisonPicked": "No comparison",
+      "sub": "{{range}} · {{dates}}. Issued invoices including tax; drafts and voided excluded.",
+      "subToDate": "{{range}} · {{dates}} · to date. Issued invoices including tax; drafts and voided excluded.",
+      "summary": {
+        "collected": "Collected",
+        "revenue": "Revenue"
+      },
+      "table": {
+        "avg": "Avg {{entity, lowercase}}",
+        "change": "Change",
+        "hint": "Click a row to see its {{entities}}",
+        "issued": "Issued",
+        "listFailed": "Couldn't load {{entities}}",
+        "previewFailed": "Couldn't load these",
+        "range": "{{first}}–{{last}} of {{count}} {{entities}}",
+        "revenue": "Revenue",
+        "share": "Share",
+        "showing": "Showing {{shown}} of {{count}}",
+        "title": "By {{group}}",
+        "total": "Total",
+        "viewAll": "View all in {{entities}}"
+      },
+      "title": "Revenue",
+      "unassigned": "No {{group}}",
+      "unknown": "Unknown",
+      "vs": "vs {{window}}"
+    },
     "title": "Reports",
     "uncategorized": "Other"
   },
