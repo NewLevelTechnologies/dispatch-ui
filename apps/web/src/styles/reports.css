@@ -114,6 +114,10 @@
 .rp-detail-note { padding-left: 23px; font-size: 11.5px; color: var(--fg-muted); }
 @media (max-width: 1099px) { .rp-opt { display: none; } }
 
+/* Tech productivity: each tech's trend as tiny bars on the table's shared scale. */
+.tp-trend { display: inline-flex; align-items: flex-end; gap: 1px; width: 84px; }
+.tp-trend > span { flex: 1; min-width: 1px; border-radius: 1px 1px 0 0; background: var(--accent-500); }
+
 /* Print list (Filter Pull List): one card per tech, what to pull beside the
    stops, and the company total last. */
 .pl-dates { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; }

@@ -30,6 +30,7 @@ export function TechCreditDrawer({
   row,
   name,
   period,
+  range,
   regionIds,
   periodLabel,
   onClose,
@@ -39,6 +40,8 @@ export function TechCreditDrawer({
   name: string;
   /** The card's period as sent to the backend; undefined = this month. */
   period: string | undefined;
+  /** The report's dates instead of a period. */
+  range?: { from: string; to: string };
   /** The card's regions, so the drill-in adds up to its row. */
   regionIds: string[] | undefined;
   periodLabel: string;
@@ -56,10 +59,11 @@ export function TechCreditDrawer({
     workOrders: getName('work_order', true),
   };
   const invoices = useQuery({
-    queryKey: ['technician-productivity', 'invoices', row?.userId, period ?? 'current', regionIds, page],
+    queryKey: ['technician-productivity', 'invoices', row?.userId, range ?? period ?? 'current', regionIds, page],
     queryFn: () =>
       technicianProductivityApi.getCreditedInvoices(row?.userId ?? '', {
         period,
+        ...range,
         regionIds,
         page: page - 1,
         size: PAGE_SIZE,
@@ -161,7 +165,11 @@ export function TechCreditDrawer({
           <Avatar name={name || ' '} size="md" />
           <div>
             <SlideOverTitle>{name}</SlideOverTitle>
-            <div className="home-att-meta">{t('dashboard.revenue.techs.drawer.period', { period: periodLabel })}</div>
+            <div className="home-att-meta">
+              {regionIds?.length
+                ? periodLabel
+                : t('dashboard.revenue.techs.drawer.period', { period: periodLabel })}
+            </div>
           </div>
         </div>
       </SlideOverHeader>
@@ -193,7 +201,9 @@ export function TechCreditDrawer({
               {excluded.length > 0 && ` ${t('dashboard.revenue.techs.drawer.excluded', { parts: excluded.join(', ') })}`}
             </p>
             {table}
-            {row.callbacks > 0 && <ChargedCallbacks userId={row.userId} period={period} regionIds={regionIds} />}
+            {row.callbacks > 0 && (
+              <ChargedCallbacks userId={row.userId} period={period} range={range} regionIds={regionIds} />
+            )}
           </div>
         )}
       </SlideOverBody>
@@ -209,17 +219,20 @@ export function TechCreditDrawer({
 function ChargedCallbacks({
   userId,
   period,
+  range,
   regionIds,
 }: {
   userId: string;
   period: string | undefined;
+  range: { from: string; to: string } | undefined;
   regionIds: string[] | undefined;
 }) {
   const { t } = useTranslation();
   const { getName } = useGlossary();
   const callbacks = useQuery({
-    queryKey: ['technician-productivity', 'callbacks', userId, period ?? 'current', regionIds],
-    queryFn: () => technicianProductivityApi.getChargedCallbacks(userId, { period, regionIds, size: CALLBACKS_SIZE }),
+    queryKey: ['technician-productivity', 'callbacks', userId, range ?? period ?? 'current', regionIds],
+    queryFn: () =>
+      technicianProductivityApi.getChargedCallbacks(userId, { period, ...range, regionIds, size: CALLBACKS_SIZE }),
   });
   if (callbacks.isLoading) return <LoadingState />;
   if (callbacks.isError || !callbacks.data) return null;

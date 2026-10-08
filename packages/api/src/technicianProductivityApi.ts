@@ -1,13 +1,14 @@
 // Technician productivity API Client
 //
 // The home dashboard's Tech productivity card (a reporting period, default
-// month to date in the tenant zone) and its per-tech drill-in. Lives on
-// work-order-service; whole-company, since invoices carry no dispatch region. See
-// dispatch-api/handoff/FE_HANDOFF_home_dashboard.md for the credit rules.
+// month to date in the tenant zone), the Tech productivity report (any
+// `from`/`to` up to 3 years, compared) and their per-tech drill-ins. Lives on
+// work-order-service. See dispatch-api/handoff/FE_HANDOFF_home_dashboard.md
+// for the credit rules and FE_HANDOFF_tech_productivity_range.md for ranges.
 
 import apiClient from './client';
 import type { Page } from './workOrderApi';
-import type { ReportingPeriodParam } from './financialApi';
+import type { ReportingPeriodParam, RevenueReportCompare } from './financialApi';
 
 export interface TechnicianProductivityRow {
   userId: string;
@@ -35,6 +36,16 @@ export interface TechnicianProductivityRow {
   firstVisit: { eligible: number; completed: number; rate: number | null };
   /** Confirmed callbacks raised in the period on jobs this tech worked. */
   callbacks: number;
+  /**
+   * The same four figures over the comparison window (zeros when the tech
+   * had nothing in it); null on every row when there's no comparison.
+   */
+  comparison: { jobs: number; revenue: number; onSiteHours: number; callbacks: number } | null;
+  /**
+   * Weeks in sevens from `periodStart`, zero-filled, the last cut at `asOf`.
+   * Revenue adds up to the row's; a job billed in two weeks counts in both.
+   */
+  weekly: { weekStart: string; revenue: number; jobs: number }[];
 }
 
 export interface RevenueBucket {
@@ -63,6 +74,11 @@ export interface TechnicianProductivityResponse {
   currency: string;
   /** The regions these figures cover; null = the whole company. */
   regionIds: string[] | null;
+  /**
+   * The comparison window and its total (unattributed included). Null with
+   * `compare=none`, or when billing in scope started after the window did.
+   */
+  comparison: { basis: RevenueReportCompare; from: string; to: string; totalRevenue: number } | null;
 }
 
 /** A callback charged to a tech in the period, and the job it calls back to. */
@@ -88,19 +104,25 @@ export interface CreditedInvoice {
   writtenByName: string | null;
 }
 
-/** The card's period (omit for this month) and regions (omit for the whole company). */
-type ScopeParams = { period?: ReportingPeriodParam; regionIds?: string[] };
+/**
+ * A period (omit for this month) or a `from`/`to` range (both, tenant-local,
+ * at most 3 years; not with `period`), and regions (omit for the whole company).
+ */
+type ScopeParams = { period?: ReportingPeriodParam; from?: string; to?: string; regionIds?: string[] };
 
-const scopeQuery = ({ period, regionIds }: ScopeParams) => ({
+const scopeQuery = ({ period, from, to, regionIds }: ScopeParams) => ({
   ...(period ? { period } : {}),
+  ...(from && to ? { from, to } : {}),
   ...(regionIds?.length ? { regionIds } : {}),
 });
 
 export const technicianProductivityApi = {
-  /** Omit `period` for the current month to date. */
-  get: async (params: ScopeParams = {}): Promise<TechnicianProductivityResponse> => {
+  /** Omit `period` for the current month to date. `compare` defaults to none. */
+  get: async (
+    params: ScopeParams & { compare?: RevenueReportCompare } = {},
+  ): Promise<TechnicianProductivityResponse> => {
     // No param at all for the default, so today's request is unchanged.
-    const query = scopeQuery(params);
+    const query = { ...scopeQuery(params), ...(params.compare ? { compare: params.compare } : {}) };
     const response = Object.keys(query).length
       ? await apiClient.get<TechnicianProductivityResponse>('/work-orders/technician-productivity', { params: query })
       : await apiClient.get<TechnicianProductivityResponse>('/work-orders/technician-productivity');

@@ -16,6 +16,7 @@ describe('reports registry', () => {
 
   it('gates the money reports on the invoice capability', () => {
     expect(findReport('revenue')?.requiresCapability).toBe('VIEW_ALL_INVOICES');
+    expect(findReport('tech-productivity')?.requiresCapability).toBe('VIEW_ALL_INVOICES');
   });
 });
 
