@@ -267,24 +267,22 @@ describe('tenantFilterSizesApi', () => {
 });
 
 describe('reportsApi.filterPullList', () => {
-  it('passes the date window and optional filters straight through', async () => {
-    vi.mocked(apiClient.get).mockResolvedValue({ data: [] });
+  it('passes the dates and filters through, and drops an empty scope', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({ data: { techs: [], totals: [] } });
 
     await reportsApi.filterPullList({
-      scheduledDateFrom: '2026-01-01',
-      scheduledDateTo: '2026-01-31',
+      date: '2026-10-09',
+      dateTo: '2026-10-12',
+      regionIds: ['r1'],
       workOrderTypeId: 'wot-1',
       divisionId: 'div-1',
     });
-
     expect(apiClient.get).toHaveBeenCalledWith('/equipment/filter-pull-list', {
-      params: {
-        scheduledDateFrom: '2026-01-01',
-        scheduledDateTo: '2026-01-31',
-        workOrderTypeId: 'wot-1',
-        divisionId: 'div-1',
-      },
+      params: { date: '2026-10-09', dateTo: '2026-10-12', regionIds: ['r1'], workOrderTypeId: 'wot-1', divisionId: 'div-1' },
     });
+
+    await reportsApi.filterPullList({ date: '2026-10-09', regionIds: [] });
+    expect(apiClient.get).toHaveBeenLastCalledWith('/equipment/filter-pull-list', { params: { date: '2026-10-09' } });
   });
 });
 

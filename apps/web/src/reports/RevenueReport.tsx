@@ -34,6 +34,7 @@ import { ChipListboxOption, ChipListboxSection, FilterChipListbox } from '../com
 import { money } from '../features/home/revenueSelectors';
 import { parsePeriod, periodGroups, periodName } from '../features/home/period';
 import { RevenueChart } from '../features/reports/RevenueChart';
+import { downloadCsv } from '../features/reports/csv';
 import { RevenueGroupsTable, RevenueInvoiceList } from '../features/reports/RevenueTables';
 import {
   COMPARES,
@@ -197,7 +198,7 @@ export default function RevenueReport() {
         region: (id) => (id ? (groupNames.region.get(id) ?? '') : ''),
       });
       const file = `revenue-${range.kind === 'period' ? range.id : `${report.from}-to-${report.to}`}.csv`;
-      download(csv, file);
+      downloadCsv(csv, file);
       showSuccess(
         t('reports.revenue.exported', { file, count: rows.length, entities: getName('invoice', true).toLowerCase() }),
       );
@@ -426,15 +427,4 @@ function Summary({ report, cmpLine }: { report: Report; cmpLine: string }) {
       })}
     </div>
   );
-}
-
-function download(text: string, filename: string) {
-  const url = URL.createObjectURL(new Blob([text], { type: 'text/csv;charset=utf-8' }));
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(url);
 }
