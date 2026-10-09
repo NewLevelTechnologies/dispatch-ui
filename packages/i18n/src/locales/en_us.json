@@ -1778,14 +1778,64 @@
       "unassigned": "No {{tech}}"
     },
     "backToReports": "Back to Reports",
+    "callbacks": {
+      "csv": {
+        "originalCompleted": "Original completed",
+        "raised": "Raised"
+      },
+      "exportFailed": "Couldn't export the callbacks",
+      "exported": "Exported {{file}} · {{count}} callbacks",
+      "groupBy": {
+        "none": "Nothing",
+        "originalDivision": "Original job's {{division}}",
+        "originalType": "Original {{workOrder}} type"
+      },
+      "list": {
+        "callback": "Callback",
+        "charged": "Charged to",
+        "completedOn": "Completed {{date}}",
+        "daysBetween": "Days after",
+        "hint": "Newest first",
+        "linkedBy": "Linked by",
+        "loadFailed": "Couldn't load the callbacks",
+        "none": "No callbacks were raised in this range.",
+        "original": "Original job",
+        "originalGone": "Original {{workOrder}} removed",
+        "title": "Callbacks"
+      },
+      "loadFailed": "Couldn't load the callbacks report",
+      "nobodyArrived": "No {{tech}} arrived on the original",
+      "sub": "{{range}} · {{dates}}. Confirmed callbacks raised in the range, charged to every {{tech}} who arrived on the original job.",
+      "subToDate": "{{range}} · {{dates}}, to date. Confirmed callbacks raised in the range, charged to every {{tech}} who arrived on the original job.",
+      "summary": {
+        "count": "Callbacks",
+        "daysBetween": "Average days after",
+        "daysBetweenNone": "No original with a completion date",
+        "daysBetweenSub": "From the original {{workOrder}}'s completion"
+      },
+      "table": {
+        "hint": "By the original job. Pick one to list its callbacks",
+        "hintTech": "A callback with two {{tech}}s counts for both. Pick one to list theirs"
+      },
+      "title": "Callbacks",
+      "untracked": "Callback linking began {{date}}. Before then, zero means nothing was linked, not that nothing came back."
+    },
     "catalog": {
       "arrivals": {
         "description": "On-time arrival by {{tech, lowercase}} and {{region, lowercase}}, with every late visit listed. Same rule as Home's arrival card.",
         "name": "Arrival windows"
       },
+      "callbacks": {
+        "description": "Every confirmed callback with its original job, the {{techs, lowercase}} charged and the days between. A {{tech, lowercase}}'s count matches Tech productivity.",
+        "name": "Callbacks"
+      },
       "filter-pull-list": {
         "description": "The filters each {{tech, lowercase}} pulls for tomorrow's {{dispatches, lowercase}}, from the board, with a company total. Print and tape to the truck before heading out.",
         "name": "Filter Pull List"
+      },
+      "jobs-completed": {
+        "description": "Completed {{workOrders, lowercase}} and average ticket by type, {{division, lowercase}} or {{region, lowercase}}, by the day they were completed.",
+        "name": "{{workOrders}} completed"
       },
       "payments": {
         "description": "Received {{payments, lowercase}} by method, payer or day, for bank reconciliation. Totals match the Revenue report's collected.",
@@ -1819,6 +1869,38 @@
       "people": "People",
       "sales": "Sales",
       "work": "Work"
+    },
+    "jobs": {
+      "chart": {
+        "day": "Completed by day",
+        "month": "Completed by month",
+        "week": "Completed by week"
+      },
+      "empty": {
+        "body": "Nothing was completed in {{range}}.",
+        "title": "No {{entities}} completed in this range"
+      },
+      "exportFailed": "Couldn't export the report",
+      "exported": "Exported {{file}}",
+      "groupBy": {
+        "none": "Nothing"
+      },
+      "loadFailed": "Couldn't load the completed {{entities}}",
+      "sub": "{{range}} · {{dates}}. {{entities}} by the day they were completed, with everything billed on them.",
+      "subToDate": "{{range}} · {{dates}}, to date. {{entities}} by the day they were completed, with everything billed on them.",
+      "summary": {
+        "billedSub": "On these jobs, whatever the {{invoices}}' dates",
+        "jobs": "Completed",
+        "notBilledSub": "Left out of the average ticket"
+      },
+      "table": {
+        "averageTicket": "Average ticket",
+        "billed": "Billed",
+        "hint": "Pick one to list its {{entities}}",
+        "notBilled": "Not billed yet",
+        "perTech": "Per {{tech}}: Tech productivity"
+      },
+      "title": "{{entities}} completed"
     },
     "loading": "Loading report…",
     "notFound": "That report does not exist.",
@@ -3473,6 +3555,7 @@
       "cancelled": "Cancelled",
       "clearAll": "Clear all",
       "completed": "Completed",
+      "completedBetween": "Completed {{range}}",
       "inProgress": "In Progress",
       "itemStatus": "Item status",
       "itemStatusHint": "contains an item",

@@ -6,7 +6,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { useTranslation } from '@dispatch/i18n';
 import { formatCurrency } from '@dispatch/utils';
-import { technicianProductivityApi, type TechnicianProductivityRow } from '../../api/setup';
+import { technicianProductivityApi, workOrderReportsApi, type TechnicianProductivityRow } from '../../api/setup';
 import { useGlossary } from '../../contexts/GlossaryContext';
 import { useUrlPage } from '../../hooks/useUrlPage';
 import { Button } from '../../components/catalyst/button';
@@ -31,6 +31,7 @@ export function TechCreditDrawer({
   name,
   period,
   range,
+  dates,
   regionIds,
   periodLabel,
   onClose,
@@ -42,6 +43,8 @@ export function TechCreditDrawer({
   period: string | undefined;
   /** The report's dates instead of a period. */
   range?: { from: string; to: string };
+  /** The period's actual dates (the response's periodStart..asOf), for the callbacks list. */
+  dates?: { from: string; to: string };
   /** The card's regions, so the drill-in adds up to its row. */
   regionIds: string[] | undefined;
   periodLabel: string;
@@ -201,8 +204,8 @@ export function TechCreditDrawer({
               {excluded.length > 0 && ` ${t('dashboard.revenue.techs.drawer.excluded', { parts: excluded.join(', ') })}`}
             </p>
             {table}
-            {row.callbacks > 0 && (
-              <ChargedCallbacks userId={row.userId} period={period} range={range} regionIds={regionIds} />
+            {row.callbacks > 0 && (range ?? dates) && (
+              <ChargedCallbacks userId={row.userId} dates={(range ?? dates)!} regionIds={regionIds} />
             )}
           </div>
         )}
@@ -218,21 +221,20 @@ export function TechCreditDrawer({
  */
 function ChargedCallbacks({
   userId,
-  period,
-  range,
+  dates,
   regionIds,
 }: {
   userId: string;
-  period: string | undefined;
-  range: { from: string; to: string } | undefined;
+  dates: { from: string; to: string };
   regionIds: string[] | undefined;
 }) {
   const { t } = useTranslation();
   const { getName } = useGlossary();
   const callbacks = useQuery({
-    queryKey: ['technician-productivity', 'callbacks', userId, range ?? period ?? 'current', regionIds],
+    // The Callbacks report's list, so the rows are the ones its count is made of.
+    queryKey: ['callbacks-report', 'list', userId, dates.from, dates.to, regionIds],
     queryFn: () =>
-      technicianProductivityApi.getChargedCallbacks(userId, { period, ...range, regionIds, size: CALLBACKS_SIZE }),
+      workOrderReportsApi.callbackList({ ...dates, technicianId: userId, regionIds, size: CALLBACKS_SIZE }),
   });
   if (callbacks.isLoading) return <LoadingState />;
   if (callbacks.isError || !callbacks.data) return null;
@@ -251,15 +253,15 @@ function ChargedCallbacks({
           </DenseTHead>
           <tbody>
             {data.content.map((c) => (
-              <DenseRow key={c.workOrderId} data-testid="charged-callback">
+              <DenseRow key={c.id} data-testid="charged-callback">
                 <td className="font-mono">
-                  <Link className="text-fg-accent hover:underline" to={`/work-orders/${c.workOrderId}`}>
+                  <Link className="text-fg-accent hover:underline" to={`/work-orders/${c.id}`}>
                     {c.workOrderNumber}
                   </Link>
                 </td>
-                <td className="num">{shortDate(c.createdAt.slice(0, 10))}</td>
+                <td className="num">{shortDate(c.createdOn)}</td>
                 <td className="font-mono">
-                  {c.original.workOrderNumber ? (
+                  {c.original ? (
                     <Link className="text-fg-accent hover:underline" to={`/work-orders/${c.original.id}`}>
                       {c.original.workOrderNumber}
                     </Link>

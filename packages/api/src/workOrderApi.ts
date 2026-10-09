@@ -450,6 +450,11 @@ export interface ListWorkOrdersParams {
   scheduledDateFrom?: string;
   scheduledDateTo?: string;
 
+  // Completed date range — ISO dates, inclusive. The Jobs completed report's
+  // drill-in: with its group filter, totalElements is the group's jobs.
+  completedDateFrom?: string;
+  completedDateTo?: string;
+
   // Visibility
   includeArchived?: boolean;
 
