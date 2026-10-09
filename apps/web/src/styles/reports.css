@@ -202,3 +202,14 @@
 /* Payments: a deposit day's per-method subtotals. */
 .rp-methods { display: inline-flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12px; }
 .rp-method { white-space: nowrap; color: var(--fg-muted); }
+
+/* Agreements: the recurring-revenue bridge. Signed lines, a bar sized to the largest. */
+.rp-table td.rp-gain { color: var(--success-500); }
+.rp-table td.rp-loss, .rp-loss { color: var(--danger-500); }
+.rp-gain { color: var(--success-500); }
+.rp-bridge-end td { background: var(--bg-elev-2); }
+.rp-quiet td { color: var(--fg-muted); }
+.rp-bridge-cell { width: 28%; }
+.rp-bridge-bar { display: block; height: 8px; border-radius: 2px; }
+.rp-bridge-bar.gain { background: var(--success-500); }
+.rp-bridge-bar.loss { background: var(--danger-500); }

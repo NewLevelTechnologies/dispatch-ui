@@ -123,6 +123,88 @@ export interface CallbackRow {
   daysBetween: number | null;
 }
 
+// ── Agreements ───────────────────────────────────────────────────────────────
+
+export interface AgreementsReportParams {
+  from: string;
+  to: string;
+  compare?: RevenueReportCompare;
+  regionIds?: string[];
+}
+
+/** A bridge line: `monthly` is signed (losses negative), so lines add and never subtract. */
+export interface AgreementBridgeLine {
+  count: number;
+  monthly: number;
+}
+
+export interface AgreementBridge {
+  /** Null when `from` is before eventsTrackedSince. */
+  recurringMonthlyAtStart: number | null;
+  /** Home's recurringMonthly for a range ending today; null when `to` is before eventsTrackedSince. */
+  recurringMonthlyAtEnd: number | null;
+  /** Became active: from draft, or reactivated by an edit. */
+  new: AgreementBridgeLine;
+  /** monthly is non-zero only when the price changed or an expired agreement revived. */
+  renewed: AgreementBridgeLine & { auto: number; manual: number };
+  repriced: AgreementBridgeLine;
+  suspended: AgreementBridgeLine;
+  resumed: AgreementBridgeLine;
+  cancelled: AgreementBridgeLine;
+  expired: AgreementBridgeLine;
+  returnedToDraft: AgreementBridgeLine;
+  /** Home's visits rule over obligations whose window starts in the range. */
+  visits: { planned: number; completed: number; missed: number };
+}
+
+export interface AgreementsReport extends AgreementBridge {
+  from: string;
+  to: string;
+  /** The first full day of history; show it whenever a figure is null. */
+  eventsTrackedSince: string;
+  comparison: (AgreementBridge & { basis: Exclude<RevenueReportCompare, 'none'>; from: string; to: string }) | null;
+  currency: string;
+  regionIds: string[] | null;
+}
+
+export type AgreementEventKind =
+  | 'ACTIVATED'
+  | 'RENEWED'
+  | 'RENEWAL_BOOKED'
+  | 'RENEWAL_CANCELLED'
+  | 'REPRICED'
+  | 'SUSPENDED'
+  | 'RESUMED'
+  | 'CANCELLED'
+  | 'EXPIRED'
+  | 'RETURNED_TO_DRAFT';
+
+export interface AgreementEventsParams {
+  from: string;
+  to: string;
+  regionIds?: string[];
+  kind?: AgreementEventKind[];
+  page?: number;
+  size?: number; // ≤ 200
+}
+
+export interface AgreementEventRow {
+  id: string;
+  agreementId: string;
+  agreementNumber: string;
+  customerName: string;
+  kind: AgreementEventKind;
+  /** RENEWED only: true for an auto-renewal. */
+  autoRenewed: boolean | null;
+  /** Tenant-local day it took effect (a term-end renewal or expiry is dated the term end). */
+  occurredOn: string;
+  userId: string | null;
+  /** "System" for the nightly run. */
+  userName: string | null;
+  monthlyValueBefore: number;
+  monthlyValueAfter: number;
+}
+
 export const workOrderReportsApi = {
   jobsCompleted: async (params: JobsReportParams): Promise<JobsReport> => {
     const response = await apiClient.get<JobsReport>('/work-orders/reports/jobs-completed', { params: withRegions(params) });
@@ -131,6 +213,19 @@ export const workOrderReportsApi = {
 
   callbacks: async (params: CallbacksReportParams): Promise<CallbacksReport> => {
     const response = await apiClient.get<CallbacksReport>('/work-orders/reports/callbacks', { params: withRegions(params) });
+    return response.data;
+  },
+
+  agreements: async (params: AgreementsReportParams): Promise<AgreementsReport> => {
+    const response = await apiClient.get<AgreementsReport>('/work-orders/reports/agreements', { params: withRegions(params) });
+    return response.data;
+  },
+
+  /** The events behind the bridge, newest first. */
+  agreementEvents: async ({ kind, ...params }: AgreementEventsParams): Promise<Page<AgreementEventRow>> => {
+    const response = await apiClient.get<Page<AgreementEventRow>>('/work-orders/reports/agreements/events', {
+      params: { ...withRegions(params), ...(kind?.length ? { kind: kind.join(',') } : {}) },
+    });
     return response.data;
   },
 
