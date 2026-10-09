@@ -25,20 +25,12 @@ import { Select } from '../components/catalyst/select';
 import { Textarea } from '../components/catalyst/textarea';
 import { PaymentMethod, paymentsApi, invoicesApi } from '../api/setup';
 import type { CreatePaymentRequest, PaymentStatus } from '../api/setup';
-import { customerApi } from '../api/setup';
+import { customerApi, dispatchRegionApi } from '../api/setup';
+import { PAYMENT_METHOD_KEY, isPaymentMethod } from '../lib/paymentMethods';
+import { FilterChip } from '../components/ui/FilterChipRow';
 
 const PAGE_SIZE = 25;
 
-// i18n keys under payments.methods.
-const METHOD_KEY: Record<PaymentMethod, string> = {
-  CASH: 'cash',
-  CHECK: 'check',
-  CREDIT_CARD: 'creditCard',
-  DEBIT_CARD: 'debitCard',
-  ACH: 'ach',
-  WIRE_TRANSFER: 'wireTransfer',
-  OTHER: 'other',
-};
 const STATUSES: PaymentStatus[] = ['RECEIVED', 'VOID'];
 
 export default function PaymentsPage() {
@@ -53,7 +45,10 @@ export default function PaymentsPage() {
   const from = searchParams.get('from') ?? '';
   const to = searchParams.get('to') ?? '';
   const methodParam = searchParams.get('method') as PaymentMethod | null;
-  const method = methodParam && methodParam in METHOD_KEY ? methodParam : null;
+  const method = isPaymentMethod(methodParam) ? methodParam : null;
+  // One payer, or one region, from the Payments report.
+  const payer = searchParams.get('payer');
+  const regionId = searchParams.get('region');
   const statusParam = searchParams.get('status') as PaymentStatus | null;
   const status = statusParam && STATUSES.includes(statusParam) ? statusParam : null;
   const setFilterParams = (updates: Record<string, string | null>) => {
@@ -93,13 +88,15 @@ export default function PaymentsPage() {
   const [submitting, setSubmitting] = useState(false);
 
   const { data: paymentPage, isLoading: paymentsLoading } = useQuery({
-    queryKey: ['payments', page, from, to, method, status],
+    queryKey: ['payments', page, from, to, method, status, payer, regionId],
     queryFn: () =>
       paymentsApi.getAll({
         from: from || undefined,
         to: to || undefined,
         method: method ? [method] : undefined,
         status: status ? [status] : undefined,
+        customerId: payer ?? undefined,
+        regionIds: regionId ? [regionId] : undefined,
         page: page - 1,
         size: PAGE_SIZE,
       }),
@@ -107,7 +104,15 @@ export default function PaymentsPage() {
   const payments = paymentPage?.content ?? [];
   const total = paymentPage?.totalElements ?? 0;
   const totalPages = paymentPage?.totalPages ?? 0;
-  const narrowed = Boolean(from || to || method || status);
+  const narrowed = Boolean(from || to || method || status || payer || regionId);
+  // The payer's name rides on their payments.
+  const payerName = payer ? (payments.find((p) => p.customerId === payer)?.payerName ?? null) : null;
+  const { data: regions = [] } = useQuery({
+    queryKey: ['dispatch-regions', 'all'],
+    queryFn: () => dispatchRegionApi.getAll(true),
+    enabled: !!regionId,
+  });
+  const regionName = regions.find((r) => r.id === regionId)?.name;
 
   // Invoice list backs the record-payment picker (id / number / balanceDue /
   // customerId lookups). The list endpoint is paged + lean now; pull one large
@@ -258,14 +263,14 @@ export default function PaymentsPage() {
             label={t('payments.table.method')}
             ariaLabel={t('payments.table.method')}
             value={method}
-            displayValue={method ? t(`payments.methods.${METHOD_KEY[method]}`) : null}
+            displayValue={method ? t(`payments.methods.${PAYMENT_METHOD_KEY[method]}`) : null}
             onChange={(v) => setFilterParams({ method: v })}
             onClear={() => setFilterParams({ method: null })}
             resetLabel={t('payments.filters.anyMethod')}
           >
-            {(Object.keys(METHOD_KEY) as PaymentMethod[]).map((m) => (
+            {(Object.keys(PAYMENT_METHOD_KEY) as PaymentMethod[]).map((m) => (
               <ChipListboxOption key={m} value={m}>
-                {t(`payments.methods.${METHOD_KEY[m]}`)}
+                {t(`payments.methods.${PAYMENT_METHOD_KEY[m]}`)}
               </ChipListboxOption>
             ))}
           </FilterChipListbox>
@@ -284,6 +289,20 @@ export default function PaymentsPage() {
               </ChipListboxOption>
             ))}
           </FilterChipListbox>
+          {regionId && (
+            <FilterChip
+              label={regionName ?? getName('dispatch_region')}
+              active
+              onToggle={() => setFilterParams({ region: null })}
+            />
+          )}
+          {payer && (
+            <FilterChip
+              label={payerName ?? t('payments.filters.onePayer')}
+              active
+              onToggle={() => setFilterParams({ payer: null })}
+            />
+          )}
         </ListToolbar>
 
         {paymentsLoading ? (
@@ -315,6 +334,7 @@ export default function PaymentsPage() {
                     <th className="right">{t('payments.table.amount')}</th>
                     <th>{t('payments.table.method')}</th>
                     <th>{t('payments.table.reference')}</th>
+                    <th>{t('payments.table.receivedBy')}</th>
                   </tr>
                 </DenseTHead>
                 <tbody>
@@ -335,15 +355,26 @@ export default function PaymentsPage() {
                         </td>
                         <td data-label={t('payments.table.paymentDate')}>{formatDate(payment.paymentDate)}</td>
                         <td className={clsx('right num strong', voided && 'line-through text-fg-muted')} data-label={t('payments.table.amount')}>
-                          {formatCurrency(payment.amount)}
+                          {/* Scoped to a region, the part that paid invoices there: what the report counts. */}
+                          {payment.amountInScope != null && payment.amountInScope !== payment.amount ? (
+                            <>
+                              {formatCurrency(payment.amountInScope)}
+                              <div className="text-[11px] font-normal text-fg-muted">
+                                {t('payments.table.ofTotal', { amount: formatCurrency(payment.amount) })}
+                              </div>
+                            </>
+                          ) : (
+                            formatCurrency(payment.amount)
+                          )}
                         </td>
                         <td>
                           <span className="inline-flex gap-1">
-                            <Pill tone="neutral">{t(`payments.methods.${METHOD_KEY[payment.paymentMethod]}`)}</Pill>
+                            <Pill tone="neutral">{t(`payments.methods.${PAYMENT_METHOD_KEY[payment.paymentMethod]}`)}</Pill>
                             {voided && <Pill tone="danger">{t('payments.status.VOID')}</Pill>}
                           </span>
                         </td>
                         <td className={clsx('muted', !payment.referenceNumber && 'dt-empty')} data-label={t('payments.table.reference')}>{payment.referenceNumber || '-'}</td>
+                        <td className={clsx('muted', !payment.receivedByName && 'dt-empty')} data-label={t('payments.table.receivedBy')}>{payment.receivedByName || '-'}</td>
                       </DenseRow>
                     );
                   })}

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { invoicesApi, quotesApi, financialActivityApi, financialDashboardApi, revenueTargetsApi,
-  revenueReportApi, receivablesReportApi, quoteReportApi } from './financialApi';
+  revenueReportApi, receivablesReportApi, quoteReportApi, paymentReportApi } from './financialApi';
 import apiClient from './client';
 
 vi.mock('./client');
@@ -270,6 +270,18 @@ describe('quoteReportApi', () => {
     await quotesApi.getAll({ firstSentFrom: '2026-09-01', sentByUserId: 'u1', status: ['ACCEPTED', 'DECLINED'] });
     expect(apiClient.get).toHaveBeenLastCalledWith('/financial/quotes', {
       params: { firstSentFrom: '2026-09-01', sentByUserId: 'u1', status: 'ACCEPTED,DECLINED' },
+    });
+  });
+});
+
+describe('paymentReportApi', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('GETs the report, dropping an empty scope', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({ data: {} });
+    await paymentReportApi.get({ from: '2026-09-01', to: '2026-09-30', compare: 'previousPeriod', groupBy: 'day', regionIds: [] });
+    expect(apiClient.get).toHaveBeenLastCalledWith('/financial/reports/payments', {
+      params: { from: '2026-09-01', to: '2026-09-30', compare: 'previousPeriod', groupBy: 'day' },
     });
   });
 });

@@ -1387,6 +1387,7 @@
       "anyMethod": "Any method",
       "anyStatus": "Any status",
       "noMatch": "No {{entities}} match these filters",
+      "onePayer": "One payer",
       "received": "Received"
     },
     "form": {
@@ -1416,9 +1417,11 @@
       "amount": "Amount",
       "appliedTo": "Applied to",
       "method": "Method",
+      "ofTotal": "of {{amount}}",
       "payer": "Payer",
       "paymentDate": "Date",
       "paymentNumber": "Payment #",
+      "receivedBy": "Received by",
       "reference": "Reference",
       "unapplied": "Unapplied"
     }
@@ -1784,6 +1787,10 @@
         "description": "The filters each {{tech, lowercase}} pulls for tomorrow's {{dispatches, lowercase}}, from the board, with a company total. Print and tape to the truck before heading out.",
         "name": "Filter Pull List"
       },
+      "payments": {
+        "description": "Received {{payments, lowercase}} by method, payer or day, for bank reconciliation. Totals match the Revenue report's collected.",
+        "name": "{{payments}} received"
+      },
       "quotes": {
         "description": "Sent, viewed, accepted and declined, by who sent them, with win rate and time to decision. Same rule as Home's {{quotes, lowercase}} card.",
         "fromHome": "{{quotes}} card",
@@ -1815,6 +1822,46 @@
     },
     "loading": "Loading report…",
     "notFound": "That report does not exist.",
+    "payments": {
+      "chart": {
+        "day": "Received by day",
+        "month": "Received by month",
+        "week": "Received by week"
+      },
+      "csv": {
+        "inScope": "In scope"
+      },
+      "days": {
+        "byMethod": "By method",
+        "hint": "Each day split by method, to match deposits. Pick one to list its {{entities}}",
+        "title": "By day"
+      },
+      "empty": {
+        "body": "Nothing was received in {{range}}.",
+        "title": "No {{entities}} in this range"
+      },
+      "exportFailed": "Couldn't export the {{entities}}",
+      "exported": "Exported {{file}} · {{count}} {{entities}}",
+      "groupBy": {
+        "day": "Day",
+        "method": "Method",
+        "none": "Nothing",
+        "payer": "Payer"
+      },
+      "loadFailed": "Couldn't load the {{entities}} report",
+      "sub": "{{range}} · {{dates}}. {{entities}} by date received. The Revenue report's collected, split.",
+      "subToDate": "{{range}} · {{dates}}, to date. {{entities}} by date received. The Revenue report's collected, split.",
+      "summary": {
+        "average": "Average {{entity, lowercase}}",
+        "received": "Received",
+        "voided": "Voided since",
+        "voidedSub": "{{count}} {{entities}} dated in the range"
+      },
+      "table": {
+        "hint": "Pick one to list its {{entities}}"
+      },
+      "title": "{{entities}} received"
+    },
     "printList": "Print list",
     "pullList": {
       "companyTotal": "Company total",

@@ -719,6 +719,9 @@ export interface Payment {
   voidedAt: string | null;
   /** Under a region scope, the part applied to in-scope invoices; null when not region-scoped. */
   amountInScope: number | null;
+  /** Who recorded it; null for older payments with no record, or the System user. */
+  receivedByUserId?: string | null;
+  receivedByName?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -1025,6 +1028,77 @@ export const receivablesReportApi = {
   get: async ({ asOf, regionIds }: { asOf?: string; regionIds?: string[] } = {}): Promise<ReceivablesReport> => {
     const response = await apiClient.get<ReceivablesReport>('/financial/reports/receivables', {
       params: { ...(asOf ? { asOf } : {}), ...(regionIds?.length ? { regionIds } : {}) },
+    });
+    return response.data;
+  },
+};
+
+export type PaymentReportGroupBy = 'method' | 'payer' | 'day' | 'none';
+
+export interface PaymentReportParams {
+  /** By paymentDate, tenant-local, inclusive. */
+  from: string;
+  to: string;
+  compare?: RevenueReportCompare;
+  groupBy?: PaymentReportGroupBy;
+  regionIds?: string[];
+}
+
+export interface PaymentDay {
+  date: string;
+  amount: number;
+  count: number;
+}
+
+export interface PaymentMethodAmount {
+  method: PaymentMethod;
+  amount: number;
+  count: number;
+}
+
+/**
+ * A method (`id` the method), a payer (`id` the customer, with its `name`) or a
+ * day (`id` the date, with `byMethod`, the deposit view). Comparison fields are
+ * null without a comparison and always null on days.
+ */
+export interface PaymentReportGroup {
+  id: string;
+  name: string | null;
+  amount: number;
+  count: number;
+  comparisonAmount: number | null;
+  comparisonCount: number | null;
+  byMethod?: PaymentMethodAmount[];
+}
+
+export interface PaymentReport {
+  from: string;
+  /** Cut off at today. */
+  to: string;
+  /** Revenue's `collected` for the same range and scope. Scoped, the part applied in scope. */
+  received: ArAgingBucket;
+  /** Payments dated in the range since voided, by the same rule. */
+  voided: ArAgingBucket;
+  /** Every day in the range, zero-filled. */
+  receivedByDay: PaymentDay[];
+  /** Exactly when Revenue's is: null when not asked for, or billing in scope began after its start. */
+  comparison: {
+    basis: Exclude<RevenueReportCompare, 'none'>;
+    from: string;
+    to: string;
+    received: ArAgingBucket;
+    voided: ArAgingBucket;
+  } | null;
+  groupBy: PaymentReportGroupBy;
+  groups: PaymentReportGroup[];
+  currency: string;
+  regionIds: string[] | null;
+}
+
+export const paymentReportApi = {
+  get: async ({ regionIds, ...params }: PaymentReportParams): Promise<PaymentReport> => {
+    const response = await apiClient.get<PaymentReport>('/financial/reports/payments', {
+      params: { ...params, ...(regionIds?.length ? { regionIds } : {}) },
     });
     return response.data;
   },
