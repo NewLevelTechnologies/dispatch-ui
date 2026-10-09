@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import clsx from 'clsx';
+import { useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from '@dispatch/i18n';
 import { useGlossary } from '../contexts/GlossaryContext';
@@ -14,22 +15,63 @@ import { Pill } from '../components/ui/Pill';
 import {
   DenseTable, DenseTHead, DenseRow,
 } from '../components/ui/DenseTable';
-import { ListToolbar, ListSearch } from '../components/ui/ListToolbar';
+import { ListToolbar } from '../components/ui/ListToolbar';
 import { ListFooter } from '../components/ui/ListFooter';
+import { FilterChipListbox, ChipListboxOption } from '../components/ui/FilterChipListbox';
+import { DateRangeChip } from '../components/ui/DateRangeChip';
 import { Dialog, DialogActions, DialogBody, DialogDescription, DialogTitle } from '../components/catalyst/dialog';
 import { Field, Label } from '../components/catalyst/fieldset';
 import { Select } from '../components/catalyst/select';
 import { Textarea } from '../components/catalyst/textarea';
 import { PaymentMethod, paymentsApi, invoicesApi } from '../api/setup';
-import type { CreatePaymentRequest } from '../api/setup';
+import type { CreatePaymentRequest, PaymentStatus } from '../api/setup';
 import { customerApi } from '../api/setup';
+
+const PAGE_SIZE = 25;
+
+// i18n keys under payments.methods.
+const METHOD_KEY: Record<PaymentMethod, string> = {
+  CASH: 'cash',
+  CHECK: 'check',
+  CREDIT_CARD: 'creditCard',
+  DEBIT_CARD: 'debitCard',
+  ACH: 'ach',
+  WIRE_TRANSFER: 'wireTransfer',
+  OTHER: 'other',
+};
+const STATUSES: PaymentStatus[] = ['RECEIVED', 'VOID'];
 
 export default function PaymentsPage() {
   const queryClient = useQueryClient();
   const { t } = useTranslation();
   const { getName } = useGlossary();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
+
+  // Filters and page live in the URL, so the footer's page links keep them.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10));
+  const from = searchParams.get('from') ?? '';
+  const to = searchParams.get('to') ?? '';
+  const methodParam = searchParams.get('method') as PaymentMethod | null;
+  const method = methodParam && methodParam in METHOD_KEY ? methodParam : null;
+  const statusParam = searchParams.get('status') as PaymentStatus | null;
+  const status = statusParam && STATUSES.includes(statusParam) ? statusParam : null;
+  const setFilterParams = (updates: Record<string, string | null>) => {
+    const next = new URLSearchParams(searchParams);
+    for (const [key, value] of Object.entries(updates)) {
+      if (value) next.set(key, value);
+      else next.delete(key);
+    }
+    next.delete('page');
+    setSearchParams(next, { replace: true });
+  };
+  const pageHref = (target: number): string => {
+    const next = new URLSearchParams(searchParams);
+    if (target <= 1) next.delete('page');
+    else next.set('page', String(target));
+    const qs = next.toString();
+    return qs ? `?${qs}` : '?';
+  };
 
   // Form state
   const [formData, setFormData] = useState<{
@@ -50,10 +92,22 @@ export default function PaymentsPage() {
 
   const [submitting, setSubmitting] = useState(false);
 
-  const { data: payments = [], isLoading: paymentsLoading } = useQuery({
-    queryKey: ['payments'],
-    queryFn: () => paymentsApi.getAll(),
+  const { data: paymentPage, isLoading: paymentsLoading } = useQuery({
+    queryKey: ['payments', page, from, to, method, status],
+    queryFn: () =>
+      paymentsApi.getAll({
+        from: from || undefined,
+        to: to || undefined,
+        method: method ? [method] : undefined,
+        status: status ? [status] : undefined,
+        page: page - 1,
+        size: PAGE_SIZE,
+      }),
   });
+  const payments = paymentPage?.content ?? [];
+  const total = paymentPage?.totalElements ?? 0;
+  const totalPages = paymentPage?.totalPages ?? 0;
+  const narrowed = Boolean(from || to || method || status);
 
   // Invoice list backs the record-payment picker (id / number / balanceDue /
   // customerId lookups). The list endpoint is paged + lean now; pull one large
@@ -154,48 +208,31 @@ export default function PaymentsPage() {
     return customer?.name || customerId;
   };
 
-  const getInvoiceNumber = (invoiceId: string) => {
-    if (!Array.isArray(invoices)) return invoiceId;
-    const invoice = invoices.find(inv => inv.id === invoiceId);
-    return invoice?.invoiceNumber || invoiceId;
-  };
-
   const getInvoiceBalance = (invoiceId: string) => {
     if (!Array.isArray(invoices)) return 0;
     const invoice = invoices.find(inv => inv.id === invoiceId);
     return invoice?.balanceDue || 0;
   };
 
-  const getPaymentMethodBadge = (method: PaymentMethod) => {
-    return <Pill tone="neutral">{t(`payments.methods.${method.toLowerCase()}`)}</Pill>;
-  };
-
-  const filteredPayments = Array.isArray(payments) ? payments.filter(payment =>
-    payment.paymentNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    getInvoiceNumber(payment.invoiceId).toLowerCase().includes(searchTerm.toLowerCase()) ||
-    getCustomerName(payment.customerId).toLowerCase().includes(searchTerm.toLowerCase())
-  ) : [];
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
   };
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
-  };
+  // paymentDate is a calendar day; read it at noon UTC so no zone shifts it.
+  const formatDate = (day: string) =>
+    new Date(`${day}T12:00:00Z`).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      timeZone: 'UTC',
+    });
 
-  const paymentsCount = Array.isArray(payments) ? payments.length : 0;
   const paymentNoun = (n: number) =>
     n === 1 ? getName('payment').toLowerCase() : getName('payment', true).toLowerCase();
-  const subtitle = paymentsCount > 0
-    ? (filteredPayments.length === paymentsCount
-        ? `${paymentsCount.toLocaleString()} ${paymentNoun(paymentsCount)}`
-        : t('common.pagination.showing', {
-            start: filteredPayments.length > 0 ? 1 : 0,
-            end: filteredPayments.length,
-            total: paymentsCount.toLocaleString(),
-          }))
-    : t('payments.description');
+  const subtitle = total > 0 ? `${total.toLocaleString()} ${paymentNoun(total)}` : t('payments.description');
+  const showingStart = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
+  const showingEnd = Math.min(page * PAGE_SIZE, total);
 
   return (
     <AppLayout>
@@ -210,18 +247,44 @@ export default function PaymentsPage() {
           }
         />
 
-        <ListToolbar
-          search={
-            <ListSearch
-              placeholder={t('payments.search.placeholder', {
-                customer: getName('customer'),
-                invoice: getName('invoice'),
-              })}
-              value={searchTerm}
-              onChange={setSearchTerm}
-            />
-          }
-        />
+        <ListToolbar>
+          <DateRangeChip
+            label={t('payments.filters.received')}
+            ariaLabel={t('payments.filters.received')}
+            value={{ from, to }}
+            onChange={(r) => setFilterParams({ from: r.from || null, to: r.to || null })}
+          />
+          <FilterChipListbox
+            label={t('payments.table.method')}
+            ariaLabel={t('payments.table.method')}
+            value={method}
+            displayValue={method ? t(`payments.methods.${METHOD_KEY[method]}`) : null}
+            onChange={(v) => setFilterParams({ method: v })}
+            onClear={() => setFilterParams({ method: null })}
+            resetLabel={t('payments.filters.anyMethod')}
+          >
+            {(Object.keys(METHOD_KEY) as PaymentMethod[]).map((m) => (
+              <ChipListboxOption key={m} value={m}>
+                {t(`payments.methods.${METHOD_KEY[m]}`)}
+              </ChipListboxOption>
+            ))}
+          </FilterChipListbox>
+          <FilterChipListbox
+            label={t('common.form.status')}
+            ariaLabel={t('common.form.status')}
+            value={status}
+            displayValue={status ? t(`payments.status.${status}`) : null}
+            onChange={(v) => setFilterParams({ status: v })}
+            onClear={() => setFilterParams({ status: null })}
+            resetLabel={t('payments.filters.anyStatus')}
+          >
+            {STATUSES.map((st) => (
+              <ChipListboxOption key={st} value={st}>
+                {t(`payments.status.${st}`)}
+              </ChipListboxOption>
+            ))}
+          </FilterChipListbox>
+        </ListToolbar>
 
         {paymentsLoading ? (
           <Card>
@@ -229,11 +292,13 @@ export default function PaymentsPage() {
               <LoadingState label={t('common.actions.loading', { entities: getName('payment', true) })} />
             </CardBody>
           </Card>
-        ) : filteredPayments.length === 0 ? (
+        ) : payments.length === 0 ? (
           <Card>
             <CardBody>
               <p className="text-[12.5px] text-fg-muted">
-                {searchTerm ? t('common.actions.noMatchSearch', { entities: getName('payment', true) }) : t('common.actions.notFound', { entities: getName('payment', true) })}
+                {narrowed
+                  ? t('payments.filters.noMatch', { entities: getName('payment', true).toLowerCase() })
+                  : t('common.actions.notFound', { entities: getName('payment', true) })}
               </p>
             </CardBody>
           </Card>
@@ -244,8 +309,8 @@ export default function PaymentsPage() {
                 <DenseTHead>
                   <tr>
                     <th>{t('payments.table.paymentNumber')}</th>
-                    <th>{t('payments.table.customer')}</th>
-                    <th>{t('payments.table.invoice')}</th>
+                    <th>{t('payments.table.payer')}</th>
+                    <th>{t('payments.table.appliedTo')}</th>
                     <th>{t('payments.table.paymentDate')}</th>
                     <th className="right">{t('payments.table.amount')}</th>
                     <th>{t('payments.table.method')}</th>
@@ -253,24 +318,45 @@ export default function PaymentsPage() {
                   </tr>
                 </DenseTHead>
                 <tbody>
-                  {filteredPayments.map((payment) => (
-                    <DenseRow key={payment.id}>
-                      <td><span className="id-mono text-fg-strong">{payment.paymentNumber}</span></td>
-                      <td className="strong" data-label={t('payments.table.customer')}>{getCustomerName(payment.customerId)}</td>
-                      <td data-label={t('payments.table.invoice')}><span className="id-mono text-fg-muted">{getInvoiceNumber(payment.invoiceId)}</span></td>
-                      <td data-label={t('payments.table.paymentDate')}>{formatDate(payment.paymentDate)}</td>
-                      <td className="right num strong" data-label={t('payments.table.amount')}>{formatCurrency(payment.amount)}</td>
-                      <td>{getPaymentMethodBadge(payment.paymentMethod)}</td>
-                      <td className={clsx('muted', !payment.referenceNumber && 'dt-empty')} data-label={t('payments.table.reference')}>{payment.referenceNumber || '-'}</td>
-                    </DenseRow>
-                  ))}
+                  {payments.map((payment) => {
+                    const voided = payment.status === 'VOID';
+                    return (
+                      <DenseRow key={payment.id}>
+                        <td><span className="id-mono text-fg-strong">{payment.paymentNumber}</span></td>
+                        <td className="strong" data-label={t('payments.table.payer')}>{payment.payerName}</td>
+                        <td className={clsx(payment.applications.length === 0 && 'muted')} data-label={t('payments.table.appliedTo')}>
+                          {payment.applications.length > 0 ? (
+                            <span className="id-mono text-fg-muted">
+                              {payment.applications.map((a) => a.invoiceNumber).join(', ')}
+                            </span>
+                          ) : (
+                            t('payments.table.unapplied')
+                          )}
+                        </td>
+                        <td data-label={t('payments.table.paymentDate')}>{formatDate(payment.paymentDate)}</td>
+                        <td className={clsx('right num strong', voided && 'line-through text-fg-muted')} data-label={t('payments.table.amount')}>
+                          {formatCurrency(payment.amount)}
+                        </td>
+                        <td>
+                          <span className="inline-flex gap-1">
+                            <Pill tone="neutral">{t(`payments.methods.${METHOD_KEY[payment.paymentMethod]}`)}</Pill>
+                            {voided && <Pill tone="danger">{t('payments.status.VOID')}</Pill>}
+                          </span>
+                        </td>
+                        <td className={clsx('muted', !payment.referenceNumber && 'dt-empty')} data-label={t('payments.table.reference')}>{payment.referenceNumber || '-'}</td>
+                      </DenseRow>
+                    );
+                  })}
                 </tbody>
               </DenseTable>
               <ListFooter
+                page={page}
+                totalPages={totalPages}
+                pageHref={pageHref}
                 left={t('common.pagination.showing', {
-                  start: filteredPayments.length > 0 ? 1 : 0,
-                  end: filteredPayments.length,
-                  total: paymentsCount.toLocaleString(),
+                  start: showingStart,
+                  end: showingEnd,
+                  total: total.toLocaleString(),
                 })}
               />
             </CardBody>

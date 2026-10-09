@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from '@dispatch/i18n';
 import { useGlossary } from '../contexts/GlossaryContext';
@@ -16,11 +17,16 @@ import { Pill } from '../components/ui/Pill';
 import {
   DenseTable, DenseTHead, DenseRow,
 } from '../components/ui/DenseTable';
-import { ListToolbar, ListSearch } from '../components/ui/ListToolbar';
+import { ListToolbar } from '../components/ui/ListToolbar';
 import { ListFooter } from '../components/ui/ListFooter';
+import { FilterChipListbox, ChipListboxOption } from '../components/ui/FilterChipListbox';
+import { DateRangeChip } from '../components/ui/DateRangeChip';
 import { QuoteStatus, quotesApi } from '../api/setup';
 import type { Quote, CreateQuoteRequest, CreateQuoteLineItemRequest } from '../api/setup';
 import { customerApi } from '../api/setup';
+
+const PAGE_SIZE = 25;
+const STATUSES = Object.values(QuoteStatus) as QuoteStatus[];
 
 export default function QuotesPage() {
   const queryClient = useQueryClient();
@@ -29,7 +35,30 @@ export default function QuotesPage() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isStatusOpen, setIsStatusOpen] = useState(false);
   const [selectedQuote, setSelectedQuote] = useState<Quote | null>(null);
-  const [searchTerm, setSearchTerm] = useState('');
+
+  // Filters and page live in the URL, so the footer's page links keep them.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10));
+  const sentFrom = searchParams.get('sentFrom') ?? '';
+  const sentTo = searchParams.get('sentTo') ?? '';
+  const statusParam = searchParams.get('status') as QuoteStatus | null;
+  const status = statusParam && STATUSES.includes(statusParam) ? statusParam : null;
+  const setFilterParams = (updates: Record<string, string | null>) => {
+    const next = new URLSearchParams(searchParams);
+    for (const [key, value] of Object.entries(updates)) {
+      if (value) next.set(key, value);
+      else next.delete(key);
+    }
+    next.delete('page');
+    setSearchParams(next, { replace: true });
+  };
+  const pageHref = (target: number): string => {
+    const next = new URLSearchParams(searchParams);
+    if (target <= 1) next.delete('page');
+    else next.set('page', String(target));
+    const qs = next.toString();
+    return qs ? `?${qs}` : '?';
+  };
 
   // Form state
   const [formData, setFormData] = useState<{
@@ -51,10 +80,21 @@ export default function QuotesPage() {
   const [newStatus, setNewStatus] = useState<QuoteStatus>(QuoteStatus.DRAFT);
   const [submitting, setSubmitting] = useState(false);
 
-  const { data: quotes = [], isLoading: quotesLoading } = useQuery({
-    queryKey: ['quotes'],
-    queryFn: () => quotesApi.getAll(),
+  const { data: quotePage, isLoading: quotesLoading } = useQuery({
+    queryKey: ['quotes', page, sentFrom, sentTo, status],
+    queryFn: () =>
+      quotesApi.getAll({
+        firstSentFrom: sentFrom || undefined,
+        firstSentTo: sentTo || undefined,
+        status: status ? [status] : undefined,
+        page: page - 1,
+        size: PAGE_SIZE,
+      }),
   });
+  const quotes = quotePage?.content ?? [];
+  const total = quotePage?.totalElements ?? 0;
+  const totalPages = quotePage?.totalPages ?? 0;
+  const narrowed = Boolean(sentFrom || sentTo || status);
 
   const { data: customers = [] } = useQuery({
     queryKey: ['quote-form-customers'],
@@ -187,10 +227,6 @@ export default function QuotesPage() {
     return customer?.name || customerId;
   };
 
-  const filteredQuotes = Array.isArray(quotes) ? quotes.filter(quote =>
-    quote.quoteNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    getCustomerName(quote.customerId).toLowerCase().includes(searchTerm.toLowerCase())
-  ) : [];
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
@@ -200,18 +236,11 @@ export default function QuotesPage() {
     return new Date(dateString).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
   };
 
-  const quoteCount = Array.isArray(quotes) ? quotes.length : 0;
   const quoteNoun = (n: number) =>
     n === 1 ? getName('quote').toLowerCase() : getName('quote', true).toLowerCase();
-  const quoteSubtitle = quoteCount > 0
-    ? (filteredQuotes.length === quoteCount
-        ? `${quoteCount.toLocaleString()} ${quoteNoun(quoteCount)}`
-        : t('common.pagination.showing', {
-            start: filteredQuotes.length > 0 ? 1 : 0,
-            end: filteredQuotes.length,
-            total: quoteCount.toLocaleString(),
-          }))
-    : t('quotes.description');
+  const quoteSubtitle = total > 0 ? `${total.toLocaleString()} ${quoteNoun(total)}` : t('quotes.description');
+  const showingStart = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
+  const showingEnd = Math.min(page * PAGE_SIZE, total);
 
   return (
     <AppLayout>
@@ -226,18 +255,29 @@ export default function QuotesPage() {
           }
         />
 
-        <ListToolbar
-          search={
-            <ListSearch
-              placeholder={t('quotes.search.placeholder', {
-                entity: getName('quote'),
-                customer: getName('customer'),
-              })}
-              value={searchTerm}
-              onChange={setSearchTerm}
-            />
-          }
-        />
+        <ListToolbar>
+          <DateRangeChip
+            label={t('quotes.filters.sent')}
+            ariaLabel={t('quotes.filters.sent')}
+            value={{ from: sentFrom, to: sentTo }}
+            onChange={(r) => setFilterParams({ sentFrom: r.from || null, sentTo: r.to || null })}
+          />
+          <FilterChipListbox
+            label={t('quotes.table.status')}
+            ariaLabel={t('quotes.table.status')}
+            value={status}
+            displayValue={status ? t(`quotes.status.${status.toLowerCase()}`) : null}
+            onChange={(v) => setFilterParams({ status: v })}
+            onClear={() => setFilterParams({ status: null })}
+            resetLabel={t('quotes.filters.anyStatus')}
+          >
+            {STATUSES.map((st) => (
+              <ChipListboxOption key={st} value={st}>
+                {t(`quotes.status.${st.toLowerCase()}`)}
+              </ChipListboxOption>
+            ))}
+          </FilterChipListbox>
+        </ListToolbar>
 
         {quotesLoading ? (
           <Card>
@@ -245,11 +285,13 @@ export default function QuotesPage() {
               <LoadingState label={t('common.actions.loading', { entities: getName('quote', true) })} />
             </CardBody>
           </Card>
-        ) : filteredQuotes.length === 0 ? (
+        ) : quotes.length === 0 ? (
           <Card>
             <CardBody>
               <p className="text-[12.5px] text-fg-muted">
-                {searchTerm ? t('common.actions.noMatchSearch', { entities: getName('quote', true) }) : t('common.actions.notFound', { entities: getName('quote', true) })}
+                {narrowed
+                  ? t('quotes.filters.noMatch', { entities: getName('quote', true).toLowerCase() })
+                  : t('common.actions.notFound', { entities: getName('quote', true) })}
               </p>
             </CardBody>
           </Card>
@@ -269,7 +311,7 @@ export default function QuotesPage() {
                   </tr>
                 </DenseTHead>
                 <tbody>
-                  {filteredQuotes.map((quote) => (
+                  {quotes.map((quote) => (
                     <DenseRow key={quote.id}>
                       <td><span className="id-mono text-fg-strong">{quote.quoteNumber}</span></td>
                       <td className="strong" data-label={t('quotes.table.customer')}>{getCustomerName(quote.customerId)}</td>
@@ -294,10 +336,13 @@ export default function QuotesPage() {
                 </tbody>
               </DenseTable>
               <ListFooter
+                page={page}
+                totalPages={totalPages}
+                pageHref={pageHref}
                 left={t('common.pagination.showing', {
-                  start: filteredQuotes.length > 0 ? 1 : 0,
-                  end: filteredQuotes.length,
-                  total: quoteCount.toLocaleString(),
+                  start: showingStart,
+                  end: showingEnd,
+                  total: total.toLocaleString(),
                 })}
               />
             </CardBody>

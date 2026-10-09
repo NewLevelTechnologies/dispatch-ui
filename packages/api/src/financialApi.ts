@@ -277,6 +277,17 @@ export interface InvoiceListItemRow {
 
 // Custom PageResponse envelope for the invoice list endpoints — NOT Spring's
 // raw Page shape (the current index is `page`, not `number`).
+/** The financial lists' page envelope (invoices, payments, quotes). */
+export interface FinancialPage<T> {
+  content: T[];
+  page: number; // 0-based current page index
+  size: number;
+  totalElements: number;
+  totalPages: number;
+  first: boolean;
+  last: boolean;
+}
+
 export interface InvoiceListPage {
   content: InvoiceListItemRow[];
   page: number; // 0-based current page index
@@ -539,8 +550,27 @@ export interface Quote {
   lastSentAt?: string | null;
   /** See `Invoice.lastSentToEmails` — same semantics. */
   lastSentToEmails?: string | null;
+  /** First send; resends don't move it. Null until sent. */
+  firstSentAt?: string | null;
+  /** First open of the share link. */
+  firstViewedAt?: string | null;
+  /** Set on ACCEPTED/DECLINED, cleared on leaving them. */
+  decidedAt?: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+/** Filters for the paged quote list, all AND-ed. */
+export interface ListQuotesParams {
+  /** Tenant-local days, inclusive, on firstSentAt; never-sent quotes drop out when either is set. */
+  firstSentFrom?: string;
+  firstSentTo?: string;
+  status?: QuoteStatus[];
+  /** The work order's location's region; quotes with no work order are company-wide only. */
+  regionIds?: string[];
+  page?: number;
+  size?: number; // ≤ 200
+  sort?: string; // quoteDate | firstSentAt | expirationDate | totalAmount | quoteNumber, e.g. 'quoteDate,desc'
 }
 
 export interface CreateQuoteLineItemRequest {
@@ -565,8 +595,11 @@ export interface UpdateQuoteStatusRequest {
 }
 
 export const quotesApi = {
-  getAll: async (): Promise<Quote[]> => {
-    const response = await apiClient.get<Quote[]>('/financial/quotes');
+  getAll: async (params: ListQuotesParams = {}): Promise<FinancialPage<Quote>> => {
+    const { status, ...rest } = params;
+    const response = await apiClient.get<FinancialPage<Quote>>('/financial/quotes', {
+      params: { ...rest, ...(status?.length ? { status: status.join(',') } : {}) },
+    });
     return response.data;
   },
 
@@ -656,18 +689,47 @@ export const PaymentMethod = {
   OTHER: 'OTHER',
 } as const;
 
-export interface Payment {
+export interface PaymentApplication {
   id: string;
   invoiceId: string;
+  invoiceNumber: string;
+  amountApplied: number;
+}
+
+export interface Payment {
+  id: string;
+  /** The payer: the customer billed. */
   customerId: string;
+  payerName: string;
   paymentNumber: string;
+  status: PaymentStatus;
   paymentDate: string;
   amount: number;
   paymentMethod: PaymentMethod;
-  referenceNumber?: string;
-  notes?: string;
+  referenceNumber?: string | null;
+  notes?: string | null;
+  applications: PaymentApplication[];
+  /** 0 when VOID. */
+  unappliedAmount: number;
+  voidedAt: string | null;
+  /** Under a region scope, the part applied to in-scope invoices; null when not region-scoped. */
+  amountInScope: number | null;
   createdAt: string;
   updatedAt: string;
+}
+
+/** Filters for the paged payment list, all AND-ed. */
+export interface ListPaymentsParams {
+  from?: string; // paymentDate, inclusive
+  to?: string;
+  method?: PaymentMethod[];
+  customerId?: string;
+  status?: PaymentStatus[];
+  /** A payment is in a region when it paid an invoice there; unapplied ones are company-wide only. */
+  regionIds?: string[];
+  page?: number;
+  size?: number; // ≤ 200
+  sort?: string; // paymentDate | amount | paymentNumber, e.g. 'paymentDate,desc'
 }
 
 /**
@@ -706,8 +768,15 @@ export interface CreatePaymentRequest {
 }
 
 export const paymentsApi = {
-  getAll: async (): Promise<Payment[]> => {
-    const response = await apiClient.get<Payment[]>('/financial/payments');
+  getAll: async (params: ListPaymentsParams = {}): Promise<FinancialPage<Payment>> => {
+    const { method, status, ...rest } = params;
+    const response = await apiClient.get<FinancialPage<Payment>>('/financial/payments', {
+      params: {
+        ...rest,
+        ...(method?.length ? { method: method.join(',') } : {}),
+        ...(status?.length ? { status: status.join(',') } : {}),
+      },
+    });
     return response.data;
   },
 
