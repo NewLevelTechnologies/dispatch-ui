@@ -186,3 +186,15 @@
   .pl-page .dense-table tbody td:first-child { position: static; box-shadow: none; }
   .pl-print-context { display: block; margin-bottom: 8px; font-size: 11px; color: #444; }
 }
+
+/* Arrival windows: a cell's second line, an empty card's note, the late list's tech filter. */
+.rp-sub { font-size: 11.5px; color: var(--fg-muted); }
+.rp-note { padding: 14px 16px; font-size: 12.5px; color: var(--fg-muted); }
+.rp-tech-filter {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 2px 8px; border-radius: 999px;
+  border: 1px solid var(--border); background: var(--bg-active);
+  font-size: 11.5px; color: var(--fg-strong); cursor: pointer;
+}
+.rp-tech-filter:hover { border-color: var(--fg-muted); }
+

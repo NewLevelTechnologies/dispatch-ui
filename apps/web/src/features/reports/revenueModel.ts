@@ -182,7 +182,14 @@ export function buckets(days: DailyAmount[], unit: ChartUnit): ChartBucket[] {
  * Saturdays; everything else lines up by bucket against the comparison
  * window. The summary and table always use the calendar comparison.
  */
-export function ghostWindow(report: RevenueReport, unit: ChartUnit): { from: string; to: string; sameWeekdays: boolean } | null {
+/** Any report with a range and an optional comparison window. */
+interface Compared {
+  from: string;
+  to: string;
+  comparison: { basis: RevenueReportCompare; from: string; to: string } | null;
+}
+
+export function ghostWindow(report: Compared, unit: ChartUnit): { from: string; to: string; sameWeekdays: boolean } | null {
   const c = report.comparison;
   if (!c) return null;
   if (unit === 'day' && c.basis === 'sameDatesLastYear')

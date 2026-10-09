@@ -351,6 +351,18 @@ export {
   type CreditedInvoice,
   type ChargedCallback,
 } from './technicianProductivityApi';
+export {
+  arrivalReportApi,
+  type ArrivalDay,
+  type ArrivalFigures,
+  type ArrivalReport,
+  type ArrivalReportComparison,
+  type ArrivalReportGroup,
+  type ArrivalReportGroupBy,
+  type ArrivalReportParams,
+  type LateArrival,
+  type LateArrivalsParams,
+} from './arrivalReportApi';
 
 // Financial APIs
 export {

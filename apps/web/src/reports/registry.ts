@@ -33,6 +33,7 @@ export interface ReportDefinition {
   requiresCapability?: string;
 }
 
+const ArrivalsReport = lazy(() => import('./ArrivalsReport'));
 const FilterPullListReport = lazy(() => import('./FilterPullListReport'));
 const ReceivablesReport = lazy(() => import('./ReceivablesReport'));
 const RevenueReport = lazy(() => import('./RevenueReport'));
@@ -60,6 +61,13 @@ export const reports: ReportDefinition[] = [
     Component: TechProductivityReport,
     // Home's Revenue tab and this card follow the invoice capability.
     requiresCapability: 'VIEW_ALL_INVOICES',
+  },
+  {
+    slug: 'arrivals',
+    group: 'work',
+    Component: ArrivalsReport,
+    // Every tech's visits, so the company-wide dispatch view.
+    requiresCapability: 'VIEW_ALL_DISPATCHES',
   },
   {
     slug: 'filter-pull-list',
