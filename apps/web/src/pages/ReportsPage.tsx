@@ -23,6 +23,7 @@ export default function ReportsPage() {
     dispatches: getName('dispatch', true),
     division: getName('division'),
     invoices: getName('invoice', true),
+    quotes: getName('quote', true),
     region: getName('dispatch_region'),
     tech: getName('technician'),
     techs: getName('technician', true),

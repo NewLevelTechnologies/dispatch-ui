@@ -185,6 +185,8 @@ export default function DispatchFormDrawer({
   const { getName, getAbbrev } = useGlossary();
   const queryClient = useQueryClient();
   const editing = !!dispatch;
+  // The server refuses to move a window once the tech has arrived.
+  const windowLocked = editing && Boolean(dispatch?.arrivedAt);
   const dispatchWord = getName('dispatch').toLowerCase();
   const techWord = getName('technician').toLowerCase();
 
@@ -314,6 +316,12 @@ export default function DispatchFormDrawer({
     if (isConflict(err) && errorCode(err) === 'DISPATCH_VERSION_CONFLICT') {
       invalidate();
       setError(t('workOrders.dispatches.form.versionConflict', { entity: getName('dispatch') }));
+      return;
+    }
+    // The tech arrived while this was open: the window is fixed now.
+    if (isConflict(err) && errorCode(err) === 'DISPATCH_WINDOW_LOCKED') {
+      invalidate();
+      setError(t('dispatchBoard.drag.windowLocked', { tech: techWord.toLowerCase() }));
       return;
     }
     const msg =
@@ -474,7 +482,8 @@ export default function DispatchFormDrawer({
                   aria-label="Date"
                   value={date}
                   onChange={(e) => setDate(e.target.value)}
-                  className="h-[34px] w-full rounded-sm border border-border bg-bg px-2.5 !text-[12.5px] text-fg-strong outline-none focus:border-accent-500"
+                  disabled={windowLocked}
+                  className="h-[34px] disabled:opacity-60 w-full rounded-sm border border-border bg-bg px-2.5 !text-[12.5px] text-fg-strong outline-none focus:border-accent-500"
                 />
               </label>
               <label className="flex-[1.2]">
@@ -485,7 +494,8 @@ export default function DispatchFormDrawer({
                   aria-label="Arrival window"
                   value={winKey}
                   onChange={(e) => setWinKey(e.target.value)}
-                  className="h-[34px] w-full rounded-sm border border-border bg-bg px-2.5 !text-[12.5px] text-fg-strong outline-none focus:border-accent-500"
+                  disabled={windowLocked}
+                  className="h-[34px] disabled:opacity-60 w-full rounded-sm border border-border bg-bg px-2.5 !text-[12.5px] text-fg-strong outline-none focus:border-accent-500"
                 >
                   {/* Only present while nothing is chosen, and it cannot be
                       re-selected once a window is: an empty option that stays
@@ -502,6 +512,11 @@ export default function DispatchFormDrawer({
             {prefill && !winKey && (
               <p className="mt-1.5 text-[11px] leading-snug text-fg-muted">
                 {t('dispatchBoard.map.windowUnset')}
+              </p>
+            )}
+            {windowLocked && (
+              <p className="mt-1.5 text-[11px] leading-snug text-fg-muted">
+                {t('dispatchBoard.drag.windowLockedHint', { tech: techWord.toLowerCase() })}
               </p>
             )}
           </Section>

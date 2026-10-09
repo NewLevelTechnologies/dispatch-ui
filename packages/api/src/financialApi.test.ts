@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { invoicesApi, quotesApi, financialActivityApi, financialDashboardApi, revenueTargetsApi,
-  revenueReportApi, receivablesReportApi } from './financialApi';
+  revenueReportApi, receivablesReportApi, quoteReportApi } from './financialApi';
 import apiClient from './client';
 
 vi.mock('./client');
@@ -251,5 +251,25 @@ describe('revenueTargetsApi', () => {
     const months = Array.from({ length: 12 }, (_, i) => ({ month: i + 1, amount: i === 0 ? 150000 : null }));
     await revenueTargetsApi.replace(2027, months);
     expect(apiClient.put).toHaveBeenCalledWith('/financial/revenue-targets/2027', { months });
+  });
+});
+
+describe('quoteReportApi', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('GETs the report with its grouping and scope', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({ data: {} });
+    await quoteReportApi.get({ from: '2026-09-01', to: '2026-09-30', compare: 'none', groupBy: 'sender', regionIds: ['r1'] });
+    expect(apiClient.get).toHaveBeenLastCalledWith('/financial/reports/quotes', {
+      params: { from: '2026-09-01', to: '2026-09-30', compare: 'none', groupBy: 'sender', regionIds: ['r1'] },
+    });
+  });
+
+  it('quotesApi.getAll sends the sender and joins statuses', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({ data: {} });
+    await quotesApi.getAll({ firstSentFrom: '2026-09-01', sentByUserId: 'u1', status: ['ACCEPTED', 'DECLINED'] });
+    expect(apiClient.get).toHaveBeenLastCalledWith('/financial/quotes', {
+      params: { firstSentFrom: '2026-09-01', sentByUserId: 'u1', status: 'ACCEPTED,DECLINED' },
+    });
   });
 });

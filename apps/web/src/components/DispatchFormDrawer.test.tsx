@@ -495,6 +495,28 @@ describe('DispatchFormDrawer concurrency', () => {
 
     expect(await screen.findByText(/Someone else changed this/)).toBeInTheDocument();
   });
+
+  // Once the tech arrives the server refuses to move the window.
+  it('fixes the date and window once the tech has arrived', async () => {
+    render({ dispatch: { ...existing, status: 'IN_PROGRESS', arrivedAt: '2026-03-15T15:20:00Z' } });
+    await screen.findByText('Daniel Park');
+    expect(screen.getByLabelText('Date')).toBeDisabled();
+    expect(screen.getByLabelText('Arrival window')).toBeDisabled();
+    expect(screen.getByText('dispatchBoard.drag.windowLockedHint')).toBeInTheDocument();
+  });
+
+  it('says the window is fixed when the tech arrived while it was open', async () => {
+    const u = userEvent.setup();
+    mockUpdate.mockRejectedValue(
+      Object.assign(new Error('locked'), {
+        response: { status: 409, data: { code: 'DISPATCH_WINDOW_LOCKED' } },
+      })
+    );
+    render({ dispatch: existing });
+    await screen.findByText('Daniel Park');
+    await u.click(screen.getAllByRole('button', { name: /save|schedule/i })[0]);
+    expect(await screen.findByText('dispatchBoard.drag.windowLocked')).toBeInTheDocument();
+  });
 });
 
 // An arrival window is tenant-local: "9–11a" means 9am where the truck is

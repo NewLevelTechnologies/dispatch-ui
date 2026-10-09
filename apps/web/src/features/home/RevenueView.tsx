@@ -13,6 +13,9 @@ import {
 } from '../../api/setup';
 import { useGlossary } from '../../contexts/GlossaryContext';
 import { useHasCapability } from '../../hooks/useCurrentUser';
+import { useTenantTimeZone } from '../../hooks/useTenantTimeZone';
+import { zonedDate } from '../../lib/boardTime';
+import { addDays, customRangeId } from '../reports/revenueModel';
 import { Button } from '../../components/catalyst/button';
 import { Card, CardBody, CardHead, CardTitle } from '../../components/ui/Card';
 import { KPI } from '../../components/ui/KPI';
@@ -142,7 +145,7 @@ export function RevenueView({
       </div>
       <TechProductivityCard revenue={revenue} ctx={ctx} />
       <div className="home-2col even">
-        <QuotesCard query={quotes} tag={asOfTag} />
+        <QuotesCard query={quotes} tag={asOfTag} regionIds={regionIds} />
         <AgreementsCard query={agreements} tag={asOfTag} regionIds={regionIds} />
       </div>
     </div>
@@ -525,19 +528,42 @@ const FUNNEL = [
   { id: 'declined', color: 'var(--border-strong)' },
 ] as const;
 
-function QuotesCard({ query, tag }: { query: UseQueryResult<FinancialDashboardQuotes>; tag?: string }) {
+function QuotesCard({
+  query,
+  tag,
+  regionIds,
+}: {
+  query: UseQueryResult<FinancialDashboardQuotes>;
+  tag?: string;
+  regionIds: string[] | undefined;
+}) {
   const { t } = useTranslation();
   const { getName } = useGlossary();
   const quotes = getName('quote', true);
+  const canReport = useHasCapability('VIEW_ALL_QUOTES');
+  const zone = useTenantTimeZone();
+  // The Quotes report on this card's 30 days (whole local days) and scope.
+  const today = zonedDate(new Date(), zone) ?? new Date().toISOString().slice(0, 10);
+  const reportHref = `/reports/quotes?${new URLSearchParams({
+    range: customRangeId(addDays(today, -29), today),
+    from: 'home',
+    ...(regionIds ? { region: regionIds[0] } : {}),
+  }).toString()}`;
   return (
     <QueryCard
       title={t('dashboard.revenue.quotes.title', { entities: quotes })}
       tag={tag}
       query={query}
       action={
-        <Button plain size="xxs" href="/quotes">
-          {t('dashboard.revenue.quotes.all', { entities: quotes })}
-        </Button>
+        canReport ? (
+          <Button plain size="xxs" href={reportHref}>
+            {t('dashboard.revenue.quotes.report', { entities: quotes })}
+          </Button>
+        ) : (
+          <Button plain size="xxs" href="/quotes">
+            {t('dashboard.revenue.quotes.all', { entities: quotes })}
+          </Button>
+        )
       }
     >
       {(q) => (

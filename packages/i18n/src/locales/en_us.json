@@ -788,6 +788,7 @@
         "all": "All {{entities, lowercase}}",
         "avgDecision": "Avg time to decision",
         "declined": "Declined",
+        "report": "{{entities}} report",
         "sent": "Sent",
         "title": "{{entities}} · last 30 days",
         "viewed": "Viewed"
@@ -1521,7 +1522,9 @@
     "filters": {
       "anyStatus": "Any status",
       "noMatch": "No {{entities}} match these filters",
-      "sent": "Sent"
+      "sent": "Sent",
+      "sentBy": "Sent by {{name}}",
+      "sentByOne": "One sender"
     },
     "form": {
       "addLineItem": "Add Line Item",
@@ -1551,6 +1554,7 @@
       "expirationDate": "Expires",
       "quoteDate": "Quote Date",
       "quoteNumber": "Quote #",
+      "sentBy": "Sent by",
       "status": "Status",
       "totalAmount": "Total"
     }
@@ -1714,11 +1718,76 @@
   },
   "reports": {
     "alsoFromHome": "Also opens from Home: {{where}}",
+    "arrivals": {
+      "chart": {
+        "day": "On time by day",
+        "month": "On time by month",
+        "week": "On time by week"
+      },
+      "csv": {
+        "arrived": "Arrived",
+        "minutesLate": "Minutes late",
+        "windowEnd": "Window end",
+        "windowStart": "Window start"
+      },
+      "empty": {
+        "body": "Nothing was booked in {{range}}.",
+        "title": "No {{dispatches}} in this range"
+      },
+      "exportFailed": "Couldn't export the late arrivals",
+      "exported": "Exported {{file}} · {{count}} late arrivals",
+      "groupBy": {
+        "none": "Nothing"
+      },
+      "late": {
+        "arrived": "Arrived",
+        "clearTech": "Show everyone",
+        "hint": "Latest first",
+        "lateBy": "Late by",
+        "loadFailed": "Couldn't load the late arrivals",
+        "none": "Nobody arrived after their window in this range.",
+        "noneForTech": "{{name}} wasn't late in this range.",
+        "onlyTech": "Only {{name}}",
+        "title": "Late arrivals",
+        "window": "Window"
+      },
+      "loadFailed": "Couldn't load the arrival report",
+      "sub": "{{range}} · {{dates}}. On time is arriving by the window's end. Same rule as Home.",
+      "subToDate": "{{range}} · {{dates}}, to date. On time is arriving by the window's end. Same rule as Home.",
+      "summary": {
+        "arrived": "Arrived",
+        "arrivedSub": "of {{count}} {{dispatches}} booked",
+        "averageLate": "Average late by",
+        "averageLateSub": "Over late arrivals only",
+        "late": "Late",
+        "onTime": "On time"
+      },
+      "table": {
+        "arrived": "Arrived",
+        "hintRegion": "Pick one to scope the report to it",
+        "hintTech": "Pick one to list their late arrivals",
+        "late": "Late",
+        "onTime": "On time",
+        "title": "On time by {{group}}",
+        "visits": "Booked"
+      },
+      "title": "Arrival windows",
+      "unassigned": "No {{tech}}"
+    },
     "backToReports": "Back to Reports",
     "catalog": {
+      "arrivals": {
+        "description": "On-time arrival by {{tech, lowercase}} and {{region, lowercase}}, with every late visit listed. Same rule as Home's arrival card.",
+        "name": "Arrival windows"
+      },
       "filter-pull-list": {
         "description": "The filters each {{tech, lowercase}} pulls for tomorrow's {{dispatches, lowercase}}, from the board, with a company total. Print and tape to the truck before heading out.",
         "name": "Filter Pull List"
+      },
+      "quotes": {
+        "description": "Sent, viewed, accepted and declined, by who sent them, with win rate and time to decision. Same rule as Home's {{quotes, lowercase}} card.",
+        "fromHome": "{{quotes}} card",
+        "name": "{{quotes}}"
       },
       "receivables": {
         "description": "What was owed at the end of any day, aged from that day, with every open {{invoices, lowercase}} behind it. For month-end close.",
@@ -1807,6 +1876,56 @@
       "title": "Filter Pull List",
       "totalHint": "Each {{entity}} counted once, however many {{techs, lowercase}} are on it.",
       "unnamed": "Unnamed {{tech, lowercase}}"
+    },
+    "quotes": {
+      "csv": {
+        "decided": "Decided",
+        "firstSent": "First sent",
+        "number": "{{entity}} #",
+        "total": "Total",
+        "viewed": "Viewed"
+      },
+      "empty": {
+        "body": "Nothing was first sent in {{range}}.",
+        "title": "No {{entities}} sent in this range"
+      },
+      "exportFailed": "Couldn't export the {{entities}}",
+      "exported": "Exported {{file}} · {{count}} {{entities}}",
+      "funnel": {
+        "accepted": "Accepted",
+        "amount": "Amount",
+        "declined": "Declined",
+        "expired": "Expired",
+        "hint": "Counts open the {{entities}} behind them",
+        "open": "Still open",
+        "sent": "Sent",
+        "share": "Of sent",
+        "stage": "Stage",
+        "title": "Where they stand now",
+        "viewed": "Viewed"
+      },
+      "groupBy": {
+        "none": "Nothing",
+        "sender": "Sender"
+      },
+      "loadFailed": "Couldn't load the {{entities}} report",
+      "noSender": "Sender not recorded",
+      "senders": {
+        "decision": "Days to decide",
+        "hint": "Pick one to list their {{entities}}",
+        "title": "By who sent them"
+      },
+      "sub": "{{range}} · {{dates}}. {{entities}} first sent in the range, by where they stand now. Same rule as Home.",
+      "subToDate": "{{range}} · {{dates}}, to date. {{entities}} first sent in the range, by where they stand now. Same rule as Home.",
+      "summary": {
+        "decision": "Time to decision",
+        "decisionNone": "Nothing decided yet",
+        "open": "Still open",
+        "openSub": "{{count}} awaiting an answer",
+        "sent": "Sent",
+        "sentSub": "{{amount}} · {{vs}}",
+        "winRate": "Win rate"
+      }
     },
     "range": {
       "backHome": "Home",
@@ -3698,7 +3817,9 @@
       "offOverlap": "{{tech}} is off {{off}} · {{window}} overlaps it",
       "removeFailed": "Couldn't remove",
       "removed": "{{workOrder}} → unscheduled",
-      "undoFailed": "Couldn't undo — reloading the board"
+      "undoFailed": "Couldn't undo — reloading the board",
+      "windowLocked": "The {{tech}} has arrived, so the arrival window can't change now.",
+      "windowLockedHint": "Fixed: the {{tech}} has arrived."
     },
     "drawer": {
       "changedPill": "Changed · not sent",

@@ -556,6 +556,9 @@ export interface Quote {
   firstViewedAt?: string | null;
   /** Set on ACCEPTED/DECLINED, cleared on leaving them. */
   decidedAt?: string | null;
+  /** Who first sent it; resends by others don't change it. Null when not recorded. */
+  firstSentByUserId?: string | null;
+  firstSentByName?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -566,6 +569,8 @@ export interface ListQuotesParams {
   firstSentFrom?: string;
   firstSentTo?: string;
   status?: QuoteStatus[];
+  /** The user who first sent it (a sender group's drill-in). */
+  sentByUserId?: string;
   /** The work order's location's region; quotes with no work order are company-wide only. */
   regionIds?: string[];
   page?: number;
@@ -1020,6 +1025,70 @@ export const receivablesReportApi = {
   get: async ({ asOf, regionIds }: { asOf?: string; regionIds?: string[] } = {}): Promise<ReceivablesReport> => {
     const response = await apiClient.get<ReceivablesReport>('/financial/reports/receivables', {
       params: { ...(asOf ? { asOf } : {}), ...(regionIds?.length ? { regionIds } : {}) },
+    });
+    return response.data;
+  },
+};
+
+export type QuoteReportGroupBy = 'sender' | 'none';
+
+export interface QuoteReportParams {
+  from: string;
+  to: string;
+  compare?: RevenueReportCompare;
+  groupBy?: QuoteReportGroupBy;
+  regionIds?: string[];
+}
+
+/** The funnel: quotes first sent in the range, split by current status. */
+export interface QuoteFunnelFigures {
+  /** The whole cohort. */
+  sent: ArAgingBucket;
+  /** Opened by the customer through a share link. */
+  viewed: ArAgingBucket;
+  accepted: ArAgingBucket;
+  declined: ArAgingBucket;
+  expired: ArAgingBucket;
+  /** Still SENT. A cohort quote moved back to DRAFT is in `sent` only. */
+  open: ArAgingBucket;
+  /** accepted ÷ (accepted + declined) by count, 0–1; null when none decided. */
+  winRate: number | null;
+  /** First send → decision, over decisions with a recorded time; null when none. */
+  averageDaysToDecision: number | null;
+}
+
+export interface QuoteReportComparison extends QuoteFunnelFigures {
+  basis: Exclude<RevenueReportCompare, 'none'>;
+  from: string;
+  to: string;
+}
+
+/** One first sender's share; `id` null is quotes with no recorded sender (sorted last). */
+export interface QuoteReportGroup extends QuoteFunnelFigures {
+  id: string | null;
+  /** Null without a comparison; zero (rate null) for a sender with none then. */
+  comparisonSent: ArAgingBucket | null;
+  comparisonAccepted: ArAgingBucket | null;
+  comparisonWinRate: number | null;
+}
+
+export interface QuoteReport extends QuoteFunnelFigures {
+  from: string;
+  /** Cut off at today. */
+  to: string;
+  /** Null when not asked for, or when the first quote in scope went out after the comparison's start. */
+  comparison: QuoteReportComparison | null;
+  groupBy: QuoteReportGroupBy;
+  /** Empty with groupBy none. */
+  groups: QuoteReportGroup[];
+  currency: string;
+  regionIds: string[] | null;
+}
+
+export const quoteReportApi = {
+  get: async ({ regionIds, ...params }: QuoteReportParams): Promise<QuoteReport> => {
+    const response = await apiClient.get<QuoteReport>('/financial/reports/quotes', {
+      params: { ...params, ...(regionIds?.length ? { regionIds } : {}) },
     });
     return response.data;
   },

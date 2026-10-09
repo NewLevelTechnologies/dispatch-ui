@@ -13,6 +13,9 @@ export function RevenueChart({
   ghosts,
   rangeLabel,
   ghostLabel,
+  title,
+  format = money,
+  max: fixedMax,
 }: {
   unit: ChartUnit;
   bars: ChartBucket[];
@@ -21,9 +24,15 @@ export function RevenueChart({
   rangeLabel: string;
   /** "Sep 2025" or "Sep 2025, same weekdays". */
   ghostLabel: string | null;
+  /** Card title; defaults to revenue by the chart's unit. */
+  title?: string;
+  /** A bar's value as text. Money by default. */
+  format?: (n: number) => string;
+  /** A fixed top of the scale (1 for a rate); else the tallest bar. */
+  max?: number;
 }) {
   const { t } = useTranslation();
-  const max = Math.max(1, ...bars.map((b, i) => Math.max(b.amount, ghosts?.[i]?.amount ?? 0)));
+  const max = fixedMax ?? Math.max(1, ...bars.map((b, i) => Math.max(b.amount, ghosts?.[i]?.amount ?? 0)));
   const px = (n: number) => Math.round((n / max) * PLOT_H);
   const crowded = bars.length > 20;
   // Label every bar while they fit; on a crowded daily chart every fifth day
@@ -33,7 +42,7 @@ export function RevenueChart({
   return (
     <Card>
       <CardHead>
-        <CardTitle>{t(`reports.revenue.chart.${unit}`)}</CardTitle>
+        <CardTitle>{title ?? t(`reports.revenue.chart.${unit}`)}</CardTitle>
         <span className="rp-legend">
           <span>
             <span className="rp-key bar" />
@@ -55,8 +64,8 @@ export function RevenueChart({
           {bars.map((b, i) => {
             const ghost = ghosts?.[i];
             const title = ghost
-              ? `${b.title}: ${money(b.amount)} · ${ghostLabel}: ${money(ghost.amount)}`
-              : `${b.title}: ${money(b.amount)}`;
+              ? `${b.title}: ${format(b.amount)} · ${ghostLabel}: ${format(ghost.amount)}`
+              : `${b.title}: ${format(b.amount)}`;
             const labelled = i % every === 0 || b.monthStart;
             return (
               <div

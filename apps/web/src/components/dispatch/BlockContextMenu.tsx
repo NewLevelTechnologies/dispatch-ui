@@ -156,7 +156,7 @@ export default function BlockContextMenu({
   // completed, no-show and cancelled are history — rescheduling those is a
   // NEW visit through the composer, not a move. A window that can't be placed
   // can't be preserved, so it doesn't offer a move either.
-  const kept = dispatch.status === 'SCHEDULED' ? preservedWindow(dispatch, timeZone) : null;
+  const kept = dispatch.status === 'SCHEDULED' && !dispatch.arrivedAt ? preservedWindow(dispatch, timeZone) : null;
   const targets = moveTargets(date, today);
   const pickable = canMoveTo(date, picked, today);
   const go = (toDate: string) => () => {
