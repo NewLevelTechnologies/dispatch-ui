@@ -198,3 +198,7 @@
 }
 .rp-tech-filter:hover { border-color: var(--fg-muted); }
 
+
+/* Payments: a deposit day's per-method subtotals. */
+.rp-methods { display: inline-flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12px; }
+.rp-method { white-space: nowrap; color: var(--fg-muted); }

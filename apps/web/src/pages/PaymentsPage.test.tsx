@@ -11,6 +11,7 @@ vi.mock('../api/setup', async (importOriginal) => {
     ...actual,
     paymentsApi: { ...actual.paymentsApi, getAll: (...a: unknown[]) => mockPayments(...a) },
     invoicesApi: { ...actual.invoicesApi, getAll: () => Promise.resolve({ content: [], page: 0, size: 200, totalElements: 0, totalPages: 0, first: true, last: true }) },
+    dispatchRegionApi: { ...actual.dispatchRegionApi, getAll: () => Promise.resolve([{ id: 'r1', name: 'East Valley', isActive: true }]) },
     customerApi: { ...actual.customerApi, getAllPaginated: () => Promise.resolve({ content: [], totalElements: 0, totalPages: 0, number: 0, size: 200 }) },
   };
 });
@@ -90,5 +91,17 @@ describe('PaymentsPage', () => {
         size: 25,
       }),
     );
+  });
+
+  it('narrows to one payer in one region, showing the part paid there', async () => {
+    mockPayments.mockResolvedValue(page([payment({ amountInScope: 150, receivedByName: 'Pat Office' })]));
+    renderWithProviders(<PaymentsPage />, { initialPath: '/payments?payer=c1&region=r1' });
+
+    const row = (await screen.findByText('PAY-0001')).closest('tr')!;
+    expect(mockPayments).toHaveBeenCalledWith(expect.objectContaining({ customerId: 'c1', regionIds: ['r1'] }));
+    expect(row).toHaveTextContent('$150.00');
+    expect(row).toHaveTextContent('payments.table.ofTotal');
+    expect(row).toHaveTextContent('Pat Office');
+    expect(screen.getByRole('button', { name: 'Acme Diner' })).toBeInTheDocument();
   });
 });
