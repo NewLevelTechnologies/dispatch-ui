@@ -1,6 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import {
+  addMonths,
   cadenceSuffix,
+  canRenew,
+  defaultRenewalEnd,
   formatWindowDates,
   hasNarrowing,
   listParams,
@@ -85,5 +88,27 @@ describe('visit windows', () => {
     expect(formatWindowDates('2026-10-01', '2026-10-31', TODAY)).toBe('Oct 1 – 31');
     expect(formatWindowDates('2026-09-28', '2026-10-04', TODAY)).toBe('Sep 28 – Oct 4');
     expect(formatWindowDates('2026-12-20', '2027-01-10', TODAY)).toBe('Dec 20, 2026 – Jan 10, 2027');
+  });
+});
+
+describe('renewal defaults', () => {
+  const base = { id: 'a', agreementNumber: 'SA-1', customer: { name: 'Acme' }, status: 'ACTIVE' as const };
+
+  it('clamps to the month end', () => {
+    expect(addMonths('2027-01-31', 1)).toBe('2027-02-28');
+    expect(addMonths('2026-10-01', 12)).toBe('2027-10-01');
+  });
+
+  it('uses the renewal term on file, else the current term length, else a year', () => {
+    expect(defaultRenewalEnd({ ...base, termStart: '2026-01-01', termEnd: '2027-01-01', renewalTermMonths: 6 })).toBe('2027-07-01');
+    expect(defaultRenewalEnd({ ...base, termStart: '2024-09-01', termEnd: '2027-09-01' })).toBe('2030-09-01');
+    expect(defaultRenewalEnd({ ...base, termEnd: '2027-09-01' })).toBe('2028-09-01');
+  });
+
+  it('renews only active or expired agreements with a term end', () => {
+    expect(canRenew({ status: 'ACTIVE', termEnd: '2027-01-01' })).toBe(true);
+    expect(canRenew({ status: 'EXPIRED', termEnd: '2027-01-01' })).toBe(true);
+    expect(canRenew({ status: 'ACTIVE', termEnd: null })).toBe(false);
+    expect(canRenew({ status: 'CANCELLED', termEnd: '2027-01-01' })).toBe(false);
   });
 });

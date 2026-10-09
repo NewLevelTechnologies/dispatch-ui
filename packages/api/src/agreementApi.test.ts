@@ -108,6 +108,14 @@ describe('agreementApi', () => {
     expect(apiClient.post).toHaveBeenCalledWith('/work-orders/agreements/a-1/cancel');
   });
 
+  it('renew POSTs the new term end and price to /renew', async () => {
+    await agreementApi.renew('a-1', { termEnd: '2028-06-01', billingAmount: 330 });
+    expect(apiClient.post).toHaveBeenCalledWith('/work-orders/agreements/a-1/renew', {
+      termEnd: '2028-06-01',
+      billingAmount: 330,
+    });
+  });
+
   it('getCoverage hits /coverage', async () => {
     await agreementApi.getCoverage('a-1');
     expect(apiClient.get).toHaveBeenCalledWith('/work-orders/agreements/a-1/coverage');

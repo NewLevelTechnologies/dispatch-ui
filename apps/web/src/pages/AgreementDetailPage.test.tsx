@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderWithProviders } from '../test/utils';
@@ -16,6 +16,7 @@ vi.mock('../api/setup', () => ({
     getRevenueRecognition: vi.fn(),
     update: vi.fn(),
     cancel: vi.fn(),
+    renew: vi.fn(),
     list: vi.fn(),
   },
   agreementPlanApi: { getById: vi.fn(), getAll: vi.fn(), create: vi.fn(), update: vi.fn(), delete: vi.fn() },
@@ -145,6 +146,67 @@ describe('AgreementDetailPage', () => {
       revenueRecognitionEnabled: false,
       revenueRecognitionBasis: 'STRAIGHT_LINE',
     } as unknown as TenantSettings);
+  });
+
+  describe('renewal', () => {
+    beforeEach(() => {
+      vi.useFakeTimers({ toFake: ['Date'] });
+      vi.setSystemTime(new Date('2026-10-08T15:00:00Z'));
+      vi.mocked(agreementApi.renew).mockResolvedValue(agreement);
+    });
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('books a renewal mid-term for the renewal term on file', async () => {
+      const user = userEvent.setup();
+      renderPage();
+      await user.click(await screen.findByRole('button', { name: 'Renew…' }));
+      const dialog = await screen.findByRole('dialog', { name: 'agreements.renew.title' });
+      expect(dialog).toHaveTextContent('agreements.renew.bookedHint');
+      expect(screen.getByLabelText(/agreements.renew.termEnd/)).toHaveValue('2028-09-01');
+      await user.click(screen.getByRole('button', { name: 'agreements.renew.submitBooked' }));
+      await waitFor(() => expect(agreementApi.renew).toHaveBeenCalledWith('a-1', { termEnd: '2028-09-01' }));
+    });
+
+    it('renews an expired agreement now, at a new price', async () => {
+      vi.mocked(agreementApi.getById).mockResolvedValue({ ...agreement, status: 'EXPIRED', termEnd: '2026-09-01' });
+      vi.mocked(agreementApi.getBillingSchedule).mockResolvedValue({
+        agreementId: 'a-1',
+        amount: 300,
+        cadenceUnit: 'QUARTER',
+        cadenceInterval: 1,
+        anchorDate: '2024-09-01',
+        netDays: 30,
+        billingMode: 'FIXED_SCHEDULE',
+        active: true,
+      });
+      const user = userEvent.setup();
+      renderPage();
+      await user.click(await screen.findByRole('button', { name: 'Renew…' }));
+      expect(await screen.findByRole('dialog', { name: 'agreements.renew.title' })).toHaveTextContent(
+        'agreements.renew.expiredHint',
+      );
+      await user.type(await screen.findByRole('spinbutton'), '330');
+      await user.click(screen.getByRole('button', { name: 'agreements.renew.submit' }));
+      await waitFor(() =>
+        expect(agreementApi.renew).toHaveBeenCalledWith('a-1', { termEnd: '2027-09-01', billingAmount: 330 }),
+      );
+    });
+
+    it('shows a booked renewal and stops asking for one', async () => {
+      vi.mocked(agreementApi.getById).mockResolvedValue({
+        ...agreement,
+        termEnd: '2026-11-01',
+        nextTermEnd: '2027-11-01',
+        nextTermBillingAmount: 330,
+      });
+      renderPage();
+      expect(await screen.findByText('Next term')).toBeInTheDocument();
+      expect(screen.getByText(/330.* per invoice/)).toBeInTheDocument();
+      expect(screen.getByText(/Renewal booked to/)).toBeInTheDocument();
+      expect(screen.queryByText(/Renews in \d+ days/)).not.toBeInTheDocument();
+    });
   });
 
   it('renders the header (name, number, customer) and the tab row', async () => {

@@ -18,6 +18,7 @@ import { Button } from '../../components/catalyst/button';
 import { Dropdown, DropdownButton, DropdownDivider, DropdownItem, DropdownLabel, DropdownMenu } from '../../components/catalyst/dropdown';
 import IconButton from '../../components/IconButton';
 import ConfirmDialog from '../../components/ConfirmDialog';
+import RenewAgreementDialog from './RenewAgreementDialog';
 import { Card, CardBody } from '../../components/ui/Card';
 import { CellStack, CellSub, CellTop, DenseRow, DenseTable, DenseTHead } from '../../components/ui/DenseTable';
 import { SortHeader, type SortDir } from '../../components/ui/SortHeader';
@@ -39,6 +40,7 @@ import {
   RENEWING_DAYS,
   STATUSES,
   cadenceSuffix,
+  canRenew,
   daysUntil,
   formatDay,
   formatWindowDates,
@@ -72,6 +74,7 @@ export function AgreementsList({
   const [searchParams, setSearchParams] = useSearchParams();
   const { page, pageHref } = useUrlPage('page');
   const [cancelling, setCancelling] = useState<AgreementListRow | null>(null);
+  const [renewing, setRenewing] = useState<AgreementListRow | null>(null);
 
   // The box reads the URL itself; the query trails it so typing stays quick.
   const q = searchParams.get('q') ?? '';
@@ -221,6 +224,7 @@ export function AgreementsList({
                   words={words}
                   onOpen={(extra) => open(a.id, extra)}
                   onCancel={() => setCancelling(a)}
+                  onRenew={() => setRenewing(a)}
                 />
               ))}
             </tbody>
@@ -327,6 +331,7 @@ export function AgreementsList({
         isDestructive
         isPending={cancelMutation.isPending}
       />
+      <RenewAgreementDialog agreement={renewing} onClose={() => setRenewing(null)} />
     </>
   );
 }
@@ -341,6 +346,7 @@ function AgreementRow({
   words,
   onOpen,
   onCancel,
+  onRenew,
 }: {
   a: AgreementListRow;
   today: string;
@@ -349,6 +355,7 @@ function AgreementRow({
   words: Words;
   onOpen: (extra?: string) => void;
   onCancel: () => void;
+  onRenew: () => void;
 }) {
   const { t } = useTranslation();
   const ended = isEnded(a.status);
@@ -434,13 +441,16 @@ function AgreementRow({
                 <DropdownLabel>{t('agreements.list.menu.setUpBilling')}</DropdownLabel>
               </DropdownItem>
             )}
+            {(canRenew(a) || !ended) && <DropdownDivider />}
+            {canRenew(a) && (
+              <DropdownItem onClick={onRenew}>
+                <DropdownLabel>{t('agreements.list.menu.renew')}</DropdownLabel>
+              </DropdownItem>
+            )}
             {!ended && (
-              <>
-                <DropdownDivider />
-                <DropdownItem onClick={onCancel}>
-                  <DropdownLabel className="text-danger-500">{t('agreements.list.menu.cancel')}</DropdownLabel>
-                </DropdownItem>
-              </>
+              <DropdownItem onClick={onCancel}>
+                <DropdownLabel className="text-danger-500">{t('agreements.list.menu.cancel')}</DropdownLabel>
+              </DropdownItem>
             )}
           </DropdownMenu>
         </Dropdown>
@@ -574,7 +584,7 @@ function RenewsCell({ a, today }: { a: AgreementListRow; today: string }) {
   const days = daysUntil(a.termEnd, today);
   const how =
     a.autoRenew == null ? null : a.autoRenew ? t('agreements.list.table.autoRenews') : t('agreements.list.cell.manualRenewal');
-  // Nothing expires an agreement on its own, so a term can run past its end.
+  // The nightly run renews or expires it; until then a term can sit past its end.
   if (days < 0)
     return (
       <CellStack>

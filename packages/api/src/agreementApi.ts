@@ -119,6 +119,10 @@ export interface AgreementResponse {
   autoRenew: boolean;
   renewalTermMonths?: number | null;
   renewalAlertDays?: number | null;
+  // A renewal booked to start at termEnd: the next term ends nextTermEnd,
+  // billed at nextTermBillingAmount when set. Both null when none is booked.
+  nextTermEnd?: string | null;
+  nextTermBillingAmount?: number | null;
   notes?: string | null;
   // Plan provenance (null = bespoke, not sold from a plan) + the member-benefits
   // snapshot the agreement was sold under. BE always sends `benefits`; kept
@@ -318,6 +322,12 @@ export interface CreateAgreementRequest {
   // snapshot the plan's benefits; send it to override the benefits per-sale.
   planId?: string | null;
   benefits?: MemberBenefits | null;
+}
+
+export interface RenewAgreementRequest {
+  termEnd: string;
+  /** Reprices the billing schedule from the new term's first period; omit to keep it. */
+  billingAmount?: number;
 }
 
 // PATCH body. Tri-state nullable fields (termStart, termEnd, renewalTermMonths,
@@ -663,6 +673,16 @@ export const agreementApi = {
   cancel: async (id: string): Promise<AgreementResponse> => {
     const response = await apiClient.post<AgreementResponse>(
       `/work-orders/agreements/${id}/cancel`,
+    );
+    return response.data;
+  },
+
+  // Renews into [termEnd, request.termEnd). Booked while the current term runs
+  // (it starts at termEnd); applied now once the term has ended or from EXPIRED.
+  renew: async (id: string, request: RenewAgreementRequest): Promise<AgreementResponse> => {
+    const response = await apiClient.post<AgreementResponse>(
+      `/work-orders/agreements/${id}/renew`,
+      request,
     );
     return response.data;
   },

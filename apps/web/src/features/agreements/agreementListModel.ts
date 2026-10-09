@@ -141,3 +141,40 @@ export function formatDay(day: string | null | undefined): string | null {
     timeZone: 'UTC',
   });
 }
+
+/** What the dialog needs from either the list row or the full agreement. */
+export interface RenewableAgreement {
+  id: string;
+  agreementNumber: string;
+  customer: { name: string };
+  status: AgreementStatus;
+  termStart?: string | null;
+  termEnd?: string | null;
+  renewalTermMonths?: number | null;
+  nextTermEnd?: string | null;
+  nextTermBillingAmount?: number | null;
+}
+
+/** Renewable from ACTIVE or EXPIRED, and only with a term end to renew from. */
+export function canRenew(a: Pick<RenewableAgreement, 'status' | 'termEnd'>): boolean {
+  return Boolean(a.termEnd) && (a.status === 'ACTIVE' || a.status === 'EXPIRED');
+}
+
+/** `day` plus `months`, clamped to the month's last day (Jan 31 + 1 → Feb 28). */
+export function addMonths(day: string, months: number): string {
+  const [y, m, d] = day.split('-').map(Number);
+  const last = new Date(Date.UTC(y, m - 1 + months + 1, 0)).getUTCDate();
+  return new Date(Date.UTC(y, m - 1 + months, Math.min(d, last))).toISOString().slice(0, 10);
+}
+
+/** The new term's default end: the renewal term on file, else the current term's length again, else a year. */
+export function defaultRenewalEnd(a: RenewableAgreement): string {
+  const termEnd = a.termEnd!;
+  let months = a.renewalTermMonths ?? 0;
+  if (!months && a.termStart) {
+    const [y1, m1] = a.termStart.split('-').map(Number);
+    const [y2, m2] = termEnd.split('-').map(Number);
+    months = (y2 - y1) * 12 + (m2 - m1);
+  }
+  return addMonths(termEnd, months > 0 ? months : 12);
+}
