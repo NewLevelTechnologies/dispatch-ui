@@ -108,6 +108,11 @@ export function useBoardMutations(date: string, timeZone: string) {
       showError(t('dispatchBoard.drag.conflict'));
       return;
     }
+    // The tech arrived mid-drag.
+    if (isConflict(err) && errorCode(err) === 'DISPATCH_WINDOW_LOCKED') {
+      showError(t('dispatchBoard.drag.windowLocked', { tech: getName('technician').toLowerCase() }));
+      return;
+    }
     showError(fallback, extractApiError(err));
   };
 

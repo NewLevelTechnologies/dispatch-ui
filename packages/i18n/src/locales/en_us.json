@@ -3698,7 +3698,9 @@
       "offOverlap": "{{tech}} is off {{off}} · {{window}} overlaps it",
       "removeFailed": "Couldn't remove",
       "removed": "{{workOrder}} → unscheduled",
-      "undoFailed": "Couldn't undo — reloading the board"
+      "undoFailed": "Couldn't undo — reloading the board",
+      "windowLocked": "The {{tech}} has arrived, so the arrival window can't change now.",
+      "windowLockedHint": "Fixed: the {{tech}} has arrived."
     },
     "drawer": {
       "changedPill": "Changed · not sent",

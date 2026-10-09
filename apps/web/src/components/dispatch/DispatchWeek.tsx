@@ -311,7 +311,7 @@ function PeekRow({
   const ref = useRef<HTMLButtonElement>(null);
   // Only SCHEDULED work moves (§3.6): en route or on site is happening now,
   // and everything else is history.
-  const movable = !readOnly && dispatch.status === 'SCHEDULED';
+  const movable = !readOnly && dispatch.status === 'SCHEDULED' && !dispatch.arrivedAt;
 
   useEffect(() => {
     const el = ref.current;

@@ -123,7 +123,8 @@ function Block({
 
   useEffect(() => {
     const el = ref.current;
-    if (!el) return;
+    // Once the tech has arrived the window is history; the server refuses to move it.
+    if (!el || dispatch.arrivedAt) return;
     return draggable({
       element: el,
       getInitialData: ({ input, element }) => ({
@@ -139,7 +140,7 @@ function Block({
       onDragStart: () => setDragging(true),
       onDrop: () => setDragging(false),
     });
-  }, [dispatch.id, window.start, window.end]);
+  }, [dispatch.id, dispatch.arrivedAt, window.start, window.end]);
 
   const left = axisPct(window.start, axis);
   const width = axisPct(window.end, axis) - left;
