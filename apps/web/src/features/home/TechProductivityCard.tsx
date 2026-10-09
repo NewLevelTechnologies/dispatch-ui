@@ -246,6 +246,7 @@ export function TechProductivityCard({
           row={openRow}
           name={openRow ? nameOf(openRow.name) : ''}
           period={ctx.apiPeriod}
+          dates={{ from: p.periodStart, to: p.asOf }}
           regionIds={ctx.regionIds}
           periodLabel={periodLabel}
           onClose={close}

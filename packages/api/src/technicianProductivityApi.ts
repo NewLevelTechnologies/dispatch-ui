@@ -82,13 +82,6 @@ export interface TechnicianProductivityResponse {
 }
 
 /** A callback charged to a tech in the period, and the job it calls back to. */
-export interface ChargedCallback {
-  workOrderId: string;
-  workOrderNumber: string;
-  createdAt: string;
-  original: { id: string; workOrderNumber: string | null };
-}
-
 export interface CreditedInvoice {
   invoiceId: string;
   invoiceNumber: string | null;
@@ -136,24 +129,6 @@ export const technicianProductivityApi = {
   ): Promise<Page<CreditedInvoice>> => {
     const response = await apiClient.get<Page<CreditedInvoice>>(
       `/work-orders/technician-productivity/${userId}/invoices`,
-      {
-        params: {
-          ...scopeQuery(params),
-          page: params.page ?? 0,
-          size: params.size ?? 25,
-        },
-      },
-    );
-    return response.data;
-  },
-
-  /** The callbacks charged to one tech in the period, newest first. */
-  getChargedCallbacks: async (
-    userId: string,
-    params: ScopeParams & { page?: number; size?: number } = {},
-  ): Promise<Page<ChargedCallback>> => {
-    const response = await apiClient.get<Page<ChargedCallback>>(
-      `/work-orders/technician-productivity/${userId}/callbacks`,
       {
         params: {
           ...scopeQuery(params),

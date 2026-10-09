@@ -349,7 +349,6 @@ export {
   type TechnicianProductivityRow,
   type RevenueBucket,
   type CreditedInvoice,
-  type ChargedCallback,
 } from './technicianProductivityApi';
 export {
   arrivalReportApi,
@@ -363,6 +362,19 @@ export {
   type LateArrival,
   type LateArrivalsParams,
 } from './arrivalReportApi';
+export {
+  workOrderReportsApi,
+  type CallbackListParams,
+  type CallbackRow,
+  type CallbacksReport,
+  type CallbacksReportGroupBy,
+  type CallbacksReportParams,
+  type JobsFigures,
+  type JobsReport,
+  type JobsReportGroup,
+  type JobsReportGroupBy,
+  type JobsReportParams,
+} from './workOrderReportsApi';
 
 // Financial APIs
 export {

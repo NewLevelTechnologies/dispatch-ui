@@ -14,7 +14,9 @@ vi.mock('../api/setup', async (importOriginal) => {
     technicianProductivityApi: {
       get: (...a: unknown[]) => mockGet(...a),
       getCreditedInvoices: (...a: unknown[]) => mockInvoices(...a),
-      getChargedCallbacks: () => Promise.resolve({ content: [], totalElements: 0, totalPages: 0, number: 0, size: 50 }),
+    },
+    workOrderReportsApi: {
+      callbackList: () => Promise.resolve({ content: [], totalElements: 0, totalPages: 0, number: 0, size: 50 }),
     },
     dispatchRegionApi: {
       ...actual.dispatchRegionApi,

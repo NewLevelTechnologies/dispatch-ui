@@ -57,8 +57,8 @@ vi.mock('../api/setup', async (importOriginal) => {
       ...actual.technicianProductivityApi,
       get: (...a: unknown[]) => mockProductivity(...a),
       getCreditedInvoices: (...a: unknown[]) => mockCredited(...a),
-      getChargedCallbacks: (...a: unknown[]) => mockChargedCallbacks(...a),
     },
+    workOrderReportsApi: { ...actual.workOrderReportsApi, callbackList: (...a: unknown[]) => mockChargedCallbacks(...a) },
     revenueTargetsApi: { ...actual.revenueTargetsApi, get: (...a: unknown[]) => mockTargets(...a) },
   };
 });
@@ -638,7 +638,12 @@ describe('DashboardPage — Revenue & productivity', () => {
     });
     mockChargedCallbacks.mockResolvedValue({
       content: [
-        { workOrderId: 'w9', workOrderNumber: 'WO-1302', createdAt: '2026-09-29T10:00:00Z', original: { id: 'w1', workOrderNumber: 'WO-1234' } },
+        {
+          id: 'w9', workOrderNumber: 'WO-1302', createdOn: '2026-09-29', createdByName: null, linkedByName: null, linkedAt: null,
+          workOrderTypeId: null, serviceLocation: { name: null, streetAddress: null, city: null },
+          original: { id: 'w1', workOrderNumber: 'WO-1234', completedDate: null, workOrderTypeId: null },
+          chargedTechnicians: [], daysBetween: null,
+        },
       ],
       totalElements: 1,
       totalPages: 1,
@@ -657,7 +662,8 @@ describe('DashboardPage — Revenue & productivity', () => {
     expect(lines[1]).toHaveTextContent('dashboard.revenue.techs.drawer.solo');
     expect(lines[1]).toHaveTextContent('dashboard.revenue.techs.drawer.notRecorded');
     // The row's 3 callbacks, each with the original job it calls back to.
-    expect(mockChargedCallbacks).toHaveBeenCalledWith('t1', { period: undefined, size: 50 });
+    // The Callbacks report's list over the card's actual dates.
+    expect(mockChargedCallbacks).toHaveBeenCalledWith({ from: '2026-09-01', to: '2026-09-10', technicianId: 't1', regionIds: undefined, size: 50 });
     const callback = await screen.findByTestId('charged-callback');
     expect(within(callback).getByRole('link', { name: 'WO-1302' })).toHaveAttribute('href', '/work-orders/w9');
     expect(within(callback).getByRole('link', { name: 'WO-1234' })).toHaveAttribute('href', '/work-orders/w1');
