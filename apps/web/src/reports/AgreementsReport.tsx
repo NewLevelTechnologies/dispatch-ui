@@ -81,7 +81,12 @@ export default function AgreementsReport() {
   const agreements = getName('agreement', true);
   const toDate = report ? report.to < range.to : range.to > today;
   const comparisonName = report?.comparison ? windowName(report.comparison.from, report.comparison.to) : null;
-  const cmpLine = comparisonLine(t, comparisonName, compare, range.from);
+  // No comparison came back although one was asked for: its window starts
+  // before history does, not "no data".
+  const cmpLine =
+    report && !report.comparison && compare !== 'none'
+      ? t('reports.agreements.noComparison', { date: longDate(report.eventsTrackedSince) })
+      : comparisonLine(t, comparisonName, compare, range.from);
   const sub = report
     ? t(toDate ? 'reports.agreements.subToDate' : 'reports.agreements.sub', {
         range: rangeName(range),
@@ -217,7 +222,7 @@ function Summary({ report, cmpLine }: { report: Report; cmpLine: string }) {
         sub={
           <>
             <Pct current={end} previous={c?.recurringMonthlyAtEnd} />
-            {t('reports.agreements.summary.recurringSub', { vs: cmpLine })}
+            {cmpLine}
           </>
         }
       />

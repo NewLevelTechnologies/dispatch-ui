@@ -1773,6 +1773,7 @@
         "suspended": "Suspended"
       },
       "loadFailed": "Couldn't load the {{entities}} report",
+      "noComparison": "Nothing to compare before {{date}}",
       "sub": "{{range}} · {{dates}}. Recurring revenue per month, and what moved it. The end matches Home.",
       "subToDate": "{{range}} · {{dates}}, to date. Recurring revenue per month, and what moved it. The end matches Home.",
       "summary": {
@@ -1780,8 +1781,7 @@
         "net": "Net change",
         "netSub": "From {{amount}} a month",
         "netUnknown": "History begins {{date}}",
-        "recurring": "Recurring per month",
-        "recurringSub": "At the end · {{vs}}",
+        "recurring": "Recurring per month at the end",
         "visits": "Visits completed",
         "visitsSub": "{{completed}} of {{planned}} · {{missed}} missed"
       },
