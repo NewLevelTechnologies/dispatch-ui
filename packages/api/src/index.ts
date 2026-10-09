@@ -364,6 +364,13 @@ export {
 } from './arrivalReportApi';
 export {
   workOrderReportsApi,
+  type AgreementBridge,
+  type AgreementBridgeLine,
+  type AgreementEventKind,
+  type AgreementEventRow,
+  type AgreementEventsParams,
+  type AgreementsReport,
+  type AgreementsReportParams,
   type CallbackListParams,
   type CallbackRow,
   type CallbacksReport,

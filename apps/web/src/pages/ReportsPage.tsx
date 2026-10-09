@@ -20,6 +20,7 @@ export default function ReportsPage() {
   const { data: user } = useCurrentUser();
   // Glossary names the catalog's copy may use.
   const words = {
+    agreements: getName('agreement', true),
     dispatches: getName('dispatch', true),
     division: getName('division'),
     invoices: getName('invoice', true),

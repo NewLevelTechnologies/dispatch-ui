@@ -1720,6 +1720,73 @@
     }
   },
   "reports": {
+    "agreements": {
+      "bridge": {
+        "end": "Recurring at the end of {{date}}",
+        "hint": "Start plus every line is the end. Pick a line to list its events",
+        "line": "Movement",
+        "monthly": "Per month",
+        "renewedSub": "{{auto}} auto · {{manual}} manual. Only a price change or a revival moves the total",
+        "start": "Recurring at the start of {{date}}",
+        "title": "Recurring revenue, start to end"
+      },
+      "csv": {
+        "after": "Monthly after",
+        "before": "Monthly before",
+        "change": "Change",
+        "number": "{{entity}} #"
+      },
+      "events": {
+        "by": "By",
+        "date": "Date",
+        "event": "Event",
+        "hint": "Newest first, renewal bookings included",
+        "loadFailed": "Couldn't load the events",
+        "none": "Nothing happened in this range.",
+        "showAll": "Show every event",
+        "title": "Events"
+      },
+      "exportFailed": "Couldn't export the events",
+      "exported": "Exported {{file}} · {{count}} events",
+      "kind": {
+        "ACTIVATED": "Activated",
+        "CANCELLED": "Cancelled",
+        "EXPIRED": "Expired",
+        "RENEWAL_BOOKED": "Renewal booked",
+        "RENEWAL_CANCELLED": "Renewal cancelled",
+        "RENEWED": "Renewed",
+        "RENEWED_AUTO": "Renewed automatically",
+        "RENEWED_MANUAL": "Renewed by hand",
+        "REPRICED": "Repriced",
+        "RESUMED": "Resumed",
+        "RETURNED_TO_DRAFT": "Returned to draft",
+        "SUSPENDED": "Suspended"
+      },
+      "line": {
+        "cancelled": "Cancelled",
+        "expired": "Expired",
+        "new": "New",
+        "renewed": "Renewed",
+        "repriced": "Repriced",
+        "resumed": "Resumed",
+        "returnedToDraft": "Returned to draft",
+        "suspended": "Suspended"
+      },
+      "loadFailed": "Couldn't load the {{entities}} report",
+      "sub": "{{range}} · {{dates}}. Recurring revenue per month, and what moved it. The end matches Home.",
+      "subToDate": "{{range}} · {{dates}}, to date. Recurring revenue per month, and what moved it. The end matches Home.",
+      "summary": {
+        "count": "{{count}} {{entities}}",
+        "net": "Net change",
+        "netSub": "From {{amount}} a month",
+        "netUnknown": "History begins {{date}}",
+        "recurring": "Recurring per month",
+        "recurringSub": "At the end · {{vs}}",
+        "visits": "Visits completed",
+        "visitsSub": "{{completed}} of {{planned}} · {{missed}} missed"
+      },
+      "untracked": "History begins {{date}}. Before then the starting figure isn't known, so the bridge can't be drawn for this range."
+    },
     "alsoFromHome": "Also opens from Home: {{where}}",
     "arrivals": {
       "chart": {
@@ -1821,6 +1888,10 @@
       "untracked": "Callback linking began {{date}}. Before then, zero means nothing was linked, not that nothing came back."
     },
     "catalog": {
+      "agreements": {
+        "description": "Recurring revenue's movement (new, renewed, repriced, cancelled, expired) from start to end, with visit completion. The end matches Home.",
+        "name": "{{agreements}}"
+      },
       "arrivals": {
         "description": "On-time arrival by {{tech, lowercase}} and {{region, lowercase}}, with every late visit listed. Same rule as Home's arrival card.",
         "name": "Arrival windows"

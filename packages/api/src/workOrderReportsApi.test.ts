@@ -27,4 +27,11 @@ describe('workOrderReportsApi', () => {
       params: { from: '2026-09-01', to: '2026-09-30', technicianId: 'u1', size: 50 },
     });
   });
+
+  it('agreementEvents joins the kinds', async () => {
+    await workOrderReportsApi.agreementEvents({ from: '2026-10-01', to: '2026-10-31', kind: ['CANCELLED', 'EXPIRED'], page: 0, size: 25 });
+    expect(apiClient.get).toHaveBeenLastCalledWith('/work-orders/reports/agreements/events', {
+      params: { from: '2026-10-01', to: '2026-10-31', page: 0, size: 25, kind: 'CANCELLED,EXPIRED' },
+    });
+  });
 });

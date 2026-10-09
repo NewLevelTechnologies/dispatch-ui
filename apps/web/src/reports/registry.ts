@@ -33,6 +33,7 @@ export interface ReportDefinition {
   requiresCapability?: string;
 }
 
+const AgreementsReport = lazy(() => import('./AgreementsReport'));
 const ArrivalsReport = lazy(() => import('./ArrivalsReport'));
 const CallbacksReport = lazy(() => import('./CallbacksReport'));
 const FilterPullListReport = lazy(() => import('./FilterPullListReport'));
@@ -99,6 +100,13 @@ export const reports: ReportDefinition[] = [
     fromHome: true,
     Component: QuotesReport,
     requiresCapability: 'VIEW_ALL_QUOTES',
+  },
+  {
+    slug: 'agreements',
+    group: 'sales',
+    Component: AgreementsReport,
+    // Recurring revenue: the money capability, as on Home.
+    requiresCapability: 'VIEW_ALL_INVOICES',
   },
   {
     slug: 'filter-pull-list',
