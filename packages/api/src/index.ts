@@ -195,6 +195,7 @@ export {
   type VisitStatusEntry,
   type CreateAgreementRequest,
   type UpdateAgreementRequest,
+  type RenewAgreementRequest,
   type CreateVisitTemplateRequest,
   type UpdateVisitTemplateRequest,
   type CoverageMembership,

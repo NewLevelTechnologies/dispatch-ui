@@ -9,6 +9,8 @@ const mockVisits = vi.fn();
 const mockOverview = vi.fn();
 const mockFacets = vi.fn();
 const mockCancel = vi.fn();
+const mockRenew = vi.fn();
+const mockBilling = vi.fn();
 
 vi.mock('../api/setup', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../api/setup')>();
@@ -21,6 +23,8 @@ vi.mock('../api/setup', async (importOriginal) => {
       getOverview: (...a: unknown[]) => mockOverview(...a),
       facets: (...a: unknown[]) => mockFacets(...a),
       cancel: (...a: unknown[]) => mockCancel(...a),
+      renew: (...a: unknown[]) => mockRenew(...a),
+      getBillingSchedule: (...a: unknown[]) => mockBilling(...a),
     },
     agreementPlanApi: {
       ...actual.agreementPlanApi,
@@ -112,6 +116,8 @@ beforeEach(() => {
     noBilling: 1,
   });
   mockCancel.mockResolvedValue({});
+  mockRenew.mockResolvedValue({});
+  mockBilling.mockRejectedValue(new Error('404'));
   // Monthly value is invoice money.
   vi.mocked(useHasCapability).mockImplementation((cap: string) => cap === 'VIEW_ALL_INVOICES');
   mockVisits.mockResolvedValue(page([visit()]));
@@ -189,6 +195,17 @@ describe('AgreementsPage', () => {
     expect(within(rows[1]).getByText(/agreements.list.cell.renewsIn/)).toHaveClass('ag-accent');
   });
 
+  it('treats a booked renewal as settled', async () => {
+    mockListPage.mockResolvedValue(
+      page([agreement({ termEnd: '2026-10-22', autoRenew: false, nextTermEnd: '2027-10-22', nextTermBillingAmount: null })]),
+    );
+    renderWithProviders(<AgreementsPage />, { initialPath: '/agreements' });
+
+    const [row] = await screen.findAllByTestId('agreement-row');
+    expect(row).toHaveTextContent('agreements.list.cell.renewalBooked');
+    expect(within(row).queryByText(/agreements.list.cell.renewsIn/)).toBeNull();
+  });
+
   it('dims an ended agreement’s identity and strikes a cancelled status', async () => {
     mockListPage.mockResolvedValue(page([agreement({ status: 'CANCELLED', endedOn: '2026-08-30', monthlyValue: null })]));
     renderWithProviders(<AgreementsPage />, { initialPath: '/agreements?status=any' });
@@ -215,6 +232,21 @@ describe('AgreementsPage', () => {
     await user.click(await screen.findByRole('menuitem', { name: 'agreements.list.menu.setUpBilling' }));
     await waitFor(() => expect(router.state.location.pathname).toBe('/agreements/a1'));
     expect(router.state.location.search).toBe('?from=agreements&billing=setup');
+  });
+
+  it('renews an expired agreement from the row, a term on from its end', async () => {
+    mockListPage.mockResolvedValue(
+      page([agreement({ status: 'EXPIRED', termStart: '2025-10-01', termEnd: '2026-10-01', endedOn: '2026-10-01' })]),
+    );
+    const user = userEvent.setup();
+    renderWithProviders(<AgreementsPage />, { initialPath: '/agreements?status=any' });
+
+    const [row] = await screen.findAllByTestId('agreement-row');
+    await user.click(within(row).getByRole('button', { name: /more options/i }));
+    expect(screen.queryByRole('menuitem', { name: 'agreements.list.menu.cancel' })).toBeNull();
+    await user.click(await screen.findByRole('menuitem', { name: 'agreements.list.menu.renew' }));
+    await user.click(await screen.findByRole('button', { name: 'agreements.renew.submit' }));
+    await waitFor(() => expect(mockRenew).toHaveBeenCalledWith('a1', { termEnd: '2027-10-01' }));
   });
 
   it('queues the visits waiting on a dispatch, with Schedule opening the booking', async () => {

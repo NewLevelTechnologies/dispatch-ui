@@ -34,6 +34,8 @@ import AppLayout from '../components/AppLayout';
 import ConfirmDialog from '../components/ConfirmDialog';
 import IconButton from '../components/IconButton';
 import AgreementFormDialog from '../components/AgreementFormDialog';
+import RenewAgreementDialog from '../features/agreements/RenewAgreementDialog';
+import { canRenew } from '../features/agreements/agreementListModel';
 import VisitTemplateFormDialog from '../components/VisitTemplateFormDialog';
 import BillingSetupDialog from '../components/BillingSetupDialog';
 import { Card } from '../components/catalyst/card';
@@ -133,6 +135,7 @@ export default function AgreementDetailPage() {
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [confirmNoRenew, setConfirmNoRenew] = useState(false);
   const [confirmActivate, setConfirmActivate] = useState(false);
+  const [renewing, setRenewing] = useState(false);
 
   const { data: agreement, isLoading, error } = useQuery({
     queryKey: ['agreement', id],
@@ -236,6 +239,7 @@ export default function AgreementDetailPage() {
             agreement={agreement}
             onEdit={() => setEditSection('identity')}
             onActivate={() => setConfirmActivate(true)}
+            onRenew={() => setRenewing(true)}
           />
 
           <div className="mb-3.5">
@@ -249,6 +253,7 @@ export default function AgreementDetailPage() {
               customerLocationCount={customerLocationCount}
               onEdit={() => setEditSection('term')}
               onActivate={() => setConfirmActivate(true)}
+              onRenew={() => setRenewing(true)}
               onViewSchedule={() => setActiveTab('schedule')}
               onViewCoverage={() => setActiveTab('coverage')}
             />
@@ -287,6 +292,8 @@ export default function AgreementDetailPage() {
         onClose={() => setEditSection(null)}
         agreement={agreement}
       />
+
+      <RenewAgreementDialog agreement={renewing ? agreement : null} onClose={() => setRenewing(false)} />
 
       <ConfirmDialog
         isOpen={confirmActivate}
@@ -375,10 +382,12 @@ function AgreementHeader({
   agreement,
   onEdit,
   onActivate,
+  onRenew,
 }: {
   agreement: AgreementResponse;
   onEdit: () => void;
   onActivate: () => void;
+  onRenew: () => void;
 }) {
   const { getName } = useGlossary();
   const { data: billing } = useQuery(agreementBillingQueryOptions(agreement.id));
@@ -403,7 +412,13 @@ function AgreementHeader({
     );
   }
   // Contract value moved out of this meta line into the "this term" strip below.
-  if (agreement.termEnd && agreement.autoRenew) {
+  if (agreement.nextTermEnd) {
+    meta.push(
+      <span key="renews">
+        Renewal booked to <strong className="font-semibold text-fg-strong">{formatDay(agreement.nextTermEnd)}</strong>
+      </span>,
+    );
+  } else if (agreement.termEnd && agreement.autoRenew) {
     meta.push(
       <span key="renews">
         Renews <strong className="font-semibold text-fg-strong">{formatDay(agreement.termEnd)}</strong>
@@ -518,6 +533,16 @@ function AgreementHeader({
             Activate
           </Button>
         )}
+        {canRenew(agreement) &&
+          (agreement.status === 'EXPIRED' ? (
+            <Button color="accent" size="xs" onClick={onRenew}>
+              Renew…
+            </Button>
+          ) : (
+            <Button outline size="xs" onClick={onRenew}>
+              Renew…
+            </Button>
+          ))}
       </div>
     </div>
   );
@@ -530,6 +555,7 @@ function OverviewTab({
   customerLocationCount,
   onEdit,
   onActivate,
+  onRenew,
   onViewSchedule,
   onViewCoverage,
 }: {
@@ -538,6 +564,7 @@ function OverviewTab({
   customerLocationCount: number | undefined;
   onEdit: () => void;
   onActivate: () => void;
+  onRenew: () => void;
   onViewSchedule: () => void;
   onViewCoverage: () => void;
 }) {
@@ -552,14 +579,15 @@ function OverviewTab({
 
   const renewsInDays = daysUntil(agreement.termEnd);
   const attention: { key: string; severity: 'warning' | 'info'; title: string; sub: string; action: string; onAction: () => void }[] = [];
-  if (renewsInDays != null && renewsInDays > 0 && renewsInDays < 90) {
+  // A booked renewal is already handled.
+  if (agreement.status === 'ACTIVE' && !agreement.nextTermEnd && renewsInDays != null && renewsInDays > 0 && renewsInDays < 90) {
     attention.push({
       key: 'renewal',
       severity: 'warning',
       title: `Renews in ${renewsInDays} days · ${formatDay(agreement.termEnd)}`,
       sub: agreement.autoRenew ? 'Auto-renew on file — confirm scope + margin' : 'No auto-renew — action required',
-      action: 'Review',
-      onAction: onEdit,
+      action: 'Renew…',
+      onAction: onRenew,
     });
   }
   if (compliance && compliance.visitsOverdue > 0) {
@@ -1188,15 +1216,29 @@ function TermCard({ agreement, onEdit }: { agreement: AgreementResponse; onEdit:
           {agreement.termEnd ? formatDay(agreement.termEnd) : 'Open-ended'}
         </span>
       </DataRow>
-      {agreement.termEnd && (
-        <DataRow label="Renews" labelWidth={90}>
+      {agreement.termEnd && agreement.nextTermEnd ? (
+        <DataRow label="Next term" labelWidth={90}>
           <span className="text-[12.5px] text-fg-strong">
-            {formatDay(agreement.termEnd)}
-            {renewsInDays != null && (
-              <span className={renewsInDays < 90 ? 'text-warning-fg' : 'text-fg-muted'}> · in {renewsInDays}d</span>
-            )}
+            {formatDay(agreement.termEnd)} <span className="text-fg-dim">→</span> {formatDay(agreement.nextTermEnd)}
+            <span className="text-fg-muted">
+              {' · '}
+              {agreement.nextTermBillingAmount != null
+                ? `${formatCurrency(agreement.nextTermBillingAmount)} per invoice`
+                : 'renewal booked'}
+            </span>
           </span>
         </DataRow>
+      ) : (
+        agreement.termEnd && (
+          <DataRow label="Renews" labelWidth={90}>
+            <span className="text-[12.5px] text-fg-strong">
+              {formatDay(agreement.termEnd)}
+              {renewsInDays != null && renewsInDays >= 0 && (
+                <span className={renewsInDays < 90 ? 'text-warning-fg' : 'text-fg-muted'}> · in {renewsInDays}d</span>
+              )}
+            </span>
+          </DataRow>
+        )
       )}
       <DataRow label="Auto-renew" labelWidth={90} last>
         {agreement.autoRenew ? (
@@ -1258,7 +1300,7 @@ function EndAgreementFooter({
         <Button
           outline
           size="xxs"
-          disabled={disabled || !agreement.autoRenew}
+          disabled={disabled || !agreement.autoRenew || Boolean(agreement.nextTermEnd)}
           onClick={onNoRenew}
         >
           <ArrowPathRoundedSquareIcon className="size-3.5" />

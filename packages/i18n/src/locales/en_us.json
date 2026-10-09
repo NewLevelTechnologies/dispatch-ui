@@ -261,6 +261,7 @@
         "onTrack": "On track",
         "perMonth": "/mo",
         "plan": "{{plan}} plan",
+        "renewalBooked": "Renewal booked · to {{date}}",
         "renewsIn_one": "in {{count}} day",
         "renewsIn_other": "in {{count}} days",
         "started": "Started {{date}}",
@@ -307,6 +308,7 @@
         "cancelTitle": "Cancel {{number}}?",
         "cancelled": "{{number}} cancelled",
         "open": "Open",
+        "renew": "Renew…",
         "setUpBilling": "Set up billing"
       },
       "search": "Search by {{agreement}}, {{customer}} or {{location}}…",
@@ -334,6 +336,28 @@
       "renewing_one": "{{count}} renewing in {{days}} days",
       "renewing_other": "{{count}} renewing in {{days}} days",
       "visitsTab": "Visits to schedule"
+    },
+    "renew": {
+      "booked": "Renewal booked: {{number}} runs to {{date}}",
+      "bookedHint": "The current term runs to {{date}}, then the new one starts. Nothing changes until then.",
+      "endAfterCurrent": "Must be after {{date}}",
+      "endAfterToday": "Must be after today",
+      "expiredHint": "Makes it active again with a term starting {{date}}. {{workOrders}} and billing for windows that already closed aren't created.",
+      "failed": "Couldn't renew the {{agreement}}",
+      "nowHint": "The term ended {{date}}, so the new one starts now. {{workOrders}} and billing for windows that already closed aren't created.",
+      "price": "Price {{cadence}}",
+      "priceHint": "Now {{amount}}. Leave blank to keep it.",
+      "rebookHint": "Renewal booked to {{date}}, starting {{end}}. Change the end or price, or cancel the renewal.",
+      "renewed": "{{number}} renewed to {{date}}",
+      "startsOn": "Starts {{date}}",
+      "submit": "Renew",
+      "submitBooked": "Book renewal",
+      "submitRebook": "Update renewal",
+      "termEnd": "New term ends",
+      "title": "Renew {{number}}",
+      "unbook": "Cancel renewal",
+      "unbookFailed": "Couldn't cancel the renewal",
+      "unbooked": "Renewal cancelled for {{number}}"
     },
     "visits": {
       "empty": {
