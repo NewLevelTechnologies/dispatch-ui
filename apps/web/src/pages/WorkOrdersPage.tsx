@@ -119,6 +119,19 @@ function formatDate(dateString?: string | null) {
   });
 }
 
+/** "Sep 1 – Sep 30, 2026", or one day. */
+function formatCompletedRange(from: string, to: string): string {
+  const fmt = (d: string, year: boolean) =>
+    new Date(`${d}T12:00:00Z`).toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      ...(year ? { year: 'numeric' } : {}),
+      timeZone: 'UTC',
+    });
+  if (!from || !to) return fmt(from || to, true);
+  return from === to ? fmt(from, true) : `${fmt(from, false)} – ${fmt(to, true)}`;
+}
+
 function isCancelled(wo: WorkOrderSummary): boolean {
   return wo.lifecycleState === 'CANCELLED';
 }
@@ -214,6 +227,9 @@ export default function WorkOrdersPage() {
   const unassignedOnly = searchParams.get('unassigned') === 'true';
   // The home dashboard's billing queue lands here with status=COMPLETED.
   const unbilledOnly = searchParams.get('unbilled') === 'true';
+  // The Jobs completed report lands here on its completion dates.
+  const completedFrom = searchParams.get('completedFrom') ?? '';
+  const completedTo = searchParams.get('completedTo') ?? '';
   const pageNumber = Math.max(1, parseInt(searchParams.get('page') ?? '1', 10) || 1);
 
   // Local search input state — mirrors URL for instant feedback. Written to the
@@ -329,13 +345,15 @@ export default function WorkOrdersPage() {
       unassigned: unassignedOnly || undefined,
       onSite: onSiteOnly || undefined,
       unbilled: unbilledOnly || undefined,
+      completedDateFrom: completedFrom || undefined,
+      completedDateTo: completedTo || undefined,
       scheduledDateFrom: dateRange.from || undefined,
       scheduledDateTo: dateRange.to || undefined,
       includeArchived: includeArchived || undefined,
       page: pageNumber - 1, // URL is 1-based; backend Spring Page is 0-based
       size: PAGE_SIZE,
     }),
-    [statusIds, cancelledView, deferredSearch, typeIds, divisionIds, regionIds, itemStatusIds, assignedId, priorityIds, unassignedOnly, onSiteOnly, unbilledOnly, dateRange, includeArchived, pageNumber]
+    [statusIds, cancelledView, deferredSearch, typeIds, divisionIds, regionIds, itemStatusIds, assignedId, priorityIds, unassignedOnly, onSiteOnly, unbilledOnly, completedFrom, completedTo, dateRange, includeArchived, pageNumber]
   );
 
   const { data: pageData, isLoading, error } = useQuery({
@@ -534,7 +552,7 @@ export default function WorkOrdersPage() {
   // `activeChips` summary), but they still count as "a filter is on" for the
   // clear-all affordance and the empty-state copy. WO status counts only when
   // it's off its "Open" default.
-  const hasQuickFilter = onSiteOnly || unassignedOnly || unbilledOnly || priorityIds.length > 0;
+  const hasQuickFilter = onSiteOnly || unassignedOnly || unbilledOnly || !!completedFrom || !!completedTo || priorityIds.length > 0;
   const statusChanged = !isOpenDefault(statusIds);
   const anyFilter = activeChips.length > 0 || hasQuickFilter || statusChanged;
 
@@ -823,6 +841,17 @@ export default function WorkOrdersPage() {
                     label={t('workOrders.filters.notInvoiced')}
                     active
                     onToggle={() => updateParams({ unbilled: null, page: null })}
+                  />
+                )}
+                {/* Only reachable from the Jobs completed report, so it shows
+                    only while on. */}
+                {(completedFrom || completedTo) && (
+                  <FilterChip
+                    label={t('workOrders.filters.completedBetween', {
+                      range: formatCompletedRange(completedFrom, completedTo),
+                    })}
+                    active
+                    onToggle={() => updateParams({ completedFrom: null, completedTo: null, page: null })}
                   />
                 )}
               </FilterChipRow>

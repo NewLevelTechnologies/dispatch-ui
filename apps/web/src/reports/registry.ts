@@ -34,7 +34,9 @@ export interface ReportDefinition {
 }
 
 const ArrivalsReport = lazy(() => import('./ArrivalsReport'));
+const CallbacksReport = lazy(() => import('./CallbacksReport'));
 const FilterPullListReport = lazy(() => import('./FilterPullListReport'));
+const JobsCompletedReport = lazy(() => import('./JobsCompletedReport'));
 const ReceivablesReport = lazy(() => import('./ReceivablesReport'));
 const PaymentsReport = lazy(() => import('./PaymentsReport'));
 const QuotesReport = lazy(() => import('./QuotesReport'));
@@ -70,6 +72,19 @@ export const reports: ReportDefinition[] = [
     Component: TechProductivityReport,
     // Home's Revenue tab and this card follow the invoice capability.
     requiresCapability: 'VIEW_ALL_INVOICES',
+  },
+  {
+    slug: 'jobs-completed',
+    group: 'work',
+    Component: JobsCompletedReport,
+    // Every job; money columns also need VIEW_ALL_INVOICES.
+    requiresCapability: 'VIEW_ALL_WORK_ORDERS',
+  },
+  {
+    slug: 'callbacks',
+    group: 'work',
+    Component: CallbacksReport,
+    requiresCapability: 'VIEW_ALL_WORK_ORDERS',
   },
   {
     slug: 'arrivals',
