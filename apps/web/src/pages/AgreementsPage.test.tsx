@@ -195,6 +195,17 @@ describe('AgreementsPage', () => {
     expect(within(rows[1]).getByText(/agreements.list.cell.renewsIn/)).toHaveClass('ag-accent');
   });
 
+  it('treats a booked renewal as settled', async () => {
+    mockListPage.mockResolvedValue(
+      page([agreement({ termEnd: '2026-10-22', autoRenew: false, nextTermEnd: '2027-10-22', nextTermBillingAmount: null })]),
+    );
+    renderWithProviders(<AgreementsPage />, { initialPath: '/agreements' });
+
+    const [row] = await screen.findAllByTestId('agreement-row');
+    expect(row).toHaveTextContent('agreements.list.cell.renewalBooked');
+    expect(within(row).queryByText(/agreements.list.cell.renewsIn/)).toBeNull();
+  });
+
   it('dims an ended agreement’s identity and strikes a cancelled status', async () => {
     mockListPage.mockResolvedValue(page([agreement({ status: 'CANCELLED', endedOn: '2026-08-30', monthlyValue: null })]));
     renderWithProviders(<AgreementsPage />, { initialPath: '/agreements?status=any' });

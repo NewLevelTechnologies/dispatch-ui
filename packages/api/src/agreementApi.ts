@@ -182,6 +182,9 @@ export interface AgreementListRow extends AgreementSummaryResponse {
   endedOn: string | null;
   /** Who created it; null when unknown (older agreements). */
   createdByName: string | null;
+  /** The booked renewal, as on the agreement; null when none is booked. */
+  nextTermEnd?: string | null;
+  nextTermBillingAmount?: number | null;
 }
 
 export interface AgreementListBilling {
@@ -684,6 +687,12 @@ export const agreementApi = {
       `/work-orders/agreements/${id}/renew`,
       request,
     );
+    return response.data;
+  },
+
+  // Cancels a booked renewal; the term then ends at termEnd. 409 when none is booked.
+  cancelRenewal: async (id: string): Promise<AgreementResponse> => {
+    const response = await apiClient.delete<AgreementResponse>(`/work-orders/agreements/${id}/renewal`);
     return response.data;
   },
 

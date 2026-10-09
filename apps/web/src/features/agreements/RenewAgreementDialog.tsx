@@ -22,6 +22,7 @@ interface Props {
 // Before term end the renewal is booked and the current term runs out first;
 // once it has ended (or from EXPIRED) the new term starts now, dated from the
 // old end, and nothing is made up for the windows that closed in between.
+// With a renewal already booked it edits that booking, or cancels it.
 export default function RenewAgreementDialog({ agreement, onClose }: Props) {
   const open = Boolean(agreement?.termEnd);
   return (
@@ -39,6 +40,7 @@ function RenewForm({ agreement, onClose }: { agreement: RenewableAgreement; onCl
   const today = zonedDate(new Date(), zone) ?? new Date().toISOString().slice(0, 10);
   const currentEnd = agreement.termEnd!;
   const booked = agreement.status === 'ACTIVE' && currentEnd > today;
+  const rebooking = booked && Boolean(agreement.nextTermEnd);
 
   const [termEnd, setTermEnd] = useState(() => agreement.nextTermEnd ?? defaultRenewalEnd(agreement));
   const [amount, setAmount] = useState(() =>
@@ -66,6 +68,17 @@ function RenewForm({ agreement, onClose }: { agreement: RenewableAgreement; onCl
     },
   });
 
+  const unbook = useMutation({
+    mutationFn: () => agreementApi.cancelRenewal(agreement.id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['agreement', agreement.id] });
+      queryClient.invalidateQueries({ queryKey: ['agreements'] });
+      showSuccess(t('agreements.renew.unbooked', { number: agreement.agreementNumber }));
+      onClose();
+    },
+  });
+  const pending = mutation.isPending || unbook.isPending;
+
   const endError = !termEnd
     ? null
     : termEnd <= currentEnd
@@ -74,9 +87,13 @@ function RenewForm({ agreement, onClose }: { agreement: RenewableAgreement; onCl
         ? t('agreements.renew.endAfterToday')
         : null;
   const amountInvalid = amount.trim() !== '' && !(Number(amount) >= 0);
-  const canSubmit = Boolean(termEnd) && !endError && !amountInvalid && !mutation.isPending;
-  const errorMessage = mutation.error
-    ? (extractApiError(mutation.error) ?? t('agreements.renew.failed', { agreement: getName('agreement').toLowerCase() }))
+  const canSubmit = Boolean(termEnd) && !endError && !amountInvalid && !pending;
+  const failed = mutation.error ?? unbook.error;
+  const errorMessage = failed
+    ? (extractApiError(failed) ??
+      t(unbook.error ? 'agreements.renew.unbookFailed' : 'agreements.renew.failed', {
+        agreement: getName('agreement').toLowerCase(),
+      }))
     : null;
 
   const handleSubmit = (e: FormEvent) => {
@@ -88,7 +105,9 @@ function RenewForm({ agreement, onClose }: { agreement: RenewableAgreement; onCl
     <>
       <DialogTitle>{t('agreements.renew.title', { number: agreement.agreementNumber })}</DialogTitle>
       <DialogDescription>
-        {booked
+        {rebooking
+          ? t('agreements.renew.rebookHint', { date: formatDay(agreement.nextTermEnd!), end: formatDay(currentEnd) })
+          : booked
           ? t('agreements.renew.bookedHint', { date: formatDay(currentEnd) })
           : t(agreement.status === 'EXPIRED' ? 'agreements.renew.expiredHint' : 'agreements.renew.nowHint', {
               date: formatDay(currentEnd),
@@ -158,11 +177,18 @@ function RenewForm({ agreement, onClose }: { agreement: RenewableAgreement; onCl
           </Fieldset>
         </DialogBody>
         <DialogActions>
-          <Button plain onClick={onClose} disabled={mutation.isPending}>
+          {rebooking && (
+            <Button plain className="mr-auto text-danger-500" onClick={() => unbook.mutate()} disabled={pending}>
+              {t('agreements.renew.unbook')}
+            </Button>
+          )}
+          <Button plain onClick={onClose} disabled={pending}>
             {t('common.cancel')}
           </Button>
           <Button type="submit" color="accent" disabled={!canSubmit}>
-            {mutation.isPending ? t('common.saving') : t(booked ? 'agreements.renew.submitBooked' : 'agreements.renew.submit')}
+            {mutation.isPending
+              ? t('common.saving')
+              : t(rebooking ? 'agreements.renew.submitRebook' : booked ? 'agreements.renew.submitBooked' : 'agreements.renew.submit')}
           </Button>
         </DialogActions>
       </form>

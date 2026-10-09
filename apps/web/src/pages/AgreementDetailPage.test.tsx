@@ -17,6 +17,7 @@ vi.mock('../api/setup', () => ({
     update: vi.fn(),
     cancel: vi.fn(),
     renew: vi.fn(),
+    cancelRenewal: vi.fn(),
     list: vi.fn(),
   },
   agreementPlanApi: { getById: vi.fn(), getAll: vi.fn(), create: vi.fn(), update: vi.fn(), delete: vi.fn() },
@@ -192,6 +193,20 @@ describe('AgreementDetailPage', () => {
       await waitFor(() =>
         expect(agreementApi.renew).toHaveBeenCalledWith('a-1', { termEnd: '2027-09-01', billingAmount: 330 }),
       );
+    });
+
+    it('cancels a booked renewal from the dialog', async () => {
+      vi.mocked(agreementApi.getById).mockResolvedValue({ ...agreement, nextTermEnd: '2028-09-01', nextTermBillingAmount: null });
+      vi.mocked(agreementApi.cancelRenewal).mockResolvedValue(agreement);
+      const user = userEvent.setup();
+      renderPage();
+      await user.click(await screen.findByRole('button', { name: 'Renew…' }));
+      expect(await screen.findByRole('dialog', { name: 'agreements.renew.title' })).toHaveTextContent(
+        'agreements.renew.rebookHint',
+      );
+      expect(screen.getByRole('button', { name: 'agreements.renew.submitRebook' })).toBeInTheDocument();
+      await user.click(screen.getByRole('button', { name: 'agreements.renew.unbook' }));
+      await waitFor(() => expect(agreementApi.cancelRenewal).toHaveBeenCalledWith('a-1'));
     });
 
     it('shows a booked renewal and stops asking for one', async () => {

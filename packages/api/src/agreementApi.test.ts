@@ -116,6 +116,11 @@ describe('agreementApi', () => {
     });
   });
 
+  it('cancelRenewal DELETEs /renewal', async () => {
+    await agreementApi.cancelRenewal('a-1');
+    expect(apiClient.delete).toHaveBeenCalledWith('/work-orders/agreements/a-1/renewal');
+  });
+
   it('getCoverage hits /coverage', async () => {
     await agreementApi.getCoverage('a-1');
     expect(apiClient.get).toHaveBeenCalledWith('/work-orders/agreements/a-1/coverage');

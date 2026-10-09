@@ -592,6 +592,14 @@ function RenewsCell({ a, today }: { a: AgreementListRow; today: string }) {
         <CellSub className="ag-warn">{t('agreements.list.cell.termPassed')}</CellSub>
       </CellStack>
     );
+  // A booked renewal is settled: no countdown, no warning.
+  if (a.nextTermEnd)
+    return (
+      <CellStack>
+        <CellTop className="ag-plain num">{formatDay(a.termEnd)}</CellTop>
+        <CellSub>{t('agreements.list.cell.renewalBooked', { date: formatDay(a.nextTermEnd) })}</CellSub>
+      </CellStack>
+    );
   const soon = days <= RENEWING_DAYS;
   return (
     <CellStack>
