@@ -118,5 +118,7 @@ describe('AgreementsReport', () => {
     expect(await screen.findByText(/reports.agreements.untracked/)).toBeInTheDocument();
     expect(screen.getByTestId('bridge-start')).toHaveTextContent('—');
     expect(within(screen.getByTestId('report-summary')).getByText(/reports.agreements.summary.netUnknown/)).toBeInTheDocument();
+    // The comparison was asked for but starts before history: say that, not "no data".
+    expect(within(screen.getByTestId('report-summary')).getByText(/reports.agreements.noComparison/)).toBeInTheDocument();
   });
 });
