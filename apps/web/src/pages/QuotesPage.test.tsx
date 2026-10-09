@@ -69,4 +69,14 @@ describe('QuotesPage', () => {
       }),
     );
   });
+
+  it('narrows to one sender in one region, from the Quotes report', async () => {
+    renderWithProviders(<QuotesPage />, { initialPath: '/quotes?sentFrom=2026-09-01&sentTo=2026-09-30&region=r1&sender=u1' });
+
+    await waitFor(() =>
+      expect(mockQuotes).toHaveBeenCalledWith(
+        expect.objectContaining({ sentByUserId: 'u1', regionIds: ['r1'], firstSentFrom: '2026-09-01' }),
+      ),
+    );
+  });
 });

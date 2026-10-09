@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import clsx from 'clsx';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from '@dispatch/i18n';
 import { useGlossary } from '../contexts/GlossaryContext';
@@ -20,10 +21,11 @@ import {
 import { ListToolbar } from '../components/ui/ListToolbar';
 import { ListFooter } from '../components/ui/ListFooter';
 import { FilterChipListbox, ChipListboxOption } from '../components/ui/FilterChipListbox';
+import { FilterChip } from '../components/ui/FilterChipRow';
 import { DateRangeChip } from '../components/ui/DateRangeChip';
 import { QuoteStatus, quotesApi } from '../api/setup';
 import type { Quote, CreateQuoteRequest, CreateQuoteLineItemRequest } from '../api/setup';
-import { customerApi } from '../api/setup';
+import { customerApi, dispatchRegionApi } from '../api/setup';
 
 const PAGE_SIZE = 25;
 const STATUSES = Object.values(QuoteStatus) as QuoteStatus[];
@@ -43,6 +45,9 @@ export default function QuotesPage() {
   const sentTo = searchParams.get('sentTo') ?? '';
   const statusParam = searchParams.get('status') as QuoteStatus | null;
   const status = statusParam && STATUSES.includes(statusParam) ? statusParam : null;
+  // A sender's quotes, from the Quotes report.
+  const sender = searchParams.get('sender');
+  const regionId = searchParams.get('region');
   const setFilterParams = (updates: Record<string, string | null>) => {
     const next = new URLSearchParams(searchParams);
     for (const [key, value] of Object.entries(updates)) {
@@ -81,12 +86,14 @@ export default function QuotesPage() {
   const [submitting, setSubmitting] = useState(false);
 
   const { data: quotePage, isLoading: quotesLoading } = useQuery({
-    queryKey: ['quotes', page, sentFrom, sentTo, status],
+    queryKey: ['quotes', page, sentFrom, sentTo, status, sender, regionId],
     queryFn: () =>
       quotesApi.getAll({
         firstSentFrom: sentFrom || undefined,
         firstSentTo: sentTo || undefined,
         status: status ? [status] : undefined,
+        sentByUserId: sender ?? undefined,
+        regionIds: regionId ? [regionId] : undefined,
         page: page - 1,
         size: PAGE_SIZE,
       }),
@@ -94,7 +101,15 @@ export default function QuotesPage() {
   const quotes = quotePage?.content ?? [];
   const total = quotePage?.totalElements ?? 0;
   const totalPages = quotePage?.totalPages ?? 0;
-  const narrowed = Boolean(sentFrom || sentTo || status);
+  const narrowed = Boolean(sentFrom || sentTo || status || sender || regionId);
+  const { data: regions = [] } = useQuery({
+    queryKey: ['dispatch-regions', 'all'],
+    queryFn: () => dispatchRegionApi.getAll(true),
+    enabled: !!regionId,
+  });
+  const regionName = regions.find((r) => r.id === regionId)?.name;
+  // The sender's name rides on their quotes.
+  const senderName = sender ? (quotes.find((q) => q.firstSentByUserId === sender)?.firstSentByName ?? null) : null;
 
   const { data: customers = [] } = useQuery({
     queryKey: ['quote-form-customers'],
@@ -277,6 +292,20 @@ export default function QuotesPage() {
               </ChipListboxOption>
             ))}
           </FilterChipListbox>
+          {regionId && (
+            <FilterChip
+              label={regionName ?? getName('dispatch_region')}
+              active
+              onToggle={() => setFilterParams({ region: null })}
+            />
+          )}
+          {sender && (
+            <FilterChip
+              label={senderName ? t('quotes.filters.sentBy', { name: senderName }) : t('quotes.filters.sentByOne')}
+              active
+              onToggle={() => setFilterParams({ sender: null })}
+            />
+          )}
         </ListToolbar>
 
         {quotesLoading ? (
@@ -307,6 +336,7 @@ export default function QuotesPage() {
                     <th>{t('quotes.table.expirationDate')}</th>
                     <th className="right">{t('quotes.table.totalAmount')}</th>
                     <th>{t('quotes.table.status')}</th>
+                    <th>{t('quotes.table.sentBy')}</th>
                     <th></th>
                   </tr>
                 </DenseTHead>
@@ -319,6 +349,9 @@ export default function QuotesPage() {
                       <td data-label={t('quotes.table.expirationDate')}>{formatDate(quote.expirationDate)}</td>
                       <td className="right num strong" data-label={t('quotes.table.totalAmount')}>{formatCurrency(quote.totalAmount)}</td>
                       <td>{getStatusBadge(quote.status)}</td>
+                      <td className={clsx('muted', !quote.firstSentByName && 'dt-empty')} data-label={t('quotes.table.sentBy')}>
+                        {quote.firstSentByName ?? '-'}
+                      </td>
                       <td>
                         <Button
                           plain

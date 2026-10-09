@@ -788,6 +788,7 @@
         "all": "All {{entities, lowercase}}",
         "avgDecision": "Avg time to decision",
         "declined": "Declined",
+        "report": "{{entities}} report",
         "sent": "Sent",
         "title": "{{entities}} · last 30 days",
         "viewed": "Viewed"
@@ -1521,7 +1522,9 @@
     "filters": {
       "anyStatus": "Any status",
       "noMatch": "No {{entities}} match these filters",
-      "sent": "Sent"
+      "sent": "Sent",
+      "sentBy": "Sent by {{name}}",
+      "sentByOne": "One sender"
     },
     "form": {
       "addLineItem": "Add Line Item",
@@ -1551,6 +1554,7 @@
       "expirationDate": "Expires",
       "quoteDate": "Quote Date",
       "quoteNumber": "Quote #",
+      "sentBy": "Sent by",
       "status": "Status",
       "totalAmount": "Total"
     }
@@ -1780,6 +1784,11 @@
         "description": "The filters each {{tech, lowercase}} pulls for tomorrow's {{dispatches, lowercase}}, from the board, with a company total. Print and tape to the truck before heading out.",
         "name": "Filter Pull List"
       },
+      "quotes": {
+        "description": "Sent, viewed, accepted and declined, by who sent them, with win rate and time to decision. Same rule as Home's {{quotes, lowercase}} card.",
+        "fromHome": "{{quotes}} card",
+        "name": "{{quotes}}"
+      },
       "receivables": {
         "description": "What was owed at the end of any day, aged from that day, with every open {{invoices, lowercase}} behind it. For month-end close.",
         "fromHome": "Receivables aging card",
@@ -1867,6 +1876,56 @@
       "title": "Filter Pull List",
       "totalHint": "Each {{entity}} counted once, however many {{techs, lowercase}} are on it.",
       "unnamed": "Unnamed {{tech, lowercase}}"
+    },
+    "quotes": {
+      "csv": {
+        "decided": "Decided",
+        "firstSent": "First sent",
+        "number": "{{entity}} #",
+        "total": "Total",
+        "viewed": "Viewed"
+      },
+      "empty": {
+        "body": "Nothing was first sent in {{range}}.",
+        "title": "No {{entities}} sent in this range"
+      },
+      "exportFailed": "Couldn't export the {{entities}}",
+      "exported": "Exported {{file}} · {{count}} {{entities}}",
+      "funnel": {
+        "accepted": "Accepted",
+        "amount": "Amount",
+        "declined": "Declined",
+        "expired": "Expired",
+        "hint": "Counts open the {{entities}} behind them",
+        "open": "Still open",
+        "sent": "Sent",
+        "share": "Of sent",
+        "stage": "Stage",
+        "title": "Where they stand now",
+        "viewed": "Viewed"
+      },
+      "groupBy": {
+        "none": "Nothing",
+        "sender": "Sender"
+      },
+      "loadFailed": "Couldn't load the {{entities}} report",
+      "noSender": "Sender not recorded",
+      "senders": {
+        "decision": "Days to decide",
+        "hint": "Pick one to list their {{entities}}",
+        "title": "By who sent them"
+      },
+      "sub": "{{range}} · {{dates}}. {{entities}} first sent in the range, by where they stand now. Same rule as Home.",
+      "subToDate": "{{range}} · {{dates}}, to date. {{entities}} first sent in the range, by where they stand now. Same rule as Home.",
+      "summary": {
+        "decision": "Time to decision",
+        "decisionNone": "Nothing decided yet",
+        "open": "Still open",
+        "openSub": "{{count}} awaiting an answer",
+        "sent": "Sent",
+        "sentSub": "{{amount}} · {{vs}}",
+        "winRate": "Win rate"
+      }
     },
     "range": {
       "backHome": "Home",

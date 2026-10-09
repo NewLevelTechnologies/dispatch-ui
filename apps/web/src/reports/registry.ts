@@ -36,6 +36,7 @@ export interface ReportDefinition {
 const ArrivalsReport = lazy(() => import('./ArrivalsReport'));
 const FilterPullListReport = lazy(() => import('./FilterPullListReport'));
 const ReceivablesReport = lazy(() => import('./ReceivablesReport'));
+const QuotesReport = lazy(() => import('./QuotesReport'));
 const RevenueReport = lazy(() => import('./RevenueReport'));
 const TechProductivityReport = lazy(() => import('./TechProductivityReport'));
 
@@ -68,6 +69,13 @@ export const reports: ReportDefinition[] = [
     Component: ArrivalsReport,
     // Every tech's visits, so the company-wide dispatch view.
     requiresCapability: 'VIEW_ALL_DISPATCHES',
+  },
+  {
+    slug: 'quotes',
+    group: 'sales',
+    fromHome: true,
+    Component: QuotesReport,
+    requiresCapability: 'VIEW_ALL_QUOTES',
   },
   {
     slug: 'filter-pull-list',
