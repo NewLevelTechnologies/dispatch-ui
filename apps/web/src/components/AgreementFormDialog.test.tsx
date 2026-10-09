@@ -7,7 +7,7 @@ import { agreementApi, agreementPlanApi, customerApi } from '../api/setup';
 vi.mock('../api/setup', () => ({
   agreementApi: { create: vi.fn(), update: vi.fn() },
   agreementPlanApi: { getAll: vi.fn() },
-  customerApi: { search: vi.fn() },
+  customerApi: { getAllPaginated: vi.fn() },
 }));
 vi.mock('../lib/toast', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../lib/toast')>();
@@ -82,8 +82,13 @@ describe('AgreementFormDialog — sold from the agreements list', () => {
       content: [], totalElements: 0, totalPages: 0, number: 0, size: 200,
     } as never);
     vi.mocked(agreementApi.create).mockResolvedValue({ id: 'a-9' } as never);
-    vi.mocked(customerApi.search).mockResolvedValue({
-      content: [{ id: 'c-7', name: 'Acme Diner', type: 'STANDARD', category: 'COMMERCIAL' }],
+    vi.mocked(customerApi.getAllPaginated).mockResolvedValue({
+      content: [
+        {
+          id: 'c-7', name: 'Acme Diner', customerNumber: 'C-1442', serviceLocationCount: 3,
+          billingAddress: { streetAddress: '100 MAIN ST', city: 'SPRINGFIELD', state: 'IL' },
+        },
+      ],
       totalElements: 1, totalPages: 1, number: 0, size: 25,
     } as never);
   });

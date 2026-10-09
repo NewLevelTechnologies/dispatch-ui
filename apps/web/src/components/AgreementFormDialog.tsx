@@ -8,10 +8,9 @@ import {
   agreementPlanApi,
   type AgreementResponse,
   type AgreementClassification,
-  type CustomerSearchResult,
   type UpdateAgreementRequest,
 } from '../api/setup';
-import CustomerPicker from './CustomerPicker';
+import LocationCustomerPicker, { type PickedCustomer } from './LocationCustomerPicker';
 import { Dialog, DialogActions, DialogBody, DialogDescription, DialogTitle } from './catalyst/dialog';
 import { Button } from './catalyst/button';
 import { Checkbox, CheckboxField } from './catalyst/checkbox';
@@ -56,7 +55,7 @@ export default function AgreementFormDialog({ isOpen, onClose, agreement, custom
   const showIdentity = !isEdit || section === 'identity';
   const showTerm = !isEdit || section === 'term';
   const pickCustomer = !isEdit && !customerId;
-  const [customer, setCustomer] = useState<CustomerSearchResult | null>(null);
+  const [customer, setCustomer] = useState<PickedCustomer | null>(null);
   const forCustomerId = customerId ?? customer?.id;
 
   const [name, setName] = useState('');
@@ -225,7 +224,7 @@ export default function AgreementFormDialog({ isOpen, onClose, agreement, custom
               {pickCustomer && (
                 <Field size="xs">
                   <Label size="xs" required>{getName('customer')}</Label>
-                  <CustomerPicker value={customer} onChange={setCustomer} ariaLabel={getName('customer')} />
+                  <LocationCustomerPicker value={customer} onChange={setCustomer} />
                 </Field>
               )}
 
