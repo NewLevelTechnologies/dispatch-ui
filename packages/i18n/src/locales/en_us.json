@@ -1382,8 +1382,11 @@
   },
   "payments": {
     "description": "Track customer payments and transactions",
-    "search": {
-      "placeholder": "Search by reference, {{customer, lowercase}}, or {{invoice, lowercase}} #…"
+    "filters": {
+      "anyMethod": "Any method",
+      "anyStatus": "Any status",
+      "noMatch": "No {{entities}} match these filters",
+      "received": "Received"
     },
     "form": {
       "amount": "Amount",
@@ -1404,14 +1407,19 @@
       "other": "Other",
       "wireTransfer": "Wire Transfer"
     },
+    "status": {
+      "RECEIVED": "Received",
+      "VOID": "Void"
+    },
     "table": {
       "amount": "Amount",
-      "customer": "Customer",
-      "invoice": "Invoice",
+      "appliedTo": "Applied to",
       "method": "Method",
+      "payer": "Payer",
       "paymentDate": "Date",
       "paymentNumber": "Payment #",
-      "reference": "Reference"
+      "reference": "Reference",
+      "unapplied": "Unapplied"
     }
   },
   "public": {
@@ -1510,8 +1518,10 @@
   },
   "quotes": {
     "description": "Create and manage customer quotes",
-    "search": {
-      "placeholder": "Search by {{entity, lowercase}} #, {{customer, lowercase}}, or amount…"
+    "filters": {
+      "anyStatus": "Any status",
+      "noMatch": "No {{entities}} match these filters",
+      "sent": "Sent"
     },
     "form": {
       "addLineItem": "Add Line Item",
