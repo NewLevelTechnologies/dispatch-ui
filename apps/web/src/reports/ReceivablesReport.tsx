@@ -144,7 +144,7 @@ export default function ReceivablesReport() {
           getName('work_order'),
           getName('dispatch_region'),
           t('reports.revenue.csv.total'),
-          t('reports.receivables.table.balanceToday'),
+          t('reports.receivables.csv.balanceOn', { date: report.asOf }),
         ],
         bucket: bucketName,
         region: (id) => (id ? (regionNames.get(id) ?? '') : ''),
@@ -452,11 +452,7 @@ function OpenInvoices({
                 <th>{getName('customer')}</th>
                 <th>{getName('work_order')}</th>
                 <th className="right">{t('reports.revenue.table.total')}</th>
-                <th className="right" title={t('reports.receivables.table.balanceTodayHint', {
-                  payments: getName('payment', true).toLowerCase(),
-                })}>
-                  {t('reports.receivables.table.balanceToday')}
-                </th>
+                <th className="right">{t('reports.receivables.table.balanceOn', { date: shortDate(asOf) })}</th>
               </tr>
             </DenseTHead>
             <tbody>
@@ -479,7 +475,7 @@ function OpenInvoices({
                       )}
                     </td>
                     <td className="right num">{formatCurrency(inv.totalAmount)}</td>
-                    <td className="right num muted-cell">{formatCurrency(inv.balanceDue)}</td>
+                    <td className="right num">{formatCurrency(inv.balanceAsOf ?? inv.balanceDue)}</td>
                   </DenseRow>
                 );
               })}

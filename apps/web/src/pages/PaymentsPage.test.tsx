@@ -93,6 +93,13 @@ describe('PaymentsPage', () => {
     );
   });
 
+  it('searches the server from the URL', async () => {
+    renderWithProviders(<PaymentsPage />, { initialPath: '/payments?search=1042' });
+
+    await waitFor(() => expect(mockPayments).toHaveBeenCalledWith(expect.objectContaining({ q: '1042', page: 0 })));
+    expect(screen.getByRole('textbox')).toHaveValue('1042');
+  });
+
   it('narrows to one payer in one region, showing the part paid there', async () => {
     mockPayments.mockResolvedValue(page([payment({ amountInScope: 150, receivedByName: 'Pat Office' })]));
     renderWithProviders(<PaymentsPage />, { initialPath: '/payments?payer=c1&region=r1' });

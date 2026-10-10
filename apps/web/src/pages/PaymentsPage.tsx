@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useDeferredValue } from 'react';
 import clsx from 'clsx';
 import { useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -15,7 +15,7 @@ import { Pill } from '../components/ui/Pill';
 import {
   DenseTable, DenseTHead, DenseRow,
 } from '../components/ui/DenseTable';
-import { ListToolbar } from '../components/ui/ListToolbar';
+import { ListToolbar, ListSearch } from '../components/ui/ListToolbar';
 import { ListFooter } from '../components/ui/ListFooter';
 import { FilterChipListbox, ChipListboxOption } from '../components/ui/FilterChipListbox';
 import { DateRangeChip } from '../components/ui/DateRangeChip';
@@ -42,6 +42,8 @@ export default function PaymentsPage() {
   // Filters and page live in the URL, so the footer's page links keep them.
   const [searchParams, setSearchParams] = useSearchParams();
   const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10));
+  const [searchQuery, setSearchQuery] = useState(searchParams.get('search') ?? '');
+  const deferredSearch = useDeferredValue(searchQuery.trim());
   const from = searchParams.get('from') ?? '';
   const to = searchParams.get('to') ?? '';
   const methodParam = searchParams.get('method') as PaymentMethod | null;
@@ -59,6 +61,10 @@ export default function PaymentsPage() {
     }
     next.delete('page');
     setSearchParams(next, { replace: true });
+  };
+  const onSearchChange = (value: string) => {
+    setSearchQuery(value);
+    setFilterParams({ search: value || null });
   };
   const pageHref = (target: number): string => {
     const next = new URLSearchParams(searchParams);
@@ -88,7 +94,7 @@ export default function PaymentsPage() {
   const [submitting, setSubmitting] = useState(false);
 
   const { data: paymentPage, isLoading: paymentsLoading } = useQuery({
-    queryKey: ['payments', page, from, to, method, status, payer, regionId],
+    queryKey: ['payments', page, deferredSearch, from, to, method, status, payer, regionId],
     queryFn: () =>
       paymentsApi.getAll({
         from: from || undefined,
@@ -97,6 +103,7 @@ export default function PaymentsPage() {
         status: status ? [status] : undefined,
         customerId: payer ?? undefined,
         regionIds: regionId ? [regionId] : undefined,
+        q: deferredSearch || undefined,
         page: page - 1,
         size: PAGE_SIZE,
       }),
@@ -104,7 +111,7 @@ export default function PaymentsPage() {
   const payments = paymentPage?.content ?? [];
   const total = paymentPage?.totalElements ?? 0;
   const totalPages = paymentPage?.totalPages ?? 0;
-  const narrowed = Boolean(from || to || method || status || payer || regionId);
+  const narrowed = Boolean(deferredSearch || from || to || method || status || payer || regionId);
   // The payer's name rides on their payments.
   const payerName = payer ? (payments.find((p) => p.customerId === payer)?.payerName ?? null) : null;
   const { data: regions = [] } = useQuery({
@@ -252,7 +259,15 @@ export default function PaymentsPage() {
           }
         />
 
-        <ListToolbar>
+        <ListToolbar
+          search={
+            <ListSearch
+              placeholder={t('payments.search.placeholder', { entity: getName('payment') })}
+              value={searchQuery}
+              onChange={onSearchChange}
+            />
+          }
+        >
           <DateRangeChip
             label={t('payments.filters.received')}
             ariaLabel={t('payments.filters.received')}

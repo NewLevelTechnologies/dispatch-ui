@@ -60,6 +60,7 @@ function invoice(i: number) {
     regionId: 'r1',
     totalAmount: 140,
     balanceDue: 70,
+    balanceAsOf: 105,
   };
 }
 
@@ -102,6 +103,8 @@ describe('ReceivablesReport', () => {
     expect(mockInvoices).toHaveBeenCalledWith({ openAsOf: '2026-09-30', sort: 'dueDate,asc', page: 0, size: 25 });
     // Aged from the date asked about, not today.
     expect(screen.getAllByTestId('report-invoice')[0]).toHaveTextContent('46');
+    // The balance on the as-of date, not today's.
+    expect(screen.getAllByTestId('report-invoice')[0]).toHaveTextContent('$105.00');
   });
 
   it('opens a bucket’s invoices, aged from the date, in the scope', async () => {
