@@ -89,8 +89,7 @@ const amount = (n: number) => n.toFixed(2);
 
 /**
  * One row per invoice open on `asOf`, oldest due first, with its age and
- * bucket on that date. The balance column is today's: the list doesn't
- * give the balance as of the date.
+ * bucket on that date, and its balance at the end of it.
  */
 export function receivablesCsv(rows: InvoiceListItemRow[], asOf: string, labels: ReceivablesCsvLabels): string {
   return csvLines([
@@ -105,7 +104,7 @@ export function receivablesCsv(rows: InvoiceListItemRow[], asOf: string, labels:
       r.workOrderNumber,
       labels.region(r.regionId),
       amount(r.totalAmount),
-      amount(r.balanceDue),
+      amount(r.balanceAsOf ?? r.balanceDue),
     ]),
   ]);
 }

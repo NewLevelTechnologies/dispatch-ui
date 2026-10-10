@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useDeferredValue } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import clsx from 'clsx';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -18,7 +18,7 @@ import { Pill } from '../components/ui/Pill';
 import {
   DenseTable, DenseTHead, DenseRow,
 } from '../components/ui/DenseTable';
-import { ListToolbar } from '../components/ui/ListToolbar';
+import { ListToolbar, ListSearch } from '../components/ui/ListToolbar';
 import { ListFooter } from '../components/ui/ListFooter';
 import { FilterChipListbox, ChipListboxOption } from '../components/ui/FilterChipListbox';
 import { FilterChip } from '../components/ui/FilterChipRow';
@@ -41,6 +41,8 @@ export default function QuotesPage() {
   // Filters and page live in the URL, so the footer's page links keep them.
   const [searchParams, setSearchParams] = useSearchParams();
   const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10));
+  const [searchQuery, setSearchQuery] = useState(searchParams.get('search') ?? '');
+  const deferredSearch = useDeferredValue(searchQuery.trim());
   const sentFrom = searchParams.get('sentFrom') ?? '';
   const sentTo = searchParams.get('sentTo') ?? '';
   const statusParam = searchParams.get('status') as QuoteStatus | null;
@@ -56,6 +58,10 @@ export default function QuotesPage() {
     }
     next.delete('page');
     setSearchParams(next, { replace: true });
+  };
+  const onSearchChange = (value: string) => {
+    setSearchQuery(value);
+    setFilterParams({ search: value || null });
   };
   const pageHref = (target: number): string => {
     const next = new URLSearchParams(searchParams);
@@ -86,7 +92,7 @@ export default function QuotesPage() {
   const [submitting, setSubmitting] = useState(false);
 
   const { data: quotePage, isLoading: quotesLoading } = useQuery({
-    queryKey: ['quotes', page, sentFrom, sentTo, status, sender, regionId],
+    queryKey: ['quotes', page, deferredSearch, sentFrom, sentTo, status, sender, regionId],
     queryFn: () =>
       quotesApi.getAll({
         firstSentFrom: sentFrom || undefined,
@@ -94,6 +100,7 @@ export default function QuotesPage() {
         status: status ? [status] : undefined,
         sentByUserId: sender ?? undefined,
         regionIds: regionId ? [regionId] : undefined,
+        q: deferredSearch || undefined,
         page: page - 1,
         size: PAGE_SIZE,
       }),
@@ -101,7 +108,7 @@ export default function QuotesPage() {
   const quotes = quotePage?.content ?? [];
   const total = quotePage?.totalElements ?? 0;
   const totalPages = quotePage?.totalPages ?? 0;
-  const narrowed = Boolean(sentFrom || sentTo || status || sender || regionId);
+  const narrowed = Boolean(deferredSearch || sentFrom || sentTo || status || sender || regionId);
   const { data: regions = [] } = useQuery({
     queryKey: ['dispatch-regions', 'all'],
     queryFn: () => dispatchRegionApi.getAll(true),
@@ -270,7 +277,15 @@ export default function QuotesPage() {
           }
         />
 
-        <ListToolbar>
+        <ListToolbar
+          search={
+            <ListSearch
+              placeholder={t('quotes.search.placeholder', { entity: getName('quote'), customer: getName('customer') })}
+              value={searchQuery}
+              onChange={onSearchChange}
+            />
+          }
+        >
           <DateRangeChip
             label={t('quotes.filters.sent')}
             ariaLabel={t('quotes.filters.sent')}
@@ -344,7 +359,7 @@ export default function QuotesPage() {
                   {quotes.map((quote) => (
                     <DenseRow key={quote.id}>
                       <td><span className="id-mono text-fg-strong">{quote.quoteNumber}</span></td>
-                      <td className="strong" data-label={t('quotes.table.customer')}>{getCustomerName(quote.customerId)}</td>
+                      <td className="strong" data-label={t('quotes.table.customer')}>{quote.customerName ?? getCustomerName(quote.customerId)}</td>
                       <td data-label={t('quotes.table.quoteDate')}>{formatDate(quote.quoteDate)}</td>
                       <td data-label={t('quotes.table.expirationDate')}>{formatDate(quote.expirationDate)}</td>
                       <td className="right num strong" data-label={t('quotes.table.totalAmount')}>{formatCurrency(quote.totalAmount)}</td>

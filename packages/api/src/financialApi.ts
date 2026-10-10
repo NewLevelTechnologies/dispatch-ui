@@ -271,6 +271,11 @@ export interface InvoiceListItemRow {
   divisionId: string | null;
   workOrderTypeId: string | null;
   regionId: string | null;
+  /**
+   * Read with `openAsOf` only: the balance at the end of that date, by the
+   * receivables report's rule, so a bucket's rows add up to its amount.
+   */
+  balanceAsOf?: number | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -534,6 +539,8 @@ export interface QuoteLineItem {
 export interface Quote {
   id: string;
   customerId: string;
+  /** Null only until the customer syncs into financial's cache. */
+  customerName?: string | null;
   /** Optional WO link (Phase 7b backend ask #7). Older quotes have null. */
   workOrderId?: string;
   quoteNumber: string;
@@ -571,6 +578,8 @@ export interface ListQuotesParams {
   status?: QuoteStatus[];
   /** The user who first sent it (a sender group's drill-in). */
   sentByUserId?: string;
+  /** Case-insensitive, anywhere in the quote number or customer name. */
+  q?: string;
   /** The work order's location's region; quotes with no work order are company-wide only. */
   regionIds?: string[];
   page?: number;
@@ -735,6 +744,8 @@ export interface ListPaymentsParams {
   status?: PaymentStatus[];
   /** A payment is in a region when it paid an invoice there; unapplied ones are company-wide only. */
   regionIds?: string[];
+  /** Case-insensitive, anywhere in the payment number, reference (check) number or payer name. */
+  q?: string;
   page?: number;
   size?: number; // ≤ 200
   sort?: string; // paymentDate | amount | paymentNumber, e.g. 'paymentDate,desc'

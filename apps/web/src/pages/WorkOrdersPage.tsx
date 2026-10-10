@@ -833,9 +833,9 @@ export default function WorkOrdersPage() {
                     updateParams({ priority: priorityIds.length > 0 ? [] : ['URGENT', 'HIGH'], page: null })
                   }
                 />
-                {/* Only reachable from the home dashboard's billing queue, so it
-                    shows only while on — a way to see and drop it, not a new
-                    triage bucket. */}
+                {/* Only reachable from the home dashboard's billing queue and
+                    the Jobs completed report, so it shows only while on — a
+                    way to see and drop it, not a new triage bucket. */}
                 {unbilledOnly && (
                   <FilterChip
                     label={t('workOrders.filters.notInvoiced')}

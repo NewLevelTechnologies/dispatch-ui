@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
-import { renderWithProviders } from '../test/utils';
+import { renderWithProviders, userEvent } from '../test/utils';
 import QuotesPage from './QuotesPage';
 
 const mockQuotes = vi.fn();
@@ -68,6 +68,27 @@ describe('QuotesPage', () => {
         size: 25,
       }),
     );
+  });
+
+  it('searches the server and names the customer from the row', async () => {
+    mockQuotes.mockResolvedValue({
+      content: [
+        {
+          id: 'q2', customerId: 'c9', customerName: 'Baker Bros', quoteNumber: 'Q-0043', status: 'SENT',
+          quoteDate: '2026-10-01', expirationDate: '2026-10-31', subtotal: 100, taxRate: 0, taxAmount: 0,
+          totalAmount: 100, lineItems: [], createdAt: '', updatedAt: '',
+        },
+      ],
+      page: 0, size: 25, totalElements: 1, totalPages: 1, first: true, last: true,
+    });
+    const user = userEvent.setup();
+    const { router } = renderWithProviders(<QuotesPage />, { initialPath: '/quotes?page=2' });
+
+    const row = (await screen.findByText('Q-0043')).closest('tr')!;
+    expect(row).toHaveTextContent('Baker Bros');
+    await user.type(screen.getByRole('textbox'), 'baker');
+    await waitFor(() => expect(mockQuotes).toHaveBeenCalledWith(expect.objectContaining({ q: 'baker', page: 0 })));
+    expect(router.state.location.search).toBe('?search=baker');
   });
 
   it('narrows to one sender in one region, from the Quotes report', async () => {

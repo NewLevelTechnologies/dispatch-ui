@@ -1409,6 +1409,9 @@
       "other": "Other",
       "wireTransfer": "Wire Transfer"
     },
+    "search": {
+      "placeholder": "Search by {{entity, lowercase}} #, check #, or payer…"
+    },
     "status": {
       "RECEIVED": "Received",
       "VOID": "Void"
@@ -1544,6 +1547,9 @@
       "taxRate": "Tax Rate (%)",
       "totalAmount": "Total Amount",
       "unitPrice": "Unit Price"
+    },
+    "search": {
+      "placeholder": "Search by {{entity, lowercase}} # or {{customer, lowercase}}…"
     },
     "status": {
       "accepted": "Accepted",
@@ -1962,7 +1968,9 @@
       "summary": {
         "billedSub": "On these jobs, whatever the {{invoices}}' dates",
         "jobs": "Completed",
-        "notBilledSub": "Left out of the average ticket"
+        "notBilledSub": "Left out of the average ticket",
+        "notBilledVisitsSub_one": "Left out of the average ticket, as is {{count}} {{agreement}} visit",
+        "notBilledVisitsSub_other": "Left out of the average ticket, as are {{count}} {{agreement}} visits"
       },
       "table": {
         "averageTicket": "Average ticket",
@@ -2170,6 +2178,7 @@
         "days91Plus": "91+ days"
       },
       "csv": {
+        "balanceOn": "Balance on {{date}}",
         "bucket": "Age on {{date}}",
         "daysPastDue": "Days past due on {{date}}",
         "due": "Due",
@@ -2200,8 +2209,7 @@
       "table": {
         "age": "Age",
         "amount": "Owed",
-        "balanceToday": "Balance today",
-        "balanceTodayHint": "What's still owed now, after any {{payments}} since",
+        "balanceOn": "Balance {{date}}",
         "daysPastDue": "Days past due",
         "hint": "Open a row for its {{invoices}}; open it again for all of them.",
         "title": "Aging"
