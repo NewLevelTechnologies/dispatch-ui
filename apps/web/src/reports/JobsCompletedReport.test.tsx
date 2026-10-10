@@ -31,12 +31,13 @@ function report(over: Record<string, unknown> = {}) {
     billed: 96420,
     averageTicket: 512.87,
     notBilled: 26,
+    agreementVisits: 12,
     jobsByDay: days,
-    comparison: { basis: 'sameDatesLastYear', from: '2025-09-01', to: '2025-09-30', jobs: 200, billed: 88100, averageTicket: 489.44, notBilled: 18 },
+    comparison: { basis: 'sameDatesLastYear', from: '2025-09-01', to: '2025-09-30', jobs: 200, billed: 88100, averageTicket: 489.44, notBilled: 18, agreementVisits: 11 },
     groupBy: 'workOrderType',
     groups: [
-      { id: 'ty1', jobs: 90, billed: 51000, averageTicket: 600, notBilled: 5, comparisonJobs: 80, comparisonBilled: 45000, comparisonAverageTicket: 562.5 },
-      { id: null, jobs: 124, billed: 45420, averageTicket: 440, notBilled: 21, comparisonJobs: 120, comparisonBilled: 43100, comparisonAverageTicket: 420 },
+      { id: 'ty1', jobs: 90, billed: 51000, averageTicket: 600, notBilled: 5, agreementVisits: 0, comparisonJobs: 80, comparisonBilled: 45000, comparisonAverageTicket: 562.5 },
+      { id: null, jobs: 124, billed: 45420, averageTicket: 440, notBilled: 21, agreementVisits: 12, comparisonJobs: 120, comparisonBilled: 43100, comparisonAverageTicket: 420 },
     ],
     currency: 'USD',
     regionIds: null,
@@ -72,7 +73,11 @@ describe('JobsCompletedReport', () => {
     expect(within(summary).getByText('+7.0%')).toBeInTheDocument();
     expect(within(summary).getByText('$96,420')).toBeInTheDocument();
     expect(within(summary).getByText('$513')).toBeInTheDocument();
-    expect(within(summary).getByText('26')).toBeInTheDocument();
+    expect(within(summary).getByRole('link', { name: '26' })).toHaveAttribute(
+      'href',
+      '/work-orders?status=COMPLETED&completedFrom=2026-09-01&completedTo=2026-09-30&unbilled=true',
+    );
+    expect(within(summary).getByText('reports.jobs.summary.notBilledVisitsSub')).toBeInTheDocument();
 
     const groups = screen.getAllByTestId('report-group');
     await waitFor(() => expect(groups[0]).toHaveTextContent('Repair'));
@@ -89,6 +94,18 @@ describe('JobsCompletedReport', () => {
     await user.click(row);
     await waitFor(() => expect(router.state.location.pathname).toBe('/work-orders'));
     expect(router.state.location.search).toBe('?status=COMPLETED&completedFrom=2026-09-01&completedTo=2026-09-30&region=r1&type=ty1');
+  });
+
+  it('opens a type’s jobs waiting to be invoiced, not the whole type', async () => {
+    const user = userEvent.setup();
+    const { router } = renderWithProviders(<JobsCompletedReport />, { initialPath: '/reports/jobs-completed' });
+
+    const [row] = await screen.findAllByTestId('report-group');
+    await user.click(within(row).getByRole('link', { name: '5' }));
+    await waitFor(() => expect(router.state.location.pathname).toBe('/work-orders'));
+    expect(router.state.location.search).toBe(
+      '?status=COMPLETED&completedFrom=2026-09-01&completedTo=2026-09-30&type=ty1&unbilled=true',
+    );
   });
 
   it('leaves out money without the invoice capability', async () => {

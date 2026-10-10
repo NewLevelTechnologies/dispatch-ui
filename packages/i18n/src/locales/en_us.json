@@ -1962,7 +1962,9 @@
       "summary": {
         "billedSub": "On these jobs, whatever the {{invoices}}' dates",
         "jobs": "Completed",
-        "notBilledSub": "Left out of the average ticket"
+        "notBilledSub": "Left out of the average ticket",
+        "notBilledVisitsSub_one": "Left out of the average ticket, as is {{count}} {{agreement}} visit",
+        "notBilledVisitsSub_other": "Left out of the average ticket, as are {{count}} {{agreement}} visits"
       },
       "table": {
         "averageTicket": "Average ticket",

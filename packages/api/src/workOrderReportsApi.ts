@@ -30,8 +30,13 @@ export interface JobsFigures {
   billed: number;
   /** billed ÷ jobs with a billed invoice; null when none. */
   averageTicket: number | null;
-  /** Jobs with no billed invoice yet. */
+  /**
+   * Jobs waiting to be invoiced, by the work order list's `unbilled=true`
+   * rule: no agreement visits, and a draft invoice counts as started.
+   */
   notBilled: number;
+  /** Agreement-generated jobs: billed per period, never per job. */
+  agreementVisits: number;
 }
 
 export interface JobsReportGroup extends JobsFigures {

@@ -13,6 +13,7 @@ import {
   divisionsApi,
   workOrderReportsApi,
   workOrderTypesApi,
+  type JobsFigures,
   type JobsReport,
   type JobsReportGroupBy,
 } from '../api/setup';
@@ -141,7 +142,7 @@ export default function JobsCompletedReport() {
         ...(showMoney ? [t('reports.jobs.table.billed'), t('reports.jobs.table.averageTicket')] : []),
         t('reports.jobs.table.notBilled'),
       ];
-      const line = (label: string[], r: { jobs: number; billed: number; averageTicket: number | null; notBilled: number }) => [
+      const line = (label: string[], r: JobsFigures) => [
         ...label,
         r.jobs,
         ...(showMoney ? [r.billed.toFixed(2), r.averageTicket != null ? r.averageTicket.toFixed(2) : ''] : []),
@@ -183,7 +184,7 @@ export default function JobsCompletedReport() {
       : null;
     body = (
       <>
-        <Summary report={report} cmpLine={cmpLine} showMoney={showMoney} />
+        <Summary report={report} scope={scope} cmpLine={cmpLine} showMoney={showMoney} />
         {report.jobs === 0 ? (
           <EmptyState
             title={t('reports.jobs.empty.title', { entities: jobs.toLowerCase() })}
@@ -260,11 +261,22 @@ function Pct({ current, previous }: { current: number | null; previous: number |
   return <span className={pct >= 0 ? 'rp-change up' : 'rp-change down'}>{formatPct(pct)} </span>;
 }
 
-function Summary({ report, cmpLine, showMoney }: { report: JobsReport; cmpLine: string; showMoney: boolean }) {
+function Summary({
+  report,
+  scope,
+  cmpLine,
+  showMoney,
+}: {
+  report: JobsReport;
+  scope: string[] | undefined;
+  cmpLine: string;
+  showMoney: boolean;
+}) {
   const { t } = useTranslation();
   const { getName } = useGlossary();
   const c = report.comparison;
   const words = { entities: getName('work_order', true).toLowerCase(), invoice: getName('invoice').toLowerCase() };
+  const visits = report.agreementVisits;
   const cells = [
     <SummaryCell
       key="jobs"
@@ -306,11 +318,24 @@ function Summary({ report, cmpLine, showMoney }: { report: JobsReport; cmpLine: 
     <SummaryCell
       key="notBilled"
       label={t('reports.jobs.table.notBilled')}
-      // Not linked: the list's "not invoiced" filter leaves out agreement
-      // visits, which this count may include, so the two wouldn't agree.
-      value={count(report.notBilled)}
+      value={
+        report.notBilled > 0 ? (
+          <RouterLink to={jobsHref(report, scope, [['unbilled', 'true']])} className="text-fg-accent hover:underline">
+            {count(report.notBilled)}
+          </RouterLink>
+        ) : (
+          count(report.notBilled)
+        )
+      }
       last
-      sub={t('reports.jobs.summary.notBilledSub', words)}
+      sub={
+        visits > 0
+          ? t('reports.jobs.summary.notBilledVisitsSub', {
+              count: visits,
+              agreement: getName('agreement').toLowerCase(),
+            })
+          : t('reports.jobs.summary.notBilledSub', words)
+      }
     />,
   ];
   return (
@@ -401,7 +426,19 @@ function GroupsTable({
                     </td>
                     {showMoney && <td className="right num">{money(g.billed)}</td>}
                     {showMoney && <td className="right num">{g.averageTicket != null ? money(g.averageTicket) : DASH}</td>}
-                    <td className="right num rp-opt">{count(g.notBilled)}</td>
+                    <td className="right num rp-opt">
+                      {href && g.notBilled > 0 ? (
+                        <RouterLink
+                          to={`${href}&unbilled=true`}
+                          onClick={(e) => e.stopPropagation()}
+                          className="text-fg-accent hover:underline"
+                        >
+                          {count(g.notBilled)}
+                        </RouterLink>
+                      ) : (
+                        count(g.notBilled)
+                      )}
+                    </td>
                     {hasCmp && <td className="right num muted-cell">{count(g.comparisonJobs ?? 0)}</td>}
                     {hasCmp && (
                       <td className="right num">
