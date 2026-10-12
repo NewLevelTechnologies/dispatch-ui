@@ -1,4 +1,5 @@
 import { Fragment, useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from '@dispatch/i18n';
 import {
@@ -608,7 +609,9 @@ export default function FinancialInvoicesTab({
                     </button>
                   </TableCell>
                   <TableCell className="font-mono">
-                    <div>{invoice.invoiceNumber}</div>
+                    <Link to={`/invoices/${invoice.id}`} className="font-semibold text-fg-accent hover:underline">
+                      {invoice.invoiceNumber}
+                    </Link>
                     {invoice.lastSentAt && (() => {
                       // Truncate + max-width so the long email tail (e.g.
                       // pwilcox@newleveltech.net) doesn't widen the column

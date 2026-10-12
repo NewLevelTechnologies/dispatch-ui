@@ -1,6 +1,6 @@
 import { useState, useDeferredValue } from 'react';
 import clsx from 'clsx';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from '@dispatch/i18n';
 import { useGlossary } from '../contexts/GlossaryContext';
@@ -126,7 +126,6 @@ export default function InvoicesPage() {
     workOrderId: string;
     invoiceDate: string;
     dueDate: string;
-    taxRate: string;
     notes: string;
     lineItems: CreateInvoiceLineItemRequest[];
   }>({
@@ -134,7 +133,6 @@ export default function InvoicesPage() {
     workOrderId: '',
     invoiceDate: new Date().toISOString().split('T')[0],
     dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-    taxRate: '0',
     notes: '',
     lineItems: [{ description: '', quantity: 1, unitPrice: 0 }],
   });
@@ -234,7 +232,6 @@ export default function InvoicesPage() {
         // the date-input value through raw, not as an ISO Instant.
         invoiceDate: formData.invoiceDate,
         dueDate: formData.dueDate,
-        taxRate: parseFloat(formData.taxRate),
         notes: formData.notes || undefined,
         lineItems: formData.lineItems,
       };
@@ -277,7 +274,6 @@ export default function InvoicesPage() {
       workOrderId: '',
       invoiceDate: new Date().toISOString().split('T')[0],
       dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-      taxRate: '0',
       notes: '',
       lineItems: [{ description: '', quantity: 1, unitPrice: 0 }],
     });
@@ -465,7 +461,7 @@ export default function InvoicesPage() {
                     return (
                     <DenseRow key={invoice.id}>
                       <td>
-                        <span className={clsx('id-mono', voided ? 'text-fg-muted' : 'text-fg-strong')}>{invoice.invoiceNumber}</span>
+                        <Link to={`/invoices/${invoice.id}`} className="id-mono font-semibold text-fg-accent hover:underline">{invoice.invoiceNumber}</Link>
                       </td>
                       <td className="strong" data-label={t('invoices.table.customer')}>{invoice.customerName ?? invoice.customerId}</td>
                       <td data-label={t('invoices.table.invoiceDate')}>{formatDate(invoice.invoiceDate)}</td>
@@ -585,16 +581,6 @@ export default function InvoicesPage() {
                   />
                 </Field>
               </div>
-
-              <Field>
-                <Label>{t('invoices.form.taxRate')}</Label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  value={formData.taxRate}
-                  onChange={(e) => setFormData({ ...formData, taxRate: e.target.value })}
-                />
-              </Field>
 
               <div>
                 <div className="flex items-center justify-between mb-2">

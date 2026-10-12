@@ -109,7 +109,6 @@ export default function QuoteDialog({
         // date-input value through raw.
         quoteDate,
         expirationDate,
-        taxRate: 0,
         notes: notes.trim() || undefined,
         lineItems: [
           {

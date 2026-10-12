@@ -62,9 +62,7 @@ const isoPlusDays = (days: number) => {
  *                       atomically per Phase 7 §4.3 step 7; no chained
  *                       status PATCH needed)
  *
- * Tax handling is intentionally out of scope here — `taxRate: 0` is
- * hardcoded. The standalone Invoices page covers tax-aware creation
- * until inventory lands.
+ * No tax input: the server taxes per line from the location's jurisdiction.
  */
 export default function InvoiceDialog({
   open,
@@ -142,7 +140,6 @@ export default function InvoiceDialog({
         dueDate,
         // Lump-sum: a single custom line item, no partId. Backend stores
         // it as-is per ask #6's contract confirmation.
-        taxRate: 0,
         notes: notes.trim() || undefined,
         lineItems: [
           {

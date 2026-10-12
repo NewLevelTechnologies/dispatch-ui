@@ -1102,15 +1102,13 @@ describe('ServiceLocationDetailPage', () => {
       expect(screen.getAllByText('$500.00')).toHaveLength(2);
     });
 
-    it('drills through to the owning work order on row click', async () => {
+    it('opens the invoice on row click', async () => {
       mockApiResponses(mockLocation, [], [], workOrders, undefined, [makeInvoice()], summary);
       const user = userEvent.setup();
-      // No standalone invoice route — navigation targets the WO (financial
-      // drawer lives there). Render with a stub WO route to observe the nav.
       const routes: RouteObject[] = [
         { path: '/service-locations/:id', element: <ServiceLocationDetailPage /> },
         // eslint-disable-next-line i18next/no-literal-string
-        { path: '/work-orders/:id', element: <div>Work order stub</div> },
+        { path: '/invoices/:id', element: <div>Invoice stub</div> },
       ];
       renderWithProviders(<ServiceLocationDetailPage />, {
         routes,
@@ -1121,7 +1119,29 @@ describe('ServiceLocationDetailPage', () => {
 
       const row = (await screen.findByText('INV-1001')).closest('tr')!;
       await user.click(row);
+      await waitFor(() => expect(screen.getByText('Invoice stub')).toBeInTheDocument());
+    });
+
+    it('opens the owning work order from the job number', async () => {
+      mockApiResponses(mockLocation, [], [], workOrders, undefined, [makeInvoice()], summary);
+      const user = userEvent.setup();
+      const routes: RouteObject[] = [
+        { path: '/service-locations/:id', element: <ServiceLocationDetailPage /> },
+        // eslint-disable-next-line i18next/no-literal-string
+        { path: '/work-orders/:id', element: <div>Work order stub</div> },
+        // eslint-disable-next-line i18next/no-literal-string
+        { path: '/invoices/:id', element: <div>Invoice stub</div> },
+      ];
+      renderWithProviders(<ServiceLocationDetailPage />, {
+        routes,
+        initialPath: '/service-locations/location-1',
+      });
+      await waitFor(() => expect(screen.getByText('Main Office')).toBeInTheDocument());
+      await user.click(screen.getByRole('tab', { name: /invoice/i }));
+
+      await user.click(await screen.findByRole('link', { name: 'WO-5000' }));
       await waitFor(() => expect(screen.getByText('Work order stub')).toBeInTheDocument());
+      expect(screen.queryByText('Invoice stub')).not.toBeInTheDocument();
     });
 
     it('strikes through and mutes the amount on a void invoice', async () => {

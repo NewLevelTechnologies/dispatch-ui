@@ -77,7 +77,6 @@ describe('InvoiceDialog', () => {
         expect.objectContaining({
           workOrderId: 'wo-1',
           customerId: 'cust-1',
-          taxRate: 0,
           lineItems: [
             expect.objectContaining({
               description: 'Replace condenser',
