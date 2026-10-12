@@ -1,5 +1,5 @@
 import { useState, useDeferredValue } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import clsx from 'clsx';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from '@dispatch/i18n';
@@ -76,14 +76,12 @@ export default function QuotesPage() {
     customerId: string;
     quoteDate: string;
     expirationDate: string;
-    taxRate: string;
     notes: string;
     lineItems: CreateQuoteLineItemRequest[];
   }>({
     customerId: '',
     quoteDate: new Date().toISOString().split('T')[0],
     expirationDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-    taxRate: '0',
     notes: '',
     lineItems: [{ description: '', quantity: 1, unitPrice: 0 }],
   });
@@ -164,7 +162,6 @@ export default function QuotesPage() {
         customerId: formData.customerId,
         quoteDate: new Date(formData.quoteDate).toISOString(),
         expirationDate: new Date(formData.expirationDate).toISOString(),
-        taxRate: parseFloat(formData.taxRate),
         notes: formData.notes || undefined,
         lineItems: formData.lineItems,
       };
@@ -206,7 +203,6 @@ export default function QuotesPage() {
       customerId: '',
       quoteDate: new Date().toISOString().split('T')[0],
       expirationDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-      taxRate: '0',
       notes: '',
       lineItems: [{ description: '', quantity: 1, unitPrice: 0 }],
     });
@@ -358,7 +354,7 @@ export default function QuotesPage() {
                 <tbody>
                   {quotes.map((quote) => (
                     <DenseRow key={quote.id}>
-                      <td><span className="id-mono text-fg-strong">{quote.quoteNumber}</span></td>
+                      <td><Link to={`/quotes/${quote.id}`} className="id-mono font-semibold text-fg-accent hover:underline">{quote.quoteNumber}</Link></td>
                       <td className="strong" data-label={t('quotes.table.customer')}>{quote.customerName ?? getCustomerName(quote.customerId)}</td>
                       <td data-label={t('quotes.table.quoteDate')}>{formatDate(quote.quoteDate)}</td>
                       <td data-label={t('quotes.table.expirationDate')}>{formatDate(quote.expirationDate)}</td>
@@ -443,16 +439,6 @@ export default function QuotesPage() {
                   />
                 </Field>
               </div>
-
-              <Field>
-                <Label>{t('quotes.form.taxRate')}</Label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  value={formData.taxRate}
-                  onChange={(e) => setFormData({ ...formData, taxRate: e.target.value })}
-                />
-              </Field>
 
               <div>
                 <div className="flex items-center justify-between mb-2">

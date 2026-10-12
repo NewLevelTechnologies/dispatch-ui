@@ -1251,7 +1251,6 @@
       "removeLineItem": "Remove",
       "subtotal": "Subtotal",
       "taxAmount": "Tax Amount",
-      "taxRate": "Tax Rate (%)",
       "totalAmount": "Total Amount",
       "unitPrice": "Unit Price",
       "workOrder": "Work Order (Optional)"
@@ -1544,7 +1543,6 @@
       "removeLineItem": "Remove",
       "subtotal": "Subtotal",
       "taxAmount": "Tax Amount",
-      "taxRate": "Tax Rate (%)",
       "totalAmount": "Total Amount",
       "unitPrice": "Unit Price"
     },

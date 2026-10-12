@@ -3468,7 +3468,7 @@ function InvoicesTab({ location }: { location: ServiceLocationDetailDto }) {
                       }
                       billTo={location.customerName}
                       fmtMoney={fmtMoney}
-                      onOpen={(workOrderId) => navigate(`/work-orders/${workOrderId}`)}
+                      onOpen={(invoiceId) => navigate(`/invoices/${invoiceId}`)}
                     />
                   ))}
                 </tbody>
@@ -3504,7 +3504,7 @@ function InvoiceRow({
   typeName?: string;
   billTo: string;
   fmtMoney: Intl.NumberFormat;
-  onOpen: (workOrderId: string) => void;
+  onOpen: (invoiceId: string) => void;
 }) {
   const voided = inv.status === InvoiceStatus.VOID || inv.status === InvoiceStatus.CANCELLED;
   // Server-derived `overdue` is canonical — same rule as the overdue filter
@@ -3515,18 +3515,24 @@ function InvoiceRow({
   const balance = invMoney(inv.balanceDue);
   const forJob = wo?.workOrderNumber ?? (inv.workOrderId ? `#${inv.workOrderId.slice(0, 8)}` : '—');
   const desc = wo ? deriveJobLabel(wo, typeName) : null;
-  const clickable = !!inv.workOrderId;
-
   return (
-    <DenseRow
-      className={voided ? 'opacity-60' : undefined}
-      onClick={clickable ? () => onOpen(inv.workOrderId!) : undefined}
-    >
+    <DenseRow className={voided ? 'opacity-60' : undefined} onClick={() => onOpen(inv.id)}>
       <td>
         <span className="font-mono text-[12px] font-bold text-fg-strong">{inv.invoiceNumber}</span>
       </td>
       <td className={clsx(!inv.workOrderId && 'dt-empty')} data-label="For work">
-        <div className="font-mono text-[11px] text-fg-muted">{forJob}</div>
+        {inv.workOrderId ? (
+          // The row opens the invoice; the job number opens the job.
+          <Link
+            to={`/work-orders/${inv.workOrderId}`}
+            onClick={(e) => e.stopPropagation()}
+            className="font-mono text-[11px] text-fg-accent hover:underline"
+          >
+            {forJob}
+          </Link>
+        ) : (
+          <div className="font-mono text-[11px] text-fg-muted">{forJob}</div>
+        )}
         {desc && (
           <div className="mt-0.5 max-w-[320px] truncate text-[10.5px] text-fg" title={desc}>
             {desc}

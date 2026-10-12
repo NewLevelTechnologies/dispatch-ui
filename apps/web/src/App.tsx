@@ -34,7 +34,9 @@ import ReportDetailPage from './pages/ReportDetailPage';
 import PartsInventoryPage from './pages/PartsInventoryPage';
 import WarehousesPage from './pages/WarehousesPage';
 import InvoicesPage from './pages/InvoicesPage';
+import InvoiceDetailPage from './pages/InvoiceDetailPage';
 import QuotesPage from './pages/QuotesPage';
+import QuoteDetailPage from './pages/QuoteDetailPage';
 import PaymentsPage from './pages/PaymentsPage';
 import DispatchBoardPage from './pages/DispatchBoardPage';
 import UsersPage from './pages/UsersPage';
@@ -227,7 +229,9 @@ function App() {
       <Route path="/parts-inventory" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<PartsInventoryPage />} />} />
       <Route path="/warehouses" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<WarehousesPage />} />} />
       <Route path="/invoices" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<InvoicesPage />} />} />
+      <Route path="/invoices/:id" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<InvoiceDetailPage />} />} />
       <Route path="/quotes" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<QuotesPage />} />} />
+      <Route path="/quotes/:id" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<QuoteDetailPage />} />} />
       <Route path="/payments" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<PaymentsPage />} />} />
       {/* The dispatch board. Supersedes /dispatches (a flat list of dispatch
           records has no audience — a dispatch is a child of a work order),

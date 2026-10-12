@@ -9,7 +9,7 @@
 import { useDeferredValue, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from '@dispatch/i18n';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import {
   invoicesApi,
@@ -256,9 +256,9 @@ export default function CustomerInvoicesTab({ customerId }: { customerId: string
                     return (
                     <DenseRow key={inv.id}>
                       <td>
-                        <span className={voided ? 'font-mono text-fg-muted' : 'font-mono font-bold text-fg-strong'}>
+                        <Link to={`/invoices/${inv.id}`} className="id-mono font-semibold text-fg-accent hover:underline">
                           {inv.invoiceNumber}
-                        </span>
+                        </Link>
                       </td>
                       <td>
                         <StatusPill row={inv} />

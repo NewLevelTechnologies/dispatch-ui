@@ -1,4 +1,5 @@
 import { Fragment, useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from '@dispatch/i18n';
 import {
@@ -443,7 +444,9 @@ export default function FinancialQuotesTab({
                     </button>
                   </TableCell>
                   <TableCell className="font-mono">
-                    <div>{quote.quoteNumber}</div>
+                    <Link to={`/quotes/${quote.id}`} className="font-semibold text-fg-accent hover:underline">
+                      {quote.quoteNumber}
+                    </Link>
                     {quote.lastSentAt && (() => {
                       const fullEmail =
                         quote.lastSentToEmails?.split(',')[0]?.trim() ?? '—';

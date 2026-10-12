@@ -1,6 +1,216 @@
 // Financial API Client
 import apiClient from './client';
 
+// ========== PRICING (shared by quotes and invoices) ==========
+//
+// Pricebook Phase 1 (dispatch-api handoff FE_HANDOFF_pricebook_phase1.md).
+// The server prices everything: the client sends lines and adjustments, never
+// tax or totals. Every percent here is a FRACTION (15% is 0.15) — display ×100.
+
+/** What a line is. LABOR has no pricebook item; the other four map 1:1 to item types. */
+export type LineType = 'LABOR' | 'SERVICE' | 'MATERIAL' | 'EQUIPMENT' | 'FEE';
+
+/** What a line is for tax. Defaults from the line type (LABOR/SERVICE → LABOR, MATERIAL → MATERIALS, …). */
+export type TaxClass = 'LABOR' | 'MATERIALS' | 'EQUIPMENT' | 'FEE';
+
+/** Which fee a FEE line is; the member trip-fee waiver finds the TRIP one. */
+export type FeeRole = 'TRIP' | 'DIAGNOSTIC' | 'AFTER_HOURS' | 'DISPOSAL' | 'OTHER';
+
+/**
+ * LEGACY documents predate the pricing engine: read-only (every edit is 409
+ * DOCUMENT_NOT_EDITABLE) and taxed at the header `taxRate`. ENGINE documents
+ * are taxed per line — read `tax` and the line tax fields instead.
+ */
+export type PricingModel = 'LEGACY' | 'ENGINE';
+
+/** What the account's rate plan did to a line; `pricingRuleValue` is the markup or multiplier (a fraction). */
+export type PricingRule = 'MARKUP_TIER' | 'PLAN_LABOR_RATE' | 'CATEGORY_MULTIPLIER' | 'PRICE_MULTIPLIER';
+
+export type AdjustmentKind = 'PERCENT' | 'AMOUNT' | 'WAIVE';
+
+/** MEMBER only comes from an agreement; the server refuses it on a manual add. */
+export type AdjustmentReason =
+  | 'MEMBER'
+  | 'REPAIR_APPROVED'
+  | 'GOODWILL'
+  | 'PROMOTION'
+  | 'INCENTIVE'
+  | 'DISCRETIONARY'
+  | 'OTHER';
+
+export type AdjustmentSource = 'MANUAL' | 'AGREEMENT';
+
+/** Codes a draft can warn with; branch on these, never show `message` verbatim. */
+export type PricingWarningCode = 'TAX_JURISDICTION_NOT_SET' | 'TAX_RATE_NOT_SET' | 'NTE_EXCEEDED';
+
+/** Needs attention but doesn't block saving. Drafts only. */
+export interface PricingWarning {
+  code: PricingWarningCode | string;
+  message: string;
+}
+
+/** The jurisdiction and exemption an ENGINE document was taxed under. Null on LEGACY. */
+export interface DocumentTax {
+  jurisdictionId: string | null;
+  jurisdictionName: string | null;
+  /** A fraction; null when the jurisdiction has no rate yet (nothing taxed, draft warns). */
+  jurisdictionRate: number | null;
+  exempt: boolean;
+  exemptCertificate: string | null;
+}
+
+/** A discount or waive, on one line (`lineId`) or the whole document (`lineId` null). */
+export interface DocumentAdjustment {
+  id: string;
+  lineId: string | null;
+  kind: AdjustmentKind;
+  /** PERCENT: a fraction. AMOUNT: dollars. WAIVE: null. */
+  value: number | null;
+  reasonCode: AdjustmentReason;
+  reasonNote: string | null;
+  /** What it came to, in dollars. */
+  computedAmount: number;
+  createdByUserId: string | null;
+  createdAt: string | null;
+  /** On an invoice billed from a quote: the quote adjustment it was copied from. */
+  copiedFromAdjustmentId?: string | null;
+  sourceType: AdjustmentSource;
+  /** AGREEMENT: the agreement id and its label ("Silver"). Internal — never customer-facing. */
+  sourceId?: string | null;
+  sourceLabel?: string | null;
+}
+
+/**
+ * A priced quote or invoice line. Everything past `lineTotal` is optional so
+ * LEGACY lines (and older fixtures) fit; the server sends them on ENGINE lines.
+ * Display by `sortOrder`.
+ */
+export interface DocumentLineItem {
+  id: string;
+  description: string;
+  quantity: number;
+  unitPrice: number;
+  /** List amount: quantity × unitPrice. */
+  lineTotal: number;
+  /** This line's adjustments, including its share of document-wide ones. Null on LEGACY. */
+  adjustmentAmount?: number | null;
+  /** lineTotal − adjustmentAmount; tax is charged on this. Null on LEGACY. */
+  netAmount?: number | null;
+  type?: LineType | null;
+  unit?: string | null;
+  /** Internal only — never on anything customer-facing. */
+  unitCost?: number | null;
+  sortOrder?: number;
+  taxClass?: TaxClass | null;
+  taxable?: boolean | null;
+  /** A fraction. */
+  taxRate?: number | null;
+  taxAmount?: number | null;
+  sourcePoLineId?: string | null;
+  /** Labor lines: the rate type, and its name when the line was added. */
+  laborRateTypeId?: string | null;
+  laborRateTypeName?: string | null;
+  /** Pricebook lines: the item, its SKU when added, and which fee it is. */
+  itemId?: string | null;
+  itemSku?: string | null;
+  feeRole?: FeeRole | null;
+  /** Price before the rate plan; show "list $X" when it differs from unitPrice. */
+  catalogUnitPrice?: number | null;
+  /** The user typed the price. */
+  priceOverridden?: boolean;
+  pricingRule?: PricingRule | null;
+  pricingRuleValue?: number | null;
+}
+
+/**
+ * A line's contents, to add or to replace one. Which fields are sent decides
+ * the kind of line:
+ *   - freeform: `type`, `description`, `quantity`, `unitPrice` (all required)
+ *   - labor:    `laborRateTypeId` + `quantity` (hours); the rate prices it
+ *   - pricebook: `itemId` + `quantity`; the item fills in the rest
+ * On labor/pricebook lines any of description/unitPrice/unitCost/unit/taxClass
+ * sent override the copied value. A replace must send the full contents.
+ */
+export interface LineFieldsRequest {
+  /** The document version the edit was made against (409 STALE_VERSION on mismatch). */
+  version: number;
+  type?: LineType;
+  description?: string;
+  quantity: number;
+  unitPrice?: number;
+  unitCost?: number;
+  unit?: string;
+  taxClass?: TaxClass;
+  laborRateTypeId?: string;
+  itemId?: string;
+}
+
+export interface AddLineRequest extends LineFieldsRequest {
+  /** A part bought on a purchase order; priced at whatever the user bills it at. */
+  sourcePoLineId?: string;
+}
+
+export type UpdateLineRequest = LineFieldsRequest;
+
+export interface ReorderLinesRequest {
+  version: number;
+  /** Every line exactly once, in the new order. */
+  lineIds: string[];
+}
+
+export interface AddAdjustmentRequest {
+  version: number;
+  /** Omit for a document-wide adjustment (spread over the lines before tax). */
+  lineId?: string;
+  kind: AdjustmentKind;
+  /** PERCENT: a fraction (0.15). AMOUNT: dollars. WAIVE: omit (lines only). */
+  value?: number;
+  /** Never MEMBER — the server refuses it. */
+  reasonCode: Exclude<AdjustmentReason, 'MEMBER'>;
+  /** ≤ 500 chars. */
+  reasonNote?: string;
+}
+
+/**
+ * The edit routes quotes and invoices share. Every call returns the whole
+ * recomputed document; take `version` from it for the next edit.
+ */
+function documentEditRoutes<D>(base: string) {
+  return {
+    addLine: async (id: string, request: AddLineRequest): Promise<D> => {
+      const response = await apiClient.post<D>(`${base}/${id}/lines`, request);
+      return response.data;
+    },
+
+    updateLine: async (id: string, lineId: string, request: UpdateLineRequest): Promise<D> => {
+      const response = await apiClient.put<D>(`${base}/${id}/lines/${lineId}`, request);
+      return response.data;
+    },
+
+    deleteLine: async (id: string, lineId: string, version: number): Promise<D> => {
+      const response = await apiClient.delete<D>(`${base}/${id}/lines/${lineId}`, { params: { version } });
+      return response.data;
+    },
+
+    reorderLines: async (id: string, request: ReorderLinesRequest): Promise<D> => {
+      const response = await apiClient.put<D>(`${base}/${id}/lines/order`, request);
+      return response.data;
+    },
+
+    addAdjustment: async (id: string, request: AddAdjustmentRequest): Promise<D> => {
+      const response = await apiClient.post<D>(`${base}/${id}/adjustments`, request);
+      return response.data;
+    },
+
+    deleteAdjustment: async (id: string, adjustmentId: string, version: number): Promise<D> => {
+      const response = await apiClient.delete<D>(`${base}/${id}/adjustments/${adjustmentId}`, {
+        params: { version },
+      });
+      return response.data;
+    },
+  };
+}
+
 // ========== INVOICES ==========
 
 export type InvoiceStatus = 'DRAFT' | 'SENT' | 'PAID' | 'OVERDUE' | 'CANCELLED' | 'VOID';
@@ -31,12 +241,9 @@ export const InvoiceAgingBucket = {
   DAYS_91_PLUS: 'DAYS_91_PLUS',
 } as const;
 
-export interface InvoiceLineItem {
-  id: string;
-  description: string;
-  quantity: number;
-  unitPrice: number;
-  lineTotal: number;
+export interface InvoiceLineItem extends DocumentLineItem {
+  /** The quote line this was billed from, if any. */
+  sourceQuoteLineId?: string | null;
 }
 
 /**
@@ -73,6 +280,12 @@ export interface NestedInvoicePayment {
   notes?: string;
   createdAt: string;
   updatedAt: string;
+  /**
+   * Set when the invoice was voided or cancelled and this slice went back to
+   * the payment's unapplied balance. The row stays as history but no longer
+   * counts toward `amountPaid` — render it as returned to credit.
+   */
+  reversedAt?: string | null;
 }
 
 export interface Invoice {
@@ -83,10 +296,26 @@ export interface Invoice {
   status: InvoiceStatus;
   invoiceDate: string;
   dueDate: string;
+  /** When the work was done; membership is tested on it. */
+  serviceDate?: string | null;
+  customerPoNumber?: string | null;
+  /** Send back on every edit; see the pricing block above. */
+  version?: number;
+  pricingModel?: PricingModel;
+  /** Pre-tax, after adjustments: grossSubtotal − adjustmentTotal. */
   subtotal: number;
+  /** List total before adjustments. */
+  grossSubtotal?: number;
+  adjustmentTotal?: number;
+  adjustments?: DocumentAdjustment[];
+  /** LEGACY documents only; ENGINE documents are taxed per line (see `tax`). */
   taxRate: number;
   taxAmount: number;
   totalAmount: number;
+  ratePlanId?: string | null;
+  ratePlanName?: string | null;
+  tax?: DocumentTax | null;
+  warnings?: PricingWarning[];
   amountPaid: number;
   balanceDue: number;
   notes?: string;
@@ -113,24 +342,68 @@ export interface Invoice {
    * case is acceptable to under-display in v1.
    */
   lastSentToEmails?: string | null;
+  /** On a reissue's corrected copy: the invoice it replaced ("Reissue of INV-3307"). */
+  reissuedFromInvoiceId?: string | null;
+  reissuedFromInvoiceNumber?: string | null;
+  /** On a reissued (voided) original: its corrected copy ("Reissued as INV-3412"). */
+  reissuedAsInvoiceId?: string | null;
+  reissuedAsInvoiceNumber?: string | null;
   createdAt: string;
   updatedAt: string;
 }
 
+/** A freeform line sent inline on create; labor and pricebook lines go through `addLine` after. */
 export interface CreateInvoiceLineItemRequest {
   description: string;
   quantity: number;
   unitPrice: number;
+  /** SERVICE when omitted. */
+  type?: LineType;
+  unitCost?: number;
+  unit?: string;
+  sourcePoLineId?: string;
+  taxClass?: TaxClass;
 }
 
+/** No tax rate — the server resolves tax from the location's jurisdiction. */
 export interface CreateInvoiceRequest {
   customerId: string;
   workOrderId?: string;
   invoiceDate: string;
   dueDate: string;
-  taxRate: number;
+  /** Defaults to the work order's completed date, else the invoice date. */
+  serviceDate?: string;
+  /** Defaults from the work order's customer order number. */
+  customerPoNumber?: string;
   notes?: string;
   lineItems: CreateInvoiceLineItemRequest[];
+}
+
+/** The whole header, replaced: send every field; null clears an optional one. DRAFT only. */
+export interface UpdateInvoiceHeaderRequest {
+  version: number;
+  invoiceDate: string;
+  dueDate: string;
+  serviceDate: string | null;
+  customerPoNumber: string | null;
+  notes: string | null;
+}
+
+/**
+ * Bill an accepted quote: a new DRAFT invoice at the quote's prices and
+ * adjustments, for the quantities given (each ≤ the line's remaining).
+ */
+export interface CreateInvoiceFromQuoteRequest {
+  quoteId: string;
+  lines: { quoteLineId: string; quantity: number }[];
+  /** Bill someone other than the quote's customer; tax and exemption resolve for them. */
+  billToCustomerId?: string;
+  invoiceDate: string;
+  dueDate: string;
+  serviceDate?: string;
+  notes?: string;
+  /** Price afresh under the bill-to's plan and the current pricebook; typed prices are kept. */
+  reprice?: boolean;
 }
 
 export interface UpdateInvoiceStatusRequest {
@@ -427,8 +700,33 @@ export const invoicesApi = {
     return response.data;
   },
 
+  /** 409 QUOTE_NOT_ACCEPTED, 409 OVER_INVOICED (past a line's remaining quantity). */
+  createFromQuote: async (request: CreateInvoiceFromQuoteRequest): Promise<Invoice> => {
+    const response = await apiClient.post<Invoice>('/financial/invoices/from-quote', request);
+    return response.data;
+  },
+
   updateStatus: async (id: string, request: UpdateInvoiceStatusRequest): Promise<Invoice> => {
     const response = await apiClient.patch<Invoice>(`/financial/invoices/${id}/status`, request);
+    return response.data;
+  },
+
+  updateHeader: async (id: string, request: UpdateInvoiceHeaderRequest): Promise<Invoice> => {
+    const response = await apiClient.put<Invoice>(`/financial/invoices/${id}/header`, request);
+    return response.data;
+  },
+
+  ...documentEditRoutes<Invoice>('/financial/invoices'),
+
+  /**
+   * Void a SENT/OVERDUE/PAID invoice and create its corrected DRAFT copy in
+   * one transaction (an already-VOID one is just copied). Returns the copy.
+   * Payments stay behind as reversed rows; apply them to the copy with
+   * `paymentsApi.apply`. 409 INVOICE_NOT_REISSUABLE (DRAFT/CANCELLED),
+   * 409 ALREADY_REISSUED.
+   */
+  reissue: async (id: string): Promise<Invoice> => {
+    const response = await apiClient.post<Invoice>(`/financial/invoices/${id}/reissue`);
     return response.data;
   },
 
@@ -528,13 +826,7 @@ export const QuoteStatus = {
   EXPIRED: 'EXPIRED',
 } as const;
 
-export interface QuoteLineItem {
-  id: string;
-  description: string;
-  quantity: number;
-  unitPrice: number;
-  lineTotal: number;
-}
+export type QuoteLineItem = DocumentLineItem;
 
 export interface Quote {
   id: string;
@@ -543,14 +835,36 @@ export interface Quote {
   customerName?: string | null;
   /** Optional WO link (Phase 7b backend ask #7). Older quotes have null. */
   workOrderId?: string;
+  /** Where the work is; defaults to the work order's location. */
+  serviceLocationId?: string | null;
+  customerPoNumber?: string | null;
   quoteNumber: string;
   status: QuoteStatus;
+  /** Bumps when a SENT quote is edited (it goes back to DRAFT). */
+  revision?: number;
+  /** The revision that was approved. */
+  acceptedRevision?: number | null;
+  /** The office user who recorded a verbal yes; null for a customer approval. */
+  acceptedByUserId?: string | null;
+  /** Send back on every edit; see the pricing block above. */
+  version?: number;
+  pricingModel?: PricingModel;
   quoteDate: string;
   expirationDate: string;
+  /** Pre-tax, after adjustments: grossSubtotal − adjustmentTotal. */
   subtotal: number;
+  /** List total before adjustments. */
+  grossSubtotal?: number;
+  adjustmentTotal?: number;
+  adjustments?: DocumentAdjustment[];
+  /** LEGACY documents only; ENGINE documents are taxed per line (see `tax`). */
   taxRate: number;
   taxAmount: number;
   totalAmount: number;
+  ratePlanId?: string | null;
+  ratePlanName?: string | null;
+  tax?: DocumentTax | null;
+  warnings?: PricingWarning[];
   notes?: string;
   lineItems: QuoteLineItem[];
   /** See `Invoice.lastSentAt` — same semantics. */
@@ -587,21 +901,51 @@ export interface ListQuotesParams {
   sort?: string; // quoteDate | firstSentAt | expirationDate | totalAmount | quoteNumber, e.g. 'quoteDate,desc'
 }
 
-export interface CreateQuoteLineItemRequest {
-  description: string;
-  quantity: number;
-  unitPrice: number;
-}
+/** Same shape as an invoice's inline freeform line. */
+export type CreateQuoteLineItemRequest = CreateInvoiceLineItemRequest;
 
+/** No tax rate — the server resolves tax from the location's jurisdiction. */
 export interface CreateQuoteRequest {
+  /** The bill-to (a payer goes here). */
   customerId: string;
   /** Optional WO link (Phase 7b backend ask #7). */
   workOrderId?: string;
+  /** Where the work is; defaults to the work order's location. Without one: tenant-default tax, no member benefits. */
+  serviceLocationId?: string;
+  customerPoNumber?: string;
   quoteDate: string;
   expirationDate: string;
-  taxRate: number;
   notes?: string;
   lineItems: CreateQuoteLineItemRequest[];
+}
+
+/** The whole header, replaced: send every field; null clears an optional one. Editing a SENT quote returns it to DRAFT. */
+export interface UpdateQuoteHeaderRequest {
+  version: number;
+  quoteDate: string;
+  expirationDate: string;
+  serviceLocationId: string | null;
+  customerPoNumber: string | null;
+  notes: string | null;
+}
+
+/** What is left to bill on an ACCEPTED quote, per line. Drafts count as invoiced; void/cancelled don't. */
+export interface QuoteInvoiceableLine {
+  quoteLineId: string;
+  sortOrder: number;
+  description: string;
+  type: LineType | null;
+  unit: string | null;
+  unitPrice: number;
+  quantity: number;
+  invoicedQuantity: number;
+  remainingQuantity: number;
+}
+
+export interface QuoteInvoiceable {
+  quoteId: string;
+  status: QuoteStatus;
+  lines: QuoteInvoiceableLine[];
 }
 
 export interface UpdateQuoteStatusRequest {
@@ -646,10 +990,29 @@ export const quotesApi = {
     return response.data;
   },
 
+  /** ACCEPTED from the office records a verbal yes (`acceptedByUserId`). */
   updateStatus: async (id: string, request: UpdateQuoteStatusRequest): Promise<Quote> => {
     const response = await apiClient.patch<Quote>(`/financial/quotes/${id}/status`, request);
     return response.data;
   },
+
+  updateHeader: async (id: string, request: UpdateQuoteHeaderRequest): Promise<Quote> => {
+    const response = await apiClient.put<Quote>(`/financial/quotes/${id}/header`, request);
+    return response.data;
+  },
+
+  /** A new DRAFT copy — how a frozen (accepted/declined/expired) quote is changed. */
+  duplicate: async (id: string): Promise<Quote> => {
+    const response = await apiClient.post<Quote>(`/financial/quotes/${id}/duplicate`);
+    return response.data;
+  },
+
+  getInvoiceable: async (id: string): Promise<QuoteInvoiceable> => {
+    const response = await apiClient.get<QuoteInvoiceable>(`/financial/quotes/${id}/invoiceable`);
+    return response.data;
+  },
+
+  ...documentEditRoutes<Quote>('/financial/quotes'),
 
   /** See `invoicesApi.send` — same contract, quote-scoped. */
   send: async (
@@ -811,6 +1174,16 @@ export const paymentsApi = {
 
   create: async (request: CreatePaymentRequest): Promise<Payment> => {
     const response = await apiClient.post<Payment>('/financial/payments', request);
+    return response.data;
+  },
+
+  /**
+   * Apply a payment's unapplied balance (e.g. credit a void returned) to
+   * invoices. 409 PAYMENT_NOT_APPLICABLE on a void payment; 400 when the
+   * total exceeds the unapplied balance.
+   */
+  apply: async (paymentId: string, applications: CreatePaymentApplication[]): Promise<Payment> => {
+    const response = await apiClient.post<Payment>(`/financial/payments/${paymentId}/applications`, { applications });
     return response.data;
   },
 

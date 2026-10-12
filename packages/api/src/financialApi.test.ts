@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { invoicesApi, quotesApi, financialActivityApi, financialDashboardApi, revenueTargetsApi,
-  revenueReportApi, receivablesReportApi, quoteReportApi, paymentReportApi } from './financialApi';
+  revenueReportApi, receivablesReportApi, quoteReportApi, paymentReportApi, paymentsApi } from './financialApi';
 import apiClient from './client';
 
 vi.mock('./client');
@@ -282,6 +282,78 @@ describe('paymentReportApi', () => {
     await paymentReportApi.get({ from: '2026-09-01', to: '2026-09-30', compare: 'previousPeriod', groupBy: 'day', regionIds: [] });
     expect(apiClient.get).toHaveBeenLastCalledWith('/financial/reports/payments', {
       params: { from: '2026-09-01', to: '2026-09-30', compare: 'previousPeriod', groupBy: 'day' },
+    });
+  });
+});
+
+describe('document edit routes (Pricebook Phase 1)', () => {
+  const doc = { data: { id: 'q-1', version: 4 } };
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(apiClient.post).mockResolvedValue(doc);
+    vi.mocked(apiClient.put).mockResolvedValue(doc);
+    vi.mocked(apiClient.delete).mockResolvedValue(doc);
+    vi.mocked(apiClient.get).mockResolvedValue(doc);
+  });
+
+  it('adds and replaces lines with the version in the body', async () => {
+    await quotesApi.addLine('q-1', { version: 3, itemId: 'it-1', quantity: 2 });
+    expect(apiClient.post).toHaveBeenCalledWith('/financial/quotes/q-1/lines', { version: 3, itemId: 'it-1', quantity: 2 });
+
+    await invoicesApi.updateLine('inv-1', 'l-1', { version: 3, type: 'MATERIAL', description: 'Cap', quantity: 1, unitPrice: 48 });
+    expect(apiClient.put).toHaveBeenCalledWith('/financial/invoices/inv-1/lines/l-1', {
+      version: 3,
+      type: 'MATERIAL',
+      description: 'Cap',
+      quantity: 1,
+      unitPrice: 48,
+    });
+  });
+
+  it('sends the version as a query param on deletes', async () => {
+    await quotesApi.deleteLine('q-1', 'l-1', 5);
+    expect(apiClient.delete).toHaveBeenCalledWith('/financial/quotes/q-1/lines/l-1', { params: { version: 5 } });
+
+    await invoicesApi.deleteAdjustment('inv-1', 'a-1', 6);
+    expect(apiClient.delete).toHaveBeenCalledWith('/financial/invoices/inv-1/adjustments/a-1', { params: { version: 6 } });
+  });
+
+  it('reorders, adjusts, and replaces the header on the documented routes', async () => {
+    await quotesApi.reorderLines('q-1', { version: 2, lineIds: ['b', 'a'] });
+    expect(apiClient.put).toHaveBeenCalledWith('/financial/quotes/q-1/lines/order', { version: 2, lineIds: ['b', 'a'] });
+
+    await invoicesApi.addAdjustment('inv-1', { version: 2, kind: 'PERCENT', value: 0.1, reasonCode: 'GOODWILL' });
+    expect(apiClient.post).toHaveBeenCalledWith('/financial/invoices/inv-1/adjustments', {
+      version: 2,
+      kind: 'PERCENT',
+      value: 0.1,
+      reasonCode: 'GOODWILL',
+    });
+
+    const header = { version: 2, quoteDate: '2026-10-12', expirationDate: '2026-11-11', serviceLocationId: null, customerPoNumber: null, notes: null };
+    await quotesApi.updateHeader('q-1', header);
+    expect(apiClient.put).toHaveBeenCalledWith('/financial/quotes/q-1/header', header);
+  });
+
+  it('duplicates a quote, reads what is left to bill, and bills it', async () => {
+    await quotesApi.duplicate('q-1');
+    expect(apiClient.post).toHaveBeenCalledWith('/financial/quotes/q-1/duplicate');
+
+    await quotesApi.getInvoiceable('q-1');
+    expect(apiClient.get).toHaveBeenCalledWith('/financial/quotes/q-1/invoiceable');
+
+    const request = { quoteId: 'q-1', lines: [{ quoteLineId: 'l-1', quantity: 1 }], invoiceDate: '2026-10-12', dueDate: '2026-11-11' };
+    await invoicesApi.createFromQuote(request);
+    expect(apiClient.post).toHaveBeenCalledWith('/financial/invoices/from-quote', request);
+  });
+
+  it('reissues an invoice and applies freed credit to the copy', async () => {
+    await invoicesApi.reissue('inv-1');
+    expect(apiClient.post).toHaveBeenCalledWith('/financial/invoices/inv-1/reissue');
+
+    await paymentsApi.apply('p-1', [{ invoiceId: 'inv-2', amountApplied: 500 }]);
+    expect(apiClient.post).toHaveBeenCalledWith('/financial/payments/p-1/applications', {
+      applications: [{ invoiceId: 'inv-2', amountApplied: 500 }],
     });
   });
 });
