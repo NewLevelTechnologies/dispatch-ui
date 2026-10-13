@@ -1484,6 +1484,8 @@
     },
     "quote": {
       "loading": "Loading quote…",
+      "beingUpdated": "This quote is being updated",
+      "beingUpdatedBody": "{{tenant}} is making changes. You'll get the updated quote when it's ready.",
       "label": "Quote",
       "total": "Total",
       "validThrough": "Valid through {{date}}",

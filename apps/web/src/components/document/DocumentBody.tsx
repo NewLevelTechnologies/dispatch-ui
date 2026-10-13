@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { formatCurrency } from '@dispatch/utils';
 import { Card } from '../catalyst/card';
 import { Callout } from '../ui/Callout';
-import { DocumentLinesCard } from './DocumentLinesCard';
+import { DocumentLinesCard, type LineEditing } from './DocumentLinesCard';
 import { DocumentTotals, type InvoiceSettlement } from './DocumentTotals';
 import type { PricedDocument } from './documentModel';
 
@@ -12,17 +12,20 @@ export function DocumentBody({
   doc,
   notes,
   settlement,
+  editing,
 }: {
   doc: PricedDocument;
   notes?: string | null;
   settlement?: InvoiceSettlement;
+  /** Present while the document is editable. */
+  editing?: LineEditing;
 }) {
   // Internal cost/margin, on by default: CSRs price with it in view. Off hides
   // it from both the table and the totals (e.g. while screen-sharing).
   const [showCost, setShowCost] = useState(true);
   return (
     <>
-      <DocumentLinesCard doc={doc} showCost={showCost} onShowCostChange={setShowCost} />
+      <DocumentLinesCard doc={doc} showCost={showCost} onShowCostChange={setShowCost} editing={editing} />
       <div className="mt-3.5 flex flex-col-reverse items-stretch gap-3 md:flex-row md:items-start md:justify-between">
         <div className="min-w-0 md:max-w-[520px] md:flex-1">
           {notes && (

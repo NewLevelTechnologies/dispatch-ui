@@ -14,6 +14,7 @@ import type {
   PricingRule,
   PricingWarning,
   TaxClass,
+  UpdateLineRequest,
 } from '../../api/setup';
 
 /** The fields the document view reads; both `Quote` and `Invoice` satisfy it. */
@@ -264,3 +265,51 @@ export function memberLabel(adjustments: DocumentAdjustment[] = []): string | nu
   const labels = [...new Set(adjustments.filter(isMember).map((a) => a.sourceLabel).filter((l): l is string => !!l))];
   return labels.length ? labels.join(', ') : null;
 }
+
+/** Line types a freeform line can take; labor lines come from a rate type. */
+export const FREEFORM_TYPES: LineType[] = ['SERVICE', 'MATERIAL', 'EQUIPMENT', 'FEE'];
+
+/** Freeform and PO lines are priced by hand, so their description and price are typed in place. */
+export const isHandPriced = (line: DocumentLineItem) => {
+  const kind = lineProvenance(line).kind;
+  return kind === 'freeform' || kind === 'po';
+};
+
+/**
+ * An edit replaces the whole line, so send everything it holds with the
+ * change applied. Re-sending the same item or rate type keeps the values
+ * copied when it was added; nothing is re-read from the pricebook.
+ */
+export function lineUpdate(
+  line: DocumentLineItem,
+  version: number,
+  change: Partial<Pick<DocumentLineItem, 'description' | 'quantity' | 'unitPrice'>>,
+): UpdateLineRequest {
+  const opt = <T>(v: T | null | undefined) => (v == null ? undefined : v);
+  return {
+    version,
+    type: opt(line.type),
+    description: change.description ?? line.description,
+    quantity: change.quantity ?? line.quantity,
+    unitPrice: change.unitPrice ?? line.unitPrice,
+    unitCost: opt(line.unitCost),
+    unit: opt(line.unit),
+    taxClass: opt(line.taxClass),
+    laborRateTypeId: opt(line.laborRateTypeId),
+    itemId: opt(line.itemId),
+  };
+}
+
+/** Lines in a new order after dragging `fromId` onto `toId`'s slot. */
+export function moveLine(ids: string[], fromId: string, toId: string): string[] {
+  const from = ids.indexOf(fromId);
+  const to = ids.indexOf(toId);
+  if (from < 0 || to < 0 || from === to) return ids;
+  const next = [...ids];
+  next.splice(from, 1);
+  next.splice(to, 0, fromId);
+  return next;
+}
+
+/** LocalDate for a date input; tolerates an ISO instant. */
+export const toDateInput = (value: string | null | undefined) => (value ? value.slice(0, 10) : '');
