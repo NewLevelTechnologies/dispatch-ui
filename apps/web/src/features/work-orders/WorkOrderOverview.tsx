@@ -638,7 +638,7 @@ function LocationCard({
 }
 
 // ── Money card — derived rollup over the job's documents (the WO owns no line
-// items). "Bills to" surfaces the payer; Quoted / Collected / Balance read off
+// items). "Bills to" surfaces the payer; Accepted / Collected / Balance read off
 // financialSummary. Membership badge + document list land with BE asks #2/#4.
 function MoneyCard({
   workOrder,
@@ -654,7 +654,7 @@ function MoneyCard({
   const { t } = useTranslation();
   const { getName } = useGlossary();
   const customer = workOrder.customer;
-  const quoted = num(summary?.quoted);
+  const accepted = num(summary?.quotedAccepted);
   const collected = num(summary?.paid);
   const balance = num(summary?.balance);
 
@@ -681,7 +681,11 @@ function MoneyCard({
         </div>
       )}
       <div className="grid grid-cols-3 gap-2">
-        <RollupStat label={getName('quote')} value={money(quoted)} onClick={quoted > 0 ? onOpenQuotes : undefined} />
+        <RollupStat
+          label={t('workOrders.detail.overview.acceptedQuotes', { quotes: getName('quote', true) })}
+          value={money(accepted)}
+          onClick={accepted > 0 ? onOpenQuotes : undefined}
+        />
         <RollupStat label={t('workOrders.detail.overview.collected')} value={money(collected)} tone="success" />
         <RollupStat label={t('workOrders.detail.money.balance')} value={money(balance)} emphasis onClick={onOpenInvoices} />
       </div>

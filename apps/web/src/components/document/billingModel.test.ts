@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Invoice, Quote, QuoteInvoiceable } from '../../api/setup';
-import { billingStats, buildBillingTree, invoicedPercent, localDate } from './billingModel';
+import { amount, buildBillingTree, invoicedPercent, localDate } from './billingModel';
 
 const quote = (over: Partial<Quote>): Quote =>
   ({ id: 'q', quoteNumber: 'Q', status: 'ACCEPTED', totalAmount: 0, lineItems: [], createdAt: '2026-10-01T00:00:00Z', ...over }) as Quote;
@@ -35,18 +35,12 @@ describe('buildBillingTree', () => {
   });
 });
 
-describe('billingStats', () => {
-  it('counts issued invoices as billed and keeps drafts, void and cancelled out', () => {
-    const stats = billingStats(
-      [quote({ status: 'ACCEPTED', totalAmount: 1000 }), quote({ status: 'SENT', totalAmount: 400 }), quote({ status: 'DECLINED', totalAmount: 99 })],
-      [
-        invoice({ status: 'SENT', totalAmount: 600, amountPaid: 100, balanceDue: 500 }),
-        invoice({ status: 'PAID', totalAmount: 200, amountPaid: 200, balanceDue: 0 }),
-        invoice({ status: 'DRAFT', totalAmount: 150, balanceDue: 150 }),
-        invoice({ status: 'VOID', totalAmount: 600 }),
-      ],
-    );
-    expect(stats).toEqual({ accepted: 1000, awaiting: 400, invoiced: 800, inDraft: 150, collected: 300, balance: 500 });
+describe('amount', () => {
+  it('reads decimals sent as strings or numbers', () => {
+    expect(amount('742.67')).toBe(742.67);
+    expect(amount(12)).toBe(12);
+    expect(amount(undefined)).toBe(0);
+    expect(amount('')).toBe(0);
   });
 });
 

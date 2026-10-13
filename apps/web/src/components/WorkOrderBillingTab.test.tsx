@@ -52,8 +52,11 @@ const invoiceable: QuoteInvoiceable = {
   ],
 };
 
-function mockApi(quotes: Quote[], invoices: Invoice[]) {
+const ZERO = { invoiced: '0', inDraft: '0', quotedAccepted: '0', quotedAwaiting: '0', paid: '0', balance: '0', currency: 'USD' };
+
+function mockApi(quotes: Quote[], invoices: Invoice[], summary: Record<string, string> = ZERO) {
   vi.mocked(apiClient.get).mockImplementation((url: string) => {
+    if (url === '/financial/work-orders/wo-1/summary') return Promise.resolve({ data: summary });
     if (url === '/financial/work-orders/wo-1/quotes') return Promise.resolve({ data: quotes });
     if (url === '/financial/work-orders/wo-1/invoices') return Promise.resolve({ data: invoices });
     if (url === '/financial/quotes/q-1/invoiceable') return Promise.resolve({ data: invoiceable });
@@ -92,6 +95,8 @@ describe('WorkOrderBillingTab', () => {
           createdAt: '2026-10-10T15:00:00Z',
         }),
       ],
+      // The server's figures, not sums of the rows.
+      { invoiced: '512.40', inDraft: '150.00', quotedAccepted: '742.67', quotedAwaiting: '1500.00', paid: '89.00', balance: '423.40', currency: 'USD' },
     );
     renderTab();
 
@@ -100,10 +105,11 @@ describe('WorkOrderBillingTab', () => {
     expect(screen.getByText('Voided · reissued as INV-2219')).toBeInTheDocument();
     expect(await screen.findByText('60% invoiced')).toBeInTheDocument();
     expect(screen.getByText('$423.40 due')).toBeInTheDocument();
-    // Accepted, then invoiced (the void isn't), collected and balance due.
-    expect(screen.getByText('$742.67', { selector: '.text-\\[18px\\]' })).toBeInTheDocument();
+    // Accepted, invoiced, collected and balance due, from the summary.
+    expect(await screen.findByText('$742.67', { selector: '.text-\\[18px\\]' })).toBeInTheDocument();
     expect(screen.getByText('+ $1,500.00 awaiting customer')).toBeInTheDocument();
     expect(screen.getByText('$512.40', { selector: '.text-\\[18px\\]' })).toBeInTheDocument();
+    expect(screen.getByText('+ $150.00 in draft')).toBeInTheDocument();
     expect(screen.getByText('$89.00', { selector: '.text-\\[18px\\]' })).toBeInTheDocument();
     expect(screen.getByText('$423.40', { selector: '.text-\\[18px\\]' })).toBeInTheDocument();
   });
