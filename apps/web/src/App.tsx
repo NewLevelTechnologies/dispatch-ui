@@ -49,6 +49,7 @@ import { RoleAddPage, RoleEditPage } from './pages/RoleFormPage';
 import SettingsLayout from './pages/settings/SettingsLayout';
 import CompanyProfilePanel from './pages/settings/CompanyProfilePanel';
 import RevenueTargetsPanel from './pages/settings/RevenueTargetsPanel';
+import TaxPanel from './pages/settings/TaxPanel';
 import TerminologyPanel from './pages/settings/TerminologyPanel';
 import NotificationTemplatesPanel from './pages/settings/NotificationTemplatesPanel';
 import NotificationTemplateEditPage from './pages/settings/NotificationTemplateEditPage';
@@ -250,6 +251,7 @@ function App() {
         <Route path="general" element={<Navigate to="/settings/company-profile" replace />} />
         <Route path="company-profile" element={<CompanyProfilePanel />} />
         <Route path="revenue-targets" element={<RevenueTargetsPanel />} />
+        <Route path="tax" element={<TaxPanel />} />
         <Route path="terminology" element={<TerminologyPanel />} />
         <Route path="notifications" element={<NotificationTemplatesPanel />} />
         <Route path="notifications/:id" element={<NotificationTemplateEditPage />} />

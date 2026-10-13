@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import { formatCurrency } from '@dispatch/utils';
 import { Card } from '../catalyst/card';
+import { Button } from '../catalyst/button';
 import { Callout } from '../ui/Callout';
 import { DocumentLinesCard, type LineEditing } from './DocumentLinesCard';
 import { DocumentTotals, type InvoiceSettlement } from './DocumentTotals';
@@ -55,19 +56,24 @@ export function DocumentWarnings({
 }) {
   const warnings = doc.warnings ?? [];
   if (!warnings.length) return null;
+  const taxSettings = (
+    <Button outline size="xs" href="/settings/tax">
+      Tax settings
+    </Button>
+  );
   return (
     <div className="mb-2.5 flex flex-col gap-2">
       {warnings.map((w) => {
         switch (w.code) {
           case 'TAX_JURISDICTION_NOT_SET':
             return (
-              <Callout key={w.code} kind="warning" title="No tax charged">
+              <Callout key={w.code} kind="warning" title="No tax charged" action={taxSettings}>
                 No tax jurisdiction applies to this location, and the company has no default jurisdiction.
               </Callout>
             );
           case 'TAX_RATE_NOT_SET':
             return (
-              <Callout key={w.code} kind="warning" title="No tax charged">
+              <Callout key={w.code} kind="warning" title="No tax charged" action={taxSettings}>
                 {doc.tax?.jurisdictionName ?? 'This location’s tax jurisdiction'} has no tax rate set yet.
               </Callout>
             );

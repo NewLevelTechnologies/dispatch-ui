@@ -118,6 +118,7 @@ import {
   mockAttention,
   type MockTone,
 } from './serviceLocationDetailMocks';
+import { LocationTaxJurisdiction } from '../components/LocationTaxJurisdiction';
 
 type TabId = 'overview' | 'equipment' | 'jobs' | 'invoices' | 'dispatches' | 'contacts' | 'files' | 'activity';
 const LOCATION_TABS = [
@@ -2733,6 +2734,8 @@ function ParentCustomerCard({ location }: { location: ServiceLocationDetailDto }
           </div>
         </div>
       )}
+
+      <LocationTaxJurisdiction serviceLocationId={location.id} />
 
       {primaryAgreement && (
         <div className="mt-2 border-t border-border-soft pt-2 text-[11.5px] text-fg-muted">
