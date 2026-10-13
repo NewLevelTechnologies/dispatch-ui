@@ -2,6 +2,9 @@ import { describe, it, expect } from 'vitest';
 import type { DocumentAdjustment, DocumentLineItem } from '../../api/setup';
 import {
   adjustmentChip,
+  adjustmentSaving,
+  documentAdjustmentBase,
+  lineAdjustmentBase,
   documentShare,
   formatDocDate,
   lineMargin,
@@ -145,5 +148,18 @@ describe('documentModel', () => {
       version: 4, type: 'LABOR', description: 'Diagnose no-cool', quantity: 2, taxClass: 'LABOR', laborRateTypeId: 'r-ot',
     });
     expect(lineUpdate({ ...line, description: 'Regular' }, 4, { laborRateTypeId: 'r-ot' }).description).toBeUndefined();
+  });
+
+  it('previews a saving the way the server caps it', () => {
+    const line = { id: 'l1', lineTotal: 50, quantity: 1, unitPrice: 50 } as DocumentLineItem;
+    const other = { id: 'l2', lineTotal: 30, quantity: 1, unitPrice: 30 } as DocumentLineItem;
+    const taken = [adj({ lineId: 'l1', kind: 'AMOUNT', value: 20, computedAmount: 20 })];
+    const at = lineAdjustmentBase(line, taken);
+    expect(at).toEqual({ base: 50, room: 30 });
+    // 80% of the $50 list is $40, but only $30 is left on the line.
+    expect(adjustmentSaving('PERCENT', 0.8, at)).toBe(30);
+    expect(adjustmentSaving('AMOUNT', 12.5, at)).toBe(12.5);
+    expect(adjustmentSaving('WAIVE', null, at)).toBe(30);
+    expect(documentAdjustmentBase([line, other], taken)).toEqual({ base: 60, room: 60, lines: 2 });
   });
 });

@@ -2,9 +2,12 @@
 // The server does all the money math; nothing here recomputes a price, a tax
 // or a total. These only label, group and sum what the server returned for
 // display (e.g. the tax line's "on $X taxable" is the sum of the taxable
-// lines' net amounts the server already settled).
+// lines' net amounts the server already settled). The one exception is the
+// adjust dialog's "Saves $X" preview, which follows the server's adjustment
+// rule so the figure matches what's applied.
 import { formatCurrency } from '@dispatch/utils';
 import type {
+  AdjustmentKind,
   AdjustmentReason,
   DocumentAdjustment,
   DocumentLineItem,
@@ -118,6 +121,37 @@ export function lineAdjustments(lineId: string, adjustments: DocumentAdjustment[
 export function documentShare(line: DocumentLineItem, adjustments: DocumentAdjustment[] = []): number {
   const own = lineAdjustments(line.id, adjustments).reduce((s, a) => s + a.computedAmount, 0);
   return Math.max(0, round2((line.adjustmentAmount ?? 0) - own));
+}
+
+/**
+ * What a new adjustment works from, mirroring the server's rule: a line's
+ * adjustments are each worked out on its list amount and together never
+ * exceed it; document-wide ones are worked out on the total after line
+ * adjustments, and likewise never exceed it. `room` is what's left to take.
+ */
+export interface AdjustmentBase {
+  base: number;
+  room: number;
+  /** Document-wide only: lines the discount is spread over. */
+  lines?: number;
+}
+
+export function lineAdjustmentBase(line: DocumentLineItem, adjustments: DocumentAdjustment[] = []): AdjustmentBase {
+  const taken = lineAdjustments(line.id, adjustments).reduce((s, a) => s + a.computedAmount, 0);
+  return { base: line.lineTotal, room: Math.max(0, round2(line.lineTotal - taken)) };
+}
+
+export function documentAdjustmentBase(lines: DocumentLineItem[], adjustments: DocumentAdjustment[] = []): AdjustmentBase {
+  const bases = lines.map((l) => lineAdjustmentBase(l, adjustments).room);
+  const base = round2(bases.reduce((s, b) => s + b, 0));
+  const taken = adjustments.filter((a) => a.lineId == null).reduce((s, a) => s + a.computedAmount, 0);
+  return { base, room: Math.max(0, round2(base - taken)), lines: bases.filter((b) => b > 0).length };
+}
+
+/** What a new adjustment would take off, the way the server works it out. Null until the value is usable. */
+export function adjustmentSaving(kind: AdjustmentKind, value: number | null, at: AdjustmentBase): number | null {
+  const raw = kind === 'WAIVE' ? at.base : value == null ? null : kind === 'PERCENT' ? round2(at.base * value) : round2(value);
+  return raw == null ? null : Math.min(raw, at.room);
 }
 
 /** Where a line came from, for the muted line under its description. */

@@ -20,6 +20,8 @@ import {
   LINE_TYPE_TONE,
   TAX_CLASS_LABEL,
   adjustmentChip,
+  documentAdjustmentBase,
+  lineAdjustmentBase,
   documentShare,
   isHandPriced,
   isLegacy,
@@ -195,6 +197,15 @@ export function DocumentLinesCard({
       {editing && (
         <DocumentAdjustDialog
           target={adjusting && 'line' in adjusting ? (adjustingLine ? { line: adjustingLine } : null) : adjusting}
+          base={
+            adjusting && 'line' in adjusting
+              ? adjustingLine
+                ? lineAdjustmentBase(adjustingLine, doc.adjustments)
+                : null
+              : adjusting
+                ? documentAdjustmentBase(lines, doc.adjustments)
+                : null
+          }
           existing={targetAdjustments}
           onAdd={editing.onAddAdjustment}
           onRemove={editing.onRemoveAdjustment}
