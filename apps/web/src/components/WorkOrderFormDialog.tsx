@@ -109,7 +109,7 @@ export default function WorkOrderFormDialog({ isOpen, onClose, workOrder, prefil
   // The summary gives us instant render; the detail brings work items, cancellation
   // reason, internal notes, and other detail-only fields.
   const { data: detail } = useQuery({
-    queryKey: ['work-order', workOrder?.id],
+    queryKey: ['work-orders', workOrder?.id],
     queryFn: () => workOrderApi.getById(workOrder!.id),
     enabled: isOpen && !!workOrder?.id,
   });
@@ -298,7 +298,6 @@ export default function WorkOrderFormDialog({ isOpen, onClose, workOrder, prefil
       workOrderApi.update(effective!.id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['work-orders'] });
-      queryClient.invalidateQueries({ queryKey: ['work-order', effective?.id] });
       // Paginated list views (customer / service-location / equipment-
       // service-history tabs) keyed under work-orders-list. A WO that just
       // moved between locations / customers has to disappear from one

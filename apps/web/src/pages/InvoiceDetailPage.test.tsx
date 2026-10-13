@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { screen, within } from '@testing-library/react';
+import { QueryClient } from '@tanstack/react-query';
 import { renderWithProviders, userEvent } from '../test/utils';
 import InvoiceDetailPage from './InvoiceDetailPage';
 import { apiClient, type Invoice, type NestedInvoicePayment } from '../api/setup';
@@ -378,5 +379,26 @@ describe('InvoiceDetailPage · parts from purchase orders', () => {
     expect(within(form).getByRole('button', { name: 'Add 2 lines' })).toBeDisabled();
     await user.click(within(form).getByRole('checkbox', { name: 'Add Contactor 40A' }));
     expect(within(form).getByRole('button', { name: 'Add 1 line' })).toBeEnabled();
+  });
+});
+
+describe('InvoiceDetailPage · the work order it shows', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('refetches the job when the work order page refreshes it, so a changed NTE shows', async () => {
+    mockApi(invoice);
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    renderWithProviders(<div />, {
+      queryClient,
+      routes: [{ path: '/invoices/:id', element: <InvoiceDetailPage /> }],
+      initialPath: '/invoices/inv-1',
+    });
+    await screen.findByText('INV-3307');
+    const jobFetches = () => vi.mocked(apiClient.get).mock.calls.filter(([u]) => u === '/work-orders/wo-1').length;
+    await vi.waitFor(() => expect(jobFetches()).toBe(1));
+
+    // What the work order page does after saving a field.
+    await queryClient.invalidateQueries({ queryKey: ['work-orders'] });
+    await vi.waitFor(() => expect(jobFetches()).toBe(2));
   });
 });

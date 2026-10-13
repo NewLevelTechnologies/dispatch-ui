@@ -429,6 +429,11 @@ export default function WorkOrderDetailPage() {
       await workOrderApi.update(id!, { [field]: next } as UpdateWorkOrderRequest);
       queryClient.invalidateQueries({ queryKey: ['work-orders'] });
       queryClient.invalidateQueries({ queryKey: ['work-order-activity', id] });
+      if (field === 'notToExceed') {
+        // Open invoices and quotes show the limit, and draft invoices warn when the job goes over it.
+        queryClient.invalidateQueries({ queryKey: ['invoice'] });
+        queryClient.invalidateQueries({ queryKey: ['quote'] });
+      }
     } catch (err) {
       const msg =
         err instanceof Error && 'response' in err
