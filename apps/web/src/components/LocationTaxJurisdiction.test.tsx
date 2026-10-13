@@ -21,6 +21,7 @@ describe('LocationTaxJurisdiction', () => {
       if (url === '/financial/service-locations/loc-1/tax-jurisdiction')
         return Promise.resolve({ data: { serviceLocationId: 'loc-1', assignedJurisdictionId: null, effective: phoenix } });
       if (url === '/financial/tax-jurisdictions') return Promise.resolve({ data: [phoenix, tempe] });
+      if (url === '/customers/cust-1') return Promise.resolve({ data: { id: 'cust-1', name: 'Sun Valley Dental', taxExempt: true } });
       return Promise.reject(new Error(`unexpected GET ${url}`));
     });
   });
@@ -28,13 +29,19 @@ describe('LocationTaxJurisdiction', () => {
   it('shows the default when nothing is assigned, and assigns another', async () => {
     const user = userEvent.setup();
     vi.mocked(apiClient.put).mockResolvedValue({ data: { serviceLocationId: 'loc-1', assignedJurisdictionId: 'j-2', effective: tempe } });
-    renderWithProviders(<LocationTaxJurisdiction serviceLocationId="loc-1" />);
+    renderWithProviders(<LocationTaxJurisdiction serviceLocationId="loc-1" customerId="cust-1" />);
 
     expect(await screen.findByText('Phoenix, AZ')).toBeInTheDocument();
     expect(screen.getByText('(default)')).toBeInTheDocument();
+    // An exempt customer is never charged, whatever the jurisdiction.
+    expect(await screen.findByText('· Customer is tax-exempt')).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Change' }));
     const dialog = await screen.findByRole('dialog');
+    expect(dialog).toHaveTextContent('drafts the next time they’re edited. Sent ones keep their tax.');
+    expect(within(dialog).getByRole('option', { name: 'Use the default (Phoenix, AZ · 8.6%)' })).toBeInTheDocument();
+    // Only pricing managers get the way to the jurisdictions themselves.
+    expect(within(dialog).queryByRole('link', { name: 'Manage jurisdictions' })).not.toBeInTheDocument();
     await within(dialog).findByRole('option', { name: 'Tempe, AZ · 8.1%' });
     await user.selectOptions(within(dialog).getByRole('combobox', { name: 'Jurisdiction' }), 'j-2');
     await user.click(within(dialog).getByRole('button', { name: 'Save' }));
@@ -50,5 +57,21 @@ describe('LocationTaxJurisdiction', () => {
 
     expect(await screen.findByText('Phoenix, AZ')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Change' })).not.toBeInTheDocument();
+  });
+
+  it('says when nothing applies, and links pricing managers to the jurisdictions', async () => {
+    const user = userEvent.setup();
+    vi.mocked(useHasAnyCapability).mockImplementation((...caps: string[]) => caps.includes('MANAGE_PRICING'));
+    vi.mocked(apiClient.get).mockImplementation((url: string) => {
+      if (url === '/financial/service-locations/loc-1/tax-jurisdiction')
+        return Promise.resolve({ data: { serviceLocationId: 'loc-1', assignedJurisdictionId: null, effective: null } });
+      if (url === '/financial/tax-jurisdictions') return Promise.resolve({ data: [] });
+      return Promise.reject(new Error(`unexpected GET ${url}`));
+    });
+    renderWithProviders(<LocationTaxJurisdiction serviceLocationId="loc-1" />);
+
+    expect(await screen.findByText('No jurisdiction and no default · no tax is charged')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Change' }));
+    expect(await screen.findByRole('link', { name: 'Manage jurisdictions' })).toHaveAttribute('href', '/settings/tax');
   });
 });
