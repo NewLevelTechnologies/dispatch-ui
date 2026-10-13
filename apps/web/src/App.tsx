@@ -53,6 +53,8 @@ import TaxPanel from './pages/settings/TaxPanel';
 import LaborRatesPanel from './pages/settings/LaborRatesPanel';
 import PricebookPage from './pages/settings/PricebookPage';
 import PricebookItemPage from './pages/settings/PricebookItemPage';
+import RatePlansPage from './pages/settings/RatePlansPage';
+import RatePlanPage from './pages/settings/RatePlanPage';
 import TerminologyPanel from './pages/settings/TerminologyPanel';
 import NotificationTemplatesPanel from './pages/settings/NotificationTemplatesPanel';
 import NotificationTemplateEditPage from './pages/settings/NotificationTemplateEditPage';
@@ -254,6 +256,9 @@ function App() {
         <Route path="general" element={<Navigate to="/settings/company-profile" replace />} />
         <Route path="company-profile" element={<CompanyProfilePanel />} />
         <Route path="revenue-targets" element={<RevenueTargetsPanel />} />
+        <Route path="rate-plans" element={<RatePlansPage />} />
+        <Route path="rate-plans/new" element={<RatePlanPage />} />
+        <Route path="rate-plans/:id" element={<RatePlanPage />} />
         <Route path="tax" element={<TaxPanel />} />
         <Route path="pricebook" element={<PricebookPage />} />
         <Route path="pricebook/new" element={<PricebookItemPage />} />

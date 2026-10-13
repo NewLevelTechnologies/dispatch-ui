@@ -1595,6 +1595,8 @@ export interface PlanCategoryMultiplier {
 export interface RatePlan {
   id: string;
   name: string;
+  /** Internal only: why the plan exists. */
+  description?: string | null;
   isDefault: boolean;
   /** 0.90 = 10% off everything a more specific rule doesn't price. */
   priceMultiplier: number | null;
@@ -1607,13 +1609,80 @@ export interface RatePlan {
   categoryMultipliers: PlanCategoryMultiplier[];
   createdAt: string | null;
   updatedAt: string | null;
+  /** Accounts explicitly assigned; the default's count leaves out the accounts that fall back to it. */
+  accountCount?: number;
 }
 
-/** Rate plans. Reading needs no capability. */
+/** An account on a plan. `customerName` is null only when financial-service hasn't received the customer yet. */
+export interface RatePlanAccount {
+  customerId: string;
+  customerName: string | null;
+  assignedAt: string | null;
+}
+
+/** The whole plan; the rule lists replace the plan's existing rules. Never deleted: deactivate with `active: false`. */
+export interface RatePlanRequest {
+  name: string;
+  /** Up to 500; blank clears it. */
+  description: string | null;
+  /** Making one the default takes it from the previous default. */
+  isDefault: boolean;
+  priceMultiplier: number | null;
+  memberBenefitsStack: boolean;
+  active: boolean;
+  laborRates: PlanLaborRate[];
+  markupTiers: PlanMarkupTier[];
+  categoryMultipliers: PlanCategoryMultiplier[];
+}
+
+/** An account's plan: what was assigned to it (null = none) and what applies, the assignment or else the default. */
+export interface CustomerRatePlan {
+  customerId: string;
+  assignedRatePlanId: string | null;
+  effective: { id: string; name: string } | null;
+}
+
+/**
+ * Rate plans. Reading needs no capability; writing needs MANAGE_PRICING.
+ * 409 codes: NAME_TAKEN, DEFAULT_REQUIRED, DEFAULT_MUST_BE_ACTIVE,
+ * RATE_PLAN_IN_USE.
+ */
 export const ratePlansApi = {
   /** Active and inactive, by name, with their rules. */
   getAll: async (): Promise<RatePlan[]> => {
     const response = await apiClient.get<RatePlan[]>('/financial/rate-plans');
+    return response.data;
+  },
+
+  get: async (id: string): Promise<RatePlan> => {
+    const response = await apiClient.get<RatePlan>(`/financial/rate-plans/${id}`);
+    return response.data;
+  },
+
+  create: async (request: RatePlanRequest): Promise<RatePlan> => {
+    const response = await apiClient.post<RatePlan>('/financial/rate-plans', request);
+    return response.data;
+  },
+
+  update: async (id: string, request: RatePlanRequest): Promise<RatePlan> => {
+    const response = await apiClient.put<RatePlan>(`/financial/rate-plans/${id}`, request);
+    return response.data;
+  },
+
+  /** The accounts on a plan, by name. Assign and unassign with `setCustomerPlan`. `size` at most 200. */
+  getAccounts: async (id: string, params: { page?: number; size?: number } = {}): Promise<FinancialPage<RatePlanAccount>> => {
+    const response = await apiClient.get<FinancialPage<RatePlanAccount>>(`/financial/rate-plans/${id}/accounts`, { params });
+    return response.data;
+  },
+
+  getCustomerPlan: async (customerId: string): Promise<CustomerRatePlan> => {
+    const response = await apiClient.get<CustomerRatePlan>(`/financial/customers/${customerId}/rate-plan`);
+    return response.data;
+  },
+
+  /** Null clears the assignment, so the default plan applies. */
+  setCustomerPlan: async (customerId: string, ratePlanId: string | null): Promise<CustomerRatePlan> => {
+    const response = await apiClient.put<CustomerRatePlan>(`/financial/customers/${customerId}/rate-plan`, { ratePlanId });
     return response.data;
   },
 };
