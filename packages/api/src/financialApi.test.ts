@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { invoicesApi, quotesApi, financialActivityApi, financialDashboardApi, revenueTargetsApi,
-  revenueReportApi, receivablesReportApi, quoteReportApi, paymentReportApi, paymentsApi, taxApi, laborRatesApi, pricebookApi } from './financialApi';
+  revenueReportApi, receivablesReportApi, quoteReportApi, paymentReportApi, paymentsApi, taxApi, laborRatesApi, pricebookApi, ratePlansApi } from './financialApi';
 import apiClient from './client';
 
 vi.mock('./client');
@@ -401,5 +401,15 @@ describe('pricebookApi', () => {
     vi.mocked(apiClient.get).mockResolvedValue({ data: { content: [] } });
     await pricebookApi.getItems({ q: 'cap', active: true, size: 20 });
     expect(apiClient.get).toHaveBeenCalledWith('/financial/pricebook/items', { params: { q: 'cap', active: true, size: 20 } });
+  });
+});
+
+describe('ratePlansApi', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('clears an account’s plan with an explicit null', async () => {
+    vi.mocked(apiClient.put).mockResolvedValue({ data: {} });
+    await ratePlansApi.setCustomerPlan('cust-1', null);
+    expect(apiClient.put).toHaveBeenCalledWith('/financial/customers/cust-1/rate-plan', { ratePlanId: null });
   });
 });

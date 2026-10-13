@@ -70,6 +70,7 @@ import { buildAttentionItems, daysUntil, type AttentionItem } from './attention'
 import { useGoToInvoicesBucket } from './invoiceAgingNav';
 import { buildRecentActivity } from '../../lib/locationActivityRows';
 import { ACTIVITY_TONE_STYLE } from '../../lib/activityGlyph';
+import { CustomerRatePlanRow } from './CustomerRatePlanRow';
 
 const PREVIEW_LIMIT = 8;
 const CONTACT_CARD_CAP = 2;
@@ -520,6 +521,7 @@ export function BillingCard({
             </div>
           </div>
         )}
+        <CustomerRatePlanRow customerId={customer.id} />
       </div>
     </Card>
   );
