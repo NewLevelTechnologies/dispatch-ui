@@ -1,6 +1,6 @@
 /* eslint-disable i18next/no-literal-string -- route placeholders + assertion strings in a test fixture. */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { screen, within } from '@testing-library/react';
+import { fireEvent, screen, within } from '@testing-library/react';
 import { renderWithProviders, userEvent } from '../test/utils';
 import QuoteDetailPage from './QuoteDetailPage';
 import { apiClient, type Quote } from '../api/setup';
@@ -210,5 +210,194 @@ describe('QuoteDetailPage', () => {
     expect(screen.getByText('Tax · 8%')).toBeInTheDocument();
     expect(screen.queryByRole('columnheader', { name: 'Adjustments' })).not.toBeInTheDocument();
     expect(screen.queryByRole('checkbox', { name: /cost & margin/i })).not.toBeInTheDocument();
+  });
+});
+
+describe('QuoteDetailPage editing', () => {
+  const freeform = {
+    id: 'f1', sortOrder: 0, type: 'SERVICE' as const, description: 'Flush drain line', quantity: 1, unitPrice: 95,
+    lineTotal: 95, adjustmentAmount: 0, netAmount: 95, taxClass: 'LABOR' as const, taxable: false, unitCost: null,
+  };
+  const part = {
+    id: 'p1', sortOrder: 1, type: 'MATERIAL' as const, description: 'Capacitor 45/5', itemId: 'it-3', itemSku: 'CAP-455',
+    quantity: 1, unit: 'ea', unitPrice: 48, lineTotal: 48, adjustmentAmount: 0, netAmount: 48, taxClass: 'MATERIALS' as const,
+    taxable: false, unitCost: 18.75,
+  };
+  const draft: Quote = {
+    ...quote, status: 'DRAFT', revision: 1, version: 7, firstSentAt: null, lastSentAt: null,
+    adjustments: [], lineItems: [freeform, part], grossSubtotal: 143, adjustmentTotal: 0, subtotal: 143, taxAmount: 0, totalAmount: 143,
+  };
+  const conflict = (code: string) => Object.assign(new Error(code), { response: { status: 409, data: { code, message: 'server words' } } });
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockApi(draft);
+  });
+
+  it('saves a quantity edit with the version, sending the whole line back', async () => {
+    const user = userEvent.setup();
+    vi.mocked(apiClient.put).mockResolvedValue({ data: { ...draft, version: 8, totalAmount: 238 } });
+    renderPage();
+
+    const qty = (await screen.findAllByRole('textbox', { name: 'Quantity' }))[0];
+    await user.clear(qty);
+    await user.type(qty, '2{Enter}');
+
+    expect(apiClient.put).toHaveBeenCalledWith('/financial/quotes/q-1/lines/f1', {
+      version: 7, type: 'SERVICE', description: 'Flush drain line', quantity: 2, unitPrice: 95, taxClass: 'LABOR',
+    });
+    expect((await screen.findAllByText('$238.00')).length).toBeGreaterThan(0);
+  });
+
+  it('types description and price only on hand-priced lines; pricebook lines edit quantity', async () => {
+    renderPage();
+    await screen.findByText('Q-1882');
+    expect(screen.getAllByRole('textbox', { name: 'Description' })).toHaveLength(1);
+    expect(screen.getAllByRole('textbox', { name: 'Unit price' })).toHaveLength(1);
+    expect(screen.getAllByRole('textbox', { name: 'Quantity' })).toHaveLength(2);
+  });
+
+  it('queues rapid edits so each goes out with the version the last one returned', async () => {
+    const user = userEvent.setup();
+    let resolveFirst!: (v: unknown) => void;
+    vi.mocked(apiClient.put)
+      .mockImplementationOnce(() => new Promise((r) => { resolveFirst = r; }))
+      .mockResolvedValueOnce({ data: { ...draft, version: 9 } });
+    renderPage();
+
+    const [qty1, qty2] = await screen.findAllByRole('textbox', { name: 'Quantity' });
+    await user.clear(qty1);
+    await user.type(qty1, '3');
+    await user.clear(qty2);
+    await user.type(qty2, '4{Enter}');
+    expect(apiClient.put).toHaveBeenCalledTimes(1);
+
+    resolveFirst({ data: { ...draft, version: 8, lineItems: [{ ...freeform, quantity: 3 }, part] } });
+    await vi.waitFor(() => expect(apiClient.put).toHaveBeenCalledTimes(2));
+    expect(vi.mocked(apiClient.put).mock.calls[1][1]).toMatchObject({ version: 8, itemId: 'it-3', quantity: 4 });
+  });
+
+  it('reloads on a stale version and says the change was not saved', async () => {
+    const user = userEvent.setup();
+    vi.mocked(apiClient.put).mockRejectedValue(conflict('STALE_VERSION'));
+    renderPage();
+
+    const qty = (await screen.findAllByRole('textbox', { name: 'Quantity' }))[0];
+    await user.clear(qty);
+    await user.type(qty, '2{Enter}');
+
+    expect(await screen.findByText(/changed somewhere else/)).toBeInTheDocument();
+    expect(screen.getByText(/your last change wasn’t saved/)).toBeInTheDocument();
+    expect(vi.mocked(apiClient.get).mock.calls.filter(([u]) => u === '/financial/quotes/q-1').length).toBeGreaterThan(1);
+    expect(screen.queryByText('server words')).not.toBeInTheDocument();
+  });
+
+  it('adds a freeform line', async () => {
+    const user = userEvent.setup();
+    vi.mocked(apiClient.post).mockResolvedValue({ data: { ...draft, version: 8 } });
+    renderPage();
+
+    await user.click(await screen.findByRole('button', { name: '+ Add line' }));
+    const form = screen.getByRole('form', { name: 'Add freeform line' });
+    await user.type(within(form).getByRole('textbox', { name: 'Description' }), 'Haul away old unit');
+    await user.selectOptions(within(form).getByRole('combobox', { name: 'Type' }), 'FEE');
+    await user.type(within(form).getByRole('textbox', { name: 'Unit price' }), '75');
+    await user.click(within(form).getByRole('button', { name: 'Add' }));
+
+    expect(apiClient.post).toHaveBeenCalledWith('/financial/quotes/q-1/lines', {
+      version: 7, type: 'FEE', description: 'Haul away old unit', quantity: 1, unitPrice: 75,
+    });
+  });
+
+  it('removes a line with the version as a query param', async () => {
+    const user = userEvent.setup();
+    vi.mocked(apiClient.delete).mockResolvedValue({ data: { ...draft, version: 8, lineItems: [part] } });
+    renderPage();
+
+    await user.click(await screen.findByRole('button', { name: 'Remove Flush drain line' }));
+    expect(apiClient.delete).toHaveBeenCalledWith('/financial/quotes/q-1/lines/f1', { params: { version: 7 } });
+  });
+
+  it('reorders lines by dragging from the handle', async () => {
+    vi.mocked(apiClient.put).mockResolvedValue({ data: { ...draft, version: 8 } });
+    renderPage();
+    await screen.findByText('Q-1882');
+
+    const [h1] = screen.getAllByRole('img', { name: 'Drag to reorder line' });
+    const rows = screen.getAllByRole('row').slice(1);
+    fireEvent.mouseDown(h1);
+    const dataTransfer = { effectAllowed: '', dropEffect: '' };
+    fireEvent.dragStart(rows[0], { dataTransfer });
+    fireEvent.dragOver(rows[1], { dataTransfer });
+    fireEvent.drop(rows[1], { dataTransfer });
+
+    await vi.waitFor(() =>
+      expect(apiClient.put).toHaveBeenCalledWith('/financial/quotes/q-1/lines/order', { version: 7, lineIds: ['p1', 'f1'] }),
+    );
+  });
+
+  it('edits the header, keeping the work order’s location', async () => {
+    const user = userEvent.setup();
+    vi.mocked(apiClient.put).mockResolvedValue({ data: { ...draft, version: 8 } });
+    renderPage();
+
+    await user.click(await screen.findByRole('button', { name: 'Edit details' }));
+    const dialog = await screen.findByRole('dialog');
+    const po = within(dialog).getByRole('textbox', { name: 'Customer PO #' });
+    await user.clear(po);
+    await user.type(po, 'PO-88');
+    await user.click(within(dialog).getByRole('button', { name: 'Save' }));
+
+    expect(apiClient.put).toHaveBeenCalledWith('/financial/quotes/q-1/header', {
+      version: 7, quoteDate: '2026-10-07', expirationDate: '2026-11-06', serviceLocationId: 'loc-1',
+      customerPoNumber: 'PO-88', notes: 'Upstairs unit only.',
+    });
+  });
+
+  it('records an office acceptance through the status endpoint', async () => {
+    const user = userEvent.setup();
+    vi.mocked(apiClient.patch).mockResolvedValue({ data: { ...draft, status: 'ACCEPTED', version: 8 } });
+    renderPage();
+
+    await user.click(await screen.findByRole('button', { name: 'More actions' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Mark accepted' }));
+    await user.click(await screen.findByRole('button', { name: 'Mark accepted' }));
+    expect(apiClient.patch).toHaveBeenCalledWith('/financial/quotes/q-1/status', { status: 'ACCEPTED' });
+  });
+
+  it('keeps a sent quote read-only until the CSR confirms a new revision', async () => {
+    const user = userEvent.setup();
+    mockApi({ ...draft, status: 'SENT', firstSentAt: '2026-10-08T16:00:00Z', lastSentAt: '2026-10-08T16:00:00Z' });
+    renderPage();
+
+    await screen.findByText('Q-1882');
+    expect(screen.queryByRole('textbox', { name: 'Quantity' })).not.toBeInTheDocument();
+    expect(screen.getByText(/Editing moves it back to Draft as Rev 2/)).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Edit quote' }));
+    await user.click(await screen.findByRole('button', { name: 'Edit as Rev 2' }));
+    expect(await screen.findAllByRole('textbox', { name: 'Quantity' })).toHaveLength(2);
+    expect(screen.getByText(/Your first change moves it back to Draft as Rev 2/)).toBeInTheDocument();
+  });
+
+  it('flags an unsent revision and offers to re-send it', async () => {
+    mockApi({ ...draft, revision: 2, firstSentAt: '2026-10-08T16:00:00Z', lastSentAt: '2026-10-08T16:00:00Z' });
+    renderPage();
+
+    expect(await screen.findByText(/Rev 2 draft\. The customer’s link shows/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Re-send · Rev 2' })).toBeInTheDocument();
+  });
+
+  it('offers only Duplicate on an accepted quote, and opens the copy', async () => {
+    const user = userEvent.setup();
+    mockApi({ ...draft, status: 'ACCEPTED' });
+    vi.mocked(apiClient.post).mockResolvedValue({ data: { ...draft, id: 'q-2', quoteNumber: 'Q-1990' } });
+    renderPage();
+
+    await screen.findByText('Q-1882');
+    expect(screen.queryByRole('textbox', { name: 'Quantity' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Send/ })).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Duplicate' }));
+    expect(apiClient.post).toHaveBeenCalledWith('/financial/quotes/q-1/duplicate');
   });
 });

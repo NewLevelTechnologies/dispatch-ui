@@ -92,6 +92,24 @@ describe('PublicQuotePage', () => {
     expect(await screen.findByText(/cancelled/i)).toBeInTheDocument();
   });
 
+  it('says the quote is being updated, with no amounts, while the office revises it', async () => {
+    vi.mocked(publicApiClient.get).mockResolvedValueOnce({
+      data: buildResponse({
+        beingUpdated: true,
+        revision: 3,
+        subtotal: null,
+        taxAmount: null,
+        totalAmount: null,
+        lineItems: [],
+      } as never),
+    });
+    renderAt('tok-1');
+    expect(await screen.findByText('This quote is being updated')).toBeInTheDocument();
+    expect(screen.getByText(/Acme HVAC is making changes/)).toBeInTheDocument();
+    expect(screen.queryByText('Total')).not.toBeInTheDocument();
+    expect(screen.queryByText(/\$/)).not.toBeInTheDocument();
+  });
+
   it('shows the cliff page when the token endpoint returns 404', async () => {
     vi.mocked(publicApiClient.get).mockRejectedValueOnce(
       Object.assign(new Error('Not Found'), {

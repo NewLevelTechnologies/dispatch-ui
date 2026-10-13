@@ -1304,6 +1304,8 @@ vi.mock('react-i18next', () => {
     'public.invoice.voidedHeadline': 'This invoice has been voided',
     'public.invoice.voidedSubline':
       'Please contact {{tenant}} for the current invoice.',
+    'public.quote.beingUpdated': 'This quote is being updated',
+    'public.quote.beingUpdatedBody': "{{tenant}} is making changes. You'll get the updated quote when it's ready.",
     'public.quote.contactCta': 'Contact {{tenant}}',
     'public.quote.expiredOn': 'Expired {{date}}',
     'public.quote.items': 'Items',

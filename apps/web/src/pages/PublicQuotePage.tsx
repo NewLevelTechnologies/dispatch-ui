@@ -175,6 +175,19 @@ export default function PublicQuotePage() {
       <div className="mx-auto max-w-2xl px-4 py-6 sm:py-10 print:max-w-none print:p-0">
         <TenantBrandingHeader tenant={tenant} />
 
+        {/* While the office revises a sent quote the server withholds the
+            money and lines; nothing here can be approved until it's re-sent. */}
+        {quote.beingUpdated ? (
+          <section className="mt-6 rounded-lg border border-zinc-200 bg-white p-6 shadow-sm print:shadow-none">
+            <p className="text-xs uppercase tracking-wide text-zinc-500">{t('public.quote.label')}</p>
+            <p className="mt-1 text-lg font-semibold text-zinc-900">#{quote.quoteNumber}</p>
+            <p className="mt-6 text-base font-semibold text-zinc-900">{t('public.quote.beingUpdated')}</p>
+            <p className="mt-1 text-sm text-zinc-600">
+              {t('public.quote.beingUpdatedBody', { tenant: senderName })}
+            </p>
+          </section>
+        ) : (
+          <>
         {/* Hero card — quote number, status, total. Expiration is the
             secondary line (customers care about "is this still good?"). */}
         <section
@@ -294,6 +307,8 @@ export default function PublicQuotePage() {
               {quote.notes}
             </p>
           </section>
+        )}
+          </>
         )}
 
         {(tenant.supportPhone || tenant.supportEmail) && (

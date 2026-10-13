@@ -94,6 +94,13 @@ export interface PublicQuoteData {
   status: PublicQuoteStatus;
   quoteDate: string;
   expirationDate: string;
+  /** Echo back on approve; a newer revision returns 409 QUOTE_REVISION_STALE. */
+  revision?: number;
+  /**
+   * True while the office revises a sent quote: the money fields are null and
+   * `lineItems` is empty until it's re-sent. Show "being updated", no approve.
+   */
+  beingUpdated?: boolean;
   subtotal: string;
   taxRate: string;
   taxAmount: string;

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { screen } from '@testing-library/react';
-import { renderWithProviders } from '../test/utils';
+import { screen, within } from '@testing-library/react';
+import { renderWithProviders, userEvent } from '../test/utils';
 import InvoiceDetailPage from './InvoiceDetailPage';
 import { apiClient, type Invoice, type NestedInvoicePayment } from '../api/setup';
 
@@ -145,5 +145,60 @@ describe('InvoiceDetailPage', () => {
     mockApi({ ...invoice, status: 'DRAFT', reissuedFromInvoiceId: 'inv-0', reissuedFromInvoiceNumber: 'INV-3307' });
     renderPage();
     expect(await screen.findByRole('link', { name: 'INV-3307' })).toHaveAttribute('href', '/invoices/inv-0');
+  });
+});
+
+describe('InvoiceDetailPage editing', () => {
+  const draft: Invoice = { ...invoice, status: 'DRAFT', amountPaid: 0, balanceDue: 1450, payments: [], lastSentAt: null };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockApi(draft);
+  });
+
+  it('edits a draft’s lines and header, sending every header field back', async () => {
+    const user = userEvent.setup();
+    vi.mocked(apiClient.put).mockResolvedValue({ data: { ...draft, version: 4 } });
+    renderPage();
+
+    expect(await screen.findAllByRole('textbox', { name: 'Quantity' })).toHaveLength(1);
+    await user.click(screen.getByRole('button', { name: 'Edit details' }));
+    const dialog = await screen.findByRole('dialog');
+    await user.clear(within(dialog).getByLabelText('Service date'));
+    await user.click(within(dialog).getByRole('button', { name: 'Save' }));
+
+    expect(apiClient.put).toHaveBeenCalledWith('/financial/invoices/inv-1/header', {
+      version: 3, invoiceDate: '2026-10-11', dueDate: '2026-11-10', serviceDate: null, customerPoNumber: 'DR-55821', notes: null,
+    });
+  });
+
+  it('sends a draft and says who it went to', async () => {
+    const user = userEvent.setup();
+    vi.mocked(apiClient.post).mockResolvedValue({ data: { lastSentToEmails: 'ap@desertridgepm.com' } });
+    renderPage();
+
+    await user.click(await screen.findByRole('button', { name: 'Send invoice' }));
+    expect(apiClient.post).toHaveBeenCalledWith('/financial/invoices/inv-1/send', undefined);
+  });
+
+  it('cancels a draft after confirming', async () => {
+    const user = userEvent.setup();
+    vi.mocked(apiClient.patch).mockResolvedValue({ data: { ...draft, status: 'CANCELLED', version: 4 } });
+    renderPage();
+
+    await user.click(await screen.findByRole('button', { name: 'More actions' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Cancel invoice' }));
+    await user.click(await screen.findByRole('button', { name: 'Cancel invoice' }));
+    expect(apiClient.patch).toHaveBeenCalledWith('/financial/invoices/inv-1/status', { status: 'CANCELLED' });
+  });
+
+  it('locks a sent invoice', async () => {
+    mockApi(invoice);
+    renderPage();
+
+    expect(await screen.findByText(/Sent invoices are locked/)).toBeInTheDocument();
+    expect(screen.queryByRole('textbox', { name: 'Quantity' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Edit details' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Resend' })).toBeInTheDocument();
   });
 });

@@ -7,6 +7,7 @@ import {
   lineMargin,
   marginSummary,
   memberLabel,
+  moveLine,
   pct,
   savingsRows,
   taxSummary,
@@ -125,5 +126,12 @@ describe('documentModel', () => {
     const m = { reasonCode: 'MEMBER' as const, sourceType: 'AGREEMENT' as const, sourceLabel: 'Silver' };
     expect(memberLabel([adj({ id: '1', ...m }), adj({ id: '2', ...m }), adj({ id: '3' })])).toBe('Silver');
     expect(memberLabel([adj({})])).toBeNull();
+  });
+
+  it('moves a dragged line into the target slot', () => {
+    expect(moveLine(['a', 'b', 'c'], 'a', 'c')).toEqual(['b', 'c', 'a']);
+    expect(moveLine(['a', 'b', 'c'], 'c', 'a')).toEqual(['c', 'a', 'b']);
+    const same = ['a', 'b'];
+    expect(moveLine(same, 'a', 'a')).toBe(same);
   });
 });
