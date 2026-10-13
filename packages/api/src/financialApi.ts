@@ -1351,6 +1351,58 @@ export const taxApi = {
   },
 };
 
+export type LaborRateRole = 'REGULAR' | 'OVERTIME' | 'AFTER_HOURS' | 'HOLIDAY';
+
+/**
+ * A kind of labor hour and what it bills at. The four seeded types carry a
+ * `role` that can't change; types the tenant adds have none.
+ */
+export interface LaborRateType {
+  id: string;
+  name: string;
+  role: LaborRateRole | null;
+  /** What an hour bills at; null leaves it unpriced (labor can't be added at it unless the plan or the user prices it). */
+  billRate: number | null;
+  /** Loaded cost of an hour. Internal only. */
+  costRate: number | null;
+  sortOrder: number;
+  active: boolean;
+  createdAt: string | null;
+  updatedAt: string | null;
+}
+
+/** The whole rate type, replaced on update. Never deleted: deactivate with `active: false`. */
+export interface LaborRateTypeRequest {
+  name: string;
+  billRate: number | null;
+  costRate: number | null;
+  sortOrder: number;
+  active: boolean;
+}
+
+/**
+ * Labor rate types. Reading needs no capability; writing needs
+ * MANAGE_PRICING. Changing Regular's bill rate reprices every computed
+ * pricebook item. 409 codes: NAME_TAKEN, REGULAR_REQUIRED.
+ */
+export const laborRatesApi = {
+  /** Active and inactive, in the tenant's order. */
+  getAll: async (): Promise<LaborRateType[]> => {
+    const response = await apiClient.get<LaborRateType[]>('/financial/labor-rates');
+    return response.data;
+  },
+
+  create: async (request: LaborRateTypeRequest): Promise<LaborRateType> => {
+    const response = await apiClient.post<LaborRateType>('/financial/labor-rates', request);
+    return response.data;
+  },
+
+  update: async (id: string, request: LaborRateTypeRequest): Promise<LaborRateType> => {
+    const response = await apiClient.put<LaborRateType>(`/financial/labor-rates/${id}`, request);
+    return response.data;
+  },
+};
+
 // ========== LOCATION FINANCIAL ACTIVITY ==========
 
 export type FinancialActivityKind = 'INVOICE_SENT' | 'INVOICE_PAID';

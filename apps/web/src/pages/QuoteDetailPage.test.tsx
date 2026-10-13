@@ -309,6 +309,68 @@ describe('QuoteDetailPage editing', () => {
     });
   });
 
+  const rates = [
+    { id: 'r-reg', name: 'Regular', role: 'REGULAR', billRate: 95, costRate: 38, sortOrder: 0, active: true, createdAt: null, updatedAt: null },
+    { id: 'r-ot', name: 'Overtime', role: 'OVERTIME', billRate: 142.5, costRate: 57, sortOrder: 1, active: true, createdAt: null, updatedAt: null },
+    { id: 'r-em', name: 'Emergency', role: null, billRate: null, costRate: null, sortOrder: 4, active: true, createdAt: null, updatedAt: null },
+    { id: 'r-old', name: 'Saturday', role: null, billRate: 120, costRate: null, sortOrder: 5, active: false, createdAt: null, updatedAt: null },
+  ];
+  const withRates = (doc: Quote) => {
+    vi.mocked(apiClient.get).mockImplementation((url: string) => {
+      if (url === '/financial/quotes/q-1') return Promise.resolve({ data: doc });
+      if (url === '/financial/labor-rates') return Promise.resolve({ data: rates });
+      if (url === '/customers/cust-1') return Promise.resolve({ data: customer });
+      if (url === '/work-orders/wo-1') return Promise.resolve({ data: workOrder });
+      return Promise.reject(new Error(`unexpected GET ${url}`));
+    });
+  };
+
+  it('adds labor at a rate type, offering only active rates', async () => {
+    const user = userEvent.setup();
+    withRates(draft);
+    vi.mocked(apiClient.post).mockResolvedValue({ data: { ...draft, version: 8 } });
+    renderPage();
+
+    await screen.findByText('Q-1882');
+    await vi.waitFor(() => expect(apiClient.get).toHaveBeenCalledWith('/financial/labor-rates'));
+    await user.click(screen.getByRole('button', { name: '+ Add line' }));
+    const form = await screen.findByRole('form', { name: 'Add labor line' });
+    expect(within(form).getByRole('radio', { name: /Regular/ })).toBeChecked();
+    expect(within(form).getByRole('radio', { name: /Emergency/ })).toHaveTextContent('not set');
+    expect(within(form).queryByRole('radio', { name: /Saturday/ })).not.toBeInTheDocument();
+
+    await user.click(within(form).getByRole('radio', { name: /Overtime/ }));
+    const hours = within(form).getByRole('textbox', { name: 'Hours' });
+    await user.clear(hours);
+    await user.type(hours, '2.5');
+    expect(within(form).getByText('$356.25')).toBeInTheDocument();
+    await user.click(within(form).getByRole('button', { name: 'Add' }));
+
+    expect(apiClient.post).toHaveBeenCalledWith('/financial/quotes/q-1/lines', {
+      version: 7, type: 'LABOR', laborRateTypeId: 'r-ot', quantity: 2.5,
+    });
+  });
+
+  it('switches a labor line to another rate, letting the server reprice and rename it', async () => {
+    const user = userEvent.setup();
+    const labor = {
+      id: 'l1', sortOrder: 2, type: 'LABOR' as const, description: 'Regular', laborRateTypeId: 'r-reg', laborRateTypeName: 'Regular',
+      quantity: 2, unit: 'hr', unitPrice: 95, lineTotal: 190, adjustmentAmount: 0, netAmount: 190, taxClass: 'LABOR' as const,
+      taxable: false, unitCost: 38,
+    };
+    withRates({ ...draft, lineItems: [freeform, part, labor] });
+    vi.mocked(apiClient.put).mockResolvedValue({ data: { ...draft, version: 8 } });
+    renderPage();
+
+    const picker = await screen.findByRole('combobox', { name: 'Labor rate for Regular' });
+    await vi.waitFor(() => expect(within(picker).getAllByRole('option')).toHaveLength(3));
+    await user.selectOptions(picker, 'r-ot');
+
+    expect(apiClient.put).toHaveBeenCalledWith('/financial/quotes/q-1/lines/l1', {
+      version: 7, type: 'LABOR', quantity: 2, taxClass: 'LABOR', laborRateTypeId: 'r-ot',
+    });
+  });
+
   it('removes a line with the version as a query param', async () => {
     const user = userEvent.setup();
     vi.mocked(apiClient.delete).mockResolvedValue({ data: { ...draft, version: 8, lineItems: [part] } });

@@ -283,9 +283,23 @@ export const isHandPriced = (line: DocumentLineItem) => {
 export function lineUpdate(
   line: DocumentLineItem,
   version: number,
-  change: Partial<Pick<DocumentLineItem, 'description' | 'quantity' | 'unitPrice'>>,
+  change: Partial<Pick<DocumentLineItem, 'description' | 'quantity' | 'unitPrice' | 'laborRateTypeId'>>,
 ): UpdateLineRequest {
   const opt = <T>(v: T | null | undefined) => (v == null ? undefined : v);
+  if (change.laborRateTypeId && change.laborRateTypeId !== line.laborRateTypeId) {
+    // Another rate type: the server copies its price, cost and name, so send
+    // only what the user made their own. A description still named after the
+    // old rate type takes the new one's name.
+    const ownDescription = line.description !== line.laborRateTypeName;
+    return {
+      version,
+      type: 'LABOR',
+      description: ownDescription ? line.description : undefined,
+      quantity: line.quantity,
+      taxClass: opt(line.taxClass),
+      laborRateTypeId: change.laborRateTypeId,
+    };
+  }
   return {
     version,
     type: opt(line.type),
