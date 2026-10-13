@@ -539,7 +539,7 @@ describe('QuoteDetailPage editing', () => {
     await user.click(within(dialog).getByRole('button', { name: 'Save' }));
 
     expect(apiClient.put).toHaveBeenCalledWith('/financial/quotes/q-1/header', {
-      version: 7, quoteDate: '2026-10-07', expirationDate: '2026-11-06', serviceLocationId: 'loc-1',
+      version: 7, title: null, quoteDate: '2026-10-07', expirationDate: '2026-11-06', serviceLocationId: 'loc-1',
       customerPoNumber: 'PO-88', notes: 'Upstairs unit only.',
     });
   });

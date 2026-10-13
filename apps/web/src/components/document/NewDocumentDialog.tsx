@@ -30,8 +30,10 @@ export function NewDocumentDialog({
 }: {
   kind: NewDocumentKind | null;
   onClose: () => void;
-  workOrderId: string;
-  customer: { id: string; name: string };
+  /** The job it's for; omitted when started from the Quotes or Invoices list. */
+  workOrderId?: string;
+  /** The job's customer, prefilled as the bill-to. */
+  customer?: { id: string; name: string };
   /** Open the new draft with its add-line panel on the job's purchase-order parts. */
   openOnPurchases?: boolean;
 }) {
@@ -53,8 +55,8 @@ function NewDocumentForm({
 }: {
   kind: NewDocumentKind;
   onClose: () => void;
-  workOrderId: string;
-  customer: { id: string; name: string };
+  workOrderId?: string;
+  customer?: { id: string; name: string };
   openOnPurchases?: boolean;
 }) {
   const { getName } = useGlossary();
@@ -63,8 +65,9 @@ function NewDocumentForm({
   const label = getName(kind);
   const lower = label.toLowerCase();
   const [billTo, setBillTo] = useState<CustomerSearchResult | null>(
-    customer.id ? { id: customer.id, name: customer.name, type: 'STANDARD', category: 'COMMERCIAL' } : null,
+    customer?.id ? { id: customer.id, name: customer.name, type: 'STANDARD', category: 'COMMERCIAL' } : null,
   );
+  const [heading, setHeading] = useState('');
   const [date, setDate] = useState(() => localDate());
   const [until, setUntil] = useState(() => localDate(30));
   const [busy, setBusy] = useState(false);
@@ -77,7 +80,14 @@ function NewDocumentForm({
     try {
       const doc =
         kind === 'quote'
-          ? await quotesApi.create({ customerId: billTo.id, workOrderId, quoteDate: date, expirationDate: until, lineItems: [] })
+          ? await quotesApi.create({
+              customerId: billTo.id,
+              workOrderId,
+              ...(heading.trim() ? { title: heading.trim() } : {}),
+              quoteDate: date,
+              expirationDate: until,
+              lineItems: [],
+            })
           : await invoicesApi.create({ customerId: billTo.id, workOrderId, invoiceDate: date, dueDate: until, lineItems: [] });
       refreshDocumentLists(queryClient);
       onClose();
@@ -92,14 +102,16 @@ function NewDocumentForm({
     <form onSubmit={submit}>
       <DialogTitle>{`New ${lower}`}</DialogTitle>
       <DialogDescription>
-        Starts a draft {lower} for this {getName('work_order').toLowerCase()}. You add the lines next.
+        {workOrderId
+          ? `Starts a draft ${lower} for this ${getName('work_order').toLowerCase()}. You add the lines next.`
+          : `Starts a draft ${lower} with no ${getName('work_order').toLowerCase()}. You add the lines next.`}
       </DialogDescription>
       <DialogBody>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_150px_150px]">
           <Field>
             <Label>Bill to</Label>
             <CustomerPicker value={billTo} onChange={setBillTo} ariaLabel="Bill to" />
-            {billTo && billTo.id !== customer.id && (
+            {customer && billTo && billTo.id !== customer.id && (
               <Description>{`Not the ${getName('work_order').toLowerCase()}'s ${getName('customer').toLowerCase()}, ${customer.name}.`}</Description>
             )}
           </Field>
@@ -112,6 +124,13 @@ function NewDocumentForm({
             <Input type="date" value={until} required onChange={(e) => setUntil(e.target.value)} />
           </Field>
         </div>
+        {kind === 'quote' && (
+          <Field className="mt-3">
+            <Label>Title</Label>
+            <Input value={heading} maxLength={120} onChange={(e) => setHeading(e.target.value)} placeholder="e.g. Condenser replacement · 3-ton" />
+            <Description>Optional. A short description of the work, shown on the quote and in the list.</Description>
+          </Field>
+        )}
       </DialogBody>
       <DialogActions>
         <Button plain onClick={onClose} disabled={busy}>
