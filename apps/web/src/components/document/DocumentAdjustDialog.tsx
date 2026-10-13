@@ -8,7 +8,7 @@ import { Input } from '../catalyst/input';
 import { Select } from '../catalyst/select';
 import { Description, Field, Fieldset, Label, Legend } from '../catalyst/fieldset';
 import { Radio, RadioField, RadioGroup } from '../catalyst/radio';
-import { REASON_LABEL, adjustmentChip } from './documentModel';
+import { REASON_LABEL, adjustmentChip, adjustmentSaving, type AdjustmentBase } from './documentModel';
 
 export type NewAdjustment = Omit<AddAdjustmentRequest, 'version'>;
 type ManualReason = NewAdjustment['reasonCode'];
@@ -26,19 +26,24 @@ export type AdjustTarget = { line: DocumentLineItem } | { document: true };
 export function DocumentAdjustDialog({
   target,
   existing,
+  base,
   onAdd,
   onRemove,
   onClose,
 }: {
   target: AdjustTarget | null;
   existing: DocumentAdjustment[];
+  /** What a new adjustment works from, for the "Saves $X" preview. */
+  base: AdjustmentBase | null;
   onAdd: (adjustment: NewAdjustment) => Promise<boolean>;
   onRemove: (adjustment: DocumentAdjustment) => Promise<boolean>;
   onClose: () => void;
 }) {
   return (
     <Dialog open={target != null} onClose={onClose} size="lg">
-      {target && <AdjustForm target={target} existing={existing} onAdd={onAdd} onRemove={onRemove} onClose={onClose} />}
+      {target && base && (
+        <AdjustForm target={target} existing={existing} base={base} onAdd={onAdd} onRemove={onRemove} onClose={onClose} />
+      )}
     </Dialog>
   );
 }
@@ -46,18 +51,22 @@ export function DocumentAdjustDialog({
 function AdjustForm({
   target,
   existing,
+  base,
   onAdd,
   onRemove,
   onClose,
 }: {
   target: AdjustTarget;
   existing: DocumentAdjustment[];
+  base: AdjustmentBase;
   onAdd: (adjustment: NewAdjustment) => Promise<boolean>;
   onRemove: (adjustment: DocumentAdjustment) => Promise<boolean>;
   onClose: () => void;
 }) {
   const line = 'line' in target ? target.line : null;
-  const [kind, setKind] = useState<AdjustmentKind>(line?.feeRole === 'TRIP' ? 'WAIVE' : 'PERCENT');
+  // Waiving is for fees (a trip charge, a diagnostic); other lines take a % or $ off.
+  const waivable = line?.type === 'FEE';
+  const [kind, setKind] = useState<AdjustmentKind>(waivable ? 'WAIVE' : 'PERCENT');
   const [value, setValue] = useState('');
   const [reason, setReason] = useState<ManualReason | ''>('');
   const [note, setNote] = useState('');
@@ -66,6 +75,7 @@ function AdjustForm({
   const n = Number(value);
   const valueOk = kind === 'WAIVE' || (value.trim() !== '' && Number.isFinite(n) && n > 0 && (kind === 'AMOUNT' || n <= 100));
   const ready = valueOk && reason !== '' && note.length <= 500;
+  const saves = valueOk ? adjustmentSaving(kind, kind === 'WAIVE' ? null : kind === 'PERCENT' ? n / 100 : n, base) : null;
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
@@ -90,11 +100,17 @@ function AdjustForm({
 
   return (
     <form onSubmit={submit}>
-      <DialogTitle>{line ? `Adjust ${line.description}` : 'Document discount'}</DialogTitle>
+      <DialogTitle>{line ? 'Adjust line' : 'Document discount'}</DialogTitle>
+      {line && (
+        <div className="mt-1 flex items-baseline gap-2 text-[13px]">
+          <span className="min-w-0 flex-1 truncate font-semibold text-fg-strong">{line.description}</span>
+          <span className="tabular-nums font-semibold text-fg-strong">{formatCurrency(line.netAmount ?? line.lineTotal)}</span>
+        </div>
+      )}
       <DialogDescription>
         {line
-          ? `List ${formatCurrency(line.lineTotal)}. The customer sees the list price struck through, with the saving and its reason.`
-          : 'Spread over the lines before tax, in proportion to each, so tax stays right when labor and materials are taxed differently.'}
+          ? 'The customer sees the list price struck through, with the saving and its reason.'
+          : `Spread over ${base.lines === 1 ? 'the 1 line' : `the ${base.lines} lines`} before tax, in proportion to each, so tax stays right when labor and materials are taxed differently.`}
       </DialogDescription>
       <DialogBody>
         {existing.length > 0 && (
@@ -105,12 +121,15 @@ function AdjustForm({
                   <span className="text-fg-strong">{adjustmentChip(a)}</span>
                   {a.reasonNote && <span className="block text-[11px] text-fg-muted">{a.reasonNote}</span>}
                   {a.sourceType === 'AGREEMENT' && (
-                    <span className="block text-[11px] text-fg-muted">From the membership. Removing it doesn't add it back.</span>
+                    <span className="block text-[11px] text-fg-muted">
+                      {`From ${a.sourceLabel ?? 'the membership'}. Removing it doesn't add it back.`}
+                    </span>
                   )}
                 </span>
                 <span className="tabular-nums font-semibold text-success-500">−{formatCurrency(a.computedAmount)}</span>
+                {/* Concessions are kept on record; removing one is a correction, not a delete. */}
                 <Button plain size="xs" disabled={busy} onClick={() => void remove(a)} aria-label={`Remove ${adjustmentChip(a)}`}>
-                  Remove
+                  Remove (correction)
                 </Button>
               </li>
             ))}
@@ -128,7 +147,7 @@ function AdjustForm({
               <Radio value="AMOUNT" />
               <Label>$ off</Label>
             </RadioField>
-            {line && (
+            {waivable && (
               <RadioField>
                 <Radio value="WAIVE" />
                 <Label>Waive</Label>
@@ -170,6 +189,17 @@ function AdjustForm({
         </Fieldset>
       </DialogBody>
       <DialogActions>
+        {saves != null && (
+          <span className="mr-auto text-[12.5px] tabular-nums text-fg-muted">
+            {saves > 0 ? (
+              <>
+                Saves <span className="font-semibold text-success-500">{formatCurrency(saves)}</span>
+              </>
+            ) : (
+              'Nothing left to take off'
+            )}
+          </span>
+        )}
         <Button plain onClick={onClose} disabled={busy}>
           Done
         </Button>

@@ -456,7 +456,11 @@ describe('QuoteDetailPage editing', () => {
 
     await user.click(await screen.findByRole('button', { name: 'Adjust Flush drain line' }));
     const dialog = await screen.findByRole('dialog');
+    expect(dialog).toHaveTextContent('Flush drain line$95.00');
+    // Waiving is for fee lines only.
+    expect(within(dialog).queryByRole('radio', { name: 'Waive' })).not.toBeInTheDocument();
     await user.type(within(dialog).getByRole('textbox', { name: 'Percent' }), '12.5');
+    expect(within(dialog).getByText(/Saves/)).toHaveTextContent('Saves $11.88');
     await user.selectOptions(within(dialog).getByRole('combobox', { name: 'Reason' }), 'GOODWILL');
     await user.type(within(dialog).getByRole('textbox', { name: 'Note' }), 'Second visit');
     await user.click(within(dialog).getByRole('button', { name: 'Apply' }));
@@ -464,6 +468,21 @@ describe('QuoteDetailPage editing', () => {
     expect(apiClient.post).toHaveBeenCalledWith('/financial/quotes/q-1/adjustments', {
       version: 7, lineId: 'f1', kind: 'PERCENT', value: 0.125, reasonCode: 'GOODWILL', reasonNote: 'Second visit',
     });
+  });
+
+  it('starts a fee line on Waive, saving the whole fee', async () => {
+    const user = userEvent.setup();
+    const trip = {
+      id: 't1', sortOrder: 2, type: 'FEE' as const, description: 'Trip charge', quantity: 1, unitPrice: 89, lineTotal: 89,
+      adjustmentAmount: 0, netAmount: 89, taxClass: 'FEE' as const, taxable: false, unitCost: null, feeRole: 'TRIP' as const,
+    };
+    mockApi({ ...draft, lineItems: [freeform, part, trip] });
+    renderPage();
+
+    await user.click(await screen.findByRole('button', { name: 'Adjust Trip charge' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByRole('radio', { name: 'Waive' })).toBeChecked();
+    expect(within(dialog).getByText(/Saves/)).toHaveTextContent('Saves $89.00');
   });
 
   it('adds a document discount and removes an existing one', async () => {
@@ -479,6 +498,11 @@ describe('QuoteDetailPage editing', () => {
     await user.click(await screen.findByRole('button', { name: 'Document discounts' }));
     const dialog = await screen.findByRole('dialog');
     expect(within(dialog).queryByRole('radio', { name: 'Waive' })).not.toBeInTheDocument();
+    expect(dialog).toHaveTextContent('Spread over the 2 lines before tax');
+    // Worked out on the $143.00 the lines come to; the existing $20 leaves room for it.
+    await user.type(within(dialog).getByRole('textbox', { name: 'Percent' }), '10');
+    expect(within(dialog).getByText(/Saves/)).toHaveTextContent('Saves $14.30');
+    expect(within(dialog).getByRole('button', { name: 'Remove −$20.00 · Promotion' })).toHaveTextContent('Remove (correction)');
     await user.click(within(dialog).getByRole('button', { name: 'Remove −$20.00 · Promotion' }));
 
     expect(apiClient.delete).toHaveBeenCalledWith('/financial/quotes/q-1/adjustments/d1', { params: { version: 7 } });
