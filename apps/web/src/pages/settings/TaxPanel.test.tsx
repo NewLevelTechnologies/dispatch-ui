@@ -50,8 +50,10 @@ describe('TaxPanel', () => {
     expect(screen.getByText('Default')).toBeInTheDocument();
     expect(screen.getByText('8.6%')).toBeInTheDocument();
     expect(screen.getByText('Not set')).toBeInTheDocument();
-    expect(screen.getAllByText('Materials, Equipment')).toHaveLength(2);
-    expect(screen.getByText('2 active · default: Phoenix, AZ')).toBeInTheDocument();
+    // All four classes show; the untaxed ones say so.
+    expect(screen.getAllByTitle('Materials is taxed')).toHaveLength(2);
+    expect(screen.getAllByTitle('Labor is not taxed')).toHaveLength(2);
+    expect(screen.getByText('Tempe, AZ has no rate. Locations using it are charged no tax.')).toBeInTheDocument();
   });
 
   it('adds a jurisdiction with the rate as a fraction', async () => {
@@ -91,6 +93,18 @@ describe('TaxPanel', () => {
     expect(await screen.findByText('Phoenix, AZ')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Add jurisdiction' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Actions for Tempe, AZ' })).not.toBeInTheDocument();
-    expect(await screen.findByRole('combobox', { name: 'Tax class' })).toBeDisabled();
+    expect(screen.getByText('View only. Changing pricing needs the Manage pricing permission.')).toBeInTheDocument();
+    expect(await screen.findByText('Tax class by line source')).toBeInTheDocument();
+    expect(screen.queryByRole('combobox', { name: /installments/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Set rate' })).not.toBeInTheDocument();
+  });
+
+  it('saves the agreement installment tax class as soon as it changes', async () => {
+    const user = userEvent.setup();
+    vi.mocked(apiClient.put).mockResolvedValue({ data: { agreementFeeTaxClass: 'LABOR', updatedAt: null } });
+    renderWithProviders(<TaxPanel />);
+
+    await user.selectOptions(await screen.findByRole('combobox', { name: /installments/ }), 'LABOR');
+    expect(apiClient.put).toHaveBeenCalledWith('/financial/pricing-settings', { agreementFeeTaxClass: 'LABOR' });
   });
 });

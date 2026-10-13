@@ -4,21 +4,22 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from '@dispatch/i18n';
 import { formatCurrency } from '@dispatch/utils';
 import { ClockIcon, EllipsisVerticalIcon, PlusIcon } from '@heroicons/react/24/outline';
-import { laborRatesApi, type LaborRateType, type LaborRateTypeRequest } from '../../api/setup';
+import { laborRatesApi, ratePlansApi, type LaborRateType, type LaborRateTypeRequest } from '../../api/setup';
 import { useHasAnyCapability } from '../../hooks/useCurrentUser';
 import { Button } from '../../components/catalyst/button';
-import { Dialog, DialogActions, DialogBody, DialogDescription, DialogTitle } from '../../components/catalyst/dialog';
+import { Dialog, DialogActions, DialogBody, DialogTitle } from '../../components/catalyst/dialog';
 import { Dropdown, DropdownButton, DropdownItem, DropdownLabel, DropdownMenu } from '../../components/catalyst/dropdown';
 import { Description, Field, Label } from '../../components/catalyst/fieldset';
 import { Input } from '../../components/catalyst/input';
 import IconButton from '../../components/IconButton';
 import { DragHandle } from '../../components/settings/DragHandle';
+import { InactiveToggle, SetupIssues, ViewOnlyNotice } from '../../components/settings/PricingPageParts';
 import { moveLine } from '../../components/document/documentModel';
-import { Card, CardBody } from '../../components/ui/Card';
+import { Callout } from '../../components/ui/Callout';
+import { Card, CardBody, CardHead, CardSub, CardTitle } from '../../components/ui/Card';
 import { DenseRow, DenseTable, DenseTHead } from '../../components/ui/DenseTable';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { ErrorState } from '../../components/ui/ErrorState';
-import { ListFooter } from '../../components/ui/ListFooter';
 import { LoadingState } from '../../components/ui/LoadingState';
 import { PageHead } from '../../components/ui/PageHead';
 import { Pill, Tag } from '../../components/ui/Pill';
@@ -36,8 +37,8 @@ const toRequest = (r: LaborRateType, change: Partial<LaborRateTypeRequest> = {})
 });
 
 /** Margin on an hour, as a whole percent; null without both rates. */
-const hourMargin = (r: LaborRateType) =>
-  r.billRate && r.costRate != null ? Math.round(((r.billRate - r.costRate) / r.billRate) * 100) : null;
+const margin = (bill: number | null, cost: number | null) =>
+  bill && cost != null ? Math.round(((bill - cost) / bill) * 100) : null;
 
 /** Words a labor rate write failure from its `code`. */
 function useLaborRateError() {
@@ -66,13 +67,18 @@ export default function LaborRatesPanel() {
   const canManage = useHasAnyCapability('MANAGE_PRICING');
   const rateError = useLaborRateError();
   const [editing, setEditing] = useState<{ rate: LaborRateType | null } | null>(null);
+  const [showInactive, setShowInactive] = useState(false);
 
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: LABOR_RATES_KEY,
     queryFn: () => laborRatesApi.getAll(),
   });
+  const { data: plans = [] } = useQuery({ queryKey: ['rate-plans'], queryFn: () => ratePlansApi.getAll() });
   const list = data ?? [];
+  const rows = list.filter((r) => r.active || showInactive);
+  const inactiveCount = list.filter((r) => !r.active).length;
   const nextSortOrder = list.length ? Math.max(...list.map((r) => r.sortOrder)) + 1 : 0;
+  const overrides = (id: string) => plans.filter((p) => p.active && p.laborRates.some((l) => l.laborRateTypeId === id)).length;
 
   const update = useMutation({
     mutationFn: ({ id, request }: { id: string; request: LaborRateTypeRequest }) => laborRatesApi.update(id, request),
@@ -83,7 +89,7 @@ export default function LaborRatesPanel() {
     onError: (err) => showError(t('settings.laborRates.toast.saveFailed'), rateError(err)),
   });
 
-  // Every type, inactive ones too, so the server can set the whole order at once.
+  // Every type, inactive ones too (even while hidden), so the server can set the whole order at once.
   const [drag, setDrag] = useState<{ id: string; over: string | null } | null>(null);
   const reorder = useMutation({
     mutationFn: (orderedIds: string[]) => laborRatesApi.reorder(orderedIds),
@@ -100,7 +106,7 @@ export default function LaborRatesPanel() {
       );
     },
   });
-  const canDrag = canManage && list.length > 1;
+  const canDrag = canManage && rows.length > 1;
   const drop = (targetId: string) => {
     if (!drag) return;
     const ids = list.map((r) => r.id);
@@ -109,19 +115,13 @@ export default function LaborRatesPanel() {
     if (next !== ids) reorder.mutate(next);
   };
 
-  const unpriced = list.filter((r) => r.active && r.billRate == null).length;
+  const unpriced = list.filter((r) => r.active && r.billRate == null);
 
   return (
     <>
       <PageHead
         title={t('settings.laborRates.title')}
-        sub={
-          list.length
-            ? unpriced
-              ? t('settings.laborRates.subtitleUnpriced', { count: list.filter((r) => r.active).length, unpriced })
-              : t('settings.laborRates.subtitle', { count: list.filter((r) => r.active).length })
-            : null
-        }
+        sub={t('settings.laborRates.description')}
         actions={
           canManage && (
             <Button color="accent" size="xs" onClick={() => setEditing({ rate: null })}>
@@ -131,143 +131,175 @@ export default function LaborRatesPanel() {
           )
         }
       />
+      {!canManage && <ViewOnlyNotice />}
+      <SetupIssues
+        issues={unpriced.map((r) => ({
+          key: r.id,
+          text: t('settings.laborRates.issueNoBillRate', { name: r.name }),
+          action: canManage ? { label: t('settings.laborRates.setRate'), onClick: () => setEditing({ rate: r }) } : undefined,
+        }))}
+      />
 
-      <div className="mt-4">
-        <Card>
-          <CardBody flush>
-            {isLoading ? (
-              <LoadingState label={t('settings.laborRates.loading')} />
-            ) : error ? (
-              <ErrorState
-                title={t('settings.laborRates.loadFailed')}
-                description={extractApiError(error) ?? (error as Error).message}
-                action={
-                  <Button outline onClick={() => refetch()}>
-                    {t('common.actions.tryAgain')}
-                  </Button>
-                }
-              />
-            ) : list.length === 0 ? (
-              <EmptyState
-                icon={<ClockIcon className="size-10 text-fg-dim" />}
-                title={t('settings.laborRates.emptyTitle')}
-                description={t('settings.laborRates.emptyDescription')}
-              />
-            ) : (
-              <>
-                <DenseTable>
-                  <DenseTHead>
-                    <tr>
-                      <th>{t('settings.laborRates.col.name')}</th>
-                      <th className="right">{t('settings.laborRates.col.billRate')}</th>
-                      <th className="right">
-                        <span className="inline-flex items-center gap-1.5">
-                          {t('settings.laborRates.col.costRate')} <Tag word>{t('settings.laborRates.internal')}</Tag>
-                        </span>
-                      </th>
-                      <th className="right">{t('settings.laborRates.col.margin')}</th>
-                      <th>{t('settings.laborRates.col.status')}</th>
-                      {canManage && <th style={{ width: 40 }} />}
-                    </tr>
-                  </DenseTHead>
-                  <tbody>
-                    {list.map((r) => {
-                      const margin = hourMargin(r);
-                      return (
-                        <DenseRow
-                          key={r.id}
-                          draggable={canDrag}
-                          onDragStart={(e) => {
-                            if (!canDrag || reorder.isPending) return;
-                            e.dataTransfer.effectAllowed = 'move';
-                            setDrag({ id: r.id, over: null });
-                          }}
-                          onDragOver={(e) => {
-                            if (!drag) return;
-                            e.preventDefault();
-                            e.dataTransfer.dropEffect = 'move';
-                            if (drag.over !== r.id) setDrag({ ...drag, over: r.id });
-                          }}
-                          onDrop={(e) => {
-                            e.preventDefault();
-                            drop(r.id);
-                          }}
-                          onDragEnd={() => setDrag(null)}
-                          className={clsx(
-                            !r.active && 'opacity-55',
-                            drag?.id === r.id && 'opacity-50',
-                            drag && drag.over === r.id && drag.id !== r.id && 'outline outline-2 -outline-offset-2 outline-accent-500/40',
+      <Card>
+        <CardHead>
+          <CardTitle>{t('settings.laborRates.cardTitle')}</CardTitle>
+          {list.length > 0 && <CardSub>{rows.length}</CardSub>}
+          <span className="flex-1" />
+          <InactiveToggle count={inactiveCount} shown={showInactive} onToggle={() => setShowInactive((s) => !s)} />
+        </CardHead>
+        <CardBody flush>
+          {isLoading ? (
+            <LoadingState label={t('settings.laborRates.loading')} />
+          ) : error ? (
+            <ErrorState
+              title={t('settings.laborRates.loadFailed')}
+              description={extractApiError(error) ?? (error as Error).message}
+              action={
+                <Button outline onClick={() => refetch()}>
+                  {t('common.actions.tryAgain')}
+                </Button>
+              }
+            />
+          ) : list.length === 0 ? (
+            <EmptyState
+              icon={<ClockIcon className="size-10 text-fg-dim" />}
+              title={t('settings.laborRates.emptyTitle')}
+              description={t('settings.laborRates.emptyDescription')}
+            />
+          ) : (
+            <DenseTable className="min-w-[720px]">
+              <DenseTHead>
+                <tr>
+                  <th>{t('settings.laborRates.col.name')}</th>
+                  <th className="right">{t('settings.laborRates.col.billRate')}</th>
+                  <th className="right">
+                    <span className="inline-flex items-center gap-1.5">
+                      {t('settings.laborRates.col.costRate')} <Tag word>{t('settings.laborRates.internal')}</Tag>
+                    </span>
+                  </th>
+                  <th className="right">{t('settings.laborRates.col.margin')}</th>
+                  <th>{t('settings.laborRates.col.overrides')}</th>
+                  <th>{t('settings.laborRates.col.status')}</th>
+                  {canManage && <th style={{ width: 40 }} />}
+                </tr>
+              </DenseTHead>
+              <tbody>
+                {rows.map((r) => {
+                  const m = margin(r.billRate, r.costRate);
+                  const planCount = overrides(r.id);
+                  return (
+                    <DenseRow
+                      key={r.id}
+                      onClick={canManage ? () => setEditing({ rate: r }) : undefined}
+                      draggable={canDrag}
+                      onDragStart={(e) => {
+                        if (!canDrag || reorder.isPending) return;
+                        e.dataTransfer.effectAllowed = 'move';
+                        setDrag({ id: r.id, over: null });
+                      }}
+                      onDragOver={(e) => {
+                        if (!drag) return;
+                        e.preventDefault();
+                        e.dataTransfer.dropEffect = 'move';
+                        if (drag.over !== r.id) setDrag({ ...drag, over: r.id });
+                      }}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        drop(r.id);
+                      }}
+                      onDragEnd={() => setDrag(null)}
+                      className={clsx(
+                        !r.active && 'opacity-55',
+                        drag?.id === r.id && 'opacity-50',
+                        drag && drag.over === r.id && drag.id !== r.id && 'outline outline-2 -outline-offset-2 outline-accent-500/40',
+                      )}
+                    >
+                      <td>
+                        <div className="flex items-start gap-2">
+                          {canDrag && (
+                            <span className="hidden sm:flex" onClick={(e) => e.stopPropagation()}>
+                              <DragHandle ariaLabel={t('settings.laborRates.dragToReorder')} />
+                            </span>
                           )}
-                        >
-                          <td className="strong">
-                            <span className="flex items-center gap-2">
-                              {canDrag && (
-                                <span className="hidden sm:flex">
-                                  <DragHandle ariaLabel={t('settings.laborRates.dragToReorder')} />
-                                </span>
-                              )}
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2 font-semibold text-fg-strong">
                               {r.name}
                               {r.role === 'REGULAR' && <Tag word>{t('settings.laborRates.defaultRate')}</Tag>}
-                            </span>
-                          </td>
-                          <td className="right num" data-label={t('settings.laborRates.col.billRate')}>
-                            {r.billRate == null ? (
-                              <Pill tone="warning">{t('settings.laborRates.notSet')}</Pill>
-                            ) : (
-                              t('settings.laborRates.perHour', { amount: formatCurrency(r.billRate) })
-                            )}
-                          </td>
-                          <td className="right num" data-label={t('settings.laborRates.col.costRate')}>
-                            {r.costRate == null ? (
-                              <span className="text-fg-muted">{t('settings.laborRates.unknown')}</span>
-                            ) : (
-                              t('settings.laborRates.perHour', { amount: formatCurrency(r.costRate) })
-                            )}
-                          </td>
-                          <td className="right num" data-label={t('settings.laborRates.col.margin')}>
-                            {margin == null ? <span className="text-fg-dim">—</span> : `${margin}%`}
-                          </td>
-                          <td>
-                            {r.active ? (
-                              <Pill tone="success" dot>
-                                {t('common.active')}
-                              </Pill>
-                            ) : (
-                              <Pill tone="neutral" dot>
-                                {t('common.inactive')}
-                              </Pill>
-                            )}
-                          </td>
-                          {canManage && (
-                            <td className="right">
-                              <Dropdown>
-                                <DropdownButton as={IconButton} aria-label={t('settings.laborRates.actionsFor', { name: r.name })}>
-                                  <EllipsisVerticalIcon className="size-4" />
-                                </DropdownButton>
-                                <DropdownMenu anchor="bottom end">
-                                  <DropdownItem onClick={() => setEditing({ rate: r })}>
-                                    <DropdownLabel>{t('common.edit')}</DropdownLabel>
-                                  </DropdownItem>
-                                  {r.role !== 'REGULAR' && (
-                                    <DropdownItem onClick={() => update.mutate({ id: r.id, request: toRequest(r, { active: !r.active }) })}>
-                                      <DropdownLabel>{r.active ? t('settings.laborRates.deactivate') : t('settings.laborRates.activate')}</DropdownLabel>
-                                    </DropdownItem>
-                                  )}
-                                </DropdownMenu>
-                              </Dropdown>
-                            </td>
-                          )}
-                        </DenseRow>
-                      );
-                    })}
-                  </tbody>
-                </DenseTable>
-                <ListFooter left={t('settings.laborRates.footer')} />
-              </>
-            )}
-          </CardBody>
-        </Card>
-      </div>
+                            </div>
+                            <div className="text-[11px] text-fg-muted">
+                              {r.role ? t(`settings.laborRates.usedFor.${r.role}`) : t('settings.laborRates.usedFor.custom')}
+                            </div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="right num" data-label={t('settings.laborRates.col.billRate')}>
+                        {r.billRate == null ? (
+                          <Pill tone="warning">{t('settings.laborRates.notSet')}</Pill>
+                        ) : (
+                          <span className="font-semibold text-fg-strong">
+                            {formatCurrency(r.billRate)}
+                            <span className="font-normal text-fg-muted">{t('settings.laborRates.hourSuffix')}</span>
+                          </span>
+                        )}
+                      </td>
+                      <td className="right num" data-label={t('settings.laborRates.col.costRate')}>
+                        {r.costRate == null ? (
+                          <span className="text-fg-muted">—</span>
+                        ) : (
+                          t('settings.laborRates.perHour', { amount: formatCurrency(r.costRate) })
+                        )}
+                      </td>
+                      <td className="right num" data-label={t('settings.laborRates.col.margin')}>
+                        {m == null ? <span className="text-fg-muted">—</span> : `${m}%`}
+                      </td>
+                      <td data-label={t('settings.laborRates.col.overrides')}>
+                        {planCount ? (
+                          t('settings.laborRates.planCount', { count: planCount })
+                        ) : (
+                          <span className="text-fg-muted">—</span>
+                        )}
+                      </td>
+                      <td>
+                        {r.active ? (
+                          <Pill tone="success" dot>
+                            {t('common.active')}
+                          </Pill>
+                        ) : (
+                          <Pill tone="neutral" dot>
+                            {t('common.inactive')}
+                          </Pill>
+                        )}
+                      </td>
+                      {canManage && (
+                        <td className="right" onClick={(e) => e.stopPropagation()}>
+                          <Dropdown>
+                            <DropdownButton as={IconButton} aria-label={t('settings.laborRates.actionsFor', { name: r.name })}>
+                              <EllipsisVerticalIcon className="size-4" />
+                            </DropdownButton>
+                            <DropdownMenu anchor="bottom end">
+                              <DropdownItem onClick={() => setEditing({ rate: r })}>
+                                <DropdownLabel>{t('common.edit')}</DropdownLabel>
+                              </DropdownItem>
+                              <DropdownItem
+                                disabled={r.role === 'REGULAR'}
+                                title={r.role === 'REGULAR' ? t('settings.laborRates.regularCantDeactivate') : undefined}
+                                onClick={() => update.mutate({ id: r.id, request: toRequest(r, { active: !r.active }) })}
+                              >
+                                <DropdownLabel>{r.active ? t('settings.laborRates.deactivate') : t('settings.laborRates.activate')}</DropdownLabel>
+                              </DropdownItem>
+                            </DropdownMenu>
+                          </Dropdown>
+                        </td>
+                      )}
+                    </DenseRow>
+                  );
+                })}
+              </tbody>
+            </DenseTable>
+          )}
+        </CardBody>
+      </Card>
+      {list.length > 0 && <p className="mt-2 text-[11.5px] text-fg-muted">{t('settings.laborRates.orderNote')}</p>}
 
       <Dialog open={editing != null} onClose={() => setEditing(null)} size="md">
         {editing && <RateForm rate={editing.rate} nextSortOrder={nextSortOrder} onClose={() => setEditing(null)} />}
@@ -290,7 +322,8 @@ function RateForm({ rate, nextSortOrder, onClose }: { rate: LaborRateType | null
   const costNum = parse(cost);
   const ok = (n: number | null) => n == null || (Number.isFinite(n) && n >= 0);
   const ready = name.trim() !== '' && ok(billNum) && ok(costNum);
-  const regular = rate?.role === 'REGULAR';
+  const m = ok(billNum) && ok(costNum) ? margin(billNum, costNum) : null;
+  const regularChanged = rate?.role === 'REGULAR' && billNum !== rate.billRate;
 
   const save = useMutation({
     mutationFn: () => {
@@ -318,14 +351,11 @@ function RateForm({ rate, nextSortOrder, onClose }: { rate: LaborRateType | null
 
   return (
     <form onSubmit={submit}>
-      <DialogTitle>{rate ? t('settings.laborRates.form.editTitle', { name: rate.name }) : t('settings.laborRates.add')}</DialogTitle>
-      <DialogDescription>
-        {regular ? t('settings.laborRates.form.regularDescription') : t('settings.laborRates.form.description')}
-      </DialogDescription>
-      <DialogBody>
+      <DialogTitle>{rate ? t('settings.laborRates.form.editTitle', { name: rate.name }) : t('settings.laborRates.form.addTitle')}</DialogTitle>
+      <DialogBody className="!mt-4">
         <Field>
           <Label>{t('settings.laborRates.form.name')}</Label>
-          <Input autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder={t('settings.laborRates.form.namePlaceholder')} />
+          <Input autoFocus={!rate} value={name} onChange={(e) => setName(e.target.value)} placeholder={t('settings.laborRates.form.namePlaceholder')} />
         </Field>
         <div className="mt-3 grid grid-cols-2 gap-3">
           <Field>
@@ -338,6 +368,7 @@ function RateForm({ rate, nextSortOrder, onClose }: { rate: LaborRateType | null
               placeholder={t('settings.laborRates.notSet')}
               className="[&_input]:text-right"
             />
+            <Description>{t('settings.laborRates.form.billHint')}</Description>
           </Field>
           <Field>
             <Label>{t('settings.laborRates.form.costRate')}</Label>
@@ -346,13 +377,21 @@ function RateForm({ rate, nextSortOrder, onClose }: { rate: LaborRateType | null
               value={cost}
               invalid={!ok(costNum)}
               onChange={(e) => setCost(e.target.value)}
-              placeholder={t('settings.laborRates.unknown')}
+              placeholder={t('settings.laborRates.form.optional')}
               className="[&_input]:text-right"
             />
             <Description>{t('settings.laborRates.form.costHint')}</Description>
           </Field>
         </div>
-        <p className="mt-2 text-[11.5px] text-fg-muted">{t('settings.laborRates.form.billHint')}</p>
+        <p className="mt-2 text-[12px] tabular-nums text-fg-muted">
+          {t('settings.laborRates.form.margin')}{' '}
+          {m == null ? '—' : <span className="font-semibold text-fg-strong">{m}%</span>}
+        </p>
+        {regularChanged && (
+          <Callout kind="warning" className="mt-3">
+            {t('settings.laborRates.form.regularWarning')}
+          </Callout>
+        )}
       </DialogBody>
       <DialogActions>
         <Button plain onClick={onClose} disabled={save.isPending}>

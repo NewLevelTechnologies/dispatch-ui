@@ -2901,20 +2901,18 @@
       "yearRow": "Year"
     },
     "tax": {
-      "activate": "Activate",
       "actionsFor": "Actions for {{name}}",
+      "activate": "Activate",
       "add": "Add jurisdiction",
-      "agreementFee": {
-        "label": "Tax class",
-        "sub": "Installment invoices for {{agreements}} are taxed as this kind of line.",
-        "title": "{{agreement}} installments"
-      },
+      "cardTitle": "Jurisdictions",
       "class": {
         "EQUIPMENT": "Equipment",
         "FEE": "Fees",
         "LABOR": "Labor",
         "MATERIALS": "Materials"
       },
+      "classNotTaxed": "{{name}} is not taxed",
+      "classTaxed": "{{name}} is taxed",
       "col": {
         "name": "Jurisdiction",
         "rate": "Rate",
@@ -2923,6 +2921,8 @@
       },
       "deactivate": "Deactivate",
       "default": "Default",
+      "defaultCantDeactivate": "Make another jurisdiction the default first",
+      "description": "Each service location uses a jurisdiction; locations without one use the default. A jurisdiction’s rate applies only to the tax classes it taxes. Tax-exempt accounts are never taxed.",
       "emptyDescription": "Add where you collect tax and its rate. Until then, no tax is charged and drafts warn.",
       "emptyTitle": "No tax jurisdictions yet",
       "errors": {
@@ -2932,27 +2932,46 @@
         "NAME_TAKEN": "A jurisdiction with that name already exists.",
         "generic": "Something went wrong. Try again."
       },
-      "footer": "Locations use the default unless one is assigned on the location's page.",
       "form": {
         "default": "Default jurisdiction",
-        "defaultHint": "Used for every location without one assigned. Takes over from the current default.",
-        "defaultLocked": "This is the default. To change it, make another jurisdiction the default.",
+        "defaultHint": "Used by every location without one. Replaces {{name}}.",
+        "defaultHintFirst": "Used by every location without one.",
+        "defaultLocked": "To change the default, make another jurisdiction the default.",
         "description": "The rate applies to the kinds of line checked below. Customers marked tax-exempt aren't charged.",
         "editTitle": "Edit {{name}}",
         "name": "Name",
         "namePlaceholder": "Phoenix, AZ",
         "rate": "Rate (%)",
-        "ratePlaceholder": "Not set",
         "rateHint": "Leave the rate blank if you don't know it yet. Nothing is taxed until it's set, and drafts warn.",
-        "taxes": "Taxes these lines"
+        "ratePlaceholder": "Not set",
+        "taxes": "Taxes these lines",
+        "taxesHint": "Only lines in a checked class are taxed here."
+      },
+      "issueNoRate": "{{name}} has no rate. Locations using it are charged no tax.",
+      "lineSource": {
+        "agreement": "{{agreement}} installments",
+        "agreementLabel": "Tax class for {{agreement}} installments",
+        "agreementNote": "Applies to the next installment billed",
+        "col": {
+          "class": "Tax class",
+          "notes": "Notes",
+          "source": "Line source"
+        },
+        "fixed": "Fixed",
+        "labor": "Labor lines",
+        "perItem": "Set on each item",
+        "pricebook": "Pricebook items",
+        "pricebookNote": "Defaults from item type",
+        "saved": "{{agreement}} installment tax class saved",
+        "title": "Tax class by line source"
       },
       "loadFailed": "Couldn't load tax jurisdictions",
       "loading": "Loading tax jurisdictions…",
       "makeDefault": "Make default",
-      "noDefault": "none",
+      "notTaxedPrefix": "Not taxed:",
       "rateNotSet": "Not set",
-      "subtitle": "{{count}} active · default: {{name}}",
-      "taxesNothing": "Nothing",
+      "setRate": "Set rate",
+      "taxedPrefix": "Taxed:",
       "title": "Tax",
       "toast": {
         "saveFailed": "Couldn't save",
@@ -2962,16 +2981,19 @@
     "laborRates": {
       "actionsFor": "Actions for {{name}}",
       "activate": "Activate",
-      "add": "Add rate type",
+      "add": "Add rate",
+      "cardTitle": "Rates",
       "col": {
         "billRate": "Bill rate",
         "costRate": "Cost",
         "margin": "Margin",
-        "name": "Rate type",
+        "name": "Rate",
+        "overrides": "Plan overrides",
         "status": "Status"
       },
       "deactivate": "Deactivate",
       "defaultRate": "Default rate",
+      "description": "Hourly bill rates for labor lines, and the rate behind computed pricebook items. Rate plans can override these per account.",
       "dragToReorder": "Drag to reorder",
       "emptyDescription": "Rate types appear here once your workspace is set up.",
       "emptyTitle": "No labor rate types",
@@ -2981,32 +3003,49 @@
         "generic": "Something went wrong. Try again.",
         "staleOrder": "The list was out of date and has been reloaded. Try again."
       },
-      "footer": "Rate types are never deleted. Deactivate one to stop using it on new lines.",
       "form": {
-        "billHint": "Leave the bill rate blank if it isn’t decided yet. Labor can’t be added at an unpriced rate unless the customer’s rate plan prices it or a price is typed on the line.",
+        "addTitle": "Add labor rate",
+        "billHint": "What the customer pays per hour. Leave blank if it isn’t decided yet.",
         "billRate": "Bill rate ($/hr)",
-        "costHint": "Loaded cost of an hour. Never shown to customers.",
+        "costHint": "Loaded cost per hour. Internal only.",
         "costRate": "Cost ($/hr)",
-        "description": "What an hour of this kind of labor bills at and costs.",
         "editTitle": "Edit {{name}}",
+        "margin": "Margin",
         "name": "Name",
         "namePlaceholder": "e.g. Emergency",
-        "regularDescription": "The standard rate. Changing its bill rate reprices every computed pricebook item."
+        "optional": "Optional",
+        "regularWarning": "Changing the Regular rate reprices every computed pricebook item. Quotes and invoices already created keep their prices."
       },
+      "hourSuffix": "/hr",
       "internal": "Internal",
+      "issueNoBillRate": "{{name}} has no bill rate, so labor lines can’t use it until one is set.",
       "loadFailed": "Couldn’t load labor rates",
       "loading": "Loading labor rates…",
       "notSet": "Not set",
+      "orderNote": "Order here is the order rate types appear when adding a labor line.",
       "perHour": "{{amount}}/hr",
-      "subtitle": "{{count}} active",
-      "subtitleUnpriced": "{{count}} active · {{unpriced}} without a bill rate",
+      "planCount_one": "{{count}} plan",
+      "planCount_other": "{{count}} plans",
+      "regularCantDeactivate": "The default rate can’t be deactivated",
+      "setRate": "Set rate",
       "title": "Labor rates",
       "toast": {
         "reorderFailed": "Couldn’t reorder the rate types",
         "saveFailed": "Couldn’t save the rate type",
         "saved": "Rate type saved"
       },
-      "unknown": "Unknown"
+      "usedFor": {
+        "AFTER_HOURS": "Used for after-hours work",
+        "HOLIDAY": "Used for holiday hours",
+        "OVERTIME": "Used for overtime hours",
+        "REGULAR": "Used for regular hours",
+        "custom": "Custom · picked by hand"
+      }
+    },
+    "pricing": {
+      "hideInactive": "Hide inactive ({{count}})",
+      "showInactive": "Show inactive ({{count}})",
+      "viewOnly": "View only. Changing pricing needs the Manage pricing permission."
     }
   },
   "tags": {

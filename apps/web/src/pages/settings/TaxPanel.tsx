@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react';
+import clsx from 'clsx';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from '@dispatch/i18n';
 import { EllipsisVerticalIcon, PlusIcon, ReceiptPercentIcon } from '@heroicons/react/24/outline';
@@ -14,10 +15,11 @@ import { Input } from '../../components/catalyst/input';
 import { Select } from '../../components/catalyst/select';
 import IconButton from '../../components/IconButton';
 import { Card, CardBody, CardHead, CardSub, CardTitle } from '../../components/ui/Card';
+import { Text } from '../../components/catalyst/text';
+import { InactiveToggle, SetupIssues, ViewOnlyNotice } from '../../components/settings/PricingPageParts';
 import { DenseRow, DenseTable, DenseTHead } from '../../components/ui/DenseTable';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { ErrorState } from '../../components/ui/ErrorState';
-import { ListFooter } from '../../components/ui/ListFooter';
 import { LoadingState } from '../../components/ui/LoadingState';
 import { PageHead } from '../../components/ui/PageHead';
 import { Pill, Tag } from '../../components/ui/Pill';
@@ -76,13 +78,16 @@ export default function TaxPanel() {
   const canManage = useHasAnyCapability('MANAGE_PRICING');
   const taxError = useTaxError();
   const [editing, setEditing] = useState<{ jurisdiction: TaxJurisdiction | null } | null>(null);
+  const [showInactive, setShowInactive] = useState(false);
 
   const { data: jurisdictions, isLoading, error, refetch } = useQuery({
     queryKey: JURISDICTIONS_KEY,
     queryFn: () => taxApi.getJurisdictions(),
   });
   const list = jurisdictions ?? [];
+  const rows = list.filter((j) => j.active || showInactive);
   const defaultOne = list.find((j) => j.isDefault);
+  const noRate = list.filter((j) => j.active && j.rate == null);
 
   const update = useMutation({
     mutationFn: ({ id, request }: { id: string; request: TaxJurisdictionRequest }) => taxApi.updateJurisdiction(id, request),
@@ -93,20 +98,11 @@ export default function TaxPanel() {
     onError: (err) => showError(t('settings.tax.toast.saveFailed'), taxError(err)),
   });
 
-  const classLabel = (c: TaxClass) => t(`settings.tax.class.${c}`);
-
   return (
     <>
       <PageHead
         title={t('settings.tax.title')}
-        sub={
-          list.length
-            ? t('settings.tax.subtitle', {
-                count: list.filter((j) => j.active).length,
-                name: defaultOne?.name ?? t('settings.tax.noDefault'),
-              })
-            : null
-        }
+        sub={t('settings.tax.description')}
         actions={
           canManage && (
             <Button color="accent" size="xs" onClick={() => setEditing({ jurisdiction: null })}>
@@ -116,9 +112,23 @@ export default function TaxPanel() {
           )
         }
       />
+      {!canManage && <ViewOnlyNotice />}
+      <SetupIssues
+        issues={noRate.map((j) => ({
+          key: j.id,
+          text: t('settings.tax.issueNoRate', { name: j.name }),
+          action: canManage ? { label: t('settings.tax.setRate'), onClick: () => setEditing({ jurisdiction: j }) } : undefined,
+        }))}
+      />
 
-      <div className="mt-4 flex flex-col gap-4">
+      <div className="flex flex-col gap-3">
         <Card>
+          <CardHead>
+            <CardTitle>{t('settings.tax.cardTitle')}</CardTitle>
+            {list.length > 0 && <CardSub>{rows.length}</CardSub>}
+            <span className="flex-1" />
+            <InactiveToggle count={list.length - list.filter((j) => j.active).length} shown={showInactive} onToggle={() => setShowInactive((s) => !s)} />
+          </CardHead>
           <CardBody flush>
             {isLoading ? (
               <LoadingState label={t('settings.tax.loading')} />
@@ -146,139 +156,191 @@ export default function TaxPanel() {
                 }
               />
             ) : (
-              <>
-                <DenseTable>
-                  <DenseTHead>
-                    <tr>
-                      <th>{t('settings.tax.col.name')}</th>
-                      <th className="right">{t('settings.tax.col.rate')}</th>
-                      <th>{t('settings.tax.col.taxes')}</th>
-                      <th>{t('settings.tax.col.status')}</th>
-                      {canManage && <th style={{ width: 40 }} />}
-                    </tr>
-                  </DenseTHead>
-                  <tbody>
-                    {list.map((j) => {
-                      const taxed = CLASSES.filter((c) => j[FLAG[c]]);
-                      return (
-                        <DenseRow key={j.id} className={j.active ? undefined : 'opacity-55'}>
-                          <td className="strong">
-                            <span className="flex items-center gap-2">
-                              {j.name}
-                              {j.isDefault && <Tag word>{t('settings.tax.default')}</Tag>}
-                            </span>
-                          </td>
-                          <td className="right num" data-label={t('settings.tax.col.rate')}>
-                            {j.rate == null ? (
-                              <Pill tone="warning">{t('settings.tax.rateNotSet')}</Pill>
-                            ) : (
-                              pct(j.rate)
-                            )}
-                          </td>
-                          <td data-label={t('settings.tax.col.taxes')}>
-                            {taxed.length ? taxed.map(classLabel).join(', ') : <span className="text-fg-muted">{t('settings.tax.taxesNothing')}</span>}
-                          </td>
-                          <td>
-                            {j.active ? (
-                              <Pill tone="success" dot>
-                                {t('common.active')}
-                              </Pill>
-                            ) : (
-                              <Pill tone="neutral" dot>
-                                {t('common.inactive')}
-                              </Pill>
-                            )}
-                          </td>
-                          {canManage && (
-                            <td className="right">
-                              <Dropdown>
-                                <DropdownButton as={IconButton} aria-label={t('settings.tax.actionsFor', { name: j.name })}>
-                                  <EllipsisVerticalIcon className="size-4" />
-                                </DropdownButton>
-                                <DropdownMenu anchor="bottom end">
-                                  <DropdownItem onClick={() => setEditing({ jurisdiction: j })}>
-                                    <DropdownLabel>{t('common.edit')}</DropdownLabel>
-                                  </DropdownItem>
-                                  {j.active && !j.isDefault && (
-                                    <DropdownItem onClick={() => update.mutate({ id: j.id, request: toRequest(j, { isDefault: true }) })}>
-                                      <DropdownLabel>{t('settings.tax.makeDefault')}</DropdownLabel>
-                                    </DropdownItem>
-                                  )}
-                                  {!j.isDefault && (
-                                    <DropdownItem onClick={() => update.mutate({ id: j.id, request: toRequest(j, { active: !j.active }) })}>
-                                      <DropdownLabel>{j.active ? t('settings.tax.deactivate') : t('settings.tax.activate')}</DropdownLabel>
-                                    </DropdownItem>
-                                  )}
-                                </DropdownMenu>
-                              </Dropdown>
-                            </td>
-                          )}
-                        </DenseRow>
-                      );
-                    })}
-                  </tbody>
-                </DenseTable>
-                <ListFooter left={t('settings.tax.footer')} />
-              </>
+              <DenseTable className="min-w-[640px]">
+                <DenseTHead>
+                  <tr>
+                    <th>{t('settings.tax.col.name')}</th>
+                    <th className="right">{t('settings.tax.col.rate')}</th>
+                    <th>{t('settings.tax.col.taxes')}</th>
+                    <th>{t('settings.tax.col.status')}</th>
+                    {canManage && <th style={{ width: 40 }} />}
+                  </tr>
+                </DenseTHead>
+                <tbody>
+                  {rows.map((j) => (
+                    <DenseRow
+                      key={j.id}
+                      onClick={canManage ? () => setEditing({ jurisdiction: j }) : undefined}
+                      className={j.active ? undefined : 'opacity-55'}
+                    >
+                      <td>
+                        <span className="flex items-center gap-2 font-semibold text-fg-strong">
+                          {j.name}
+                          {j.isDefault && <Tag word>{t('settings.tax.default')}</Tag>}
+                        </span>
+                      </td>
+                      <td className="right num" data-label={t('settings.tax.col.rate')}>
+                        {j.rate == null ? (
+                          <Pill tone="warning">{t('settings.tax.rateNotSet')}</Pill>
+                        ) : (
+                          <span className="font-semibold text-fg-strong">{pct(j.rate)}</span>
+                        )}
+                      </td>
+                      <td data-label={t('settings.tax.col.taxes')}>
+                        <TaxedClasses jurisdiction={j} />
+                      </td>
+                      <td>
+                        {j.active ? (
+                          <Pill tone="success" dot>
+                            {t('common.active')}
+                          </Pill>
+                        ) : (
+                          <Pill tone="neutral" dot>
+                            {t('common.inactive')}
+                          </Pill>
+                        )}
+                      </td>
+                      {canManage && (
+                        <td className="right" onClick={(e) => e.stopPropagation()}>
+                          <Dropdown>
+                            <DropdownButton as={IconButton} aria-label={t('settings.tax.actionsFor', { name: j.name })}>
+                              <EllipsisVerticalIcon className="size-4" />
+                            </DropdownButton>
+                            <DropdownMenu anchor="bottom end">
+                              <DropdownItem onClick={() => setEditing({ jurisdiction: j })}>
+                                <DropdownLabel>{t('common.edit')}</DropdownLabel>
+                              </DropdownItem>
+                              {j.active && !j.isDefault && (
+                                <DropdownItem onClick={() => update.mutate({ id: j.id, request: toRequest(j, { isDefault: true }) })}>
+                                  <DropdownLabel>{t('settings.tax.makeDefault')}</DropdownLabel>
+                                </DropdownItem>
+                              )}
+                              <DropdownItem
+                                disabled={j.isDefault}
+                                title={j.isDefault ? t('settings.tax.defaultCantDeactivate') : undefined}
+                                onClick={() => update.mutate({ id: j.id, request: toRequest(j, { active: !j.active }) })}
+                              >
+                                <DropdownLabel>{j.active ? t('settings.tax.deactivate') : t('settings.tax.activate')}</DropdownLabel>
+                              </DropdownItem>
+                            </DropdownMenu>
+                          </Dropdown>
+                        </td>
+                      )}
+                    </DenseRow>
+                  ))}
+                </tbody>
+              </DenseTable>
             )}
           </CardBody>
         </Card>
 
-        <AgreementFeeTaxCard canManage={canManage} />
+        <LineSourceTaxCard canManage={canManage} />
       </div>
 
       <JurisdictionDialog
         state={editing}
         onClose={() => setEditing(null)}
-        hasDefault={!!defaultOne}
+        defaultName={defaultOne?.name ?? null}
       />
     </>
   );
 }
 
-function AgreementFeeTaxCard({ canManage }: { canManage: boolean }) {
+/** All four classes: taxed ones solid, untaxed ones dashed and struck through, so what isn't taxed shows too. */
+function TaxedClasses({ jurisdiction }: { jurisdiction: TaxJurisdiction }) {
+  const { t } = useTranslation();
+  return (
+    <span className="flex flex-wrap gap-1">
+      {CLASSES.map((c) => {
+        const on = jurisdiction[FLAG[c]];
+        const name = t(`settings.tax.class.${c}`);
+        return (
+          <span
+            key={c}
+            title={on ? t('settings.tax.classTaxed', { name }) : t('settings.tax.classNotTaxed', { name })}
+            className={clsx(
+              'rounded-full px-1.5 py-px text-[11px] font-semibold',
+              on
+                ? 'border border-[color-mix(in_oklch,var(--accent-500)_35%,var(--border))] bg-[color-mix(in_oklch,var(--accent-500)_10%,transparent)] text-fg-strong'
+                : 'border border-dashed border-border-strong text-fg-muted line-through decoration-border-strong',
+            )}
+          >
+            <span className="sr-only">{on ? t('settings.tax.taxedPrefix') : t('settings.tax.notTaxedPrefix')}</span>
+            {name}
+          </span>
+        );
+      })}
+    </span>
+  );
+}
+
+/** Which tax class each kind of line is taxed as; only agreement installments are a setting. */
+function LineSourceTaxCard({ canManage }: { canManage: boolean }) {
   const { t } = useTranslation();
   const { getName } = useGlossary();
   const queryClient = useQueryClient();
   const { data } = useQuery({ queryKey: SETTINGS_KEY, queryFn: () => taxApi.getPricingSettings() });
-  const [choice, setChoice] = useState<TaxClass | null>(null);
-  const current = choice ?? data?.agreementFeeTaxClass ?? null;
   const save = useMutation({
     mutationFn: (c: TaxClass) => taxApi.updatePricingSettings(c),
     onSuccess: (next) => {
       queryClient.setQueryData(SETTINGS_KEY, next);
-      setChoice(null);
-      showSuccess(t('settings.tax.toast.saved'));
+      showSuccess(t('settings.tax.lineSource.saved', { agreement: getName('agreement') }));
     },
     onError: (err) => showError(t('settings.tax.toast.saveFailed'), extractApiError(err)),
   });
   if (!data) return null;
-  const agreements = getName('agreement', true).toLowerCase();
+  const classLabel = (c: TaxClass) => t(`settings.tax.class.${c}`);
 
   return (
     <Card>
       <CardHead>
-        <CardTitle>{t('settings.tax.agreementFee.title', { agreement: getName('agreement') })}</CardTitle>
-        <CardSub>{t('settings.tax.agreementFee.sub', { agreements })}</CardSub>
+        <CardTitle>{t('settings.tax.lineSource.title')}</CardTitle>
       </CardHead>
-      <CardBody>
-        <div className="flex flex-wrap items-end gap-2">
-          <Field className="w-56">
-            <Label>{t('settings.tax.agreementFee.label')}</Label>
-            <Select value={current ?? ''} disabled={!canManage} onChange={(e) => setChoice(e.target.value as TaxClass)}>
-              {CLASSES.map((c) => (
-                <option key={c} value={c}>
-                  {t(`settings.tax.class.${c}`)}
-                </option>
-              ))}
-            </Select>
-          </Field>
-          {canManage && choice && choice !== data.agreementFeeTaxClass && (
-            <Button color="dark/zinc" disabled={save.isPending} onClick={() => save.mutate(choice)}>
-              {t('settings.saveChanges')}
-            </Button>
-          )}
-        </div>
+      <CardBody flush>
+        <DenseTable>
+          <DenseTHead>
+            <tr>
+              <th>{t('settings.tax.lineSource.col.source')}</th>
+              <th>{t('settings.tax.lineSource.col.class')}</th>
+              <th>{t('settings.tax.lineSource.col.notes')}</th>
+            </tr>
+          </DenseTHead>
+          <tbody>
+            <DenseRow>
+              <td className="font-semibold text-fg-strong">{t('settings.tax.lineSource.pricebook')}</td>
+              <td>{t('settings.tax.lineSource.perItem')}</td>
+              <td className="text-fg-muted">{t('settings.tax.lineSource.pricebookNote')}</td>
+            </DenseRow>
+            <DenseRow>
+              <td className="font-semibold text-fg-strong">{t('settings.tax.lineSource.labor')}</td>
+              <td>{classLabel('LABOR')}</td>
+              <td className="text-fg-muted">{t('settings.tax.lineSource.fixed')}</td>
+            </DenseRow>
+            <DenseRow>
+              <td className="font-semibold text-fg-strong">{t('settings.tax.lineSource.agreement', { agreement: getName('agreement') })}</td>
+              <td>
+                {canManage ? (
+                  <Select
+                    aria-label={t('settings.tax.lineSource.agreementLabel', { agreement: getName('agreement') })}
+                    value={data.agreementFeeTaxClass}
+                    disabled={save.isPending}
+                    onChange={(e) => save.mutate(e.target.value as TaxClass)}
+                    className="!w-40"
+                  >
+                    {CLASSES.map((c) => (
+                      <option key={c} value={c}>
+                        {classLabel(c)}
+                      </option>
+                    ))}
+                  </Select>
+                ) : (
+                  classLabel(data.agreementFeeTaxClass)
+                )}
+              </td>
+              <td className="text-fg-muted">{t('settings.tax.lineSource.agreementNote')}</td>
+            </DenseRow>
+          </tbody>
+        </DenseTable>
       </CardBody>
     </Card>
   );
@@ -287,15 +349,15 @@ function AgreementFeeTaxCard({ canManage }: { canManage: boolean }) {
 function JurisdictionDialog({
   state,
   onClose,
-  hasDefault,
+  defaultName,
 }: {
   state: { jurisdiction: TaxJurisdiction | null } | null;
   onClose: () => void;
-  hasDefault: boolean;
+  defaultName: string | null;
 }) {
   return (
     <Dialog open={state != null} onClose={onClose} size="lg">
-      {state && <JurisdictionForm jurisdiction={state.jurisdiction} onClose={onClose} hasDefault={hasDefault} />}
+      {state && <JurisdictionForm jurisdiction={state.jurisdiction} onClose={onClose} defaultName={defaultName} />}
     </Dialog>
   );
 }
@@ -303,12 +365,13 @@ function JurisdictionDialog({
 function JurisdictionForm({
   jurisdiction,
   onClose,
-  hasDefault,
+  defaultName,
 }: {
   jurisdiction: TaxJurisdiction | null;
   onClose: () => void;
-  hasDefault: boolean;
+  defaultName: string | null;
 }) {
+  const hasDefault = defaultName != null;
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const taxError = useTaxError();
@@ -375,6 +438,7 @@ function JurisdictionForm({
         <p className="mt-1 text-[11.5px] text-fg-muted">{t('settings.tax.form.rateHint')}</p>
         <Fieldset className="mt-4">
           <Legend className="!text-[13px]">{t('settings.tax.form.taxes')}</Legend>
+          <Text size="sm" tone="muted" className="mt-0.5">{t('settings.tax.form.taxesHint')}</Text>
           <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
             {CLASSES.map((c) => (
               <CheckboxField key={c}>
@@ -388,7 +452,11 @@ function JurisdictionForm({
           <Checkbox checked={isDefault} disabled={!!jurisdiction?.isDefault} onChange={setIsDefault} />
           <Label>{t('settings.tax.form.default')}</Label>
           <Description>
-            {jurisdiction?.isDefault ? t('settings.tax.form.defaultLocked') : t('settings.tax.form.defaultHint')}
+            {jurisdiction?.isDefault
+              ? t('settings.tax.form.defaultLocked')
+              : hasDefault
+                ? t('settings.tax.form.defaultHint', { name: defaultName })
+                : t('settings.tax.form.defaultHintFirst')}
           </Description>
         </CheckboxField>
       </DialogBody>

@@ -1414,6 +1414,51 @@ export const laborRatesApi = {
   },
 };
 
+/** A plan's bill rate for one labor rate type, replacing the tenant's rate for its accounts. */
+export interface PlanLaborRate {
+  laborRateTypeId: string;
+  billRate: number;
+}
+
+/** Materials costing `minCost` or more (to the next tier) are priced at cost × (1 + markupPct). */
+export interface PlanMarkupTier {
+  minCost: number;
+  markupPct: number;
+}
+
+/** Pricebook items in the category and its subcategories are priced × priceMultiplier. */
+export interface PlanCategoryMultiplier {
+  categoryId: string;
+  priceMultiplier: number;
+}
+
+/** How an account is priced. Every tenant has a default plan ("Standard"). */
+export interface RatePlan {
+  id: string;
+  name: string;
+  isDefault: boolean;
+  /** 0.90 = 10% off everything a more specific rule doesn't price. */
+  priceMultiplier: number | null;
+  /** False: agreement member benefits don't apply on this plan. */
+  memberBenefitsStack: boolean;
+  active: boolean;
+  laborRates: PlanLaborRate[];
+  /** Lowest first. */
+  markupTiers: PlanMarkupTier[];
+  categoryMultipliers: PlanCategoryMultiplier[];
+  createdAt: string | null;
+  updatedAt: string | null;
+}
+
+/** Rate plans. Reading needs no capability. */
+export const ratePlansApi = {
+  /** Active and inactive, by name, with their rules. */
+  getAll: async (): Promise<RatePlan[]> => {
+    const response = await apiClient.get<RatePlan[]>('/financial/rate-plans');
+    return response.data;
+  },
+};
+
 // ========== LOCATION FINANCIAL ACTIVITY ==========
 
 export type FinancialActivityKind = 'INVOICE_SENT' | 'INVOICE_PAID';
