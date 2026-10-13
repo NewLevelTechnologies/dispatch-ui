@@ -1687,6 +1687,61 @@ export const ratePlansApi = {
   },
 };
 
+/** A part bought on a purchase order for a job and not yet on an invoice that counts (not void or cancelled; drafts count). */
+export interface UnbilledPurchase {
+  purchaseOrderId: string;
+  purchaseOrderNumber: string;
+  purchaseOrderType: 'ORDER' | 'FIELD' | 'STOCK';
+  poLineId: string;
+  description: string;
+  sku?: string | null;
+  /** Ordered. */
+  quantity: number;
+  billedQuantity: number;
+  /** Always above 0 on the list. */
+  unbilledQuantity: number;
+  /** Internal only. */
+  unitCost: number;
+  unbilledCost: number;
+  /** The PO line's bill price, when it has one. */
+  suggestedUnitPrice?: number | null;
+  /** Only with `includeNotBillable`, on parts marked not billable. */
+  notBillable?: PurchaseLineBilling | null;
+}
+
+/** Whether a PO line is marked as never billed to the customer, and who said so. */
+export interface PurchaseLineBilling {
+  poLineId: string;
+  notBillable: boolean;
+  reason?: string | null;
+  markedByUserId?: string | null;
+  markedByName?: string | null;
+  markedAt?: string | null;
+}
+
+/**
+ * Parts bought for a job that aren't billed yet, and dismissing ones that
+ * never will be. No capability beyond tenant membership.
+ */
+export const purchaseBillingApi = {
+  /** By PO number, then line order. `includeNotBillable` brings back dismissed parts with their decision. */
+  getUnbilled: async (workOrderId: string, includeNotBillable = false): Promise<UnbilledPurchase[]> => {
+    const response = await apiClient.get<UnbilledPurchase[]>(`/financial/work-orders/${workOrderId}/unbilled-purchases`, {
+      params: includeNotBillable ? { includeNotBillable: true } : undefined,
+    });
+    return response.data;
+  },
+
+  /** Mark not billable with a reason (required, ≤ 500), or undo. 400 INVALID_REQUEST for an unknown line or bad reason. */
+  setBilling: async (
+    poLineId: string,
+    body: { notBillable: true; reason: string } | { notBillable: false },
+  ): Promise<PurchaseLineBilling> => {
+    const response = await apiClient.put<PurchaseLineBilling>(`/financial/purchase-order-lines/${poLineId}/billing`, body);
+    return response.data;
+  },
+};
+
 // ========== LOCATION FINANCIAL ACTIVITY ==========
 
 export type FinancialActivityKind = 'INVOICE_SENT' | 'INVOICE_PAID';

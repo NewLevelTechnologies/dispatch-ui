@@ -224,5 +224,9 @@ describe('PurchaseOrderFormPage', () => {
     await waitFor(() => expect(mockUpdate).toHaveBeenCalledTimes(1));
     expect(mockUpdate.mock.calls[0][0]).toBe('po-1');
     expect(mockUpdate.mock.calls[0][1]).toEqual(expect.objectContaining({ vendorId: 'v-1' }));
+    // The existing line keeps its id, so invoice lines billed from it stay linked.
+    expect(mockUpdate.mock.calls[0][1].lines).toEqual([
+      expect.objectContaining({ id: 'l-1', name: 'Capacitor 45/5', quantityOrdered: 2 }),
+    ]);
   });
 });

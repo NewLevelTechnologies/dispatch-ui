@@ -1,13 +1,13 @@
 /* eslint-disable i18next/no-literal-string -- dense billing detail; short operational labels stay literal (same convention as the PO detail page). Entity names route through getName(). */
 import { useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { EllipsisHorizontalIcon } from '@heroicons/react/16/solid';
 import { useTranslation } from '@dispatch/i18n';
 import { formatCurrency } from '@dispatch/utils';
 import { invoicesApi, InvoiceStatus, paymentsApi, type Invoice, type NestedInvoicePayment } from '../api/setup';
 import { useGlossary } from '../contexts/GlossaryContext';
-import { showError, showSuccess } from '../lib/toast';
+import { errorCode, showError, showSuccess } from '../lib/toast';
 import { Pill } from '../components/ui/Pill';
 import { Callout } from '../components/ui/Callout';
 import { Button } from '../components/catalyst/button';
@@ -23,6 +23,7 @@ import { DocumentEditStatus, StaleCallout } from '../components/document/Documen
 import { useDocumentParties } from '../components/document/useDocumentParties';
 import { documentErrorMessage, lineEditing, refreshDocumentLists, useDocumentEditor } from '../components/document/useDocumentEditor';
 import { useShareLink } from '../components/document/useShareLink';
+import { ReissueCreditCallout } from '../components/document/ReissueCreditCallout';
 import { formatDocDate, isLegacy, memberLabel, memberSavings, toDateInput } from '../components/document/documentModel';
 
 const STATUS_TONE: Record<InvoiceStatus, 'neutral' | 'info' | 'success' | 'danger'> = {
@@ -56,6 +57,8 @@ export default function InvoiceDetailPage() {
   const [paying, setPaying] = useState(false);
   const [voiding, setVoiding] = useState(false);
   const [voidingPayment, setVoidingPayment] = useState<NestedInvoicePayment | null>(null);
+  const [reissuing, setReissuing] = useState(false);
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const shareLink = useShareLink({
     routes: invoicesApi,
@@ -102,6 +105,9 @@ export default function InvoiceDetailPage() {
   const sendable = draft || open;
   const payable = open && invoice.balanceDue > 0;
   const voidable = open || invoice.status === InvoiceStatus.PAID;
+  // A sent invoice is corrected by voiding it and copying it to a new draft; a void one can still be copied once.
+  const reissuable = !invoice.reissuedAsInvoiceId && (voidable || invoice.status === InvoiceStatus.VOID);
+  const reissueLabel = invoice.status === InvoiceStatus.VOID ? `Reissue ${entityLower}` : 'Void & reissue';
 
   const send = () => {
     let to = '';
@@ -138,6 +144,28 @@ export default function InvoiceDetailPage() {
       showError(`Couldn’t void ${payment.paymentNumber}`, documentErrorMessage(err, entityLower));
     }
   };
+  const reissue = async () => {
+    setReissuing(false);
+    try {
+      const copy = await invoicesApi.reissue(invoice.id);
+      queryClient.invalidateQueries({ queryKey: ['invoice', invoice.id] });
+      refreshDocumentLists(queryClient);
+      showSuccess(
+        invoice.status === InvoiceStatus.VOID
+          ? `${copy.invoiceNumber} draft created`
+          : `${invoice.invoiceNumber} voided · ${copy.invoiceNumber} draft created`,
+      );
+      navigate(`/invoices/${copy.id}`);
+    } catch (err) {
+      showError(
+        `Couldn’t reissue ${invoice.invoiceNumber}`,
+        // A 400 here is a pre-pricing invoice with a credit line, which can't be copied.
+        errorCode(err) === 'INVALID_REQUEST'
+          ? `It has a credit line from before line pricing, so it can’t be copied. Correct it by hand.`
+          : documentErrorMessage(err, entityLower),
+      );
+    }
+  };
   const cancel = () =>
     void editor.run(
       () => invoicesApi.updateStatus(invoice.id, { status: InvoiceStatus.CANCELLED }),
@@ -167,7 +195,7 @@ export default function InvoiceDetailPage() {
           Take payment
         </Button>
       )}
-      {(draft || voidable) && (
+      {(draft || voidable || reissuable) && (
         <Dropdown>
           <DropdownButton plain size="xs" aria-label="More actions">
             <EllipsisHorizontalIcon />
@@ -179,6 +207,11 @@ export default function InvoiceDetailPage() {
               </DropdownItem>
             )}
             {voidable && invoice.lastSentAt && shareLink.items}
+            {reissuable && (
+              <DropdownItem onClick={() => setReissuing(true)}>
+                <DropdownLabel>{reissueLabel}</DropdownLabel>
+              </DropdownItem>
+            )}
             {voidable && (
               <DropdownItem onClick={() => setVoiding(true)}>
                 <DropdownLabel>{`Void ${entityLower}`}</DropdownLabel>
@@ -259,10 +292,21 @@ export default function InvoiceDetailPage() {
           {billTo.name}'s credit and can be applied to another {entityLabel.toLowerCase()}.
         </Callout>
       )}
+      {invoice.reissuedFromInvoiceId && <ReissueCreditCallout invoice={invoice} billToName={billTo.name} entity={entityLower} />}
       {!legacy && LOCKED.includes(invoice.status) && (
-        <Callout kind="neutral" className="mb-2.5">
+        <Callout
+          kind="neutral"
+          className="mb-2.5"
+          action={
+            reissuable && (
+              <Button outline size="xs" onClick={() => setReissuing(true)}>
+                {reissueLabel}
+              </Button>
+            )
+          }
+        >
           Sent {getName('invoice', true).toLowerCase()} are locked because the customer’s copy and balance depend on the
-          total.
+          total.{reissuable && ' To correct one, void and reissue it.'}
         </Callout>
       )}
       <DocumentWarnings doc={invoice} billToName={billTo.name} nte={workOrder?.notToExceed} />
@@ -314,6 +358,26 @@ export default function InvoiceDetailPage() {
         confirmLabel={`Cancel ${entityLower}`}
         cancelLabel="Keep it"
         isDestructive
+      />
+      <ConfirmDialog
+        isOpen={reissuing}
+        onClose={() => setReissuing(false)}
+        onConfirm={() => void reissue()}
+        title={invoice.status === InvoiceStatus.VOID ? `Reissue ${invoice.invoiceNumber}?` : `Void ${invoice.invoiceNumber} and reissue?`}
+        message={
+          invoice.status === InvoiceStatus.VOID
+            ? `A new draft with the same lines opens so you can correct it and send it. ${invoice.invoiceNumber} stays void.`
+            : `${invoice.invoiceNumber} becomes Void and stays in the record.${
+                invoice.amountPaid > 0
+                  ? ` The ${formatCurrency(invoice.amountPaid)} paid on it goes back to ${billTo.name}’s credit.`
+                  : ''
+              } A new draft with the same lines opens so you can correct it${
+                invoice.amountPaid > 0 ? ', and once it’s sent it offers to apply that credit' : ''
+              }.`
+        }
+        confirmLabel={invoice.status === InvoiceStatus.VOID ? 'Reissue' : 'Void & reissue'}
+        cancelLabel="Keep it"
+        isDestructive={invoice.status !== InvoiceStatus.VOID}
       />
       <ConfirmDialog
         isOpen={!!voidingPayment}

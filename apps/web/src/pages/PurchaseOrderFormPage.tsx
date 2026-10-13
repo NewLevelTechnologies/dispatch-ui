@@ -46,6 +46,8 @@ const FIELD_PAID_BY = ['Company account', 'Cash', 'Reimbursable', 'Paid at count
 
 interface Row {
   key: string;
+  /** The saved line's id; absent on a line added in this edit. */
+  id?: string;
   name: string;
   sku: string;
   qty: string;
@@ -151,6 +153,7 @@ export default function PurchaseOrderFormPage() {
       po.lines.length
         ? po.lines.map((l) => ({
             key: `r-${++rowSeq}`,
+            id: l.id,
             name: l.name,
             sku: l.sku ?? '',
             qty: String(l.quantityOrdered),
@@ -206,6 +209,8 @@ export default function PurchaseOrderFormPage() {
 
   const buildLines = (): PurchaseOrderLineInput[] =>
     lineRows.map((r) => ({
+      // Existing lines keep their id, so invoice lines billed from them stay linked.
+      ...(r.id ? { id: r.id } : {}),
       name: r.name.trim(),
       sku: r.sku.trim() || undefined,
       quantityOrdered: parseInt(r.qty, 10) || 1,

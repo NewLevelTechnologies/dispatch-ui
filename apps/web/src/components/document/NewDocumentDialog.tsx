@@ -26,15 +26,20 @@ export function NewDocumentDialog({
   onClose,
   workOrderId,
   customer,
+  openOnPurchases,
 }: {
   kind: NewDocumentKind | null;
   onClose: () => void;
   workOrderId: string;
   customer: { id: string; name: string };
+  /** Open the new draft with its add-line panel on the job's purchase-order parts. */
+  openOnPurchases?: boolean;
 }) {
   return (
     <Dialog open={kind != null} onClose={onClose} size="lg">
-      {kind && <NewDocumentForm kind={kind} onClose={onClose} workOrderId={workOrderId} customer={customer} />}
+      {kind && (
+        <NewDocumentForm kind={kind} onClose={onClose} workOrderId={workOrderId} customer={customer} openOnPurchases={openOnPurchases} />
+      )}
     </Dialog>
   );
 }
@@ -44,11 +49,13 @@ function NewDocumentForm({
   onClose,
   workOrderId,
   customer,
+  openOnPurchases,
 }: {
   kind: NewDocumentKind;
   onClose: () => void;
   workOrderId: string;
   customer: { id: string; name: string };
+  openOnPurchases?: boolean;
 }) {
   const { getName } = useGlossary();
   const navigate = useNavigate();
@@ -74,7 +81,7 @@ function NewDocumentForm({
           : await invoicesApi.create({ customerId: billTo.id, workOrderId, invoiceDate: date, dueDate: until, lineItems: [] });
       refreshDocumentLists(queryClient);
       onClose();
-      navigate(kind === 'quote' ? `/quotes/${doc.id}` : `/invoices/${doc.id}`);
+      navigate(`${kind === 'quote' ? `/quotes/${doc.id}` : `/invoices/${doc.id}`}${openOnPurchases ? '?add=po' : ''}`);
     } catch (err) {
       showError(`Couldn’t create the ${lower}`, documentErrorMessage(err, lower));
       setBusy(false);

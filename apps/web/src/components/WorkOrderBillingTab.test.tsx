@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { screen, within } from '@testing-library/react';
 import { renderWithProviders, userEvent } from '../test/utils';
 import WorkOrderBillingTab from './WorkOrderBillingTab';
-import { apiClient, type Invoice, type Quote, type QuoteInvoiceable } from '../api/setup';
+import { apiClient, type Invoice, type Quote, type QuoteInvoiceable, type UnbilledPurchase } from '../api/setup';
 
 vi.mock('@dispatch/api/src/client');
 
@@ -164,5 +164,66 @@ describe('WorkOrderBillingTab', () => {
 
     await user.click(screen.getByRole('button', { name: 'Take payment' }));
     expect(await screen.findByRole('dialog')).toBeInTheDocument();
+  });
+});
+
+describe('WorkOrderBillingTab · not billed yet', () => {
+  const part = (over: Partial<UnbilledPurchase>): UnbilledPurchase => ({
+    purchaseOrderId: 'po-1', purchaseOrderNumber: 'PO-1043', purchaseOrderType: 'ORDER', poLineId: 'pl-1',
+    description: 'Capacitor 45/5', sku: 'CAP-455', quantity: 1, billedQuantity: 0, unbilledQuantity: 1,
+    unitCost: 18.75, unbilledCost: 18.75, suggestedUnitPrice: 48, ...over,
+  });
+  const parts = [part({}), part({ poLineId: 'pl-2', description: 'Contactor 40A', unitCost: 28.4, unbilledCost: 28.4 })];
+  const withParts = (invoices: Invoice[], rows: UnbilledPurchase[]) => {
+    vi.mocked(apiClient.get).mockImplementation((url: string) => {
+      if (url === '/financial/work-orders/wo-1/summary') return Promise.resolve({ data: ZERO });
+      if (url === '/financial/work-orders/wo-1/quotes') return Promise.resolve({ data: [] });
+      if (url === '/financial/work-orders/wo-1/invoices') return Promise.resolve({ data: invoices });
+      if (url === '/financial/work-orders/wo-1/unbilled-purchases') return Promise.resolve({ data: rows });
+      return Promise.reject(new Error(`unexpected GET ${url}`));
+    });
+  };
+
+  beforeEach(() => vi.clearAllMocks());
+
+  it('groups unbilled parts by PO and sends them to the draft invoice', async () => {
+    withParts([invoice({ id: 'inv-9', invoiceNumber: 'INV-2219', status: 'DRAFT' })], parts);
+    renderTab();
+
+    expect(await screen.findByText(/2 parts bought on/)).toHaveTextContent('2 parts bought on PO-1043 aren’t on any invoice');
+    expect(screen.getByText('Capacitor 45/5, Contactor 40A · $47.15 cost')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Add to invoice' })).toHaveAttribute('href', '/invoices/inv-9?add=po');
+  });
+
+  it('shows the card before there are any documents, offering a new invoice', async () => {
+    const user = userEvent.setup();
+    withParts([], parts);
+    renderTab();
+
+    await user.click(await screen.findByRole('button', { name: 'Add to new invoice' }));
+    expect(await screen.findByRole('dialog')).toBeInTheDocument();
+  });
+
+  it('dismisses a PO’s parts with a reason, and undoes one', async () => {
+    const user = userEvent.setup();
+    vi.mocked(apiClient.put).mockResolvedValue({ data: {} });
+    withParts([], [
+      ...parts,
+      part({ poLineId: 'pl-3', description: 'Filter 16x25', notBillable: { poLineId: 'pl-3', notBillable: true, reason: 'Shop stock', markedByName: 'Dana Ortiz' } }),
+    ]);
+    renderTab();
+
+    await user.click(await screen.findByRole('button', { name: 'Dismiss' }));
+    const dialog = await screen.findByRole('dialog');
+    await user.type(within(dialog).getByRole('textbox', { name: 'Reason' }), 'Warranty part');
+    await user.click(within(dialog).getByRole('button', { name: 'Dismiss' }));
+    await vi.waitFor(() => expect(apiClient.put).toHaveBeenCalledTimes(2));
+    expect(apiClient.put).toHaveBeenCalledWith('/financial/purchase-order-lines/pl-1/billing', { notBillable: true, reason: 'Warranty part' });
+    expect(apiClient.put).toHaveBeenCalledWith('/financial/purchase-order-lines/pl-2/billing', { notBillable: true, reason: 'Warranty part' });
+
+    await user.click(screen.getByRole('button', { name: 'Show dismissed (1)' }));
+    expect(screen.getByText('Not billable: Shop stock · Dana Ortiz')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Undo dismiss Filter 16x25' }));
+    expect(apiClient.put).toHaveBeenCalledWith('/financial/purchase-order-lines/pl-3/billing', { notBillable: false });
   });
 });
