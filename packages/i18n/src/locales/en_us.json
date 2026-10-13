@@ -3291,6 +3291,7 @@
         "quoted": "quoted"
       },
       "overview": {
+        "acceptedQuotes": "Accepted {{quotes, lowercase}}",
         "access": "Access",
         "attachEquipment": "Attach equipment on site",
         "attnLive": "{{name}} on site",

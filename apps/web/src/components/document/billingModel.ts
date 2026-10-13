@@ -1,4 +1,4 @@
-import { InvoiceStatus, QuoteStatus, type Invoice, type Quote, type QuoteInvoiceable } from '../../api/setup';
+import type { Invoice, Quote, QuoteInvoiceable } from '../../api/setup';
 
 /** A work order's documents as the billing tab lists them: each quote with the invoices billed from it. */
 export type BillingNode =
@@ -45,30 +45,10 @@ export function buildBillingTree(quotes: Quote[], invoices: Invoice[]): BillingN
   return nodes.sort((a, b) => byCreated(b, a)).map((n) => n.node);
 }
 
-/** Issued invoices: what the customer has been asked to pay. */
-const ISSUED: InvoiceStatus[] = [InvoiceStatus.SENT, InvoiceStatus.OVERDUE, InvoiceStatus.PAID];
-
-export interface BillingStats {
-  accepted: number;
-  awaiting: number;
-  invoiced: number;
-  inDraft: number;
-  collected: number;
-  balance: number;
-}
-
-/** Sums of the documents' own totals; drafts aren't billed yet, void and cancelled never were. */
-export function billingStats(quotes: Quote[], invoices: Invoice[]): BillingStats {
-  const sum = <T>(rows: T[], f: (r: T) => number) => rows.reduce((s, r) => s + f(r), 0);
-  const issued = invoices.filter((i) => ISSUED.includes(i.status));
-  return {
-    accepted: sum(quotes.filter((q) => q.status === QuoteStatus.ACCEPTED), (q) => q.totalAmount),
-    awaiting: sum(quotes.filter((q) => q.status === QuoteStatus.SENT), (q) => q.totalAmount),
-    invoiced: sum(issued, (i) => i.totalAmount),
-    inDraft: sum(invoices.filter((i) => i.status === InvoiceStatus.DRAFT), (i) => i.totalAmount),
-    collected: sum(issued, (i) => i.amountPaid),
-    balance: sum(issued, (i) => i.balanceDue),
-  };
+/** A summary amount as a number; the server's decimals may arrive as strings. */
+export function amount(v: string | number | null | undefined): number {
+  const n = typeof v === 'number' ? v : parseFloat(v ?? '');
+  return Number.isFinite(n) ? n : 0;
 }
 
 /**

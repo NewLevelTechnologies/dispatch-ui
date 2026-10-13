@@ -1840,6 +1840,7 @@ vi.mock('react-i18next', () => {
     'workOrders.detail.premiseBusiness': 'Business',
     'workOrders.detail.premiseResidence': 'Residence',
     'workOrders.detail.overview.access': 'Access',
+    'workOrders.detail.overview.acceptedQuotes': 'Accepted {{quotes, lowercase}}',
     'workOrders.detail.overview.attnLive': '{{name}} on site',
     'workOrders.detail.overview.balanceDue': 'Balance due · {{amount}}',
     'workOrders.detail.overview.collectedAmount': '{{amount}} collected',

@@ -136,6 +136,9 @@ describe('WorkOrderDetailPage', () => {
 
   const ZERO_SUMMARY: WorkOrderFinancialSummary = {
     invoiced: '0.00',
+    inDraft: '0.00',
+    quotedAccepted: '0.00',
+    quotedAwaiting: '0.00',
     paid: '0.00',
     balance: '0.00',
     currency: 'USD',

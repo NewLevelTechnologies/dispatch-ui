@@ -6,7 +6,7 @@ import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/rea
 import { ClipboardDocumentListIcon, DocumentTextIcon, PlusIcon } from '@heroicons/react/16/solid';
 import { useTranslation } from '@dispatch/i18n';
 import { formatCurrency } from '@dispatch/utils';
-import { invoicesApi, InvoiceStatus, quotesApi, QuoteStatus, type Invoice, type Quote } from '../api/setup';
+import { financialSummaryApi, invoicesApi, InvoiceStatus, quotesApi, QuoteStatus, type Invoice, type Quote } from '../api/setup';
 import { useGlossary } from '../contexts/GlossaryContext';
 import { showError, showSuccess } from '../lib/toast';
 import { Button } from './catalyst/button';
@@ -16,7 +16,7 @@ import { Pill, Tag } from './ui/Pill';
 import PaymentDialog from './PaymentDialog';
 import { BillQuoteDialog } from './document/BillQuoteDialog';
 import { NewDocumentDialog, type NewDocumentKind } from './document/NewDocumentDialog';
-import { billingStats, buildBillingTree, invoicedPercent } from './document/billingModel';
+import { amount, buildBillingTree, invoicedPercent } from './document/billingModel';
 import { formatDocDate } from './document/documentModel';
 import { documentErrorMessage, refreshDocumentLists } from './document/useDocumentEditor';
 
@@ -46,7 +46,8 @@ const day = (v: string | null | undefined) => formatDocDate(v, false) ?? '—';
 
 /**
  * A work order's quotes and invoices together. The work order owns no money:
- * every figure is the documents' own. Each invoice sits under the quote it
+ * the totals are the server's summary of its documents, the same figures the
+ * Overview card and the dispatch board show. Each invoice sits under the quote it
  * was billed from, a voided invoice next to its correction.
  */
 export default function WorkOrderBillingTab({
@@ -70,6 +71,10 @@ export default function WorkOrderBillingTab({
   const invoicesQuery = useQuery({
     queryKey: ['workOrderInvoices', workOrderId],
     queryFn: () => invoicesApi.getByWorkOrder(workOrderId),
+  });
+  const summaryQuery = useQuery({
+    queryKey: ['financialSummary', workOrderId],
+    queryFn: () => financialSummaryApi.getByWorkOrder(workOrderId),
   });
   const quotes = quotesQuery.data ?? [];
   const invoices = invoicesQuery.data ?? [];
@@ -172,7 +177,9 @@ export default function WorkOrderBillingTab({
     );
   }
 
-  const stats = billingStats(quotes, invoices);
+  const summary = summaryQuery.data;
+  const inDraft = amount(summary?.inDraft);
+  const awaiting = amount(summary?.quotedAwaiting);
   const partlyBilled = accepted.some((q) => {
     const p = percentOf.get(q.id);
     return p != null && p < 100;
@@ -199,29 +206,31 @@ export default function WorkOrderBillingTab({
 
   return (
     <div className="flex flex-col gap-3">
-      <Card>
-        <div className="grid grid-cols-2 lg:grid-cols-4">
-          <Stat
-            label={`Accepted ${getName('quote', true).toLowerCase()}`}
-            value={stats.accepted}
-            sub={stats.awaiting > 0 ? `+ ${formatCurrency(stats.awaiting)} awaiting ${getName('customer').toLowerCase()}` : null}
-          />
-          <Stat
-            label="Invoiced"
-            value={stats.invoiced}
-            sub={
-              stats.inDraft > 0
-                ? `+ ${formatCurrency(stats.inDraft)} in draft`
-                : partlyBilled
-                  ? `${getName('quote', true)} not fully invoiced`
-                  : null
-            }
-            warn={stats.inDraft === 0 && partlyBilled}
-          />
-          <Stat label="Collected" value={stats.collected} />
-          <Stat label="Balance due" value={stats.balance} strong />
-        </div>
-      </Card>
+      {summary && (
+        <Card>
+          <div className="grid grid-cols-2 lg:grid-cols-4">
+            <Stat
+              label={`Accepted ${getName('quote', true).toLowerCase()}`}
+              value={amount(summary.quotedAccepted)}
+              sub={awaiting > 0 ? `+ ${formatCurrency(awaiting)} awaiting ${getName('customer').toLowerCase()}` : null}
+            />
+            <Stat
+              label="Invoiced"
+              value={amount(summary.invoiced)}
+              sub={
+                inDraft > 0
+                  ? `+ ${formatCurrency(inDraft)} in draft`
+                  : partlyBilled
+                    ? `${getName('quote', true)} not fully invoiced`
+                    : null
+              }
+              warn={inDraft === 0 && partlyBilled}
+            />
+            <Stat label="Collected" value={amount(summary.paid)} />
+            <Stat label="Balance due" value={amount(summary.balance)} strong />
+          </div>
+        </Card>
+      )}
 
       <Card>
         <CardHead>

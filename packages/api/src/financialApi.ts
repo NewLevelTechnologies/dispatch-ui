@@ -1225,14 +1225,21 @@ export const paymentsApi = {
  *   - the WO id belongs to a different tenant (RLS isolation)
  * These three are intentionally indistinguishable (security default).
  */
+/**
+ * A work order's money, from its documents. `invoiced`, `paid` and `balance`
+ * count billed invoices only (not DRAFT, VOID or CANCELLED). All zero when
+ * the work order is outside the caller's regions. Decimals may arrive as
+ * strings.
+ */
 export interface WorkOrderFinancialSummary {
   invoiced: string;
-  /**
-   * Optional. Sum of non-DECLINED, non-EXPIRED quote totals for the WO
-   * (Phase 7b backend ask #9). Always returned on tenants where 7b has
-   * shipped; typed optional so the field can roll out additively
-   * without breaking the chip-row code path during transition.
-   */
+  /** Total of DRAFT invoices: not billed yet. */
+  inDraft: string;
+  /** Total of ACCEPTED quotes. */
+  quotedAccepted: string;
+  /** Total of SENT quotes, waiting on the customer. */
+  quotedAwaiting: string;
+  /** @deprecated Every quote not declined or expired, drafts included. Read `quotedAccepted` / `quotedAwaiting`. */
   quoted?: string;
   paid: string;
   balance: string;
