@@ -77,7 +77,7 @@ export default function PurchaseOrderFormPage() {
   // the label + back link. Stock POs (no WO) are allowed but not the WO-tab path.
   const workOrderId = editing ? (po?.workOrderId ?? null) : params.get('workOrderId');
   const { data: workOrder } = useQuery({
-    queryKey: ['work-order', workOrderId],
+    queryKey: ['work-orders', workOrderId],
     queryFn: () => workOrderApi.getById(workOrderId!),
     enabled: !!workOrderId,
   });

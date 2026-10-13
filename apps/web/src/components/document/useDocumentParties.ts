@@ -42,7 +42,7 @@ export function useDocumentParties({
     enabled: !!customerId,
   });
   const workOrderQuery = useQuery({
-    queryKey: ['work-order', workOrderId],
+    queryKey: ['work-orders', workOrderId],
     queryFn: () => workOrderApi.getById(workOrderId!),
     enabled: !!workOrderId,
   });
