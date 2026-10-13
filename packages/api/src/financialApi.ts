@@ -1435,6 +1435,8 @@ export interface PricebookCategory {
   name: string;
   sortOrder: number;
   active: boolean;
+  /** Active items in it and all its subcategories (the same scope as the `categoryId` filter). */
+  activeItemCount?: number;
   createdAt: string | null;
   updatedAt: string | null;
 }
@@ -1465,6 +1467,15 @@ export interface PricebookItem {
   laborHours: number | null;
   materialsCost: number | null;
   active: boolean;
+  /**
+   * Only when asked with `billToCustomerId`: what a line added from it gets
+   * under that account's rate plan (equal to `unitPrice` when no rule
+   * applies; null when the item has no price at all).
+   */
+  planUnitPrice?: number | null;
+  /** The plan rule that set `planUnitPrice`; null when the list price stands. */
+  pricingRule?: PricingRule | null;
+  pricingRuleValue?: number | null;
   /** Send back on an edit; a mismatch is 409 STALE_VERSION. */
   version: number;
   createdAt: string | null;
@@ -1502,6 +1513,8 @@ export interface PricebookItemQuery {
   /** Omit for both. */
   active?: boolean;
   pricingMode?: PricingMode;
+  /** Price each result for this account's rate plan (the document's customer). */
+  billToCustomerId?: string;
   page?: number;
   /** At most 200. */
   size?: number;
@@ -1532,6 +1545,15 @@ export const pricebookApi = {
 
   getItems: async (params: PricebookItemQuery = {}): Promise<FinancialPage<PricebookItem>> => {
     const response = await apiClient.get<FinancialPage<PricebookItem>>('/financial/pricebook/items', { params });
+    return response.data;
+  },
+
+  /**
+   * Active items ranked by how often they were added to quotes and invoices
+   * in the last 90 days. `size` at most 20.
+   */
+  getFrequent: async (params: { size?: number; billToCustomerId?: string } = {}): Promise<PricebookItem[]> => {
+    const response = await apiClient.get<PricebookItem[]>('/financial/pricebook/items/frequent', { params });
     return response.data;
   },
 

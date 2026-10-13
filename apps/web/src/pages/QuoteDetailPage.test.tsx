@@ -360,10 +360,11 @@ describe('QuoteDetailPage editing', () => {
     taxClass: 'MATERIALS', pricingMode: 'FIXED', unitPrice: 48, unitCost: 18.75, markupPct: null, laborHours: null,
     materialsCost: null, active: true, version: 1, createdAt: null, updatedAt: null,
   };
-  const withPricebook = (results: unknown[]) => {
+  const withPricebook = (results: unknown[], frequent: unknown[] = []) => {
     vi.mocked(apiClient.get).mockImplementation((url: string) => {
       if (url === '/financial/quotes/q-1') return Promise.resolve({ data: draft });
       if (url === '/financial/pricebook/items') return Promise.resolve({ data: { content: results, totalElements: results.length } });
+      if (url === '/financial/pricebook/items/frequent') return Promise.resolve({ data: frequent });
       if (url === '/customers/cust-1') return Promise.resolve({ data: customer });
       if (url === '/work-orders/wo-1') return Promise.resolve({ data: workOrder });
       return Promise.reject(new Error(`unexpected GET ${url}`));
@@ -381,7 +382,7 @@ describe('QuoteDetailPage editing', () => {
     const search = screen.getByRole('combobox', { name: 'Search pricebook' });
     await user.type(search, 'cap');
     expect(await screen.findByRole('option', { name: /Capacitor 45\/5/ })).toHaveAttribute('aria-selected', 'true');
-    expect(apiClient.get).toHaveBeenCalledWith('/financial/pricebook/items', { params: { q: 'cap', active: true, size: 20 } });
+    expect(apiClient.get).toHaveBeenCalledWith('/financial/pricebook/items', { params: { q: 'cap', active: true, size: 20, billToCustomerId: 'cust-1' } });
     await user.keyboard('{Enter}');
 
     expect(apiClient.post).toHaveBeenCalledWith('/financial/quotes/q-1/lines', { version: 7, itemId: 'it-9', quantity: 1 });
@@ -389,6 +390,22 @@ describe('QuoteDetailPage editing', () => {
     expect(search).toHaveValue('');
     await user.keyboard('{Escape}');
     expect(screen.queryByRole('combobox', { name: 'Search pricebook' })).not.toBeInTheDocument();
+  });
+
+  it('shows frequently used items priced at the customer’s plan before anything is typed', async () => {
+    const user = userEvent.setup();
+    withPricebook([], [{ ...capItem, planUnitPrice: 43.2, pricingRule: 'PRICE_MULTIPLIER', pricingRuleValue: 0.9 }]);
+    vi.mocked(apiClient.post).mockResolvedValue({ data: { ...draft, version: 8 } });
+    renderPage();
+
+    await user.click(await screen.findByRole('button', { name: '+ Add line' }));
+    expect(await screen.findByText('Frequently used')).toBeInTheDocument();
+    expect(apiClient.get).toHaveBeenCalledWith('/financial/pricebook/items/frequent', { params: { size: 6, billToCustomerId: 'cust-1' } });
+    const option = screen.getByRole('option', { name: /Capacitor 45\/5/ });
+    expect(option).toHaveTextContent('list $48.00 · × 0.9 · plan');
+    expect(option).toHaveTextContent('$43.20');
+    await user.keyboard('{Enter}');
+    expect(apiClient.post).toHaveBeenCalledWith('/financial/quotes/q-1/lines', { version: 7, itemId: 'it-9', quantity: 1 });
   });
 
   it('offers a freeform line when nothing in the pricebook matches', async () => {
