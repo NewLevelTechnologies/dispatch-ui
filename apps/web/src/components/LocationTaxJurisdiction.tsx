@@ -1,7 +1,8 @@
 /* eslint-disable i18next/no-literal-string -- dense visual detail page; short operational labels stay literal (same convention as ServiceLocationDetailPage). */
 import { useState, type FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { taxApi, type LocationTaxJurisdiction as LocationTax } from '../api/setup';
+import { Link } from 'react-router-dom';
+import { customerApi, taxApi, type LocationTaxJurisdiction as LocationTax } from '../api/setup';
 import { useHasAnyCapability } from '../hooks/useCurrentUser';
 import { extractApiError, showError, showSuccess } from '../lib/toast';
 import { Dialog, DialogActions, DialogBody, DialogDescription, DialogTitle } from './catalyst/dialog';
@@ -15,10 +16,16 @@ const DEFAULT = '__default';
 /**
  * The tax this location's quotes and invoices are charged under: its
  * assigned jurisdiction, or the company default. Changeable by anyone who
- * manages pricing or edits quotes or invoices.
+ * manages pricing or edits quotes or invoices. A tax-exempt customer is
+ * never charged, whatever the jurisdiction, so that's said too.
  */
-export function LocationTaxJurisdiction({ serviceLocationId }: { serviceLocationId: string }) {
+export function LocationTaxJurisdiction({ serviceLocationId, customerId }: { serviceLocationId: string; customerId?: string }) {
   const canAssign = useHasAnyCapability('MANAGE_PRICING', 'EDIT_QUOTES', 'EDIT_INVOICES');
+  const { data: customer } = useQuery({
+    queryKey: ['customers', customerId],
+    queryFn: () => customerApi.getById(customerId!),
+    enabled: !!customerId,
+  });
   const [open, setOpen] = useState(false);
   const { data } = useQuery({
     queryKey: ['location-tax-jurisdiction', serviceLocationId],
@@ -38,8 +45,9 @@ export function LocationTaxJurisdiction({ serviceLocationId }: { serviceLocation
             {data.assignedJurisdictionId == null && <span className="text-fg-muted"> (default)</span>}
           </>
         ) : (
-          <span className="text-warning-fg">Not set. No tax is charged.</span>
+          <span className="text-warning-fg">No jurisdiction and no default · no tax is charged</span>
         )}
+        {customer?.taxExempt && <span className="text-fg-muted"> · Customer is tax-exempt</span>}
       </span>
       {canAssign && (
         <button type="button" className="card-action" onClick={() => setOpen(true)}>
@@ -55,6 +63,7 @@ export function LocationTaxJurisdiction({ serviceLocationId }: { serviceLocation
 
 function AssignForm({ current, onClose }: { current: LocationTax; onClose: () => void }) {
   const queryClient = useQueryClient();
+  const canManagePricing = useHasAnyCapability('MANAGE_PRICING');
   const { data: jurisdictions = [] } = useQuery({
     queryKey: ['tax-jurisdictions'],
     queryFn: () => taxApi.getJurisdictions(),
@@ -82,12 +91,18 @@ function AssignForm({ current, onClose }: { current: LocationTax; onClose: () =>
   return (
     <form onSubmit={submit}>
       <DialogTitle>Tax jurisdiction</DialogTitle>
-      <DialogDescription>Quotes and invoices for this location are taxed under it.</DialogDescription>
+      <DialogDescription>
+        Applies to new quotes and invoices at this location, and to drafts the next time they’re edited. Sent ones keep their tax.
+      </DialogDescription>
       <DialogBody>
         <Field>
           <Label>Jurisdiction</Label>
           <Select value={choice} onChange={(e) => setChoice(e.target.value)}>
-            <option value={DEFAULT}>{defaultOne ? `Use the default (${defaultOne.name})` : 'Use the default (none set)'}</option>
+            <option value={DEFAULT}>
+              {defaultOne
+                ? `Use the default (${defaultOne.name}${defaultOne.rate != null ? ` · ${pct(defaultOne.rate)}` : ''})`
+                : 'Use the default (none set)'}
+            </option>
             {options.map((j) => (
               <option key={j.id} value={j.id}>
                 {j.name}
@@ -97,6 +112,11 @@ function AssignForm({ current, onClose }: { current: LocationTax; onClose: () =>
             ))}
           </Select>
         </Field>
+        {canManagePricing && (
+          <Link to="/settings/tax" className="mt-2 inline-block text-[12px] text-fg-accent hover:underline">
+            Manage jurisdictions
+          </Link>
+        )}
       </DialogBody>
       <DialogActions>
         <Button plain onClick={onClose} disabled={save.isPending}>

@@ -2735,7 +2735,7 @@ function ParentCustomerCard({ location }: { location: ServiceLocationDetailDto }
         </div>
       )}
 
-      <LocationTaxJurisdiction serviceLocationId={location.id} />
+      <LocationTaxJurisdiction serviceLocationId={location.id} customerId={location.customerId} />
 
       {primaryAgreement && (
         <div className="mt-2 border-t border-border-soft pt-2 text-[11.5px] text-fg-muted">
