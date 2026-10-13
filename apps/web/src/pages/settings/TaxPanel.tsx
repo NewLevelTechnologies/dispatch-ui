@@ -89,6 +89,16 @@ export default function TaxPanel() {
   const defaultOne = list.find((j) => j.isDefault);
   const noRate = list.filter((j) => j.active && j.rate == null);
 
+  // What a missing rate costs: the default's covers every unassigned location; an assigned one, its own.
+  const noRateText = (j: TaxJurisdiction) =>
+    j.isDefault
+      ? t('settings.tax.issueNoRateDefault', { name: j.name })
+      : j.locationCount == null
+        ? t('settings.tax.issueNoRate', { name: j.name })
+        : j.locationCount === 0
+          ? t('settings.tax.issueNoRateUnused', { name: j.name })
+          : t('settings.tax.issueNoRateCount', { name: j.name, count: j.locationCount });
+
   const update = useMutation({
     mutationFn: ({ id, request }: { id: string; request: TaxJurisdictionRequest }) => taxApi.updateJurisdiction(id, request),
     onSuccess: () => {
@@ -116,7 +126,7 @@ export default function TaxPanel() {
       <SetupIssues
         issues={noRate.map((j) => ({
           key: j.id,
-          text: t('settings.tax.issueNoRate', { name: j.name }),
+          text: noRateText(j),
           action: canManage ? { label: t('settings.tax.setRate'), onClick: () => setEditing({ jurisdiction: j }) } : undefined,
         }))}
       />
@@ -162,6 +172,7 @@ export default function TaxPanel() {
                     <th>{t('settings.tax.col.name')}</th>
                     <th className="right">{t('settings.tax.col.rate')}</th>
                     <th>{t('settings.tax.col.taxes')}</th>
+                    <th className="right">{t('settings.tax.col.locations')}</th>
                     <th>{t('settings.tax.col.status')}</th>
                     {canManage && <th style={{ width: 40 }} />}
                   </tr>
@@ -188,6 +199,10 @@ export default function TaxPanel() {
                       </td>
                       <td data-label={t('settings.tax.col.taxes')}>
                         <TaxedClasses jurisdiction={j} />
+                      </td>
+                      <td className="right num" data-label={t('settings.tax.col.locations')}>
+                        {j.locationCount ? j.locationCount : <span className="text-fg-muted">—</span>}
+                        {j.isDefault && <div className="text-[10.5px] text-fg-muted">{t('settings.tax.allUnassigned')}</div>}
                       </td>
                       <td>
                         {j.active ? (

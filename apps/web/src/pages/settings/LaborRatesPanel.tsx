@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from '@dispatch/i18n';
 import { formatCurrency } from '@dispatch/utils';
 import { ClockIcon, EllipsisVerticalIcon, PlusIcon } from '@heroicons/react/24/outline';
-import { laborRatesApi, ratePlansApi, type LaborRateType, type LaborRateTypeRequest } from '../../api/setup';
+import { laborRatesApi, pricebookApi, ratePlansApi, type LaborRateType, type LaborRateTypeRequest } from '../../api/setup';
 import { useHasAnyCapability } from '../../hooks/useCurrentUser';
 import { Button } from '../../components/catalyst/button';
 import { Dialog, DialogActions, DialogBody, DialogTitle } from '../../components/catalyst/dialog';
@@ -324,6 +324,13 @@ function RateForm({ rate, nextSortOrder, onClose }: { rate: LaborRateType | null
   const ready = name.trim() !== '' && ok(billNum) && ok(costNum);
   const m = ok(billNum) && ok(costNum) ? margin(billNum, costNum) : null;
   const regularChanged = rate?.role === 'REGULAR' && billNum !== rate.billRate;
+  // How many items the change reprices. Inactive ones are repriced too, but only active ones get billed.
+  const { data: computed } = useQuery({
+    queryKey: ['pricebook-items', { pricingMode: 'COMPUTED', active: true, count: true }],
+    queryFn: () => pricebookApi.getItems({ pricingMode: 'COMPUTED', active: true, size: 1 }),
+    enabled: rate?.role === 'REGULAR',
+  });
+  const computedCount = computed?.totalElements;
 
   const save = useMutation({
     mutationFn: () => {
@@ -387,9 +394,11 @@ function RateForm({ rate, nextSortOrder, onClose }: { rate: LaborRateType | null
           {t('settings.laborRates.form.margin')}{' '}
           {m == null ? '—' : <span className="font-semibold text-fg-strong">{m}%</span>}
         </p>
-        {regularChanged && (
+        {regularChanged && computedCount !== 0 && (
           <Callout kind="warning" className="mt-3">
-            {t('settings.laborRates.form.regularWarning')}
+            {computedCount == null
+              ? t('settings.laborRates.form.regularWarning')
+              : t('settings.laborRates.form.regularWarningCount', { count: computedCount })}
           </Callout>
         )}
       </DialogBody>

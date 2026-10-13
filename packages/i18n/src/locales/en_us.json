@@ -2629,14 +2629,15 @@
       "filterSizes": "Filter Sizes",
       "general": "General",
       "itemStatuses": "Item Statuses",
+      "laborRates": "Labor rates",
       "notificationTemplates": "Notification Templates",
       "plans": "Plans",
+      "pricebook": "Pricebook",
       "revenueTargets": "Revenue Targets",
       "tax": "Tax",
       "terminology": "Terminology",
       "types": "Types",
-      "workflows": "Workflows",
-      "laborRates": "Labor rates"
+      "workflows": "Workflows"
     },
     "openNav": "Open settings menu",
     "planned": "Planned",
@@ -2904,6 +2905,7 @@
       "actionsFor": "Actions for {{name}}",
       "activate": "Activate",
       "add": "Add jurisdiction",
+      "allUnassigned": "+ all unassigned",
       "cardTitle": "Jurisdictions",
       "class": {
         "EQUIPMENT": "Equipment",
@@ -2914,6 +2916,7 @@
       "classNotTaxed": "{{name}} is not taxed",
       "classTaxed": "{{name}} is taxed",
       "col": {
+        "locations": "Locations",
         "name": "Jurisdiction",
         "rate": "Rate",
         "status": "Status",
@@ -2948,6 +2951,10 @@
         "taxesHint": "Only lines in a checked class are taxed here."
       },
       "issueNoRate": "{{name}} has no rate. Locations using it are charged no tax.",
+      "issueNoRateCount_one": "{{name}} has no rate. {{count}} location using it is charged no tax.",
+      "issueNoRateCount_other": "{{name}} has no rate. {{count}} locations using it are charged no tax.",
+      "issueNoRateDefault": "{{name}} is the default and has no rate. Locations without their own jurisdiction are charged no tax.",
+      "issueNoRateUnused": "{{name}} has no rate. No locations use it yet.",
       "lineSource": {
         "agreement": "{{agreement}} installments",
         "agreementLabel": "Tax class for {{agreement}} installments",
@@ -3014,7 +3021,9 @@
         "name": "Name",
         "namePlaceholder": "e.g. Emergency",
         "optional": "Optional",
-        "regularWarning": "Changing the Regular rate reprices every computed pricebook item. Quotes and invoices already created keep their prices."
+        "regularWarning": "Changing the Regular rate reprices every computed pricebook item. Quotes and invoices already created keep their prices.",
+        "regularWarningCount_one": "Changing the Regular rate reprices {{count}} computed pricebook item. Quotes and invoices already created keep their prices.",
+        "regularWarningCount_other": "Changing the Regular rate reprices {{count}} computed pricebook items. Quotes and invoices already created keep their prices."
       },
       "hourSuffix": "/hr",
       "internal": "Internal",
@@ -3046,6 +3055,138 @@
       "hideInactive": "Hide inactive ({{count}})",
       "showInactive": "Show inactive ({{count}})",
       "viewOnly": "View only. Changing pricing needs the Manage pricing permission."
+    },
+    "pricebook": {
+      "actionsFor": "Actions for {{name}}",
+      "activate": "Activate",
+      "add": "Add item",
+      "allItems": "All items",
+      "allTypes": "All",
+      "categories": {
+        "add": "Add a category",
+        "addButton": "Add",
+        "manageDescription": "Group items so they’re easier to find. Rate plans can also price a category differently. Categories with active items can’t be deactivated.",
+        "manageTitle": "Categories",
+        "name": "Name",
+        "none": "No categories yet.",
+        "parent": "Inside",
+        "saveFailed": "Couldn’t save the category",
+        "saved": "{{name}} saved",
+        "title": "Categories",
+        "topLevel": "Top level"
+      },
+      "col": {
+        "cost": "Cost",
+        "item": "Item",
+        "margin": "Margin",
+        "price": "Price",
+        "pricing": "Pricing",
+        "taxClass": "Tax class"
+      },
+      "computedDetail": "{{hours}} hr Regular + {{cost}} parts +{{markup}}%",
+      "computedLaborOnly": "{{hours}} hr Regular",
+      "deactivate": "Deactivate",
+      "description": "Services, parts, equipment and fees you put on quotes and invoices. Prices here are list prices; rate plans adjust them per account.",
+      "duplicate": "Duplicate",
+      "emptyDescription": "Add the services, parts and fees you bill most, so they’re one search away on a quote.",
+      "emptyFilteredTitle": "No items here",
+      "emptyTitle": "No items yet",
+      "errors": {
+        "CATEGORY_IN_USE": "It still holds active items or subcategories. Move or deactivate them first.",
+        "NAME_TAKEN": "That name is already taken.",
+        "SKU_TAKEN": "Another item already has that SKU.",
+        "STALE_VERSION": "Someone else changed this item. It’s been reloaded; make your change again.",
+        "generic": "Something went wrong. Try again."
+      },
+      "feeRole": {
+        "AFTER_HOURS": "After-hours",
+        "DIAGNOSTIC": "Diagnostic",
+        "DISPOSAL": "Disposal",
+        "OTHER": "Other",
+        "TRIP": "Trip"
+      },
+      "form": {
+        "activeHint": "Inactive items can’t be added to new documents. Existing lines keep them.",
+        "calcLabor": "{{hours}} hr × {{rate}}",
+        "calcParts": "{{cost}} parts + {{markup}}%",
+        "category": "Category",
+        "computedUnpriced": "The Regular labor rate isn’t set, so this item has no price and can’t be billed yet.",
+        "cost": "Cost",
+        "costOptional": "Optional.",
+        "costUnknown": "cost unknown",
+        "create": "Create item",
+        "feeRole": "Fee role",
+        "feeRoleHint": "Says which fee this is, so member benefits like a waived trip charge find it.",
+        "feeRolePick": "Pick one",
+        "itemSection": "Item",
+        "itemSectionHint": "Type sets the tax class default and how the item can be priced.",
+        "keepPrices": "Existing quotes and invoices keep the price they were created with.",
+        "laborHours": "Labor hours",
+        "margin": "Margin",
+        "markup": "Markup (%)",
+        "mode": {
+          "goods": {
+            "FIXED": "List price",
+            "MARKUP": "Cost + markup"
+          },
+          "service": {
+            "COMPUTED": "Computed from labor + parts",
+            "FIXED": "Fixed price"
+          }
+        },
+        "name": "Name",
+        "nameHint": "Shown on quotes and invoices.",
+        "newTitle": "New item",
+        "noCategory": "None",
+        "partsCost": "Parts cost",
+        "partsMarkup": "Parts markup (%)",
+        "price": "Price",
+        "priceUnit": "Price (per {{unit}})",
+        "pricingHintGoods": "A list price, or the cost marked up. Rate plans can still re-price materials from cost.",
+        "pricingHintService": "Computed prices follow the Regular labor rate and update when it changes.",
+        "pricingSection": "Pricing",
+        "rate": "Rate",
+        "regularNotSet": "Regular rate not set",
+        "regularRate": "{{name}} · {{rate}}/hr",
+        "setRegular": "Set the Regular rate",
+        "sku": "SKU / code",
+        "statusSection": "Status",
+        "taxClass": "Tax class",
+        "taxDefault": "Default for {{type}} items.",
+        "taxOverride": "Overrides the {{type}} default ({{class}}).",
+        "taxSection": "Tax",
+        "type": "Type",
+        "typeLocked": "Type can’t change after creation. Duplicate the item to make one of a different type.",
+        "unit": "Unit"
+      },
+      "internal": "Internal",
+      "loadFailed": "Couldn’t load the pricebook",
+      "loadItemFailed": "Couldn’t load this item",
+      "loading": "Loading the pricebook…",
+      "loadingItem": "Loading item…",
+      "markupDetail": "{{cost}} cost +{{markup}}%",
+      "mode": {
+        "COMPUTED": "Computed",
+        "FIXED": "Fixed",
+        "MARKUP": "Cost + markup"
+      },
+      "needsRegularRate": "Needs Regular rate",
+      "noMatchDescription": "Try a different name or SKU.",
+      "noMatchTitle": "No items match “{{q}}”",
+      "searchPlaceholder": "Name or SKU…",
+      "showing": "Showing {{count}} of {{total}}",
+      "title": "Pricebook",
+      "toast": {
+        "saveFailed": "Couldn’t save the item",
+        "saved": "{{name}} saved"
+      },
+      "type": {
+        "EQUIPMENT": "Equipment",
+        "FEE": "Fee",
+        "MATERIAL": "Material",
+        "SERVICE": "Service"
+      },
+      "typeFilter": "Item type"
     }
   },
   "tags": {

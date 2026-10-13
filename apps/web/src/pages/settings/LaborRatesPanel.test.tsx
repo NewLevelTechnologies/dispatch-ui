@@ -40,6 +40,7 @@ describe('LaborRatesPanel', () => {
     vi.mocked(apiClient.get).mockImplementation((url: string) => {
       if (url === '/financial/labor-rates') return Promise.resolve({ data: [regular, holiday, apprentice] });
       if (url === '/financial/rate-plans') return Promise.resolve({ data: [plan] });
+      if (url === '/financial/pricebook/items') return Promise.resolve({ data: { content: [], totalElements: 14 } });
       return Promise.reject(new Error(`unexpected GET ${url}`));
     });
   });
@@ -84,11 +85,12 @@ describe('LaborRatesPanel', () => {
     await screen.findByText('Regular');
     await user.click(rowOf('Regular'));
     const dialog = await screen.findByRole('dialog');
-    expect(within(dialog).queryByText(/reprices every computed pricebook item/)).not.toBeInTheDocument();
+    expect(within(dialog).queryByText(/reprices/)).not.toBeInTheDocument();
     const bill = within(dialog).getByRole('textbox', { name: 'Bill rate ($/hr)' });
     await user.clear(bill);
     await user.type(bill, '105');
-    expect(within(dialog).getByText(/reprices every computed pricebook item/)).toBeInTheDocument();
+    expect(await within(dialog).findByText(/reprices 14 computed pricebook items/)).toBeInTheDocument();
+    expect(apiClient.get).toHaveBeenCalledWith('/financial/pricebook/items', { params: { pricingMode: 'COMPUTED', active: true, size: 1 } });
     expect(within(dialog).getByText('64%')).toBeInTheDocument();
   });
 
