@@ -16,6 +16,8 @@ export interface HeaderDateField {
 }
 
 export interface HeaderValues {
+  /** Only when the dialog edits a title (quotes). */
+  workTitle?: string | null;
   dates: Record<string, string>;
   customerPoNumber: string | null;
   notes: string | null;
@@ -30,6 +32,7 @@ export function DocumentHeaderDialog({
   onClose,
   title,
   description,
+  workTitle,
   dates,
   customerPoNumber,
   notes,
@@ -39,6 +42,8 @@ export function DocumentHeaderDialog({
   onClose: () => void;
   title: string;
   description?: string;
+  /** A quote's short description of the work. Leave undefined for documents without one. */
+  workTitle?: string | null;
   dates: HeaderDateField[];
   customerPoNumber: string | null | undefined;
   notes: string | null | undefined;
@@ -51,6 +56,7 @@ export function DocumentHeaderDialog({
         <HeaderForm
           title={title}
           description={description}
+          workTitle={workTitle}
           dates={dates}
           customerPoNumber={customerPoNumber}
           notes={notes}
@@ -65,6 +71,7 @@ export function DocumentHeaderDialog({
 function HeaderForm({
   title,
   description,
+  workTitle,
   dates,
   customerPoNumber,
   notes,
@@ -73,12 +80,15 @@ function HeaderForm({
 }: {
   title: string;
   description?: string;
+  workTitle?: string | null;
   dates: HeaderDateField[];
   customerPoNumber: string | null | undefined;
   notes: string | null | undefined;
   onSave: (values: HeaderValues) => Promise<boolean>;
   onClose: () => void;
 }) {
+  const hasTitle = workTitle !== undefined;
+  const [heading, setHeading] = useState(workTitle ?? '');
   const [values, setValues] = useState<Record<string, string>>(() =>
     Object.fromEntries(dates.map((d) => [d.key, d.value])),
   );
@@ -92,6 +102,7 @@ function HeaderForm({
     if (!valid || busy) return;
     setBusy(true);
     const ok = await onSave({
+      ...(hasTitle ? { workTitle: heading.trim() || null } : {}),
       dates: values,
       customerPoNumber: po.trim() || null,
       notes: text.trim() || null,
@@ -106,6 +117,18 @@ function HeaderForm({
       {description && <DialogDescription>{description}</DialogDescription>}
       <DialogBody>
         <FieldGroup>
+          {hasTitle && (
+            <Field>
+              <Label>Title</Label>
+              <Input
+                value={heading}
+                maxLength={120}
+                onChange={(e) => setHeading(e.target.value)}
+                placeholder="e.g. Condenser replacement · 3-ton"
+              />
+              <Description>A short description of the work. The customer sees it on the quote.</Description>
+            </Field>
+          )}
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             {dates.map((d) => (
               <Field key={d.key}>

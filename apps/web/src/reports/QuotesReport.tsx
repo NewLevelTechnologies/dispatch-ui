@@ -14,7 +14,7 @@ import {
   quotesApi,
   userApi,
   type ArAgingBucket,
-  type Quote,
+  type QuoteListItem,
   type QuoteReport,
   type QuoteReportGroupBy,
   type QuoteStatus,
@@ -106,7 +106,7 @@ export default function QuotesReport() {
     if (!report) return;
     setExporting(true);
     try {
-      const rows: Quote[] = [];
+      const rows: QuoteListItem[] = [];
       for (let page = 0; ; page++) {
         const res = await quotesApi.getAll({
           firstSentFrom: report.from,

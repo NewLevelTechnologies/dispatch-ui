@@ -193,6 +193,7 @@ export default function QuoteDetailPage() {
       error={false}
       entityLabel={entityLabel}
       back={back}
+      title={quote.title || undefined}
       number={quote.quoteNumber}
       actions={actions}
       badges={
@@ -264,6 +265,7 @@ export default function QuoteDetailPage() {
         open={headerOpen}
         onClose={() => setHeaderOpen(false)}
         title={`Edit ${entityLower} details`}
+        workTitle={quote.title ?? null}
         dates={[
           { key: 'quoteDate', label: `${entityLabel} date`, value: toDateInput(quote.quoteDate), required: true },
           { key: 'expirationDate', label: 'Expires', value: toDateInput(quote.expirationDate), required: true },
@@ -275,6 +277,8 @@ export default function QuoteDetailPage() {
             (version) =>
               quotesApi.updateHeader(quote.id, {
                 version,
+                // The header edit replaces the title, so it always goes back.
+                title: v.workTitle ?? null,
                 quoteDate: v.dates.quoteDate,
                 expirationDate: v.dates.expirationDate,
                 // The location is the work order's; never changed here.

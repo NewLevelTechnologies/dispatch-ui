@@ -1,56 +1,90 @@
-import { useState, useDeferredValue } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+/* eslint-disable i18next/no-literal-string -- dense billing list; short operational labels stay literal (same convention as the document pages). Entity names route through getName(). */
+import { useDeferredValue, useState, type ReactNode } from 'react';
 import clsx from 'clsx';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useTranslation } from '@dispatch/i18n';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { DocumentTextIcon, PlusIcon } from '@heroicons/react/16/solid';
+import { formatCurrency } from '@dispatch/utils';
 import { useGlossary } from '../contexts/GlossaryContext';
 import AppLayout from '../components/AppLayout';
 import { Button } from '../components/catalyst/button';
-import { Input } from '../components/catalyst/input';
-import { Dialog, DialogActions, DialogBody, DialogDescription, DialogTitle } from '../components/catalyst/dialog';
-import { Field, Label } from '../components/catalyst/fieldset';
-import { Select } from '../components/catalyst/select';
-import { Textarea } from '../components/catalyst/textarea';
 import { PageHead } from '../components/ui/PageHead';
 import { Card, CardBody } from '../components/ui/Card';
 import { LoadingState } from '../components/ui/LoadingState';
-import { Pill } from '../components/ui/Pill';
-import {
-  DenseTable, DenseTHead, DenseRow,
-} from '../components/ui/DenseTable';
+import { EmptyState } from '../components/ui/EmptyState';
+import { Pill, Tag } from '../components/ui/Pill';
+import { Avatar } from '../components/ui/Avatar';
+import { ViewTabs } from '../components/ui/Tabs';
+import { DenseTable, DenseTHead, DenseRow } from '../components/ui/DenseTable';
 import { ListToolbar, ListSearch } from '../components/ui/ListToolbar';
 import { ListFooter } from '../components/ui/ListFooter';
-import { FilterChipListbox, ChipListboxOption } from '../components/ui/FilterChipListbox';
+import { ChipListboxOption, FilterChipListbox } from '../components/ui/FilterChipListbox';
 import { FilterChip } from '../components/ui/FilterChipRow';
 import { DateRangeChip } from '../components/ui/DateRangeChip';
-import { QuoteStatus, quotesApi } from '../api/setup';
-import type { Quote, CreateQuoteRequest, CreateQuoteLineItemRequest } from '../api/setup';
-import { customerApi, dispatchRegionApi } from '../api/setup';
+import { NewDocumentDialog } from '../components/document/NewDocumentDialog';
+import { BillQuoteDialog } from '../components/document/BillQuoteDialog';
+import { formatDocDate } from '../components/document/documentModel';
+import {
+  QUOTE_STATUS_TONE,
+  QUOTE_VIEWS,
+  QUOTE_VIEW_PARAMS,
+  daysUntil,
+  quoteListStatus,
+  type QuoteView,
+} from '../components/billing/billingListModel';
+import { QuoteStatus, dispatchRegionApi, quotesApi, type QuoteListItem } from '../api/setup';
 
 const PAGE_SIZE = 25;
-const STATUSES = Object.values(QuoteStatus) as QuoteStatus[];
+const STATUSES: QuoteStatus[] = [QuoteStatus.DRAFT, QuoteStatus.SENT, QuoteStatus.ACCEPTED, QuoteStatus.DECLINED, QuoteStatus.EXPIRED];
+const STATUS_LABEL: Record<QuoteStatus, string> = {
+  [QuoteStatus.DRAFT]: 'Draft',
+  [QuoteStatus.SENT]: 'Sent',
+  [QuoteStatus.ACCEPTED]: 'Accepted',
+  [QuoteStatus.DECLINED]: 'Declined',
+  [QuoteStatus.EXPIRED]: 'Expired',
+};
+const VIEW_LABEL: Record<QuoteView, string> = {
+  open: 'Open',
+  ready: 'Ready to invoice',
+  accepted: 'Accepted',
+  closed: 'Declined & expired',
+  all: 'All',
+};
 
+const day = (v: string | null | undefined) => formatDocDate(v, false) ?? '—';
+const usd0 = (n: number) => `$${Math.round(n).toLocaleString('en-US')}`;
+
+/**
+ * Every quote, by what needs doing: open ones waiting on the customer,
+ * accepted ones with work still to invoice, then accepted, closed and all.
+ * Counts and the summary come from the server over the same filters. A row
+ * opens the quote; on Ready to invoice, a row's action bills it.
+ */
 export default function QuotesPage() {
-  const queryClient = useQueryClient();
-  const { t } = useTranslation();
   const { getName } = useGlossary();
-  const [isCreateOpen, setIsCreateOpen] = useState(false);
-  const [isStatusOpen, setIsStatusOpen] = useState(false);
-  const [selectedQuote, setSelectedQuote] = useState<Quote | null>(null);
+  const navigate = useNavigate();
+  const entities = getName('quote', true);
+  const entity = getName('quote');
+  const invoiceLower = getName('invoice').toLowerCase();
+  const [creating, setCreating] = useState(false);
+  const [billing, setBilling] = useState<QuoteListItem | null>(null);
 
-  // Filters and page live in the URL, so the footer's page links keep them.
   const [searchParams, setSearchParams] = useSearchParams();
-  const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10));
   const [searchQuery, setSearchQuery] = useState(searchParams.get('search') ?? '');
   const deferredSearch = useDeferredValue(searchQuery.trim());
+  const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10));
   const sentFrom = searchParams.get('sentFrom') ?? '';
   const sentTo = searchParams.get('sentTo') ?? '';
+  // An exact status from the Quotes report's funnel shows as a chip on All.
   const statusParam = searchParams.get('status') as QuoteStatus | null;
   const status = statusParam && STATUSES.includes(statusParam) ? statusParam : null;
+  const viewParam = searchParams.get('view') as QuoteView | null;
+  const view: QuoteView = status ? 'all' : viewParam && QUOTE_VIEWS.includes(viewParam) ? viewParam : 'open';
   // A sender's quotes, from the Quotes report.
   const sender = searchParams.get('sender');
   const regionId = searchParams.get('region');
-  const setFilterParams = (updates: Record<string, string | null>) => {
+
+  const setParams = (updates: Record<string, string | null>) => {
     const next = new URLSearchParams(searchParams);
     for (const [key, value] of Object.entries(updates)) {
       if (value) next.set(key, value);
@@ -61,7 +95,7 @@ export default function QuotesPage() {
   };
   const onSearchChange = (value: string) => {
     setSearchQuery(value);
-    setFilterParams({ search: value || null });
+    setParams({ search: value || null });
   };
   const pageHref = (target: number): string => {
     const next = new URLSearchParams(searchParams);
@@ -71,41 +105,27 @@ export default function QuotesPage() {
     return qs ? `?${qs}` : '?';
   };
 
-  // Form state
-  const [formData, setFormData] = useState<{
-    customerId: string;
-    quoteDate: string;
-    expirationDate: string;
-    notes: string;
-    lineItems: CreateQuoteLineItemRequest[];
-  }>({
-    customerId: '',
-    quoteDate: new Date().toISOString().split('T')[0],
-    expirationDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-    notes: '',
-    lineItems: [{ description: '', quantity: 1, unitPrice: 0 }],
-  });
-
-  const [newStatus, setNewStatus] = useState<QuoteStatus>(QuoteStatus.DRAFT);
-  const [submitting, setSubmitting] = useState(false);
-
-  const { data: quotePage, isLoading: quotesLoading } = useQuery({
-    queryKey: ['quotes', page, deferredSearch, sentFrom, sentTo, status, sender, regionId],
+  const scope = {
+    firstSentFrom: sentFrom || undefined,
+    firstSentTo: sentTo || undefined,
+    sentByUserId: sender ?? undefined,
+    regionIds: regionId ? [regionId] : undefined,
+  };
+  const { data: views } = useQuery({ queryKey: ['quotes', 'views', scope], queryFn: () => quotesApi.getViews(scope) });
+  const { data: quotePage, isLoading } = useQuery({
+    queryKey: ['quotes', view, status, page, deferredSearch, sentFrom, sentTo, sender, regionId],
     queryFn: () =>
       quotesApi.getAll({
-        firstSentFrom: sentFrom || undefined,
-        firstSentTo: sentTo || undefined,
-        status: status ? [status] : undefined,
-        sentByUserId: sender ?? undefined,
-        regionIds: regionId ? [regionId] : undefined,
+        ...scope,
+        ...(status ? { status: [status] } : QUOTE_VIEW_PARAMS[view]),
         q: deferredSearch || undefined,
         page: page - 1,
         size: PAGE_SIZE,
       }),
+    placeholderData: keepPreviousData,
   });
   const quotes = quotePage?.content ?? [];
   const total = quotePage?.totalElements ?? 0;
-  const totalPages = quotePage?.totalPages ?? 0;
   const narrowed = Boolean(deferredSearch || sentFrom || sentTo || status || sender || regionId);
   const { data: regions = [] } = useQuery({
     queryKey: ['dispatch-regions', 'all'],
@@ -113,420 +133,271 @@ export default function QuotesPage() {
     enabled: !!regionId,
   });
   const regionName = regions.find((r) => r.id === regionId)?.name;
-  // The sender's name rides on their quotes.
   const senderName = sender ? (quotes.find((q) => q.firstSentByUserId === sender)?.firstSentByName ?? null) : null;
+  const decided = view === 'ready' || view === 'accepted';
 
-  const { data: customers = [] } = useQuery({
-    queryKey: ['quote-form-customers'],
-    queryFn: async () => {
-      const page = await customerApi.getAllPaginated({ size: 200, status: ['ACTIVE'] });
-      return page.content;
-    },
-  });
-
-  const createMutation = useMutation({
-    mutationFn: (request: CreateQuoteRequest) => quotesApi.create(request),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['quotes'] });
-      setIsCreateOpen(false);
-      resetForm();
-    },
-  });
-
-  const updateStatusMutation = useMutation({
-    mutationFn: ({ id, status }: { id: string; status: QuoteStatus }) =>
-      quotesApi.updateStatus(id, { status }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['quotes'] });
-      setIsStatusOpen(false);
-      setSelectedQuote(null);
-    },
-  });
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!formData.customerId) {
-      alert(t('quotes.form.customer') + ' is required');
-      return;
-    }
-
-    if (formData.lineItems.length === 0 || !formData.lineItems.every(item => item.description && item.quantity > 0)) {
-      alert('Please add at least one complete line item');
-      return;
-    }
-
-    try {
-      setSubmitting(true);
-      const request: CreateQuoteRequest = {
-        customerId: formData.customerId,
-        quoteDate: new Date(formData.quoteDate).toISOString(),
-        expirationDate: new Date(formData.expirationDate).toISOString(),
-        notes: formData.notes || undefined,
-        lineItems: formData.lineItems,
-      };
-      await createMutation.mutateAsync(request);
-    } catch (error: unknown) {
-      console.error('Error creating quote:', error);
-      const message = error && typeof error === 'object' && 'response' in error &&
-        error.response && typeof error.response === 'object' && 'data' in error.response &&
-        error.response.data && typeof error.response.data === 'object' && 'message' in error.response.data
-        ? String(error.response.data.message)
-        : t('common.form.errorCreate', { entity: getName('quote') });
-      alert(message);
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const handleStatusUpdate = async () => {
-    if (!selectedQuote) return;
-
-    try {
-      setSubmitting(true);
-      await updateStatusMutation.mutateAsync({ id: selectedQuote.id, status: newStatus });
-    } catch (error: unknown) {
-      console.error('Error updating status:', error);
-      const message = error && typeof error === 'object' && 'response' in error &&
-        error.response && typeof error.response === 'object' && 'data' in error.response &&
-        error.response.data && typeof error.response.data === 'object' && 'message' in error.response.data
-        ? String(error.response.data.message)
-        : 'Failed to update quote status';
-      alert(message);
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const resetForm = () => {
-    setFormData({
-      customerId: '',
-      quoteDate: new Date().toISOString().split('T')[0],
-      expirationDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-      notes: '',
-      lineItems: [{ description: '', quantity: 1, unitPrice: 0 }],
-    });
-  };
-
-  const addLineItem = () => {
-    setFormData({
-      ...formData,
-      lineItems: [...formData.lineItems, { description: '', quantity: 1, unitPrice: 0 }],
-    });
-  };
-
-  const removeLineItem = (index: number) => {
-    setFormData({
-      ...formData,
-      lineItems: formData.lineItems.filter((_, i) => i !== index),
-    });
-  };
-
-  const updateLineItem = (index: number, field: keyof CreateQuoteLineItemRequest, value: string | number) => {
-    const updated = [...formData.lineItems];
-    updated[index] = { ...updated[index], [field]: value };
-    setFormData({ ...formData, lineItems: updated });
-  };
-
-  const getStatusBadge = (status: QuoteStatus) => {
-    const tones: Record<QuoteStatus, 'neutral' | 'info' | 'success' | 'warning' | 'danger'> = {
-      [QuoteStatus.DRAFT]: 'neutral',
-      [QuoteStatus.SENT]: 'info',
-      [QuoteStatus.ACCEPTED]: 'success',
-      [QuoteStatus.DECLINED]: 'danger',
-      [QuoteStatus.EXPIRED]: 'warning',
-    };
-    return <Pill tone={tones[status]} dot>{t(`quotes.status.${status.toLowerCase()}`)}</Pill>;
-  };
-
-  const getCustomerName = (customerId: string) => {
-    if (!Array.isArray(customers)) return customerId;
-    const customer = customers.find(c => c.id === customerId);
-    return customer?.name || customerId;
-  };
-
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
-  };
-
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
-  };
-
-  const quoteNoun = (n: number) =>
-    n === 1 ? getName('quote').toLowerCase() : getName('quote', true).toLowerCase();
-  const quoteSubtitle = total > 0 ? `${total.toLocaleString()} ${quoteNoun(total)}` : t('quotes.description');
-  const showingStart = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
-  const showingEnd = Math.min(page * PAGE_SIZE, total);
+  const summary = views && (
+    <>
+      <Strong>{views.counts.open}</Strong> open · <Strong>{usd0(views.awaitingCustomer)}</Strong> awaiting{' '}
+      {getName('customer').toLowerCase()} · <Strong>{views.expiringThisWeek}</Strong> expiring this week ·{' '}
+      <Strong>{usd0(views.readyToInvoiceAmount)}</Strong> ready to invoice
+    </>
+  );
 
   return (
     <AppLayout>
-      <div>
-        <PageHead
-          title={getName('quote', true)}
-          sub={quoteSubtitle}
-          actions={
-            <Button color="accent" onClick={() => setIsCreateOpen(true)}>
-              {t('common.actions.create', { entity: getName('quote') })}
-            </Button>
-          }
-        />
+      <PageHead
+        title={entities}
+        sub={summary}
+        actions={
+          <Button color="accent" size="xs" onClick={() => setCreating(true)}>
+            <PlusIcon />
+            {`New ${entity.toLowerCase()}`}
+          </Button>
+        }
+      />
 
-        <ListToolbar
-          search={
-            <ListSearch
-              placeholder={t('quotes.search.placeholder', { entity: getName('quote'), customer: getName('customer') })}
-              value={searchQuery}
-              onChange={onSearchChange}
-            />
-          }
-        >
-          <DateRangeChip
-            label={t('quotes.filters.sent')}
-            ariaLabel={t('quotes.filters.sent')}
-            value={{ from: sentFrom, to: sentTo }}
-            onChange={(r) => setFilterParams({ sentFrom: r.from || null, sentTo: r.to || null })}
+      <ViewTabs
+        className="mb-3"
+        value={status ? '' : view}
+        onChange={(id) => setParams({ view: id === 'open' ? null : id, status: null })}
+        tabs={QUOTE_VIEWS.map((v) => ({
+          id: v,
+          label: VIEW_LABEL[v],
+          count: views?.counts[v === 'ready' ? 'readyToInvoice' : v],
+          ...(v === 'ready' ? { tone: 'accent' as const } : {}),
+        }))}
+      />
+
+      <ListToolbar
+        search={
+          <ListSearch
+            placeholder={`${entity} #, ${getName('customer').toLowerCase()}, title…`}
+            value={searchQuery}
+            onChange={onSearchChange}
           />
+        }
+      >
+        <DateRangeChip
+          label="Sent"
+          ariaLabel="Sent"
+          value={{ from: sentFrom, to: sentTo }}
+          onChange={(r) => setParams({ sentFrom: r.from || null, sentTo: r.to || null })}
+        />
+        {status && (
           <FilterChipListbox
-            label={t('quotes.table.status')}
-            ariaLabel={t('quotes.table.status')}
+            label="Status"
+            ariaLabel="Status"
             value={status}
-            displayValue={status ? t(`quotes.status.${status.toLowerCase()}`) : null}
-            onChange={(v) => setFilterParams({ status: v })}
-            onClear={() => setFilterParams({ status: null })}
-            resetLabel={t('quotes.filters.anyStatus')}
+            displayValue={STATUS_LABEL[status]}
+            onChange={(v) => setParams({ status: v })}
+            onClear={() => setParams({ status: null })}
+            resetLabel="Any status"
           >
             {STATUSES.map((st) => (
               <ChipListboxOption key={st} value={st}>
-                {t(`quotes.status.${st.toLowerCase()}`)}
+                {STATUS_LABEL[st]}
               </ChipListboxOption>
             ))}
           </FilterChipListbox>
-          {regionId && (
-            <FilterChip
-              label={regionName ?? getName('dispatch_region')}
-              active
-              onToggle={() => setFilterParams({ region: null })}
-            />
-          )}
-          {sender && (
-            <FilterChip
-              label={senderName ? t('quotes.filters.sentBy', { name: senderName }) : t('quotes.filters.sentByOne')}
-              active
-              onToggle={() => setFilterParams({ sender: null })}
-            />
-          )}
-        </ListToolbar>
+        )}
+        {regionId && (
+          <FilterChip label={regionName ?? getName('dispatch_region')} active onToggle={() => setParams({ region: null })} />
+        )}
+        {sender && (
+          <FilterChip label={senderName ? `Sent by ${senderName}` : 'Sent by one person'} active onToggle={() => setParams({ sender: null })} />
+        )}
+      </ListToolbar>
 
-        {quotesLoading ? (
-          <Card>
-            <CardBody flush>
-              <LoadingState label={t('common.actions.loading', { entities: getName('quote', true) })} />
-            </CardBody>
-          </Card>
-        ) : quotes.length === 0 ? (
-          <Card>
-            <CardBody>
-              <p className="text-[12.5px] text-fg-muted">
-                {narrowed
-                  ? t('quotes.filters.noMatch', { entities: getName('quote', true).toLowerCase() })
-                  : t('common.actions.notFound', { entities: getName('quote', true) })}
-              </p>
-            </CardBody>
-          </Card>
-        ) : (
-          <Card>
-            <CardBody flush>
-              <DenseTable>
+      <Card>
+        <CardBody flush>
+          {isLoading ? (
+            <LoadingState label={`Loading ${entities.toLowerCase()}…`} />
+          ) : quotes.length === 0 ? (
+            <EmptyState
+              icon={<DocumentTextIcon className="size-10 text-fg-dim" />}
+              title={deferredSearch ? `No ${entities.toLowerCase()} match “${deferredSearch}”` : narrowed ? `No ${entities.toLowerCase()} match these filters` : 'Nothing here'}
+              description={
+                deferredSearch
+                  ? `Try ${entity.toLowerCase()} #, ${getName('customer').toLowerCase()} or title.`
+                  : `${entities} in this view show up here.`
+              }
+            />
+          ) : (
+            <>
+              <DenseTable className="min-w-[1240px]">
                 <DenseTHead>
                   <tr>
-                    <th>{t('quotes.table.quoteNumber')}</th>
-                    <th>{t('quotes.table.customer')}</th>
-                    <th>{t('quotes.table.quoteDate')}</th>
-                    <th>{t('quotes.table.expirationDate')}</th>
-                    <th className="right">{t('quotes.table.totalAmount')}</th>
-                    <th>{t('quotes.table.status')}</th>
-                    <th>{t('quotes.table.sentBy')}</th>
-                    <th></th>
+                    <th style={{ minWidth: 130 }}>{entity}</th>
+                    <th>Bill to</th>
+                    <th>Description</th>
+                    <th>Advisor</th>
+                    <th>{decided ? 'Accepted' : 'Sent'}</th>
+                    <th>Expires</th>
+                    <th>Status</th>
+                    <th className="right">Total</th>
+                    {view === 'ready' && <th style={{ width: 132 }} />}
                   </tr>
                 </DenseTHead>
                 <tbody>
-                  {quotes.map((quote) => (
-                    <DenseRow key={quote.id}>
-                      <td><Link to={`/quotes/${quote.id}`} className="id-mono font-semibold text-fg-accent hover:underline">{quote.quoteNumber}</Link></td>
-                      <td className="strong" data-label={t('quotes.table.customer')}>{quote.customerName ?? getCustomerName(quote.customerId)}</td>
-                      <td data-label={t('quotes.table.quoteDate')}>{formatDate(quote.quoteDate)}</td>
-                      <td data-label={t('quotes.table.expirationDate')}>{formatDate(quote.expirationDate)}</td>
-                      <td className="right num strong" data-label={t('quotes.table.totalAmount')}>{formatCurrency(quote.totalAmount)}</td>
-                      <td>{getStatusBadge(quote.status)}</td>
-                      <td className={clsx('muted', !quote.firstSentByName && 'dt-empty')} data-label={t('quotes.table.sentBy')}>
-                        {quote.firstSentByName ?? '-'}
-                      </td>
-                      <td>
-                        <Button
-                          plain
-                          onClick={() => {
-                            setSelectedQuote(quote);
-                            setNewStatus(quote.status);
-                            setIsStatusOpen(true);
-                          }}
-                        >
-                          {t('common.edit')}
-                        </Button>
-                      </td>
-                    </DenseRow>
+                  {quotes.map((q) => (
+                    <QuoteRow
+                      key={q.id}
+                      quote={q}
+                      noJob={`No ${getName('work_order').toLowerCase()} yet`}
+                      action={
+                        view === 'ready' ? (
+                          <Button outline size="xs" onClick={() => setBilling(q)}>
+                            {`Create ${invoiceLower}`}
+                          </Button>
+                        ) : undefined
+                      }
+                      onOpen={() => navigate(`/quotes/${q.id}`)}
+                    />
                   ))}
                 </tbody>
               </DenseTable>
               <ListFooter
                 page={page}
-                totalPages={totalPages}
+                totalPages={quotePage?.totalPages ?? 0}
                 pageHref={pageHref}
-                left={t('common.pagination.showing', {
-                  start: showingStart,
-                  end: showingEnd,
-                  total: total.toLocaleString(),
-                })}
+                left={
+                  <>
+                    Showing <Strong>{quotes.length}</Strong> of {total.toLocaleString()}
+                  </>
+                }
               />
-            </CardBody>
-          </Card>
-        )}
-      </div>
+            </>
+          )}
+        </CardBody>
+      </Card>
 
-      {/* Create Quote Dialog */}
-      <Dialog open={isCreateOpen} onClose={setIsCreateOpen}>
-        <DialogTitle>{t('common.actions.create', { entity: getName('quote') })}</DialogTitle>
-        <DialogDescription>{t('common.form.descriptionCreate', { entity: getName('quote') })}</DialogDescription>
-        <form onSubmit={handleSubmit}>
-          <DialogBody>
-            <div className="space-y-4">
-              <Field>
-                <Label>{t('quotes.form.customer')}</Label>
-                <Select
-                  name="customerId"
-                  value={formData.customerId}
-                  onChange={(e) => setFormData({ ...formData, customerId: e.target.value })}
-                  required
-                >
-                  <option value="">{t('workOrders.form.customerPlaceholder')}</option>
-                  {customers.map((customer) => (
-                    <option key={customer.id} value={customer.id}>
-                      {customer.name}
-                    </option>
-                  ))}
-                </Select>
-              </Field>
-
-              <div className="grid grid-cols-2 gap-4">
-                <Field>
-                  <Label>{t('quotes.form.quoteDate')}</Label>
-                  <Input
-                    type="date"
-                    value={formData.quoteDate}
-                    onChange={(e) => setFormData({ ...formData, quoteDate: e.target.value })}
-                    required
-                  />
-                </Field>
-
-                <Field>
-                  <Label>{t('quotes.form.expirationDate')}</Label>
-                  <Input
-                    type="date"
-                    value={formData.expirationDate}
-                    onChange={(e) => setFormData({ ...formData, expirationDate: e.target.value })}
-                    required
-                  />
-                </Field>
-              </div>
-
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <Label>{t('quotes.form.lineItems')}</Label>
-                  <Button type="button" plain onClick={addLineItem}>
-                    {t('quotes.form.addLineItem')}
-                  </Button>
-                </div>
-                {formData.lineItems.map((item, index) => (
-                  <div key={index} className="flex gap-2 mb-2">
-                    <Input
-                      placeholder={t('quotes.form.description')}
-                      value={item.description}
-                      onChange={(e) => updateLineItem(index, 'description', e.target.value)}
-                      required
-                    />
-                    <Input
-                      type="number"
-                      placeholder={t('quotes.form.quantity')}
-                      value={item.quantity}
-                      onChange={(e) => updateLineItem(index, 'quantity', parseFloat(e.target.value))}
-                      className="w-24"
-                      required
-                    />
-                    <Input
-                      type="number"
-                      step="0.01"
-                      placeholder={t('quotes.form.unitPrice')}
-                      value={item.unitPrice}
-                      onChange={(e) => updateLineItem(index, 'unitPrice', parseFloat(e.target.value))}
-                      className="w-32"
-                      required
-                    />
-                    {formData.lineItems.length > 1 && (
-                      <Button type="button" plain onClick={() => removeLineItem(index)}>
-                        {t('quotes.form.removeLineItem')}
-                      </Button>
-                    )}
-                  </div>
-                ))}
-              </div>
-
-              <Field>
-                <Label>{t('common.form.notes')}</Label>
-                <Textarea
-                  value={formData.notes}
-                  onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                  rows={3}
-                />
-              </Field>
-            </div>
-          </DialogBody>
-          <DialogActions>
-            <Button plain onClick={() => { setIsCreateOpen(false); resetForm(); }}>
-              {t('common.cancel')}
-            </Button>
-            <Button type="submit" disabled={submitting}>
-              {submitting ? t('common.saving') : t('common.create')}
-            </Button>
-          </DialogActions>
-        </form>
-      </Dialog>
-
-      {/* Update Status Dialog */}
-      <Dialog open={isStatusOpen} onClose={setIsStatusOpen}>
-        <DialogTitle>{t('common.actions.edit', { entity: getName('quote') })}</DialogTitle>
-        <DialogDescription>{t('common.updateStatus', { entity: getName('quote') })}</DialogDescription>
-        <DialogBody>
-          <Field>
-            <Label>{t('common.form.status')}</Label>
-            <Select value={newStatus} onChange={(e) => setNewStatus(e.target.value as QuoteStatus)}>
-              {Object.values(QuoteStatus).map((status) => (
-                <option key={status} value={status}>
-                  {t(`quotes.status.${status.toLowerCase()}`)}
-                </option>
-              ))}
-            </Select>
-          </Field>
-        </DialogBody>
-        <DialogActions>
-          <Button plain onClick={() => setIsStatusOpen(false)}>
-            {t('common.cancel')}
-          </Button>
-          <Button onClick={handleStatusUpdate} disabled={submitting}>
-            {submitting ? t('common.saving') : t('common.update')}
-          </Button>
-        </DialogActions>
-      </Dialog>
+      <NewDocumentDialog kind={creating ? 'quote' : null} onClose={() => setCreating(false)} />
+      {billing && <BillQuoteDialog quote={billing} open onClose={() => setBilling(null)} />}
     </AppLayout>
+  );
+}
+
+const Strong = ({ children }: { children: ReactNode }) => <span className="font-semibold tabular-nums text-fg-strong">{children}</span>;
+
+function QuoteRow({
+  quote: q,
+  noJob,
+  action,
+  onOpen,
+}: {
+  quote: QuoteListItem;
+  noJob: string;
+  action?: ReactNode;
+  onOpen: () => void;
+}) {
+  const status = quoteListStatus(q);
+  const open = q.status === QuoteStatus.DRAFT || q.status === QuoteStatus.SENT;
+  const days = daysUntil(q.expirationDate);
+  const urgent = open && days >= 0 && days <= 3;
+  const advisor = q.createdByName ?? q.firstSentByName ?? null;
+  const accepted = q.status === QuoteStatus.ACCEPTED;
+  const pct = q.invoicedPercent ?? null;
+
+  return (
+    <DenseRow onClick={onOpen}>
+      <td>
+        <div className="flex flex-col">
+          <span className="flex items-center gap-1.5">
+            <Link to={`/quotes/${q.id}`} onClick={(e) => e.stopPropagation()} className="id-mono font-semibold text-fg-strong hover:underline">
+              {q.quoteNumber}
+            </Link>
+            {(q.revision ?? 1) > 1 && <Tag word>{`Rev ${q.revision}`}</Tag>}
+          </span>
+          <span className="font-mono text-[11px] text-fg-muted">{q.workOrderNumber ?? noJob}</span>
+        </div>
+      </td>
+      <td data-label="Bill to">
+        <div className="flex flex-col">
+          <span className="flex items-center gap-1.5 font-medium text-fg-strong">
+            {q.customerName ?? '—'}
+            {q.billToIsPayer && <Tag word>Payer</Tag>}
+          </span>
+          {(q.serviceLocationName ?? q.serviceLocationAddress) && (
+            <span className="text-[11px] text-fg-muted">{q.serviceLocationName ?? q.serviceLocationAddress}</span>
+          )}
+        </div>
+      </td>
+      <td data-label="Description">
+        <div className="flex flex-col">
+          <span className={clsx('text-[12.5px] font-medium', q.title ? 'text-fg' : 'text-fg-muted')}>{q.title || 'No title'}</span>
+          {q.lineCount != null && <span className="text-[11px] text-fg-muted">{q.lineCount === 1 ? '1 line' : `${q.lineCount} lines`}</span>}
+        </div>
+      </td>
+      <td data-label="Advisor">
+        {advisor ? (
+          <span className="flex items-center gap-1.5">
+            <Avatar name={advisor} size="sm" />
+            <span className="whitespace-nowrap text-[11.5px]">{advisor}</span>
+          </span>
+        ) : (
+          <span className="text-fg-muted">—</span>
+        )}
+      </td>
+      <td data-label="Sent">
+        <div className="flex flex-col">
+          <span className="text-[12px] text-fg">
+            {accepted || q.status === QuoteStatus.DECLINED
+              ? day(q.decidedAt)
+              : q.firstSentAt
+                ? day(q.lastSentAt ?? q.firstSentAt)
+                : 'Not sent'}
+          </span>
+          <span className="text-[11px] text-fg-muted">
+            {accepted
+              ? 'accepted'
+              : q.status === QuoteStatus.DECLINED
+                ? 'declined'
+                : q.firstSentAt
+                  ? q.firstViewedAt
+                    ? `viewed ${day(q.firstViewedAt)}`
+                    : 'not viewed'
+                  : `Created ${day(q.createdAt)}`}
+          </span>
+        </div>
+      </td>
+      <td data-label="Expires">
+        {open || q.status === QuoteStatus.EXPIRED ? (
+          <div className="flex flex-col">
+            <span className={clsx('whitespace-nowrap text-[12px]', urgent || days < 0 ? 'font-semibold text-danger-500' : 'text-fg')}>
+              {day(q.expirationDate)}
+            </span>
+            <span className="text-[11px] text-fg-muted">{days < 0 ? 'expired' : days === 0 ? 'today' : `in ${days}d`}</span>
+          </div>
+        ) : (
+          <span className="text-[12px] text-fg-muted">—</span>
+        )}
+      </td>
+      <td>
+        <Pill tone={QUOTE_STATUS_TONE[status]} dot>
+          {status}
+        </Pill>
+        {status === 'Being updated' && (
+          <div className="mt-0.5 whitespace-nowrap text-[10.5px] text-fg-muted">{`Rev ${q.revision ?? 1} draft · link paused`}</div>
+        )}
+      </td>
+      <td className="right" data-label="Total">
+        <div className="whitespace-nowrap font-bold tabular-nums text-fg-strong">{formatCurrency(q.totalAmount)}</div>
+        {accepted && pct != null && (
+          <div className={clsx('whitespace-nowrap text-[10.5px] tabular-nums', pct < 100 ? 'font-semibold text-warning-fg' : 'text-fg-muted')}>
+            {pct >= 100
+              ? 'Fully invoiced'
+              : pct > 0
+                ? `${pct}% invoiced · ${usd0(q.remainingToInvoice ?? 0)} left`
+                : 'Not invoiced'}
+          </div>
+        )}
+      </td>
+      {action && (
+        <td className="right" onClick={(e) => e.stopPropagation()}>
+          {action}
+        </td>
+      )}
+    </DenseRow>
   );
 }

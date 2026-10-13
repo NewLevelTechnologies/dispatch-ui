@@ -549,6 +549,24 @@ export interface InvoiceListItemRow {
    * receivables report's rule, so a bucket's rows add up to its amount.
    */
   balanceAsOf?: number | null;
+  customerPoNumber?: string | null;
+  /** The bill-to is a payer (a billing-only account). */
+  billToIsPayer?: boolean;
+  /** The bill-to's current terms: 0 = due on receipt. */
+  paymentTermsDays?: number | null;
+  serviceLocationName?: string | null;
+  /** "12 Elm St, Tempe" (street and city). */
+  serviceLocationAddress?: string | null;
+  /** Billed from this quote (a reissue keeps it). */
+  quoteId?: string | null;
+  quoteNumber?: string | null;
+  reissuedFromInvoiceId?: string | null;
+  reissuedFromInvoiceNumber?: string | null;
+  reissuedAsInvoiceId?: string | null;
+  reissuedAsInvoiceNumber?: string | null;
+  /** When the balance reached zero; cleared if a payment is voided and it reopens. */
+  paidAt?: string | null;
+  voidedAt?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -602,7 +620,8 @@ export interface ListInvoicesParams {
   customerId?: string;
   serviceLocationId?: string;
   agreementId?: string; // installment invoices for one agreement (migration 032)
-  status?: InvoiceStatus;
+  /** One status, or several (`SENT,OVERDUE` is the Unpaid tab). */
+  status?: InvoiceStatus | InvoiceStatus[];
   from?: string; // YYYY-MM-DD, invoiceDate >= from (inclusive)
   to?: string; // YYYY-MM-DD, invoiceDate <= to (inclusive — no +1-day trick)
   overdue?: boolean; // true = open + strictly past due
@@ -612,7 +631,7 @@ export interface ListInvoicesParams {
   // dated by then). With it, `agingBucket` ages from that date. Rows'
   // amountPaid/balanceDue stay as of now.
   openAsOf?: string;
-  q?: string; // case-insensitive substring on invoiceNumber OR customerName
+  q?: string; // case-insensitive substring on invoice #, customer name, customer PO #, work order # or the site's street/name
   regionIds?: string[]; // the invoice's service location's region; a user's own regions bound it either way
   // Revenue report drill-down. `billed` = issued (not DRAFT/VOID/CANCELLED),
   // the report's billed set. Division and type are the work order's current
@@ -633,7 +652,16 @@ export const invoicesApi = {
   // invoice number or customer name. Returns the page envelope so callers can
   // drive a pager off totalElements / totalPages.
   getAll: async (params?: ListInvoicesParams): Promise<InvoiceListPage> => {
-    const response = await apiClient.get<InvoiceListPage>('/financial/invoices', { params });
+    const { status, ...rest } = params ?? {};
+    const response = await apiClient.get<InvoiceListPage>('/financial/invoices', {
+      params: { ...rest, ...(status ? { status: Array.isArray(status) ? status.join(',') : status } : {}) },
+    });
+    return response.data;
+  },
+
+  /** Counts per list tab and the summary totals, over the same scope as the list (no status or q). */
+  getViews: async (params: InvoiceViewsParams = {}): Promise<InvoiceViews> => {
+    const response = await apiClient.get<InvoiceViews>('/financial/invoices/views', { params });
     return response.data;
   },
 
@@ -830,6 +858,8 @@ export type QuoteLineItem = DocumentLineItem;
 
 export interface Quote {
   id: string;
+  /** Short description of the work. */
+  title?: string | null;
   customerId: string;
   /** Null only until the customer syncs into financial's cache. */
   customerName?: string | null;
@@ -892,8 +922,10 @@ export interface ListQuotesParams {
   status?: QuoteStatus[];
   /** The user who first sent it (a sender group's drill-in). */
   sentByUserId?: string;
-  /** Case-insensitive, anywhere in the quote number or customer name. */
+  /** Case-insensitive, anywhere in the quote number, title or customer name. */
   q?: string;
+  /** Accepted quotes with a line not fully invoiced (the `invoiceable` rule). */
+  readyToInvoice?: boolean;
   /** The work order's location's region; quotes with no work order are company-wide only. */
   regionIds?: string[];
   page?: number;
@@ -908,6 +940,8 @@ export type CreateQuoteLineItemRequest = CreateInvoiceLineItemRequest;
 export interface CreateQuoteRequest {
   /** The bill-to (a payer goes here). */
   customerId: string;
+  /** Short description of the work, up to 120 characters. */
+  title?: string;
   /** Optional WO link (Phase 7b backend ask #7). */
   workOrderId?: string;
   /** Where the work is; defaults to the work order's location. Without one: tenant-default tax, no member benefits. */
@@ -922,6 +956,8 @@ export interface CreateQuoteRequest {
 /** The whole header, replaced: send every field; null clears an optional one. Editing a SENT quote returns it to DRAFT. */
 export interface UpdateQuoteHeaderRequest {
   version: number;
+  /** Replaced on every header edit: send the current title back, or it is cleared. */
+  title: string | null;
   quoteDate: string;
   expirationDate: string;
   serviceLocationId: string | null;
@@ -953,11 +989,18 @@ export interface UpdateQuoteStatusRequest {
 }
 
 export const quotesApi = {
-  getAll: async (params: ListQuotesParams = {}): Promise<FinancialPage<Quote>> => {
+  /** Light rows (no lines, adjustments or tax); open one with `getById`. */
+  getAll: async (params: ListQuotesParams = {}): Promise<FinancialPage<QuoteListItem>> => {
     const { status, ...rest } = params;
-    const response = await apiClient.get<FinancialPage<Quote>>('/financial/quotes', {
+    const response = await apiClient.get<FinancialPage<QuoteListItem>>('/financial/quotes', {
       params: { ...rest, ...(status?.length ? { status: status.join(',') } : {}) },
     });
+    return response.data;
+  },
+
+  /** Counts per list tab and the summary totals, over the same scope as the list (no status, q or readyToInvoice). */
+  getViews: async (params: QuoteViewsParams = {}): Promise<QuoteViews> => {
+    const response = await apiClient.get<QuoteViews>('/financial/quotes/views', { params });
     return response.data;
   },
 
@@ -1096,6 +1139,78 @@ export interface Payment {
   receivedByName?: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface InvoiceViewsParams {
+  customerId?: string;
+  serviceLocationId?: string;
+  from?: string;
+  to?: string;
+  regionIds?: string[];
+}
+
+/** Each count equals `totalElements` of its tab's list call. */
+export interface InvoiceViews {
+  counts: { unpaid: number; overdue: number; draft: number; paid: number; all: number; void: number };
+  /** Balance due on unpaid invoices. */
+  outstanding: number;
+  overdueAmount: number;
+}
+
+/** A quote as the list shows it. */
+export interface QuoteListItem {
+  id: string;
+  quoteNumber: string;
+  title?: string | null;
+  status: QuoteStatus;
+  customerId: string;
+  customerName?: string | null;
+  billToIsPayer?: boolean;
+  workOrderId?: string | null;
+  workOrderNumber?: string | null;
+  serviceLocationId?: string | null;
+  serviceLocationName?: string | null;
+  serviceLocationAddress?: string | null;
+  customerPoNumber?: string | null;
+  quoteDate: string;
+  expirationDate: string;
+  subtotal: number;
+  taxAmount: number;
+  totalAmount: number;
+  lineCount?: number;
+  revision?: number;
+  /** Who wrote it (the Advisor column); null for older quotes with no record, so fall back to the sender. */
+  createdByUserId?: string | null;
+  createdByName?: string | null;
+  lastSentAt?: string | null;
+  firstSentAt?: string | null;
+  firstSentByUserId?: string | null;
+  firstSentByName?: string | null;
+  firstViewedAt?: string | null;
+  decidedAt?: string | null;
+  /** Accepted quotes only: rounded down, so 100 means nothing is left. */
+  invoicedPercent?: number | null;
+  /** Accepted quotes only: what's left to bill, after discounts, before tax. */
+  remainingToInvoice?: number | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface QuoteViewsParams {
+  firstSentFrom?: string;
+  firstSentTo?: string;
+  sentByUserId?: string;
+  regionIds?: string[];
+}
+
+export interface QuoteViews {
+  counts: { open: number; readyToInvoice: number; accepted: number; closed: number; all: number };
+  /** Total of SENT quotes, with tax. */
+  awaitingCustomer: number;
+  /** DRAFT or SENT quotes expiring today through the next 6 days. */
+  expiringThisWeek: number;
+  /** Sum of remainingToInvoice, before tax. */
+  readyToInvoiceAmount: number;
 }
 
 /** Filters for the paged payment list, all AND-ed. */
