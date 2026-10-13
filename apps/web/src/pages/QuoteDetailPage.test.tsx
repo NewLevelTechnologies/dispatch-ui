@@ -401,3 +401,30 @@ describe('QuoteDetailPage editing', () => {
     expect(apiClient.post).toHaveBeenCalledWith('/financial/quotes/q-1/duplicate');
   });
 });
+
+describe('QuoteDetailPage billing', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('offers to invoice an accepted quote until it is fully invoiced', async () => {
+    const accepted: Quote = { ...quote, status: 'ACCEPTED', decidedAt: '2026-10-09T16:00:00Z' };
+    const left = (remaining: number) => ({
+      quoteId: 'q-1',
+      status: 'ACCEPTED',
+      lines: [
+        { quoteLineId: 'l2', sortOrder: 1, description: 'Regular', type: 'LABOR', unit: 'hr', unitPrice: 125, quantity: 2, invoicedQuantity: 2 - remaining, remainingQuantity: remaining },
+      ],
+    });
+    vi.mocked(apiClient.get).mockImplementation((url: string) => {
+      if (url === '/financial/quotes/q-1') return Promise.resolve({ data: accepted });
+      if (url === '/financial/quotes/q-1/invoiceable') return Promise.resolve({ data: left(1) });
+      if (url === '/customers/cust-1') return Promise.resolve({ data: customer });
+      if (url === '/work-orders/wo-1') return Promise.resolve({ data: workOrder });
+      return Promise.reject(new Error(`unexpected GET ${url}`));
+    });
+    renderPage();
+
+    expect(await screen.findByRole('button', { name: 'Create invoice' })).toBeInTheDocument();
+    expect(screen.getByText(/50% invoiced so far/)).toBeInTheDocument();
+  });
+});
+

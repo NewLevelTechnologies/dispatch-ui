@@ -19,6 +19,9 @@ import { DocumentHeaderDialog } from '../components/document/DocumentHeaderDialo
 import { DocumentEditStatus, StaleCallout } from '../components/document/DocumentEditStatus';
 import { useDocumentParties } from '../components/document/useDocumentParties';
 import { documentErrorMessage, lineEditing, useDocumentEditor } from '../components/document/useDocumentEditor';
+import { useShareLink } from '../components/document/useShareLink';
+import { BillQuoteDialog } from '../components/document/BillQuoteDialog';
+import { invoicedPercent } from '../components/document/billingModel';
 import { formatDocDate, isLegacy, memberLabel, memberSavings, toDateInput } from '../components/document/documentModel';
 
 const STATUS_TONE: Record<QuoteStatus, 'neutral' | 'info' | 'success' | 'warning' | 'danger'> = {
@@ -56,6 +59,15 @@ export default function QuoteDetailPage() {
   const revising = revisingId === id;
   const [confirm, setConfirm] = useState<Confirm>(null);
   const [headerOpen, setHeaderOpen] = useState(false);
+  const [billing, setBilling] = useState(false);
+  const shareLink = useShareLink({ routes: quotesApi, id: id ?? '', number: quote?.quoteNumber ?? '', entity: entityLower });
+  const accepted = quote?.status === QuoteStatus.ACCEPTED;
+  const { data: invoiceable } = useQuery({
+    queryKey: ['quoteInvoiceable', id],
+    queryFn: () => quotesApi.getInvoiceable(id!),
+    enabled: !!id && accepted,
+  });
+  const invoiced = invoiceable ? invoicedPercent(invoiceable) : null;
 
   const duplicate = useMutation({
     mutationFn: () => quotesApi.duplicate(id!),
@@ -138,9 +150,16 @@ export default function QuoteDetailPage() {
         </Button>
       )}
       {frozen ? (
-        <Button outline size="xs" disabled={duplicate.isPending} onClick={() => duplicate.mutate()}>
-          Duplicate
-        </Button>
+        <>
+          <Button outline size="xs" disabled={duplicate.isPending} onClick={() => duplicate.mutate()}>
+            Duplicate
+          </Button>
+          {accepted && invoiced != null && invoiced < 100 && (
+            <Button color="dark/zinc" size="xs" onClick={() => setBilling(true)}>
+              {`Create ${getName('invoice').toLowerCase()}`}
+            </Button>
+          )}
+        </>
       ) : (
         <>
           <Button color="dark/zinc" size="xs" disabled={editor.saving} onClick={send}>
@@ -160,6 +179,7 @@ export default function QuoteDetailPage() {
               <DropdownItem onClick={() => duplicate.mutate()}>
                 <DropdownLabel>Duplicate</DropdownLabel>
               </DropdownItem>
+              {quote.lastSentAt && shareLink.items}
             </DropdownMenu>
           </Dropdown>
         </>
@@ -210,6 +230,12 @@ export default function QuoteDetailPage() {
           Accepted {formatDocDate(quote.decidedAt) ?? ''}
           {quote.acceptedByUserId ? ', recorded by the office' : ' by the customer'}
           {quote.acceptedRevision != null ? ` · Rev ${quote.acceptedRevision}` : ''}. Accepted {getName('quote', true).toLowerCase()} are locked.
+          {invoiced != null &&
+            (invoiced === 100
+              ? ` Fully invoiced.`
+              : invoiced > 0
+                ? ` ${invoiced}% invoiced so far.`
+                : ` Not invoiced yet.`)}
         </Callout>
       )}
       {!legacy && quote.status === QuoteStatus.SENT && (
@@ -285,6 +311,8 @@ export default function QuoteDetailPage() {
         confirmLabel="Mark declined"
         isDestructive
       />
+      <BillQuoteDialog quote={quote} open={billing} onClose={() => setBilling(false)} />
+      {shareLink.dialogs}
     </DocumentPageFrame>
   );
 }

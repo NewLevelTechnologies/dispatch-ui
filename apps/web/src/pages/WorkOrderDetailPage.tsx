@@ -39,8 +39,7 @@ import EditableField from '../components/EditableField';
 import EquipmentQuickViewDrawer from '../components/EquipmentQuickViewDrawer';
 import { equipmentCreateUrl, workItemAttachToken, parseWorkItemAttachToken } from '../lib/equipmentCreate';
 import { showError, extractApiError } from '../lib/toast';
-import FinancialInvoicesTab from '../components/FinancialInvoicesTab';
-import FinancialQuotesTab from '../components/FinancialQuotesTab';
+import WorkOrderBillingTab from '../components/WorkOrderBillingTab';
 import WorkItemsTab from '../components/WorkItemsTab';
 import WorkOrderFormDialog from '../components/WorkOrderFormDialog';
 import WorkOrderApprovalsCallout from '../features/work-orders/WorkOrderApprovalsCallout';
@@ -1088,20 +1087,11 @@ export default function WorkOrderDetailPage() {
           )}
 
           {tab === 'estimate' && (
-            <div className="flex flex-col gap-4">
-              <FinancialInvoicesTab
-                workOrderId={workOrder.id}
-                workOrderNumber={woDisplayNumber}
-                customerId={customer?.id ?? workOrder.customerId ?? ''}
-                customerName={customer?.name ?? ''}
-              />
-              <FinancialQuotesTab
-                workOrderId={workOrder.id}
-                workOrderNumber={woDisplayNumber}
-                customerId={customer?.id ?? workOrder.customerId ?? ''}
-                customerName={customer?.name ?? ''}
-              />
-            </div>
+            <WorkOrderBillingTab
+              workOrderId={workOrder.id}
+              workOrderNumber={woDisplayNumber}
+              customer={{ id: customer?.id ?? workOrder.customerId ?? '', name: customer?.name ?? '' }}
+            />
           )}
 
           {tab === 'purchasing' && (

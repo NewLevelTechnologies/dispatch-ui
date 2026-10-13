@@ -2,14 +2,26 @@
 import type { ReactNode } from 'react';
 import clsx from 'clsx';
 import { formatCurrency } from '@dispatch/utils';
-import type { NestedInvoicePayment } from '../../api/setup';
-import { isLegacy, marginSummary, savingsRows, taxSummary, type PricedDocument } from './documentModel';
+import type { NestedInvoicePayment, PaymentMethod } from '../../api/setup';
+import { formatDocDate, isLegacy, marginSummary, savingsRows, taxSummary, type PricedDocument } from './documentModel';
+
+const METHOD_LABEL: Record<PaymentMethod, string> = {
+  CASH: 'Cash',
+  CHECK: 'Check',
+  CREDIT_CARD: 'Card',
+  DEBIT_CARD: 'Debit card',
+  ACH: 'ACH',
+  WIRE_TRANSFER: 'Wire',
+  OTHER: 'Other',
+};
 
 /** Invoice-only money below the total, all as the server returned it. */
 export interface InvoiceSettlement {
   amountPaid: number;
   balanceDue: number;
   payments: NestedInvoicePayment[];
+  /** Offers to void each payment still applied. */
+  onVoidPayment?: (payment: NestedInvoicePayment) => void;
 }
 
 /**
@@ -32,6 +44,7 @@ export function DocumentTotals({
   // Reversed slices stay as history: the invoice was voided or cancelled and
   // the money went back to the payment's unapplied balance.
   const reversed = settlement?.payments.filter((p) => p.reversedAt) ?? [];
+  const applied = settlement?.payments.filter((p) => !p.reversedAt && p.status !== 'VOID') ?? [];
 
   return (
     <div className="w-full max-w-[360px]">
@@ -54,6 +67,25 @@ export function DocumentTotals({
       {settlement && (settlement.amountPaid > 0 || reversed.length > 0) && (
         <>
           <TotalRow label="Payments applied" value={`−${formatCurrency(settlement.amountPaid)}`} />
+          {applied.map((p) => (
+            <div key={p.id} className="flex items-baseline justify-between gap-3 pb-1 pl-3 text-[11.5px] text-fg-muted">
+              <span>
+                <span className="font-mono">{p.paymentNumber}</span> · {METHOD_LABEL[p.paymentMethod] ?? p.paymentMethod} ·{' '}
+                {formatDocDate(p.paymentDate, false)}
+                {settlement.onVoidPayment && (
+                  <button
+                    type="button"
+                    className="card-action ml-2"
+                    aria-label={`Void ${p.paymentNumber}`}
+                    onClick={() => settlement.onVoidPayment!(p)}
+                  >
+                    Void
+                  </button>
+                )}
+              </span>
+              <span className="tabular-nums">{formatCurrency(p.amount)}</span>
+            </div>
+          ))}
           {reversed.map((p) => (
             <TotalRow
               key={`${p.id}-${p.reversedAt}`}
