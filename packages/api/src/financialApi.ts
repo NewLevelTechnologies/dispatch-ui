@@ -1383,7 +1383,8 @@ export interface LaborRateTypeRequest {
 /**
  * Labor rate types. Reading needs no capability; writing needs
  * MANAGE_PRICING. Changing Regular's bill rate reprices every computed
- * pricebook item. 409 codes: NAME_TAKEN, REGULAR_REQUIRED.
+ * pricebook item. PUT replaces `sortOrder` too, so send the current one back.
+ * 409 codes: NAME_TAKEN, REGULAR_REQUIRED.
  */
 export const laborRatesApi = {
   /** Active and inactive, in the tenant's order. */
@@ -1399,6 +1400,16 @@ export const laborRatesApi = {
 
   update: async (id: string, request: LaborRateTypeRequest): Promise<LaborRateType> => {
     const response = await apiClient.put<LaborRateType>(`/financial/labor-rates/${id}`, request);
+    return response.data;
+  },
+
+  /**
+   * Sets the whole order in one transaction. Lists every rate type exactly
+   * once, inactive ones included; 400 INVALID_REQUEST when the list is out
+   * of date. Returns the list in its new order.
+   */
+  reorder: async (orderedIds: string[]): Promise<LaborRateType[]> => {
+    const response = await apiClient.post<LaborRateType[]>('/financial/labor-rates/reorder', { orderedIds });
     return response.data;
   },
 };

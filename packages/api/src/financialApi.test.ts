@@ -386,4 +386,10 @@ describe('laborRatesApi', () => {
     await laborRatesApi.update('r-5', request);
     expect(apiClient.put).toHaveBeenCalledWith('/financial/labor-rates/r-5', request);
   });
+
+  it('reorders with the full list of ids', async () => {
+    vi.mocked(apiClient.post).mockResolvedValue({ data: [] });
+    await laborRatesApi.reorder(['r-2', 'r-1']);
+    expect(apiClient.post).toHaveBeenCalledWith('/financial/labor-rates/reorder', { orderedIds: ['r-2', 'r-1'] });
+  });
 });

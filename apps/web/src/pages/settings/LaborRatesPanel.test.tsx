@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { screen, within } from '@testing-library/react';
+import { fireEvent, screen, within } from '@testing-library/react';
 import { renderWithProviders, userEvent } from '../../test/utils';
 import LaborRatesPanel from './LaborRatesPanel';
 import { apiClient, type LaborRateType } from '../../api/setup';
@@ -81,6 +81,41 @@ describe('LaborRatesPanel', () => {
     });
   });
 
+  it('reorders by dragging, sending every rate type once', async () => {
+    vi.mocked(apiClient.post).mockResolvedValue({ data: [holiday, regular] });
+    renderWithProviders(<LaborRatesPanel />);
+    await screen.findByText('Regular');
+
+    const rows = screen.getAllByRole('row').slice(1);
+    const dataTransfer = { effectAllowed: '', dropEffect: '' };
+    fireEvent.dragStart(rows[1], { dataTransfer });
+    fireEvent.dragOver(rows[0], { dataTransfer });
+    fireEvent.drop(rows[0], { dataTransfer });
+
+    await vi.waitFor(() =>
+      expect(apiClient.post).toHaveBeenCalledWith('/financial/labor-rates/reorder', { orderedIds: ['r-hol', 'r-reg'] }),
+    );
+    await vi.waitFor(() => expect(screen.getAllByRole('row')[1]).toHaveTextContent('Holiday'));
+  });
+
+  it('reloads when the order was out of date', async () => {
+    vi.mocked(apiClient.post).mockRejectedValue(
+      Object.assign(new Error('bad'), { response: { status: 400, data: { code: 'INVALID_REQUEST', message: 'server words' } } }),
+    );
+    renderWithProviders(<LaborRatesPanel />);
+    await screen.findByText('Regular');
+
+    const rows = screen.getAllByRole('row').slice(1);
+    const dataTransfer = { effectAllowed: '', dropEffect: '' };
+    fireEvent.dragStart(rows[1], { dataTransfer });
+    fireEvent.dragOver(rows[0], { dataTransfer });
+    fireEvent.drop(rows[0], { dataTransfer });
+
+    await vi.waitFor(() =>
+      expect(vi.mocked(apiClient.get).mock.calls.filter(([u]) => u === '/financial/labor-rates').length).toBeGreaterThan(1),
+    );
+  });
+
   it('is read-only without MANAGE_PRICING', async () => {
     grant([]);
     renderWithProviders(<LaborRatesPanel />);
@@ -88,5 +123,6 @@ describe('LaborRatesPanel', () => {
     expect(await screen.findByText('Regular')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Add rate type' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Actions for Regular' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('img', { name: 'Drag to reorder' })).not.toBeInTheDocument();
   });
 });

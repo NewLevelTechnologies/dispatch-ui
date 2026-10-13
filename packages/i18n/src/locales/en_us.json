@@ -2972,12 +2972,14 @@
       },
       "deactivate": "Deactivate",
       "defaultRate": "Default rate",
+      "dragToReorder": "Drag to reorder",
       "emptyDescription": "Rate types appear here once your workspace is set up.",
       "emptyTitle": "No labor rate types",
       "errors": {
         "NAME_TAKEN": "Another rate type already has that name.",
         "REGULAR_REQUIRED": "Regular can’t be deactivated. Labor and computed pricebook items are priced from it.",
-        "generic": "Something went wrong. Try again."
+        "generic": "Something went wrong. Try again.",
+        "staleOrder": "The list was out of date and has been reloaded. Try again."
       },
       "footer": "Rate types are never deleted. Deactivate one to stop using it on new lines.",
       "form": {
@@ -3000,6 +3002,7 @@
       "subtitleUnpriced": "{{count}} active · {{unpriced}} without a bill rate",
       "title": "Labor rates",
       "toast": {
+        "reorderFailed": "Couldn’t reorder the rate types",
         "saveFailed": "Couldn’t save the rate type",
         "saved": "Rate type saved"
       },
