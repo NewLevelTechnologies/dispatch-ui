@@ -21,9 +21,8 @@ describe('CustomerPicker', () => {
     // Default: never-resolving search so query state never settles into
     // results during these synchronous tests (which exercise render-time
     // behavior — selection display, placeholder, disabled, dropdown open
-    // -on-focus). Tests that drive the result list end-to-end live in
-    // FinancialQuotesTab / QuoteDialog / InvoiceDialog where the
-    // surrounding component already paces the flow.
+    // -on-focus). Tests that drive the result list stub the search
+    // themselves.
     vi.mocked(apiClient.get).mockReturnValue(new Promise(() => {}));
   });
 

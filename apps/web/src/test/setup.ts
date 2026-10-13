@@ -1870,79 +1870,6 @@ vi.mock('react-i18next', () => {
     'workOrders.detail.tabs.files': 'Files',
     'workOrders.detail.tabs.overview': 'Overview',
     'workOrders.detail.tabs.purchasing': 'Purchasing',
-    'workOrders.financialDrawer.comingSoon': 'Coming soon',
-    'workOrders.financialDrawer.invoicesTab.actions.extend': 'Extend link expiry',
-    'workOrders.financialDrawer.invoicesTab.actions.markPaid': 'Mark paid',
-    'workOrders.financialDrawer.invoicesTab.actions.reissue': 'Reissue link',
-    'workOrders.financialDrawer.invoicesTab.actions.resend': 'Resend',
-    'workOrders.financialDrawer.invoicesTab.actions.send': 'Send',
-    'workOrders.financialDrawer.invoicesTab.actions.void': 'Void',
-    'workOrders.financialDrawer.invoicesTab.actions.voidPayment': 'Void {{entity, lowercase}}',
-    'workOrders.financialDrawer.invoicesTab.extendConfirm':
-      'Extend the customer-facing link for {{entity, lowercase}} {{number}} by another year? The existing link keeps working.',
-    'workOrders.financialDrawer.invoicesTab.extendSuccess': 'Link expiry extended.',
-    'workOrders.financialDrawer.invoicesTab.lastSentTo': 'Last sent {{date}} to {{email}}',
-    'workOrders.financialDrawer.invoicesTab.reissueConfirm':
-      'Reissue the customer-facing link for {{entity, lowercase}} {{number}}? The previous link will stop working — the customer will need a new email to view this {{entity, lowercase}}.',
-    'workOrders.financialDrawer.invoicesTab.reissueSuccess':
-      'Link reissued. The previous link no longer works.',
-    'workOrders.financialDrawer.invoicesTab.sendError':
-      'Failed to send {{entity, lowercase}}.',
-    'workOrders.financialDrawer.invoicesTab.sendErrorNoRecipient':
-      'Add an email to the bill-to {{customer, lowercase}} first.',
-    'workOrders.financialDrawer.invoicesTab.sendSuccess': '{{entity}} sent.',
-    'workOrders.financialDrawer.invoicesTab.addPayment': '{{entity}}',
-    'workOrders.financialDrawer.invoicesTab.changeStatus':
-      'Change status (currently {{current}})',
-    'workOrders.financialDrawer.invoicesTab.collapseRow': 'Hide line items',
-    'workOrders.financialDrawer.invoicesTab.columns.balance': 'Balance',
-    'workOrders.financialDrawer.invoicesTab.columns.date': 'Date',
-    'workOrders.financialDrawer.invoicesTab.columns.due': 'Due',
-    'workOrders.financialDrawer.invoicesTab.columns.invoiceNumber': '{{entity}} #',
-    'workOrders.financialDrawer.invoicesTab.columns.paid': 'Paid',
-    'workOrders.financialDrawer.invoicesTab.columns.status': 'Status',
-    'workOrders.financialDrawer.invoicesTab.columns.total': 'Total',
-    'workOrders.financialDrawer.invoicesTab.empty':
-      'No {{entities, lowercase}} on this {{workOrder, lowercase}} yet.',
-    'workOrders.financialDrawer.invoicesTab.errorLoading':
-      'Failed to load {{entities, lowercase}}.',
-    'workOrders.financialDrawer.invoicesTab.expandRow': 'Show line items',
-    'workOrders.financialDrawer.invoicesTab.lineColumns.description': 'Description',
-    'workOrders.financialDrawer.invoicesTab.lineColumns.lineTotal': 'Total',
-    'workOrders.financialDrawer.invoicesTab.lineColumns.quantity': 'Qty',
-    'workOrders.financialDrawer.invoicesTab.lineColumns.unitPrice': 'Unit price',
-    'workOrders.financialDrawer.invoicesTab.lineItemsHeading': 'Line items',
-    'workOrders.financialDrawer.invoicesTab.loading': 'Loading {{entities, lowercase}}…',
-    'workOrders.financialDrawer.invoicesTab.newInvoice': 'New {{entity}}',
-    'workOrders.financialDrawer.invoicesTab.noLineItems': 'No line items.',
-    'workOrders.financialDrawer.invoicesTab.noPayments':
-      'No {{entities, lowercase}} recorded against this {{parent, lowercase}}.',
-    'workOrders.financialDrawer.invoicesTab.notesHeading': 'Notes',
-    'workOrders.financialDrawer.invoicesTab.paymentColumns.amount': 'Amount',
-    'workOrders.financialDrawer.invoicesTab.paymentColumns.date': 'Date',
-    'workOrders.financialDrawer.invoicesTab.paymentColumns.method': 'Method',
-    'workOrders.financialDrawer.invoicesTab.paymentColumns.paymentNumber': '{{entity}} #',
-    'workOrders.financialDrawer.invoicesTab.paymentColumns.reference': 'Reference',
-    'workOrders.financialDrawer.invoicesTab.paymentsHeading': '{{entities}}',
-    'workOrders.financialDrawer.invoicesTab.recordPayment': 'Record {{entity}}',
-    'workOrders.financialDrawer.invoicesTab.statuses.cancelled': 'Cancelled',
-    'workOrders.financialDrawer.invoicesTab.statuses.draft': 'Draft',
-    'workOrders.financialDrawer.invoicesTab.statuses.overdue': 'Overdue',
-    'workOrders.financialDrawer.invoicesTab.statuses.paid': 'Paid',
-    'workOrders.financialDrawer.invoicesTab.statuses.sent': 'Sent',
-    'workOrders.financialDrawer.invoicesTab.statuses.void': 'Void',
-    'workOrders.financialDrawer.invoicesTab.voidConfirm':
-      'Void {{entity, lowercase}} {{number}} for {{amount}}? This cannot be undone.',
-    'workOrders.financialDrawer.invoicesTab.voidPaymentConfirm':
-      'Void {{entity, lowercase}} {{number}} ({{amount}} applied to this {{parent, lowercase}})? This reverses the full {{entity, lowercase}} from every {{parent, lowercase}} it applies to. Cannot be undone.',
-    'workOrders.financialDrawer.invoiceDialog.amount': 'Amount',
-    'workOrders.financialDrawer.invoiceDialog.billTo': 'Bill to',
-    'workOrders.financialDrawer.invoiceDialog.contextStrip':
-      '{{workOrder}} #{{number}} · {{customer}}',
-    'workOrders.financialDrawer.invoiceDialog.customerRequired':
-      'A bill-to {{entity, lowercase}} is required.',
-    'workOrders.financialDrawer.invoiceDialog.datesRequired':
-      'Both dates are required.',
     'common.accountManagerPicker.noResults': 'No users match "{{query}}".',
     'common.accountManagerPicker.noUsers': 'No users found.',
     'common.accountManagerPicker.placeholder': 'Search users…',
@@ -1952,90 +1879,6 @@ vi.mock('react-i18next', () => {
     'common.customerPicker.searching': 'Searching…',
     'common.customerPicker.typeToSearch':
       'Type at least 2 characters to search…',
-    'workOrders.financialDrawer.invoiceDialog.description': 'Description',
-    'workOrders.financialDrawer.invoiceDialog.descriptionPlaceholder':
-      'What is this {{entity, lowercase}} for?',
-    'workOrders.financialDrawer.invoiceDialog.descriptionRequired':
-      'Description is required.',
-    'workOrders.financialDrawer.invoiceDialog.dueDate': 'Due date',
-    'workOrders.financialDrawer.invoiceDialog.errorCreate':
-      'Failed to create {{entity, lowercase}}.',
-    'workOrders.financialDrawer.invoiceDialog.errorNoRecipient':
-      'Add an email to the bill-to customer first, then try Send again. The {{entity, lowercase}} was created as a draft.',
-    'workOrders.financialDrawer.invoiceDialog.invalidAmount':
-      'Amount must be a positive number.',
-    'workOrders.financialDrawer.invoiceDialog.invoiceDate': '{{entity}} date',
-    'workOrders.financialDrawer.invoiceDialog.saveAndSend': 'Save & Send',
-    'workOrders.financialDrawer.invoiceDialog.saveAsDraft': 'Save as Draft',
-    'workOrders.financialDrawer.invoiceDialog.title': 'New {{entity}}',
-    'workOrders.financialDrawer.quotesTab.actions.extend': 'Extend link expiry',
-    'workOrders.financialDrawer.quotesTab.actions.markAccepted': 'Mark accepted',
-    'workOrders.financialDrawer.quotesTab.actions.markDeclined': 'Mark declined',
-    'workOrders.financialDrawer.quotesTab.actions.reissue': 'Reissue link',
-    'workOrders.financialDrawer.quotesTab.actions.resend': 'Resend',
-    'workOrders.financialDrawer.quotesTab.actions.send': 'Send',
-    'workOrders.financialDrawer.quotesTab.extendConfirm':
-      'Extend the customer-facing link for {{entity, lowercase}} {{number}} by another year? The existing link keeps working.',
-    'workOrders.financialDrawer.quotesTab.extendSuccess': 'Link expiry extended.',
-    'workOrders.financialDrawer.quotesTab.lastSentTo': 'Last sent {{date}} to {{email}}',
-    'workOrders.financialDrawer.quotesTab.reissueConfirm':
-      'Reissue the customer-facing link for {{entity, lowercase}} {{number}}? The previous link will stop working — the customer will need a new email to view this {{entity, lowercase}}.',
-    'workOrders.financialDrawer.quotesTab.reissueSuccess':
-      'Link reissued. The previous link no longer works.',
-    'workOrders.financialDrawer.quotesTab.sendError':
-      'Failed to send {{entity, lowercase}}.',
-    'workOrders.financialDrawer.quotesTab.sendErrorNoRecipient':
-      'Add an email to the bill-to {{customer, lowercase}} first.',
-    'workOrders.financialDrawer.quotesTab.sendSuccess': '{{entity}} sent.',
-    'workOrders.financialDrawer.quotesTab.changeStatus':
-      'Change status (currently {{current}})',
-    'workOrders.financialDrawer.quotesTab.collapseRow': 'Hide line items',
-    'workOrders.financialDrawer.quotesTab.columns.date': 'Date',
-    'workOrders.financialDrawer.quotesTab.columns.expires': 'Expires',
-    'workOrders.financialDrawer.quotesTab.columns.quoteNumber': '{{entity}} #',
-    'workOrders.financialDrawer.quotesTab.columns.status': 'Status',
-    'workOrders.financialDrawer.quotesTab.columns.total': 'Total',
-    'workOrders.financialDrawer.quotesTab.empty':
-      'No {{entities, lowercase}} on this {{workOrder, lowercase}} yet.',
-    'workOrders.financialDrawer.quotesTab.errorLoading':
-      'Failed to load {{entities, lowercase}}.',
-    'workOrders.financialDrawer.quotesTab.expandRow': 'Show line items',
-    'workOrders.financialDrawer.quotesTab.lineColumns.description': 'Description',
-    'workOrders.financialDrawer.quotesTab.lineColumns.lineTotal': 'Total',
-    'workOrders.financialDrawer.quotesTab.lineColumns.quantity': 'Qty',
-    'workOrders.financialDrawer.quotesTab.lineColumns.unitPrice': 'Unit price',
-    'workOrders.financialDrawer.quotesTab.lineItemsHeading': 'Line items',
-    'workOrders.financialDrawer.quotesTab.loading': 'Loading {{entities, lowercase}}…',
-    'workOrders.financialDrawer.quotesTab.newQuote': 'New {{entity}}',
-    'workOrders.financialDrawer.quotesTab.noLineItems': 'No line items.',
-    'workOrders.financialDrawer.quotesTab.notesHeading': 'Notes',
-    'workOrders.financialDrawer.quotesTab.statuses.accepted': 'Accepted',
-    'workOrders.financialDrawer.quotesTab.statuses.declined': 'Declined',
-    'workOrders.financialDrawer.quotesTab.statuses.draft': 'Draft',
-    'workOrders.financialDrawer.quotesTab.statuses.expired': 'Expired',
-    'workOrders.financialDrawer.quotesTab.statuses.sent': 'Sent',
-    'workOrders.financialDrawer.quoteDialog.amount': 'Amount',
-    'workOrders.financialDrawer.quoteDialog.billTo': 'Bill to',
-    'workOrders.financialDrawer.quoteDialog.contextStrip':
-      '{{workOrder}} #{{number}} · {{customer}}',
-    'workOrders.financialDrawer.quoteDialog.customerRequired':
-      'A bill-to {{entity, lowercase}} is required.',
-    'workOrders.financialDrawer.quoteDialog.datesRequired':
-      'Both dates are required.',
-    'workOrders.financialDrawer.quoteDialog.description': 'Description',
-    'workOrders.financialDrawer.quoteDialog.descriptionPlaceholder':
-      'What is this {{entity, lowercase}} for?',
-    'workOrders.financialDrawer.quoteDialog.descriptionRequired':
-      'Description is required.',
-    'workOrders.financialDrawer.quoteDialog.errorCreate':
-      'Failed to create {{entity, lowercase}}.',
-    'workOrders.financialDrawer.quoteDialog.expirationDate': 'Expires',
-    'workOrders.financialDrawer.quoteDialog.invalidAmount':
-      'Amount must be a positive number.',
-    'workOrders.financialDrawer.quoteDialog.quoteDate': '{{entity}} date',
-    'workOrders.financialDrawer.quoteDialog.saveAndSend': 'Save & Send',
-    'workOrders.financialDrawer.quoteDialog.saveAsDraft': 'Save as Draft',
-    'workOrders.financialDrawer.quoteDialog.title': 'New {{entity}}',
     'workOrders.financialDrawer.voidDialog.body.invoice':
       'Void {{entity, lowercase}} {{number}} for {{amount}}? This cannot be undone.',
     'workOrders.financialDrawer.voidDialog.body.quote':
@@ -2075,12 +1918,6 @@ vi.mock('react-i18next', () => {
       'Check number, transaction id, etc.',
     'workOrders.financialDrawer.paymentDialog.submit': 'Record {{entity}}',
     'workOrders.financialDrawer.paymentDialog.title': 'Record {{entity}}',
-    'workOrders.financialDrawer.stubBlockers.purchaseOrders':
-      'Deferred to phase 7c — no backend entity yet.',
-    'workOrders.financialDrawer.stubBlockers.quotes':
-      'Quotes ship in phase 7b — waiting on backend asks #7–#10.',
-    'workOrders.financialDrawer.tabs.purchaseOrders': 'POs',
-    'workOrders.financialDrawer.title': 'Financials · {{workOrder}} #{{number}}',
     'workOrders.workItems.changeStatus': 'Change status (currently {{current}})',
     'workOrders.workItems.backToEntity': 'Back to {{entity}}',
     'workOrders.workItems.collapseRow': 'Hide details',

@@ -1,25 +1,28 @@
 /* eslint-disable i18next/no-literal-string -- dense billing detail; short operational labels stay literal (same convention as the PO detail page). Entity names route through getName(). */
 import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { EllipsisHorizontalIcon } from '@heroicons/react/16/solid';
 import { useTranslation } from '@dispatch/i18n';
 import { formatCurrency } from '@dispatch/utils';
-import { invoicesApi, InvoiceStatus, type Invoice } from '../api/setup';
+import { invoicesApi, InvoiceStatus, paymentsApi, type Invoice, type NestedInvoicePayment } from '../api/setup';
 import { useGlossary } from '../contexts/GlossaryContext';
-import { showSuccess } from '../lib/toast';
+import { showError, showSuccess } from '../lib/toast';
 import { Pill } from '../components/ui/Pill';
 import { Callout } from '../components/ui/Callout';
 import { Button } from '../components/catalyst/button';
 import { Dropdown, DropdownButton, DropdownItem, DropdownLabel, DropdownMenu } from '../components/catalyst/dropdown';
 import ConfirmDialog from '../components/ConfirmDialog';
+import PaymentDialog from '../components/PaymentDialog';
+import VoidFinancialDocDialog from '../components/VoidFinancialDocDialog';
 import { DocumentPageFrame } from '../components/document/DocumentPageFrame';
 import { DocumentSummaryHeader, type DocumentStep } from '../components/document/DocumentSummaryHeader';
 import { DocumentBody, DocumentWarnings } from '../components/document/DocumentBody';
 import { DocumentHeaderDialog } from '../components/document/DocumentHeaderDialog';
 import { DocumentEditStatus, StaleCallout } from '../components/document/DocumentEditStatus';
 import { useDocumentParties } from '../components/document/useDocumentParties';
-import { lineEditing, useDocumentEditor } from '../components/document/useDocumentEditor';
+import { documentErrorMessage, lineEditing, refreshDocumentLists, useDocumentEditor } from '../components/document/useDocumentEditor';
+import { useShareLink } from '../components/document/useShareLink';
 import { formatDocDate, isLegacy, memberLabel, memberSavings, toDateInput } from '../components/document/documentModel';
 
 const STATUS_TONE: Record<InvoiceStatus, 'neutral' | 'info' | 'success' | 'danger'> = {
@@ -50,6 +53,16 @@ export default function InvoiceDetailPage() {
   const editor = useDocumentEditor<Invoice>({ queryKey: ['invoice', id], entity: entityLower });
   const [headerOpen, setHeaderOpen] = useState(false);
   const [confirmCancel, setConfirmCancel] = useState(false);
+  const [paying, setPaying] = useState(false);
+  const [voiding, setVoiding] = useState(false);
+  const [voidingPayment, setVoidingPayment] = useState<NestedInvoicePayment | null>(null);
+  const queryClient = useQueryClient();
+  const shareLink = useShareLink({
+    routes: invoicesApi,
+    id: id ?? '',
+    number: invoice?.invoiceNumber ?? '',
+    entity: entityLower,
+  });
   const { billTo, location, workOrder } = useDocumentParties({
     customerId: invoice?.customerId ?? '',
     workOrderId: invoice?.workOrderId,
@@ -85,7 +98,10 @@ export default function InvoiceDetailPage() {
   const legacy = isLegacy(invoice);
   const draft = invoice.status === InvoiceStatus.DRAFT;
   const editable = !legacy && draft;
-  const sendable = draft || invoice.status === InvoiceStatus.SENT || invoice.status === InvoiceStatus.OVERDUE;
+  const open = invoice.status === InvoiceStatus.SENT || invoice.status === InvoiceStatus.OVERDUE;
+  const sendable = draft || open;
+  const payable = open && invoice.balanceDue > 0;
+  const voidable = open || invoice.status === InvoiceStatus.PAID;
 
   const send = () => {
     let to = '';
@@ -98,6 +114,29 @@ export default function InvoiceDetailPage() {
         { returnsDocument: false },
       )
       .then((ok) => ok && showSuccess(`${invoice.invoiceNumber} sent`, to ? `To ${to}` : undefined));
+  };
+  const voidInvoice = ({ revokeShareLink }: { revokeShareLink: boolean }) => {
+    setVoiding(false);
+    void editor
+      .run(() => invoicesApi.updateStatus(invoice.id, { status: InvoiceStatus.VOID }), `Couldn’t void this ${entityLower}`)
+      .then(async (ok) => {
+        if (!ok || !revokeShareLink) return;
+        try {
+          await invoicesApi.revokeShareLink(invoice.id);
+        } catch {
+          showError('The customer’s link still works', 'Replace it from the ⋯ menu to turn it off.');
+        }
+      });
+  };
+  const voidPayment = async (payment: NestedInvoicePayment) => {
+    try {
+      await paymentsApi.void(payment.id);
+      queryClient.invalidateQueries({ queryKey: ['invoice', invoice.id] });
+      refreshDocumentLists(queryClient);
+      showSuccess(`${payment.paymentNumber} voided`);
+    } catch (err) {
+      showError(`Couldn’t void ${payment.paymentNumber}`, documentErrorMessage(err, entityLower));
+    }
   };
   const cancel = () =>
     void editor.run(
@@ -113,20 +152,38 @@ export default function InvoiceDetailPage() {
           Edit details
         </Button>
       )}
-      {sendable && (
-        <Button color="dark/zinc" size="xs" disabled={editor.saving} onClick={send}>
-          {draft ? `Send ${entityLower}` : 'Resend'}
+      {sendable &&
+        (payable ? (
+          <Button outline size="xs" disabled={editor.saving} onClick={send}>
+            Resend
+          </Button>
+        ) : (
+          <Button color="dark/zinc" size="xs" disabled={editor.saving} onClick={send}>
+            {draft ? `Send ${entityLower}` : 'Resend'}
+          </Button>
+        ))}
+      {payable && (
+        <Button color="dark/zinc" size="xs" onClick={() => setPaying(true)}>
+          Take payment
         </Button>
       )}
-      {draft && (
+      {(draft || voidable) && (
         <Dropdown>
           <DropdownButton plain size="xs" aria-label="More actions">
             <EllipsisHorizontalIcon />
           </DropdownButton>
           <DropdownMenu anchor="bottom end">
-            <DropdownItem onClick={() => setConfirmCancel(true)}>
-              <DropdownLabel>{`Cancel ${entityLower}`}</DropdownLabel>
-            </DropdownItem>
+            {draft && (
+              <DropdownItem onClick={() => setConfirmCancel(true)}>
+                <DropdownLabel>{`Cancel ${entityLower}`}</DropdownLabel>
+              </DropdownItem>
+            )}
+            {voidable && invoice.lastSentAt && shareLink.items}
+            {voidable && (
+              <DropdownItem onClick={() => setVoiding(true)}>
+                <DropdownLabel>{`Void ${entityLower}`}</DropdownLabel>
+              </DropdownItem>
+            )}
           </DropdownMenu>
         </Dropdown>
       )}
@@ -213,7 +270,12 @@ export default function InvoiceDetailPage() {
       <DocumentBody
         doc={invoice}
         notes={invoice.notes}
-        settlement={{ amountPaid: invoice.amountPaid, balanceDue: invoice.balanceDue, payments: invoice.payments }}
+        settlement={{
+          amountPaid: invoice.amountPaid,
+          balanceDue: invoice.balanceDue,
+          payments: invoice.payments,
+          onVoidPayment: withdrawn ? undefined : setVoidingPayment,
+        }}
         editing={editable ? lineEditing(invoicesApi, invoice.id, editor.run) : undefined}
       />
 
@@ -253,6 +315,41 @@ export default function InvoiceDetailPage() {
         cancelLabel="Keep it"
         isDestructive
       />
+      <ConfirmDialog
+        isOpen={!!voidingPayment}
+        onClose={() => setVoidingPayment(null)}
+        onConfirm={() => voidingPayment && void voidPayment(voidingPayment)}
+        title={`Void ${voidingPayment?.paymentNumber ?? 'payment'}?`}
+        message={`This undoes the whole ${getName('payment').toLowerCase()}, on every ${entityLower} it was applied to, not just this one. It can't be undone.`}
+        confirmLabel={`Void ${getName('payment').toLowerCase()}`}
+        cancelLabel="Keep it"
+        isDestructive
+      />
+      {voiding && (
+        <VoidFinancialDocDialog
+          open
+          kind="invoice"
+          entityLabel={entityLabel}
+          documentNumber={invoice.invoiceNumber}
+          amountDisplay={formatCurrency(invoice.totalAmount)}
+          hasActiveShareLink={!!invoice.lastSentAt}
+          onConfirm={voidInvoice}
+          onClose={() => setVoiding(false)}
+        />
+      )}
+      <PaymentDialog
+        open={paying}
+        onClose={() => {
+          setPaying(false);
+          queryClient.invalidateQueries({ queryKey: ['invoice', invoice.id] });
+        }}
+        workOrderId={invoice.workOrderId ?? ''}
+        workOrderNumber={workOrder?.workOrderNumber ?? ''}
+        customerName={billTo.name}
+        openInvoices={payable ? [invoice] : []}
+        lockedInvoice={invoice}
+      />
+      {shareLink.dialogs}
     </DocumentPageFrame>
   );
 }

@@ -201,4 +201,33 @@ describe('InvoiceDetailPage editing', () => {
     expect(screen.queryByRole('button', { name: 'Edit details' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Resend' })).toBeInTheDocument();
   });
+
+  it('takes a payment on an open invoice, and voids one after confirming', async () => {
+    const user = userEvent.setup();
+    mockApi({ ...invoice, status: 'SENT' });
+    vi.mocked(apiClient.post).mockResolvedValue({ data: {} });
+    renderPage();
+
+    await user.click(await screen.findByRole('button', { name: 'Take payment' }));
+    expect(await screen.findByRole('dialog')).toBeInTheDocument();
+    await user.keyboard('{Escape}');
+
+    await user.click(screen.getByRole('button', { name: 'Void PMT-0012' }));
+    await user.click(await screen.findByRole('button', { name: 'Void payment' }));
+    expect(apiClient.post).toHaveBeenCalledWith('/financial/payments/p-1/void');
+  });
+
+  it('voids a sent invoice from the menu', async () => {
+    const user = userEvent.setup();
+    mockApi(invoice);
+    vi.mocked(apiClient.patch).mockResolvedValue({ data: { ...invoice, status: 'VOID', version: 4 } });
+    renderPage();
+
+    await user.click(await screen.findByRole('button', { name: 'More actions' }));
+    expect(screen.getByRole('menuitem', { name: 'Replace customer link' })).toBeInTheDocument();
+    await user.click(screen.getByRole('menuitem', { name: 'Void invoice' }));
+    const dialog = await screen.findByRole('dialog');
+    await user.click(within(dialog).getByRole('button', { name: /void/i }));
+    expect(apiClient.patch).toHaveBeenCalledWith('/financial/invoices/inv-1/status', { status: 'VOID' });
+  });
 });

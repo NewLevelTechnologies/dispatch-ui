@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from 'react';
-import { useQueryClient, type QueryKey } from '@tanstack/react-query';
+import { useQueryClient, type QueryClient, type QueryKey } from '@tanstack/react-query';
 import type { AddLineRequest, ReorderLinesRequest, UpdateLineRequest } from '../../api/setup';
 import { errorCode, showError } from '../../lib/toast';
 import type { LineEditing } from './DocumentLinesCard';
@@ -14,7 +14,13 @@ const DEPENDENT_KEYS = [
   'financialSummary',
   'location-invoices',
   'location-invoice-summary',
+  'quoteInvoiceable',
 ];
+
+/** Refetches the lists and rollups a created or changed document shows up in. */
+export function refreshDocumentLists(queryClient: QueryClient) {
+  for (const key of DEPENDENT_KEYS) queryClient.invalidateQueries({ queryKey: [key] });
+}
 
 /**
  * Words a document-edit failure from its `code`; the server's `message` is
@@ -24,6 +30,8 @@ export function documentErrorMessage(err: unknown, entity: string): string {
   switch (errorCode(err)) {
     case 'DOCUMENT_NOT_EDITABLE':
       return `This ${entity} can't be edited any more.`;
+    case 'QUOTE_NOT_ACCEPTED':
+      return 'Only an accepted quote can be invoiced.';
     case 'OVER_INVOICED':
       return 'That is more than is left to bill on the quote line. Put extra work on a new line.';
     case 'LABOR_RATE_NOT_SET':
@@ -67,9 +75,7 @@ export function useDocumentEditor<D extends { version?: number }>({
   const [pending, setPending] = useState(0);
   const [stale, setStale] = useState(false);
 
-  const refreshDependents = useCallback(() => {
-    for (const key of DEPENDENT_KEYS) queryClient.invalidateQueries({ queryKey: [key] });
-  }, [queryClient]);
+  const refreshDependents = useCallback(() => refreshDocumentLists(queryClient), [queryClient]);
 
   /**
    * Queue an edit. `fn` gets the current version; when it returns the
