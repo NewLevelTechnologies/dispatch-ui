@@ -38,8 +38,10 @@ export type PublicQuoteStatus =
   | 'DRAFT'
   | 'SENT'
   | 'ACCEPTED'
-  | 'REJECTED'
+  | 'DECLINED'
   | 'EXPIRED'
+  // Older values; the server no longer sends them.
+  | 'REJECTED'
   | 'CANCELLED';
 
 export type PublicPaymentMethod =
@@ -58,11 +60,51 @@ export type PublicPaymentMethod =
  */
 export type PublicPaymentStatus = 'RECEIVED' | 'VOID';
 
+export type PublicAdjustmentKind = 'PERCENT' | 'AMOUNT' | 'WAIVE';
+
+export type PublicAdjustmentReason =
+  | 'MEMBER'
+  | 'REPAIR_APPROVED'
+  | 'GOODWILL'
+  | 'PROMOTION'
+  | 'INCENTIVE'
+  | 'DISCRETIONARY'
+  | 'OTHER';
+
+/** A discount or waive as the customer sees it; the page words it from `reasonCode`. */
+export interface PublicAdjustment {
+  kind: PublicAdjustmentKind;
+  reasonCode: PublicAdjustmentReason;
+  /** PERCENT: a fraction. AMOUNT: dollars. WAIVE: null. */
+  value: string | null;
+  /** What it saved. */
+  amount: string;
+}
+
 export interface PublicLineItem {
   description: string;
   quantity: string;
   unitPrice: string;
+  /** The list amount; struck through when `adjustmentAmount` is above zero. */
   lineTotal: string;
+  /** The saving on the line, its share of document discounts included. Absent on older documents. */
+  adjustmentAmount?: string | null;
+  /** What the line comes to after the saving. */
+  netAmount?: string | null;
+  /** The line's own discounts and waives. */
+  adjustments?: PublicAdjustment[];
+}
+
+/** Savings and tax context both public documents carry. Absent on older documents. */
+export interface PublicPricing {
+  /** List total before savings. */
+  grossSubtotal?: string | null;
+  /** Everything saved ("You save $X"). */
+  adjustmentTotal?: string | null;
+  /** Discounts on the whole document. */
+  documentAdjustments?: PublicAdjustment[];
+  taxJurisdictionName?: string | null;
+  taxExempt?: boolean;
 }
 
 export interface PublicPayment {
@@ -72,7 +114,7 @@ export interface PublicPayment {
   status: PublicPaymentStatus;
 }
 
-export interface PublicInvoiceData {
+export interface PublicInvoiceData extends PublicPricing {
   invoiceNumber: string;
   status: PublicInvoiceStatus;
   invoiceDate: string;
@@ -89,7 +131,7 @@ export interface PublicInvoiceData {
   payments: PublicPayment[];
 }
 
-export interface PublicQuoteData {
+export interface PublicQuoteData extends PublicPricing {
   quoteNumber: string;
   status: PublicQuoteStatus;
   quoteDate: string;
@@ -101,10 +143,11 @@ export interface PublicQuoteData {
    * `lineItems` is empty until it's re-sent. Show "being updated", no approve.
    */
   beingUpdated?: boolean;
-  subtotal: string;
-  taxRate: string;
-  taxAmount: string;
-  totalAmount: string;
+  /** Null while `beingUpdated`. */
+  subtotal: string | null;
+  taxRate: string | null;
+  taxAmount: string | null;
+  totalAmount: string | null;
   notes: string | null;
   lineItems: PublicLineItem[];
 }
@@ -177,6 +220,21 @@ export const publicFinancialApi = {
     const response = await publicApiClient.get<PublicQuoteResponse>(
       '/public/quotes',
       tokenHeaders(token, signal),
+    );
+    return response.data;
+  },
+
+  /**
+   * The customer approves the revision they're looking at. Returns the
+   * quote, now ACCEPTED. 409 `QUOTE_REVISION_STALE`: it was revised since
+   * the page loaded, reload it. 409 `QUOTE_NOT_APPROVABLE`: it's no longer
+   * waiting on the customer.
+   */
+  approveQuote: async (token: string, revision: number | undefined): Promise<PublicQuoteResponse> => {
+    const response = await publicApiClient.post<PublicQuoteResponse>(
+      '/public/quotes/approve',
+      { revision },
+      tokenHeaders(token),
     );
     return response.data;
   },

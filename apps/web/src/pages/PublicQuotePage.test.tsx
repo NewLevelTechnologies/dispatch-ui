@@ -1,13 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { act, screen, waitFor } from '@testing-library/react';
-import { renderWithProviders } from '../test/utils';
+import { renderWithProviders, userEvent } from '../test/utils';
 import PublicQuotePage from './PublicQuotePage';
 import publicApiClient from '@dispatch/api/src/publicClient';
 import type { PublicQuoteResponse } from '../api/setup';
 
 vi.mock('@dispatch/api/src/publicClient', () => ({
   __esModule: true,
-  default: { get: vi.fn() },
+  default: { get: vi.fn(), post: vi.fn() },
   setPublicApiBaseURL: vi.fn(),
 }));
 
@@ -163,5 +163,78 @@ describe('PublicQuotePage', () => {
     expect(
       screen.getByRole('heading', { name: /this link is no longer available/i }),
     ).toBeInTheDocument();
+  });
+
+  it('shows savings: the list price struck through, why, and what the customer saves', async () => {
+    vi.mocked(publicApiClient.get).mockResolvedValueOnce({
+      data: buildResponse({
+        grossSubtotal: '1289.00',
+        adjustmentTotal: '139.00',
+        subtotal: '1150.00',
+        totalAmount: '1150.00',
+        taxJurisdictionName: 'Phoenix, AZ',
+        taxExempt: true,
+        documentAdjustments: [{ kind: 'AMOUNT', reasonCode: 'GOODWILL', value: '50.00', amount: '50.00' }],
+        lineItems: [
+          {
+            description: 'Trip charge',
+            quantity: '1',
+            unitPrice: '89.00',
+            lineTotal: '89.00',
+            adjustmentAmount: '89.00',
+            netAmount: '0.00',
+            adjustments: [{ kind: 'WAIVE', reasonCode: 'MEMBER', value: null, amount: '89.00' }],
+          },
+          { description: 'Replace compressor', quantity: '1', unitPrice: '1200.00', lineTotal: '1200.00', adjustmentAmount: '50.00', netAmount: '1150.00', adjustments: [] },
+        ],
+      }),
+    });
+    renderAt('tok-s');
+
+    expect(await screen.findByText('Waived · Member')).toBeInTheDocument();
+    expect(screen.getByText('$89.00')).toHaveClass('line-through');
+    expect(screen.getByText('$1,289.00')).toBeInTheDocument();
+    expect(screen.getByText('−$139.00')).toBeInTheDocument();
+    expect(screen.getByText('$50.00 off · Courtesy · −$50.00')).toBeInTheDocument();
+    expect(screen.getByText('Tax (exempt)')).toBeInTheDocument();
+  });
+
+  it('approves the revision shown, after confirming', async () => {
+    const user = userEvent.setup();
+    vi.mocked(publicApiClient.get).mockResolvedValueOnce({ data: buildResponse({ revision: 3 }) });
+    vi.mocked(publicApiClient.post).mockResolvedValueOnce({ data: buildResponse({ revision: 3, status: 'ACCEPTED' }) });
+    renderAt('tok-a');
+
+    await user.click(await screen.findByRole('button', { name: 'Approve quote' }));
+    expect(screen.getByText('Approve quote #Q-0007 for $1,200.00?')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Yes, approve' }));
+
+    expect(publicApiClient.post).toHaveBeenCalledWith('/public/quotes/approve', { revision: 3 }, expect.objectContaining({ headers: { 'X-Share-Token': 'tok-a' } }));
+    expect(await screen.findByText('You approved this quote')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Approve quote' })).not.toBeInTheDocument();
+  });
+
+  it('reloads and says so when the quote was revised since it opened', async () => {
+    const user = userEvent.setup();
+    vi.mocked(publicApiClient.get)
+      .mockResolvedValueOnce({ data: buildResponse({ revision: 1 }) })
+      .mockResolvedValue({ data: buildResponse({ revision: 2, totalAmount: '1300.00' }) });
+    vi.mocked(publicApiClient.post).mockRejectedValueOnce(
+      Object.assign(new Error('409'), { isAxiosError: true, response: { status: 409, data: { code: 'QUOTE_REVISION_STALE' } } }),
+    );
+    renderAt('tok-r');
+
+    await user.click(await screen.findByRole('button', { name: 'Approve quote' }));
+    await user.click(screen.getByRole('button', { name: 'Yes, approve' }));
+
+    expect(await screen.findByText('This quote was just updated. Review the new version before approving.')).toBeInTheDocument();
+    await waitFor(() => expect(publicApiClient.get).toHaveBeenCalledTimes(2));
+  });
+
+  it('shows a "Declined" badge and no approve button for a declined quote', async () => {
+    vi.mocked(publicApiClient.get).mockResolvedValueOnce({ data: buildResponse({ status: 'DECLINED' }) });
+    renderAt('tok-d');
+    expect(await screen.findByText('Declined')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Approve quote' })).not.toBeInTheDocument();
   });
 });
