@@ -52,6 +52,11 @@ export default function PricebookPage() {
 
   const { data: categories = [] } = useQuery({ queryKey: CATEGORIES_KEY, queryFn: () => pricebookApi.getCategories() });
   const tree = categoryTree(categories.filter((c) => c.active));
+  // The categories response has no "All items" total, so one count call stands in for it.
+  const { data: allActive } = useQuery({
+    queryKey: [...ITEMS_KEY, { allActiveCount: true }],
+    queryFn: () => pricebookApi.getItems({ active: true, size: 1 }),
+  });
   const categoryName = (id: string | null) => categories.find((c) => c.id === id)?.name ?? null;
 
   const filters = {
@@ -115,11 +120,18 @@ export default function PricebookPage() {
             )}
           </CardHead>
           <nav aria-label={t('settings.pricebook.categories.title')} className="p-1">
-            <CategoryButton label={t('settings.pricebook.allItems')} level={0} on={categoryId == null} onClick={() => pick(() => setCategoryId(null))} />
+            <CategoryButton
+              label={t('settings.pricebook.allItems')}
+              count={allActive?.totalElements}
+              level={0}
+              on={categoryId == null}
+              onClick={() => pick(() => setCategoryId(null))}
+            />
             {tree.map(({ category, level }) => (
               <CategoryButton
                 key={category.id}
                 label={category.name}
+                count={category.activeItemCount}
                 level={level + 1}
                 on={categoryId === category.id}
                 onClick={() => pick(() => setCategoryId(category.id))}
@@ -229,7 +241,19 @@ export default function PricebookPage() {
   );
 }
 
-function CategoryButton({ label, level, on, onClick }: { label: string; level: number; on: boolean; onClick: () => void }) {
+function CategoryButton({
+  label,
+  count,
+  level,
+  on,
+  onClick,
+}: {
+  label: string;
+  count?: number;
+  level: number;
+  on: boolean;
+  onClick: () => void;
+}) {
   return (
     <button
       type="button"
@@ -237,11 +261,12 @@ function CategoryButton({ label, level, on, onClick }: { label: string; level: n
       aria-current={on ? 'true' : undefined}
       style={{ paddingLeft: 10 + level * 12 }}
       className={clsx(
-        'flex w-full rounded-sm py-1.5 pr-2.5 text-left !text-[12.5px]',
+        'flex w-full gap-2 rounded-sm py-1.5 pr-2.5 text-left !text-[12.5px]',
         on ? 'bg-bg-active !font-semibold text-fg-strong' : 'text-fg hover:bg-bg-hover',
       )}
     >
-      {label}
+      <span className="flex-1">{label}</span>
+      {count != null && <span className="text-[11px] font-normal tabular-nums text-fg-muted">{count}</span>}
     </button>
   );
 }

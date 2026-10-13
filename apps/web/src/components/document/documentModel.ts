@@ -19,6 +19,8 @@ import type {
 
 /** The fields the document view reads; both `Quote` and `Invoice` satisfy it. */
 export interface PricedDocument {
+  /** The bill-to account; its rate plan prices pricebook search results. */
+  customerId?: string;
   pricingModel?: PricingModel;
   lineItems: DocumentLineItem[];
   adjustments?: DocumentAdjustment[];
@@ -134,6 +136,9 @@ const RULE_NOTE: Record<PricingRule, (v: number | null | undefined) => string> =
   CATEGORY_MULTIPLIER: (v) => `× ${v ?? 1} · category`,
   PRICE_MULTIPLIER: (v) => `× ${v ?? 1} · plan`,
 };
+
+/** What a plan rule did, in the words a line uses ("cost + 40% · plan tier"). */
+export const pricingRuleNote = (rule: PricingRule, value: number | null | undefined) => RULE_NOTE[rule](value);
 
 /**
  * The muted note under a unit price: what the rate plan did ("list $89.00 ·

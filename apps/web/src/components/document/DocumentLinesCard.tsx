@@ -160,7 +160,7 @@ export function DocumentLinesCard({
           </tbody>
         </DenseTable>
       </div>
-      {editing && adding && <AddLinePanel rates={activeRates} onAdd={editing.onAdd} onClose={() => setAdding(false)} />}
+      {editing && adding && <AddLinePanel rates={activeRates} billToCustomerId={doc.customerId} onAdd={editing.onAdd} onClose={() => setAdding(false)} />}
       {editing && (
         <div className="flex flex-wrap gap-1.5 border-t border-border-soft px-3.5 py-2.5">
           <Button

@@ -12,7 +12,7 @@ import { Select } from '../catalyst/select';
 import { Field, Label } from '../catalyst/fieldset';
 import { ToggleGroup, ToggleGroupOption } from '../ui/ToggleGroup';
 import { ViewTabs } from '../ui/Tabs';
-import { FREEFORM_TYPES, LINE_TYPE_LABEL, LINE_TYPE_TONE } from './documentModel';
+import { FREEFORM_TYPES, LINE_TYPE_LABEL, LINE_TYPE_TONE, pricingRuleNote } from './documentModel';
 import type { NewLine } from './DocumentLinesCard';
 
 type Tab = 'pricebook' | 'labor' | 'freeform';
@@ -30,11 +30,14 @@ const isMoney = (n: number | undefined) => n == null || (Number.isFinite(n) && n
  */
 export function AddLinePanel({
   rates,
+  billToCustomerId,
   onAdd,
   onClose,
 }: {
   /** Active labor rate types, in the tenant's order. */
   rates: LaborRateType[];
+  /** The document's customer: search results are priced at its rate plan, so what's picked is what lands. */
+  billToCustomerId?: string;
   onAdd: (line: NewLine) => Promise<boolean>;
   onClose: () => void;
 }) {
@@ -84,6 +87,7 @@ export function AddLinePanel({
       <div className="border-t border-border-soft px-3.5 py-2.5">
         {tab === 'pricebook' ? (
           <PricebookSearch
+            billToCustomerId={billToCustomerId}
             onAdd={add}
             onFreeform={(q) => {
               setFreeformSeed(q);
@@ -104,22 +108,35 @@ export function AddLinePanel({
  * Search the active pricebook. Arrow keys move the highlight; Enter adds
  * the highlighted item and clears the search for the next one.
  */
-function PricebookSearch({ onAdd, onFreeform }: { onAdd: Add; onFreeform: (q: string) => void }) {
+function PricebookSearch({
+  billToCustomerId,
+  onAdd,
+  onFreeform,
+}: {
+  billToCustomerId?: string;
+  onAdd: Add;
+  onFreeform: (q: string) => void;
+}) {
   const [search, setSearch] = useState('');
   const q = useDeferredValue(search.trim());
   const [hi, setHi] = useState(0);
   const [busy, setBusy] = useState(false);
   const { data, isFetching } = useQuery({
-    queryKey: ['pricebook-items', 'search', q],
-    queryFn: () => pricebookApi.getItems({ q, active: true, size: 20 }),
+    queryKey: ['pricebook-items', 'search', q, billToCustomerId],
+    queryFn: () => pricebookApi.getItems({ q, active: true, size: 20, billToCustomerId }),
     enabled: q !== '',
     placeholderData: keepPreviousData,
   });
-  const results = q ? (data?.content ?? []) : [];
+  // With nothing typed, the items this tenant adds most are one click away.
+  const { data: frequent = [] } = useQuery({
+    queryKey: ['pricebook-items', 'frequent', billToCustomerId],
+    queryFn: () => pricebookApi.getFrequent({ size: 6, billToCustomerId }),
+  });
+  const results = q ? (data?.content ?? []) : frequent;
   const highlighted = Math.min(hi, Math.max(0, results.length - 1));
 
   const pick = async (item: PricebookItem) => {
-    if (busy || item.unitPrice == null) return;
+    if (busy || priceOf(item) == null) return;
     setBusy(true);
     const ok = await onAdd({ itemId: item.id, quantity: 1 }, item.name);
     setBusy(false);
@@ -163,9 +180,9 @@ function PricebookSearch({ onAdd, onFreeform }: { onAdd: Add; onFreeform: (q: st
           aria-activedescendant={results[highlighted] ? `pricebook-result-${results[highlighted].id}` : undefined}
         />
       </InputGroup>
-      {!q ? (
+      {!q && !results.length ? (
         <p className="mt-2 text-[11.5px] text-fg-muted">Type a name or SKU. ↑↓ to move, Enter adds and clears for the next item.</p>
-      ) : results.length === 0 && !isFetching ? (
+      ) : q && results.length === 0 && !isFetching ? (
         <p className="mt-2 text-[12px] text-fg-muted">
           No items match “{q}”.{' '}
           <button type="button" className="!font-semibold text-fg-accent hover:underline" onClick={() => onFreeform(q)}>
@@ -175,11 +192,12 @@ function PricebookSearch({ onAdd, onFreeform }: { onAdd: Add; onFreeform: (q: st
       ) : (
         <>
           <div className="mt-2 px-1 text-[10px] font-bold uppercase tracking-[0.05em] text-fg-muted">
-            {results.length === 1 ? '1 result' : `${results.length} results`}
+            {!q ? 'Frequently used' : results.length === 1 ? '1 result' : `${results.length} results`}
           </div>
           <ul id="pricebook-results" role="listbox" aria-label="Pricebook results" className="mt-1 max-h-[264px] overflow-y-auto">
             {results.map((item, i) => {
-              const unpriced = item.unitPrice == null;
+              const price = priceOf(item);
+              const unpriced = price == null;
               return (
                 <li
                   key={item.id}
@@ -203,11 +221,9 @@ function PricebookSearch({ onAdd, onFreeform }: { onAdd: Add; onFreeform: (q: st
                     <span className="truncate text-[12.5px] text-fg-strong">{item.name}</span>
                     {item.sku && <span className="font-mono text-[10.5px] text-fg-muted">{item.sku}</span>}
                   </span>
-                  <span className="text-[10.5px] text-fg-muted">
-                    {unpriced ? 'needs Regular rate' : item.pricingMode === 'COMPUTED' ? 'computed · list' : 'list'}
-                  </span>
+                  <span className="text-[10.5px] text-fg-muted">{resultNote(item, !!billToCustomerId)}</span>
                   <span className="min-w-[80px] text-right text-[12.5px] font-medium tabular-nums text-fg-strong">
-                    {unpriced ? '—' : formatCurrency(item.unitPrice!)}
+                    {price == null ? '—' : formatCurrency(price)}
                     {!unpriced && <span className="text-[10.5px] font-normal text-fg-muted">/{item.unit}</span>}
                   </span>
                 </li>
@@ -218,6 +234,20 @@ function PricebookSearch({ onAdd, onFreeform }: { onAdd: Add; onFreeform: (q: st
       )}
     </div>
   );
+}
+
+/** What a line added from the item would bill at: the account's plan price when asked for it, else the list price. */
+const priceOf = (item: PricebookItem) => (item.planUnitPrice !== undefined ? item.planUnitPrice : item.unitPrice);
+
+/** How the shown price was made: the plan rule, or the list price as-is. */
+function resultNote(item: PricebookItem, forAccount: boolean) {
+  if (priceOf(item) == null) return 'needs Regular rate';
+  if (item.pricingRule) {
+    const rule = pricingRuleNote(item.pricingRule, item.pricingRuleValue);
+    return item.unitPrice != null && item.unitPrice !== item.planUnitPrice ? `list ${formatCurrency(item.unitPrice)} · ${rule}` : rule;
+  }
+  // Without the account, the price is the list price and a plan may still change it on the line.
+  return forAccount ? null : 'list';
 }
 
 function LaborLineForm({ rates, onAdd }: { rates: LaborRateType[]; onAdd: Add }) {
