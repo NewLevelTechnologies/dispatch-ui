@@ -5,6 +5,7 @@ import {
   documentShare,
   formatDocDate,
   lineMargin,
+  lineUpdate,
   marginSummary,
   memberLabel,
   moveLine,
@@ -133,5 +134,16 @@ describe('documentModel', () => {
     expect(moveLine(['a', 'b', 'c'], 'c', 'a')).toEqual(['c', 'a', 'b']);
     const same = ['a', 'b'];
     expect(moveLine(same, 'a', 'a')).toBe(same);
+  });
+
+  it('switching a labor line’s rate keeps a typed description and drops the copied price', () => {
+    const line = {
+      id: 'l1', sortOrder: 0, type: 'LABOR', description: 'Diagnose no-cool', laborRateTypeId: 'r-reg', laborRateTypeName: 'Regular',
+      quantity: 2, unit: 'hr', unitPrice: 95, unitCost: 38, lineTotal: 190, taxClass: 'LABOR',
+    } as DocumentLineItem;
+    expect(lineUpdate(line, 4, { laborRateTypeId: 'r-ot' })).toEqual({
+      version: 4, type: 'LABOR', description: 'Diagnose no-cool', quantity: 2, taxClass: 'LABOR', laborRateTypeId: 'r-ot',
+    });
+    expect(lineUpdate({ ...line, description: 'Regular' }, 4, { laborRateTypeId: 'r-ot' }).description).toBeUndefined();
   });
 });

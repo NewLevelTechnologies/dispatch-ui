@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { invoicesApi, quotesApi, financialActivityApi, financialDashboardApi, revenueTargetsApi,
-  revenueReportApi, receivablesReportApi, quoteReportApi, paymentReportApi, paymentsApi, taxApi } from './financialApi';
+  revenueReportApi, receivablesReportApi, quoteReportApi, paymentReportApi, paymentsApi, taxApi, laborRatesApi } from './financialApi';
 import apiClient from './client';
 
 vi.mock('./client');
@@ -372,5 +372,24 @@ describe('taxApi', () => {
   it('sets the agreement fee tax class', async () => {
     await taxApi.updatePricingSettings('FEE');
     expect(apiClient.put).toHaveBeenCalledWith('/financial/pricing-settings', { agreementFeeTaxClass: 'FEE' });
+  });
+});
+
+describe('laborRatesApi', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(apiClient.put).mockResolvedValue({ data: {} });
+  });
+
+  it('replaces the whole rate type', async () => {
+    const request = { name: 'Emergency', billRate: 195, costRate: null, sortOrder: 4, active: true };
+    await laborRatesApi.update('r-5', request);
+    expect(apiClient.put).toHaveBeenCalledWith('/financial/labor-rates/r-5', request);
+  });
+
+  it('reorders with the full list of ids', async () => {
+    vi.mocked(apiClient.post).mockResolvedValue({ data: [] });
+    await laborRatesApi.reorder(['r-2', 'r-1']);
+    expect(apiClient.post).toHaveBeenCalledWith('/financial/labor-rates/reorder', { orderedIds: ['r-2', 'r-1'] });
   });
 });

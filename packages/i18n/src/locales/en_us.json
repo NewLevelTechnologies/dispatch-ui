@@ -2635,7 +2635,8 @@
       "tax": "Tax",
       "terminology": "Terminology",
       "types": "Types",
-      "workflows": "Workflows"
+      "workflows": "Workflows",
+      "laborRates": "Labor rates"
     },
     "openNav": "Open settings menu",
     "planned": "Planned",
@@ -2957,6 +2958,55 @@
         "saveFailed": "Couldn't save",
         "saved": "Saved"
       }
+    },
+    "laborRates": {
+      "actionsFor": "Actions for {{name}}",
+      "activate": "Activate",
+      "add": "Add rate type",
+      "col": {
+        "billRate": "Bill rate",
+        "costRate": "Cost",
+        "margin": "Margin",
+        "name": "Rate type",
+        "status": "Status"
+      },
+      "deactivate": "Deactivate",
+      "defaultRate": "Default rate",
+      "dragToReorder": "Drag to reorder",
+      "emptyDescription": "Rate types appear here once your workspace is set up.",
+      "emptyTitle": "No labor rate types",
+      "errors": {
+        "NAME_TAKEN": "Another rate type already has that name.",
+        "REGULAR_REQUIRED": "Regular can’t be deactivated. Labor and computed pricebook items are priced from it.",
+        "generic": "Something went wrong. Try again.",
+        "staleOrder": "The list was out of date and has been reloaded. Try again."
+      },
+      "footer": "Rate types are never deleted. Deactivate one to stop using it on new lines.",
+      "form": {
+        "billHint": "Leave the bill rate blank if it isn’t decided yet. Labor can’t be added at an unpriced rate unless the customer’s rate plan prices it or a price is typed on the line.",
+        "billRate": "Bill rate ($/hr)",
+        "costHint": "Loaded cost of an hour. Never shown to customers.",
+        "costRate": "Cost ($/hr)",
+        "description": "What an hour of this kind of labor bills at and costs.",
+        "editTitle": "Edit {{name}}",
+        "name": "Name",
+        "namePlaceholder": "e.g. Emergency",
+        "regularDescription": "The standard rate. Changing its bill rate reprices every computed pricebook item."
+      },
+      "internal": "Internal",
+      "loadFailed": "Couldn’t load labor rates",
+      "loading": "Loading labor rates…",
+      "notSet": "Not set",
+      "perHour": "{{amount}}/hr",
+      "subtitle": "{{count}} active",
+      "subtitleUnpriced": "{{count}} active · {{unpriced}} without a bill rate",
+      "title": "Labor rates",
+      "toast": {
+        "reorderFailed": "Couldn’t reorder the rate types",
+        "saveFailed": "Couldn’t save the rate type",
+        "saved": "Rate type saved"
+      },
+      "unknown": "Unknown"
     }
   },
   "tags": {

@@ -1,20 +1,20 @@
 /* eslint-disable i18next/no-literal-string -- dense billing detail; short operational labels stay literal (same convention as the PO detail page). Entity names route through getName(). */
-import { useState, type FormEvent } from 'react';
+import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import clsx from 'clsx';
 import { XMarkIcon } from '@heroicons/react/16/solid';
 import { formatCurrency } from '@dispatch/utils';
-import type { AddLineRequest, DocumentAdjustment, DocumentLineItem, LineType } from '../../api/setup';
+import { laborRatesApi, type AddLineRequest, type DocumentAdjustment, type DocumentLineItem, type LaborRateType } from '../../api/setup';
 import { Card } from '../catalyst/card';
 import { Button } from '../catalyst/button';
 import { Input } from '../catalyst/input';
 import { Select } from '../catalyst/select';
-import { Field, Label } from '../catalyst/fieldset';
 import { DragHandle } from '../settings/DragHandle';
+import { AddLinePanel } from './AddLinePanel';
 import { DocumentAdjustDialog, type AdjustTarget, type NewAdjustment } from './DocumentAdjustDialog';
 import { DenseTable, DenseTHead, DenseRow } from '../ui/DenseTable';
 import { Tag } from '../ui/Pill';
 import {
-  FREEFORM_TYPES,
   LINE_TYPE_LABEL,
   LINE_TYPE_TONE,
   TAX_CLASS_LABEL,
@@ -32,7 +32,7 @@ import {
   type PricedDocument,
 } from './documentModel';
 
-type LineChange = Partial<Pick<DocumentLineItem, 'description' | 'quantity' | 'unitPrice'>>;
+type LineChange = Partial<Pick<DocumentLineItem, 'description' | 'quantity' | 'unitPrice' | 'laborRateTypeId'>>;
 export type NewLine = Omit<AddLineRequest, 'version'>;
 
 /** What an editable document can do to its lines. Each resolves true once saved. */
@@ -67,6 +67,12 @@ export function DocumentLinesCard({
   const [adding, setAdding] = useState(false);
   const [drag, setDrag] = useState<{ id: string; over: string | null } | null>(null);
   const [adjusting, setAdjusting] = useState<AdjustTarget | null>(null);
+  const { data: rates = [] } = useQuery({
+    queryKey: ['labor-rates'],
+    queryFn: () => laborRatesApi.getAll(),
+    enabled: !!editing,
+  });
+  const activeRates = rates.filter((r) => r.active);
   // Read from the latest document, so a removal shows at once.
   const adjustingLine = adjusting && 'line' in adjusting ? lines.find((l) => l.id === adjusting.line.id) : null;
   const targetAdjustments = adjusting
@@ -128,6 +134,7 @@ export function DocumentLinesCard({
                 legacy={legacy}
                 showCost={costCols}
                 editing={editing}
+                rates={activeRates}
                 onAdjust={() => setAdjusting({ line })}
                 drag={
                   editing && lines.length > 1
@@ -156,7 +163,7 @@ export function DocumentLinesCard({
       {editing && (
         <div className="border-t border-border-soft px-3.5 py-2.5">
           {adding ? (
-            <FreeformLineForm onAdd={editing.onAdd} onClose={() => setAdding(false)} />
+            <AddLinePanel rates={activeRates} onAdd={editing.onAdd} onClose={() => setAdding(false)} />
           ) : (
             <div className="flex flex-wrap gap-1.5">
               <Button outline size="xs" onClick={() => setAdding(true)}>
@@ -181,89 +188,6 @@ export function DocumentLinesCard({
         />
       )}
     </Card>
-  );
-}
-
-/**
- * A typed-in line. Stays open after adding so several lines go in quickly.
- * Labor and pricebook lines get their own tabs when those settings land.
- */
-function FreeformLineForm({ onAdd, onClose }: { onAdd: (line: NewLine) => Promise<boolean>; onClose: () => void }) {
-  const blank = { description: '', type: 'SERVICE' as LineType, quantity: '1', unit: '', unitCost: '', unitPrice: '' };
-  const [f, setF] = useState(blank);
-  const [busy, setBusy] = useState(false);
-  const set = (p: Partial<typeof blank>) => setF((x) => ({ ...x, ...p }));
-  const num = (v: string) => (v.trim() === '' ? undefined : Number(v));
-  const qty = num(f.quantity);
-  const price = num(f.unitPrice);
-  const cost = num(f.unitCost);
-  const valid =
-    f.description.trim() !== '' &&
-    qty != null && Number.isFinite(qty) && qty > 0 &&
-    price != null && Number.isFinite(price) && price >= 0 &&
-    (cost == null || (Number.isFinite(cost) && cost >= 0));
-
-  const submit = async (e: FormEvent) => {
-    e.preventDefault();
-    if (!valid || busy) return;
-    setBusy(true);
-    const ok = await onAdd({
-      type: f.type,
-      description: f.description.trim(),
-      quantity: qty!,
-      unitPrice: price!,
-      ...(cost != null ? { unitCost: cost } : {}),
-      ...(f.unit.trim() ? { unit: f.unit.trim() } : {}),
-    });
-    setBusy(false);
-    if (ok) setF({ ...blank, type: f.type });
-  };
-
-  return (
-    <form onSubmit={submit} aria-label="Add freeform line">
-      <div className="mb-1.5 text-[12px] font-semibold text-fg-strong">
-        Freeform line <span className="font-normal text-fg-muted">· typed in, not from the pricebook</span>
-      </div>
-      <div className="grid grid-cols-2 items-end gap-2 sm:grid-cols-[minmax(200px,1fr)_130px_70px_70px_96px_96px_auto]">
-        <Field className="col-span-2 sm:col-span-1">
-          <Label className="!text-[11px]">Description</Label>
-          <Input size="xs" autoFocus value={f.description} onChange={(e) => set({ description: e.target.value })} placeholder="What the customer sees on the line" />
-        </Field>
-        <Field>
-          <Label className="!text-[11px]">Type</Label>
-          <Select size="xs" value={f.type} onChange={(e) => set({ type: e.target.value as LineType })}>
-            {FREEFORM_TYPES.map((t) => (
-              <option key={t} value={t}>{LINE_TYPE_LABEL[t]}</option>
-            ))}
-          </Select>
-        </Field>
-        <Field>
-          <Label className="!text-[11px]">Qty</Label>
-          <Input size="xs" inputMode="decimal" value={f.quantity} onChange={(e) => set({ quantity: e.target.value })} className="[&_input]:text-right" />
-        </Field>
-        <Field>
-          <Label className="!text-[11px]">Unit</Label>
-          <Input size="xs" value={f.unit} onChange={(e) => set({ unit: e.target.value })} placeholder="ea" />
-        </Field>
-        <Field>
-          <Label className="!text-[11px]">Unit cost</Label>
-          <Input size="xs" inputMode="decimal" value={f.unitCost} onChange={(e) => set({ unitCost: e.target.value })} placeholder="Unknown" className="[&_input]:text-right" />
-        </Field>
-        <Field>
-          <Label className="!text-[11px]">Unit price</Label>
-          <Input size="xs" inputMode="decimal" value={f.unitPrice} onChange={(e) => set({ unitPrice: e.target.value })} placeholder="0.00" className="[&_input]:text-right" />
-        </Field>
-        <div className="col-span-2 flex items-center gap-1.5 sm:col-span-1">
-          <Button type="submit" color="dark/zinc" size="xs" disabled={!valid || busy}>
-            Add
-          </Button>
-          <Button plain size="xs" onClick={onClose}>
-            Done
-          </Button>
-        </div>
-      </div>
-      <div className="mt-1 text-[11px] text-fg-muted">Leave cost blank if you don’t know it; margin then shows as unknown, not 100%.</div>
-    </form>
   );
 }
 
@@ -361,6 +285,7 @@ function LineRow({
   legacy,
   showCost,
   editing,
+  rates,
   onAdjust,
   drag,
 }: {
@@ -369,6 +294,8 @@ function LineRow({
   legacy: boolean;
   showCost: boolean;
   editing?: LineEditing;
+  /** Active labor rate types, for switching a labor line's rate. */
+  rates: LaborRateType[];
   onAdjust: () => void;
   drag?: RowDrag;
 }) {
@@ -439,7 +366,11 @@ function LineRow({
             ) : (
               <div className="text-[12.5px] font-medium text-fg-strong">{line.description}</div>
             )}
-            {!legacy && <Provenance line={line} />}
+            {editing && line.laborRateTypeId ? (
+              <LaborRatePicker line={line} rates={rates} onChange={(id) => editing.onUpdate(line, { laborRateTypeId: id })} />
+            ) : (
+              !legacy && <Provenance line={line} />
+            )}
           </div>
         </div>
       </td>
@@ -541,4 +472,39 @@ function Provenance({ line }: { line: DocumentLineItem }) {
       'Freeform · not in pricebook'
     );
   return <div className="mt-px text-[11px] text-fg-muted">{text}</div>;
+}
+
+/** A labor line's rate type, switchable in place; the server reprices it at the new rate. */
+function LaborRatePicker({
+  line,
+  rates,
+  onChange,
+}: {
+  line: DocumentLineItem;
+  rates: LaborRateType[];
+  onChange: (rateTypeId: string) => Promise<boolean>;
+}) {
+  // The line keeps a rate type that has since been deactivated.
+  const current = rates.some((r) => r.id === line.laborRateTypeId)
+    ? null
+    : { id: line.laborRateTypeId!, name: line.laborRateTypeName ?? 'Current rate' };
+  return (
+    <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-fg-muted">
+      Labor ·
+      <Select
+        size="xs"
+        aria-label={`Labor rate for ${line.description}`}
+        value={line.laborRateTypeId ?? ''}
+        onChange={(e) => void onChange(e.target.value)}
+        className="!w-auto"
+      >
+        {current && <option value={current.id}>{current.name}</option>}
+        {rates.map((r) => (
+          <option key={r.id} value={r.id}>
+            {r.name}
+          </option>
+        ))}
+      </Select>
+    </div>
+  );
 }
