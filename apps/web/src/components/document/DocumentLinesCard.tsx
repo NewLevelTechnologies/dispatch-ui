@@ -160,21 +160,21 @@ export function DocumentLinesCard({
           </tbody>
         </DenseTable>
       </div>
+      {editing && adding && <AddLinePanel rates={activeRates} onAdd={editing.onAdd} onClose={() => setAdding(false)} />}
       {editing && (
-        <div className="border-t border-border-soft px-3.5 py-2.5">
-          {adding ? (
-            <AddLinePanel rates={activeRates} onAdd={editing.onAdd} onClose={() => setAdding(false)} />
-          ) : (
-            <div className="flex flex-wrap gap-1.5">
-              <Button outline size="xs" onClick={() => setAdding(true)}>
-                + Add line
-              </Button>
-              {lines.length > 0 && (
-                <Button plain size="xs" onClick={() => setAdjusting({ document: true })}>
-                  {(doc.adjustments ?? []).some((a) => a.lineId == null) ? 'Document discounts' : 'Document discount'}
-                </Button>
-              )}
-            </div>
+        <div className="flex flex-wrap gap-1.5 border-t border-border-soft px-3.5 py-2.5">
+          <Button
+            {...(adding ? { color: 'dark/zinc' as const } : { outline: true as const })}
+            size="xs"
+            aria-pressed={adding}
+            onClick={() => setAdding((a) => !a)}
+          >
+            + Add line
+          </Button>
+          {lines.length > 0 && (
+            <Button plain size="xs" onClick={() => setAdjusting({ document: true })}>
+              {(doc.adjustments ?? []).some((a) => a.lineId == null) ? 'Document discounts' : 'Document discount'}
+            </Button>
           )}
         </div>
       )}

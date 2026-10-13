@@ -298,6 +298,7 @@ describe('QuoteDetailPage editing', () => {
     renderPage();
 
     await user.click(await screen.findByRole('button', { name: '+ Add line' }));
+    await user.click(screen.getByRole('tab', { name: 'Freeform' }));
     const form = screen.getByRole('form', { name: 'Add freeform line' });
     await user.type(within(form).getByRole('textbox', { name: 'Description' }), 'Haul away old unit');
     await user.selectOptions(within(form).getByRole('combobox', { name: 'Type' }), 'FEE');
@@ -334,9 +335,12 @@ describe('QuoteDetailPage editing', () => {
     await screen.findByText('Q-1882');
     await vi.waitFor(() => expect(apiClient.get).toHaveBeenCalledWith('/financial/labor-rates'));
     await user.click(screen.getByRole('button', { name: '+ Add line' }));
+    await user.click(screen.getByRole('tab', { name: 'Labor' }));
     const form = await screen.findByRole('form', { name: 'Add labor line' });
     expect(within(form).getByRole('radio', { name: /Regular/ })).toBeChecked();
-    expect(within(form).getByRole('radio', { name: /Emergency/ })).toHaveTextContent('not set');
+    // A rate with no bill rate shows, but can't be picked.
+    expect(within(form).getByRole('radio', { name: /Emergency/ })).toHaveTextContent('Not set');
+    expect(within(form).getByRole('radio', { name: /Emergency/ })).toHaveAttribute('aria-disabled', 'true');
     expect(within(form).queryByRole('radio', { name: /Saturday/ })).not.toBeInTheDocument();
 
     await user.click(within(form).getByRole('radio', { name: /Overtime/ }));
@@ -349,6 +353,54 @@ describe('QuoteDetailPage editing', () => {
     expect(apiClient.post).toHaveBeenCalledWith('/financial/quotes/q-1/lines', {
       version: 7, type: 'LABOR', laborRateTypeId: 'r-ot', quantity: 2.5,
     });
+  });
+
+  const capItem = {
+    id: 'it-9', itemType: 'MATERIAL', feeRole: null, name: 'Capacitor 45/5', sku: 'CAP-455', categoryId: null, unit: 'ea',
+    taxClass: 'MATERIALS', pricingMode: 'FIXED', unitPrice: 48, unitCost: 18.75, markupPct: null, laborHours: null,
+    materialsCost: null, active: true, version: 1, createdAt: null, updatedAt: null,
+  };
+  const withPricebook = (results: unknown[]) => {
+    vi.mocked(apiClient.get).mockImplementation((url: string) => {
+      if (url === '/financial/quotes/q-1') return Promise.resolve({ data: draft });
+      if (url === '/financial/pricebook/items') return Promise.resolve({ data: { content: results, totalElements: results.length } });
+      if (url === '/customers/cust-1') return Promise.resolve({ data: customer });
+      if (url === '/work-orders/wo-1') return Promise.resolve({ data: workOrder });
+      return Promise.reject(new Error(`unexpected GET ${url}`));
+    });
+  };
+
+  it('adds from the pricebook by keyboard, staying open for the next item', async () => {
+    const user = userEvent.setup();
+    withPricebook([capItem]);
+    vi.mocked(apiClient.post).mockResolvedValue({ data: { ...draft, version: 8 } });
+    renderPage();
+
+    await user.click(await screen.findByRole('button', { name: '+ Add line' }));
+    expect(screen.getByRole('button', { name: '+ Add line' })).toHaveAttribute('aria-pressed', 'true');
+    const search = screen.getByRole('combobox', { name: 'Search pricebook' });
+    await user.type(search, 'cap');
+    expect(await screen.findByRole('option', { name: /Capacitor 45\/5/ })).toHaveAttribute('aria-selected', 'true');
+    expect(apiClient.get).toHaveBeenCalledWith('/financial/pricebook/items', { params: { q: 'cap', active: true, size: 20 } });
+    await user.keyboard('{Enter}');
+
+    expect(apiClient.post).toHaveBeenCalledWith('/financial/quotes/q-1/lines', { version: 7, itemId: 'it-9', quantity: 1 });
+    expect(await screen.findByText('Added Capacitor 45/5')).toBeInTheDocument();
+    expect(search).toHaveValue('');
+    await user.keyboard('{Escape}');
+    expect(screen.queryByRole('combobox', { name: 'Search pricebook' })).not.toBeInTheDocument();
+  });
+
+  it('offers a freeform line when nothing in the pricebook matches', async () => {
+    const user = userEvent.setup();
+    withPricebook([]);
+    renderPage();
+
+    await user.click(await screen.findByRole('button', { name: '+ Add line' }));
+    await user.type(screen.getByRole('combobox', { name: 'Search pricebook' }), 'Crane rental');
+    await user.click(await screen.findByRole('button', { name: 'Add it as a freeform line' }));
+    const form = screen.getByRole('form', { name: 'Add freeform line' });
+    expect(within(form).getByRole('textbox', { name: 'Description' })).toHaveValue('Crane rental');
   });
 
   it('switches a labor line to another rate, letting the server reprice and rename it', async () => {

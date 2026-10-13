@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { invoicesApi, quotesApi, financialActivityApi, financialDashboardApi, revenueTargetsApi,
-  revenueReportApi, receivablesReportApi, quoteReportApi, paymentReportApi, paymentsApi, taxApi, laborRatesApi } from './financialApi';
+  revenueReportApi, receivablesReportApi, quoteReportApi, paymentReportApi, paymentsApi, taxApi, laborRatesApi, pricebookApi } from './financialApi';
 import apiClient from './client';
 
 vi.mock('./client');
@@ -391,5 +391,15 @@ describe('laborRatesApi', () => {
     vi.mocked(apiClient.post).mockResolvedValue({ data: [] });
     await laborRatesApi.reorder(['r-2', 'r-1']);
     expect(apiClient.post).toHaveBeenCalledWith('/financial/labor-rates/reorder', { orderedIds: ['r-2', 'r-1'] });
+  });
+});
+
+describe('pricebookApi', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('searches items with the list params as given', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({ data: { content: [] } });
+    await pricebookApi.getItems({ q: 'cap', active: true, size: 20 });
+    expect(apiClient.get).toHaveBeenCalledWith('/financial/pricebook/items', { params: { q: 'cap', active: true, size: 20 } });
   });
 });

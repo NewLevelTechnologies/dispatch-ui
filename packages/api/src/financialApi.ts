@@ -1268,6 +1268,11 @@ export interface TaxJurisdiction {
   taxesFees: boolean;
   isDefault: boolean;
   active: boolean;
+  /**
+   * Locations explicitly assigned to it; the default's count leaves out the
+   * locations that fall back to it. Null on a location's `effective` one.
+   */
+  locationCount?: number | null;
   createdAt: string | null;
   updatedAt: string | null;
 }
@@ -1410,6 +1415,138 @@ export const laborRatesApi = {
    */
   reorder: async (orderedIds: string[]): Promise<LaborRateType[]> => {
     const response = await apiClient.post<LaborRateType[]>('/financial/labor-rates/reorder', { orderedIds });
+    return response.data;
+  },
+};
+
+export type PricebookItemType = 'SERVICE' | 'MATERIAL' | 'EQUIPMENT' | 'FEE';
+
+/**
+ * How an item's price is made. FIXED: as entered. MARKUP: unitCost × (1 +
+ * markupPct). COMPUTED (services only): laborHours × the Regular rate, plus
+ * materialsCost marked up; the server calculates it.
+ */
+export type PricingMode = 'FIXED' | 'MARKUP' | 'COMPUTED';
+
+/** A pricebook category; build the tree from `parentId`. */
+export interface PricebookCategory {
+  id: string;
+  parentId: string | null;
+  name: string;
+  sortOrder: number;
+  active: boolean;
+  createdAt: string | null;
+  updatedAt: string | null;
+}
+
+export interface PricebookCategoryRequest {
+  name: string;
+  parentId: string | null;
+  sortOrder: number;
+  active: boolean;
+}
+
+export interface PricebookItem {
+  id: string;
+  itemType: PricebookItemType;
+  feeRole: FeeRole | null;
+  name: string;
+  sku: string | null;
+  categoryId: string | null;
+  unit: string;
+  taxClass: TaxClass;
+  pricingMode: PricingMode;
+  /** Null only for a COMPUTED item while the Regular rate isn't set; it can't be billed yet. */
+  unitPrice: number | null;
+  /** Internal only, as are the computed inputs below. */
+  unitCost: number | null;
+  /** A fraction: 0.35 is 35%. */
+  markupPct: number | null;
+  laborHours: number | null;
+  materialsCost: number | null;
+  active: boolean;
+  /** Send back on an edit; a mismatch is 409 STALE_VERSION. */
+  version: number;
+  createdAt: string | null;
+  updatedAt: string | null;
+}
+
+/** The whole item, replaced on update. Never deleted: deactivate with `active: false`. */
+export interface PricebookItemRequest {
+  /** Required on update. */
+  version?: number;
+  itemType: PricebookItemType;
+  /** Required on FEE items, refused on others. */
+  feeRole: FeeRole | null;
+  name: string;
+  sku: string | null;
+  categoryId: string | null;
+  unit: string | null;
+  /** Null takes the type's default. */
+  taxClass: TaxClass | null;
+  pricingMode: PricingMode;
+  unitPrice: number | null;
+  unitCost: number | null;
+  markupPct: number | null;
+  laborHours: number | null;
+  materialsCost: number | null;
+  active: boolean;
+}
+
+export interface PricebookItemQuery {
+  /** Name or SKU. */
+  q?: string;
+  type?: PricebookItemType;
+  /** Includes subcategories. */
+  categoryId?: string;
+  /** Omit for both. */
+  active?: boolean;
+  pricingMode?: PricingMode;
+  page?: number;
+  /** At most 200. */
+  size?: number;
+  /** `name,asc` etc. over name, sku, itemType, unitPrice, updatedAt. */
+  sort?: string;
+}
+
+/**
+ * The pricebook. Reading needs no capability; writing needs MANAGE_PRICING.
+ * 409 codes: STALE_VERSION, SKU_TAKEN, NAME_TAKEN, CATEGORY_IN_USE.
+ */
+export const pricebookApi = {
+  /** Every category, flat. */
+  getCategories: async (): Promise<PricebookCategory[]> => {
+    const response = await apiClient.get<PricebookCategory[]>('/financial/pricebook/categories');
+    return response.data;
+  },
+
+  createCategory: async (request: PricebookCategoryRequest): Promise<PricebookCategory> => {
+    const response = await apiClient.post<PricebookCategory>('/financial/pricebook/categories', request);
+    return response.data;
+  },
+
+  updateCategory: async (id: string, request: PricebookCategoryRequest): Promise<PricebookCategory> => {
+    const response = await apiClient.put<PricebookCategory>(`/financial/pricebook/categories/${id}`, request);
+    return response.data;
+  },
+
+  getItems: async (params: PricebookItemQuery = {}): Promise<FinancialPage<PricebookItem>> => {
+    const response = await apiClient.get<FinancialPage<PricebookItem>>('/financial/pricebook/items', { params });
+    return response.data;
+  },
+
+  getItem: async (id: string): Promise<PricebookItem> => {
+    const response = await apiClient.get<PricebookItem>(`/financial/pricebook/items/${id}`);
+    return response.data;
+  },
+
+  createItem: async (request: PricebookItemRequest): Promise<PricebookItem> => {
+    const response = await apiClient.post<PricebookItem>('/financial/pricebook/items', request);
+    return response.data;
+  },
+
+  updateItem: async (id: string, request: PricebookItemRequest): Promise<PricebookItem> => {
+    const response = await apiClient.put<PricebookItem>(`/financial/pricebook/items/${id}`, request);
     return response.data;
   },
 };

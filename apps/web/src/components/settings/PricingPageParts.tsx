@@ -61,3 +61,16 @@ export function InactiveToggle({ count, shown, onToggle }: { count: number; show
     </Button>
   );
 }
+
+/** One section of a pricing form page: a label column on the left, its fields on the right. */
+export function FormSection({ title, description, children }: { title: string; description?: ReactNode; children: ReactNode }) {
+  return (
+    <section className="grid grid-cols-1 gap-2.5 border-b border-border-soft py-[18px] last:border-b-0 lg:grid-cols-[220px_minmax(0,1fr)] lg:gap-6">
+      <div>
+        <div className="text-[13px] font-semibold text-fg-strong">{title}</div>
+        {description && <div className="mt-0.5 text-[12px] leading-normal text-fg-muted">{description}</div>}
+      </div>
+      <div className="flex min-w-0 flex-col gap-3">{children}</div>
+    </section>
+  );
+}

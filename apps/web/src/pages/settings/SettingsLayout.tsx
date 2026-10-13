@@ -137,6 +137,7 @@ export default function SettingsLayout() {
     {
       label: t('settings.sections.pricing'),
       items: [
+        { label: t('settings.nav.pricebook'), to: '/settings/pricebook' },
         { label: t('settings.nav.laborRates'), to: '/settings/labor-rates' },
         { label: t('settings.nav.tax'), to: '/settings/tax' },
       ],

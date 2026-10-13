@@ -22,8 +22,8 @@ const jurisdiction = (over: Partial<TaxJurisdiction>): TaxJurisdiction => ({
   ...over,
 });
 
-const phoenix = jurisdiction({});
-const tempe = jurisdiction({ id: 'j-2', name: 'Tempe, AZ', rate: null, isDefault: false });
+const phoenix = jurisdiction({ locationCount: 318 });
+const tempe = jurisdiction({ id: 'j-2', name: 'Tempe, AZ', rate: null, isDefault: false, locationCount: 12 });
 
 function mockApi(list: TaxJurisdiction[]) {
   vi.mocked(apiClient.get).mockImplementation((url: string) => {
@@ -53,7 +53,11 @@ describe('TaxPanel', () => {
     // All four classes show; the untaxed ones say so.
     expect(screen.getAllByTitle('Materials is taxed')).toHaveLength(2);
     expect(screen.getAllByTitle('Labor is not taxed')).toHaveLength(2);
-    expect(screen.getByText('Tempe, AZ has no rate. Locations using it are charged no tax.')).toBeInTheDocument();
+    expect(screen.getByText('Tempe, AZ has no rate. 12 locations using it are charged no tax.')).toBeInTheDocument();
+    // The default's count is only its explicit assignments; it also covers every unassigned location.
+    const phx = screen.getByText('Phoenix, AZ').closest('tr')!;
+    expect(phx).toHaveTextContent('318');
+    expect(phx).toHaveTextContent('+ all unassigned');
   });
 
   it('adds a jurisdiction with the rate as a fraction', async () => {
