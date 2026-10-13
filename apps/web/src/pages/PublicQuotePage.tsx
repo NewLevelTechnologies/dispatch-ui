@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from '@dispatch/i18n';
 import axios from 'axios';
 import {
@@ -11,6 +11,7 @@ import {
 import TenantBrandingHeader from '../components/TenantBrandingHeader';
 import CliffPage from '../components/CliffPage';
 import { Badge } from '../components/catalyst/badge';
+import { PublicLineItems, PublicPricingRows } from '../components/public/PublicDocumentParts';
 import { useScopedReferrerPolicy } from '../hooks/useScopedReferrerPolicy';
 
 /**
@@ -19,9 +20,8 @@ import { useScopedReferrerPolicy } from '../hooks/useScopedReferrerPolicy';
  *
  * Mirrors `PublicInvoicePage` structure with a quote-shaped hero (total
  * amount + expiration date instead of balance + due date) and no payments
- * section. REJECTED / EXPIRED / CANCELLED render with muted styling;
- * ACCEPTED gets a lime accent. No customer-side accept/decline affordance
- * in v1 (out of scope — quote responses are a phone call today).
+ * section. DECLINED / EXPIRED render with muted styling; ACCEPTED gets a
+ * lime accent. A SENT quote can be approved here, for the revision shown.
  */
 
 const currencyFormatter = new Intl.NumberFormat('en-US', {
@@ -42,12 +42,6 @@ const formatDate = (iso: string | null | undefined): string => {
   });
 };
 
-const formatQuantity = (value: string | number): string => {
-  const n = Number(value);
-  if (!Number.isFinite(n)) return String(value);
-  return Number.isInteger(n) ? String(n) : String(n);
-};
-
 type QuoteBadgeProps = { status: PublicQuoteStatus };
 
 const QuoteStatusBadge = ({ status }: QuoteBadgeProps) => {
@@ -55,9 +49,8 @@ const QuoteStatusBadge = ({ status }: QuoteBadgeProps) => {
   switch (status) {
     case 'ACCEPTED':
       return <Badge color="lime">{t('public.quote.status.accepted')}</Badge>;
+    case 'DECLINED':
     case 'REJECTED':
-      // Customer-facing label stays "Declined" — gentler than "Rejected"
-      // on a document the customer themselves may have declined.
       return <Badge color="zinc">{t('public.quote.status.declined')}</Badge>;
     case 'CANCELLED':
       return <Badge color="zinc">{t('public.quote.status.cancelled')}</Badge>;
@@ -128,6 +121,26 @@ export default function PublicQuotePage() {
     retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 8000),
   });
 
+  const queryClient = useQueryClient();
+  const [confirming, setConfirming] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
+  const approve = useMutation({
+    mutationFn: () => publicFinancialApi.approveQuote(token, data?.quote.revision),
+    onSuccess: (next) => {
+      setConfirming(false);
+      queryClient.setQueryData(['publicQuote', token], next);
+    },
+    onError: (err) => {
+      setConfirming(false);
+      const code = axios.isAxiosError(err) ? (err.response?.data as { code?: string } | undefined)?.code : undefined;
+      const sender = data?.tenant.displayName ?? t('public.common.theSender');
+      if (code === 'QUOTE_REVISION_STALE') setNotice(t('public.quote.revisionStale'));
+      else if (code === 'QUOTE_NOT_APPROVABLE') setNotice(t('public.quote.notApprovable', { tenant: sender }));
+      else setNotice(t('public.quote.approveError'));
+      if (code === 'QUOTE_REVISION_STALE' || code === 'QUOTE_NOT_APPROVABLE') void refetch();
+    },
+  });
+
   // Mail's in-app browser (SFSafariViewController) prewarms this page: the
   // initial request fires and completes during the prewarm pass — the
   // response is visible in the network log — but its result never reaches
@@ -169,6 +182,7 @@ export default function PublicQuotePage() {
   const isAccepted = quote.status === 'ACCEPTED';
   const isExpired = quote.status === 'EXPIRED';
   const senderName = tenant.displayName ?? t('public.common.theSender');
+  const approvable = quote.status === 'SENT' && !quote.beingUpdated;
 
   return (
     <div className="min-h-screen bg-zinc-50 print:bg-white">
@@ -245,48 +259,66 @@ export default function PublicQuotePage() {
               </dd>
             </div>
           </dl>
+
+          {notice && (
+            <p role="status" className="mt-4 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800">
+              {notice}
+            </p>
+          )}
+          {isAccepted && (
+            <div className="mt-4 rounded-md bg-lime-50 px-3 py-2 text-sm text-lime-900">
+              <p className="font-semibold">{t('public.quote.approved')}</p>
+              <p className="mt-0.5">{t('public.quote.approvedBody', { tenant: senderName })}</p>
+            </div>
+          )}
+          {approvable && (
+            <div className="mt-5 print:hidden">
+              {confirming ? (
+                <div className="rounded-md border border-zinc-200 bg-zinc-50 p-4">
+                  <p className="text-sm font-semibold text-zinc-900">
+                    {t('public.quote.approveTitle', { number: quote.quoteNumber, total: formatMoney(quote.totalAmount) })}
+                  </p>
+                  <p className="mt-1 text-sm text-zinc-600">{t('public.quote.approveBody', { tenant: senderName })}</p>
+                  <div className="mt-3 flex gap-2">
+                    <button
+                      type="button"
+                      disabled={approve.isPending}
+                      onClick={() => approve.mutate()}
+                      className="rounded-md bg-zinc-900 px-4 py-2 !text-sm !font-semibold text-white hover:bg-zinc-800 disabled:opacity-60"
+                    >
+                      {approve.isPending ? t('public.quote.approving') : t('public.quote.approveConfirm')}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={approve.isPending}
+                      onClick={() => setConfirming(false)}
+                      className="rounded-md px-4 py-2 !text-sm !font-medium text-zinc-700 hover:bg-zinc-100"
+                    >
+                      {t('public.quote.approveCancel')}
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setNotice(null);
+                    setConfirming(true);
+                  }}
+                  className="w-full rounded-md bg-zinc-900 px-4 py-3 !text-base !font-semibold text-white hover:bg-zinc-800 sm:w-auto"
+                >
+                  {t('public.quote.approve')}
+                </button>
+              )}
+            </div>
+          )}
         </section>
 
-        <section className="mt-4 overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-sm print:shadow-none">
-          <h2 className="border-b border-zinc-100 px-6 py-3 text-xs font-semibold uppercase tracking-wide text-zinc-500">
-            {t('public.quote.items')}
-          </h2>
-          <ul className="divide-y divide-zinc-100">
-            {quote.lineItems.map((item, idx) => (
-              <li
-                key={idx}
-                className="flex flex-col gap-1 px-6 py-3 sm:flex-row sm:items-start sm:justify-between sm:gap-6"
-              >
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm text-zinc-900">{item.description}</p>
-                  <p className="mt-0.5 text-xs text-zinc-500">
-                    {formatQuantity(item.quantity)} × {formatMoney(item.unitPrice)}
-                  </p>
-                </div>
-                <div className="text-sm font-medium text-zinc-900 sm:text-right">
-                  {formatMoney(item.lineTotal)}
-                </div>
-              </li>
-            ))}
-          </ul>
-        </section>
+        <PublicLineItems title={t('public.quote.items')} items={quote.lineItems} />
 
         <section className="mt-4 rounded-lg border border-zinc-200 bg-white p-6 shadow-sm print:shadow-none">
           <dl className="space-y-2 text-sm">
-            <div className="flex justify-between">
-              <dt className="text-zinc-600">{t('public.quote.subtotal')}</dt>
-              <dd className="text-zinc-900">{formatMoney(quote.subtotal)}</dd>
-            </div>
-            {Number(quote.taxAmount) > 0 && (
-              <div className="flex justify-between">
-                <dt className="text-zinc-600">
-                  {Number(quote.taxRate) > 0
-                    ? t('public.quote.taxWithRate', { rate: quote.taxRate })
-                    : t('public.quote.tax')}
-                </dt>
-                <dd className="text-zinc-900">{formatMoney(quote.taxAmount)}</dd>
-              </div>
-            )}
+            <PublicPricingRows doc={quote} subtotalLabel={t('public.quote.subtotal')} />
             <div className="flex justify-between border-t border-zinc-200 pt-2 text-base">
               <dt className="font-semibold text-zinc-900">
                 {t('public.quote.total')}

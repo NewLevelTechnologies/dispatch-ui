@@ -1452,8 +1452,6 @@
       "invoiceDate": "Invoice date",
       "items": "Items",
       "subtotal": "Subtotal",
-      "tax": "Tax",
-      "taxWithRate": "Tax ({{rate}}%)",
       "total": "Total",
       "paid": "Paid",
       "balanceDue": "Balance due",
@@ -1494,8 +1492,6 @@
       "quoteDate": "Quote date",
       "items": "Items",
       "subtotal": "Subtotal",
-      "tax": "Tax",
-      "taxWithRate": "Tax ({{rate}}%)",
       "notes": "Notes",
       "questions": "Questions about this quote?",
       "contactCta": "Contact {{tenant}}",
@@ -1506,7 +1502,38 @@
         "declined": "Declined",
         "cancelled": "Cancelled",
         "expired": "Expired"
-      }
+      },
+      "approve": "Approve quote",
+      "approveBody": "{{tenant}} will be notified and will contact you to schedule the work.",
+      "approveCancel": "Not yet",
+      "approveConfirm": "Yes, approve",
+      "approveError": "Something went wrong. Try again.",
+      "approveTitle": "Approve quote #{{number}} for {{total}}?",
+      "approved": "You approved this quote",
+      "approvedBody": "{{tenant}} has been notified and will be in touch to schedule the work.",
+      "approving": "Approving…",
+      "notApprovable": "This quote can't be approved anymore. Contact {{tenant}} if you have questions.",
+      "revisionStale": "This quote was just updated. Review the new version before approving."
+    },
+    "document": {
+      "adjustment": {
+        "amountOff": "{{amount}} off",
+        "percentOff": "{{percent}} off",
+        "waived": "Waived"
+      },
+      "reason": {
+        "DISCRETIONARY": "Discount",
+        "GOODWILL": "Courtesy",
+        "INCENTIVE": "Incentive",
+        "MEMBER": "Member",
+        "OTHER": "Discount",
+        "PROMOTION": "Promotion",
+        "REPAIR_APPROVED": "Repair approved"
+      },
+      "tax": "Tax",
+      "taxExempt": "Tax (exempt)",
+      "taxNamed": "Tax · {{name}}",
+      "youSave": "You save"
     }
   },
   "capabilities": {

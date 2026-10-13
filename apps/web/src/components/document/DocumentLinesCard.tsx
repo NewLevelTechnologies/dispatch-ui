@@ -3,13 +3,14 @@ import { useState, type FormEvent } from 'react';
 import clsx from 'clsx';
 import { XMarkIcon } from '@heroicons/react/16/solid';
 import { formatCurrency } from '@dispatch/utils';
-import type { AddLineRequest, DocumentLineItem, LineType } from '../../api/setup';
+import type { AddLineRequest, DocumentAdjustment, DocumentLineItem, LineType } from '../../api/setup';
 import { Card } from '../catalyst/card';
 import { Button } from '../catalyst/button';
 import { Input } from '../catalyst/input';
 import { Select } from '../catalyst/select';
 import { Field, Label } from '../catalyst/fieldset';
 import { DragHandle } from '../settings/DragHandle';
+import { DocumentAdjustDialog, type AdjustTarget, type NewAdjustment } from './DocumentAdjustDialog';
 import { DenseTable, DenseTHead, DenseRow } from '../ui/DenseTable';
 import { Tag } from '../ui/Pill';
 import {
@@ -40,6 +41,8 @@ export interface LineEditing {
   onRemove: (line: DocumentLineItem) => Promise<boolean>;
   onReorder: (lineIds: string[]) => Promise<boolean>;
   onAdd: (line: NewLine) => Promise<boolean>;
+  onAddAdjustment: (adjustment: NewAdjustment) => Promise<boolean>;
+  onRemoveAdjustment: (adjustment: DocumentAdjustment) => Promise<boolean>;
 }
 
 /**
@@ -63,6 +66,12 @@ export function DocumentLinesCard({
   const costCols = !legacy && showCost;
   const [adding, setAdding] = useState(false);
   const [drag, setDrag] = useState<{ id: string; over: string | null } | null>(null);
+  const [adjusting, setAdjusting] = useState<AdjustTarget | null>(null);
+  // Read from the latest document, so a removal shows at once.
+  const adjustingLine = adjusting && 'line' in adjusting ? lines.find((l) => l.id === adjusting.line.id) : null;
+  const targetAdjustments = adjusting
+    ? (doc.adjustments ?? []).filter((a) => (adjustingLine ? a.lineId === adjustingLine.id : a.lineId == null))
+    : [];
 
   const drop = (targetId: string) => {
     if (!editing || !drag) return;
@@ -119,6 +128,7 @@ export function DocumentLinesCard({
                 legacy={legacy}
                 showCost={costCols}
                 editing={editing}
+                onAdjust={() => setAdjusting({ line })}
                 drag={
                   editing && lines.length > 1
                     ? {
@@ -148,11 +158,27 @@ export function DocumentLinesCard({
           {adding ? (
             <FreeformLineForm onAdd={editing.onAdd} onClose={() => setAdding(false)} />
           ) : (
-            <Button outline size="xs" onClick={() => setAdding(true)}>
-              + Add line
-            </Button>
+            <div className="flex flex-wrap gap-1.5">
+              <Button outline size="xs" onClick={() => setAdding(true)}>
+                + Add line
+              </Button>
+              {lines.length > 0 && (
+                <Button plain size="xs" onClick={() => setAdjusting({ document: true })}>
+                  {(doc.adjustments ?? []).some((a) => a.lineId == null) ? 'Document discounts' : 'Document discount'}
+                </Button>
+              )}
+            </div>
           )}
         </div>
+      )}
+      {editing && (
+        <DocumentAdjustDialog
+          target={adjusting && 'line' in adjusting ? (adjustingLine ? { line: adjustingLine } : null) : adjusting}
+          existing={targetAdjustments}
+          onAdd={editing.onAddAdjustment}
+          onRemove={editing.onRemoveAdjustment}
+          onClose={() => setAdjusting(null)}
+        />
       )}
     </Card>
   );
@@ -335,6 +361,7 @@ function LineRow({
   legacy,
   showCost,
   editing,
+  onAdjust,
   drag,
 }: {
   line: DocumentLineItem;
@@ -342,6 +369,7 @@ function LineRow({
   legacy: boolean;
   showCost: boolean;
   editing?: LineEditing;
+  onAdjust: () => void;
   drag?: RowDrag;
 }) {
   const own = lineAdjustments(line.id, doc.adjustments);
@@ -486,9 +514,14 @@ function LineRow({
       )}
       {editing && (
         <td className="right">
-          <Button plain size="xs" aria-label={`Remove ${line.description}`} onClick={() => void editing.onRemove(line)}>
-            <XMarkIcon />
-          </Button>
+          <div className="flex items-center justify-end gap-0.5">
+            <Button plain size="xs" aria-label={`Adjust ${line.description}`} onClick={onAdjust}>
+              Adjust
+            </Button>
+            <Button plain size="xs" aria-label={`Remove ${line.description}`} onClick={() => void editing.onRemove(line)}>
+              <XMarkIcon />
+            </Button>
+          </div>
         </td>
       )}
     </DenseRow>

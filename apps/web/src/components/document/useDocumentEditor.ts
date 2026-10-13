@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState } from 'react';
 import { useQueryClient, type QueryClient, type QueryKey } from '@tanstack/react-query';
-import type { AddLineRequest, ReorderLinesRequest, UpdateLineRequest } from '../../api/setup';
+import type { AddAdjustmentRequest, AddLineRequest, ReorderLinesRequest, UpdateLineRequest } from '../../api/setup';
 import { errorCode, showError } from '../../lib/toast';
 import type { LineEditing } from './DocumentLinesCard';
 import { lineUpdate } from './documentModel';
@@ -124,6 +124,8 @@ interface LineRoutes<D> {
   updateLine: (id: string, lineId: string, request: UpdateLineRequest) => Promise<D>;
   deleteLine: (id: string, lineId: string, version: number) => Promise<D>;
   reorderLines: (id: string, request: ReorderLinesRequest) => Promise<D>;
+  addAdjustment: (id: string, request: AddAdjustmentRequest) => Promise<D>;
+  deleteAdjustment: (id: string, adjustmentId: string, version: number) => Promise<D>;
 }
 
 /** Wires the lines card's edits to a document's line routes through the edit queue. */
@@ -138,5 +140,9 @@ export function lineEditing<D extends { version?: number }>(
       run((version) => routes.updateLine(id, line.id, lineUpdate(line, version, change)), 'Couldn’t save the line'),
     onRemove: (line) => run((version) => routes.deleteLine(id, line.id, version), 'Couldn’t remove the line'),
     onReorder: (lineIds) => run((version) => routes.reorderLines(id, { version, lineIds }), 'Couldn’t reorder the lines'),
+    onAddAdjustment: (adjustment) =>
+      run((version) => routes.addAdjustment(id, { ...adjustment, version }), 'Couldn’t add the discount'),
+    onRemoveAdjustment: (adjustment) =>
+      run((version) => routes.deleteAdjustment(id, adjustment.id, version), 'Couldn’t remove the discount'),
   };
 }

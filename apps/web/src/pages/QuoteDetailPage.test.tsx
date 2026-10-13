@@ -318,6 +318,41 @@ describe('QuoteDetailPage editing', () => {
     expect(apiClient.delete).toHaveBeenCalledWith('/financial/quotes/q-1/lines/f1', { params: { version: 7 } });
   });
 
+  it('adds a percent discount to a line, as a fraction, with its reason', async () => {
+    const user = userEvent.setup();
+    vi.mocked(apiClient.post).mockResolvedValue({ data: { ...draft, version: 8 } });
+    renderPage();
+
+    await user.click(await screen.findByRole('button', { name: 'Adjust Flush drain line' }));
+    const dialog = await screen.findByRole('dialog');
+    await user.type(within(dialog).getByRole('textbox', { name: 'Percent' }), '12.5');
+    await user.selectOptions(within(dialog).getByRole('combobox', { name: 'Reason' }), 'GOODWILL');
+    await user.type(within(dialog).getByRole('textbox', { name: 'Note' }), 'Second visit');
+    await user.click(within(dialog).getByRole('button', { name: 'Apply' }));
+
+    expect(apiClient.post).toHaveBeenCalledWith('/financial/quotes/q-1/adjustments', {
+      version: 7, lineId: 'f1', kind: 'PERCENT', value: 0.125, reasonCode: 'GOODWILL', reasonNote: 'Second visit',
+    });
+  });
+
+  it('adds a document discount and removes an existing one', async () => {
+    const user = userEvent.setup();
+    const existing = {
+      id: 'd1', lineId: null, kind: 'AMOUNT' as const, value: 20, reasonCode: 'PROMOTION' as const, reasonNote: null, computedAmount: 20,
+      sourceType: 'MANUAL' as const, createdByUserId: null, createdAt: '2026-10-07T15:00:00Z',
+    };
+    mockApi({ ...draft, adjustments: [existing] });
+    vi.mocked(apiClient.delete).mockResolvedValue({ data: { ...draft, version: 8 } });
+    renderPage();
+
+    await user.click(await screen.findByRole('button', { name: 'Document discounts' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).queryByRole('radio', { name: 'Waive' })).not.toBeInTheDocument();
+    await user.click(within(dialog).getByRole('button', { name: 'Remove −$20.00 · Promotion' }));
+
+    expect(apiClient.delete).toHaveBeenCalledWith('/financial/quotes/q-1/adjustments/d1', { params: { version: 7 } });
+  });
+
   it('reorders lines by dragging from the handle', async () => {
     vi.mocked(apiClient.put).mockResolvedValue({ data: { ...draft, version: 8 } });
     renderPage();

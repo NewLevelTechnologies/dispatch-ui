@@ -12,6 +12,7 @@ import {
 import TenantBrandingHeader from '../components/TenantBrandingHeader';
 import CliffPage from '../components/CliffPage';
 import { Badge } from '../components/catalyst/badge';
+import { PublicLineItems, PublicPricingRows } from '../components/public/PublicDocumentParts';
 import { useScopedReferrerPolicy } from '../hooks/useScopedReferrerPolicy';
 
 /**
@@ -46,17 +47,6 @@ const formatDate = (iso: string | null | undefined): string => {
     day: 'numeric',
     timeZone: 'UTC',
   });
-};
-
-/**
- * Format a BigDecimal quantity string for display. Trim trailing zeros so
- * "1.00" reads as "1" and "1.50" as "1.5"; preserves meaningful precision
- * like "1.75". Customer-facing — they shouldn't see padding noise.
- */
-const formatQuantity = (value: string | number): string => {
-  const n = Number(value);
-  if (!Number.isFinite(n)) return String(value);
-  return Number.isInteger(n) ? String(n) : String(n);
 };
 
 type InvoiceBadgeProps = { status: PublicInvoiceStatus };
@@ -285,49 +275,12 @@ export default function PublicInvoicePage() {
           </dl>
         </section>
 
-        {/* Line items. Mobile collapses the table into stacked rows via
-            per-row flex; desktop uses a real table. */}
-        <section className="mt-4 overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-sm print:shadow-none">
-          <h2 className="border-b border-zinc-100 px-6 py-3 text-xs font-semibold uppercase tracking-wide text-zinc-500">
-            {t('public.invoice.items')}
-          </h2>
-          <ul className="divide-y divide-zinc-100">
-            {invoice.lineItems.map((item, idx) => (
-              <li
-                key={idx}
-                className="flex flex-col gap-1 px-6 py-3 sm:flex-row sm:items-start sm:justify-between sm:gap-6"
-              >
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm text-zinc-900">{item.description}</p>
-                  <p className="mt-0.5 text-xs text-zinc-500">
-                    {formatQuantity(item.quantity)} × {formatMoney(item.unitPrice)}
-                  </p>
-                </div>
-                <div className="text-sm font-medium text-zinc-900 sm:text-right">
-                  {formatMoney(item.lineTotal)}
-                </div>
-              </li>
-            ))}
-          </ul>
-        </section>
+        <PublicLineItems title={t('public.invoice.items')} items={invoice.lineItems} />
 
         {/* Totals card. Right-aligned values, balance bolded. */}
         <section className="mt-4 rounded-lg border border-zinc-200 bg-white p-6 shadow-sm print:shadow-none">
           <dl className="space-y-2 text-sm">
-            <div className="flex justify-between">
-              <dt className="text-zinc-600">{t('public.invoice.subtotal')}</dt>
-              <dd className="text-zinc-900">{formatMoney(invoice.subtotal)}</dd>
-            </div>
-            {Number(invoice.taxAmount) > 0 && (
-              <div className="flex justify-between">
-                <dt className="text-zinc-600">
-                  {Number(invoice.taxRate) > 0
-                    ? t('public.invoice.taxWithRate', { rate: invoice.taxRate })
-                    : t('public.invoice.tax')}
-                </dt>
-                <dd className="text-zinc-900">{formatMoney(invoice.taxAmount)}</dd>
-              </div>
-            )}
+            <PublicPricingRows doc={invoice} subtotalLabel={t('public.invoice.subtotal')} />
             <div className="flex justify-between border-t border-zinc-100 pt-2">
               <dt className="font-medium text-zinc-900">
                 {t('public.invoice.total')}
