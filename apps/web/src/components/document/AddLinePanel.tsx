@@ -2,20 +2,22 @@
 import { useDeferredValue, useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from 'react';
 import clsx from 'clsx';
 import { Link } from 'react-router-dom';
-import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
 import { MagnifyingGlassIcon } from '@heroicons/react/16/solid';
 import { formatCurrency } from '@dispatch/utils';
-import { pricebookApi, type LaborRateType, type LineType, type PricebookItem } from '../../api/setup';
+import { pricebookApi, purchaseBillingApi, ratePlansApi, type LaborRateType, type LineType, type PricebookItem, type UnbilledPurchase } from '../../api/setup';
 import { Button } from '../catalyst/button';
 import { Input, InputGroup } from '../catalyst/input';
 import { Select } from '../catalyst/select';
 import { Field, Label } from '../catalyst/fieldset';
+import { Checkbox } from '../catalyst/checkbox';
 import { ToggleGroup, ToggleGroupOption } from '../ui/ToggleGroup';
 import { ViewTabs } from '../ui/Tabs';
 import { FREEFORM_TYPES, LINE_TYPE_LABEL, LINE_TYPE_TONE, pricingRuleNote } from './documentModel';
 import type { NewLine } from './DocumentLinesCard';
 
-type Tab = 'pricebook' | 'labor' | 'freeform';
+export type AddLineTab = 'pricebook' | 'labor' | 'freeform' | 'po';
+type Tab = AddLineTab;
 /** Adds a line and resolves true once saved; `name` is what the "Added …" flash says. */
 type Add = (line: NewLine, name: string) => Promise<boolean>;
 
@@ -31,6 +33,10 @@ const isMoney = (n: number | undefined) => n == null || (Number.isFinite(n) && n
 export function AddLinePanel({
   rates,
   billToCustomerId,
+  workOrderId,
+  ratePlanId,
+  docPoLineIds,
+  initialTab = 'pricebook',
   onAdd,
   onClose,
 }: {
@@ -38,15 +44,33 @@ export function AddLinePanel({
   rates: LaborRateType[];
   /** The document's customer: search results are priced at its rate plan, so what's picked is what lands. */
   billToCustomerId?: string;
+  /** The job, for parts bought on its purchase orders. */
+  workOrderId?: string | null;
+  ratePlanId?: string | null;
+  /** PO lines already on this document; they aren't offered again. */
+  docPoLineIds: Set<string>;
+  initialTab?: AddLineTab;
   onAdd: (line: NewLine) => Promise<boolean>;
   onClose: () => void;
 }) {
-  const [tab, setTab] = useState<Tab>('pricebook');
+  const [tab, setTab] = useState<Tab>(initialTab);
+  const { data: unbilled = [] } = useQuery({
+    queryKey: ['unbilledPurchases', workOrderId],
+    queryFn: () => purchaseBillingApi.getUnbilled(workOrderId!),
+    enabled: !!workOrderId,
+  });
+  // A quote's lines don't count as billed, so parts already on this document are left out here too.
+  const poLines = unbilled.filter((p) => !docPoLineIds.has(p.poLineId));
   const [freeformSeed, setFreeformSeed] = useState('');
   const [flash, setFlash] = useState<{ name: string; at: number } | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
   useEffect(() => () => clearTimeout(timer.current), []);
 
+  const flashAdded = (name: string) => {
+    setFlash({ name, at: Date.now() });
+    clearTimeout(timer.current);
+    timer.current = setTimeout(() => setFlash(null), 1800);
+  };
   const add: Add = async (line, name) => {
     const ok = await onAdd(line);
     if (ok) {
@@ -73,6 +97,9 @@ export function AddLinePanel({
             { id: 'pricebook', label: 'Pricebook' },
             { id: 'labor', label: 'Labor' },
             { id: 'freeform', label: 'Freeform' },
+            ...(workOrderId && (poLines.length || tab === 'po')
+              ? [{ id: 'po', label: poLines.length ? `From PO (${poLines.length})` : 'From PO' }]
+              : []),
           ]}
         />
         {flash && (
@@ -94,6 +121,8 @@ export function AddLinePanel({
               setTab('freeform');
             }}
           />
+        ) : tab === 'po' ? (
+          <FromPoForm lines={poLines} ratePlanId={ratePlanId} workOrderId={workOrderId!} onAdd={onAdd} onAdded={(n) => flashAdded(n)} />
         ) : tab === 'labor' ? (
           <LaborLineForm rates={rates} onAdd={add} />
         ) : (
@@ -248,6 +277,148 @@ function resultNote(item: PricebookItem, forAccount: boolean) {
   }
   // Without the account, the price is the list price and a plan may still change it on the line.
   return forAccount ? null : 'list';
+}
+
+const r2 = (n: number) => Math.round(n * 100) / 100;
+
+/**
+ * Parts bought on the job's purchase orders and not billed yet, all checked
+ * to start. Each line keeps a link to its PO line, so the part stops showing
+ * as unbilled. Price prefills from the PO's bill price; left blank, the
+ * customer's rate plan prices it from cost, which needs markup tiers.
+ */
+function FromPoForm({
+  lines,
+  ratePlanId,
+  workOrderId,
+  onAdd,
+  onAdded,
+}: {
+  lines: UnbilledPurchase[];
+  ratePlanId?: string | null;
+  workOrderId: string;
+  onAdd: (line: NewLine) => Promise<boolean>;
+  onAdded: (name: string) => void;
+}) {
+  const queryClient = useQueryClient();
+  const { data: plan } = useQuery({
+    queryKey: ['rate-plans', 'one', ratePlanId],
+    queryFn: () => ratePlansApi.get(ratePlanId!),
+    enabled: !!ratePlanId,
+  });
+  const fromCost = (plan?.markupTiers.length ?? 0) > 0;
+  const [rows, setRows] = useState(() =>
+    Object.fromEntries(
+      lines.map((l) => [
+        l.poLineId,
+        { on: true, qty: String(l.unbilledQuantity), price: l.suggestedUnitPrice != null ? String(l.suggestedUnitPrice) : '' },
+      ]),
+    ),
+  );
+  const [busy, setBusy] = useState(false);
+  // Parts that arrived after the tab opened start checked too.
+  const row = (l: UnbilledPurchase) =>
+    rows[l.poLineId] ?? {
+      on: true,
+      qty: String(l.unbilledQuantity),
+      price: l.suggestedUnitPrice != null ? String(l.suggestedUnitPrice) : '',
+    };
+  const set = (l: UnbilledPurchase, patch: Partial<{ on: boolean; qty: string; price: string }>) =>
+    setRows((rs) => ({ ...rs, [l.poLineId]: { ...row(l), ...patch } }));
+
+  if (!lines.length) {
+    return <p className="py-3 text-center text-[12.5px] text-fg-muted">All parts bought for this job are already billed or on this document.</p>;
+  }
+  const picked = lines.filter((l) => row(l).on);
+  const rowOk = (l: UnbilledPurchase) => {
+    const r = row(l);
+    const qty = num(r.qty);
+    const price = num(r.price);
+    return isQty(qty) && isMoney(price) && (price != null || fromCost);
+  };
+  const ready = picked.length > 0 && picked.every(rowOk);
+
+  const submit = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!ready || busy) return;
+    setBusy(true);
+    let added = 0;
+    for (const l of picked) {
+      const r = row(l);
+      const price = num(r.price);
+      const ok = await onAdd({
+        type: 'MATERIAL',
+        description: l.description,
+        quantity: num(r.qty)!,
+        unitCost: l.unitCost,
+        sourcePoLineId: l.poLineId,
+        ...(price != null ? { unitPrice: price } : {}),
+      });
+      if (!ok) break;
+      added++;
+    }
+    setBusy(false);
+    queryClient.invalidateQueries({ queryKey: ['unbilledPurchases', workOrderId] });
+    if (added) onAdded(added === 1 ? picked[0].description : `${added} lines`);
+  };
+
+  return (
+    <form onSubmit={submit} aria-label="Add from purchase orders">
+      <p className="mb-1.5 text-[11.5px] text-fg-muted">Parts bought on purchase orders for this job. Each line keeps a link to its PO line.</p>
+      <ul className="divide-y divide-border-soft">
+        {lines.map((l) => {
+          const r = row(l);
+          return (
+            <li key={l.poLineId} className="flex flex-wrap items-center gap-2.5 py-1.5">
+              <Checkbox aria-label={`Add ${l.description}`} checked={r.on} onChange={(on) => set(l, { on })} />
+              <span className="flex min-w-[200px] flex-1 flex-col">
+                <span className="text-[12.5px] text-fg-strong">{l.description}</span>
+                <span className="text-[11px] tabular-nums text-fg-muted">
+                  <span className="font-mono">{l.purchaseOrderNumber}</span>
+                  {l.sku && <span className="font-mono"> · {l.sku}</span>}
+                  {' · '}
+                  {l.billedQuantity > 0 ? `${l.unbilledQuantity} of ${l.quantity} not billed` : `qty ${l.quantity}`} · cost {formatCurrency(l.unitCost)}
+                </span>
+              </span>
+              <Input
+                size="xs"
+                inputMode="decimal"
+                aria-label={`Quantity of ${l.description}`}
+                value={r.qty}
+                disabled={!r.on}
+                onChange={(e) => set(l, { qty: e.target.value })}
+                className="!w-16 [&_input]:text-right"
+              />
+              <Input
+                size="xs"
+                inputMode="decimal"
+                aria-label={`Price of ${l.description}`}
+                value={r.price}
+                disabled={!r.on}
+                invalid={r.on && !rowOk(l)}
+                placeholder={fromCost ? 'From cost' : 'Price'}
+                onChange={(e) => set(l, { price: e.target.value })}
+                className="!w-24 [&_input]:text-right"
+              />
+            </li>
+          );
+        })}
+      </ul>
+      <div className="mt-2 flex items-center gap-3">
+        <span className="flex-1 text-[11px] text-fg-muted">
+          {fromCost
+            ? `Leave price blank to price from cost by ${plan?.name ?? 'the rate plan'}’s markup tiers.`
+            : 'Enter a price for each part. This customer’s rate plan has no markup tiers to price from cost.'}
+        </span>
+        <span className="text-[11.5px] tabular-nums text-fg-muted">
+          cost {formatCurrency(r2(picked.reduce((s, l) => s + (num(row(l).qty) ?? 0) * l.unitCost, 0)))}
+        </span>
+        <Button type="submit" color="dark/zinc" size="xs" disabled={!ready || busy}>
+          {picked.length === 1 ? 'Add 1 line' : `Add ${picked.length} lines`}
+        </Button>
+      </div>
+    </form>
+  );
 }
 
 function LaborLineForm({ rates, onAdd }: { rates: LaborRateType[]; onAdd: Add }) {

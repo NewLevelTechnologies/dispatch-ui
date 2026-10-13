@@ -231,3 +231,152 @@ describe('InvoiceDetailPage editing', () => {
     expect(apiClient.patch).toHaveBeenCalledWith('/financial/invoices/inv-1/status', { status: 'VOID' });
   });
 });
+
+describe('InvoiceDetailPage reissue and credit', () => {
+  const copy: Invoice = {
+    ...invoice,
+    id: 'inv-2',
+    invoiceNumber: 'INV-3412',
+    status: 'DRAFT',
+    version: 1,
+    amountPaid: 0,
+    balanceDue: 1450,
+    payments: [],
+    lastSentAt: null,
+    reissuedFromInvoiceId: 'inv-1',
+    reissuedFromInvoiceNumber: 'INV-3307',
+  };
+  const voided: Invoice = {
+    ...invoice,
+    status: 'VOID',
+    amountPaid: 0,
+    payments: [payment({ reversedAt: '2026-10-12T10:00:00Z' })],
+    reissuedAsInvoiceId: 'inv-2',
+    reissuedAsInvoiceNumber: 'INV-3412',
+  };
+  const mockBoth = (original: Invoice, corrected: Invoice) =>
+    vi.mocked(apiClient.get).mockImplementation((url: string) => {
+      if (url === '/financial/invoices/inv-1') return Promise.resolve({ data: original });
+      if (url === '/financial/invoices/inv-2') return Promise.resolve({ data: corrected });
+      if (url === '/financial/payments/p-1')
+        return Promise.resolve({ data: { id: 'p-1', paymentNumber: 'PMT-0012', status: 'RECEIVED', amount: 500, unappliedAmount: 500, applications: [] } });
+      if (url === '/customers/pay-1') return Promise.resolve({ data: payer });
+      if (url === '/work-orders/wo-1') return Promise.resolve({ data: workOrder });
+      return Promise.reject(new Error(`unexpected GET ${url}`));
+    });
+  const renderAt = (id: string) =>
+    renderWithProviders(<div />, {
+      routes: [{ path: '/invoices/:id', element: <InvoiceDetailPage /> }],
+      initialPath: `/invoices/${id}`,
+    });
+
+  beforeEach(() => vi.clearAllMocks());
+
+  it('voids a sent invoice and opens its corrected draft', async () => {
+    const user = userEvent.setup();
+    mockBoth(invoice, copy);
+    vi.mocked(apiClient.post).mockResolvedValue({ data: copy });
+    renderAt('inv-1');
+
+    await user.click(await screen.findByRole('button', { name: 'Void & reissue' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(dialog).toHaveTextContent('The $500.00 paid on it goes back to Desert Ridge Property Mgmt’s credit.');
+    await user.click(within(dialog).getByRole('button', { name: 'Void & reissue' }));
+
+    expect(apiClient.post).toHaveBeenCalledWith('/financial/invoices/inv-1/reissue');
+    expect(await screen.findByText('INV-3412')).toBeInTheDocument();
+  });
+
+  it('offers no reissue once an invoice was already reissued', async () => {
+    mockBoth(voided, copy);
+    renderAt('inv-1');
+
+    expect(await screen.findByText(/Voided and reissued as/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /reissue/i })).not.toBeInTheDocument();
+  });
+
+  it('holds the returned credit while the corrected copy is a draft', async () => {
+    mockBoth(voided, copy);
+    renderAt('inv-2');
+
+    expect(await screen.findByText(/\$500\.00 from INV-3307’s payments is on Desert Ridge Property Mgmt’s credit/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /credit/ })).not.toBeInTheDocument();
+  });
+
+  it('applies the returned credit once the corrected copy is sent', async () => {
+    const user = userEvent.setup();
+    mockBoth(voided, { ...copy, status: 'SENT', lastSentAt: '2026-10-13T10:00:00Z' });
+    vi.mocked(apiClient.post).mockResolvedValue({ data: {} });
+    renderAt('inv-2');
+
+    await user.click(await screen.findByRole('button', { name: 'Apply $500.00 credit' }));
+    expect(apiClient.post).toHaveBeenCalledWith('/financial/payments/p-1/applications', {
+      applications: [{ invoiceId: 'inv-2', amountApplied: 500 }],
+    });
+  });
+});
+
+describe('InvoiceDetailPage · parts from purchase orders', () => {
+  const draft: Invoice = { ...invoice, status: 'DRAFT', version: 4, amountPaid: 0, balanceDue: 1450, payments: [], lastSentAt: null, ratePlanId: 'rp-1' };
+  const parts = [
+    {
+      purchaseOrderId: 'po-1', purchaseOrderNumber: 'PO-1043', purchaseOrderType: 'ORDER', poLineId: 'pl-1', description: 'Capacitor 45/5',
+      sku: 'CAP-455', quantity: 2, billedQuantity: 0, unbilledQuantity: 2, unitCost: 18.75, unbilledCost: 37.5, suggestedUnitPrice: 48,
+    },
+    {
+      purchaseOrderId: 'po-1', purchaseOrderNumber: 'PO-1043', purchaseOrderType: 'ORDER', poLineId: 'pl-2', description: 'Contactor 40A',
+      sku: null, quantity: 1, billedQuantity: 0, unbilledQuantity: 1, unitCost: 28.4, unbilledCost: 28.4, suggestedUnitPrice: null,
+    },
+  ];
+  const withParts = (tiers: { minCost: number; markupPct: number }[]) =>
+    vi.mocked(apiClient.get).mockImplementation((url: string) => {
+      if (url === '/financial/invoices/inv-1') return Promise.resolve({ data: draft });
+      if (url === '/financial/work-orders/wo-1/unbilled-purchases') return Promise.resolve({ data: parts });
+      if (url === '/financial/rate-plans/rp-1')
+        return Promise.resolve({ data: { id: 'rp-1', name: 'Desert Ridge', markupTiers: tiers, laborRates: [], categoryMultipliers: [] } });
+      if (url === '/customers/pay-1') return Promise.resolve({ data: payer });
+      if (url === '/work-orders/wo-1') return Promise.resolve({ data: workOrder });
+      return Promise.reject(new Error(`unexpected GET ${url}`));
+    });
+  const renderAddPo = () =>
+    renderWithProviders(<div />, {
+      routes: [{ path: '/invoices/:id', element: <InvoiceDetailPage /> }],
+      initialPath: '/invoices/inv-1?add=po',
+    });
+
+  beforeEach(() => vi.clearAllMocks());
+
+  it('opens on the job’s unbilled parts and adds them linked to their PO lines', async () => {
+    const user = userEvent.setup();
+    withParts([{ minCost: 0, markupPct: 0.5 }]);
+    vi.mocked(apiClient.post).mockResolvedValue({ data: { ...draft, version: 5 } });
+    renderAddPo();
+
+    const form = await screen.findByRole('form', { name: 'Add from purchase orders' });
+    expect(screen.getByRole('tab', { name: 'From PO (2)' })).toHaveAttribute('aria-selected', 'true');
+    expect(await within(form).findByText(/Leave price blank to price from cost by Desert Ridge’s markup tiers/)).toBeInTheDocument();
+    expect(within(form).getByRole('textbox', { name: 'Price of Capacitor 45/5' })).toHaveValue('48');
+    await user.click(within(form).getByRole('button', { name: 'Add 2 lines' }));
+
+    await vi.waitFor(() => expect(apiClient.post).toHaveBeenCalledTimes(2));
+    expect(apiClient.post).toHaveBeenNthCalledWith(1, '/financial/invoices/inv-1/lines', {
+      version: 4, type: 'MATERIAL', description: 'Capacitor 45/5', quantity: 2, unitCost: 18.75, sourcePoLineId: 'pl-1', unitPrice: 48,
+    });
+    // No price: the plan's tiers price it from cost.
+    expect(apiClient.post).toHaveBeenNthCalledWith(2, '/financial/invoices/inv-1/lines', {
+      version: 5, type: 'MATERIAL', description: 'Contactor 40A', quantity: 1, unitCost: 28.4, sourcePoLineId: 'pl-2',
+    });
+  });
+
+  it('needs a price on every part when the plan can’t price from cost', async () => {
+    const user = userEvent.setup();
+    withParts([]);
+    renderAddPo();
+
+    const form = await screen.findByRole('form', { name: 'Add from purchase orders' });
+    expect(await within(form).findByText(/has no markup tiers to price from cost/)).toBeInTheDocument();
+    expect(within(form).getByRole('button', { name: 'Add 2 lines' })).toBeDisabled();
+    await user.click(within(form).getByRole('checkbox', { name: 'Add Contactor 40A' }));
+    expect(within(form).getByRole('button', { name: 'Add 1 line' })).toBeEnabled();
+  });
+});

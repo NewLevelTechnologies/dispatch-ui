@@ -111,8 +111,12 @@ export interface PurchaseOrderResponse {
   cancellationReason?: string | null;
 }
 
-// A line on create/patch. Omit id for new lines; PATCH `lines` replaces the set.
+// A line on create/patch. On PATCH, send `id` for every existing line: it's
+// updated in place and keeps its id, so invoice lines billed from it
+// (`sourcePoLineId`) stay linked. A line without an id is new; existing
+// lines left out are removed.
 export interface PurchaseOrderLineInput {
+  id?: string;
   name: string;
   sku?: string | null;
   quantityOrdered: number;

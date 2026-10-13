@@ -21,6 +21,10 @@ import type {
 export interface PricedDocument {
   /** The bill-to account; its rate plan prices pricebook search results. */
   customerId?: string;
+  /** The job; its purchase-order parts can be added as lines. */
+  workOrderId?: string | null;
+  /** The plan pricing it: a part added with no price is priced from cost by its markup tiers. */
+  ratePlanId?: string | null;
   pricingModel?: PricingModel;
   lineItems: DocumentLineItem[];
   adjustments?: DocumentAdjustment[];

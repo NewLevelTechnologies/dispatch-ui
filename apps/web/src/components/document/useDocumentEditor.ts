@@ -15,6 +15,8 @@ const DEPENDENT_KEYS = [
   'location-invoices',
   'location-invoice-summary',
   'quoteInvoiceable',
+  // Adding or removing a PO part, or voiding an invoice, changes what's left to bill.
+  'unbilledPurchases',
 ];
 
 /** Refetches the lists and rollups a created or changed document shows up in. */
@@ -47,6 +49,12 @@ export function documentErrorMessage(err: unknown, entity: string): string {
       return 'The bill-to has no email address to send to.';
     case 'NOT_SENDABLE_STATUS':
       return `This ${entity} can't be sent in its current status.`;
+    case 'INVOICE_NOT_REISSUABLE':
+      return `Only a sent, overdue, paid or void ${entity} can be reissued.`;
+    case 'ALREADY_REISSUED':
+      return `This ${entity} was already reissued. Open the corrected copy instead.`;
+    case 'PAYMENT_NOT_APPLICABLE':
+      return 'That payment was voided, so its credit can’t be applied.';
     case 'RATE_LIMIT_EXCEEDED':
       return 'Too many sends just now. Try again in a minute.';
     default:

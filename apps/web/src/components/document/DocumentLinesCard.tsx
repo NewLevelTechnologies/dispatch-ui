@@ -1,5 +1,6 @@
 /* eslint-disable i18next/no-literal-string -- dense billing detail; short operational labels stay literal (same convention as the PO detail page). Entity names route through getName(). */
 import { useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import clsx from 'clsx';
 import { XMarkIcon } from '@heroicons/react/16/solid';
@@ -10,7 +11,7 @@ import { Button } from '../catalyst/button';
 import { Input } from '../catalyst/input';
 import { Select } from '../catalyst/select';
 import { DragHandle } from '../settings/DragHandle';
-import { AddLinePanel } from './AddLinePanel';
+import { AddLinePanel, type AddLineTab } from './AddLinePanel';
 import { DocumentAdjustDialog, type AdjustTarget, type NewAdjustment } from './DocumentAdjustDialog';
 import { DenseTable, DenseTHead, DenseRow } from '../ui/DenseTable';
 import { Tag } from '../ui/Pill';
@@ -64,7 +65,11 @@ export function DocumentLinesCard({
   const legacy = isLegacy(doc);
   const lines = sortLines(doc.lineItems);
   const costCols = !legacy && showCost;
-  const [adding, setAdding] = useState(false);
+  // `?add=po` (from the job's "Not billed yet" card) opens the panel on the job's purchase-order parts.
+  const [params] = useSearchParams();
+  const initialTab: AddLineTab = params.get('add') === 'po' ? 'po' : 'pricebook';
+  const [adding, setAdding] = useState(!!editing && params.get('add') === 'po');
+  const docPoLineIds = new Set(doc.lineItems.map((l) => l.sourcePoLineId).filter((id): id is string => !!id));
   const [drag, setDrag] = useState<{ id: string; over: string | null } | null>(null);
   const [adjusting, setAdjusting] = useState<AdjustTarget | null>(null);
   const { data: rates = [] } = useQuery({
@@ -160,7 +165,16 @@ export function DocumentLinesCard({
           </tbody>
         </DenseTable>
       </div>
-      {editing && adding && <AddLinePanel rates={activeRates} billToCustomerId={doc.customerId} onAdd={editing.onAdd} onClose={() => setAdding(false)} />}
+      {editing && adding && <AddLinePanel
+          rates={activeRates}
+          billToCustomerId={doc.customerId}
+          workOrderId={doc.workOrderId}
+          ratePlanId={doc.ratePlanId}
+          docPoLineIds={docPoLineIds}
+          initialTab={initialTab}
+          onAdd={editing.onAdd}
+          onClose={() => setAdding(false)}
+        />}
       {editing && (
         <div className="flex flex-wrap gap-1.5 border-t border-border-soft px-3.5 py-2.5">
           <Button

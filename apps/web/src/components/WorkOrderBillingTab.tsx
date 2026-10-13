@@ -16,6 +16,7 @@ import { Pill, Tag } from './ui/Pill';
 import PaymentDialog from './PaymentDialog';
 import { BillQuoteDialog } from './document/BillQuoteDialog';
 import { NewDocumentDialog, type NewDocumentKind } from './document/NewDocumentDialog';
+import { UnbilledPurchasesCard } from './UnbilledPurchasesCard';
 import { amount, buildBillingTree, invoicedPercent } from './document/billingModel';
 import { formatDocDate } from './document/documentModel';
 import { documentErrorMessage, refreshDocumentLists } from './document/useDocumentEditor';
@@ -92,6 +93,7 @@ export default function WorkOrderBillingTab({
   });
 
   const [creating, setCreating] = useState<NewDocumentKind | null>(null);
+  const [fromPurchases, setFromPurchases] = useState(false);
   const [billing, setBilling] = useState<Quote | null>(null);
   const [paying, setPaying] = useState<Invoice | null>(null);
 
@@ -122,7 +124,16 @@ export default function WorkOrderBillingTab({
 
   const dialogs = (
     <>
-      <NewDocumentDialog kind={creating} onClose={() => setCreating(null)} workOrderId={workOrderId} customer={customer} />
+      <NewDocumentDialog
+        kind={creating}
+        onClose={() => {
+          setCreating(null);
+          setFromPurchases(false);
+        }}
+        workOrderId={workOrderId}
+        customer={customer}
+        openOnPurchases={fromPurchases}
+      />
       {billing && <BillQuoteDialog quote={billing} open onClose={() => setBilling(null)} />}
       <PaymentDialog
         open={!!paying}
@@ -134,6 +145,16 @@ export default function WorkOrderBillingTab({
         lockedInvoice={paying ?? undefined}
       />
     </>
+  );
+  const unbilledCard = (
+    <UnbilledPurchasesCard
+      workOrderId={workOrderId}
+      draftInvoices={invoices.filter((i) => i.status === InvoiceStatus.DRAFT)}
+      onNewInvoice={() => {
+        setFromPurchases(true);
+        setCreating('invoice');
+      }}
+    />
   );
   const newButtons = (
     <div className="flex gap-1.5">
@@ -162,18 +183,21 @@ export default function WorkOrderBillingTab({
 
   if (quotes.length === 0 && invoices.length === 0) {
     return (
-      <Card>
-        <div className="px-5 py-9 text-center">
-          <div className="text-[14px] font-semibold text-fg-strong">
-            No {getName('quote', true).toLowerCase()} or {getName('invoice', true).toLowerCase()} yet
+      <div className="flex flex-col gap-3">
+        {unbilledCard}
+        <Card>
+          <div className="px-5 py-9 text-center">
+            <div className="text-[14px] font-semibold text-fg-strong">
+              No {getName('quote', true).toLowerCase()} or {getName('invoice', true).toLowerCase()} yet
+            </div>
+            <div className="mt-1 text-[12.5px] text-fg-muted">
+              Quote the work first, or invoice directly for a simple repair.
+            </div>
+            <div className="mt-3.5 flex justify-center">{newButtons}</div>
           </div>
-          <div className="mt-1 text-[12.5px] text-fg-muted">
-            Quote the work first, or invoice directly for a simple repair.
-          </div>
-          <div className="mt-3.5 flex justify-center">{newButtons}</div>
-        </div>
-        {dialogs}
-      </Card>
+          {dialogs}
+        </Card>
+      </div>
     );
   }
 
@@ -231,6 +255,8 @@ export default function WorkOrderBillingTab({
           </div>
         </Card>
       )}
+
+      {unbilledCard}
 
       <Card>
         <CardHead>
