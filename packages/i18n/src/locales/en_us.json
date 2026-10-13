@@ -2632,6 +2632,7 @@
       "notificationTemplates": "Notification Templates",
       "plans": "Plans",
       "revenueTargets": "Revenue Targets",
+      "tax": "Tax",
       "terminology": "Terminology",
       "types": "Types",
       "workflows": "Workflows"
@@ -2646,6 +2647,7 @@
       "dispatch": "{{dispatch}}",
       "equipment": "{{equipment}}",
       "organization": "Organization",
+      "pricing": "Pricing",
       "workOrders": "{{workOrders}}"
     },
     "showingCount": "Showing {{count}} {{noun}}",
@@ -2896,6 +2898,65 @@
       "toDate": "to date",
       "yearLabel": "Year",
       "yearRow": "Year"
+    },
+    "tax": {
+      "activate": "Activate",
+      "actionsFor": "Actions for {{name}}",
+      "add": "Add jurisdiction",
+      "agreementFee": {
+        "label": "Tax class",
+        "sub": "Installment invoices for {{agreements}} are taxed as this kind of line.",
+        "title": "{{agreement}} installments"
+      },
+      "class": {
+        "EQUIPMENT": "Equipment",
+        "FEE": "Fees",
+        "LABOR": "Labor",
+        "MATERIALS": "Materials"
+      },
+      "col": {
+        "name": "Jurisdiction",
+        "rate": "Rate",
+        "status": "Status",
+        "taxes": "Taxes"
+      },
+      "deactivate": "Deactivate",
+      "default": "Default",
+      "emptyDescription": "Add where you collect tax and its rate. Until then, no tax is charged and drafts warn.",
+      "emptyTitle": "No tax jurisdictions yet",
+      "errors": {
+        "DEFAULT_MUST_BE_ACTIVE": "The default jurisdiction has to be active.",
+        "DEFAULT_REQUIRED": "There has to be a default. Make another jurisdiction the default instead.",
+        "JURISDICTION_IN_USE": "Locations are assigned to it. Move them to another jurisdiction first.",
+        "NAME_TAKEN": "A jurisdiction with that name already exists.",
+        "generic": "Something went wrong. Try again."
+      },
+      "footer": "Locations use the default unless one is assigned on the location's page.",
+      "form": {
+        "default": "Default jurisdiction",
+        "defaultHint": "Used for every location without one assigned. Takes over from the current default.",
+        "defaultLocked": "This is the default. To change it, make another jurisdiction the default.",
+        "description": "The rate applies to the kinds of line checked below. Customers marked tax-exempt aren't charged.",
+        "editTitle": "Edit {{name}}",
+        "name": "Name",
+        "namePlaceholder": "Phoenix, AZ",
+        "rate": "Rate (%)",
+        "ratePlaceholder": "Not set",
+        "rateHint": "Leave the rate blank if you don't know it yet. Nothing is taxed until it's set, and drafts warn.",
+        "taxes": "Taxes these lines"
+      },
+      "loadFailed": "Couldn't load tax jurisdictions",
+      "loading": "Loading tax jurisdictions…",
+      "makeDefault": "Make default",
+      "noDefault": "none",
+      "rateNotSet": "Not set",
+      "subtitle": "{{count}} active · default: {{name}}",
+      "taxesNothing": "Nothing",
+      "title": "Tax",
+      "toast": {
+        "saveFailed": "Couldn't save",
+        "saved": "Saved"
+      }
     }
   },
   "tags": {

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { invoicesApi, quotesApi, financialActivityApi, financialDashboardApi, revenueTargetsApi,
-  revenueReportApi, receivablesReportApi, quoteReportApi, paymentReportApi, paymentsApi } from './financialApi';
+  revenueReportApi, receivablesReportApi, quoteReportApi, paymentReportApi, paymentsApi, taxApi } from './financialApi';
 import apiClient from './client';
 
 vi.mock('./client');
@@ -355,5 +355,22 @@ describe('document edit routes (Pricebook Phase 1)', () => {
     expect(apiClient.post).toHaveBeenCalledWith('/financial/payments/p-1/applications', {
       applications: [{ invoiceId: 'inv-2', amountApplied: 500 }],
     });
+  });
+});
+
+describe('taxApi', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(apiClient.put).mockResolvedValue({ data: {} });
+  });
+
+  it('clears a location assignment with an explicit null', async () => {
+    await taxApi.setLocationJurisdiction('loc-1', null);
+    expect(apiClient.put).toHaveBeenCalledWith('/financial/service-locations/loc-1/tax-jurisdiction', { taxJurisdictionId: null });
+  });
+
+  it('sets the agreement fee tax class', async () => {
+    await taxApi.updatePricingSettings('FEE');
+    expect(apiClient.put).toHaveBeenCalledWith('/financial/pricing-settings', { agreementFeeTaxClass: 'FEE' });
   });
 });

@@ -1255,6 +1255,102 @@ export const financialSummaryApi = {
   },
 };
 
+// ========== TAX ==========
+
+/** Where tax comes from. `rate` is a fraction (8.25% is 0.0825); null means not set yet, so nothing is taxed. */
+export interface TaxJurisdiction {
+  id: string;
+  name: string;
+  rate: number | null;
+  taxesLabor: boolean;
+  taxesMaterials: boolean;
+  taxesEquipment: boolean;
+  taxesFees: boolean;
+  isDefault: boolean;
+  active: boolean;
+  createdAt: string | null;
+  updatedAt: string | null;
+}
+
+/** The whole jurisdiction, replaced on update. Never deleted: deactivate with `active: false`. */
+export interface TaxJurisdictionRequest {
+  name: string;
+  rate: number | null;
+  taxesLabor: boolean;
+  taxesMaterials: boolean;
+  taxesEquipment: boolean;
+  taxesFees: boolean;
+  /** Making one the default takes it from the previous default. */
+  isDefault: boolean;
+  active: boolean;
+}
+
+/** A location's tax: what was assigned to it (null = none) and what applies, the assignment or else the default. */
+export interface LocationTaxJurisdiction {
+  serviceLocationId: string;
+  assignedJurisdictionId: string | null;
+  effective: TaxJurisdiction | null;
+}
+
+export interface PricingSettings {
+  /** The tax class agreement installment invoices are issued under. */
+  agreementFeeTaxClass: TaxClass;
+  updatedAt: string | null;
+}
+
+/**
+ * Tax jurisdictions and pricing settings. Reading needs no capability;
+ * writing needs MANAGE_PRICING, except a location's assignment, which
+ * EDIT_QUOTES or EDIT_INVOICES can also set. 409 codes: NAME_TAKEN,
+ * DEFAULT_REQUIRED, DEFAULT_MUST_BE_ACTIVE, JURISDICTION_IN_USE.
+ */
+export const taxApi = {
+  /** Active and inactive, by name. */
+  getJurisdictions: async (): Promise<TaxJurisdiction[]> => {
+    const response = await apiClient.get<TaxJurisdiction[]>('/financial/tax-jurisdictions');
+    return response.data;
+  },
+
+  createJurisdiction: async (request: TaxJurisdictionRequest): Promise<TaxJurisdiction> => {
+    const response = await apiClient.post<TaxJurisdiction>('/financial/tax-jurisdictions', request);
+    return response.data;
+  },
+
+  updateJurisdiction: async (id: string, request: TaxJurisdictionRequest): Promise<TaxJurisdiction> => {
+    const response = await apiClient.put<TaxJurisdiction>(`/financial/tax-jurisdictions/${id}`, request);
+    return response.data;
+  },
+
+  getLocationJurisdiction: async (serviceLocationId: string): Promise<LocationTaxJurisdiction> => {
+    const response = await apiClient.get<LocationTaxJurisdiction>(
+      `/financial/service-locations/${serviceLocationId}/tax-jurisdiction`,
+    );
+    return response.data;
+  },
+
+  /** Null clears the assignment, so the default applies. */
+  setLocationJurisdiction: async (
+    serviceLocationId: string,
+    taxJurisdictionId: string | null,
+  ): Promise<LocationTaxJurisdiction> => {
+    const response = await apiClient.put<LocationTaxJurisdiction>(
+      `/financial/service-locations/${serviceLocationId}/tax-jurisdiction`,
+      { taxJurisdictionId },
+    );
+    return response.data;
+  },
+
+  getPricingSettings: async (): Promise<PricingSettings> => {
+    const response = await apiClient.get<PricingSettings>('/financial/pricing-settings');
+    return response.data;
+  },
+
+  updatePricingSettings: async (agreementFeeTaxClass: TaxClass): Promise<PricingSettings> => {
+    const response = await apiClient.put<PricingSettings>('/financial/pricing-settings', { agreementFeeTaxClass });
+    return response.data;
+  },
+};
+
 // ========== LOCATION FINANCIAL ACTIVITY ==========
 
 export type FinancialActivityKind = 'INVOICE_SENT' | 'INVOICE_PAID';
