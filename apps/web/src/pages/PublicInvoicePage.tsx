@@ -10,6 +10,7 @@ import {
   type PublicPaymentMethod,
 } from '../api/setup';
 import TenantBrandingHeader from '../components/TenantBrandingHeader';
+import PublicPreviewBanner from '../components/PublicPreviewBanner';
 import CliffPage from '../components/CliffPage';
 import { Badge } from '../components/catalyst/badge';
 import { PublicLineItems, PublicPricingRows } from '../components/public/PublicDocumentParts';
@@ -194,6 +195,7 @@ export default function PublicInvoicePage() {
 
   return (
     <div className="min-h-screen bg-zinc-50 print:bg-white">
+      {data.preview && <PublicPreviewBanner customer={customer.name} />}
       {isVoid && (
         <div className="bg-rose-600 px-4 py-4 text-center text-white print:bg-white print:text-rose-700">
           <p className="text-lg font-semibold sm:text-xl">
@@ -228,7 +230,7 @@ export default function PublicInvoicePage() {
                 #{invoice.invoiceNumber}
               </p>
             </div>
-            <InvoiceStatusBadge status={invoice.status} />
+            <InvoiceStatusBadge status={data.preview && invoice.status === 'DRAFT' ? 'SENT' : invoice.status} />
           </div>
 
           <div className="mt-6">

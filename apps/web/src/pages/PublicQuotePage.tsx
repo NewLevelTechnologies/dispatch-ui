@@ -9,6 +9,7 @@ import {
   type PublicQuoteStatus,
 } from '../api/setup';
 import TenantBrandingHeader from '../components/TenantBrandingHeader';
+import PublicPreviewBanner from '../components/PublicPreviewBanner';
 import CliffPage from '../components/CliffPage';
 import { Badge } from '../components/catalyst/badge';
 import { PublicLineItems, PublicPricingRows } from '../components/public/PublicDocumentParts';
@@ -187,10 +188,12 @@ export default function PublicQuotePage() {
   const isDeclined = quote.status === 'DECLINED';
   const canSign = approverName.trim().length > 0 && approverName.trim().length <= 120 && consent;
   const senderName = tenant.displayName ?? t('public.common.theSender');
-  const approvable = quote.status === 'SENT' && !quote.beingUpdated;
+  // The office's preview shows the page but never takes an approval.
+  const approvable = quote.status === 'SENT' && !quote.beingUpdated && !data.preview;
 
   return (
     <div className="min-h-screen bg-zinc-50 print:bg-white">
+      {data.preview && <PublicPreviewBanner customer={customer.name} />}
       <div className="mx-auto max-w-2xl px-4 py-6 sm:py-10 print:max-w-none print:p-0">
         <TenantBrandingHeader tenant={tenant} />
 
@@ -228,7 +231,7 @@ export default function PublicQuotePage() {
               </p>
               {quote.title && <p className="mt-0.5 text-sm text-zinc-700">{quote.title}</p>}
             </div>
-            <QuoteStatusBadge status={quote.status} />
+            <QuoteStatusBadge status={data.preview && quote.status === 'DRAFT' ? 'SENT' : quote.status} />
           </div>
 
           <div className="mt-6">

@@ -522,6 +522,15 @@ const sendBody = ({ recipientEmails, recipientPhones, message }: SendOptions, da
   return Object.keys(body).length ? body : undefined;
 };
 
+/**
+ * `POST .../preview-link`: a 30-minute link to the public page as the customer
+ * will see it, for any status. Not a view; can't approve or pay.
+ */
+export interface PreviewLink {
+  url: string;
+  expiresAt: string;
+}
+
 /** `GET .../send-preview`: render `emailNotificationTypeKey` (or the SMS key) with `templateData` via `notificationTemplateApi.render`. */
 export interface SendPreview {
   emailNotificationTypeKey: string;
@@ -840,6 +849,12 @@ export const invoicesApi = {
     return response.data;
   },
 
+  /** The public page as the customer will see it; a draft's due date override (409 DOCUMENT_NOT_EDITABLE once sent) shows on it. */
+  previewLink: async (id: string, dueDate?: string): Promise<PreviewLink> => {
+    const response = await apiClient.post<PreviewLink>(`/financial/invoices/${id}/preview-link`, dueDate ? { dueDate } : undefined);
+    return response.data;
+  },
+
   /** What the send email would say: its type keys plus the data to render them with via `notificationTemplateApi.render`. */
   sendPreview: async (id: string, dueDate?: string): Promise<SendPreview> => {
     const response = await apiClient.get<SendPreview>(`/financial/invoices/${id}/send-preview`, { params: dueDate ? { dueDate } : {} });
@@ -1117,6 +1132,12 @@ export const quotesApi = {
     } = {},
   ): Promise<SendResponse> => {
     const response = await apiClient.post<SendResponse>(`/financial/quotes/${id}/send`, sendBody(rest, expirationDate ? { expirationDate } : {}));
+    return response.data;
+  },
+
+  /** See `invoicesApi.previewLink`. */
+  previewLink: async (id: string, expirationDate?: string): Promise<PreviewLink> => {
+    const response = await apiClient.post<PreviewLink>(`/financial/quotes/${id}/preview-link`, expirationDate ? { expirationDate } : undefined);
     return response.data;
   },
 

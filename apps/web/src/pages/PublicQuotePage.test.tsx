@@ -64,6 +64,25 @@ describe('PublicQuotePage', () => {
     vi.clearAllMocks();
   });
 
+  it('shows the office preview of a draft as it will be sent, with nothing to approve', async () => {
+    vi.mocked(publicApiClient.get).mockResolvedValueOnce({
+      data: { ...buildResponse({ status: 'DRAFT' }), preview: true },
+    });
+    renderAt('tok-preview');
+    expect(await screen.findByText('Preview')).toBeInTheDocument();
+    expect(screen.getByText(/This is what Jane Smith will see/)).toBeInTheDocument();
+    expect(screen.getByText('Pending')).toBeInTheDocument(); // not "Draft"
+    expect(screen.getByText('Replace compressor')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Approve quote' })).not.toBeInTheDocument();
+  });
+
+  it('has no preview banner on a real link', async () => {
+    vi.mocked(publicApiClient.get).mockResolvedValueOnce({ data: { ...buildResponse(), preview: false } });
+    renderAt('tok-1');
+    expect(await screen.findByRole('button', { name: 'Approve quote' })).toBeInTheDocument();
+    expect(screen.queryByText(/This is what Jane Smith will see/)).not.toBeInTheDocument();
+  });
+
   it('renders the quote with tenant branding and the total amount', async () => {
     vi.mocked(publicApiClient.get).mockResolvedValueOnce({
       data: buildResponse(),
