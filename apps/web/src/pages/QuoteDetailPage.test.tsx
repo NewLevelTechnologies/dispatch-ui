@@ -192,6 +192,13 @@ describe('QuoteDetailPage', () => {
     expect(await screen.findByText(/recorded by the office · Rev 2\. Accepted quotes are locked\./)).toBeInTheDocument();
   });
 
+  it('names the customer who signed when they approved on their link', async () => {
+    mockApi({ ...quote, status: 'ACCEPTED', decidedAt: '2026-10-09T18:00:00Z', acceptedRevision: 2, acceptedByUserId: null, approvedByName: 'Karen Wu' });
+    renderPage();
+
+    expect(await screen.findByText(/by Karen Wu, signed on the customer's link · Rev 2\./)).toBeInTheDocument();
+  });
+
   it('shows a legacy quote at its header tax rate, without engine columns', async () => {
     mockApi({
       ...quote,

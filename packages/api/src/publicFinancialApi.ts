@@ -143,6 +143,12 @@ export interface PublicQuoteData extends PublicPricing {
    * `lineItems` is empty until it's re-sent. Show "being updated", no approve.
    */
   beingUpdated?: boolean;
+  /** Short description of the work, when the office gave one. */
+  title?: string | null;
+  /** When it was accepted or declined. */
+  decidedAt?: string | null;
+  /** The name the customer typed when approving; null when the office recorded it or it predates names. */
+  approvedByName?: string | null;
   /** Null while `beingUpdated`. */
   subtotal: string | null;
   taxRate: string | null;
@@ -225,15 +231,16 @@ export const publicFinancialApi = {
   },
 
   /**
-   * The customer approves the revision they're looking at. Returns the
+   * The customer approves the revision they're looking at, signing with
+   * their typed name (required, 1–120 characters; 400 INVALID_REQUEST otherwise). Returns the
    * quote, now ACCEPTED. 409 `QUOTE_REVISION_STALE`: it was revised since
    * the page loaded, reload it. 409 `QUOTE_NOT_APPROVABLE`: it's no longer
    * waiting on the customer.
    */
-  approveQuote: async (token: string, revision: number | undefined): Promise<PublicQuoteResponse> => {
+  approveQuote: async (token: string, revision: number | undefined, approverName: string): Promise<PublicQuoteResponse> => {
     const response = await publicApiClient.post<PublicQuoteResponse>(
       '/public/quotes/approve',
-      { revision },
+      { revision, approverName },
       tokenHeaders(token),
     );
     return response.data;

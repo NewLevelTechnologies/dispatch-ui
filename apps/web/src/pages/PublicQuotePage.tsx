@@ -124,8 +124,11 @@ export default function PublicQuotePage() {
   const queryClient = useQueryClient();
   const [confirming, setConfirming] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  // The customer signs by typing their name and confirming; the name is kept with the approval.
+  const [approverName, setApproverName] = useState('');
+  const [consent, setConsent] = useState(false);
   const approve = useMutation({
-    mutationFn: () => publicFinancialApi.approveQuote(token, data?.quote.revision),
+    mutationFn: () => publicFinancialApi.approveQuote(token, data?.quote.revision, approverName.trim()),
     onSuccess: (next) => {
       setConfirming(false);
       queryClient.setQueryData(['publicQuote', token], next);
@@ -181,6 +184,8 @@ export default function PublicQuotePage() {
   const { quote, tenant, customer } = data;
   const isAccepted = quote.status === 'ACCEPTED';
   const isExpired = quote.status === 'EXPIRED';
+  const isDeclined = quote.status === 'DECLINED';
+  const canSign = approverName.trim().length > 0 && approverName.trim().length <= 120 && consent;
   const senderName = tenant.displayName ?? t('public.common.theSender');
   const approvable = quote.status === 'SENT' && !quote.beingUpdated;
 
@@ -221,6 +226,7 @@ export default function PublicQuotePage() {
               <p className="mt-1 text-lg font-semibold text-zinc-900">
                 #{quote.quoteNumber}
               </p>
+              {quote.title && <p className="mt-0.5 text-sm text-zinc-700">{quote.title}</p>}
             </div>
             <QuoteStatusBadge status={quote.status} />
           </div>
@@ -229,23 +235,29 @@ export default function PublicQuotePage() {
             <p className="text-xs uppercase tracking-wide text-zinc-500">
               {t('public.quote.total')}
             </p>
-            <p className="mt-1 text-4xl font-bold tracking-tight text-zinc-900">
+            {/* An expired quote's amounts stay readable but muted: they may no longer hold. */}
+            <p className={`mt-1 text-4xl font-bold tracking-tight ${isExpired ? 'text-zinc-400' : 'text-zinc-900'}`}>
               {formatMoney(quote.totalAmount)}
             </p>
-            <p
-              className={`mt-1 text-sm ${
-                isExpired ? 'text-amber-700' : 'text-zinc-600'
-              }`}
-            >
-              {isExpired
-                ? t('public.quote.expiredOn', {
-                    date: formatDate(quote.expirationDate),
-                  })
-                : t('public.quote.validThrough', {
-                    date: formatDate(quote.expirationDate),
-                  })}
-            </p>
+            {!isAccepted && !isDeclined && !isExpired && (
+              <p className="mt-1 text-sm text-zinc-600">
+                {t('public.quote.validThrough', { date: formatDate(quote.expirationDate) })}
+              </p>
+            )}
           </div>
+          {isExpired && (
+            <div className="mt-4 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800">
+              {t('public.quote.expiredBody', { date: formatDate(quote.expirationDate), tenant: senderName })}
+            </div>
+          )}
+          {isDeclined && (
+            <div className="mt-4 rounded-md bg-zinc-100 px-3 py-2 text-sm text-zinc-700">
+              <p className="font-semibold">
+                {quote.decidedAt ? t('public.quote.declinedOn', { date: formatDate(quote.decidedAt) }) : t('public.quote.declined')}
+              </p>
+              <p className="mt-0.5">{t('public.quote.declinedBody', { tenant: senderName })}</p>
+            </div>
+          )}
 
           <dl className="mt-6 grid grid-cols-2 gap-x-6 gap-y-3 border-t border-zinc-100 pt-4 text-sm">
             <div>
@@ -267,7 +279,13 @@ export default function PublicQuotePage() {
           )}
           {isAccepted && (
             <div className="mt-4 rounded-md bg-lime-50 px-3 py-2 text-sm text-lime-900">
-              <p className="font-semibold">{t('public.quote.approved')}</p>
+              <p className="font-semibold">
+                {quote.decidedAt && quote.approvedByName
+                  ? t('public.quote.approvedOnBy', { date: formatDate(quote.decidedAt), name: quote.approvedByName })
+                  : quote.decidedAt
+                    ? t('public.quote.approvedOn', { date: formatDate(quote.decidedAt) })
+                    : t('public.quote.approved')}
+              </p>
               <p className="mt-0.5">{t('public.quote.approvedBody', { tenant: senderName })}</p>
             </div>
           )}
@@ -279,10 +297,32 @@ export default function PublicQuotePage() {
                     {t('public.quote.approveTitle', { number: quote.quoteNumber, total: formatMoney(quote.totalAmount) })}
                   </p>
                   <p className="mt-1 text-sm text-zinc-600">{t('public.quote.approveBody', { tenant: senderName })}</p>
+                  <label className="mt-3 block text-sm font-medium text-zinc-900" htmlFor="approver-name">
+                    {t('public.quote.approverName')}
+                  </label>
+                  <input
+                    id="approver-name"
+                    autoFocus
+                    autoComplete="name"
+                    maxLength={120}
+                    value={approverName}
+                    onChange={(e) => setApproverName(e.target.value)}
+                    placeholder={t('public.quote.approverNamePlaceholder')}
+                    className="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 !text-base text-zinc-900 focus:border-zinc-500 focus:outline-none sm:!text-sm"
+                  />
+                  <label className="mt-3 flex items-start gap-2 text-sm text-zinc-800">
+                    <input
+                      type="checkbox"
+                      checked={consent}
+                      onChange={(e) => setConsent(e.target.checked)}
+                      className="mt-0.5 size-4 rounded border-zinc-300"
+                    />
+                    <span>{t('public.quote.approveConsent', { number: quote.quoteNumber, total: formatMoney(quote.totalAmount) })}</span>
+                  </label>
                   <div className="mt-3 flex gap-2">
                     <button
                       type="button"
-                      disabled={approve.isPending}
+                      disabled={approve.isPending || !canSign}
                       onClick={() => approve.mutate()}
                       className="rounded-md bg-zinc-900 px-4 py-2 !text-sm !font-semibold text-white hover:bg-zinc-800 disabled:opacity-60"
                     >

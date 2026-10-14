@@ -202,15 +202,27 @@ describe('PublicQuotePage', () => {
   it('approves the revision shown, after confirming', async () => {
     const user = userEvent.setup();
     vi.mocked(publicApiClient.get).mockResolvedValueOnce({ data: buildResponse({ revision: 3 }) });
-    vi.mocked(publicApiClient.post).mockResolvedValueOnce({ data: buildResponse({ revision: 3, status: 'ACCEPTED' }) });
+    vi.mocked(publicApiClient.post).mockResolvedValueOnce({
+      data: buildResponse({ revision: 3, status: 'ACCEPTED', decidedAt: '2026-10-13T16:00:00Z', approvedByName: 'Karen Wu' }),
+    });
     renderAt('tok-a');
 
     await user.click(await screen.findByRole('button', { name: 'Approve quote' }));
     expect(screen.getByText('Approve quote #Q-0007 for $1,200.00?')).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Yes, approve' }));
+    // Signing needs the customer's name and the confirmation both.
+    const confirm = screen.getByRole('button', { name: 'Yes, approve' });
+    expect(confirm).toBeDisabled();
+    await user.type(screen.getByRole('textbox', { name: 'Your name' }), '  Karen Wu ');
+    expect(confirm).toBeDisabled();
+    await user.click(screen.getByRole('checkbox', { name: 'I approve quote #Q-0007 for $1,200.00.' }));
+    await user.click(confirm);
 
-    expect(publicApiClient.post).toHaveBeenCalledWith('/public/quotes/approve', { revision: 3 }, expect.objectContaining({ headers: { 'X-Share-Token': 'tok-a' } }));
-    expect(await screen.findByText('You approved this quote')).toBeInTheDocument();
+    expect(publicApiClient.post).toHaveBeenCalledWith(
+      '/public/quotes/approve',
+      { revision: 3, approverName: 'Karen Wu' },
+      expect.objectContaining({ headers: { 'X-Share-Token': 'tok-a' } }),
+    );
+    expect(await screen.findByText(/^Approved .* by Karen Wu$/)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Approve quote' })).not.toBeInTheDocument();
   });
 
@@ -225,16 +237,31 @@ describe('PublicQuotePage', () => {
     renderAt('tok-r');
 
     await user.click(await screen.findByRole('button', { name: 'Approve quote' }));
+    await user.type(screen.getByRole('textbox', { name: 'Your name' }), 'Karen Wu');
+    await user.click(screen.getByRole('checkbox', { name: /I approve quote/ }));
     await user.click(screen.getByRole('button', { name: 'Yes, approve' }));
 
     expect(await screen.findByText('This quote was just updated. Review the new version before approving.')).toBeInTheDocument();
     await waitFor(() => expect(publicApiClient.get).toHaveBeenCalledTimes(2));
   });
 
-  it('shows a "Declined" badge and no approve button for a declined quote', async () => {
-    vi.mocked(publicApiClient.get).mockResolvedValueOnce({ data: buildResponse({ status: 'DECLINED' }) });
+  it('says when a declined quote was declined, with no approve button', async () => {
+    vi.mocked(publicApiClient.get).mockResolvedValueOnce({ data: buildResponse({ status: 'DECLINED', decidedAt: '2026-10-05T16:00:00Z' }) });
     renderAt('tok-d');
-    expect(await screen.findByText('Declined')).toBeInTheDocument();
+    expect(await screen.findByText(/^Declined .*2026$/)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Approve quote' })).not.toBeInTheDocument();
+  });
+
+  it('tells the customer an expired quote needs updating, and can’t be approved', async () => {
+    vi.mocked(publicApiClient.get).mockResolvedValueOnce({ data: buildResponse({ status: 'EXPIRED' }) });
+    renderAt('tok-x');
+    expect(await screen.findByText(/^This quote expired .* for an updated quote\.$/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Approve quote' })).not.toBeInTheDocument();
+  });
+
+  it('shows the quote’s title under its number', async () => {
+    vi.mocked(publicApiClient.get).mockResolvedValueOnce({ data: buildResponse({ title: 'Condenser replacement · 3-ton' }) });
+    renderAt('tok-t');
+    expect(await screen.findByText('Condenser replacement · 3-ton')).toBeInTheDocument();
   });
 });
