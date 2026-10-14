@@ -12,7 +12,6 @@ import {
   quotesApi,
   ratePlansApi,
   taxApi,
-  workOrderApi,
   type CustomerSearchResult,
   type QuoteListItem,
   type ServiceLocationSearchResult,
@@ -32,8 +31,9 @@ import { Tag } from '../ui/Pill';
 import { BillQuoteDialog } from './BillQuoteDialog';
 import { pct } from './documentModel';
 import { documentErrorMessage, refreshDocumentLists } from './useDocumentEditor';
+import { jobsAt, type StartKind } from './startDocumentModel';
 
-export type StartKind = 'quote' | 'invoice';
+export type { StartKind };
 
 /** A location already chosen (from the job, a location or a customer page); opens on the confirm step. */
 export interface StartAt {
@@ -43,27 +43,11 @@ export interface StartAt {
   billSomeoneElse?: boolean;
 }
 
-const OPEN_PROGRESS = ['NOT_STARTED', 'AWAITING_SCHEDULE', 'IN_PROGRESS', 'BLOCKED'] as const;
-
 const termsLabel = (days: number | null | undefined) =>
   days == null ? null : days === 0 ? 'Due on receipt' : `Net ${days}`;
 
 const placeLine = (l: ServiceLocationSearchResult) => titleCaseAddress(l.address.streetAddress);
 const cityLine = (l: ServiceLocationSearchResult) => `${titleCaseAddress(l.address.city)}, ${l.address.state}`;
-
-/** Open jobs at a location, and for an invoice also finished jobs not invoiced yet: that's where most invoices go. */
-async function jobsAt(locationId: string, kind: StartKind): Promise<WorkOrderSummary[]> {
-  const open = await workOrderApi.getAll({
-    serviceLocationId: locationId,
-    lifecycleState: 'ACTIVE',
-    progressCategory: [...OPEN_PROGRESS],
-    size: 20,
-  });
-  if (kind === 'quote') return open.content;
-  const done = await workOrderApi.getAll({ serviceLocationId: locationId, unbilled: true, size: 20 });
-  const seen = new Set(open.content.map((w) => w.id));
-  return [...open.content, ...done.content.filter((w) => !seen.has(w.id))];
-}
 
 /**
  * Starts a draft quote or invoice from where the work is: pick the service
@@ -74,10 +58,13 @@ async function jobsAt(locationId: string, kind: StartKind): Promise<WorkOrderSum
 export function StartDocumentDialog({
   kind,
   start,
+  query,
   onClose,
 }: {
   kind: StartKind | null;
   start?: StartAt | null;
+  /** Starts the location search with this typed (a customer's name, to list their locations). */
+  query?: string;
   onClose: () => void;
 }) {
   // "Invoice from quote" closes this and opens the quote's billing dialog instead.
@@ -86,7 +73,14 @@ export function StartDocumentDialog({
     <>
       <Dialog open={kind != null && !billingQuote} onClose={onClose} size="xl" className="sm:!max-w-[560px]">
         {kind && (
-          <StartForm key={`${kind}-${start?.location.id ?? ''}`} kind={kind} start={start ?? null} onClose={onClose} onInvoiceQuote={setBillingQuote} />
+          <StartForm
+            key={`${kind}-${start?.location.id ?? ''}`}
+            kind={kind}
+            start={start ?? null}
+            query={query}
+            onClose={onClose}
+            onInvoiceQuote={setBillingQuote}
+          />
         )}
       </Dialog>
       {billingQuote && (
@@ -106,11 +100,13 @@ export function StartDocumentDialog({
 function StartForm({
   kind,
   start,
+  query,
   onClose,
   onInvoiceQuote,
 }: {
   kind: StartKind;
   start: StartAt | null;
+  query?: string;
   onClose: () => void;
   onInvoiceQuote: (q: QuoteListItem) => void;
 }) {
@@ -157,7 +153,7 @@ function StartForm({
       <DialogDescription>Where is the work? Pricing and tax come from the service location and who’s billed.</DialogDescription>
       <DialogBody className="!mt-3">
         {!location ? (
-          <LocationSearch onPick={(l) => setLocation(l)} />
+          <LocationSearch initialQuery={query} onPick={(l) => setLocation(l)} />
         ) : (
           <Confirm
             kind={kind}
@@ -195,9 +191,9 @@ function StartForm({
 }
 
 /** Step 1: search locations by address, customer or payer; recent ones before anything is typed. */
-function LocationSearch({ onPick }: { onPick: (l: ServiceLocationSearchResult) => void }) {
+function LocationSearch({ initialQuery, onPick }: { initialQuery?: string; onPick: (l: ServiceLocationSearchResult) => void }) {
   const { getName } = useGlossary();
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState(initialQuery ?? '');
   const q = useDeferredValue(search.trim());
   const [hi, setHi] = useState(0);
   const { data: found } = useQuery({

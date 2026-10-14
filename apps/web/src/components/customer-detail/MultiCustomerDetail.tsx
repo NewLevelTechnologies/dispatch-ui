@@ -50,6 +50,8 @@ import { formatDateShort } from './format';
 import { formatPhone, titleCaseAddress } from '@dispatch/utils';
 import { useUrlTab } from '../../hooks/useUrlTab';
 import { equipmentCreateUrl, equipmentEditUrl } from '../../lib/equipmentCreate';
+import { useStartDocument } from '../document/useStartDocument';
+import type { StartKind } from '../document/startDocumentModel';
 
 type TabId =
   | 'overview'
@@ -76,6 +78,9 @@ export default function MultiCustomerDetail({ customer }: { customer: Customer }
   const { t } = useTranslation();
   const { getName } = useGlossary();
   const navigate = useNavigate();
+  // Several locations: the start dialog opens on a search for this customer's sites.
+  const startDocument = useStartDocument();
+  const startMulti = (kind: StartKind) => void startDocument.start(kind, undefined, customer.name);
   const routerLocation = useLocation();
   const queryClient = useQueryClient();
   const canEditCustomers = useHasCapability('EDIT_CUSTOMERS');
@@ -197,6 +202,7 @@ export default function MultiCustomerDetail({ customer }: { customer: Customer }
 
   return (
     <AppLayout>
+      {startDocument.element}
       <div className="px-1 py-1">
         <div className="mx-auto max-w-[1240px]">
           <Link
@@ -274,6 +280,12 @@ export default function MultiCustomerDetail({ customer }: { customer: Customer }
                   <EllipsisVerticalIcon className="size-4" />
                 </DropdownButton>
                 <DropdownMenu anchor="bottom end">
+                  <DropdownItem onClick={() => startMulti('quote')}>
+                    <DropdownLabel>{t('common.actions.new', { entity: getName('quote') })}</DropdownLabel>
+                  </DropdownItem>
+                  <DropdownItem onClick={() => startMulti('invoice')}>
+                    <DropdownLabel>{t('common.actions.new', { entity: getName('invoice') })}</DropdownLabel>
+                  </DropdownItem>
                   <DropdownItem onClick={() => setIsNotificationOpen(true)}>
                     <DropdownLabel>{t('notifications.preferences.manage')}</DropdownLabel>
                   </DropdownItem>

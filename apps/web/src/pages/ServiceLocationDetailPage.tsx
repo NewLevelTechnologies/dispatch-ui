@@ -119,6 +119,8 @@ import {
   type MockTone,
 } from './serviceLocationDetailMocks';
 import { LocationTaxJurisdiction } from '../components/LocationTaxJurisdiction';
+import { useStartDocument } from '../components/document/useStartDocument';
+import { locationForStart, type StartKind } from '../components/document/startDocumentModel';
 
 type TabId = 'overview' | 'equipment' | 'jobs' | 'invoices' | 'dispatches' | 'contacts' | 'files' | 'activity';
 const LOCATION_TABS = [
@@ -180,6 +182,7 @@ function useBackContext(location: ServiceLocationDetailDto): { label: string; hr
 export default function ServiceLocationDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const startDocument = useStartDocument();
   const { t } = useTranslation();
   const { getName } = useGlossary();
   const queryClient = useQueryClient();
@@ -309,6 +312,7 @@ export default function ServiceLocationDetailPage() {
 
   return (
     <AppLayout>
+      {startDocument.element}
       <div className="px-1 py-1">
         <div className="mx-auto max-w-[1240px]">
           <BackLink location={location} />
@@ -317,6 +321,7 @@ export default function ServiceLocationDetailPage() {
             location={location}
             headline={headline}
             onNewJob={() => navigate(`/work-orders/new?locationId=${location.id}`)}
+            onNewDocument={(kind) => void startDocument.start(kind, locationForStart(location))}
             canEdit={canEditServiceLocations}
             onClose={
               canCloseServiceLocations && location.status !== 'CLOSED'
@@ -423,12 +428,14 @@ function LocationHeader({
   location,
   headline,
   onNewJob,
+  onNewDocument,
   canEdit,
   onClose,
 }: {
   location: ServiceLocationDetailDto;
   headline: string;
   onNewJob: () => void;
+  onNewDocument: (kind: StartKind) => void;
   canEdit?: boolean;
   onClose?: () => void;
 }) {
@@ -521,12 +528,17 @@ function LocationHeader({
           <CalendarDaysIcon className="size-4" />
           <span className="relative top-[0.5px] hidden sm:inline">Schedule visit</span>
         </Button>
-        {(canEdit || onClose) && (
-          <Dropdown>
+        <Dropdown>
             <DropdownButton as={IconButton} aria-label={t('common.moreOptions')} className="max-sm:p-2">
               <EllipsisVerticalIcon className="size-4" />
             </DropdownButton>
             <DropdownMenu anchor="bottom end">
+              <DropdownItem onClick={() => onNewDocument('quote')}>
+                <DropdownLabel>{t('common.actions.new', { entity: getName('quote') })}</DropdownLabel>
+              </DropdownItem>
+              <DropdownItem onClick={() => onNewDocument('invoice')}>
+                <DropdownLabel>{t('common.actions.new', { entity: getName('invoice') })}</DropdownLabel>
+              </DropdownItem>
               {canEdit && (
                 <DropdownItem onClick={() => setEditing(true)}>
                   <DropdownLabel>{t('common.edit')}</DropdownLabel>
@@ -539,7 +551,6 @@ function LocationHeader({
               )}
             </DropdownMenu>
           </Dropdown>
-        )}
         {canEdit && (
           <Button color="accent" size="xs" onClick={() => setEditing(true)} className="max-sm:flex-1">
             {t('common.edit')}
