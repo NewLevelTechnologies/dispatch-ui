@@ -415,6 +415,13 @@ describe('QuoteDetailPage editing', () => {
     expect(apiClient.post).toHaveBeenCalledWith('/financial/quotes/q-1/lines', { version: 7, itemId: 'it-9', quantity: 1 });
   });
 
+  it('says an undated draft gets its expiry when it’s sent', async () => {
+    mockApi({ ...draft, quoteDate: null, expirationDate: null });
+    renderPage();
+
+    expect(await screen.findByText('Not sent · expiry set when sent')).toBeInTheDocument();
+  });
+
   it('opens a just-created draft ready for its first line, the pricebook search focused', async () => {
     withPricebook([]);
     renderWithProviders(<div />, { routes, initialPath: '/quotes/q-1?add=pricebook' });

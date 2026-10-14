@@ -64,13 +64,14 @@ export const bucketByFilter = (filter: string | null) => BUCKETS.find((b) => b.f
 /** Open invoices' count: the five buckets. */
 export const openCount = (r: ReceivablesReport) => BUCKETS.reduce((sum, b) => sum + r[b.key].count, 0);
 
-/** Days past due on `asOf` (0 or less is current). */
-export function daysPastDue(dueDate: string, asOf: string): number {
+/** Days past due on `asOf` (0 or less is current). Undated drafts never reach receivables; treated as current. */
+export function daysPastDue(dueDate: string | null, asOf: string): number {
+  if (!dueDate) return 0;
   return Math.round((Date.parse(`${asOf}T00:00:00Z`) - Date.parse(`${dueDate}T00:00:00Z`)) / 86_400_000);
 }
 
 /** The bucket an invoice sits in on `asOf`, by days past due. */
-export function bucketOn(dueDate: string, asOf: string): BucketKey {
+export function bucketOn(dueDate: string | null, asOf: string): BucketKey {
   const days = daysPastDue(dueDate, asOf);
   if (days <= 0) return 'current';
   if (days <= 30) return 'days1To30';

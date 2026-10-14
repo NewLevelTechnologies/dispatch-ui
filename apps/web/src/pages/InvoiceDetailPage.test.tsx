@@ -402,3 +402,14 @@ describe('InvoiceDetailPage · the work order it shows', () => {
     await vi.waitFor(() => expect(jobFetches()).toBe(2));
   });
 });
+
+describe('InvoiceDetailPage · an undated draft', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('says it isn’t sent and when it will be due, from the bill-to’s terms', async () => {
+    mockApi({ ...invoice, status: 'DRAFT', invoiceDate: null, dueDate: null, amountPaid: 0, balanceDue: 1450, payments: [], lastSentAt: null });
+    renderPage();
+
+    expect(await screen.findByText(/Not sent · due 30 days after it’s sent/)).toBeInTheDocument();
+  });
+});

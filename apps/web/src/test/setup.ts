@@ -763,6 +763,7 @@ vi.mock('react-i18next', () => {
     'equipment.table.warehouse': 'Warehouse',
     'financial.comingSoon': 'Coming soon...',
     'financial.description': 'Manage invoices, quotes, and payments',
+    'invoices.notSent': 'Not sent',
     'invoices.description': 'Manage customer invoices and billing',
     'invoices.filters.anyStatus': 'Any status',
     'invoices.filters.issued': 'Issued',

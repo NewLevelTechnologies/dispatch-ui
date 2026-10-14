@@ -288,14 +288,15 @@ export interface NestedInvoicePayment {
   reversedAt?: string | null;
 }
 
+/** `invoiceDate` / `dueDate` are null until the invoice is first issued (sent); drafts show "Not sent". */
 export interface Invoice {
   id: string;
   customerId: string;
   workOrderId?: string;
   invoiceNumber: string;
   status: InvoiceStatus;
-  invoiceDate: string;
-  dueDate: string;
+  invoiceDate: string | null;
+  dueDate: string | null;
   /** When the work was done; membership is tested on it. */
   serviceDate?: string | null;
   customerPoNumber?: string | null;
@@ -369,21 +370,25 @@ export interface CreateInvoiceLineItemRequest {
 export interface CreateInvoiceRequest {
   customerId: string;
   workOrderId?: string;
-  invoiceDate: string;
-  dueDate: string;
+  /** Defaults to the work order's location; send it when there's no work order. */
+  serviceLocationId?: string;
+  /** Left out: dated when first sent (due = send date + the bill-to's terms). */
+  invoiceDate?: string;
+  dueDate?: string;
   /** Defaults to the work order's completed date, else the invoice date. */
   serviceDate?: string;
   /** Defaults from the work order's customer order number. */
   customerPoNumber?: string;
   notes?: string;
-  lineItems: CreateInvoiceLineItemRequest[];
+  /** Defaults to none. */
+  lineItems?: CreateInvoiceLineItemRequest[];
 }
 
 /** The whole header, replaced: send every field; null clears an optional one. DRAFT only. */
 export interface UpdateInvoiceHeaderRequest {
   version: number;
-  invoiceDate: string;
-  dueDate: string;
+  invoiceDate: string | null;
+  dueDate: string | null;
   serviceDate: string | null;
   customerPoNumber: string | null;
   notes: string | null;
@@ -398,8 +403,8 @@ export interface CreateInvoiceFromQuoteRequest {
   lines: { quoteLineId: string; quantity: number }[];
   /** Bill someone other than the quote's customer; tax and exemption resolve for them. */
   billToCustomerId?: string;
-  invoiceDate: string;
-  dueDate: string;
+  invoiceDate?: string;
+  dueDate?: string;
   serviceDate?: string;
   notes?: string;
   /** Price afresh under the bill-to's plan and the current pricebook; typed prices are kept. */
@@ -529,8 +534,8 @@ export interface InvoiceListItemRow {
   // installment schedule to invoices on periodKey == billingPeriodKey.
   agreementId: string | null;
   billingPeriodKey: string | null;
-  invoiceDate: string;
-  dueDate: string;
+  invoiceDate: string | null;
+  dueDate: string | null;
   subtotal: number;
   taxAmount: number;
   totalAmount: number;
@@ -856,6 +861,7 @@ export const QuoteStatus = {
 
 export type QuoteLineItem = DocumentLineItem;
 
+/** `quoteDate` / `expirationDate` are null until the quote is first sent; drafts show "Not sent". */
 export interface Quote {
   id: string;
   /** Short description of the work. */
@@ -881,8 +887,8 @@ export interface Quote {
   /** Send back on every edit; see the pricing block above. */
   version?: number;
   pricingModel?: PricingModel;
-  quoteDate: string;
-  expirationDate: string;
+  quoteDate: string | null;
+  expirationDate: string | null;
   /** Pre-tax, after adjustments: grossSubtotal − adjustmentTotal. */
   subtotal: number;
   /** List total before adjustments. */
@@ -949,10 +955,11 @@ export interface CreateQuoteRequest {
   /** Where the work is; defaults to the work order's location. Without one: tenant-default tax, no member benefits. */
   serviceLocationId?: string;
   customerPoNumber?: string;
-  quoteDate: string;
-  expirationDate: string;
+  quoteDate?: string;
+  expirationDate?: string;
   notes?: string;
-  lineItems: CreateQuoteLineItemRequest[];
+  /** Defaults to none. */
+  lineItems?: CreateQuoteLineItemRequest[];
 }
 
 /** The whole header, replaced: send every field; null clears an optional one. Editing a SENT quote returns it to DRAFT. */
@@ -960,8 +967,8 @@ export interface UpdateQuoteHeaderRequest {
   version: number;
   /** Replaced on every header edit: send the current title back, or it is cleared. */
   title: string | null;
-  quoteDate: string;
-  expirationDate: string;
+  quoteDate: string | null;
+  expirationDate: string | null;
   serviceLocationId: string | null;
   customerPoNumber: string | null;
   notes: string | null;
@@ -1174,8 +1181,8 @@ export interface QuoteListItem {
   serviceLocationName?: string | null;
   serviceLocationAddress?: string | null;
   customerPoNumber?: string | null;
-  quoteDate: string;
-  expirationDate: string;
+  quoteDate: string | null;
+  expirationDate: string | null;
   subtotal: number;
   taxAmount: number;
   totalAmount: number;
@@ -1417,6 +1424,8 @@ export interface LocationTaxJurisdiction {
 export interface PricingSettings {
   /** The tax class agreement installment invoices are issued under. */
   agreementFeeTaxClass: TaxClass;
+  /** Days a quote stays open after it's sent (1–365, default 30). */
+  quoteValidityDays?: number;
   updatedAt: string | null;
 }
 

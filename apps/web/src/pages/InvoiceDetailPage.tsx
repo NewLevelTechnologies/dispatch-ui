@@ -66,7 +66,7 @@ export default function InvoiceDetailPage() {
     number: invoice?.invoiceNumber ?? '',
     entity: entityLower,
   });
-  const { billTo, location, workOrder } = useDocumentParties({
+  const { billTo, location, workOrder, termsDays } = useDocumentParties({
     customerId: invoice?.customerId ?? '',
     workOrderId: invoice?.workOrderId,
   });
@@ -251,7 +251,9 @@ export default function InvoiceDetailPage() {
             'Nothing is owed on this invoice'
           ) : (
             <>
-              Due {due ?? '—'}
+              {invoice.dueDate
+                ? `Due ${due}`
+                : `Not sent · ${termsDays == null ? 'dated when sent' : termsDays === 0 ? 'due on receipt once sent' : `due ${termsDays} days after it’s sent`}`}
               {paid && ` · total ${formatCurrency(invoice.totalAmount)}, ${formatCurrency(invoice.amountPaid)} paid`}
             </>
           )
@@ -328,8 +330,8 @@ export default function InvoiceDetailPage() {
         onClose={() => setHeaderOpen(false)}
         title={`Edit ${entityLower} details`}
         dates={[
-          { key: 'invoiceDate', label: `${entityLabel} date`, value: toDateInput(invoice.invoiceDate), required: true },
-          { key: 'dueDate', label: 'Due', value: toDateInput(invoice.dueDate), required: true },
+          { key: 'invoiceDate', label: `${entityLabel} date`, value: toDateInput(invoice.invoiceDate), hint: 'Blank: dated when sent' },
+          { key: 'dueDate', label: 'Due', value: toDateInput(invoice.dueDate), hint: 'Blank: from the terms' },
           { key: 'serviceDate', label: 'Service date', value: toDateInput(invoice.serviceDate), hint: 'When the work was done' },
         ]}
         customerPoNumber={invoice.customerPoNumber}
@@ -339,8 +341,8 @@ export default function InvoiceDetailPage() {
             (version) =>
               invoicesApi.updateHeader(invoice.id, {
                 version,
-                invoiceDate: v.dates.invoiceDate,
-                dueDate: v.dates.dueDate,
+                invoiceDate: v.dates.invoiceDate || null,
+                dueDate: v.dates.dueDate || null,
                 serviceDate: v.dates.serviceDate || null,
                 customerPoNumber: v.customerPoNumber,
                 notes: v.notes,

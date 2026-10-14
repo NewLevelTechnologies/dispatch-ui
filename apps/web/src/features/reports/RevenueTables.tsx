@@ -24,8 +24,8 @@ const DASH = '—';
 const PREVIEW = 4;
 const PAGE_SIZE = 25;
 
-const shortDate = (day: string) =>
-  new Date(`${day}T12:00:00Z`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
+const shortDate = (day: string | null) =>
+  day ? new Date(`${day}T12:00:00Z`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' }) : '—';
 
 function Change({ current, previous }: { current: number; previous: number | null }) {
   const pct = changePct(current, previous);

@@ -293,8 +293,9 @@ function QuoteRow({
 }) {
   const status = quoteListStatus(q);
   const open = q.status === QuoteStatus.DRAFT || q.status === QuoteStatus.SENT;
-  const days = daysUntil(q.expirationDate);
-  const urgent = open && days >= 0 && days <= 3;
+  // Null on a draft not yet sent: it's given an expiry when it goes out.
+  const days = q.expirationDate ? daysUntil(q.expirationDate) : null;
+  const urgent = open && days != null && days >= 0 && days <= 3;
   const advisor = q.createdByName ?? q.firstSentByName ?? null;
   const accepted = q.status === QuoteStatus.ACCEPTED;
   const pct = q.invoicedPercent ?? null;
@@ -362,7 +363,9 @@ function QuoteRow({
         </div>
       </td>
       <td data-label="Expires">
-        {open || q.status === QuoteStatus.EXPIRED ? (
+        {days == null ? (
+          <span className="text-[12px] text-fg-muted">When sent</span>
+        ) : open || q.status === QuoteStatus.EXPIRED ? (
           <div className="flex flex-col">
             <span className={clsx('whitespace-nowrap text-[12px]', urgent || days < 0 ? 'font-semibold text-danger-500' : 'text-fg')}>
               {day(q.expirationDate)}

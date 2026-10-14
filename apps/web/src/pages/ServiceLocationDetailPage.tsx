@@ -3547,7 +3547,7 @@ function InvoiceRow({
           carries no payer field yet, so there's nothing to surface; wire the
           badge when payer lands on the invoice read model. */}
       <td className="text-[11.5px] text-fg" data-label="Bill to">{billTo}</td>
-      <td className="text-[11.5px] text-fg-muted" data-label="Issued">{formatTimestamp(inv.invoiceDate)}</td>
+      <td className="text-[11.5px] text-fg-muted" data-label="Issued">{inv.invoiceDate ? formatTimestamp(inv.invoiceDate) : 'Not sent'}</td>
       <td className="text-[11.5px] text-fg-muted" data-label="Due">{formatTimestamp(inv.dueDate)}</td>
       <td>
         <Pill tone={overdue ? 'warning' : INVOICE_STATUS_TONE[inv.status]} dot>

@@ -123,8 +123,9 @@ export function matchesRevenueMtd(totalRevenue: number, billed: number): boolean
   return Math.round(totalRevenue * 100) === Math.round(billed * 100);
 }
 
-/** "Sep 14" from a LocalDate, without a timezone shift. */
-export function shortDate(date: string): string {
+/** "Sep 14" from a LocalDate, without a timezone shift; "—" for a draft never dated. */
+export function shortDate(date: string | null): string {
+  if (!date) return '—';
   return new Date(`${date}T12:00:00Z`).toLocaleDateString('en-US', {
     month: 'short',
     day: 'numeric',

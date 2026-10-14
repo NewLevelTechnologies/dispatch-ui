@@ -131,8 +131,8 @@ export interface PublicPayment {
 export interface PublicInvoiceData extends PublicPricing {
   invoiceNumber: string;
   status: PublicInvoiceStatus;
-  invoiceDate: string;
-  dueDate: string;
+  invoiceDate: string | null;
+  dueDate: string | null;
   subtotal: string;
   taxRate: string;
   taxAmount: string;
@@ -148,8 +148,8 @@ export interface PublicInvoiceData extends PublicPricing {
 export interface PublicQuoteData extends PublicPricing {
   quoteNumber: string;
   status: PublicQuoteStatus;
-  quoteDate: string;
-  expirationDate: string;
+  quoteDate: string | null;
+  expirationDate: string | null;
   /** Echo back on approve; a newer revision returns 409 QUOTE_REVISION_STALE. */
   revision?: number;
   /**

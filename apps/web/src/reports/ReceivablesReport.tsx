@@ -61,8 +61,8 @@ const DATE_INPUT =
   'hover:border-border-strong focus:border-accent-500/60 ' +
   '[color-scheme:light] [.theme-dark_&]:[color-scheme:dark]';
 
-const shortDate = (day: string) =>
-  new Date(`${day}T12:00:00Z`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
+const shortDate = (day: string | null) =>
+  day ? new Date(`${day}T12:00:00Z`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' }) : '—';
 
 export default function ReceivablesReport() {
   const { t } = useTranslation();

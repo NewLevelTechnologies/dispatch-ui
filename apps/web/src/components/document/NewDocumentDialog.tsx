@@ -10,7 +10,6 @@ import { Button } from '../catalyst/button';
 import { Input } from '../catalyst/input';
 import { Description, Field, Label } from '../catalyst/fieldset';
 import CustomerPicker from '../CustomerPicker';
-import { localDate } from './billingModel';
 import { documentErrorMessage, refreshDocumentLists } from './useDocumentEditor';
 
 export type NewDocumentKind = 'quote' | 'invoice';
@@ -68,10 +67,8 @@ function NewDocumentForm({
     customer?.id ? { id: customer.id, name: customer.name, type: 'STANDARD', category: 'COMMERCIAL' } : null,
   );
   const [heading, setHeading] = useState('');
-  const [date, setDate] = useState(() => localDate());
-  const [until, setUntil] = useState(() => localDate(30));
   const [busy, setBusy] = useState(false);
-  const ready = !!billTo && !!date && !!until;
+  const ready = !!billTo;
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
@@ -84,11 +81,9 @@ function NewDocumentForm({
               customerId: billTo.id,
               workOrderId,
               ...(heading.trim() ? { title: heading.trim() } : {}),
-              quoteDate: date,
-              expirationDate: until,
-              lineItems: [],
             })
-          : await invoicesApi.create({ customerId: billTo.id, workOrderId, invoiceDate: date, dueDate: until, lineItems: [] });
+          : // No dates: dated when it's sent, due by the bill-to's terms.
+            await invoicesApi.create({ customerId: billTo.id, workOrderId });
       refreshDocumentLists(queryClient);
       onClose();
       // A new draft opens ready for its first line.
@@ -108,21 +103,13 @@ function NewDocumentForm({
           : `Starts a draft ${lower} with no ${getName('work_order').toLowerCase()}. You add the lines next.`}
       </DialogDescription>
       <DialogBody>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_150px_150px]">
+        <div className="grid grid-cols-1 gap-3">
           <Field>
             <Label>Bill to</Label>
             <CustomerPicker value={billTo} onChange={setBillTo} ariaLabel="Bill to" />
             {customer && billTo && billTo.id !== customer.id && (
               <Description>{`Not the ${getName('work_order').toLowerCase()}'s ${getName('customer').toLowerCase()}, ${customer.name}.`}</Description>
             )}
-          </Field>
-          <Field>
-            <Label>{`${label} date`}</Label>
-            <Input type="date" value={date} required onChange={(e) => setDate(e.target.value)} />
-          </Field>
-          <Field>
-            <Label>{kind === 'quote' ? 'Expires' : 'Due'}</Label>
-            <Input type="date" value={until} required onChange={(e) => setUntil(e.target.value)} />
           </Field>
         </div>
         {kind === 'quote' && (
@@ -134,6 +121,9 @@ function NewDocumentForm({
         )}
       </DialogBody>
       <DialogActions>
+        <span className="mr-auto text-[11.5px] text-fg-muted">
+          {kind === 'quote' ? 'Expiry is set when you send it.' : 'Dated when you send it, due by the bill-to’s terms.'}
+        </span>
         <Button plain onClick={onClose} disabled={busy}>
           Cancel
         </Button>
