@@ -795,14 +795,16 @@ export const invoicesApi = {
   send: async (
     id: string,
     recipientEmails?: string[],
+    /** Drafts only (409 DOCUMENT_NOT_EDITABLE once sent): overrides the due date from the terms. */
+    dueDate?: string,
   ): Promise<SendResponse> => {
-    const body =
-      recipientEmails && recipientEmails.length > 0
-        ? { recipientEmails }
-        : undefined;
+    const body = {
+      ...(recipientEmails && recipientEmails.length > 0 ? { recipientEmails } : {}),
+      ...(dueDate ? { dueDate } : {}),
+    };
     const response = await apiClient.post<SendResponse>(
       `/financial/invoices/${id}/send`,
-      body,
+      Object.keys(body).length ? body : undefined,
     );
     return response.data;
   },
@@ -1072,14 +1074,16 @@ export const quotesApi = {
   send: async (
     id: string,
     recipientEmails?: string[],
+    /** Drafts only (409 DOCUMENT_NOT_EDITABLE once sent): overrides the expiry from the quote validity setting. */
+    expirationDate?: string,
   ): Promise<SendResponse> => {
-    const body =
-      recipientEmails && recipientEmails.length > 0
-        ? { recipientEmails }
-        : undefined;
+    const body = {
+      ...(recipientEmails && recipientEmails.length > 0 ? { recipientEmails } : {}),
+      ...(expirationDate ? { expirationDate } : {}),
+    };
     const response = await apiClient.post<SendResponse>(
       `/financial/quotes/${id}/send`,
-      body,
+      Object.keys(body).length ? body : undefined,
     );
     return response.data;
   },
@@ -1478,8 +1482,12 @@ export const taxApi = {
     return response.data;
   },
 
-  updatePricingSettings: async (agreementFeeTaxClass: TaxClass): Promise<PricingSettings> => {
-    const response = await apiClient.put<PricingSettings>('/financial/pricing-settings', { agreementFeeTaxClass });
+  /** `quoteValidityDays` (1–365) left out keeps the current value. */
+  updatePricingSettings: async (agreementFeeTaxClass: TaxClass, quoteValidityDays?: number): Promise<PricingSettings> => {
+    const response = await apiClient.put<PricingSettings>('/financial/pricing-settings', {
+      agreementFeeTaxClass,
+      ...(quoteValidityDays != null ? { quoteValidityDays } : {}),
+    });
     return response.data;
   },
 };

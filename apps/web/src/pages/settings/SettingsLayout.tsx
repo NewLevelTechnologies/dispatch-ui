@@ -144,6 +144,10 @@ export default function SettingsLayout() {
       ],
     },
     {
+      label: t('settings.sections.billing'),
+      items: [{ label: t('settings.nav.documents'), to: '/settings/quotes-invoices' }],
+    },
+    {
       label: t('settings.sections.dispatch', { dispatch: getName('dispatch') }),
       items: [
         { label: getName('dispatch_region', true), to: '/settings/dispatch-regions' },

@@ -2,7 +2,7 @@
 import { useState, type ReactNode } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import clsx from 'clsx';
-import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ClipboardDocumentListIcon, DocumentTextIcon, PlusIcon } from '@heroicons/react/16/solid';
 import { useTranslation } from '@dispatch/i18n';
 import { formatCurrency } from '@dispatch/utils';
@@ -17,13 +17,14 @@ import {
   type Quote,
 } from '../api/setup';
 import { useGlossary } from '../contexts/GlossaryContext';
-import { showError, showSuccess } from '../lib/toast';
+import { showError } from '../lib/toast';
 import { Button } from './catalyst/button';
 import { Card, CardBody, CardHead, CardSub, CardTitle } from './ui/Card';
 import { LoadingState } from './ui/LoadingState';
 import { Pill, Tag } from './ui/Pill';
 import PaymentDialog from './PaymentDialog';
 import { BillQuoteDialog } from './document/BillQuoteDialog';
+import { SendDocumentDialog, type SendTarget } from './document/SendDocumentDialog';
 import { StartDocumentDialog, type StartKind } from './document/StartDocumentDialog';
 import { Dropdown, DropdownButton, DropdownItem, DropdownLabel, DropdownMenu } from './catalyst/dropdown';
 import { UnbilledPurchasesCard } from './UnbilledPurchasesCard';
@@ -136,20 +137,8 @@ export default function WorkOrderBillingTab({
   const [billing, setBilling] = useState<Quote | null>(null);
   const [paying, setPaying] = useState<Invoice | null>(null);
 
-  const send = useMutation({
-    mutationFn: async (doc: { kind: 'quote'; quote: Quote } | { kind: 'invoice'; invoice: Invoice }) =>
-      doc.kind === 'quote' ? quotesApi.send(doc.quote.id) : invoicesApi.send(doc.invoice.id),
-    onSuccess: (res, doc) => {
-      refreshDocumentLists(queryClient);
-      queryClient.invalidateQueries({ queryKey: doc.kind === 'quote' ? ['quote', doc.quote.id] : ['invoice', doc.invoice.id] });
-      const num = doc.kind === 'quote' ? doc.quote.quoteNumber : doc.invoice.invoiceNumber;
-      showSuccess(`${num} sent`, res.lastSentToEmails ? `To ${res.lastSentToEmails}` : undefined);
-    },
-    onError: (err, doc) => {
-      const entity = (doc.kind === 'quote' ? quoteLabel : invoiceLabel).toLowerCase();
-      showError(`Couldn’t send this ${entity}`, documentErrorMessage(err, entity));
-    },
-  });
+  // Sending confirms who it goes to and its dates first.
+  const [sendTarget, setSendTarget] = useState<SendTarget | null>(null);
 
   if (quotesQuery.isLoading || invoicesQuery.isLoading) {
     return (
@@ -169,6 +158,7 @@ export default function WorkOrderBillingTab({
         onClose={() => setStartingFor(null)}
       />
       {billing && <BillQuoteDialog quote={billing} open onClose={() => setBilling(null)} />}
+      <SendDocumentDialog target={sendTarget} onClose={() => setSendTarget(null)} />
       <PaymentDialog
         open={!!paying}
         onClose={() => setPaying(null)}
@@ -264,12 +254,12 @@ export default function WorkOrderBillingTab({
     if (q.status === QuoteStatus.DRAFT || q.status === QuoteStatus.SENT)
       return {
         label: q.status === QuoteStatus.SENT ? 'Resend' : q.firstSentAt ? `Re-send · Rev ${q.revision ?? 1}` : 'Send',
-        run: () => send.mutate({ kind: 'quote', quote: q }),
+        run: () => setSendTarget({ kind: 'quote', doc: q }),
       };
     return null;
   };
   const invoiceAction = (i: Invoice) => {
-    if (i.status === InvoiceStatus.DRAFT) return { label: 'Send', run: () => send.mutate({ kind: 'invoice', invoice: i }) };
+    if (i.status === InvoiceStatus.DRAFT) return { label: 'Send', run: () => setSendTarget({ kind: 'invoice', doc: i }) };
     if (OPEN_INVOICE.includes(i.status) && i.balanceDue > 0) return { label: 'Take payment', run: () => setPaying(i) };
     return null;
   };
@@ -315,19 +305,19 @@ export default function WorkOrderBillingTab({
           {tree.map((node) =>
             node.kind === 'quote' ? (
               <div key={node.quote.id}>
-                <QuoteRow quote={node.quote} percent={percentOf.get(node.quote.id) ?? null} action={quoteAction(node.quote)} busy={send.isPending} />
+                <QuoteRow quote={node.quote} percent={percentOf.get(node.quote.id) ?? null} action={quoteAction(node.quote)} busy={false} />
                 {node.invoices.map((inv, i) => (
                   <InvoiceRow
                     key={inv.id}
                     invoice={inv}
                     child={i === node.invoices.length - 1 ? 'last' : 'mid'}
                     action={invoiceAction(inv)}
-                    busy={send.isPending}
+                    busy={false}
                   />
                 ))}
               </div>
             ) : (
-              <InvoiceRow key={node.invoice.id} invoice={node.invoice} action={invoiceAction(node.invoice)} busy={send.isPending} />
+              <InvoiceRow key={node.invoice.id} invoice={node.invoice} action={invoiceAction(node.invoice)} busy={false} />
             ),
           )}
         </CardBody>

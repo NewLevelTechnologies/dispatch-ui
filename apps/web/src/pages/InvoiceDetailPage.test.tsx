@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { screen, within } from '@testing-library/react';
+import { fireEvent, screen, within } from '@testing-library/react';
 import { QueryClient } from '@tanstack/react-query';
 import { renderWithProviders, userEvent } from '../test/utils';
 import InvoiceDetailPage from './InvoiceDetailPage';
@@ -179,7 +179,33 @@ describe('InvoiceDetailPage editing', () => {
     renderPage();
 
     await user.click(await screen.findByRole('button', { name: 'Send invoice' }));
-    expect(apiClient.post).toHaveBeenCalledWith('/financial/invoices/inv-1/send', undefined);
+    const dialog = await screen.findByRole('dialog');
+    // The account's own address is checked; the due date comes from its terms.
+    expect(await within(dialog).findByRole('checkbox', { name: 'Send to ap@desertridgepm.com' })).toBeChecked();
+    expect(within(dialog).getByText('Net 30')).toBeInTheDocument();
+    await user.click(within(dialog).getByRole('button', { name: /^Send invoice · / }));
+    expect(apiClient.post).toHaveBeenCalledWith('/financial/invoices/inv-1/send', { recipientEmails: ['ap@desertridgepm.com'] });
+  });
+
+  it('sends with a changed due date and an added recipient', async () => {
+    const user = userEvent.setup();
+    vi.mocked(apiClient.post).mockResolvedValue({ data: { lastSentToEmails: 'ap@desertridgepm.com' } });
+    renderPage();
+
+    await user.click(await screen.findByRole('button', { name: 'Send invoice' }));
+    const dialog = await screen.findByRole('dialog');
+    await within(dialog).findByRole('checkbox', { name: 'Send to ap@desertridgepm.com' });
+    await user.click(within(dialog).getByRole('button', { name: 'Change' }));
+    fireEvent.change(within(dialog).getByLabelText('Due date'), { target: { value: '2099-01-15' } });
+    expect(within(dialog).getByText('Changed from Net 30 for this invoice')).toBeInTheDocument();
+    await user.type(within(dialog).getByRole('textbox', { name: 'Add recipient' }), 'pm@desertridgepm.com');
+    await user.click(within(dialog).getByRole('button', { name: 'Add' }));
+    await user.click(within(dialog).getByRole('button', { name: /^Send invoice · / }));
+
+    expect(apiClient.post).toHaveBeenCalledWith('/financial/invoices/inv-1/send', {
+      recipientEmails: ['ap@desertridgepm.com', 'pm@desertridgepm.com'],
+      dueDate: '2099-01-15',
+    });
   });
 
   it('cancels a draft after confirming', async () => {
