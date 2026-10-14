@@ -4,7 +4,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { EllipsisHorizontalIcon } from '@heroicons/react/16/solid';
 import { useTranslation } from '@dispatch/i18n';
-import { quotesApi, QuoteStatus, type Quote } from '../api/setup';
+import { quotesApi, QuoteStatus, taxApi, type Quote } from '../api/setup';
 import { useGlossary } from '../contexts/GlossaryContext';
 import { showError, showSuccess } from '../lib/toast';
 import { Pill, Tag } from '../components/ui/Pill';
@@ -83,6 +83,9 @@ export default function QuoteDetailPage() {
     workOrderId: quote?.workOrderId,
     serviceLocationId: quote?.serviceLocationId,
   });
+  // How long a quote stays open once sent, for an undated draft's header.
+  const { data: pricingSettings } = useQuery({ queryKey: ['pricing-settings'], queryFn: () => taxApi.getPricingSettings() });
+  const validityDays = pricingSettings?.quoteValidityDays ?? null;
 
   const back = quote?.workOrderId
     ? {
@@ -213,7 +216,11 @@ export default function QuoteDetailPage() {
         member={memberLabel(quote.adjustments)}
         amountLabel={`${entityLabel} total`}
         amount={quote.totalAmount}
-        amountSub={`Expires ${formatDocDate(quote.expirationDate) ?? '—'}`}
+        amountSub={
+          quote.expirationDate
+            ? `Expires ${formatDocDate(quote.expirationDate)}`
+            : `Not sent · ${validityDays ? `expires ${validityDays} days after it’s sent` : 'expiry set when sent'}`
+        }
         memberSaved={memberSavings(quote.adjustments)}
         steps={steps}
         current={STEP_INDEX[quote.status]}
@@ -271,8 +278,8 @@ export default function QuoteDetailPage() {
         title={`Edit ${entityLower} details`}
         workTitle={quote.title ?? null}
         dates={[
-          { key: 'quoteDate', label: `${entityLabel} date`, value: toDateInput(quote.quoteDate), required: true },
-          { key: 'expirationDate', label: 'Expires', value: toDateInput(quote.expirationDate), required: true },
+          { key: 'quoteDate', label: `${entityLabel} date`, value: toDateInput(quote.quoteDate), hint: 'Blank: dated when sent' },
+          { key: 'expirationDate', label: 'Expires', value: toDateInput(quote.expirationDate), hint: 'Blank: set when sent' },
         ]}
         customerPoNumber={quote.customerPoNumber}
         notes={quote.notes}
@@ -283,8 +290,8 @@ export default function QuoteDetailPage() {
                 version,
                 // The header edit replaces the title, so it always goes back.
                 title: v.workTitle ?? null,
-                quoteDate: v.dates.quoteDate,
-                expirationDate: v.dates.expirationDate,
+                quoteDate: v.dates.quoteDate || null,
+                expirationDate: v.dates.expirationDate || null,
                 // The location is the work order's; never changed here.
                 serviceLocationId: quote.serviceLocationId ?? null,
                 customerPoNumber: v.customerPoNumber,

@@ -263,7 +263,7 @@ export default function CustomerInvoicesTab({ customerId }: { customerId: string
                       <td>
                         <StatusPill row={inv} />
                       </td>
-                      <td className="muted" data-label={t('invoices.table.invoiceDate')}>{formatDateShort(inv.invoiceDate)}</td>
+                      <td className="muted" data-label={t('invoices.table.invoiceDate')}>{inv.invoiceDate ? formatDateShort(inv.invoiceDate) : t('invoices.notSent')}</td>
                       <td className="muted" data-label={t('invoices.table.dueDate')}>{formatDateShort(inv.dueDate)}</td>
                       <td
                         className={voided ? 'right num text-fg-muted line-through' : 'right num strong'}

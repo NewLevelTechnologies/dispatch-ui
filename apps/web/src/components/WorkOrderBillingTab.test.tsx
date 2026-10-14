@@ -146,10 +146,8 @@ describe('WorkOrderBillingTab', () => {
     await user.click(screen.getByRole('button', { name: 'New quote' }));
     await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Create quote' }));
 
-    expect(apiClient.post).toHaveBeenCalledWith(
-      '/financial/quotes',
-      expect.objectContaining({ customerId: 'cust-1', workOrderId: 'wo-1', lineItems: [] }),
-    );
+    // No dates or lines: the draft is dated when it's sent.
+    expect(apiClient.post).toHaveBeenCalledWith('/financial/quotes', { customerId: 'cust-1', workOrderId: 'wo-1' });
     expect(await screen.findByText('Quote page')).toBeInTheDocument();
   });
 

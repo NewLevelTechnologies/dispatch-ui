@@ -394,7 +394,9 @@ function QuoteRow({ quote, percent, action, busy }: { quote: Quote; percent: num
       default:
         return beingUpdated
           ? `Rev ${rev} draft · the ${getName('customer').toLowerCase()}'s link is paused until you re-send`
-          : `Not sent · expires ${day(quote.expirationDate)}`;
+          : quote.expirationDate
+            ? `Not sent · expires ${day(quote.expirationDate)}`
+            : 'Not sent';
     }
   })();
   return (
@@ -450,7 +452,9 @@ function InvoiceRow({
       case InvoiceStatus.DRAFT:
         return invoice.reissuedFromInvoiceNumber
           ? `Reissue of ${invoice.reissuedFromInvoiceNumber} · not sent`
-          : `Not sent · due ${day(invoice.dueDate)}`;
+          : invoice.dueDate
+            ? `Not sent · due ${day(invoice.dueDate)}`
+            : 'Not sent';
       case InvoiceStatus.PAID:
         return `Sent ${day(invoice.lastSentAt ?? invoice.invoiceDate)} · paid in full`;
       default:

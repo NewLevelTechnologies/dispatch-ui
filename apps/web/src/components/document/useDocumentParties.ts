@@ -73,5 +73,6 @@ export function useDocumentParties({
       ? locationParty(woLocation.id, woLocation.locationName, woLocation.address)
       : null;
 
-  return { billTo, location, workOrder: wo ?? null };
+  // The bill-to's terms, for "due 30 days after it's sent" on an undated draft.
+  return { billTo, location, workOrder: wo ?? null, termsDays: customer?.paymentTermsDays ?? null };
 }

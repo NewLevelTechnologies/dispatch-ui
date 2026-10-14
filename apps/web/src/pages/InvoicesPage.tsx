@@ -313,7 +313,7 @@ function InvoiceRow({ invoice: i, onOpen }: { invoice: InvoiceListItemRow; onOpe
   const withdrawn = status === 'Void' || status === 'Cancelled';
   const overdue = status === 'Overdue';
   const terms = termsLabel(i.paymentTermsDays);
-  const lateDays = overdue ? daysSince(i.dueDate) : 0;
+  const lateDays = overdue && i.dueDate ? daysSince(i.dueDate) : 0;
 
   return (
     <DenseRow onClick={onOpen} className={withdrawn ? 'opacity-70' : undefined}>
