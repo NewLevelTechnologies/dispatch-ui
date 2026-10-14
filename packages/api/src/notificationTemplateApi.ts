@@ -148,6 +148,18 @@ export interface SendTestRequest {
   };
 }
 
+/** `POST /notification-templates/render`: the tenant's template rendered with real data, as a send renders it. */
+export interface RenderTemplateRequest {
+  notificationTypeKey: string;
+  templateData: Record<string, unknown>;
+}
+
+export interface RenderedTemplate {
+  subject: string;
+  body: string;
+  htmlBody: string;
+}
+
 export interface NotificationTemplatesResponse {
   templates: NotificationTemplateListItem[];
 }
@@ -204,6 +216,14 @@ export const notificationTemplateApi = {
       `/notification-templates/${id}/preview`,
       request
     );
+    return response.data;
+  },
+
+  /**
+   * Render a type's live template with given data (any tenant member; 400 UNKNOWN_NOTIFICATION_TYPE for a bad key)
+   */
+  render: async (request: RenderTemplateRequest): Promise<RenderedTemplate> => {
+    const response = await apiClient.post<RenderedTemplate>('/notification-templates/render', request);
     return response.data;
   },
 

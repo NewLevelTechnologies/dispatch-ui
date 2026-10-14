@@ -29,7 +29,7 @@ describe('invoicesApi.send', () => {
   });
 
   it('POSTs the recipientEmails array as body when an override list is provided', async () => {
-    await invoicesApi.send('inv-1', ['alice@example.com', 'bob@example.com']);
+    await invoicesApi.send('inv-1', { recipientEmails: ['alice@example.com', 'bob@example.com'] });
     expect(apiClient.post).toHaveBeenCalledWith(
       '/financial/invoices/inv-1/send',
       { recipientEmails: ['alice@example.com', 'bob@example.com'] },
@@ -40,11 +40,37 @@ describe('invoicesApi.send', () => {
     // Empty array must collapse to "no body" so the backend resolver runs.
     // Sending { recipientEmails: [] } would be interpreted as an explicit
     // zero-recipient override and 422 NO_RECIPIENT.
-    await invoicesApi.send('inv-1', []);
+    await invoicesApi.send('inv-1', { recipientEmails: [] });
     expect(apiClient.post).toHaveBeenCalledWith(
       '/financial/invoices/inv-1/send',
       undefined,
     );
+  });
+});
+
+describe('send phones, message and preview', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(apiClient.post).mockResolvedValue(okSendResponse);
+  });
+
+  it('sends phones and a message, and drops a blank message and empty lists', async () => {
+    await invoicesApi.send('inv-1', { recipientPhones: ['(602) 555-0182'], message: 'Hi\n\n{{link}}', dueDate: '2026-11-30' });
+    expect(apiClient.post).toHaveBeenCalledWith('/financial/invoices/inv-1/send', {
+      recipientPhones: ['(602) 555-0182'],
+      message: 'Hi\n\n{{link}}',
+      dueDate: '2026-11-30',
+    });
+    await quotesApi.send('q-1', { recipientEmails: [], recipientPhones: [], message: '   ' });
+    expect(apiClient.post).toHaveBeenLastCalledWith('/financial/quotes/q-1/send', undefined);
+  });
+
+  it('passes the date override to the send preview', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({ data: {} });
+    await quotesApi.sendPreview('q-1', '2026-12-01');
+    expect(apiClient.get).toHaveBeenCalledWith('/financial/quotes/q-1/send-preview', { params: { expirationDate: '2026-12-01' } });
+    await invoicesApi.sendPreview('inv-1');
+    expect(apiClient.get).toHaveBeenLastCalledWith('/financial/invoices/inv-1/send-preview', { params: {} });
   });
 });
 
@@ -63,7 +89,7 @@ describe('quotesApi.send', () => {
   });
 
   it('POSTs the recipientEmails array as body when an override list is provided', async () => {
-    await quotesApi.send('q-1', ['alice@example.com']);
+    await quotesApi.send('q-1', { recipientEmails: ['alice@example.com'] });
     expect(apiClient.post).toHaveBeenCalledWith(
       '/financial/quotes/q-1/send',
       { recipientEmails: ['alice@example.com'] },
@@ -71,7 +97,7 @@ describe('quotesApi.send', () => {
   });
 
   it('omits the body when given an empty array', async () => {
-    await quotesApi.send('q-1', []);
+    await quotesApi.send('q-1', { recipientEmails: [] });
     expect(apiClient.post).toHaveBeenCalledWith(
       '/financial/quotes/q-1/send',
       undefined,

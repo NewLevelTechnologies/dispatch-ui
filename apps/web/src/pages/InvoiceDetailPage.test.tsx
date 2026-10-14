@@ -208,6 +208,72 @@ describe('InvoiceDetailPage editing', () => {
     });
   });
 
+  it('texts a contact instead of emailing, and rewrites the email for one send', async () => {
+    const user = userEvent.setup();
+    vi.mocked(apiClient.get).mockImplementation((url: string) => {
+      if (url === '/financial/invoices/inv-1') return Promise.resolve({ data: draft });
+      if (url === '/customers/pay-1') return Promise.resolve({ data: payer });
+      if (url === '/customers/pay-1/contacts')
+        return Promise.resolve({ data: [{ id: 'c-1', name: 'Mark Ellison', role: 'Property manager', mobilePhone: '6025550182' }] });
+      if (url === '/financial/invoices/inv-1/send-preview')
+        return Promise.resolve({ data: { emailNotificationTypeKey: 'invoice_sent', smsNotificationTypeKey: 'invoice_sent.sms', templateData: { share_url: '{{link}}' } } });
+      if (url === '/work-orders/wo-1') return Promise.resolve({ data: workOrder });
+      return Promise.reject(new Error(`unexpected GET ${url}`));
+    });
+    vi.mocked(apiClient.post).mockImplementation((url: string) =>
+      Promise.resolve({
+        data:
+          url === '/notification-templates/render'
+            ? { subject: 'Invoice INV-3307', body: 'Hello,\n\nView and pay: {{link}}', htmlBody: '' }
+            : { lastSentToEmails: 'ap@desertridgepm.com', lastSentToPhones: '+16025550182' },
+      }),
+    );
+    renderPage();
+
+    await user.click(await screen.findByRole('button', { name: 'Send invoice' }));
+    const dialog = await screen.findByRole('dialog');
+    // The template reads as it will go out, the link shown in place.
+    expect(await within(dialog).findByText('[link to the invoice]')).toBeInTheDocument();
+    const text = await within(dialog).findByRole('checkbox', { name: 'Text (602) 555-0182' });
+    expect(text).not.toBeChecked();
+    await user.click(text);
+    expect(within(dialog).getByText('Texts use their own short template, not this message.')).toBeInTheDocument();
+
+    await user.click(within(dialog).getByRole('button', { name: 'Edit' }));
+    const box = within(dialog).getByRole('textbox', { name: 'Message' });
+    expect(box).toHaveValue('Hello,\n\nView and pay: {{link}}');
+    await user.clear(box);
+    await user.type(box, 'Mark, here it is: {{{{link}}');
+    await user.click(within(dialog).getByRole('button', { name: /^Send invoice · / }));
+
+    expect(apiClient.post).toHaveBeenCalledWith('/financial/invoices/inv-1/send', {
+      recipientEmails: ['ap@desertridgepm.com'],
+      recipientPhones: ['6025550182'],
+      message: 'Mark, here it is: {{link}}',
+    });
+  });
+
+  it('sends by text only, without a message', async () => {
+    const user = userEvent.setup();
+    vi.mocked(apiClient.get).mockImplementation((url: string) => {
+      if (url === '/financial/invoices/inv-1') return Promise.resolve({ data: draft });
+      if (url === '/customers/pay-1') return Promise.resolve({ data: { ...payer, phone: '602.555.0100' } });
+      if (url === '/work-orders/wo-1') return Promise.resolve({ data: workOrder });
+      return Promise.reject(new Error(`unexpected GET ${url}`));
+    });
+    vi.mocked(apiClient.post).mockResolvedValue({ data: { lastSentToEmails: null, lastSentToPhones: '+16025550100' } });
+    renderPage();
+
+    await user.click(await screen.findByRole('button', { name: 'Send invoice' }));
+    const dialog = await screen.findByRole('dialog');
+    await user.click(await within(dialog).findByRole('checkbox', { name: 'Send to ap@desertridgepm.com' }));
+    await user.click(within(dialog).getByRole('checkbox', { name: 'Text (602) 555-0100' }));
+    expect(within(dialog).getByText(/^Texts only/)).toBeInTheDocument();
+    await user.click(within(dialog).getByRole('button', { name: /^Send invoice · / }));
+
+    expect(apiClient.post).toHaveBeenCalledWith('/financial/invoices/inv-1/send', { recipientPhones: ['602.555.0100'] });
+  });
+
   it('cancels a draft after confirming', async () => {
     const user = userEvent.setup();
     vi.mocked(apiClient.patch).mockResolvedValue({ data: { ...draft, status: 'CANCELLED', version: 4 } });
