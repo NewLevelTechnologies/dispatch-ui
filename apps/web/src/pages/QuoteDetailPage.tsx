@@ -229,7 +229,11 @@ export default function QuoteDetailPage() {
       {quote.status === QuoteStatus.ACCEPTED && (
         <Callout kind="success" className="mb-2.5">
           Accepted {formatDocDate(quote.decidedAt) ?? ''}
-          {quote.acceptedByUserId ? ', recorded by the office' : ' by the customer'}
+          {quote.acceptedByUserId
+            ? ', recorded by the office'
+            : quote.approvedByName
+              ? ` by ${quote.approvedByName}, signed on the customer's link`
+              : ' by the customer'}
           {quote.acceptedRevision != null ? ` · Rev ${quote.acceptedRevision}` : ''}. Accepted {getName('quote', true).toLowerCase()} are locked.
           {invoiced != null &&
             (invoiced === 100

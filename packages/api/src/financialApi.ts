@@ -876,6 +876,8 @@ export interface Quote {
   acceptedRevision?: number | null;
   /** The office user who recorded a verbal yes; null for a customer approval. */
   acceptedByUserId?: string | null;
+  /** The name the customer typed when approving on the share page; null for office acceptances. */
+  approvedByName?: string | null;
   /** Send back on every edit; see the pricing block above. */
   version?: number;
   pricingModel?: PricingModel;
