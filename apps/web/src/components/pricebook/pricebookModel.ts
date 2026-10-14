@@ -1,4 +1,12 @@
-import type { PricebookCategory, PricebookItem, PricebookItemType, TaxClass } from '../../api/setup';
+import type {
+  ItemPresentation,
+  ItemPresentationRequest,
+  PresentationPhoto,
+  PricebookCategory,
+  PricebookItem,
+  PricebookItemType,
+  TaxClass,
+} from '../../api/setup';
 
 export const ITEM_TYPES: PricebookItemType[] = ['SERVICE', 'MATERIAL', 'EQUIPMENT', 'FEE'];
 
@@ -83,3 +91,30 @@ const round2 = (n: number) => Math.round(n * 100) / 100;
 
 /** True when the item still can't be billed (a computed item while the Regular rate is unset). */
 export const isUnpriced = (item: Pick<PricebookItem, 'unitPrice'>) => item.unitPrice == null;
+
+/** The form's copy of an item's customer presentation; null means it has none. */
+export interface PresentationDraft {
+  customerName: string;
+  description: string;
+  highlights: string[];
+  photos: PresentationPhoto[];
+}
+
+export const isFilled = (p: PresentationDraft | null) =>
+  !!p && (p.photos.length > 0 || p.customerName.trim() !== '' || p.description.trim() !== '' || p.highlights.some((h) => h.trim()));
+
+export const toPresentationDraft = (p: ItemPresentation | null | undefined): PresentationDraft | null =>
+  p
+    ? { customerName: p.customerName ?? '', description: p.description ?? '', highlights: [...p.highlights], photos: [...p.photos] }
+    : null;
+
+/** What the item request sends; nothing filled in means removed. */
+export const toPresentationRequest = (p: PresentationDraft | null): ItemPresentationRequest | null =>
+  isFilled(p)
+    ? {
+        customerName: p!.customerName.trim() || null,
+        description: p!.description.trim() || null,
+        highlights: p!.highlights.map((h) => h.trim()).filter(Boolean),
+        photoIds: p!.photos.map((x) => x.id),
+      }
+    : null;

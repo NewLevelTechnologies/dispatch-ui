@@ -30,10 +30,15 @@ import {
   computedPrice,
   fromPercent,
   itemMargin,
+  isFilled,
   markupPrice,
   toPercent,
+  toPresentationDraft,
+  toPresentationRequest,
+  type PresentationDraft,
 } from '../../components/pricebook/pricebookModel';
 import { CATEGORIES_KEY, ITEMS_KEY, usePricebookError } from '../../components/pricebook/pricebookRequests';
+import { PresentationSection } from '../../components/pricebook/PresentationSection';
 import { Callout } from '../../components/ui/Callout';
 import { Card } from '../../components/ui/Card';
 import { ErrorState } from '../../components/ui/ErrorState';
@@ -137,11 +142,20 @@ export default function PricebookItemPage() {
       key={`${id ?? 'new'}-${source?.version ?? ''}`}
       item={id ? (source ?? null) : null}
       initial={source ? fromItem(source, !id) : blank(params.get('category') ?? '')}
+      initialPresentation={toPresentationDraft(source?.presentation)}
     />
   );
 }
 
-function ItemForm({ item, initial }: { item: PricebookItem | null; initial: FormState }) {
+function ItemForm({
+  item,
+  initial,
+  initialPresentation,
+}: {
+  item: PricebookItem | null;
+  initial: FormState;
+  initialPresentation: PresentationDraft | null;
+}) {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -150,6 +164,9 @@ function ItemForm({ item, initial }: { item: PricebookItem | null; initial: Form
   const pricebookError = usePricebookError();
   const [f, setF] = useState(initial);
   const set = (patch: Partial<FormState>) => setF((x) => ({ ...x, ...patch }));
+  const [presentation, setPresentation] = useState(initialPresentation);
+  // Untouched, the request leaves it out, which the server reads as unchanged.
+  const [presentationTouched, setPresentationTouched] = useState(!item && isFilled(initialPresentation));
 
   const { data: categories = [] } = useQuery({ queryKey: CATEGORIES_KEY, queryFn: () => pricebookApi.getCategories() });
   const { data: rates = [] } = useQuery({ queryKey: ['labor-rates'], queryFn: () => laborRatesApi.getAll() });
@@ -206,6 +223,7 @@ function ItemForm({ item, initial }: { item: PricebookItem | null; initial: Form
         laborHours: f.pricingMode === 'COMPUTED' ? hours : null,
         materialsCost: f.pricingMode === 'COMPUTED' ? materials : null,
         active: f.active,
+        ...(presentationTouched ? { presentation: toPresentationRequest(presentation) } : {}),
       };
       return item ? pricebookApi.updateItem(item.id, request) : pricebookApi.createItem(request);
     },
@@ -395,6 +413,16 @@ function ItemForm({ item, initial }: { item: PricebookItem | null; initial: Form
                     {shownCost == null && shownPrice ? ` · ${t('settings.pricebook.form.costUnknown')}` : ''}
                   </p>
                 </FormSection>
+
+                <PresentationSection
+                  value={presentation}
+                  itemName={f.name.trim() || t('settings.pricebook.form.newTitle')}
+                  readOnly={readOnly}
+                  onChange={(next) => {
+                    setPresentation(next);
+                    setPresentationTouched(true);
+                  }}
+                />
 
                 <FormSection title={t('settings.pricebook.form.taxSection')}>
                   <Field className="max-w-60">

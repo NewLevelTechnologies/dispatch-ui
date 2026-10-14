@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { invoicesApi, quotesApi, financialActivityApi, financialDashboardApi, revenueTargetsApi,
-  revenueReportApi, receivablesReportApi, quoteReportApi, paymentReportApi, paymentsApi, taxApi, laborRatesApi, pricebookApi, ratePlansApi } from './financialApi';
+  revenueReportApi, receivablesReportApi, quoteReportApi, paymentReportApi, paymentsApi, taxApi, laborRatesApi, pricebookApi, ratePlansApi, mediaApi } from './financialApi';
 import apiClient from './client';
 
 vi.mock('./client');
@@ -411,5 +411,26 @@ describe('ratePlansApi', () => {
     vi.mocked(apiClient.put).mockResolvedValue({ data: {} });
     await ratePlansApi.setCustomerPlan('cust-1', null);
     expect(apiClient.put).toHaveBeenCalledWith('/financial/customers/cust-1/rate-plan', { ratePlanId: null });
+  });
+});
+
+describe('mediaApi.upload', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('gets an upload URL, PUTs the file with the returned type, then confirms', async () => {
+    vi.mocked(apiClient.post)
+      .mockResolvedValueOnce({ data: { mediaId: 'm-1', uploadUrl: 'https://s3/put', contentType: 'image/jpeg' } })
+      .mockResolvedValueOnce({ data: { id: 'm-1', status: 'READY', url: 'https://cdn/m-1.jpg', thumbnailUrl: 'https://cdn/m-1-t.jpg' } });
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true });
+    vi.stubGlobal('fetch', fetchMock);
+    const file = new File(['x'], 'unit.jpg', { type: 'image/jpeg' });
+
+    const media = await mediaApi.upload(file);
+
+    expect(apiClient.post).toHaveBeenNthCalledWith(1, '/financial/media/upload-url', { fileName: 'unit.jpg', contentType: 'image/jpeg', sizeBytes: 1 });
+    expect(fetchMock).toHaveBeenCalledWith('https://s3/put', { method: 'PUT', headers: { 'Content-Type': 'image/jpeg' }, body: file });
+    expect(apiClient.post).toHaveBeenNthCalledWith(2, '/financial/media/m-1/confirm');
+    expect(media.status).toBe('READY');
+    vi.unstubAllGlobals();
   });
 });

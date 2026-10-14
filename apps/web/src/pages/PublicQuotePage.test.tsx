@@ -264,4 +264,26 @@ describe('PublicQuotePage', () => {
     renderAt('tok-t');
     expect(await screen.findByText('Condenser replacement · 3-ton')).toBeInTheDocument();
   });
+
+  it('presents a pricebook item with its photos, customer name, description and highlights', async () => {
+    const base = buildResponse({});
+    const line = {
+      ...base.quote.lineItems[0],
+      description: 'Capacitor 45/5',
+      presentation: {
+        customerName: 'Run capacitor replacement',
+        description: 'Restores the motor’s starting power.',
+        highlights: ['Same-day', '1-year warranty'],
+        photos: [{ url: 'https://cdn/c.jpg', thumbnailUrl: 'https://cdn/c-t.jpg' }],
+      },
+    };
+    vi.mocked(publicApiClient.get).mockResolvedValueOnce({ data: { ...base, quote: { ...base.quote, lineItems: [line] } } });
+    renderAt('tok-p');
+
+    expect(await screen.findByText('Run capacitor replacement')).toBeInTheDocument();
+    expect(screen.queryByText('Capacitor 45/5')).not.toBeInTheDocument();
+    expect(screen.getByText('Restores the motor’s starting power.')).toBeInTheDocument();
+    expect(screen.getByText('1-year warranty')).toBeInTheDocument();
+    expect(document.querySelector('img[src="https://cdn/c-t.jpg"]')).not.toBeNull();
+  });
 });

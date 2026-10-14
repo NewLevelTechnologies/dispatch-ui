@@ -1595,8 +1595,38 @@ export interface PricebookItem {
   pricingRuleValue?: number | null;
   /** Send back on an edit; a mismatch is 409 STALE_VERSION. */
   version: number;
+  /** How it's shown to customers on public quotes; null when it has none. */
+  presentation?: ItemPresentation | null;
+  hasPresentation?: boolean;
+  /** The main photo's thumbnail, for the list. */
+  thumbnailUrl?: string | null;
   createdAt: string | null;
   updatedAt: string | null;
+}
+
+export interface PresentationPhoto {
+  id: string;
+  url: string;
+  thumbnailUrl: string;
+}
+
+export interface ItemPresentation {
+  /** Null or blank: the item name. */
+  customerName?: string | null;
+  description?: string | null;
+  highlights: string[];
+  /** In order; the first is the main photo. */
+  photos: PresentationPhoto[];
+}
+
+/** Sent to set an item's presentation; replaces it whole. */
+export interface ItemPresentationRequest {
+  customerName?: string | null;
+  description?: string | null;
+  /** 0–5, each ≤ 120; blank entries are dropped. */
+  highlights: string[];
+  /** 0–4 READY media ids, in order. */
+  photoIds: string[];
 }
 
 /** The whole item, replaced on update. Never deleted: deactivate with `active: false`. */
@@ -1619,6 +1649,8 @@ export interface PricebookItemRequest {
   laborHours: number | null;
   materialsCost: number | null;
   active: boolean;
+  /** Left out: unchanged. null: removed. An object: replaces it. */
+  presentation?: ItemPresentationRequest | null;
 }
 
 export interface PricebookItemQuery {
@@ -1687,6 +1719,52 @@ export const pricebookApi = {
   updateItem: async (id: string, request: PricebookItemRequest): Promise<PricebookItem> => {
     const response = await apiClient.put<PricebookItem>(`/financial/pricebook/items/${id}`, request);
     return response.data;
+  },
+};
+
+export type MediaStatus = 'PENDING' | 'READY';
+
+/** An image in the tenant's media library. `url` (≤1600px) and `thumbnailUrl` (400px) are permanent CDN links, null until READY. */
+export interface Media {
+  id: string;
+  status: MediaStatus;
+  url?: string | null;
+  thumbnailUrl?: string | null;
+  width?: number | null;
+  height?: number | null;
+  fileName: string;
+  contentType: string;
+  sizeBytes: number;
+  createdAt: string;
+}
+
+/** Image types the library takes (HEIC is refused), up to 20 MB. */
+export const MEDIA_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+export const MEDIA_MAX_BYTES = 20 * 1024 * 1024;
+
+/**
+ * The tenant media library (images). Upload is presigned and two-step:
+ * `upload-url` → PUT to S3 → `confirm`. Writes need MANAGE_PRICING.
+ * Errors: 400 INVALID_REQUEST (type, size, name), 409 UPLOAD_MISSING,
+ * 400 UNREADABLE_IMAGE, 404 MEDIA_NOT_FOUND.
+ */
+export const mediaApi = {
+  get: async (id: string): Promise<Media> => {
+    const response = await apiClient.get<Media>(`/financial/media/${id}`);
+    return response.data;
+  },
+
+  /** Upload one image and wait for its renditions; resolves READY media. */
+  upload: async (file: File): Promise<Media> => {
+    const { data: target } = await apiClient.post<{ mediaId: string; uploadUrl: string; contentType: string }>(
+      '/financial/media/upload-url',
+      { fileName: file.name, contentType: file.type, sizeBytes: file.size },
+    );
+    // Straight to S3, without our auth header; the content type must match exactly.
+    const res = await fetch(target.uploadUrl, { method: 'PUT', headers: { 'Content-Type': target.contentType }, body: file });
+    if (!res.ok) throw new Error(`Upload failed with ${res.status}`);
+    const { data } = await apiClient.post<Media>(`/financial/media/${target.mediaId}/confirm`);
+    return data;
   },
 };
 

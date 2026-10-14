@@ -14,7 +14,7 @@ const item = (over: Partial<PricebookItem>): PricebookItem => ({
 });
 const computed = item({});
 const markup = item({ id: 'i-2', itemType: 'MATERIAL', name: 'Contactor 40A', sku: 'CONT-40A1', taxClass: 'MATERIALS', pricingMode: 'MARKUP', unitPrice: 39.76, unitCost: 28.4, markupPct: 0.4, laborHours: null, materialsCost: null });
-const trip = item({ id: 'i-3', itemType: 'FEE', feeRole: 'TRIP', name: 'Trip charge', sku: 'FEE-TRIP', categoryId: null, taxClass: 'FEE', pricingMode: 'FIXED', unitPrice: 89, markupPct: null, laborHours: null, materialsCost: null });
+const trip = item({ id: 'i-3', itemType: 'FEE', feeRole: 'TRIP', thumbnailUrl: 'https://cdn/trip-t.jpg', name: 'Trip charge', sku: 'FEE-TRIP', categoryId: null, taxClass: 'FEE', pricingMode: 'FIXED', unitPrice: 89, markupPct: null, laborHours: null, materialsCost: null });
 const unpriced = item({ id: 'i-4', name: 'Replace blower motor', sku: 'SVC-BLWR', unitPrice: null });
 const categories = [
   { id: 'c-rep', parentId: null, name: 'Repairs', sortOrder: 0, active: true, activeItemCount: 3, createdAt: null, updatedAt: null },
@@ -48,6 +48,8 @@ describe('PricebookPage', () => {
     expect(rowOf('Contactor 40A')).toHaveTextContent('$28.40 cost +40%');
     expect(rowOf('Trip charge')).toHaveTextContent('Fee · Trip');
     expect(rowOf('Replace blower motor')).toHaveTextContent('Needs Regular rate');
+    expect(rowOf('Trip charge').querySelector('img')).toHaveAttribute('src', 'https://cdn/trip-t.jpg');
+    expect(rowOf('Contactor 40A').querySelector('img')).toBeNull();
   });
 
   it('counts active items in each category, subcategories included', async () => {

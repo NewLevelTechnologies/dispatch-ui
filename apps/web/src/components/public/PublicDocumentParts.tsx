@@ -1,5 +1,6 @@
 import { useTranslation } from '@dispatch/i18n';
 import type { PublicAdjustment, PublicLineItem, PublicPricing } from '../../api/setup';
+import { CheckIcon } from '@heroicons/react/16/solid';
 
 const currencyFormatter = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
 
@@ -41,10 +42,39 @@ export function PublicLineItems({ title, items }: { title: string; items: Public
       <ul className="divide-y divide-zinc-100">
         {items.map((item, idx) => {
           const saved = num(item.adjustmentAmount) > 0;
+          const pres = item.presentation;
+          const main = pres?.photos[0];
           return (
             <li key={idx} className="flex flex-col gap-1 px-6 py-3 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
+              {main && (
+                <a href={main.url} target="_blank" rel="noreferrer" className="shrink-0">
+                  <img src={main.thumbnailUrl} alt="" className="size-20 rounded-md border border-zinc-200 object-cover" />
+                </a>
+              )}
               <div className="min-w-0 flex-1">
-                <p className="text-sm text-zinc-900">{item.description}</p>
+                <p className={pres ? 'text-sm font-semibold text-zinc-900' : 'text-sm text-zinc-900'}>
+                  {pres?.customerName || item.description}
+                </p>
+                {pres?.description && <p className="mt-1 text-sm text-zinc-600">{pres.description}</p>}
+                {pres && pres.highlights.length > 0 && (
+                  <ul className="mt-1.5 space-y-0.5 text-sm text-zinc-700">
+                    {pres.highlights.map((h, i) => (
+                      <li key={i} className="flex gap-1.5">
+                        <CheckIcon aria-hidden className="mt-0.5 size-4 shrink-0 text-emerald-600" />
+                        {h}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {pres && pres.photos.length > 1 && (
+                  <div className="mt-2 flex gap-1.5">
+                    {pres.photos.slice(1).map((ph, i) => (
+                      <a key={i} href={ph.url} target="_blank" rel="noreferrer">
+                        <img src={ph.thumbnailUrl} alt="" className="size-12 rounded border border-zinc-200 object-cover" />
+                      </a>
+                    ))}
+                  </div>
+                )}
                 <p className="mt-0.5 text-xs text-zinc-500">
                   {formatQuantity(item.quantity)} × {formatPublicMoney(item.unitPrice)}
                 </p>
