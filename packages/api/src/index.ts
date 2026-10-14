@@ -522,6 +522,8 @@ export {
   type PaymentStatus,
   type CreatePaymentRequest,
   type SendResponse,
+  type SendOptions,
+  type SendPreview,
   type ReissueShareLinkResponse,
   type ExtendShareLinkResponse,
   type WorkOrderFinancialSummary,
@@ -626,6 +628,8 @@ export {
   type TemplateSample,
   type TemplateSamplesResponse,
   type SendTestRequest,
+  type RenderTemplateRequest,
+  type RenderedTemplate,
 } from './notificationTemplateApi';
 
 // Dispatch Board API (GET /scheduling/board + the unscheduled rail)

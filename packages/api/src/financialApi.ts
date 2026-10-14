@@ -343,6 +343,8 @@ export interface Invoice {
    * case is acceptable to under-display in v1.
    */
   lastSentToEmails?: string | null;
+  /** Comma-separated E.164 numbers texted at the last send; null when it didn't text. */
+  lastSentToPhones?: string | null;
   /** On a reissue's corrected copy: the invoice it replaced ("Reissue of INV-3307"). */
   reissuedFromInvoiceId?: string | null;
   reissuedFromInvoiceNumber?: string | null;
@@ -490,7 +492,42 @@ export interface SendResponse {
   notificationId: string;
   queuedAt: string;
   shareUrl: string;
-  lastSentToEmails: string;
+  /** Null when the send went by text only. */
+  lastSentToEmails: string | null;
+  /** Comma-separated E.164; null when the send didn't text. */
+  lastSentToPhones?: string | null;
+}
+
+/**
+ * Who a send goes to and what it says. Emails and phones each left out
+ * (never `[]`, which would be an explicit empty list) fall back as follows:
+ * phones only → text only; neither → the customer's email on file.
+ */
+export interface SendOptions {
+  /** At most 10. */
+  recipientEmails?: string[];
+  /** US numbers in any punctuation; at most 10. */
+  recipientPhones?: string[];
+  /** Replaces the email body for this send (≤ 2,000 chars). `{{link}}` marks where the link goes; without it the link is appended. Texts always use the SMS template. */
+  message?: string;
+}
+
+const sendBody = ({ recipientEmails, recipientPhones, message }: SendOptions, date: Record<string, string>) => {
+  const body = {
+    ...(recipientEmails?.length ? { recipientEmails } : {}),
+    ...(recipientPhones?.length ? { recipientPhones } : {}),
+    ...(message?.trim() ? { message } : {}),
+    ...date,
+  };
+  return Object.keys(body).length ? body : undefined;
+};
+
+/** `GET .../send-preview`: render `emailNotificationTypeKey` (or the SMS key) with `templateData` via `notificationTemplateApi.render`. */
+export interface SendPreview {
+  emailNotificationTypeKey: string;
+  smsNotificationTypeKey: string;
+  /** `share_url` is the literal `{{link}}` placeholder. */
+  templateData: Record<string, unknown>;
 }
 
 /**
@@ -794,18 +831,18 @@ export const invoicesApi = {
    */
   send: async (
     id: string,
-    recipientEmails?: string[],
-    /** Drafts only (409 DOCUMENT_NOT_EDITABLE once sent): overrides the due date from the terms. */
-    dueDate?: string,
+    { dueDate, ...rest }: SendOptions & {
+      /** Drafts only (409 DOCUMENT_NOT_EDITABLE once sent): overrides the due date from the terms. */
+      dueDate?: string;
+    } = {},
   ): Promise<SendResponse> => {
-    const body = {
-      ...(recipientEmails && recipientEmails.length > 0 ? { recipientEmails } : {}),
-      ...(dueDate ? { dueDate } : {}),
-    };
-    const response = await apiClient.post<SendResponse>(
-      `/financial/invoices/${id}/send`,
-      Object.keys(body).length ? body : undefined,
-    );
+    const response = await apiClient.post<SendResponse>(`/financial/invoices/${id}/send`, sendBody(rest, dueDate ? { dueDate } : {}));
+    return response.data;
+  },
+
+  /** What the send email would say: its type keys plus the data to render them with via `notificationTemplateApi.render`. */
+  sendPreview: async (id: string, dueDate?: string): Promise<SendPreview> => {
+    const response = await apiClient.get<SendPreview>(`/financial/invoices/${id}/send-preview`, { params: dueDate ? { dueDate } : {} });
     return response.data;
   },
 
@@ -911,6 +948,7 @@ export interface Quote {
   lastSentAt?: string | null;
   /** See `Invoice.lastSentToEmails` — same semantics. */
   lastSentToEmails?: string | null;
+  lastSentToPhones?: string | null;
   /** First send; resends don't move it. Null until sent. */
   firstSentAt?: string | null;
   /** First open of the share link. */
@@ -1073,18 +1111,18 @@ export const quotesApi = {
   /** See `invoicesApi.send` — same contract, quote-scoped. */
   send: async (
     id: string,
-    recipientEmails?: string[],
-    /** Drafts only (409 DOCUMENT_NOT_EDITABLE once sent): overrides the expiry from the quote validity setting. */
-    expirationDate?: string,
+    { expirationDate, ...rest }: SendOptions & {
+      /** Drafts only (409 DOCUMENT_NOT_EDITABLE once sent): overrides the expiry from the quote validity setting. */
+      expirationDate?: string;
+    } = {},
   ): Promise<SendResponse> => {
-    const body = {
-      ...(recipientEmails && recipientEmails.length > 0 ? { recipientEmails } : {}),
-      ...(expirationDate ? { expirationDate } : {}),
-    };
-    const response = await apiClient.post<SendResponse>(
-      `/financial/quotes/${id}/send`,
-      Object.keys(body).length ? body : undefined,
-    );
+    const response = await apiClient.post<SendResponse>(`/financial/quotes/${id}/send`, sendBody(rest, expirationDate ? { expirationDate } : {}));
+    return response.data;
+  },
+
+  /** See `invoicesApi.sendPreview`. */
+  sendPreview: async (id: string, expirationDate?: string): Promise<SendPreview> => {
+    const response = await apiClient.get<SendPreview>(`/financial/quotes/${id}/send-preview`, { params: expirationDate ? { expirationDate } : {} });
     return response.data;
   },
 
