@@ -90,4 +90,90 @@ describe('PricebookItemPage', () => {
     expect(await screen.findByRole('textbox', { name: 'Name' })).toBeDisabled();
     expect(screen.queryByRole('button', { name: 'Save changes' })).not.toBeInTheDocument();
   });
+
+  describe('customer presentation', () => {
+    const presented = {
+      ...material,
+      presentation: {
+        customerName: 'Contactor replacement part',
+        description: 'Keeps the compressor switching cleanly.',
+        highlights: ['OEM equivalent', 'Same-day install', '1-year warranty'],
+        photos: [
+          { id: 'm-1', url: 'https://cdn/m-1.jpg', thumbnailUrl: 'https://cdn/m-1-t.jpg' },
+          { id: 'm-2', url: 'https://cdn/m-2.jpg', thumbnailUrl: 'https://cdn/m-2-t.jpg' },
+        ],
+      },
+      hasPresentation: true,
+      thumbnailUrl: 'https://cdn/m-1-t.jpg',
+    };
+    const withItem = (item: unknown) =>
+      vi.mocked(apiClient.get).mockImplementation((url: string) => {
+        if (url === '/financial/pricebook/categories') return Promise.resolve({ data: [] });
+        if (url === '/financial/labor-rates') return Promise.resolve({ data: [regular] });
+        if (url === '/financial/pricebook/items/i-2') return Promise.resolve({ data: item });
+        return Promise.reject(new Error(`unexpected GET ${url}`));
+      });
+    const putBody = () => vi.mocked(apiClient.put).mock.calls[0][1] as Record<string, unknown>;
+
+    it('sums up a presentation while collapsed, and leaves it alone when untouched', async () => {
+      const user = userEvent.setup();
+      withItem(presented);
+      vi.mocked(apiClient.put).mockResolvedValue({ data: presented });
+      renderWithProviders(<div />, { routes, initialPath: '/settings/pricebook/i-2' });
+
+      expect(await screen.findByText('Contactor replacement part')).toBeInTheDocument();
+      expect(screen.getByText('· 2 photos · description · 3 highlights')).toBeInTheDocument();
+      await user.click(screen.getByRole('button', { name: 'Save changes' }));
+      // Left out of the request: the server keeps it as it is.
+      expect(putBody()).not.toHaveProperty('presentation');
+    });
+
+    it('uploads a photo, makes it the main one, and saves the photos in order', async () => {
+      const user = userEvent.setup();
+      withItem(presented);
+      vi.mocked(apiClient.post)
+        .mockResolvedValueOnce({ data: { mediaId: 'm-3', uploadUrl: 'https://s3/put', contentType: 'image/png' } })
+        .mockResolvedValueOnce({ data: { id: 'm-3', status: 'READY', url: 'https://cdn/m-3.jpg', thumbnailUrl: 'https://cdn/m-3-t.jpg' } });
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true }));
+      vi.mocked(apiClient.put).mockResolvedValue({ data: presented });
+      renderWithProviders(<div />, { routes, initialPath: '/settings/pricebook/i-2' });
+
+      await user.click(await screen.findByRole('button', { name: 'Edit' }));
+      await user.upload(screen.getByLabelText('Add photo', { selector: 'input' }), new File(['x'], 'unit.png', { type: 'image/png' }));
+      expect(await screen.findByRole('img', { name: 'Photo 3' })).toHaveAttribute('src', 'https://cdn/m-3-t.jpg');
+      await user.click(screen.getAllByRole('button', { name: 'Make main' })[1]);
+      await user.click(screen.getByRole('button', { name: 'Save changes' }));
+
+      expect(putBody().presentation).toEqual({
+        customerName: 'Contactor replacement part',
+        description: 'Keeps the compressor switching cleanly.',
+        highlights: ['OEM equivalent', 'Same-day install', '1-year warranty'],
+        photoIds: ['m-3', 'm-1', 'm-2'],
+      });
+      vi.unstubAllGlobals();
+    });
+
+    it('refuses an image type the library won’t take, before uploading', async () => {
+      const user = userEvent.setup({ applyAccept: false });
+      withItem(presented);
+      renderWithProviders(<div />, { routes, initialPath: '/settings/pricebook/i-2' });
+
+      await user.click(await screen.findByRole('button', { name: 'Edit' }));
+      await user.upload(screen.getByLabelText('Add photo', { selector: 'input' }), new File(['x'], 'IMG_0001.heic', { type: 'image/heic' }));
+      expect(apiClient.post).not.toHaveBeenCalled();
+    });
+
+    it('removes a presentation by sending null', async () => {
+      const user = userEvent.setup();
+      withItem(presented);
+      vi.mocked(apiClient.put).mockResolvedValue({ data: material });
+      renderWithProviders(<div />, { routes, initialPath: '/settings/pricebook/i-2' });
+
+      await user.click(await screen.findByRole('button', { name: 'Edit' }));
+      await user.click(screen.getByRole('button', { name: 'Remove presentation' }));
+      expect(screen.getByRole('button', { name: 'Add photos & description' })).toBeInTheDocument();
+      await user.click(screen.getByRole('button', { name: 'Save changes' }));
+      expect(putBody().presentation).toBeNull();
+    });
+  });
 });

@@ -293,6 +293,11 @@ function ItemRow({
   return (
     <DenseRow onClick={onOpen} className={item.active ? undefined : 'opacity-55'}>
       <td>
+        <div className="flex items-start gap-2.5">
+        {item.thumbnailUrl && (
+          <img src={item.thumbnailUrl} alt="" className="mt-0.5 size-9 shrink-0 rounded border border-border object-cover" />
+        )}
+        <div className="min-w-0">
         <div className={clsx('text-[10px] font-bold uppercase tracking-[0.04em]', LINE_TYPE_TONE[item.itemType])}>
           {t(`settings.pricebook.type.${item.itemType}`)}
           {item.feeRole && ` · ${t(`settings.pricebook.feeRole.${item.feeRole}`)}`}
@@ -306,6 +311,8 @@ function ItemRow({
             {categoryName}
           </div>
         )}
+        </div>
+        </div>
       </td>
       <td data-label={t('settings.pricebook.col.pricing')}>
         <div>{t(`settings.pricebook.mode.${item.pricingMode}`)}</div>

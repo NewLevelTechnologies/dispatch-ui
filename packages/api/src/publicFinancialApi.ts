@@ -93,6 +93,20 @@ export interface PublicLineItem {
   netAmount?: string | null;
   /** The line's own discounts and waives. */
   adjustments?: PublicAdjustment[];
+  /**
+   * Quotes only: the pricebook item's customer presentation, read live when
+   * the page loads. Null for freeform lines and items without one; then
+   * show `description`.
+   */
+  presentation?: PublicLinePresentation | null;
+}
+
+export interface PublicLinePresentation {
+  /** Null means use the line's description. */
+  customerName?: string | null;
+  description?: string | null;
+  highlights: string[];
+  photos: { url: string; thumbnailUrl: string }[];
 }
 
 /** Savings and tax context both public documents carry. Absent on older documents. */
