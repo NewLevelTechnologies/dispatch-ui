@@ -67,10 +67,13 @@ export function DocumentLinesCard({
   const legacy = isLegacy(doc);
   const lines = sortLines(doc.lineItems);
   const costCols = !legacy && showCost;
-  // `?add=po` (from the job's "Not billed yet" card) opens the panel on the job's purchase-order parts.
+  // `?add=` opens the add-line panel on arrival: `pricebook` for a draft just
+  // created (the next keystroke searches), `po` from the job's "Not billed
+  // yet" card (the job's purchase-order parts).
   const [params] = useSearchParams();
-  const initialTab: AddLineTab = params.get('add') === 'po' ? 'po' : 'pricebook';
-  const [adding, setAdding] = useState(!!editing && params.get('add') === 'po');
+  const addParam = params.get('add');
+  const initialTab: AddLineTab = addParam === 'po' ? 'po' : 'pricebook';
+  const [adding, setAdding] = useState(!!editing && (addParam === 'po' || addParam === 'pricebook'));
   const docPoLineIds = new Set(doc.lineItems.map((l) => l.sourcePoLineId).filter((id): id is string => !!id));
   const [drag, setDrag] = useState<{ id: string; over: string | null } | null>(null);
   const [adjusting, setAdjusting] = useState<AdjustTarget | null>(null);
@@ -160,7 +163,7 @@ export function DocumentLinesCard({
             {!lines.length && (
               <tr>
                 <td colSpan={9} className="py-7 text-center text-[12.5px] text-fg-muted">
-                  {editing ? 'No lines yet. Add one below.' : 'No lines yet.'}
+                  {editing ? 'No lines yet. Add from the pricebook, labor, or a freeform line.' : 'No lines yet.'}
                 </td>
               </tr>
             )}

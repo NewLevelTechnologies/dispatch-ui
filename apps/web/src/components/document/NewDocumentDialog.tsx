@@ -91,7 +91,8 @@ function NewDocumentForm({
           : await invoicesApi.create({ customerId: billTo.id, workOrderId, invoiceDate: date, dueDate: until, lineItems: [] });
       refreshDocumentLists(queryClient);
       onClose();
-      navigate(`${kind === 'quote' ? `/quotes/${doc.id}` : `/invoices/${doc.id}`}${openOnPurchases ? '?add=po' : ''}`);
+      // A new draft opens ready for its first line.
+      navigate(`${kind === 'quote' ? `/quotes/${doc.id}` : `/invoices/${doc.id}`}?add=${openOnPurchases ? 'po' : 'pricebook'}`);
     } catch (err) {
       showError(`Couldn’t create the ${lower}`, documentErrorMessage(err, lower));
       setBusy(false);

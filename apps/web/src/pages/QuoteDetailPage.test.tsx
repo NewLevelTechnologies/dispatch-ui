@@ -415,6 +415,22 @@ describe('QuoteDetailPage editing', () => {
     expect(apiClient.post).toHaveBeenCalledWith('/financial/quotes/q-1/lines', { version: 7, itemId: 'it-9', quantity: 1 });
   });
 
+  it('opens a just-created draft ready for its first line, the pricebook search focused', async () => {
+    withPricebook([]);
+    renderWithProviders(<div />, { routes, initialPath: '/quotes/q-1?add=pricebook' });
+
+    const search = await screen.findByRole('combobox', { name: 'Search pricebook' });
+    expect(search).toHaveFocus();
+    expect(screen.getByRole('button', { name: '+ Add line' })).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('says where lines come from on an empty draft', async () => {
+    mockApi({ ...draft, lineItems: [], grossSubtotal: 0, subtotal: 0, totalAmount: 0 });
+    renderPage();
+
+    expect(await screen.findByText('No lines yet. Add from the pricebook, labor, or a freeform line.')).toBeInTheDocument();
+  });
+
   it('offers a freeform line when nothing in the pricebook matches', async () => {
     const user = userEvent.setup();
     withPricebook([]);
