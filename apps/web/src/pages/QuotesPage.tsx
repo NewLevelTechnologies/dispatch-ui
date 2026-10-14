@@ -21,7 +21,7 @@ import { ListFooter } from '../components/ui/ListFooter';
 import { ChipListboxOption, FilterChipListbox } from '../components/ui/FilterChipListbox';
 import { FilterChip } from '../components/ui/FilterChipRow';
 import { DateRangeChip } from '../components/ui/DateRangeChip';
-import { NewDocumentDialog } from '../components/document/NewDocumentDialog';
+import { StartDocumentDialog } from '../components/document/StartDocumentDialog';
 import { BillQuoteDialog } from '../components/document/BillQuoteDialog';
 import { formatDocDate } from '../components/document/documentModel';
 import {
@@ -272,7 +272,7 @@ export default function QuotesPage() {
         </CardBody>
       </Card>
 
-      <NewDocumentDialog kind={creating ? 'quote' : null} onClose={() => setCreating(false)} />
+      <StartDocumentDialog kind={creating ? 'quote' : null} onClose={() => setCreating(false)} />
       {billing && <BillQuoteDialog quote={billing} open onClose={() => setBilling(null)} />}
     </AppLayout>
   );
