@@ -67,7 +67,7 @@ function RailContent({
       <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-4">
         {filteredSections.map((section) => (
           <div key={section.label}>
-            <div className="mb-1 px-2 text-[10px] font-semibold uppercase tracking-wider text-fg-muted">
+            <div className="px-2 pt-2 pb-0.5 text-[10px] font-semibold uppercase tracking-wider text-fg-muted">
               {section.label}
             </div>
             <ul className="space-y-0.5">
@@ -78,7 +78,7 @@ function RailContent({
                     onClick={onNavigate}
                     className={({ isActive }) =>
                       [
-                        'group relative flex items-center justify-between gap-2 rounded-md px-2 py-1.5 text-[12.5px] transition-colors',
+                        'group relative flex items-center justify-between gap-2 rounded-md px-2 py-1 text-[12.5px] leading-[1.35] transition-colors',
                         isActive
                           ? 'bg-bg-active font-semibold text-fg-strong'
                           : 'text-fg hover:bg-bg-hover hover:text-fg-strong',
