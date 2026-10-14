@@ -1433,6 +1433,8 @@
     "common": {
       "logoAlt": "{{name}} logo",
       "contactPhone": " at {{phone}}",
+      "previewBody": "This is what {{customer}} will see. Nothing here can be approved or paid, and opening it doesn't count as a view.",
+      "previewTitle": "Preview",
       "retry": "Try again",
       "slowLoad": "Still loading — this is taking longer than usual.",
       "theSender": "the sender"

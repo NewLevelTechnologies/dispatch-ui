@@ -205,12 +205,16 @@ export interface PublicInvoiceResponse {
   invoice: PublicInvoiceData;
   tenant: PublicTenantBranding;
   customer: PublicCustomerSummary;
+  /** Opened through an office preview link: show a Preview banner and no approve or pay. A draft carries the dates it will be sent with. */
+  preview?: boolean;
 }
 
 export interface PublicQuoteResponse {
   quote: PublicQuoteData;
   tenant: PublicTenantBranding;
   customer: PublicCustomerSummary;
+  /** Opened through an office preview link: show a Preview banner and no approve or pay. A draft carries the dates it will be sent with. */
+  preview?: boolean;
 }
 
 const tokenHeaders = (token: string, signal?: AbortSignal) => ({

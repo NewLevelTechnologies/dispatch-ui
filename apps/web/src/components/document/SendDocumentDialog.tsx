@@ -173,6 +173,24 @@ function SendForm({ target, onClose, onSent }: { target: SendTarget; onClose: ()
     setAdding('');
   };
 
+  // The customer's page in a new tab, with this send's dates. The tab opens on the click so it isn't blocked as a popup.
+  const [previewing, setPreviewing] = useState(false);
+  const openPreview = async () => {
+    const tab = window.open('', '_blank');
+    if (tab) tab.opener = null;
+    setPreviewing(true);
+    try {
+      const { url } = isQuote ? await quotesApi.previewLink(doc.id, previewDate) : await invoicesApi.previewLink(doc.id, previewDate);
+      if (tab) tab.location.href = url;
+      else window.open(url, '_blank', 'noopener');
+    } catch (err) {
+      tab?.close();
+      showError('Couldn’t open the preview', documentErrorMessage(err, noun));
+    } finally {
+      setPreviewing(false);
+    }
+  };
+
   const canSend = (emails.length > 0 || phones.length > 0) && !tooLong;
   const send = async () => {
     if (busy || !canSend) return;
@@ -346,6 +364,9 @@ function SendForm({ target, onClose, onSent }: { target: SendTarget; onClose: ()
         </div>
       </DialogBody>
       <DialogActions>
+        <Button plain className="sm:mr-auto" disabled={previewing} onClick={() => void openPreview()}>
+          Preview customer view
+        </Button>
         <Button plain onClick={onClose} disabled={busy}>
           Cancel
         </Button>

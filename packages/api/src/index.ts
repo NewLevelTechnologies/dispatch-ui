@@ -524,6 +524,7 @@ export {
   type SendResponse,
   type SendOptions,
   type SendPreview,
+  type PreviewLink,
   type ReissueShareLinkResponse,
   type ExtendShareLinkResponse,
   type WorkOrderFinancialSummary,

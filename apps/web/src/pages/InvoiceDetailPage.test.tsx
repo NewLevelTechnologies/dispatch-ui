@@ -253,6 +253,27 @@ describe('InvoiceDetailPage editing', () => {
     });
   });
 
+  it('opens the customer’s view of the draft in a new tab, with the changed due date', async () => {
+    const user = userEvent.setup();
+    const tab = { opener: {}, location: { href: '' }, close: vi.fn() };
+    const open = vi.spyOn(window, 'open').mockReturnValue(tab as unknown as Window);
+    mockApi(draft);
+    vi.mocked(apiClient.post).mockResolvedValue({ data: { url: 'https://app.example/p/invoice/prev-1', expiresAt: '2026-10-14T18:00:00Z' } });
+    renderPage();
+
+    await user.click(await screen.findByRole('button', { name: 'Send invoice' }));
+    const dialog = await screen.findByRole('dialog');
+    await within(dialog).findByRole('checkbox', { name: 'Send to ap@desertridgepm.com' });
+    await user.click(within(dialog).getByRole('button', { name: 'Change' }));
+    fireEvent.change(within(dialog).getByLabelText('Due date'), { target: { value: '2099-01-15' } });
+    await user.click(within(dialog).getByRole('button', { name: 'Preview customer view' }));
+
+    expect(apiClient.post).toHaveBeenCalledWith('/financial/invoices/inv-1/preview-link', { dueDate: '2099-01-15' });
+    await vi.waitFor(() => expect(tab.location.href).toBe('https://app.example/p/invoice/prev-1'));
+    expect(tab.opener).toBeNull();
+    open.mockRestore();
+  });
+
   it('sends by text only, without a message', async () => {
     const user = userEvent.setup();
     vi.mocked(apiClient.get).mockImplementation((url: string) => {
