@@ -142,6 +142,8 @@ export interface ServiceLocationSearchResult {
   siteContactName?: string | null;
   siteContactPhone?: string | null;
   status: 'ACTIVE' | 'INACTIVE' | 'CLOSED';
+  /** Work orders here not completed or cancelled ("2 open jobs"). */
+  openWorkOrderCount?: number;
 }
 
 // ── Duplicate check (Add Customer intake) ──────────────────────────────

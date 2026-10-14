@@ -1,12 +1,21 @@
 /* eslint-disable i18next/no-literal-string -- dense billing detail; short operational labels stay literal (same convention as the PO detail page). Entity names route through getName(). */
 import { useState, type ReactNode } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import clsx from 'clsx';
 import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ClipboardDocumentListIcon, DocumentTextIcon, PlusIcon } from '@heroicons/react/16/solid';
 import { useTranslation } from '@dispatch/i18n';
 import { formatCurrency } from '@dispatch/utils';
-import { financialSummaryApi, invoicesApi, InvoiceStatus, quotesApi, QuoteStatus, type Invoice, type Quote } from '../api/setup';
+import {
+  financialSummaryApi,
+  invoicesApi,
+  InvoiceStatus,
+  quotesApi,
+  QuoteStatus,
+  workOrderApi,
+  type Invoice,
+  type Quote,
+} from '../api/setup';
 import { useGlossary } from '../contexts/GlossaryContext';
 import { showError, showSuccess } from '../lib/toast';
 import { Button } from './catalyst/button';
@@ -15,7 +24,8 @@ import { LoadingState } from './ui/LoadingState';
 import { Pill, Tag } from './ui/Pill';
 import PaymentDialog from './PaymentDialog';
 import { BillQuoteDialog } from './document/BillQuoteDialog';
-import { NewDocumentDialog, type NewDocumentKind } from './document/NewDocumentDialog';
+import { StartDocumentDialog, type StartKind } from './document/StartDocumentDialog';
+import { Dropdown, DropdownButton, DropdownItem, DropdownLabel, DropdownMenu } from './catalyst/dropdown';
 import { UnbilledPurchasesCard } from './UnbilledPurchasesCard';
 import { amount, buildBillingTree, invoicedPercent } from './document/billingModel';
 import { formatDocDate } from './document/documentModel';
@@ -92,8 +102,37 @@ export default function WorkOrderBillingTab({
     if (data) percentOf.set(q.id, invoicedPercent(data));
   });
 
-  const [creating, setCreating] = useState<NewDocumentKind | null>(null);
-  const [fromPurchases, setFromPurchases] = useState(false);
+  const navigate = useNavigate();
+  // Billed to someone other than the job's customer (a warranty company, a payer): the start dialog on this job's site.
+  const [startingFor, setStartingFor] = useState<StartKind | null>(null);
+  const [creating, setCreating] = useState(false);
+  const { data: job } = useQuery({ queryKey: ['work-orders', workOrderId], queryFn: () => workOrderApi.getById(workOrderId) });
+  const jobLocation = job?.serviceLocation
+    ? {
+        id: job.serviceLocation.id,
+        customerId: customer.id,
+        customerName: customer.name,
+        locationName: job.serviceLocation.locationName ?? null,
+        address: job.serviceLocation.address,
+        status: 'ACTIVE' as const,
+      }
+    : null;
+
+  // A new quote or invoice for this job is billed to its customer, at its site, with its PO: no questions to ask.
+  const createDraft = async (kind: StartKind, add: 'pricebook' | 'po' = 'pricebook') => {
+    if (creating) return;
+    setCreating(true);
+    const label = (kind === 'quote' ? quoteLabel : invoiceLabel).toLowerCase();
+    try {
+      const body = { customerId: customer.id, workOrderId };
+      const doc = kind === 'quote' ? await quotesApi.create(body) : await invoicesApi.create(body);
+      refreshDocumentLists(queryClient);
+      navigate(`${kind === 'quote' ? `/quotes/${doc.id}` : `/invoices/${doc.id}`}?add=${add}`);
+    } catch (err) {
+      showError(`Couldn’t create the ${label}`, documentErrorMessage(err, label));
+      setCreating(false);
+    }
+  };
   const [billing, setBilling] = useState<Quote | null>(null);
   const [paying, setPaying] = useState<Invoice | null>(null);
 
@@ -124,15 +163,10 @@ export default function WorkOrderBillingTab({
 
   const dialogs = (
     <>
-      <NewDocumentDialog
-        kind={creating}
-        onClose={() => {
-          setCreating(null);
-          setFromPurchases(false);
-        }}
-        workOrderId={workOrderId}
-        customer={customer}
-        openOnPurchases={fromPurchases}
+      <StartDocumentDialog
+        kind={startingFor}
+        start={jobLocation ? { location: jobLocation, workOrderId, billSomeoneElse: true } : null}
+        onClose={() => setStartingFor(null)}
       />
       {billing && <BillQuoteDialog quote={billing} open onClose={() => setBilling(null)} />}
       <PaymentDialog
@@ -150,22 +184,34 @@ export default function WorkOrderBillingTab({
     <UnbilledPurchasesCard
       workOrderId={workOrderId}
       draftInvoices={invoices.filter((i) => i.status === InvoiceStatus.DRAFT)}
-      onNewInvoice={() => {
-        setFromPurchases(true);
-        setCreating('invoice');
-      }}
+      onNewInvoice={() => void createDraft('invoice', 'po')}
     />
   );
   const newButtons = (
     <div className="flex gap-1.5">
-      <Button outline size="xs" onClick={() => setCreating('quote')}>
+      <Button outline size="xs" disabled={creating} onClick={() => void createDraft('quote')}>
         <PlusIcon />
         {`New ${quoteLabel.toLowerCase()}`}
       </Button>
-      <Button outline size="xs" onClick={() => setCreating('invoice')}>
+      <Button outline size="xs" disabled={creating} onClick={() => void createDraft('invoice')}>
         <PlusIcon />
         {`New ${invoiceLabel.toLowerCase()}`}
       </Button>
+      {jobLocation && (
+        <Dropdown>
+          <DropdownButton plain size="xs">
+            Bill someone else…
+          </DropdownButton>
+          <DropdownMenu anchor="bottom end">
+            <DropdownItem onClick={() => setStartingFor('quote')}>
+              <DropdownLabel>{`${quoteLabel} billed to someone else`}</DropdownLabel>
+            </DropdownItem>
+            <DropdownItem onClick={() => setStartingFor('invoice')}>
+              <DropdownLabel>{`${invoiceLabel} billed to someone else`}</DropdownLabel>
+            </DropdownItem>
+          </DropdownMenu>
+        </Dropdown>
+      )}
     </div>
   );
 

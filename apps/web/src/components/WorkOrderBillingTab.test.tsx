@@ -143,8 +143,8 @@ describe('WorkOrderBillingTab', () => {
     renderTab();
 
     expect(await screen.findByText('No quotes or invoices yet')).toBeInTheDocument();
+    // No dialog: billed to the job's customer, at its site.
     await user.click(screen.getByRole('button', { name: 'New quote' }));
-    await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Create quote' }));
 
     // No dates or lines: the draft is dated when it's sent.
     expect(apiClient.post).toHaveBeenCalledWith('/financial/quotes', { customerId: 'cust-1', workOrderId: 'wo-1' });
@@ -198,8 +198,10 @@ describe('WorkOrderBillingTab · not billed yet', () => {
     withParts([], parts);
     renderTab();
 
+    vi.mocked(apiClient.post).mockResolvedValue({ data: { id: 'inv-9' } });
     await user.click(await screen.findByRole('button', { name: 'Add to new invoice' }));
-    expect(await screen.findByRole('dialog')).toBeInTheDocument();
+    expect(apiClient.post).toHaveBeenCalledWith('/financial/invoices', { customerId: 'cust-1', workOrderId: 'wo-1' });
+    expect(await screen.findByText('Invoice page')).toBeInTheDocument();
   });
 
   it('dismisses a PO’s parts with a reason, and undoes one', async () => {

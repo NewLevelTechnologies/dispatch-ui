@@ -21,7 +21,7 @@ import { ChipListboxOption, FilterChipListbox } from '../components/ui/FilterChi
 import { DateRangeChip } from '../components/ui/DateRangeChip';
 import { EMPTY_DATE_RANGE, rangeForPreset, type DatePreset, type DateRange } from '../lib/dateRangePresets';
 import { AssignmentChip, UNASSIGNED } from '../components/billing/AssignmentChip';
-import { NewDocumentDialog } from '../components/document/NewDocumentDialog';
+import { StartDocumentDialog } from '../components/document/StartDocumentDialog';
 import { formatDocDate } from '../components/document/documentModel';
 import {
   INVOICE_STATUS_FILTERS,
@@ -299,7 +299,7 @@ export default function InvoicesPage() {
         </CardBody>
       </Card>
 
-      <NewDocumentDialog kind={creating ? 'invoice' : null} onClose={() => setCreating(false)} />
+      <StartDocumentDialog kind={creating ? 'invoice' : null} onClose={() => setCreating(false)} />
     </AppLayout>
   );
 }

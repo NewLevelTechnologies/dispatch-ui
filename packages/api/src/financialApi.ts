@@ -934,6 +934,8 @@ export interface ListQuotesParams {
   q?: string;
   /** Accepted quotes with a line not fully invoiced (the `invoiceable` rule). */
   readyToInvoice?: boolean;
+  /** One job's quotes. */
+  workOrderId?: string;
   /** The work order's location's region; quotes with no work order are company-wide only. */
   regionIds?: string[];
   page?: number;
