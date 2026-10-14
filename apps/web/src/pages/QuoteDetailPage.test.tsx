@@ -608,6 +608,19 @@ describe('QuoteDetailPage editing', () => {
     expect(screen.getByRole('button', { name: 'Re-send · Rev 2' })).toBeInTheDocument();
   });
 
+  it('re-sends a revision through the Send dialog, which says what replacing the old one means', async () => {
+    const user = userEvent.setup();
+    mockApi({ ...draft, revision: 2, firstSentAt: '2026-10-08T16:00:00Z', lastSentAt: '2026-10-08T16:00:00Z', expirationDate: '2020-01-01' });
+    renderPage();
+
+    await user.click(await screen.findByRole('button', { name: 'Re-send · Rev 2' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByRole('heading', { name: 'Send Q-1882 · Rev 2' })).toBeInTheDocument();
+    expect(dialog).toHaveTextContent('Rev 2 replaces Rev 1');
+    // Its old expiry has passed, so it gets the company default again.
+    expect(within(dialog).getByText('30 days · company default')).toBeInTheDocument();
+  });
+
   it('offers only Duplicate on an accepted quote, and opens the copy', async () => {
     const user = userEvent.setup();
     mockApi({ ...draft, status: 'ACCEPTED' });

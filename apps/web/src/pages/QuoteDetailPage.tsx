@@ -23,6 +23,7 @@ import { useShareLink } from '../components/document/useShareLink';
 import { BillQuoteDialog } from '../components/document/BillQuoteDialog';
 import { invoicedPercent } from '../components/document/billingModel';
 import { formatDocDate, isLegacy, memberLabel, memberSavings, toDateInput } from '../components/document/documentModel';
+import { SendDocumentDialog } from '../components/document/SendDocumentDialog';
 
 const STATUS_TONE: Record<QuoteStatus, 'neutral' | 'info' | 'success' | 'warning' | 'danger'> = {
   [QuoteStatus.DRAFT]: 'neutral',
@@ -59,6 +60,7 @@ export default function QuoteDetailPage() {
   const revising = revisingId === id;
   const [confirm, setConfirm] = useState<Confirm>(null);
   const [headerOpen, setHeaderOpen] = useState(false);
+  const [sending, setSending] = useState(false);
   const [billing, setBilling] = useState(false);
   const shareLink = useShareLink({ routes: quotesApi, id: id ?? '', number: quote?.quoteNumber ?? '', entity: entityLower });
   const accepted = quote?.status === QuoteStatus.ACCEPTED;
@@ -119,22 +121,8 @@ export default function QuoteDetailPage() {
   const unsentRevision = quote.status === QuoteStatus.DRAFT && !!quote.firstSentAt;
   const nextRev = (revision ?? 1) + 1;
 
-  const send = () => {
-    let to = '';
-    void editor
-      .run(
-        async () => {
-          to = (await quotesApi.send(quote.id)).lastSentToEmails;
-        },
-        `Couldn’t send this ${entityLower}`,
-        { returnsDocument: false },
-      )
-      .then((ok) => {
-        if (!ok) return;
-        setRevisingId(null);
-        showSuccess(`${quote.quoteNumber} sent`, to ? `To ${to}` : undefined);
-      });
-  };
+  // Who it goes to and its expiry are confirmed in the Send dialog.
+  const send = () => setSending(true);
   const setStatus = (status: QuoteStatus) =>
     void editor.run(() => quotesApi.updateStatus(quote.id, { status }), `Couldn’t update this ${entityLower}`);
 
@@ -272,6 +260,11 @@ export default function QuoteDetailPage() {
         editing={editable ? lineEditing(quotesApi, quote.id, editor.run) : undefined}
       />
 
+      <SendDocumentDialog
+        target={sending ? { kind: 'quote', doc: quote } : null}
+        onClose={() => setSending(false)}
+        onSent={() => setRevisingId(null)}
+      />
       <DocumentHeaderDialog
         open={headerOpen}
         onClose={() => setHeaderOpen(false)}

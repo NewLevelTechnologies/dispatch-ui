@@ -2632,6 +2632,7 @@
     },
     "nav": {
       "companyProfile": "Company Profile",
+      "documents": "Quotes & invoices",
       "equipmentCategories": "Categories",
       "equipmentTaxonomy": "Types & Categories",
       "equipmentTypes": "Types",
@@ -2656,6 +2657,7 @@
     "searchPlaceholder": "Search settings",
     "sections": {
       "access": "Access",
+      "billing": "Billing",
       "dispatch": "{{dispatch}}",
       "equipment": "{{equipment}}",
       "organization": "Organization",
@@ -3349,6 +3351,23 @@
         "saveFailed": "Couldn’t save the plan",
         "saved": "{{name}} saved"
       }
+    },
+    "documents": {
+      "days": "days",
+      "description": "Defaults for documents you send. You can change dates on any single quote or invoice when you send it.",
+      "invalid": "Enter 1 to 365 days.",
+      "invoices": "Invoices",
+      "invoicesBody": "Due dates follow each account’s payment terms (Net 30, Due on receipt, and so on). Set terms on the customer or payer.",
+      "loading": "Loading…",
+      "presets": "Common lengths",
+      "previewAfter": ". Quotes already sent keep their date.",
+      "previewBefore": "A quote sent today expires",
+      "quotes": "Quotes",
+      "saveFailed": "Couldn’t save quote validity",
+      "saved": "Quote validity saved",
+      "title": "Quotes & invoices",
+      "validFor": "Valid for",
+      "validForHint": "Counted from the day a quote is sent. Customers can’t approve after it expires."
     }
   },
   "tags": {

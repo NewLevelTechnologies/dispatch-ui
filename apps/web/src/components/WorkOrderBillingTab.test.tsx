@@ -157,8 +157,10 @@ describe('WorkOrderBillingTab', () => {
     vi.mocked(apiClient.post).mockResolvedValue({ data: { lastSentToEmails: 'tanya@example.com' } });
     renderTab();
 
+    // Sending confirms recipients and dates first.
     await user.click(await screen.findByRole('button', { name: 'Send' }));
-    expect(apiClient.post).toHaveBeenCalledWith('/financial/invoices/inv-3/send', undefined);
+    expect(await screen.findByRole('heading', { name: 'Send invoice INV-3000' })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
 
     await user.click(screen.getByRole('button', { name: 'Take payment' }));
     expect(await screen.findByRole('dialog')).toBeInTheDocument();

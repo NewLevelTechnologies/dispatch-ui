@@ -25,6 +25,7 @@ import { documentErrorMessage, lineEditing, refreshDocumentLists, useDocumentEdi
 import { useShareLink } from '../components/document/useShareLink';
 import { ReissueCreditCallout } from '../components/document/ReissueCreditCallout';
 import { formatDocDate, isLegacy, memberLabel, memberSavings, toDateInput } from '../components/document/documentModel';
+import { SendDocumentDialog } from '../components/document/SendDocumentDialog';
 
 const STATUS_TONE: Record<InvoiceStatus, 'neutral' | 'info' | 'success' | 'danger'> = {
   [InvoiceStatus.DRAFT]: 'neutral',
@@ -58,6 +59,7 @@ export default function InvoiceDetailPage() {
   const [voiding, setVoiding] = useState(false);
   const [voidingPayment, setVoidingPayment] = useState<NestedInvoicePayment | null>(null);
   const [reissuing, setReissuing] = useState(false);
+  const [sending, setSending] = useState(false);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const shareLink = useShareLink({
@@ -109,18 +111,8 @@ export default function InvoiceDetailPage() {
   const reissuable = !invoice.reissuedAsInvoiceId && (voidable || invoice.status === InvoiceStatus.VOID);
   const reissueLabel = invoice.status === InvoiceStatus.VOID ? `Reissue ${entityLower}` : 'Void & reissue';
 
-  const send = () => {
-    let to = '';
-    void editor
-      .run(
-        async () => {
-          to = (await invoicesApi.send(invoice.id)).lastSentToEmails;
-        },
-        `Couldn’t send this ${entityLower}`,
-        { returnsDocument: false },
-      )
-      .then((ok) => ok && showSuccess(`${invoice.invoiceNumber} sent`, to ? `To ${to}` : undefined));
-  };
+  // Who it goes to and its due date are confirmed in the Send dialog.
+  const send = () => setSending(true);
   const voidInvoice = ({ revokeShareLink }: { revokeShareLink: boolean }) => {
     setVoiding(false);
     void editor
@@ -361,6 +353,7 @@ export default function InvoiceDetailPage() {
         cancelLabel="Keep it"
         isDestructive
       />
+      <SendDocumentDialog target={sending ? { kind: 'invoice', doc: invoice } : null} onClose={() => setSending(false)} />
       <ConfirmDialog
         isOpen={reissuing}
         onClose={() => setReissuing(false)}
