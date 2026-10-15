@@ -12,8 +12,8 @@ const DEPENDENT_KEYS = [
   'workOrderQuotes',
   'workOrderInvoices',
   'financialSummary',
-  'location-invoices',
-  'location-invoice-summary',
+  // Location detail's Quotes & invoices tab: list and counts.
+  'documents',
   'quoteInvoiceable',
   // Adding or removing a PO part, or voiding an invoice, changes what's left to bill.
   'unbilledPurchases',

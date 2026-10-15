@@ -40,12 +40,7 @@ import {
   activityApi,
   financialActivityApi,
   FILE_MAX_BYTES,
-  invoicesApi,
-  InvoiceStatus,
-  type InvoiceListItemRow,
-  type InvoiceStatus as InvoiceStatusType,
-  type ListInvoicesParams,
-  type LocationInvoiceSummaryResponse,
+  documentsApi,
   type LocationDispatchResponse,
   type DispatchStatus,
   type OnSiteTech,
@@ -119,6 +114,7 @@ import {
   type MockTone,
 } from './serviceLocationDetailMocks';
 import { LocationTaxJurisdiction } from '../components/LocationTaxJurisdiction';
+import { DocumentsTab, DOCUMENTS_KEY } from '../components/document/DocumentsTab';
 import { useEntityNames } from '../hooks/useEntityNames';
 
 type TabId = 'overview' | 'equipment' | 'jobs' | 'invoices' | 'dispatches' | 'contacts' | 'files' | 'activity';
@@ -210,8 +206,12 @@ export default function ServiceLocationDetailPage() {
   });
   const equipment: EquipmentSummary[] = useMemo(() => equipmentPage?.content ?? [], [equipmentPage]);
 
-  // Drives the Invoices tab-count badge; the tab re-reads the same count cache.
-  const { data: locationInvoicesPage } = useQuery(locationInvoiceCountQueryOptions(id ?? ''));
+  // Drives the Quotes & invoices tab-count badge; shares the tab's counts cache.
+  const { data: documentViews } = useQuery({
+    queryKey: [DOCUMENTS_KEY, { serviceLocationId: id }, 'views'],
+    queryFn: () => documentsApi.getViews({ serviceLocationId: id! }),
+    enabled: !!id,
+  });
   // Drives the Dispatches tab-count badge; the tab body runs its own paged queries.
   const { data: locationDispatchesCount } = useQuery(locationDispatchCountQueryOptions(id ?? ''));
   // Drives the Files tab-count badge — sums the two file sources' anchor-wide
@@ -302,7 +302,7 @@ export default function ServiceLocationDetailPage() {
     { id: 'overview', label: t('serviceLocations.tabs.overview') },
     { id: 'equipment', label: getName('equipment', true), count: equipmentPage?.totalElements ?? equipment.length },
     { id: 'jobs', label: getName('work_order', true), count: workOrdersData?.totalElements ?? 0 },
-    { id: 'invoices', label: getName('invoice', true), count: locationInvoicesPage?.totalElements },
+    { id: 'invoices', label: `${getName('quote', true)} & ${getName('invoice', true).toLowerCase()}`, count: documentViews?.counts.all },
     { id: 'dispatches', label: getName('dispatch', true), count: locationDispatchesCount?.totalElements },
     { id: 'contacts', label: 'Contacts', count: contactCount },
     { id: 'files', label: 'Files', count: filesCount },
@@ -356,7 +356,7 @@ export default function ServiceLocationDetailPage() {
             <JobsTab location={location} onNewJob={() => navigate(`/work-orders/new?locationId=${location.id}`)} />
           )}
 
-          {activeTab === 'invoices' && <InvoicesTab location={location} />}
+          {activeTab === 'invoices' && <LocationDocumentsTab location={location} />}
           {activeTab === 'dispatches' && <DispatchesTab location={location} />}
           {activeTab === 'contacts' && <ContactsTab location={location} canEdit={canEditServiceLocations} />}
           {activeTab === 'files' && (
@@ -832,19 +832,6 @@ function locationTechQueryOptions(serviceLocationId: string) {
   return {
     queryKey: ['location-tech', serviceLocationId] as const,
     queryFn: () => dispatchesApi.getLocationTech(serviceLocationId),
-    enabled: Boolean(serviceLocationId),
-  };
-}
-
-// Per-location invoice count (FIN-1) — `totalElements` off a lean size-1 page.
-// Drives the tab-count badge and the tab's "N invoices" rollup sub; the tab
-// body runs its own filtered/paged list query. Keyed under the
-// ['location-invoices'] prefix so invoice/payment mutations elsewhere
-// (invalidateLocationInvoiceCaches) refresh it too.
-function locationInvoiceCountQueryOptions(serviceLocationId: string) {
-  return {
-    queryKey: ['location-invoices', serviceLocationId, 'count'] as const,
-    queryFn: () => invoicesApi.getAll({ serviceLocationId, size: 1 }),
     enabled: Boolean(serviceLocationId),
   };
 }
@@ -3196,396 +3183,54 @@ function EquipmentRow({
 }
 
 // ─────────────────────────────────────────────────────────────────────────
-// Invoices tab — the per-location billing slice (FIN-1). Invoices bill at the
-// CUSTOMER level; this surfaces only the invoices for work performed AT this
-// site, plus a YTD/open/aged rollup. Read + drill-through, NOT a management
-// surface — no apply-payment / no statements (those are customer-level). Rows
-// drill to the owning work order's financial drawer (there is no standalone
-// invoice-detail route yet).
+// Quotes & invoices tab — the documents for work AT this site, by the
+// document's own location, else its work order's. Read, drill through and
+// start new ones; payments and statements live on the bill-to account.
 // ─────────────────────────────────────────────────────────────────────────
-const INVOICE_STATUS_TONE: Record<InvoiceStatusType, 'neutral' | 'info' | 'success' | 'warning'> = {
-  DRAFT: 'neutral',
-  SENT: 'info',
-  PAID: 'success',
-  OVERDUE: 'warning',
-  CANCELLED: 'neutral',
-  VOID: 'neutral',
-};
-const INVOICE_STATUS_LABEL: Record<InvoiceStatusType, string> = {
-  DRAFT: 'Draft',
-  SENT: 'Sent',
-  PAID: 'Paid',
-  OVERDUE: 'Overdue',
-  CANCELLED: 'Cancelled',
-  VOID: 'Void',
-};
-
-// Backend serializes money as JSON numbers, but the WO-scoped list has shown
-// runtime strings before (see FinancialInvoicesTab) — coerce defensively. For
-// display only; all totals here are server-computed, never summed client-side.
-const invMoney = (v: number | string | null | undefined): number => Number(v ?? 0) || 0;
-
-// Status chip — single-select mirror of JOB_STATUS_FILTERS. The backend has no
-// multi-status param (an "Open" entry would take two requests), so each entry
-// maps to at most one `status`. "Overdue" rides the server-derived
-// `overdue=true` (open + strictly past due) rather than `status=OVERDUE`, so a
-// SENT invoice past its due date matches even before the stored status flips.
-// Statuses come from the InvoiceStatus enum, never free text — the server
-// rejects unknown values (unlike `sort`, which silently drops them).
-const INVOICE_STATUS_FILTERS: { id: string; label: string; params: Partial<ListInvoicesParams> }[] = [
-  { id: 'all', label: 'All', params: {} },
-  { id: 'overdue', label: 'Overdue', params: { overdue: true } },
-  { id: 'draft', label: 'Draft', params: { status: InvoiceStatus.DRAFT } },
-  { id: 'sent', label: 'Sent', params: { status: InvoiceStatus.SENT } },
-  { id: 'paid', label: 'Paid', params: { status: InvoiceStatus.PAID } },
-  { id: 'cancelled', label: 'Cancelled', params: { status: InvoiceStatus.CANCELLED } },
-  { id: 'void', label: 'Void', params: { status: InvoiceStatus.VOID } },
-];
-const INVOICES_PAGE_SIZE = 25;
-
-function InvoicesTab({ location }: { location: ServiceLocationDetailDto }) {
+function LocationDocumentsTab({ location }: { location: ServiceLocationDetailDto }) {
   const { getName } = useGlossary();
-  const { t } = useTranslation();
-  const navigate = useNavigate();
-
-  const [statusId, setStatusId] = useState('all');
-  const [dateRange, setDateRange] = useState<DateRange>(EMPTY_DATE_RANGE);
-  const [search, setSearch] = useState('');
-  const { page, pageHref, resetPage } = useUrlPage('invoicesPage');
-  const deferredSearch = useDeferredValue(search.trim());
-
-  const statusParams = INVOICE_STATUS_FILTERS.find((s) => s.id === statusId)?.params ?? {};
-
-  const params: ListInvoicesParams = {
-    serviceLocationId: location.id,
-    ...statusParams,
-    // The chip's inclusive day strings pass through as-is.
-    from: dateRange.from || undefined,
-    to: dateRange.to || undefined, // inclusive on the backend — no +1-day trick
-    q: deferredSearch || undefined,
-    page: page - 1, // local state is 1-based; backend page is 0-based
-    size: INVOICES_PAGE_SIZE,
-    sort: 'invoiceDate,desc',
-  };
-
-  // Filtered/paged list + count + summary are independent reads — fire in
-  // parallel. All keyed so invalidateLocationInvoiceCaches refreshes them.
-  const { data, isLoading } = useQuery({
-    queryKey: ['location-invoices', location.id, params],
-    queryFn: () => invoicesApi.getAll(params),
-  });
-  const rows = data?.content ?? [];
-  const total = data?.totalElements ?? 0;
-  const totalPages = data?.totalPages ?? 0;
-
-  // Unfiltered site total — shared cache with the tab-count badge.
-  const { data: countPage } = useQuery(locationInvoiceCountQueryOptions(location.id));
-  const { data: summary } = useQuery<LocationInvoiceSummaryResponse>({
-    queryKey: ['location-invoice-summary', location.id],
-    queryFn: () => invoicesApi.getLocationSummary(location.id),
-    enabled: !!location.id,
-  });
-
-  // WO number + job blurb for the "For work" column. Invoices carry only
-  // workOrderId, so resolve display fields from the location's WO list (shared
-  // cache). A WO outside the loaded page falls back to a short id.
+  // Job descriptions for invoice rows (invoices carry no title), from the
+  // site's work orders (shared cache). A job outside that page shows just its number.
   const { data: woData } = useQuery(workOrdersListQueryOptions({ serviceLocationId: location.id }));
   const { data: workOrderTypes } = useQuery({
     queryKey: ['work-order-types'],
     queryFn: () => workOrderTypesApi.getAll(),
   });
-  const safeTypes = Array.isArray(workOrderTypes) ? workOrderTypes : [];
-  const woById = useMemo(() => {
-    const map = new Map<string, WorkOrderSummary>();
-    for (const wo of woData?.content ?? []) map.set(wo.id, wo);
-    return map;
-  }, [woData]);
-
-  const currency = summary?.currency ?? 'USD';
-  const fmtMoney = useMemo(
-    () => new Intl.NumberFormat('en-US', { style: 'currency', currency }),
-    [currency],
-  );
-
-  const stats: { label: string; value: string; sub: string; tone?: 'info' | 'warning' }[] = [
-    {
-      label: 'Billed YTD',
-      value: summary ? fmtMoney.format(invMoney(summary.billedYtd)) : '—',
-      sub: t('common.entitiesCount', { entities: getName('invoice', true), count: countPage?.totalElements ?? 0 }),
-    },
-    {
-      label: 'Open',
-      value: summary ? fmtMoney.format(invMoney(summary.openAmount)) : '—',
-      sub: `${summary?.openCount ?? 0} open`,
-      tone: (summary?.openAmount ?? 0) > 0 ? 'info' : undefined,
-    },
-    {
-      label: '91+ aged',
-      value: summary ? fmtMoney.format(invMoney(summary.aged91)) : '—',
-      sub: (summary?.aged91 ?? 0) > 0 ? 'past due' : 'none',
-      tone: (summary?.aged91 ?? 0) > 0 ? 'warning' : undefined,
-    },
-  ];
-
-  const filtersActive = statusId !== 'all' || Boolean(dateRange.from || dateRange.to) || !!deferredSearch;
-  const showingStart = total === 0 ? 0 : (page - 1) * INVOICES_PAGE_SIZE + 1;
-  const showingEnd = Math.min(page * INVOICES_PAGE_SIZE, total);
-
-  const clearFilters = () => {
-    setStatusId('all');
-    setDateRange(EMPTY_DATE_RANGE);
-    setSearch('');
-    resetPage();
-  };
+  const jobLabel = useMemo(() => {
+    const types = Array.isArray(workOrderTypes) ? workOrderTypes : [];
+    const byId = new Map((woData?.content ?? []).map((wo) => [wo.id, wo]));
+    return (workOrderId: string) => {
+      const wo = byId.get(workOrderId);
+      return wo ? deriveJobLabel(wo, types.find((tp) => tp.id === wo.workOrderTypeId)?.name) : undefined;
+    };
+  }, [woData, workOrderTypes]);
 
   return (
-    <div className="flex flex-col gap-3">
-      {/* Summary strip — per-location billing at a glance. */}
-      <Card padding="none">
-        <div className="grid grid-cols-3">
-          {stats.map((s, i) => (
-            <div key={s.label} className={i < stats.length - 1 ? 'border-r border-border-soft px-3.5 py-2.5' : 'px-3.5 py-2.5'}>
-              <div className="text-[10px] font-semibold uppercase tracking-wider text-fg-muted">{s.label}</div>
-              <div
-                className="mt-0.5 font-mono text-[18px] font-bold tabular-nums tracking-tight"
-                style={{
-                  color:
-                    s.tone === 'warning' ? 'var(--warning-fg)' : s.tone === 'info' ? 'var(--info-500)' : 'var(--fg-strong)',
-                }}
-              >
-                {s.value}
-              </div>
-              <div className="text-[11px] text-fg-muted">{s.sub}</div>
-            </div>
-          ))}
-        </div>
-      </Card>
-
-      {/* Filter bar — same toolbar pattern as the Jobs tab. `q` matches invoice
-          number OR customer name server-side, but the customer is constant at a
-          location, so the placeholder is honest about what it's for. (Heads-up:
-          the backend doesn't escape LIKE wildcards in `q` — `%` matches all.) */}
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="flex h-8 min-w-[200px] max-w-[320px] flex-1 items-center gap-2 rounded-md border border-border bg-bg-elev px-2.5">
-          <MagnifyingGlassIcon className="size-3.5 text-fg-dim" />
-          <input
-            value={search}
-            onChange={(e) => {
-              setSearch(e.target.value);
-              resetPage();
-            }}
-            placeholder={`Search ${getName('invoice').toLowerCase()} #…`}
-            className="min-w-0 flex-1 bg-transparent !text-[12.5px] text-fg outline-none placeholder:text-fg-dim"
-          />
-          {search && (
-            <button
-              onClick={() => {
-                setSearch('');
-                resetPage();
-              }}
-              className="px-1 !text-[11px] text-fg-dim hover:text-fg-strong"
-            >
-              ×
-            </button>
-          )}
-        </div>
-
-        <FilterChipListbox
-          label="Status"
-          ariaLabel="Status"
-          value={statusId}
-          displayValue={INVOICE_STATUS_FILTERS.find((s) => s.id === statusId)?.label ?? 'All'}
-          onChange={(id) => {
-            setStatusId(id as string);
-            resetPage();
-          }}
-        >
-          {INVOICE_STATUS_FILTERS.map((s) => (
-            <ChipListboxOption key={s.id} value={s.id}>
-              {s.label}
-            </ChipListboxOption>
-          ))}
-        </FilterChipListbox>
-
-        <DateRangeChip
-          label="Issued"
-          ariaLabel="Issued date"
-          value={dateRange}
-          onChange={(r) => {
-            setDateRange(r);
-            resetPage();
-          }}
-        />
-
-        {filtersActive && (
-          <Button plain size="xs" onClick={clearFilters}>
-            Clear
-          </Button>
-        )}
-      </div>
-
-      <Card
-        title={<CardTitle icon={<ReceiptPercentIcon className="size-3.5" />}>{getName('invoice', true)}</CardTitle>}
-        padding="none"
-      >
-        {isLoading ? (
-          <LoadingState label={t('common.actions.loading', { entities: getName('invoice', true) })} />
-        ) : rows.length === 0 ? (
-          <div className="px-3.5 py-10 text-center">
-            <div className="text-[13px] font-semibold text-fg-strong">
-              {filtersActive
-                ? `No matching ${getName('invoice', true).toLowerCase()}`
-                : t('common.actions.noEntitiesYet', { entities: getName('invoice', true) })}
-            </div>
-            <div className="mt-1 text-[12px] text-fg-muted">
-              {filtersActive
-                ? 'Adjust your search or clear filters.'
-                : `${getName('invoice', true)} for work at this site will appear here.`}
-            </div>
-            {filtersActive && (
-              <Button plain size="xs" className="mt-2" onClick={clearFilters}>
-                Clear filters
-              </Button>
-            )}
-          </div>
-        ) : (
-          <>
-            {/* DenseTable: dense columns on desktop, one card per invoice
-                < 640px (INV# leads, Balance pins top-right, the rest stack). */}
-            <div className="overflow-x-auto">
-              <DenseTable className="dense-stack">
-                <DenseTHead>
-                  <tr>
-                    <th>{getName('invoice')}</th>
-                    <th>For work</th>
-                    <th>Bill to</th>
-                    <th>Issued</th>
-                    <th>Due</th>
-                    <th>{t('workOrders.table.statusHeader')}</th>
-                    <th className="right">Amount</th>
-                    <th className="right">Balance</th>
-                  </tr>
-                </DenseTHead>
-                <tbody>
-                  {rows.map((inv) => (
-                    <InvoiceRow
-                      key={inv.id}
-                      inv={inv}
-                      wo={inv.workOrderId ? woById.get(inv.workOrderId) : undefined}
-                      typeName={
-                        inv.workOrderId
-                          ? safeTypes.find((tp) => tp.id === woById.get(inv.workOrderId!)?.workOrderTypeId)?.name
-                          : undefined
-                      }
-                      billTo={location.customerName}
-                      fmtMoney={fmtMoney}
-                      onOpen={(invoiceId) => navigate(`/invoices/${invoiceId}`)}
-                    />
-                  ))}
-                </tbody>
-              </DenseTable>
-            </div>
-            <ListFooter
-              page={page}
-              totalPages={totalPages}
-              pageHref={pageHref}
-              left={t('common.pagination.showing', {
-                start: showingStart,
-                end: showingEnd,
-                total: total.toLocaleString(),
-              })}
-            />
-          </>
-        )}
-      </Card>
-    </div>
-  );
-}
-
-function InvoiceRow({
-  inv,
-  wo,
-  typeName,
-  billTo,
-  fmtMoney,
-  onOpen,
-}: {
-  inv: InvoiceListItemRow;
-  wo?: WorkOrderSummary;
-  typeName?: string;
-  billTo: string;
-  fmtMoney: Intl.NumberFormat;
-  onOpen: (invoiceId: string) => void;
-}) {
-  const voided = inv.status === InvoiceStatus.VOID || inv.status === InvoiceStatus.CANCELLED;
-  // Server-derived `overdue` is canonical — same rule as the overdue filter
-  // (open + strictly past due), so badge and filter always agree. It also
-  // covers SENT rows whose stored status hasn't flipped to OVERDUE yet. Never
-  // recompute from dueDate client-side (timezone drift).
-  const overdue = inv.overdue && !voided;
-  const balance = invMoney(inv.balanceDue);
-  const forJob = wo?.workOrderNumber ?? (inv.workOrderId ? `#${inv.workOrderId.slice(0, 8)}` : '—');
-  const desc = wo ? deriveJobLabel(wo, typeName) : null;
-  return (
-    <DenseRow className={voided ? 'opacity-60' : undefined} onClick={() => onOpen(inv.id)}>
-      <td>
-        <span className="font-mono text-[12px] font-bold text-fg-strong">{inv.invoiceNumber}</span>
-      </td>
-      <td className={clsx(!inv.workOrderId && 'dt-empty')} data-label="For work">
-        {inv.workOrderId ? (
-          // The row opens the invoice; the job number opens the job.
-          <Link
-            to={`/work-orders/${inv.workOrderId}`}
-            onClick={(e) => e.stopPropagation()}
-            className="font-mono text-[11px] text-fg-accent hover:underline"
-          >
-            {forJob}
+    <DocumentsTab
+      scope={{ serviceLocationId: location.id }}
+      start={{
+        location: {
+          id: location.id,
+          locationNumber: location.locationNumber,
+          customerId: location.customerId,
+          customerName: location.customerName,
+          locationName: location.locationName,
+          premiseType: location.premiseType,
+          address: location.address,
+          status: location.status,
+        },
+      }}
+      jobLabel={jobLabel}
+      footer={
+        <>
+          {`Work at this ${getName('service_location').toLowerCase()}. ${getName('payment', true)} and statements are on `}
+          <Link to={`/customers/${location.customerId}`} className="font-medium text-fg-accent hover:underline">
+            {location.customerName}
           </Link>
-        ) : (
-          <div className="font-mono text-[11px] text-fg-muted">{forJob}</div>
-        )}
-        {desc && (
-          <div className="mt-0.5 max-w-[320px] truncate text-[10.5px] text-fg" title={desc}>
-            {desc}
-          </div>
-        )}
-      </td>
-      {/* Bill-to is the location's customer for every row. The job-level payer
-          override (warranty co + PAYER badge) is deferred — the Invoice DTO
-          carries no payer field yet, so there's nothing to surface; wire the
-          badge when payer lands on the invoice read model. */}
-      <td className="text-[11.5px] text-fg" data-label="Bill to">{billTo}</td>
-      <td className="text-[11.5px] text-fg-muted" data-label="Issued">{inv.invoiceDate ? formatTimestamp(inv.invoiceDate) : 'Not sent'}</td>
-      <td className="text-[11.5px] text-fg-muted" data-label="Due">{formatTimestamp(inv.dueDate)}</td>
-      <td>
-        <Pill tone={overdue ? 'warning' : INVOICE_STATUS_TONE[inv.status]} dot>
-          {overdue ? INVOICE_STATUS_LABEL.OVERDUE : INVOICE_STATUS_LABEL[inv.status]}
-        </Pill>
-      </td>
-      {/* Void/cancelled amount is meaningless money — strike + mute it so a
-          voided $100 doesn't scan as real AR (the row dimming alone leaves the
-          bold amount pulling full weight). */}
-      <td
-        className={`right font-mono text-[12px] tabular-nums ${
-          voided ? 'font-normal text-fg-muted line-through' : 'font-bold text-fg-strong'
-        }`}
-        data-label="Amount"
-      >
-        {fmtMoney.format(invMoney(inv.totalAmount))}
-      </td>
-      {/* What's still owed — the actionable number for a CSR. Settled rows go
-          dim; voided rows have no receivable at all, so a dash (not $0.00,
-          which would read as "paid off") — and the line drops off the mobile card. */}
-      <td
-        className={clsx(
-          'right font-mono text-[12px] tabular-nums',
-          voided ? 'text-fg-dim dt-empty' : balance > 0 ? 'font-semibold text-fg-strong' : 'text-fg-dim',
-        )}
-        data-label="Balance"
-      >
-        {voided ? '—' : fmtMoney.format(balance)}
-      </td>
-    </DenseRow>
+          .
+        </>
+      }
+    />
   );
 }
 

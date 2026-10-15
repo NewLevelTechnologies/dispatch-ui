@@ -418,31 +418,6 @@ export interface UpdateInvoiceStatusRequest {
 }
 
 /**
- * Per-location billing rollup for the Location detail → Invoices tab header
- * strip (FIN-1). All money fields are decimals serialized as JSON numbers;
- * format client-side and key currency off the field rather than hardcoding.
- *
- *  - `billedYtd`  sum of totalAmount, calendar-year-to-date (resets Jan 1),
- *                 excluding DRAFT / VOID / CANCELLED. Server-computed — do NOT
- *                 re-derive from the list.
- *  - `openCount`  count of open invoices (status SENT or OVERDUE).
- *  - `openAmount` sum of totalAmount for those open invoices.
- *  - `aged91`     open amount past due > 90 days (dueDate < today − 90).
- *
- * serviceLocationId is derived server-side from each invoice's work order, so
- * an invoice with no work order (or whose WO has no service location) is absent
- * from both this summary and the location list — it shows only on customer-level
- * views.
- */
-export interface LocationInvoiceSummaryResponse {
-  billedYtd: number;
-  openCount: number;
-  openAmount: number;
-  aged91: number;
-  currency: string;
-}
-
-/**
  * Customer-level AR rollup (FIN-1) — `GET /financial/customers/{id}/ar-summary`.
  * Drives the customer detail Billing & AR card + the attention strip's AR rule.
  * One cheap call, fired in parallel on page load. All money fields are decimal
@@ -745,20 +720,6 @@ export const invoicesApi = {
   getByWorkOrder: async (workOrderId: string): Promise<Invoice[]> => {
     const response = await apiClient.get<Invoice[]>(
       `/financial/work-orders/${workOrderId}/invoices`,
-    );
-    return response.data;
-  },
-
-  /**
-   * Per-location billing rollup (FIN-1) for the Invoices tab header strip. One
-   * cheap call; independent of the list. See {@link LocationInvoiceSummaryResponse}.
-   */
-  getLocationSummary: async (
-    serviceLocationId: string,
-  ): Promise<LocationInvoiceSummaryResponse> => {
-    const response = await apiClient.get<LocationInvoiceSummaryResponse>(
-      '/financial/invoices/summary',
-      { params: { serviceLocationId } },
     );
     return response.data;
   },
@@ -2522,3 +2483,52 @@ export const financialApi = {
 };
 
 export default financialApi;
+
+/** A location's or customer's quotes and invoices, together. One of the two scopes is required; both means that customer at that site. */
+export interface DocumentScope {
+  serviceLocationId?: string;
+  customerId?: string;
+}
+
+/**
+ * `open`: draft and sent quotes, accepted ones with something left to invoice, and draft, sent and
+ * overdue invoices. `all` and `invoice` leave out void and cancelled invoices.
+ */
+export type DocumentView = 'open' | 'all' | 'quote' | 'invoice';
+
+export interface ListDocumentsParams extends DocumentScope {
+  view?: DocumentView;
+  /** Document number, a quote's title, or the work order number. */
+  q?: string;
+  page?: number;
+  size?: number; // ≤ 200
+}
+
+/** Each row embeds the same row the quotes or invoices list returns. Order is fixed: drafts first, then by document date, newest first. */
+export type DocumentRow =
+  | { kind: 'QUOTE'; id: string; quote: QuoteListItem }
+  | { kind: 'INVOICE'; id: string; invoice: InvoiceListItemRow };
+
+/**
+ * Counts per view (each equals that view's `totalElements`) and the header figures, over the scope
+ * alone. `openQuotes` is DRAFT and SENT; `due` is what SENT and OVERDUE invoices still owe, and
+ * `overdue` the part of it past due.
+ */
+export interface DocumentViews {
+  counts: Record<DocumentView, number>;
+  openQuotes: { count: number; amount: number };
+  due: number;
+  overdue: number;
+}
+
+export const documentsApi = {
+  list: async (params: ListDocumentsParams): Promise<FinancialPage<DocumentRow>> => {
+    const response = await apiClient.get<FinancialPage<DocumentRow>>('/financial/documents', { params });
+    return response.data;
+  },
+
+  getViews: async (scope: DocumentScope): Promise<DocumentViews> => {
+    const response = await apiClient.get<DocumentViews>('/financial/documents/views', { params: scope });
+    return response.data;
+  },
+};
