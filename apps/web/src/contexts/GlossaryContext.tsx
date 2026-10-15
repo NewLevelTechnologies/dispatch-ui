@@ -3,42 +3,22 @@
 // Note: Exporting GLOSSARY_DEFAULTS and useGlossary alongside components is intentional
 // for test mocking (DRY - single source of truth)
 import { createContext, useContext, useState } from 'react';
-import { useTranslation } from '@dispatch/i18n';
+import { i18n, useTranslation } from '@dispatch/i18n';
+import { GLOSSARY_DEFAULTS, glossaryVariables } from './glossaryVariables';
 import type { Glossary, GlossaryEntry } from '../api/setup';
 
+export { GLOSSARY_DEFAULTS };
+
 /**
- * Default entity names (English).
- *
- * IMPORTANT: These should match backend EntityType enum exactly.
- * This is hardcoded (not fetched) for optimal performance.
- *
- * When adding a new entity:
- * 1. Backend adds to EntityType enum
- * 2. Add here with defaults
- * 3. Add to i18n (en_us.json entities section)
- * 4. Deploy together
- *
- * Exported for test mocking (DRY - single source of truth).
+ * Makes the tenant's names default variables for every translation, so any
+ * string can say `{{workOrders, lowercase}}` or `{{customer}}` without its
+ * call site passing names. A param the call passes still wins.
  */
-export const GLOSSARY_DEFAULTS: Record<string, GlossaryEntry> = {
-  agreement: { singular: 'Agreement', plural: 'Agreements' },
-  customer: { singular: 'Customer', plural: 'Customers' },
-  dispatch: { singular: 'Dispatch', plural: 'Dispatches' },
-  dispatch_region: { singular: 'Region', plural: 'Regions' },
-  division: { singular: 'Division', plural: 'Divisions' },
-  equipment: { singular: 'Equipment', plural: 'Equipment' },
-  equipment_component: { singular: 'Unit', plural: 'Units' },
-  invoice: { singular: 'Invoice', plural: 'Invoices' },
-  payer: { singular: 'Payer', plural: 'Payers' },
-  payment: { singular: 'Payment', plural: 'Payments' },
-  quote: { singular: 'Quote', plural: 'Quotes' },
-  route: { singular: 'Route', plural: 'Routes' },
-  schedule: { singular: 'Schedule', plural: 'Schedules' },
-  service_location: { singular: 'Location', plural: 'Locations' },
-  technician: { singular: 'Technician', plural: 'Technicians' },
-  work_item: { singular: 'Work Item', plural: 'Work Items', abbreviation: 'WI' },
-  work_order: { singular: 'Work Order', plural: 'Work Orders', abbreviation: 'WO' },
-};
+function publishToI18n(glossary: Record<string, GlossaryEntry>) {
+  i18n.options.interpolation = { ...i18n.options.interpolation, defaultVariables: glossaryVariables(glossary) };
+}
+// Before any tenant loads (sign-in, public pages): the default names.
+publishToI18n(GLOSSARY_DEFAULTS);
 
 interface GlossaryContextType {
   getName: (entityCode: string, plural?: boolean) => string;
@@ -75,6 +55,7 @@ export const GlossaryProvider: React.FC<GlossaryProviderProps> = ({
         };
       });
     }
+    publishToI18n(merged);
     return merged;
   });
 
@@ -93,6 +74,7 @@ export const GlossaryProvider: React.FC<GlossaryProviderProps> = ({
         };
       });
     }
+    publishToI18n(merged);
     setGlossary(merged);
   };
 

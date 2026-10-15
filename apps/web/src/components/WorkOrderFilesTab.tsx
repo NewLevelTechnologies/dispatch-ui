@@ -359,7 +359,7 @@ export default function WorkOrderFilesTab({
         onClose={() => setDeletingFile(null)}
         onConfirm={() => deletingFile && deleteMutation.mutate(deletingFile)}
         title={deletingFile ? `Delete ${deletingFile.fileName}?` : 'Delete file?'}
-        message="This permanently removes the file from this job."
+        message={`This permanently removes the file from this ${getName('work_order').toLowerCase()}.`}
         confirmLabel="Delete"
         isDestructive
         isPending={deleteMutation.isPending}
@@ -370,10 +370,11 @@ export default function WorkOrderFilesTab({
 
 // Subject backlink chips — the work item / equipment a file documents.
 function SubjectChips({ f }: { f: WorkOrderFile }) {
+  const { getName } = useGlossary();
   const stop = (e: React.MouseEvent) => e.stopPropagation();
   if (!f.equipmentId || !f.equipmentName) return null;
   return (
-    <Link to={`/equipment/${f.equipmentId}`} onClick={stop} title="View equipment">
+    <Link to={`/equipment/${f.equipmentId}`} onClick={stop} title={`View ${getName('equipment').toLowerCase()}`}>
       <Pill tone="violet">{f.equipmentName}</Pill>
     </Link>
   );

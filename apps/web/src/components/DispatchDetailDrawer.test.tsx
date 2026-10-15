@@ -187,7 +187,7 @@ describe('DispatchDetailDrawer', () => {
     // read-only: no inline actions, so pending steps render as hollow "—".
     renderDrawer(mockDispatch(), { readOnly: true });
     expect(await screen.findByText('Dispatch timeline')).toBeInTheDocument();
-    expect(screen.getByText('Tech notified')).toBeInTheDocument();
+    expect(screen.getByText('Technician notified')).toBeInTheDocument();
     expect(screen.getByText('Customer notified')).toBeInTheDocument();
     expect(screen.getByText('En route')).toBeInTheDocument();
     expect(screen.getByText('Arrived on site')).toBeInTheDocument();

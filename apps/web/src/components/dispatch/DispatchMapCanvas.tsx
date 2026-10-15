@@ -52,6 +52,7 @@ import {
 import { siteLabel } from '../../lib/siteLabel';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { isOutOfDate } from '../../lib/releaseState';
+import { useGlossary } from '../../contexts/GlossaryContext';
 
 export type RoutesMode = 'none' | 'selected' | 'all';
 
@@ -154,7 +155,7 @@ const ROUTE_SOURCE = 'db-routes';
  * notification carries — because zip is what tells two same-named streets
  * apart across a metro, and a tooltip is the one surface with room for it.
  */
-function unassignedTooltip(workOrder: UnscheduledWorkOrder): HTMLElement {
+function unassignedTooltip(workOrder: UnscheduledWorkOrder, technicianName: string): HTMLElement {
   const root = document.createElement('div');
   root.className = 'db-pintip';
 
@@ -193,7 +194,7 @@ function unassignedTooltip(workOrder: UnscheduledWorkOrder): HTMLElement {
   root.append(
     line(
       'db-pintip-hint',
-      'Click to schedule · drag onto a route to pick a technician',
+      `Click to schedule · drag onto a route to pick a ${technicianName}`,
     ),
   );
 
@@ -234,7 +235,9 @@ export default function DispatchMapCanvas({
 
   // Handlers read through a ref so the draw effect doesn't have to re-run
   // (and rebuild every marker) each time the page re-renders a new closure.
+  const technicianName = useGlossary().getName('technician').toLowerCase();
   const latest = useRef({
+    technicianName,
     onOpenDispatch,
     onFocusTech,
     onAssign,
@@ -243,6 +246,7 @@ export default function DispatchMapCanvas({
     byTech,
   });
   latest.current = {
+    technicianName,
     onOpenDispatch,
     onFocusTech,
     onAssign,
@@ -489,7 +493,7 @@ export default function DispatchMapCanvas({
             latest.current.onHoverWorkOrder(workOrder.workOrderId);
             popupRef.current
               ?.setLngLat([workOrder.longitude!, workOrder.latitude!])
-              .setDOMContent(unassignedTooltip(workOrder))
+              .setDOMContent(unassignedTooltip(workOrder, latest.current.technicianName))
               .addTo(map);
           });
           el.addEventListener('mouseleave', () => {

@@ -582,7 +582,7 @@ export default function DispatchFormDrawer({
           {/* Customer — text the customer their arrival window. Explicit,
               logged send (POST /notify?audience=CUSTOMER after save); the
               backend respects the customer's per-type SMS opt-in. */}
-          <Section title="Customer" last>
+          <Section title={getName('customer')} last>
             <button
               type="button"
               role="switch"
@@ -591,8 +591,8 @@ export default function DispatchFormDrawer({
               className="flex w-full items-center gap-3 text-left"
             >
               <div className="min-w-0 grow">
-                <div className="text-[12.5px] font-semibold text-fg-strong">Text the customer</div>
-                <div className="text-[11px] text-fg-muted">Send the customer the date + arrival window</div>
+                <div className="text-[12.5px] font-semibold text-fg-strong">{`Text the ${getName('customer').toLowerCase()}`}</div>
+                <div className="text-[11px] text-fg-muted">{`Send the ${getName('customer').toLowerCase()} the date + arrival window`}</div>
               </div>
               <span
                 className={`relative h-5 w-9 shrink-0 rounded-full transition-colors ${notifyCustomer ? 'bg-accent-500' : 'bg-bg-active'}`}
