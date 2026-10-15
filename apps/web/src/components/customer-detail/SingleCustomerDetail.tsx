@@ -54,6 +54,8 @@ import { buildAttentionItems } from './attention';
 import { useGoToInvoicesBucket } from './invoiceAgingNav';
 import { EquipmentSummaryCard } from '../detail/EquipmentSummaryCard';
 import { SiteWorkOrdersCard, SiteInstructionsCard, SiteContactCard, DispatchesTab } from '../detail/locationCards';
+import { useLocationDispatchCount, useLocationFilesCount } from '../detail/locationCounts';
+import { workOrdersListQueryOptions } from '../../api/setup';
 import { OrgMark } from './shared';
 import { formatDateShort } from './format';
 import { formatPhone, titleCaseAddress } from '@dispatch/utils';
@@ -182,7 +184,12 @@ export default function SingleCustomerDetail({ customer }: { customer: Customer 
     queryFn: () => agreementApi.getCustomerSummary(customer.id),
     enabled: !!customer.id,
   });
-  // Tab badge; shares the Quotes & invoices tab's counts cache.
+  // Tab badges. Work orders are the customer's (the same list the tab reads);
+  // dispatches and files are the one site's, as those tabs are.
+  const { data: workOrdersData } = useQuery(workOrdersListQueryOptions({ customerId: customer.id }));
+  const dispatchCount = useLocationDispatchCount(locId || undefined);
+  const filesCount = useLocationFilesCount(locId || undefined);
+  // Shares the Quotes & invoices tab's counts cache.
   const { data: documentViews } = useQuery({
     queryKey: [DOCUMENTS_KEY, { customerId: customer.id }, 'views'],
     queryFn: () => documentsApi.getViews({ customerId: customer.id }),
@@ -248,11 +255,11 @@ export default function SingleCustomerDetail({ customer }: { customer: Customer 
   const tabs: { id: TabId; label: string; count?: number }[] = [
     { id: 'overview', label: t('customers.tabs.overview') },
     { id: 'equipment', label: getName('equipment', true), count: equipmentPage?.totalElements },
-    { id: 'jobs', label: getName('work_order', true) },
+    { id: 'jobs', label: getName('work_order', true), count: workOrdersData?.totalElements },
     { id: 'agreements', label: getName('agreement', true), count: agreements.length },
     { id: 'invoices', label: `${getName('quote', true)} & ${getName('invoice', true).toLowerCase()}`, count: documentViews?.counts.all },
-    { id: 'dispatches', label: getName('dispatch', true) },
-    { id: 'files', label: 'Files' },
+    { id: 'dispatches', label: getName('dispatch', true), count: dispatchCount },
+    { id: 'files', label: 'Files', count: filesCount },
     { id: 'activity', label: t('customers.tabs.activity') },
   ];
 
