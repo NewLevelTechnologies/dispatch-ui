@@ -27,6 +27,7 @@ import { PageHead } from '../../components/ui/PageHead';
 import { Pill, Tag } from '../../components/ui/Pill';
 import { ToggleGroup, ToggleGroupOption } from '../../components/ui/ToggleGroup';
 import { extractApiError, showError, showSuccess } from '../../lib/toast';
+import { useEntityNames } from '../../hooks/useEntityNames';
 
 const PAGE_SIZE = 50;
 
@@ -37,6 +38,7 @@ const PAGE_SIZE = 50;
  * Items are never deleted, only deactivated.
  */
 export default function PricebookPage() {
+  const names = useEntityNames();
   const { t } = useTranslation();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -96,7 +98,7 @@ export default function PricebookPage() {
     <>
       <PageHead
         title={t('settings.pricebook.title')}
-        sub={t('settings.pricebook.description')}
+        sub={t('settings.pricebook.description', names)}
         actions={
           canManage && (
             <Button color="accent" size="xs" href={categoryId ? `/settings/pricebook/new?category=${categoryId}` : '/settings/pricebook/new'}>
@@ -189,7 +191,7 @@ export default function PricebookPage() {
                 <EmptyState
                   icon={<BookOpenIcon className="size-10 text-fg-dim" />}
                   title={q ? t('settings.pricebook.noMatchTitle', { q }) : filtering ? t('settings.pricebook.emptyFilteredTitle') : t('settings.pricebook.emptyTitle')}
-                  description={q ? t('settings.pricebook.noMatchDescription') : t('settings.pricebook.emptyDescription')}
+                  description={q ? t('settings.pricebook.noMatchDescription') : t('settings.pricebook.emptyDescription', names)}
                 />
               ) : (
                 <>

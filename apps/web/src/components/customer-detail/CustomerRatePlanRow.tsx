@@ -8,6 +8,7 @@ import { Dialog, DialogActions, DialogBody, DialogDescription, DialogTitle } fro
 import { Button } from '../catalyst/button';
 import { Field, Label } from '../catalyst/fieldset';
 import { Select } from '../catalyst/select';
+import { useGlossary } from '../../contexts/GlossaryContext';
 
 const DEFAULT = '__default';
 
@@ -50,6 +51,7 @@ export function CustomerRatePlanRow({ customerId }: { customerId: string }) {
 }
 
 function AssignForm({ current, onClose }: { current: CustomerRatePlan; onClose: () => void }) {
+  const { getName } = useGlossary();
   const queryClient = useQueryClient();
   const { data: plans = [] } = useQuery({ queryKey: ['rate-plans'], queryFn: () => ratePlansApi.getAll() });
   const [choice, setChoice] = useState(current.assignedRatePlanId ?? DEFAULT);
@@ -75,7 +77,7 @@ function AssignForm({ current, onClose }: { current: CustomerRatePlan; onClose: 
   return (
     <form onSubmit={submit}>
       <DialogTitle>Rate plan</DialogTitle>
-      <DialogDescription>Prices new quote and invoice lines billed to this account. Existing lines keep their prices.</DialogDescription>
+      <DialogDescription>{`Prices new ${getName('quote').toLowerCase()} and ${getName('invoice').toLowerCase()} lines billed to this account. Existing lines keep their prices.`}</DialogDescription>
       <DialogBody>
         <Field>
           <Label>Plan</Label>

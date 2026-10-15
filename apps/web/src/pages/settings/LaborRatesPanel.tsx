@@ -24,6 +24,7 @@ import { LoadingState } from '../../components/ui/LoadingState';
 import { PageHead } from '../../components/ui/PageHead';
 import { Pill, Tag } from '../../components/ui/Pill';
 import { errorCode, extractApiError, showError, showSuccess } from '../../lib/toast';
+import { useEntityNames } from '../../hooks/useEntityNames';
 
 const LABOR_RATES_KEY = ['labor-rates'] as const;
 
@@ -311,6 +312,7 @@ export default function LaborRatesPanel() {
 const money = (v: number | null) => (v == null ? '' : String(v));
 
 function RateForm({ rate, nextSortOrder, onClose }: { rate: LaborRateType | null; nextSortOrder: number; onClose: () => void }) {
+  const names = useEntityNames();
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const rateError = useLaborRateError();
@@ -375,7 +377,7 @@ function RateForm({ rate, nextSortOrder, onClose }: { rate: LaborRateType | null
               placeholder={t('settings.laborRates.notSet')}
               className="[&_input]:text-right"
             />
-            <Description>{t('settings.laborRates.form.billHint')}</Description>
+            <Description>{t('settings.laborRates.form.billHint', names)}</Description>
           </Field>
           <Field>
             <Label>{t('settings.laborRates.form.costRate')}</Label>
@@ -397,8 +399,8 @@ function RateForm({ rate, nextSortOrder, onClose }: { rate: LaborRateType | null
         {regularChanged && computedCount !== 0 && (
           <Callout kind="warning" className="mt-3">
             {computedCount == null
-              ? t('settings.laborRates.form.regularWarning')
-              : t('settings.laborRates.form.regularWarningCount', { count: computedCount })}
+              ? t('settings.laborRates.form.regularWarning', names)
+              : t('settings.laborRates.form.regularWarningCount', { ...names, count: computedCount })}
           </Callout>
         )}
       </DialogBody>

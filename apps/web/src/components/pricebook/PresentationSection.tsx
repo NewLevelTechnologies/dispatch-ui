@@ -10,6 +10,7 @@ import { Textarea } from '../catalyst/textarea';
 import { FormSection } from '../settings/PricingPageParts';
 import { errorCode, showError } from '../../lib/toast';
 import { isFilled, type PresentationDraft } from './pricebookModel';
+import { useEntityNames } from '../../hooks/useEntityNames';
 
 const MAX_PHOTOS = 4;
 const MAX_HIGHLIGHTS = 5;
@@ -34,6 +35,7 @@ export function PresentationSection({
   readOnly: boolean;
   onChange: (next: PresentationDraft | null) => void;
 }) {
+  const names = useEntityNames();
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [uploading, setUploading] = useState(0);
@@ -83,7 +85,7 @@ export function PresentationSection({
 
   if (!open) {
     return (
-      <FormSection title={t('settings.pricebook.presentation.title')} description={t('settings.pricebook.presentation.optional')}>
+      <FormSection title={t('settings.pricebook.presentation.title', names)} description={t('settings.pricebook.presentation.optional')}>
         <div className="flex flex-wrap items-center gap-3">
           {filled && p.photos[0] && (
             <img src={p.photos[0].thumbnailUrl} alt="" className="size-12 shrink-0 rounded-md border border-border object-cover" />
@@ -96,8 +98,8 @@ export function PresentationSection({
               </div>
             ) : (
               <>
-                <div className="text-[12.5px] text-fg">{t('settings.pricebook.presentation.pitch')}</div>
-                <div className="mt-0.5 text-[11.5px] text-fg-muted">{t('settings.pricebook.presentation.skip')}</div>
+                <div className="text-[12.5px] text-fg">{t('settings.pricebook.presentation.pitch', names)}</div>
+                <div className="mt-0.5 text-[11.5px] text-fg-muted">{t('settings.pricebook.presentation.skip', names)}</div>
               </>
             )}
           </div>
@@ -118,7 +120,7 @@ export function PresentationSection({
   }
 
   return (
-    <FormSection title={t('settings.pricebook.presentation.title')} description={t('settings.pricebook.presentation.where')}>
+    <FormSection title={t('settings.pricebook.presentation.title', names)} description={t('settings.pricebook.presentation.where', names)}>
       <Field>
         <Label>{t('settings.pricebook.presentation.photos')}</Label>
         <div className="mt-1.5 flex flex-wrap gap-2">
@@ -185,7 +187,7 @@ export function PresentationSection({
         <Description>{t('settings.pricebook.presentation.photosHint')}</Description>
       </Field>
       <Field>
-        <Label>{t('settings.pricebook.presentation.customerName')}</Label>
+        <Label>{t('settings.pricebook.presentation.customerName', names)}</Label>
         <Input value={p.customerName} maxLength={120} disabled={readOnly} placeholder={itemName} onChange={(e) => set({ customerName: e.target.value })} />
         <Description>{t('settings.pricebook.presentation.customerNameHint')}</Description>
       </Field>

@@ -10,6 +10,7 @@ import { Button } from './catalyst/button';
 import { Field, Label } from './catalyst/fieldset';
 import { Select } from './catalyst/select';
 import { pct } from './document/documentModel';
+import { useGlossary } from '../contexts/GlossaryContext';
 
 const DEFAULT = '__default';
 
@@ -20,6 +21,7 @@ const DEFAULT = '__default';
  * never charged, whatever the jurisdiction, so that's said too.
  */
 export function LocationTaxJurisdiction({ serviceLocationId, customerId }: { serviceLocationId: string; customerId?: string }) {
+  const { getName } = useGlossary();
   const canAssign = useHasAnyCapability('MANAGE_PRICING', 'EDIT_QUOTES', 'EDIT_INVOICES');
   const { data: customer } = useQuery({
     queryKey: ['customers', customerId],
@@ -47,7 +49,7 @@ export function LocationTaxJurisdiction({ serviceLocationId, customerId }: { ser
         ) : (
           <span className="text-warning-fg">No jurisdiction and no default · no tax is charged</span>
         )}
-        {customer?.taxExempt && <span className="text-fg-muted"> · Customer is tax-exempt</span>}
+        {customer?.taxExempt && <span className="text-fg-muted">{` · ${getName('customer')} is tax-exempt`}</span>}
       </span>
       {canAssign && (
         <button type="button" className="card-action" onClick={() => setOpen(true)}>
@@ -62,6 +64,7 @@ export function LocationTaxJurisdiction({ serviceLocationId, customerId }: { ser
 }
 
 function AssignForm({ current, onClose }: { current: LocationTax; onClose: () => void }) {
+  const { getName } = useGlossary();
   const queryClient = useQueryClient();
   const canManagePricing = useHasAnyCapability('MANAGE_PRICING');
   const { data: jurisdictions = [] } = useQuery({
@@ -92,7 +95,7 @@ function AssignForm({ current, onClose }: { current: LocationTax; onClose: () =>
     <form onSubmit={submit}>
       <DialogTitle>Tax jurisdiction</DialogTitle>
       <DialogDescription>
-        Applies to new quotes and invoices at this location, and to drafts the next time they’re edited. Sent ones keep their tax.
+        {`Applies to new ${getName('quote', true).toLowerCase()} and ${getName('invoice', true).toLowerCase()} at this ${getName('service_location').toLowerCase()}, and to drafts the next time they’re edited. Sent ones keep their tax.`}
       </DialogDescription>
       <DialogBody>
         <Field>

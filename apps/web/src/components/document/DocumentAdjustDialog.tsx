@@ -9,6 +9,7 @@ import { Select } from '../catalyst/select';
 import { Description, Field, Fieldset, Label, Legend } from '../catalyst/fieldset';
 import { Radio, RadioField, RadioGroup } from '../catalyst/radio';
 import { REASON_LABEL, adjustmentChip, adjustmentSaving, type AdjustmentBase } from './documentModel';
+import { useGlossary } from '../../contexts/GlossaryContext';
 
 export type NewAdjustment = Omit<AddAdjustmentRequest, 'version'>;
 type ManualReason = NewAdjustment['reasonCode'];
@@ -63,6 +64,7 @@ function AdjustForm({
   onRemove: (adjustment: DocumentAdjustment) => Promise<boolean>;
   onClose: () => void;
 }) {
+  const { getName } = useGlossary();
   const line = 'line' in target ? target.line : null;
   // Waiving is for fees (a trip charge, a diagnostic); other lines take a % or $ off.
   const waivable = line?.type === 'FEE';
@@ -109,7 +111,7 @@ function AdjustForm({
       )}
       <DialogDescription>
         {line
-          ? 'The customer sees the list price struck through, with the saving and its reason.'
+          ? `The ${getName('customer').toLowerCase()} sees the list price struck through, with the saving and its reason.`
           : `Spread over ${base.lines === 1 ? 'the 1 line' : `the ${base.lines} lines`} before tax, in proportion to each, so tax stays right when labor and materials are taxed differently.`}
       </DialogDescription>
       <DialogBody>

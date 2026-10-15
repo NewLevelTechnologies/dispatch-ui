@@ -56,7 +56,7 @@ describe('StartDocumentDialog', () => {
     expect(await screen.findByText('4821 E Indian School Rd')).toBeInTheDocument();
     expect(screen.getByText('Tanya Reyes · Phoenix, AZ')).toBeInTheDocument();
     await user.type(search, 'camel');
-    expect(await screen.findByText('2 open jobs')).toBeInTheDocument();
+    expect(await screen.findByText('2 open work orders')).toBeInTheDocument();
     await user.keyboard('{Enter}');
 
     const dialog = screen.getByRole('dialog');
@@ -80,7 +80,7 @@ describe('StartDocumentDialog', () => {
     renderWithProviders(<div />, { routes: routes('invoice'), initialPath: '/' });
 
     await user.type(await screen.findByRole('combobox', { name: 'Search address, customer, or payer' }), 'camel');
-    await screen.findByText('2 open jobs');
+    await screen.findByText('2 open work orders');
     await user.keyboard('{Enter}');
     expect(await screen.findByText(/was accepted and has/)).toHaveTextContent('Q-2051 was accepted and has $990.55 not yet invoiced.');
     expect(apiClient.get).toHaveBeenCalledWith('/financial/quotes', { params: { workOrderId: 'wo-4107', readyToInvoice: true, size: 1 } });
@@ -91,7 +91,7 @@ describe('StartDocumentDialog', () => {
     renderWithProviders(<div />, { routes: routes('quote'), initialPath: '/' });
 
     await user.type(await screen.findByRole('combobox', { name: 'Search address, customer, or payer' }), 'camel');
-    await screen.findByText('2 open jobs');
+    await screen.findByText('2 open work orders');
     await user.keyboard('{Enter}');
     await user.click(screen.getByRole('radio', { name: /Someone else/ }));
     // Nothing to create until the other account is picked.

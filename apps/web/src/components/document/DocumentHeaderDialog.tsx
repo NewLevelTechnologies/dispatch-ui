@@ -5,6 +5,7 @@ import { Button } from '../catalyst/button';
 import { Input } from '../catalyst/input';
 import { Textarea } from '../catalyst/textarea';
 import { Field, FieldGroup, Label, Description } from '../catalyst/fieldset';
+import { useGlossary } from '../../contexts/GlossaryContext';
 
 export interface HeaderDateField {
   key: string;
@@ -87,6 +88,7 @@ function HeaderForm({
   onSave: (values: HeaderValues) => Promise<boolean>;
   onClose: () => void;
 }) {
+  const { getName } = useGlossary();
   const hasTitle = workTitle !== undefined;
   const [heading, setHeading] = useState(workTitle ?? '');
   const [values, setValues] = useState<Record<string, string>>(() =>
@@ -126,7 +128,7 @@ function HeaderForm({
                 onChange={(e) => setHeading(e.target.value)}
                 placeholder="e.g. Condenser replacement · 3-ton"
               />
-              <Description>A short description of the work. The customer sees it on the quote.</Description>
+              <Description>{`A short description of the work. The ${getName('customer').toLowerCase()} sees it on the ${getName('quote').toLowerCase()}.`}</Description>
             </Field>
           )}
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">

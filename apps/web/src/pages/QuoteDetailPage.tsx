@@ -227,8 +227,8 @@ export default function QuoteDetailPage() {
           {quote.acceptedByUserId
             ? ', recorded by the office'
             : quote.approvedByName
-              ? ` by ${quote.approvedByName}, signed on the customer's link`
-              : ' by the customer'}
+              ? ` by ${quote.approvedByName}, signed on the ${getName('customer').toLowerCase()}'s link`
+              : ` by the ${getName('customer').toLowerCase()}`}
           {quote.acceptedRevision != null ? ` · Rev ${quote.acceptedRevision}` : ''}. Accepted {getName('quote', true).toLowerCase()} are locked.
           {invoiced != null &&
             (invoiced === 100
@@ -299,7 +299,7 @@ export default function QuoteDetailPage() {
         onClose={() => setConfirm(null)}
         onConfirm={() => setRevisingId(id ?? null)}
         title={`Edit ${quote.quoteNumber}?`}
-        message={`It goes back to Draft as Rev ${nextRev}. The customer’s link will show “This ${entityLower} is being updated” with no amounts until you re-send. An approval of Rev ${revision ?? 1} won’t be accepted after that.`}
+        message={`It goes back to Draft as Rev ${nextRev}. The ${getName('customer').toLowerCase()}’s link will show “This ${entityLower} is being updated” with no amounts until you re-send. An approval of Rev ${revision ?? 1} won’t be accepted after that.`}
         confirmLabel={`Edit as Rev ${nextRev}`}
       />
       <ConfirmDialog

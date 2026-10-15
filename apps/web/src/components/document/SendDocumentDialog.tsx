@@ -140,7 +140,7 @@ function SendForm({ target, onClose, onSent }: { target: SendTarget; onClose: ()
   const [picked, setPicked] = useState<Record<string, boolean>>({});
   const [extra, setExtra] = useState<Recipient[]>([]);
   const [adding, setAdding] = useState('');
-  const accountRole = customer?.type === 'BILLING_ONLY' ? 'Payer' : 'Customer';
+  const accountRole = getName(customer?.type === 'BILLING_ONLY' ? 'payer' : 'customer');
   const contactPhone = (c: (typeof contacts)[number]) => c.mobilePhone || c.phone;
   const base: Recipient[] = [
     ...(customer?.email ? [{ key: 'account', name: customer.name, role: accountRole, channel: 'email' as const, address: customer.email, on: true }] : []),
@@ -221,12 +221,12 @@ function SendForm({ target, onClose, onSent }: { target: SendTarget; onClose: ()
       <DialogTitle>{draft ? (revision ? `Send ${number} · Rev ${revision}` : `Send ${noun} ${number}`) : `Resend ${number}`}</DialogTitle>
       {revision && revision > 1 && (
         <DialogDescription>
-          {`Rev ${revision} replaces Rev ${revision - 1}. The customer’s link will show this revision, and Rev ${revision - 1} can no longer be approved.`}
+          {`Rev ${revision} replaces Rev ${revision - 1}. The ${getName('customer').toLowerCase()}’s link will show this revision, and Rev ${revision - 1} can no longer be approved.`}
         </DialogDescription>
       )}
       <DialogBody className="!mt-3 flex flex-col gap-4">
         {nteOver && (
-          <Callout kind="warning">{`Over the job’s not-to-exceed. Make sure ${customer?.name ?? 'the customer'} approved the extra before sending.`}</Callout>
+          <Callout kind="warning">{`Over the ${getName('work_order').toLowerCase()}’s not-to-exceed. Make sure ${customer?.name ?? `the ${getName('customer').toLowerCase()}`} approved the extra before sending.`}</Callout>
         )}
 
         <div>
@@ -365,7 +365,7 @@ function SendForm({ target, onClose, onSent }: { target: SendTarget; onClose: ()
       </DialogBody>
       <DialogActions>
         <Button plain className="sm:mr-auto" disabled={previewing} onClick={() => void openPreview()}>
-          Preview customer view
+          {`Preview ${getName('customer').toLowerCase()} view`}
         </Button>
         <Button plain onClick={onClose} disabled={busy}>
           Cancel

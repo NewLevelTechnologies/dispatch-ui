@@ -145,7 +145,7 @@ export default function SettingsLayout() {
     },
     {
       label: t('settings.sections.billing'),
-      items: [{ label: t('settings.nav.documents'), to: '/settings/quotes-invoices' }],
+      items: [{ label: t('settings.nav.documents', { quotes: getName('quote', true), invoices: getName('invoice', true) }), to: '/settings/quotes-invoices' }],
     },
     {
       label: t('settings.sections.dispatch', { dispatch: getName('dispatch') }),

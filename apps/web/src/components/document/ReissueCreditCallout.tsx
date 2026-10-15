@@ -7,6 +7,7 @@ import { showError, showSuccess } from '../../lib/toast';
 import { Button } from '../catalyst/button';
 import { Callout } from '../ui/Callout';
 import { documentErrorMessage, refreshDocumentLists } from './useDocumentEditor';
+import { useGlossary } from '../../contexts/GlossaryContext';
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
@@ -18,6 +19,7 @@ const round2 = (n: number) => Math.round(n * 100) / 100;
  * the credit is waiting.
  */
 export function ReissueCreditCallout({ invoice, billToName, entity }: { invoice: Invoice; billToName: string; entity: string }) {
+  const { getName } = useGlossary();
   const queryClient = useQueryClient();
   const [busy, setBusy] = useState(false);
   const { data: original } = useQuery({
@@ -57,7 +59,7 @@ export function ReissueCreditCallout({ invoice, billToName, entity }: { invoice:
     } catch (err) {
       showError(
         applied > 0 ? `Only ${formatCurrency(applied)} of the credit was applied` : 'Couldn’t apply the credit',
-        documentErrorMessage(err, entity),
+        documentErrorMessage(err, entity, { payment: getName('payment').toLowerCase() }),
       );
     } finally {
       setBusy(false);
@@ -69,7 +71,7 @@ export function ReissueCreditCallout({ invoice, billToName, entity }: { invoice:
 
   return draft ? (
     <Callout kind="neutral" className="mb-2.5">
-      {formatCurrency(available)} from {original.invoiceNumber}’s payments is on {billToName}’s credit. Apply it once this{' '}
+      {formatCurrency(available)} from {original.invoiceNumber}’s {getName('payment', true).toLowerCase()} is on {billToName}’s credit. Apply it once this{' '}
       {entity} is sent: applied to a draft it fully covers, it would mark the draft paid and lock it.
     </Callout>
   ) : (

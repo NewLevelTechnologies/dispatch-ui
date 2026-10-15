@@ -233,11 +233,11 @@ function LocationSearch({ onPick }: { onPick: (l: ServiceLocationSearchResult) =
         <Input
           autoFocus
           role="combobox"
-          aria-label="Search address, customer, or payer"
+          aria-label={`Search address, ${getName('customer').toLowerCase()}, or ${getName('payer').toLowerCase()}`}
           aria-expanded={results.length > 0}
           aria-controls="start-locations"
           aria-activedescendant={results[highlighted] ? `start-location-${results[highlighted].id}` : undefined}
-          placeholder="Search address, customer, or payer"
+          placeholder={`Search address, ${getName('customer').toLowerCase()}, or ${getName('payer').toLowerCase()}`}
           value={search}
           onChange={(e) => {
             setSearch(e.target.value);
@@ -249,7 +249,7 @@ function LocationSearch({ onPick }: { onPick: (l: ServiceLocationSearchResult) =
       <div className="mt-3 mb-1 px-0.5 text-[10.5px] font-semibold uppercase tracking-[0.04em] text-fg-muted">
         {q ? (results.length === 1 ? '1 location' : `${results.length} locations`) : `Recent ${getName('service_location', true).toLowerCase()}`}
       </div>
-      <ul id="start-locations" role="listbox" aria-label="Locations" className="-mx-2">
+      <ul id="start-locations" role="listbox" aria-label={getName('service_location', true)} className="-mx-2">
         {results.map((l, i) => (
           <li
             key={l.id}
@@ -271,7 +271,7 @@ function LocationSearch({ onPick }: { onPick: (l: ServiceLocationSearchResult) =
             </span>
             {(l.openWorkOrderCount ?? 0) > 0 && (
               <span className="whitespace-nowrap text-[11px] text-fg-muted">
-                {l.openWorkOrderCount === 1 ? '1 open job' : `${l.openWorkOrderCount} open jobs`}
+                {`${l.openWorkOrderCount} open ${getName('work_order', l.openWorkOrderCount !== 1).toLowerCase()}`}
               </span>
             )}
           </li>
@@ -279,7 +279,7 @@ function LocationSearch({ onPick }: { onPick: (l: ServiceLocationSearchResult) =
       </ul>
       {q && found && !results.length && (
         <p className="mt-1 px-0.5 text-[12.5px] text-fg-muted">
-          No location matches “{q}”.{' '}
+          {`No ${getName('service_location').toLowerCase()} matches “${q}”.`}{' '}
           <Link to="/service-locations/new" className="text-fg-accent hover:underline">
             {`Add a ${getName('service_location').toLowerCase()}`}
           </Link>
@@ -319,6 +319,7 @@ function Confirm({
   onWorkOrder: (id: string | null) => void;
   onInvoiceQuote: (q: QuoteListItem) => void;
 }) {
+  const { getName } = useGlossary();
   const { data: owner } = useQuery({
     queryKey: ['customers', location.customerId],
     queryFn: () => customerApi.getById(location.customerId),
@@ -383,14 +384,14 @@ function Confirm({
             <Radio value="owner" />
             <Label className="flex flex-wrap items-center gap-1.5">
               <span className="font-semibold text-fg-strong">{location.customerName}</span>
-              {owner?.type === 'BILLING_ONLY' ? <Tag word>Payer</Tag> : <Tag word>Customer</Tag>}
-              <span className="text-[11px] text-fg-muted">Location default</span>
+              <Tag word>{getName(owner?.type === 'BILLING_ONLY' ? 'payer' : 'customer')}</Tag>
+              <span className="text-[11px] text-fg-muted">{`${getName('service_location')} default`}</span>
               {ownerTerms && <span className="text-[12px] text-fg-muted">· {ownerTerms}</span>}
             </Label>
           </RadioField>
           <RadioField>
             <Radio value="other" />
-            <Label>Someone else, like a warranty company or payer</Label>
+            <Label>{`Someone else, like a warranty company or ${getName('payer').toLowerCase()}`}</Label>
           </RadioField>
         </RadioGroup>
         {billing === 'other' && (
@@ -412,9 +413,9 @@ function Confirm({
         </Select>
         <p className="mt-1 text-[11.5px] text-fg-muted">
           {job
-            ? `Shows on ${job.workOrderNumber}'s Quotes & invoices tab${job.customerOrderNumber ? `. Customer PO ${job.customerOrderNumber} carries over.` : '.'}`
+            ? `Shows on ${job.workOrderNumber}'s ${getName('quote', true)} & ${getName('invoice', true).toLowerCase()} tab${job.customerOrderNumber ? `. ${getName('customer')} PO ${job.customerOrderNumber} carries over.` : '.'}`
             : jobs.length
-              ? `${jobs.length === 1 ? '1 job' : `${jobs.length} jobs`} here. Link one so it shows up on the job.`
+              ? `${jobs.length} ${jobs.length === 1 ? woNoun : getName('work_order', true).toLowerCase()} here. Link one so it shows up on the ${woNoun}.`
               : `No open ${woNoun}s here. You can link one later.`}
         </p>
         {kind === 'invoice' && readyQuote && (
@@ -424,7 +425,7 @@ function Confirm({
               <span className="font-semibold tabular-nums">{formatCurrency(readyQuote.remainingToInvoice ?? 0)}</span> not yet invoiced.
             </span>
             <Button outline size="xs" onClick={() => onInvoiceQuote(readyQuote)}>
-              Invoice from quote
+              {`${getName('invoice')} from ${getName('quote').toLowerCase()}`}
             </Button>
           </div>
         )}
