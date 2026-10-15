@@ -188,6 +188,11 @@ export interface PublicTenantBranding {
   city: string | null;
   state: string | null;
   zipCode: string | null;
+  /**
+   * The tenant's glossary overrides by entity code (e.g. `quote` → "Estimate"),
+   * so the page uses the tenant's own words. Absent or partial: use defaults.
+   */
+  glossary?: Record<string, { singular?: string | null; plural?: string | null }> | null;
 }
 
 /**

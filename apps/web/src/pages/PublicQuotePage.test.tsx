@@ -76,6 +76,18 @@ describe('PublicQuotePage', () => {
     expect(screen.queryByRole('button', { name: 'Approve quote' })).not.toBeInTheDocument();
   });
 
+  it('uses the company’s own name for a quote', async () => {
+    const res = buildResponse();
+    vi.mocked(publicApiClient.get).mockResolvedValueOnce({
+      data: { ...res, tenant: { ...res.tenant, glossary: { quote: { singular: 'Estimate', plural: 'Estimates' } } } },
+    });
+    renderAt('tok-1');
+    expect(await screen.findByRole('button', { name: 'Approve estimate' })).toBeInTheDocument();
+    expect(screen.getByText('Estimate date')).toBeInTheDocument();
+    expect(screen.getByText('Questions about this estimate?')).toBeInTheDocument();
+    expect(screen.queryByText(/\bquote\b/i)).not.toBeInTheDocument();
+  });
+
   it('has no preview banner on a real link', async () => {
     vi.mocked(publicApiClient.get).mockResolvedValueOnce({ data: { ...buildResponse(), preview: false } });
     renderAt('tok-1');

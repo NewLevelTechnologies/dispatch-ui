@@ -9,6 +9,7 @@ import {
   type PublicQuoteStatus,
 } from '../api/setup';
 import TenantBrandingHeader from '../components/TenantBrandingHeader';
+import { publicNames } from '../components/public/publicNames';
 import PublicPreviewBanner from '../components/PublicPreviewBanner';
 import CliffPage from '../components/CliffPage';
 import { Badge } from '../components/catalyst/badge';
@@ -74,6 +75,7 @@ const QuoteStatusBadge = ({ status }: QuoteBadgeProps) => {
  */
 const QuoteLoadingState = ({ onRetry }: { onRetry: () => void }) => {
   const { t } = useTranslation();
+  const names = publicNames();
   const [slow, setSlow] = useState(false);
 
   useEffect(() => {
@@ -83,7 +85,7 @@ const QuoteLoadingState = ({ onRetry }: { onRetry: () => void }) => {
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center gap-3 bg-zinc-50 px-4 text-center">
-      <div className="text-zinc-500">{t('public.quote.loading')}</div>
+      <div className="text-zinc-500">{t('public.quote.loading', names)}</div>
       {slow && (
         <>
           <div className="text-sm text-zinc-400">{t('public.common.slowLoad')}</div>
@@ -121,6 +123,7 @@ export default function PublicQuotePage() {
     },
     retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 8000),
   });
+  const names = publicNames(data?.tenant);
 
   const queryClient = useQueryClient();
   const [confirming, setConfirming] = useState(false);
@@ -138,8 +141,8 @@ export default function PublicQuotePage() {
       setConfirming(false);
       const code = axios.isAxiosError(err) ? (err.response?.data as { code?: string } | undefined)?.code : undefined;
       const sender = data?.tenant.displayName ?? t('public.common.theSender');
-      if (code === 'QUOTE_REVISION_STALE') setNotice(t('public.quote.revisionStale'));
-      else if (code === 'QUOTE_NOT_APPROVABLE') setNotice(t('public.quote.notApprovable', { tenant: sender }));
+      if (code === 'QUOTE_REVISION_STALE') setNotice(t('public.quote.revisionStale', names));
+      else if (code === 'QUOTE_NOT_APPROVABLE') setNotice(t('public.quote.notApprovable', { ...names, tenant: sender }));
       else setNotice(t('public.quote.approveError'));
       if (code === 'QUOTE_REVISION_STALE' || code === 'QUOTE_NOT_APPROVABLE') void refetch();
     },
@@ -201,11 +204,11 @@ export default function PublicQuotePage() {
             money and lines; nothing here can be approved until it's re-sent. */}
         {quote.beingUpdated ? (
           <section className="mt-6 rounded-lg border border-zinc-200 bg-white p-6 shadow-sm print:shadow-none">
-            <p className="text-xs uppercase tracking-wide text-zinc-500">{t('public.quote.label')}</p>
+            <p className="text-xs uppercase tracking-wide text-zinc-500">{t('public.quote.label', names)}</p>
             <p className="mt-1 text-lg font-semibold text-zinc-900">#{quote.quoteNumber}</p>
-            <p className="mt-6 text-base font-semibold text-zinc-900">{t('public.quote.beingUpdated')}</p>
+            <p className="mt-6 text-base font-semibold text-zinc-900">{t('public.quote.beingUpdated', names)}</p>
             <p className="mt-1 text-sm text-zinc-600">
-              {t('public.quote.beingUpdatedBody', { tenant: senderName })}
+              {t('public.quote.beingUpdatedBody', { ...names, tenant: senderName })}
             </p>
           </section>
         ) : (
@@ -224,7 +227,7 @@ export default function PublicQuotePage() {
           <div className="flex items-start justify-between gap-4">
             <div>
               <p className="text-xs uppercase tracking-wide text-zinc-500">
-                {t('public.quote.label')}
+                {t('public.quote.label', names)}
               </p>
               <p className="mt-1 text-lg font-semibold text-zinc-900">
                 #{quote.quoteNumber}
@@ -250,7 +253,7 @@ export default function PublicQuotePage() {
           </div>
           {isExpired && (
             <div className="mt-4 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800">
-              {t('public.quote.expiredBody', { date: formatDate(quote.expirationDate), tenant: senderName })}
+              {t('public.quote.expiredBody', { ...names, date: formatDate(quote.expirationDate), tenant: senderName })}
             </div>
           )}
           {isDeclined && (
@@ -268,7 +271,7 @@ export default function PublicQuotePage() {
               <dd className="mt-0.5 text-zinc-900">{customer.name}</dd>
             </div>
             <div>
-              <dt className="text-zinc-500">{t('public.quote.quoteDate')}</dt>
+              <dt className="text-zinc-500">{t('public.quote.quoteDate', names)}</dt>
               <dd className="mt-0.5 text-zinc-900">
                 {formatDate(quote.quoteDate)}
               </dd>
@@ -287,7 +290,7 @@ export default function PublicQuotePage() {
                   ? t('public.quote.approvedOnBy', { date: formatDate(quote.decidedAt), name: quote.approvedByName })
                   : quote.decidedAt
                     ? t('public.quote.approvedOn', { date: formatDate(quote.decidedAt) })
-                    : t('public.quote.approved')}
+                    : t('public.quote.approved', names)}
               </p>
               <p className="mt-0.5">{t('public.quote.approvedBody', { tenant: senderName })}</p>
             </div>
@@ -297,7 +300,7 @@ export default function PublicQuotePage() {
               {confirming ? (
                 <div className="rounded-md border border-zinc-200 bg-zinc-50 p-4">
                   <p className="text-sm font-semibold text-zinc-900">
-                    {t('public.quote.approveTitle', { number: quote.quoteNumber, total: formatMoney(quote.totalAmount) })}
+                    {t('public.quote.approveTitle', { ...names, number: quote.quoteNumber, total: formatMoney(quote.totalAmount) })}
                   </p>
                   <p className="mt-1 text-sm text-zinc-600">{t('public.quote.approveBody', { tenant: senderName })}</p>
                   <label className="mt-3 block text-sm font-medium text-zinc-900" htmlFor="approver-name">
@@ -320,7 +323,7 @@ export default function PublicQuotePage() {
                       onChange={(e) => setConsent(e.target.checked)}
                       className="mt-0.5 size-4 rounded border-zinc-300"
                     />
-                    <span>{t('public.quote.approveConsent', { number: quote.quoteNumber, total: formatMoney(quote.totalAmount) })}</span>
+                    <span>{t('public.quote.approveConsent', { ...names, number: quote.quoteNumber, total: formatMoney(quote.totalAmount) })}</span>
                   </label>
                   <div className="mt-3 flex gap-2">
                     <button
@@ -350,7 +353,7 @@ export default function PublicQuotePage() {
                   }}
                   className="w-full rounded-md bg-zinc-900 px-4 py-3 !text-base !font-semibold text-white hover:bg-zinc-800 sm:w-auto"
                 >
-                  {t('public.quote.approve')}
+                  {t('public.quote.approve', names)}
                 </button>
               )}
             </div>
@@ -388,7 +391,7 @@ export default function PublicQuotePage() {
 
         {(tenant.supportPhone || tenant.supportEmail) && (
           <footer className="mt-8 text-center text-sm text-zinc-500 print:mt-4">
-            <p>{t('public.quote.questions')}</p>
+            <p>{t('public.quote.questions', names)}</p>
             <p className="mt-1 text-zinc-700">
               {t('public.quote.contactCta', { tenant: senderName })}
               {tenant.supportPhone
