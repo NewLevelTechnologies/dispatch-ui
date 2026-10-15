@@ -515,7 +515,7 @@ function AgreementHeader({
           {nextInvoice && (
             <HeaderStat
               first={!compliance && !billing}
-              label="Next invoice"
+              label={`Next ${getName('invoice').toLowerCase()}`}
               valueClassName="text-fg-accent"
               value={formatCurrency(nextInvoice.amount)}
               sub={`${formatDayNoYear(nextInvoice.dueDate)} · ${nextInvoice.n} of ${nextInvoice.of}`}
@@ -885,7 +885,7 @@ function FinancialSnapshotCard({ agreement }: { agreement: AgreementResponse }) 
           <EmptyState
             icon={<ReceiptPercentIcon className="size-9 text-fg-dim" />}
             title="No billing set up"
-            description="Set the contract value and how it's invoiced. Installments generate automatically and flow into the Invoices tab."
+            description={`Set the contract value and how it's invoiced. Installments generate automatically and flow into the ${getName('invoice', true)} tab.`}
             action={
               <Button color="accent" size="xs" onClick={() => setSetupOpen(true)}>
                 Set up billing
@@ -909,7 +909,7 @@ function FinancialSnapshotCard({ agreement }: { agreement: AgreementResponse }) 
                 mono={false}
               />
               <FinCell
-                k="Next invoice"
+                k={`Next ${getName('invoice').toLowerCase()}`}
                 v={nextInvoice ? formatCurrency(nextInvoice.amount) : '—'}
                 sub={nextInvoice ? `${formatDayNoYear(nextInvoice.dueDate)} · ${nextInvoice.n} of ${nextInvoice.of}` : undefined}
                 accent={!!nextInvoice}
@@ -1203,6 +1203,7 @@ function formatDuration(mins: number): string {
 }
 
 function TermCard({ agreement, onEdit }: { agreement: AgreementResponse; onEdit: () => void }) {
+  const { getName } = useGlossary();
   const renewsInDays = daysUntil(agreement.termEnd);
   return (
     <Card
@@ -1223,7 +1224,7 @@ function TermCard({ agreement, onEdit }: { agreement: AgreementResponse; onEdit:
             <span className="text-fg-muted">
               {' · '}
               {agreement.nextTermBillingAmount != null
-                ? `${formatCurrency(agreement.nextTermBillingAmount)} per invoice`
+                ? `${formatCurrency(agreement.nextTermBillingAmount)} per ${getName('invoice').toLowerCase()}`
                 : 'renewal booked'}
             </span>
           </span>

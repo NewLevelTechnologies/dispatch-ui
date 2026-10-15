@@ -32,6 +32,7 @@ import { StatusChip } from '../components/ui/StatusChip';
 import { useApprovalsVisible } from '../hooks/useApprovalsVisible';
 import { useCurrentUser } from '../hooks/useCurrentUser';
 import { extractApiError, showError, showSuccess } from '../lib/toast';
+import { useGlossary } from '../contexts/GlossaryContext';
 
 type TabId = 'pending' | 'my-requests' | 'all' | 'approved' | 'rejected' | 'expired';
 
@@ -459,6 +460,7 @@ function RequestRow({
   selected: boolean;
   onSelect: () => void;
 }) {
+  const { getName } = useGlossary();
   const { t } = useTranslation();
   const urgent = isUrgent(request);
   const name = requesterFullName(request.requester);
@@ -507,7 +509,7 @@ function RequestRow({
       </div>
 
       <div className="font-mono text-[11px] text-fg-muted">
-        <Strong>{request.workOrder.displayId}</Strong> · {fallbackText(request.workOrder.customerName, 'Unknown customer')}
+        <Strong>{request.workOrder.displayId}</Strong> · {fallbackText(request.workOrder.customerName, `Unknown ${getName('customer').toLowerCase()}`)}
       </div>
 
       {urgent && (
@@ -577,6 +579,7 @@ function DetailPane({
   onOpenWorkOrder,
   hasNeighbors,
 }: DetailPaneProps) {
+  const { getName } = useGlossary();
   const { t } = useTranslation();
   const name = requesterFullName(request.requester);
   const urgent = isUrgent(request);
@@ -643,7 +646,7 @@ function DetailPane({
           />
           <KVRow
             k={t('common.customer')}
-            v={fallbackText(request.workOrder.customerName, 'Unknown customer')}
+            v={fallbackText(request.workOrder.customerName, `Unknown ${getName('customer').toLowerCase()}`)}
           />
           {request.workOrder.serviceLocation && (
             <KVRow k={t('common.serviceLocation')} v={request.workOrder.serviceLocation} />

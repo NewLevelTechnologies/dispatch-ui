@@ -154,7 +154,7 @@ function StartForm({
   return (
     <>
       <DialogTitle>{`New ${noun}`}</DialogTitle>
-      <DialogDescription>Where is the work? Pricing and tax come from the service location and who’s billed.</DialogDescription>
+      <DialogDescription>{`Where is the work? Pricing and tax come from the ${getName('service_location').toLowerCase()} and who’s billed.`}</DialogDescription>
       <DialogBody className="!mt-3">
         {!location ? (
           <LocationSearch onPick={(l) => setLocation(l)} />
@@ -247,7 +247,7 @@ function LocationSearch({ onPick }: { onPick: (l: ServiceLocationSearchResult) =
         />
       </InputGroup>
       <div className="mt-3 mb-1 px-0.5 text-[10.5px] font-semibold uppercase tracking-[0.04em] text-fg-muted">
-        {q ? (results.length === 1 ? '1 location' : `${results.length} locations`) : `Recent ${getName('service_location', true).toLowerCase()}`}
+        {q ? `${results.length} ${getName('service_location', results.length !== 1).toLowerCase()}` : `Recent ${getName('service_location', true).toLowerCase()}`}
       </div>
       <ul id="start-locations" role="listbox" aria-label={getName('service_location', true)} className="-mx-2">
         {results.map((l, i) => (

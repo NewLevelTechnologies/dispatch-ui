@@ -186,7 +186,7 @@ function AdjustForm({
           <Field className="mt-3">
             <Label>Note</Label>
             <Input value={note} maxLength={500} onChange={(e) => setNote(e.target.value)} placeholder="Optional" />
-            <Description>For the office. The customer sees only the reason.</Description>
+            <Description>{`For the office. The ${getName('customer').toLowerCase()} sees only the reason.`}</Description>
           </Field>
         </Fieldset>
       </DialogBody>

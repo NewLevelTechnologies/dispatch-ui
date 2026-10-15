@@ -22,6 +22,7 @@ import { Dialog, DialogActions, DialogBody, DialogDescription, DialogTitle } fro
 import { Button } from './catalyst/button';
 import { Input } from './catalyst/input';
 import IconButton from './IconButton';
+import { useGlossary } from '../contexts/GlossaryContext';
 
 interface Props {
   isOpen: boolean;
@@ -70,6 +71,7 @@ function validateFile(file: File): string | null {
 }
 
 export default function AgreementFileUploadDialog({ isOpen, onClose, agreementId }: Props) {
+  const { getName } = useGlossary();
   const queryClient = useQueryClient();
   const { t } = useTranslation();
 
@@ -192,8 +194,7 @@ export default function AgreementFileUploadDialog({ isOpen, onClose, agreementId
     <Dialog open={isOpen} onClose={isUploading ? () => undefined : onClose} size="2xl">
       <DialogTitle>Upload documents</DialogTitle>
       <DialogDescription>
-        Attach the signed contract, COIs, and other paperwork to this agreement — PDF, Word, Excel,
-        PowerPoint, text, or image scan, up to 25 MB each.
+        {`Attach the signed contract, COIs, and other paperwork to this ${getName('agreement').toLowerCase()} — PDF, Word, Excel, PowerPoint, text, or image scan, up to 25 MB each.`}
       </DialogDescription>
       <form onSubmit={handleSubmit}>
         <DialogBody>

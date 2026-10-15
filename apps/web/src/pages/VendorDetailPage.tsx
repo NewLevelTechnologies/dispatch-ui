@@ -12,6 +12,7 @@ import { Text } from '../components/catalyst/text';
 import { Pill, Tag } from '../components/ui/Pill';
 import { PoTypeBadge } from '../components/ui/PoTypeBadge';
 import { LoadingState } from '../components/ui/LoadingState';
+import { useGlossary } from '../contexts/GlossaryContext';
 
 const KIND_LABEL: Record<VendorKind, string> = {
   DISTRIBUTOR: 'Distributor',
@@ -24,6 +25,7 @@ const currency = new Intl.NumberFormat('en-US', { style: 'currency', currency: '
 const money = (n?: number | null) => currency.format(n ?? 0);
 
 export default function VendorDetailPage() {
+  const { getName } = useGlossary();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
 
@@ -163,7 +165,7 @@ export default function VendorDetailPage() {
                 >
                   <span className="shrink-0 font-mono text-[12px] font-bold text-fg-strong">{po.poNumber}</span>
                   <PoTypeBadge type={po.type} />
-                  <span className="truncate text-[11.5px] text-fg-muted">{po.workOrderId ? 'Work order' : 'Stock'}</span>
+                  <span className="truncate text-[11.5px] text-fg-muted">{po.workOrderId ? getName('work_order') : 'Stock'}</span>
                   <span className="grow" />
                   <Pill tone={PO_STATUS_TONE[po.status]} dot={poStatusHasDot(po.status)}>
                     {PO_STATUS_LABEL[po.status]}

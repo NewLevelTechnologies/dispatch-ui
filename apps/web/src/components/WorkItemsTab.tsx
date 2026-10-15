@@ -711,7 +711,7 @@ function NewWorkItemComposer({
       if (!description) {
         showError(
           t('workOrders.workItems.complaintRequiredForEquipment', {
-            defaultValue: 'Enter a complaint before adding equipment.',
+            defaultValue: `Enter a complaint before adding ${getName('equipment').toLowerCase()}.`,
           })
         );
       }

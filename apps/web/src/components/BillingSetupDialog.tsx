@@ -17,6 +17,7 @@ import { Select } from './catalyst/select';
 import { Checkbox, CheckboxField } from './catalyst/checkbox';
 import { extractApiError, showSuccess } from '../lib/toast';
 import { cadenceLabel, formatCurrency, periodsPerYear } from '../pages/agreement/agreementShared';
+import { useGlossary } from '../contexts/GlossaryContext';
 
 interface BillingSetupDialogProps {
   isOpen: boolean;
@@ -48,6 +49,7 @@ export default function BillingSetupDialog({
   defaultAnchorDate,
   plan,
 }: BillingSetupDialogProps) {
+  const { getName } = useGlossary();
   const queryClient = useQueryClient();
   const isEdit = Boolean(billing);
 
@@ -146,7 +148,7 @@ export default function BillingSetupDialog({
             <FieldGroup className="!space-y-3">
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-[150px_1fr_110px] sm:gap-4">
                 <Field size="xs">
-                  <Label size="xs" required>Amount / invoice</Label>
+                  <Label size="xs" required>{`Amount / ${getName('invoice').toLowerCase()}`}</Label>
                   <InputGroup>
                     <CurrencyDollarIcon data-slot="icon" />
                     <Input
@@ -221,8 +223,7 @@ export default function BillingSetupDialog({
                     {amountNum > 0 ? (
                       billingMode === 'FIXED_SCHEDULE' ? (
                         <>
-                          Generates <strong className="font-semibold">{perYear}</strong> invoice
-                          {perYear === 1 ? '' : 's'}/yr of{' '}
+                          Generates <strong className="font-semibold">{perYear}</strong> {getName('invoice', perYear !== 1).toLowerCase()}/yr of{' '}
                           <strong className="font-semibold tabular-nums">{formatCurrency(amountNum)}</strong> —{' '}
                           {cadenceLabel(cadenceUnit, intervalNum).toLowerCase()}.
                           {arr != null && (
@@ -239,7 +240,7 @@ export default function BillingSetupDialog({
                     )}
                   </span>
                 </div>
-                <div className="mt-1 pl-6 text-[11px] text-fg-dim">Preview — actual invoices appear in the Invoices tab.</div>
+                <div className="mt-1 pl-6 text-[11px] text-fg-dim">{`Preview — actual ${getName('invoice', true).toLowerCase()} appear in the ${getName('invoice', true)} tab.`}</div>
               </div>
 
               <CheckboxField>

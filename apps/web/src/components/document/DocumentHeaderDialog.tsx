@@ -146,7 +146,7 @@ function HeaderForm({
             ))}
           </div>
           <Field className="sm:max-w-[240px]">
-            <Label>Customer PO #</Label>
+            <Label>{`${getName('customer')} PO #`}</Label>
             <Input value={po} onChange={(e) => setPo(e.target.value)} placeholder="None" className="[&_input]:font-mono" />
           </Field>
           <Field>

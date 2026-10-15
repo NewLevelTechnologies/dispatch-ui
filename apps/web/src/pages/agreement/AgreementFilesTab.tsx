@@ -33,6 +33,7 @@ import { Dropdown, DropdownButton, DropdownItem, DropdownLabel, DropdownMenu } f
 import IconButton from '../../components/IconButton';
 import { LoadingState } from '../../components/ui/LoadingState';
 import AgreementFileUploadDialog from '../../components/AgreementFileUploadDialog';
+import { useGlossary } from '../../contexts/GlossaryContext';
 
 const PAGE_LIMIT = 100;
 
@@ -48,6 +49,7 @@ function nextPageParam(last: PagedFiles<WorkOrderFile>): number | undefined {
 }
 
 export default function AgreementFilesTab({ agreementId }: { agreementId: string }) {
+  const { getName } = useGlossary();
   const [uploadOpen, setUploadOpen] = useState(false);
   const [captioning, setCaptioning] = useState<WorkOrderFile | null>(null);
 
@@ -73,7 +75,7 @@ export default function AgreementFilesTab({ agreementId }: { agreementId: string
     <div className="flex flex-col gap-3">
       <div className="flex items-center gap-2">
         <div className="text-[11.5px] text-fg-muted">
-          The signed contract, COIs, and other paperwork for this agreement.
+          {`The signed contract, COIs, and other paperwork for this ${getName('agreement').toLowerCase()}.`}
         </div>
         <span className="grow" />
         <Button color="accent" size="xs" onClick={() => setUploadOpen(true)}>

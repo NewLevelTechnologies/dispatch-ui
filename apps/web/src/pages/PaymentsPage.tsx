@@ -432,7 +432,7 @@ export default function PaymentsPage() {
                   }}
                   required
                 >
-                  <option value="">Select invoice...</option>
+                  <option value="">{`Select ${getName('invoice').toLowerCase()}...`}</option>
                   {(Array.isArray(invoices) ? invoices.filter(inv => inv.balanceDue > 0) : []).map((invoice) => (
                     <option key={invoice.id} value={invoice.id}>
                       {invoice.invoiceNumber} - {getCustomerName(invoice.customerId)} - {t('payments.form.balance')}: {formatCurrency(invoice.balanceDue)}

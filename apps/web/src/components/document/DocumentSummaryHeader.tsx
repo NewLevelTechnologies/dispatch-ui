@@ -89,7 +89,7 @@ export function DocumentSummaryHeader({
       <div className="flex min-w-0 flex-col gap-3 px-4 py-3.5">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Party label="Bill to" party={billTo} />
-          <Party label={getName('service_location')} party={location ?? { name: '—', sub: 'No location on this document' }} />
+          <Party label={getName('service_location')} party={location ?? { name: '—', sub: `No ${getName('service_location').toLowerCase()} on this document` }} />
         </div>
         {meta.length > 0 && (
           <div className="flex min-h-6 flex-wrap items-center gap-2 text-[12px]">

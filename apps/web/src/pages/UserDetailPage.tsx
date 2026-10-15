@@ -30,6 +30,7 @@ import { Text } from '../components/catalyst/text';
 import ConfirmDialog from '../components/ConfirmDialog';
 import RemovalGuardDialog, { type RemovalGuard } from '../components/users/RemovalGuardDialog';
 import { showError, showSuccess, extractApiError, errorCode, isConflict } from '../lib/toast';
+import { useGlossary } from '../contexts/GlossaryContext';
 
 function formatDateShort(d: string | Date | undefined): string {
   if (!d) return '—';
@@ -489,6 +490,7 @@ function AccessCard({
   divisions: { id: string; name: string }[];
   onEditAccess?: () => void;
 }) {
+  const { getName } = useGlossary();
   const [open, setOpen] = useState(false);
   const { t } = useTranslation();
   const userRegions = (user.dispatchRegionIds ?? [])
@@ -541,7 +543,7 @@ function AccessCard({
       )}
 
       <DataRow
-        label="Regions"
+        label={getName('dispatch_region', true)}
         labelWidth={90}
         last={capCount === 0 && divisions.length === 0}
       >
@@ -566,7 +568,7 @@ function AccessCard({
           invite an admin to "fix" it by narrowing someone who is available
           for anything. */}
       {divisions.length > 0 && (
-        <DataRow label="Divisions" labelWidth={90} last={capCount === 0}>
+        <DataRow label={getName('division', true)} labelWidth={90} last={capCount === 0}>
           <div className="flex flex-wrap gap-1">
             {userDivisions.length === 0 ? (
               <span className="text-[11.5px] text-fg-muted">

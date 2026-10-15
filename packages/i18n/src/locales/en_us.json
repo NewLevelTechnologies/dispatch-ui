@@ -137,9 +137,9 @@
     "builtIn": "Built-in",
     "cancel": "Cancel",
     "clear": "Clear",
-    "customer": "Customer",
+    "customer": "{{customer}}",
     "id": "ID",
-    "serviceLocation": "Service location",
+    "serviceLocation": "{{location}}",
     "close": "Close",
     "cloning": "Cloning...",
     "create": "Create",
@@ -172,7 +172,7 @@
       "addressLine2": "Address Line 2",
       "afterHoursPhone": "After-Hours Phone",
       "billingAddress": "Billing Address",
-      "billingAddressSameAsService": "Send invoice to same address",
+      "billingAddressSameAsService": "Send {{invoice, lowercase}} to same address",
       "city": "City",
       "code": "Code",
       "color": "Color",
@@ -304,7 +304,7 @@
       },
       "menu": {
         "cancel": "Cancel…",
-        "cancelBody": "Ends the {{agreement}} mid-term. {{workOrder}} and invoice history are kept; new {{workOrders}} stop generating.",
+        "cancelBody": "Ends the {{agreement}} mid-term. {{workOrder}} and {{invoice, lowercase}} history are kept; new {{workOrders}} stop generating.",
         "cancelConfirm": "Cancel {{agreement}}",
         "cancelFailed": "Couldn't cancel the {{agreement}}",
         "cancelTitle": "Cancel {{number}}?",
@@ -392,7 +392,7 @@
   "approvals": {
     "title": "Approvals",
     "subtitle": "Work item transitions waiting on your sign-off · expiries auto-reject if untouched",
-    "filteredByWorkOrder": "Filtered by work order",
+    "filteredByWorkOrder": "Filtered by {{workOrder, lowercase}}",
     "tabs": {
       "pending": "Pending",
       "myRequests": "My requests",
@@ -409,7 +409,7 @@
     "detail": {
       "header": "{{name}} requested an approval",
       "workflowName": "{{workflow}} workflow",
-      "workOrder": "Work order",
+      "workOrder": "{{workOrder}}",
       "workItem": "Work item",
       "reasonFromRequester": "Reason from requester",
       "notApprover": "You don't have the capability to approve this transition. The request is visible here for reference.",
@@ -1273,8 +1273,8 @@
       "balanceDue": "Balance Due",
       "customer": "Customer",
       "dueDate": "Due Date",
-      "invoiceDate": "Invoice Date",
-      "invoiceNumber": "Invoice Number",
+      "invoiceDate": "{{invoice}} Date",
+      "invoiceNumber": "{{invoice}} Number",
       "status": "Status",
       "totalAmount": "Total"
     }
@@ -1385,21 +1385,21 @@
     }
   },
   "payments": {
-    "description": "Track customer payments and transactions",
+    "description": "Track {{customer, lowercase}} {{payments, lowercase}} and transactions",
     "filters": {
       "anyMethod": "Any method",
       "anyStatus": "Any status",
       "noMatch": "No {{entities}} match these filters",
-      "onePayer": "One payer",
+      "onePayer": "One {{payer, lowercase}}",
       "received": "Received"
     },
     "form": {
       "amount": "Amount",
       "balance": "Balance",
-      "invoice": "Invoice",
-      "invoiceBalance": "Invoice balance",
-      "paymentDate": "Payment Date",
-      "paymentMethod": "Payment Method",
+      "invoice": "{{invoice}}",
+      "invoiceBalance": "{{invoice}} balance",
+      "paymentDate": "{{payment}} Date",
+      "paymentMethod": "{{payment}} Method",
       "paymentNumber": "Payment Number",
       "referenceNumber": "Reference Number"
     },
@@ -1424,9 +1424,9 @@
       "appliedTo": "Applied to",
       "method": "Method",
       "ofTotal": "of {{amount}}",
-      "payer": "Payer",
+      "payer": "{{payer}}",
       "paymentDate": "Date",
-      "paymentNumber": "Payment #",
+      "paymentNumber": "{{payment}} #",
       "receivedBy": "Received by",
       "reference": "Reference",
       "unapplied": "Unapplied"
@@ -1678,7 +1678,7 @@
       "editTitle": "Edit {{name}}",
       "errorEmptyCapabilities": "Pick at least one capability. A role with zero capabilities can't grant access.",
       "namePlaceholder": "e.g. Refund Approver",
-      "performsFieldWorkHint": "Users in this role can be assigned to work orders and appear in dispatch-board pickers.",
+      "performsFieldWorkHint": "Users in this role can be assigned to {{workOrders, lowercase}} and appear in {{dispatch, lowercase}}-board pickers.",
       "performsFieldWorkLabel": "Performs field work",
       "removalWarningArea": "{{area}}: removing {{count}} capability",
       "removalWarningArea_other": "{{area}}: removing {{count}} capabilities",
@@ -1901,7 +1901,7 @@
       "exported": "Exported {{file}} · {{count}} callbacks",
       "groupBy": {
         "none": "Nothing",
-        "originalDivision": "Original job's {{division}}",
+        "originalDivision": "Original {{workOrder, lowercase}}'s {{division}}",
         "originalType": "Original {{workOrder}} type"
       },
       "list": {
@@ -1913,14 +1913,14 @@
         "linkedBy": "Linked by",
         "loadFailed": "Couldn't load the callbacks",
         "none": "No callbacks were raised in this range.",
-        "original": "Original job",
+        "original": "Original {{workOrder, lowercase}}",
         "originalGone": "Original {{workOrder}} removed",
         "title": "Callbacks"
       },
       "loadFailed": "Couldn't load the callbacks report",
       "nobodyArrived": "No {{tech}} arrived on the original",
-      "sub": "{{range}} · {{dates}}. Confirmed callbacks raised in the range, charged to every {{tech}} who arrived on the original job.",
-      "subToDate": "{{range}} · {{dates}}, to date. Confirmed callbacks raised in the range, charged to every {{tech}} who arrived on the original job.",
+      "sub": "{{range}} · {{dates}}. Confirmed callbacks raised in the range, charged to every {{tech}} who arrived on the original {{workOrder, lowercase}}.",
+      "subToDate": "{{range}} · {{dates}}, to date. Confirmed callbacks raised in the range, charged to every {{tech}} who arrived on the original {{workOrder, lowercase}}.",
       "summary": {
         "count": "Callbacks",
         "daysBetween": "Average days after",
@@ -1928,7 +1928,7 @@
         "daysBetweenSub": "From the original {{workOrder}}'s completion"
       },
       "table": {
-        "hint": "By the original job. Pick one to list its callbacks",
+        "hint": "By the original {{workOrder, lowercase}}. Pick one to list its callbacks",
         "hintTech": "A callback with two {{tech}}s counts for both. Pick one to list theirs"
       },
       "title": "Callbacks",
@@ -1944,7 +1944,7 @@
         "name": "Arrival windows"
       },
       "callbacks": {
-        "description": "Every confirmed callback with its original job, the {{techs, lowercase}} charged and the days between. A {{tech, lowercase}}'s count matches Tech productivity.",
+        "description": "Every confirmed callback with its original {{workOrder, lowercase}}, the {{techs, lowercase}} charged and the days between. A {{tech, lowercase}}'s count matches Tech productivity.",
         "name": "Callbacks"
       },
       "filter-pull-list": {
@@ -1956,7 +1956,7 @@
         "name": "{{workOrders}} completed"
       },
       "payments": {
-        "description": "Received {{payments, lowercase}} by method, payer or day, for bank reconciliation. Totals match the Revenue report's collected.",
+        "description": "Received {{payments, lowercase}} by method, {{payer, lowercase}} or day, for bank reconciliation. Totals match the Revenue report's collected.",
         "name": "{{payments}} received"
       },
       "quotes": {
@@ -2007,7 +2007,7 @@
       "sub": "{{range}} · {{dates}}. {{entities}} by the day they were completed, with everything billed on them.",
       "subToDate": "{{range}} · {{dates}}, to date. {{entities}} by the day they were completed, with everything billed on them.",
       "summary": {
-        "billedSub": "On these jobs, whatever the {{invoices}}' dates",
+        "billedSub": "On these {{workOrders, lowercase}}, whatever the {{invoices}}' dates",
         "jobs": "Completed",
         "notBilledSub": "Left out of the average ticket",
         "notBilledVisitsSub_one": "Left out of the average ticket, as is {{count}} {{agreement}} visit",
@@ -2018,7 +2018,7 @@
         "billed": "Billed",
         "hint": "Pick one to list its {{entities}}",
         "notBilled": "Not billed yet",
-        "perTech": "Per {{tech}}: Tech productivity"
+        "perTech": "Per {{tech}}: {{technician}} productivity"
       },
       "title": "{{entities}} completed"
     },
@@ -2048,7 +2048,7 @@
         "day": "Day",
         "method": "Method",
         "none": "Nothing",
-        "payer": "Payer"
+        "payer": "{{payer}}"
       },
       "loadFailed": "Couldn't load the {{entities}} report",
       "sub": "{{range}} · {{dates}}. {{entities}} by date received. The Revenue report's collected, split.",
@@ -2370,8 +2370,8 @@
     "itemStatuses": {
       "builtInBadge": "Built-in",
       "builtInCantDelete": "Built-in statuses can't be deleted.",
-      "categoryChangedWarning": "Changing a built-in status's category may affect dispatch queue and progress rollups.",
-      "categoryHelper": "Groups statuses for the dispatch queue and progress rollups.",
+      "categoryChangedWarning": "Changing a built-in status's category may affect {{dispatch, lowercase}} queue and progress rollups.",
+      "categoryHelper": "Groups statuses for the {{dispatch, lowercase}} queue and progress rollups.",
       "codeHint": "Stable identifier. UPPERCASE_WITH_UNDERSCORES. Auto-generated from name.",
       "codeImmutable": "Code cannot be changed after creation.",
       "codeLockedHint": "Built-in status codes are stable identifiers used by reports and integrations. Rename it freely — the code stays.",
@@ -2379,7 +2379,7 @@
       "colCode": "Code",
       "colName": "Name",
       "colorConflict": "This color is already used by {{statusName}}. Pick a different color.",
-      "colorHint": "Shown on work item lists, the dispatch board, and reports.",
+      "colorHint": "Shown on {{workItem, lowercase}} lists, the {{dispatch, lowercase}} board, and reports.",
       "colorLabel": "Color",
       "colorTakenBy": "Used by {{name}}",
       "couldNotLoad": "Couldn't load {{workItem, lowercase}} statuses",
@@ -2404,7 +2404,7 @@
       "searchPlaceholder": "Search statuses…",
       "singular": "Status",
       "statusSingular": "Status",
-      "subtitle": "{{count}} statuses · used to track {{workItem, lowercase}} progress through dispatch and completion",
+      "subtitle": "{{count}} statuses · used to track {{workItem, lowercase}} progress through {{dispatch, lowercase}} and completion",
       "table": {
         "category": "Category",
         "terminal": "Terminal"
@@ -2550,10 +2550,10 @@
         "status": "Status"
       },
       "disableConfirm": {
-        "body": "Service locations and technicians assigned to \"{{name}}\" will lose their region. They'll appear in an Unassigned bucket on the {{dispatch, lowercase}} board until reassigned.",
+        "body": "{{locations}} and {{technicians, lowercase}} assigned to \"{{name}}\" will lose their {{region, lowercase}}. They'll appear in an Unassigned bucket on the {{dispatch, lowercase}} board until reassigned.",
         "title": "Disable \"{{name}}\"?"
       },
-      "emptyDescription": "Add a region to start organizing service locations and technicians on the {{dispatch, lowercase}} board.",
+      "emptyDescription": "Add a {{region, lowercase}} to start organizing {{locations, lowercase}} and {{technicians, lowercase}} on the {{dispatch, lowercase}} board.",
       "emptyTitle": "No {{regions, lowercase}} yet",
       "field": {
         "abbreviation": "Abbreviation",
@@ -2566,11 +2566,11 @@
       "titleAdd": "Add {{region}}",
       "titleEdit": "Edit {{region}}",
       "toast": {
-        "disabled": "Region disabled",
-        "disableFailed": "Couldn't disable region",
-        "enabled": "Region enabled",
-        "enableFailed": "Couldn't enable region",
-        "reorderFailed": "Couldn't reorder regions"
+        "disabled": "{{region}} disabled",
+        "disableFailed": "Couldn't disable {{region, lowercase}}",
+        "enabled": "{{region}} enabled",
+        "enableFailed": "Couldn't enable {{region, lowercase}}",
+        "reorderFailed": "Couldn't reorder {{regions, lowercase}}"
       }
     },
     "companyProfile": {
@@ -2592,7 +2592,7 @@
         "edit": "Edit"
       },
       "audience": {
-        "customer": "Customer",
+        "customer": "{{customer}}",
         "internal": "Internal"
       },
       "channel": {
@@ -2619,7 +2619,7 @@
       "loading": "Loading templates...",
       "nounPlural": "templates",
       "searchPlaceholder": "Search templates…",
-      "subtitle": "Customize the email and SMS messages sent to customers. Use Mustache variables like",
+      "subtitle": "Customize the email and SMS messages sent to {{customers, lowercase}}. Use Mustache variables like",
       "summary": "customized · {{systemDefault}} on system defaults",
       "versionShort": "v{{version}}",
       "status": {
@@ -2724,29 +2724,29 @@
       "errorReorder": "Failed to reorder {{entity}}"
     },
     "divisions": {
-      "codeChangedWarning": "Changing the code may break integrations and reports that reference this division.",
+      "codeChangedWarning": "Changing the code may break integrations and reports that reference this {{division, lowercase}}.",
       "codeHint": "Stable identifier. UPPERCASE_WITH_UNDERSCORES. Auto-generated from name.",
       "codeImmutable": "Editing the code may break integrations and reports.",
       "colCode": "Code",
       "colName": "Name",
-      "couldNotLoad": "Couldn't load divisions",
+      "couldNotLoad": "Couldn't load {{divisions, lowercase}}",
       "deleteConfirm": "Delete \"{{name}}\"?",
-      "deleteWarning": "Customers, technicians, and work orders assigned to this division will become unassigned.",
+      "deleteWarning": "{{customers}}, {{technicians, lowercase}}, and {{workOrders, lowercase}} assigned to this {{division, lowercase}} will become unassigned.",
       "description": "Operating units (e.g., HVAC, Electrical, Plumbing) used to organize {{divisions}} and route work.",
-      "emptyDescription": "Add a division to split your dispatch board view by team, region, or service line.",
-      "emptyTitle": "No divisions yet",
-      "errorCreate": "Failed to create division",
-      "errorUpdate": "Failed to update division",
+      "emptyDescription": "Add a {{division, lowercase}} to split your {{dispatch, lowercase}} board view by team, {{region, lowercase}}, or service line.",
+      "emptyTitle": "No {{divisions, lowercase}} yet",
+      "errorCreate": "Failed to create {{division, lowercase}}",
+      "errorUpdate": "Failed to update {{division, lowercase}}",
       "form": {
-        "create": "Create division",
+        "create": "Create {{division, lowercase}}",
         "save": "Save changes",
-        "titleAdd": "Add Division",
+        "titleAdd": "Add {{division}}",
         "titleEdit": "Edit {{name}}"
       },
-      "noMatches": "No divisions match your search.",
+      "noMatches": "No {{divisions, lowercase}} match your search.",
       "rowsCount": "{{count}} {{noun}}",
-      "searchPlaceholder": "Search divisions…",
-      "subtitle": "{{count}} divisions · split the dispatch board view and segment reports"
+      "searchPlaceholder": "Search {{divisions, lowercase}}…",
+      "subtitle": "{{count}} {{divisions, lowercase}} · split the {{dispatch, lowercase}} board view and segment reports"
     },
     "workOrderTypes": {
       "addColorless": "Set up the {{count}} {{accents}} after adding the type.",
@@ -2757,7 +2757,7 @@
       "colCode": "Code",
       "colName": "Name",
       "colorConflict": "This color is already used by {{typeName}}. Pick a different color.",
-      "colorHint": "Shown on {{workOrder, lowercase}} lists, the dispatch board, and reports.",
+      "colorHint": "Shown on {{workOrder, lowercase}} lists, the {{dispatch, lowercase}} board, and reports.",
       "colorLabel": "Color",
       "colorTakenBy": "Used by {{name}}",
       "couldNotLoad": "Couldn't load {{workOrder, lowercase}} types",
@@ -2778,7 +2778,7 @@
       "rowsCount": "{{count}} {{noun}}",
       "searchPlaceholder": "Search types…",
       "singular": "Type",
-      "subtitle": "{{count}} types · used to classify {{workOrder, lowercase}}s in lists, the dispatch board, and reports"
+      "subtitle": "{{count}} types · used to classify {{workOrders, lowercase}} in lists, the {{dispatch, lowercase}} board, and reports"
     },
     "workflows": {
       "backToList": "Workflows",
@@ -2791,9 +2791,9 @@
       "couldNotLoad": "Couldn't load workflows",
       "editor": {
         "noStatuses": "No statuses available. Create item statuses first to define a workflow.",
-        "subtitle": "Click a cell to toggle whether items in the row status can transition to the column status. System actions (dispatch creation, completion, cancellation) also drive automatic changes — those don't appear in the matrix."
+        "subtitle": "Click a cell to toggle whether items in the row status can transition to the column status. System actions ({{dispatch, lowercase}} creation, completion, cancellation) also drive automatic changes — those don't appear in the matrix."
       },
-      "emptyDescription": "Workflows are created automatically when you add a work order type.",
+      "emptyDescription": "Workflows are created automatically when you add a {{workOrder, lowercase}} type.",
       "emptyTitle": "No workflows yet",
       "enforcement": {
         "open": "Open",
@@ -2801,7 +2801,7 @@
         "saved": "Enforcement mode updated",
         "saveError": "Couldn't update enforcement mode",
         "strict": "Strict",
-        "strictDescription": "Items can only transition along defined paths. Undefined transitions return an error. System actions (dispatch events) bypass enforcement.",
+        "strictDescription": "Items can only transition along defined paths. Undefined transitions return an error. System actions ({{dispatch, lowercase}} events) bypass enforcement.",
         "title": "Enforcement"
       },
       "legend": {
@@ -2845,7 +2845,7 @@
         "transitionCount_one": "{{count}} transition",
         "transitionCount_other": "{{count}} transitions"
       },
-      "subtitle": "One workflow per work order type · defines the allowed status transitions",
+      "subtitle": "One workflow per {{workOrder, lowercase}} type · defines the allowed status transitions",
       "title": "Workflows",
       "transitionSummary_one": "1 transition · {{approvals}} approval gates",
       "transitionSummary_other": "{{count}} transitions · {{approvals}} approval gates",
@@ -3465,9 +3465,9 @@
     "actions": {
       "deleteConfirm": "Delete {{name}}'s membership in {{company}}?",
       "deleteFailed": "Couldn't delete membership",
-      "deleteWarning": "Permanently deletes their access, roles and regions here. Work they created stays. Use Remove access instead if you might restore them.",
-      "deleteWarningEndsSignIn": "Permanently deletes their access, roles and regions — and their sign-in. Work they created stays.",
-      "deleteWarningKeepsSignIn": "Permanently deletes their access, roles and regions here. Work they created stays; their sign-in is unaffected.",
+      "deleteWarning": "Permanently deletes their access, roles and {{regions, lowercase}} here. Work they created stays. Use Remove access instead if you might restore them.",
+      "deleteWarningEndsSignIn": "Permanently deletes their access, roles and {{regions, lowercase}} — and their sign-in. Work they created stays.",
+      "deleteWarningKeepsSignIn": "Permanently deletes their access, roles and {{regions, lowercase}} here. Work they created stays; their sign-in is unaffected.",
       "deletedToast": "{{name}} deleted from {{company}}",
       "disableConfirm": "Remove {{name}} from {{company}}?",
       "disableNotAffected": "Their password and two-factor setup.",
@@ -3477,7 +3477,7 @@
       "disableWarningEndsSignIn": "Ends their access and disables their sign-in. Any open session ends now; work history is kept.",
       "disableWarningKeepsSignIn": "Ends their access now, including any open session. Work history is kept.",
       "enableConfirm": "Restore {{name}}'s access to {{company}}?",
-      "enableWarning": "They regain access to this workspace immediately, with their previous roles and regions kept as-is. No email is sent.",
+      "enableWarning": "They regain access to this workspace immediately, with their previous roles and {{regions, lowercase}} kept as-is. No email is sent.",
       "removeAccessLabel": "Remove access",
       "removeFailed": "Couldn't remove access",
       "removeTitle": "Remove {{name}} from {{company}}",
@@ -3532,7 +3532,7 @@
       "moreOptions": "More options",
       "noActivityYet": "No activity recorded yet.",
       "noCapabilities": "No capabilities assigned",
-      "noRegionsAssigned": "No regions assigned",
+      "noRegionsAssigned": "No {{regions, lowercase}} assigned",
       "noRolesAssigned": "No roles assigned",
       "passwordLabel": "Password",
       "passwordValue": "Managed via reset link",
@@ -4326,7 +4326,7 @@
     "signedInAs": "Signed in as {{email}}",
     "switchAria": "Switch workspace",
     "switching": {
-      "body": "Loading this workspace’s jobs and customers",
+      "body": "Loading this workspace’s {{workOrders, lowercase}} and {{customers, lowercase}}",
       "title": "Switching to {{company}}…"
     },
     "tryAgain": "Try again",

@@ -4,6 +4,7 @@ import clsx from 'clsx';
 import { formatCurrency } from '@dispatch/utils';
 import type { NestedInvoicePayment, PaymentMethod } from '../../api/setup';
 import { formatDocDate, isLegacy, marginSummary, savingsRows, taxSummary, type PricedDocument } from './documentModel';
+import { useGlossary } from '../../contexts/GlossaryContext';
 
 const METHOD_LABEL: Record<PaymentMethod, string> = {
   CASH: 'Cash',
@@ -37,6 +38,7 @@ export function DocumentTotals({
   settlement?: InvoiceSettlement;
   showCost: boolean;
 }) {
+  const { getName } = useGlossary();
   const legacy = isLegacy(doc);
   const savings = legacy ? [] : savingsRows(doc);
   const tax = taxSummary(doc);
@@ -66,7 +68,7 @@ export function DocumentTotals({
 
       {settlement && (settlement.amountPaid > 0 || reversed.length > 0) && (
         <>
-          <TotalRow label="Payments applied" value={`−${formatCurrency(settlement.amountPaid)}`} />
+          <TotalRow label={`${getName('payment', true)} applied`} value={`−${formatCurrency(settlement.amountPaid)}`} />
           {applied.map((p) => (
             <div key={p.id} className="flex items-baseline justify-between gap-3 pb-1 pl-3 text-[11.5px] text-fg-muted">
               <span>
