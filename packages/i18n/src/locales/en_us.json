@@ -211,6 +211,7 @@
       "status": "Status",
       "streetAddress": "Street Address",
       "successCreate": "{{entity}} created",
+      "successUpdate": "{{entity}} updated",
       "taxExempt": "Tax Exempt",
       "taxExemptCertificate": "Tax Exempt Certificate",
       "timezone": "Timezone",
@@ -1033,8 +1034,8 @@
       "descriptionPlaceholder": "Add a description…",
       "editLifecycleFullPage": "Edit specs, warranty & dates on full page →",
       "editOnFullPage": "Edit on full page →",
-      "editScopeHint": "Applies to this equipment everywhere",
-      "editScopeReminder": "Editing the equipment record — changes apply everywhere this equipment appears, on every work order.",
+      "editScopeHint": "Applies to this {{equipment, lowercase}} everywhere",
+      "editScopeReminder": "Editing the {{equipment, lowercase}} record — changes apply everywhere this {{equipment, lowercase}} appears, on every {{workOrder, lowercase}}.",
       "filtersNone": "None on file",
       "identification": "Identification",
       "installed": "Installed",
@@ -1047,7 +1048,7 @@
       "noUnits": "No {{entities, lowercase}} on this system",
       "photos": "Photos",
       "profileImageAlt": "{{name}} profile image",
-      "scopeReminder": "This is the equipment record — notes & photos here follow it across every work order, not just this job.",
+      "scopeReminder": "This is the {{equipment, lowercase}} record — notes & photos here follow it across every {{workOrder, lowercase}}, not just this one.",
       "serial": "Serial",
       "tabComingSoon": "Coming soon.",
       "type": "Type",
@@ -1106,10 +1107,10 @@
       "errorUpdate": "Failed to update note",
       "heading": "Notes",
       "headingWithCount": "Notes ({{count}})",
-      "helper": "Saved with this equipment, not this work order",
-      "none": "No notes on this equipment yet.",
+      "helper": "Saved with this {{equipment, lowercase}}, not this {{workOrder, lowercase}}",
+      "none": "No notes on this {{equipment, lowercase}} yet.",
       "systemAuthor": "System",
-      "viewAll": "{{count}} more on the equipment page"
+      "viewAll": "{{count}} more on the {{equipment, lowercase}} page"
     },
     "filters": {
       "addFilter": "Add Filter",
@@ -1147,7 +1148,7 @@
       "allTypes": "All Types"
     },
     "search": {
-      "placeholder": "Search by serial number, model, or location…"
+      "placeholder": "Search by serial number, model, or {{location, lowercase}}…"
     },
     "picker": {
       "clear": "Clear selection",
@@ -2494,7 +2495,7 @@
       "add": "Add size",
       "addRowLabel": "Add filter size — Length × Width × Thickness in inches",
       "clearSearch": "Clear search",
-      "deleteBody": "This size won't appear as a quick-add chip on equipment forms. Existing equipment records keep their dimensions.",
+      "deleteBody": "This size won't appear as a quick-add chip on {{equipment, lowercase}} forms. Existing {{equipment, lowercase}} records keep their dimensions.",
       "deleteTitle": "Delete \"{{name}}\"?",
       "description": "Common filter sizes that appear as quick-add chips on the equipment filters tab.",
       "dimAbbrev": {
@@ -2529,8 +2530,8 @@
       "seedSuccess_other": "{{count}} sizes added",
       "seedSkipped": "All common sizes are already in your list.",
       "size": "Size",
-      "subtitle_one": "{{count}} filter size · quick-add chips on equipment forms",
-      "subtitle_other": "{{count}} filter sizes · quick-add chips on equipment forms",
+      "subtitle_one": "{{count}} filter size · quick-add chips on {{equipment, lowercase}} forms",
+      "subtitle_other": "{{count}} filter sizes · quick-add chips on {{equipment, lowercase}} forms",
       "thickness": "Thickness (in)",
       "title": "Filter Sizes",
       "titleAdd": "Add Filter Size",

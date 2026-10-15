@@ -767,7 +767,7 @@ export default function EquipmentFormPage() {
                     <div className="flex h-8 items-center rounded-[7px] border border-border bg-bg px-2.5 text-[12.5px] text-fg-strong">
                       <span className="truncate">{locationLabel}</span>
                     </div>
-                    <Text size="xs" tone="muted" className="mt-1">Moving a unit to another location isn’t available here yet.</Text>
+                    <Text size="xs" tone="muted" className="mt-1">{`Moving ${getName('equipment').toLowerCase()} to another ${getName('service_location').toLowerCase()} isn’t available here yet.`}</Text>
                   </Field>
                   <Field size="xs">
                     <Label size="xs">Part of (parent system)</Label>
@@ -819,7 +819,7 @@ export default function EquipmentFormPage() {
             <div className="flex flex-wrap items-center gap-2 rounded-[10px] border border-border bg-bg-elev px-3.5 py-3 shadow-sm">
               <div className="text-[11.5px] text-fg-muted max-sm:basis-full">
                 {isEdit
-                  ? 'Saves changes to this equipment record.'
+                  ? `Saves changes to this ${getName('equipment').toLowerCase()} record.`
                   : addParent
                     ? <>Adds a sub-unit under <strong className="text-fg-strong">{addParent.name}</strong>.</>
                     : <>Creates one {getName('equipment').toLowerCase()} record{!standalone && <> at <strong className="text-fg-strong">{locationLabel}</strong></>}.</>}
