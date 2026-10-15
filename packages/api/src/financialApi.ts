@@ -2500,6 +2500,11 @@ export interface ListDocumentsParams extends DocumentScope {
   view?: DocumentView;
   /** Document number, a quote's title, or the work order number. */
   q?: string;
+  /**
+   * Open invoices (SENT, OVERDUE) by days past due, on top of `view` (send `view=invoice`). With
+   * `customerId`, only invoices billed to that customer, so the total matches its AR-summary bucket.
+   */
+  agingBucket?: InvoiceAgingBucket;
   page?: number;
   size?: number; // ≤ 200
 }

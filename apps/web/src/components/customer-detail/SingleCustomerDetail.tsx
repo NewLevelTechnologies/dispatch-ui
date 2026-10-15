@@ -14,6 +14,7 @@ import {
   customerApi,
   equipmentApi,
   agreementApi,
+  documentsApi,
   invoicesApi,
   EquipmentStatus,
   type Customer,
@@ -45,7 +46,7 @@ import LocationActivityStream from '../LocationActivityStream';
 import NotesCard from '../NotesCard';
 import CustomerEquipmentTab from './CustomerEquipmentTab';
 import CustomerWorkOrdersTab from './CustomerWorkOrdersTab';
-import CustomerInvoicesTab from './CustomerInvoicesTab';
+import { DocumentsTab, DOCUMENTS_KEY } from '../document/DocumentsTab';
 import CustomerAgreementsTab from '../CustomerAgreementsTab';
 import CustomerHeaderTags from './CustomerHeaderTags';
 import { BillingCard, AccountDetailsCard, CustomerHeaderEdit, AttentionStrip, AgreementsSummaryCard } from './MultiOverviewTab';
@@ -181,10 +182,10 @@ export default function SingleCustomerDetail({ customer }: { customer: Customer 
     queryFn: () => agreementApi.getCustomerSummary(customer.id),
     enabled: !!customer.id,
   });
-  // INV-1 tab-count badge — lean size:1 page, unfiltered customer total.
-  const { data: invoicesCount } = useQuery({
-    queryKey: ['invoices', 'customer-count', customer.id],
-    queryFn: () => invoicesApi.getAll({ customerId: customer.id, size: 1 }),
+  // Tab badge; shares the Quotes & invoices tab's counts cache.
+  const { data: documentViews } = useQuery({
+    queryKey: [DOCUMENTS_KEY, { customerId: customer.id }, 'views'],
+    queryFn: () => documentsApi.getViews({ customerId: customer.id }),
     enabled: !!customer.id,
   });
   const attentionItems = buildAttentionItems(agreements, arSummary, agreementSummary, customer.id);
@@ -249,7 +250,7 @@ export default function SingleCustomerDetail({ customer }: { customer: Customer 
     { id: 'equipment', label: getName('equipment', true), count: equipmentPage?.totalElements },
     { id: 'jobs', label: getName('work_order', true) },
     { id: 'agreements', label: getName('agreement', true), count: agreements.length },
-    { id: 'invoices', label: getName('invoice', true), count: invoicesCount?.totalElements },
+    { id: 'invoices', label: `${getName('quote', true)} & ${getName('invoice', true).toLowerCase()}`, count: documentViews?.counts.all },
     { id: 'dispatches', label: getName('dispatch', true) },
     { id: 'files', label: 'Files' },
     { id: 'activity', label: t('customers.tabs.activity') },
@@ -399,7 +400,17 @@ export default function SingleCustomerDetail({ customer }: { customer: Customer 
 
           {activeTab === 'agreements' && <CustomerAgreementsTab customerId={customer.id} />}
 
-          {activeTab === 'invoices' && <CustomerInvoicesTab customerId={customer.id} />}
+          {activeTab === 'invoices' && (
+            <DocumentsTab
+              aging
+              scope={{ customerId: customer.id }}
+              start={
+                customer.serviceLocations[0]
+                  ? { location: { ...customer.serviceLocations[0], customerName: customer.name } }
+                  : undefined
+              }
+            />
+          )}
 
           {activeTab === 'dispatches' &&
             (location ? (

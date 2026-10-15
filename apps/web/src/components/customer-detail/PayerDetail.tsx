@@ -18,6 +18,7 @@ import { useTranslation } from '@dispatch/i18n';
 import { EllipsisVerticalIcon } from '@heroicons/react/24/outline';
 import {
   customerApi,
+  documentsApi,
   invoicesApi,
   type Customer,
   type CustomerStatus,
@@ -41,7 +42,7 @@ import ConfirmDialog from '../ConfirmDialog';
 import NotificationPreferencesDialog from '../NotificationPreferencesDialog';
 import LocationActivityStream from '../LocationActivityStream';
 import NotesCard from '../NotesCard';
-import CustomerInvoicesTab from './CustomerInvoicesTab';
+import { DocumentsTab, DOCUMENTS_KEY } from '../document/DocumentsTab';
 import CustomerContactsTab from './CustomerContactsTab';
 import CustomerHeaderTags from './CustomerHeaderTags';
 import { BillingCard, AccountDetailsCard, CustomerHeaderEdit, AttentionStrip, ContactCard } from './MultiOverviewTab';
@@ -73,9 +74,10 @@ export default function PayerDetail({ customer }: { customer: Customer }) {
     queryFn: () => invoicesApi.getCustomerArSummary(customer.id),
     enabled: !!customer.id,
   });
-  const { data: invoicesCount } = useQuery({
-    queryKey: ['invoices', 'customer-count', customer.id],
-    queryFn: () => invoicesApi.getAll({ customerId: customer.id, size: 1 }),
+  // Tab badge; shares the Quotes & invoices tab's counts cache.
+  const { data: documentViews } = useQuery({
+    queryKey: [DOCUMENTS_KEY, { customerId: customer.id }, 'views'],
+    queryFn: () => documentsApi.getViews({ customerId: customer.id }),
     enabled: !!customer.id,
   });
 
@@ -115,7 +117,7 @@ export default function PayerDetail({ customer }: { customer: Customer }) {
 
   const tabs: { id: TabId; label: string; count?: number }[] = [
     { id: 'overview', label: t('customers.tabs.overview') },
-    { id: 'invoices', label: getName('invoice', true), count: invoicesCount?.totalElements },
+    { id: 'invoices', label: `${getName('quote', true)} & ${getName('invoice', true).toLowerCase()}`, count: documentViews?.counts.all },
     { id: 'contacts', label: 'Contacts', count: customer.additionalContacts.length },
     { id: 'activity', label: t('customers.tabs.activity') },
   ];
@@ -236,7 +238,7 @@ export default function PayerDetail({ customer }: { customer: Customer }) {
             </div>
           )}
 
-          {activeTab === 'invoices' && <CustomerInvoicesTab customerId={customer.id} />}
+          {activeTab === 'invoices' && <DocumentsTab aging showLocation scope={{ customerId: customer.id }} />}
 
           {activeTab === 'contacts' && (
             <CustomerContactsTab

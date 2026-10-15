@@ -23,7 +23,7 @@ import { EmptyState } from '../../components/ui/EmptyState';
 import { useUrlPage } from '../../hooks/useUrlPage';
 import { formatDateShort, formatMoney } from '../../components/customer-detail/format';
 
-// Canonical AR status → tone (mirrors CustomerInvoicesTab / InvoicesPage).
+// Canonical AR status → tone (mirrors InvoicesPage).
 const INVOICE_STATUS_TONE: Record<InvoiceStatus, 'neutral' | 'info' | 'success' | 'warning' | 'danger'> = {
   [InvoiceStatus.DRAFT]: 'neutral',
   [InvoiceStatus.SENT]: 'info',
