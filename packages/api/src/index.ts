@@ -469,6 +469,7 @@ export {
   type FinancialActivityEvent,
   type FinancialActivityKind,
   type FinancialActivityPage,
+  type FinancialActivityParams,
   InvoiceStatus,
   InvoiceAgingBucket,
   QuoteStatus,

@@ -136,7 +136,17 @@ describe('financialActivityApi.getForCustomer', () => {
     vi.clearAllMocks();
   });
 
-  const row = { id: 'f1', kind: 'INVOICE_PAID', invoiceId: 'i1', invoiceNumber: 'INV-1', workOrderId: null, serviceLocationId: null, amount: 250.0, actor: null, timestamp: '2026-06-14T15:00:00Z' };
+  const row = {
+    id: 'f1',
+    kind: 'INVOICE_PAID',
+    category: 'FINANCIAL',
+    timestamp: '2026-06-14T15:00:00Z',
+    subject: { type: 'INVOICE', id: 'i1', number: null, label: 'INV-1' },
+    actor: null,
+    workOrderId: null,
+    serviceLocationId: null,
+    data: { totalAmount: 250 },
+  };
 
   it('GETs the cursor-paginated customer financial stream (ACT-1) and passes the envelope through', async () => {
     const page = { content: [row], nextCursor: 'c1', hasMore: true };
@@ -148,10 +158,12 @@ describe('financialActivityApi.getForCustomer', () => {
     expect(out).toEqual(page);
   });
 
-  it('tolerates the pre-cursor bare-array shape (deploy window) by wrapping it as a final page', async () => {
-    vi.mocked(apiClient.get).mockResolvedValue({ data: [row] });
-    const out = await financialActivityApi.getForCustomer('cust-1');
-    expect(out).toEqual({ content: [row], nextCursor: null, hasMore: false });
+  it('narrows by kind on the server', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({ data: { content: [], nextCursor: null, hasMore: false } });
+    await financialActivityApi.getForCustomer('cust-1', { kinds: ['PAYMENT_RECEIVED', 'INVOICE_PAID'] });
+    expect(apiClient.get).toHaveBeenCalledWith('/financial/customers/cust-1/activity', {
+      params: { kinds: 'PAYMENT_RECEIVED,INVOICE_PAID' },
+    });
   });
 });
 
@@ -160,7 +172,17 @@ describe('financialActivityApi.getForLocation', () => {
     vi.clearAllMocks();
   });
 
-  const row = { id: 'f1', kind: 'INVOICE_SENT', invoiceId: 'i1', invoiceNumber: 'INV-1', workOrderId: null, serviceLocationId: 'sl-1', amount: 50.0, actor: null, timestamp: '2026-06-14T15:00:00Z' };
+  const row = {
+    id: 'f1',
+    kind: 'INVOICE_SENT',
+    category: 'FINANCIAL',
+    timestamp: '2026-06-14T15:00:00Z',
+    subject: { type: 'INVOICE', id: 'i1', number: null, label: 'INV-1' },
+    actor: null,
+    workOrderId: null,
+    serviceLocationId: 'sl-1',
+    data: { totalAmount: 50, channels: ['EMAIL'] },
+  };
 
   it('GETs the cursor-paginated location financial stream and passes the envelope through', async () => {
     const page = { content: [row], nextCursor: 'c1', hasMore: true };
@@ -172,11 +194,6 @@ describe('financialActivityApi.getForLocation', () => {
     expect(out).toEqual(page);
   });
 
-  it('tolerates the pre-cursor bare-array shape by wrapping it as a final page', async () => {
-    vi.mocked(apiClient.get).mockResolvedValue({ data: [row] });
-    const out = await financialActivityApi.getForLocation('sl-1');
-    expect(out).toEqual({ content: [row], nextCursor: null, hasMore: false });
-  });
 });
 
 describe('financialActivityApi.getForTenant', () => {
@@ -194,8 +211,10 @@ describe('financialActivityApi.getForTenant', () => {
 
   it('narrows to regions when asked', async () => {
     vi.mocked(apiClient.get).mockResolvedValue({ data: { content: [], nextCursor: null, hasMore: false } });
-    await financialActivityApi.getForTenant({ limit: 9, regionIds: ['r1'] });
-    expect(apiClient.get).toHaveBeenCalledWith('/financial/activity', { params: { limit: 9, regionIds: ['r1'] } });
+    await financialActivityApi.getForTenant({ limit: 9, regionIds: ['r1'], kinds: ['INVOICE_SENT', 'INVOICE_PAID'] });
+    expect(apiClient.get).toHaveBeenCalledWith('/financial/activity', {
+      params: { limit: 9, kinds: 'INVOICE_SENT,INVOICE_PAID', regionIds: ['r1'] },
+    });
   });
 });
 

@@ -934,11 +934,6 @@
         "changes": "Changes",
         "notes": "Notes"
       },
-      "financial": {
-        "paid": "{{doc}} {{invoice}} paid · {{amount}}",
-        "sent": "{{doc}} {{invoice}} sent · {{amount}}",
-        "viewJob": "View {{entity}}"
-      },
       "heading": "Activity",
       "loadMore": "Load more",
       "loading": "Loading activity…",
@@ -3772,6 +3767,8 @@
       "loadMore": "Load more",
       "loading": "Loading activity…",
       "message": {
+        "bounced": "{{base}} · bounced",
+        "delivered": "{{base}} · delivered",
         "emailed": "{{what}} emailed to {{recipient}}",
         "failed": "{{base}} · failed",
         "fallback": "Message",
