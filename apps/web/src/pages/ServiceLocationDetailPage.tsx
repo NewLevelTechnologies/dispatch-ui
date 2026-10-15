@@ -35,7 +35,6 @@ import {
   arrivalFactApi,
   tagApi,
   dispatchesApi,
-  filesApi,
   locationFilesApi,
   activityApi,
   financialActivityApi,
@@ -115,6 +114,7 @@ import {
 } from './serviceLocationDetailMocks';
 import { LocationTaxJurisdiction } from '../components/LocationTaxJurisdiction';
 import { DocumentsTab, DOCUMENTS_KEY } from '../components/document/DocumentsTab';
+import { useLocationDispatchCount, useLocationFilesCount } from '../components/detail/locationCounts';
 import { useEntityNames } from '../hooks/useEntityNames';
 
 type TabId = 'overview' | 'equipment' | 'jobs' | 'invoices' | 'dispatches' | 'contacts' | 'files' | 'activity';
@@ -212,29 +212,9 @@ export default function ServiceLocationDetailPage() {
     queryFn: () => documentsApi.getViews({ serviceLocationId: id! }),
     enabled: !!id,
   });
-  // Drives the Dispatches tab-count badge; the tab body runs its own paged queries.
-  const { data: locationDispatchesCount } = useQuery(locationDispatchCountQueryOptions(id ?? ''));
-  // Drives the Files tab-count badge — sums the two file sources' anchor-wide
-  // counts (job/equipment aggregate + direct site uploads) off lean limit-1
-  // pages. Keyed under the ['location-files', id] prefix so the tab's
-  // upload/delete/profile invalidations refresh the badge too. The aggregate
-  // read (work-order-service /files) can be down independently of direct
-  // uploads — its failure just drops that side of the sum.
-  const { data: directFilesCount } = useQuery({
-    queryKey: ['location-files', id, 'direct-count'] as const,
-    queryFn: () => locationFilesApi.list(id!, { limit: 1 }),
-    enabled: !!id,
-  });
-  const { data: aggFilesCount } = useQuery({
-    queryKey: ['location-files', id, 'agg-count'] as const,
-    queryFn: () => filesApi.listForServiceLocation(id!, { limit: 1 }),
-    enabled: !!id,
-    retry: 1,
-  });
-  const filesCount =
-    directFilesCount || aggFilesCount
-      ? (directFilesCount?.counts.all ?? 0) + (aggFilesCount?.counts.all ?? 0)
-      : undefined;
+  // Dispatches and Files tab-count badges.
+  const dispatchCount = useLocationDispatchCount(id);
+  const filesCount = useLocationFilesCount(id);
 
   const deleteEquipmentMutation = useMutation({
     mutationFn: (equipmentId: string) => equipmentApi.delete(equipmentId),
@@ -303,7 +283,7 @@ export default function ServiceLocationDetailPage() {
     { id: 'equipment', label: getName('equipment', true), count: equipmentPage?.totalElements ?? equipment.length },
     { id: 'jobs', label: getName('work_order', true), count: workOrdersData?.totalElements ?? 0 },
     { id: 'invoices', label: `${getName('quote', true)} & ${getName('invoice', true).toLowerCase()}`, count: documentViews?.counts.all },
-    { id: 'dispatches', label: getName('dispatch', true), count: locationDispatchesCount?.totalElements },
+    { id: 'dispatches', label: getName('dispatch', true), count: dispatchCount },
     { id: 'contacts', label: 'Contacts', count: contactCount },
     { id: 'files', label: 'Files', count: filesCount },
     { id: 'activity', label: t('serviceLocations.tabs.activity') },
@@ -832,18 +812,6 @@ function locationTechQueryOptions(serviceLocationId: string) {
   return {
     queryKey: ['location-tech', serviceLocationId] as const,
     queryFn: () => dispatchesApi.getLocationTech(serviceLocationId),
-    enabled: Boolean(serviceLocationId),
-  };
-}
-
-// Per-location dispatch count — `totalElements` off a lean size-1 page of the
-// full history listing (which counts every dispatch, incl. cancelled/no-show).
-// Drives the tab-count badge; the tab body runs its own upcoming/past queries
-// under the same ['location-dispatches'] prefix so one invalidation sweeps all.
-function locationDispatchCountQueryOptions(serviceLocationId: string) {
-  return {
-    queryKey: ['location-dispatches', serviceLocationId, 'count'] as const,
-    queryFn: () => dispatchesApi.listForServiceLocation(serviceLocationId, { size: 1 }),
     enabled: Boolean(serviceLocationId),
   };
 }
