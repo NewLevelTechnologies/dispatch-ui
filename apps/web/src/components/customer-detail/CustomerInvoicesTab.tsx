@@ -157,7 +157,7 @@ export default function CustomerInvoicesTab({ customerId }: { customerId: string
               setSearch(e.target.value);
               resetPage();
             }}
-            placeholder="Search invoice #…"
+            placeholder={`Search ${getName('invoice').toLowerCase()} #…`}
             className="min-w-0 flex-1 bg-transparent !text-[12.5px] text-fg outline-none placeholder:text-fg-dim"
           />
           {search && (
@@ -224,7 +224,7 @@ export default function CustomerInvoicesTab({ customerId }: { customerId: string
             <div className="mt-1 text-[12px] text-fg-muted">
               {filtersActive
                 ? 'Adjust your search or clear filters.'
-                : `${getName('invoice', true)} for this customer will appear here.`}
+                : `${getName('invoice', true)} for this ${getName('customer').toLowerCase()} will appear here.`}
             </div>
             {filtersActive && (
               <Button plain size="xs" className="mt-2" onClick={clearFilters}>

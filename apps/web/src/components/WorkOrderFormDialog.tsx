@@ -30,6 +30,7 @@ import { Subheading } from './catalyst/heading';
 import { Badge } from './catalyst/badge';
 import ServiceLocationPicker from './ServiceLocationPicker';
 import { US_STATES } from '../constants/states';
+import { useEntityNames } from '../hooks/useEntityNames';
 
 interface AddressData {
   streetAddress: string;
@@ -102,6 +103,7 @@ export default function WorkOrderFormDialog({ isOpen, onClose, workOrder, prefil
   const queryClient = useQueryClient();
   const { t } = useTranslation();
   const { getName } = useGlossary();
+  const names = useEntityNames();
 
   const isEdit = !!workOrder?.id;
 
@@ -665,7 +667,7 @@ export default function WorkOrderFormDialog({ isOpen, onClose, workOrder, prefil
                   {/* CONDITIONAL: Billing Address (if different) */}
                   {!billingAddressSameAsService && (
                     <div className="border-t border-zinc-200 pt-3 dark:border-zinc-800">
-                      <Subheading className="mb-3 text-sm font-semibold">{t('customers.form.billingInvoiceRecipient')}</Subheading>
+                      <Subheading className="mb-3 text-sm font-semibold">{t('customers.form.billingInvoiceRecipient', names)}</Subheading>
                       <div className="space-y-2">
                         {/* Billing Name */}
                         <Field>

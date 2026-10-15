@@ -307,6 +307,7 @@ export function BillingCard({
   // boxes as static (e.g. where there's no Invoices tab to jump to).
   onSelectAging?: (bucket: InvoiceAgingBucket) => void;
 }) {
+  const { getName } = useGlossary();
   const queryClient = useQueryClient();
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<BillingDraft>(() => seedBillingDraft(customer));
@@ -432,7 +433,7 @@ export function BillingCard({
                     key={k}
                     type="button"
                     onClick={() => onSelectAging!(bucket)}
-                    title={`View ${k} invoices (${b.count})`}
+                    title={`View ${k} ${getName('invoice', true).toLowerCase()} (${b.count})`}
                     className={`${cls} cursor-pointer transition-colors hover:border-border`}
                     style={tint.wrap}
                   >
@@ -578,7 +579,7 @@ function LocationsPreviewCard({
           <tr>
             <th>{getName('service_location')}</th>
             <th>Last service</th>
-            {enriched && <th className="right">Open jobs</th>}
+            {enriched && <th className="right">{`Open ${getName('work_order', true).toLowerCase()}`}</th>}
             <th>Status</th>
           </tr>
         </DenseTHead>
@@ -602,7 +603,7 @@ function LocationsPreviewCard({
                 {enriched && (
                   <td
                     className={clsx('right num strong', !(l.openJobsCount && l.openJobsCount > 0) && 'dt-empty')}
-                    data-label="Open jobs"
+                    data-label={`Open ${getName('work_order', true).toLowerCase()}`}
                   >
                     {l.openJobsCount && l.openJobsCount > 0 ? (
                       l.openJobsCount
@@ -1011,12 +1012,12 @@ export function CustomerHeaderEdit({ customer, onDone }: { customer: Customer; o
       // WO detail/list responses embed the customer name + billing → refetch.
       queryClient.invalidateQueries({ queryKey: ['work-orders'] });
       queryClient.invalidateQueries({ queryKey: ['work-orders-list'] });
-      showSuccess('Customer updated');
+      showSuccess(`${getName('customer')} updated`);
       onDone();
     },
     onError: (err) => {
       if (handleConcurrentEdit(err, queryClient, ['customers'])) return;
-      showError("Couldn't save customer", extractApiError(err) ?? undefined);
+      showError(`Couldn't save ${getName('customer').toLowerCase()}`, extractApiError(err) ?? undefined);
     },
   });
 

@@ -499,6 +499,7 @@ function siteFileChipLabel(f: SiteFile): string {
 }
 
 function SourceChips({ f }: { f: SiteFile }) {
+  const { getName } = useGlossary();
   const stop = (e: React.MouseEvent) => e.stopPropagation();
   if (f.origin === 'site') {
     return <Pill tone="neutral">{siteFileChipLabel(f)}</Pill>;
@@ -506,12 +507,12 @@ function SourceChips({ f }: { f: SiteFile }) {
   return (
     <span className="flex flex-wrap items-center gap-1">
       {f.workOrderId && f.workOrderNumber && (
-        <Link to={`/work-orders/${f.workOrderId}`} onClick={stop} title="View work order">
+        <Link to={`/work-orders/${f.workOrderId}`} onClick={stop} title={`View ${getName('work_order').toLowerCase()}`}>
           <Pill tone="info" className="font-mono">{f.workOrderNumber}</Pill>
         </Link>
       )}
       {f.equipmentId && f.equipmentName && (
-        <Link to={`/equipment/${f.equipmentId}`} onClick={stop} title="View equipment">
+        <Link to={`/equipment/${f.equipmentId}`} onClick={stop} title={`View ${getName('equipment').toLowerCase()}`}>
           <Pill tone="violet">{f.equipmentName}</Pill>
         </Link>
       )}
@@ -620,6 +621,7 @@ function DocRow({
   locationId: string;
   canEdit: boolean;
 }) {
+  const { getName } = useGlossary();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
@@ -667,7 +669,7 @@ function DocRow({
             </DropdownItem>
             {f.workOrderId && (
               <DropdownItem onClick={() => navigate(`/work-orders/${f.workOrderId}`)}>
-                <DropdownLabel>View work order</DropdownLabel>
+                <DropdownLabel>{`View ${getName('work_order').toLowerCase()}`}</DropdownLabel>
               </DropdownItem>
             )}
             {f.origin === 'site' && canEdit && (

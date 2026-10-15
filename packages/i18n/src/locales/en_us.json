@@ -210,6 +210,7 @@
       "stateHelper": "CA",
       "status": "Status",
       "streetAddress": "Street Address",
+      "successCreate": "{{entity}} created",
       "taxExempt": "Tax Exempt",
       "taxExemptCertificate": "Tax Exempt Certificate",
       "timezone": "Timezone",
@@ -516,7 +517,7 @@
   },
   "customers": {
     "agedBadge": "91+ aged",
-    "agedBadgeAria": "Has invoices aged 91 or more days",
+    "agedBadgeAria": "Has {{invoices, lowercase}} aged 91 or more days",
     "category": {
       "billingOnly": "Bill-only",
       "commercial": "Commercial",
@@ -564,7 +565,7 @@
       "all": "All",
       "allStatuses": "All Statuses",
       "openBalance": "Open balance",
-      "openJobs": "Open jobs",
+      "openJobs": "Open {{workOrders, lowercase}}",
       "status": "Status",
       "statusActive": "Active",
       "statusInactive": "Inactive",
@@ -577,20 +578,20 @@
     "subtitle": {
       "totalActive": "{{total}} total · {{active}} active"
     },
-    "entityToggleAria": "Switch between customers and payers",
+    "entityToggleAria": "Switch between {{customers, lowercase}} and {{payers, lowercase}}",
     "form": {
       "accessInstructionsOptional": "Access Instructions (optional)",
       "accessInstructionsPlaceholder": "e.g., Use back entrance, gate code 1234",
       "billingAddressHelp": "Check this if invoices should be sent to the service address",
       "billingAddressSection": "Billing Address",
-      "billingInvoiceRecipient": "Invoice Recipient",
-      "billingOnlyConversionBlocked": "Delete this customer's service location(s) before converting to Bill-only.",
-      "billingOnlyHeading": "Bill-only customer — Billing address",
-      "billingOnlyHint": "Invoiced only — no service address. Use for warranty companies, property managers, and other third-party payers.",
+      "billingInvoiceRecipient": "{{invoice}} Recipient",
+      "billingOnlyConversionBlocked": "Delete this {{customer, lowercase}}'s {{locations, lowercase}} before converting to Bill-only.",
+      "billingOnlyHeading": "Bill-only {{customer, lowercase}} — Billing address",
+      "billingOnlyHint": "Invoiced only — no service address. Use for warranty companies, property managers, and other third-party {{payers, lowercase}}.",
       "businessDetails": "Business Details",
       "companyName": "Company/Name *",
-      "customerTypeBillingOnly": "Bill-only customer",
-      "customerTypeStandard": "Service customer",
+      "customerTypeBillingOnly": "Bill-only {{customer, lowercase}}",
+      "customerTypeStandard": "Service {{customer, lowercase}}",
       "locationNameHelp": "Optional - useful for businesses with multiple locations",
       "newWorkOrder": "New Work Order",
       "paymentTermsHelp": "0 = Due on receipt",
@@ -601,17 +602,17 @@
       "billingAddress": "Billing Address",
       "contact": "Contact",
       "customer": "Customer",
-      "jobsCount_one": "{{count}} job",
-      "jobsCount_other": "{{count}} jobs",
+      "jobsCount_one": "{{count}} {{workOrder, lowercase}}",
+      "jobsCount_other": "{{count}} {{workOrders, lowercase}}",
       "location": "Location",
       "locationName": "Location Name",
       "locationAddress": "Address",
       "locationContact": "Contact",
       "locations": "Locations",
-      "locationsCount": "{{count}} locations",
+      "locationsCount": "{{count}} {{locations, lowercase}}",
       "moreLocations": "+{{count}} more",
       "none": "None",
-      "openJobs": "Open jobs",
+      "openJobs": "Open {{workOrders, lowercase}}",
       "tags": "Tags",
       "terms": "Terms",
       "type": "Type"
@@ -905,8 +906,9 @@
   },
   "serviceLocations": {
     "actions": {
-      "close": "Close Location",
-      "closeConfirm": "Are you sure you want to close {{name}}? This location will no longer be available for new work orders."
+      "close": "Close {{location}}",
+      "closeConfirm": "Are you sure you want to close {{name}}? This location will no longer be available for new work orders.",
+      "closed": "{{location}} closed"
     },
     "activity": {
       "audit": {
@@ -918,7 +920,7 @@
         "hideDiff": "Hide",
         "object": {
           "address": "address",
-          "location": "location details",
+          "location": "{{location, lowercase}} details",
           "siteContact": "site contact"
         },
         "showDiff": "Show change"
@@ -932,8 +934,8 @@
         "notes": "Notes"
       },
       "financial": {
-        "paid": "Invoice {{invoice}} paid · {{amount}}",
-        "sent": "Invoice {{invoice}} sent · {{amount}}",
+        "paid": "{{doc}} {{invoice}} paid · {{amount}}",
+        "sent": "{{doc}} {{invoice}} sent · {{amount}}",
         "viewJob": "View {{entity}}"
       },
       "heading": "Activity",
@@ -973,13 +975,13 @@
     },
     "filter": {
       "all": "All",
-      "allRegions": "All regions",
+      "allRegions": "All {{regions, lowercase}}",
       "allStatuses": "All statuses",
       "business": "Business",
-      "live": "Tech on site",
-      "openJobs": "Open jobs",
+      "live": "{{technician}} on site",
+      "openJobs": "Open {{workOrders, lowercase}}",
       "overdue": "Visit overdue",
-      "region": "Region",
+      "region": "{{region}}",
       "residence": "Residence",
       "status": "Status",
       "statusActive": "Active",
@@ -988,7 +990,7 @@
       "tags": "Tags"
     },
     "search": {
-      "placeholder": "Search by address, customer, contact, phone…"
+      "placeholder": "Search by address, {{customer, lowercase}}, contact, phone…"
     },
     "subtitle": {
       "totalActiveAcrossCustomers": "{{total}} total · {{active}} active · across {{customers}} customers"
@@ -1007,8 +1009,8 @@
       "location": "Location",
       "locationName": "Location Name",
       "neverServiced": "Never",
-      "newCustomer": "New customer",
-      "region": "Region",
+      "newCustomer": "New {{customer, lowercase}}",
+      "region": "{{region}}",
       "tags": "Tags",
       "type": "Type"
     },
@@ -1367,12 +1369,12 @@
       "tags": "Tags"
     },
     "search": {
-      "placeholder": "Search payers…"
+      "placeholder": "Search {{payers, lowercase}}…"
     },
     "table": {
       "dueOnReceipt": "Due on receipt",
       "in91": "{{amount}} in 91+",
-      "lastPayment": "Last payment",
+      "lastPayment": "Last {{payment, lowercase}}",
       "lifetimePaid": "Lifetime paid",
       "net": "Net {{days}}",
       "openInvoices": "Open inv.",

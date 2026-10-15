@@ -405,7 +405,7 @@ describe('ServiceLocationDetailPage', () => {
     it('derives the urgent open-jobs row from the loaded work orders', async () => {
       mockApiResponses(techLocation, [], [], workOrders, locationTech);
       renderDetailPage();
-      await waitFor(() => expect(screen.getByText(/1 urgent job/)).toBeInTheDocument());
+      await waitFor(() => expect(screen.getByText(/1 urgent work order/)).toBeInTheDocument());
     });
 
     it('renders embedded assigned users per work-order row (name, +N, null fallback)', async () => {
@@ -940,7 +940,7 @@ describe('ServiceLocationDetailPage', () => {
       const user = await openDispatchesTab([makeDispatch()]);
       await waitFor(() => expect(screen.getByText('WO-5000')).toBeInTheDocument());
 
-      await user.type(screen.getByPlaceholderText(/search by tech or work order/i), 'jane');
+      await user.type(screen.getByPlaceholderText(/search by technician or work order/i), 'jane');
       await waitFor(() => expect(dispatchCallWith((p) => p.q === 'jane' && p.when === 'upcoming')).toBe(true));
       expect(dispatchCallWith((p) => p.q === 'jane' && p.when === 'past')).toBe(true);
       // Jane Tech matches — the row survives the server-side filter.
@@ -1009,7 +1009,7 @@ describe('ServiceLocationDetailPage', () => {
       ]);
       await waitFor(() => expect(screen.getByText('WO-5000')).toBeInTheDocument());
 
-      await user.type(screen.getByPlaceholderText(/search by tech or work order/i), 'zzz');
+      await user.type(screen.getByPlaceholderText(/search by technician or work order/i), 'zzz');
       await waitFor(() => expect(screen.getByText(/no matching dispatches/i)).toBeInTheDocument());
 
       await user.click(screen.getByRole('button', { name: 'Clear filters' }));

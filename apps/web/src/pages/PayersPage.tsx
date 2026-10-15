@@ -27,6 +27,7 @@ import { LoadingState } from '../components/ui/LoadingState';
 import { EmptyState } from '../components/ui/EmptyState';
 import { ErrorState } from '../components/ui/ErrorState';
 import { PayerMark } from '../components/customer-detail/shared';
+import { useEntityNames } from '../hooks/useEntityNames';
 
 // Payers list — the bookkeeper triage surface for BILLING_ONLY customers
 // ("find who owes"). Default sort is outstanding,desc (server-side; we just omit
@@ -77,6 +78,7 @@ export default function PayersPage() {
   const navigate = useNavigate();
   const { t } = useTranslation();
   const { getName } = useGlossary();
+  const names = useEntityNames();
   const [searchParams, setSearchParams] = useSearchParams();
   // Payers are customers — gate the Add button on the customer capability.
   const canAddPayers = useHasCapability('ADD_CUSTOMERS');
@@ -203,7 +205,7 @@ export default function PayersPage() {
         <PageHead
           eyebrow={
             <EntityToggle
-              ariaLabel={t('customers.entityToggleAria')}
+              ariaLabel={t('customers.entityToggleAria', names)}
               items={[
                 { label: getName('customer', true), to: '/customers' },
                 { label: getName('payer', true), to: '/payers' },
@@ -224,7 +226,7 @@ export default function PayersPage() {
         <ListToolbar
           search={
             <ListSearch
-              placeholder={t('payers.search.placeholder')}
+              placeholder={t('payers.search.placeholder', names)}
               value={searchQuery}
               onChange={(value) => {
                 setSearchQuery(value);
@@ -310,7 +312,7 @@ export default function PayersPage() {
                         <SortHeader sortKey="outstanding" label={t('payers.table.outstanding')} current={currentSort} onSort={onSort} align="right" />
                         <SortHeader sortKey="openInvoices" label={t('payers.table.openInvoices')} current={currentSort} onSort={onSort} align="right" />
                         <SortHeader sortKey="lifetimePaid" label={t('payers.table.lifetimePaid')} current={currentSort} onSort={onSort} align="right" />
-                        <SortHeader sortKey="lastPayment" label={t('payers.table.lastPayment')} current={currentSort} onSort={onSort} />
+                        <SortHeader sortKey="lastPayment" label={t('payers.table.lastPayment', names)} current={currentSort} onSort={onSort} />
                         <th>{t('payers.table.tags')}</th>
                       </tr>
                     </DenseTHead>
@@ -380,7 +382,7 @@ export default function PayersPage() {
                               {p.lastPaymentAt ? (
                                 <CellStack>
                                   <CellTop>
-                                    <span className="dt-inline-label">{t('payers.table.lastPayment')}: </span>
+                                    <span className="dt-inline-label">{t('payers.table.lastPayment', names)}: </span>
                                     {formatTimestamp(p.lastPaymentAt)}
                                   </CellTop>
                                   {p.lastPaymentAmount != null && (
