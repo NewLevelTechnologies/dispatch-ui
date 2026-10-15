@@ -10,6 +10,7 @@ import {
   type PublicPaymentMethod,
 } from '../api/setup';
 import TenantBrandingHeader from '../components/TenantBrandingHeader';
+import { publicNames } from '../components/public/publicNames';
 import PublicPreviewBanner from '../components/PublicPreviewBanner';
 import CliffPage from '../components/CliffPage';
 import { Badge } from '../components/catalyst/badge';
@@ -95,6 +96,7 @@ const PaymentMethodLabel = ({ method }: PaymentMethodProps) => {
  */
 const InvoiceLoadingState = ({ onRetry }: { onRetry: () => void }) => {
   const { t } = useTranslation();
+  const names = publicNames();
   const [slow, setSlow] = useState(false);
 
   useEffect(() => {
@@ -104,7 +106,7 @@ const InvoiceLoadingState = ({ onRetry }: { onRetry: () => void }) => {
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center gap-3 bg-zinc-50 px-4 text-center">
-      <div className="text-zinc-500">{t('public.invoice.loading')}</div>
+      <div className="text-zinc-500">{t('public.invoice.loading', names)}</div>
       {slow && (
         <>
           <div className="text-sm text-zinc-400">{t('public.common.slowLoad')}</div>
@@ -142,6 +144,7 @@ export default function PublicInvoicePage() {
     },
     retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 8000),
   });
+  const names = publicNames(data?.tenant);
 
   // Mail's in-app browser (SFSafariViewController) prewarms this page: the
   // initial request fires and completes during the prewarm pass — the
@@ -199,10 +202,10 @@ export default function PublicInvoicePage() {
       {isVoid && (
         <div className="bg-rose-600 px-4 py-4 text-center text-white print:bg-white print:text-rose-700">
           <p className="text-lg font-semibold sm:text-xl">
-            {t('public.invoice.voidedHeadline')}
+            {t('public.invoice.voidedHeadline', names)}
           </p>
           <p className="mt-0.5 text-sm text-rose-100 print:text-rose-700">
-            {t('public.invoice.voidedSubline', { tenant: senderName })}
+            {t('public.invoice.voidedSubline', { ...names, tenant: senderName })}
           </p>
         </div>
       )}
@@ -224,7 +227,7 @@ export default function PublicInvoicePage() {
           <div className="flex items-start justify-between gap-4">
             <div>
               <p className="text-xs uppercase tracking-wide text-zinc-500">
-                {t('public.invoice.label')}
+                {t('public.invoice.label', names)}
               </p>
               <p className="mt-1 text-lg font-semibold text-zinc-900">
                 #{invoice.invoiceNumber}
@@ -268,7 +271,7 @@ export default function PublicInvoicePage() {
             </div>
             <div>
               <dt className="text-zinc-500">
-                {t('public.invoice.invoiceDate')}
+                {t('public.invoice.invoiceDate', names)}
               </dt>
               <dd className="mt-0.5 text-zinc-900">
                 {formatDate(invoice.invoiceDate)}
@@ -333,7 +336,7 @@ export default function PublicInvoicePage() {
         {invoice.payments.length > 0 && (
           <section className="mt-4 overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-sm print:shadow-none">
             <h2 className="border-b border-zinc-100 px-6 py-3 text-xs font-semibold uppercase tracking-wide text-zinc-500">
-              {t('public.invoice.paymentsReceived')}
+              {t('public.invoice.paymentsReceived', names)}
             </h2>
             <ul className="divide-y divide-zinc-100">
               {invoice.payments.map((payment, idx) => {
@@ -379,7 +382,7 @@ export default function PublicInvoicePage() {
             whole block when the tenant has no contact info at all. */}
         {(tenant.supportPhone || tenant.supportEmail) && (
           <footer className="mt-8 text-center text-sm text-zinc-500 print:mt-4">
-            <p>{t('public.invoice.questions')}</p>
+            <p>{t('public.invoice.questions', names)}</p>
             <p className="mt-1 text-zinc-700">
               {t('public.invoice.contactCta', { tenant: senderName })}
               {tenant.supportPhone
