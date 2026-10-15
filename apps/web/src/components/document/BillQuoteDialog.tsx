@@ -121,7 +121,7 @@ function BillQuoteFields({
       onClose();
       navigate(`/invoices/${invoice.id}`);
     },
-    onError: (err) => showError(`Couldn’t create the ${invoiceLower}`, documentErrorMessage(err, invoiceLower)),
+    onError: (err) => showError(`Couldn’t create the ${invoiceLower}`, documentErrorMessage(err, invoiceLower, { quote: getName('quote').toLowerCase() })),
   });
 
   return (

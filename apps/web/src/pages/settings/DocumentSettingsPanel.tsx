@@ -11,6 +11,7 @@ import { PageHead } from '../../components/ui/PageHead';
 import { ToggleGroup, ToggleGroupOption } from '../../components/ui/ToggleGroup';
 import { FormSection, ViewOnlyNotice } from '../../components/settings/PricingPageParts';
 import { extractApiError, showError, showSuccess } from '../../lib/toast';
+import { useEntityNames } from '../../hooks/useEntityNames';
 
 const SETTINGS_KEY = ['pricing-settings'] as const;
 const PRESETS = ['14', '30', '60', '90'] as const;
@@ -27,13 +28,14 @@ const expiresOn = (days: number, today = new Date()) => {
  * single quote or invoice can still be given its own date when it's sent.
  */
 export default function DocumentSettingsPanel() {
+  const names = useEntityNames();
   const { t } = useTranslation();
   const canManage = useHasAnyCapability('MANAGE_PRICING');
   const { data, isLoading } = useQuery({ queryKey: SETTINGS_KEY, queryFn: () => taxApi.getPricingSettings() });
 
   return (
     <>
-      <PageHead title={t('settings.documents.title')} sub={t('settings.documents.description')} />
+      <PageHead title={t('settings.documents.title', names)} sub={t('settings.documents.description', names)} />
       {!canManage && <ViewOnlyNotice />}
       {isLoading || !data ? (
         <Card>
@@ -47,10 +49,10 @@ export default function DocumentSettingsPanel() {
           <QuotesCard key={data.quoteValidityDays ?? 30} settings={data} canManage={canManage} />
           <Card>
             <CardHead>
-              <CardTitle>{t('settings.documents.invoices')}</CardTitle>
+              <CardTitle>{t('settings.documents.invoices', names)}</CardTitle>
             </CardHead>
             <CardBody>
-              <p className="text-[12.5px] text-fg">{t('settings.documents.invoicesBody')}</p>
+              <p className="text-[12.5px] text-fg">{t('settings.documents.invoicesBody', names)}</p>
             </CardBody>
           </Card>
         </div>
@@ -60,6 +62,7 @@ export default function DocumentSettingsPanel() {
 }
 
 function QuotesCard({ settings, canManage }: { settings: PricingSettings; canManage: boolean }) {
+  const names = useEntityNames();
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const saved = settings.quoteValidityDays ?? 30;
@@ -72,18 +75,18 @@ function QuotesCard({ settings, canManage }: { settings: PricingSettings; canMan
     mutationFn: () => taxApi.updatePricingSettings(settings.agreementFeeTaxClass, n),
     onSuccess: (next) => {
       queryClient.setQueryData(SETTINGS_KEY, next);
-      showSuccess(t('settings.documents.saved'));
+      showSuccess(t('settings.documents.saved', names));
     },
-    onError: (err) => showError(t('settings.documents.saveFailed'), extractApiError(err)),
+    onError: (err) => showError(t('settings.documents.saveFailed', names), extractApiError(err)),
   });
 
   return (
     <Card>
       <CardHead>
-        <CardTitle>{t('settings.documents.quotes')}</CardTitle>
+        <CardTitle>{t('settings.documents.quotes', names)}</CardTitle>
       </CardHead>
       <div className="px-5">
-      <FormSection title={t('settings.documents.validFor')} description={t('settings.documents.validForHint')}>
+      <FormSection title={t('settings.documents.validFor')} description={t('settings.documents.validForHint', names)}>
         <div className="flex flex-wrap items-center gap-2.5">
           <div className="flex w-32 items-center gap-1.5">
             <Input
@@ -110,8 +113,8 @@ function QuotesCard({ settings, canManage }: { settings: PricingSettings; canMan
         <p className={valid ? 'text-[12px] text-fg-muted' : 'text-[12px] text-danger-500'}>
           {valid ? (
             <>
-              {t('settings.documents.previewBefore')} <span className="font-semibold text-fg-strong">{expiresOn(n)}</span>
-              {t('settings.documents.previewAfter')}
+              {t('settings.documents.previewBefore', names)} <span className="font-semibold text-fg-strong">{expiresOn(n)}</span>
+              {t('settings.documents.previewAfter', names)}
             </>
           ) : (
             t('settings.documents.invalid')

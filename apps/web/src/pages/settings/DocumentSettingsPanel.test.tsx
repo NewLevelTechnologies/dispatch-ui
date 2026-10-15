@@ -4,6 +4,7 @@ import { renderWithProviders, userEvent } from '../../test/utils';
 import DocumentSettingsPanel from './DocumentSettingsPanel';
 import { apiClient } from '../../api/setup';
 import { useHasAnyCapability } from '../../hooks/useCurrentUser';
+import { GLOSSARY_DEFAULTS, useGlossary } from '../../contexts/GlossaryContext';
 
 vi.mock('@dispatch/api/src/client');
 
@@ -24,10 +25,27 @@ describe('DocumentSettingsPanel', () => {
     expect(screen.queryByRole('button', { name: 'Save' })).not.toBeInTheDocument();
     await user.click(screen.getByRole('radio', { name: '60' }));
     expect(field).toHaveValue('60');
-    expect(screen.getByText(/A quote sent today expires/)).toBeInTheDocument();
+    expect(screen.getByText(/Quotes sent today expire/)).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Save' }));
 
     expect(apiClient.put).toHaveBeenCalledWith('/financial/pricing-settings', { agreementFeeTaxClass: 'FEE', quoteValidityDays: 60 });
+  });
+
+  it('uses the company’s own names for quotes and customers', async () => {
+    const original = vi.mocked(useGlossary).getMockImplementation()!;
+    const renamed: Record<string, [string, string]> = { quote: ['Estimate', 'Estimates'], customer: ['Client', 'Clients'] };
+    vi.mocked(useGlossary).mockReturnValue({
+      getName: (code: string, plural = false) => renamed[code]?.[plural ? 1 : 0] ?? (plural ? GLOSSARY_DEFAULTS[code].plural : GLOSSARY_DEFAULTS[code].singular),
+      getAbbrev: () => '',
+      updateGlossary: vi.fn(),
+    } as unknown as ReturnType<typeof useGlossary>);
+    renderWithProviders(<DocumentSettingsPanel />);
+
+    expect(await screen.findByText(/Estimates sent today expire/)).toBeInTheDocument();
+    expect(screen.getByText('Estimates & invoices')).toBeInTheDocument();
+    expect(screen.getByText(/Clients can’t approve after it expires/)).toBeInTheDocument();
+    expect(screen.queryByText(/quote/i)).not.toBeInTheDocument();
+    vi.mocked(useGlossary).mockImplementation(original);
   });
 
   it('won’t take a length outside 1 to 365 days', async () => {

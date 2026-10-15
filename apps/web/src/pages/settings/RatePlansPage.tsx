@@ -19,6 +19,7 @@ import { LoadingState } from '../../components/ui/LoadingState';
 import { PageHead } from '../../components/ui/PageHead';
 import { Pill, Tag } from '../../components/ui/Pill';
 import { extractApiError, showError, showSuccess } from '../../lib/toast';
+import { useEntityNames } from '../../hooks/useEntityNames';
 
 /**
  * Rate plans: how an account is priced (labor rates, how parts are marked
@@ -27,6 +28,7 @@ import { extractApiError, showError, showSuccess } from '../../lib/toast';
  * never deleted, only deactivated.
  */
 export default function RatePlansPage() {
+  const names = useEntityNames();
   const { t } = useTranslation();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -52,7 +54,7 @@ export default function RatePlansPage() {
     <>
       <PageHead
         title={t('settings.ratePlans.title')}
-        sub={t('settings.ratePlans.description')}
+        sub={t('settings.ratePlans.description', names)}
         actions={
           canManage && (
             <Button color="accent" size="xs" href="/settings/rate-plans/new">

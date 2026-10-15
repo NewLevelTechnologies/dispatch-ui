@@ -122,7 +122,7 @@ export default function InvoiceDetailPage() {
         try {
           await invoicesApi.revokeShareLink(invoice.id);
         } catch {
-          showError('The customer’s link still works', 'Replace it from the ⋯ menu to turn it off.');
+          showError(`The ${getName('customer').toLowerCase()}’s link still works`, 'Replace it from the ⋯ menu to turn it off.');
         }
       });
   };
@@ -184,7 +184,7 @@ export default function InvoiceDetailPage() {
         ))}
       {payable && (
         <Button color="dark/zinc" size="xs" onClick={() => setPaying(true)}>
-          Take payment
+          {`Take ${getName('payment').toLowerCase()}`}
         </Button>
       )}
       {(draft || voidable || reissuable) && (
@@ -240,7 +240,7 @@ export default function InvoiceDetailPage() {
         amount={withdrawn ? invoice.totalAmount : invoice.balanceDue}
         amountSub={
           withdrawn ? (
-            'Nothing is owed on this invoice'
+            `Nothing is owed on this ${entityLower}`
           ) : (
             <>
               {invoice.dueDate
@@ -378,7 +378,7 @@ export default function InvoiceDetailPage() {
         isOpen={!!voidingPayment}
         onClose={() => setVoidingPayment(null)}
         onConfirm={() => voidingPayment && void voidPayment(voidingPayment)}
-        title={`Void ${voidingPayment?.paymentNumber ?? 'payment'}?`}
+        title={`Void ${voidingPayment?.paymentNumber ?? getName('payment').toLowerCase()}?`}
         message={`This undoes the whole ${getName('payment').toLowerCase()}, on every ${entityLower} it was applied to, not just this one. It can't be undone.`}
         confirmLabel={`Void ${getName('payment').toLowerCase()}`}
         cancelLabel="Keep it"

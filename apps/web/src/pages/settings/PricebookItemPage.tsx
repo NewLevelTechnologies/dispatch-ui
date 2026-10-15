@@ -46,6 +46,7 @@ import { LoadingState } from '../../components/ui/LoadingState';
 import { Tag } from '../../components/ui/Pill';
 import { ToggleGroup, ToggleGroupOption } from '../../components/ui/ToggleGroup';
 import { errorCode, extractApiError, showError, showSuccess } from '../../lib/toast';
+import { useEntityNames } from '../../hooks/useEntityNames';
 
 const TAX_CLASSES: TaxClass[] = ['LABOR', 'MATERIALS', 'EQUIPMENT', 'FEE'];
 const FEE_ROLES: FeeRole[] = ['TRIP', 'DIAGNOSTIC', 'AFTER_HOURS', 'DISPOSAL', 'OTHER'];
@@ -156,6 +157,7 @@ function ItemForm({
   initial: FormState;
   initialPresentation: PresentationDraft | null;
 }) {
+  const names = useEntityNames();
   const { t } = useTranslation();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -294,7 +296,7 @@ function ItemForm({
                   <Field>
                     <Label>{t('settings.pricebook.form.name')}</Label>
                     <Input autoFocus={!item && !readOnly} value={f.name} onChange={(e) => set({ name: e.target.value })} />
-                    <Description>{t('settings.pricebook.form.nameHint')}</Description>
+                    <Description>{t('settings.pricebook.form.nameHint', names)}</Description>
                   </Field>
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                     <Field>
@@ -457,7 +459,7 @@ function ItemForm({
         {!readOnly && (
           <div className="flex flex-shrink-0 flex-wrap items-center gap-2 border-t border-border bg-bg-elev px-7 py-3 max-lg:px-4">
             <Text size="sm" tone="muted" className="max-sm:basis-full">
-              {t('settings.pricebook.form.keepPrices')}
+              {t('settings.pricebook.form.keepPrices', names)}
             </Text>
             <span className="flex-1" />
             <Button href="/settings/pricebook" plain size="xs">

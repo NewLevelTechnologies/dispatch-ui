@@ -270,7 +270,7 @@ export default function InvoicesPage() {
                     <th style={{ minWidth: 150 }}>{entity}</th>
                     <th>Bill to</th>
                     <th>{getName('service_location')}</th>
-                    <th>Customer PO</th>
+                    <th>{`${getName('customer')} PO`}</th>
                     <th>Issued</th>
                     <th>Status</th>
                     <th className="right">Total</th>
@@ -309,6 +309,7 @@ const Strong = ({ children }: { children: ReactNode }) => (
 );
 
 function InvoiceRow({ invoice: i, onOpen }: { invoice: InvoiceListItemRow; onOpen: () => void }) {
+  const { getName } = useGlossary();
   const status = invoiceListStatus(i);
   const withdrawn = status === 'Void' || status === 'Cancelled';
   const overdue = status === 'Overdue';
@@ -351,18 +352,18 @@ function InvoiceRow({ invoice: i, onOpen }: { invoice: InvoiceListItemRow; onOpe
         <div className="flex flex-col">
           <span className="flex items-center gap-1.5 font-medium text-fg-strong">
             {i.customerName ?? '—'}
-            {i.billToIsPayer && <Tag word>Payer</Tag>}
+            {i.billToIsPayer && <Tag word>{getName('payer')}</Tag>}
           </span>
           {terms && <span className="text-[11px] text-fg-muted">{terms}</span>}
         </div>
       </td>
-      <td data-label="Location">
+      <td data-label={getName('service_location')}>
         <div className="flex flex-col">
           <span className="text-[12px] text-fg">{i.serviceLocationName ?? i.serviceLocationAddress ?? '—'}</span>
           {i.workOrderNumber && <span className="font-mono text-[11px] text-fg-muted">{i.workOrderNumber}</span>}
         </div>
       </td>
-      <td data-label="Customer PO" className={clsx('font-mono text-[11.5px]', i.customerPoNumber ? 'text-fg' : 'text-fg-muted')}>
+      <td data-label={`${getName('customer')} PO`} className={clsx('font-mono text-[11.5px]', i.customerPoNumber ? 'text-fg' : 'text-fg-muted')}>
         {i.customerPoNumber || '—'}
       </td>
       <td data-label="Issued">

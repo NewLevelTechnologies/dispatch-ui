@@ -15,6 +15,7 @@ import { ToggleGroup, ToggleGroupOption } from '../ui/ToggleGroup';
 import { ViewTabs } from '../ui/Tabs';
 import { FREEFORM_TYPES, LINE_TYPE_LABEL, LINE_TYPE_TONE, pricingRuleNote } from './documentModel';
 import type { NewLine } from './DocumentLinesCard';
+import { useGlossary } from '../../contexts/GlossaryContext';
 
 export type AddLineTab = 'pricebook' | 'labor' | 'freeform' | 'po';
 type Tab = AddLineTab;
@@ -300,6 +301,7 @@ function FromPoForm({
   onAdd: (line: NewLine) => Promise<boolean>;
   onAdded: (name: string) => void;
 }) {
+  const { getName } = useGlossary();
   const queryClient = useQueryClient();
   const { data: plan } = useQuery({
     queryKey: ['rate-plans', 'one', ratePlanId],
@@ -327,7 +329,7 @@ function FromPoForm({
     setRows((rs) => ({ ...rs, [l.poLineId]: { ...row(l), ...patch } }));
 
   if (!lines.length) {
-    return <p className="py-3 text-center text-[12.5px] text-fg-muted">All parts bought for this job are already billed or on this document.</p>;
+    return <p className="py-3 text-center text-[12.5px] text-fg-muted">{`All parts bought for this ${getName('work_order').toLowerCase()} are already billed or on this document.`}</p>;
   }
   const picked = lines.filter((l) => row(l).on);
   const rowOk = (l: UnbilledPurchase) => {
@@ -364,7 +366,7 @@ function FromPoForm({
 
   return (
     <form onSubmit={submit} aria-label="Add from purchase orders">
-      <p className="mb-1.5 text-[11.5px] text-fg-muted">Parts bought on purchase orders for this job. Each line keeps a link to its PO line.</p>
+      <p className="mb-1.5 text-[11.5px] text-fg-muted">{`Parts bought on purchase orders for this ${getName('work_order').toLowerCase()}. Each line keeps a link to its PO line.`}</p>
       <ul className="divide-y divide-border-soft">
         {lines.map((l) => {
           const r = row(l);
@@ -408,7 +410,7 @@ function FromPoForm({
         <span className="flex-1 text-[11px] text-fg-muted">
           {fromCost
             ? `Leave price blank to price from cost by ${plan?.name ?? 'the rate plan'}’s markup tiers.`
-            : 'Enter a price for each part. This customer’s rate plan has no markup tiers to price from cost.'}
+            : `Enter a price for each part. This ${getName('customer').toLowerCase()}’s rate plan has no markup tiers to price from cost.`}
         </span>
         <span className="text-[11.5px] tabular-nums text-fg-muted">
           cost {formatCurrency(r2(picked.reduce((s, l) => s + (num(row(l).qty) ?? 0) * l.unitCost, 0)))}
@@ -422,6 +424,7 @@ function FromPoForm({
 }
 
 function LaborLineForm({ rates, onAdd }: { rates: LaborRateType[]; onAdd: Add }) {
+  const { getName } = useGlossary();
   // A rate with no bill rate can't be picked: the server would refuse the line.
   const priced = rates.filter((r) => r.billRate != null);
   const [rateId, setRateId] = useState(priced.find((r) => r.role === 'REGULAR')?.id ?? priced[0]?.id ?? '');
@@ -513,12 +516,13 @@ function LaborLineForm({ rates, onAdd }: { rates: LaborRateType[]; onAdd: Add })
           )}
         </div>
       </div>
-      <div className="mt-1 text-[11px] text-fg-muted">Leave price blank to bill at the rate, or the customer’s plan rate if it has one.</div>
+      <div className="mt-1 text-[11px] text-fg-muted">{`Leave price blank to bill at the rate, or the ${getName('customer').toLowerCase()}’s plan rate if it has one.`}</div>
     </form>
   );
 }
 
 function FreeformLineForm({ seed, onAdd }: { seed: string; onAdd: Add }) {
+  const { getName } = useGlossary();
   const blank = { description: '', type: 'SERVICE' as LineType, quantity: '1', unit: '', unitCost: '', unitPrice: '' };
   const [f, setF] = useState({ ...blank, description: seed });
   const [busy, setBusy] = useState(false);
@@ -552,7 +556,7 @@ function FreeformLineForm({ seed, onAdd }: { seed: string; onAdd: Add }) {
       <div className="grid grid-cols-2 items-end gap-2 sm:grid-cols-[minmax(200px,1fr)_130px_70px_70px_96px_96px_auto]">
         <Field className="col-span-2 sm:col-span-1">
           <Label className="!text-[11px]">Description</Label>
-          <Input size="xs" autoFocus value={f.description} onChange={(e) => set({ description: e.target.value })} placeholder="What the customer sees on the line" />
+          <Input size="xs" autoFocus value={f.description} onChange={(e) => set({ description: e.target.value })} placeholder={`What the ${getName('customer').toLowerCase()} sees on the line`} />
         </Field>
         <Field>
           <Label className="!text-[11px]">Type</Label>

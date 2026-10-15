@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { formatSiteAddress, titleCaseAddress } from '@dispatch/utils';
 import { customerApi, workOrderApi } from '../../api/setup';
 import type { DocumentParty } from './DocumentSummaryHeader';
+import { useGlossary } from '../../contexts/GlossaryContext';
 
 interface Address {
   streetAddress: string;
@@ -36,6 +37,7 @@ export function useDocumentParties({
   workOrderId?: string | null;
   serviceLocationId?: string | null;
 }) {
+  const { getName } = useGlossary();
   const customerQuery = useQuery({
     queryKey: ['customer', customerId],
     queryFn: () => customerApi.getById(customerId),
@@ -62,7 +64,7 @@ export function useDocumentParties({
   const billTo: DocumentParty = {
     name: customer?.name ?? customerName ?? '…',
     href: `/customers/${customerId}`,
-    kind: customer?.type === 'BILLING_ONLY' ? 'Payer' : null,
+    kind: customer?.type === 'BILLING_ONLY' ? getName('payer') : null,
     sub: [terms, customer?.email].filter(Boolean).join(' · ') || null,
   };
 

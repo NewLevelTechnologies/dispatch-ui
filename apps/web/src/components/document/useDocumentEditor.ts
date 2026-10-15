@@ -28,14 +28,20 @@ export function refreshDocumentLists(queryClient: QueryClient) {
  * Words a document-edit failure from its `code`; the server's `message` is
  * never shown. `entity` is the glossary name, lowercase ("quote").
  */
-export function documentErrorMessage(err: unknown, entity: string): string {
+export function documentErrorMessage(
+  err: unknown,
+  entity: string,
+  /** Glossary names (lowercase) for the codes that mention another entity; pass them where those codes can come back. */
+  names: { quote?: string; payment?: string } = {},
+): string {
+  const { quote = 'quote', payment = 'payment' } = names;
   switch (errorCode(err)) {
     case 'DOCUMENT_NOT_EDITABLE':
       return `This ${entity} can't be edited any more.`;
     case 'QUOTE_NOT_ACCEPTED':
-      return 'Only an accepted quote can be invoiced.';
+      return `Only an accepted ${quote} can be invoiced.`;
     case 'OVER_INVOICED':
-      return 'That is more than is left to bill on the quote line. Put extra work on a new line.';
+      return `That is more than is left to bill on the ${quote} line. Put extra work on a new line.`;
     case 'LABOR_RATE_NOT_SET':
       return 'That labor rate has no bill rate yet. Type a price, or set the rate.';
     case 'ITEM_NOT_PRICED':
@@ -54,7 +60,7 @@ export function documentErrorMessage(err: unknown, entity: string): string {
     case 'ALREADY_REISSUED':
       return `This ${entity} was already reissued. Open the corrected copy instead.`;
     case 'PAYMENT_NOT_APPLICABLE':
-      return 'That payment was voided, so its credit can’t be applied.';
+      return `That ${payment} was voided, so its credit can’t be applied.`;
     case 'RATE_LIMIT_EXCEEDED':
       return 'Too many sends just now. Try again in a minute.';
     default:

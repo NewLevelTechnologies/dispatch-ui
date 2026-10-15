@@ -291,6 +291,7 @@ function QuoteRow({
   action?: ReactNode;
   onOpen: () => void;
 }) {
+  const { getName } = useGlossary();
   const status = quoteListStatus(q);
   const open = q.status === QuoteStatus.DRAFT || q.status === QuoteStatus.SENT;
   // Null on a draft not yet sent: it's given an expiry when it goes out.
@@ -317,7 +318,7 @@ function QuoteRow({
         <div className="flex flex-col">
           <span className="flex items-center gap-1.5 font-medium text-fg-strong">
             {q.customerName ?? '—'}
-            {q.billToIsPayer && <Tag word>Payer</Tag>}
+            {q.billToIsPayer && <Tag word>{getName('payer')}</Tag>}
           </span>
           {(q.serviceLocationName ?? q.serviceLocationAddress) && (
             <span className="text-[11px] text-fg-muted">{q.serviceLocationName ?? q.serviceLocationAddress}</span>

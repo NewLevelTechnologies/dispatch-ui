@@ -30,6 +30,7 @@ import { DenseRow, DenseTable, DenseTHead } from '../../components/ui/DenseTable
 import { ErrorState } from '../../components/ui/ErrorState';
 import { LoadingState } from '../../components/ui/LoadingState';
 import { extractApiError, showError, showSuccess } from '../../lib/toast';
+import { useEntityNames } from '../../hooks/useEntityNames';
 
 /** The worked example under the adjustment. */
 const EXAMPLE_PRICE = 120;
@@ -96,6 +97,7 @@ export default function RatePlanPage() {
 }
 
 function PlanForm({ plan, copiedFrom, initial }: { plan: RatePlan | null; copiedFrom: RatePlan | null; initial: FormState }) {
+  const names = useEntityNames();
   const { t } = useTranslation();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -267,7 +269,7 @@ function PlanForm({ plan, copiedFrom, initial }: { plan: RatePlan | null; copied
                   </div>
                 </FormSection>
 
-                <FormSection title={t('settings.ratePlans.form.parts')} description={t('settings.ratePlans.form.partsHint')}>
+                <FormSection title={t('settings.ratePlans.form.parts')} description={t('settings.ratePlans.form.partsHint', names)}>
                   <RadioGroup value={f.parts} onChange={(v) => set({ parts: v as FormState['parts'] })} aria-label={t('settings.ratePlans.form.parts')}>
                     <RadioField>
                       <Radio value="catalog" disabled={readOnly} />
@@ -377,7 +379,7 @@ function PlanForm({ plan, copiedFrom, initial }: { plan: RatePlan | null; copied
                   </div>
                 </FormSection>
 
-                <FormSection title={t('settings.ratePlans.form.members')} description={t('settings.ratePlans.form.membersHint')}>
+                <FormSection title={t('settings.ratePlans.form.members')} description={t('settings.ratePlans.form.membersHint', names)}>
                   <CheckboxField>
                     <Checkbox checked={f.memberBenefitsStack} onChange={(v) => set({ memberBenefitsStack: v })} disabled={readOnly} />
                     <Label>{t('settings.ratePlans.form.membersStack')}</Label>
@@ -386,7 +388,7 @@ function PlanForm({ plan, copiedFrom, initial }: { plan: RatePlan | null; copied
                 </FormSection>
               </fieldset>
               {plan && !plan.isDefault && (
-                <FormSection title={t('settings.ratePlans.form.accounts')} description={t('settings.ratePlans.form.accountsHint')}>
+                <FormSection title={t('settings.ratePlans.form.accounts')} description={t('settings.ratePlans.form.accountsHint', names)}>
                   <PlanAccountsSection planId={plan.id} planName={plan.name} canManage={canManage} />
                 </FormSection>
               )}
@@ -397,7 +399,7 @@ function PlanForm({ plan, copiedFrom, initial }: { plan: RatePlan | null; copied
         {!readOnly && (
           <div className="flex flex-shrink-0 flex-wrap items-center gap-2 border-t border-border bg-bg-elev px-7 py-3 max-lg:px-4">
             <Text size="sm" tone="muted" className="max-sm:basis-full">
-              {t('settings.ratePlans.form.keepPrices')}
+              {t('settings.ratePlans.form.keepPrices', names)}
             </Text>
             <span className="flex-1" />
             <Button href="/settings/rate-plans" plain size="xs">

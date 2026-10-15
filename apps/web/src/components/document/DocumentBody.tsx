@@ -7,6 +7,7 @@ import { Callout } from '../ui/Callout';
 import { DocumentLinesCard, type LineEditing } from './DocumentLinesCard';
 import { DocumentTotals, type InvoiceSettlement } from './DocumentTotals';
 import type { PricedDocument } from './documentModel';
+import { useGlossary } from '../../contexts/GlossaryContext';
 
 /** Lines, totals and notes — the part quotes and invoices share outright. */
 export function DocumentBody({
@@ -54,6 +55,7 @@ export function DocumentWarnings({
   billToName: string;
   nte?: number | null;
 }) {
+  const { getName } = useGlossary();
   const warnings = doc.warnings ?? [];
   if (!warnings.length) return null;
   const taxSettings = (
@@ -68,21 +70,21 @@ export function DocumentWarnings({
           case 'TAX_JURISDICTION_NOT_SET':
             return (
               <Callout key={w.code} kind="warning" title="No tax charged" action={taxSettings}>
-                No tax jurisdiction applies to this location, and the company has no default jurisdiction.
+                {`No tax jurisdiction applies to this ${getName('service_location').toLowerCase()}, and the company has no default jurisdiction.`}
               </Callout>
             );
           case 'TAX_RATE_NOT_SET':
             return (
               <Callout key={w.code} kind="warning" title="No tax charged" action={taxSettings}>
-                {doc.tax?.jurisdictionName ?? 'This location’s tax jurisdiction'} has no tax rate set yet.
+                {doc.tax?.jurisdictionName ?? `This ${getName('service_location').toLowerCase()}’s tax jurisdiction`} has no tax rate set yet.
               </Callout>
             );
           case 'NTE_EXCEEDED':
             return (
               <Callout key={w.code} kind="warning" title="Over not-to-exceed">
-                This job’s invoices, this one included, come to more than its
-                {nte != null ? ` ${formatCurrency(nte)}` : ''} not-to-exceed. Get approval from {billToName} before
-                sending.
+                {`This ${getName('work_order').toLowerCase()}’s ${getName('invoice', true).toLowerCase()}, this one included, come to more than its${
+                  nte != null ? ` ${formatCurrency(nte)}` : ''
+                } not-to-exceed. Get approval from ${billToName} before sending.`}
               </Callout>
             );
           default:

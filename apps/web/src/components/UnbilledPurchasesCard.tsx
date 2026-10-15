@@ -142,7 +142,7 @@ export function UnbilledPurchasesCard({
             </div>
           );
         })}
-        {!open.length && <p className="px-4 py-2.5 text-[12px] text-fg-muted">Every part bought for this job is billed or dismissed.</p>}
+        {!open.length && <p className="px-4 py-2.5 text-[12px] text-fg-muted">{`Every part bought for this ${getName('work_order').toLowerCase()} is billed or dismissed.`}</p>}
         {showDismissed &&
           dismissed.map((l) => (
             <div key={l.poLineId} className="flex flex-wrap items-center gap-3 border-t border-border-soft bg-bg-elev-2 px-4 py-2">

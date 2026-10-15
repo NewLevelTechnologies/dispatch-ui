@@ -25,6 +25,7 @@ import { PageHead } from '../../components/ui/PageHead';
 import { Pill, Tag } from '../../components/ui/Pill';
 import { errorCode, extractApiError, showError, showSuccess } from '../../lib/toast';
 import { pct } from '../../components/document/documentModel';
+import { useEntityNames } from '../../hooks/useEntityNames';
 
 const JURISDICTIONS_KEY = ['tax-jurisdictions'] as const;
 const SETTINGS_KEY = ['pricing-settings'] as const;
@@ -51,6 +52,7 @@ const toRequest = (j: TaxJurisdiction, change: Partial<TaxJurisdictionRequest> =
 
 /** Words a tax write failure from its `code`. */
 function useTaxError() {
+  const names = useEntityNames();
   const { t } = useTranslation();
   return (err: unknown) => {
     const code = errorCode(err);
@@ -59,7 +61,7 @@ function useTaxError() {
       case 'DEFAULT_REQUIRED':
       case 'DEFAULT_MUST_BE_ACTIVE':
       case 'JURISDICTION_IN_USE':
-        return t(`settings.tax.errors.${code}`);
+        return t(`settings.tax.errors.${code}`, names);
       default:
         return extractApiError(err) ?? t('settings.tax.errors.generic');
     }
@@ -73,6 +75,7 @@ function useTaxError() {
  * jurisdictions are deactivated.
  */
 export default function TaxPanel() {
+  const names = useEntityNames();
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const canManage = useHasAnyCapability('MANAGE_PRICING');
@@ -90,14 +93,14 @@ export default function TaxPanel() {
   const noRate = list.filter((j) => j.active && j.rate == null);
 
   // What a missing rate costs: the default's covers every unassigned location; an assigned one, its own.
-  const noRateText = (j: TaxJurisdiction) =>
+  const noRateText = (j: TaxJurisdiction): string =>
     j.isDefault
-      ? t('settings.tax.issueNoRateDefault', { name: j.name })
+      ? t('settings.tax.issueNoRateDefault', { ...names, name: j.name })
       : j.locationCount == null
-        ? t('settings.tax.issueNoRate', { name: j.name })
+        ? t('settings.tax.issueNoRate', { ...names, name: j.name })
         : j.locationCount === 0
-          ? t('settings.tax.issueNoRateUnused', { name: j.name })
-          : t('settings.tax.issueNoRateCount', { name: j.name, count: j.locationCount });
+          ? t('settings.tax.issueNoRateUnused', { ...names, name: j.name })
+          : t('settings.tax.issueNoRateCount', { ...names, name: j.name, count: j.locationCount });
 
   const update = useMutation({
     mutationFn: ({ id, request }: { id: string; request: TaxJurisdictionRequest }) => taxApi.updateJurisdiction(id, request),
@@ -112,7 +115,7 @@ export default function TaxPanel() {
     <>
       <PageHead
         title={t('settings.tax.title')}
-        sub={t('settings.tax.description')}
+        sub={t('settings.tax.description', names)}
         actions={
           canManage && (
             <Button color="accent" size="xs" onClick={() => setEditing({ jurisdiction: null })}>
@@ -172,7 +175,7 @@ export default function TaxPanel() {
                     <th>{t('settings.tax.col.name')}</th>
                     <th className="right">{t('settings.tax.col.rate')}</th>
                     <th>{t('settings.tax.col.taxes')}</th>
-                    <th className="right">{t('settings.tax.col.locations')}</th>
+                    <th className="right">{t('settings.tax.col.locations', names)}</th>
                     <th>{t('settings.tax.col.status')}</th>
                     {canManage && <th style={{ width: 40 }} />}
                   </tr>
@@ -200,7 +203,7 @@ export default function TaxPanel() {
                       <td data-label={t('settings.tax.col.taxes')}>
                         <TaxedClasses jurisdiction={j} />
                       </td>
-                      <td className="right num" data-label={t('settings.tax.col.locations')}>
+                      <td className="right num" data-label={t('settings.tax.col.locations', names)}>
                         {j.locationCount ? j.locationCount : <span className="text-fg-muted">—</span>}
                         {j.isDefault && <div className="text-[10.5px] text-fg-muted">{t('settings.tax.allUnassigned')}</div>}
                       </td>
@@ -386,6 +389,7 @@ function JurisdictionForm({
   onClose: () => void;
   defaultName: string | null;
 }) {
+  const names = useEntityNames();
   const hasDefault = defaultName != null;
   const { t } = useTranslation();
   const queryClient = useQueryClient();
@@ -431,7 +435,7 @@ function JurisdictionForm({
   return (
     <form onSubmit={submit}>
       <DialogTitle>{jurisdiction ? t('settings.tax.form.editTitle', { name: jurisdiction.name }) : t('settings.tax.add')}</DialogTitle>
-      <DialogDescription>{t('settings.tax.form.description')}</DialogDescription>
+      <DialogDescription>{t('settings.tax.form.description', names)}</DialogDescription>
       <DialogBody>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_140px]">
           <Field>
@@ -470,8 +474,8 @@ function JurisdictionForm({
             {jurisdiction?.isDefault
               ? t('settings.tax.form.defaultLocked')
               : hasDefault
-                ? t('settings.tax.form.defaultHint', { name: defaultName })
-                : t('settings.tax.form.defaultHintFirst')}
+                ? t('settings.tax.form.defaultHint', { ...names, name: defaultName })
+                : t('settings.tax.form.defaultHintFirst', names)}
           </Description>
         </CheckboxField>
       </DialogBody>
