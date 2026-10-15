@@ -51,9 +51,9 @@ const KIND_GLYPH: Partial<Record<ActivityKind, { glyph: string; tone: ActivityTo
 
 const CATEGORY_GLYPH: Record<ActivityCategory, { glyph: string; tone: ActivityTone }> = {
   STATUS: { glyph: '✓', tone: 'neutral' },
+  WORK_ITEM: { glyph: '✓', tone: 'neutral' },
   DISPATCH: { glyph: '→', tone: 'info' },
   NOTE: { glyph: '✎', tone: 'warning' },
-  FINANCIAL: { glyph: '$', tone: 'success' },
 };
 
 export function glyphFor(event: ActivityEvent): { glyph: string; tone: ActivityTone } {

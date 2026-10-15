@@ -2447,7 +2447,6 @@ vi.mock('react-i18next', async () => {
     'workOrders.activity.fieldLabel.workOrderTypeId': 'Type',
     'workOrders.activity.filter.all': 'All',
     'workOrders.activity.filter.dispatches': 'Dispatches',
-    'workOrders.activity.filter.financial': '$',
     'workOrders.activity.filter.notes': 'Notes',
     'workOrders.activity.filter.status': 'Status',
     'workOrders.activity.heading': 'Activity',

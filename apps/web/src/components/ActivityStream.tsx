@@ -12,7 +12,6 @@ import { getDayBucket } from '../lib/activityDayBucket';
 import { Text } from './catalyst/text';
 import {
   ChatBubbleLeftEllipsisIcon,
-  CurrencyDollarIcon,
   TruckIcon,
   ArrowsUpDownIcon,
   QuestionMarkCircleIcon,
@@ -80,8 +79,8 @@ export default function ActivityStream({ workOrderId }: Props) {
     { id: 'ALL', label: t('workOrders.activity.filter.all') },
     { id: 'NOTE', label: t('workOrders.activity.filter.notes') },
     { id: 'DISPATCH', label: getName('dispatch', true) },
+    { id: 'WORK_ITEM', label: getName('work_item', true) },
     { id: 'STATUS', label: t('workOrders.activity.filter.status') },
-    { id: 'FINANCIAL', label: t('workOrders.activity.filter.financial') },
   ];
 
   const {
@@ -278,8 +277,6 @@ function CategoryIcon({ category }: { category: ActivityEvent['category'] }) {
       return <TruckIcon className={`${className} text-amber-500 dark:text-amber-400`} />;
     case 'status':
       return <ArrowsUpDownIcon className={`${className} text-zinc-500 dark:text-zinc-400`} />;
-    case 'financial':
-      return <CurrencyDollarIcon className={`${className} text-emerald-500 dark:text-emerald-400`} />;
     default:
       return <QuestionMarkCircleIcon className={`${className} text-zinc-500 dark:text-zinc-400`} />;
   }

@@ -233,19 +233,19 @@ describe('ActivityStream', () => {
           data: {},
         }),
         event({
-          id: 'e-invoice',
-          kind: 'INVOICE_ISSUED',
-          category: 'FINANCIAL',
-          data: { invoiceNumber: '11079', amount: 9800 },
+          id: 'e-dispatch',
+          kind: 'DISPATCH_CANCELLED',
+          category: 'DISPATCH',
+          data: {},
         }),
       ]),
     });
     renderWithProviders(<ActivityStream workOrderId="wo-1" />);
     await waitFor(() => {
-      // Default glossary: work_order singular = "Work Order", invoice = "Invoice"
+      // Default glossary: work_order singular = "Work Order", dispatch = "Dispatch"
       expect(screen.getByText('Work Order cancelled')).toBeInTheDocument();
     });
-    expect(screen.getByText(/Invoice 11079 issued for \$9,800/)).toBeInTheDocument();
+    expect(screen.getByText('Dispatch cancelled')).toBeInTheDocument();
   });
 
   it('renders dispatch events using the backend assignedUserName field', async () => {

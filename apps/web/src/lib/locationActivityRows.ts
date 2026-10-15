@@ -174,7 +174,7 @@ export function buildDays({
     }
     const evt = item.event;
     const wo = evt.workOrder;
-    const isLifecycle = !!wo && (evt.category === 'STATUS' || evt.category === 'DISPATCH');
+    const isLifecycle = !!wo && (evt.category === 'STATUS' || evt.category === 'WORK_ITEM' || evt.category === 'DISPATCH');
     if (isLifecycle && wo!.activityCount > 1) {
       // The WO's lifecycle collapses to one group; later events fold in silently.
       if (groupedWos.has(wo!.id)) continue;

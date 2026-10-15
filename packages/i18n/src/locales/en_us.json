@@ -3723,7 +3723,6 @@
       "filter": {
         "all": "All",
         "dispatches": "Dispatches",
-        "financial": "$",
         "notes": "Notes",
         "status": "Status"
       },
