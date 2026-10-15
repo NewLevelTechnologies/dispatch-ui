@@ -33,15 +33,22 @@ const KIND_GLYPH: Partial<Record<ActivityKind, { glyph: string; tone: ActivityTo
   DISPATCH_CHECKED_OUT: { glyph: '✓', tone: 'success' },
   DISPATCH_CANCELLED: { glyph: '✕', tone: 'neutral' },
   DISPATCH_NO_SHOW: { glyph: '⚠', tone: 'warning' },
+  DISPATCH_RESCHEDULED: { glyph: '↻', tone: 'info' },
+  DISPATCH_REASSIGNED: { glyph: '⇄', tone: 'neutral' },
+  FILES_UPLOADED: { glyph: '◎', tone: 'neutral' },
   NOTE_ADDED: { glyph: '✎', tone: 'warning' },
   NOTE_DELETED: { glyph: '✕', tone: 'neutral' },
-  QUOTE_SENT: { glyph: '⎙', tone: 'accent' },
+  QUOTE_SENT: { glyph: '✉', tone: 'accent' },
+  QUOTE_VIEWED: { glyph: '◉', tone: 'info' },
   QUOTE_ACCEPTED: { glyph: '✓', tone: 'success' },
   QUOTE_DECLINED: { glyph: '✕', tone: 'neutral' },
   INVOICE_ISSUED: { glyph: '$', tone: 'success' },
+  INVOICE_SENT: { glyph: '✉', tone: 'accent' },
   INVOICE_PAID: { glyph: '$', tone: 'success' },
+  INVOICE_VOIDED: { glyph: '✕', tone: 'neutral' },
   PAYMENT_RECEIVED: { glyph: '$', tone: 'success' },
   PO_CREATED: { glyph: '+', tone: 'neutral' },
+  PO_STATUS_CHANGED: { glyph: '⊙', tone: 'neutral' },
   // A callback charges a named tech, so linking reads as a warning moment;
   // unlinking/changing is an audit edit.
   CALLBACK_LINKED: { glyph: '↩', tone: 'warning' },
@@ -49,11 +56,13 @@ const KIND_GLYPH: Partial<Record<ActivityKind, { glyph: string; tone: ActivityTo
   CALLBACK_CHANGED: { glyph: '✎', tone: 'neutral' },
 };
 
-const CATEGORY_GLYPH: Record<ActivityCategory, { glyph: string; tone: ActivityTone }> = {
+const CATEGORY_GLYPH: Record<ActivityCategory | 'FINANCIAL' | 'PURCHASING', { glyph: string; tone: ActivityTone }> = {
   STATUS: { glyph: '✓', tone: 'neutral' },
   WORK_ITEM: { glyph: '✓', tone: 'neutral' },
   DISPATCH: { glyph: '→', tone: 'info' },
   NOTE: { glyph: '✎', tone: 'warning' },
+  FINANCIAL: { glyph: '$', tone: 'success' },
+  PURCHASING: { glyph: '⊙', tone: 'neutral' },
 };
 
 export function glyphFor(event: ActivityEvent): { glyph: string; tone: ActivityTone } {

@@ -59,6 +59,55 @@ const events: ActivityEvent[] = [
     data: { fromStatusName: 'New', toStatusName: 'Scheduled' },
   }),
 ];
+const quote = { type: 'QUOTE' as const, id: 'q-1', number: null, label: 'Q-1882' };
+const financialEvents: ActivityEvent[] = [
+  event({
+    id: 'f-accept',
+    kind: 'QUOTE_ACCEPTED',
+    category: 'FINANCIAL',
+    timestamp: '2026-05-14T18:02:00Z',
+    subject: quote,
+    actor: { type: 'CUSTOMER', userId: null, userName: 'Tanya Reyes' },
+    data: { revision: 2, totalAmount: 742.67 },
+  }),
+  event({
+    id: 'f-view',
+    kind: 'QUOTE_VIEWED',
+    category: 'FINANCIAL',
+    timestamp: '2026-05-14T17:58:00Z',
+    subject: quote,
+    actor: { type: 'CUSTOMER', userId: null, userName: '' },
+    data: { revision: 2 },
+  }),
+  event({
+    id: 'f-send',
+    kind: 'QUOTE_SENT',
+    category: 'FINANCIAL',
+    timestamp: '2026-05-14T17:51:00Z',
+    subject: quote,
+    actor: { type: 'USER', userId: 'u-1', userName: 'Maria C.' },
+    data: { revision: 2, totalAmount: 742.67, channels: ['SMS', 'EMAIL'] },
+  }),
+];
+const po = { type: 'PURCHASE_ORDER' as const, id: 'po-1', number: null, label: 'PO-2104' };
+const purchasingEvents: ActivityEvent[] = [
+  event({
+    id: 'p-cancel',
+    kind: 'PO_STATUS_CHANGED',
+    category: 'PURCHASING',
+    timestamp: '2026-05-14T18:43:00Z',
+    subject: po,
+    data: { fromStatus: 'ORDERED', toStatus: 'CANCELLED', reason: 'duplicate' },
+  }),
+  event({
+    id: 'p-create',
+    kind: 'PO_CREATED',
+    category: 'PURCHASING',
+    timestamp: '2026-05-14T18:20:00Z',
+    subject: po,
+    data: { vendorName: 'Ferguson HVAC', type: 'ORDER', status: 'ORDERED', totalCost: 64.8 },
+  }),
+];
 const auditEntry: ServiceLocationAuditEntry = {
   id: 'a-1',
   userName: 'Maria C.',
@@ -85,6 +134,12 @@ describe('WorkOrderActivityTab', () => {
     vi.mocked(useHasCapability).mockReturnValue(true);
     vi.mocked(apiClient.get).mockImplementation((url: string, cfg?: { params?: Params }) => {
       if (url === '/audit/WorkOrder/wo-1') return Promise.resolve({ data: [auditEntry] });
+      if (url === '/inventory/work-orders/wo-1/activity') {
+        return Promise.resolve({ data: { content: purchasingEvents, nextCursor: null, hasMore: false } });
+      }
+      if (url === '/financial/work-orders/wo-1/activity') {
+        return Promise.resolve({ data: { content: financialEvents, nextCursor: null, hasMore: false } });
+      }
       const cls = cfg?.params?.classification;
       const content = events.filter((e) => cls === 'ALL' || e.classification === (cls ?? 'BUSINESS'));
       return Promise.resolve({ data: { content, nextCursor: null, hasMore: false } });
@@ -100,7 +155,7 @@ describe('WorkOrderActivityTab', () => {
     expect(screen.queryByText('D. Park arrived')).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Dispatch 2' })).toHaveAttribute('href', expect.stringContaining('tab=trips'));
 
-    await user.click(screen.getByRole('button', { name: /1 update/ }));
+    await user.click(screen.getByText('D. Park checked out').closest<HTMLElement>('[role="button"]')!);
     expect(screen.getByText('D. Park arrived')).toBeInTheDocument();
 
     // A work item status change carries the note entered with it, and its item number.
@@ -145,5 +200,46 @@ describe('WorkOrderActivityTab', () => {
     await user.click(screen.getByRole('button', { name: 'Changes' }));
     expect(await screen.findByText(/from New to Scheduled/)).toBeInTheDocument();
     expect(auditCalled()).toBe(false);
+  });
+
+  it('merges the quote’s steps from financial-service into one row', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<WorkOrderActivityTab workOrderId="wo-1" />);
+
+    // The approval leads, by the customer who typed their name; it links to the quote.
+    expect(await screen.findByText('Quote approved · $742.67')).toBeInTheDocument();
+    expect(screen.getByText('Tanya Reyes')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Q-1882' })).toHaveAttribute('href', '/quotes/q-1');
+    expect(screen.queryByText(/Quote sent/)).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /2 updates/ }));
+    expect(screen.getByText('Quote sent by text and email · rev 2 · $742.67')).toBeInTheDocument();
+    expect(screen.getByText('Viewed by the customer · rev 2')).toBeInTheDocument();
+  });
+
+  it('shows only quotes and invoices on their chip', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<WorkOrderActivityTab workOrderId="wo-1" />);
+    await screen.findByText('D. Park checked out');
+    const before = feedCalls().length;
+
+    await user.click(screen.getByRole('button', { name: 'Quotes & invoices' }));
+    expect(await screen.findByText('Quote approved · $742.67')).toBeInTheDocument();
+    expect(screen.queryByText('D. Park checked out')).not.toBeInTheDocument();
+    expect(feedCalls()).toHaveLength(before);
+  });
+
+  it('folds a purchase order’s steps under it and filters to them', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<WorkOrderActivityTab workOrderId="wo-1" />);
+
+    expect(await screen.findByText('Marked cancelled · duplicate')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'PO-2104' })).toHaveAttribute('href', '/purchase-orders/po-1');
+
+    await user.click(screen.getByRole('button', { name: 'Purchasing' }));
+    await user.click(await screen.findByRole('button', { name: /1 update/ }));
+    expect(screen.getByText('Purchase order created · Ferguson HVAC · $64.80')).toBeInTheDocument();
+    expect(screen.queryByText('D. Park checked out')).not.toBeInTheDocument();
+    expect(screen.queryByText('Quote approved · $742.67')).not.toBeInTheDocument();
   });
 });

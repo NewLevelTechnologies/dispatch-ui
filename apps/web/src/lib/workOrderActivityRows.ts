@@ -12,8 +12,8 @@ import { getDayBucket } from './activityDayBucket';
 import { glyphFor, type ActivityTone } from './activityGlyph';
 import type { AuditRowModel, BaseRow, GetName, TFunc } from './locationActivityRows';
 
-/** Subjects whose steps fold into one row. Quotes, invoices and POs join as their streams land. */
-const GROUPED: ReadonlySet<ActivitySubject['type']> = new Set(['DISPATCH']);
+/** Subjects whose steps fold into one row. */
+const GROUPED: ReadonlySet<ActivitySubject['type']> = new Set(['DISPATCH', 'QUOTE', 'INVOICE', 'PURCHASE_ORDER']);
 
 export interface StepRow {
   id: string;
@@ -37,8 +37,10 @@ export interface WoDayGroup {
 
 type GetAbbrev = (entityCode: string) => string;
 
-function actorOf(evt: ActivityEvent, t: TFunc): { actor: string; isPerson: boolean } {
+function actorOf(evt: ActivityEvent, t: TFunc, getName: GetName): { actor: string; isPerson: boolean } {
   const name = evt.actor?.userName?.trim();
+  // A customer viewing a quote has no name; approving one carries the name they typed.
+  if (evt.actor?.type === 'CUSTOMER') return { actor: name || getName('customer'), isPerson: true };
   const isPerson = evt.actor?.type !== 'SYSTEM' && !!name && name.toLowerCase() !== 'unknown';
   return { actor: isPerson ? name! : t('workOrders.activity.systemActor'), isPerson };
 }
@@ -60,13 +62,101 @@ export function subjectLink(
         obj: subject.number != null ? workItemLabel(getAbbrev('work_item'), subject.number) : getName('work_item'),
         objHref: '?tab=items',
       };
+    case 'QUOTE':
+      return { obj: subject.label ?? getName('quote'), objHref: `/quotes/${subject.id}` };
+    case 'INVOICE':
+      return { obj: subject.label ?? getName('invoice'), objHref: `/invoices/${subject.id}` };
+    case 'PURCHASE_ORDER':
+      return { obj: subject.label ?? 'Purchase order', objHref: `/purchase-orders/${subject.id}` };
     default:
       return { obj: null, objHref: null };
   }
 }
 
+const money = (v: unknown) =>
+  typeof v === 'number' ? v.toLocaleString('en-US', { style: 'currency', currency: 'USD' }) : '—';
+
+/** " by email and text" from the send's channels; empty means it was marked sent by hand. */
+const via = (channels: unknown): string => {
+  const list = Array.isArray(channels) ? channels : [];
+  const words = list.map((c) => (c === 'SMS' ? 'text' : String(c).toLowerCase()));
+  return words.length ? ` by ${words.join(' and ')}` : '';
+};
+
+const PO_STATUS: Record<string, string> = {
+  DRAFT: 'draft',
+  ORDERED: 'ordered',
+  PARTIALLY_RECEIVED: 'partly received',
+  RECEIVED: 'received',
+  BILLED: 'billed',
+  CANCELLED: 'cancelled',
+};
+
+const WINDOW_DAY = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' });
+const WINDOW_TIME = new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit' });
+/** "May 15, 12:00 PM–2:00 PM" for a same-day window. */
+function arrivalWindow(start: unknown, end: unknown): string {
+  const s = typeof start === 'string' ? new Date(start) : null;
+  if (!s || Number.isNaN(s.getTime())) return '—';
+  const e = typeof end === 'string' ? new Date(end) : null;
+  const tail = e && !Number.isNaN(e.getTime()) ? `–${WINDOW_TIME.format(e)}` : '';
+  return `${WINDOW_DAY.format(s)}, ${WINDOW_TIME.format(s)}${tail}`;
+}
+
+/** The sentence for kinds whose words are built here rather than from raw `data`. */
+function builtText(evt: ActivityEvent, t: TFunc): string | null {
+  const d = evt.data;
+  const key = (k: string) => `workOrders.activity.kind.${k}`;
+  const rev = typeof d.revision === 'number' && d.revision > 1 ? ` · rev ${d.revision}` : '';
+  const amount = money(d.totalAmount ?? d.amount);
+  switch (evt.kind) {
+    case 'DISPATCH_RESCHEDULED':
+      return t(key('dispatchRescheduled'), { window: arrivalWindow(d.arrivalWindowStart, d.arrivalWindowEnd) });
+    case 'FILES_UPLOADED': {
+      const count = typeof d.count === 'number' ? d.count : 0;
+      const photos = count > 0 && d.photoCount === count;
+      const what = photos ? (count === 1 ? 'photo' : 'photos') : count === 1 ? 'file' : 'files';
+      return t(key('filesUploaded'), { count, what });
+    }
+    case 'QUOTE_SENT':
+      return via(d.channels)
+        ? t(key('quoteSent'), { via: via(d.channels), rev, amount })
+        : t(key('quoteMarkedSent'), { rev, amount });
+    case 'QUOTE_VIEWED':
+      return t(key('quoteViewed'), { rev });
+    case 'QUOTE_ACCEPTED':
+      return t(key('quoteAccepted'), { amount });
+    case 'QUOTE_DECLINED':
+      return t(key('quoteDeclined'), { amount });
+    case 'INVOICE_SENT':
+      return via(d.channels) ? t(key('invoiceSent'), { via: via(d.channels), amount }) : t(key('invoiceMarkedSent'), { amount });
+    case 'INVOICE_PAID':
+      return t(key('invoicePaid'), { amount });
+    case 'INVOICE_VOIDED':
+      return t(key('invoiceVoided'), { amount });
+    case 'PO_CREATED':
+      return t(key('poCreated'), {
+        vendor: typeof d.vendorName === 'string' && d.vendorName ? ` · ${d.vendorName}` : '',
+        amount: money(d.totalCost),
+      });
+    case 'PO_STATUS_CHANGED': {
+      const status = typeof d.toStatus === 'string' ? (PO_STATUS[d.toStatus] ?? d.toStatus.toLowerCase()) : '—';
+      const reason = typeof d.reason === 'string' && d.reason.trim() ? ` · ${d.reason.trim()}` : '';
+      return t(key('poStatusChanged'), { status, reason });
+    }
+    case 'PAYMENT_RECEIVED': {
+      const method = typeof d.method === 'string' && d.method ? ` · ${d.method.replace(/_/g, ' ').toLowerCase()}` : '';
+      return t(key('paymentReceived'), { paymentNumber: typeof d.paymentNumber === 'string' ? d.paymentNumber : '', amount, method });
+    }
+    default:
+      return null;
+  }
+}
+
 /** The row's sentence: the kind's template, plus what the feed adds beyond it. */
 function eventText(evt: ActivityEvent, t: TFunc, getName: GetName): string {
+  const built = builtText(evt, t);
+  if (built) return built;
   const base = resolveEventSummary(evt, t, getName);
   const note = typeof evt.data.note === 'string' ? evt.data.note.trim() : '';
   if (evt.kind === 'WORK_ITEM_STATUS_CHANGED' && note) return `${base} · ${note}`;
@@ -175,7 +265,7 @@ export function buildWorkOrderDays({
     }
     const earlier = key ? bySubject.get(key)!.slice(1).reverse() : [];
     const { glyph, tone } = glyphFor(evt);
-    const { actor, isPerson } = actorOf(evt, t);
+    const { actor, isPerson } = actorOf(evt, t, getName);
     const { obj, objHref } = subjectLink(evt.subject, getName, getAbbrev);
     push(item.ts, {
       kind: 'single',
