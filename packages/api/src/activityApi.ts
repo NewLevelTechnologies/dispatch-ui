@@ -33,13 +33,19 @@ export type ActivityKind =
   | 'DISPATCH_CHECKED_OUT'
   | 'DISPATCH_CANCELLED'
   | 'DISPATCH_NO_SHOW'
+  | 'DISPATCH_RESCHEDULED'
+  | 'DISPATCH_REASSIGNED'
+  | 'FILES_UPLOADED'
   | 'NOTE_ADDED'
   | 'NOTE_DELETED'
   | 'QUOTE_SENT'
+  | 'QUOTE_VIEWED'
   | 'QUOTE_ACCEPTED'
   | 'QUOTE_DECLINED'
   | 'INVOICE_ISSUED'
+  | 'INVOICE_SENT'
   | 'INVOICE_PAID'
+  | 'INVOICE_VOIDED'
   | 'PAYMENT_RECEIVED'
   | 'PO_CREATED'
   | 'CALLBACK_LINKED'
@@ -51,7 +57,8 @@ export type ActivityKind =
  * `userId` and the name "System". There's no office/tech split: show the person.
  */
 export interface ActivityActor {
-  type?: 'USER' | 'SYSTEM';
+  /** `CUSTOMER` (financial stream only): a view, or an approval on the public page with the typed name. */
+  type?: 'USER' | 'SYSTEM' | 'CUSTOMER';
   userId: string | null;
   userName: string;
 }
@@ -79,7 +86,8 @@ export interface ActivitySubject {
 export interface ActivityEvent {
   id: string;
   kind: ActivityKind;
-  category: ActivityCategory;
+  /** `FINANCIAL` rows come from the financial stream, never this feed. */
+  category: ActivityCategory | 'FINANCIAL';
   classification?: ActivityClassification;
   timestamp: string;
   subject?: ActivitySubject | null;
@@ -154,6 +162,20 @@ export const activityApi = {
         },
       }
     );
+    return response.data;
+  },
+
+  /**
+   * The work order's quote, invoice and payment steps (financial-service), in
+   * the same row shape and envelope as `list`, for merging by timestamp.
+   * Quote and invoice rows carry their document as `subject` (label "Q-1882");
+   * a payment is a step on the invoice it paid. No category or classification
+   * filter.
+   */
+  listFinancial: async (workOrderId: string, params?: { cursor?: string; limit?: number }): Promise<ActivityPage> => {
+    const response = await apiClient.get<ActivityPage>(`/financial/work-orders/${workOrderId}/activity`, {
+      params: { cursor: params?.cursor, limit: params?.limit },
+    });
     return response.data;
   },
 
