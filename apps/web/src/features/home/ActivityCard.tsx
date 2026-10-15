@@ -38,10 +38,12 @@ export function ActivityCard({ regionIds }: { regionIds: string[] | undefined })
     queryKey: ['home-activity', 'work-orders', regionIds],
     queryFn: () => activityApi.listForTenant({ limit: SHOWN, regionIds }),
   });
-  // Invoice amounts ride this stream, so it follows the invoice capability.
+  // Invoice amounts ride this stream, so it follows the invoice capability. The
+  // home card keeps to invoices sent and paid; quote steps and individual
+  // payments live on the location, customer and job feeds.
   const financial = useQuery({
     queryKey: ['home-activity', 'financial', regionIds],
-    queryFn: () => financialActivityApi.getForTenant({ limit: SHOWN, regionIds }),
+    queryFn: () => financialActivityApi.getForTenant({ limit: SHOWN, regionIds, kinds: ['INVOICE_SENT', 'INVOICE_PAID'] }),
     enabled: canInvoices,
   });
 

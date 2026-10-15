@@ -37,7 +37,7 @@ export interface WoDayGroup {
 
 type GetAbbrev = (entityCode: string) => string;
 
-function actorOf(evt: ActivityEvent, t: TFunc, getName: GetName): { actor: string; isPerson: boolean } {
+export function actorOf(evt: ActivityEvent, t: TFunc, getName: GetName): { actor: string; isPerson: boolean } {
   const name = evt.actor?.userName?.trim();
   // A customer viewing a quote has no name; approving one carries the name they typed.
   if (evt.actor?.type === 'CUSTOMER') return { actor: name || getName('customer'), isPerson: true };
@@ -103,8 +103,12 @@ function arrivalWindow(start: unknown, end: unknown): string {
   return `${WINDOW_DAY.format(s)}, ${WINDOW_TIME.format(s)}${tail}`;
 }
 
-/** The sentence for kinds whose words are built here rather than from raw `data`. */
-function builtText(evt: ActivityEvent, t: TFunc): string | null {
+/**
+ * The sentence for kinds whose words are built here rather than from raw `data`
+ * (quote, invoice, payment and PO steps, reschedules, uploads). Shared with the
+ * location, customer and home feeds, which carry the same financial rows.
+ */
+export function builtText(evt: ActivityEvent, t: TFunc): string | null {
   const d = evt.data;
   const key = (k: string) => `workOrders.activity.kind.${k}`;
   const rev = typeof d.revision === 'number' && d.revision > 1 ? ` · rev ${d.revision}` : '';
@@ -213,13 +217,16 @@ function messageText(m: NotificationLogDto, t: TFunc): string {
     what: m.notificationTypeName || t('workOrders.activity.message.fallback'),
     recipient: m.recipientName || m.recipientPhone || m.recipientEmail || '—',
   });
+  // Delivery is reported back by the providers; SENT stays when no report comes.
+  if (m.status === 'DELIVERED') return t('workOrders.activity.message.delivered', { base });
+  if (m.status === 'BOUNCED') return t('workOrders.activity.message.bounced', { base });
   if (m.status === 'FAILED') return t('workOrders.activity.message.failed', { base });
   if (m.status === 'SUPPRESSED') return t('workOrders.activity.message.suppressed', { base });
   return base;
 }
 
 function messageGlyph(m: NotificationLogDto): { glyph: string; tone: ActivityTone } {
-  return m.status === 'FAILED' ? { glyph: '!', tone: 'warning' } : { glyph: '✉', tone: 'neutral' };
+  return m.status === 'FAILED' || m.status === 'BOUNCED' ? { glyph: '!', tone: 'warning' } : { glyph: '✉', tone: 'neutral' };
 }
 
 type Entry =

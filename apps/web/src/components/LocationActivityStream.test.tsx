@@ -76,12 +76,13 @@ const financialEvent = (
 ): FinancialActivityEvent => ({
   id: 'f-1',
   kind: 'INVOICE_PAID',
-  invoiceId: 'inv-1',
-  invoiceNumber: 'INV-1042',
+  category: 'FINANCIAL',
+  classification: 'BUSINESS',
+  subject: { type: 'INVOICE', id: 'inv-1', number: null, label: 'INV-1042' },
   workOrderId: null,
   serviceLocationId: 'sl-1',
-  amount: '149.00',
-  actor: { userId: 'u-9', userName: 'Maria Chen' },
+  data: { totalAmount: 149 },
+  actor: { type: 'USER', userId: 'u-9', userName: 'Maria Chen' },
   timestamp: '2026-06-03T14:03:00Z',
   ...overrides,
 });
@@ -97,7 +98,7 @@ function mockFeeds(
 ) {
   vi.mocked(apiClient.get).mockImplementation((url: string) => {
     let data: unknown;
-    if (url.includes('/financial/')) data = financial;
+    if (url.includes('/financial/')) data = { content: financial, nextCursor: null, hasMore: false };
     else if (url.includes('/audit/')) data = audit;
     else if (url.includes('/work-orders/locations/')) data = location;
     else data = perWo; // /work-orders/{id}/activity — group expansion
@@ -325,8 +326,36 @@ describe('LocationActivityStream', () => {
     mockFeeds(locPage([]), woPage([]), [], [financialEvent()]);
     renderWithProviders(<LocationActivityStream serviceLocationId="sl-1" />);
     await waitFor(() => {
-      expect(screen.getByText('Invoice INV-1042 paid · $149.00')).toBeInTheDocument();
+      expect(screen.getByText('Invoice paid in full · $149.00')).toBeInTheDocument();
     });
+    expect(screen.getByRole('link', { name: 'INV-1042' })).toHaveAttribute('href', '/invoices/inv-1');
+  });
+
+  it('shows a customer’s quote approval and narrows the chips by kind on the server', async () => {
+    mockFeeds(locPage([]), woPage([]), [], [
+      financialEvent({
+        id: 'f-2',
+        kind: 'QUOTE_ACCEPTED',
+        subject: { type: 'QUOTE', id: 'q-1', number: null, label: 'Q-1882' },
+        actor: { type: 'CUSTOMER', userId: null, userName: 'Tanya Reyes' },
+        data: { revision: 2, totalAmount: 742.67 },
+      }),
+    ]);
+    const user = userEvent.setup();
+    renderWithProviders(<LocationActivityStream serviceLocationId="sl-1" />);
+    expect(await screen.findByText('Quote approved · $742.67')).toBeInTheDocument();
+    expect(screen.getByText('Tanya Reyes')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Payments' }));
+    await waitFor(() =>
+      expect(
+        vi.mocked(apiClient.get).mock.calls.some(
+          ([u, cfg]) =>
+            String(u).includes('/financial/locations/sl-1/activity') &&
+            (cfg as { params?: { kinds?: string } } | undefined)?.params?.kinds === 'PAYMENT_RECEIVED',
+        ),
+      ).toBe(true),
+    );
   });
 
   it('labels the entity-mapped chips through the glossary', async () => {
@@ -337,7 +366,7 @@ describe('LocationActivityStream', () => {
       // job → work orders, visit → dispatches, invoice → invoices, payment →
       // payments (all default glossary plurals)
       expect(within(group).getByRole('button', { name: 'Work Orders' })).toBeInTheDocument();
-      expect(within(group).getByRole('button', { name: 'Invoices' })).toBeInTheDocument();
+      expect(within(group).getByRole('button', { name: 'Quotes & invoices' })).toBeInTheDocument();
       expect(within(group).getByRole('button', { name: 'Dispatches' })).toBeInTheDocument();
       expect(within(group).getByRole('button', { name: 'Payments' })).toBeInTheDocument();
     });

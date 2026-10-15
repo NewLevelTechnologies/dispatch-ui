@@ -1,5 +1,6 @@
 // Financial API Client
 import apiClient from './client';
+import type { ActivityEvent } from './activityApi';
 
 // ========== PRICING (shared by quotes and invoices) ==========
 //
@@ -1978,85 +1979,69 @@ export const purchaseBillingApi = {
 
 // ========== LOCATION FINANCIAL ACTIVITY ==========
 
-export type FinancialActivityKind = 'INVOICE_SENT' | 'INVOICE_PAID';
+/** The quote, invoice and payment steps the financial feeds carry. */
+export type FinancialActivityKind =
+  | 'QUOTE_SENT'
+  | 'QUOTE_VIEWED'
+  | 'QUOTE_ACCEPTED'
+  | 'QUOTE_DECLINED'
+  | 'INVOICE_SENT'
+  | 'INVOICE_PAID'
+  | 'INVOICE_VOIDED'
+  | 'PAYMENT_RECEIVED';
 
 /**
- * A money milestone at a service location (invoice sent / paid). Standalone
- * customer payments aren't here by design — INVOICE_PAID carries the location
- * side. `workOrderId` (when present) groups the row under its work order; a
- * null actor (or null userName) means a historical/system row → gear glyph.
- * `amount` is a decimal string from the backend.
+ * A quote or invoice step at a location, for a customer, or tenant-wide: the
+ * work order tab's row (`subject` is the document, `data.totalAmount` or a
+ * payment's `data.amount`) plus where it happened. `serviceLocationId` may be
+ * null on the customer feed for a document with no site.
  */
-export interface FinancialActivityEvent {
-  id: string;
-  kind: FinancialActivityKind;
-  invoiceId: string;
-  invoiceNumber: string;
+export type FinancialActivityEvent = ActivityEvent & {
   workOrderId: string | null;
-  // Non-null on the location feed; the customer feed (getForCustomer) may return
-  // null for a customer-level invoice with no site. Row rendering keys off
-  // workOrderId, not this, so null is safe.
   serviceLocationId: string | null;
-  amount: string;
-  actor: { userId: string; userName: string | null } | null;
-  timestamp: string;
-}
+};
 
-/** Cursor-paginated page of customer financial milestones (ACT-1). Same
- * envelope as the WO activity stream so the two co-paginate. */
+/** Cursor-paginated, same envelope as the work order streams so they co-paginate. */
 export interface FinancialActivityPage {
   content: FinancialActivityEvent[];
   nextCursor: string | null;
   hasMore: boolean;
 }
 
+/** `kinds` filters on the server, which keeps paging correct. */
+export interface FinancialActivityParams {
+  cursor?: string;
+  limit?: number;
+  kinds?: FinancialActivityKind[];
+}
+
+const financialActivityQuery = ({ kinds, ...rest }: FinancialActivityParams = {}) => ({
+  ...rest,
+  ...(kinds?.length ? { kinds: kinds.join(',') } : {}),
+});
+
 export const financialActivityApi = {
-  /** Location-scoped financial milestones, newest-first. Cursor-paginated
-   * (keyset, hole-free), same envelope as {@link getForCustomer}, so it
-   * co-paginates with the WO activity stream — pass `nextCursor` back as
-   * `cursor`. Defensive: tolerates the pre-cursor bare-array response during the
-   * backend deploy window (wraps it as a single final page). */
-  getForLocation: async (
-    serviceLocationId: string,
-    params?: { cursor?: string; limit?: number },
-  ): Promise<FinancialActivityPage> => {
-    const response = await apiClient.get<FinancialActivityPage | FinancialActivityEvent[]>(
-      `/financial/locations/${serviceLocationId}/activity`,
-      { params },
-    );
-    const data = response.data;
-    return Array.isArray(data) ? { content: data, nextCursor: null, hasMore: false } : data;
+  /** A location's quote and invoice steps (the document's site), newest first. */
+  getForLocation: async (serviceLocationId: string, params?: FinancialActivityParams): Promise<FinancialActivityPage> => {
+    const response = await apiClient.get<FinancialActivityPage>(`/financial/locations/${serviceLocationId}/activity`, {
+      params: financialActivityQuery(params),
+    });
+    return response.data;
   },
 
-  /** Customer-scoped financial milestones (ACT-1), newest-first. Same row shape
-   * as {@link getForLocation} (interleaved with the WO activity stream), except
-   * `serviceLocationId` may be null for customer-level invoices with no site.
-   *
-   * Cursor-paginated (keyset, hole-free) so the FE co-paginates it against the
-   * cursor-based WO activity stream — pass `nextCursor` back as `cursor`.
-   * Defensive: tolerates the pre-cursor bare-array response during the backend
-   * deploy window (wraps it as a single, final page). */
-  getForCustomer: async (
-    customerId: string,
-    params?: { cursor?: string; limit?: number },
-  ): Promise<FinancialActivityPage> => {
-    const response = await apiClient.get<FinancialActivityPage | FinancialActivityEvent[]>(
-      `/financial/customers/${customerId}/activity`,
-      { params },
-    );
-    const data = response.data;
-    return Array.isArray(data) ? { content: data, nextCursor: null, hasMore: false } : data;
+  /** A customer's quote and invoice steps (documents billed to them), newest first. */
+  getForCustomer: async (customerId: string, params?: FinancialActivityParams): Promise<FinancialActivityPage> => {
+    const response = await apiClient.get<FinancialActivityPage>(`/financial/customers/${customerId}/activity`, {
+      params: financialActivityQuery(params),
+    });
+    return response.data;
   },
 
-  /** Tenant-wide financial milestones (home dashboard), newest-first. Same row
-   * shape and cursor envelope as {@link getForCustomer}, so it co-paginates with
-   * `activityApi.listForTenant`. `regionIds` narrows to invoices in those regions. */
-  getForTenant: async (
-    params?: { cursor?: string; limit?: number; regionIds?: string[] },
-  ): Promise<FinancialActivityPage> => {
+  /** Tenant-wide steps (home dashboard); `regionIds` narrows to documents in those regions. */
+  getForTenant: async (params?: FinancialActivityParams & { regionIds?: string[] }): Promise<FinancialActivityPage> => {
     const { regionIds, ...rest } = params ?? {};
     const response = await apiClient.get<FinancialActivityPage>('/financial/activity', {
-      params: { ...rest, ...(regionIds?.length ? { regionIds } : {}) },
+      params: { ...financialActivityQuery(rest), ...(regionIds?.length ? { regionIds } : {}) },
     });
     return response.data;
   },

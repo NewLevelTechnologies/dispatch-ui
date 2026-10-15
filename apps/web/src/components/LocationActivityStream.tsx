@@ -24,6 +24,7 @@ import {
   auditApi,
   financialActivityApi,
   type ActivityCategory,
+  type FinancialActivityKind,
   type ListActivityParams,
 } from '../api/setup';
 import { useGlossary } from '../contexts/GlossaryContext';
@@ -69,6 +70,11 @@ const CHIP_CATEGORY: Partial<Record<ChipId, ActivityCategory[]>> = {
 };
 const BUSINESS_CHIPS: ChipId[] = ['all', 'job', 'visit', 'note'];
 const FINANCIAL_CHIPS: ChipId[] = ['all', 'invoice', 'payment'];
+// The financial chips narrow its stream by kind on the server, so paging stays right.
+const CHIP_KINDS: Partial<Record<ChipId, FinancialActivityKind[]>> = {
+  invoice: ['QUOTE_SENT', 'QUOTE_VIEWED', 'QUOTE_ACCEPTED', 'QUOTE_DECLINED', 'INVOICE_SENT', 'INVOICE_PAID', 'INVOICE_VOIDED'],
+  payment: ['PAYMENT_RECEIVED'],
+};
 
 // Scope-aware: the same merged feed powers the Location detail and the Customer
 // detail Activity tabs. Location scope adds the audit (field-edit) stream + the
@@ -145,7 +151,7 @@ export default function LocationActivityStream({ serviceLocationId, customerId }
     { id: 'all', label: t('serviceLocations.activity.filter.all') },
     { id: 'job', label: getName('work_order', true) },
     { id: 'visit', label: getName('dispatch', true) },
-    { id: 'invoice', label: getName('invoice', true) },
+    { id: 'invoice', label: `${getName('quote', true)} & ${getName('invoice', true).toLowerCase()}` },
     { id: 'payment', label: getName('payment', true) },
     { id: 'note', label: t('serviceLocations.activity.filter.notes') },
     ...(canViewAudit && isLocation
@@ -189,9 +195,9 @@ export default function LocationActivityStream({ serviceLocationId, customerId }
     isLoading: financialLoading,
     error: financialError,
   } = useInfiniteQuery({
-    queryKey: ['financial-activity', scope.type, scope.id],
+    queryKey: ['financial-activity', scope.type, scope.id, CHIP_KINDS[chip] ?? 'ALL'],
     queryFn: ({ pageParam }) => {
-      const params = { cursor: pageParam, limit: PAGE_SIZE };
+      const params = { cursor: pageParam, limit: PAGE_SIZE, kinds: CHIP_KINDS[chip] };
       return isLocation
         ? financialActivityApi.getForLocation(scope.id, params)
         : financialActivityApi.getForCustomer(scope.id, params);
@@ -243,11 +249,10 @@ export default function LocationActivityStream({ serviceLocationId, customerId }
         events: businessActive ? events.filter((e) => tsMs(e.timestamp) >= boundaryMs) : [],
         financial: financialActive ? financialData.filter((f) => tsMs(f.timestamp) >= boundaryMs) : [],
         audit: auditActive ? auditData ?? [] : [],
-        chip,
         t,
         getName,
       }),
-    [businessActive, financialActive, auditActive, events, financialData, auditData, boundaryMs, chip, t, getName]
+    [businessActive, financialActive, auditActive, events, financialData, auditData, boundaryMs, t, getName]
   );
 
   // Combined infinite scroll across both cursor streams. On load-more, advance

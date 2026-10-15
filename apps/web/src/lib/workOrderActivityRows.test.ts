@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import type { ActivityEvent } from '../api/setup';
+import type { ActivityEvent, NotificationLogDto } from '../api/setup';
 import { buildWorkOrderDays, type WoSingleRow } from './workOrderActivityRows';
 
 const t = (key: string, params: Record<string, unknown> = {}) =>
@@ -75,5 +75,29 @@ describe('buildWorkOrderDays', () => {
       }),
     ]);
     expect(row.text).toBe('invoiceMarkedSent(amount=$389.00)');
+  });
+
+  it('says whether a text or email was delivered or bounced', () => {
+    const msg = (status: NotificationLogDto['status']): NotificationLogDto => ({
+      id: status,
+      notificationId: 'n',
+      notificationTypeId: 'nt',
+      notificationTypeName: 'Invoice',
+      channel: 'EMAIL',
+      recipientName: 'Ops desk',
+      status,
+      entityType: 'invoice',
+      entityId: 'i-1',
+      about: null,
+      createdAt: '2026-05-14T18:00:00Z',
+      retryCount: 0,
+    });
+    const out = buildWorkOrderDays({ events: [], messages: [msg('DELIVERED'), msg('BOUNCED')], audit: [], t, getName, getAbbrev })
+      .flatMap((d) => d.rows) as WoSingleRow[];
+    expect(out.map((r) => r.text)).toEqual([
+      'delivered(base=emailed(what=Invoice,recipient=Ops desk))',
+      'bounced(base=emailed(what=Invoice,recipient=Ops desk))',
+    ]);
+    expect(out.map((r) => r.tone)).toEqual(['neutral', 'warning']);
   });
 });
