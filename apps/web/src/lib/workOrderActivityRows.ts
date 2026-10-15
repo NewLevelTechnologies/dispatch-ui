@@ -12,8 +12,8 @@ import { getDayBucket } from './activityDayBucket';
 import { glyphFor, type ActivityTone } from './activityGlyph';
 import type { AuditRowModel, BaseRow, GetName, TFunc } from './locationActivityRows';
 
-/** Subjects whose steps fold into one row. Purchase orders join when their stream lands. */
-const GROUPED: ReadonlySet<ActivitySubject['type']> = new Set(['DISPATCH', 'QUOTE', 'INVOICE']);
+/** Subjects whose steps fold into one row. */
+const GROUPED: ReadonlySet<ActivitySubject['type']> = new Set(['DISPATCH', 'QUOTE', 'INVOICE', 'PURCHASE_ORDER']);
 
 export interface StepRow {
   id: string;
@@ -66,6 +66,8 @@ export function subjectLink(
       return { obj: subject.label ?? getName('quote'), objHref: `/quotes/${subject.id}` };
     case 'INVOICE':
       return { obj: subject.label ?? getName('invoice'), objHref: `/invoices/${subject.id}` };
+    case 'PURCHASE_ORDER':
+      return { obj: subject.label ?? 'Purchase order', objHref: `/purchase-orders/${subject.id}` };
     default:
       return { obj: null, objHref: null };
   }
@@ -79,6 +81,15 @@ const via = (channels: unknown): string => {
   const list = Array.isArray(channels) ? channels : [];
   const words = list.map((c) => (c === 'SMS' ? 'text' : String(c).toLowerCase()));
   return words.length ? ` by ${words.join(' and ')}` : '';
+};
+
+const PO_STATUS: Record<string, string> = {
+  DRAFT: 'draft',
+  ORDERED: 'ordered',
+  PARTIALLY_RECEIVED: 'partly received',
+  RECEIVED: 'received',
+  BILLED: 'billed',
+  CANCELLED: 'cancelled',
 };
 
 const WINDOW_DAY = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' });
@@ -123,6 +134,16 @@ function builtText(evt: ActivityEvent, t: TFunc): string | null {
       return t(key('invoicePaid'), { amount });
     case 'INVOICE_VOIDED':
       return t(key('invoiceVoided'), { amount });
+    case 'PO_CREATED':
+      return t(key('poCreated'), {
+        vendor: typeof d.vendorName === 'string' && d.vendorName ? ` · ${d.vendorName}` : '',
+        amount: money(d.totalCost),
+      });
+    case 'PO_STATUS_CHANGED': {
+      const status = typeof d.toStatus === 'string' ? (PO_STATUS[d.toStatus] ?? d.toStatus.toLowerCase()) : '—';
+      const reason = typeof d.reason === 'string' && d.reason.trim() ? ` · ${d.reason.trim()}` : '';
+      return t(key('poStatusChanged'), { status, reason });
+    }
     case 'PAYMENT_RECEIVED': {
       const method = typeof d.method === 'string' && d.method ? ` · ${d.method.replace(/_/g, ' ').toLowerCase()}` : '';
       return t(key('paymentReceived'), { paymentNumber: typeof d.paymentNumber === 'string' ? d.paymentNumber : '', amount, method });

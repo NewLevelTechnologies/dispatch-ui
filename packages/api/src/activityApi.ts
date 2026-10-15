@@ -48,6 +48,7 @@ export type ActivityKind =
   | 'INVOICE_VOIDED'
   | 'PAYMENT_RECEIVED'
   | 'PO_CREATED'
+  | 'PO_STATUS_CHANGED'
   | 'CALLBACK_LINKED'
   | 'CALLBACK_UNLINKED'
   | 'CALLBACK_CHANGED';
@@ -86,8 +87,8 @@ export interface ActivitySubject {
 export interface ActivityEvent {
   id: string;
   kind: ActivityKind;
-  /** `FINANCIAL` rows come from the financial stream, never this feed. */
-  category: ActivityCategory | 'FINANCIAL';
+  /** `FINANCIAL` and `PURCHASING` rows come from their services' streams, never this feed. */
+  category: ActivityCategory | 'FINANCIAL' | 'PURCHASING';
   classification?: ActivityClassification;
   timestamp: string;
   subject?: ActivitySubject | null;
@@ -174,6 +175,18 @@ export const activityApi = {
    */
   listFinancial: async (workOrderId: string, params?: { cursor?: string; limit?: number }): Promise<ActivityPage> => {
     const response = await apiClient.get<ActivityPage>(`/financial/work-orders/${workOrderId}/activity`, {
+      params: { cursor: params?.cursor, limit: params?.limit },
+    });
+    return response.data;
+  },
+
+  /**
+   * The work order's purchase order steps (inventory-service): created, then
+   * each status change (ordered, received, cancelled with reason, reopened).
+   * Same row shape and envelope as `list`; the PO is the `subject`.
+   */
+  listPurchasing: async (workOrderId: string, params?: { cursor?: string; limit?: number }): Promise<ActivityPage> => {
+    const response = await apiClient.get<ActivityPage>(`/inventory/work-orders/${workOrderId}/activity`, {
       params: { cursor: params?.cursor, limit: params?.limit },
     });
     return response.data;

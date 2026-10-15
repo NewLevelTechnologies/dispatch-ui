@@ -2472,6 +2472,8 @@ vi.mock('react-i18next', async () => {
     'workOrders.activity.kind.quoteMarkedSent': '{{quote}} marked sent{{rev}} · {{amount}}',
     'workOrders.activity.kind.quoteSent': '{{quote}} sent{{via}}{{rev}} · {{amount}}',
     'workOrders.activity.kind.quoteViewed': 'Viewed by the {{customer, lowercase}}{{rev}}',
+    'workOrders.activity.kind.poCreated': 'Purchase order created{{vendor}} · {{amount}}',
+    'workOrders.activity.kind.poStatusChanged': 'Marked {{status}}{{reason}}',
     'workOrders.activity.kind.unknown': 'Unrecognized activity',
     'workOrders.activity.kind.workItemCreated': 'Added {{entity, lowercase}}',
     'workOrders.activity.kind.workItemDeleted': 'Removed {{entity, lowercase}}',

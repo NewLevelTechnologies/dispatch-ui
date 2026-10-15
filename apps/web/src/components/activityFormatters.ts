@@ -42,6 +42,7 @@ const KIND_TEMPLATE_KEYS: Record<ActivityKind, string> = {
   INVOICE_VOIDED: 'workOrders.activity.kind.invoiceVoided',
   PAYMENT_RECEIVED: 'workOrders.activity.kind.paymentReceived',
   PO_CREATED: 'workOrders.activity.kind.poCreated',
+  PO_STATUS_CHANGED: 'workOrders.activity.kind.poStatusChanged',
   CALLBACK_LINKED: 'workOrders.activity.kind.callbackLinked',
   CALLBACK_UNLINKED: 'workOrders.activity.kind.callbackUnlinked',
   CALLBACK_CHANGED: 'workOrders.activity.kind.callbackChanged',

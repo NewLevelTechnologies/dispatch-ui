@@ -89,6 +89,25 @@ const financialEvents: ActivityEvent[] = [
     data: { revision: 2, totalAmount: 742.67, channels: ['SMS', 'EMAIL'] },
   }),
 ];
+const po = { type: 'PURCHASE_ORDER' as const, id: 'po-1', number: null, label: 'PO-2104' };
+const purchasingEvents: ActivityEvent[] = [
+  event({
+    id: 'p-cancel',
+    kind: 'PO_STATUS_CHANGED',
+    category: 'PURCHASING',
+    timestamp: '2026-05-14T18:43:00Z',
+    subject: po,
+    data: { fromStatus: 'ORDERED', toStatus: 'CANCELLED', reason: 'duplicate' },
+  }),
+  event({
+    id: 'p-create',
+    kind: 'PO_CREATED',
+    category: 'PURCHASING',
+    timestamp: '2026-05-14T18:20:00Z',
+    subject: po,
+    data: { vendorName: 'Ferguson HVAC', type: 'ORDER', status: 'ORDERED', totalCost: 64.8 },
+  }),
+];
 const auditEntry: ServiceLocationAuditEntry = {
   id: 'a-1',
   userName: 'Maria C.',
@@ -115,6 +134,9 @@ describe('WorkOrderActivityTab', () => {
     vi.mocked(useHasCapability).mockReturnValue(true);
     vi.mocked(apiClient.get).mockImplementation((url: string, cfg?: { params?: Params }) => {
       if (url === '/audit/WorkOrder/wo-1') return Promise.resolve({ data: [auditEntry] });
+      if (url === '/inventory/work-orders/wo-1/activity') {
+        return Promise.resolve({ data: { content: purchasingEvents, nextCursor: null, hasMore: false } });
+      }
       if (url === '/financial/work-orders/wo-1/activity') {
         return Promise.resolve({ data: { content: financialEvents, nextCursor: null, hasMore: false } });
       }
@@ -133,7 +155,7 @@ describe('WorkOrderActivityTab', () => {
     expect(screen.queryByText('D. Park arrived')).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Dispatch 2' })).toHaveAttribute('href', expect.stringContaining('tab=trips'));
 
-    await user.click(screen.getByRole('button', { name: /1 update/ }));
+    await user.click(screen.getByText('D. Park checked out').closest<HTMLElement>('[role="button"]')!);
     expect(screen.getByText('D. Park arrived')).toBeInTheDocument();
 
     // A work item status change carries the note entered with it, and its item number.
@@ -205,5 +227,19 @@ describe('WorkOrderActivityTab', () => {
     expect(await screen.findByText('Quote approved · $742.67')).toBeInTheDocument();
     expect(screen.queryByText('D. Park checked out')).not.toBeInTheDocument();
     expect(feedCalls()).toHaveLength(before);
+  });
+
+  it('folds a purchase order’s steps under it and filters to them', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<WorkOrderActivityTab workOrderId="wo-1" />);
+
+    expect(await screen.findByText('Marked cancelled · duplicate')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'PO-2104' })).toHaveAttribute('href', '/purchase-orders/po-1');
+
+    await user.click(screen.getByRole('button', { name: 'Purchasing' }));
+    await user.click(await screen.findByRole('button', { name: /1 update/ }));
+    expect(screen.getByText('Purchase order created · Ferguson HVAC · $64.80')).toBeInTheDocument();
+    expect(screen.queryByText('D. Park checked out')).not.toBeInTheDocument();
+    expect(screen.queryByText('Quote approved · $742.67')).not.toBeInTheDocument();
   });
 });

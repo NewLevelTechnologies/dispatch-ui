@@ -6,9 +6,9 @@
 //
 // Streams, merged by time: the work order's own feed (work order, work items,
 // dispatches, notes, uploads), its quote/invoice/payment steps from
-// financial-service, and, for the Changes chip and audit detail, the work
-// order's field-change audit trail. Purchase orders and messages join as
-// their streams land.
+// financial-service, its purchase order steps from inventory-service, and,
+// for the Changes chip and audit detail, the work order's field-change audit
+// trail. Messages join when their stream lands.
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { useTranslation } from '@dispatch/i18n';
@@ -22,7 +22,7 @@ import { buildWorkOrderDays, type WoSingleRow } from '../../lib/workOrderActivit
 const PAGE_SIZE = 50;
 const AUDIT_LIMIT = 200;
 
-type ChipId = 'all' | 'dispatch' | 'item' | 'billing' | 'note' | 'change';
+type ChipId = 'all' | 'dispatch' | 'item' | 'billing' | 'purchasing' | 'note' | 'change';
 
 const CHIP_CATEGORY: Partial<Record<ChipId, ActivityCategory[]>> = {
   dispatch: ['DISPATCH'],
@@ -43,8 +43,9 @@ export default function WorkOrderActivityTab({ workOrderId }: { workOrderId: str
   // Work order field edits are neither dispatches, items nor notes.
   const auditActive = canViewAudit && (chip === 'change' || (chip === 'all' && showAudit));
 
-  const feedActive = chip !== 'billing';
+  const feedActive = chip !== 'billing' && chip !== 'purchasing';
   const financialActive = chip === 'all' || chip === 'billing';
+  const purchasingActive = chip === 'all' || chip === 'purchasing';
 
   const feed = useInfiniteQuery({
     queryKey: ['work-order-activity', workOrderId, 'tab', categories ?? 'ALL', classification],
@@ -62,15 +63,23 @@ export default function WorkOrderActivityTab({ workOrderId }: { workOrderId: str
     getNextPageParam: (last) => last.nextCursor ?? undefined,
     enabled: !!workOrderId && financialActive,
   });
+  // Purchase order steps; likewise unfiltered.
+  const purchasing = useInfiniteQuery({
+    queryKey: ['work-order-activity', workOrderId, 'purchasing'],
+    queryFn: ({ pageParam }) => activityApi.listPurchasing(workOrderId, { cursor: pageParam, limit: PAGE_SIZE }),
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (last) => last.nextCursor ?? undefined,
+    enabled: !!workOrderId && purchasingActive,
+  });
   const audit = useQuery({
     queryKey: ['work-order-audit', workOrderId],
     queryFn: () => auditApi.getWorkOrderChanges(workOrderId, AUDIT_LIMIT),
     enabled: !!workOrderId && auditActive,
   });
 
-  // Two paged streams merge cleanly only down to the older of their loaded
-  // ends: below the newest "oldest loaded" row of a stream with more to load,
-  // that stream may still have rows to slot in, so those wait for its next page.
+  // Paged streams merge cleanly only down to the newest "oldest loaded" row of
+  // any stream with more to load: below it, that stream may still have rows to
+  // slot in, so those wait for its next page.
   const streams = useMemo(() => {
     const out: { events: ActivityEvent[]; hasMore: boolean; fetchMore: () => void }[] = [];
     if (feedActive) {
@@ -80,16 +89,21 @@ export default function WorkOrderActivityTab({ workOrderId }: { workOrderId: str
         fetchMore: () => void feed.fetchNextPage(),
       });
     }
-    if (financialActive) {
-      const rows = financial.data?.pages.flatMap((p) => p.content) ?? [];
+    // The other services' streams take no filters; change rows drop out here.
+    for (const [active, q] of [
+      [financialActive, financial],
+      [purchasingActive, purchasing],
+    ] as const) {
+      if (!active) continue;
+      const rows = q.data?.pages.flatMap((p) => p.content) ?? [];
       out.push({
         events: classification === 'BUSINESS' ? rows.filter((e) => e.classification !== 'CHANGE') : rows,
-        hasMore: !!financial.hasNextPage,
-        fetchMore: () => void financial.fetchNextPage(),
+        hasMore: !!q.hasNextPage,
+        fetchMore: () => void q.fetchNextPage(),
       });
     }
     return out;
-  }, [feedActive, financialActive, feed, financial, classification]);
+  }, [feedActive, financialActive, purchasingActive, feed, financial, purchasing, classification]);
   const oldest = (evts: ActivityEvent[]) => evts[evts.length - 1]?.timestamp ?? '';
   const boundary = streams
     .filter((st) => st.hasMore)
@@ -119,7 +133,7 @@ export default function WorkOrderActivityTab({ workOrderId }: { workOrderId: str
   // of each stream holding the merge back.
   const sentinelRef = useRef<HTMLDivElement>(null);
   const hasNextPage = streams.some((st) => st.hasMore);
-  const isFetchingNextPage = feed.isFetchingNextPage || financial.isFetchingNextPage;
+  const isFetchingNextPage = feed.isFetchingNextPage || financial.isFetchingNextPage || purchasing.isFetchingNextPage;
   useEffect(() => {
     const node = sentinelRef.current;
     if (!node || !hasNextPage || isFetchingNextPage) return;
@@ -139,15 +153,19 @@ export default function WorkOrderActivityTab({ workOrderId }: { workOrderId: str
     { id: 'dispatch', label: getName('dispatch', true) },
     { id: 'item', label: getName('work_item', true) },
     { id: 'billing', label: `${getName('quote', true)} & ${getName('invoice', true).toLowerCase()}` },
+    { id: 'purchasing', label: 'Purchasing' },
     { id: 'note', label: 'Notes' },
     { id: 'change', label: 'Changes' },
   ];
 
   const loading =
-    (feedActive && feed.isLoading) || (financialActive && financial.isLoading) || (auditActive && audit.isLoading);
+    (feedActive && feed.isLoading) ||
+    (financialActive && financial.isLoading) ||
+    (purchasingActive && purchasing.isLoading) ||
+    (auditActive && audit.isLoading);
   // A missing audit trail (no access, or audit-service down) shouldn't blank the
-  // feed; neither should the financial stream failing on All.
-  const error = chip === 'billing' ? financial.error : feed.error;
+  // feed; neither should another service's stream failing on All.
+  const error = chip === 'billing' ? financial.error : chip === 'purchasing' ? purchasing.error : feed.error;
   const empty = !loading && !error && days.length === 0;
 
   return (
