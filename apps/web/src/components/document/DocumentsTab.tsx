@@ -97,8 +97,11 @@ export function DocumentsTab({
         <ToggleGroup value={view} onChange={changeView} size="sm" aria-label="Show">
           {VIEWS.map((v) => (
             <ToggleGroupOption key={v} value={v}>
-              {viewLabel[v]}
-              {views && <span className="ml-1 font-medium tabular-nums text-fg-muted">{views.counts[v]}</span>}
+              {/* One inline run: the sm option is a grid, so loose children would stack. */}
+              <span className="inline-flex items-baseline gap-1 whitespace-nowrap">
+                {viewLabel[v]}
+                {views && <span className="text-[11px] font-medium tabular-nums text-fg-muted">{views.counts[v]}</span>}
+              </span>
             </ToggleGroupOption>
           ))}
         </ToggleGroup>
