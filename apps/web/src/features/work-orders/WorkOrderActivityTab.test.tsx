@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
 import { renderWithProviders, userEvent } from '../../test/utils';
-import { apiClient, type ActivityEvent, type ServiceLocationAuditEntry } from '../../api/setup';
+import { apiClient, type ActivityEvent, type NotificationLogDto, type ServiceLocationAuditEntry } from '../../api/setup';
 import { useHasCapability } from '../../hooks/useCurrentUser';
 import WorkOrderActivityTab from './WorkOrderActivityTab';
 
@@ -108,6 +108,36 @@ const purchasingEvents: ActivityEvent[] = [
     data: { vendorName: 'Ferguson HVAC', type: 'ORDER', status: 'ORDERED', totalCost: 64.8 },
   }),
 ];
+const log = (over: Partial<NotificationLogDto>): NotificationLogDto => ({
+  id: 'm',
+  notificationId: 'n',
+  notificationTypeId: 'nt',
+  notificationTypeName: 'Appointment confirmation',
+  channel: 'SMS',
+  recipientName: 'Tanya Reyes',
+  recipientPhone: '6025550182',
+  status: 'SENT',
+  entityType: 'DISPATCH',
+  entityId: 'd-2',
+  audience: 'CUSTOMER',
+  workOrderId: 'wo-1',
+  about: { type: 'DISPATCH', id: 'd-2' },
+  createdAt: '2026-05-14T16:31:00Z',
+  retryCount: 0,
+  ...over,
+});
+const messageLogs: NotificationLogDto[] = [
+  log({ id: 'm-confirm' }),
+  log({
+    id: 'm-fail',
+    notificationTypeName: 'Invoice',
+    channel: 'EMAIL',
+    recipientName: 'Ops desk',
+    status: 'FAILED',
+    about: { type: 'INVOICE', id: 'inv-9' },
+    createdAt: '2026-05-13T10:00:00Z',
+  }),
+];
 const auditEntry: ServiceLocationAuditEntry = {
   id: 'a-1',
   userName: 'Maria C.',
@@ -134,6 +164,10 @@ describe('WorkOrderActivityTab', () => {
     vi.mocked(useHasCapability).mockReturnValue(true);
     vi.mocked(apiClient.get).mockImplementation((url: string, cfg?: { params?: Params }) => {
       if (url === '/audit/WorkOrder/wo-1') return Promise.resolve({ data: [auditEntry] });
+      if (url.startsWith('/notification-logs?')) {
+        expect(url).toContain('workOrderId=wo-1');
+        return Promise.resolve({ data: { content: messageLogs, last: true, number: 0 } });
+      }
       if (url === '/inventory/work-orders/wo-1/activity') {
         return Promise.resolve({ data: { content: purchasingEvents, nextCursor: null, hasMore: false } });
       }
@@ -212,7 +246,7 @@ describe('WorkOrderActivityTab', () => {
     expect(screen.getByRole('link', { name: 'Q-1882' })).toHaveAttribute('href', '/quotes/q-1');
     expect(screen.queryByText(/Quote sent/)).not.toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: /2 updates/ }));
+    await user.click(screen.getByText('Quote approved · $742.67').closest<HTMLElement>('[role="button"]')!);
     expect(screen.getByText('Quote sent by text and email · rev 2 · $742.67')).toBeInTheDocument();
     expect(screen.getByText('Viewed by the customer · rev 2')).toBeInTheDocument();
   });
@@ -241,5 +275,24 @@ describe('WorkOrderActivityTab', () => {
     expect(screen.getByText('Purchase order created · Ferguson HVAC · $64.80')).toBeInTheDocument();
     expect(screen.queryByText('D. Park checked out')).not.toBeInTheDocument();
     expect(screen.queryByText('Quote approved · $742.67')).not.toBeInTheDocument();
+  });
+
+  it('folds a text under the dispatch it was about and lists messages on their chip', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<WorkOrderActivityTab workOrderId="wo-1" />);
+
+    // Under the dispatch, the confirmation text sits among its steps.
+    const dispatchRow = (await screen.findByText('D. Park checked out')).closest<HTMLElement>('[role="button"]')!;
+    expect(dispatchRow).toHaveTextContent('2 updates');
+    await user.click(dispatchRow);
+    expect(screen.getByText('Appointment confirmation texted to Tanya Reyes')).toBeInTheDocument();
+
+    // A failed email about an invoice with no other rows here stands on its own.
+    expect(screen.getByText('Invoice emailed to Ops desk · failed')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Messages' }));
+    expect(await screen.findByText('Appointment confirmation texted to Tanya Reyes')).toBeInTheDocument();
+    expect(screen.queryByText('D. Park checked out')).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Invoice' })).toHaveAttribute('href', '/invoices/inv-9');
   });
 });

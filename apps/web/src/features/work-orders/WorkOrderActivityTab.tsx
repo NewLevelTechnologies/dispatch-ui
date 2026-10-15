@@ -8,11 +8,18 @@
 // dispatches, notes, uploads), its quote/invoice/payment steps from
 // financial-service, its purchase order steps from inventory-service, and,
 // for the Changes chip and audit detail, the work order's field-change audit
-// trail. Messages join when their stream lands.
+// trail, and the texts and emails sent for it (notification-service).
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { useTranslation } from '@dispatch/i18n';
-import { activityApi, auditApi, type ActivityCategory, type ActivityEvent } from '../../api/setup';
+import {
+  activityApi,
+  auditApi,
+  notificationApi,
+  type ActivityCategory,
+  type ActivityEvent,
+  type NotificationLogDto,
+} from '../../api/setup';
 import { useGlossary } from '../../contexts/GlossaryContext';
 import { useHasCapability } from '../../hooks/useCurrentUser';
 import { ActGlyph, ActorCell, AuditRow, EventCell } from '../../components/LocationActivityStream';
@@ -22,7 +29,7 @@ import { buildWorkOrderDays, type WoSingleRow } from '../../lib/workOrderActivit
 const PAGE_SIZE = 50;
 const AUDIT_LIMIT = 200;
 
-type ChipId = 'all' | 'dispatch' | 'item' | 'billing' | 'purchasing' | 'note' | 'change';
+type ChipId = 'all' | 'dispatch' | 'item' | 'billing' | 'purchasing' | 'message' | 'note' | 'change';
 
 const CHIP_CATEGORY: Partial<Record<ChipId, ActivityCategory[]>> = {
   dispatch: ['DISPATCH'],
@@ -43,9 +50,10 @@ export default function WorkOrderActivityTab({ workOrderId }: { workOrderId: str
   // Work order field edits are neither dispatches, items nor notes.
   const auditActive = canViewAudit && (chip === 'change' || (chip === 'all' && showAudit));
 
-  const feedActive = chip !== 'billing' && chip !== 'purchasing';
+  const feedActive = chip !== 'billing' && chip !== 'purchasing' && chip !== 'message';
   const financialActive = chip === 'all' || chip === 'billing';
   const purchasingActive = chip === 'all' || chip === 'purchasing';
+  const messagesActive = chip === 'all' || chip === 'message';
 
   const feed = useInfiniteQuery({
     queryKey: ['work-order-activity', workOrderId, 'tab', categories ?? 'ALL', classification],
@@ -71,6 +79,15 @@ export default function WorkOrderActivityTab({ workOrderId }: { workOrderId: str
     getNextPageParam: (last) => last.nextCursor ?? undefined,
     enabled: !!workOrderId && purchasingActive,
   });
+  // Texts and emails. Paged by number (newest first), not by cursor.
+  const messages = useInfiniteQuery({
+    queryKey: ['work-order-activity', workOrderId, 'messages'],
+    queryFn: ({ pageParam }) =>
+      notificationApi.getNotificationLogs({ workOrderId, page: pageParam, size: PAGE_SIZE, sort: 'createdAt,desc' }),
+    initialPageParam: 0,
+    getNextPageParam: (last) => (last.last ? undefined : last.number + 1),
+    enabled: !!workOrderId && messagesActive,
+  });
   const audit = useQuery({
     queryKey: ['work-order-audit', workOrderId],
     queryFn: () => auditApi.getWorkOrderChanges(workOrderId, AUDIT_LIMIT),
@@ -81,10 +98,15 @@ export default function WorkOrderActivityTab({ workOrderId }: { workOrderId: str
   // any stream with more to load: below it, that stream may still have rows to
   // slot in, so those wait for its next page.
   const streams = useMemo(() => {
-    const out: { events: ActivityEvent[]; hasMore: boolean; fetchMore: () => void }[] = [];
+    const out: { events: ActivityEvent[]; messages: NotificationLogDto[]; oldest: string; hasMore: boolean; fetchMore: () => void }[] =
+      [];
+    const last = (evts: ActivityEvent[]) => evts[evts.length - 1]?.timestamp ?? '';
     if (feedActive) {
+      const rows = feed.data?.pages.flatMap((p) => p.content) ?? [];
       out.push({
-        events: feed.data?.pages.flatMap((p) => p.content) ?? [],
+        events: rows,
+        messages: [],
+        oldest: last(rows),
         hasMore: !!feed.hasNextPage,
         fetchMore: () => void feed.fetchNextPage(),
       });
@@ -98,49 +120,54 @@ export default function WorkOrderActivityTab({ workOrderId }: { workOrderId: str
       const rows = q.data?.pages.flatMap((p) => p.content) ?? [];
       out.push({
         events: classification === 'BUSINESS' ? rows.filter((e) => e.classification !== 'CHANGE') : rows,
+        messages: [],
+        // The page's own end, before the change rows drop out.
+        oldest: last(rows),
         hasMore: !!q.hasNextPage,
         fetchMore: () => void q.fetchNextPage(),
       });
     }
+    if (messagesActive) {
+      const rows = messages.data?.pages.flatMap((p) => p.content) ?? [];
+      out.push({
+        events: [],
+        messages: rows,
+        oldest: rows[rows.length - 1]?.createdAt ?? '',
+        hasMore: !!messages.hasNextPage,
+        fetchMore: () => void messages.fetchNextPage(),
+      });
+    }
     return out;
-  }, [feedActive, financialActive, purchasingActive, feed, financial, purchasing, classification]);
-  const oldest = (evts: ActivityEvent[]) => evts[evts.length - 1]?.timestamp ?? '';
+  }, [feedActive, financialActive, purchasingActive, messagesActive, feed, financial, purchasing, messages, classification]);
   const boundary = streams
     .filter((st) => st.hasMore)
-    .map((st) => oldest(st.events))
+    .map((st) => st.oldest)
     .reduce((max, ts) => (ts > max ? ts : max), '');
-  const events = useMemo(
-    () =>
-      streams
-        .flatMap((st) => st.events)
-        .filter((e) => !boundary || e.timestamp >= boundary)
-        .sort((a, b) => b.timestamp.localeCompare(a.timestamp)),
-    [streams, boundary],
-  );
-  const days = useMemo(
-    () =>
-      buildWorkOrderDays({
-        events,
-        audit: auditActive ? (audit.data ?? []) : [],
-        t,
-        getName,
-        getAbbrev,
-      }),
-    [events, audit.data, auditActive, t, getName, getAbbrev],
-  );
+  const days = useMemo(() => {
+    const within = (ts: string) => !boundary || ts >= boundary;
+    return buildWorkOrderDays({
+      events: streams.flatMap((st) => st.events).filter((e) => within(e.timestamp)),
+      messages: streams.flatMap((st) => st.messages).filter((m) => within(m.createdAt)),
+      audit: auditActive ? (audit.data ?? []) : [],
+      t,
+      getName,
+      getAbbrev,
+    });
+  }, [streams, boundary, audit.data, auditActive, t, getName, getAbbrev]);
 
   // Older pages load as the end of the list scrolls into view: the next page
   // of each stream holding the merge back.
   const sentinelRef = useRef<HTMLDivElement>(null);
   const hasNextPage = streams.some((st) => st.hasMore);
-  const isFetchingNextPage = feed.isFetchingNextPage || financial.isFetchingNextPage || purchasing.isFetchingNextPage;
+  const isFetchingNextPage =
+    feed.isFetchingNextPage || financial.isFetchingNextPage || purchasing.isFetchingNextPage || messages.isFetchingNextPage;
   useEffect(() => {
     const node = sentinelRef.current;
     if (!node || !hasNextPage || isFetchingNextPage) return;
     const observer = new IntersectionObserver(
       (entries) => {
         if (!entries[0]?.isIntersecting) return;
-        for (const st of streams) if (st.hasMore && oldest(st.events) >= boundary) st.fetchMore();
+        for (const st of streams) if (st.hasMore && st.oldest >= boundary) st.fetchMore();
       },
       { rootMargin: '200px' },
     );
@@ -154,6 +181,7 @@ export default function WorkOrderActivityTab({ workOrderId }: { workOrderId: str
     { id: 'item', label: getName('work_item', true) },
     { id: 'billing', label: `${getName('quote', true)} & ${getName('invoice', true).toLowerCase()}` },
     { id: 'purchasing', label: 'Purchasing' },
+    { id: 'message', label: 'Messages' },
     { id: 'note', label: 'Notes' },
     { id: 'change', label: 'Changes' },
   ];
@@ -162,10 +190,18 @@ export default function WorkOrderActivityTab({ workOrderId }: { workOrderId: str
     (feedActive && feed.isLoading) ||
     (financialActive && financial.isLoading) ||
     (purchasingActive && purchasing.isLoading) ||
+    (messagesActive && messages.isLoading) ||
     (auditActive && audit.isLoading);
   // A missing audit trail (no access, or audit-service down) shouldn't blank the
   // feed; neither should another service's stream failing on All.
-  const error = chip === 'billing' ? financial.error : chip === 'purchasing' ? purchasing.error : feed.error;
+  const error =
+    chip === 'billing'
+      ? financial.error
+      : chip === 'purchasing'
+        ? purchasing.error
+        : chip === 'message'
+          ? messages.error
+          : feed.error;
   const empty = !loading && !error && days.length === 0;
 
   return (

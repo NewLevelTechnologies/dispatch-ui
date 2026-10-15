@@ -6,7 +6,7 @@
 // tests without rendering.
 // ─────────────────────────────────────────────────────────────────
 import { formatExactTimestamp, formatTimestamp, workItemLabel } from '@dispatch/utils';
-import type { ActivityEvent, ActivitySubject, ServiceLocationAuditEntry } from '../api/setup';
+import type { ActivityEvent, ActivitySubject, NotificationLogDto, ServiceLocationAuditEntry } from '../api/setup';
 import { resolveEventSummary } from '../components/activityFormatters';
 import { getDayBucket } from './activityDayBucket';
 import { glyphFor, type ActivityTone } from './activityGlyph';
@@ -207,14 +207,36 @@ function auditRow(a: ServiceLocationAuditEntry, t: TFunc, getName: GetName): Aud
   };
 }
 
+/** A text or email: what it was, how it went, to whom, and whether it went out. */
+function messageText(m: NotificationLogDto, t: TFunc): string {
+  const base = t(`workOrders.activity.message.${m.channel === 'SMS' ? 'texted' : 'emailed'}`, {
+    what: m.notificationTypeName || t('workOrders.activity.message.fallback'),
+    recipient: m.recipientName || m.recipientPhone || m.recipientEmail || '—',
+  });
+  if (m.status === 'FAILED') return t('workOrders.activity.message.failed', { base });
+  if (m.status === 'SUPPRESSED') return t('workOrders.activity.message.suppressed', { base });
+  return base;
+}
+
+function messageGlyph(m: NotificationLogDto): { glyph: string; tone: ActivityTone } {
+  return m.status === 'FAILED' ? { glyph: '!', tone: 'warning' } : { glyph: '✉', tone: 'neutral' };
+}
+
+type Entry =
+  | { kind: 'event'; id: string; ts: string; evt: ActivityEvent }
+  | { kind: 'message'; id: string; ts: string; msg: NotificationLogDto };
+
 export function buildWorkOrderDays({
   events,
+  messages = [],
   audit,
   t,
   getName,
   getAbbrev,
 }: {
   events: ActivityEvent[];
+  /** Texts and emails for the work order; each folds under the quote, invoice or dispatch it was about. */
+  messages?: NotificationLogDto[];
   audit: ServiceLocationAuditEntry[];
   t: TFunc;
   getName: GetName;
@@ -223,18 +245,82 @@ export function buildWorkOrderDays({
   // A save that touched nothing isn't an event.
   const changes = audit.filter((a) => !(a.action === 'UPDATE' && a.changes.length === 0));
 
-  // Each grouped subject's events, newest first (the feed's order).
-  const bySubject = new Map<string, ActivityEvent[]>();
-  const keyOf = (evt: ActivityEvent) =>
-    evt.subject && GROUPED.has(evt.subject.type) ? `${evt.subject.type}:${evt.subject.id}` : null;
-  for (const evt of events) {
-    const key = keyOf(evt);
-    if (key) bySubject.set(key, [...(bySubject.get(key) ?? []), evt]);
+  const entries: Entry[] = [
+    ...events.map((evt): Entry => ({ kind: 'event', id: evt.id, ts: evt.timestamp, evt })),
+    ...messages.map((msg): Entry => ({ kind: 'message', id: msg.id, ts: msg.createdAt, msg })),
+  ];
+  entries.sort((a, b) => b.ts.localeCompare(a.ts));
+
+  const keyOf = (e: Entry): string | null => {
+    const ref = e.kind === 'event' ? e.evt.subject : e.msg.about;
+    return ref && GROUPED.has(ref.type as ActivitySubject['type']) ? `${ref.type}:${ref.id}` : null;
+  };
+  // Each grouped subject's entries, newest first.
+  const bySubject = new Map<string, Entry[]>();
+  for (const e of entries) {
+    const key = keyOf(e);
+    if (key) bySubject.set(key, [...(bySubject.get(key) ?? []), e]);
   }
 
-  type Item = { ts: string; evt: ActivityEvent } | { ts: string; audit: ServiceLocationAuditEntry };
+  const stepOfEntry = (e: Entry): StepRow =>
+    e.kind === 'event'
+      ? stepOf(e.evt, t, getName)
+      : {
+          id: e.id,
+          glyph: messageGlyph(e.msg).glyph,
+          text: messageText(e.msg, t),
+          change: false,
+          ts: formatTimestamp(e.ts),
+          tsExact: formatExactTimestamp(e.ts),
+        };
+
+  const rowOf = (e: Entry, steps: StepRow[]): WoSingleRow => {
+    if (e.kind === 'message') {
+      const about = e.msg.about;
+      const { obj, objHref } =
+        about && about.type !== 'APPROVAL_REQUEST'
+          ? subjectLink({ type: about.type, id: about.id, number: null, label: null }, getName, getAbbrev)
+          : { obj: null, objHref: null };
+      return {
+        kind: 'single',
+        id: e.id,
+        ...messageGlyph(e.msg),
+        // Logs don't record who triggered a send; the quote, invoice or dispatch row does.
+        actor: t('workOrders.activity.systemActor'),
+        isPerson: false,
+        text: messageText(e.msg, t),
+        obj,
+        objHref,
+        ts: formatTimestamp(e.ts),
+        tsExact: formatExactTimestamp(e.ts),
+        change: false,
+        steps,
+      };
+    }
+    const evt = e.evt;
+    const { glyph, tone } = glyphFor(evt);
+    const { actor, isPerson } = actorOf(evt, t, getName);
+    const { obj, objHref } = subjectLink(evt.subject, getName, getAbbrev);
+    return {
+      kind: 'single',
+      id: evt.id,
+      glyph,
+      tone,
+      actor,
+      isPerson,
+      text: eventText(evt, t, getName),
+      obj,
+      objHref,
+      ts: formatTimestamp(evt.timestamp),
+      tsExact: formatExactTimestamp(evt.timestamp),
+      change: evt.classification === 'CHANGE',
+      steps,
+    };
+  };
+
+  type Item = { ts: string; entry: Entry } | { ts: string; audit: ServiceLocationAuditEntry };
   const timeline: Item[] = [
-    ...events.map((evt) => ({ ts: evt.timestamp, evt })),
+    ...entries.map((entry) => ({ ts: entry.ts, entry })),
     ...changes.map((a) => ({ ts: a.timestamp, audit: a })),
   ];
   timeline.sort((a, b) => b.ts.localeCompare(a.ts));
@@ -250,38 +336,26 @@ export function buildWorkOrderDays({
     current.rows.push(row);
   };
 
-  // A grouped subject shows once, at its newest step; the rest list under it, oldest first.
+  // A grouped subject shows once, at its newest entry. Its newest event heads
+  // the row (a send's text reads under the step that caused it); the rest list
+  // under it, oldest first.
   const shown = new Set<string>();
   for (const item of timeline) {
     if ('audit' in item) {
       push(item.ts, auditRow(item.audit, t, getName));
       continue;
     }
-    const evt = item.evt;
-    const key = keyOf(evt);
-    if (key) {
-      if (shown.has(key)) continue;
-      shown.add(key);
+    const key = keyOf(item.entry);
+    if (!key) {
+      push(item.ts, rowOf(item.entry, []));
+      continue;
     }
-    const earlier = key ? bySubject.get(key)!.slice(1).reverse() : [];
-    const { glyph, tone } = glyphFor(evt);
-    const { actor, isPerson } = actorOf(evt, t, getName);
-    const { obj, objHref } = subjectLink(evt.subject, getName, getAbbrev);
-    push(item.ts, {
-      kind: 'single',
-      id: evt.id,
-      glyph,
-      tone: tone as ActivityTone,
-      actor,
-      isPerson,
-      text: eventText(evt, t, getName),
-      obj,
-      objHref,
-      ts: formatTimestamp(evt.timestamp),
-      tsExact: formatExactTimestamp(evt.timestamp),
-      change: evt.classification === 'CHANGE',
-      steps: earlier.map((e) => stepOf(e, t, getName)),
-    });
+    if (shown.has(key)) continue;
+    shown.add(key);
+    const group = bySubject.get(key)!;
+    const head = group.find((e) => e.kind === 'event') ?? group[0];
+    const rest = group.filter((e) => e !== head).reverse();
+    push(item.ts, rowOf(head, rest.map(stepOfEntry)));
   }
   return days;
 }

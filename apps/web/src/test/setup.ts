@@ -2491,6 +2491,11 @@ vi.mock('react-i18next', async () => {
     'workOrders.activity.kind.workOrderUpdatedFieldOnly': '{{field}} changed',
     'workOrders.activity.loadMore': 'Load more',
     'workOrders.activity.loading': 'Loading activity…',
+    'workOrders.activity.message.emailed': '{{what}} emailed to {{recipient}}',
+    'workOrders.activity.message.failed': '{{base}} · failed',
+    'workOrders.activity.message.fallback': 'Message',
+    'workOrders.activity.message.suppressed': '{{base}} · not sent, notifications are off',
+    'workOrders.activity.message.texted': '{{what}} texted to {{recipient}}',
     'workOrders.activity.systemActor': 'System',
 
     'common.builtIn': 'Built-in',
