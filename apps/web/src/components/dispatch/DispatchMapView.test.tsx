@@ -110,7 +110,7 @@ describe('when a basemap is configured', () => {
 
   it('counts dispatches whose site never geocoded, rather than dropping them silently', async () => {
     renderMap({ missingCoordinates: 3 });
-    expect(await screen.findByText('3 jobs have no location')).toBeInTheDocument();
+    expect(await screen.findByText('3 work orders have no location')).toBeInTheDocument();
   });
 
   it('counts unassigned work with no location SEPARATELY — different cause, different fix', async () => {
@@ -120,7 +120,7 @@ describe('when a basemap is configured', () => {
     });
     // The plural reads oddly because the test dictionary carries one form;
     // production has _one/_other and renders "1 unassigned job".
-    expect(await screen.findByText('1 unassigned jobs have no location')).toBeInTheDocument();
+    expect(await screen.findByText('1 unassigned work orders have no location')).toBeInTheDocument();
   });
 
   it('admits when the rail page did not reach every unassigned job', async () => {

@@ -260,7 +260,7 @@ export default function WorkOrderBillingTab({
   };
   const invoiceAction = (i: Invoice) => {
     if (i.status === InvoiceStatus.DRAFT) return { label: 'Send', run: () => setSendTarget({ kind: 'invoice', doc: i }) };
-    if (OPEN_INVOICE.includes(i.status) && i.balanceDue > 0) return { label: 'Take payment', run: () => setPaying(i) };
+    if (OPEN_INVOICE.includes(i.status) && i.balanceDue > 0) return { label: `Take ${getName('payment').toLowerCase()}`, run: () => setPaying(i) };
     return null;
   };
 
