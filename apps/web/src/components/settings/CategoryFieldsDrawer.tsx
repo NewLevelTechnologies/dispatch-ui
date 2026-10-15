@@ -37,6 +37,7 @@ import { Pill } from '../ui/Pill';
 import { EmptyState } from '../ui/EmptyState';
 import { LoadingState } from '../ui/LoadingState';
 import { extractApiError, showError, showSuccess } from '../../lib/toast';
+import { useGlossary } from '../../contexts/GlossaryContext';
 
 const DATA_TYPES: EquipmentFieldDataType[] = ['TEXT', 'NUMBER', 'CURRENCY', 'DATE', 'BOOLEAN', 'SELECT'];
 const DATA_TYPE_LABEL: Record<EquipmentFieldDataType, string> = {
@@ -76,6 +77,7 @@ interface Props {
 }
 
 export default function CategoryFieldsDrawer({ category, onClose }: Props) {
+  const { getName } = useGlossary();
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const open = category !== null;
@@ -165,7 +167,7 @@ export default function CategoryFieldsDrawer({ category, onClose }: Props) {
   };
 
   const handleDelete = (f: EquipmentCategoryField) => {
-    if (window.confirm(`Remove the “${f.label}” field? Values already saved on equipment are kept.`)) {
+    if (window.confirm(`Remove the “${f.label}” field? Values already saved on ${getName('equipment').toLowerCase()} are kept.`)) {
       deleteMut.mutate(f.id);
     }
   };
@@ -192,7 +194,7 @@ export default function CategoryFieldsDrawer({ category, onClose }: Props) {
       <SlideOverHeader onClose={onClose}>
         <SlideOverTitle>Fields{category ? ` — ${category.name}` : ''}</SlideOverTitle>
         <SlideOverDescription>
-          These render as the Specs section on the equipment form and detail page for this category. Drag to set their order.
+          {`These render as the Specs section on the ${getName('equipment').toLowerCase()} form and detail page for this category. Drag to set their order.`}
         </SlideOverDescription>
       </SlideOverHeader>
 
@@ -329,6 +331,7 @@ function FieldEditor({
   onSave: (d: SavePayload) => void;
   onCancel: () => void;
 }) {
+  const { getName } = useGlossary();
   const { t } = useTranslation();
   const isEdit = !!field;
   const [label, setLabel] = useState(field?.label ?? '');
@@ -432,7 +435,7 @@ function FieldEditor({
           <Input
             value={helpText}
             onChange={(e) => setHelpText(e.target.value)}
-            placeholder="Optional — shown under the field on the equipment form."
+            placeholder={`Optional — shown under the field on the ${getName('equipment').toLowerCase()} form.`}
           />
         </Field>
 

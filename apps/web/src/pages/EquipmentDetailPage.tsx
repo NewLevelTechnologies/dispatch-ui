@@ -357,7 +357,7 @@ export default function EquipmentDetailPage() {
     onSuccess: (_data, next) => {
       invalidateEquipmentRelatedCaches();
       setRetireConfirm(false);
-      showSuccess(next === EquipmentStatus.RETIRED ? 'Equipment retired' : 'Equipment reactivated');
+      showSuccess(`${getName('equipment')} ${next === EquipmentStatus.RETIRED ? 'retired' : 'reactivated'}`);
     },
     onError: (err) => showError(t('common.form.errorUpdate', { entity: getName('equipment') }), extractApiError(err)),
   });
@@ -679,7 +679,7 @@ export default function EquipmentDetailPage() {
                   />
                   <div className="min-w-0 flex-1">
                     <div className="mb-1 text-[10.5px] font-semibold uppercase tracking-[0.08em] text-fg-muted">
-                      Edit equipment
+                      {`Edit ${getName('equipment').toLowerCase()}`}
                     </div>
                     <Input
                       autoFocus
@@ -783,7 +783,7 @@ export default function EquipmentDetailPage() {
                     {typeLabel && <Pill tone="neutral">{typeLabel}</Pill>}
                     {openWo && (
                       <Pill tone="info" dot live>
-                        Open work order
+                        {`Open ${getName('work_order').toLowerCase()}`}
                       </Pill>
                     )}
                     {hasWarranty && (
@@ -855,7 +855,7 @@ export default function EquipmentDetailPage() {
                       {t('common.actions.new', { entity: getName('work_order') })}
                     </span>
                   </Button>
-                  <Button outline size="xs" onClick={beginIdentityEdit} aria-label="Edit equipment details">
+                  <Button outline size="xs" onClick={beginIdentityEdit} aria-label={`Edit ${getName('equipment').toLowerCase()} details`}>
                     {t('common.edit')}
                   </Button>
                   <Dropdown>
@@ -910,10 +910,10 @@ export default function EquipmentDetailPage() {
                         <DenseTHead>
                           <tr>
                             <th>Date</th>
-                            <th>Work order</th>
+                            <th>{getName('work_order')}</th>
                             <th>Work</th>
                             <th>Type</th>
-                            <th>Tech</th>
+                            <th>{getName('technician')}</th>
                           </tr>
                         </DenseTHead>
                         <tbody>
@@ -1573,8 +1573,8 @@ export default function EquipmentDetailPage() {
               }
             >
               {isRetired
-                ? 'Restores the unit to the location’s active equipment list. New work orders can reference it again.'
-                : 'Marks the unit decommissioned. Service history, media, filters and warranty are preserved; it drops off the location’s active equipment list.'}
+                ? `Restores it to the ${getName('service_location').toLowerCase()}’s active ${getName('equipment').toLowerCase()} list. New ${getName('work_order', true).toLowerCase()} can reference it again.`
+                : `Marks it decommissioned. Service history, media, filters and warranty are preserved; it drops off the ${getName('service_location').toLowerCase()}’s active ${getName('equipment').toLowerCase()} list.`}
             </Callout>
           </div>
         </div>
@@ -1613,7 +1613,7 @@ export default function EquipmentDetailPage() {
         title={isRetired ? `Reactivate ${equipment.name}?` : `Retire ${equipment.name}?`}
         message={
           isRetired
-            ? 'Restores the unit to the location’s active equipment list.'
+            ? `Restores it to the ${getName('service_location').toLowerCase()}’s active ${getName('equipment').toLowerCase()} list.`
             : 'Marks the unit decommissioned. Service history, media, filters and warranty are preserved.'
         }
         confirmLabel={isRetired ? 'Reactivate' : 'Retire'}
@@ -1625,7 +1625,7 @@ export default function EquipmentDetailPage() {
         isOpen={equipmentDeleteConfirm}
         onClose={() => setEquipmentDeleteConfirm(false)}
         onConfirm={() => deleteEquipmentMutation.mutate()}
-        title="Delete equipment?"
+        title={`Delete ${getName('equipment').toLowerCase()}?`}
         message={t('common.actions.deleteConfirm', { name: equipment.name })}
         confirmLabel={t('common.delete')}
         isDestructive
