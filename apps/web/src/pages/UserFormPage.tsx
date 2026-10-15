@@ -40,6 +40,7 @@ interface UserFormPageProps {
 }
 
 export default function UserFormPage({ mode }: UserFormPageProps) {
+  const { getName } = useGlossary();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -156,7 +157,7 @@ export default function UserFormPage({ mode }: UserFormPageProps) {
         } catch (err) {
           // The user exists and the invite went out; only the divisions are
           // missing, so this must not read as a failed invite.
-          showError("Invited, but couldn't save divisions", extractApiError(err));
+          showError(`Invited, but couldn't save ${getName('division', true).toLowerCase()}`, extractApiError(err));
         }
       }
       queryClient.invalidateQueries({ queryKey: ['users'] });
@@ -244,14 +245,14 @@ export default function UserFormPage({ mode }: UserFormPageProps) {
   const updateRegionsMutation = useMutation({
     mutationFn: () =>
       userApi.updateRegions(id!, { dispatchRegionIds: formData.dispatchRegionIds }),
-    onError: (err) => showError("Couldn't update regions", extractApiError(err)),
+    onError: (err) => showError(`Couldn't update ${getName('dispatch_region', true).toLowerCase()}`, extractApiError(err)),
   });
 
   // Its own endpoint rather than a field on the profile PUT, matching how
   // roles and regions already save from this form.
   const updateDivisionsMutation = useMutation({
     mutationFn: () => userApi.updateDivisions(id!, { divisionIds: formData.divisionIds }),
-    onError: (err) => showError("Couldn't update divisions", extractApiError(err)),
+    onError: (err) => showError(`Couldn't update ${getName('division', true).toLowerCase()}`, extractApiError(err)),
   });
 
   const submitting =
@@ -471,7 +472,7 @@ export default function UserFormPage({ mode }: UserFormPageProps) {
             </Card>
 
             <Card
-              title="Regions"
+              title={getName('dispatch_region', true)}
               subtitle="Where in the world this user works. Limits which records they see."
               className="mb-3"
             >
@@ -481,12 +482,12 @@ export default function UserFormPage({ mode }: UserFormPageProps) {
                 onToggle={toggleRegion}
                 empty={
                   <>
-                    No active dispatch regions configured.{' '}
+                    {`No active ${getName('dispatch_region', true).toLowerCase()} configured. `}
                     <Link
                       to="/settings/dispatch-regions"
                       className="font-medium text-fg-accent hover:underline"
                     >
-                      Manage regions →
+                      {`Manage ${getName('dispatch_region', true).toLowerCase()} →`}
                     </Link>
                   </>
                 }
@@ -503,7 +504,7 @@ export default function UserFormPage({ mode }: UserFormPageProps) {
                 semantics; borrowing their language would turn a preference into
                 something that looks like a compliance control. */}
             <Card
-              title="Divisions"
+              title={getName('division', true)}
               subtitle="The kinds of work they're good at taking on. Leave empty and they're offered for everything."
               className="mb-3"
             >
@@ -513,12 +514,12 @@ export default function UserFormPage({ mode }: UserFormPageProps) {
                 onToggle={toggleDivision}
                 empty={
                   <>
-                    No divisions configured.{' '}
+                    {`No ${getName('division', true).toLowerCase()} configured. `}
                     <Link
                       to="/settings/work-orders"
                       className="font-medium text-fg-accent hover:underline"
                     >
-                      Manage divisions →
+                      {`Manage ${getName('division', true).toLowerCase()} →`}
                     </Link>
                   </>
                 }
@@ -696,6 +697,7 @@ function RoleMultiSelect({
   onToggle: (id: string) => void;
   onClear: () => void;
 }) {
+  const { getName } = useGlossary();
   const needsSearch = roles.length > SEARCH_THRESHOLD;
   const [query, setQuery] = useState('');
 
@@ -787,7 +789,7 @@ function RoleMultiSelect({
                       the Dispatchable override deliberately is not. */}
                   {role.performsFieldWork && (
                     <span
-                      title="Users in this role appear on the dispatch board"
+                      title={`Users in this role appear on the ${getName('dispatch').toLowerCase()} board`}
                       className="flex-shrink-0 rounded-sm bg-bg-active px-1 py-px font-mono text-[9.5px] font-bold tracking-wide text-fg-muted uppercase"
                     >
                       Field

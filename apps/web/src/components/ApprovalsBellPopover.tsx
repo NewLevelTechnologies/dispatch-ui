@@ -35,6 +35,7 @@ import { Button } from './catalyst/button';
 import { Textarea } from './catalyst/textarea';
 import { extractApiError, showError, showSuccess } from '../lib/toast';
 import { roleAccent } from '@dispatch/utils';
+import { useGlossary } from '../contexts/GlossaryContext';
 
 type BellTab = 'forMe' | 'mine';
 
@@ -434,6 +435,7 @@ function RequestRow({
   onToggle: () => void;
   onResolved: () => void;
 }) {
+  const { getName } = useGlossary();
   const { t } = useTranslation();
   const urgent = isUrgent(request);
   const name = requesterFullName(request.requester);
@@ -476,7 +478,7 @@ function RequestRow({
 
           <div className="mt-1 font-mono text-[10.5px] text-fg-muted">
             <span className="font-medium text-fg-strong">{request.workOrder.displayId}</span>
-            <span> · {fallbackText(request.workOrder.customerName, 'Unknown customer')}</span>
+            <span> · {fallbackText(request.workOrder.customerName, `Unknown ${getName('customer').toLowerCase()}`)}</span>
           </div>
 
           {urgent && (
@@ -509,6 +511,7 @@ function ResolvedRow({
   request: ApprovalRequest;
   onClick: () => void;
 }) {
+  const { getName } = useGlossary();
   const { t } = useTranslation();
   const responderName = request.respondedBy
     ? `${request.respondedBy.firstName ?? ''} ${request.respondedBy.lastName ?? ''}`.trim() ||
@@ -545,7 +548,7 @@ function ResolvedRow({
 
         <div className="mt-1 font-mono text-[10.5px] text-fg-muted">
           <span className="font-medium text-fg-strong">{request.workOrder.displayId}</span>
-          <span> · {fallbackText(request.workOrder.customerName, 'Unknown customer')}</span>
+          <span> · {fallbackText(request.workOrder.customerName, `Unknown ${getName('customer').toLowerCase()}`)}</span>
         </div>
       </div>
     </button>

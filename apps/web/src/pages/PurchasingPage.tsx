@@ -21,6 +21,7 @@ import { ListFooter } from '../components/ui/ListFooter';
 import { LoadingState } from '../components/ui/LoadingState';
 import { EmptyState } from '../components/ui/EmptyState';
 import { ErrorState } from '../components/ui/ErrorState';
+import { useGlossary } from '../contexts/GlossaryContext';
 
 // Purchasing — records-level list of POs across every job + vendor (the office
 // companion to the WO Purchasing tab). Server-side paged + filtered
@@ -41,6 +42,7 @@ const formatDate = (iso?: string | null) =>
   iso ? new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '—';
 
 export default function PurchasingPage() {
+  const { getName } = useGlossary();
   const navigate = useNavigate();
   const { t } = useTranslation();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -166,7 +168,7 @@ export default function PurchasingPage() {
         <ListToolbar
           search={
             <ListSearch
-              placeholder="Search PO#, vendor, job, site…"
+              placeholder={`Search PO#, vendor, ${getName('work_order').toLowerCase()}, site…`}
               value={searchQuery}
               onChange={(value) => {
                 setSearchQuery(value);

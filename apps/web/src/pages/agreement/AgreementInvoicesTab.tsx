@@ -79,7 +79,7 @@ export default function AgreementInvoicesTab({ agreementId }: { agreementId: str
       ) : rows.length === 0 ? (
         <EmptyState
           title={`No ${getName('invoice', true).toLowerCase()} yet`}
-          description="Installment invoices generate automatically once the billing schedule is active and each period comes due."
+          description={`Installment ${getName('invoice', true).toLowerCase()} generate automatically once the billing schedule is active and each period comes due.`}
         />
       ) : (
         <>

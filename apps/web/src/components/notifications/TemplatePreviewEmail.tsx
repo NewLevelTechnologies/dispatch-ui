@@ -1,10 +1,10 @@
-/* eslint-disable i18next/no-literal-string -- dense visual preview; copy stays inline. Translation pass lives in a follow-up. */
 // Email preview — inbox-card mockup with From / To / Subject header + body.
 // The card sits on an elevated pane (`bg-bg-elev-2`) so the email surface
 // (`bg-bg-elev`) visually rises out of it.
 
 import type { ReactNode } from 'react';
 import { renderWithHighlights } from '../../lib/templateEditor';
+import { useGlossary } from '../../contexts/GlossaryContext';
 
 type Props = {
   subject: string;
@@ -23,7 +23,8 @@ export function TemplatePreviewEmail({
   fromAddress = 'no-reply@pinecrest.example',
   toName,
 }: Props) {
-  const recipient = toName ?? sample.customer_name ?? 'Customer';
+  const { getName } = useGlossary();
+  const recipient = toName ?? sample.customer_name ?? getName('customer');
   return (
     <div className="rounded-lg bg-bg-elev-2 p-3">
       <div className="overflow-hidden rounded-md border border-border bg-bg-elev shadow-sm">
@@ -46,8 +47,7 @@ export function TemplatePreviewEmail({
         </div>
       </div>
       <p className="mt-2.5 text-[10.5px] leading-[1.5] text-fg-dim">
-        Customers on clients that block remote content see plain-text only —
-        make sure the message reads correctly without HTML formatting.
+        {`${getName('customer', true)} on clients that block remote content see plain-text only — make sure the message reads correctly without HTML formatting.`}
       </p>
     </div>
   );

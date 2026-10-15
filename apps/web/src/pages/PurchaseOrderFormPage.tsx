@@ -331,8 +331,8 @@ export default function PurchaseOrderFormPage() {
               {editing
                 ? `${po?.poNumber ?? ''} · ${field ? 'field purchase' : 'special order'}`
                 : field
-                  ? 'Log a counter run that already happened. Cost only — the customer price lives on the quote.'
-                  : 'Order parts or equipment from a vendor. Cost only — the customer price lives on the quote.'}
+                  ? `Log a counter run that already happened. Cost only — the ${getName('customer').toLowerCase()} price lives on the ${getName('quote').toLowerCase()}.`
+                  : `Order parts or equipment from a vendor. Cost only — the ${getName('customer').toLowerCase()} price lives on the ${getName('quote').toLowerCase()}.`}
             </Text>
           </div>
 
@@ -424,7 +424,7 @@ export default function PurchaseOrderFormPage() {
           </Card>
 
           {/* Line items */}
-          <Card title="Items" subtitle="Cost is what we pay the vendor. Bill price is the suggested sell price on the quote." className="mb-3.5">
+          <Card title="Items" subtitle={`Cost is what we pay the vendor. Bill price is the suggested sell price on the ${getName('quote').toLowerCase()}.`} className="mb-3.5">
             <div className="overflow-x-auto">
               <table className="w-full border-collapse text-[12px]">
                 <thead>

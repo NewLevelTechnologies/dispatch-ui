@@ -353,7 +353,7 @@ export default function PurchaseOrderDetailPage() {
               {billTotal > 0 && (
                 <div className="mt-2.5 rounded-sm border border-border-soft bg-bg-elev-2 px-2.5 py-2">
                   <div className="flex items-center justify-between text-[11.5px]">
-                    <span className="text-fg-muted">Bills to customer</span>
+                    <span className="text-fg-muted">{`Bills to ${getName('customer').toLowerCase()}`}</span>
                     <span className="font-mono font-semibold tabular-nums text-fg-strong">{money(billTotal)}</span>
                   </div>
                   <div className="mt-1 flex items-center justify-between text-[11.5px]">

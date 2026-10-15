@@ -185,7 +185,7 @@ function BillQuoteFields({
               ? 'A quantity is more than what’s left on its line.'
               : credits > 0
                 ? `${credits} credit line${credits === 1 ? '' : 's'} not shown. Add credits to the ${invoiceLower} as an adjustment.`
-                : 'Before tax and any discounts on the quote.'}
+                : `Before tax and any discounts on the ${getName('quote').toLowerCase()}.`}
           </span>
           <span className="font-semibold tabular-nums text-fg-strong">{formatCurrency(amount)}</span>
         </div>
