@@ -119,6 +119,7 @@ import {
   type MockTone,
 } from './serviceLocationDetailMocks';
 import { LocationTaxJurisdiction } from '../components/LocationTaxJurisdiction';
+import { useEntityNames } from '../hooks/useEntityNames';
 
 type TabId = 'overview' | 'equipment' | 'jobs' | 'invoices' | 'dispatches' | 'contacts' | 'files' | 'activity';
 const LOCATION_TABS = [
@@ -165,7 +166,7 @@ function useBackContext(location: ServiceLocationDetailDto): { label: string; hr
     // locations route yet, so the href stays the global list; the customer
     // name rides the label for context.
     return {
-      label: `All locations · ${location.customerName}`,
+      label: `All ${getName('service_location', true).toLowerCase()} · ${location.customerName}`,
       href: resolveBack('/service-locations', params.get('back')),
     };
   }
@@ -182,6 +183,7 @@ export default function ServiceLocationDetailPage() {
   const navigate = useNavigate();
   const { t } = useTranslation();
   const { getName } = useGlossary();
+  const names = useEntityNames();
   const queryClient = useQueryClient();
 
   const [activeTab, setActiveTab] = useUrlTab(LOCATION_TABS, 'overview');
@@ -264,7 +266,7 @@ export default function ServiceLocationDetailPage() {
       queryClient.invalidateQueries({ queryKey: ['service-location', id] });
       queryClient.invalidateQueries({ queryKey: ['service-locations'] });
       queryClient.invalidateQueries({ queryKey: ['customers'] });
-      showSuccess(t('serviceLocations.actions.closed', { defaultValue: 'Location closed' }));
+      showSuccess(t('serviceLocations.actions.closed', { ...names, defaultValue: 'Location closed' }));
     },
     onError: (err) => showError(t('common.form.errorUpdate', { entity: getName('service_location') }), extractApiError(err) ?? undefined),
   });
@@ -382,8 +384,8 @@ export default function ServiceLocationDetailPage() {
         onClose={() => setConfirmClose(false)}
         onConfirm={() => closeLocationMutation.mutate()}
         title={t('serviceLocations.actions.closeConfirm', { name: headline })}
-        message="Stops new jobs at this site. Equipment, visit history, files and notes are preserved. The parent customer is unaffected."
-        confirmLabel={t('serviceLocations.actions.close', { defaultValue: 'Close location' })}
+        message={`Stops new ${getName('work_order', true).toLowerCase()} at this site. ${getName('equipment')}, visit history, files and notes are preserved. The parent ${getName('customer').toLowerCase()} is unaffected.`}
+        confirmLabel={t('serviceLocations.actions.close', { ...names, defaultValue: 'Close location' })}
         isDestructive
         isPending={closeLocationMutation.isPending}
       />
@@ -434,6 +436,7 @@ function LocationHeader({
 }) {
   const { t } = useTranslation();
   const { getName } = useGlossary();
+  const names = useEntityNames();
 
   // Header "Edit" flips this card into inline-edit mode in place (no modal, no
   // route change) — same inline pattern as the cards below. The edit form
@@ -534,7 +537,7 @@ function LocationHeader({
               )}
               {onClose && (
                 <DropdownItem onClick={onClose}>
-                  <DropdownLabel>{t('serviceLocations.actions.close', { defaultValue: 'Close location' })}</DropdownLabel>
+                  <DropdownLabel>{t('serviceLocations.actions.close', { ...names, defaultValue: 'Close location' })}</DropdownLabel>
                 </DropdownItem>
               )}
             </DropdownMenu>
@@ -632,10 +635,10 @@ function LocationHeaderEdit({
       // so every cached WO that references this site is stale until refetch.
       queryClient.invalidateQueries({ queryKey: ['work-orders'] });
       queryClient.invalidateQueries({ queryKey: ['work-orders-list'] });
-      showSuccess('Location updated');
+      showSuccess(`${getName('service_location')} updated`);
       onDone();
     },
-    onError: (err: unknown) => showError('Couldn’t save location', extractApiError(err) ?? undefined),
+    onError: (err: unknown) => showError(`Couldn’t save ${getName('service_location').toLowerCase()}`, extractApiError(err) ?? undefined),
   });
 
   const saving = saveMutation.isPending;
@@ -644,7 +647,7 @@ function LocationHeaderEdit({
   return (
     <div className="mb-3 rounded-[10px] border border-accent-500/40 bg-bg-elev px-4 py-3.5 shadow-sm">
       <div className="mb-3 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-        <span className="text-[13px] font-semibold text-fg-strong">Edit location</span>
+        <span className="text-[13px] font-semibold text-fg-strong">{`Edit ${getName('service_location').toLowerCase()}`}</span>
         <span className="text-[11.5px] text-fg-muted">· instructions, contacts &amp; notes edit in their own cards below; tags edit on the header</span>
       </div>
 
@@ -894,6 +897,7 @@ function OverviewTab({
   onViewContacts: () => void;
   canEdit: boolean;
 }) {
+  const { getName } = useGlossary();
   const { data: locationTech } = useQuery(locationTechQueryOptions(location.id));
   // Shares the work-orders cache with SiteWorkOrdersCard (same query key → one
   // request). Used to derive the real open / urgent counts for the strip.
@@ -903,7 +907,7 @@ function OverviewTab({
     open: woItems.filter(woIsOpen).length,
     urgent: woItems.filter((wo) => woIsOpen(wo) && wo.priority === 'URGENT').length,
   };
-  const attentionItems = buildAttentionItems(location, locationTech?.onSiteTech ?? null, openJobs, onViewJobs);
+  const attentionItems = buildAttentionItems(location, locationTech?.onSiteTech ?? null, openJobs, onViewJobs, getName);
 
   return (
     <div className="flex flex-col gap-3">
@@ -960,6 +964,7 @@ function buildAttentionItems(
   onSiteTech: OnSiteTech | null,
   openJobs: { open: number; urgent: number },
   onViewJobs: () => void,
+  getName: (code: string, plural?: boolean) => string,
 ): AttentionItem[] {
   const a = mockAttention;
   const items: AttentionItem[] = [];
@@ -968,13 +973,13 @@ function buildAttentionItems(
   // the rich live row comes from onSiteTech here. Name can lag the user-cache,
   // so fall back rather than blank the row.
   if (onSiteTech) {
-    const who = onSiteTech.name ?? 'A technician';
+    const who = onSiteTech.name ?? `A ${getName('technician').toLowerCase()}`;
     items.push({
       key: 'live',
       severity: 'live',
       title: `${who} on site · ${onSiteTech.workOrderNumber}`,
       sub: `on site ${formatOnSiteDuration(onSiteTech.since)}`,
-      action: 'Open job',
+      action: `Open ${getName('work_order').toLowerCase()}`,
       to: `/work-orders/${onSiteTech.workOrderId}`,
     });
   }
@@ -988,9 +993,9 @@ function buildAttentionItems(
     items.push({
       key: 'open-jobs',
       severity: 'warning',
-      title: urgent > 0 ? `${urgent} urgent ${urgent === 1 ? 'job' : 'jobs'}` : 'Open jobs at this site',
-      sub: open > 0 ? `${open} open at this site` : 'Open work orders',
-      action: 'Open jobs',
+      title: urgent > 0 ? `${urgent} urgent ${getName('work_order', urgent !== 1).toLowerCase()}` : `Open ${getName('work_order', true).toLowerCase()} at this site`,
+      sub: open > 0 ? `${open} open at this site` : `Open ${getName('work_order', true).toLowerCase()}`,
+      action: `Open ${getName('work_order', true).toLowerCase()}`,
       onAction: onViewJobs,
     });
   }
@@ -1625,6 +1630,7 @@ function SitePhotoBanner({ location, canEdit }: { location: ServiceLocationDetai
 
 // Exported for the SINGLE customer-detail page (shared site-instructions card).
 export function SiteInstructionsCard({ location, canEdit }: { location: ServiceLocationDetailDto; canEdit: boolean }) {
+  const { getName } = useGlossary();
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const factsQueryKey = ['service-location-arrival-facts', location.id];
@@ -1807,7 +1813,7 @@ export function SiteInstructionsCard({ location, canEdit }: { location: ServiceL
         title="Delete this field?"
         message={
           factToDelete
-            ? `“${factToDelete.label}” holds a sensitive value. Remove it from this location’s arrival info?`
+            ? `“${factToDelete.label}” holds a sensitive value. Remove it from this ${getName('service_location').toLowerCase()}’s arrival info?`
             : ''
         }
         confirmLabel={t('common.delete')}
@@ -1831,6 +1837,7 @@ function NotesEditor({
   onSave: (value: string) => void;
   onCancel: () => void;
 }) {
+  const { getName } = useGlossary();
   const [text, setText] = useState(initial);
   return (
     <div>
@@ -1839,7 +1846,7 @@ function NotesEditor({
         rows={4}
         value={text}
         onChange={(e) => setText(e.target.value)}
-        placeholder="Parking, where to check in, who to ask for, anything a tech should know before arriving…"
+        placeholder={`Parking, where to check in, who to ask for, anything a ${getName('technician').toLowerCase()} should know before arriving…`}
       />
       <div className="mt-2 flex items-center justify-end gap-1.5">
         <Button plain size="xs" onClick={onCancel} disabled={saving}>
@@ -2698,7 +2705,7 @@ function ParentCustomerCard({ location }: { location: ServiceLocationDetailDto }
   return (
     <Card
       title={<CardTitle icon={<ReceiptPercentIcon className="size-3.5" />}>Billed to</CardTitle>}
-      action={<CardLink to={`/customers/${location.customerId}`}>Open customer →</CardLink>}
+      action={<CardLink to={`/customers/${location.customerId}`}>{`Open ${getName('customer').toLowerCase()} →`}</CardLink>}
     >
       <div className="text-[13px] font-semibold text-fg-strong">{location.customerName}</div>
       <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
@@ -2713,11 +2720,11 @@ function ParentCustomerCard({ location }: { location: ServiceLocationDetailDto }
       {hasFinance && (
         <div className="mt-2.5 grid grid-cols-2 gap-3 border-t border-border-soft pt-2.5">
           <div>
-            <div className="text-[10px] font-semibold uppercase tracking-wider text-fg-muted">Customer balance</div>
+            <div className="text-[10px] font-semibold uppercase tracking-wider text-fg-muted">{`${getName('customer')} balance`}</div>
             <div className="mt-0.5 font-mono text-[13px] font-bold tabular-nums text-fg-strong">
               {typeof customerBalance === 'number' ? balanceFormatter.format(customerBalance) : '—'}
             </div>
-            <div className="text-[10.5px] text-fg-muted">across all locations</div>
+            <div className="text-[10.5px] text-fg-muted">{`across all ${getName('service_location', true).toLowerCase()}`}</div>
           </div>
           <div>
             <div className="text-[10px] font-semibold uppercase tracking-wider text-fg-muted">This site</div>
@@ -2971,7 +2978,7 @@ function EquipmentTab({
 
   const hasFilters = !!deferredSearch || filter !== null;
   const chips: { id: Exclude<EquipFilter, null>; label: string; count: number }[] = [
-    { id: 'open-wo', label: 'Open work order', count: openWoCount ?? 0 },
+    { id: 'open-wo', label: `Open ${getName('work_order').toLowerCase()}`, count: openWoCount ?? 0 },
     { id: 'warranty', label: 'Warranty expired', count: warrantyCount ?? 0 },
   ];
 
@@ -3038,11 +3045,11 @@ function EquipmentTab({
           <div className="px-5 py-10 text-center">
             <div className="text-[13px] font-semibold text-fg-strong">
               {hasFilters
-                ? 'No equipment matches'
+                ? `No ${getName('equipment').toLowerCase()} matches`
                 : t('common.actions.noEntitiesYet', { entities: getName('equipment', true) })}
             </div>
             <div className="mt-1 text-[12px] text-fg-muted">
-              {hasFilters ? 'Adjust your search or clear filters.' : 'Add equipment to get started.'}
+              {hasFilters ? 'Adjust your search or clear filters.' : `Add ${getName('equipment').toLowerCase()} to get started.`}
             </div>
           </div>
         ) : (
@@ -3103,6 +3110,7 @@ function EquipmentRow({
   onEdit: (item: EquipmentSummary) => void;
   onDelete: (item: EquipmentSummary) => void;
 }) {
+  const { getName } = useGlossary();
   const navigate = useNavigate();
   const { t } = useTranslation();
   const age = equipmentAgeYears(e.installDate);
@@ -3159,7 +3167,7 @@ function EquipmentRow({
       <td className={clsx(!e.hasOpenWorkOrder && 'dt-empty')}>
         {e.hasOpenWorkOrder ? (
           <Pill tone="info" dot live>
-            Open work order
+            {`Open ${getName('work_order').toLowerCase()}`}
           </Pill>
         ) : (
           <span className="text-[11px] text-fg-dim">—</span>
@@ -3366,7 +3374,7 @@ function InvoicesTab({ location }: { location: ServiceLocationDetailDto }) {
               setSearch(e.target.value);
               resetPage();
             }}
-            placeholder="Search invoice #…"
+            placeholder={`Search ${getName('invoice').toLowerCase()} #…`}
             className="min-w-0 flex-1 bg-transparent !text-[12.5px] text-fg outline-none placeholder:text-fg-dim"
           />
           {search && (
@@ -3426,7 +3434,7 @@ function InvoicesTab({ location }: { location: ServiceLocationDetailDto }) {
           <div className="px-3.5 py-10 text-center">
             <div className="text-[13px] font-semibold text-fg-strong">
               {filtersActive
-                ? 'No matching invoices'
+                ? `No matching ${getName('invoice', true).toLowerCase()}`
                 : t('common.actions.noEntitiesYet', { entities: getName('invoice', true) })}
             </div>
             <div className="mt-1 text-[12px] text-fg-muted">
@@ -3703,7 +3711,7 @@ export function DispatchesTab({ location }: { location: ServiceLocationDetailDto
               setSearch(e.target.value);
               resetPage();
             }}
-            placeholder="Search by tech or work order…"
+            placeholder={`Search by ${getName('technician').toLowerCase()} or ${getName('work_order').toLowerCase()}…`}
             className="min-w-0 flex-1 bg-transparent !text-[12.5px] text-fg outline-none placeholder:text-fg-dim"
           />
           {search && (
@@ -3846,7 +3854,7 @@ function DispatchesTable({
             <th>When</th>
             <th>Type</th>
             <th>{getName('work_order')}</th>
-            <th>Tech</th>
+            <th>{getName('technician')}</th>
             <th>{t('workOrders.table.statusHeader')}</th>
           </tr>
         </DenseTHead>
@@ -3910,7 +3918,7 @@ function DispatchRow({
           </div>
         )}
       </td>
-      <td data-label="Tech">
+      <td data-label={getName('technician')}>
         <DispatchTechCell name={techName} live={live} muted={didntHappen} />
       </td>
       {/* Status — last cell → pins top-right on the mobile card, never clipped. */}
@@ -3927,8 +3935,9 @@ function DispatchRow({
 // on site. Name can be null while the user-cache catches up — fall back rather
 // than blank the cell. Same name-hash color as user avatars elsewhere.
 function DispatchTechCell({ name, live, muted }: { name: string | null; live: boolean; muted: boolean }) {
+  const { getName } = useGlossary();
   const named = Boolean(name);
-  const display = name ?? 'Tech assigned';
+  const display = name ?? `${getName('technician')} assigned`;
   return (
     <span className="flex items-center gap-1.5">
       <span className="relative shrink-0">
@@ -4025,7 +4034,7 @@ function JobDenseRow({ wo, woType }: { wo: WorkOrderSummary; woType?: WoTypeRef 
 }
 
 function JobsTab({ location, onNewJob }: { location: ServiceLocationDetailDto; onNewJob: () => void }) {
-  const { getName } = useGlossary();
+  const { getName, getAbbrev } = useGlossary();
   const { t } = useTranslation();
 
   // Default to All — this tab is the site's full work-order history, not just
@@ -4099,7 +4108,7 @@ function JobsTab({ location, onNewJob }: { location: ServiceLocationDetailDto; o
               setSearch(e.target.value);
               resetPage();
             }}
-            placeholder="Search WO#, summary, tech, equipment…"
+            placeholder={`Search ${getAbbrev('work_order')}#, summary, ${getName('technician').toLowerCase()}, ${getName('equipment').toLowerCase()}…`}
             className="min-w-0 flex-1 bg-transparent !text-[12.5px] text-fg outline-none placeholder:text-fg-dim"
           />
           {search && (
@@ -4185,7 +4194,7 @@ function JobsTab({ location, onNewJob }: { location: ServiceLocationDetailDto; o
         ) : rows.length === 0 ? (
           <div className="px-5 py-10 text-center">
             <div className="text-[13px] font-semibold text-fg-strong">
-              {filtersActive ? 'No matching work orders' : t('common.actions.noEntitiesYet', { entities: getName('work_order', true) })}
+              {filtersActive ? `No matching ${getName('work_order', true).toLowerCase()}` : t('common.actions.noEntitiesYet', { entities: getName('work_order', true) })}
             </div>
             <div className="mt-1 text-[12px] text-fg-muted">
               {filtersActive
@@ -4251,11 +4260,12 @@ function CloseFooter({
   headline: string;
   onClose?: () => void;
 }) {
+  const { getName } = useGlossary();
   if (location.status === 'CLOSED') {
     return (
       <div className="mt-3.5">
         <Callout kind="neutral" icon={null} title={`${headline} is closed`}>
-          This location is closed. Equipment, visit history, files and notes are preserved.
+          {`This ${getName('service_location').toLowerCase()} is closed. ${getName('equipment')}, visit history, files and notes are preserved.`}
         </Callout>
       </div>
     );
@@ -4269,11 +4279,11 @@ function CloseFooter({
         title={`Close ${headline}`}
         action={
           <Button outline="red" size="xxs" onClick={onClose}>
-            Close location
+            {`Close ${getName('service_location').toLowerCase()}`}
           </Button>
         }
       >
-        Stops new jobs at this site. Equipment, visit history, files and notes are preserved. The parent customer is unaffected.
+        {`Stops new ${getName('work_order', true).toLowerCase()} at this site. ${getName('equipment')}, visit history, files and notes are preserved. The parent ${getName('customer').toLowerCase()} is unaffected.`}
       </Callout>
     </div>
   );

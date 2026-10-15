@@ -234,7 +234,7 @@ function auditRowModel(
   if (reverted) {
     // Toggle-and-undo: name the field/object that was put back; carry both steps
     // (the original edit, then this undo) for the expandable detail.
-    const fieldName = single ? single.label : t(objectLabelKey(a.changes));
+    const fieldName = single ? single.label : t(objectLabelKey(a.changes), { location: getName('service_location') });
     text = t('serviceLocations.activity.audit.editedReverted', { field: fieldName });
     changes = [...revertedOf.changes, ...a.changes];
   } else if (a.action === 'CREATE') {
@@ -247,7 +247,7 @@ function auditRowModel(
     // Several fields → lead with the object touched, not a count. The deltas
     // below say which fields; the count is secondary.
     text = t('serviceLocations.activity.audit.editedObject', {
-      object: t(objectLabelKey(a.changes)),
+      object: t(objectLabelKey(a.changes), { location: getName('service_location') }),
     });
   }
   return {
@@ -298,7 +298,7 @@ function financialRowModel(f: FinancialActivityEvent, t: TFunc, getName: GetName
   const key = paid
     ? 'serviceLocations.activity.financial.paid'
     : 'serviceLocations.activity.financial.sent';
-  const text = t(key, { invoice: f.invoiceNumber, amount: formatMoney(f.amount) });
+  const text = t(key, { doc: getName('invoice'), invoice: f.invoiceNumber, amount: formatMoney(f.amount) });
   const { actor, isPerson } = actorOf(f.actor?.userName ?? undefined, t);
   return {
     kind: 'financial',

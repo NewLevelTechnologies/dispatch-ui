@@ -105,11 +105,11 @@ export default function PayerDetail({ customer }: { customer: Customer }) {
       queryClient.invalidateQueries({ queryKey: ['customers', customer.id] });
       queryClient.invalidateQueries({ queryKey: ['customers'] });
       setLifecycleConfirm(false);
-      showSuccess(customer.status === 'ACTIVE' ? 'Payer deactivated' : 'Payer reactivated');
+      showSuccess(`${getName('payer')} ${customer.status === 'ACTIVE' ? 'deactivated' : 'reactivated'}`);
     },
     onError: (err) => {
       if (handleConcurrentEdit(err, queryClient, ['customers'])) return;
-      showError("Couldn't update payer", extractApiError(err) ?? undefined);
+      showError(`Couldn't update ${getName('payer').toLowerCase()}`, extractApiError(err) ?? undefined);
     },
   });
 
@@ -160,7 +160,7 @@ export default function PayerDetail({ customer }: { customer: Customer }) {
                 <Heading level={1} size="page-sm" className="m-0">
                   {customer.name}
                 </Heading>
-                <Pill tone="warning">Payer</Pill>
+                <Pill tone="warning">{getName('payer')}</Pill>
                 <Pill tone={customer.status === 'ACTIVE' ? 'success' : 'neutral'} dot live={customer.status === 'ACTIVE'}>
                   {customer.status === 'ACTIVE' ? t('common.active') : t('common.inactive')}
                 </Pill>
@@ -267,8 +267,8 @@ export default function PayerDetail({ customer }: { customer: Customer }) {
                 }
               >
                 {customer.status === 'ACTIVE'
-                  ? 'Removes this payer from new-invoice bill-to pickers. Open invoices and payment history are preserved.'
-                  : 'Restores the payer to bill-to pickers. New invoices can name it again.'}
+                  ? `Removes this ${getName('payer').toLowerCase()} from new-${getName('invoice').toLowerCase()} bill-to pickers. Open ${getName('invoice', true).toLowerCase()} and ${getName('payment').toLowerCase()} history are preserved.`
+                  : `Restores the ${getName('payer').toLowerCase()} to bill-to pickers. New ${getName('invoice', true).toLowerCase()} can name it again.`}
               </Callout>
             </div>
           )}
@@ -288,8 +288,8 @@ export default function PayerDetail({ customer }: { customer: Customer }) {
         title={customer.status === 'ACTIVE' ? `Deactivate ${customer.name}?` : `Reactivate ${customer.name}?`}
         message={
           customer.status === 'ACTIVE'
-            ? 'Removes this payer from new-invoice bill-to pickers. Open invoices and payment history are preserved.'
-            : 'Restores the payer to bill-to pickers. New invoices can name it again.'
+            ? `Removes this ${getName('payer').toLowerCase()} from new-${getName('invoice').toLowerCase()} bill-to pickers. Open ${getName('invoice', true).toLowerCase()} and ${getName('payment').toLowerCase()} history are preserved.`
+            : `Restores the ${getName('payer').toLowerCase()} to bill-to pickers. New ${getName('invoice', true).toLowerCase()} can name it again.`
         }
         confirmLabel={customer.status === 'ACTIVE' ? 'Deactivate' : 'Reactivate'}
         isDestructive={customer.status === 'ACTIVE'}
@@ -304,6 +304,7 @@ export default function PayerDetail({ customer }: { customer: Customer }) {
 // billed-for / performed-at denorm (the actual customer + service address per
 // row) that the invoice list doesn't carry yet — see BACKEND_ASKS PAYER-1.
 function LinkedWorkPendingCard({ onViewInvoices }: { onViewInvoices: () => void }) {
+  const { getName } = useGlossary();
   return (
     <Card title={<CardTitle>Linked work</CardTitle>} padding="none">
       <div className="px-3.5 py-6 text-center">
@@ -313,7 +314,7 @@ function LinkedWorkPendingCard({ onViewInvoices }: { onViewInvoices: () => void 
           per invoice needs a backend denorm (PAYER-1).
         </div>
         <Button outline size="xs" className="mt-2.5" onClick={onViewInvoices}>
-          View invoices
+          {`View ${getName('invoice', true).toLowerCase()}`}
         </Button>
       </div>
     </Card>

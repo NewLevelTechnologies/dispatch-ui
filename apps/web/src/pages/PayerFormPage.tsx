@@ -234,7 +234,7 @@ export default function PayerFormPage() {
               {t('common.actions.add', { entity: getName('payer') })}
             </Heading>
             <Text size="sm" tone="muted" className="mt-1">
-              A billing-only account — a warranty company, insurer, or property manager that pays invoices but has no
+              {`A billing-only account — a warranty company, insurer, or property manager that pays ${getName('invoice', true).toLowerCase()} but has no`}
               service locations. Only a name is required.
             </Text>
           </div>
@@ -312,7 +312,7 @@ export default function PayerFormPage() {
             {/* AP contact — optional; created post-create as a customer contact. */}
             <Card
               title="Accounts-payable contact"
-              subtitle="Who to reach about invoices and payment. Optional — add later if unknown."
+              subtitle={`Who to reach about ${getName('invoice', true).toLowerCase()} and payment. Optional — add later if unknown.`}
               className="mb-3.5"
             >
               <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
@@ -373,7 +373,7 @@ export default function PayerFormPage() {
                 so no USPS verify). Omitted from the payload entirely if blank. */}
             <Card
               title="Remit-to address"
-              subtitle="Where mailed payments / statements go. Optional — many payers are EDI-only."
+              subtitle={`Where mailed ${getName('payment', true).toLowerCase()} / statements go. Optional — many ${getName('payer', true).toLowerCase()} are EDI-only.`}
               className="mb-3.5"
             >
               <Field size="xs">
@@ -496,7 +496,7 @@ export default function PayerFormPage() {
             {/* Footer */}
             <div className="flex flex-wrap items-center gap-2 rounded-[10px] border border-border bg-bg-elev px-3.5 py-3 shadow-sm">
               <div className="text-[11.5px] text-fg-muted max-sm:basis-full">
-                Creates a billing-only account — no service location.
+                {`Creates a billing-only account — no ${getName('service_location').toLowerCase()}.`}
               </div>
               <span className="flex-1" />
               <Button href="/payers" plain size="xs">

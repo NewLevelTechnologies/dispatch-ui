@@ -224,11 +224,11 @@ export default function SingleCustomerDetail({ customer }: { customer: Customer 
       queryClient.invalidateQueries({ queryKey: ['customers', customer.id] });
       queryClient.invalidateQueries({ queryKey: ['customers'] });
       setLifecycleConfirm(false);
-      showSuccess(customer.status === 'ACTIVE' ? 'Customer deactivated' : 'Customer reactivated');
+      showSuccess(`${getName('customer')} ${customer.status === 'ACTIVE' ? 'deactivated' : 'reactivated'}`);
     },
     onError: (err) => {
       if (handleConcurrentEdit(err, queryClient, ['customers'])) return;
-      showError("Couldn't update customer", extractApiError(err) ?? undefined);
+      showError(`Couldn't update ${getName('customer').toLowerCase()}`, extractApiError(err) ?? undefined);
     },
   });
 
@@ -430,8 +430,8 @@ export default function SingleCustomerDetail({ customer }: { customer: Customer 
                 }
               >
                 {customer.status === 'ACTIVE'
-                  ? 'Stops new work, estimates and invoices. AR history, equipment, files and notes are preserved.'
-                  : 'Restores the account. New work, estimates and invoices can be created again.'}
+                  ? `Stops new work, ${getName('quote', true).toLowerCase()} and ${getName('invoice', true).toLowerCase()}. AR history, ${getName('equipment').toLowerCase()}, files and notes are preserved.`
+                  : `Restores the account. New work, ${getName('quote', true).toLowerCase()} and ${getName('invoice', true).toLowerCase()} can be created again.`}
               </Callout>
             </div>
           )}
@@ -461,8 +461,8 @@ export default function SingleCustomerDetail({ customer }: { customer: Customer 
         title={customer.status === 'ACTIVE' ? `Deactivate ${customer.name}?` : `Reactivate ${customer.name}?`}
         message={
           customer.status === 'ACTIVE'
-            ? 'Stops new work, estimates and invoices. AR history, equipment, files and notes are preserved.'
-            : 'Restores the account. New work, estimates and invoices can be created again.'
+            ? `Stops new work, ${getName('quote', true).toLowerCase()} and ${getName('invoice', true).toLowerCase()}. AR history, ${getName('equipment').toLowerCase()}, files and notes are preserved.`
+            : `Restores the account. New work, ${getName('quote', true).toLowerCase()} and ${getName('invoice', true).toLowerCase()} can be created again.`
         }
         confirmLabel={customer.status === 'ACTIVE' ? 'Deactivate' : 'Reactivate'}
         isDestructive={customer.status === 'ACTIVE'}

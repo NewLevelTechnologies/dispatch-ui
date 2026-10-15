@@ -108,7 +108,7 @@ export default function CustomerEquipmentTab({
 
   const hasFilters = !!deferredSearch || filter !== null;
   const chips: { id: Exclude<EquipFilter, null>; label: string; count: number }[] = [
-    { id: 'open-wo', label: 'Open work order', count: openWoCount ?? 0 },
+    { id: 'open-wo', label: `Open ${getName('work_order').toLowerCase()}`, count: openWoCount ?? 0 },
     { id: 'warranty', label: 'Warranty expired', count: warrantyCount ?? 0 },
   ];
 
@@ -185,10 +185,10 @@ export default function CustomerEquipmentTab({
         ) : rows.length === 0 ? (
           <div className="px-5 py-10 text-center">
             <div className="text-[13px] font-semibold text-fg-strong">
-              {hasFilters ? 'No equipment matches' : t('common.actions.noEntitiesYet', { entities: getName('equipment', true) })}
+              {hasFilters ? `No ${getName('equipment').toLowerCase()} matches` : t('common.actions.noEntitiesYet', { entities: getName('equipment', true) })}
             </div>
             <div className="mt-1 text-[12px] text-fg-muted">
-              {hasFilters ? 'Adjust your search or clear filters.' : 'Add equipment to get started.'}
+              {hasFilters ? 'Adjust your search or clear filters.' : `Add ${getName('equipment').toLowerCase()} to get started.`}
             </div>
           </div>
         ) : (

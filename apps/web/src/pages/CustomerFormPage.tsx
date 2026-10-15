@@ -241,7 +241,7 @@ export default function CustomerFormPage() {
   // and invoices through them. (Backend types both optional; this is the FE
   // floor.) Email, if given, must be well-formed.
   if (!form.phone.trim() && !form.email.trim()) {
-    errors.contact = 'Add a phone or email — we send confirmations and invoices through them.';
+    errors.contact = `Add a phone or email — we send confirmations and ${getName('invoice', true).toLowerCase()} through them.`;
   }
   if (form.email.trim() && !EMAIL_RE.test(form.email.trim())) errors.email = t('common.form.invalidEmail');
   if (!form.service.street.trim()) errors['service.street'] = 'Required';
@@ -257,7 +257,7 @@ export default function CustomerFormPage() {
     if (!form.billing.zip.trim()) errors['billing.zip'] = 'Required';
     // The invoice has to reach the payer — require a billing channel.
     if (!form.billingContactPhone.trim() && !form.billingContactEmail.trim()) {
-      errors['billing.contact'] = 'Add a phone or email — this is where we deliver the invoice.';
+      errors['billing.contact'] = `Add a phone or email — this is where we deliver the ${getName('invoice').toLowerCase()}.`;
     }
     if (form.billingContactEmail.trim() && !EMAIL_RE.test(form.billingContactEmail.trim())) {
       errors['billing.email'] = t('common.form.invalidEmail');
@@ -560,7 +560,7 @@ export default function CustomerFormPage() {
                 </Text>
               ) : (
                 <Text size="xs" tone="muted" className="mt-1.5">
-                  At least one — we send confirmations and invoices through them.
+                  {`At least one — we send confirmations and ${getName('invoice', true).toLowerCase()} through them.`}
                 </Text>
               )}
             </Card>
@@ -571,7 +571,7 @@ export default function CustomerFormPage() {
                 then moves onto the location. Not a customer-type signal. */}
             <Card
               title="Who pays?"
-              subtitle="Invoices go to this customer unless you name someone else."
+              subtitle={`${getName('invoice', true)} go to this ${getName('customer').toLowerCase()} unless you name someone else.`}
               className="mb-3.5"
             >
               <label className="flex cursor-pointer items-start gap-2.5">
@@ -580,7 +580,7 @@ export default function CustomerFormPage() {
                   // The visible text sits in a sibling span, so the control
                   // needs its own name — a bare <label> around a non-input
                   // doesn't associate.
-                  aria-label="Bill this customer directly"
+                  aria-label={`Bill this ${getName('customer').toLowerCase()} directly`}
                   checked={form.sameBilling}
                   onChange={(v) =>
                     set({
@@ -594,7 +594,7 @@ export default function CustomerFormPage() {
                   }
                 />
                 <span>
-                  <span className="block text-[12.5px] font-medium text-fg-strong">Bill this customer directly</span>
+                  <span className="block text-[12.5px] font-medium text-fg-strong">{`Bill this ${getName('customer').toLowerCase()} directly`}</span>
                   <span className="mt-0.5 block text-[11px] text-fg-muted">
                     Uncheck only if someone else is invoiced — a franchise owner, property manager, or corporate AP.
                   </span>
@@ -686,7 +686,7 @@ export default function CustomerFormPage() {
                     </Text>
                   ) : (
                     <Text size="xs" tone="muted" className="mt-1.5">
-                      At least one — this is where we send the invoice.
+                      {`At least one — this is where we send the ${getName('invoice').toLowerCase()}.`}
                     </Text>
                   )}
                 </div>
@@ -936,6 +936,7 @@ function DuplicateGuard({
   onDismiss: () => void;
   onUse: (candidate: DuplicateCandidate) => void;
 }) {
+  const { getName } = useGlossary();
   const strongRows = dupes.filter((d) => d.matchReason !== 'NAME');
   const weakRows = dupes.filter((d) => d.matchReason === 'NAME');
   const strong = strongRows.length > 0;
@@ -951,8 +952,8 @@ function DuplicateGuard({
         ? 'You already service this address'
         : `You already service this address — ${strongRows.length} records`
       : weakRows.length === 1
-        ? 'A customer with a similar name exists'
-        : `${weakRows.length} customers have a similar name`;
+        ? `A ${getName('customer').toLowerCase()} with a similar name exists`
+        : `${weakRows.length} ${getName('customer', true).toLowerCase()} have a similar name`;
   const sub = mixed
     ? 'The address match splits this place’s history if you add it again. The name matches are different addresses — probably other people.'
     : strong
@@ -989,7 +990,7 @@ function DuplicateGuard({
         const primaryName = locName || d.name;
         const account = locName && locName !== d.name ? d.name : null;
         // Lifetime job count was dropped server-side; only open work is returned.
-        const meta = [account, last && `Last job ${last}`, d.openJobCount > 0 && `${d.openJobCount} open`].filter(
+        const meta = [account, last && `Last ${getName('work_order').toLowerCase()} ${last}`, d.openJobCount > 0 && `${d.openJobCount} open`].filter(
           Boolean
         );
         return (
@@ -1037,7 +1038,7 @@ function DuplicateGuard({
               {meta.length > 0 && <div className="mt-0.5 text-[11px] text-fg-muted">{meta.join(' · ')}</div>}
             </div>
             <Button color="accent" onClick={() => onUse(d)} className="shrink-0">
-              {d.serviceLocationId ? 'Use this location →' : 'Use this customer →'}
+              {`Use this ${getName(d.serviceLocationId ? 'service_location' : 'customer').toLowerCase()} →`}
             </Button>
           </div>
         );

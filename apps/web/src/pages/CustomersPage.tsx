@@ -33,6 +33,7 @@ import { ListFooter } from '../components/ui/ListFooter';
 import { LoadingState } from '../components/ui/LoadingState';
 import { EmptyState } from '../components/ui/EmptyState';
 import { ErrorState } from '../components/ui/ErrorState';
+import { useEntityNames } from '../hooks/useEntityNames';
 
 // Desktop-dense CSR layout — see CLAUDE.md. 50 per page keeps two pages
 // visible on a 1080p monitor without scrolling.
@@ -78,6 +79,7 @@ export default function CustomersPage() {
   const queryClient = useQueryClient();
   const { t } = useTranslation();
   const { getName } = useGlossary();
+  const names = useEntityNames();
   const [searchParams, setSearchParams] = useSearchParams();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
@@ -314,7 +316,7 @@ export default function CustomersPage() {
         <PageHead
           eyebrow={
             <EntityToggle
-              ariaLabel={t('customers.entityToggleAria')}
+              ariaLabel={t('customers.entityToggleAria', names)}
               items={[
                 { label: getName('customer', true), to: '/customers' },
                 { label: getName('payer', true), to: '/payers' },
@@ -377,7 +379,7 @@ export default function CustomersPage() {
               onToggle={() => updateFilters({ openBalance: !openBalanceFilter })}
             />
             <FilterChip
-              label={t('customers.filter.openJobs')}
+              label={t('customers.filter.openJobs', names)}
               count={counts?.openJobs}
               tone="info"
               active={openJobsFilter}
@@ -442,7 +444,7 @@ export default function CustomersPage() {
                       <SortHeader sortKey="name" label={getName('customer')} current={currentSort} onSort={onSort} />
                       <th>{t('customers.table.billingAddress')}</th>
                       <th>{t('customers.table.contact')}</th>
-                      <SortHeader sortKey="openJobsCount" label={t('customers.table.openJobs')} current={currentSort} onSort={onSort} />
+                      <SortHeader sortKey="openJobsCount" label={t('customers.table.openJobs', names)} current={currentSort} onSort={onSort} />
                       <th>{t('customers.table.tags')}</th>
                       <th style={{ width: 40 }}></th>
                     </tr>
@@ -468,7 +470,7 @@ export default function CustomersPage() {
                                   <Pill
                                     tone="warning"
                                     className="ml-1.5 align-middle text-[9.5px] font-bold uppercase tracking-[0.04em]"
-                                    title={t('customers.agedBadgeAria')}
+                                    title={t('customers.agedBadgeAria', names)}
                                   >
                                     {t('customers.agedBadge')}
                                   </Pill>
@@ -490,7 +492,7 @@ export default function CustomersPage() {
                                   <span className="text-fg-dim"> · </span>
                                 )}
                                 {customer.serviceLocationCount > 1
-                                  ? t('customers.table.locationsCount', { count: customer.serviceLocationCount })
+                                  ? t('customers.table.locationsCount', { ...names, count: customer.serviceLocationCount })
                                   : null}
                               </CellSub>
                             </CellStack>
@@ -535,11 +537,11 @@ export default function CustomersPage() {
                           </td>
                           <td
                             className={clsx(!(customer.openJobsCount && customer.openJobsCount > 0) && 'dt-empty')}
-                            data-label={t('customers.table.openJobs')}
+                            data-label={t('customers.table.openJobs', names)}
                           >
                             {customer.openJobsCount && customer.openJobsCount > 0 ? (
                               <Pill tone="info" dot>
-                                {t('customers.table.jobsCount', { count: customer.openJobsCount })}
+                                {t('customers.table.jobsCount', { ...names, count: customer.openJobsCount })}
                               </Pill>
                             ) : (
                               <span className="text-fg-dim">—</span>

@@ -16,6 +16,7 @@ import { Textarea } from './catalyst/textarea';
 import { Radio, RadioField, RadioGroup } from './catalyst/radio';
 import { US_STATES } from '../constants/states';
 import { Subheading } from './catalyst/heading';
+import { useEntityNames } from '../hooks/useEntityNames';
 
 interface CustomerFormDialogProps {
   isOpen: boolean;
@@ -86,6 +87,7 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
   const queryClient = useQueryClient();
   const { t } = useTranslation();
   const { getName } = useGlossary();
+  const names = useEntityNames();
   const isEdit = !!customer?.id;
 
   // Collapsible sections state
@@ -404,18 +406,18 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
             >
               <RadioField>
                 <Radio value="STANDARD" />
-                <Label>{t('customers.form.customerTypeStandard')}</Label>
+                <Label>{t('customers.form.customerTypeStandard', names)}</Label>
               </RadioField>
               <RadioField>
                 <Radio value="BILLING_ONLY" />
-                <Label>{t('customers.form.customerTypeBillingOnly')}</Label>
+                <Label>{t('customers.form.customerTypeBillingOnly', names)}</Label>
               </RadioField>
             </RadioGroup>
 
             {createFormData.type === 'BILLING_ONLY' ? (
             <div>
-              <Subheading className="text-base font-semibold">{t('customers.form.billingOnlyHeading')}</Subheading>
-              <p className="mb-2 mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">{t('customers.form.billingOnlyHint')}</p>
+              <Subheading className="text-base font-semibold">{t('customers.form.billingOnlyHeading', names)}</Subheading>
+              <p className="mb-2 mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">{t('customers.form.billingOnlyHint', names)}</p>
               <div className="space-y-2">
                 {/* Row 1: Name, Email, Phone */}
                 <div className="grid grid-cols-12 gap-2">
@@ -702,7 +704,7 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
             {/* CONDITIONAL: Billing Address (if different) */}
             {!createFormData.billingAddressSameAsService && (
               <div className="border-t border-zinc-200 pt-3 dark:border-zinc-800">
-                <Subheading className="mb-3 text-sm font-semibold">{t('customers.form.billingInvoiceRecipient')}</Subheading>
+                <Subheading className="mb-3 text-sm font-semibold">{t('customers.form.billingInvoiceRecipient', names)}</Subheading>
                 <div className="space-y-2">
                   {/* Billing Name */}
                   <Field>
@@ -1047,16 +1049,16 @@ export default function CustomerFormDialog({ isOpen, onClose, customer }: Custom
                   >
                     <RadioField>
                       <Radio value="STANDARD" />
-                      <Label>{t('customers.form.customerTypeStandard')}</Label>
+                      <Label>{t('customers.form.customerTypeStandard', names)}</Label>
                     </RadioField>
                     <RadioField>
                       <Radio value="BILLING_ONLY" disabled={convertToBillingOnlyBlocked} />
-                      <Label>{t('customers.form.customerTypeBillingOnly')}</Label>
+                      <Label>{t('customers.form.customerTypeBillingOnly', names)}</Label>
                     </RadioField>
                   </RadioGroup>
                   {convertToBillingOnlyBlocked && (
                     <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-                      {t('customers.form.billingOnlyConversionBlocked')}
+                      {t('customers.form.billingOnlyConversionBlocked', names)}
                     </p>
                   )}
                 </div>
