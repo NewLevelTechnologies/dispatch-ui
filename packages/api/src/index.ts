@@ -23,6 +23,7 @@ export {
   type ActivityClassification,
   type ActivityKind,
   type ActivityActor,
+  type ActivitySubject,
   type ActivityEvent,
   type ActivityPage,
   type ListActivityParams,

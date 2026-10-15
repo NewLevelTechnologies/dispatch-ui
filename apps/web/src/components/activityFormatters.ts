@@ -233,9 +233,9 @@ function formatCurrency(amount: number): string {
  * Maps each category to a heroicon name (resolved at the component layer).
  * Used to give the activity row a glanceable left-edge marker.
  */
-export const CATEGORY_ICON_KEY: Record<string, 'note' | 'dispatch' | 'status' | 'financial'> = {
+export const CATEGORY_ICON_KEY: Record<string, 'note' | 'dispatch' | 'status'> = {
   NOTE: 'note',
   DISPATCH: 'dispatch',
   STATUS: 'status',
-  FINANCIAL: 'financial',
+  WORK_ITEM: 'status',
 };

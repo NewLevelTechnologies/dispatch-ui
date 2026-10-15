@@ -28,7 +28,7 @@ import {
 import { useGlossary } from '../contexts/GlossaryContext';
 import ActivityButton from '../components/ActivityButton';
 import ActivityDrawer from '../components/ActivityDrawer';
-import ActivityStream from '../components/ActivityStream';
+import WorkOrderActivityTab from '../features/work-orders/WorkOrderActivityTab';
 import { resolveBack } from '../lib/backContext';
 import AppLayout from '../components/AppLayout';
 import ConfirmDialog from '../components/ConfirmDialog';
@@ -1107,11 +1107,7 @@ export default function WorkOrderDetailPage() {
             <WorkOrderFilesTab workOrderId={workOrder.id} dispatches={dispatches} readOnly={frozen} />
           )}
 
-          {tab === 'activity' && (
-            <Card>
-              <ActivityStream workOrderId={workOrder.id} />
-            </Card>
-          )}
+          {tab === 'activity' && <WorkOrderActivityTab workOrderId={workOrder.id} />}
         </div>
       </div>
 

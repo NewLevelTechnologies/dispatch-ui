@@ -1,7 +1,12 @@
 import apiClient from './client';
 import type { ProgressCategory } from './workOrderApi';
 
-export type ActivityCategory = 'DISPATCH' | 'STATUS' | 'NOTE' | 'FINANCIAL';
+/**
+ * `STATUS` is the work order's own lifecycle (created, completed, cancelled,
+ * callback links); work item rows are `WORK_ITEM`. Quotes, invoices, payments
+ * and purchase orders come from their own services' streams, not this feed.
+ */
+export type ActivityCategory = 'DISPATCH' | 'STATUS' | 'WORK_ITEM' | 'NOTE';
 
 /**
  * Server-assigned split between meaningful business events and field-level
@@ -41,9 +46,28 @@ export type ActivityKind =
   | 'CALLBACK_UNLINKED'
   | 'CALLBACK_CHANGED';
 
+/**
+ * `SYSTEM` moves (an item advancing when a dispatch arrives) carry a null
+ * `userId` and the name "System". There's no office/tech split: show the person.
+ */
 export interface ActivityActor {
-  userId: string;
+  type?: 'USER' | 'SYSTEM';
+  userId: string | null;
   userName: string;
+}
+
+/**
+ * What a row is about, as it was when written. Rows sharing `type` + `id` are
+ * one thing's steps (a dispatch's assigned → arrived → checked out).
+ * `number` is raw: a work item's sequence or a dispatch's trip number, so
+ * format it with the glossary abbreviation. `label` is a name (the work order
+ * number, a dispatch's own label), or null.
+ */
+export interface ActivitySubject {
+  type: 'WORK_ORDER' | 'WORK_ITEM' | 'DISPATCH' | 'NOTE' | 'FILE' | 'QUOTE' | 'INVOICE' | 'PAYMENT' | 'PURCHASE_ORDER';
+  id: string;
+  number: number | null;
+  label: string | null;
 }
 
 /**
@@ -56,9 +80,9 @@ export interface ActivityEvent {
   id: string;
   kind: ActivityKind;
   category: ActivityCategory;
-  /** BUSINESS vs CHANGE; present on the location feed, optional on the WO rail. */
   classification?: ActivityClassification;
   timestamp: string;
+  subject?: ActivitySubject | null;
   actor: ActivityActor | null;
   data: Record<string, unknown>;
 }
