@@ -1,9 +1,9 @@
 /* eslint-disable i18next/no-literal-string -- dense billing list; short operational labels stay literal (same convention as the document pages). Entity names route through getName(). */
 import { useDeferredValue, useState, type ReactNode } from 'react';
 import clsx from 'clsx';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
-import { ClipboardDocumentListIcon, DocumentTextIcon, PlusIcon } from '@heroicons/react/16/solid';
+import { ClipboardDocumentListIcon, DocumentTextIcon, PlusIcon, XMarkIcon } from '@heroicons/react/16/solid';
 import { formatCurrency } from '@dispatch/utils';
 import {
   InvoiceStatus,
@@ -12,6 +12,7 @@ import {
   type DocumentRow,
   type DocumentScope,
   type DocumentView,
+  type InvoiceAgingBucket,
   type InvoiceListItemRow,
   type QuoteListItem,
 } from '../../api/setup';
@@ -26,6 +27,7 @@ import { LoadingState } from '../ui/LoadingState';
 import { Pill, Tag } from '../ui/Pill';
 import { ToggleGroup, ToggleGroupOption } from '../ui/ToggleGroup';
 import { INVOICE_STATUS_TONE, QUOTE_STATUS_TONE, daysSince, invoiceListStatus, quoteListStatus } from '../billing/billingListModel';
+import { INVOICE_AGING_FILTERS, INVOICE_AGING_PARAM, readAgingId } from '../customer-detail/invoiceAgingNav';
 import { formatDocDate } from './documentModel';
 import { StartDocumentDialog, type StartAt, type StartKind } from './StartDocumentDialog';
 
@@ -47,6 +49,8 @@ export const DOCUMENTS_KEY = 'documents';
 export function DocumentsTab({
   scope,
   start,
+  canStart = !!start,
+  aging = false,
   showLocation = false,
   jobLabel,
   footer,
@@ -54,6 +58,14 @@ export function DocumentsTab({
   scope: DocumentScope;
   /** Opens New quote / New invoice with this location chosen. */
   start?: StartAt;
+  /** Shows New quote / New invoice; without `start` they open on the location picker. */
+  canStart?: boolean;
+  /**
+   * Reads an AR aging bucket from the URL (`invoicesAging`, set by the customer
+   * overview's Billing & AR boxes): shows that bucket's open invoices, billed to
+   * the customer, as a removable chip. Customer scope only.
+   */
+  aging?: boolean;
   /** Adds a Location column (the customer page, where documents span sites). */
   showLocation?: boolean;
   /** A short description of a job, for invoices (which carry no title of their own). */
@@ -67,6 +79,21 @@ export function DocumentsTab({
   const [creating, setCreating] = useState<StartKind | null>(null);
   const { page, pageHref, resetPage } = useUrlPage('documentsPage');
   const q = useDeferredValue(search.trim());
+  const [searchParams, setSearchParams] = useSearchParams();
+  const agingId = aging ? readAgingId(searchParams) : 'all';
+  const agingBucket = agingId !== 'all' ? (agingId as InvoiceAgingBucket) : undefined;
+  // A bucket is open invoices only, so it shows on the Invoices view.
+  const shownView: DocumentView = agingBucket ? 'invoice' : view;
+  const clearAging = () =>
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete(INVOICE_AGING_PARAM);
+        next.delete('documentsPage');
+        return next;
+      },
+      { replace: true },
+    );
 
   const quotes = getName('quote', true);
   const invoices = getName('invoice', true);
@@ -77,8 +104,9 @@ export function DocumentsTab({
     queryFn: () => documentsApi.getViews(scope),
   });
   const { data, isLoading } = useQuery({
-    queryKey: [DOCUMENTS_KEY, scope, { view, q, page }],
-    queryFn: () => documentsApi.list({ ...scope, view, q: q || undefined, page: page - 1, size: PAGE_SIZE }),
+    queryKey: [DOCUMENTS_KEY, scope, { view: shownView, agingBucket, q, page }],
+    queryFn: () =>
+      documentsApi.list({ ...scope, view: shownView, agingBucket, q: q || undefined, page: page - 1, size: PAGE_SIZE }),
     placeholderData: keepPreviousData,
   });
   const rows = data?.content ?? [];
@@ -86,15 +114,16 @@ export function DocumentsTab({
 
   const changeView = (v: DocumentView) => {
     setView(v);
-    resetPage();
+    if (agingBucket) clearAging();
+    else resetPage();
   };
 
-  const lastHeader = view === 'quote' ? 'Invoiced' : view === 'invoice' ? 'Balance' : 'Balance · invoiced';
+  const lastHeader = shownView === 'quote' ? 'Invoiced' : shownView === 'invoice' ? 'Balance' : 'Balance · invoiced';
 
   return (
     <Card>
       <CardHead className="flex-wrap gap-y-2">
-        <ToggleGroup value={view} onChange={changeView} size="sm" aria-label="Show">
+        <ToggleGroup value={shownView} onChange={changeView} size="sm" aria-label="Show">
           {VIEWS.map((v) => (
             <ToggleGroupOption key={v} value={v}>
               {/* One inline run: the sm option is a grid, so loose children would stack. */}
@@ -119,6 +148,14 @@ export function DocumentsTab({
             )}
           </span>
         )}
+        {agingBucket && (
+          <span className="inline-flex items-center gap-1 rounded-md border border-border bg-bg-elev px-2 py-0.5 text-[11.5px] font-medium text-fg-strong">
+            {`Aged ${INVOICE_AGING_FILTERS.find((f) => f.id === agingBucket)?.label ?? ''}`}
+            <button type="button" onClick={clearAging} aria-label="Clear aging filter" className="text-fg-muted hover:text-fg-strong">
+              <XMarkIcon className="size-3.5" />
+            </button>
+          </span>
+        )}
         <span className="grow" />
         <ListSearch
           compact
@@ -130,7 +167,7 @@ export function DocumentsTab({
           placeholder="Number or job…"
           ariaLabel={`Search ${quotes.toLowerCase()} and ${invoices.toLowerCase()}`}
         />
-        {start && (
+        {canStart && (
           <div className="flex gap-1.5">
             <Button outline size="xs" onClick={() => setCreating('quote')}>
               <PlusIcon />
@@ -151,16 +188,20 @@ export function DocumentsTab({
             <div className="text-[13.5px] font-semibold text-fg-strong">
               {q
                 ? 'No matches'
-                : view === 'open'
+                : agingBucket
+                  ? `No ${invoices.toLowerCase()} in this age range`
+                  : shownView === 'open'
                   ? 'Nothing open'
-                  : view === 'all'
+                  : shownView === 'all'
                     ? `No ${quotes.toLowerCase()} or ${invoices.toLowerCase()} yet`
-                    : `No ${viewLabel[view].toLowerCase()} yet`}
+                    : `No ${viewLabel[shownView].toLowerCase()} yet`}
             </div>
             <div className="mt-1 text-[12.5px] text-fg-muted">
               {q
                 ? 'Try a different number or job.'
-                : view === 'open'
+                : agingBucket
+                  ? `Open ${invoices.toLowerCase()} billed to this account land here as they age.`
+                  : shownView === 'open'
                   ? `No open ${quotes.toLowerCase()} or unpaid ${invoices.toLowerCase()}.`
                   : `${quotes} and ${invoices.toLowerCase()} for work here will show up here.`}
             </div>
@@ -196,7 +237,7 @@ export function DocumentsTab({
       </CardBody>
       <div className="flex flex-wrap items-center gap-2 border-t border-border-soft px-3.5 py-2 text-[11.5px] text-fg-muted">
         <span className="grow">{footer}</span>
-        {(view === 'all' || view === 'invoice') && <span>{`Void ${invoices.toLowerCase()} hidden`}</span>}
+        {(shownView === 'all' || shownView === 'invoice') && <span>{`Void ${invoices.toLowerCase()} hidden`}</span>}
       </div>
       <ListFooter
         page={page}

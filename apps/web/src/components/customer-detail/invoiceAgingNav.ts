@@ -2,11 +2,11 @@ import { useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { InvoiceAgingBucket } from '../../api/setup';
 
-// URL param carrying the AR aging-bucket filter on the customer Invoices tab. It
+// URL param carrying the AR aging-bucket filter on the customer Quotes & invoices tab. It
 // lives in the URL (not local state) so the overview "Billing & AR" boxes can
 // deep-link into the filtered list across the tab boundary, and so a refreshed /
 // shared URL restores it. Pairs with useUrlTab ('tab') + useUrlPage
-// ('invoicesPage').
+// ('documentsPage').
 export const INVOICE_AGING_PARAM = 'invoicesAging';
 
 // Toolbar options for the Aging filter chip. Non-'all' ids ARE the backend enum
@@ -29,7 +29,7 @@ export function readAgingId(params: URLSearchParams): string {
 }
 
 // Jump to the Invoices tab pre-filtered to one AR aging bucket — sets
-// ?tab=invoices&invoicesAging=<bucket> and clears the invoices page param in a
+// ?tab=invoices&invoicesAging=<bucket> and clears the documents page param in a
 // single history entry. Used by the overview Billing & AR boxes so each box
 // deep-links to exactly its bucket (count matches the box).
 export function useGoToInvoicesBucket() {
@@ -40,7 +40,7 @@ export function useGoToInvoicesBucket() {
         const next = new URLSearchParams(prev);
         next.set('tab', 'invoices');
         next.set(INVOICE_AGING_PARAM, bucket);
-        next.delete('invoicesPage');
+        next.delete('documentsPage');
         return next;
       });
     },

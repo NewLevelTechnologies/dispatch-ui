@@ -14,7 +14,7 @@ import {
   customerApi,
   equipmentApi,
   agreementApi,
-  invoicesApi,
+  documentsApi,
   EquipmentStatus,
   type Customer,
   type CustomerStatus,
@@ -42,7 +42,7 @@ import CustomerHeaderTags from './CustomerHeaderTags';
 import MultiOverviewTab, { CustomerHeaderEdit } from './MultiOverviewTab';
 import MultiLocationsTab from './MultiLocationsTab';
 import CustomerEquipmentTab from './CustomerEquipmentTab';
-import CustomerInvoicesTab from './CustomerInvoicesTab';
+import { DocumentsTab, DOCUMENTS_KEY } from '../document/DocumentsTab';
 import CustomerWorkOrdersTab from './CustomerWorkOrdersTab';
 import CustomerContactsTab from './CustomerContactsTab';
 import { OrgMark } from './shared';
@@ -101,12 +101,10 @@ export default function MultiCustomerDetail({ customer }: { customer: Customer }
     queryFn: () => equipmentApi.list({ customerId: customer.id, status: EquipmentStatus.ACTIVE, size: 100 }),
     enabled: !!customer.id,
   });
-  // Invoice tab-count badge. Stable (customerId-only, unfiltered) so it shows the
-  // customer's total — distinct from the tab body's filtered/paged query. size:1
-  // keeps the payload minimal; we only read totalElements.
-  const { data: invoicesCount } = useQuery({
-    queryKey: ['invoices', 'customer-count', customer.id],
-    queryFn: () => invoicesApi.getAll({ customerId: customer.id, size: 1 }),
+  // Tab badge; shares the Quotes & invoices tab's counts cache.
+  const { data: documentViews } = useQuery({
+    queryKey: [DOCUMENTS_KEY, { customerId: customer.id }, 'views'],
+    queryFn: () => documentsApi.getViews({ customerId: customer.id }),
     enabled: !!customer.id,
   });
 
@@ -168,7 +166,7 @@ export default function MultiCustomerDetail({ customer }: { customer: Customer }
     { id: 'agreements', label: getName('agreement', true), count: agreementsData?.length },
     { id: 'equipment', label: getName('equipment', true), count: equipmentPage?.totalElements },
     { id: 'jobs', label: getName('work_order', true), count: workOrdersData?.totalElements },
-    { id: 'invoices', label: getName('invoice', true), count: invoicesCount?.totalElements },
+    { id: 'invoices', label: `${getName('quote', true)} & ${getName('invoice', true).toLowerCase()}`, count: documentViews?.counts.all },
     { id: 'contacts', label: 'Contacts', count: customer.additionalContacts.length },
     { id: 'activity', label: t('customers.tabs.activity') },
   ];
@@ -335,7 +333,7 @@ export default function MultiCustomerDetail({ customer }: { customer: Customer }
             />
           )}
 
-          {activeTab === 'invoices' && <CustomerInvoicesTab customerId={customer.id} />}
+          {activeTab === 'invoices' && <DocumentsTab aging canStart showLocation scope={{ customerId: customer.id }} />}
 
           {activeTab === 'contacts' && (
             <CustomerContactsTab
