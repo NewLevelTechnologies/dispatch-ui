@@ -3771,6 +3771,13 @@
       },
       "loadMore": "Load more",
       "loading": "Loading activity…",
+      "message": {
+        "emailed": "{{what}} emailed to {{recipient}}",
+        "failed": "{{base}} · failed",
+        "fallback": "Message",
+        "suppressed": "{{base}} · not sent, notifications are off",
+        "texted": "{{what}} texted to {{recipient}}"
+      },
       "systemActor": "System"
     },
     "detail": {

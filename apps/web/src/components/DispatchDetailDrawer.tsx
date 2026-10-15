@@ -69,6 +69,8 @@ const NOTIF_TONE: Record<NotificationStatus, PillTone> = {
   PENDING: 'neutral',
   BOUNCED: 'danger',
   FAILED: 'danger',
+  // Nothing went out: the tenant has external notifications off.
+  SUPPRESSED: 'neutral',
 };
 
 // Work-item statusCategory → Pill tone (shared grammar with the overview peek).

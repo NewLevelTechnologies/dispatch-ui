@@ -8,6 +8,8 @@ export const NotificationStatus = {
   DELIVERED: 'DELIVERED',
   BOUNCED: 'BOUNCED',
   FAILED: 'FAILED',
+  /** The tenant has external notifications off, so nothing went out. */
+  SUPPRESSED: 'SUPPRESSED',
 } as const;
 
 export type NotificationStatus = typeof NotificationStatus[keyof typeof NotificationStatus];
@@ -40,8 +42,15 @@ export interface NotificationLogDto {
   // shipped. For SMS it's the whole message; for email it's the plain-text body.
   body?: string;
   // Who the notification targeted — drives the Tech/Customer audience chip.
-  // Optional: not yet on the backend log; the chip hides until it ships.
-  audience?: 'TECH' | 'CUSTOMER';
+  audience?: 'TECH' | 'CUSTOMER' | 'INTERNAL';
+  /** The work order the send belongs to, when it belongs to one. */
+  workOrderId?: string | null;
+  /**
+   * What the send was about, in the activity feeds' subject terms, so it
+   * groups under that quote, invoice or dispatch's own rows. (Not `subject`:
+   * that's the email's subject line.)
+   */
+  about?: { type: 'QUOTE' | 'INVOICE' | 'DISPATCH' | 'APPROVAL_REQUEST'; id: string } | null;
   createdAt: string;
   sentAt?: string;
   deliveredAt?: string;
@@ -79,6 +88,8 @@ export interface NotificationLogsQueryParams {
   serviceLocationId?: string;
   entityType?: string;
   entityId?: string;
+  /** Every send for one work order: quote/invoice sends, dispatch texts, approval notices. */
+  workOrderId?: string;
   status?: NotificationStatus;
   channel?: NotificationChannel;
   startDate?: string;
@@ -128,6 +139,7 @@ export const notificationApi = {
     if (params.customerId) queryParams.append('customerId', params.customerId);
     if (params.entityType) queryParams.append('entityType', params.entityType);
     if (params.entityId) queryParams.append('entityId', params.entityId);
+    if (params.workOrderId) queryParams.append('workOrderId', params.workOrderId);
     if (params.status) queryParams.append('status', params.status);
     if (params.channel) queryParams.append('channel', params.channel);
     if (params.startDate) queryParams.append('startDate', params.startDate);
