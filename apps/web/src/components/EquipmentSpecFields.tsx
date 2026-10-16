@@ -52,7 +52,10 @@ export function SpecFieldInput({
       ) : field.dataType === 'DATE' ? (
         <Input size="xs" type="date" value={value} onChange={(e) => onChange(e.target.value)} invalid={!!error} />
       ) : field.dataType === 'CURRENCY' ? (
-        <Input size="xs" type="number" step="0.01" leading="$" value={value} onChange={(e) => onChange(e.target.value)} invalid={!!error} />
+        <div className="relative">
+          <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-[12px] text-fg-muted">$</span>
+          <Input size="xs" type="number" step="0.01" className="pl-5" value={value} onChange={(e) => onChange(e.target.value)} invalid={!!error} />
+        </div>
       ) : field.dataType === 'NUMBER' ? (
         <Input size="xs" type="number" value={value} onChange={(e) => onChange(e.target.value)} invalid={!!error} />
       ) : (
