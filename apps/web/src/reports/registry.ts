@@ -36,6 +36,7 @@ export interface ReportDefinition {
 const AgreementsReport = lazy(() => import('./AgreementsReport'));
 const ArrivalsReport = lazy(() => import('./ArrivalsReport'));
 const CallbacksReport = lazy(() => import('./CallbacksReport'));
+const DiscountsReport = lazy(() => import('./DiscountsReport'));
 const FilterPullListReport = lazy(() => import('./FilterPullListReport'));
 const JobsCompletedReport = lazy(() => import('./JobsCompletedReport'));
 const ReceivablesReport = lazy(() => import('./ReceivablesReport'));
@@ -64,6 +65,12 @@ export const reports: ReportDefinition[] = [
     group: 'money',
     Component: PaymentsReport,
     // Revenue's collected, split: the same money capability.
+    requiresCapability: 'VIEW_ALL_INVOICES',
+  },
+  {
+    slug: 'discounts',
+    group: 'money',
+    Component: DiscountsReport,
     requiresCapability: 'VIEW_ALL_INVOICES',
   },
   {

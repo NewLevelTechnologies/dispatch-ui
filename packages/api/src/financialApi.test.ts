@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { invoicesApi, quotesApi, financialActivityApi, financialDashboardApi, revenueTargetsApi,
-  revenueReportApi, receivablesReportApi, quoteReportApi, paymentReportApi, paymentsApi, taxApi, laborRatesApi, pricebookApi, ratePlansApi, mediaApi } from './financialApi';
+  revenueReportApi, receivablesReportApi, quoteReportApi, paymentReportApi, discountReportApi, paymentsApi, taxApi, laborRatesApi, pricebookApi, ratePlansApi, mediaApi } from './financialApi';
 import apiClient from './client';
 
 vi.mock('./client');
@@ -327,6 +327,31 @@ describe('paymentReportApi', () => {
     await paymentReportApi.get({ from: '2026-09-01', to: '2026-09-30', compare: 'previousPeriod', groupBy: 'day', regionIds: [] });
     expect(apiClient.get).toHaveBeenLastCalledWith('/financial/reports/payments', {
       params: { from: '2026-09-01', to: '2026-09-30', compare: 'previousPeriod', groupBy: 'day' },
+    });
+  });
+});
+
+describe('discountReportApi', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('GETs the report, dropping an empty scope', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({ data: {} });
+    await discountReportApi.get({ from: '2026-09-01', to: '2026-09-30', member: 'exclude', groupBy: 'givenBy', regionIds: [] });
+    expect(apiClient.get).toHaveBeenLastCalledWith('/financial/reports/discounts', {
+      params: { from: '2026-09-01', to: '2026-09-30', member: 'exclude', groupBy: 'givenBy' },
+    });
+  });
+
+  it('GETs one group\'s rows and the CSV as a blob', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({ data: {} });
+    await discountReportApi.rows({ from: '2026-09-01', to: '2026-09-30', groupBy: 'reason', groupKey: 'FEE_WAIVED', page: 1, size: 25, regionIds: ['r1'] });
+    expect(apiClient.get).toHaveBeenLastCalledWith('/financial/reports/discounts/rows', {
+      params: { from: '2026-09-01', to: '2026-09-30', groupBy: 'reason', groupKey: 'FEE_WAIVED', page: 1, size: 25, regionIds: ['r1'] },
+    });
+    await discountReportApi.exportCsv({ from: '2026-09-01', to: '2026-09-30', member: 'include' });
+    expect(apiClient.get).toHaveBeenLastCalledWith('/financial/reports/discounts/export.csv', {
+      params: { from: '2026-09-01', to: '2026-09-30', member: 'include' },
+      responseType: 'blob',
     });
   });
 });

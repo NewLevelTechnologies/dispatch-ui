@@ -21,8 +21,11 @@ export function ReportBackLink({ state }: { state: ReportRangeState }) {
   );
 }
 
-/** Range (with custom dates), Compare, and Scope when there's more than one region. */
-export function RangeChips({ state }: { state: ReportRangeState }) {
+/**
+ * Range (with custom dates), Compare, and Scope when there's more than one
+ * region. `compare={false}` for a report with no comparison period.
+ */
+export function RangeChips({ state, compare: showCompare = true }: { state: ReportRangeState; compare?: boolean }) {
   const { t } = useTranslation();
   const { range, today, compare, regionId } = state;
   const { data: regions = [] } = useQuery({
@@ -61,19 +64,21 @@ export function RangeChips({ state }: { state: ReportRangeState }) {
           onChange={state.setCustom}
         />
       )}
-      <FilterChipListbox
-        label={t('reports.range.filters.compare')}
-        ariaLabel={t('reports.range.filters.compare')}
-        value={compare}
-        displayValue={t(`reports.range.compare.${compare}`)}
-        onChange={state.pickCompare}
-      >
-        {COMPARES.map((c) => (
-          <ChipListboxOption key={c} value={c}>
-            {t(`reports.range.compare.${c}`)}
-          </ChipListboxOption>
-        ))}
-      </FilterChipListbox>
+      {showCompare && (
+        <FilterChipListbox
+          label={t('reports.range.filters.compare')}
+          ariaLabel={t('reports.range.filters.compare')}
+          value={compare}
+          displayValue={t(`reports.range.compare.${compare}`)}
+          onChange={state.pickCompare}
+        >
+          {COMPARES.map((c) => (
+            <ChipListboxOption key={c} value={c}>
+              {t(`reports.range.compare.${c}`)}
+            </ChipListboxOption>
+          ))}
+        </FilterChipListbox>
+      )}
       {regions.length > 1 && (
         <FilterChipListbox
           label={regionId ? t('dashboard.scope.label') : t('dashboard.scope.labelAll')}

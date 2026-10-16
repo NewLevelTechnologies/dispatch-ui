@@ -116,6 +116,25 @@
 .rp-detail-note { padding-left: 23px; font-size: 11.5px; color: var(--fg-muted); }
 @media (max-width: 1099px) { .rp-opt { display: none; } }
 
+/* Billing reports (Discounts, Sales tax, Unbilled). Their breakpoints follow
+   the content width, not the viewport (the sidebar takes ~250px of it), so the
+   page is a size container. A detail row hides its cells with the same classes
+   as the header, so expanded rows keep the header's columns. */
+.rp-cq { container-type: inline-size; }
+.rp-trunc {
+  display: inline-block;
+  max-width: 32ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: bottom;
+}
+@container (max-width: 899px) {
+  .rp-hide-md { display: none; }
+  .rp-trunc { max-width: 18ch; }
+}
+@container (max-width: 699px) { .rp-hide-sm { display: none; } }
+
 /* Tech productivity: each tech's trend as tiny bars on the table's shared scale. */
 .tp-trend { display: inline-flex; align-items: flex-end; gap: 1px; width: 84px; }
 .tp-trend > span { flex: 1; min-width: 1px; border-radius: 1px 1px 0 0; background: var(--accent-500); }

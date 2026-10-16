@@ -1,4 +1,5 @@
-// CSV for the reports: built in the browser and handed over as a download.
+// CSV for the reports: built in the browser (or by the server) and handed over
+// as a download.
 
 export function csvCell(v: string | number | null | undefined): string {
   const s = v == null ? '' : String(v);
@@ -11,7 +12,12 @@ export function csvLines(rows: (string | number | null | undefined)[][]): string
 }
 
 export function downloadCsv(text: string, filename: string) {
-  const url = URL.createObjectURL(new Blob([text], { type: 'text/csv;charset=utf-8' }));
+  downloadBlob(new Blob([text], { type: 'text/csv;charset=utf-8' }), filename);
+}
+
+/** A file the server built (a report's `export.csv`), handed over as a download. */
+export function downloadBlob(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
   a.download = filename;
