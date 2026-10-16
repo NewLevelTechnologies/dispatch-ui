@@ -1943,6 +1943,10 @@
         "description": "Every confirmed callback with its original {{workOrder, lowercase}}, the {{techs, lowercase}} charged and the days between. A {{tech, lowercase}}'s count matches Tech productivity.",
         "name": "Callbacks"
       },
+      "discounts": {
+        "description": "Every price reduction on billed {{invoices, lowercase}}, by reason, who gave it, {{customer, lowercase}} or line type. Member savings are counted on their own.",
+        "name": "Discounts & concessions"
+      },
       "filter-pull-list": {
         "description": "The filters each {{tech, lowercase}} pulls for tomorrow's {{dispatches, lowercase}}, from the board, with a company total. Print and tape to the truck before heading out.",
         "name": "Filter Pull List"
@@ -1977,6 +1981,67 @@
       }
     },
     "description": "Fixed reports with filters and export. Their numbers match Home.",
+    "discounts": {
+      "automatic": "Automatic",
+      "empty": {
+        "body": "No {{invoices}} billed in {{range}} had a discount or waive.",
+        "title": "No discounts in this range"
+      },
+      "exportFailed": "Couldn't export the discounts",
+      "exported": "Exported {{file}}",
+      "filters": {
+        "member": "Member savings"
+      },
+      "groupBy": {
+        "customer": "Bill-to {{customer, lowercase}}",
+        "givenBy": "Given by",
+        "lineType": "Line type",
+        "reason": "Reason"
+      },
+      "key": {
+        "automatic": "Automatic",
+        "feeWaived": "Fee waived",
+        "member": "Member · {{plan}}",
+        "unrecorded": "Not recorded",
+        "untyped": "No line type",
+        "wholeInvoice": "Whole invoice"
+      },
+      "list": {
+        "billTo": "Bill-to",
+        "billed": "Billed",
+        "failed": "Couldn't load the adjustments",
+        "line": "Line",
+        "range": "{{first}}–{{last}} of {{count}} adjustments",
+        "title": "{{group}} · every adjustment"
+      },
+      "loadFailed": "Couldn't load the discounts report",
+      "member": {
+        "exclude": "Exclude",
+        "include": "Include"
+      },
+      "sub": "{{range}} · {{dates}}. Every price reduction on {{invoices}} billed in the range, with its reason. Member savings come from agreements, not from a person, so they're shown separately.",
+      "subToDate": "{{range}} · {{dates}}, to date. Every price reduction on {{invoices}} billed in the range, with its reason. Member savings come from agreements, not from a person, so they're shown separately.",
+      "summary": {
+        "count_one": "{{count}} adjustment",
+        "count_other": "{{count}} adjustments",
+        "feesWaived": "Fees waived",
+        "member": "Member savings",
+        "memberSub": "Automatic, from agreements",
+        "ofList": "{{pct}} of list price · {{count}}",
+        "staff": "Given by staff",
+        "staffSub": "Manual discounts and waives",
+        "total": "Total reduced"
+      },
+      "table": {
+        "amount": "Amount",
+        "average": "Avg",
+        "count": "Adjustments",
+        "hint": "Pick a row to see its largest adjustments",
+        "onlyMember": "Only member savings in this range. Include them to see them.",
+        "viewAll": "View all"
+      },
+      "title": "Discounts & concessions"
+    },
     "empty": "No reports are available yet.",
     "groups": {
       "money": "Money",

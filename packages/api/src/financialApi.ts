@@ -2201,6 +2201,126 @@ export const paymentReportApi = {
   },
 };
 
+export type DiscountReportGroupBy = 'reason' | 'givenBy' | 'customer' | 'lineType';
+export type DiscountReportMember = 'include' | 'exclude';
+
+export interface DiscountReportParams {
+  from: string;
+  to: string;
+  member?: DiscountReportMember;
+  groupBy?: DiscountReportGroupBy;
+  regionIds?: string[];
+}
+
+/** One adjustment on a billed invoice: a sample row, a `/rows` row, a CSV row. */
+export interface DiscountReportRow {
+  adjustmentId: string;
+  invoiceId: string;
+  invoiceNumber: string;
+  invoiceDate: string;
+  billToCustomerId: string | null;
+  billToName: string | null;
+  /** The serviced customer (the location's owner); null with no location. */
+  customerId: string | null;
+  customerName: string | null;
+  /** All three null for a whole-invoice discount. */
+  lineId: string | null;
+  lineDescription: string | null;
+  lineType: LineType | null;
+  reasonCode: AdjustmentReason;
+  reasonNote: string | null;
+  kind: AdjustmentKind;
+  /** PERCENT: a fraction. AMOUNT: dollars. WAIVE: null. */
+  value: number | null;
+  /** What it took off, positive. */
+  amount: number;
+  source: AdjustmentSource;
+  /** AGREEMENT rows: the plan label. */
+  sourceLabel: string | null;
+  /** Null when automatic or unrecorded. Credited to whoever gave it on the quote, for a copied adjustment. */
+  givenByUserId: string | null;
+  givenByName: string | null;
+  automatic: boolean;
+}
+
+/**
+ * `key` by grouping: reason → an AdjustmentReason, `FEE_WAIVED` or
+ * `MEMBER:{plan label}`; givenBy → a user id, `AUTOMATIC` or `UNRECORDED`;
+ * customer → the bill-to id; lineType → a LineType, `DOCUMENT` (whole invoice)
+ * or `UNTYPED`. `label` is the server-side name (person, bill-to, plan), null
+ * for codes.
+ */
+export interface DiscountReportGroup {
+  key: string;
+  label: string | null;
+  /** Member savings, from an agreement. */
+  automatic: boolean;
+  count: number;
+  amount: number;
+  /** Of `total.amount`, 0–1. */
+  share: number;
+  /** Per adjustment. */
+  average: number;
+  /** The first 4 rows, largest first. */
+  sample: DiscountReportRow[];
+}
+
+export interface DiscountReport {
+  from: string;
+  /** Cut off at today. */
+  to: string;
+  member: DiscountReportMember;
+  groupBy: DiscountReportGroupBy;
+  /** Every source, whatever `member` is. staff + feesWaived + memberSavings = totalReduced. */
+  summary: {
+    totalReduced: number;
+    adjustmentCount: number;
+    /** The billed invoices' gross subtotal, before adjustments. */
+    listPrice: number;
+    /** totalReduced / listPrice; null when listPrice is 0. */
+    shareOfList: number | null;
+    staff: number;
+    feesWaived: number;
+    memberSavings: number;
+  };
+  /** Largest first; they add up to `total`. Member groups drop out with `member=exclude`. */
+  groups: DiscountReportGroup[];
+  total: { count: number; amount: number };
+  currency: string;
+  regionIds: string[] | null;
+}
+
+const reportParams = <P extends { regionIds?: string[] }>({ regionIds, ...params }: P) => ({
+  ...params,
+  ...(regionIds?.length ? { regionIds } : {}),
+});
+
+export const discountReportApi = {
+  get: async (params: DiscountReportParams): Promise<DiscountReport> => {
+    const response = await apiClient.get<DiscountReport>('/financial/reports/discounts', {
+      params: reportParams(params),
+    });
+    return response.data;
+  },
+  /** One group's adjustments, in sample order: the "View all" behind an expanded row. */
+  rows: async (
+    params: DiscountReportParams & { groupKey: string; page?: number; size?: number },
+  ): Promise<FinancialPage<DiscountReportRow>> => {
+    const response = await apiClient.get<FinancialPage<DiscountReportRow>>('/financial/reports/discounts/rows', {
+      params: reportParams(params),
+    });
+    return response.data;
+  },
+  /** One row per adjustment, newest invoice first; built on the server. */
+  exportCsv: async (params: Omit<DiscountReportParams, 'groupBy'>): Promise<Blob> => {
+    const response = await apiClient.get<Blob>('/financial/reports/discounts/export.csv', {
+      params: reportParams(params),
+      responseType: 'blob',
+    });
+    return response.data;
+  },
+};
+
 export type QuoteReportGroupBy = 'sender' | 'none';
 
 export interface QuoteReportParams {
