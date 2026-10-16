@@ -2321,6 +2321,91 @@ export const discountReportApi = {
   },
 };
 
+export type SalesTaxBasis = 'sent';
+
+export interface SalesTaxReportParams {
+  from: string;
+  to: string;
+  basis?: SalesTaxBasis;
+  regionIds?: string[];
+}
+
+/** Gross is the line net (after adjustments, before tax): taxable + nonTaxable + exempt. */
+export interface SalesTaxFigures {
+  gross: number;
+  taxable: number;
+  nonTaxable: number;
+  exempt: number;
+  tax: number;
+}
+
+/** One tax class in a jurisdiction, on invoices to non-exempt bill-tos. */
+export interface SalesTaxClassRow {
+  /** Null = unclassified lines. */
+  taxClass: TaxClass | null;
+  /** Whether the jurisdiction taxes this class today. */
+  taxedHere: boolean;
+  gross: number;
+  taxable: number;
+  nonTaxable: number;
+  tax: number;
+}
+
+/**
+ * A jurisdiction, or one of two special rows with no class split: `NONE`
+ * (invoices written with no jurisdiction) and `LEGACY` (before per-line tax,
+ * `rates` empty).
+ */
+export interface SalesTaxJurisdiction extends SalesTaxFigures {
+  key: string;
+  jurisdictionId: string | null;
+  name: string | null;
+  /** Distinct stored rates, fractions; null = not set; 2+ when the rate changed in range. */
+  rates: (number | null)[];
+  /** Today's rate; null = not set today. */
+  currentRate: number | null;
+  classes: SalesTaxClassRow[];
+  /** Every line on invoices to exempt bill-tos; null when none. */
+  exemptAccounts: { gross: number; tax: number } | null;
+}
+
+export type SalesTaxWarning =
+  | { code: 'NO_RATE'; jurisdictionId: string; jurisdictionName: string; amount: number }
+  | { code: 'TAX_MISMATCH'; count: number; invoiceNumbers: string[] };
+
+export interface SalesTaxReport {
+  from: string;
+  /** Cut off at today. */
+  to: string;
+  basis: SalesTaxBasis;
+  total: SalesTaxFigures;
+  jurisdictionCount: number;
+  /** Real jurisdictions by gross descending, then NONE and LEGACY. They add up to `total`. */
+  jurisdictions: SalesTaxJurisdiction[];
+  /** The invoices' own tax; equals `total.tax` unless a TAX_MISMATCH warning says otherwise. */
+  invoiceTaxTotal: number;
+  warnings: SalesTaxWarning[];
+  currency: string;
+  regionIds: string[] | null;
+}
+
+export const salesTaxReportApi = {
+  get: async (params: SalesTaxReportParams): Promise<SalesTaxReport> => {
+    const response = await apiClient.get<SalesTaxReport>('/financial/reports/sales-tax', {
+      params: reportParams(params),
+    });
+    return response.data;
+  },
+  /** One row per invoice line, for audit; built on the server. */
+  exportCsv: async (params: SalesTaxReportParams): Promise<Blob> => {
+    const response = await apiClient.get<Blob>('/financial/reports/sales-tax/export.csv', {
+      params: reportParams(params),
+      responseType: 'blob',
+    });
+    return response.data;
+  },
+};
+
 export type QuoteReportGroupBy = 'sender' | 'none';
 
 export interface QuoteReportParams {

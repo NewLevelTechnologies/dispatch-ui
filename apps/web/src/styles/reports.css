@@ -119,7 +119,8 @@
 /* Billing reports (Discounts, Sales tax, Unbilled). Their breakpoints follow
    the content width, not the viewport (the sidebar takes ~250px of it), so the
    page is a size container. A detail row hides its cells with the same classes
-   as the header, so expanded rows keep the header's columns. */
+   as the header, so expanded rows keep the header's columns. `.rp-show-md` is
+   the narrow stand-in (a merged column, whole dollars). */
 .rp-cq { container-type: inline-size; }
 .rp-trunc {
   display: inline-block;
@@ -129,8 +130,11 @@
   white-space: nowrap;
   vertical-align: bottom;
 }
+.rp-show-md { display: none; }
 @container (max-width: 899px) {
   .rp-hide-md { display: none; }
+  td.rp-show-md, th.rp-show-md { display: table-cell; }
+  span.rp-show-md { display: inline; }
   .rp-trunc { max-width: 18ch; }
 }
 @container (max-width: 699px) { .rp-hide-sm { display: none; } }

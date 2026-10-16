@@ -43,6 +43,7 @@ const ReceivablesReport = lazy(() => import('./ReceivablesReport'));
 const PaymentsReport = lazy(() => import('./PaymentsReport'));
 const QuotesReport = lazy(() => import('./QuotesReport'));
 const RevenueReport = lazy(() => import('./RevenueReport'));
+const SalesTaxReport = lazy(() => import('./SalesTaxReport'));
 const TechProductivityReport = lazy(() => import('./TechProductivityReport'));
 
 export const reports: ReportDefinition[] = [
@@ -71,6 +72,12 @@ export const reports: ReportDefinition[] = [
     slug: 'discounts',
     group: 'money',
     Component: DiscountsReport,
+    requiresCapability: 'VIEW_ALL_INVOICES',
+  },
+  {
+    slug: 'sales-tax',
+    group: 'money',
+    Component: SalesTaxReport,
     requiresCapability: 'VIEW_ALL_INVOICES',
   },
   {

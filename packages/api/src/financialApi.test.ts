@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { invoicesApi, quotesApi, financialActivityApi, financialDashboardApi, revenueTargetsApi,
-  revenueReportApi, receivablesReportApi, quoteReportApi, paymentReportApi, discountReportApi, paymentsApi, taxApi, laborRatesApi, pricebookApi, ratePlansApi, mediaApi } from './financialApi';
+  revenueReportApi, receivablesReportApi, quoteReportApi, paymentReportApi, discountReportApi, salesTaxReportApi, paymentsApi, taxApi, laborRatesApi, pricebookApi, ratePlansApi, mediaApi } from './financialApi';
 import apiClient from './client';
 
 vi.mock('./client');
@@ -351,6 +351,23 @@ describe('discountReportApi', () => {
     await discountReportApi.exportCsv({ from: '2026-09-01', to: '2026-09-30', member: 'include' });
     expect(apiClient.get).toHaveBeenLastCalledWith('/financial/reports/discounts/export.csv', {
       params: { from: '2026-09-01', to: '2026-09-30', member: 'include' },
+      responseType: 'blob',
+    });
+  });
+});
+
+describe('salesTaxReportApi', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('GETs the report and the CSV as a blob, dropping an empty scope', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({ data: {} });
+    await salesTaxReportApi.get({ from: '2026-09-01', to: '2026-09-30', basis: 'sent', regionIds: [] });
+    expect(apiClient.get).toHaveBeenLastCalledWith('/financial/reports/sales-tax', {
+      params: { from: '2026-09-01', to: '2026-09-30', basis: 'sent' },
+    });
+    await salesTaxReportApi.exportCsv({ from: '2026-09-01', to: '2026-09-30', basis: 'sent', regionIds: ['r1'] });
+    expect(apiClient.get).toHaveBeenLastCalledWith('/financial/reports/sales-tax/export.csv', {
+      params: { from: '2026-09-01', to: '2026-09-30', basis: 'sent', regionIds: ['r1'] },
       responseType: 'blob',
     });
   });
