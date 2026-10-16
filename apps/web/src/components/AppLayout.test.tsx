@@ -1,11 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { screen } from '@testing-library/react';
+import { screen, waitFor } from '@testing-library/react';
 import { renderWithProviders } from '../test/utils';
 import AppLayout from './AppLayout';
+import { apiClient } from '../api/setup';
 
-const mockFlags = vi.hoisted(() => ({ inventory: false }));
-vi.mock('../lib/featureFlags', () => ({ flags: mockFlags }));
 vi.mock('@dispatch/api/src/client');
+
+const withInventory = (enableInventory: boolean) =>
+  vi.mocked(apiClient.get).mockImplementation((url) =>
+    Promise.resolve({ data: url === '/tenant-settings' ? { enableInventory } : {} }),
+  );
 
 const NAV = [
   '/dashboard', '/dispatch', '/approvals',
@@ -23,11 +27,13 @@ const navHrefs = () =>
 
 describe('AppLayout sidebar', () => {
   beforeEach(() => {
-    mockFlags.inventory = false;
+    vi.clearAllMocks();
+    withInventory(false);
   });
 
-  it('groups the nav as Work, Financial, Purchasing, with no Equipment or Inventory', () => {
+  it('groups the nav as Work, Financial, Purchasing, with no Equipment or Inventory', async () => {
     renderWithProviders(<AppLayout><div /></AppLayout>);
+    await waitFor(() => expect(apiClient.get).toHaveBeenCalledWith('/tenant-settings'));
     const hrefs = navHrefs();
     expect(hrefs.slice(0, 2)).toEqual(['/dashboard', '/dispatch']);
     const order = hrefs.filter((h) => h !== '/approvals' && h !== '/settings');
@@ -43,12 +49,12 @@ describe('AppLayout sidebar', () => {
     expect(screen.queryByText('Inventory')).not.toBeInTheDocument();
   });
 
-  it('shows the Inventory group after Purchasing when inventory is on', () => {
-    mockFlags.inventory = true;
+  it('shows the Inventory group after Purchasing when the tenant turned inventory on', async () => {
+    withInventory(true);
     renderWithProviders(<AppLayout><div /></AppLayout>);
+    expect(await screen.findByText('Inventory')).toBeInTheDocument();
     const order = navHrefs().filter((h) => h !== '/approvals' && h !== '/settings');
     expect(order.slice(-4)).toEqual(['/vendors', '/parts-inventory', '/warehouses', '/reports']);
-    expect(screen.getByText('Inventory')).toBeInTheDocument();
     expect(order).not.toContain('/equipment');
   });
 });

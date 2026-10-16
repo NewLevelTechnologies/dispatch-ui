@@ -68,6 +68,9 @@ export interface TenantSettings {
   // Tenant-wide AI feature switch. New optional field — absent on older
   // responses, so the UI treats undefined as off.
   enableAiFeatures?: boolean;
+  // Display gate for the Inventory sidebar group (Parts, Warehouses). Always
+  // present, default false. Inventory endpoints work either way.
+  enableInventory?: boolean;
   // Tenant-wide default applied to new service locations created without an
   // explicit premise. Always present; server defaults to 'BUSINESS'.
   defaultPremiseType: PremiseType;
@@ -105,6 +108,7 @@ export interface UpdateTenantSettingsRequest {
   enableEmailNotifications?: boolean;
   enableExternalNotifications?: boolean;
   enableAiFeatures?: boolean;
+  enableInventory?: boolean;
   defaultPremiseType?: PremiseType;
   // Partial-update semantics — omit to leave unchanged. Basis is case-insensitive
   // on the wire but we always send the canonical uppercase union value.

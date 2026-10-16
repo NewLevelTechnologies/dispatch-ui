@@ -26,8 +26,7 @@ import {
   CheckBadgeIcon,
   ArrowPathRoundedSquareIcon,
 } from '@heroicons/react/24/outline';
-import { approvalsApi, type ApprovalsBellSummary } from '../api/setup';
-import { flags } from '../lib/featureFlags';
+import { approvalsApi, tenantSettingsApi, type ApprovalsBellSummary } from '../api/setup';
 import { Sidebar, SidebarBody, SidebarFooter, SidebarHeader, SidebarHeading, SidebarItem, SidebarSection } from './catalyst/sidebar';
 import { SidebarLayout } from './catalyst/sidebar-layout';
 import { Navbar } from './catalyst/navbar';
@@ -75,6 +74,13 @@ export default function AppLayout({ children, flush }: { children: React.ReactNo
   const canViewSettings = useHasAnyCapability('VIEW_SETTINGS');
 
   const approvalsVisible = useApprovalsVisible();
+
+  // Parts and Warehouses show only for tenants who turned inventory on.
+  const { data: tenantSettings } = useQuery({
+    queryKey: ['tenant-settings'],
+    queryFn: () => tenantSettingsApi.getSettings(),
+  });
+  const inventoryOn = tenantSettings?.enableInventory ?? false;
 
   // Bell summary: pending-for-me (approver workload) + recently-resolved-
   // mine (24h server window, requester side). Drives both the sidebar
@@ -156,7 +162,7 @@ export default function AppLayout({ children, flush }: { children: React.ReactNo
     },
     // Equipment has no nav item: it's reached from location and customer
     // detail, search and the Filter Pull List report. Its route still works.
-    ...(flags.inventory
+    ...(inventoryOn
       ? [
           {
             section: t('entities.inventory'),

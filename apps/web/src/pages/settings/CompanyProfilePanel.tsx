@@ -592,6 +592,7 @@ function PreferencesCard({ settings, canEdit }: { settings: TenantSettings; canE
   // Absent on older responses — undefined ⇒ off / straight-line.
   const recognitionOn = settings.revenueRecognitionEnabled ?? false;
   const aiOn = settings.enableAiFeatures ?? false;
+  const inventoryOn = settings.enableInventory ?? false;
   const notificationsOn = settings.enableExternalNotifications;
   const basis = settings.revenueRecognitionBasis ?? 'STRAIGHT_LINE';
 
@@ -641,6 +642,13 @@ function PreferencesCard({ settings, canEdit }: { settings: TenantSettings; canE
             checked={aiOn}
             disabled={!canEdit}
             onChange={(next) => save.mutate({ enableAiFeatures: next })}
+          />
+          <ToggleRow
+            label="Inventory"
+            help="Parts and warehouses in the sidebar."
+            checked={inventoryOn}
+            disabled={!canEdit}
+            onChange={(next) => save.mutate({ enableInventory: next })}
           />
           <ToggleRow
             label="Notifications"

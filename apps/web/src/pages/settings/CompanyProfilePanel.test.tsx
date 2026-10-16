@@ -295,6 +295,24 @@ describe('CompanyProfilePanel', () => {
     });
   });
 
+  it('turns inventory on', async () => {
+    const user = userEvent.setup();
+    vi.mocked(apiClient.put).mockResolvedValue({ data: { ...mockSettings, enableInventory: true } });
+    renderWithProviders(<CompanyProfilePanel />);
+    await waitFor(() => expect(screen.getByText('Acme HVAC')).toBeInTheDocument());
+
+    const toggle = screen.getByRole('switch', { name: /inventory/i });
+    expect(toggle).not.toBeChecked();
+    await user.click(toggle);
+
+    await waitFor(() => {
+      expect(apiClient.put).toHaveBeenCalledWith(
+        expect.stringContaining('/tenant'),
+        expect.objectContaining({ enableInventory: true }),
+      );
+    });
+  });
+
   it('flips AI features in place and persists only that field', async () => {
     const user = userEvent.setup();
     vi.mocked(apiClient.put).mockResolvedValue({
