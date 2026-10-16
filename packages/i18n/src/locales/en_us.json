@@ -1974,6 +1974,10 @@
         "fromHome": "Revenue chart",
         "name": "Revenue"
       },
+      "sales-tax": {
+        "description": "Taxable, non-taxable and exempt sales with the tax collected, by jurisdiction and tax class, from what each {{invoice, lowercase}} line stored. For filing.",
+        "name": "Sales tax"
+      },
       "tech-productivity": {
         "description": "Home's {{tech, lowercase}} scorecard over any range, compared with last year or the period before, with a weekly trend per {{tech, lowercase}}.",
         "fromHome": "{{tech}} productivity card",
@@ -2373,6 +2377,61 @@
       "title": "Revenue",
       "unassigned": "No {{group}}",
       "unknown": "Unknown"
+    },
+    "salesTax": {
+      "basis": {
+        "cash": "Payment date (cash basis)",
+        "sent": "Invoice date",
+        "soon": "Soon"
+      },
+      "empty": {
+        "body": "No {{invoices}} were billed in {{range}}.",
+        "title": "No billed {{invoices}} in this range"
+      },
+      "exemptAccounts": "Exempt accounts",
+      "exportFailed": "Couldn't export the sales tax lines",
+      "exported": "Exported {{file}}",
+      "filters": {
+        "basis": "Basis"
+      },
+      "key": {
+        "legacy": "Before tax setup",
+        "none": "No jurisdiction",
+        "unclassified": "Unclassified"
+      },
+      "loadFailed": "Couldn't load the sales tax report",
+      "notSet": "Not set",
+      "notTaxedHere": "not taxed here",
+      "sub": "{{range}} · {{dates}}. {{invoices}} billed in the range, by the tax each line stored when it was written. Voids are excluded; a reissued invoice counts once. For filing, check against your accountant's basis (billed vs. paid).",
+      "subToDate": "{{range}} · {{dates}}, to date. {{invoices}} billed in the range, by the tax each line stored when it was written. Voids are excluded; a reissued invoice counts once. For filing, check against your accountant's basis (billed vs. paid).",
+      "summary": {
+        "exemptSub": "{{amount}} to exempt accounts",
+        "gross": "Gross sales",
+        "jurisdictions_one": "{{count}} jurisdiction",
+        "jurisdictions_other": "{{count}} jurisdictions",
+        "notTaxed": "Non-taxable + exempt",
+        "tax": "Tax collected",
+        "taxable": "Taxable"
+      },
+      "table": {
+        "exempt": "Exempt",
+        "gross": "Gross",
+        "hint": "Pick a jurisdiction to split it by tax class",
+        "jurisdiction": "Jurisdiction",
+        "nonTaxable": "Non-taxable",
+        "notTaxed": "Not taxed",
+        "rate": "Rate",
+        "tax": "Tax",
+        "taxable": "Taxable",
+        "title": "By jurisdiction"
+      },
+      "title": "Sales tax",
+      "warn": {
+        "mismatch": "{{count}} {{invoices}}' tax doesn't match their lines: {{numbers}}. Report this to support.",
+        "noRate": "{{name}} has no rate set, so {{amount}} of taxable sales collected no tax.",
+        "nowSet": "It's now set to {{rate}}.",
+        "setRate": "Set rate"
+      }
     },
     "techs": {
       "csv": {

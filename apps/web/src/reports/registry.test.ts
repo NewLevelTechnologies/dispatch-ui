@@ -18,6 +18,7 @@ describe('reports registry', () => {
     expect(findReport('revenue')?.requiresCapability).toBe('VIEW_ALL_INVOICES');
     expect(findReport('tech-productivity')?.requiresCapability).toBe('VIEW_ALL_INVOICES');
     expect(findReport('discounts')?.requiresCapability).toBe('VIEW_ALL_INVOICES');
+    expect(findReport('sales-tax')?.requiresCapability).toBe('VIEW_ALL_INVOICES');
   });
 });
 
