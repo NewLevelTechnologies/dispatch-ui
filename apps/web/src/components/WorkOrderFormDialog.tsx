@@ -22,7 +22,7 @@ import { Dialog, DialogActions, DialogBody, DialogDescription, DialogTitle } fro
 import { Button } from './catalyst/button';
 import { Checkbox, CheckboxField } from './catalyst/checkbox';
 import { Description, Field, FieldGroup, Fieldset, Label, Legend } from './catalyst/fieldset';
-import { Input, InputGroup } from './catalyst/input';
+import { Input } from './catalyst/input';
 import { Textarea } from './catalyst/textarea';
 import { Select } from './catalyst/select';
 import { Radio, RadioField, RadioGroup } from './catalyst/radio';
@@ -1037,16 +1037,14 @@ export default function WorkOrderFormDialog({ isOpen, onClose, workOrder, prefil
                 {isEdit && (
                   <Field>
                     <Label className="text-xs">{t('workOrders.form.notToExceed')}</Label>
-                    <InputGroup>
-                      <span data-slot="icon" className="text-center text-base/5 sm:text-sm/4">$</span>
-                      <Input
-                        name="notToExceed"
-                        inputMode="decimal"
-                        value={formData.notToExceed}
-                        onChange={(e) => handleChange('notToExceed', e.target.value)}
-                        placeholder={t('workOrders.form.notToExceedPlaceholder')}
-                      />
-                    </InputGroup>
+                    <Input
+                      name="notToExceed"
+                      inputMode="decimal"
+                      leading="$"
+                      value={formData.notToExceed}
+                      onChange={(e) => handleChange('notToExceed', e.target.value)}
+                      placeholder={t('workOrders.form.notToExceedPlaceholder')}
+                    />
                     <Description className="text-xs">
                       {t('workOrders.form.notToExceedHint')}
                     </Description>
