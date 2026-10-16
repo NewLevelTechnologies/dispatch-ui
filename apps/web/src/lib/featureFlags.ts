@@ -15,11 +15,6 @@ export const flags = {
   // BE PR-2: POST /notification-templates/{id}/send-test. While false,
   // the Send test button is suppressed entirely from the editor header.
   notificationTestSend: true,
-
-  // TODO: read the tenant's `inventory.enabled` flag once the backend has one.
-  // While false, Parts and Warehouses stay out of the sidebar; their routes
-  // still load by URL.
-  inventory: false,
 } as const;
 
 export type FeatureFlag = keyof typeof flags;
