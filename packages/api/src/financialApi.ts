@@ -1977,6 +1977,27 @@ export const purchaseBillingApi = {
   },
 };
 
+/** Whether an accepted quote's line is marked as never billed, and who said so. */
+export interface QuoteLineBilling {
+  quoteLineId: string;
+  notBillable: boolean;
+  reason?: string | null;
+  markedByUserId?: string | null;
+  markedByName?: string | null;
+  markedAt?: string | null;
+}
+
+export const quoteLineBillingApi = {
+  /** Dismiss (with a reason, ≤500 chars) or restore a line of an accepted quote. */
+  setBilling: async (
+    quoteLineId: string,
+    body: { notBillable: true; reason: string } | { notBillable: false },
+  ): Promise<QuoteLineBilling> => {
+    const response = await apiClient.put<QuoteLineBilling>(`/financial/quote-lines/${quoteLineId}/billing`, body);
+    return response.data;
+  },
+};
+
 // ========== LOCATION FINANCIAL ACTIVITY ==========
 
 /** The quote, invoice and payment steps the financial feeds carry. */
@@ -2399,6 +2420,121 @@ export const salesTaxReportApi = {
   /** One row per invoice line, for audit; built on the server. */
   exportCsv: async (params: SalesTaxReportParams): Promise<Blob> => {
     const response = await apiClient.get<Blob>('/financial/reports/sales-tax/export.csv', {
+      params: reportParams(params),
+      responseType: 'blob',
+    });
+    return response.data;
+  },
+};
+
+export type UnbilledReportSource = 'all' | 'quote' | 'po';
+export type UnbilledReportGroupBy = 'job' | 'source' | 'age';
+export type UnbilledItemSource = 'QUOTE' | 'PO';
+/** How a PO part's ≈ amount was priced: its own bill price, the rate plan's markup on cost, or cost. */
+export type UnbilledEstimateBasis = 'BILL_PRICE' | 'MARKUP_TIER' | 'COST';
+
+export interface UnbilledReportParams {
+  source?: UnbilledReportSource;
+  groupBy?: UnbilledReportGroupBy;
+  regionIds?: string[];
+}
+
+/** An accepted quote line or placed PO line not fully on issued invoices. */
+export interface UnbilledItem {
+  /** The quote line id (QUOTE) or PO line id (PO): what dismissal takes. */
+  itemId: string;
+  source: UnbilledItemSource;
+  description: string;
+  /** What's left to bill. */
+  quantity: number;
+  amount: number;
+  /** PO parts: priced as the line editor would, so shown with ≈. */
+  estimate: boolean;
+  estimateBasis: UnbilledEstimateBasis | null;
+  /** Quote acceptance or PO placed date. */
+  since: string;
+  ageDays: number;
+  workOrderId: string | null;
+  workOrderNumber: string | null;
+  billToCustomerId: string | null;
+  billToName: string | null;
+  billToIsPayer: boolean;
+  /** The serviced customer (location owner). */
+  customerId: string | null;
+  customerName: string | null;
+  quoteId: string | null;
+  quoteNumber: string | null;
+  purchaseOrderId: string | null;
+  poNumber: string | null;
+  /** On a draft invoice, which bills nothing until it's issued. */
+  onDraftInvoice: { invoiceId: string; invoiceNumber: string } | null;
+}
+
+/**
+ * `key` by grouping: job → the work order id, or `QUOTE:{quoteId}` for a
+ * quote with no work order (`label` the WO or quote number); source →
+ * `QUOTE` | `PO`; age → `DAYS_0_30` … `DAYS_91_PLUS` (oldest first).
+ */
+export interface UnbilledReportGroup {
+  key: string;
+  label: string | null;
+  count: number;
+  amount: number;
+  /** Of `total.amount`, 0–1. */
+  share: number;
+  oldestAgeDays: number;
+  /** Job groups only. `workOrderId` null for a quote with no work order. */
+  job?: {
+    workOrderId: string | null;
+    workOrderNumber: string | null;
+    billToCustomerId: string | null;
+    billToName: string | null;
+    billToIsPayer: boolean;
+  } | null;
+  /** The first 4 items, oldest first. */
+  sample: UnbilledItem[];
+}
+
+export interface UnbilledReport {
+  /** Today, tenant-local: the report has no range. */
+  asOf: string;
+  source: UnbilledReportSource;
+  groupBy: UnbilledReportGroupBy;
+  /** Follows the source filter. total = quoted + estimated. */
+  summary: {
+    total: number;
+    itemCount: number;
+    jobCount: number;
+    quoted: number;
+    estimated: number;
+    overThirtyDays: number;
+    overThirtyDaysCount: number;
+  };
+  groups: UnbilledReportGroup[];
+  total: { count: number; amount: number };
+  currency: string;
+  regionIds: string[] | null;
+}
+
+export const unbilledReportApi = {
+  get: async (params: UnbilledReportParams): Promise<UnbilledReport> => {
+    const response = await apiClient.get<UnbilledReport>('/financial/reports/unbilled', {
+      params: reportParams(params),
+    });
+    return response.data;
+  },
+  /** One group's items, oldest first: the "View all" behind an expanded row. */
+  rows: async (
+    params: UnbilledReportParams & { groupKey: string; page?: number; size?: number },
+  ): Promise<FinancialPage<UnbilledItem>> => {
+    const response = await apiClient.get<FinancialPage<UnbilledItem>>('/financial/reports/unbilled/rows', {
+      params: reportParams(params),
+    });
+    return response.data;
+  },
+  /** One row per item, oldest first; built on the server. */
+  exportCsv: async (params: Omit<UnbilledReportParams, 'groupBy'>): Promise<Blob> => {
+    const response = await apiClient.get<Blob>('/financial/reports/unbilled/export.csv', {
       params: reportParams(params),
       responseType: 'blob',
     });

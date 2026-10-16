@@ -28,10 +28,6 @@ export function ReportBackLink({ state }: { state: ReportRangeState }) {
 export function RangeChips({ state, compare: showCompare = true }: { state: ReportRangeState; compare?: boolean }) {
   const { t } = useTranslation();
   const { range, today, compare, regionId } = state;
-  const { data: regions = [] } = useQuery({
-    queryKey: ['dispatch-regions', 'active'],
-    queryFn: () => dispatchRegionApi.getAll(false),
-  });
 
   return (
     <>
@@ -79,24 +75,35 @@ export function RangeChips({ state, compare: showCompare = true }: { state: Repo
           ))}
         </FilterChipListbox>
       )}
-      {regions.length > 1 && (
-        <FilterChipListbox
-          label={regionId ? t('dashboard.scope.label') : t('dashboard.scope.labelAll')}
-          ariaLabel={t('dashboard.scope.label')}
-          value={regionId}
-          displayValue={regions.find((r) => r.id === regionId)?.name ?? null}
-          resetLabel={t('dashboard.scope.all')}
-          onChange={(id) => state.update({ region: id })}
-          onClear={() => state.update({ region: null })}
-        >
-          {regions.map((r) => (
-            <ChipListboxOption key={r.id} value={r.id}>
-              {r.name}
-            </ChipListboxOption>
-          ))}
-        </FilterChipListbox>
-      )}
+      <ScopeChip regionId={regionId} onChange={(id) => state.update({ region: id })} />
     </>
+  );
+}
+
+/** Scope, when there's more than one region. On its own for a report with no range. */
+export function ScopeChip({ regionId, onChange }: { regionId: string | null; onChange: (id: string | null) => void }) {
+  const { t } = useTranslation();
+  const { data: regions = [] } = useQuery({
+    queryKey: ['dispatch-regions', 'active'],
+    queryFn: () => dispatchRegionApi.getAll(false),
+  });
+  if (regions.length <= 1) return null;
+  return (
+    <FilterChipListbox
+      label={regionId ? t('dashboard.scope.label') : t('dashboard.scope.labelAll')}
+      ariaLabel={t('dashboard.scope.label')}
+      value={regionId}
+      displayValue={regions.find((r) => r.id === regionId)?.name ?? null}
+      resetLabel={t('dashboard.scope.all')}
+      onChange={onChange}
+      onClear={() => onChange(null)}
+    >
+      {regions.map((r) => (
+        <ChipListboxOption key={r.id} value={r.id}>
+          {r.name}
+        </ChipListboxOption>
+      ))}
+    </FilterChipListbox>
   );
 }
 
