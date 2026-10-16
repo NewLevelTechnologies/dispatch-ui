@@ -1040,7 +1040,6 @@ export default function WorkOrderFormDialog({ isOpen, onClose, workOrder, prefil
                     <Input
                       name="notToExceed"
                       inputMode="decimal"
-                      leading="$"
                       value={formData.notToExceed}
                       onChange={(e) => handleChange('notToExceed', e.target.value)}
                       placeholder={t('workOrders.form.notToExceedPlaceholder')}

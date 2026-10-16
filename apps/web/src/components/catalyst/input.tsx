@@ -32,42 +32,23 @@ type DateType = (typeof dateTypes)[number]
 // v1.5 dense variant — 32px tall, 12.5px text, fixed (no responsive shift).
 const sizes = {
   md: [
-    'py-[calc(--spacing(2.5)-1px)] sm:py-[calc(--spacing(1.5)-1px)]',
+    'px-[calc(--spacing(3.5)-1px)] py-[calc(--spacing(2.5)-1px)] sm:px-[calc(--spacing(3)-1px)] sm:py-[calc(--spacing(1.5)-1px)]',
     'text-base/6 sm:text-sm/6',
   ],
   xs: [
-    'py-[calc(--spacing(1.5)-1px)]',
+    'px-[calc(--spacing(2.5)-1px)] py-[calc(--spacing(1.5)-1px)]',
     'text-[12.5px]/[18px]',
   ],
-}
-
-// Horizontal padding, plain or with a `leading` text affix ("$"). The affix is
-// set in the input's own type size and centred on its line box, so it sits on
-// the value's baseline, and the value starts just past it.
-const inlinePadding = {
-  md: {
-    plain: 'px-[calc(--spacing(3.5)-1px)] sm:px-[calc(--spacing(3)-1px)]',
-    leading: 'pr-[calc(--spacing(3.5)-1px)] pl-7 sm:pr-[calc(--spacing(3)-1px)] sm:pl-6',
-    affix: 'left-[calc(--spacing(3.5)-1px)] sm:left-[calc(--spacing(3)-1px)] text-base/6 sm:text-sm/6',
-  },
-  xs: {
-    plain: 'px-[calc(--spacing(2.5)-1px)]',
-    leading: 'pr-[calc(--spacing(2.5)-1px)] pl-5',
-    affix: 'left-[calc(--spacing(2.5)-1px)] text-[12.5px]/[18px]',
-  },
 }
 
 export const Input = forwardRef(function Input(
   {
     className,
     size,
-    leading,
     ...props
   }: {
     className?: string
     size?: keyof typeof sizes
-    /** Short text before the value, like a currency symbol. For an icon, use InputGroup. */
-    leading?: React.ReactNode
     type?: 'email' | 'number' | 'password' | 'search' | 'tel' | 'text' | 'url' | DateType
   } & Omit<Headless.InputProps, 'as' | 'className' | 'size'>,
   ref: React.ForwardedRef<HTMLInputElement>
@@ -89,17 +70,6 @@ export const Input = forwardRef(function Input(
         'has-data-disabled:opacity-50 has-data-disabled:before:bg-bg-active has-data-disabled:before:shadow-none',
       ])}
     >
-      {leading != null && (
-        <span
-          aria-hidden
-          className={clsx(
-            'pointer-events-none absolute inset-y-0 z-10 flex items-center text-fg-muted',
-            inlinePadding[size ?? 'md'].affix
-          )}
-        >
-          {leading}
-        </span>
-      )}
       <Headless.Input
         ref={ref}
         {...props}
@@ -124,7 +94,6 @@ export const Input = forwardRef(function Input(
           'relative block w-full appearance-none rounded-lg',
           // Size (padding + text)
           sizes[size ?? 'md'],
-          inlinePadding[size ?? 'md'][leading != null ? 'leading' : 'plain'],
           // Typography
           'text-fg-strong placeholder:text-fg-dim',
           // Border

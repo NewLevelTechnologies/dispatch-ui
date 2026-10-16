@@ -4227,7 +4227,7 @@
       "firstWorkItemRequired": "Please describe the first work item.",
       "newCustomer": "New {{entity, lowercase}}",
       "newCustomerDetails": "New {{entity}} Details",
-      "notToExceed": "Not-to-exceed",
+      "notToExceed": "Not-to-exceed ($)",
       "notToExceedHint": "Warns on {{quotes, lowercase}} and {{invoices, lowercase}} that go over.",
       "notToExceedInvalid": "Not-to-exceed must be a positive amount.",
       "notToExceedPlaceholder": "No limit",

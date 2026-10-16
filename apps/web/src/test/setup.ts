@@ -1866,7 +1866,7 @@ vi.mock('react-i18next', async () => {
     'workOrders.form.firstWorkItemRequired': 'Please describe the first work item.',
     'workOrders.form.newCustomer': 'New customer',
     'workOrders.form.newCustomerDetails': 'New Customer Details',
-    'workOrders.form.notToExceed': 'Not-to-exceed',
+    'workOrders.form.notToExceed': 'Not-to-exceed ($)',
     'workOrders.form.notToExceedHint': 'Warns on {{quotes, lowercase}} and {{invoices, lowercase}} that go over.',
     'workOrders.form.notToExceedInvalid': 'Not-to-exceed must be a positive amount.',
     'workOrders.form.notToExceedPlaceholder': 'No limit',
