@@ -403,7 +403,7 @@ describe('WorkOrderFormDialog', () => {
       it('sets a limit', async () => {
         const user = userEvent.setup();
         open(null);
-        const input = screen.getByLabelText('Not-to-exceed');
+        const input = screen.getByLabelText('Not-to-exceed ($)');
         expect(input).toHaveAttribute('placeholder', 'No limit');
         await user.type(input, '2,500');
         await user.click(screen.getByRole('button', { name: /update/i }));
@@ -427,7 +427,7 @@ describe('WorkOrderFormDialog', () => {
         const user = userEvent.setup();
         const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
         open(null);
-        await user.type(screen.getByLabelText('Not-to-exceed'), '0');
+        await user.type(screen.getByLabelText('Not-to-exceed ($)'), '0');
         await user.click(screen.getByRole('button', { name: /update/i }));
         expect(alertSpy).toHaveBeenCalledWith('Not-to-exceed must be a positive amount.');
         expect(apiClient.patch).not.toHaveBeenCalled();
