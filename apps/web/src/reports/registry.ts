@@ -45,6 +45,7 @@ const QuotesReport = lazy(() => import('./QuotesReport'));
 const RevenueReport = lazy(() => import('./RevenueReport'));
 const SalesTaxReport = lazy(() => import('./SalesTaxReport'));
 const TechProductivityReport = lazy(() => import('./TechProductivityReport'));
+const UnbilledReport = lazy(() => import('./UnbilledReport'));
 
 export const reports: ReportDefinition[] = [
   {
@@ -78,6 +79,12 @@ export const reports: ReportDefinition[] = [
     slug: 'sales-tax',
     group: 'money',
     Component: SalesTaxReport,
+    requiresCapability: 'VIEW_ALL_INVOICES',
+  },
+  {
+    slug: 'unbilled',
+    group: 'money',
+    Component: UnbilledReport,
     requiresCapability: 'VIEW_ALL_INVOICES',
   },
   {

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { invoicesApi, quotesApi, financialActivityApi, financialDashboardApi, revenueTargetsApi,
-  revenueReportApi, receivablesReportApi, quoteReportApi, paymentReportApi, discountReportApi, salesTaxReportApi, paymentsApi, taxApi, laborRatesApi, pricebookApi, ratePlansApi, mediaApi } from './financialApi';
+  revenueReportApi, receivablesReportApi, quoteReportApi, paymentReportApi, discountReportApi, salesTaxReportApi, unbilledReportApi, quoteLineBillingApi, paymentsApi, taxApi, laborRatesApi, pricebookApi, ratePlansApi, mediaApi } from './financialApi';
 import apiClient from './client';
 
 vi.mock('./client');
@@ -370,6 +370,31 @@ describe('salesTaxReportApi', () => {
       params: { from: '2026-09-01', to: '2026-09-30', basis: 'sent', regionIds: ['r1'] },
       responseType: 'blob',
     });
+  });
+});
+
+describe('unbilledReportApi', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('GETs the report, a group\'s rows and the CSV, dropping an empty scope', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({ data: {} });
+    await unbilledReportApi.get({ source: 'po', groupBy: 'age', regionIds: [] });
+    expect(apiClient.get).toHaveBeenLastCalledWith('/financial/reports/unbilled', { params: { source: 'po', groupBy: 'age' } });
+    await unbilledReportApi.rows({ source: 'all', groupBy: 'job', groupKey: 'wo-1', page: 0, size: 25 });
+    expect(apiClient.get).toHaveBeenLastCalledWith('/financial/reports/unbilled/rows', {
+      params: { source: 'all', groupBy: 'job', groupKey: 'wo-1', page: 0, size: 25 },
+    });
+    await unbilledReportApi.exportCsv({ source: 'quote', regionIds: ['r1'] });
+    expect(apiClient.get).toHaveBeenLastCalledWith('/financial/reports/unbilled/export.csv', {
+      params: { source: 'quote', regionIds: ['r1'] },
+      responseType: 'blob',
+    });
+  });
+
+  it('PUTs a quote line\'s billing', async () => {
+    vi.mocked(apiClient.put).mockResolvedValue({ data: {} });
+    await quoteLineBillingApi.setBilling('ql-1', { notBillable: true, reason: 'Warranty' });
+    expect(apiClient.put).toHaveBeenLastCalledWith('/financial/quote-lines/ql-1/billing', { notBillable: true, reason: 'Warranty' });
   });
 });
 

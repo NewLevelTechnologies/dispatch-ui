@@ -19,6 +19,7 @@ describe('reports registry', () => {
     expect(findReport('tech-productivity')?.requiresCapability).toBe('VIEW_ALL_INVOICES');
     expect(findReport('discounts')?.requiresCapability).toBe('VIEW_ALL_INVOICES');
     expect(findReport('sales-tax')?.requiresCapability).toBe('VIEW_ALL_INVOICES');
+    expect(findReport('unbilled')?.requiresCapability).toBe('VIEW_ALL_INVOICES');
   });
 });
 

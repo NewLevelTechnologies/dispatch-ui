@@ -1982,6 +1982,10 @@
         "description": "Home's {{tech, lowercase}} scorecard over any range, compared with last year or the period before, with a weekly trend per {{tech, lowercase}}.",
         "fromHome": "{{tech}} productivity card",
         "name": "{{tech}} productivity"
+      },
+      "unbilled": {
+        "description": "Accepted {{quotes, lowercase}} and job purchases that aren't on an issued {{invoice, lowercase}} yet, by {{workOrder, lowercase}}, source or age. As of today.",
+        "name": "Unbilled work"
       }
     },
     "description": "Fixed reports with filters and export. Their numbers match Home.",
@@ -2479,7 +2483,88 @@
       },
       "title": "{{tech}} productivity"
     },
-    "title": "Reports"
+    "title": "Reports",
+    "unbilled": {
+      "age": {
+        "DAYS_0_30": "0–30 days",
+        "DAYS_31_60": "31–60 days",
+        "DAYS_61_90": "61–90 days",
+        "DAYS_91_PLUS": "Over 90 days"
+      },
+      "basis": {
+        "BILL_PRICE": "Estimate: the PO line's bill price",
+        "COST": "Estimate: at cost (no bill price or markup)",
+        "MARKUP_TIER": "Estimate: the rate plan's markup on cost"
+      },
+      "days_one": "{{count}} day",
+      "days_other": "{{count}} days",
+      "dismiss": {
+        "action": "Dismiss",
+        "body": "For work that will never go on an {{invoice}}, like warranty work. It applies for everyone and the reason is kept. It drops off this report.",
+        "confirm": "Dismiss",
+        "done": "{{name}} dismissed",
+        "failed": "Couldn't dismiss the item",
+        "placeholder": "e.g. Warranty part",
+        "reason": "Reason",
+        "title": "Dismiss {{name}}?"
+      },
+      "empty": {
+        "body": "Every accepted line and placed part is on an issued invoice.",
+        "title": "Nothing unbilled"
+      },
+      "exportFailed": "Couldn't export the unbilled work",
+      "exported": "Exported {{file}}",
+      "filters": {
+        "source": "Source"
+      },
+      "groupBy": {
+        "age": "Age",
+        "source": "Source"
+      },
+      "itemSource": {
+        "PO": "PO parts",
+        "QUOTE": "Accepted quotes"
+      },
+      "list": {
+        "age": "Age",
+        "billTo": "Bill-to",
+        "description": "Item",
+        "failed": "Couldn't load the items",
+        "range": "{{first}}–{{last}} of {{count}} items",
+        "since": "Since",
+        "source": "Source",
+        "title": "{{group}} · every item"
+      },
+      "loadFailed": "Couldn't load the unbilled work report",
+      "onDraft": "on draft",
+      "source": {
+        "all": "All",
+        "po": "PO parts",
+        "quote": "Accepted quotes"
+      },
+      "sub": "As of {{date}}. Work approved or bought that isn't on an issued {{invoice}} yet; a draft doesn't count. Amounts marked ≈ are estimates at the job's rate plan; the {{invoice}} prices them for real.",
+      "summary": {
+        "estimated": "PO parts",
+        "estimatedSub": "Estimated at the rate plan",
+        "items_one": "{{count}} item",
+        "items_other": "{{count}} items",
+        "over30": "Over 30 days",
+        "quoted": "Accepted quotes",
+        "total": "Unbilled total",
+        "totalSub": "{{items}} on {{count}} {{jobs}}"
+      },
+      "table": {
+        "actions": "Actions",
+        "hint": "Pick a row to see its oldest items",
+        "items": "Items",
+        "oldest": "Oldest",
+        "open": "Open",
+        "unbilled": "Unbilled",
+        "viewAll": "View all"
+      },
+      "title": "Unbilled work",
+      "today": "today"
+    }
   },
   "scheduling": {
     "form": {
