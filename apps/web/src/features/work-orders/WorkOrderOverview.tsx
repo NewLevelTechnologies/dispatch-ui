@@ -49,7 +49,7 @@ import { formatPhone, titleCaseAddress, tripsByWorkItem, workItemLabel } from '@
 import { Avatar } from '../../components/ui/Avatar';
 import NotesCard from '../../components/NotesCard';
 import EquipmentThumbnail from '../../components/EquipmentThumbnail';
-import { ActivityRow } from '../../components/ActivityStream';
+import { ActivityRow } from '../../components/ActivityRow';
 import { PROGRESS_TONE } from '../../lib/workItemProgress';
 
 type PillTone = 'neutral' | 'info' | 'success' | 'warning' | 'danger' | 'accent' | 'violet';

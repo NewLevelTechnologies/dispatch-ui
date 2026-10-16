@@ -21,8 +21,8 @@ import { useGlossary } from '../contexts/GlossaryContext';
 import { Dialog, DialogActions, DialogBody, DialogDescription, DialogTitle } from './catalyst/dialog';
 import { Button } from './catalyst/button';
 import { Checkbox, CheckboxField } from './catalyst/checkbox';
-import { Field, FieldGroup, Fieldset, Label, Legend } from './catalyst/fieldset';
-import { Input } from './catalyst/input';
+import { Description, Field, FieldGroup, Fieldset, Label, Legend } from './catalyst/fieldset';
+import { Input, InputGroup } from './catalyst/input';
 import { Textarea } from './catalyst/textarea';
 import { Select } from './catalyst/select';
 import { Radio, RadioField, RadioGroup } from './catalyst/radio';
@@ -48,6 +48,8 @@ interface WorkOrderFormState {
   priority: WorkOrderPriority;
   scheduledDate: string;
   customerOrderNumber: string;
+  // Edit-mode only. Blank = no limit.
+  notToExceed: string;
   // Create-mode only: the description for the first work item, sent inside the
   // atomic POST /work-orders payload as workItems: [{ description }]. Edit mode
   // ignores this field — work item edits happen inline on the detail page.
@@ -62,6 +64,7 @@ const EMPTY_FORM: WorkOrderFormState = {
   priority: 'NORMAL',
   scheduledDate: '',
   customerOrderNumber: '',
+  notToExceed: '',
   firstWorkItemDescription: '',
 };
 
@@ -220,6 +223,7 @@ export default function WorkOrderFormDialog({ isOpen, onClose, workOrder, prefil
         priority: wo.priority ?? 'NORMAL',
         scheduledDate: wo.scheduledDate || '',
         customerOrderNumber: wo.customerOrderNumber || '',
+        notToExceed: wo.notToExceed != null ? String(wo.notToExceed) : '',
         firstWorkItemDescription: '', // not used in edit mode
       });
       setSelectedLocation(
@@ -298,7 +302,7 @@ export default function WorkOrderFormDialog({ isOpen, onClose, workOrder, prefil
   const updateMutation = useMutation({
     mutationFn: (data: UpdateWorkOrderRequest) =>
       workOrderApi.update(effective!.id, data),
-    onSuccess: () => {
+    onSuccess: (_, vars) => {
       queryClient.invalidateQueries({ queryKey: ['work-orders'] });
       // Paginated list views (customer / service-location / equipment-
       // service-history tabs) keyed under work-orders-list. A WO that just
@@ -308,6 +312,11 @@ export default function WorkOrderFormDialog({ isOpen, onClose, workOrder, prefil
       // Activity rail picks up the WORK_ORDER_UPDATED event the backend emits
       // for the change.
       queryClient.invalidateQueries({ queryKey: ['work-order-activity', effective?.id] });
+      if (vars.notToExceed !== undefined) {
+        // Open invoices and quotes show the limit, and draft invoices warn when the job goes over it.
+        queryClient.invalidateQueries({ queryKey: ['invoice'] });
+        queryClient.invalidateQueries({ queryKey: ['quote'] });
+      }
       onClose();
     },
     onError: (error: unknown) => {
@@ -348,6 +357,12 @@ export default function WorkOrderFormDialog({ isOpen, onClose, workOrder, prefil
     if (readOnly) return;
 
     if (isEdit) {
+      const nteRaw = formData.notToExceed.trim().replace(/[$,\s]/g, '');
+      const nte = nteRaw === '' ? null : Number(nteRaw);
+      if (nte !== null && !(Number.isFinite(nte) && nte > 0)) {
+        alert(t('workOrders.form.notToExceedInvalid'));
+        return;
+      }
       const updateRequest: UpdateWorkOrderRequest = {
         // Service location is editable in edit mode; cross-customer moves
         // are allowed. The picker is required, so this should always be
@@ -361,6 +376,8 @@ export default function WorkOrderFormDialog({ isOpen, onClose, workOrder, prefil
         priority: formData.priority,
         scheduledDate: formData.scheduledDate || undefined,
         customerOrderNumber: formData.customerOrderNumber || undefined,
+        // Only sent when changed: null clears the limit, omitted leaves it alone.
+        ...(nte !== ((effective as WorkOrder).notToExceed ?? null) ? { notToExceed: nte } : {}),
       };
       updateMutation.mutate(updateRequest);
       return;
@@ -995,7 +1012,7 @@ export default function WorkOrderFormDialog({ isOpen, onClose, workOrder, prefil
                 </Field>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className={isEdit ? 'grid grid-cols-2 gap-3 sm:grid-cols-3' : 'grid grid-cols-2 gap-3'}>
                 <Field>
                   <Label className="text-xs">{t('workOrders.form.scheduledDate')}</Label>
                   <Input
@@ -1016,6 +1033,25 @@ export default function WorkOrderFormDialog({ isOpen, onClose, workOrder, prefil
                     maxLength={100}
                   />
                 </Field>
+
+                {isEdit && (
+                  <Field>
+                    <Label className="text-xs">{t('workOrders.form.notToExceed')}</Label>
+                    <InputGroup>
+                      <span data-slot="icon" className="text-center text-base/5 sm:text-sm/4">$</span>
+                      <Input
+                        name="notToExceed"
+                        inputMode="decimal"
+                        value={formData.notToExceed}
+                        onChange={(e) => handleChange('notToExceed', e.target.value)}
+                        placeholder={t('workOrders.form.notToExceedPlaceholder')}
+                      />
+                    </InputGroup>
+                    <Description className="text-xs">
+                      {t('workOrders.form.notToExceedHint')}
+                    </Description>
+                  </Field>
+                )}
               </div>
 
               {/* First work item — required on create. The atomic POST sends

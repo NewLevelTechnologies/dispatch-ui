@@ -8,7 +8,6 @@ import {
   HomeIcon,
   UserGroupIcon,
   ClipboardDocumentListIcon,
-  WrenchScrewdriverIcon,
   TruckIcon,
   ShoppingCartIcon,
   CalendarIcon,
@@ -28,6 +27,7 @@ import {
   ArrowPathRoundedSquareIcon,
 } from '@heroicons/react/24/outline';
 import { approvalsApi, type ApprovalsBellSummary } from '../api/setup';
+import { flags } from '../lib/featureFlags';
 import { Sidebar, SidebarBody, SidebarFooter, SidebarHeader, SidebarHeading, SidebarItem, SidebarSection } from './catalyst/sidebar';
 import { SidebarLayout } from './catalyst/sidebar-layout';
 import { Navbar } from './catalyst/navbar';
@@ -112,63 +112,75 @@ export default function AppLayout({ children, flush }: { children: React.ReactNo
   const isCurrent = (href: string) =>
     href === '/dashboard' ? location.pathname === href : location.pathname.startsWith(href);
 
-  type MainNavItem = { name: string; href: string; icon: typeof HomeIcon; badge?: number };
-  const mainNavigation: MainNavItem[] = [
-    { name: t('entities.dashboard'), href: '/dashboard', icon: HomeIcon },
-    { name: getName('customer', true), href: '/customers', icon: UserGroupIcon },
-    { name: getName('service_location', true), href: '/service-locations', icon: MapPinIcon },
-    // A record kept on customers, so it sits with them: the agreements and
-    // the visits on them still to dispatch.
-    { name: getName('agreement', true), href: '/agreements', icon: ArrowPathRoundedSquareIcon },
-    { name: getName('work_order', true), href: '/work-orders', icon: ClipboardDocumentListIcon },
-    // "Dispatch Board", not "Dispatch": `dispatch` is itself a glossary entity,
-    // so the bare noun reads as the RECORD and sets up the wrong expectation
-    // for a board. Not "Scheduling" either — that can't follow the glossary,
-    // and it would overlap the `schedule` entity, work-order scheduling and
-    // agreement visit schedules. Shares the page-heading key so the sidebar
-    // and the <h1> can't drift; a tenant on "Trip" gets "Trip Board".
+  type NavItem = { name: string; href: string; icon: typeof HomeIcon; badge?: number };
+  type NavGroup = { section?: string; items: NavItem[] };
+  const navGroups: NavGroup[] = [
     {
-      name: t('dispatchBoard.title', { entity: getName('dispatch') }),
-      href: '/dispatch',
-      icon: CalendarIcon,
+      items: [
+        { name: t('entities.dashboard'), href: '/dashboard', icon: HomeIcon },
+        // "Dispatch Board", not "Dispatch": `dispatch` is itself a glossary entity,
+        // so the bare noun reads as the RECORD and sets up the wrong expectation
+        // for a board. Not "Scheduling" either — that can't follow the glossary,
+        // and it would overlap the `schedule` entity, work-order scheduling and
+        // agreement visit schedules. Shares the page-heading key so the sidebar
+        // and the <h1> can't drift; a tenant on "Trip" gets "Trip Board".
+        { name: t('dispatchBoard.title', { entity: getName('dispatch') }), href: '/dispatch', icon: CalendarIcon },
+        ...(approvalsVisible
+          ? [{ name: t('approvals.title'), href: '/approvals', icon: CheckBadgeIcon, badge: pendingApprovalCount }]
+          : []),
+      ],
     },
-    ...(approvalsVisible
-      ? [{ name: t('approvals.title'), href: '/approvals', icon: CheckBadgeIcon, badge: pendingApprovalCount }]
+    {
+      section: t('entities.work'),
+      items: [
+        { name: getName('work_order', true), href: '/work-orders', icon: ClipboardDocumentListIcon },
+        { name: getName('customer', true), href: '/customers', icon: UserGroupIcon },
+        { name: getName('service_location', true), href: '/service-locations', icon: MapPinIcon },
+        { name: getName('agreement', true), href: '/agreements', icon: ArrowPathRoundedSquareIcon },
+      ],
+    },
+    {
+      section: t('entities.financial'),
+      items: [
+        { name: getName('quote', true), href: '/quotes', icon: DocumentChartBarIcon },
+        { name: getName('invoice', true), href: '/invoices', icon: DocumentTextIcon },
+        { name: getName('payment', true), href: '/payments', icon: CreditCardIcon },
+      ],
+    },
+    {
+      section: t('entities.purchasing'),
+      items: [
+        { name: t('entities.purchasing'), href: '/purchasing', icon: ShoppingCartIcon },
+        { name: t('entities.vendors'), href: '/vendors', icon: TruckIcon },
+      ],
+    },
+    // Equipment has no nav item: it's reached from location and customer
+    // detail, search and the Filter Pull List report. Its route still works.
+    ...(flags.inventory
+      ? [
+          {
+            section: t('entities.inventory'),
+            items: [
+              { name: t('equipment.entities.parts'), href: '/parts-inventory', icon: CubeIcon },
+              { name: t('equipment.entities.warehouses'), href: '/warehouses', icon: BuildingStorefrontIcon },
+            ],
+          },
+        ]
       : []),
+    {
+      items: [
+        // Reports lives here as a role-restricted utility surface (alongside
+        // Settings). Not gated yet — when we wire capability checks, gate on
+        // "user has access to at least one report" via the registry's
+        // requiresCapability fields.
+        { name: t('reports.title'), href: '/reports', icon: ChartBarIcon },
+        ...(canViewSettings ? [{ name: t('entities.settings'), href: '/settings', icon: Cog6ToothIcon }] : []),
+      ],
+    },
   ];
 
-  const equipmentNavigation = [
-    { name: getName('equipment', true), href: '/equipment', icon: WrenchScrewdriverIcon },
-    { name: t('equipment.entities.parts'), href: '/parts-inventory', icon: CubeIcon },
-    { name: t('equipment.entities.warehouses'), href: '/warehouses', icon: BuildingStorefrontIcon },
-    { name: t('entities.vendors'), href: '/vendors', icon: TruckIcon },
-    { name: t('entities.purchasing'), href: '/purchasing', icon: ShoppingCartIcon },
-  ];
-
-  const financialNavigation = [
-    { name: getName('invoice', true), href: '/invoices', icon: DocumentTextIcon },
-    { name: getName('quote', true), href: '/quotes', icon: DocumentChartBarIcon },
-    { name: getName('payment', true), href: '/payments', icon: CreditCardIcon },
-  ];
-
-  const adminNavigation = [
-    // Reports lives here as a role-restricted utility surface (alongside
-    // Settings). Not gated yet — when we wire capability checks, gate on
-    // "user has access to at least one report" via the registry's
-    // requiresCapability fields.
-    { name: t('reports.title'), href: '/reports', icon: ChartBarIcon },
-    ...(canViewSettings ? [{ name: t('entities.settings'), href: '/settings', icon: Cog6ToothIcon }] : []),
-  ];
-
-  // Breadcrumbs: walk the nav groups to find which one the current route belongs
-  // to, then surface "Section / Page" in the topbar. mainNavigation and
-  // adminNavigation have no section heading, so those routes show just the page.
-  const navGroups: { section?: string; items: { name: string; href: string }[] }[] = [
-    { items: mainNavigation },
-    { section: t('entities.inventory'), items: equipmentNavigation },
-    { section: t('entities.financial'), items: financialNavigation },
-    { items: adminNavigation },
-  ];
+  // Breadcrumbs: find the nav group the current route belongs to, then surface
+  // "Section / Page" in the topbar. Unlabelled groups show just the page.
   const activeGroup = navGroups.find((g) => g.items.some((i) => isCurrent(i.href)));
   const activeItem = activeGroup?.items.find((i) => isCurrent(i.href));
   const breadcrumbs: string[] = [];
@@ -188,15 +200,11 @@ export default function AppLayout({ children, flush }: { children: React.ReactNo
           </SidebarHeader>
 
           <SidebarBody className="[&>[data-slot=section]+[data-slot=section]]:mt-5">
-            <SidebarSection>
-              {mainNavigation.map((item) => {
-                const current = isCurrent(item.href);
-                return (
-                  <SidebarItem
-                    key={item.name}
-                    href={item.href}
-                    current={current}
-                  >
+            {navGroups.map((group, gi) => (
+              <SidebarSection key={group.section ?? gi}>
+                {group.section && <SidebarHeading>{group.section}</SidebarHeading>}
+                {group.items.map((item) => (
+                  <SidebarItem key={item.href} href={item.href} current={isCurrent(item.href)}>
                     <item.icon data-slot="icon" />
                     <span>{item.name}</span>
                     {item.badge != null && item.badge > 0 && (
@@ -208,61 +216,9 @@ export default function AppLayout({ children, flush }: { children: React.ReactNo
                       </span>
                     )}
                   </SidebarItem>
-                );
-              })}
-            </SidebarSection>
-
-            <SidebarSection>
-              <SidebarHeading>{t('entities.inventory')}</SidebarHeading>
-              {equipmentNavigation.map((item) => {
-                const current = isCurrent(item.href);
-                return (
-                  <SidebarItem
-                    key={item.name}
-                    href={item.href}
-                    current={current}
-                  >
-                    <item.icon data-slot="icon" />
-                    <span>{item.name}</span>
-                  </SidebarItem>
-                );
-              })}
-            </SidebarSection>
-
-            <SidebarSection>
-              <SidebarHeading>{t('entities.financial')}</SidebarHeading>
-              {financialNavigation.map((item) => {
-                const current = isCurrent(item.href);
-                return (
-                  <SidebarItem
-                    key={item.name}
-                    href={item.href}
-                    current={current}
-                  >
-                    <item.icon data-slot="icon" />
-                    <span>{item.name}</span>
-                  </SidebarItem>
-                );
-              })}
-            </SidebarSection>
-
-            {adminNavigation.length > 0 && (
-              <SidebarSection>
-                {adminNavigation.map((item) => {
-                  const current = isCurrent(item.href);
-                  return (
-                    <SidebarItem
-                      key={item.name}
-                      href={item.href}
-                      current={current}
-                    >
-                      <item.icon data-slot="icon" />
-                      <span>{item.name}</span>
-                    </SidebarItem>
-                  );
-                })}
+                ))}
               </SidebarSection>
-            )}
+            ))}
           </SidebarBody>
 
           <SidebarFooter>
