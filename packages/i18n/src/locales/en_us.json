@@ -897,6 +897,7 @@
     "users": "Users",
     "vendor": "Vendor",
     "vendors": "Vendors",
+    "work": "Work",
     "workOrder": "Work Order",
     "workOrders": "Work Orders"
   },
@@ -3689,21 +3690,11 @@
     "activity": {
       "activeDispatches": "Active {{entities}}",
       "byline": "by {{actor}} · {{time}}",
-      "composer": {
-        "ariaLabel": "Add a note to this {{workOrder, lowercase}}",
-        "error": "Couldn't save note",
-        "hint": "Press N to focus, Cmd+Enter to save",
-        "placeholder": "Add a note…",
-        "save": "Save",
-        "saving": "Saving…"
-      },
       "day": {
         "thisWeek": "This week",
         "today": "Today",
         "yesterday": "Yesterday"
       },
-      "empty": "No activity yet.",
-      "emptyForFilter": "No matching events for this filter.",
       "errorLoading": "Couldn't load activity.",
       "fieldLabel": {
         "completedDate": "Completed Date",
@@ -3714,12 +3705,6 @@
         "scheduledDate": "Scheduled Date",
         "summary": "Summary",
         "workOrderTypeId": "Type"
-      },
-      "filter": {
-        "all": "All",
-        "dispatches": "Dispatches",
-        "notes": "Notes",
-        "status": "Status"
       },
       "heading": "Activity",
       "kind": {
@@ -3781,11 +3766,10 @@
       "actionPending": "Available in a future phase",
       "addNote": "Add Note",
       "callSite": "Call site",
-      "completed": "Completed",
+      "completedAt": "Completed {{time}}",
       "copied": "Copied",
       "copyAddress": "Click to copy address",
       "copyPhone": "Click to copy phone",
-      "created": "Created",
       "directions": "Directions",
       "openedAt": "Opened {{time}}",
       "customerContact": "Customer Contact",
@@ -3793,9 +3777,10 @@
       "eta": "ETA {{date}}",
       "etaLabel": "ETA",
       "notScheduled": "Not scheduled",
+      "nte": "NTE {{amount}}",
+      "po": "PO",
       "siteContact": "Site Contact",
       "frozen": "Cancelled or archived — actions are disabled",
-      "info": "{{entity}} Info",
       "lastUpdated": "Updated {{time}}",
       "money": {
         "balance": "Balance",
@@ -4033,9 +4018,10 @@
       "firstWorkItemRequired": "Please describe the first work item.",
       "newCustomer": "New {{entity, lowercase}}",
       "newCustomerDetails": "New {{entity}} Details",
-      "notToExceed": "NTE",
-      "notToExceedInvalid": "NTE must be a non-negative number.",
-      "notToExceedPlaceholder": "e.g., 1500.00",
+      "notToExceed": "Not-to-exceed",
+      "notToExceedHint": "Warns on {{quotes, lowercase}} and {{invoices, lowercase}} that go over.",
+      "notToExceedInvalid": "Not-to-exceed must be a positive amount.",
+      "notToExceedPlaceholder": "No limit",
       "priority": "Priority",
       "progressLabel": "Progress",
       "progressHelper": "Derived automatically from work item statuses.",

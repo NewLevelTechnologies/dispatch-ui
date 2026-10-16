@@ -466,34 +466,27 @@ describe('WorkOrderDetailPage', () => {
     });
   });
 
-  // ── Overview: Details (extraRail) card — PO# + NTE inline edit ────────
-  it('renders the Details card with the customer PO number', async () => {
-    mockApiResponses();
+  // ── Header meta line: PO, NTE, Completed ─────────────────────────────
+  it('shows the PO and NTE in the header only when set, and no info card', async () => {
+    mockApiResponses({ ...mockWorkOrder, notToExceed: 2500 });
     renderPage();
-    // PO# shows in the header meta line AND the Details card.
-    await waitFor(() => {
-      expect(screen.getAllByText('PO-12345').length).toBeGreaterThan(0);
-    });
+    expect(await screen.findByText('PO-12345')).toBeInTheDocument();
+    expect(screen.getByText('NTE $2,500.00')).toBeInTheDocument();
+    expect(screen.queryByText('Work Order Info')).not.toBeInTheDocument();
   });
 
-  it('saves a new NTE value via the Details card inline edit', async () => {
-    const user = userEvent.setup();
-    mockApiResponses();
-    vi.mocked(apiClient.patch).mockResolvedValue({ data: { ...mockWorkOrder, notToExceed: 1500 } });
+  it('leaves the PO and NTE out of the header when empty', async () => {
+    mockApiResponses({ ...mockWorkOrder, customerOrderNumber: null, notToExceed: null });
     renderPage();
+    await screen.findByText(/^Opened /);
+    expect(screen.queryByText('PO')).not.toBeInTheDocument();
+    expect(screen.queryByText(/^NTE /)).not.toBeInTheDocument();
+  });
 
-    const nteTrigger = await screen.findByLabelText('NTE');
-    await user.click(nteTrigger);
-    const input = await screen.findByLabelText('NTE');
-    await user.type(input, '1500');
-    await user.keyboard('{Enter}');
-
-    await waitFor(() => {
-      expect(apiClient.patch).toHaveBeenCalledWith(
-        expect.stringMatching(/\/work-orders\/wo-1$/),
-        { notToExceed: 1500 },
-      );
-    });
+  it('shows the completed date once the job is complete', async () => {
+    mockApiResponses({ ...mockWorkOrder, progressCategory: 'COMPLETED', completedDate: '2026-04-26T15:00:00Z' });
+    renderPage();
+    expect(await screen.findByText('Completed Apr 26, 2026')).toBeInTheDocument();
   });
 
   // ── Header actions ───────────────────────────────────────────────────
