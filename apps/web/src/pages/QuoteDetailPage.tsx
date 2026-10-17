@@ -1,7 +1,7 @@
 /* eslint-disable i18next/no-literal-string -- dense billing detail; short operational labels stay literal (same convention as the PO detail page). Entity names route through getName(). */
 import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { EllipsisHorizontalIcon } from '@heroicons/react/16/solid';
 import { useTranslation } from '@dispatch/i18n';
 import { formatCurrency } from '@dispatch/utils';
@@ -20,7 +20,8 @@ import { DocumentHeaderDialog } from '../components/document/DocumentHeaderDialo
 import { DocumentEditStatus, StaleCallout } from '../components/document/DocumentEditStatus';
 import { withDocumentBack } from '../lib/backContext';
 import { useDocumentParties } from '../components/document/useDocumentParties';
-import { documentErrorMessage, lineEditing, useDocumentEditor } from '../components/document/useDocumentEditor';
+import { documentErrorMessage, lineEditing, refreshDocumentLists, useDocumentEditor } from '../components/document/useDocumentEditor';
+import { useHasAnyCapability } from '../hooks/useCurrentUser';
 import { useShareLink } from '../components/document/useShareLink';
 import { BillQuoteDialog } from '../components/document/BillQuoteDialog';
 import { invoicedPercent } from '../components/document/billingModel';
@@ -43,7 +44,7 @@ const STEP_INDEX: Record<QuoteStatus, number> = { DRAFT: 0, SENT: 1, ACCEPTED: 2
 
 const FROZEN: QuoteStatus[] = [QuoteStatus.ACCEPTED, QuoteStatus.DECLINED, QuoteStatus.EXPIRED];
 
-type Confirm = 'revise' | 'accept' | 'decline' | null;
+type Confirm = 'revise' | 'accept' | 'decline' | 'delete' | null;
 
 export default function QuoteDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -86,6 +87,19 @@ export default function QuoteDetailPage() {
     onError: (err) => showError(`Couldn’t duplicate this ${entityLower}`, documentErrorMessage(err, entityLower)),
   });
   const { data: pricedSelection } = useQuoteSelection(quote);
+  const queryClient = useQueryClient();
+  const canDelete = useHasAnyCapability('EDIT_QUOTES');
+  // Only a draft that was never sent; afterwards back to where it was opened from.
+  const remove = useMutation({
+    mutationFn: () => quotesApi.delete(id!, quote?.version ?? 0),
+    onSuccess: () => {
+      refreshDocumentLists(queryClient);
+      queryClient.removeQueries({ queryKey: ['quote', id] });
+      showSuccess(`${quote?.quoteNumber ?? entityLabel} deleted`);
+      navigate(quote?.workOrderId ? `/work-orders/${quote.workOrderId}?tab=estimate` : '/quotes', { replace: true });
+    },
+    onError: (err) => showError(`Couldn’t delete this ${entityLower}`, documentErrorMessage(err, entityLower)),
+  });
   const { billTo, location, workOrder } = useDocumentParties({
     customerId: quote?.customerId ?? '',
     customerName: quote?.customerName,
@@ -150,6 +164,8 @@ export default function QuoteDetailPage() {
   const range = pricedSelection?.priceRange ?? (optionTotals.length ? { low: Math.min(...optionTotals), high: Math.max(...optionTotals) } : null);
   const optionRange = proposal && options.length > 1 && range ? `${formatCurrency(range.low)} – ${formatCurrency(range.high)}` : null;
 
+  const deletable = canDelete && quote.status === QuoteStatus.DRAFT && !quote.firstSentAt;
+
   const sendLabel = unsentRevision ? `Re-send · Rev ${revision ?? 1}` : quote.lastSentAt ? 'Resend' : `Send ${entityLower}`;
   const actions = (
     <>
@@ -195,6 +211,11 @@ export default function QuoteDetailPage() {
                 <DropdownLabel>Duplicate</DropdownLabel>
               </DropdownItem>
               {quote.lastSentAt && shareLink.items}
+              {deletable && (
+                <DropdownItem onClick={() => setConfirm('delete')}>
+                  <DropdownLabel>{`Delete ${entityLower}`}</DropdownLabel>
+                </DropdownItem>
+              )}
             </DropdownMenu>
           </Dropdown>
         </>
@@ -363,6 +384,19 @@ export default function QuoteDetailPage() {
         message={`Declined ${getName('quote', true).toLowerCase()} are locked. To quote the work again, duplicate it.`}
         confirmLabel="Mark declined"
         isDestructive
+      />
+      <ConfirmDialog
+        isOpen={confirm === 'delete'}
+        onClose={() => setConfirm(null)}
+        onConfirm={() => {
+          setConfirm(null);
+          remove.mutate();
+        }}
+        title={`Delete ${quote.quoteNumber}?`}
+        message={`It has never been sent, so no ${getName('customer').toLowerCase()} has seen it. It’s removed from every list; the activity keeps a record that it was deleted.`}
+        confirmLabel={`Delete ${entityLower}`}
+        isDestructive
+        isPending={remove.isPending}
       />
       <BillQuoteDialog quote={quote} open={billing} onClose={() => setBilling(false)} />
       {shareLink.dialogs}

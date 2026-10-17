@@ -61,6 +61,8 @@ export function documentErrorMessage(
       return `This ${entity} was already reissued. Open the corrected copy instead.`;
     case 'PAYMENT_NOT_APPLICABLE':
       return `That ${payment} was voided, so its credit can’t be applied.`;
+    case 'QUOTE_NOT_DELETABLE':
+      return `Only a draft that was never sent can be deleted. Decline it instead, or let it expire.`;
     case 'PRESENTATION_LOCKED':
       return `This ${entity} has been sent, so it can't switch between standard and proposal any more.`;
     case 'PRESENTATION_HAS_OPTIONS':

@@ -422,6 +422,8 @@ describe('quotesApi proposal structure', () => {
     expect(apiClient.get).toHaveBeenLastCalledWith('/financial/quotes/q-1/approval');
     await quotesApi.saveSelection('q-1', { optionIds: ['o-2'], addOnLineIds: ['l-9'] });
     expect(apiClient.put).toHaveBeenLastCalledWith('/financial/quotes/q-1/selection', { optionIds: ['o-2'], addOnLineIds: ['l-9'] });
+    await quotesApi.delete('q-1', 9);
+    expect(apiClient.delete).toHaveBeenLastCalledWith('/financial/quotes/q-1', { params: { version: 9 } });
     await quotesApi.deleteOption('q-1', 'o-1', 8);
     expect(apiClient.delete).toHaveBeenLastCalledWith('/financial/quotes/q-1/options/o-1', { params: { version: 8 } });
   });

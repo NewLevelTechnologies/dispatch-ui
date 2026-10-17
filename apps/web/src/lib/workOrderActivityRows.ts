@@ -132,6 +132,8 @@ export function builtText(evt: ActivityEvent, t: TFunc): string | null {
       return t(key('quoteAccepted'), { amount });
     case 'QUOTE_DECLINED':
       return t(key('quoteDeclined'), { amount });
+    case 'QUOTE_DELETED':
+      return t(key('quoteDeleted'), { amount });
     case 'INVOICE_SENT':
       return via(d.channels) ? t(key('invoiceSent'), { via: via(d.channels), amount }) : t(key('invoiceMarkedSent'), { amount });
     case 'INVOICE_PAID':
@@ -307,7 +309,9 @@ export function buildWorkOrderDays({
     const evt = e.evt;
     const { glyph, tone } = glyphFor(evt);
     const { actor, isPerson } = actorOf(evt, t, getName);
-    const { obj, objHref } = subjectLink(evt.subject, getName, getAbbrev);
+    const link = subjectLink(evt.subject, getName, getAbbrev);
+    // A deleted quote no longer loads: name it, don't link it.
+    const { obj, objHref } = evt.kind === 'QUOTE_DELETED' ? { ...link, objHref: null } : link;
     return {
       kind: 'single',
       id: evt.id,

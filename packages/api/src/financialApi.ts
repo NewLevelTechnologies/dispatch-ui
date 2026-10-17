@@ -1305,6 +1305,13 @@ export const quotesApi = {
     const response = await apiClient.put<Quote>(`/financial/quotes/${id}/options/${optionId}/add-ons/${lineId}`, request);
     return response.data;
   },
+  /**
+   * Delete a never-sent draft (204). 409 QUOTE_NOT_DELETABLE otherwise (a sent
+   * quote back in draft included), 409 STALE_VERSION, 403 without EDIT_QUOTES.
+   */
+  delete: async (id: string, version: number): Promise<void> => {
+    await apiClient.delete(`/financial/quotes/${id}`, { params: { version } });
+  },
   /** The signed copy of a proposal approved through its link (400 when the office recorded the yes). */
   getApproval: async (id: string): Promise<QuoteApproval> => {
     const response = await apiClient.get<QuoteApproval>(`/financial/quotes/${id}/approval`);
@@ -2261,6 +2268,7 @@ export type FinancialActivityKind =
   | 'QUOTE_VIEWED'
   | 'QUOTE_ACCEPTED'
   | 'QUOTE_DECLINED'
+  | 'QUOTE_DELETED'
   | 'INVOICE_SENT'
   | 'INVOICE_PAID'
   | 'INVOICE_VOIDED'

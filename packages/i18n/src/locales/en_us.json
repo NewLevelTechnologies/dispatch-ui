@@ -4036,6 +4036,7 @@
         "poStatusChanged": "Marked {{status}}{{reason}}",
         "quoteAccepted": "{{quote}} approved · {{amount}}",
         "quoteDeclined": "{{quote}} declined · {{amount}}",
+        "quoteDeleted": "Draft {{quote, lowercase}} deleted · {{amount}}",
         "quoteMarkedSent": "{{quote}} marked sent{{rev}} · {{amount}}",
         "quoteSent": "{{quote}} sent{{via}}{{rev}} · {{amount}}",
         "quoteViewed": "Viewed by the {{customer, lowercase}}{{rev}}",
