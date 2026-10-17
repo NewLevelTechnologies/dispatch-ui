@@ -398,6 +398,30 @@ describe('unbilledReportApi', () => {
   });
 });
 
+describe('quotesApi proposal structure', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('adds groups and options, sets an add-on mode, and moves a line', async () => {
+    vi.mocked(apiClient.post).mockResolvedValue({ data: {} });
+    vi.mocked(apiClient.put).mockResolvedValue({ data: {} });
+    vi.mocked(apiClient.delete).mockResolvedValue({ data: {} });
+    await quotesApi.addOptionGroup('q-1', { version: 3, name: 'System' });
+    expect(apiClient.post).toHaveBeenLastCalledWith('/financial/quotes/q-1/option-groups', { version: 3, name: 'System' });
+    await quotesApi.addOption('q-1', { version: 4, groupId: 'g-1', name: 'Comfort' });
+    expect(apiClient.post).toHaveBeenLastCalledWith('/financial/quotes/q-1/options', { version: 4, groupId: 'g-1', name: 'Comfort' });
+    await quotesApi.reorderOptions('q-1', 'g-1', { version: 5, optionIds: ['o-2', 'o-1'] });
+    expect(apiClient.put).toHaveBeenLastCalledWith('/financial/quotes/q-1/option-groups/g-1/options/order', { version: 5, optionIds: ['o-2', 'o-1'] });
+    await quotesApi.setAddOnMode('q-1', 'o-1', 'l-9', { version: 6, mode: 'INCLUDED' });
+    expect(apiClient.put).toHaveBeenLastCalledWith('/financial/quotes/q-1/options/o-1/add-ons/l-9', { version: 6, mode: 'INCLUDED' });
+    await quotesApi.setLinePlacement('q-1', 'l-9', { version: 7, role: 'ADD_ON', recommended: true, recommendationNote: 'Leaky ducts' });
+    expect(apiClient.put).toHaveBeenLastCalledWith('/financial/quotes/q-1/lines/l-9/placement', {
+      version: 7, role: 'ADD_ON', recommended: true, recommendationNote: 'Leaky ducts',
+    });
+    await quotesApi.deleteOption('q-1', 'o-1', 8);
+    expect(apiClient.delete).toHaveBeenLastCalledWith('/financial/quotes/q-1/options/o-1', { params: { version: 8 } });
+  });
+});
+
 describe('document edit routes (Pricebook Phase 1)', () => {
   const doc = { data: { id: 'q-1', version: 4 } };
   beforeEach(() => {

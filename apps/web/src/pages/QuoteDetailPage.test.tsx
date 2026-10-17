@@ -660,5 +660,38 @@ describe('QuoteDetailPage billing', () => {
     expect(await screen.findByRole('button', { name: 'Create invoice' })).toBeInTheDocument();
     expect(screen.getByText(/50% invoiced so far/)).toBeInTheDocument();
   });
-});
 
+  it('switches a never-sent draft to a proposal, sending the header back whole', async () => {
+    const draft: Quote = { ...quote, status: 'DRAFT', version: 7, firstSentAt: null, lastSentAt: null, presentation: 'STANDARD' };
+    mockApi(draft);
+    vi.mocked(apiClient.put).mockResolvedValue({ data: { ...draft, version: 8, presentation: 'PROPOSAL', optionGroups: [] } });
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(await screen.findByRole('radio', { name: 'Proposal' }));
+    expect(apiClient.put).toHaveBeenCalledWith(
+      '/financial/quotes/q-1/header',
+      expect.objectContaining({ version: 7, presentation: 'PROPOSAL', customerPoNumber: draft.customerPoNumber ?? null }),
+    );
+    expect(await screen.findByText('Start the proposal')).toBeInTheDocument();
+  });
+
+  it('shows a sent proposal’s options with their price range, no longer switchable', async () => {
+    const totals = (n: number) => ({ grossSubtotal: n, adjustmentTotal: 0, subtotal: n, taxAmount: 0, totalAmount: n });
+    const opt = (id: string, name: string, n: number) => ({
+      id, groupId: 'g-1', name, sortOrder: id === 'o-1' ? 0 : 1, recommended: false, selected: id === 'o-1',
+      specs: [], highlights: [], photos: [], addOnModes: {}, totals: totals(n),
+    });
+    mockApi({
+      ...quote,
+      presentation: 'PROPOSAL',
+      optionGroups: [{ id: 'g-1', name: 'Options', sortOrder: 0, options: [opt('o-1', 'Essential', 11480), opt('o-2', 'Comfort', 15960)] }],
+    });
+    renderPage();
+
+    expect(await screen.findAllByTestId('proposal-option')).toHaveLength(2);
+    expect(screen.getByText('$11,480.00 – $15,960.00')).toBeInTheDocument();
+    expect(screen.getByText('2 options')).toBeInTheDocument();
+    expect(screen.queryByRole('radio', { name: 'Proposal' })).not.toBeInTheDocument();
+  });
+});

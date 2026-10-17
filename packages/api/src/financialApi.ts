@@ -149,6 +149,11 @@ export interface LineFieldsRequest {
 export interface AddLineRequest extends LineFieldsRequest {
   /** A part bought on a purchase order; priced at whatever the user bills it at. */
   sourcePoLineId?: string;
+  /** Quotes with options: where the line goes. Omitted = a required line on the whole quote. */
+  optionId?: string;
+  role?: 'REQUIRED' | 'ADD_ON';
+  recommended?: boolean;
+  recommendationNote?: string;
 }
 
 export type UpdateLineRequest = LineFieldsRequest;
@@ -875,7 +880,84 @@ export const QuoteStatus = {
   EXPIRED: 'EXPIRED',
 } as const;
 
-export type QuoteLineItem = DocumentLineItem;
+/** A quote line's place in a proposal: REQUIRED in an option (or on the whole quote), or an ADD_ON on the quote. */
+export type QuoteLineRole = 'REQUIRED' | 'ADD_ON';
+
+export interface QuoteLineItem extends DocumentLineItem {
+  /** The option it belongs to; null on the whole quote (always null for an add-on). */
+  optionId?: string | null;
+  role?: QuoteLineRole;
+  /** Add-ons only: "Why I recommend it" is shown on the customer's card. */
+  recommended?: boolean;
+  recommendationNote?: string | null;
+  /** Sold under the current selection. */
+  selected?: boolean;
+  /** Not sold once accepted; kept for follow-up. */
+  declined?: boolean;
+  /** An add-on an option includes at $0. */
+  included?: boolean;
+}
+
+export type QuotePresentation = 'STANDARD' | 'PROPOSAL';
+/** How an option treats an add-on. Lines missing from `addOnModes` are offered. */
+export type AddOnMode = 'OFFER' | 'INCLUDED' | 'HIDDEN';
+
+export interface QuoteOptionTotals {
+  grossSubtotal: number;
+  adjustmentTotal: number;
+  subtotal: number;
+  taxAmount: number;
+  totalAmount: number;
+}
+
+export interface QuoteOption {
+  id: string;
+  groupId: string;
+  name: string;
+  tagline?: string | null;
+  sortOrder: number;
+  /** The "Most popular" badge; at most one per group. */
+  recommended: boolean;
+  /** Under the current selection. */
+  selected: boolean;
+  /** The pricebook item it's built from. */
+  presentationItemId?: string | null;
+  /** That item's presentation, shown when the option's own photos or highlights are empty. */
+  itemPresentation?: {
+    customerName?: string | null;
+    description?: string | null;
+    highlights?: string[];
+    photos?: PresentationPhoto[];
+  } | null;
+  specs: string[];
+  /** This quote's override of the item's highlights. */
+  highlights: string[];
+  photos: PresentationPhoto[];
+  /** Utility or manufacturer; shown "after rebate", never deducted on the invoice. */
+  rebateAmount?: number | null;
+  addOnModes: Record<string, AddOnMode>;
+  /** The quote with this option chosen and no add-ons taken. */
+  totals: QuoteOptionTotals;
+}
+
+export interface QuoteOptionGroup {
+  id: string;
+  name: string;
+  sortOrder: number;
+  options: QuoteOption[];
+}
+
+/** An option's content; PUT replaces it as a whole. */
+export interface QuoteOptionFields {
+  name: string;
+  tagline?: string | null;
+  recommended?: boolean;
+  presentationItemId?: string | null;
+  photoIds?: string[];
+  specs?: string[];
+  highlights?: string[];
+  rebateAmount?: number | null;
+}
 
 /** `quoteDate` / `expirationDate` are null until the quote is first sent; drafts show "Not sent". */
 export interface Quote {
@@ -921,6 +1003,14 @@ export interface Quote {
   warnings?: PricingWarning[];
   notes?: string;
   lineItems: QuoteLineItem[];
+  presentation?: QuotePresentation;
+  /** Proposal: the first thing the customer reads. */
+  coverNote?: string | null;
+  /** The one set, else the quote's creator. */
+  advisorUserId?: string | null;
+  optionGroups?: QuoteOptionGroup[];
+  /** What the quote's totals are priced for: each group's chosen option and the add-ons taken. */
+  selection?: { optionIds: string[]; addOnLineIds: string[] } | null;
   /** See `Invoice.lastSentAt` — same semantics. */
   lastSentAt?: string | null;
   /** See `Invoice.lastSentToEmails` — same semantics. */
@@ -979,6 +1069,8 @@ export interface CreateQuoteRequest {
   notes?: string;
   /** Defaults to none. */
   lineItems?: CreateQuoteLineItemRequest[];
+  /** Defaults from the site: PROPOSAL at a residence, else STANDARD. */
+  presentation?: QuotePresentation;
 }
 
 /** The whole header, replaced: send every field; null clears an optional one. Editing a SENT quote returns it to DRAFT. */
@@ -991,6 +1083,10 @@ export interface UpdateQuoteHeaderRequest {
   serviceLocationId: string | null;
   customerPoNumber: string | null;
   notes: string | null;
+  /** Refused (409) once sent, and PROPOSAL → STANDARD with more than one option. */
+  presentation?: QuotePresentation;
+  coverNote?: string | null;
+  advisorUserId?: string | null;
 }
 
 /** What is left to bill on an ACCEPTED quote, per line. Drafts count as invoiced; void/cancelled don't. */
@@ -1084,6 +1180,49 @@ export const quotesApi = {
   },
 
   ...documentEditRoutes<Quote>('/financial/quotes'),
+
+  // Proposal structure. Every call takes the quote version and returns the whole quote.
+  addOptionGroup: async (id: string, request: { version: number; name: string }): Promise<Quote> => {
+    const response = await apiClient.post<Quote>(`/financial/quotes/${id}/option-groups`, request);
+    return response.data;
+  },
+  renameOptionGroup: async (id: string, groupId: string, request: { version: number; name: string }): Promise<Quote> => {
+    const response = await apiClient.put<Quote>(`/financial/quotes/${id}/option-groups/${groupId}`, request);
+    return response.data;
+  },
+  deleteOptionGroup: async (id: string, groupId: string, version: number): Promise<Quote> => {
+    const response = await apiClient.delete<Quote>(`/financial/quotes/${id}/option-groups/${groupId}`, { params: { version } });
+    return response.data;
+  },
+  addOption: async (id: string, request: QuoteOptionFields & { version: number; groupId: string }): Promise<Quote> => {
+    const response = await apiClient.post<Quote>(`/financial/quotes/${id}/options`, request);
+    return response.data;
+  },
+  updateOption: async (id: string, optionId: string, request: QuoteOptionFields & { version: number }): Promise<Quote> => {
+    const response = await apiClient.put<Quote>(`/financial/quotes/${id}/options/${optionId}`, request);
+    return response.data;
+  },
+  reorderOptions: async (id: string, groupId: string, request: { version: number; optionIds: string[] }): Promise<Quote> => {
+    const response = await apiClient.put<Quote>(`/financial/quotes/${id}/option-groups/${groupId}/options/order`, request);
+    return response.data;
+  },
+  deleteOption: async (id: string, optionId: string, version: number): Promise<Quote> => {
+    const response = await apiClient.delete<Quote>(`/financial/quotes/${id}/options/${optionId}`, { params: { version } });
+    return response.data;
+  },
+  setAddOnMode: async (id: string, optionId: string, lineId: string, request: { version: number; mode: AddOnMode }): Promise<Quote> => {
+    const response = await apiClient.put<Quote>(`/financial/quotes/${id}/options/${optionId}/add-ons/${lineId}`, request);
+    return response.data;
+  },
+  /** Move a line, or set an add-on's recommendation. */
+  setLinePlacement: async (
+    id: string,
+    lineId: string,
+    request: { version: number; optionId?: string | null; role: QuoteLineRole; recommended?: boolean; recommendationNote?: string | null },
+  ): Promise<Quote> => {
+    const response = await apiClient.put<Quote>(`/financial/quotes/${id}/lines/${lineId}/placement`, request);
+    return response.data;
+  },
 
   /** See `invoicesApi.send` — same contract, quote-scoped. */
   send: async (
