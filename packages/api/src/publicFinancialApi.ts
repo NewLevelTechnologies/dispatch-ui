@@ -175,7 +175,7 @@ export interface PublicQuoteData extends PublicPricing {
   /** The advisor's opening note. */
   coverNote?: string | null;
   /** The advisor, else the quote's creator. */
-  advisor?: { name: string | null; phone: string | null } | null;
+  advisor?: { name: string | null; phone: string | null; title?: string | null; photoUrl?: string | null } | null;
   /** Sent and past its expiration: no choosing, no approving. */
   expired?: boolean;
   /** Null without options or add-ons, and while being updated. */

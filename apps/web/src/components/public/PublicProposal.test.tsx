@@ -253,4 +253,17 @@ describe('PublicProposal', () => {
     );
     await waitFor(() => expect(screen.getAllByTestId('pp-cart')[0]).toHaveTextContent('Comfort Club'));
   });
+
+  it('signs the cover note with the advisor’s photo and title, and puts the photo on their recommendations', async () => {
+    const user = userEvent.setup();
+    renderPage(page({ advisor: { name: 'Danny Ortiz', phone: '(602) 555-0147', title: 'Comfort Advisor', photoUrl: 'https://cdn/danny.jpg' } }));
+
+    const from = screen.getByTestId('pp-advisor');
+    expect(from).toHaveTextContent('Danny Ortiz');
+    expect(from).toHaveTextContent('Comfort Advisor');
+    expect(from.querySelector('img')).toHaveAttribute('src', 'https://cdn/danny.jpg');
+    await user.click(screen.getByRole('button', { name: /public.proposal.steps.addons/ }));
+    const [ducts] = screen.getAllByTestId('pp-addon');
+    expect(ducts.querySelector('img.pp-av')).toHaveAttribute('src', 'https://cdn/danny.jpg');
+  });
 });

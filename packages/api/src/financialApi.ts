@@ -1152,6 +1152,9 @@ export interface Quote {
   advisorUserId?: string | null;
   /** Null when the user cache doesn't know them. */
   advisorName?: string | null;
+  /** The advisor's job title and photo, for the proposal; null when they have none. */
+  advisorTitle?: string | null;
+  advisorPhotoUrl?: string | null;
   /** The agreement plan this proposal offers ("join and save"). */
   membershipPlanId?: string | null;
   /** Signed with "join" on: waiting for the office to set the agreement up. */

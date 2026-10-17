@@ -68,6 +68,8 @@ export interface User {
   firstName: string;
   lastName: string;
   phoneNumber: string | null;
+  /** Shown on proposals beside the advisor's name ("Comfort Advisor"). */
+  jobTitle?: string | null;
   // Versioned CloudFront URL; cache-immutable. null when the user hasn't
   // uploaded a photo — UI falls back to an initials avatar. Optional so the
   // type stays compatible with older endpoints that don't include it yet.
@@ -188,12 +190,16 @@ export interface CreateUserRequest {
   roleIds: string[];
   dispatchRegionIds?: string[];
   phoneNumber?: string | null;
+  /** Up to 100 characters. */
+  jobTitle?: string | null;
 }
 
 export interface UpdateUserProfileRequest {
   firstName: string;
   lastName: string;
   phoneNumber?: string | null;
+  /** Up to 100 characters; null leaves it unchanged, blank clears it. */
+  jobTitle?: string | null;
   // Rides the same sparse PUT /users/{id}. The form ALWAYS sends its current
   // value rather than omitting it when unchanged: on this endpoint omitting
   // means "leave alone" while INHERIT means "reset to follow the roles", and

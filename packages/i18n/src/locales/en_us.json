@@ -4595,6 +4595,8 @@
       "emailHint": "contact your admin to change",
       "errorGeneric": "Could not save your profile.",
       "firstName": "First name",
+      "jobTitle": "Job title",
+      "jobTitlePlaceholder": "e.g. Comfort Advisor",
       "lastName": "Last name",
       "phone": "Phone",
       "phonePlaceholder": "(555) 555-5555",

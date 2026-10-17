@@ -65,6 +65,15 @@ describe('AccountSettingsPage', () => {
     expect(saveButton).not.toBeDisabled();
   });
 
+  it('lets a person set their own job title', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<AccountSettingsPage />);
+
+    await screen.findByDisplayValue('Test');
+    await user.type(screen.getByLabelText('account.profile.jobTitle'), 'Comfort Advisor');
+    expect(screen.getByRole('button', { name: /save/i })).not.toBeDisabled();
+  });
+
   it('resets the form when reset is clicked', async () => {
     const user = userEvent.setup();
     renderWithProviders(<AccountSettingsPage />);

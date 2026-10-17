@@ -956,6 +956,15 @@ function CoverNoteCard({ quote, editable, run }: { quote: Quote; editable: boole
       <CardBody className="flex flex-col gap-3 md:flex-row md:items-start">
         <div className="w-full shrink-0 md:w-56">
           <div className="label-tiny mb-1">Advisor</div>
+          {(quote.advisorPhotoUrl || quote.advisorTitle) && (
+            <div className="mb-1.5 flex items-center gap-2" data-testid="proposal-advisor">
+              {quote.advisorPhotoUrl && <img src={quote.advisorPhotoUrl} alt="" className="size-8 rounded-full object-cover" />}
+              <div className="min-w-0 text-[11.5px] leading-tight">
+                <div className="truncate font-semibold text-fg-strong">{advisorName}</div>
+                {quote.advisorTitle && <div className="truncate text-fg-muted">{quote.advisorTitle}</div>}
+              </div>
+            </div>
+          )}
           {editable ? (
             <AccountManagerPicker
               value={quote.advisorUserId ? { id: quote.advisorUserId, name: advisorName ?? '…' } : null}

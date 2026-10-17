@@ -36,6 +36,15 @@ const initials = (name: string | null | undefined) =>
     .slice(0, 2)
     .map((w) => w[0]?.toUpperCase())
     .join('');
+/** The advisor's photo, else their initials. */
+function AdvisorAvatar({ name, photoUrl, className }: { name: string; photoUrl?: string | null; className?: string }) {
+  return photoUrl ? (
+    <img src={photoUrl} alt="" className={`pp-av pp-av--photo ${className ?? ''}`} />
+  ) : (
+    <span className={`pp-av ${className ?? ''}`}>{initials(name)}</span>
+  );
+}
+
 const firstName = (name: string | null | undefined) => (name ?? '').trim().split(/\s+/)[0] ?? '';
 const SAVE_DEBOUNCE_MS = 500;
 
@@ -212,7 +221,12 @@ function Shell({
             <span>
               {t('public.proposal.preparedFor')} <b>{customer.name}</b>
             </span>
-            {advisorName && <span>{t('public.proposal.with', { name: advisorName })}</span>}
+            {advisorName && (
+              <span>
+                {t('public.proposal.with', { name: advisorName })}
+                {quote.advisor?.title ? `, ${quote.advisor.title}` : ''}
+              </span>
+            )}
           </div>
         ) : phone && (
           <div className="pp-who">
@@ -438,6 +452,8 @@ function Chooser({
               coverNote={quote.coverNote}
               customerName={customerName}
               advisorName={advisorName}
+              advisorPhotoUrl={quote.advisor?.photoUrl ?? null}
+              advisorTitle={quote.advisor?.title ?? null}
               step={index + 1}
               count={steps.length}
               onPick={pickOption}
@@ -449,6 +465,8 @@ function Chooser({
               choice={choice}
               canChoose={canChoose}
               advisorName={advisorName}
+              advisorPhotoUrl={quote.advisor?.photoUrl ?? null}
+              advisorTitle={quote.advisor?.title ?? null}
               step={index + 1}
               count={steps.length}
               onToggle={toggleAddOn}
@@ -532,6 +550,8 @@ function OptionsStep({
   coverNote,
   customerName,
   advisorName,
+  advisorPhotoUrl,
+  advisorTitle,
   step,
   count,
   onPick,
@@ -543,6 +563,8 @@ function OptionsStep({
   coverNote?: string | null;
   customerName: string;
   advisorName: string;
+  advisorPhotoUrl?: string | null;
+  advisorTitle?: string | null;
   step: number;
   count: number;
   onPick: (groupId: string, optionId: string) => void;
@@ -558,6 +580,16 @@ function OptionsStep({
         title={t('public.proposal.options.title', { name: firstName(customerName), count: optionCount })}
         lede={coverNote || t('public.proposal.options.lede', { advisor: advisorName })}
       />
+      {/* The cover note is the advisor's: who wrote it, with their photo. */}
+      {coverNote && (
+        <div className="pp-from" data-testid="pp-advisor">
+          <AdvisorAvatar name={advisorName} photoUrl={advisorPhotoUrl} />
+          <div className="flex flex-col">
+            <b>{advisorName}</b>
+            {advisorTitle && <span>{advisorTitle}</span>}
+          </div>
+        </div>
+      )}
       {groups.map((g) => (
         <div key={g.id} className="pp-group">
           {groups.length > 1 && <h2 className="pp-group-name">{g.name}</h2>}
@@ -646,6 +678,7 @@ function AddOnsStep({
   choice,
   canChoose,
   advisorName,
+  advisorPhotoUrl,
   step,
   count,
   onToggle,
@@ -654,6 +687,8 @@ function AddOnsStep({
   choice: PublicSelectionChoice;
   canChoose: boolean;
   advisorName: string;
+  advisorPhotoUrl?: string | null;
+  advisorTitle?: string | null;
   step: number;
   count: number;
   onToggle: (lineId: string) => void;
@@ -689,7 +724,7 @@ function AddOnsStep({
                 {a.presentation?.description && <div className="pp-addon-desc">{a.presentation.description}</div>}
                 {a.recommended && !included && a.recommendationNote && (
                   <div className="pp-rec">
-                    <span className="pp-av">{initials(advisorName)}</span>
+                    <AdvisorAvatar name={advisorName} photoUrl={advisorPhotoUrl} />
                     <div>
                       <b>{t('public.proposal.addons.recommended')}</b>
                       <span>{`“${a.recommendationNote}”`}</span>

@@ -87,6 +87,7 @@ export default function UserFormPage({ mode }: UserFormPageProps) {
     lastName: '',
     email: '',
     phoneNumber: '',
+    jobTitle: '',
     roleIds: [] as string[],
     dispatchRegionIds: [] as string[],
     divisionIds: [] as string[],
@@ -106,6 +107,7 @@ export default function UserFormPage({ mode }: UserFormPageProps) {
       lastName: existingUser.lastName,
       email: existingUser.email,
       phoneNumber: existingUser.phoneNumber ?? '',
+      jobTitle: existingUser.jobTitle ?? '',
       roleIds: existingUser.roles?.map((r) => r.id) ?? [],
       dispatchRegionIds: existingUser.dispatchRegionIds ?? [],
       divisionIds: existingUser.divisionIds ?? [],
@@ -145,6 +147,7 @@ export default function UserFormPage({ mode }: UserFormPageProps) {
         roleIds: formData.roleIds,
         dispatchRegionIds: formData.dispatchRegionIds,
         phoneNumber: formData.phoneNumber.trim() || null,
+        jobTitle: formData.jobTitle.trim() || null,
       }),
     onSuccess: async (created) => {
       // Divisions are not accepted on create — the contract exposes them only
@@ -214,6 +217,8 @@ export default function UserFormPage({ mode }: UserFormPageProps) {
         firstName: formData.firstName,
         lastName: formData.lastName,
         phoneNumber: formData.phoneNumber.trim() || null,
+        // Blank clears it on this endpoint; null would leave it as it was.
+        jobTitle: formData.jobTitle.trim(),
         // Always sent. On this sparse PUT, omitting means "leave alone" while
         // INHERIT means "reset to follow the roles" — sending it every time
         // keeps that distinction out of the callsite.
@@ -415,7 +420,7 @@ export default function UserFormPage({ mode }: UserFormPageProps) {
                   />
                 </Field>
               </div>
-              <div className="mt-2.5">
+              <div className="mt-2.5 grid grid-cols-1 gap-2.5 sm:grid-cols-2">
                 <Field size="xs">
                   <Label size="xs">Phone</Label>
                   <PatternFormat
@@ -429,6 +434,16 @@ export default function UserFormPage({ mode }: UserFormPageProps) {
                       setFormData((p) => ({ ...p, phoneNumber: values.value }))
                     }
                     placeholder="(555) 123-4567"
+                  />
+                </Field>
+                <Field size="xs">
+                  <Label size="xs">Job title</Label>
+                  <Input
+                    size="xs"
+                    value={formData.jobTitle}
+                    maxLength={100}
+                    onChange={(e) => setFormData((p) => ({ ...p, jobTitle: e.target.value }))}
+                    placeholder="e.g. Comfort Advisor"
                   />
                 </Field>
               </div>
