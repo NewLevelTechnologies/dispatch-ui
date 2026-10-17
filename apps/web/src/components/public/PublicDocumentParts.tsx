@@ -48,7 +48,7 @@ export function PublicLineItems({ title, items }: { title: string; items: Public
             <li key={idx} className="flex flex-col gap-1 px-6 py-3 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
               {main && (
                 <a href={main.url} target="_blank" rel="noreferrer" className="shrink-0">
-                  <img src={main.thumbnailUrl} alt="" className="size-20 rounded-md border border-zinc-200 object-cover" />
+                  <img src={main.thumbnailUrl} alt="" className="size-20 rounded-md border border-zinc-200 bg-white object-contain" />
                 </a>
               )}
               <div className="min-w-0 flex-1">
@@ -70,7 +70,7 @@ export function PublicLineItems({ title, items }: { title: string; items: Public
                   <div className="mt-2 flex gap-1.5">
                     {pres.photos.slice(1).map((ph, i) => (
                       <a key={i} href={ph.url} target="_blank" rel="noreferrer">
-                        <img src={ph.thumbnailUrl} alt="" className="size-12 rounded border border-zinc-200 object-cover" />
+                        <img src={ph.thumbnailUrl} alt="" className="size-12 rounded border border-zinc-200 bg-white object-contain" />
                       </a>
                     ))}
                   </div>

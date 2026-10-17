@@ -297,7 +297,7 @@ function ItemRow({
       <td>
         <div className="flex items-start gap-2.5">
         {item.thumbnailUrl && (
-          <img src={item.thumbnailUrl} alt="" className="mt-0.5 size-9 shrink-0 rounded border border-border object-cover" />
+          <img src={item.thumbnailUrl} alt="" className="mt-0.5 size-9 shrink-0 rounded border border-border bg-white object-contain" />
         )}
         <div className="min-w-0">
         <div className={clsx('text-[10px] font-bold uppercase tracking-[0.04em]', LINE_TYPE_TONE[item.itemType])}>

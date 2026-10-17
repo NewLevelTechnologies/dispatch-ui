@@ -105,10 +105,10 @@ describe('QuoteDetailPage', () => {
 
     expect(await screen.findByText('Q-1882')).toBeInTheDocument();
     expect(screen.getByText('Rev 2')).toBeInTheDocument();
-    expect(await screen.findByRole('link', { name: 'Tanya Reyes' })).toHaveAttribute('href', '/customers/cust-1');
+    expect(await screen.findByRole('link', { name: 'Tanya Reyes' })).toHaveAttribute('href', '/customers/cust-1?from=quote&docId=q-1&docNo=Q-1882');
     expect(screen.getByText('Due on receipt · tanya@example.com')).toBeInTheDocument();
     // Location from the work order, title-cased.
-    expect(await screen.findByRole('link', { name: '4821 E Indian School Rd' })).toHaveAttribute('href', '/service-locations/loc-1');
+    expect(await screen.findByRole('link', { name: '4821 E Indian School Rd' })).toHaveAttribute('href', '/service-locations/loc-1?from=quote&docId=q-1&docNo=Q-1882');
     expect(screen.getByText('PO-77')).toBeInTheDocument();
     expect(screen.getByText('Comfort Club')).toBeInTheDocument();
     expect(screen.getAllByText('$247.24').length).toBeGreaterThanOrEqual(2);
@@ -116,6 +116,7 @@ describe('QuoteDetailPage', () => {
     expect(screen.getByText('Includes $126.50 member savings')).toBeInTheDocument();
     // Back to the job it belongs to.
     expect(screen.getByRole('link', { name: /WO-3892 · AC not cooling/ })).toHaveAttribute('href', '/work-orders/wo-1');
+    expect(screen.getByRole('link', { name: 'WO-3892' })).toHaveAttribute('href', '/work-orders/wo-1?from=quote&docId=q-1&docNo=Q-1882');
   });
 
   it('shows each line priced as the server returned it, in sortOrder', async () => {
