@@ -19,6 +19,7 @@ import { ViewTabs } from '../components/ui/Tabs';
 import { ChipListboxOption, FilterChipListbox } from '../components/ui/FilterChipListbox';
 import { Button } from '../components/catalyst/button';
 import AgreementFormDialog from '../components/AgreementFormDialog';
+import { MembershipSignupsCard } from '../components/proposal/MembershipSignups';
 import { extractApiError, showError } from '../lib/toast';
 import { money } from '../features/home/revenueSelectors';
 import { downloadCsv } from '../features/reports/csv';
@@ -165,6 +166,7 @@ export default function AgreementsPage() {
           </>
         }
       />
+      <MembershipSignupsCard />
       <ViewTabs
         className="mb-3"
         value={view}

@@ -48,6 +48,8 @@ export type ActivityKind =
   | 'QUOTE_PRICE_APPROVAL_REQUESTED'
   | 'QUOTE_PRICE_APPROVED'
   | 'QUOTE_PRICE_REJECTED'
+  /** Signed with "join" on (`data.planId`, `planName`): the office sets the agreement up. */
+  | 'QUOTE_MEMBERSHIP_SIGNUP'
   /** A never-sent draft deleted; its subject no longer loads, so it renders unlinked. */
   | 'QUOTE_DELETED'
   | 'INVOICE_ISSUED'

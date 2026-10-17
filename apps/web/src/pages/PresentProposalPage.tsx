@@ -1,4 +1,3 @@
-/* eslint-disable i18next/no-literal-string -- loading and error lines match the quote page's literal convention. */
 // "Present in home": the proposal full screen on the advisor's device, the
 // customer choosing and signing in person. The same page the link shows,
 // with choices saved as the advisor's and the signature taken through the

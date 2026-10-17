@@ -151,7 +151,7 @@ export function ProposalBuilder({ quote, editable, run }: { quote: Quote; editab
         {options.length > 0 && (
           <AddOnsCard quote={quote} options={options} editable={editable} accepted={accepted} run={run} onAdd={() => setAdding({ kind: 'addon' })} />
         )}
-        {options.length > 0 && <SavingsCard quote={quote} editable={editable} run={run} />}
+        {options.length > 0 && <SavingsCard quote={quote} editable={editable} run={run} priced={priced} />}
         <CoverNoteCard quote={quote} editable={editable} run={run} />
       </div>
       <Rail quote={quote} options={options} accepted={accepted} priced={priced} />
@@ -1029,6 +1029,9 @@ function Rail({
                     <span className="font-semibold text-success-500">{`Save ${formatCurrency(live.youSave)}`}</span>
                   )}
                   {afterRebate != null && <span>{`${formatCurrency(afterRebate)} after rebate`}</span>}
+                  {priced?.membership && (live?.joinSaves ?? 0) > 0 && (
+                    <span>{`${priced.membership.name} saves ${formatCurrency(live?.joinSaves ?? 0)}`}</span>
+                  )}
                 </div>
               </div>
             );
@@ -1086,7 +1089,11 @@ function CurrentSelection({ quote, priced }: { quote: Quote; priced: PricedSelec
       </CardHead>
       <CardBody className="flex flex-col gap-1">
         <div className="text-[12.5px] font-semibold text-fg-strong" data-testid="proposal-current-selection">
-          {[...chosen.map((o) => o.name), ...addOns.map((l) => l.description)].join(' + ') || '—'}
+          {[
+            ...chosen.map((o) => o.name),
+            ...addOns.map((l) => l.description),
+            ...(priced.selection.joinMembership && priced.membership ? [priced.membership.name] : []),
+          ].join(' + ') || '—'}
         </div>
         <div className="text-[12px] tabular-nums text-fg-muted">
           {formatCurrency(priced.totals.totalAmount)}

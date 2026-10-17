@@ -221,4 +221,36 @@ describe('PublicProposal', () => {
     expect(banner).toHaveTextContent('Fall Comfort Event · public.proposal.deals.ends');
     expect(banner).toHaveTextContent('public.proposal.decideToday · $350 public.proposal.deals.off · public.proposal.deals.approveBy');
   });
+
+  it('offers the membership in its own step: what it costs, what it saves, and joining prices it', async () => {
+    const club = {
+      planId: 'plan-1', name: 'Comfort Club', amount: 19, cadenceUnit: 'MONTH', cadenceInterval: 1,
+      laborDiscountPct: 0.15, partsDiscountPct: null, tripFeeWaived: true,
+    };
+    const base = priced();
+    const offered = priced({
+      membership: club,
+      totals: { ...totals(15580, 500, 400), joinSaves: 239 },
+      options: base.options.map((o) => ({ ...o, totals: { ...o.totals, joinSaves: 239 } })),
+    });
+    api.saveQuoteSelection.mockResolvedValue({ ...offered, selection: { ...offered.selection, joinMembership: true } });
+    const user = userEvent.setup();
+    renderPage(page({ selection: offered }));
+
+    // The cards say what members save before anyone joins.
+    expect(screen.getAllByTestId('pp-option')[1]).toHaveTextContent('public.proposal.club.cardSaves');
+    await user.click(screen.getByRole('button', { name: /public.proposal.steps.protect/ }));
+    const card = screen.getByTestId('pp-club');
+    expect(card).toHaveTextContent('Comfort Club');
+    expect(card).toHaveTextContent('public.proposal.club.saves');
+    expect(card).toHaveTextContent('public.proposal.club.benefit.labor');
+    expect(card).toHaveTextContent('public.proposal.club.benefit.trip');
+    expect(card).not.toHaveTextContent('public.proposal.club.benefit.parts');
+    await user.click(within(card).getByRole('button', { name: 'public.proposal.club.add' }));
+    await waitFor(
+      () => expect(api.saveQuoteSelection).toHaveBeenCalledWith('tok', { optionIds: ['o-2'], addOnLineIds: [], joinMembership: true }),
+      { timeout: 2000 },
+    );
+    await waitFor(() => expect(screen.getAllByTestId('pp-cart')[0]).toHaveTextContent('Comfort Club'));
+  });
 });

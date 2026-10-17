@@ -16,7 +16,9 @@ import {
   type PublicQuoteResponse,
   type PublicSaving,
   type PublicSelectionChoice,
+  type PublicMembershipOffer,
 } from '../../api/setup';
+import { cadenceWords, memberBenefits } from '../proposal/membershipModel';
 import PublicPreviewBanner from '../PublicPreviewBanner';
 import { publicNames } from './publicNames';
 
@@ -37,7 +39,7 @@ const initials = (name: string | null | undefined) =>
 const firstName = (name: string | null | undefined) => (name ?? '').trim().split(/\s+/)[0] ?? '';
 const SAVE_DEBOUNCE_MS = 500;
 
-type Step = 'options' | 'addons' | 'review';
+type Step = 'options' | 'addons' | 'protect' | 'review';
 
 function Check({ size = 16 }: { size?: number }) {
   return (
@@ -264,7 +266,9 @@ function Chooser({
   const timer = useRef<number | undefined>(undefined);
 
   const hasAddOns = proposal.addOns.some((a) => addOnMode(a, choice.optionIds) !== 'HIDDEN');
-  const steps: Step[] = hasAddOns ? ['options', 'addons', 'review'] : ['options', 'review'];
+  // "Protect" offers the membership, when there's one to join.
+  const offersMembership = !!priced?.membership;
+  const steps: Step[] = ['options', ...(hasAddOns ? (['addons'] as const) : []), ...(offersMembership ? (['protect'] as const) : []), 'review'];
   const [step, setStep] = useState<Step>('options');
   const current = steps.includes(step) ? step : 'options';
   const index = steps.indexOf(current);
@@ -313,6 +317,7 @@ function Chooser({
     const others = choice.optionIds.filter((id) => !group?.options.some((o) => o.id === id));
     change({ ...choice, optionIds: [...others, optionId] });
   };
+  const toggleJoin = () => change({ ...choice, joinMembership: !choice.joinMembership });
   const toggleAddOn = (lineId: string) =>
     change({
       ...choice,
@@ -447,6 +452,17 @@ function Chooser({
               step={index + 1}
               count={steps.length}
               onToggle={toggleAddOn}
+            />
+          )}
+          {current === 'protect' && priced?.membership && (
+            <ProtectStep
+              priced={priced}
+              joined={!!choice.joinMembership}
+              canChoose={canChoose}
+              sender={sender}
+              step={index + 1}
+              count={steps.length}
+              onToggle={toggleJoin}
             />
           )}
           {current === 'review' && (
@@ -592,6 +608,11 @@ function OptionsStep({
                       )}
                       {num(o.rebateAmount) > 0 && (
                         <div className="pp-rebate">{t('public.proposal.rebate', { amount: usd(o.rebateAmount) })}</div>
+                      )}
+                      {priced?.membership && !choice.joinMembership && num(card?.joinSaves) > 0 && (
+                        <div className="pp-rebate">
+                          {t('public.proposal.club.cardSaves', { amount: usd(card?.joinSaves), name: priced.membership.name })}
+                        </div>
                       )}
                       <button
                         type="button"
@@ -814,6 +835,82 @@ function PackageLines({ priced, proposal }: { priced: PublicPricedSelection | Pu
   );
 }
 
+/** "$19 / month", from the plan's amount and cadence. */
+function clubPrice(t: (k: string, o?: Record<string, unknown>) => string, m: PublicMembershipOffer): string {
+  const every = cadenceWords(m);
+  return every ? t('public.proposal.club.price', { amount: usdCents(m.amount), every }) : usdCents(m.amount);
+}
+
+/** The membership offer: what it costs, what it saves on this job, what it includes. */
+function ProtectStep({
+  priced,
+  joined,
+  canChoose,
+  sender,
+  step,
+  count,
+  onToggle,
+}: {
+  priced: PublicPricedSelection;
+  joined: boolean;
+  canChoose: boolean;
+  sender: string;
+  step: number;
+  count: number;
+  onToggle: () => void;
+}) {
+  const { t } = useTranslation();
+  const m = priced.membership!;
+  const saves = num(priced.totals.joinSaves);
+  return (
+    <section>
+      <StepHead step={step} count={count} title={t('public.proposal.club.title')} lede={t('public.proposal.club.lede')} />
+      <div className="pp-protect">
+        <article className={`pp-club${joined ? ' on' : ''}`} data-testid="pp-club">
+          <div className="pp-club-head">
+            <div>
+              <div className="pp-eyebrow pp-eyebrow--inv">{t('public.proposal.club.eyebrow')}</div>
+              <div className="pp-club-name">{m.name}</div>
+            </div>
+            {m.amount != null && <div className="pp-club-price tabular-nums">{clubPrice(t, m)}</div>}
+          </div>
+          <div className="pp-club-b">
+            {saves > 0 && (
+              <div className="pp-club-today">
+                {t('public.proposal.club.saves', { amount: usd(saves) })}
+              </div>
+            )}
+            <ul className="pp-bul">
+              {memberBenefits(m).map((b) => (
+                <li key={b.kind}>
+                  <Check />
+                  <span>{t(`public.proposal.club.benefit.${b.kind}`, { pct: b.pct })}</span>
+                </li>
+              ))}
+            </ul>
+            <button
+              type="button"
+              className={`pp-btn ${joined ? 'pp-btn--on' : 'pp-btn--1'}`}
+              aria-pressed={joined}
+              disabled={!canChoose}
+              onClick={onToggle}
+            >
+              {joined ? (
+                <>
+                  <Check /> {t('public.proposal.club.added', { name: m.name })}
+                </>
+              ) : (
+                t('public.proposal.club.add', { name: m.name })
+              )}
+            </button>
+            <div className="pp-fine">{t('public.proposal.club.fine', { tenant: sender })}</div>
+          </div>
+        </article>
+      </div>
+    </section>
+  );
+}
+
 function ReviewStep({
   priced,
   proposal,
@@ -1004,6 +1101,15 @@ function Cart({
             <b className="tabular-nums">+{usd(a.lineTotal)}</b>
           </div>
         ))}
+        {choice.joinMembership && priced?.membership && (
+          <div className="pp-cart-line">
+            <span>
+              {priced.membership.name}
+              <small> · {t('public.proposal.club.billedSeparately')}</small>
+            </span>
+            <b className="tabular-nums">{clubPrice(t, priced.membership)}</b>
+          </div>
+        )}
       </div>
       {priced && num(priced.totals.youSave) > 0 && (
         <div className="pp-cart-save tabular-nums">
@@ -1048,6 +1154,11 @@ function Done({ approval, data }: { approval: PublicApproval | null; data: Publi
       </div>
       <h1 className="pp-h1">{t('public.proposal.done.title', { name: firstName(approval?.signerName ?? customer.name) })}</h1>
       <p className="pp-lede">{t('public.proposal.done.lede', { ...names, tenant: sender })}</p>
+      {approval?.selection.joinMembership && (
+        <p className="pp-lede" data-testid="pp-joined">
+          {t('public.proposal.club.welcome', { tenant: sender })}
+        </p>
+      )}
       {approval && (
         <div className="pp-card pp-done-sum" data-testid="pp-signed-copy">
           <div className="pp-card-t">{t('public.proposal.done.signedCopy')}</div>

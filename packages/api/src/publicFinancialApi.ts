@@ -236,7 +236,7 @@ export interface PublicSaving {
   /** The source's name (a member plan, a promotion); else name it from `reasonCode`. */
   label: string | null;
   amount: PublicMoney;
-  sourceType?: 'MANUAL' | 'AGREEMENT' | 'PROMOTION';
+  sourceType?: 'MANUAL' | 'AGREEMENT' | 'PROMOTION' | 'MEMBERSHIP';
   optionId?: string | null;
   /** The last day it's offered ("approve by Oct 12"). */
   validThrough?: string | null;
@@ -250,11 +250,27 @@ export interface PublicSelectionTotals {
   totalAmount: PublicMoney;
   rebateAmount: PublicMoney | null;
   afterRebate: PublicMoney | null;
+  /** What joining saves here, joined or not. */
+  joinSaves?: PublicMoney | null;
 }
 
 export interface PublicSelectionChoice {
   optionIds: string[];
   addOnLineIds: string[];
+  /** "Join and save" the offered plan. */
+  joinMembership?: boolean;
+}
+
+/** The plan a proposal offers and its member benefits on a job (fractions). */
+export interface PublicMembershipOffer {
+  planId: string;
+  name: string;
+  amount: PublicMoney | null;
+  cadenceUnit: string | null;
+  cadenceInterval: number | null;
+  laborDiscountPct: number | null;
+  partsDiscountPct: number | null;
+  tripFeeWaived: boolean;
 }
 
 export interface PublicPricedLine {
@@ -280,6 +296,8 @@ export interface PublicPricedSelection {
   /** The side-by-side cards: each option chosen, no add-ons taken. */
   options: { optionId: string; groupId: string; name: string; selected: boolean; savings: PublicSaving[]; totals: PublicSelectionTotals }[];
   priceRange: { low: PublicMoney; high: PublicMoney } | null;
+  /** Null when no plan is offered, or the site is a member already. */
+  membership?: PublicMembershipOffer | null;
 }
 
 /** The signed copy, stored once at approval. */
