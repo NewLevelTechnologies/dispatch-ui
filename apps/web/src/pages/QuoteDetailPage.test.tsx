@@ -4,6 +4,7 @@ import { fireEvent, screen, within } from '@testing-library/react';
 import { renderWithProviders, userEvent } from '../test/utils';
 import QuoteDetailPage from './QuoteDetailPage';
 import { apiClient, type Quote } from '../api/setup';
+import { useHasAnyCapability } from '../hooks/useCurrentUser';
 
 vi.mock('@dispatch/api/src/client');
 
@@ -693,5 +694,42 @@ describe('QuoteDetailPage billing', () => {
     expect(screen.getByText('$11,480.00 – $15,960.00')).toBeInTheDocument();
     expect(screen.getByText('2 options')).toBeInTheDocument();
     expect(screen.queryByRole('radio', { name: 'Proposal' })).not.toBeInTheDocument();
+  });
+
+  describe('deleting a never-sent draft', () => {
+    const draft: Quote = { ...quote, status: 'DRAFT', version: 7, firstSentAt: null, lastSentAt: null };
+
+    it('deletes after confirming, then goes back to the job', async () => {
+      vi.mocked(useHasAnyCapability).mockImplementation((...caps: string[]) => caps.includes('EDIT_QUOTES'));
+      mockApi(draft);
+      vi.mocked(apiClient.delete).mockResolvedValue({ data: undefined });
+      const user = userEvent.setup();
+      const { router } = renderPage();
+
+      await user.click(await screen.findByRole('button', { name: 'More actions' }));
+      await user.click(await screen.findByRole('menuitem', { name: 'Delete quote' }));
+      const dialog = await screen.findByRole('dialog');
+      await user.click(within(dialog).getByRole('button', { name: 'Delete quote' }));
+
+      expect(apiClient.delete).toHaveBeenCalledWith('/financial/quotes/q-1', { params: { version: 7 } });
+      await vi.waitFor(() => expect(router.state.location.pathname).toBe('/work-orders/wo-1'));
+      expect(router.state.location.search).toBe('?tab=estimate');
+    });
+
+    it('isn’t offered once it has been sent, or without EDIT_QUOTES', async () => {
+      vi.mocked(useHasAnyCapability).mockImplementation((...caps: string[]) => caps.includes('EDIT_QUOTES'));
+      mockApi({ ...draft, firstSentAt: '2026-10-08T16:00:00Z', revision: 2 });
+      const user = userEvent.setup();
+      const { unmount } = renderPage();
+      await user.click(await screen.findByRole('button', { name: 'More actions' }));
+      expect(screen.queryByRole('menuitem', { name: 'Delete quote' })).not.toBeInTheDocument();
+      unmount();
+
+      vi.mocked(useHasAnyCapability).mockImplementation(() => false);
+      mockApi(draft);
+      renderPage();
+      await user.click(await screen.findByRole('button', { name: 'More actions' }));
+      expect(screen.queryByRole('menuitem', { name: 'Delete quote' })).not.toBeInTheDocument();
+    });
   });
 });

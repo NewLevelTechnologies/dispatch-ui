@@ -42,6 +42,8 @@ export type ActivityKind =
   | 'QUOTE_VIEWED'
   | 'QUOTE_ACCEPTED'
   | 'QUOTE_DECLINED'
+  /** A never-sent draft deleted; its subject no longer loads, so it renders unlinked. */
+  | 'QUOTE_DELETED'
   | 'INVOICE_ISSUED'
   | 'INVOICE_SENT'
   | 'INVOICE_PAID'

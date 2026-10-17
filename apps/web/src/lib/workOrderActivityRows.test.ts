@@ -65,6 +65,20 @@ describe('buildWorkOrderDays', () => {
     expect(row.objHref).toBe('/quotes/q-1');
   });
 
+  it('names a deleted draft without linking it: the quote no longer loads', () => {
+    const [row] = rows([
+      event({
+        kind: 'QUOTE_DELETED',
+        category: 'FINANCIAL',
+        subject: { type: 'QUOTE', id: 'q-9', number: null, label: 'Q-1990' },
+        data: { totalAmount: 412 },
+      }),
+    ]);
+    expect(row.text).toBe('quoteDeleted(amount=$412.00)');
+    expect(row.obj).toBe('Q-1990');
+    expect(row.objHref).toBeNull();
+  });
+
   it('words a send with no channels as marked sent', () => {
     const [row] = rows([
       event({

@@ -1544,6 +1544,90 @@
       "taxExempt": "Tax (exempt)",
       "taxNamed": "Tax · {{name}}",
       "youSave": "You save"
+    },
+    "proposal": {
+      "addOn": "Add-on",
+      "addons": {
+        "add": "Add",
+        "addLabel": "Add {{name}}",
+        "added": "Added",
+        "included": "Included with {{option}}",
+        "lede": "Optional extras for {{option}}. Add any you like; your total updates as you go.",
+        "ledeRecommended": "Optional extras for {{option}}. {{advisor}} recommends some based on what they found at your home.",
+        "recommended": "Recommended for your home",
+        "removeLabel": "Remove {{name}}",
+        "title": "Make it yours"
+      },
+      "approve": "Approve & sign",
+      "approveShort": "Approve",
+      "approving": "Approving…",
+      "back": "Back",
+      "call": "Call {{name}} · {{phone}}",
+      "cartSaving": "You’re saving",
+      "continue": "Continue",
+      "continueTo": "Continue to {{step}}",
+      "done": {
+        "lede": "{{tenant}} has your signed {{quote, lowercase}} and will be in touch to schedule the work.",
+        "questions": "Questions? {{tenant}} · {{phone}}",
+        "signatureAlt": "{{name}}’s signature",
+        "signedBy": "Signed by {{name}} · {{date}}",
+        "signedCopy": "Your signed copy",
+        "title": "You’re all set, {{name}}."
+      },
+      "expired": {
+        "body": "It expired on {{date}}, so the prices may have changed. Ask {{advisor}} to refresh it.",
+        "title": "This {{quote, lowercase}} has expired"
+      },
+      "hidePackage": "Hide package",
+      "included": "Included",
+      "includedWith": "Included with {{option}}",
+      "notice": {
+        "saveFailed": "We couldn’t save that choice. Check your connection and try again.",
+        "slowDown": "That was a lot of changes at once. Wait a moment, then try again.",
+        "totalChanged": "The total changed since you looked. Check the new figure and sign again."
+      },
+      "number": "{{quote}} #{{number}}",
+      "options": {
+        "lede": "{{advisor}} put these together for you. Pick the one that fits.",
+        "title_one": "Hi {{name}}, here’s your option.",
+        "title_other": "Hi {{name}}, here are {{count}} ways to go."
+      },
+      "package": "Your package",
+      "popular": "Most popular",
+      "previewHint": "Preview: the customer chooses and signs on their own link.",
+      "questions": "Questions?",
+      "questionsFor": "Questions? Call {{name}}",
+      "rebate": "Plus an estimated {{amount}} rebate, paid to you",
+      "rebateNote": "Plus an estimated {{amount}} rebate, paid to you after the work. It isn’t taken off your total.",
+      "review": {
+        "approveTitle": "Approve and sign",
+        "authorize": "By signing, you authorize {{tenant}} to do the work above for {{total}}. Proposal {{number}}, valid through {{date}}.",
+        "clear": "Clear",
+        "consent": "I agree to the terms of this proposal from {{tenant}}.",
+        "lede": "Everything in one place. Change anything by going back a step.",
+        "name": "Your name",
+        "signHere": "Sign here with your finger",
+        "signatureLabel": "Signature",
+        "title": "Review & approve"
+      },
+      "saving": "Saving {{amount}}",
+      "select": "Select {{name}}",
+      "selected": "Selected",
+      "signHint": "Sign and check the box to approve.",
+      "stepOf": "Step {{step}} of {{count}}",
+      "steps": {
+        "addons": "Add-ons",
+        "options": "Options",
+        "review": "Review"
+      },
+      "stepsLabel": "Proposal steps",
+      "tax": "Tax",
+      "total": "Total",
+      "updating": "Updating your total…",
+      "validThrough": "Prices valid through {{date}}.",
+      "viewPackage": "View package",
+      "youSave": "You save {{amount}}",
+      "youreSaving": "You’re saving {{amount}}"
     }
   },
   "capabilities": {
@@ -3952,6 +4036,7 @@
         "poStatusChanged": "Marked {{status}}{{reason}}",
         "quoteAccepted": "{{quote}} approved · {{amount}}",
         "quoteDeclined": "{{quote}} declined · {{amount}}",
+        "quoteDeleted": "Draft {{quote, lowercase}} deleted · {{amount}}",
         "quoteMarkedSent": "{{quote}} marked sent{{rev}} · {{amount}}",
         "quoteSent": "{{quote}} sent{{via}}{{rev}} · {{amount}}",
         "quoteViewed": "Viewed by the {{customer, lowercase}}{{rev}}",

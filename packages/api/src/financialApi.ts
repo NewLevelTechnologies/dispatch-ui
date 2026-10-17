@@ -1014,6 +1014,21 @@ export interface PricedSelection {
   priceRange: { low: number; high: number } | null;
 }
 
+/** The signed copy, stored once at approval; the app also sees IP and user agent. */
+export interface QuoteApproval {
+  signerName: string;
+  signedAt: string;
+  signatureImage: string | null;
+  consent: boolean;
+  revision: number | null;
+  selection: QuoteSelectionChoice;
+  lines: PricedSelectionLine[];
+  savings: Omit<PricedSaving, 'adjustmentId'>[];
+  totals: Omit<SelectionTotals, 'margin'>;
+  ipAddress: string | null;
+  userAgent: string | null;
+}
+
 export interface QuoteOptionGroup {
   id: string;
   name: string;
@@ -1082,6 +1097,8 @@ export interface Quote {
   coverNote?: string | null;
   /** The one set, else the quote's creator. */
   advisorUserId?: string | null;
+  /** Null when the user cache doesn't know them. */
+  advisorName?: string | null;
   optionGroups?: QuoteOptionGroup[];
   /** What the quote's totals are priced for: each group's chosen option and the add-ons taken. */
   selection?: { optionIds: string[]; addOnLineIds: string[] } | null;
@@ -1286,6 +1303,18 @@ export const quotesApi = {
   },
   setAddOnMode: async (id: string, optionId: string, lineId: string, request: { version: number; mode: AddOnMode }): Promise<Quote> => {
     const response = await apiClient.put<Quote>(`/financial/quotes/${id}/options/${optionId}/add-ons/${lineId}`, request);
+    return response.data;
+  },
+  /**
+   * Delete a never-sent draft (204). 409 QUOTE_NOT_DELETABLE otherwise (a sent
+   * quote back in draft included), 409 STALE_VERSION, 403 without EDIT_QUOTES.
+   */
+  delete: async (id: string, version: number): Promise<void> => {
+    await apiClient.delete(`/financial/quotes/${id}`, { params: { version } });
+  },
+  /** The signed copy of a proposal approved through its link (400 when the office recorded the yes). */
+  getApproval: async (id: string): Promise<QuoteApproval> => {
+    const response = await apiClient.get<QuoteApproval>(`/financial/quotes/${id}/approval`);
     return response.data;
   },
   /** The saved choice, priced. */
@@ -2239,6 +2268,7 @@ export type FinancialActivityKind =
   | 'QUOTE_VIEWED'
   | 'QUOTE_ACCEPTED'
   | 'QUOTE_DECLINED'
+  | 'QUOTE_DELETED'
   | 'INVOICE_SENT'
   | 'INVOICE_PAID'
   | 'INVOICE_VOIDED'
