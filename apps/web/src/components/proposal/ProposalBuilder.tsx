@@ -5,7 +5,7 @@
 // queue and return the whole quote.
 import { Fragment, useState, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { formatCurrency } from '@dispatch/utils';
+import { formatCurrency, formatTimestamp } from '@dispatch/utils';
 import { CheckIcon, EllipsisHorizontalIcon, ExclamationTriangleIcon, PhotoIcon, PlusIcon, XMarkIcon } from '@heroicons/react/16/solid';
 import clsx from 'clsx';
 import {
@@ -13,6 +13,7 @@ import {
   quotesApi,
   userApi,
   type AddOnMode,
+  type PricedSelection,
   type Quote,
   type QuoteLineItem,
   type QuoteOption,
@@ -27,7 +28,7 @@ import { Switch } from '../catalyst/switch';
 import { Textarea } from '../catalyst/textarea';
 import { Card, CardBody, CardHead, CardSub, CardTitle } from '../ui/Card';
 import { DenseTable, DenseTHead } from '../ui/DenseTable';
-import { Pill } from '../ui/Pill';
+import { Pill, Tag } from '../ui/Pill';
 import AccountManagerPicker from '../AccountManagerPicker';
 import ConfirmDialog from '../ConfirmDialog';
 import { AddLinePanel } from '../document/AddLinePanel';
@@ -39,16 +40,21 @@ import {
   addOnLines,
   allOptions,
   headerFields,
+  marginPct,
   modeOf,
   optionFields,
   optionHighlights,
   optionLines,
   optionPhoto,
+  pricedOption,
+  savingLabel,
   sendChecks,
   sharedLines,
 } from './proposalModel';
+import { useQuoteSelection } from './useQuoteSelection';
 
 type Run = ReturnType<typeof useDocumentEditor<Quote>>['run'];
+type PricedOption = PricedSelection['options'][number];
 
 const MODE_LABEL: Record<AddOnMode, string> = { OFFER: 'Offer', INCLUDED: 'Included', HIDDEN: '—' };
 const MODE_CLASS: Record<AddOnMode, string> = {
@@ -71,6 +77,7 @@ export function ProposalBuilder({ quote, editable, run }: { quote: Quote; editab
   const [adding, setAdding] = useState<AddTarget>(null);
   const accepted = quote.status === 'ACCEPTED';
   const options = allOptions(quote);
+  const { data: priced } = useQuoteSelection(quote);
   const groups = [...(quote.optionGroups ?? [])].sort((a, b) => a.sortOrder - b.sortOrder);
 
   const { data: rates = [] } = useQuery({ queryKey: ['labor-rates'], queryFn: () => laborRatesApi.getAll() });
@@ -130,6 +137,7 @@ export function ProposalBuilder({ quote, editable, run }: { quote: Quote; editab
               options={[...g.options].sort((a, b) => a.sortOrder - b.sortOrder)}
               editable={editable}
               accepted={accepted}
+              priced={priced}
               run={run}
               onAddLine={(option) => setAdding({ kind: 'option', option })}
             />
@@ -141,7 +149,7 @@ export function ProposalBuilder({ quote, editable, run }: { quote: Quote; editab
         )}
         <CoverNoteCard quote={quote} editable={editable} run={run} />
       </div>
-      <Rail quote={quote} options={options} accepted={accepted} />
+      <Rail quote={quote} options={options} accepted={accepted} priced={priced} />
 
       <Dialog open={!!adding} onClose={() => setAdding(null)} size="3xl">
         <DialogTitle>{adding?.kind === 'option' ? `Add a line to ${adding.option.name}` : 'Add an add-on'}</DialogTitle>
@@ -229,6 +237,7 @@ function OptionsCard({
   options,
   editable,
   accepted,
+  priced,
   run,
   onAddLine,
 }: {
@@ -238,6 +247,7 @@ function OptionsCard({
   options: QuoteOption[];
   editable: boolean;
   accepted: boolean;
+  priced: PricedSelection | undefined;
   run: Run;
   onAddLine: (option: QuoteOption) => void;
 }) {
@@ -280,6 +290,7 @@ function OptionsCard({
               count={options.length}
               editable={editable}
               accepted={accepted}
+              priced={pricedOption(priced, o.id)}
               onRename={(name) => void update(o, { name })}
               onTagline={(tagline) => void update(o, { tagline: tagline || null })}
               onPopular={() => void update(o, { recommended: !o.recommended })}
@@ -327,6 +338,7 @@ function OptionCard({
   count,
   editable,
   accepted,
+  priced,
   onRename,
   onTagline,
   onPopular,
@@ -343,6 +355,8 @@ function OptionCard({
   count: number;
   editable: boolean;
   accepted: boolean;
+  /** Live figures from the priced selection; the quote's own until it loads. */
+  priced?: PricedOption;
   onRename: (name: string) => void;
   onTagline: (tagline: string) => void;
   onPopular: () => void;
@@ -358,9 +372,6 @@ function OptionCard({
   const photo = optionPhoto(o);
   const highlights = optionHighlights(o);
   const chosen = accepted && o.selected;
-  const t = o.totals;
-  const rebate = o.rebateAmount ?? 0;
-
   return (
     <div
       className={clsx('pb-opt', o.recommended && !accepted && 'pb-opt--popular', chosen && 'pb-opt--chosen', accepted && !chosen && 'pb-opt--declined')}
@@ -495,36 +506,83 @@ function OptionCard({
         )}
       </div>
 
-      <div className="pb-opt-foot">
-        <Kv label="List price" value={formatCurrency(t.grossSubtotal)} />
-        {t.adjustmentTotal > 0 && <Kv label="Discounts" value={`−${formatCurrency(t.adjustmentTotal)}`} />}
-        {t.taxAmount > 0 && <Kv label="Tax" value={formatCurrency(t.taxAmount)} />}
-        <Kv label="Total" value={formatCurrency(t.totalAmount)} strong />
-        <Kv
-          label={
-            <>
-              Rebate <span className="pb-hint">utility · not on the invoice</span>
-            </>
-          }
-          value={
-            editable ? (
-              <RebateInput value={o.rebateAmount ?? null} onSave={onRebate} name={o.name} />
-            ) : rebate ? (
-              formatCurrency(rebate)
-            ) : (
-              '—'
-            )
-          }
-        />
-        {rebate > 0 && <Kv label="After rebate" value={formatCurrency(t.totalAmount - rebate)} />}
-      </div>
+      <OptionFoot option={o} priced={priced} editable={editable} onRebate={onRebate} />
     </div>
   );
 }
 
-function Kv({ label, value, strong }: { label: ReactNode; value: ReactNode; strong?: boolean }) {
+/** List, each saving with its reason, total, rebate, and the internal margin. */
+function OptionFoot({
+  option: o,
+  priced,
+  editable,
+  onRebate,
+}: {
+  option: QuoteOption;
+  priced?: PricedOption;
+  editable: boolean;
+  onRebate: (amount: number | null) => void;
+}) {
+  const live = priced?.totals;
+  const list = live?.listPrice ?? o.totals.grossSubtotal;
+  const total = live?.totalAmount ?? o.totals.totalAmount;
+  const tax = live?.taxAmount ?? o.totals.taxAmount;
+  const rebate = o.rebateAmount ?? 0;
+  const afterRebate = live ? live.afterRebate : rebate > 0 ? total - rebate : null;
+  const margin = live?.margin;
   return (
-    <div className={clsx('pb-kv', strong && 'pb-kv--strong')}>
+    <div className="pb-opt-foot">
+      <Kv label="List price" value={formatCurrency(list)} />
+      {priced
+        ? priced.savings.map((sv) => <Kv key={sv.adjustmentId} label={savingLabel(sv)} value={`−${formatCurrency(sv.amount)}`} saving />)
+        : o.totals.adjustmentTotal > 0 && <Kv label="Discounts" value={`−${formatCurrency(o.totals.adjustmentTotal)}`} saving />}
+      {live && live.youSave > 0 && <Kv label="You save" value={formatCurrency(live.youSave)} saving />}
+      {tax > 0 && <Kv label="Tax" value={formatCurrency(tax)} />}
+      <Kv label="Total" value={formatCurrency(total)} strong />
+      <Kv
+        label={
+          <>
+            Rebate <span className="pb-hint">utility · not on the invoice</span>
+          </>
+        }
+        value={
+          editable ? (
+            <RebateInput value={o.rebateAmount ?? null} onSave={onRebate} name={o.name} />
+          ) : rebate ? (
+            formatCurrency(rebate)
+          ) : (
+            '—'
+          )
+        }
+      />
+      {afterRebate != null && <Kv label="After rebate" value={formatCurrency(afterRebate)} />}
+      {margin && (
+        <>
+          <Kv
+            label={
+              <>
+                Margin after savings <Tag>Internal</Tag>
+              </>
+            }
+            value={
+              <span className={clsx('font-semibold', margin.belowFloor && 'text-warning-fg')}>
+                {margin.margin == null ? '—' : marginPct(margin.margin)}
+              </span>
+            }
+          />
+          {margin.belowFloor && margin.floor != null && (
+            <div className="pb-warn">{`Below the ${marginPct(margin.floor)} floor.`}</div>
+          )}
+          {!margin.costKnown && <div className="pb-costnote">Some lines have no cost; they count as $0.</div>}
+        </>
+      )}
+    </div>
+  );
+}
+
+function Kv({ label, value, strong, saving }: { label: ReactNode; value: ReactNode; strong?: boolean; saving?: boolean }) {
+  return (
+    <div className={clsx('pb-kv', strong && 'pb-kv--strong', saving && 'pb-kv--saving')}>
       <span>{label}</span>
       <span className="tabular-nums">{value}</span>
     </div>
@@ -908,9 +966,19 @@ function CoverNoteCard({ quote, editable, run }: { quote: Quote; editable: boole
   );
 }
 
-function Rail({ quote, options, accepted }: { quote: Quote; options: QuoteOption[]; accepted: boolean }) {
+function Rail({
+  quote,
+  options,
+  accepted,
+  priced,
+}: {
+  quote: Quote;
+  options: QuoteOption[];
+  accepted: boolean;
+  priced: PricedSelection | undefined;
+}) {
   const { getName } = useGlossary();
-  const checks = sendChecks(quote);
+  const checks = sendChecks(quote, priced);
   return (
     <aside className="pb-rail">
       <Card>
@@ -920,7 +988,10 @@ function Rail({ quote, options, accepted }: { quote: Quote; options: QuoteOption
         <CardBody flush>
           {options.length === 0 && <p className="px-3.5 py-3 text-[12px] text-fg-muted">No options yet.</p>}
           {options.map((o) => {
+            const live = pricedOption(priced, o.id)?.totals;
+            const total = live?.totalAmount ?? o.totals.totalAmount;
             const rebate = o.rebateAmount ?? 0;
+            const afterRebate = live ? live.afterRebate : rebate > 0 ? total - rebate : null;
             return (
               <div key={o.id} className="pb-rail-opt" data-testid="proposal-rail-option">
                 <div className="flex items-baseline gap-1.5">
@@ -931,19 +1002,23 @@ function Rail({ quote, options, accepted }: { quote: Quote; options: QuoteOption
                       Chosen
                     </Pill>
                   )}
-                  <span className="ml-auto text-[15px] font-bold tabular-nums text-fg-strong">{formatCurrency(o.totals.totalAmount)}</span>
+                  <span className="ml-auto text-[15px] font-bold tabular-nums text-fg-strong">{formatCurrency(total)}</span>
                 </div>
-                {rebate > 0 && (
-                  <div className="mt-0.5 text-[11.5px] tabular-nums text-fg-muted">{`${formatCurrency(o.totals.totalAmount - rebate)} after rebate`}</div>
-                )}
+                <div className="mt-0.5 flex flex-wrap gap-x-2 text-[11.5px] tabular-nums text-fg-muted">
+                  {live && live.youSave > 0 && (
+                    <span className="font-semibold text-success-500">{`Save ${formatCurrency(live.youSave)}`}</span>
+                  )}
+                  {afterRebate != null && <span>{`${formatCurrency(afterRebate)} after rebate`}</span>}
+                </div>
               </div>
             );
           })}
           <p className="border-t border-border-soft px-3.5 py-2 text-[11px] text-fg-muted">
-            {`Each option’s total, before add-ons. The ${getName('quote').toLowerCase()} total above is the selected option.`}
+            {`Each option’s total, before add-ons. The ${getName('quote').toLowerCase()} total above is the current selection.`}
           </p>
         </CardBody>
       </Card>
+      {priced && !accepted && <CurrentSelection quote={quote} priced={priced} />}
       {!accepted && quote.status === 'DRAFT' && options.length > 0 && (
         <Card>
           <CardHead>
@@ -967,5 +1042,38 @@ function Rail({ quote, options, accepted }: { quote: Quote; options: QuoteOption
         </Card>
       )}
     </aside>
+  );
+}
+
+/** What the quote is priced for right now, and who chose it. */
+function CurrentSelection({ quote, priced }: { quote: Quote; priced: PricedSelection }) {
+  const { getName } = useGlossary();
+  const chosen = allOptions(quote).filter((o) => priced.selection.optionIds.includes(o.id));
+  const addOns = addOnLines(quote).filter((l) => priced.selection.addOnLineIds.includes(l.id));
+  const who =
+    priced.updatedVia === 'CUSTOMER'
+      ? `Chosen by the ${getName('customer').toLowerCase()} on the link`
+      : priced.updatedVia === 'ADVISOR'
+        ? 'Set in the app'
+        : 'Nobody has chosen yet: the most popular option is shown';
+  return (
+    <Card>
+      <CardHead>
+        <CardTitle>Current selection</CardTitle>
+      </CardHead>
+      <CardBody className="flex flex-col gap-1">
+        <div className="text-[12.5px] font-semibold text-fg-strong" data-testid="proposal-current-selection">
+          {[...chosen.map((o) => o.name), ...addOns.map((l) => l.description)].join(' + ') || '—'}
+        </div>
+        <div className="text-[12px] tabular-nums text-fg-muted">
+          {formatCurrency(priced.totals.totalAmount)}
+          {priced.totals.youSave > 0 && ` · saves ${formatCurrency(priced.totals.youSave)}`}
+        </div>
+        <div className="text-[11.5px] text-fg-muted">
+          {who}
+          {priced.updatedAt && ` · ${formatTimestamp(priced.updatedAt, { withTime: true })}`}
+        </div>
+      </CardBody>
+    </Card>
   );
 }

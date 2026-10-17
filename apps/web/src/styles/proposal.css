@@ -144,6 +144,9 @@
 .pb-kv > span:last-child { color: var(--fg-strong); }
 .pb-kv--strong { font-weight: 600; }
 .pb-kv--strong > span:last-child { font-size: 14px; font-weight: 700; }
+.pb-kv--saving > span:last-child { color: var(--success-500); }
+.pb-warn { font-size: 11px; font-weight: 500; line-height: 1.4; color: var(--warning-fg); }
+.pb-costnote { font-size: 10.5px; color: var(--fg-muted); }
 .pb-hint { margin-left: 4px; font-size: 10.5px; font-weight: 400; color: var(--fg-muted); text-transform: none; letter-spacing: 0; }
 
 .pb-money {

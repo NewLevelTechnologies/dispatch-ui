@@ -47,6 +47,7 @@ export default function DocumentSettingsPanel() {
         <div className="flex flex-col gap-3">
           {/* Keyed on the saved value so a save starts the field over from it. */}
           <QuotesCard key={data.quoteValidityDays ?? 30} settings={data} canManage={canManage} />
+          <ProposalsCard key={data.marginFloor ?? 'none'} settings={data} canManage={canManage} />
           <Card>
             <CardHead>
               <CardTitle>{t('settings.documents.invoices', names)}</CardTitle>
@@ -131,6 +132,73 @@ function QuotesCard({ settings, canManage }: { settings: PricingSettings; canMan
           </div>
         )}
       </FormSection>
+      </div>
+    </Card>
+  );
+}
+
+/** Fraction ↔ the percent typed: 0.35 ↔ "35". */
+const floorText = (floor: number | null | undefined) => (floor ? String(Math.round(floor * 1000) / 10) : '');
+
+function ProposalsCard({ settings, canManage }: { settings: PricingSettings; canManage: boolean }) {
+  const names = useEntityNames();
+  const { t } = useTranslation();
+  const queryClient = useQueryClient();
+  const saved = floorText(settings.marginFloor);
+  const [pct, setPct] = useState(saved);
+  const n = Number(pct);
+  const blank = pct.trim() === '';
+  const valid = blank || (Number.isFinite(n) && n > 0 && n < 100);
+  const dirty = valid && pct.trim() !== saved;
+
+  const save = useMutation({
+    // 0 removes the floor.
+    mutationFn: () => taxApi.updatePricingSettings(settings.agreementFeeTaxClass, undefined, { marginFloor: blank ? 0 : n / 100 }),
+    onSuccess: (next) => {
+      queryClient.setQueryData(SETTINGS_KEY, next);
+      queryClient.invalidateQueries({ queryKey: ['quote-selection'] });
+      showSuccess(t('settings.documents.marginFloor.saved'));
+    },
+    onError: (err) => showError(t('settings.documents.marginFloor.saveFailed'), extractApiError(err)),
+  });
+
+  return (
+    <Card>
+      <CardHead>
+        <CardTitle>{t('settings.documents.marginFloor.title')}</CardTitle>
+      </CardHead>
+      <div className="px-5">
+        <FormSection title={t('settings.documents.marginFloor.label')} description={t('settings.documents.marginFloor.hint', names)}>
+          <div className="flex w-32 items-center gap-1.5">
+            <Input
+              inputMode="decimal"
+              aria-label={t('settings.documents.marginFloor.label')}
+              value={pct}
+              disabled={!canManage}
+              invalid={!valid}
+              onChange={(e) => setPct(e.target.value.replace(/[^0-9.]/g, ''))}
+              className="[&_input]:text-right"
+            />
+            <span className="text-[12.5px] text-fg-muted">%</span>
+          </div>
+          <p className={valid ? 'text-[12px] text-fg-muted' : 'text-[12px] text-danger-500'}>
+            {!valid
+              ? t('settings.documents.marginFloor.invalid')
+              : blank
+                ? t('settings.documents.marginFloor.none')
+                : t('settings.documents.marginFloor.preview', { pct: `${n}%` })}
+          </p>
+          {canManage && dirty && (
+            <div className="flex gap-2">
+              <Button color="dark/zinc" size="xs" disabled={save.isPending} onClick={() => save.mutate()}>
+                {t('common.save')}
+              </Button>
+              <Button plain size="xs" onClick={() => setPct(saved)}>
+                {t('common.cancel')}
+              </Button>
+            </div>
+          )}
+        </FormSection>
       </div>
     </Card>
   );

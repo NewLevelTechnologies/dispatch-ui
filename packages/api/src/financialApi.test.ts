@@ -417,6 +417,8 @@ describe('quotesApi proposal structure', () => {
     expect(apiClient.put).toHaveBeenLastCalledWith('/financial/quotes/q-1/lines/l-9/placement', {
       version: 7, role: 'ADD_ON', recommended: true, recommendationNote: 'Leaky ducts',
     });
+    await quotesApi.saveSelection('q-1', { optionIds: ['o-2'], addOnLineIds: ['l-9'] });
+    expect(apiClient.put).toHaveBeenLastCalledWith('/financial/quotes/q-1/selection', { optionIds: ['o-2'], addOnLineIds: ['l-9'] });
     await quotesApi.deleteOption('q-1', 'o-1', 8);
     expect(apiClient.delete).toHaveBeenLastCalledWith('/financial/quotes/q-1/options/o-1', { params: { version: 8 } });
   });
@@ -508,6 +510,13 @@ describe('taxApi', () => {
   it('sets the agreement fee tax class', async () => {
     await taxApi.updatePricingSettings('FEE');
     expect(apiClient.put).toHaveBeenCalledWith('/financial/pricing-settings', { agreementFeeTaxClass: 'FEE' });
+  });
+
+  it('sets or removes the margin floor', async () => {
+    await taxApi.updatePricingSettings('FEE', undefined, { marginFloor: 0.35 });
+    expect(apiClient.put).toHaveBeenLastCalledWith('/financial/pricing-settings', { agreementFeeTaxClass: 'FEE', marginFloor: 0.35 });
+    await taxApi.updatePricingSettings('FEE', 30, { marginFloor: 0 });
+    expect(apiClient.put).toHaveBeenLastCalledWith('/financial/pricing-settings', { agreementFeeTaxClass: 'FEE', quoteValidityDays: 30, marginFloor: 0 });
   });
 });
 

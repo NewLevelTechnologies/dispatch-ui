@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { screen, waitFor, within } from '@testing-library/react';
 import { renderWithProviders, userEvent } from '../../test/utils';
 import { ProposalBuilder } from './ProposalBuilder';
-import { proposalQuote } from './proposalFixtures';
+import { pricedSelection, proposalQuote } from './proposalFixtures';
 import type { Quote } from '../../api/setup';
 
 const api = vi.hoisted(() => ({
@@ -16,6 +16,7 @@ const api = vi.hoisted(() => ({
   deleteLine: vi.fn(),
   updateHeader: vi.fn(),
   addLine: vi.fn(),
+  getSelection: vi.fn(),
 }));
 
 vi.mock('../../api/setup', async (importOriginal) => {
@@ -40,6 +41,8 @@ const renderBuilder = (quote: Quote = proposalQuote(), editable = true) =>
 beforeEach(() => {
   vi.clearAllMocks();
   for (const fn of Object.values(api)) fn.mockResolvedValue(proposalQuote());
+  // Until a test prices it, the cards show the quote's own totals.
+  api.getSelection.mockReturnValue(new Promise(() => {}));
 });
 
 describe('ProposalBuilder', () => {
@@ -171,5 +174,37 @@ describe('ProposalBuilder', () => {
     expect(ducts).toHaveTextContent('Taken');
     expect(tstat).toHaveTextContent('Included');
     expect(screen.queryByText('Before sending')).not.toBeInTheDocument();
+  });
+
+  describe('priced by the server', () => {
+    beforeEach(() => api.getSelection.mockResolvedValue(pricedSelection()));
+
+    it('shows each card’s savings with their reasons, what the customer saves, and the margin floor', async () => {
+      renderBuilder();
+
+      const [, comfort] = screen.getAllByTestId('proposal-option');
+      expect(await within(comfort).findByText('You save')).toBeInTheDocument();
+      expect(within(comfort).getByText('Promotion')).toBeInTheDocument();
+      expect(within(comfort).getAllByText('−$500.00')).toHaveLength(1);
+      expect(within(comfort).getByText('$15,060.00')).toBeInTheDocument(); // after rebate, from the server
+      expect(within(comfort).getByText('34%')).toHaveClass('text-warning-fg');
+      expect(within(comfort).getByText('Below the 35% floor.')).toBeInTheDocument();
+      expect(within(comfort).getByText('Some lines have no cost; they count as $0.')).toBeInTheDocument();
+      expect(api.getSelection).toHaveBeenCalledWith('q-1');
+    });
+
+    it('flags the below-floor option before sending', async () => {
+      renderBuilder();
+      await screen.findAllByText('You save');
+      const checks = screen.getAllByTestId('proposal-check').map((c) => c.textContent);
+      expect(checks).toContain('Comfort is below the 35% margin floor');
+    });
+
+    it('says what the customer is looking at and who chose it', async () => {
+      renderBuilder();
+      expect(await screen.findByTestId('proposal-current-selection')).toHaveTextContent('Comfort + Duct sealing');
+      expect(screen.getByText(/Chosen by the customer on the link/)).toBeInTheDocument();
+      expect(screen.getByText(/saves \$500\.00/)).toBeInTheDocument();
+    });
   });
 });

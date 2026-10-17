@@ -27,6 +27,7 @@ import { invoicedPercent } from '../components/document/billingModel';
 import { formatDocDate, isLegacy, memberLabel, memberSavings, toDateInput } from '../components/document/documentModel';
 import { SendDocumentDialog } from '../components/document/SendDocumentDialog';
 import { ProposalBuilder } from '../components/proposal/ProposalBuilder';
+import { useQuoteSelection } from '../components/proposal/useQuoteSelection';
 import { addOnLines, allOptions, headerFields, isProposal, modeOf } from '../components/proposal/proposalModel';
 import { ToggleGroup, ToggleGroupOption } from '../components/ui/ToggleGroup';
 
@@ -84,6 +85,7 @@ export default function QuoteDetailPage() {
     },
     onError: (err) => showError(`Couldn’t duplicate this ${entityLower}`, documentErrorMessage(err, entityLower)),
   });
+  const { data: pricedSelection } = useQuoteSelection(quote);
   const { billTo, location, workOrder } = useDocumentParties({
     customerId: quote?.customerId ?? '',
     customerName: quote?.customerName,
@@ -143,11 +145,10 @@ export default function QuoteDetailPage() {
       (version) => quotesApi.updateHeader(quote.id, headerFields(quote, version, { presentation })),
       `Couldn’t switch this ${entityLower}`,
     );
+  // The server's range once the priced selection loads; the options' last-edit totals until then.
   const optionTotals = options.map((o) => o.totals.totalAmount);
-  const optionRange =
-    proposal && optionTotals.length > 1
-      ? `${formatCurrency(Math.min(...optionTotals))} – ${formatCurrency(Math.max(...optionTotals))}`
-      : null;
+  const range = pricedSelection?.priceRange ?? (optionTotals.length ? { low: Math.min(...optionTotals), high: Math.max(...optionTotals) } : null);
+  const optionRange = proposal && options.length > 1 && range ? `${formatCurrency(range.low)} – ${formatCurrency(range.high)}` : null;
 
   const sendLabel = unsentRevision ? `Re-send · Rev ${revision ?? 1}` : quote.lastSentAt ? 'Resend' : `Send ${entityLower}`;
   const actions = (
