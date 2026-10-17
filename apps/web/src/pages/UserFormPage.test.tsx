@@ -424,6 +424,19 @@ describe('UserFormPage', () => {
       });
     });
 
+    it('saves a job title, shown on proposals beside the advisor’s name', async () => {
+      const user = userEvent.setup();
+      renderWithProviders(<UserEditPage />);
+
+      await screen.findByDisplayValue('Jane');
+      await user.type(screen.getByPlaceholderText('e.g. Comfort Advisor'), 'Comfort Advisor');
+      await user.click(screen.getByRole('button', { name: /save changes/i }));
+
+      await waitFor(() =>
+        expect(apiClient.put).toHaveBeenCalledWith('/users/user-1', expect.objectContaining({ jobTitle: 'Comfort Advisor' })),
+      );
+    });
+
     it('edit submit with zero roles surfaces an error and does not call API', async () => {
       const user = userEvent.setup();
       renderWithProviders(<UserEditPage />);

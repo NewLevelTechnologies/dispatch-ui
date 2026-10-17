@@ -69,7 +69,12 @@ export function toPresentation({
       lineItems: [],
       presentation: 'PROPOSAL',
       coverNote: quote.coverNote ?? null,
-      advisor: { name: quote.advisorName ?? null, phone: null },
+      advisor: {
+        name: quote.advisorName ?? null,
+        phone: null,
+        title: quote.advisorTitle ?? null,
+        photoUrl: quote.advisorPhotoUrl ?? null,
+      },
       expired: isExpired(quote, today),
       proposal: {
         groups: groups.map((g) => ({

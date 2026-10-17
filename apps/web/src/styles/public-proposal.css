@@ -95,6 +95,10 @@
 .pp-rec b { display: block; margin-bottom: 2px; font-size: 12.5px; color: var(--fg-accent); }
 .pp-rec span { font-size: 13.5px; color: var(--fg); }
 .pp-av { display: grid; place-items: center; flex: none; width: 30px; height: 30px; border-radius: 50%; background: var(--fg-strong); color: var(--bg-elev); font-size: 11px; font-weight: 700; }
+.pp-av--photo { object-fit: cover; background: var(--bg-elev-2); }
+.pp-from { display: flex; align-items: center; gap: 10px; margin: -12px 0 24px; font-size: 13.5px; color: var(--fg-muted); }
+.pp-from .pp-av { width: 40px; height: 40px; font-size: 13px; }
+.pp-from b { font-size: 14.5px; color: var(--fg-strong); }
 .pp-addon-foot { display: flex; align-items: center; gap: 10px; margin-top: auto; padding-top: 6px; }
 .pp-addon-price { flex: 1; font-size: 18px; font-weight: 700; color: var(--fg-strong); }
 .pp-btn-sm { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 18px; border: 1.5px solid var(--border-strong); border-radius: 10px; background: var(--bg-elev); color: var(--fg-strong); font-size: 14.5px; font-weight: 700; cursor: pointer; }

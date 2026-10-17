@@ -94,6 +94,7 @@ function ProfileCard({ user }: { user: User }) {
   // display. Legacy rows with formatted strings in storage normalize to
   // digits on next save, which is the documented backfill path.
   const [phone, setPhone] = useState(stripPhoneDigits(user.phoneNumber));
+  const [jobTitle, setJobTitle] = useState(user.jobTitle ?? '');
   const [saveError, setSaveError] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -110,7 +111,8 @@ function ProfileCard({ user }: { user: User }) {
   const dirty =
     firstName !== user.firstName ||
     lastName !== user.lastName ||
-    phone !== stripPhoneDigits(user.phoneNumber);
+    phone !== stripPhoneDigits(user.phoneNumber) ||
+    jobTitle.trim() !== (user.jobTitle ?? '');
 
   // Every self-update returns the full User — push it into the currentUser
   // cache and invalidate the user list/detail queries so the sidebar,
@@ -127,6 +129,8 @@ function ProfileCard({ user }: { user: User }) {
         firstName: firstName.trim(),
         lastName: lastName.trim(),
         phoneNumber: phone || null,
+        // Blank clears it on this endpoint; null would leave it as it was.
+        jobTitle: jobTitle.trim(),
       }),
     onSuccess: (updated) => {
       onSelfUserUpdated(updated);
@@ -164,6 +168,7 @@ function ProfileCard({ user }: { user: User }) {
     setFirstName(user.firstName);
     setLastName(user.lastName);
     setPhone(stripPhoneDigits(user.phoneNumber));
+    setJobTitle(user.jobTitle ?? '');
     setSaveError('');
   };
 
@@ -276,6 +281,10 @@ function ProfileCard({ user }: { user: User }) {
             onValueChange={(values) => setPhone(values.value)}
             placeholder={t('account.profile.phonePlaceholder')}
           />
+        </Field>
+        <Field size="xs">
+          <Label size="xs">{t('account.profile.jobTitle')}</Label>
+          <Input size="xs" value={jobTitle} maxLength={100} onChange={(e) => setJobTitle(e.target.value)} placeholder={t('account.profile.jobTitlePlaceholder')} />
         </Field>
       </div>
 
