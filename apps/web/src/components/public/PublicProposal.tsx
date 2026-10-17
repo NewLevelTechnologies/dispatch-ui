@@ -326,6 +326,7 @@ function Chooser({
     setChoice(next);
     save(next);
   };
+  const pickPlan = (paymentPlanId: string | null) => change({ ...choice, paymentPlanId });
   const pickOption = (groupId: string, optionId: string) => {
     const group = proposal.groups.find((g) => g.id === groupId);
     const others = choice.optionIds.filter((id) => !group?.options.some((o) => o.id === id));
@@ -500,6 +501,9 @@ function Chooser({
               onSignerName={setSignerName}
               agree={agree}
               onAgree={setAgree}
+              selectedPlanId={choice.paymentPlanId ?? null}
+              canChoose={canChoose}
+              onPickPlan={pickPlan}
             />
           )}
           {index > 0 && (
@@ -637,6 +641,9 @@ function OptionsStep({
                             </>
                           )}
                         </div>
+                      )}
+                      {card?.fromMonthly != null && (
+                        <div className="pp-sub tabular-nums">{t('public.proposal.pay.fromMonthly', { monthly: usd(card.fromMonthly) })}</div>
                       )}
                       {num(o.rebateAmount) > 0 && (
                         <div className="pp-rebate">{t('public.proposal.rebate', { amount: usd(o.rebateAmount) })}</div>
@@ -946,6 +953,32 @@ function ProtectStep({
   );
 }
 
+/** One way to pay: in full, or a plan's monthly payment. */
+function PlanOption({
+  on,
+  disabled,
+  label,
+  value,
+  sub,
+  onPick,
+}: {
+  on: boolean;
+  disabled: boolean;
+  label: string;
+  value: ReactNode;
+  sub: string;
+  onPick: () => void;
+}) {
+  return (
+    <button type="button" role="radio" aria-checked={on} className={`pp-plan${on ? ' on' : ''}`} disabled={disabled} onClick={onPick}>
+      <span className="pp-radio">{on && <span />}</span>
+      <span className="pp-plan-l">{label}</span>
+      <span className="pp-plan-v tabular-nums">{value}</span>
+      <span className="pp-plan-s">{sub}</span>
+    </button>
+  );
+}
+
 function ReviewStep({
   priced,
   proposal,
@@ -962,6 +995,9 @@ function ReviewStep({
   onSignerName,
   agree,
   onAgree,
+  selectedPlanId,
+  canChoose,
+  onPickPlan,
 }: {
   priced: PublicPricedSelection | null;
   proposal: Proposal;
@@ -978,8 +1014,13 @@ function ReviewStep({
   onSignerName: (v: string) => void;
   agree: boolean;
   onAgree: (v: boolean) => void;
+  selectedPlanId: string | null;
+  canChoose: boolean;
+  onPickPlan: (planId: string | null) => void;
 }) {
   const { t } = useTranslation();
+  const financing = priced?.financing ?? null;
+  const plan = financing?.plans.find((p) => p.planId === selectedPlanId) ?? null;
   return (
     <section>
       <StepHead step={step} count={count} title={t('public.proposal.review.title')} lede={t('public.proposal.review.lede')} />
@@ -1003,6 +1044,38 @@ function ReviewStep({
             )}
           </div>
         )}
+        {financing && priced && (
+          <div className="pp-card" data-testid="pp-pay">
+            <div className="pp-card-t">{t('public.proposal.pay.title')}</div>
+            <div className="pp-plans" role="radiogroup" aria-label={t('public.proposal.pay.title')}>
+              <PlanOption
+                on={!selectedPlanId}
+                disabled={!canChoose}
+                label={t('public.proposal.pay.full')}
+                value={usd(priced.totals.totalAmount)}
+                sub={t('public.proposal.pay.fullSub')}
+                onPick={() => onPickPlan(null)}
+              />
+              {financing.plans.map((p) => (
+                <PlanOption
+                  key={p.planId}
+                  on={selectedPlanId === p.planId}
+                  disabled={!canChoose}
+                  label={p.label}
+                  value={
+                    <>
+                      {usd(p.monthlyPayment)}
+                      <small>{t('public.proposal.pay.perMonth')}</small>
+                    </>
+                  }
+                  sub={t('public.proposal.pay.terms', { apr: `${Number(num(p.apr).toFixed(3))}%`, count: p.months })}
+                  onPick={() => onPickPlan(p.planId)}
+                />
+              ))}
+            </div>
+            <div className="pp-fine">{t('public.proposal.pay.fine')}</div>
+          </div>
+        )}
         {canSign && priced && (
           <div className="pp-card">
             <div className="pp-card-t">{t('public.proposal.review.approveTitle')}</div>
@@ -1013,6 +1086,7 @@ function ReviewStep({
                 number: quoteNumber,
                 date: validThrough,
               })}
+              {plan && ` ${t('public.proposal.pay.authorizeMonthly', { monthly: usdCents(plan.monthlyPayment), plan: plan.label })}`}
             </p>
             <SignaturePad key={padKey} signed={!!signature} onChange={onSignature} />
             <label className="pp-field">
@@ -1157,9 +1231,21 @@ function Cart({
         <div className="pp-cart-sub tabular-nums">
           {saving ? (
             <span className="pp-updating">{t('public.proposal.updating')}</span>
-          ) : priced && num(priced.totals.youSave) > 0 ? (
-            <s>{usd(priced.totals.listPrice)}</s>
-          ) : null}
+          ) : (
+            <>
+              {priced && num(priced.totals.youSave) > 0 && <s>{usd(priced.totals.listPrice)}</s>}
+              {priced?.financing?.monthlyPayment != null ? (
+                <span className="block">
+                  {t('public.proposal.pay.orMonthly', {
+                    monthly: usd(priced.financing.monthlyPayment),
+                    plan: priced.financing.plans.find((p) => p.planId === priced.financing?.selectedPlanId)?.label ?? '',
+                  })}
+                </span>
+              ) : priced?.totals.fromMonthly != null ? (
+                <span className="block">{t('public.proposal.pay.fromMonthly', { monthly: usd(priced.totals.fromMonthly) })}</span>
+              ) : null}
+            </>
+          )}
         </div>
       </div>
       {cta && (
@@ -1177,6 +1263,7 @@ function Cart({
 
 /** After approval: the signed copy, as stored. */
 function Done({ approval, data }: { approval: PublicApproval | null; data: PublicQuoteResponse }) {
+  const applicationUrl = data.quote.selection?.financing?.applicationUrl ?? null;
   const { t } = useTranslation();
   const { quote, tenant, customer } = data;
   const names = publicNames(tenant);
@@ -1206,6 +1293,23 @@ function Done({ approval, data }: { approval: PublicApproval | null; data: Publi
               date: new Date(approval.signedAt).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' }),
             })}
           </div>
+        </div>
+      )}
+      {approval?.paymentPlan && (
+        <div className="pp-card pp-done-sum" data-testid="pp-financing">
+          <div className="pp-card-t">{t('public.proposal.pay.doneTitle')}</div>
+          <p className="pp-auth">
+            {t('public.proposal.pay.doneBody', {
+              monthly: usdCents(approval.paymentPlan.monthlyPayment),
+              plan: approval.paymentPlan.label,
+              tenant: sender,
+            })}
+          </p>
+          {applicationUrl && (
+            <a className="pp-btn pp-btn--1 pp-btn--inline" href={applicationUrl} target="_blank" rel="noopener noreferrer">
+              {t('public.proposal.pay.apply')}
+            </a>
+          )}
         </div>
       )}
       {phone && <div className="pp-done-foot">{t('public.proposal.done.questions', { tenant: sender, phone })}</div>}

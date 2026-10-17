@@ -989,6 +989,8 @@ export interface SelectionTotals {
   margin: SelectionMargin | null;
   /** What joining the offered plan saves here, joined or not ("Join and save $239"). */
   joinSaves?: number | null;
+  /** The lowest monthly payment among the offered plans ("from $289/mo"). */
+  fromMonthly?: number | null;
 }
 
 export interface PricedSelectionLine {
@@ -1014,6 +1016,28 @@ export interface QuoteSelectionChoice {
   addOnLineIds: string[];
   /** "Join and save": priced at the offered plan's member price. Ignored (false) with no plan offered. */
   joinMembership?: boolean;
+  /** The payment plan picked; null = paying in full. 400 when the quote doesn't offer it. */
+  paymentPlanId?: string | null;
+}
+
+/** A payment plan's monthly payment on a choice (standard amortization, on the total after tax). */
+export interface FinancingPlanQuote {
+  planId: string;
+  label: string;
+  /** A percentage: 7.99 = 7.99%. */
+  apr: number;
+  months: number;
+  monthlyPayment: number;
+}
+
+/** The plans a proposal offers, priced on the current choice; null when it offers none. */
+export interface SelectionFinancing {
+  plans: FinancingPlanQuote[];
+  /** Null: paying in full. */
+  selectedPlanId: string | null;
+  monthlyPayment: number | null;
+  /** The tenant's lender application link. */
+  applicationUrl: string | null;
 }
 
 /** The plan a proposal offers, and its member benefits on a job. Fractions. */
@@ -1060,6 +1084,7 @@ export interface PricedSelection {
   priceRange: { low: number; high: number } | null;
   /** The plan offered; null when none is, or the site is a member already. */
   membership?: MembershipOffer | null;
+  financing?: SelectionFinancing | null;
 }
 
 /** The signed copy, stored once at approval; the app also sees IP and user agent. */
@@ -1080,6 +1105,8 @@ export interface QuoteApproval {
   /** IN_PERSON: the advisor who was there. */
   witnessUserId?: string | null;
   witnessName?: string | null;
+  /** The payment plan as it stood when signed; null when paying in full. */
+  paymentPlan?: FinancingPlanQuote | null;
 }
 
 export interface QuoteOptionGroup {
@@ -1155,6 +1182,8 @@ export interface Quote {
   /** The advisor's job title and photo, for the proposal; null when they have none. */
   advisorTitle?: string | null;
   advisorPhotoUrl?: string | null;
+  /** The payment plans offered: null (the default) = every active plan; [] = none. */
+  paymentPlanIds?: string[] | null;
   /** The agreement plan this proposal offers ("join and save"). */
   membershipPlanId?: string | null;
   /** Signed with "join" on: waiting for the office to set the agreement up. */
@@ -1408,6 +1437,11 @@ export const quotesApi = {
   /** The signed copy (on the link or in person); 400 when the office recorded the yes without one. */
   getApproval: async (id: string): Promise<QuoteApproval> => {
     const response = await apiClient.get<QuoteApproval>(`/financial/quotes/${id}/approval`);
+    return response.data;
+  },
+  /** Which payment plans this proposal offers: null = every active plan, [] = none. */
+  setPaymentPlans: async (id: string, request: { version: number; planIds: string[] | null }): Promise<Quote> => {
+    const response = await apiClient.put<Quote>(`/financial/quotes/${id}/payment-plans`, request);
     return response.data;
   },
   /** Offer an agreement plan's member price ("join and save"); null offers none. 400 for an archived plan or one with no job benefit. */
@@ -1834,6 +1868,8 @@ export interface PricingSettings {
   quoteValidityDays?: number;
   /** Proposals: options below this margin (a fraction) are flagged. Null = none. */
   marginFloor?: number | null;
+  /** The lender's application page, linked from proposals that pick a plan. */
+  financingApplicationUrl?: string | null;
   updatedAt: string | null;
 }
 
@@ -1891,12 +1927,14 @@ export const taxApi = {
   updatePricingSettings: async (
     agreementFeeTaxClass: TaxClass,
     quoteValidityDays?: number,
-    { marginFloor }: { marginFloor?: number } = {},
+    { marginFloor, financingApplicationUrl }: { marginFloor?: number; financingApplicationUrl?: string } = {},
   ): Promise<PricingSettings> => {
     const response = await apiClient.put<PricingSettings>('/financial/pricing-settings', {
       agreementFeeTaxClass,
       ...(quoteValidityDays != null ? { quoteValidityDays } : {}),
       ...(marginFloor != null ? { marginFloor } : {}),
+      // "" removes it; left out, it stays.
+      ...(financingApplicationUrl != null ? { financingApplicationUrl } : {}),
     });
     return response.data;
   },
@@ -2461,6 +2499,40 @@ export const quotePriceApprovalsApi = {
   /** Withdraw: the asker, or a manager. */
   cancel: async (id: string): Promise<QuotePriceApproval> => {
     const response = await apiClient.post<QuotePriceApproval>(`/financial/quote-price-approvals/${id}/cancel`);
+    return response.data;
+  },
+};
+
+// ========== PAYMENT PLANS ==========
+
+/** A financing plan the tenant's lender offers. No delete: switch it off. Writes need MANAGE_PRICING. */
+export interface PaymentPlanRequest {
+  /** Up to 80 characters. */
+  label: string;
+  /** A percentage (7.99 = 7.99%), 0 to under 100, up to 3 decimals. */
+  apr: number;
+  /** 1–360. */
+  months: number;
+  sortOrder: number;
+  active: boolean;
+}
+
+export interface PaymentPlan extends PaymentPlanRequest {
+  id: string;
+}
+
+export const paymentPlansApi = {
+  /** By sortOrder then label, inactive included. */
+  getAll: async (): Promise<PaymentPlan[]> => {
+    const response = await apiClient.get<PaymentPlan[]>('/financial/payment-plans');
+    return response.data;
+  },
+  create: async (request: PaymentPlanRequest): Promise<PaymentPlan> => {
+    const response = await apiClient.post<PaymentPlan>('/financial/payment-plans', request);
+    return response.data;
+  },
+  update: async (id: string, request: PaymentPlanRequest): Promise<PaymentPlan> => {
+    const response = await apiClient.put<PaymentPlan>(`/financial/payment-plans/${id}`, request);
     return response.data;
   },
 };

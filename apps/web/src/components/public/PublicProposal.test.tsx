@@ -266,4 +266,55 @@ describe('PublicProposal', () => {
     const [ducts] = screen.getAllByTestId('pp-addon');
     expect(ducts.querySelector('img.pp-av')).toHaveAttribute('src', 'https://cdn/danny.jpg');
   });
+
+  it('lets the customer pay monthly: from-prices on the cards, a plan picked at review, the payment in the package', async () => {
+    const financing = {
+      plans: [
+        { planId: 'pp-1', label: '12 months same as cash', apr: 0, months: 12, monthlyPayment: 1256.67 },
+        { planId: 'pp-2', label: '60 months', apr: 9.99, months: 60, monthlyPayment: 320.33 },
+      ],
+      selectedPlanId: null, monthlyPayment: null, applicationUrl: 'https://apply.lender.com',
+    };
+    const base = priced();
+    const offered = priced({
+      financing,
+      totals: { ...base.totals, fromMonthly: 320.33 },
+      options: base.options.map((o) => ({ ...o, totals: { ...o.totals, fromMonthly: 289.1 } })),
+    });
+    api.saveQuoteSelection.mockResolvedValue({
+      ...offered,
+      selection: { ...offered.selection, paymentPlanId: 'pp-2' },
+      financing: { ...financing, selectedPlanId: 'pp-2', monthlyPayment: 320.33 },
+    });
+    const user = userEvent.setup();
+    renderPage(page({ selection: offered }));
+
+    expect(screen.getAllByTestId('pp-option')[0]).toHaveTextContent('public.proposal.pay.fromMonthly');
+    await user.click(screen.getByRole('button', { name: /public.proposal.steps.review/ }));
+    const pay = screen.getByTestId('pp-pay');
+    expect(within(pay).getByRole('radio', { name: /public.proposal.pay.full/ })).toHaveAttribute('aria-checked', 'true');
+    await user.click(within(pay).getByRole('radio', { name: /60 months/ }));
+    await waitFor(
+      () => expect(api.saveQuoteSelection).toHaveBeenCalledWith('tok', { optionIds: ['o-2'], addOnLineIds: [], paymentPlanId: 'pp-2' }),
+      { timeout: 2000 },
+    );
+    await waitFor(() => expect(screen.getAllByTestId('pp-cart')[0]).toHaveTextContent('public.proposal.pay.orMonthly'));
+  });
+
+  it('shows the plan chosen once signed, with the lender’s application link', () => {
+    renderPage(
+      page({
+        status: 'ACCEPTED',
+        selection: priced({ financing: { plans: [], selectedPlanId: null, monthlyPayment: null, applicationUrl: 'https://apply.lender.com' } }),
+        approval: {
+          signerName: 'Tanya Reyes', signedAt: '2026-10-13T15:11:00Z', signatureImage: null, consent: true, revision: 2,
+          selection: { optionIds: ['o-2'], addOnLineIds: [] }, lines: [], savings: [], totals: totals(15580, 500),
+          paymentPlan: { planId: 'pp-2', label: '60 months', apr: 9.99, months: 60, monthlyPayment: 320.33 },
+        },
+      }),
+    );
+    const card = screen.getByTestId('pp-financing');
+    expect(card).toHaveTextContent('public.proposal.pay.doneBody');
+    expect(within(card).getByRole('link', { name: 'public.proposal.pay.apply' })).toHaveAttribute('href', 'https://apply.lender.com');
+  });
 });

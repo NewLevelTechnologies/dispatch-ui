@@ -252,6 +252,8 @@ export interface PublicSelectionTotals {
   afterRebate: PublicMoney | null;
   /** What joining saves here, joined or not. */
   joinSaves?: PublicMoney | null;
+  /** The lowest monthly payment among the offered plans. */
+  fromMonthly?: PublicMoney | null;
 }
 
 export interface PublicSelectionChoice {
@@ -259,6 +261,24 @@ export interface PublicSelectionChoice {
   addOnLineIds: string[];
   /** "Join and save" the offered plan. */
   joinMembership?: boolean;
+  /** The payment plan picked; null = paying in full. */
+  paymentPlanId?: string | null;
+}
+
+export interface PublicFinancingPlan {
+  planId: string;
+  label: string;
+  /** A percentage. */
+  apr: PublicMoney;
+  months: number;
+  monthlyPayment: PublicMoney;
+}
+
+export interface PublicFinancing {
+  plans: PublicFinancingPlan[];
+  selectedPlanId: string | null;
+  monthlyPayment: PublicMoney | null;
+  applicationUrl: string | null;
 }
 
 /** The plan a proposal offers and its member benefits on a job (fractions). */
@@ -298,6 +318,8 @@ export interface PublicPricedSelection {
   priceRange: { low: PublicMoney; high: PublicMoney } | null;
   /** Null when no plan is offered, or the site is a member already. */
   membership?: PublicMembershipOffer | null;
+  /** Null when the quote offers no payment plans. */
+  financing?: PublicFinancing | null;
 }
 
 /** The signed copy, stored once at approval. */
@@ -314,6 +336,8 @@ export interface PublicApproval {
   totals: PublicSelectionTotals;
   signedVia?: 'LINK' | 'IN_PERSON';
   witnessName?: string | null;
+  /** As it stood when signed; null when paying in full. */
+  paymentPlan?: PublicFinancingPlan | null;
 }
 
 /**

@@ -39,6 +39,9 @@ export function SignedCopyCard({ quoteId }: { quoteId: string }) {
         {approval.signatureImage && (
           <img src={approval.signatureImage} alt={`${approval.signerName}’s signature`} className="pb-signature" />
         )}
+        {approval.paymentPlan && (
+          <div className="text-[11.5px] text-fg-muted">{`${approval.paymentPlan.label} · ${formatCurrency(approval.paymentPlan.monthlyPayment)}/mo: arrange it with the lender`}</div>
+        )}
         <div className="flex items-baseline justify-between text-[12.5px]">
           <span className="font-semibold text-fg-strong">Total</span>
           <span className="text-[15px] font-bold tabular-nums text-fg-strong">{formatCurrency(approval.totals.totalAmount)}</span>
@@ -88,6 +91,12 @@ function SignedCopyDialog({ approval, open, onClose }: { approval: QuoteApproval
           {t.taxAmount > 0 && <Row label="Tax" value={formatCurrency(t.taxAmount)} />}
           <Row label="Total" value={formatCurrency(t.totalAmount)} strong />
           {t.afterRebate != null && <Row label="After rebate (not billed)" value={formatCurrency(t.afterRebate)} />}
+          {approval.paymentPlan && (
+            <Row
+              label={`Paying on ${approval.paymentPlan.label} (${Number(approval.paymentPlan.apr.toFixed(3))}% APR, ${approval.paymentPlan.months} months)`}
+              value={`${formatCurrency(approval.paymentPlan.monthlyPayment)}/mo`}
+            />
+          )}
         </dl>
         {approval.signatureImage && (
           <img src={approval.signatureImage} alt={`${approval.signerName}’s signature`} className="pb-signature" />
