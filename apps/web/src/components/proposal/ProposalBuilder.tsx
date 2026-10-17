@@ -11,7 +11,6 @@ import clsx from 'clsx';
 import {
   laborRatesApi,
   quotesApi,
-  userApi,
   type AddOnMode,
   type PricedSelection,
   type Quote,
@@ -52,6 +51,7 @@ import {
   sharedLines,
 } from './proposalModel';
 import { useQuoteSelection } from './useQuoteSelection';
+import { SignedCopyCard } from './SignedCopy';
 
 type Run = ReturnType<typeof useDocumentEditor<Quote>>['run'];
 type PricedOption = PricedSelection['options'][number];
@@ -918,12 +918,7 @@ function CoverNoteCard({ quote, editable, run }: { quote: Quote; editable: boole
     setShown(quote.coverNote ?? '');
     setDraft(quote.coverNote ?? '');
   }
-  const { data: advisor } = useQuery({
-    queryKey: ['users', quote.advisorUserId],
-    queryFn: () => userApi.getById(quote.advisorUserId!),
-    enabled: !!quote.advisorUserId,
-  });
-  const advisorName = advisor ? `${advisor.firstName} ${advisor.lastName}`.trim() : null;
+  const advisorName = quote.advisorName ?? null;
   const save = (change: { coverNote?: string | null; advisorUserId?: string | null }, fail: string) =>
     run((version) => quotesApi.updateHeader(quote.id, headerFields(quote, version, change)), fail);
 
@@ -1019,6 +1014,8 @@ function Rail({
         </CardBody>
       </Card>
       {priced && !accepted && <CurrentSelection quote={quote} priced={priced} />}
+      {/* Only a link approval has a signed record; the office's verbal yes doesn't. */}
+      {accepted && !quote.acceptedByUserId && <SignedCopyCard quoteId={quote.id} />}
       {!accepted && quote.status === 'DRAFT' && options.length > 0 && (
         <Card>
           <CardHead>

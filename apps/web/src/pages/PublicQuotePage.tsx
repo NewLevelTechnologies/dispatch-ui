@@ -14,6 +14,7 @@ import PublicPreviewBanner from '../components/PublicPreviewBanner';
 import CliffPage from '../components/CliffPage';
 import { Badge } from '../components/catalyst/badge';
 import { PublicLineItems, PublicPricingRows } from '../components/public/PublicDocumentParts';
+import { PublicProposal } from '../components/public/PublicProposal';
 import { useScopedReferrerPolicy } from '../hooks/useScopedReferrerPolicy';
 
 /**
@@ -186,6 +187,17 @@ export default function PublicQuotePage() {
   }
 
   const { quote, tenant, customer } = data;
+  // A proposal gets the guided page; a declined one, or one being updated, reads as a plain quote.
+  if (quote.presentation === 'PROPOSAL' && quote.proposal && !quote.beingUpdated && quote.status !== 'DECLINED') {
+    return (
+      <PublicProposal
+        data={data}
+        token={token}
+        onReplace={(next) => queryClient.setQueryData(['publicQuote', token], next)}
+        onReload={() => void refetch()}
+      />
+    );
+  }
   const isAccepted = quote.status === 'ACCEPTED';
   const isExpired = quote.status === 'EXPIRED';
   const isDeclined = quote.status === 'DECLINED';

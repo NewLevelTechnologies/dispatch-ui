@@ -170,6 +170,126 @@ export interface PublicQuoteData extends PublicPricing {
   totalAmount: string | null;
   notes: string | null;
   lineItems: PublicLineItem[];
+  /** Which page to render. */
+  presentation?: 'STANDARD' | 'PROPOSAL';
+  /** The advisor's opening note. */
+  coverNote?: string | null;
+  /** The advisor, else the quote's creator. */
+  advisor?: { name: string | null; phone: string | null } | null;
+  /** Sent and past its expiration: no choosing, no approving. */
+  expired?: boolean;
+  /** Null without options or add-ons, and while being updated. */
+  proposal?: PublicProposal | null;
+  /** The current choice priced, while it can still be chosen on. */
+  selection?: PublicPricedSelection | null;
+  /** The signed copy once approved through the link. */
+  approval?: PublicApproval | null;
+}
+
+/** Money on the proposal payload; may come as a string (BigDecimal). Render with `Number(...)`. */
+export type PublicMoney = number | string;
+
+export interface PublicProposalPhoto {
+  url: string;
+  thumbnailUrl: string;
+}
+
+export interface PublicProposalOption {
+  id: string;
+  name: string;
+  tagline?: string | null;
+  /** The "Most popular" badge. */
+  recommended: boolean;
+  specs: string[];
+  /** The option's own, else its pricebook item's. */
+  highlights: string[];
+  photos: PublicProposalPhoto[];
+  description?: string | null;
+  rebateAmount?: PublicMoney | null;
+  /** What the option is made of; no prices (they're in `selection`). */
+  lines: { description: string; quantity: number; unit?: string | null }[];
+}
+
+export interface PublicProposalAddOn {
+  lineId: string;
+  description: string;
+  quantity: number;
+  /** List price. */
+  lineTotal: PublicMoney;
+  recommended: boolean;
+  recommendationNote?: string | null;
+  presentation?: PublicLinePresentation | null;
+  /** By option id; options not listed offer it. */
+  modes: Record<string, 'OFFER' | 'INCLUDED' | 'HIDDEN'>;
+}
+
+export interface PublicProposal {
+  groups: { id: string; name: string; options: PublicProposalOption[] }[];
+  addOns: PublicProposalAddOn[];
+}
+
+export interface PublicSaving {
+  adjustmentId?: string;
+  lineId: string | null;
+  kind: PublicAdjustmentKind;
+  reasonCode: PublicAdjustmentReason;
+  /** The source's name (a member plan); else name it from `reasonCode`. */
+  label: string | null;
+  amount: PublicMoney;
+}
+
+export interface PublicSelectionTotals {
+  listPrice: PublicMoney;
+  youSave: PublicMoney;
+  subtotal: PublicMoney;
+  taxAmount: PublicMoney;
+  totalAmount: PublicMoney;
+  rebateAmount: PublicMoney | null;
+  afterRebate: PublicMoney | null;
+}
+
+export interface PublicSelectionChoice {
+  optionIds: string[];
+  addOnLineIds: string[];
+}
+
+export interface PublicPricedLine {
+  id?: string;
+  description: string;
+  optionId: string | null;
+  quantity: number;
+  unit?: string | null;
+  unitPrice: PublicMoney;
+  lineTotal: PublicMoney;
+  adjustmentAmount: PublicMoney;
+  netAmount: PublicMoney;
+  taxAmount: PublicMoney;
+  included: boolean;
+}
+
+/** The current choice, priced by the server (no margin on the link). */
+export interface PublicPricedSelection {
+  selection: PublicSelectionChoice;
+  lines: PublicPricedLine[];
+  savings: PublicSaving[];
+  totals: PublicSelectionTotals;
+  /** The side-by-side cards: each option chosen, no add-ons taken. */
+  options: { optionId: string; groupId: string; name: string; selected: boolean; savings: PublicSaving[]; totals: PublicSelectionTotals }[];
+  priceRange: { low: PublicMoney; high: PublicMoney } | null;
+}
+
+/** The signed copy, stored once at approval. */
+export interface PublicApproval {
+  signerName: string;
+  signedAt: string;
+  /** A PNG data URL. */
+  signatureImage: string | null;
+  consent: boolean;
+  revision: number | null;
+  selection: PublicSelectionChoice;
+  lines: PublicPricedLine[];
+  savings: PublicSaving[];
+  totals: PublicSelectionTotals;
 }
 
 /**
@@ -266,6 +386,37 @@ export const publicFinancialApi = {
       { revision, approverName },
       tokenHeaders(token),
     );
+    return response.data;
+  },
+
+  /**
+   * The customer's whole choice (one option per group, the add-ons taken),
+   * priced by the server. Debounce it. 409 QUOTE_NOT_APPROVABLE unless SENT
+   * and not expired; 429 RATE_LIMIT_EXCEEDED past 60 a minute.
+   */
+  saveQuoteSelection: async (token: string, choice: PublicSelectionChoice): Promise<PublicPricedSelection> => {
+    const response = await publicApiClient.put<PublicPricedSelection>('/public/quotes/selection', choice, tokenHeaders(token));
+    return response.data;
+  },
+
+  /**
+   * Approve a proposal: the choice, the total the customer saw for it, a
+   * PNG signature and consent. 409 QUOTE_TOTAL_CHANGED when it no longer
+   * comes to `totalAmount` (nothing is signed); QUOTE_REVISION_STALE and
+   * QUOTE_NOT_APPROVABLE as for a plain approval.
+   */
+  approveProposal: async (
+    token: string,
+    body: {
+      revision: number | undefined;
+      signerName: string;
+      signature: string;
+      consent: true;
+      selection: PublicSelectionChoice;
+      totalAmount: number;
+    },
+  ): Promise<PublicQuoteResponse> => {
+    const response = await publicApiClient.post<PublicQuoteResponse>('/public/quotes/approve', body, tokenHeaders(token));
     return response.data;
   },
 };

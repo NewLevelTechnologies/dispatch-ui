@@ -17,6 +17,7 @@ const api = vi.hoisted(() => ({
   updateHeader: vi.fn(),
   addLine: vi.fn(),
   getSelection: vi.fn(),
+  getApproval: vi.fn(),
 }));
 
 vi.mock('../../api/setup', async (importOriginal) => {
@@ -206,5 +207,25 @@ describe('ProposalBuilder', () => {
       expect(screen.getByText(/Chosen by the customer on the link/)).toBeInTheDocument();
       expect(screen.getByText(/saves \$500\.00/)).toBeInTheDocument();
     });
+  });
+
+  it('shows the signed copy of a proposal the customer approved on the link', async () => {
+    api.getApproval.mockResolvedValue({
+      signerName: 'Tanya Reyes', signedAt: '2026-10-13T15:11:00Z', signatureImage: 'data:image/png;base64,SIG', consent: true,
+      revision: 2, selection: { optionIds: ['o-2'], addOnLineIds: [] }, lines: [], savings: [],
+      totals: { listPrice: 15960, youSave: 0, subtotal: 15960, taxAmount: 0, totalAmount: 15960, rebateAmount: null, afterRebate: null },
+      ipAddress: '203.0.113.9', userAgent: 'Safari',
+    });
+    renderBuilder(proposalQuote({ status: 'ACCEPTED', acceptedByUserId: null, approvedByName: 'Tanya Reyes' }), false);
+
+    const signed = await screen.findByTestId('proposal-signed');
+    expect(signed).toHaveTextContent('Tanya Reyes');
+    expect(within(signed).getByRole('img')).toHaveAttribute('src', 'data:image/png;base64,SIG');
+    expect(api.getApproval).toHaveBeenCalledWith('q-1');
+  });
+
+  it('has no signed copy when the office recorded the yes', () => {
+    renderBuilder(proposalQuote({ status: 'ACCEPTED', acceptedByUserId: 'u-1' }), false);
+    expect(api.getApproval).not.toHaveBeenCalled();
   });
 });
