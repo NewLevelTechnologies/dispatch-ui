@@ -51,6 +51,7 @@ import SettingsLayout from './pages/settings/SettingsLayout';
 import CompanyProfilePanel from './pages/settings/CompanyProfilePanel';
 import RevenueTargetsPanel from './pages/settings/RevenueTargetsPanel';
 import TaxPanel from './pages/settings/TaxPanel';
+import PromotionsPanel from './pages/settings/PromotionsPanel';
 import DocumentSettingsPanel from './pages/settings/DocumentSettingsPanel';
 import LaborRatesPanel from './pages/settings/LaborRatesPanel';
 import PricebookPage from './pages/settings/PricebookPage';
@@ -263,6 +264,7 @@ function App() {
         <Route path="rate-plans/new" element={<RatePlanPage />} />
         <Route path="rate-plans/:id" element={<RatePlanPage />} />
         <Route path="tax" element={<TaxPanel />} />
+        <Route path="promotions" element={<PromotionsPanel />} />
         <Route path="quotes-invoices" element={<DocumentSettingsPanel />} />
         <Route path="pricebook" element={<PricebookPage />} />
         <Route path="pricebook/new" element={<PricebookItemPage />} />

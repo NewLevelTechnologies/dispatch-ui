@@ -16,8 +16,11 @@ type ManualReason = NewAdjustment['reasonCode'];
 
 const REASONS: ManualReason[] = ['GOODWILL', 'REPAIR_APPROVED', 'PROMOTION', 'INCENTIVE', 'DISCRETIONARY', 'OTHER'];
 
-/** What's being adjusted: one line, or the whole document (spread over the lines before tax). */
-export type AdjustTarget = { line: DocumentLineItem } | { document: true };
+/**
+ * What's being adjusted: one line, the whole document (spread over the lines
+ * before tax), or one option of a proposal (its lines, while it's chosen).
+ */
+export type AdjustTarget = { line: DocumentLineItem } | { document: true } | { option: { id: string; name: string } };
 
 /**
  * Discounts and waives on a line or the whole document: the ones already
@@ -66,6 +69,7 @@ function AdjustForm({
 }) {
   const { getName } = useGlossary();
   const line = 'line' in target ? target.line : null;
+  const option = 'option' in target ? target.option : null;
   // Waiving is for fees (a trip charge, a diagnostic); other lines take a % or $ off.
   const waivable = line?.type === 'FEE';
   const [kind, setKind] = useState<AdjustmentKind>(waivable ? 'WAIVE' : 'PERCENT');
@@ -85,6 +89,7 @@ function AdjustForm({
     setBusy(true);
     const ok = await onAdd({
       ...(line ? { lineId: line.id } : {}),
+      ...(option ? { optionId: option.id } : {}),
       kind,
       ...(kind === 'PERCENT' ? { value: Math.round(n * 100) / 10000 } : kind === 'AMOUNT' ? { value: n } : {}),
       reasonCode: reason as ManualReason,
@@ -102,7 +107,7 @@ function AdjustForm({
 
   return (
     <form onSubmit={submit}>
-      <DialogTitle>{line ? 'Adjust line' : 'Document discount'}</DialogTitle>
+      <DialogTitle>{line ? 'Adjust line' : option ? `Discount on ${option.name}` : 'Document discount'}</DialogTitle>
       {line && (
         <div className="mt-1 flex items-baseline gap-2 text-[13px]">
           <span className="min-w-0 flex-1 truncate font-semibold text-fg-strong">{line.description}</span>
@@ -112,7 +117,9 @@ function AdjustForm({
       <DialogDescription>
         {line
           ? `The ${getName('customer').toLowerCase()} sees the list price struck through, with the saving and its reason.`
-          : `Spread over ${base.lines === 1 ? 'the 1 line' : `the ${base.lines} lines`} before tax, in proportion to each, so tax stays right when labor and materials are taxed differently.`}
+          : option
+            ? `Off ${option.name} only, while it's the one chosen. It shows on its card with the reason.`
+            : `Spread over ${base.lines === 1 ? 'the 1 line' : `the ${base.lines} lines`} before tax, in proportion to each, so tax stays right when labor and materials are taxed differently.`}
       </DialogDescription>
       <DialogBody>
         {existing.length > 0 && (

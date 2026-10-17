@@ -19,6 +19,8 @@ const api = vi.hoisted(() => ({
   getSelection: vi.fn(),
   getApproval: vi.fn(),
   getActivity: vi.fn(),
+  addAdjustment: vi.fn(),
+  deleteAdjustment: vi.fn(),
 }));
 
 vi.mock('../../api/setup', async (importOriginal) => {
@@ -27,6 +29,7 @@ vi.mock('../../api/setup', async (importOriginal) => {
     ...actual,
     quotesApi: { ...actual.quotesApi, ...api },
     laborRatesApi: { ...actual.laborRatesApi, getAll: () => Promise.resolve([]) },
+    promotionsApi: { ...actual.promotionsApi, getAll: () => Promise.resolve([]) },
     userApi: { ...actual.userApi, getById: () => Promise.resolve({ id: 'u-1', firstName: 'Danny', lastName: 'Ortiz' }) },
   };
 });
@@ -262,5 +265,23 @@ describe('ProposalBuilder', () => {
     renderBuilder();
     expect(api.getActivity).not.toHaveBeenCalled();
     expect(screen.queryByText('Activity')).not.toBeInTheDocument();
+  });
+
+  it('takes a discount off one option only', async () => {
+    const user = userEvent.setup();
+    renderBuilder();
+
+    await user.click(screen.getByRole('button', { name: 'Actions for Comfort' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Discount on this option' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText('Discount on Comfort')).toBeInTheDocument();
+    await user.click(within(dialog).getByRole('radio', { name: '$ off' }));
+    await user.type(within(dialog).getByLabelText('Amount'), '500');
+    await user.selectOptions(within(dialog).getByLabelText('Reason'), 'DISCRETIONARY');
+    await user.click(within(dialog).getByRole('button', { name: 'Apply' }));
+
+    await waitFor(() =>
+      expect(api.addAdjustment).toHaveBeenCalledWith('q-1', { optionId: 'o-2', kind: 'AMOUNT', value: 500, reasonCode: 'DISCRETIONARY', version: 4 }),
+    );
   });
 });

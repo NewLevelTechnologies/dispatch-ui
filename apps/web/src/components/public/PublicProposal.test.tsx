@@ -207,4 +207,18 @@ describe('PublicProposal', () => {
     expect(screen.queryByLabelText('public.proposal.review.signatureLabel')).not.toBeInTheDocument();
     expect(screen.getAllByText('public.proposal.previewHint').length).toBeGreaterThan(0);
   });
+
+  it('shows the offers that end in a banner: a promotion by name, decide-today with its date', () => {
+    const deal = priced({
+      savings: [
+        { adjustmentId: 'p-1', lineId: null, kind: 'AMOUNT', reasonCode: 'PROMOTION', label: 'Fall Comfort Event', amount: 500, sourceType: 'PROMOTION', validThrough: '2026-10-31' },
+        { adjustmentId: 'a-9', lineId: null, kind: 'AMOUNT', reasonCode: 'INCENTIVE', label: null, amount: 350, sourceType: 'MANUAL', validThrough: '2099-10-12' },
+      ],
+    });
+    renderPage(page({ selection: deal }));
+
+    const banner = screen.getByTestId('pp-deals');
+    expect(banner).toHaveTextContent('Fall Comfort Event · public.proposal.deals.ends');
+    expect(banner).toHaveTextContent('public.proposal.decideToday · $350 public.proposal.deals.off · public.proposal.deals.approveBy');
+  });
 });

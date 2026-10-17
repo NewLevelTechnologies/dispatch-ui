@@ -34,6 +34,7 @@ import ConfirmDialog from '../ConfirmDialog';
 import { AddLinePanel } from '../document/AddLinePanel';
 import type { NewLine } from '../document/DocumentLinesCard';
 import { LINE_TYPE_LABEL } from '../document/documentModel';
+import { DocumentAdjustDialog } from '../document/DocumentAdjustDialog';
 import type { useDocumentEditor } from '../document/useDocumentEditor';
 import {
   NEXT_MODE,
@@ -54,6 +55,7 @@ import {
 import { useQuoteSelection } from './useQuoteSelection';
 import { builtText } from '../../lib/workOrderActivityRows';
 import { SignedCopyCard } from './SignedCopy';
+import { SavingsCard } from './SavingsCard';
 
 type Run = ReturnType<typeof useDocumentEditor<Quote>>['run'];
 type PricedOption = PricedSelection['options'][number];
@@ -149,6 +151,7 @@ export function ProposalBuilder({ quote, editable, run }: { quote: Quote; editab
         {options.length > 0 && (
           <AddOnsCard quote={quote} options={options} editable={editable} accepted={accepted} run={run} onAdd={() => setAdding({ kind: 'addon' })} />
         )}
+        {options.length > 0 && <SavingsCard quote={quote} editable={editable} run={run} />}
         <CoverNoteCard quote={quote} editable={editable} run={run} />
       </div>
       <Rail quote={quote} options={options} accepted={accepted} priced={priced} />
@@ -255,6 +258,12 @@ function OptionsCard({
 }) {
   const [editing, setEditing] = useState<QuoteOption | null>(null);
   const [deleting, setDeleting] = useState<QuoteOption | null>(null);
+  const [discounting, setDiscounting] = useState<QuoteOption | null>(null);
+  const discountBase = (o: QuoteOption) => {
+    const live = pricedOption(priced, o.id)?.totals;
+    const base = live?.listPrice ?? o.totals.grossSubtotal;
+    return { base, room: base - (live?.youSave ?? o.totals.adjustmentTotal), lines: optionLines(quote, o.id).length };
+  };
   const update = (o: QuoteOption, change: Partial<QuoteOptionFields>, fail = 'Couldn’t save the option') =>
     run((version) => quotesApi.updateOption(quote.id, o.id, { ...optionFields(o, change), version }), fail);
   const move = (index: number, by: number) => {
@@ -299,6 +308,7 @@ function OptionsCard({
               onRebate={(rebateAmount) => void update(o, { rebateAmount })}
               onMove={(by) => move(i, by)}
               onEdit={() => setEditing(o)}
+              onDiscount={() => setDiscounting(o)}
               onDelete={() => setDeleting(o)}
               onAddLine={() => onAddLine(o)}
               onRemoveLine={(line) =>
@@ -308,6 +318,14 @@ function OptionsCard({
           ))}
         </div>
       </CardBody>
+      <DocumentAdjustDialog
+        target={discounting ? { option: { id: discounting.id, name: discounting.name } } : null}
+        existing={(quote.adjustments ?? []).filter((a) => !!discounting && a.optionId === discounting.id)}
+        base={discounting ? discountBase(discounting) : null}
+        onAdd={(a) => run((version) => quotesApi.addAdjustment(quote.id, { ...a, version }), 'Couldn’t add the discount')}
+        onRemove={(a) => run((version) => quotesApi.deleteAdjustment(quote.id, a.id, version), 'Couldn’t remove the discount')}
+        onClose={() => setDiscounting(null)}
+      />
       <OptionDetailsDialog
         option={editing}
         onClose={() => setEditing(null)}
@@ -347,6 +365,7 @@ function OptionCard({
   onRebate,
   onMove,
   onEdit,
+  onDiscount,
   onDelete,
   onAddLine,
   onRemoveLine,
@@ -365,6 +384,7 @@ function OptionCard({
   onRebate: (amount: number | null) => void;
   onMove: (by: number) => void;
   onEdit: () => void;
+  onDiscount: () => void;
   onDelete: () => void;
   onAddLine: () => void;
   onRemoveLine: (line: QuoteLineItem) => void;
@@ -399,7 +419,10 @@ function OptionCard({
             </DropdownButton>
             <DropdownMenu anchor="bottom end">
               <DropdownItem onClick={onEdit}>
-                <DropdownLabel>Specs, highlights and rebate</DropdownLabel>
+                <DropdownLabel>Specs and highlights</DropdownLabel>
+              </DropdownItem>
+              <DropdownItem onClick={onDiscount}>
+                <DropdownLabel>Discount on this option</DropdownLabel>
               </DropdownItem>
               {index > 0 && (
                 <DropdownItem onClick={() => onMove(-1)}>
