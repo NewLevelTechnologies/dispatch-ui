@@ -1263,7 +1263,6 @@ function Cart({
 
 /** After approval: the signed copy, as stored. */
 function Done({ approval, data }: { approval: PublicApproval | null; data: PublicQuoteResponse }) {
-  const applicationUrl = data.quote.selection?.financing?.applicationUrl ?? null;
   const { t } = useTranslation();
   const { quote, tenant, customer } = data;
   const names = publicNames(tenant);
@@ -1305,11 +1304,6 @@ function Done({ approval, data }: { approval: PublicApproval | null; data: Publi
               tenant: sender,
             })}
           </p>
-          {applicationUrl && (
-            <a className="pp-btn pp-btn--1 pp-btn--inline" href={applicationUrl} target="_blank" rel="noopener noreferrer">
-              {t('public.proposal.pay.apply')}
-            </a>
-          )}
         </div>
       )}
       {phone && <div className="pp-done-foot">{t('public.proposal.done.questions', { tenant: sender, phone })}</div>}

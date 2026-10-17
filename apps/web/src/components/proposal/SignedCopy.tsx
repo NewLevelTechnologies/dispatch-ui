@@ -40,7 +40,7 @@ export function SignedCopyCard({ quoteId }: { quoteId: string }) {
           <img src={approval.signatureImage} alt={`${approval.signerName}’s signature`} className="pb-signature" />
         )}
         {approval.paymentPlan && (
-          <div className="text-[11.5px] text-fg-muted">{`${approval.paymentPlan.label} · ${formatCurrency(approval.paymentPlan.monthlyPayment)}/mo: arrange it with the lender`}</div>
+          <div className="text-[11.5px] text-fg-muted">{`${approval.paymentPlan.label} · ${formatCurrency(approval.paymentPlan.monthlyPayment)}/mo: set it up with the customer`}</div>
         )}
         <div className="flex items-baseline justify-between text-[12.5px]">
           <span className="font-semibold text-fg-strong">Total</span>

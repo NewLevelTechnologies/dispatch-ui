@@ -510,7 +510,7 @@ describe('membership on proposals', () => {
 describe('payment plans', () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it('lists, creates and updates plans, sets a quote’s offer, and the application link', async () => {
+  it('lists, creates and updates plans, and sets a quote’s offer', async () => {
     vi.mocked(apiClient.get).mockResolvedValue({ data: [] });
     vi.mocked(apiClient.post).mockResolvedValue({ data: {} });
     vi.mocked(apiClient.put).mockResolvedValue({ data: {} });
@@ -523,8 +523,6 @@ describe('payment plans', () => {
     expect(apiClient.put).toHaveBeenLastCalledWith('/financial/payment-plans/pp-1', { ...plan, active: false });
     await quotesApi.setPaymentPlans('q-1', { version: 7, planIds: ['pp-1'] });
     expect(apiClient.put).toHaveBeenLastCalledWith('/financial/quotes/q-1/payment-plans', { version: 7, planIds: ['pp-1'] });
-    await taxApi.updatePricingSettings('FEE', undefined, { financingApplicationUrl: '' });
-    expect(apiClient.put).toHaveBeenLastCalledWith('/financial/pricing-settings', { agreementFeeTaxClass: 'FEE', financingApplicationUrl: '' });
   });
 });
 

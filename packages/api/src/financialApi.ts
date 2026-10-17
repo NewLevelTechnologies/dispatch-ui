@@ -1036,7 +1036,7 @@ export interface SelectionFinancing {
   /** Null: paying in full. */
   selectedPlanId: string | null;
   monthlyPayment: number | null;
-  /** The tenant's lender application link. */
+  /** On the wire; the app doesn't use it (no lender is integrated). */
   applicationUrl: string | null;
 }
 
@@ -1868,7 +1868,7 @@ export interface PricingSettings {
   quoteValidityDays?: number;
   /** Proposals: options below this margin (a fraction) are flagged. Null = none. */
   marginFloor?: number | null;
-  /** The lender's application page, linked from proposals that pick a plan. */
+  /** On the wire; the app doesn't set or use it (no lender is integrated). */
   financingApplicationUrl?: string | null;
   updatedAt: string | null;
 }
@@ -1927,14 +1927,12 @@ export const taxApi = {
   updatePricingSettings: async (
     agreementFeeTaxClass: TaxClass,
     quoteValidityDays?: number,
-    { marginFloor, financingApplicationUrl }: { marginFloor?: number; financingApplicationUrl?: string } = {},
+    { marginFloor }: { marginFloor?: number } = {},
   ): Promise<PricingSettings> => {
     const response = await apiClient.put<PricingSettings>('/financial/pricing-settings', {
       agreementFeeTaxClass,
       ...(quoteValidityDays != null ? { quoteValidityDays } : {}),
       ...(marginFloor != null ? { marginFloor } : {}),
-      // "" removes it; left out, it stays.
-      ...(financingApplicationUrl != null ? { financingApplicationUrl } : {}),
     });
     return response.data;
   },
@@ -2505,7 +2503,7 @@ export const quotePriceApprovalsApi = {
 
 // ========== PAYMENT PLANS ==========
 
-/** A financing plan the tenant's lender offers. No delete: switch it off. Writes need MANAGE_PRICING. */
+/** A payment plan the company offers on proposals. No delete: switch it off. Writes need MANAGE_PRICING. */
 export interface PaymentPlanRequest {
   /** Up to 80 characters. */
   label: string;
