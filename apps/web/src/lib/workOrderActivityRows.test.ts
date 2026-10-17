@@ -91,6 +91,11 @@ describe('buildWorkOrderDays', () => {
     expect(choice({ path: ['Comfort'], added: [], removed: [] })).toBe('quoteChoiceSame(last=Comfort)');
   });
 
+  it('flags a membership signed up for on a proposal', () => {
+    const [row] = rows([event({ kind: 'QUOTE_MEMBERSHIP_SIGNUP', category: 'FINANCIAL', subject: { type: 'QUOTE', id: 'q-1', number: null, label: 'Q-1907' }, data: { planId: 'p', planName: 'Comfort Club' } })]);
+    expect(row.text).toBe('quoteMembershipSignup(plan=Comfort Club)');
+  });
+
   it('words a send with no channels as marked sent', () => {
     const [row] = rows([
       event({

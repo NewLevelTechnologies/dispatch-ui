@@ -41,6 +41,7 @@ const KIND_TEMPLATE_KEYS: Record<ActivityKind, string> = {
   QUOTE_PRICE_APPROVAL_REQUESTED: 'workOrders.activity.kind.quotePriceRequested',
   QUOTE_PRICE_APPROVED: 'workOrders.activity.kind.quotePriceApproved',
   QUOTE_PRICE_REJECTED: 'workOrders.activity.kind.quotePriceRejected',
+  QUOTE_MEMBERSHIP_SIGNUP: 'workOrders.activity.kind.quoteMembershipSignup',
   INVOICE_ISSUED: 'workOrders.activity.kind.invoiceIssued',
   INVOICE_SENT: 'workOrders.activity.kind.invoiceSent',
   INVOICE_PAID: 'workOrders.activity.kind.invoicePaid',

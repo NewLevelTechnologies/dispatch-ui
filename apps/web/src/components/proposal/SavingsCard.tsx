@@ -5,7 +5,17 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { formatCurrency } from '@dispatch/utils';
-import { promotionsApi, quotesApi, type DocumentAdjustment, type Promotion, type Quote } from '../../api/setup';
+import {
+  agreementPlanApi,
+  promotionsApi,
+  quotesApi,
+  type DocumentAdjustment,
+  type PricedSelection,
+  type Promotion,
+  type Quote,
+} from '../../api/setup';
+import { Select } from '../catalyst/select';
+import { cadenceWords, memberBenefits } from './membershipModel';
 import { useTenantTimeZone } from '../../hooks/useTenantTimeZone';
 import { zonedDate } from '../../lib/boardTime';
 import { Button } from '../catalyst/button';
@@ -24,7 +34,17 @@ const shortDate = (day: string) =>
 const offer = (p: Pick<Promotion, 'kind' | 'value'>) =>
   p.kind === 'PERCENT' ? `${Math.round(p.value * 1000) / 10}% off` : `${formatCurrency(p.value)} off`;
 
-export function SavingsCard({ quote, editable, run }: { quote: Quote; editable: boolean; run: Run }) {
+export function SavingsCard({
+  quote,
+  editable,
+  run,
+  priced,
+}: {
+  quote: Quote;
+  editable: boolean;
+  run: Run;
+  priced?: PricedSelection;
+}) {
   const zone = useTenantTimeZone();
   const today = zonedDate(new Date(), zone) ?? new Date().toISOString().slice(0, 10);
   const { data: promotions = [] } = useQuery({ queryKey: ['promotions'], queryFn: () => promotionsApi.getAll() });
@@ -79,6 +99,7 @@ export function SavingsCard({ quote, editable, run }: { quote: Quote; editable: 
           );
         })}
         <DecideToday quote={quote} existing={today$} editable={editable} today={today} run={run} />
+        <MembershipOfferRow quote={quote} editable={editable} run={run} priced={priced} />
         <div className="pb-srow">
           <span className="text-[11.5px] text-fg-muted">
             Rebates are entered per option. They show as “after rebate” on the proposal but are never taken off the invoice.
@@ -175,6 +196,68 @@ function DecideToday({
         )}
       </div>
       {existing?.value != null && <span className={ended ? 'pb-srow-amt' : 'pb-srow-amt pb-srow-amt--on'}>{`−${formatCurrency(existing.value)}`}</span>}
+    </div>
+  );
+}
+
+const BENEFIT_WORDS = { labor: (p?: string) => `${p} off labor`, parts: (p?: string) => `${p} off parts`, trip: () => 'no trip charge' };
+
+/** "Join and save": which agreement plan's member price the customer can take, and what it saves. */
+function MembershipOfferRow({
+  quote,
+  editable,
+  run,
+  priced,
+}: {
+  quote: Quote;
+  editable: boolean;
+  run: Run;
+  priced?: PricedSelection;
+}) {
+  const { data: plans } = useQuery({
+    queryKey: ['agreement-plans', 'active'],
+    queryFn: () => agreementPlanApi.getAll({ active: true, size: 100, sortBy: 'name', sortDir: 'asc' }),
+  });
+  const offer = priced?.membership ?? null;
+  const offered = quote.membershipPlanId ?? '';
+  const choose = (planId: string) =>
+    void run((version) => quotesApi.setMembershipOffer(quote.id, { version, planId: planId || null }), 'Couldn’t change the membership offer');
+  const saves = priced?.totals.joinSaves ?? 0;
+
+  return (
+    <div className="pb-srow pb-srow--wrap" data-testid="proposal-membership">
+      <div className="min-w-0 flex-1">
+        <div className={offered ? 'text-[12.5px] font-semibold text-fg-strong' : 'text-[12.5px] font-semibold text-fg-muted'}>
+          Membership offer
+        </div>
+        <div className="text-[11.5px] text-fg-muted">
+          {!offered
+            ? 'None. Offer a plan and the customer can join on the proposal, at member prices on this job.'
+            : offer
+              ? [
+                  offer.amount != null ? `${formatCurrency(offer.amount)} / ${cadenceWords(offer) ?? 'term'}` : null,
+                  ...memberBenefits(offer).map((b) => BENEFIT_WORDS[b.kind](b.pct)),
+                ]
+                  .filter(Boolean)
+                  .join(' · ')
+              : 'This site is already a member: its member prices apply as usual.'}
+        </div>
+        {offer && saves > 0 && (
+          <div className="mt-0.5 text-[11.5px] font-semibold text-success-500">{`Joining saves ${formatCurrency(saves)} on the current choice`}</div>
+        )}
+        {editable && (
+          <div className="mt-2 max-w-72">
+            <Select aria-label="Membership plan to offer" value={offered} onChange={(e) => choose(e.target.value)}>
+              <option value="">Don’t offer a membership</option>
+              {(plans?.content ?? []).map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+            </Select>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

@@ -173,6 +173,8 @@ export function builtText(evt: ActivityEvent, t: TFunc): string | null {
       return t(key('quotePriceApproved'), { why: said(d.note) });
     case 'QUOTE_PRICE_REJECTED':
       return t(key('quotePriceRejected'), { why: said(d.note) });
+    case 'QUOTE_MEMBERSHIP_SIGNUP':
+      return t(key('quoteMembershipSignup'), { plan: typeof d.planName === 'string' ? d.planName : '' });
     case 'INVOICE_SENT':
       return via(d.channels) ? t(key('invoiceSent'), { via: via(d.channels), amount }) : t(key('invoiceMarkedSent'), { amount });
     case 'INVOICE_PAID':

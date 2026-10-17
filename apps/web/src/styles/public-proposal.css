@@ -106,6 +106,17 @@
 .pp-nav { display: flex; margin-top: 28px; }
 .pp-fine { font-size: 12.5px; color: var(--fg-muted); text-wrap: pretty; }
 
+/* Protect: the membership offer. */
+.pp-protect { display: grid; grid-template-columns: minmax(0, 1fr); max-width: 640px; }
+.pp-club { overflow: hidden; border: 1.5px solid var(--border); border-radius: 20px; background: var(--bg-elev); }
+.pp-club.on { border-color: var(--accent-500); box-shadow: 0 0 0 3px color-mix(in oklch, var(--accent-500) 18%, transparent); }
+.pp-club-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; padding: 22px 24px; background: var(--fg-strong); color: var(--bg-elev); }
+.pp-eyebrow--inv { color: inherit; opacity: 0.8; }
+.pp-club-name { font-size: 28px; font-weight: 700; letter-spacing: -0.02em; }
+.pp-club-price { font-size: 24px; font-weight: 800; letter-spacing: -0.02em; line-height: 1; }
+.pp-club-b { display: flex; flex-direction: column; gap: 16px; padding: 22px 24px; }
+.pp-club-today { font-size: 17px; font-weight: 600; color: var(--pp-save); text-wrap: pretty; }
+
 /* Review. */
 .pp-stack { display: flex; flex-direction: column; gap: 16px; max-width: 820px; }
 .pp-card { padding: 20px 22px; border: 1px solid var(--border); border-radius: 18px; background: var(--bg-elev); }

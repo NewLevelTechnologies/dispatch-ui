@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from '@dispatch/i18n';
@@ -35,6 +35,8 @@ interface AgreementFormDialogProps {
   // neither to pick the customer in the form (the company-wide list).
   agreement?: AgreementResponse;
   customerId?: string;
+  /** Create mode: start from this plan (a membership signed on a proposal). */
+  planId?: string;
   // Edit-where-you-see-it: scope the edit to the card that opened it. 'identity'
   // (header) edits the name; 'term' (Term card) edits term dates + renewal.
   // Omitted on create → the full form. Ignored in create mode.
@@ -45,7 +47,7 @@ interface AgreementFormDialogProps {
 // the only v1 values) and routes to its detail page so the user can configure
 // visit templates + coverage and then activate. Edits are scoped to the card
 // they open from (see `section`) so no two Edit buttons open the same fields.
-export default function AgreementFormDialog({ isOpen, onClose, agreement, customerId, section }: AgreementFormDialogProps) {
+export default function AgreementFormDialog({ isOpen, onClose, agreement, customerId, planId: startPlanId, section }: AgreementFormDialogProps) {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const { t } = useTranslation();
@@ -115,6 +117,29 @@ export default function AgreementFormDialog({ isOpen, onClose, agreement, custom
     setPlanTermMonths(plan.defaultTermMonths ?? null);
     if (termStart && plan.defaultTermMonths != null) setTermEnd(addMonths(termStart, plan.defaultTermMonths));
   };
+
+  // Opened from a membership sign-up: start from its plan, once per opening,
+  // as if it were picked (its term and renewal defaults fill in).
+  const startedFrom = useRef<string | null>(null);
+  /* eslint-disable react-hooks/set-state-in-effect -- applies the starting plan once its list loads */
+  useEffect(() => {
+    if (!isOpen) {
+      startedFrom.current = null;
+      return;
+    }
+    if (isEdit || !startPlanId || !activePlans || startedFrom.current === startPlanId) return;
+    startedFrom.current = startPlanId;
+    // The plan's defaults, as picking it would set them (no start date yet, so no end).
+    const plan = activePlans.find((p) => p.id === startPlanId);
+    if (!plan) return;
+    setPlanId(plan.id);
+    setClassification(plan.classification);
+    setAutoRenew(plan.defaultAutoRenew);
+    setRenewalTermMonths(plan.defaultRenewalTermMonths != null ? String(plan.defaultRenewalTermMonths) : '');
+    setRenewalAlertDays(plan.defaultRenewalAlertDays != null ? String(plan.defaultRenewalAlertDays) : '');
+    setPlanTermMonths(plan.defaultTermMonths ?? null);
+  }, [isOpen, isEdit, startPlanId, activePlans]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   // Picking a start date re-derives the end from the plan's term length.
   const handleTermStartChange = (value: string) => {

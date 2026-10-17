@@ -39,7 +39,7 @@ export type AdjustmentReason =
   | 'DISCRETIONARY'
   | 'OTHER';
 
-export type AdjustmentSource = 'MANUAL' | 'AGREEMENT' | 'PROMOTION';
+export type AdjustmentSource = 'MANUAL' | 'AGREEMENT' | 'PROMOTION' | 'MEMBERSHIP';
 
 /** Codes a draft can warn with; branch on these, never show `message` verbatim. */
 export type PricingWarningCode = 'TAX_JURISDICTION_NOT_SET' | 'TAX_RATE_NOT_SET' | 'NTE_EXCEEDED';
@@ -987,6 +987,8 @@ export interface SelectionTotals {
   rebateAmount: number | null;
   afterRebate: number | null;
   margin: SelectionMargin | null;
+  /** What joining the offered plan saves here, joined or not ("Join and save $239"). */
+  joinSaves?: number | null;
 }
 
 export interface PricedSelectionLine {
@@ -1010,6 +1012,36 @@ export interface QuoteSelectionChoice {
   optionIds: string[];
   /** Offered add-ons taken; ones the chosen option includes or hides are dropped. */
   addOnLineIds: string[];
+  /** "Join and save": priced at the offered plan's member price. Ignored (false) with no plan offered. */
+  joinMembership?: boolean;
+}
+
+/** The plan a proposal offers, and its member benefits on a job. Fractions. */
+export interface MembershipOffer {
+  planId: string;
+  name: string;
+  amount: number | null;
+  cadenceUnit: 'DAY' | 'WEEK' | 'MONTH' | 'YEAR' | string | null;
+  cadenceInterval: number | null;
+  laborDiscountPct: number | null;
+  partsDiscountPct: number | null;
+  tripFeeWaived: boolean;
+}
+
+/** A proposal signed with "join" on: the office sets the agreement up, then marks it done. */
+export interface MembershipSignup {
+  quoteId: string;
+  quoteNumber: string;
+  customerId: string;
+  customerName: string | null;
+  serviceLocationId: string | null;
+  planId: string;
+  planName: string;
+  signedAt: string;
+  status: 'PENDING' | 'DONE';
+  handledByUserId: string | null;
+  handledByName: string | null;
+  handledAt: string | null;
 }
 
 /** A choice priced by the server. Card totals (`options`) don't move with add-ons. */
@@ -1026,6 +1058,8 @@ export interface PricedSelection {
   options: { optionId: string; groupId: string; name: string; selected: boolean; savings: PricedSaving[]; totals: SelectionTotals }[];
   /** Across option totals; null without options. */
   priceRange: { low: number; high: number } | null;
+  /** The plan offered; null when none is, or the site is a member already. */
+  membership?: MembershipOffer | null;
 }
 
 /** The signed copy, stored once at approval; the app also sees IP and user agent. */
@@ -1118,6 +1152,10 @@ export interface Quote {
   advisorUserId?: string | null;
   /** Null when the user cache doesn't know them. */
   advisorName?: string | null;
+  /** The agreement plan this proposal offers ("join and save"). */
+  membershipPlanId?: string | null;
+  /** Signed with "join" on: waiting for the office to set the agreement up. */
+  membershipSignup?: MembershipSignup | null;
   /** This quote's choice per promotion; missing = the promotion's own autoApply. */
   promotionOverrides?: Record<string, 'APPLY' | 'EXCLUDE'>;
   /** Recorded customer views (at most one per half hour per revision). */
@@ -1367,6 +1405,11 @@ export const quotesApi = {
   /** The signed copy (on the link or in person); 400 when the office recorded the yes without one. */
   getApproval: async (id: string): Promise<QuoteApproval> => {
     const response = await apiClient.get<QuoteApproval>(`/financial/quotes/${id}/approval`);
+    return response.data;
+  },
+  /** Offer an agreement plan's member price ("join and save"); null offers none. 400 for an archived plan or one with no job benefit. */
+  setMembershipOffer: async (id: string, request: { version: number; planId: string | null }): Promise<Quote> => {
+    const response = await apiClient.put<Quote>(`/financial/quotes/${id}/membership-offer`, request);
     return response.data;
   },
   /** "Don't apply" (EXCLUDE) or take one that isn't auto-applied (APPLY); null = the promotion's own setting. */
@@ -2419,6 +2462,21 @@ export const quotePriceApprovalsApi = {
   },
 };
 
+// ========== MEMBERSHIP SIGN-UPS ==========
+
+/** The office's worklist: proposals signed with "join" on, newest first. */
+export const membershipSignupsApi = {
+  list: async (status: 'PENDING' | 'DONE' = 'PENDING'): Promise<MembershipSignup[]> => {
+    const response = await apiClient.get<MembershipSignup[]>('/financial/membership-signups', { params: { status } });
+    return response.data;
+  },
+  /** DONE once the agreement is set up (records who and when); PENDING reopens it. */
+  setStatus: async (quoteId: string, status: 'PENDING' | 'DONE'): Promise<MembershipSignup> => {
+    const response = await apiClient.put<MembershipSignup>(`/financial/membership-signups/${quoteId}`, { status });
+    return response.data;
+  },
+};
+
 // ========== PROMOTIONS ==========
 
 /** Tenant-authored, dated, auto-applying offers ("Fall Comfort Event — $500 off"). Writes need MANAGE_PRICING. */
@@ -2481,6 +2539,7 @@ export type FinancialActivityKind =
   | 'QUOTE_PRICE_APPROVAL_REQUESTED'
   | 'QUOTE_PRICE_APPROVED'
   | 'QUOTE_PRICE_REJECTED'
+  | 'QUOTE_MEMBERSHIP_SIGNUP'
   | 'QUOTE_DELETED'
   | 'INVOICE_SENT'
   | 'INVOICE_PAID'

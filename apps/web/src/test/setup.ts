@@ -2484,6 +2484,7 @@ vi.mock('react-i18next', async () => {
     'workOrders.activity.kind.quoteDeclined': '{{quote}} declined · {{amount}}',
     'workOrders.activity.kind.quoteDeleted': 'Draft {{quote, lowercase}} deleted · {{amount}}',
     'workOrders.activity.kind.quoteMarkedSent': '{{quote}} marked sent{{rev}} · {{amount}}',
+    'workOrders.activity.kind.quoteMembershipSignup': 'Joined {{plan}} when signing: set up the agreement',
     'workOrders.activity.kind.quotePriceApproved': 'Price approved{{why}}',
     'workOrders.activity.kind.quotePriceRejected': 'Price rejected{{why}}',
     'workOrders.activity.kind.quotePriceRequested': 'Price approval asked · {{margin}} margin, under the {{floor}} floor{{why}}',

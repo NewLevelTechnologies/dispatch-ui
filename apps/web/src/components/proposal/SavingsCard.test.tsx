@@ -2,16 +2,17 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { screen, waitFor, within } from '@testing-library/react';
 import { renderWithProviders, userEvent } from '../../test/utils';
 import { SavingsCard } from './SavingsCard';
-import { proposalQuote } from './proposalFixtures';
+import { pricedSelection, proposalQuote } from './proposalFixtures';
 import type { Promotion, Quote } from '../../api/setup';
 
-const api = vi.hoisted(() => ({ setPromotion: vi.fn(), addAdjustment: vi.fn(), deleteAdjustment: vi.fn(), getAll: vi.fn() }));
+const api = vi.hoisted(() => ({ setPromotion: vi.fn(), addAdjustment: vi.fn(), deleteAdjustment: vi.fn(), getAll: vi.fn(), setMembershipOffer: vi.fn(), plans: vi.fn() }));
 
 vi.mock('../../api/setup', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../api/setup')>();
   return {
     ...actual,
-    quotesApi: { ...actual.quotesApi, setPromotion: api.setPromotion, addAdjustment: api.addAdjustment, deleteAdjustment: api.deleteAdjustment },
+    quotesApi: { ...actual.quotesApi, setPromotion: api.setPromotion, addAdjustment: api.addAdjustment, deleteAdjustment: api.deleteAdjustment, setMembershipOffer: api.setMembershipOffer },
+    agreementPlanApi: { ...actual.agreementPlanApi, getAll: api.plans },
     promotionsApi: { ...actual.promotionsApi, getAll: api.getAll },
     tenantSettingsApi: { ...actual.tenantSettingsApi, getSettings: () => Promise.resolve({ timezone: 'UTC' }) },
   };
@@ -34,7 +35,8 @@ beforeEach(() => {
   vi.clearAllMocks();
   vi.useFakeTimers({ toFake: ['Date'] });
   vi.setSystemTime(new Date('2026-10-12T15:00:00Z'));
-  for (const fn of [api.setPromotion, api.addAdjustment, api.deleteAdjustment]) fn.mockResolvedValue(proposalQuote());
+  for (const fn of [api.setPromotion, api.addAdjustment, api.deleteAdjustment, api.setMembershipOffer]) fn.mockResolvedValue(proposalQuote());
+  api.plans.mockResolvedValue({ content: [{ id: 'plan-1', name: 'Comfort Club' }, { id: 'plan-2', name: 'Gold' }] });
   api.getAll.mockResolvedValue([promo(), promo({ id: 'p-2', name: 'Duct month', autoApply: false, kind: 'PERCENT', value: 0.15, minAmount: null })]);
 });
 
@@ -101,5 +103,31 @@ describe('SavingsCard', () => {
 
     await user.click(within(row).getByRole('switch', { name: 'Decide-today savings' }));
     expect(api.deleteAdjustment).toHaveBeenCalledTimes(2);
+  });
+
+  it('offers a membership plan, with its terms and what joining saves', async () => {
+    const user = userEvent.setup();
+    const priced = pricedSelection({
+      membership: {
+        planId: 'plan-1', name: 'Comfort Club', amount: 19, cadenceUnit: 'MONTH', cadenceInterval: 1,
+        laborDiscountPct: 0.15, partsDiscountPct: 0.1, tripFeeWaived: true,
+      },
+      totals: { ...pricedSelection().totals, joinSaves: 239 },
+    });
+    renderWithProviders(<SavingsCard quote={proposalQuote({ membershipPlanId: 'plan-1' })} editable run={run} priced={priced} />);
+
+    const row = screen.getByTestId('proposal-membership');
+    expect(row).toHaveTextContent('$19.00 / month · 15% off labor · 10% off parts · no trip charge');
+    expect(row).toHaveTextContent('Joining saves $239.00 on the current choice');
+    await screen.findByRole('option', { name: 'Gold' });
+    await user.selectOptions(within(row).getByLabelText('Membership plan to offer'), '');
+    expect(api.setMembershipOffer).toHaveBeenCalledWith('q-1', { version: 4, planId: null });
+  });
+
+  it('says a member site keeps its own member prices', () => {
+    renderWithProviders(
+      <SavingsCard quote={proposalQuote({ membershipPlanId: 'plan-1' })} editable={false} run={run} priced={pricedSelection({ membership: null })} />,
+    );
+    expect(screen.getByTestId('proposal-membership')).toHaveTextContent('already a member');
   });
 });

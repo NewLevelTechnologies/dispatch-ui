@@ -1,4 +1,3 @@
-/* eslint-disable i18next/no-literal-string -- assertion strings in a test fixture. */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { screen, waitFor, within } from '@testing-library/react';
 import { renderWithProviders, userEvent } from '../test/utils';

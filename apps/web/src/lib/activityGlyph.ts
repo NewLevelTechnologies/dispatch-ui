@@ -47,6 +47,7 @@ const KIND_GLYPH: Partial<Record<ActivityKind, { glyph: string; tone: ActivityTo
   QUOTE_PRICE_APPROVAL_REQUESTED: { glyph: '?', tone: 'warning' },
   QUOTE_PRICE_APPROVED: { glyph: '✓', tone: 'success' },
   QUOTE_PRICE_REJECTED: { glyph: '✕', tone: 'neutral' },
+  QUOTE_MEMBERSHIP_SIGNUP: { glyph: '★', tone: 'success' },
   INVOICE_ISSUED: { glyph: '$', tone: 'success' },
   INVOICE_SENT: { glyph: '✉', tone: 'accent' },
   INVOICE_PAID: { glyph: '$', tone: 'success' },

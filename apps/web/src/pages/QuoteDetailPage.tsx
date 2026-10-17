@@ -31,6 +31,7 @@ import { ProposalBuilder } from '../components/proposal/ProposalBuilder';
 import { useQuoteSelection } from '../components/proposal/useQuoteSelection';
 import { PriceApprovalCallout, RequestInPersonDialog } from '../components/proposal/PriceApproval';
 import { usePriceClearance } from '../components/proposal/usePriceClearance';
+import { MembershipSignupCallout } from '../components/proposal/MembershipSignups';
 import { addOnLines, allOptions, headerFields, isProposal, modeOf } from '../components/proposal/proposalModel';
 import { ToggleGroup, ToggleGroupOption } from '../components/ui/ToggleGroup';
 
@@ -340,6 +341,7 @@ export default function QuoteDetailPage() {
           Rev {revision ?? 1} draft. The customer’s link shows “This {entityLower} is being updated” until you re-send.
         </Callout>
       )}
+      <MembershipSignupCallout quote={quote} />
       {clearance && <PriceApprovalCallout quote={quote} clearance={clearance} />}
       <DocumentWarnings doc={quote} billToName={billTo.name} nte={workOrder?.notToExceed} />
 

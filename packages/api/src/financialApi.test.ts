@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { invoicesApi, quotesApi, financialActivityApi, financialDashboardApi, revenueTargetsApi,
-  revenueReportApi, receivablesReportApi, quoteReportApi, paymentReportApi, discountReportApi, salesTaxReportApi, unbilledReportApi, quoteLineBillingApi, promotionsApi, quotePriceApprovalsApi, paymentsApi, taxApi, laborRatesApi, pricebookApi, ratePlansApi, mediaApi } from './financialApi';
+  revenueReportApi, receivablesReportApi, quoteReportApi, paymentReportApi, discountReportApi, salesTaxReportApi, unbilledReportApi, quoteLineBillingApi, promotionsApi, quotePriceApprovalsApi, membershipSignupsApi, paymentsApi, taxApi, laborRatesApi, pricebookApi, ratePlansApi, mediaApi } from './financialApi';
 import apiClient from './client';
 
 vi.mock('./client');
@@ -489,6 +489,21 @@ describe('quote price approvals', () => {
     expect(apiClient.post).toHaveBeenLastCalledWith('/financial/quotes/q-1/price-approvals', { reason: 'In the home' });
     await quotesApi.getPriceClearance('q-1');
     expect(apiClient.get).toHaveBeenLastCalledWith('/financial/quotes/q-1/price-clearance');
+  });
+});
+
+describe('membership on proposals', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('offers a plan on a quote and works the sign-up list', async () => {
+    vi.mocked(apiClient.put).mockResolvedValue({ data: {} });
+    vi.mocked(apiClient.get).mockResolvedValue({ data: [] });
+    await quotesApi.setMembershipOffer('q-1', { version: 7, planId: 'plan-1' });
+    expect(apiClient.put).toHaveBeenLastCalledWith('/financial/quotes/q-1/membership-offer', { version: 7, planId: 'plan-1' });
+    await membershipSignupsApi.list();
+    expect(apiClient.get).toHaveBeenLastCalledWith('/financial/membership-signups', { params: { status: 'PENDING' } });
+    await membershipSignupsApi.setStatus('q-1', 'DONE');
+    expect(apiClient.put).toHaveBeenLastCalledWith('/financial/membership-signups/q-1', { status: 'DONE' });
   });
 });
 

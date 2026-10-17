@@ -1593,6 +1593,24 @@
       "back": "Back",
       "call": "Call {{name}} · {{phone}}",
       "cartSaving": "You’re saving",
+      "club": {
+        "add": "Add {{name}}",
+        "added": "{{name}} added",
+        "benefit": {
+          "labor": "{{pct}} off labor",
+          "parts": "{{pct}} off parts",
+          "trip": "No trip charges"
+        },
+        "billedSeparately": "billed separately",
+        "cardSaves": "Save {{amount}} more with {{name}}",
+        "eyebrow": "Membership",
+        "fine": "Billed separately from this proposal. {{tenant}} sets up your membership after you sign.",
+        "lede": "Members pay less on this job, and on every visit after.",
+        "price": "{{amount}} / {{every}}",
+        "saves": "Join today and save {{amount}} on this job.",
+        "title": "Protect your investment",
+        "welcome": "Welcome to the club: {{tenant}} will set up your membership and be in touch."
+      },
       "continue": "Continue",
       "continueTo": "Continue to {{step}}",
       "deals": {
@@ -1659,6 +1677,7 @@
       "steps": {
         "addons": "Add-ons",
         "options": "Options",
+        "protect": "Protect",
         "review": "Review"
       },
       "stepsLabel": "Proposal steps",
@@ -4139,6 +4158,7 @@
         "quoteDeclined": "{{quote}} declined · {{amount}}",
         "quoteDeleted": "Draft {{quote, lowercase}} deleted · {{amount}}",
         "quoteMarkedSent": "{{quote}} marked sent{{rev}} · {{amount}}",
+        "quoteMembershipSignup": "Joined {{plan}} when signing: set up the agreement",
         "quotePriceApproved": "Price approved{{why}}",
         "quotePriceRejected": "Price rejected{{why}}",
         "quotePriceRequested": "Price approval asked · {{margin}} margin, under the {{floor}} floor{{why}}",
