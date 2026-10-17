@@ -103,6 +103,32 @@ function arrivalWindow(start: unknown, end: unknown): string {
   return `${WINDOW_DAY.format(s)}, ${WINDOW_TIME.format(s)}${tail}`;
 }
 
+const names = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : []);
+
+/**
+ * A stretch of the customer clicking through a proposal: "Looked at Ultimate,
+ * then switched to Comfort · added Duct sealing · $17,700.00". One option and
+ * no add-on changes means they ended where they started.
+ */
+function choiceText(d: Record<string, unknown>, t: TFunc, amount: string): string {
+  const key = (k: string) => `workOrders.activity.kind.${k}`;
+  const path = names(d.path);
+  const added = names(d.added);
+  const removed = names(d.removed);
+  const last = path[path.length - 1] ?? '';
+  const parts = [
+    path.length > 1
+      ? t(key('quoteChoicePath'), { seen: path.slice(0, -1).join(', '), last })
+      : added.length || removed.length
+        ? t(key('quoteChoiceOn'), { last })
+        : t(key('quoteChoiceSame'), { last }),
+    ...(added.length ? [t(key('quoteChoiceAdded'), { list: added.join(', ') })] : []),
+    ...(removed.length ? [t(key('quoteChoiceRemoved'), { list: removed.join(', ') })] : []),
+    ...(typeof d.totalAmount === 'number' ? [amount] : []),
+  ];
+  return parts.join(' · ');
+}
+
 /**
  * The sentence for kinds whose words are built here rather than from raw `data`
  * (quote, invoice, payment and PO steps, reschedules, uploads). Shared with the
@@ -134,6 +160,8 @@ export function builtText(evt: ActivityEvent, t: TFunc): string | null {
       return t(key('quoteDeclined'), { amount });
     case 'QUOTE_DELETED':
       return t(key('quoteDeleted'), { amount });
+    case 'QUOTE_CHOICE_CHANGED':
+      return choiceText(d, t, amount);
     case 'INVOICE_SENT':
       return via(d.channels) ? t(key('invoiceSent'), { via: via(d.channels), amount }) : t(key('invoiceMarkedSent'), { amount });
     case 'INVOICE_PAID':

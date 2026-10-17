@@ -418,6 +418,10 @@ describe('quotesApi proposal structure', () => {
       version: 7, role: 'ADD_ON', recommended: true, recommendationNote: 'Leaky ducts',
     });
     vi.mocked(apiClient.get).mockResolvedValue({ data: {} });
+    await quotesApi.getActivity('q-1', { limit: 30, kinds: ['QUOTE_VIEWED', 'QUOTE_CHOICE_CHANGED'] });
+    expect(apiClient.get).toHaveBeenLastCalledWith('/financial/quotes/q-1/activity', {
+      params: { limit: 30, kinds: 'QUOTE_VIEWED,QUOTE_CHOICE_CHANGED' },
+    });
     await quotesApi.getApproval('q-1');
     expect(apiClient.get).toHaveBeenLastCalledWith('/financial/quotes/q-1/approval');
     await quotesApi.saveSelection('q-1', { optionIds: ['o-2'], addOnLineIds: ['l-9'] });

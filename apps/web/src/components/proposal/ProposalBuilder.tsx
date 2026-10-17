@@ -5,6 +5,7 @@
 // queue and return the whole quote.
 import { Fragment, useState, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { useTranslation } from '@dispatch/i18n';
 import { formatCurrency, formatTimestamp } from '@dispatch/utils';
 import { CheckIcon, EllipsisHorizontalIcon, ExclamationTriangleIcon, PhotoIcon, PlusIcon, XMarkIcon } from '@heroicons/react/16/solid';
 import clsx from 'clsx';
@@ -51,6 +52,7 @@ import {
   sharedLines,
 } from './proposalModel';
 import { useQuoteSelection } from './useQuoteSelection';
+import { builtText } from '../../lib/workOrderActivityRows';
 import { SignedCopyCard } from './SignedCopy';
 
 type Run = ReturnType<typeof useDocumentEditor<Quote>>['run'];
@@ -1014,6 +1016,7 @@ function Rail({
         </CardBody>
       </Card>
       {priced && !accepted && <CurrentSelection quote={quote} priced={priced} />}
+      {quote.firstSentAt && <ActivityCard quote={quote} />}
       {/* Only a link approval has a signed record; the office's verbal yes doesn't. */}
       {accepted && !quote.acceptedByUserId && <SignedCopyCard quoteId={quote.id} />}
       {!accepted && quote.status === 'DRAFT' && options.length > 0 && (
@@ -1070,6 +1073,45 @@ function CurrentSelection({ quote, priced }: { quote: Quote; priced: PricedSelec
           {who}
           {priced.updatedAt && ` · ${formatTimestamp(priced.updatedAt, { withTime: true })}`}
         </div>
+      </CardBody>
+    </Card>
+  );
+}
+
+/** What the customer did with the link, newest first: opens, choices, the decision. */
+function ActivityCard({ quote }: { quote: Quote }) {
+  const { t } = useTranslation();
+  const { data } = useQuery({
+    queryKey: ['quote-activity', quote.id, quote.version, quote.viewCount],
+    queryFn: () => quotesApi.getActivity(quote.id, { limit: 30 }),
+  });
+  const events = data?.content ?? [];
+  const views = quote.viewCount ?? 0;
+  return (
+    <Card>
+      <CardHead>
+        <CardTitle>Activity</CardTitle>
+        <span className="ml-auto text-[11.5px] text-fg-muted">{views ? `Viewed ${views}×` : 'Not opened yet'}</span>
+      </CardHead>
+      <CardBody>
+        {events.length === 0 ? (
+          <p className="text-[12px] text-fg-muted">Nothing yet.</p>
+        ) : (
+          <ol className="pb-events">
+            {events.map((e) => {
+              const who = e.kind === 'QUOTE_ACCEPTED' || e.kind === 'QUOTE_SENT' ? e.actor?.userName : null;
+              return (
+                <li key={e.id} data-testid="proposal-event">
+                  <span className="tabular-nums">{formatTimestamp(e.timestamp, { withTime: true })}</span>
+                  <span>
+                    {builtText(e, t) ?? e.kind}
+                    {who && <span className="block text-[11px] text-fg-muted">{who}</span>}
+                  </span>
+                </li>
+              );
+            })}
+          </ol>
+        )}
       </CardBody>
     </Card>
   );

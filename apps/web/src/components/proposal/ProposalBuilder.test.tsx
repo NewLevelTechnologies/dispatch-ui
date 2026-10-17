@@ -18,6 +18,7 @@ const api = vi.hoisted(() => ({
   addLine: vi.fn(),
   getSelection: vi.fn(),
   getApproval: vi.fn(),
+  getActivity: vi.fn(),
 }));
 
 vi.mock('../../api/setup', async (importOriginal) => {
@@ -227,5 +228,39 @@ describe('ProposalBuilder', () => {
   it('has no signed copy when the office recorded the yes', () => {
     renderBuilder(proposalQuote({ status: 'ACCEPTED', acceptedByUserId: 'u-1' }), false);
     expect(api.getApproval).not.toHaveBeenCalled();
+  });
+
+  it('shows a sent proposal’s view count and what the customer did, newest first', async () => {
+    api.getActivity.mockResolvedValue({
+      content: [
+        {
+          id: 'e2', kind: 'QUOTE_CHOICE_CHANGED', category: 'FINANCIAL', classification: 'BUSINESS', timestamp: '2026-10-12T19:16:00Z',
+          subject: { type: 'QUOTE', id: 'q-1', number: null, label: 'Q-1907' }, actor: { type: 'CUSTOMER', userId: null, userName: '' },
+          data: { path: ['Ultimate', 'Comfort'], added: ['Duct sealing'], removed: [], totalAmount: 17700 },
+          workOrderId: null, serviceLocationId: null,
+        },
+        {
+          id: 'e1', kind: 'QUOTE_VIEWED', category: 'FINANCIAL', classification: 'BUSINESS', timestamp: '2026-10-12T19:14:00Z',
+          subject: { type: 'QUOTE', id: 'q-1', number: null, label: 'Q-1907' }, actor: { type: 'CUSTOMER', userId: null, userName: '' },
+          data: { revision: 1 }, workOrderId: null, serviceLocationId: null,
+        },
+      ],
+      nextCursor: null,
+      hasMore: false,
+    });
+    renderBuilder(proposalQuote({ status: 'SENT', firstSentAt: '2026-10-12T16:00:00Z', viewCount: 2 }), false);
+
+    expect(await screen.findByText('Viewed 2×')).toBeInTheDocument();
+    const [choice, viewed] = await screen.findAllByTestId('proposal-event');
+    expect(choice).toHaveTextContent('Ultimate');
+    expect(choice).toHaveTextContent('$17,700.00');
+    expect(viewed).toHaveTextContent(/viewed/i);
+    expect(api.getActivity).toHaveBeenCalledWith('q-1', { limit: 30 });
+  });
+
+  it('has no activity card before the proposal is sent', () => {
+    renderBuilder();
+    expect(api.getActivity).not.toHaveBeenCalled();
+    expect(screen.queryByText('Activity')).not.toBeInTheDocument();
   });
 });

@@ -42,6 +42,8 @@ export type ActivityKind =
   | 'QUOTE_VIEWED'
   | 'QUOTE_ACCEPTED'
   | 'QUOTE_DECLINED'
+  /** The customer browsing a proposal: one entry per stretch of clicking (`data.path`, `added`, `removed`, `totalAmount`). */
+  | 'QUOTE_CHOICE_CHANGED'
   /** A never-sent draft deleted; its subject no longer loads, so it renders unlinked. */
   | 'QUOTE_DELETED'
   | 'INVOICE_ISSUED'

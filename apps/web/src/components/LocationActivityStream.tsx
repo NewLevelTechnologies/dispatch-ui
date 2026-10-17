@@ -72,7 +72,7 @@ const BUSINESS_CHIPS: ChipId[] = ['all', 'job', 'visit', 'note'];
 const FINANCIAL_CHIPS: ChipId[] = ['all', 'invoice', 'payment'];
 // The financial chips narrow its stream by kind on the server, so paging stays right.
 const CHIP_KINDS: Partial<Record<ChipId, FinancialActivityKind[]>> = {
-  invoice: ['QUOTE_SENT', 'QUOTE_VIEWED', 'QUOTE_ACCEPTED', 'QUOTE_DECLINED', 'QUOTE_DELETED', 'INVOICE_SENT', 'INVOICE_PAID', 'INVOICE_VOIDED'],
+  invoice: ['QUOTE_SENT', 'QUOTE_VIEWED', 'QUOTE_ACCEPTED', 'QUOTE_DECLINED', 'QUOTE_CHOICE_CHANGED', 'QUOTE_DELETED', 'INVOICE_SENT', 'INVOICE_PAID', 'INVOICE_VOIDED'],
   payment: ['PAYMENT_RECEIVED'],
 };
 
