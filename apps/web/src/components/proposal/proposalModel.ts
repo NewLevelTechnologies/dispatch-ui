@@ -2,6 +2,8 @@
 // add-ons and how each option treats them. Every figure is the server's.
 import type {
   AddOnMode,
+  DocumentAdjustment,
+  Promotion,
   PricedSaving,
   PricedSelection,
   Quote,
@@ -84,7 +86,13 @@ export interface SendCheck {
 }
 
 /** A saving's name: its source's (a member plan), else its reason. */
-export const savingLabel = (s: PricedSaving) => s.label || (s.kind === 'WAIVE' ? 'Waived' : (REASON_LABEL[s.reasonCode] ?? s.reasonCode));
+export const savingLabel = (s: PricedSaving) =>
+  s.label ||
+  (s.reasonCode === 'INCENTIVE' && s.validThrough
+    ? 'Decide-today savings'
+    : s.kind === 'WAIVE'
+      ? 'Waived'
+      : (REASON_LABEL[s.reasonCode] ?? s.reasonCode));
 
 /** "24.8%". */
 export const marginPct = (fraction: number) => `${Math.round(fraction * 1000) / 10}%`;
@@ -111,3 +119,13 @@ export function sendChecks(q: Quote, priced?: PricedSelection): SendCheck[] {
     ...options.filter((o) => !optionPhoto(o)).map((o) => ({ ok: false, soft: true, text: `${o.name} has no photo` })),
   ];
 }
+
+/** Whether a promotion applies on this quote: its own setting unless the quote overrides it. */
+export function promotionApplies(p: Promotion, quote: Pick<Quote, 'promotionOverrides'>): boolean {
+  const choice = quote.promotionOverrides?.[p.id];
+  return choice === 'APPLY' || (choice !== 'EXCLUDE' && p.autoApply);
+}
+
+/** The decide-today saving: a quote-wide incentive with an end date. */
+export const decideToday = (quote: Pick<Quote, 'adjustments'>): DocumentAdjustment | undefined =>
+  (quote.adjustments ?? []).find((a) => !a.lineId && !a.optionId && a.reasonCode === 'INCENTIVE' && !!a.validThrough);

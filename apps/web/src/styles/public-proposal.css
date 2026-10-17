@@ -35,6 +35,10 @@
 .pp-who b, .pp-who a { font-weight: 600; color: var(--fg-strong); text-decoration: none; }
 .pp-exit { flex: none; }
 
+.pp-promo { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 18px; padding: 11px 28px; background: var(--fg-strong); color: var(--bg-elev); font-size: 14px; }
+.pp-promo b { color: var(--accent-300); }
+.theme-dark .pp-promo b { color: var(--accent-700); }
+.pp-promo-2 { opacity: 0.9; }
 .pp-notice { max-width: 1440px; margin: 16px auto 0; padding: 0 28px; }
 .pp-notice > div { padding: 12px 16px; border: 1px solid var(--warning-500); border-radius: 12px; background: color-mix(in oklch, var(--warning-500) 10%, var(--bg-elev)); font-size: 14.5px; color: var(--fg-strong); }
 

@@ -39,7 +39,7 @@ export type AdjustmentReason =
   | 'DISCRETIONARY'
   | 'OTHER';
 
-export type AdjustmentSource = 'MANUAL' | 'AGREEMENT';
+export type AdjustmentSource = 'MANUAL' | 'AGREEMENT' | 'PROMOTION';
 
 /** Codes a draft can warn with; branch on these, never show `message` verbatim. */
 export type PricingWarningCode = 'TAX_JURISDICTION_NOT_SET' | 'TAX_RATE_NOT_SET' | 'NTE_EXCEEDED';
@@ -75,6 +75,10 @@ export interface DocumentAdjustment {
   createdAt: string | null;
   /** On an invoice billed from a quote: the quote adjustment it was copied from. */
   copiedFromAdjustmentId?: string | null;
+  /** A discount on one option of a proposal. */
+  optionId?: string | null;
+  /** The last day it's offered. */
+  validThrough?: string | null;
   sourceType: AdjustmentSource;
   /** AGREEMENT: the agreement id and its label ("Silver"). Internal — never customer-facing. */
   sourceId?: string | null;
@@ -175,6 +179,10 @@ export interface AddAdjustmentRequest {
   reasonCode: Exclude<AdjustmentReason, 'MEMBER'>;
   /** ≤ 500 chars. */
   reasonNote?: string;
+  /** Quotes with options: a discount on that option only, while it's chosen (no lineId, no WAIVE). */
+  optionId?: string;
+  /** Quotes: the last day it's offered (tenant time zone); after it, it no longer prices. Decide-today uses INCENTIVE. */
+  validThrough?: string;
 }
 
 /**
@@ -946,9 +954,15 @@ export interface PricedSaving {
   lineId: string | null;
   kind: AdjustmentKind;
   reasonCode: AdjustmentReason;
-  /** The source's name where it has one (member plans); else name it from `reasonCode`. */
+  /** The source's name where it has one (member plans, promotions); else name it from `reasonCode`. */
   label: string | null;
   amount: number;
+  /** PROMOTION: `adjustmentId` is the promotion's id. */
+  sourceType?: AdjustmentSource;
+  /** An option's own discount. */
+  optionId?: string | null;
+  /** The last day it's offered ("valid through Oct 31", "approve by Oct 12"). */
+  validThrough?: string | null;
 }
 
 /** Advisor only (never on the link): pre-tax, after savings, counting included add-ons' cost. */
@@ -1104,6 +1118,8 @@ export interface Quote {
   advisorUserId?: string | null;
   /** Null when the user cache doesn't know them. */
   advisorName?: string | null;
+  /** This quote's choice per promotion; missing = the promotion's own autoApply. */
+  promotionOverrides?: Record<string, 'APPLY' | 'EXCLUDE'>;
   /** Recorded customer views (at most one per half hour per revision). */
   viewCount?: number;
   /** Who chose last, and when. */
@@ -1351,6 +1367,11 @@ export const quotesApi = {
   /** The signed copy (on the link or in person); 400 when the office recorded the yes without one. */
   getApproval: async (id: string): Promise<QuoteApproval> => {
     const response = await apiClient.get<QuoteApproval>(`/financial/quotes/${id}/approval`);
+    return response.data;
+  },
+  /** "Don't apply" (EXCLUDE) or take one that isn't auto-applied (APPLY); null = the promotion's own setting. */
+  setPromotion: async (id: string, promotionId: string, request: { version: number; choice: 'APPLY' | 'EXCLUDE' | null }): Promise<Quote> => {
+    const response = await apiClient.put<Quote>(`/financial/quotes/${id}/promotions/${promotionId}`, request);
     return response.data;
   },
   /** The saved choice, priced. */
@@ -2292,6 +2313,56 @@ export const quoteLineBillingApi = {
     body: { notBillable: true; reason: string } | { notBillable: false },
   ): Promise<QuoteLineBilling> => {
     const response = await apiClient.put<QuoteLineBilling>(`/financial/quote-lines/${quoteLineId}/billing`, body);
+    return response.data;
+  },
+};
+
+// ========== PROMOTIONS ==========
+
+/** Tenant-authored, dated, auto-applying offers ("Fall Comfort Event — $500 off"). Writes need MANAGE_PRICING. */
+export interface PromotionRequest {
+  name: string;
+  /** What the customer reads. */
+  customerCopy?: string | null;
+  startsOn: string;
+  endsOn: string;
+  kind: 'AMOUNT' | 'PERCENT';
+  /** AMOUNT: dollars. PERCENT: a fraction (0.15). */
+  value: number;
+  /** Applies when its covered lines come to at least this at list; null = no minimum. */
+  minAmount?: number | null;
+  /** What it covers; both empty = every line. */
+  itemIds: string[];
+  categoryIds: string[];
+  autoApply: boolean;
+  /** No delete; switch it off. */
+  active: boolean;
+}
+
+export interface Promotion extends PromotionRequest {
+  id: string;
+  /** Active and in its window today. */
+  onOffer: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export const promotionsApi = {
+  /** Latest ending first. */
+  getAll: async (): Promise<Promotion[]> => {
+    const response = await apiClient.get<Promotion[]>('/financial/promotions');
+    return response.data;
+  },
+  get: async (id: string): Promise<Promotion> => {
+    const response = await apiClient.get<Promotion>(`/financial/promotions/${id}`);
+    return response.data;
+  },
+  create: async (request: PromotionRequest): Promise<Promotion> => {
+    const response = await apiClient.post<Promotion>('/financial/promotions', request);
+    return response.data;
+  },
+  update: async (id: string, request: PromotionRequest): Promise<Promotion> => {
+    const response = await apiClient.put<Promotion>(`/financial/promotions/${id}`, request);
     return response.data;
   },
 };

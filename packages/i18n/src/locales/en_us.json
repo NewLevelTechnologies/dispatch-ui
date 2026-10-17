@@ -1566,6 +1566,13 @@
       "cartSaving": "You’re saving",
       "continue": "Continue",
       "continueTo": "Continue to {{step}}",
+      "deals": {
+        "approveBy": "approve by {{date}}",
+        "ends": "ends {{date}}",
+        "endsToday": "ends today",
+        "off": "off"
+      },
+      "decideToday": "Decide-today savings",
       "done": {
         "lede": "{{tenant}} has your signed {{quote, lowercase}} and will be in touch to schedule the work.",
         "questions": "Questions? {{tenant}} · {{phone}}",
@@ -2942,6 +2949,7 @@
       "notificationTemplates": "Notification Templates",
       "plans": "Plans",
       "pricebook": "Pricebook",
+      "promotions": "Promotions",
       "ratePlans": "Rate plans",
       "revenueTargets": "Revenue Targets",
       "tax": "Tax",
@@ -2951,6 +2959,59 @@
     },
     "openNav": "Open settings menu",
     "planned": "Planned",
+    "promotions": {
+      "add": "New promotion",
+      "auto": "Auto",
+      "col": {
+        "covers": "Covers",
+        "dates": "Runs",
+        "name": "Promotion",
+        "offer": "Off",
+        "status": "Status"
+      },
+      "description": "Dated offers that come off proposals on their own, like “$500 off a new system”. Each {{quote, lowercase}} can still leave one off.",
+      "empty": {
+        "body": "Add one to show a saving on {{quotes, lowercase}} while it runs.",
+        "title": "No promotions yet"
+      },
+      "everything": "Every line",
+      "form": {
+        "active": "On",
+        "activeHint": "Off stops it applying anywhere. There’s no delete.",
+        "addTitle": "New promotion",
+        "amount": "Amount",
+        "amountOff": "$ off",
+        "autoApply": "Apply automatically",
+        "autoApplyHint": "On every proposal it covers, unless a quote leaves it off. Otherwise it’s applied per quote.",
+        "copy": "What the customer reads",
+        "covers": "Covers",
+        "coversHint": "Lines in these categories. None ticked: every line.",
+        "editTitle": "Edit {{name}}",
+        "ends": "Ends",
+        "itemsKept_one": "Also covers {{count}} item, kept as it was.",
+        "itemsKept_other": "Also covers {{count}} items, kept as they were.",
+        "kind": "Kind",
+        "minimum": "Only over",
+        "name": "Name",
+        "noCategories": "No pricebook categories yet.",
+        "noMinimum": "No minimum",
+        "percent": "Percent",
+        "percentOff": "% off",
+        "starts": "Starts"
+      },
+      "items_one": "{{count}} item",
+      "items_other": "{{count}} items",
+      "loadFailed": "Couldn’t load promotions",
+      "over": "over {{amount}}",
+      "saveFailed": "Couldn’t save the promotion",
+      "saved": "{{name}} saved",
+      "status": {
+        "notInWindow": "Not running",
+        "off": "Off",
+        "onOffer": "On offer"
+      },
+      "title": "Promotions"
+    },
     "resetDefaults": "Reset to defaults",
     "saveChanges": "Save changes",
     "searchPlaceholder": "Search settings",

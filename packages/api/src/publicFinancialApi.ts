@@ -233,9 +233,13 @@ export interface PublicSaving {
   lineId: string | null;
   kind: PublicAdjustmentKind;
   reasonCode: PublicAdjustmentReason;
-  /** The source's name (a member plan); else name it from `reasonCode`. */
+  /** The source's name (a member plan, a promotion); else name it from `reasonCode`. */
   label: string | null;
   amount: PublicMoney;
+  sourceType?: 'MANUAL' | 'AGREEMENT' | 'PROMOTION';
+  optionId?: string | null;
+  /** The last day it's offered ("approve by Oct 12"). */
+  validThrough?: string | null;
 }
 
 export interface PublicSelectionTotals {

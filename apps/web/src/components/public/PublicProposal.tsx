@@ -414,6 +414,7 @@ function Chooser({
 
   return (
     <Shell data={data} steps={stepNav} mode={mode} onExit={onExit}>
+      <DealsBanner priced={priced} mode={mode} />
       {notice && (
         <div className="pp-notice" role="status">
           <div>{notice}</div>
@@ -709,7 +710,57 @@ function AddOnsStep({
 }
 
 const savingName = (t: (k: string) => string, s: PublicSaving) =>
-  s.label || (s.kind === 'WAIVE' ? t('public.document.adjustment.waived') : t(`public.document.reason.${s.reasonCode}`));
+  s.label ||
+  (s.reasonCode === 'INCENTIVE' && s.validThrough
+    ? t('public.proposal.decideToday')
+    : s.kind === 'WAIVE'
+      ? t('public.document.adjustment.waived')
+      : t(`public.document.reason.${s.reasonCode}`));
+
+/**
+ * The offers with an end date (promotions, decide-today), once each, from the
+ * current choice and every card: what the banner under the top bar lists.
+ */
+function dealsOf(priced: PublicPricedSelection | null): PublicSaving[] {
+  if (!priced) return [];
+  const all = [...priced.savings, ...priced.options.flatMap((o) => o.savings)];
+  const seen = new Set<string>();
+  return all.filter((s) => {
+    if (!s.validThrough || (s.sourceType !== 'PROMOTION' && s.reasonCode !== 'INCENTIVE')) return false;
+    const key = `${s.sourceType ?? ''}:${s.adjustmentId ?? s.label ?? s.reasonCode}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+/** "Fall Comfort Event · ends Oct 31" and "Decide-today savings · $350 off · approve by Oct 12". */
+function DealsBanner({ priced, mode }: { priced: PublicPricedSelection | null; mode: 'remote' | 'inhome' }) {
+  const { t } = useTranslation();
+  const deals = dealsOf(priced);
+  if (!deals.length) return null;
+  const today = new Date().toISOString().slice(0, 10);
+  return (
+    <div className="pp-promo" data-testid="pp-deals">
+      {deals.map((d, i) => {
+        const date = longDate(d.validThrough);
+        const incentive = d.sourceType !== 'PROMOTION';
+        const ends = incentive
+          ? mode === 'inhome' && d.validThrough!.slice(0, 10) <= today
+            ? t('public.proposal.deals.endsToday')
+            : t('public.proposal.deals.approveBy', { date })
+          : t('public.proposal.deals.ends', { date });
+        return (
+          <span key={i} className={i > 0 ? 'pp-promo-2' : undefined}>
+            {/* A promotion's amount differs by option, so only a flat decide-today saving shows one. */}
+            <b>{savingName(t, d)}</b>
+            {incentive && ` · ${usd(d.amount)} ${t('public.proposal.deals.off')}`} · {ends}
+          </span>
+        );
+      })}
+    </div>
+  );
+}
 
 /** What the choice sells, priced: the package lines, savings and total. */
 function PackageLines({ priced, proposal }: { priced: PublicPricedSelection | PublicApproval; proposal: Proposal | null }) {

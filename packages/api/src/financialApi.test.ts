@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { invoicesApi, quotesApi, financialActivityApi, financialDashboardApi, revenueTargetsApi,
-  revenueReportApi, receivablesReportApi, quoteReportApi, paymentReportApi, discountReportApi, salesTaxReportApi, unbilledReportApi, quoteLineBillingApi, paymentsApi, taxApi, laborRatesApi, pricebookApi, ratePlansApi, mediaApi } from './financialApi';
+  revenueReportApi, receivablesReportApi, quoteReportApi, paymentReportApi, discountReportApi, salesTaxReportApi, unbilledReportApi, quoteLineBillingApi, promotionsApi, paymentsApi, taxApi, laborRatesApi, pricebookApi, ratePlansApi, mediaApi } from './financialApi';
 import apiClient from './client';
 
 vi.mock('./client');
@@ -434,6 +434,28 @@ describe('quotesApi proposal structure', () => {
     expect(apiClient.delete).toHaveBeenLastCalledWith('/financial/quotes/q-1', { params: { version: 9 } });
     await quotesApi.deleteOption('q-1', 'o-1', 8);
     expect(apiClient.delete).toHaveBeenLastCalledWith('/financial/quotes/q-1/options/o-1', { params: { version: 8 } });
+  });
+});
+
+describe('promotionsApi', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('lists, creates and updates promotions, and sets one per quote', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({ data: [] });
+    vi.mocked(apiClient.post).mockResolvedValue({ data: {} });
+    vi.mocked(apiClient.put).mockResolvedValue({ data: {} });
+    await promotionsApi.getAll();
+    expect(apiClient.get).toHaveBeenLastCalledWith('/financial/promotions');
+    const body = {
+      name: 'Fall Comfort Event', customerCopy: '$500 off a new system', startsOn: '2026-10-01', endsOn: '2026-10-31',
+      kind: 'AMOUNT' as const, value: 500, minAmount: 8000, itemIds: [], categoryIds: ['cat-1'], autoApply: true, active: true,
+    };
+    await promotionsApi.create(body);
+    expect(apiClient.post).toHaveBeenLastCalledWith('/financial/promotions', body);
+    await promotionsApi.update('p-1', { ...body, active: false });
+    expect(apiClient.put).toHaveBeenLastCalledWith('/financial/promotions/p-1', { ...body, active: false });
+    await quotesApi.setPromotion('q-1', 'p-1', { version: 7, choice: 'EXCLUDE' });
+    expect(apiClient.put).toHaveBeenLastCalledWith('/financial/quotes/q-1/promotions/p-1', { version: 7, choice: 'EXCLUDE' });
   });
 });
 

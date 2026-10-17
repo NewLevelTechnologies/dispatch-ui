@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { addOnLines, allOptions, headerFields, marginPct, modeOf, savingLabel, optionFields, optionHighlights, optionLines, optionPhoto, sendChecks } from './proposalModel';
+import { addOnLines, allOptions, decideToday, headerFields, marginPct, promotionApplies, modeOf, savingLabel, optionFields, optionHighlights, optionLines, optionPhoto, sendChecks } from './proposalModel';
 import { option, pricedSelection, proposalQuote } from './proposalFixtures';
 
 describe('proposalModel', () => {
@@ -74,5 +74,23 @@ describe('proposalModel', () => {
     expect(savingLabel({ ...base, reasonCode: 'GOODWILL', label: null })).toBe('Goodwill');
     expect(savingLabel({ ...base, kind: 'WAIVE', reasonCode: 'OTHER', label: null })).toBe('Waived');
     expect(marginPct(0.2478)).toBe('24.8%');
+  });
+
+  it('knows whether a promotion applies here: its own setting unless the quote overrides it', () => {
+    const p = { id: 'p-1', autoApply: true } as never;
+    const optional = { id: 'p-2', autoApply: false } as never;
+    expect(promotionApplies(p, {})).toBe(true);
+    expect(promotionApplies(p, { promotionOverrides: { 'p-1': 'EXCLUDE' } })).toBe(false);
+    expect(promotionApplies(optional, {})).toBe(false);
+    expect(promotionApplies(optional, { promotionOverrides: { 'p-2': 'APPLY' } })).toBe(true);
+  });
+
+  it('finds the decide-today saving and names it', () => {
+    const base = { lineId: null, kind: 'AMOUNT' as const, value: 350, reasonNote: null, computedAmount: 350, createdByUserId: null, createdAt: null, sourceType: 'MANUAL' as const };
+    const today = { ...base, id: 'a-2', reasonCode: 'INCENTIVE' as const, validThrough: '2026-10-12' };
+    expect(decideToday({ adjustments: [{ ...base, id: 'a-1', reasonCode: 'INCENTIVE' }, today] })).toBe(today);
+    expect(savingLabel({ adjustmentId: 'a-2', lineId: null, kind: 'AMOUNT', reasonCode: 'INCENTIVE', label: null, amount: 350, validThrough: '2026-10-12' })).toBe(
+      'Decide-today savings',
+    );
   });
 });
