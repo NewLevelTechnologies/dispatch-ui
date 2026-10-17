@@ -1,20 +1,19 @@
-// Settings → Financing: the payment plans the company's lender offers, shown
-// on proposals as monthly payments, and the lender's application link. No
-// lender is integrated: the customer picks a plan and the office arranges the
-// loan. No delete: a plan is switched off. Writing needs MANAGE_PRICING.
+// Settings → Financing: the payment plans the company offers, shown on
+// proposals as monthly payments. The customer picks one and the office sets
+// it up. No delete: a plan is switched off. Writing needs MANAGE_PRICING.
 import { useState, type FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from '@dispatch/i18n';
 import { PlusIcon } from '@heroicons/react/16/solid';
-import { paymentPlansApi, taxApi, type PaymentPlan, type PaymentPlanRequest, type PricingSettings } from '../../api/setup';
+import { paymentPlansApi, type PaymentPlan, type PaymentPlanRequest } from '../../api/setup';
 import { useHasAnyCapability } from '../../hooks/useCurrentUser';
 import { Button } from '../../components/catalyst/button';
 import { Dialog, DialogActions, DialogBody, DialogTitle } from '../../components/catalyst/dialog';
 import { Description, Field, Label } from '../../components/catalyst/fieldset';
 import { Input } from '../../components/catalyst/input';
 import { Switch, SwitchField } from '../../components/catalyst/switch';
-import { FormSection, ViewOnlyNotice } from '../../components/settings/PricingPageParts';
-import { Card, CardBody, CardHead, CardTitle } from '../../components/ui/Card';
+import { ViewOnlyNotice } from '../../components/settings/PricingPageParts';
+import { Card, CardBody } from '../../components/ui/Card';
 import { DenseRow, DenseTable, DenseTHead } from '../../components/ui/DenseTable';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { LoadingState } from '../../components/ui/LoadingState';
@@ -24,7 +23,6 @@ import { extractApiError, showError, showSuccess } from '../../lib/toast';
 import { useEntityNames } from '../../hooks/useEntityNames';
 
 const PLANS_KEY = ['payment-plans'] as const;
-const SETTINGS_KEY = ['pricing-settings'] as const;
 
 const aprText = (apr: number) => `${Number(apr.toFixed(3))}%`;
 
@@ -34,7 +32,6 @@ export default function FinancingPanel() {
   const canManage = useHasAnyCapability('MANAGE_PRICING');
   const [editing, setEditing] = useState<{ plan: PaymentPlan | null } | null>(null);
   const plans = useQuery({ queryKey: PLANS_KEY, queryFn: () => paymentPlansApi.getAll() });
-  const { data: settings } = useQuery({ queryKey: SETTINGS_KEY, queryFn: () => taxApi.getPricingSettings() });
   const rows = plans.data ?? [];
 
   return (
@@ -91,7 +88,6 @@ export default function FinancingPanel() {
             )}
           </CardBody>
         </Card>
-        {settings && <ApplicationLinkCard key={settings.financingApplicationUrl ?? ''} settings={settings} canManage={canManage} />}
       </div>
       <Dialog open={editing != null} onClose={() => setEditing(null)} size="md">
         {editing && <PlanForm plan={editing.plan} nextOrder={rows.length + 1} onDone={() => setEditing(null)} />}
@@ -166,54 +162,5 @@ function PlanForm({ plan, nextOrder, onDone }: { plan: PaymentPlan | null; nextO
         </Button>
       </DialogActions>
     </form>
-  );
-}
-
-function ApplicationLinkCard({ settings, canManage }: { settings: PricingSettings; canManage: boolean }) {
-  const { t } = useTranslation();
-  const queryClient = useQueryClient();
-  const saved = settings.financingApplicationUrl ?? '';
-  const [url, setUrl] = useState(saved);
-  const valid = url.trim() === '' || /^https:\/\/\S+$/.test(url.trim());
-  const dirty = url.trim() !== saved;
-  const save = useMutation({
-    mutationFn: () => taxApi.updatePricingSettings(settings.agreementFeeTaxClass, undefined, { financingApplicationUrl: url.trim() }),
-    onSuccess: (next) => {
-      queryClient.setQueryData(SETTINGS_KEY, next);
-      showSuccess(t('settings.financing.link.saved'));
-    },
-    onError: (err) => showError(t('settings.financing.link.saveFailed'), extractApiError(err)),
-  });
-  return (
-    <Card>
-      <CardHead>
-        <CardTitle>{t('settings.financing.link.title')}</CardTitle>
-      </CardHead>
-      <div className="px-5">
-        <FormSection title={t('settings.financing.link.label')} description={t('settings.financing.link.hint')}>
-          <Input
-            type="url"
-            aria-label={t('settings.financing.link.label')}
-            value={url}
-            maxLength={500}
-            disabled={!canManage}
-            invalid={!valid}
-            onChange={(e) => setUrl(e.target.value)}
-            placeholder="https://apply.yourlender.com/…"
-          />
-          {!valid && <p className="text-[12px] text-danger-500">{t('settings.financing.link.invalid')}</p>}
-          {canManage && dirty && valid && (
-            <div className="flex gap-2">
-              <Button color="dark/zinc" size="xs" disabled={save.isPending} onClick={() => save.mutate()}>
-                {t('common.save')}
-              </Button>
-              <Button plain size="xs" onClick={() => setUrl(saved)}>
-                {t('common.cancel')}
-              </Button>
-            </div>
-          )}
-        </FormSection>
-      </div>
-    </Card>
   );
 }

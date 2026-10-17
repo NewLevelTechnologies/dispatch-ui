@@ -46,7 +46,7 @@ export function PaymentOptionsCard({
       </CardHead>
       <CardBody className="flex flex-col gap-2">
         {active.length === 0 ? (
-          <p className="text-[12px] text-fg-muted">No payment plans yet. Add your lender’s plans in Settings → Financing.</p>
+          <p className="text-[12px] text-fg-muted">No payment plans yet. Add them in Settings → Financing.</p>
         ) : (
           <>
             <div className="text-[12px] text-fg-muted">Pay in full is always offered.</div>

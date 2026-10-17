@@ -273,7 +273,7 @@ describe('PublicProposal', () => {
         { planId: 'pp-1', label: '12 months same as cash', apr: 0, months: 12, monthlyPayment: 1256.67 },
         { planId: 'pp-2', label: '60 months', apr: 9.99, months: 60, monthlyPayment: 320.33 },
       ],
-      selectedPlanId: null, monthlyPayment: null, applicationUrl: 'https://apply.lender.com',
+      selectedPlanId: null, monthlyPayment: null, applicationUrl: null,
     };
     const base = priced();
     const offered = priced({
@@ -301,11 +301,11 @@ describe('PublicProposal', () => {
     await waitFor(() => expect(screen.getAllByTestId('pp-cart')[0]).toHaveTextContent('public.proposal.pay.orMonthly'));
   });
 
-  it('shows the plan chosen once signed, with the lender’s application link', () => {
+  it('shows the plan chosen once signed, with no application to start', () => {
     renderPage(
       page({
         status: 'ACCEPTED',
-        selection: priced({ financing: { plans: [], selectedPlanId: null, monthlyPayment: null, applicationUrl: 'https://apply.lender.com' } }),
+        selection: null,
         approval: {
           signerName: 'Tanya Reyes', signedAt: '2026-10-13T15:11:00Z', signatureImage: null, consent: true, revision: 2,
           selection: { optionIds: ['o-2'], addOnLineIds: [] }, lines: [], savings: [], totals: totals(15580, 500),
@@ -315,6 +315,6 @@ describe('PublicProposal', () => {
     );
     const card = screen.getByTestId('pp-financing');
     expect(card).toHaveTextContent('public.proposal.pay.doneBody');
-    expect(within(card).getByRole('link', { name: 'public.proposal.pay.apply' })).toHaveAttribute('href', 'https://apply.lender.com');
+    expect(within(card).queryByRole('link')).not.toBeInTheDocument();
   });
 });
