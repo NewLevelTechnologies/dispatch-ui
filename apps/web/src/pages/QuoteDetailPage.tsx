@@ -4,7 +4,8 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { EllipsisHorizontalIcon } from '@heroicons/react/16/solid';
 import { useTranslation } from '@dispatch/i18n';
-import { quotesApi, QuoteStatus, taxApi, type Quote } from '../api/setup';
+import { formatCurrency } from '@dispatch/utils';
+import { quotesApi, QuoteStatus, taxApi, type Quote, type QuotePresentation } from '../api/setup';
 import { useGlossary } from '../contexts/GlossaryContext';
 import { showError, showSuccess } from '../lib/toast';
 import { Pill, Tag } from '../components/ui/Pill';
@@ -25,6 +26,9 @@ import { BillQuoteDialog } from '../components/document/BillQuoteDialog';
 import { invoicedPercent } from '../components/document/billingModel';
 import { formatDocDate, isLegacy, memberLabel, memberSavings, toDateInput } from '../components/document/documentModel';
 import { SendDocumentDialog } from '../components/document/SendDocumentDialog';
+import { ProposalBuilder } from '../components/proposal/ProposalBuilder';
+import { addOnLines, allOptions, headerFields, isProposal, modeOf } from '../components/proposal/proposalModel';
+import { ToggleGroup, ToggleGroupOption } from '../components/ui/ToggleGroup';
 
 const STATUS_TONE: Record<QuoteStatus, 'neutral' | 'info' | 'success' | 'warning' | 'danger'> = {
   [QuoteStatus.DRAFT]: 'neutral',
@@ -127,6 +131,24 @@ export default function QuoteDetailPage() {
   const setStatus = (status: QuoteStatus) =>
     void editor.run(() => quotesApi.updateStatus(quote.id, { status }), `Couldn’t update this ${entityLower}`);
 
+  // Proposal or standard, switchable until it's first sent. Back to standard
+  // needs one option that includes no add-ons (the server refuses otherwise).
+  const proposal = isProposal(quote);
+  const options = allOptions(quote);
+  const canSwitch = editable && !quote.firstSentAt;
+  const standardBlocked =
+    proposal && (options.length > 1 || options.some((o) => addOnLines(quote).some((l) => modeOf(o, l.id) === 'INCLUDED')));
+  const setPresentation = (presentation: QuotePresentation) =>
+    void editor.run(
+      (version) => quotesApi.updateHeader(quote.id, headerFields(quote, version, { presentation })),
+      `Couldn’t switch this ${entityLower}`,
+    );
+  const optionTotals = options.map((o) => o.totals.totalAmount);
+  const optionRange =
+    proposal && optionTotals.length > 1
+      ? `${formatCurrency(Math.min(...optionTotals))} – ${formatCurrency(Math.max(...optionTotals))}`
+      : null;
+
   const sendLabel = unsentRevision ? `Re-send · Rev ${revision ?? 1}` : quote.lastSentAt ? 'Resend' : `Send ${entityLower}`;
   const actions = (
     <>
@@ -194,6 +216,20 @@ export default function QuoteDetailPage() {
             {t(`quotes.status.${quote.status.toLowerCase()}`)}
           </Pill>
           {revision != null && <Tag word>Rev {revision}</Tag>}
+          {canSwitch ? (
+            <ToggleGroup size="sm" value={quote.presentation ?? 'STANDARD'} onChange={setPresentation} aria-label="Presentation">
+              <ToggleGroupOption
+                value="STANDARD"
+                disabled={standardBlocked}
+                title={standardBlocked ? 'Only a proposal with one option, including no add-ons, can go back to standard' : undefined}
+              >
+                Standard
+              </ToggleGroupOption>
+              <ToggleGroupOption value="PROPOSAL">Proposal</ToggleGroupOption>
+            </ToggleGroup>
+          ) : (
+            proposal && <Tag word>Proposal</Tag>
+          )}
         </>
       }
     >
@@ -205,8 +241,9 @@ export default function QuoteDetailPage() {
         poNumber={quote.customerPoNumber}
         nte={workOrder?.notToExceed != null ? { amount: workOrder.notToExceed, over: false } : null}
         member={memberLabel(quote.adjustments)}
-        amountLabel={`${entityLabel} total`}
+        amountLabel={optionRange ? `${options.length} options` : `${entityLabel} total`}
         amount={quote.totalAmount}
+        amountDisplay={optionRange}
         amountSub={
           quote.expirationDate
             ? `Expires ${formatDocDate(quote.expirationDate)}`
@@ -257,11 +294,15 @@ export default function QuoteDetailPage() {
       )}
       <DocumentWarnings doc={quote} billToName={billTo.name} nte={workOrder?.notToExceed} />
 
-      <DocumentBody
-        doc={quote}
-        notes={quote.notes}
-        editing={editable ? lineEditing(quotesApi, quote.id, editor.run) : undefined}
-      />
+      {proposal ? (
+        <ProposalBuilder quote={quote} editable={editable} run={editor.run} />
+      ) : (
+        <DocumentBody
+          doc={quote}
+          notes={quote.notes}
+          editing={editable ? lineEditing(quotesApi, quote.id, editor.run) : undefined}
+        />
+      )}
 
       <SendDocumentDialog
         target={sending ? { kind: 'quote', doc: quote } : null}

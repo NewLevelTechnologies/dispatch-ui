@@ -34,6 +34,7 @@ export function DocumentSummaryHeader({
   member,
   amountLabel,
   amount,
+  amountDisplay,
   amountSub,
   memberSaved,
   steps,
@@ -55,6 +56,8 @@ export function DocumentSummaryHeader({
   member?: string | null;
   amountLabel: string;
   amount: number;
+  /** Shown instead of `amount`, e.g. a proposal's range across its options. */
+  amountDisplay?: string | null;
   amountSub?: ReactNode;
   memberSaved?: number;
   steps: DocumentStep[];
@@ -125,7 +128,7 @@ export function DocumentSummaryHeader({
         <div>
           <div className="label-tiny mb-0.5">{amountLabel}</div>
           <div className="text-[28px] font-bold leading-tight tracking-[-0.03em] tabular-nums text-fg-strong">
-            {formatCurrency(amount)}
+            {amountDisplay ?? formatCurrency(amount)}
           </div>
           {amountSub && <div className="mt-0.5 text-[12px] tabular-nums text-fg-muted">{amountSub}</div>}
           {memberSaved != null && memberSaved > 0 && (
