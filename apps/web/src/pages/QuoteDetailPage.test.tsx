@@ -694,6 +694,8 @@ describe('QuoteDetailPage billing', () => {
     expect(screen.getByText('$11,480.00 – $15,960.00')).toBeInTheDocument();
     expect(screen.getByText('2 options')).toBeInTheDocument();
     expect(screen.queryByRole('radio', { name: 'Proposal' })).not.toBeInTheDocument();
+    // Presented full screen on the advisor's device.
+    expect(screen.getByRole('button', { name: 'Present in home' })).toBeInTheDocument();
   });
 
   describe('deleting a never-sent draft', () => {

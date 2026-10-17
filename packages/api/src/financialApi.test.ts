@@ -426,6 +426,10 @@ describe('quotesApi proposal structure', () => {
     expect(apiClient.get).toHaveBeenLastCalledWith('/financial/quotes/q-1/approval');
     await quotesApi.saveSelection('q-1', { optionIds: ['o-2'], addOnLineIds: ['l-9'] });
     expect(apiClient.put).toHaveBeenLastCalledWith('/financial/quotes/q-1/selection', { optionIds: ['o-2'], addOnLineIds: ['l-9'] });
+    vi.mocked(apiClient.post).mockResolvedValue({ data: {} });
+    const signed = { signerName: 'Tanya Reyes', signature: 'data:image/png;base64,S', consent: true as const, totalAmount: 16170, selection: { optionIds: ['o-2'], addOnLineIds: [] } };
+    await quotesApi.approveInPerson('q-1', signed);
+    expect(apiClient.post).toHaveBeenLastCalledWith('/financial/quotes/q-1/approve', signed);
     await quotesApi.delete('q-1', 9);
     expect(apiClient.delete).toHaveBeenLastCalledWith('/financial/quotes/q-1', { params: { version: 9 } });
     await quotesApi.deleteOption('q-1', 'o-1', 8);

@@ -1017,8 +1017,8 @@ function Rail({
       </Card>
       {priced && !accepted && <CurrentSelection quote={quote} priced={priced} />}
       {quote.firstSentAt && <ActivityCard quote={quote} />}
-      {/* Only a link approval has a signed record; the office's verbal yes doesn't. */}
-      {accepted && !quote.acceptedByUserId && <SignedCopyCard quoteId={quote.id} />}
+      {/* A signature (on the link or in person) leaves a signed record; the office's verbal yes doesn't. */}
+      {accepted && !!quote.approvedByName && <SignedCopyCard quoteId={quote.id} />}
       {!accepted && quote.status === 'DRAFT' && options.length > 0 && (
         <Card>
           <CardHead>

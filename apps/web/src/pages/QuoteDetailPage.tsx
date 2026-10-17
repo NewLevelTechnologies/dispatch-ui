@@ -164,6 +164,8 @@ export default function QuoteDetailPage() {
   const range = pricedSelection?.priceRange ?? (optionTotals.length ? { low: Math.min(...optionTotals), high: Math.max(...optionTotals) } : null);
   const optionRange = proposal && options.length > 1 && range ? `${formatCurrency(range.low)} – ${formatCurrency(range.high)}` : null;
 
+  // On the advisor's device: the proposal full screen, chosen and signed in person.
+  const canPresent = proposal && options.length > 0 && (quote.status === QuoteStatus.DRAFT || quote.status === QuoteStatus.SENT);
   const deletable = canDelete && quote.status === QuoteStatus.DRAFT && !quote.firstSentAt;
 
   const sendLabel = unsentRevision ? `Re-send · Rev ${revision ?? 1}` : quote.lastSentAt ? 'Resend' : `Send ${entityLower}`;
@@ -193,6 +195,11 @@ export default function QuoteDetailPage() {
         </>
       ) : (
         <>
+          {canPresent && (
+            <Button outline size="xs" onClick={() => navigate(`/quotes/${quote.id}/present`)}>
+              Present in home
+            </Button>
+          )}
           <Button color="dark/zinc" size="xs" disabled={editor.saving} onClick={send}>
             {sendLabel}
           </Button>

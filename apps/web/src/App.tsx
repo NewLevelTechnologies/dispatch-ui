@@ -37,6 +37,7 @@ import InvoicesPage from './pages/InvoicesPage';
 import InvoiceDetailPage from './pages/InvoiceDetailPage';
 import QuotesPage from './pages/QuotesPage';
 import QuoteDetailPage from './pages/QuoteDetailPage';
+import PresentProposalPage from './pages/PresentProposalPage';
 import PaymentsPage from './pages/PaymentsPage';
 import DispatchBoardPage from './pages/DispatchBoardPage';
 import UsersPage from './pages/UsersPage';
@@ -239,6 +240,7 @@ function App() {
       <Route path="/invoices/:id" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<InvoiceDetailPage />} />} />
       <Route path="/quotes" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<QuotesPage />} />} />
       <Route path="/quotes/:id" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<QuoteDetailPage />} />} />
+      <Route path="/quotes/:id/present" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<PresentProposalPage />} />} />
       <Route path="/payments" element={<ProtectedRoute isAuthenticated={isAuthenticated} element={<PaymentsPage />} />} />
       {/* The dispatch board. Supersedes /dispatches (a flat list of dispatch
           records has no audience — a dispatch is a child of a work order),

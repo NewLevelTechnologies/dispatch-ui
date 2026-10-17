@@ -290,6 +290,8 @@ export interface PublicApproval {
   lines: PublicPricedLine[];
   savings: PublicSaving[];
   totals: PublicSelectionTotals;
+  signedVia?: 'LINK' | 'IN_PERSON';
+  witnessName?: string | null;
 }
 
 /**
