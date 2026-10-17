@@ -37,6 +37,7 @@ const KIND_TEMPLATE_KEYS: Record<ActivityKind, string> = {
   QUOTE_ACCEPTED: 'workOrders.activity.kind.quoteAccepted',
   QUOTE_DECLINED: 'workOrders.activity.kind.quoteDeclined',
   QUOTE_DELETED: 'workOrders.activity.kind.quoteDeleted',
+  QUOTE_CHOICE_CHANGED: 'workOrders.activity.kind.quoteChoiceSame',
   INVOICE_ISSUED: 'workOrders.activity.kind.invoiceIssued',
   INVOICE_SENT: 'workOrders.activity.kind.invoiceSent',
   INVOICE_PAID: 'workOrders.activity.kind.invoicePaid',

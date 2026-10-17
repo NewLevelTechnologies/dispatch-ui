@@ -1099,6 +1099,11 @@ export interface Quote {
   advisorUserId?: string | null;
   /** Null when the user cache doesn't know them. */
   advisorName?: string | null;
+  /** Recorded customer views (at most one per half hour per revision). */
+  viewCount?: number;
+  /** Who chose last, and when. */
+  selectionUpdatedVia?: 'ADVISOR' | 'CUSTOMER' | null;
+  selectionUpdatedAt?: string | null;
   optionGroups?: QuoteOptionGroup[];
   /** What the quote's totals are priced for: each group's chosen option and the add-ons taken. */
   selection?: { optionIds: string[]; addOnLineIds: string[] } | null;
@@ -1311,6 +1316,13 @@ export const quotesApi = {
    */
   delete: async (id: string, version: number): Promise<void> => {
     await apiClient.delete(`/financial/quotes/${id}`, { params: { version } });
+  },
+  /** The quote's own timeline, newest first: sends, views, the customer's choices, the decision. */
+  getActivity: async (id: string, params?: FinancialActivityParams): Promise<FinancialActivityPage> => {
+    const response = await apiClient.get<FinancialActivityPage>(`/financial/quotes/${id}/activity`, {
+      params: financialActivityQuery(params),
+    });
+    return response.data;
   },
   /** The signed copy of a proposal approved through its link (400 when the office recorded the yes). */
   getApproval: async (id: string): Promise<QuoteApproval> => {
@@ -2268,6 +2280,7 @@ export type FinancialActivityKind =
   | 'QUOTE_VIEWED'
   | 'QUOTE_ACCEPTED'
   | 'QUOTE_DECLINED'
+  | 'QUOTE_CHOICE_CHANGED'
   | 'QUOTE_DELETED'
   | 'INVOICE_SENT'
   | 'INVOICE_PAID'

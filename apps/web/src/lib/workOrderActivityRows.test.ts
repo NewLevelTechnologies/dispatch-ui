@@ -79,6 +79,18 @@ describe('buildWorkOrderDays', () => {
     expect(row.objHref).toBeNull();
   });
 
+  it('words a stretch of the customer choosing: where they went, what they added, where they left it', () => {
+    const choice = (data: Record<string, unknown>) =>
+      rows([event({ kind: 'QUOTE_CHOICE_CHANGED', category: 'FINANCIAL', subject: { type: 'QUOTE', id: 'q-1', number: null, label: 'Q-1907' }, data })])[0].text;
+    expect(choice({ path: ['Comfort', 'Ultimate', 'Comfort'], added: ['Duct sealing'], removed: [], totalAmount: 17700 })).toBe(
+      'quoteChoicePath(seen=Comfort, Ultimate,last=Comfort) · quoteChoiceAdded(list=Duct sealing) · $17,700.00',
+    );
+    expect(choice({ path: ['Comfort'], added: [], removed: ['Surge protector'], totalAmount: 15080 })).toBe(
+      'quoteChoiceOn(last=Comfort) · quoteChoiceRemoved(list=Surge protector) · $15,080.00',
+    );
+    expect(choice({ path: ['Comfort'], added: [], removed: [] })).toBe('quoteChoiceSame(last=Comfort)');
+  });
+
   it('words a send with no channels as marked sent', () => {
     const [row] = rows([
       event({
