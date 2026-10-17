@@ -142,6 +142,7 @@ export default function SettingsLayout() {
         { label: t('settings.nav.ratePlans'), to: '/settings/rate-plans' },
         { label: t('settings.nav.tax'), to: '/settings/tax' },
         { label: t('settings.nav.promotions'), to: '/settings/promotions' },
+        { label: t('settings.nav.financing'), to: '/settings/financing' },
       ],
     },
     {

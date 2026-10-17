@@ -1651,6 +1651,21 @@
         "title_other": "Hi {{name}}, here are {{count}} ways to go."
       },
       "package": "Your package",
+      "pay": {
+        "apply": "Start your financing application",
+        "authorizeMonthly": "You chose to pay {{monthly}} a month on {{plan}}, subject to the lender’s approval.",
+        "doneBody": "You chose {{plan}}, about {{monthly}} a month. {{tenant}} will arrange it with the lender; apply below to speed it up.",
+        "doneTitle": "Your payment plan",
+        "fine": "Financing is subject to credit approval by the lender. Monthly payments are estimates on the total shown, before any rebate.",
+        "fromMonthly": "or from {{monthly}}/mo",
+        "full": "Pay in full",
+        "fullSub": "Card, bank transfer or check",
+        "orMonthly": "or {{monthly}}/mo · {{plan}}",
+        "perMonth": "/mo",
+        "terms_one": "{{apr}} APR · {{count}} month",
+        "terms_other": "{{apr}} APR · {{count}} months",
+        "title": "How would you like to pay?"
+      },
       "popular": "Most popular",
       "preparedFor": "Prepared for",
       "previewHint": "Preview: the customer chooses and signs on their own link.",
@@ -2717,6 +2732,45 @@
     }
   },
   "settings": {
+    "financing": {
+      "add": "New plan",
+      "col": {
+        "apr": "APR",
+        "label": "Plan",
+        "status": "Status",
+        "term": "Term"
+      },
+      "description": "Plans your lender offers. Proposals show a monthly payment for each, and the {{customer, lowercase}} picks one; the office arranges the loan.",
+      "empty": {
+        "body": "Add the plans your lender offers to show monthly payments on {{quotes, lowercase}}.",
+        "title": "No payment plans yet"
+      },
+      "form": {
+        "active": "On",
+        "activeHint": "Off stops offering it on proposals. There’s no delete.",
+        "addTitle": "New payment plan",
+        "apr": "APR (%)",
+        "aprHint": "0 for same-as-cash.",
+        "editTitle": "Edit {{name}}",
+        "label": "Name",
+        "months": "Months"
+      },
+      "link": {
+        "hint": "Where a customer who picks a plan applies. Shown after they sign.",
+        "invalid": "Use an https:// link.",
+        "label": "Application link",
+        "saveFailed": "Couldn’t save the application link",
+        "saved": "Application link saved",
+        "title": "Lender"
+      },
+      "months_one": "{{count}} month",
+      "months_other": "{{count}} months",
+      "off": "Off",
+      "on": "On",
+      "saveFailed": "Couldn’t save the plan",
+      "saved": "{{name}} saved",
+      "title": "Financing"
+    },
     "itemStatuses": {
       "builtInBadge": "Built-in",
       "builtInCantDelete": "Built-in statuses can't be deleted.",
@@ -2992,6 +3046,7 @@
       "equipmentTaxonomy": "Types & Categories",
       "equipmentTypes": "Types",
       "filterSizes": "Filter Sizes",
+      "financing": "Financing",
       "general": "General",
       "itemStatuses": "Item Statuses",
       "laborRates": "Labor rates",

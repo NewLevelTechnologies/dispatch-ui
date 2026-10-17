@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { invoicesApi, quotesApi, financialActivityApi, financialDashboardApi, revenueTargetsApi,
-  revenueReportApi, receivablesReportApi, quoteReportApi, paymentReportApi, discountReportApi, salesTaxReportApi, unbilledReportApi, quoteLineBillingApi, promotionsApi, quotePriceApprovalsApi, membershipSignupsApi, paymentsApi, taxApi, laborRatesApi, pricebookApi, ratePlansApi, mediaApi } from './financialApi';
+  revenueReportApi, receivablesReportApi, quoteReportApi, paymentReportApi, discountReportApi, salesTaxReportApi, unbilledReportApi, quoteLineBillingApi, promotionsApi, quotePriceApprovalsApi, membershipSignupsApi, paymentPlansApi, paymentsApi, taxApi, laborRatesApi, pricebookApi, ratePlansApi, mediaApi } from './financialApi';
 import apiClient from './client';
 
 vi.mock('./client');
@@ -504,6 +504,27 @@ describe('membership on proposals', () => {
     expect(apiClient.get).toHaveBeenLastCalledWith('/financial/membership-signups', { params: { status: 'PENDING' } });
     await membershipSignupsApi.setStatus('q-1', 'DONE');
     expect(apiClient.put).toHaveBeenLastCalledWith('/financial/membership-signups/q-1', { status: 'DONE' });
+  });
+});
+
+describe('payment plans', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('lists, creates and updates plans, sets a quote’s offer, and the application link', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({ data: [] });
+    vi.mocked(apiClient.post).mockResolvedValue({ data: {} });
+    vi.mocked(apiClient.put).mockResolvedValue({ data: {} });
+    await paymentPlansApi.getAll();
+    expect(apiClient.get).toHaveBeenLastCalledWith('/financial/payment-plans');
+    const plan = { label: '12 months same as cash', apr: 0, months: 12, sortOrder: 1, active: true };
+    await paymentPlansApi.create(plan);
+    expect(apiClient.post).toHaveBeenLastCalledWith('/financial/payment-plans', plan);
+    await paymentPlansApi.update('pp-1', { ...plan, active: false });
+    expect(apiClient.put).toHaveBeenLastCalledWith('/financial/payment-plans/pp-1', { ...plan, active: false });
+    await quotesApi.setPaymentPlans('q-1', { version: 7, planIds: ['pp-1'] });
+    expect(apiClient.put).toHaveBeenLastCalledWith('/financial/quotes/q-1/payment-plans', { version: 7, planIds: ['pp-1'] });
+    await taxApi.updatePricingSettings('FEE', undefined, { financingApplicationUrl: '' });
+    expect(apiClient.put).toHaveBeenLastCalledWith('/financial/pricing-settings', { agreementFeeTaxClass: 'FEE', financingApplicationUrl: '' });
   });
 });
 

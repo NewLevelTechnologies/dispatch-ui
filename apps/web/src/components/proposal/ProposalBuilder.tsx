@@ -56,6 +56,7 @@ import { useQuoteSelection } from './useQuoteSelection';
 import { builtText } from '../../lib/workOrderActivityRows';
 import { SignedCopyCard } from './SignedCopy';
 import { SavingsCard } from './SavingsCard';
+import { PaymentOptionsCard } from './PaymentOptionsCard';
 
 type Run = ReturnType<typeof useDocumentEditor<Quote>>['run'];
 type PricedOption = PricedSelection['options'][number];
@@ -152,6 +153,7 @@ export function ProposalBuilder({ quote, editable, run }: { quote: Quote; editab
           <AddOnsCard quote={quote} options={options} editable={editable} accepted={accepted} run={run} onAdd={() => setAdding({ kind: 'addon' })} />
         )}
         {options.length > 0 && <SavingsCard quote={quote} editable={editable} run={run} priced={priced} />}
+        {options.length > 0 && <PaymentOptionsCard quote={quote} editable={editable} run={run} priced={priced} />}
         <CoverNoteCard quote={quote} editable={editable} run={run} />
       </div>
       <Rail quote={quote} options={options} accepted={accepted} priced={priced} />
@@ -1037,6 +1039,7 @@ function Rail({
                   {live && live.youSave > 0 && (
                     <span className="font-semibold text-success-500">{`Save ${formatCurrency(live.youSave)}`}</span>
                   )}
+                  {live?.fromMonthly != null && <span>{`from ${formatCurrency(live.fromMonthly)}/mo`}</span>}
                   {afterRebate != null && <span>{`${formatCurrency(afterRebate)} after rebate`}</span>}
                   {priced?.membership && (live?.joinSaves ?? 0) > 0 && (
                     <span>{`${priced.membership.name} saves ${formatCurrency(live?.joinSaves ?? 0)}`}</span>
@@ -1107,6 +1110,10 @@ function CurrentSelection({ quote, priced }: { quote: Quote; priced: PricedSelec
         <div className="text-[12px] tabular-nums text-fg-muted">
           {formatCurrency(priced.totals.totalAmount)}
           {priced.totals.youSave > 0 && ` · saves ${formatCurrency(priced.totals.youSave)}`}
+          {priced.financing?.monthlyPayment != null &&
+            ` · ${formatCurrency(priced.financing.monthlyPayment)}/mo on ${
+              priced.financing.plans.find((p) => p.planId === priced.financing?.selectedPlanId)?.label ?? 'a plan'
+            }`}
         </div>
         <div className="text-[11.5px] text-fg-muted">
           {who}
