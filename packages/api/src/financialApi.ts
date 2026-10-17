@@ -940,6 +940,80 @@ export interface QuoteOption {
   totals: QuoteOptionTotals;
 }
 
+/** One saving on a priced choice, with its reason. */
+export interface PricedSaving {
+  adjustmentId: string;
+  lineId: string | null;
+  kind: AdjustmentKind;
+  reasonCode: AdjustmentReason;
+  /** The source's name where it has one (member plans); else name it from `reasonCode`. */
+  label: string | null;
+  amount: number;
+}
+
+/** Advisor only (never on the link): pre-tax, after savings, counting included add-ons' cost. */
+export interface SelectionMargin {
+  cost: number;
+  /** A fraction; null when nothing is charged. */
+  margin: number | null;
+  /** False when a sold line has no cost (counted as $0). */
+  costKnown: boolean;
+  /** The tenant's floor, a fraction; null = none. */
+  floor: number | null;
+  belowFloor: boolean;
+}
+
+export interface SelectionTotals {
+  listPrice: number;
+  youSave: number;
+  subtotal: number;
+  taxAmount: number;
+  totalAmount: number;
+  /** The chosen option's rebate; null without one. Shown only, never billed. */
+  rebateAmount: number | null;
+  afterRebate: number | null;
+  margin: SelectionMargin | null;
+}
+
+export interface PricedSelectionLine {
+  id: string;
+  description: string;
+  optionId: string | null;
+  role: QuoteLineRole;
+  quantity: number;
+  unit?: string | null;
+  unitPrice: number;
+  lineTotal: number;
+  adjustmentAmount: number;
+  netAmount: number;
+  taxAmount: number;
+  /** Comes with the chosen option at $0. */
+  included: boolean;
+}
+
+export interface QuoteSelectionChoice {
+  /** Exactly one per group that has options. */
+  optionIds: string[];
+  /** Offered add-ons taken; ones the chosen option includes or hides are dropped. */
+  addOnLineIds: string[];
+}
+
+/** A choice priced by the server. Card totals (`options`) don't move with add-ons. */
+export interface PricedSelection {
+  quoteId: string;
+  selection: QuoteSelectionChoice;
+  /** Who last chose; null until anyone has. */
+  updatedVia: 'ADVISOR' | 'CUSTOMER' | null;
+  updatedAt: string | null;
+  lines: PricedSelectionLine[];
+  savings: PricedSaving[];
+  totals: SelectionTotals;
+  /** Every option of every group, in order: each chosen, no add-ons taken. */
+  options: { optionId: string; groupId: string; name: string; selected: boolean; savings: PricedSaving[]; totals: SelectionTotals }[];
+  /** Across option totals; null without options. */
+  priceRange: { low: number; high: number } | null;
+}
+
 export interface QuoteOptionGroup {
   id: string;
   name: string;
@@ -1212,6 +1286,16 @@ export const quotesApi = {
   },
   setAddOnMode: async (id: string, optionId: string, lineId: string, request: { version: number; mode: AddOnMode }): Promise<Quote> => {
     const response = await apiClient.put<Quote>(`/financial/quotes/${id}/options/${optionId}/add-ons/${lineId}`, request);
+    return response.data;
+  },
+  /** The saved choice, priced. */
+  getSelection: async (id: string): Promise<PricedSelection> => {
+    const response = await apiClient.get<PricedSelection>(`/financial/quotes/${id}/selection`);
+    return response.data;
+  },
+  /** Save the whole choice (no version: the last save wins, and the quote's version doesn't move). */
+  saveSelection: async (id: string, choice: QuoteSelectionChoice): Promise<PricedSelection> => {
+    const response = await apiClient.put<PricedSelection>(`/financial/quotes/${id}/selection`, choice);
     return response.data;
   },
   /** Move a line, or set an add-on's recommendation. */
@@ -1592,6 +1676,8 @@ export interface PricingSettings {
   agreementFeeTaxClass: TaxClass;
   /** Days a quote stays open after it's sent (1–365, default 30). */
   quoteValidityDays?: number;
+  /** Proposals: options below this margin (a fraction) are flagged. Null = none. */
+  marginFloor?: number | null;
   updatedAt: string | null;
 }
 
@@ -1642,11 +1728,19 @@ export const taxApi = {
     return response.data;
   },
 
-  /** `quoteValidityDays` (1–365) left out keeps the current value. */
-  updatePricingSettings: async (agreementFeeTaxClass: TaxClass, quoteValidityDays?: number): Promise<PricingSettings> => {
+  /**
+   * `quoteValidityDays` (1–365) left out keeps the current value. `marginFloor`:
+   * a fraction above 0 and below 1, `0` removes it, left out keeps it.
+   */
+  updatePricingSettings: async (
+    agreementFeeTaxClass: TaxClass,
+    quoteValidityDays?: number,
+    { marginFloor }: { marginFloor?: number } = {},
+  ): Promise<PricingSettings> => {
     const response = await apiClient.put<PricingSettings>('/financial/pricing-settings', {
       agreementFeeTaxClass,
       ...(quoteValidityDays != null ? { quoteValidityDays } : {}),
+      ...(marginFloor != null ? { marginFloor } : {}),
     });
     return response.data;
   },

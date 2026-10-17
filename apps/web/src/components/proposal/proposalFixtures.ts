@@ -1,4 +1,4 @@
-import type { Quote, QuoteLineItem, QuoteOption } from '../../api/setup';
+import type { PricedSelection, Quote, QuoteLineItem, QuoteOption, SelectionTotals } from '../../api/setup';
 
 const totals = (total: number) => ({ grossSubtotal: total, adjustmentTotal: 0, subtotal: total, taxAmount: 0, totalAmount: total });
 
@@ -90,6 +90,57 @@ export function proposalQuote(over: Partial<Quote> = {}): Quote {
     ],
     createdAt: '2026-10-17T12:00:00Z',
     updatedAt: '2026-10-17T12:00:00Z',
+    ...over,
+  };
+}
+
+const priced = (list: number, save: number, over: Partial<SelectionTotals> = {}): SelectionTotals => ({
+  listPrice: list,
+  youSave: save,
+  subtotal: list - save,
+  taxAmount: 0,
+  totalAmount: list - save,
+  rebateAmount: null,
+  afterRebate: null,
+  margin: { cost: 6980, margin: 0.38, costKnown: true, floor: 0.35, belowFloor: false },
+  ...over,
+});
+
+const promo = (id: string, amount: number) => ({
+  adjustmentId: id,
+  lineId: null,
+  kind: 'AMOUNT' as const,
+  reasonCode: 'PROMOTION' as const,
+  label: null,
+  amount,
+});
+
+/** The customer chose Comfort + duct sealing; Comfort sits below a 35% floor. */
+export function pricedSelection(over: Partial<PricedSelection> = {}): PricedSelection {
+  return {
+    quoteId: 'q-1',
+    selection: { optionIds: ['o-2'], addOnLineIds: ['l-ducts'] },
+    updatedVia: 'CUSTOMER',
+    updatedAt: '2026-10-17T19:22:00Z',
+    lines: [],
+    savings: [promo('a-2', 500)],
+    totals: priced(17430, 500, { rebateAmount: 400, afterRebate: 16530 }),
+    options: [
+      { optionId: 'o-1', groupId: 'g-1', name: 'Essential', selected: false, savings: [promo('a-1', 500)], totals: priced(11480, 500) },
+      {
+        optionId: 'o-2',
+        groupId: 'g-1',
+        name: 'Comfort',
+        selected: true,
+        savings: [promo('a-2', 500)],
+        totals: priced(15960, 500, {
+          rebateAmount: 400,
+          afterRebate: 15060,
+          margin: { cost: 10200, margin: 0.3402, costKnown: false, floor: 0.35, belowFloor: true },
+        }),
+      },
+    ],
+    priceRange: { low: 10980, high: 15460 },
     ...over,
   };
 }

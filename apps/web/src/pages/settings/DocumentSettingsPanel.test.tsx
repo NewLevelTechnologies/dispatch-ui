@@ -31,6 +31,33 @@ describe('DocumentSettingsPanel', () => {
     expect(apiClient.put).toHaveBeenCalledWith('/financial/pricing-settings', { agreementFeeTaxClass: 'FEE', quoteValidityDays: 60 });
   });
 
+  it('sets the proposal margin floor as a percent, and removes it when cleared', async () => {
+    const user = userEvent.setup();
+    vi.mocked(apiClient.put).mockResolvedValue({ data: { agreementFeeTaxClass: 'FEE', quoteValidityDays: 30, marginFloor: 0.35, updatedAt: null } });
+    renderWithProviders(<DocumentSettingsPanel />);
+
+    const field = await screen.findByRole('textbox', { name: 'settings.documents.marginFloor.label' });
+    expect(field).toHaveValue('');
+    expect(screen.getByText('settings.documents.marginFloor.none')).toBeInTheDocument();
+    await user.type(field, '35');
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+    expect(apiClient.put).toHaveBeenLastCalledWith('/financial/pricing-settings', { agreementFeeTaxClass: 'FEE', marginFloor: 0.35 });
+
+    const saved = await screen.findByRole('textbox', { name: 'settings.documents.marginFloor.label' });
+    await user.clear(saved);
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+    expect(apiClient.put).toHaveBeenLastCalledWith('/financial/pricing-settings', { agreementFeeTaxClass: 'FEE', marginFloor: 0 });
+  });
+
+  it('won’t take a margin floor of 100% or more', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<DocumentSettingsPanel />);
+
+    await user.type(await screen.findByRole('textbox', { name: 'settings.documents.marginFloor.label' }), '100');
+    expect(screen.getByText('settings.documents.marginFloor.invalid')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Save' })).not.toBeInTheDocument();
+  });
+
   it('uses the company’s own names for quotes and customers', async () => {
     const original = vi.mocked(useGlossary).getMockImplementation()!;
     const renamed: Record<string, [string, string]> = { quote: ['Estimate', 'Estimates'], customer: ['Client', 'Clients'] };

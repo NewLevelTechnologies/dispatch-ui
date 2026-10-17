@@ -3569,6 +3569,16 @@
       "invoices": "{{invoices}}",
       "invoicesBody": "Due dates follow each account’s payment terms (Net 30, Due on receipt, and so on). Set terms on the {{customer, lowercase}} or {{payer, lowercase}}.",
       "loading": "Loading…",
+      "marginFloor": {
+        "hint": "Proposal options whose margin after savings falls below this are flagged to the advisor. Blank for no floor.",
+        "invalid": "Enter a percent above 0 and below 100.",
+        "label": "Margin floor",
+        "none": "No floor set. Options aren’t flagged.",
+        "preview": "Options under {{pct}} margin after savings are flagged.",
+        "saveFailed": "Couldn’t save the margin floor",
+        "saved": "Margin floor saved",
+        "title": "Proposals"
+      },
       "presets": "Common lengths",
       "previewAfter": ". Those already sent keep their date.",
       "previewBefore": "{{quotes}} sent today expire",

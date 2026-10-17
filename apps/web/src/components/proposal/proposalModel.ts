@@ -2,13 +2,15 @@
 // add-ons and how each option treats them. Every figure is the server's.
 import type {
   AddOnMode,
+  PricedSaving,
+  PricedSelection,
   Quote,
   QuoteLineItem,
   QuoteOption,
   QuoteOptionFields,
   UpdateQuoteHeaderRequest,
 } from '../../api/setup';
-import { toDateInput } from '../document/documentModel';
+import { REASON_LABEL, toDateInput } from '../document/documentModel';
 
 export const isProposal = (q: Pick<Quote, 'presentation'>) => q.presentation === 'PROPOSAL';
 
@@ -81,9 +83,20 @@ export interface SendCheck {
   soft?: boolean;
 }
 
-/** What the builder lists under "Before sending". */
-export function sendChecks(q: Quote): SendCheck[] {
+/** A saving's name: its source's (a member plan), else its reason. */
+export const savingLabel = (s: PricedSaving) => s.label || (s.kind === 'WAIVE' ? 'Waived' : (REASON_LABEL[s.reasonCode] ?? s.reasonCode));
+
+/** "24.8%". */
+export const marginPct = (fraction: number) => `${Math.round(fraction * 1000) / 10}%`;
+
+/** The priced card for an option, when the selection has loaded. */
+export const pricedOption = (priced: PricedSelection | undefined, optionId: string) =>
+  priced?.options.find((p) => p.optionId === optionId);
+
+/** What the builder lists under "Before sending". `priced` adds the margin floor. */
+export function sendChecks(q: Quote, priced?: PricedSelection): SendCheck[] {
   const options = allOptions(q);
+  const belowFloor = (priced?.options ?? []).filter((p) => p.totals.margin?.belowFloor);
   return [
     options.length >= 2
       ? { ok: true, text: `${options.length} options` }
@@ -91,6 +104,10 @@ export function sendChecks(q: Quote): SendCheck[] {
     ...options
       .filter((o) => optionLines(q, o.id).length === 0)
       .map((o) => ({ ok: false, text: `${o.name} has no lines` })),
+    ...belowFloor.map((p) => ({
+      ok: false,
+      text: `${p.name} is below the ${marginPct(p.totals.margin?.floor ?? 0)} margin floor`,
+    })),
     ...options.filter((o) => !optionPhoto(o)).map((o) => ({ ok: false, soft: true, text: `${o.name} has no photo` })),
   ];
 }

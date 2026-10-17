@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { addOnLines, allOptions, headerFields, modeOf, optionFields, optionHighlights, optionLines, optionPhoto, sendChecks } from './proposalModel';
-import { option, proposalQuote } from './proposalFixtures';
+import { addOnLines, allOptions, headerFields, marginPct, modeOf, savingLabel, optionFields, optionHighlights, optionLines, optionPhoto, sendChecks } from './proposalModel';
+import { option, pricedSelection, proposalQuote } from './proposalFixtures';
 
 describe('proposalModel', () => {
   it('reads options in order, their lines, and the add-ons', () => {
@@ -62,5 +62,17 @@ describe('proposalModel', () => {
       { ok: false, text: 'Add a second option to compare' },
       { ok: false, text: 'Option 1 has no lines' },
     ]);
+  });
+
+  it('adds below-floor options to the checks once priced', () => {
+    expect(sendChecks(proposalQuote(), pricedSelection())).toContainEqual({ ok: false, text: 'Comfort is below the 35% margin floor' });
+  });
+
+  it('names a saving by its source, else its reason', () => {
+    const base = { adjustmentId: 'a', lineId: null, kind: 'AMOUNT' as const, amount: 5 };
+    expect(savingLabel({ ...base, reasonCode: 'MEMBER', label: 'Comfort Club' })).toBe('Comfort Club');
+    expect(savingLabel({ ...base, reasonCode: 'GOODWILL', label: null })).toBe('Goodwill');
+    expect(savingLabel({ ...base, kind: 'WAIVE', reasonCode: 'OTHER', label: null })).toBe('Waived');
+    expect(marginPct(0.2478)).toBe('24.8%');
   });
 });
