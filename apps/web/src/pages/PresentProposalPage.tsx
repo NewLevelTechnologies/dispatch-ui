@@ -2,7 +2,7 @@
 // "Present in home": the proposal full screen on the advisor's device, the
 // customer choosing and signing in person. The same page the link shows,
 // with choices saved as the advisor's and the signature taken through the
-// logged-in in-person approval (APPROVE_QUOTES). Route: /quotes/:id/present.
+// logged-in in-person approval (SEND_QUOTES; below the margin floor, approved first). Route: /quotes/:id/present.
 import { useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -25,7 +25,8 @@ export default function PresentProposalPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { getName } = useGlossary();
-  const canSign = useHasAnyCapability('APPROVE_QUOTES');
+  // Presenting in the home is sending it in person.
+  const canSign = useHasAnyCapability('SEND_QUOTES');
   const zone = useTenantTimeZone();
   const today = zonedDate(new Date(), zone) ?? new Date().toISOString().slice(0, 10);
 

@@ -34,7 +34,7 @@ const renderPage = () => renderWithProviders(<div />, { routes, initialPath: '/q
 
 beforeEach(() => {
   vi.clearAllMocks();
-  vi.mocked(useHasAnyCapability).mockImplementation((...caps: string[]) => caps.includes('APPROVE_QUOTES'));
+  vi.mocked(useHasAnyCapability).mockImplementation((...caps: string[]) => caps.includes('SEND_QUOTES'));
   api.getById.mockResolvedValue(proposalQuote({ customerName: 'Tanya Reyes', advisorName: 'Danny Ortiz' }));
   api.getSelection.mockResolvedValue(pricedSelection());
   HTMLCanvasElement.prototype.getContext = vi.fn(() => ({
@@ -78,7 +78,7 @@ describe('PresentProposalPage', () => {
     );
   });
 
-  it('lets someone without APPROVE_QUOTES present but not take a signature', async () => {
+  it('lets someone without SEND_QUOTES present but not take a signature', async () => {
     vi.mocked(useHasAnyCapability).mockImplementation(() => false);
     const user = userEvent.setup();
     renderPage();
@@ -99,5 +99,17 @@ describe('PresentProposalPage', () => {
     api.getById.mockResolvedValue(proposalQuote({ presentation: 'STANDARD' }));
     renderPage();
     expect(await screen.findByText('Nothing to present')).toBeInTheDocument();
+  });
+
+  it('says a below-floor choice needs the price approved before it can be signed', async () => {
+    api.approveInPerson.mockRejectedValue(
+      Object.assign(new Error('409'), { isAxiosError: true, response: { status: 409, data: { code: 'MARGIN_APPROVAL_REQUIRED' } } }),
+    );
+    const user = userEvent.setup();
+    renderPage();
+
+    await sign(user);
+    await user.click(screen.getAllByRole('button', { name: 'public.proposal.approve' })[0]);
+    expect(await screen.findByText('public.proposal.notice.marginApproval')).toBeInTheDocument();
   });
 });

@@ -735,3 +735,63 @@ describe('QuoteDetailPage billing', () => {
     });
   });
 });
+
+describe('QuoteDetailPage below the margin floor', () => {
+  const draft: Quote = { ...quote, status: 'DRAFT', version: 7, firstSentAt: null, lastSentAt: null };
+  const clearance = (over: Record<string, unknown> = {}) => ({
+    belowFloor: true, lowestMargin: 0.248, floor: 0.35, approvalRequired: true, callerCanApprove: false, latest: null, ...over,
+  });
+  const mockWith = (c: ReturnType<typeof clearance>) =>
+    vi.mocked(apiClient.get).mockImplementation((url: string) => {
+      if (url === '/financial/quotes/q-1') return Promise.resolve({ data: draft });
+      if (url === '/financial/quotes/q-1/price-clearance') return Promise.resolve({ data: c });
+      if (url === '/customers/cust-1') return Promise.resolve({ data: customer });
+      if (url === '/work-orders/wo-1') return Promise.resolve({ data: workOrder });
+      return Promise.reject(new Error(`unexpected GET ${url}`));
+    });
+
+  beforeEach(() => vi.clearAllMocks());
+
+  it('asks a manager first: the send waits for approval, with a reason', async () => {
+    mockWith(clearance());
+    vi.mocked(apiClient.post).mockResolvedValue({ data: {} });
+    const user = userEvent.setup();
+    renderPage();
+
+    expect(await screen.findByText('Below the margin floor')).toBeInTheDocument();
+    await user.click(await screen.findByRole('button', { name: 'Request approval & send' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByTestId('send-approval')).toHaveTextContent('24.8%, under the 35% floor');
+    const submit = within(dialog).getByRole('button', { name: 'Request approval & send' });
+    await user.type(within(dialog).getByLabelText('Reason for approval'), 'Matching a bid');
+    await vi.waitFor(() => expect(submit).toBeEnabled());
+    await user.click(submit);
+
+    await vi.waitFor(() =>
+      expect(apiClient.post).toHaveBeenCalledWith(
+        '/financial/quotes/q-1/price-approvals',
+        expect.objectContaining({ reason: 'Matching a bid', send: expect.objectContaining({ recipientEmails: ['tanya@example.com'] }) }),
+      ),
+    );
+  });
+
+  it('says it’s waiting on a manager, and lets the asker withdraw', async () => {
+    mockWith(
+      clearance({
+        latest: {
+          id: 'pa-1', quoteId: 'q-1', quoteNumber: 'Q-1882', status: 'PENDING', current: true, sendsOnApproval: true,
+          requestedByUserId: 'someone-else', requestedByName: 'Danny Ortiz', reason: 'Matching a bid', requestedAt: '2026-10-12T16:00:00Z',
+        },
+        callerCanApprove: true,
+      }),
+    );
+    vi.mocked(apiClient.post).mockResolvedValue({ data: {} });
+    const user = userEvent.setup();
+    renderPage();
+
+    expect(await screen.findByText('Waiting on a manager to approve the price')).toBeInTheDocument();
+    expect(screen.getByText(/It goes out as soon as they approve/)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Withdraw' }));
+    expect(apiClient.post).toHaveBeenCalledWith('/financial/quote-price-approvals/pa-1/cancel');
+  });
+});

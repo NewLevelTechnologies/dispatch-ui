@@ -26,7 +26,7 @@ import {
   CheckBadgeIcon,
   ArrowPathRoundedSquareIcon,
 } from '@heroicons/react/24/outline';
-import { approvalsApi, tenantSettingsApi, type ApprovalsBellSummary } from '../api/setup';
+import { approvalsApi, quotePriceApprovalsApi, tenantSettingsApi, type ApprovalsBellSummary } from '../api/setup';
 import { Sidebar, SidebarBody, SidebarFooter, SidebarHeader, SidebarHeading, SidebarItem, SidebarSection } from './catalyst/sidebar';
 import { SidebarLayout } from './catalyst/sidebar-layout';
 import { Navbar } from './catalyst/navbar';
@@ -102,7 +102,17 @@ export default function AppLayout({ children, flush }: { children: React.ReactNo
     refetchOnWindowFocus: true,
   });
 
-  const pendingApprovalCount = bellSummary?.pendingForMe ?? 0;
+  // Quote price approvals wait on managers only (APPROVE_QUOTES); they count toward the same badge.
+  const canApproveQuotes = useHasAnyCapability('APPROVE_QUOTES');
+  const { data: priceApprovals } = useQuery({
+    queryKey: ['quote-price-approvals', 'count'],
+    queryFn: () => quotePriceApprovalsApi.count(),
+    enabled: authStatus === 'authenticated' && canApproveQuotes,
+    refetchInterval: 5 * 60 * 1000,
+    refetchIntervalInBackground: false,
+    refetchOnWindowFocus: true,
+  });
+  const pendingApprovalCount = (bellSummary?.pendingForMe ?? 0) + (priceApprovals?.pending ?? 0);
   const recentlyResolvedMine = bellSummary?.recentlyResolvedMine ?? 0;
   const bellBadgeCount = pendingApprovalCount + recentlyResolvedMine;
 
@@ -131,7 +141,7 @@ export default function AppLayout({ children, flush }: { children: React.ReactNo
         // agreement visit schedules. Shares the page-heading key so the sidebar
         // and the <h1> can't drift; a tenant on "Trip" gets "Trip Board".
         { name: t('dispatchBoard.title', { entity: getName('dispatch') }), href: '/dispatch', icon: CalendarIcon },
-        ...(approvalsVisible
+        ...(approvalsVisible || canApproveQuotes
           ? [{ name: t('approvals.title'), href: '/approvals', icon: CheckBadgeIcon, badge: pendingApprovalCount }]
           : []),
       ],

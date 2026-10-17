@@ -44,6 +44,10 @@ export type ActivityKind =
   | 'QUOTE_DECLINED'
   /** The customer browsing a proposal: one entry per stretch of clicking (`data.path`, `added`, `removed`, `totalAmount`). */
   | 'QUOTE_CHOICE_CHANGED'
+  /** Below the margin floor: asked, approved, rejected (`data`: revision, note or reason, lowestMargin, floor). */
+  | 'QUOTE_PRICE_APPROVAL_REQUESTED'
+  | 'QUOTE_PRICE_APPROVED'
+  | 'QUOTE_PRICE_REJECTED'
   /** A never-sent draft deleted; its subject no longer loads, so it renders unlinked. */
   | 'QUOTE_DELETED'
   | 'INVOICE_ISSUED'
