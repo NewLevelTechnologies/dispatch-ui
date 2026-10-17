@@ -88,7 +88,7 @@ export function PresentationSection({
       <FormSection title={t('settings.pricebook.presentation.title', names)} description={t('settings.pricebook.presentation.optional')}>
         <div className="flex flex-wrap items-center gap-3">
           {filled && p.photos[0] && (
-            <img src={p.photos[0].thumbnailUrl} alt="" className="size-12 shrink-0 rounded-md border border-border object-cover" />
+            <img src={p.photos[0].thumbnailUrl} alt="" className="size-12 shrink-0 rounded-md border border-border bg-white object-contain" />
           )}
           <div className="min-w-[220px] flex-1">
             {filled ? (
@@ -129,7 +129,7 @@ export function PresentationSection({
               <img
                 src={photo.thumbnailUrl}
                 alt={i === 0 ? t('settings.pricebook.presentation.mainPhoto') : t('settings.pricebook.presentation.photoN', { n: i + 1 })}
-                className={clsx('size-24 rounded-lg border object-cover', i === 0 ? 'border-accent-500' : 'border-border')}
+                className={clsx('size-24 rounded-lg border bg-white object-contain', i === 0 ? 'border-accent-500' : 'border-border')}
               />
               {i === 0 && (
                 <span className="absolute bottom-1 left-1 rounded bg-bg-elev px-1 text-[10px] font-semibold text-fg-strong">

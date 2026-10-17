@@ -17,6 +17,7 @@ import { DocumentSummaryHeader, type DocumentStep } from '../components/document
 import { DocumentBody, DocumentWarnings } from '../components/document/DocumentBody';
 import { DocumentHeaderDialog } from '../components/document/DocumentHeaderDialog';
 import { DocumentEditStatus, StaleCallout } from '../components/document/DocumentEditStatus';
+import { withDocumentBack } from '../lib/backContext';
 import { useDocumentParties } from '../components/document/useDocumentParties';
 import { documentErrorMessage, lineEditing, useDocumentEditor } from '../components/document/useDocumentEditor';
 import { useShareLink } from '../components/document/useShareLink';
@@ -199,6 +200,8 @@ export default function QuoteDetailPage() {
       <DocumentSummaryHeader
         billTo={billTo}
         location={location}
+        workOrder={quote.workOrderId ? { id: quote.workOrderId, number: workOrder?.workOrderNumber ?? null } : null}
+        linkBack={(path) => withDocumentBack(path, 'quote', quote.id, quote.quoteNumber)}
         poNumber={quote.customerPoNumber}
         nte={workOrder?.notToExceed != null ? { amount: workOrder.notToExceed, over: false } : null}
         member={memberLabel(quote.adjustments)}

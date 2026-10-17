@@ -28,6 +28,7 @@ import {
 import { useGlossary } from '../contexts/GlossaryContext';
 import WorkOrderActivityTab from '../features/work-orders/WorkOrderActivityTab';
 import { resolveBack } from '../lib/backContext';
+import { useDocumentBack } from '../hooks/useDocumentBack';
 import AppLayout from '../components/AppLayout';
 import ConfirmDialog from '../components/ConfirmDialog';
 import DispatchFormDrawer from '../components/DispatchFormDrawer';
@@ -143,8 +144,11 @@ export default function WorkOrderDetailPage() {
   // carries the board's own query, so they land on the board they left.
   // The agreements queue works the same way: back lands on the queue's tab.
   const from = searchParams.get('from');
-  const back =
-    from === 'dispatch'
+  // Opened from a quote or invoice's header: back returns to that document.
+  const docBack = useDocumentBack();
+  const back = docBack
+    ? { href: docBack.href, label: t('common.actions.backTo', { entities: docBack.label }) }
+    : from === 'dispatch'
       ? {
           href: resolveBack('/dispatch', searchParams.get('back')),
           label: t('common.actions.backTo', { entities: t('dispatchBoard.backTarget') }),

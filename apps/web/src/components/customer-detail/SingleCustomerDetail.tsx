@@ -24,6 +24,7 @@ import {
   type PremiseType,
 } from '../../api/setup';
 import { useGlossary } from '../../contexts/GlossaryContext';
+import { useDocumentBack } from '../../hooks/useDocumentBack';
 import { useHasCapability } from '../../hooks/useCurrentUser';
 import { useUrlTab } from '../../hooks/useUrlTab';
 import { showSuccess, showError, extractApiError } from '../../lib/toast';
@@ -133,6 +134,7 @@ function PremisePill({
 export default function SingleCustomerDetail({ customer }: { customer: Customer }) {
   const { t } = useTranslation();
   const { getName } = useGlossary();
+  const docBack = useDocumentBack();
   const queryClient = useQueryClient();
 
   const canEditCustomers = useHasCapability('EDIT_CUSTOMERS');
@@ -273,10 +275,10 @@ export default function SingleCustomerDetail({ customer }: { customer: Customer 
       <div className="px-1 py-1">
         <div className="mx-auto max-w-[1240px]">
           <Link
-            to="/customers"
+            to={docBack?.href ?? '/customers'}
             className="mb-2.5 inline-flex items-center gap-1 text-[11.5px] text-fg-muted hover:text-fg-strong"
           >
-            ← {t('common.actions.backTo', { entities: getName('customer', true) })}
+            ← {t('common.actions.backTo', { entities: docBack?.label ?? getName('customer', true) })}
           </Link>
 
           {/* Header — customer billing identity, with the single site's premise

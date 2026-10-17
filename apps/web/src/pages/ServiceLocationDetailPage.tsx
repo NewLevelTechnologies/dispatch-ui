@@ -64,6 +64,7 @@ import { FilterChipListbox, ChipListboxOption } from '../components/ui/FilterChi
 import { DateRangeChip } from '../components/ui/DateRangeChip';
 import { formatExactTimestamp, formatPhone, formatTimestamp, nextTagColor, roleColor, titleCaseAddress } from '@dispatch/utils';
 import { useGlossary } from '../contexts/GlossaryContext';
+import { useDocumentBack } from '../hooks/useDocumentBack';
 import { resolveBack } from '../lib/backContext';
 import { useHasCapability } from '../hooks/useCurrentUser';
 import { useMediaQuery } from '../hooks/useMediaQuery';
@@ -139,6 +140,9 @@ function useBackContext(location: ServiceLocationDetailDto): { label: string; hr
   const [params] = useSearchParams();
   const { getName } = useGlossary();
   const from = (params.get('from') || '').toLowerCase();
+  // Opened from a quote or invoice's header: back returns to that document.
+  const docBack = useDocumentBack();
+  if (docBack) return docBack;
 
   if (from === 'work-order') {
     // Work-order detail resolves by UUID (getById), so the href carries woId;

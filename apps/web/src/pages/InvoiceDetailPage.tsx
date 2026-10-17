@@ -20,6 +20,7 @@ import { DocumentSummaryHeader, type DocumentStep } from '../components/document
 import { DocumentBody, DocumentWarnings } from '../components/document/DocumentBody';
 import { DocumentHeaderDialog } from '../components/document/DocumentHeaderDialog';
 import { DocumentEditStatus, StaleCallout } from '../components/document/DocumentEditStatus';
+import { withDocumentBack } from '../lib/backContext';
 import { useDocumentParties } from '../components/document/useDocumentParties';
 import { documentErrorMessage, lineEditing, refreshDocumentLists, useDocumentEditor } from '../components/document/useDocumentEditor';
 import { useShareLink } from '../components/document/useShareLink';
@@ -232,6 +233,8 @@ export default function InvoiceDetailPage() {
       <DocumentSummaryHeader
         billTo={billTo}
         location={location}
+        workOrder={invoice.workOrderId ? { id: invoice.workOrderId, number: workOrder?.workOrderNumber ?? null } : null}
+        linkBack={(path) => withDocumentBack(path, 'invoice', invoice.id, invoice.invoiceNumber)}
         serviceDate={formatDocDate(invoice.serviceDate)}
         poNumber={invoice.customerPoNumber}
         nte={workOrder?.notToExceed != null ? { amount: workOrder.notToExceed, over: nteOver } : null}

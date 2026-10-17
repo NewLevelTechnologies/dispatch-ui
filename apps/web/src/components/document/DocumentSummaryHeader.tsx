@@ -26,6 +26,8 @@ export interface DocumentStep {
 export function DocumentSummaryHeader({
   billTo,
   location,
+  workOrder,
+  linkBack = (path) => path,
   serviceDate,
   poNumber,
   nte,
@@ -40,6 +42,10 @@ export function DocumentSummaryHeader({
 }: {
   billTo: DocumentParty;
   location?: DocumentParty | null;
+  /** The work order the document is for; its number links to it. */
+  workOrder?: { id: string; number: string | null } | null;
+  /** Adds the document as the back-context of its links, so the page they open can return here. */
+  linkBack?: (path: string) => string;
   /** Invoices: when the work was done (already formatted). */
   serviceDate?: string | null;
   poNumber?: string | null;
@@ -59,6 +65,14 @@ export function DocumentSummaryHeader({
 }) {
   const { getName } = useGlossary();
   const meta: ReactNode[] = [
+    workOrder ? (
+      <span key="wo" className="flex items-baseline gap-1">
+        <span className="text-fg-muted">{getName('work_order')}</span>
+        <Link to={linkBack(`/work-orders/${workOrder.id}`)} className="font-mono font-medium text-fg-accent hover:underline">
+          {workOrder.number ?? '…'}
+        </Link>
+      </span>
+    ) : null,
     serviceDate ? (
       <span key="service">
         <span className="text-fg-muted">Service</span> <span className="font-medium text-fg-strong">{serviceDate}</span>
@@ -88,8 +102,12 @@ export function DocumentSummaryHeader({
     <div className="mb-3 grid grid-cols-1 overflow-hidden rounded-[10px] border border-border bg-bg-elev md:grid-cols-[minmax(0,1fr)_minmax(250px,320px)]">
       <div className="flex min-w-0 flex-col gap-3 px-4 py-3.5">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <Party label="Bill to" party={billTo} />
-          <Party label={getName('service_location')} party={location ?? { name: '—', sub: `No ${getName('service_location').toLowerCase()} on this document` }} />
+          <Party label="Bill to" party={billTo} linkBack={linkBack} />
+          <Party
+            label={getName('service_location')}
+            party={location ?? { name: '—', sub: `No ${getName('service_location').toLowerCase()} on this document` }}
+            linkBack={linkBack}
+          />
         </div>
         {meta.length > 0 && (
           <div className="flex min-h-6 flex-wrap items-center gap-2 text-[12px]">
@@ -147,13 +165,13 @@ export function DocumentSummaryHeader({
   );
 }
 
-function Party({ label, party }: { label: string; party: DocumentParty }) {
+function Party({ label, party, linkBack }: { label: string; party: DocumentParty; linkBack: (path: string) => string }) {
   return (
     <div className="min-w-0">
       <div className="label-tiny mb-0.5">{label}</div>
       <div className="flex min-h-[22px] flex-wrap items-center gap-1.5">
         {party.href ? (
-          <Link to={party.href} className="text-[15px] font-semibold tracking-[-0.01em] text-fg-strong hover:text-fg-accent">
+          <Link to={linkBack(party.href)} className="text-[15px] font-semibold tracking-[-0.01em] text-fg-accent hover:underline">
             {party.name}
           </Link>
         ) : (

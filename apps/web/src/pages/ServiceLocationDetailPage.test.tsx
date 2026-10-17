@@ -582,6 +582,15 @@ describe('ServiceLocationDetailPage', () => {
     expect(backLink).toHaveAttribute('href', '/work-orders');
   });
 
+  it('back-link returns to the quote it was opened from', async () => {
+    mockApiResponses();
+    renderDetailPage('location-1?from=quote&docId=q-1&docNo=QTE-00025');
+    await waitFor(() => {
+      expect(screen.getByText('Main Office')).toBeInTheDocument();
+    });
+    expect(screen.getByRole('link', { name: /← QTE-00025/ })).toHaveAttribute('href', '/quotes/q-1');
+  });
+
   it('back-link restores the filters the Locations list was carrying', async () => {
     mockApiResponses();
     renderDetailPage(`location-1?from=locations&back=${encodeURIComponent('status=inactive')}`);

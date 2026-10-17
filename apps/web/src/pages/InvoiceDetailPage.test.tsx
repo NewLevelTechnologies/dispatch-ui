@@ -91,11 +91,13 @@ describe('InvoiceDetailPage', () => {
     renderPage();
 
     expect(await screen.findByText('INV-3307')).toBeInTheDocument();
-    expect(await screen.findByRole('link', { name: 'Desert Ridge Property Mgmt' })).toBeInTheDocument();
+    expect(await screen.findByRole('link', { name: 'Desert Ridge Property Mgmt' })).toHaveAttribute('href', '/customers/pay-1?from=invoice&docId=inv-1&docNo=INV-3307');
+    // The work order it's for, by number, beside the PO.
+    expect(await screen.findByRole('link', { name: 'WO-4107' })).toHaveAttribute('href', '/work-orders/wo-1?from=invoice&docId=inv-1&docNo=INV-3307');
     expect(screen.getByText('Payer')).toBeInTheDocument();
     expect(screen.getByText('Net 30 · ap@desertridgepm.com')).toBeInTheDocument();
     // An invoice's location is its work order's.
-    expect(await screen.findByRole('link', { name: 'Camelback Plaza · Suite 210' })).toHaveAttribute('href', '/service-locations/loc-9');
+    expect(await screen.findByRole('link', { name: 'Camelback Plaza · Suite 210' })).toHaveAttribute('href', '/service-locations/loc-9?from=invoice&docId=inv-1&docNo=INV-3307');
     expect(screen.getByText('2390 E Camelback Rd, Phoenix, AZ 85016')).toBeInTheDocument();
     expect(screen.getByText('Oct 10, 2026')).toBeInTheDocument(); // service date, not shifted a day
     expect(screen.getByText('DR-55821')).toBeInTheDocument();

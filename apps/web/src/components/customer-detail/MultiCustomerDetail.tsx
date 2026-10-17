@@ -23,6 +23,7 @@ import {
 } from '../../api/setup';
 import { workOrdersListQueryOptions } from '../../api/setup';
 import { useGlossary } from '../../contexts/GlossaryContext';
+import { useDocumentBack } from '../../hooks/useDocumentBack';
 import { useHasCapability } from '../../hooks/useCurrentUser';
 import { showSuccess, showError, extractApiError } from '../../lib/toast';
 import { handleConcurrentEdit } from '../../lib/conflict';
@@ -75,6 +76,7 @@ const VALID_TABS: TabId[] = [
 export default function MultiCustomerDetail({ customer }: { customer: Customer }) {
   const { t } = useTranslation();
   const { getName } = useGlossary();
+  const docBack = useDocumentBack();
   const navigate = useNavigate();
   const routerLocation = useLocation();
   const queryClient = useQueryClient();
@@ -198,10 +200,10 @@ export default function MultiCustomerDetail({ customer }: { customer: Customer }
       <div className="px-1 py-1">
         <div className="mx-auto max-w-[1240px]">
           <Link
-            to="/customers"
+            to={docBack?.href ?? '/customers'}
             className="mb-2.5 inline-flex items-center gap-1 text-[11.5px] text-fg-muted hover:text-fg-strong"
           >
-            ← {t('common.actions.backTo', { entities: getName('customer', true) })}
+            ← {t('common.actions.backTo', { entities: docBack?.label ?? getName('customer', true) })}
           </Link>
 
           {/* Header — identity (name/phone/email) edits inline here; attributes in cards */}
