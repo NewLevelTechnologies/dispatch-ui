@@ -1027,6 +1027,11 @@ export interface QuoteApproval {
   totals: Omit<SelectionTotals, 'margin'>;
   ipAddress: string | null;
   userAgent: string | null;
+  /** LINK (the customer's link) or IN_PERSON (on the advisor's device). Older records are LINK. */
+  signedVia?: 'LINK' | 'IN_PERSON';
+  /** IN_PERSON: the advisor who was there. */
+  witnessUserId?: string | null;
+  witnessName?: string | null;
 }
 
 export interface QuoteOptionGroup {
@@ -1324,7 +1329,26 @@ export const quotesApi = {
     });
     return response.data;
   },
-  /** The signed copy of a proposal approved through its link (400 when the office recorded the yes). */
+  /**
+   * The customer signs on the advisor's device ("Present in home"). Needs
+   * APPROVE_QUOTES. Same rules as the link: 409 QUOTE_TOTAL_CHANGED (nothing
+   * signed), QUOTE_NOT_APPROVABLE, QUOTE_REVISION_STALE. A draft can be signed.
+   */
+  approveInPerson: async (
+    id: string,
+    body: {
+      revision?: number;
+      signerName: string;
+      signature: string;
+      consent: true;
+      selection?: QuoteSelectionChoice;
+      totalAmount: number;
+    },
+  ): Promise<Quote> => {
+    const response = await apiClient.post<Quote>(`/financial/quotes/${id}/approve`, body);
+    return response.data;
+  },
+  /** The signed copy (on the link or in person); 400 when the office recorded the yes without one. */
   getApproval: async (id: string): Promise<QuoteApproval> => {
     const response = await apiClient.get<QuoteApproval>(`/financial/quotes/${id}/approval`);
     return response.data;

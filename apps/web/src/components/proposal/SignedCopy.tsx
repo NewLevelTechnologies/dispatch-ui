@@ -12,6 +12,10 @@ import { Card, CardBody, CardHead, CardTitle } from '../ui/Card';
 import { DenseTable, DenseTHead } from '../ui/DenseTable';
 import { REASON_LABEL } from '../document/documentModel';
 
+/** "on the link", or "in person with Danny Ortiz". */
+const signedWhere = (a: QuoteApproval) =>
+  a.signedVia === 'IN_PERSON' ? (a.witnessName ? `in person with ${a.witnessName}` : 'in person') : 'on the link';
+
 const savingName = (s: QuoteApproval['savings'][number]) =>
   s.label || (s.kind === 'WAIVE' ? 'Waived' : (REASON_LABEL[s.reasonCode] ?? s.reasonCode));
 
@@ -30,7 +34,7 @@ export function SignedCopyCard({ quoteId }: { quoteId: string }) {
       </CardHead>
       <CardBody className="flex flex-col gap-2" data-testid="proposal-signed">
         <div className="text-[12px] text-fg-muted">
-          {`${formatTimestamp(approval.signedAt, { withTime: true })} · ${approval.signerName} · on the link`}
+          {`${formatTimestamp(approval.signedAt, { withTime: true })} · ${approval.signerName} · ${signedWhere(approval)}`}
         </div>
         {approval.signatureImage && (
           <img src={approval.signatureImage} alt={`${approval.signerName}’s signature`} className="pb-signature" />
@@ -93,6 +97,8 @@ function SignedCopyDialog({ approval, open, onClose }: { approval: QuoteApproval
           <dd className="text-fg">{approval.signerName}</dd>
           <dt className="text-fg-muted">When</dt>
           <dd className="text-fg">{formatTimestamp(approval.signedAt, { withTime: true })}</dd>
+          <dt className="text-fg-muted">Where</dt>
+          <dd className="text-fg">{signedWhere(approval)}</dd>
           <dt className="text-fg-muted">Consent</dt>
           <dd className="text-fg">{approval.consent ? `Agreed to the ${getName('quote').toLowerCase()}’s terms` : '—'}</dd>
           {approval.ipAddress && (

@@ -66,6 +66,19 @@ function initialChoice(proposal: Proposal, priced: PublicPricedSelection | null 
   };
 }
 
+/** Where choices are saved and how a signature is taken: the share link, or the advisor's logged-in device. */
+export interface ProposalActions {
+  save: (choice: PublicSelectionChoice) => Promise<PublicPricedSelection>;
+  approve: (body: {
+    revision: number | undefined;
+    signerName: string;
+    signature: string;
+    selection: PublicSelectionChoice;
+    totalAmount: number;
+  }) => Promise<void>;
+}
+
+/** The customer's link: choices and the signature go through the share token. */
 export function PublicProposal({
   data,
   token,
@@ -79,6 +92,38 @@ export function PublicProposal({
   /** Reload the page (the quote changed under the customer). */
   onReload: () => void;
 }) {
+  const actions: ProposalActions = {
+    save: (choice) => publicFinancialApi.saveQuoteSelection(token, choice),
+    approve: async (body) => onReplace(await publicFinancialApi.approveProposal(token, { ...body, consent: true })),
+  };
+  // The office's preview and a draft behind the link can be looked at but not chosen on.
+  const canChoose = !data.preview && data.quote.status === 'SENT' && !!data.quote.selection;
+  return <ProposalExperience data={data} actions={actions} canChoose={canChoose} canSign={canChoose} mode="remote" onReload={onReload} />;
+}
+
+/**
+ * The proposal itself, for the link (`remote`) or presented on the advisor's
+ * device (`inhome`). Same steps and figures; in the home the top bar names
+ * who it's for and who's presenting, and there's a way back to the quote.
+ */
+export function ProposalExperience({
+  data,
+  actions,
+  canChoose,
+  canSign,
+  mode,
+  onReload,
+  onExit,
+}: {
+  data: PublicQuoteResponse;
+  actions: ProposalActions;
+  canChoose: boolean;
+  /** Choosing without signing: e.g. in the home without permission to take signatures. */
+  canSign: boolean;
+  mode: 'remote' | 'inhome';
+  onReload: () => void;
+  onExit?: () => void;
+}) {
   const { t } = useTranslation();
   const { quote, tenant, customer } = data;
   const proposal = quote.proposal!;
@@ -86,16 +131,17 @@ export function PublicProposal({
   const sender = tenant.displayName ?? t('public.common.theSender');
   const advisorName = quote.advisor?.name ?? sender;
   const phone = quote.advisor?.phone ?? tenant.supportPhone;
+  const shell = { data, mode, onExit };
 
   if (quote.status === 'ACCEPTED')
     return (
-      <Shell data={data}>
+      <Shell {...shell}>
         <Done approval={quote.approval ?? null} data={data} />
       </Shell>
     );
   if (quote.expired || quote.status === 'EXPIRED')
     return (
-      <Shell data={data}>
+      <Shell {...shell}>
         <div className="pp-done">
           <div className="pp-done-ic pp-done-ic--warn" aria-hidden>
             !
@@ -104,7 +150,7 @@ export function PublicProposal({
           <p className="pp-lede">
             {t('public.proposal.expired.body', { ...names, date: longDate(quote.expirationDate), advisor: advisorName })}
           </p>
-          {phone && (
+          {phone && mode === 'remote' && (
             <a className="pp-btn pp-btn--1 pp-btn--inline mt-6" href={`tel:${phone.replace(/[^\d+]/g, '')}`}>
               {t('public.proposal.call', { name: firstName(advisorName), phone })}
             </a>
@@ -112,11 +158,35 @@ export function PublicProposal({
         </div>
       </Shell>
     );
-  return <Chooser data={data} proposal={proposal} token={token} onReplace={onReplace} onReload={onReload} customerName={customer.name} />;
+  return (
+    <Chooser
+      data={data}
+      proposal={proposal}
+      actions={actions}
+      canChoose={canChoose}
+      canSign={canSign}
+      mode={mode}
+      onExit={onExit}
+      onReload={onReload}
+      customerName={customer.name}
+    />
+  );
 }
 
 /** Top bar and preview banner around every state. `steps` is the step nav, when there is one. */
-function Shell({ data, children, steps }: { data: PublicQuoteResponse; children: ReactNode; steps?: ReactNode }) {
+function Shell({
+  data,
+  children,
+  steps,
+  mode = 'remote',
+  onExit,
+}: {
+  data: PublicQuoteResponse;
+  children: ReactNode;
+  steps?: ReactNode;
+  mode?: 'remote' | 'inhome';
+  onExit?: () => void;
+}) {
   const { t } = useTranslation();
   const { quote, tenant, customer } = data;
   const names = publicNames(tenant);
@@ -135,11 +205,23 @@ function Shell({ data, children, steps }: { data: PublicQuoteResponse; children:
           </div>
         </div>
         {steps ?? <span className="mx-auto" />}
-        {phone && (
+        {mode === 'inhome' ? (
+          <div className="pp-who pp-who--inhome">
+            <span>
+              {t('public.proposal.preparedFor')} <b>{customer.name}</b>
+            </span>
+            {advisorName && <span>{t('public.proposal.with', { name: advisorName })}</span>}
+          </div>
+        ) : phone && (
           <div className="pp-who">
             <span>{advisorName ? t('public.proposal.questionsFor', { name: firstName(advisorName) }) : t('public.proposal.questions')}</span>
             <a href={`tel:${phone.replace(/[^\d+]/g, '')}`}>{phone}</a>
           </div>
+        )}
+        {onExit && (
+          <button type="button" className="pp-link pp-exit" onClick={onExit}>
+            {t('public.proposal.exit')}
+          </button>
         )}
       </header>
       {children}
@@ -150,15 +232,21 @@ function Shell({ data, children, steps }: { data: PublicQuoteResponse; children:
 function Chooser({
   data,
   proposal,
-  token,
-  onReplace,
+  actions,
+  canChoose,
+  canSign,
+  mode,
+  onExit,
   onReload,
   customerName,
 }: {
   data: PublicQuoteResponse;
   proposal: Proposal;
-  token: string;
-  onReplace: (next: PublicQuoteResponse) => void;
+  actions: ProposalActions;
+  canChoose: boolean;
+  canSign: boolean;
+  mode: 'remote' | 'inhome';
+  onExit?: () => void;
   onReload: () => void;
   customerName: string;
 }) {
@@ -167,8 +255,6 @@ function Chooser({
   const names = publicNames(tenant);
   const sender = tenant.displayName ?? t('public.common.theSender');
   const advisorName = quote.advisor?.name ?? sender;
-  // The office's preview and a draft can be looked at but not chosen on.
-  const canChoose = !data.preview && quote.status === 'SENT' && !!quote.selection;
 
   const [choice, setChoice] = useState<PublicSelectionChoice>(() => initialChoice(proposal, quote.selection));
   const [priced, setPriced] = useState<PublicPricedSelection | null>(quote.selection ?? null);
@@ -192,7 +278,7 @@ function Chooser({
       setSaving(true);
       timer.current = window.setTimeout(async () => {
         try {
-          const result = await publicFinancialApi.saveQuoteSelection(token, next);
+          const result = await actions.save(next);
           if (mine !== seq.current) return;
           setPriced(result);
           setChoice(result.selection);
@@ -213,7 +299,7 @@ function Chooser({
         }
       }, SAVE_DEBOUNCE_MS);
     },
-    [token, t, names, sender, onReload],
+    [actions, t, names, sender, onReload],
   );
   useEffect(() => () => window.clearTimeout(timer.current), []);
 
@@ -247,21 +333,19 @@ function Chooser({
   const [signerName, setSignerName] = useState(customerName);
   const [agree, setAgree] = useState(false);
   const [approving, setApproving] = useState(false);
-  const ready = canChoose && !!priced && !saving && !!signature && agree && signerName.trim().length > 0;
+  const ready = canChoose && canSign && !!priced && !saving && !!signature && agree && signerName.trim().length > 0;
   const approve = async () => {
     if (!ready || !priced) return;
     setApproving(true);
     try {
-      const next = await publicFinancialApi.approveProposal(token, {
+      await actions.approve({
         revision: quote.revision,
         signerName: signerName.trim().slice(0, 120),
         signature: signature!,
-        consent: true,
         selection: priced.selection,
         totalAmount: num(priced.totals.totalAmount),
       });
       window.scrollTo({ top: 0 });
-      onReplace(next);
     } catch (err) {
       const code = axios.isAxiosError(err) ? (err.response?.data as { code?: string } | undefined)?.code : undefined;
       setSignature(null);
@@ -291,7 +375,9 @@ function Chooser({
           disabled: !ready || approving,
           hint: !canChoose
             ? t('public.proposal.previewHint', names)
-            : !(signature && agree)
+            : !canSign
+              ? t('public.proposal.noSignPermission')
+              : !(signature && agree)
               ? t('public.proposal.signHint')
               : saving
                 ? t('public.proposal.updating')
@@ -327,7 +413,7 @@ function Chooser({
   );
 
   return (
-    <Shell data={data} steps={stepNav}>
+    <Shell data={data} steps={stepNav} mode={mode} onExit={onExit}>
       {notice && (
         <div className="pp-notice" role="status">
           <div>{notice}</div>
@@ -369,7 +455,7 @@ function Chooser({
               sender={sender}
               quoteNumber={quote.quoteNumber}
               validThrough={longDate(quote.expirationDate)}
-              canSign={canChoose}
+              canSign={canChoose && canSign}
               padKey={padKey}
               signature={signature}
               onSignature={setSignature}
@@ -915,8 +1001,9 @@ function Done({ approval, data }: { approval: PublicApproval | null; data: Publi
           <PackageLines priced={approval} proposal={quote.proposal ?? null} />
           {approval.signatureImage && <img className="pp-signature" src={approval.signatureImage} alt={t('public.proposal.done.signatureAlt', { name: approval.signerName })} />}
           <div className="pp-fine mt-1">
-            {t('public.proposal.done.signedBy', {
+            {t(approval.signedVia === 'IN_PERSON' && approval.witnessName ? 'public.proposal.done.signedInPerson' : 'public.proposal.done.signedBy', {
               name: approval.signerName,
+              witness: approval.witnessName,
               date: new Date(approval.signedAt).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' }),
             })}
           </div>

@@ -1572,8 +1572,10 @@
         "signatureAlt": "{{name}}’s signature",
         "signedBy": "Signed by {{name}} · {{date}}",
         "signedCopy": "Your signed copy",
+        "signedInPerson": "Signed in person by {{name}} with {{witness}} · {{date}}",
         "title": "You’re all set, {{name}}."
       },
+      "exit": "Back to the quote",
       "expired": {
         "body": "It expired on {{date}}, so the prices may have changed. Ask {{advisor}} to refresh it.",
         "title": "This {{quote, lowercase}} has expired"
@@ -1581,6 +1583,7 @@
       "hidePackage": "Hide package",
       "included": "Included",
       "includedWith": "Included with {{option}}",
+      "noSignPermission": "Your role can’t take signatures. Ask someone who can approve quotes.",
       "notice": {
         "saveFailed": "We couldn’t save that choice. Check your connection and try again.",
         "slowDown": "That was a lot of changes at once. Wait a moment, then try again.",
@@ -1594,6 +1597,7 @@
       },
       "package": "Your package",
       "popular": "Most popular",
+      "preparedFor": "Prepared for",
       "previewHint": "Preview: the customer chooses and signs on their own link.",
       "questions": "Questions?",
       "questionsFor": "Questions? Call {{name}}",
@@ -1626,6 +1630,7 @@
       "updating": "Updating your total…",
       "validThrough": "Prices valid through {{date}}.",
       "viewPackage": "View package",
+      "with": "with {{name}}",
       "youSave": "You save {{amount}}",
       "youreSaving": "You’re saving {{amount}}"
     }
