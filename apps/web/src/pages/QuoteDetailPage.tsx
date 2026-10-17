@@ -29,6 +29,8 @@ import { formatDocDate, isLegacy, memberLabel, memberSavings, toDateInput } from
 import { SendDocumentDialog } from '../components/document/SendDocumentDialog';
 import { ProposalBuilder } from '../components/proposal/ProposalBuilder';
 import { useQuoteSelection } from '../components/proposal/useQuoteSelection';
+import { PriceApprovalCallout, RequestInPersonDialog } from '../components/proposal/PriceApproval';
+import { usePriceClearance } from '../components/proposal/usePriceClearance';
 import { addOnLines, allOptions, headerFields, isProposal, modeOf } from '../components/proposal/proposalModel';
 import { ToggleGroup, ToggleGroupOption } from '../components/ui/ToggleGroup';
 
@@ -68,6 +70,7 @@ export default function QuoteDetailPage() {
   const [confirm, setConfirm] = useState<Confirm>(null);
   const [headerOpen, setHeaderOpen] = useState(false);
   const [sending, setSending] = useState(false);
+  const [askingInPerson, setAskingInPerson] = useState(false);
   const [billing, setBilling] = useState(false);
   const shareLink = useShareLink({ routes: quotesApi, id: id ?? '', number: quote?.quoteNumber ?? '', entity: entityLower });
   const accepted = quote?.status === QuoteStatus.ACCEPTED;
@@ -87,6 +90,11 @@ export default function QuoteDetailPage() {
     onError: (err) => showError(`Couldn’t duplicate this ${entityLower}`, documentErrorMessage(err, entityLower)),
   });
   const { data: pricedSelection } = useQuoteSelection(quote);
+  // Below the margin floor, a send (or an in-person signing) waits for a manager.
+  const { data: clearance } = usePriceClearance(
+    quote,
+    !!quote && quote.status !== QuoteStatus.ACCEPTED && quote.status !== QuoteStatus.DECLINED && quote.status !== QuoteStatus.EXPIRED,
+  );
   const queryClient = useQueryClient();
   const canDelete = useHasAnyCapability('EDIT_QUOTES');
   // Only a draft that was never sent; afterwards back to where it was opened from.
@@ -168,7 +176,13 @@ export default function QuoteDetailPage() {
   const canPresent = proposal && options.length > 0 && (quote.status === QuoteStatus.DRAFT || quote.status === QuoteStatus.SENT);
   const deletable = canDelete && quote.status === QuoteStatus.DRAFT && !quote.firstSentAt;
 
-  const sendLabel = unsentRevision ? `Re-send · Rev ${revision ?? 1}` : quote.lastSentAt ? 'Resend' : `Send ${entityLower}`;
+  const sendLabel = clearance?.approvalRequired
+    ? 'Request approval & send'
+    : unsentRevision
+      ? `Re-send · Rev ${revision ?? 1}`
+      : quote.lastSentAt
+        ? 'Resend'
+        : `Send ${entityLower}`;
   const actions = (
     <>
       <DocumentEditStatus saving={editor.saving} />
@@ -218,6 +232,11 @@ export default function QuoteDetailPage() {
                 <DropdownLabel>Duplicate</DropdownLabel>
               </DropdownItem>
               {quote.lastSentAt && shareLink.items}
+              {canPresent && clearance?.approvalRequired && (
+                <DropdownItem onClick={() => setAskingInPerson(true)}>
+                  <DropdownLabel>Ask to approve the price (to sign in person)</DropdownLabel>
+                </DropdownItem>
+              )}
               {deletable && (
                 <DropdownItem onClick={() => setConfirm('delete')}>
                   <DropdownLabel>{`Delete ${entityLower}`}</DropdownLabel>
@@ -321,6 +340,7 @@ export default function QuoteDetailPage() {
           Rev {revision ?? 1} draft. The customer’s link shows “This {entityLower} is being updated” until you re-send.
         </Callout>
       )}
+      {clearance && <PriceApprovalCallout quote={quote} clearance={clearance} />}
       <DocumentWarnings doc={quote} billToName={billTo.name} nte={workOrder?.notToExceed} />
 
       {proposal ? (
@@ -333,7 +353,9 @@ export default function QuoteDetailPage() {
         />
       )}
 
+      <RequestInPersonDialog quote={quote} open={askingInPerson} onClose={() => setAskingInPerson(false)} />
       <SendDocumentDialog
+        approval={clearance}
         target={sending ? { kind: 'quote', doc: quote } : null}
         onClose={() => setSending(false)}
         onSent={() => setRevisingId(null)}

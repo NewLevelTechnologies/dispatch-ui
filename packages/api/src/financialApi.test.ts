@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { invoicesApi, quotesApi, financialActivityApi, financialDashboardApi, revenueTargetsApi,
-  revenueReportApi, receivablesReportApi, quoteReportApi, paymentReportApi, discountReportApi, salesTaxReportApi, unbilledReportApi, quoteLineBillingApi, promotionsApi, paymentsApi, taxApi, laborRatesApi, pricebookApi, ratePlansApi, mediaApi } from './financialApi';
+  revenueReportApi, receivablesReportApi, quoteReportApi, paymentReportApi, discountReportApi, salesTaxReportApi, unbilledReportApi, quoteLineBillingApi, promotionsApi, quotePriceApprovalsApi, paymentsApi, taxApi, laborRatesApi, pricebookApi, ratePlansApi, mediaApi } from './financialApi';
 import apiClient from './client';
 
 vi.mock('./client');
@@ -456,6 +456,39 @@ describe('promotionsApi', () => {
     expect(apiClient.put).toHaveBeenLastCalledWith('/financial/promotions/p-1', { ...body, active: false });
     await quotesApi.setPromotion('q-1', 'p-1', { version: 7, choice: 'EXCLUDE' });
     expect(apiClient.put).toHaveBeenLastCalledWith('/financial/quotes/q-1/promotions/p-1', { version: 7, choice: 'EXCLUDE' });
+  });
+});
+
+describe('quote price approvals', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('lists, counts and answers the queue', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({ data: [] });
+    vi.mocked(apiClient.post).mockResolvedValue({ data: {} });
+    await quotePriceApprovalsApi.list({ status: ['PENDING'], mine: true });
+    expect(apiClient.get).toHaveBeenLastCalledWith('/financial/quote-price-approvals', { params: { mine: true, status: ['PENDING'] } });
+    await quotePriceApprovalsApi.count();
+    expect(apiClient.get).toHaveBeenLastCalledWith('/financial/quote-price-approvals/count');
+    await quotePriceApprovalsApi.approve('pa-1', 'OK this once');
+    expect(apiClient.post).toHaveBeenLastCalledWith('/financial/quote-price-approvals/pa-1/approve', { note: 'OK this once' });
+    await quotePriceApprovalsApi.reject('pa-1');
+    expect(apiClient.post).toHaveBeenLastCalledWith('/financial/quote-price-approvals/pa-1/reject', {});
+    await quotePriceApprovalsApi.cancel('pa-1');
+    expect(apiClient.post).toHaveBeenLastCalledWith('/financial/quote-price-approvals/pa-1/cancel');
+  });
+
+  it('asks for approval with the send to make once approved, or without for signing in person', async () => {
+    vi.mocked(apiClient.post).mockResolvedValue({ data: {} });
+    vi.mocked(apiClient.get).mockResolvedValue({ data: {} });
+    await quotesApi.requestPriceApproval('q-1', { reason: 'Matching a bid', send: { recipientEmails: ['t@x.com'], expirationDate: '2026-11-01' } });
+    expect(apiClient.post).toHaveBeenLastCalledWith('/financial/quotes/q-1/price-approvals', {
+      reason: 'Matching a bid',
+      send: { recipientEmails: ['t@x.com'], expirationDate: '2026-11-01' },
+    });
+    await quotesApi.requestPriceApproval('q-1', { reason: 'In the home' });
+    expect(apiClient.post).toHaveBeenLastCalledWith('/financial/quotes/q-1/price-approvals', { reason: 'In the home' });
+    await quotesApi.getPriceClearance('q-1');
+    expect(apiClient.get).toHaveBeenLastCalledWith('/financial/quotes/q-1/price-clearance');
   });
 });
 

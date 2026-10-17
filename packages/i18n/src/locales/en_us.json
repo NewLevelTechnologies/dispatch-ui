@@ -390,6 +390,35 @@
     }
   },
   "approvals": {
+    "price": {
+      "approved": "{{number}} price approved",
+      "approvedSends": "It’s being sent to the customer now.",
+      "changed": "Changed since asked",
+      "changedBody": "The {{quote, lowercase}} was edited after this was asked, so it can’t be approved. The advisor needs to ask again.",
+      "header": "{{name}} asks to approve a price",
+      "inPerson": "For signing in person",
+      "margin": "Margin after savings",
+      "marginValue": "{{margin}}, under the {{floor}} floor",
+      "quote": "{{quote}}",
+      "rejected": "{{number}} price rejected",
+      "rowSummary": "Price below the floor · {{margin}} vs {{floor}}",
+      "section": "Prices",
+      "sendsOnApproval": "Sends to the customer once approved",
+      "someone": "Someone",
+      "status": {
+        "APPROVED": "Approved",
+        "CANCELLED": "Withdrawn",
+        "PENDING": "Pending",
+        "REJECTED": "Rejected"
+      },
+      "title": "Title",
+      "total": "Total",
+      "waiting": "Waiting on a manager who can approve {{quotes, lowercase}}.",
+      "withdraw": "Withdraw the request",
+      "withdrawFailed": "Couldn’t withdraw the request",
+      "withdrawn": "Request withdrawn",
+      "workflowSection": "Status changes"
+    },
     "title": "Approvals",
     "subtitle": "Work item transitions waiting on your sign-off · expiries auto-reject if untouched",
     "filteredByWorkOrder": "Filtered by {{workOrder, lowercase}}",
@@ -1592,6 +1621,7 @@
       "includedWith": "Included with {{option}}",
       "noSignPermission": "Your role can’t take signatures. Ask someone who can approve quotes.",
       "notice": {
+        "marginApproval": "This choice is under the margin floor. Ask a manager to approve the price on the quote, then sign.",
         "saveFailed": "We couldn’t save that choice. Check your connection and try again.",
         "slowDown": "That was a lot of changes at once. Wait a moment, then try again.",
         "totalChanged": "The total changed since you looked. Check the new figure and sign again."
@@ -4109,6 +4139,9 @@
         "quoteDeclined": "{{quote}} declined · {{amount}}",
         "quoteDeleted": "Draft {{quote, lowercase}} deleted · {{amount}}",
         "quoteMarkedSent": "{{quote}} marked sent{{rev}} · {{amount}}",
+        "quotePriceApproved": "Price approved{{why}}",
+        "quotePriceRejected": "Price rejected{{why}}",
+        "quotePriceRequested": "Price approval asked · {{margin}} margin, under the {{floor}} floor{{why}}",
         "quoteSent": "{{quote}} sent{{via}}{{rev}} · {{amount}}",
         "quoteViewed": "Viewed by the {{customer, lowercase}}{{rev}}",
         "unknown": "Unrecognized activity",

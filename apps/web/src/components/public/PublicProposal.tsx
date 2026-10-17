@@ -353,6 +353,8 @@ function Chooser({
       setNotice(
         code === 'QUOTE_TOTAL_CHANGED'
           ? t('public.proposal.notice.totalChanged')
+          : code === 'MARGIN_APPROVAL_REQUIRED'
+            ? t('public.proposal.notice.marginApproval')
           : code === 'QUOTE_REVISION_STALE'
             ? t('public.quote.revisionStale', names)
             : code === 'QUOTE_NOT_APPROVABLE'

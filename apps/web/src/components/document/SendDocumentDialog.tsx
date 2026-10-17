@@ -14,6 +14,7 @@ import {
   taxApi,
   type Invoice,
   type Quote,
+  type QuotePriceClearance,
   type SendResponse,
 } from '../../api/setup';
 import { useGlossary } from '../../contexts/GlossaryContext';
@@ -65,19 +66,34 @@ export function SendDocumentDialog({
   target,
   onClose,
   onSent,
+  approval,
 }: {
   target: SendTarget | null;
   onClose: () => void;
   onSent?: (res: SendResponse) => void;
+  /** A quote below the margin floor: the send waits for a manager, then goes out on its own. */
+  approval?: QuotePriceClearance | null;
 }) {
   return (
     <Dialog open={target != null} onClose={onClose} size="xl" className="sm:!max-w-[560px]">
-      {target && <SendForm key={target.doc.id} target={target} onClose={onClose} onSent={onSent} />}
+      {target && <SendForm key={target.doc.id} target={target} onClose={onClose} onSent={onSent} approval={approval} />}
     </Dialog>
   );
 }
 
-function SendForm({ target, onClose, onSent }: { target: SendTarget; onClose: () => void; onSent?: (res: SendResponse) => void }) {
+const pct = (f: number | null | undefined) => (f == null ? '—' : `${Math.round(f * 1000) / 10}%`);
+
+function SendForm({
+  target,
+  onClose,
+  onSent,
+  approval,
+}: {
+  target: SendTarget;
+  onClose: () => void;
+  onSent?: (res: SendResponse) => void;
+  approval?: QuotePriceClearance | null;
+}) {
   const { getName } = useGlossary();
   const queryClient = useQueryClient();
   const { kind, doc } = target;
@@ -191,9 +207,30 @@ function SendForm({ target, onClose, onSent }: { target: SendTarget; onClose: ()
     }
   };
 
-  const canSend = (emails.length > 0 || phones.length > 0) && !tooLong;
+  const held = isQuote && !!approval?.approvalRequired;
+  const [reason, setReason] = useState('');
+  const canSend = (emails.length > 0 || phones.length > 0) && !tooLong && (!held || reason.trim().length > 0);
+  // Below the floor: ask a manager, with this exact send to make once they approve.
+  const ask = async () => {
+    setBusy(true);
+    try {
+      const override = overridden ? (chosen ?? undefined) : undefined;
+      await quotesApi.requestPriceApproval(doc.id, {
+        reason: reason.trim(),
+        send: { recipientEmails: emails, recipientPhones: phones, message: edited && emails.length ? message! : undefined, expirationDate: override },
+      });
+      queryClient.invalidateQueries({ queryKey: ['quote-price-clearance', doc.id] });
+      queryClient.invalidateQueries({ queryKey: ['quote-activity', doc.id] });
+      showSuccess(`${number} sent for approval`, 'It goes out as soon as a manager approves it.');
+      onClose();
+    } catch (err) {
+      showError('Couldn’t ask for approval', documentErrorMessage(err, noun));
+      setBusy(false);
+    }
+  };
   const send = async () => {
     if (busy || !canSend) return;
+    if (held) return void ask();
     setBusy(true);
     try {
       const override = overridden ? (chosen ?? undefined) : undefined;
@@ -218,7 +255,23 @@ function SendForm({ target, onClose, onSent }: { target: SendTarget; onClose: ()
 
   return (
     <>
-      <DialogTitle>{draft ? (revision ? `Send ${number} · Rev ${revision}` : `Send ${noun} ${number}`) : `Resend ${number}`}</DialogTitle>
+      <DialogTitle>
+        {held ? `Request approval & send ${number}` : draft ? (revision ? `Send ${number} · Rev ${revision}` : `Send ${noun} ${number}`) : `Resend ${number}`}
+      </DialogTitle>
+      {held && (
+        <div className="mt-3 flex flex-col gap-2" data-testid="send-approval">
+          <Callout kind="warning">
+            {`Its lowest margin after savings is ${pct(approval?.lowestMargin)}, under the ${pct(approval?.floor)} floor. A manager approves it first; it sends to these recipients as soon as they do.`}
+          </Callout>
+          <Input
+            value={reason}
+            maxLength={500}
+            onChange={(e) => setReason(e.target.value)}
+            placeholder="Why this price (e.g. matching a competing bid)"
+            aria-label="Reason for approval"
+          />
+        </div>
+      )}
       {revision && revision > 1 && (
         <DialogDescription>
           {`Rev ${revision} replaces Rev ${revision - 1}. The ${getName('customer').toLowerCase()}’s link will show this revision, and Rev ${revision - 1} can no longer be approved.`}
@@ -371,7 +424,7 @@ function SendForm({ target, onClose, onSent }: { target: SendTarget; onClose: ()
           Cancel
         </Button>
         <Button color="dark/zinc" disabled={busy || !canSend} onClick={() => void send()}>
-          {`${draft ? `Send ${noun}` : 'Resend'} · ${formatCurrency(doc.totalAmount)}`}
+          {held ? 'Request approval & send' : `${draft ? `Send ${noun}` : 'Resend'} · ${formatCurrency(doc.totalAmount)}`}
         </Button>
       </DialogActions>
     </>

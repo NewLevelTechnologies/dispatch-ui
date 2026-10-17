@@ -103,6 +103,11 @@ function arrivalWindow(start: unknown, end: unknown): string {
   return `${WINDOW_DAY.format(s)}, ${WINDOW_TIME.format(s)}${tail}`;
 }
 
+/** "24.8%" from a fraction; "—" without one. */
+const pctOf = (v: unknown) => (typeof v === 'number' ? `${Math.round(v * 1000) / 10}%` : '—');
+/** ": “Matching a bid”" when there's a note or reason. */
+const said = (v: unknown) => (typeof v === 'string' && v.trim() ? `: “${v.trim()}”` : '');
+
 const names = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : []);
 
 /**
@@ -162,6 +167,12 @@ export function builtText(evt: ActivityEvent, t: TFunc): string | null {
       return t(key('quoteDeleted'), { amount });
     case 'QUOTE_CHOICE_CHANGED':
       return choiceText(d, t, amount);
+    case 'QUOTE_PRICE_APPROVAL_REQUESTED':
+      return t(key('quotePriceRequested'), { margin: pctOf(d.lowestMargin), floor: pctOf(d.floor), why: said(d.reason) });
+    case 'QUOTE_PRICE_APPROVED':
+      return t(key('quotePriceApproved'), { why: said(d.note) });
+    case 'QUOTE_PRICE_REJECTED':
+      return t(key('quotePriceRejected'), { why: said(d.note) });
     case 'INVOICE_SENT':
       return via(d.channels) ? t(key('invoiceSent'), { via: via(d.channels), amount }) : t(key('invoiceMarkedSent'), { amount });
     case 'INVOICE_PAID':

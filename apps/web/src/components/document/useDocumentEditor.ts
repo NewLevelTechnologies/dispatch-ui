@@ -61,6 +61,10 @@ export function documentErrorMessage(
       return `This ${entity} was already reissued. Open the corrected copy instead.`;
     case 'PAYMENT_NOT_APPLICABLE':
       return `That ${payment} was voided, so its credit can’t be applied.`;
+    case 'MARGIN_APPROVAL_REQUIRED':
+      return `This ${entity} is under the margin floor. Send it for a manager's approval first.`;
+    case 'PRICE_APPROVAL_CLOSED':
+      return `That request was already answered, or the ${entity} changed since it was asked.`;
     case 'QUOTE_NOT_DELETABLE':
       return `Only a draft that was never sent can be deleted. Decline it instead, or let it expire.`;
     case 'PRESENTATION_LOCKED':

@@ -1374,6 +1374,30 @@ export const quotesApi = {
     const response = await apiClient.put<Quote>(`/financial/quotes/${id}/promotions/${promotionId}`, request);
     return response.data;
   },
+  getPriceClearance: async (id: string): Promise<QuotePriceClearance> => {
+    const response = await apiClient.get<QuotePriceClearance>(`/financial/quotes/${id}/price-clearance`);
+    return response.data;
+  },
+  /**
+   * Ask a manager to approve a below-floor price. With `send` (the /send body)
+   * it goes out as soon as it's approved; without, it's for signing in person.
+   * Asking again replaces a pending ask; 400 when within the floor.
+   */
+  requestPriceApproval: async (
+    id: string,
+    { reason, send }: { reason: string; send?: SendOptions & { expirationDate?: string } },
+  ): Promise<QuotePriceApproval> => {
+    const sendRequest = send ? (sendBody(send, send.expirationDate ? { expirationDate: send.expirationDate } : {}) ?? {}) : undefined;
+    const response = await apiClient.post<QuotePriceApproval>(`/financial/quotes/${id}/price-approvals`, {
+      reason,
+      ...(sendRequest ? { send: sendRequest } : {}),
+    });
+    return response.data;
+  },
+  getPriceApprovals: async (id: string): Promise<QuotePriceApproval[]> => {
+    const response = await apiClient.get<QuotePriceApproval[]>(`/financial/quotes/${id}/price-approvals`);
+    return response.data;
+  },
   /** The saved choice, priced. */
   getSelection: async (id: string): Promise<PricedSelection> => {
     const response = await apiClient.get<PricedSelection>(`/financial/quotes/${id}/selection`);
@@ -2317,6 +2341,84 @@ export const quoteLineBillingApi = {
   },
 };
 
+// ========== QUOTE PRICE APPROVALS ==========
+
+export type PriceApprovalStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED';
+
+/** A quote held below the margin floor until a manager (APPROVE_QUOTES) answers. */
+export interface QuotePriceApproval {
+  id: string;
+  quoteId: string;
+  quoteNumber: string;
+  quoteTitle: string | null;
+  customerName: string | null;
+  revision: number | null;
+  status: PriceApprovalStatus;
+  /** False once the quote was edited after the ask: it can't be approved ("changed since asked"). */
+  current: boolean;
+  requestedByUserId: string | null;
+  requestedByName: string | null;
+  requestedAt: string;
+  reason: string | null;
+  /** Approving sends the quote as the asker's send; false = for signing in person. */
+  sendsOnApproval: boolean;
+  /** Fractions. */
+  lowestMargin: number | null;
+  floor: number | null;
+  totalAmount: number | null;
+  respondedByUserId: string | null;
+  respondedByName: string | null;
+  respondedAt: string | null;
+  responseNote: string | null;
+}
+
+/** Whether a quote can be sent (or signed in person) as it stands. */
+export interface QuotePriceClearance {
+  /** An option's card or the current choice sells under the floor after savings. */
+  belowFloor: boolean;
+  lowestMargin: number | null;
+  floor: number | null;
+  /** Below the floor and not approved as the quote stands: "Request approval & send". */
+  approvalRequired: boolean;
+  /** A manager: their own sends aren't held. */
+  callerCanApprove: boolean;
+  latest: QuotePriceApproval | null;
+}
+
+export interface ListPriceApprovalsParams {
+  status?: PriceApprovalStatus[];
+  /** The caller's own requests. */
+  mine?: boolean;
+  limit?: number;
+}
+
+export const quotePriceApprovalsApi = {
+  list: async ({ status, ...rest }: ListPriceApprovalsParams = {}): Promise<QuotePriceApproval[]> => {
+    const response = await apiClient.get<QuotePriceApproval[]>('/financial/quote-price-approvals', {
+      params: { ...rest, ...(status?.length ? { status } : {}) },
+    });
+    return response.data;
+  },
+  count: async (): Promise<{ pending: number }> => {
+    const response = await apiClient.get<{ pending: number }>('/financial/quote-price-approvals/count');
+    return response.data;
+  },
+  /** APPROVE_QUOTES. 409 PRICE_APPROVAL_CLOSED when answered already or the quote changed. */
+  approve: async (id: string, note?: string): Promise<QuotePriceApproval> => {
+    const response = await apiClient.post<QuotePriceApproval>(`/financial/quote-price-approvals/${id}/approve`, note ? { note } : {});
+    return response.data;
+  },
+  reject: async (id: string, note?: string): Promise<QuotePriceApproval> => {
+    const response = await apiClient.post<QuotePriceApproval>(`/financial/quote-price-approvals/${id}/reject`, note ? { note } : {});
+    return response.data;
+  },
+  /** Withdraw: the asker, or a manager. */
+  cancel: async (id: string): Promise<QuotePriceApproval> => {
+    const response = await apiClient.post<QuotePriceApproval>(`/financial/quote-price-approvals/${id}/cancel`);
+    return response.data;
+  },
+};
+
 // ========== PROMOTIONS ==========
 
 /** Tenant-authored, dated, auto-applying offers ("Fall Comfort Event — $500 off"). Writes need MANAGE_PRICING. */
@@ -2376,6 +2478,9 @@ export type FinancialActivityKind =
   | 'QUOTE_ACCEPTED'
   | 'QUOTE_DECLINED'
   | 'QUOTE_CHOICE_CHANGED'
+  | 'QUOTE_PRICE_APPROVAL_REQUESTED'
+  | 'QUOTE_PRICE_APPROVED'
+  | 'QUOTE_PRICE_REJECTED'
   | 'QUOTE_DELETED'
   | 'INVOICE_SENT'
   | 'INVOICE_PAID'
