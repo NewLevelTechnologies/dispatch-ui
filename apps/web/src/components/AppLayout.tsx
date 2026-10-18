@@ -141,7 +141,9 @@ export default function AppLayout({ children, flush }: { children: React.ReactNo
         // agreement visit schedules. Shares the page-heading key so the sidebar
         // and the <h1> can't drift; a tenant on "Trip" gets "Trip Board".
         { name: t('dispatchBoard.title', { entity: getName('dispatch') }), href: '/dispatch', icon: CalendarIcon },
-        ...(approvalsVisible || canApproveQuotes
+        // Only when something waits on this user: an empty inbox in the nav is noise.
+        // The page stays reachable from the bell, and by link.
+        ...(pendingApprovalCount > 0
           ? [{ name: t('approvals.title'), href: '/approvals', icon: CheckBadgeIcon, badge: pendingApprovalCount }]
           : []),
       ],

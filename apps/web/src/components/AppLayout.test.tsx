@@ -57,4 +57,27 @@ describe('AppLayout sidebar', () => {
     expect(order.slice(-4)).toEqual(['/vendors', '/parts-inventory', '/warehouses', '/reports']);
     expect(order).not.toContain('/equipment');
   });
+
+  it('lists Approvals only when something waits on this user', async () => {
+    const respond = (pendingForMe: number) =>
+      vi.mocked(apiClient.get).mockImplementation((url) =>
+        Promise.resolve({
+          data: url.endsWith('/workflow')
+            ? { enforcementMode: 'STRICT', hasAnyApprovalRequests: true }
+            : url === '/work-orders/approvals/count'
+              ? { pendingForMe, recentlyResolvedMine: 0 }
+              : {},
+        }),
+      );
+
+    respond(0);
+    const { unmount } = renderWithProviders(<AppLayout><div /></AppLayout>);
+    await waitFor(() => expect(apiClient.get).toHaveBeenCalledWith('/work-orders/approvals/count'));
+    expect(navHrefs()).not.toContain('/approvals');
+    unmount();
+
+    respond(2);
+    renderWithProviders(<AppLayout><div /></AppLayout>);
+    await waitFor(() => expect(navHrefs()).toContain('/approvals'));
+  });
 });
