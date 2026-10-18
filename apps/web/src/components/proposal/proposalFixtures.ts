@@ -83,8 +83,8 @@ export function proposalQuote(over: Partial<Quote> = {}): Quote {
     ],
     selection: { optionIds: ['o-2'], addOnLineIds: [] },
     lineItems: [
-      line(),
-      line({ id: 'l-2', description: '3-ton 17 SEER2 two-stage system', unitPrice: 15580, lineTotal: 15580, optionId: 'o-2' }),
+      line({ itemId: 'item-1' }),
+      line({ id: 'l-2', itemId: 'item-1', description: '3-ton 17 SEER2 two-stage system', unitPrice: 15580, lineTotal: 15580, optionId: 'o-2' }),
       line({ id: 'l-ducts', description: 'Duct sealing', unitPrice: 1850, lineTotal: 1850, optionId: null, role: 'ADD_ON', type: 'SERVICE' }),
       line({ id: 'l-tstat', description: 'Smart Wi-Fi thermostat', unitPrice: 420, lineTotal: 420, optionId: null, role: 'ADD_ON', type: 'EQUIPMENT' }),
     ],

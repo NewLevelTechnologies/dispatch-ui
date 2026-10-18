@@ -7,7 +7,7 @@ import { Fragment, useState, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from '@dispatch/i18n';
 import { formatCurrency, formatTimestamp } from '@dispatch/utils';
-import { CheckIcon, EllipsisHorizontalIcon, ExclamationTriangleIcon, PhotoIcon, PlusIcon, XMarkIcon } from '@heroicons/react/16/solid';
+import { CheckIcon, EllipsisHorizontalIcon, ExclamationTriangleIcon, MagnifyingGlassIcon, PlusIcon, XMarkIcon } from '@heroicons/react/16/solid';
 import clsx from 'clsx';
 import {
   laborRatesApi,
@@ -31,7 +31,7 @@ import { DenseTable, DenseTHead } from '../ui/DenseTable';
 import { Pill, Tag } from '../ui/Pill';
 import AccountManagerPicker from '../AccountManagerPicker';
 import ConfirmDialog from '../ConfirmDialog';
-import { AddLinePanel } from '../document/AddLinePanel';
+import { AddLinePanel, type AddLineTab } from '../document/AddLinePanel';
 import type { NewLine } from '../document/DocumentLinesCard';
 import { LINE_TYPE_LABEL } from '../document/documentModel';
 import { DocumentAdjustDialog } from '../document/DocumentAdjustDialog';
@@ -48,6 +48,7 @@ import {
   optionLines,
   optionPhoto,
   pricedOption,
+  systemLine,
   savingLabel,
   sendChecks,
   sharedLines,
@@ -71,7 +72,7 @@ const SPECS_MAX = 6;
 const HIGHLIGHTS_MAX = 6;
 
 /** Where the add-line dialog puts what's picked. */
-type AddTarget = { kind: 'option'; option: QuoteOption } | { kind: 'addon' } | null;
+type AddTarget = { kind: 'option'; option: QuoteOption; tab: AddLineTab } | { kind: 'addon' } | null;
 
 const lineSub = (l: QuoteLineItem) => {
   const type = l.type ? LINE_TYPE_LABEL[l.type] : 'Line';
@@ -144,7 +145,7 @@ export function ProposalBuilder({ quote, editable, run }: { quote: Quote; editab
               accepted={accepted}
               priced={priced}
               run={run}
-              onAddLine={(option) => setAdding({ kind: 'option', option })}
+              onAddLine={(option, tab) => setAdding({ kind: 'option', option, tab })}
             />
           ))
         )}
@@ -173,6 +174,7 @@ export function ProposalBuilder({ quote, editable, run }: { quote: Quote; editab
               workOrderId={quote.workOrderId}
               ratePlanId={quote.ratePlanId}
               docPoLineIds={docPoLineIds}
+              initialTab={adding.kind === 'option' ? adding.tab : 'pricebook'}
               onAdd={addLine}
               onClose={() => setAdding(null)}
             />
@@ -256,7 +258,7 @@ function OptionsCard({
   accepted: boolean;
   priced: PricedSelection | undefined;
   run: Run;
-  onAddLine: (option: QuoteOption) => void;
+  onAddLine: (option: QuoteOption, tab: AddLineTab) => void;
 }) {
   const [editing, setEditing] = useState<QuoteOption | null>(null);
   const [deleting, setDeleting] = useState<QuoteOption | null>(null);
@@ -312,7 +314,7 @@ function OptionsCard({
               onEdit={() => setEditing(o)}
               onDiscount={() => setDiscounting(o)}
               onDelete={() => setDeleting(o)}
-              onAddLine={() => onAddLine(o)}
+              onAddLine={(tab) => onAddLine(o, tab)}
               onRemoveLine={(line) =>
                 void run((version) => quotesApi.deleteLine(quote.id, line.id, version), 'Couldn’t remove the line')
               }
@@ -388,16 +390,57 @@ function OptionCard({
   onEdit: () => void;
   onDiscount: () => void;
   onDelete: () => void;
-  onAddLine: () => void;
+  /** The pricebook search, or a custom (freeform) line. */
+  onAddLine: (tab: AddLineTab) => void;
   onRemoveLine: (line: QuoteLineItem) => void;
 }) {
   const lines = optionLines(quote, o.id);
   const included = addOnLines(quote).filter((l) => modeOf(o, l.id) === 'INCLUDED');
   const photo = optionPhoto(o);
   const highlights = optionHighlights(o);
+  const system = systemLine(quote, o);
+  const searchLabel = lines.length ? 'Add from pricebook…' : 'Search pricebook for a system…';
+  /** Under the system line: its spec chips, then photo · highlights · edit. */
+  const systemMeta = (
+    <div className="pb-sysmeta" data-testid="proposal-system-meta">
+      {o.specs.length > 0 && (
+        <div className="flex flex-wrap gap-1">
+          {o.specs.map((sp) => (
+            <span key={sp} className="pb-spec">
+              {sp}
+            </span>
+          ))}
+        </div>
+      )}
+      <div className="pb-sysmeta-row">
+        {[
+          photo ? 'Photo' : 'No photo',
+          highlights.length
+            ? `${highlights.length} highlight${highlights.length === 1 ? '' : 's'}${o.highlights.length ? ' for this quote' : ' from pricebook'}`
+            : 'No highlights',
+        ].join(' · ')}
+        {editable && (
+          <>
+            {' · '}
+            <button type="button" className="pb-sysmeta-edit" onClick={onEdit}>
+              Edit for this quote
+            </button>
+          </>
+        )}
+      </div>
+    </div>
+  );
   const chosen = accepted && o.selected;
   return (
     <div
+      // "/" opens this card's pricebook search, from anywhere in the card that isn't a text field.
+      onKeyDown={(e) => {
+        const tag = (e.target as HTMLElement).tagName;
+        if (editable && e.key === '/' && tag !== 'INPUT' && tag !== 'TEXTAREA') {
+          e.preventDefault();
+          onAddLine('pricebook');
+        }
+      }}
       className={clsx('pb-opt', o.recommended && !accepted && 'pb-opt--popular', chosen && 'pb-opt--chosen', accepted && !chosen && 'pb-opt--declined')}
       data-testid="proposal-option"
     >
@@ -467,54 +510,49 @@ function OptionCard({
       ) : (
         o.tagline && <div className="pb-tagline">{o.tagline}</div>
       )}
-      {photo ? (
-        <img src={photo.thumbnailUrl} alt="" className="pb-photo" />
-      ) : (
-        <div className="pb-photo pb-photo--empty">
-          <PhotoIcon className="size-3.5" />
-          No photo
-        </div>
+      {/* Pricebook first: the system comes from there, so the search sits at the top. */}
+      {editable && (
+        <button type="button" className="pb-search" onClick={() => onAddLine('pricebook')} aria-label={searchLabel}>
+          <MagnifyingGlassIcon className="size-3.5 shrink-0" />
+          <span className="min-w-0 flex-1 truncate text-left">{searchLabel}</span>
+          <kbd className="pb-kbd">/</kbd>
+        </button>
       )}
-      {o.specs.length > 0 && (
-        <div className="flex flex-wrap gap-1">
-          {o.specs.map((s) => (
-            <span key={s} className="pb-spec">
-              {s}
-            </span>
-          ))}
-        </div>
-      )}
-      <div className="text-[11px] text-fg-muted">
-        {highlights.length
-          ? `${highlights.length} highlight${highlights.length === 1 ? '' : 's'}${o.highlights.length ? ' for this quote' : ' from the pricebook item'}`
-          : 'No highlights'}
-        {editable && (
-          <>
-            {' · '}
-            <button type="button" className="card-action" onClick={onEdit}>
-              Edit
-            </button>
-          </>
-        )}
-      </div>
 
       <div className="pb-lines">
-        {lines.map((l) => (
-          <div key={l.id} className="pb-line" data-testid="proposal-option-line">
-            <div className="min-w-0">
-              <div className="pb-line-name" title={l.description}>
-                {l.description}
+        {!system && (o.specs.length > 0 || highlights.length > 0) && systemMeta}
+        {lines.map((l) => {
+          const isSystem = l.id === system?.id;
+          return (
+            <Fragment key={l.id}>
+              <div className={clsx('pb-line', isSystem && 'pb-line--system')} data-testid="proposal-option-line">
+                {isSystem &&
+                  (photo ? (
+                    <img src={photo.thumbnailUrl} alt="" className="pb-thumb" data-testid="proposal-system-thumb" />
+                  ) : (
+                    <span
+                      className="pb-thumb pb-thumb--empty"
+                      title="No photo on this pricebook item. The proposal shows the name only."
+                      data-testid="proposal-system-thumb"
+                    />
+                  ))}
+                <div className="min-w-0">
+                  <div className="pb-line-name" title={l.description}>
+                    {l.description}
+                  </div>
+                  <div className="pb-line-sub">{lineSub(l)}</div>
+                </div>
+                <span className="pb-line-amt tabular-nums">{formatCurrency(l.lineTotal)}</span>
+                {editable && (
+                  <button type="button" className="pb-line-x" aria-label={`Remove ${l.description}`} onClick={() => onRemoveLine(l)}>
+                    <XMarkIcon className="size-3" />
+                  </button>
+                )}
               </div>
-              <div className="pb-line-sub">{lineSub(l)}</div>
-            </div>
-            <span className="pb-line-amt tabular-nums">{formatCurrency(l.lineTotal)}</span>
-            {editable && (
-              <button type="button" className="pb-line-x" aria-label={`Remove ${l.description}`} onClick={() => onRemoveLine(l)}>
-                <XMarkIcon className="size-3" />
-              </button>
-            )}
-          </div>
-        ))}
+              {isSystem && systemMeta}
+            </Fragment>
+          );
+        })}
         {included.map((l) => (
           <div key={l.id} className="pb-line">
             <div className="min-w-0">
@@ -524,11 +562,11 @@ function OptionCard({
             <span className="pb-line-amt text-[11.5px] font-semibold text-success-500">Included</span>
           </div>
         ))}
-        {!lines.length && <div className="py-2 text-[12px] text-fg-muted">Add a system from the pricebook to start.</div>}
+        {!lines.length && !editable && <div className="py-2 text-[12px] text-fg-muted">No lines.</div>}
         {editable && (
-          <button type="button" className="card-action pt-2" onClick={onAddLine}>
+          <button type="button" className="card-action pt-2" onClick={() => onAddLine('freeform')}>
             <PlusIcon />
-            Add line
+            Custom line
           </button>
         )}
       </div>

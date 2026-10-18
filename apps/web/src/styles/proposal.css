@@ -81,20 +81,44 @@
 }
 .pb-pop:disabled { cursor: default; }
 
-/* Product photos show whole, on white: a crop cuts the unit off. */
-.pb-photo {
+/* Pricebook search: a read-only input that opens the add-line panel. */
+.pb-search {
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 6px;
+  gap: 8px;
   width: 100%;
-  height: 96px;
-  border: 1px solid var(--border-soft);
+  height: 32px;
+  padding: 0 8px;
+  border: 1px solid var(--border);
   border-radius: 6px;
-  background: #fff;
-  object-fit: contain;
+  background: var(--bg-elev);
+  color: var(--fg-muted);
+  font-size: 12.5px;
+  font-family: inherit;
+  cursor: text;
 }
-.pb-photo--empty { border-style: dashed; border-color: var(--border-strong); background: transparent; font-size: 11.5px; color: var(--fg-muted); }
+.pb-search:hover { border-color: var(--border-strong); }
+.pb-search:focus-visible { outline: none; box-shadow: 0 0 0 2px color-mix(in oklch, var(--accent-500) 40%, transparent); }
+.pb-kbd {
+  padding: 0 5px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg-elev-2);
+  color: var(--fg-muted);
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 10.5px;
+  line-height: 16px;
+}
+
+/* The system line: its pricebook photo, whole on white; dashed when there is none. */
+.pb-line--system { grid-template-columns: 44px minmax(0, 1fr) auto; align-items: center; border-bottom: 0; }
+.pb-thumb { width: 44px; height: 44px; border: 1px solid var(--border-soft); border-radius: 6px; background: #fff; object-fit: contain; }
+.pb-thumb--empty { display: block; border-style: dashed; border-color: var(--border-strong); background: transparent; }
+.pb-sysmeta { display: flex; flex-direction: column; gap: 4px; padding: 0 0 6px; border-bottom: 1px solid var(--border-soft); }
+.pb-line--system + .pb-sysmeta { padding-left: 52px; }
+.pb-sysmeta-row { font-size: 10.5px; color: var(--fg-muted); }
+.pb-sysmeta-edit { border: 0; padding: 0; background: transparent; font-size: 10.5px; font-weight: 600; color: var(--fg-accent); cursor: pointer; }
+.pb-sysmeta-edit:hover { text-decoration: underline; }
 
 .pb-spec {
   padding: 2px 6px;
