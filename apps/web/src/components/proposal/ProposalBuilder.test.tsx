@@ -58,15 +58,49 @@ describe('ProposalBuilder', () => {
     expect(within(essential).getByLabelText('Option name')).toHaveValue('Essential');
     expect(within(essential).getByText('3-ton 15.2 SEER2 split system')).toBeInTheDocument();
     expect(within(essential).getByText('15.2 SEER2')).toBeInTheDocument();
-    expect(essential).toHaveTextContent('1 highlight from the pricebook item');
+    // Under the system line: its photo, its specs, and where the highlights come from.
+    expect(within(essential).getByTestId('proposal-system-thumb')).toHaveAttribute('src', 'https://cdn/x-t.jpg');
+    expect(within(essential).getByTestId('proposal-system-meta')).toHaveTextContent('Photo · 1 highlight from pricebook · Edit for this quote');
     expect(within(essential).getAllByText('$11,480.00')).toHaveLength(2); // list price and total
 
     expect(within(comfort).getByRole('button', { name: '★ Most popular' })).toHaveAttribute('aria-pressed', 'true');
     // The thermostat is included with Comfort, at no charge.
     expect(within(comfort).getByText('Smart Wi-Fi thermostat')).toBeInTheDocument();
     expect(within(comfort).getByText('Included · set in add-ons')).toBeInTheDocument();
-    expect(within(comfort).getByText('No photo')).toBeInTheDocument();
+    // No photo on the item: a dashed box that says so, and nowhere to upload one.
+    expect(within(comfort).getByTestId('proposal-system-thumb')).toHaveAttribute(
+      'title',
+      'No photo on this pricebook item. The proposal shows the name only.',
+    );
+    expect(within(comfort).getByTestId('proposal-system-meta')).toHaveTextContent('No photo · No highlights');
     expect(within(comfort).getByText('$15,560.00')).toBeInTheDocument(); // after the $400 rebate
+  });
+
+  it('opens the pricebook search first and a custom line last', async () => {
+    const user = userEvent.setup();
+    const q = proposalQuote();
+    q.lineItems = q.lineItems.filter((l) => l.optionId !== 'o-2');
+    renderBuilder(q);
+
+    const [essential, comfort] = screen.getAllByTestId('proposal-option');
+    expect(within(comfort).getByRole('button', { name: 'Search pricebook for a system…' })).toBeInTheDocument();
+    await user.click(within(essential).getByRole('button', { name: 'Add from pricebook…' }));
+    expect(await screen.findByRole('tab', { name: /pricebook/i, selected: true })).toBeInTheDocument();
+    await user.keyboard('{Escape}');
+
+    await user.click(within(essential).getByRole('button', { name: 'Custom line' }));
+    expect(await screen.findByRole('tab', { name: /custom|freeform/i, selected: true })).toBeInTheDocument();
+  });
+
+  it('has no search or custom line once sent, but keeps the thumbnails', () => {
+    renderBuilder(proposalQuote({ status: 'SENT' }), false);
+
+    const [essential, comfort] = screen.getAllByTestId('proposal-option');
+    expect(within(essential).queryByRole('button', { name: 'Add from pricebook…' })).not.toBeInTheDocument();
+    expect(within(essential).queryByRole('button', { name: 'Custom line' })).not.toBeInTheDocument();
+    expect(within(essential).getByTestId('proposal-system-thumb')).toBeInTheDocument();
+    expect(within(comfort).getByTestId('proposal-system-thumb')).toBeInTheDocument();
+    expect(within(essential).getByTestId('proposal-system-meta')).not.toHaveTextContent('Edit for this quote');
   });
 
   it('renames an option, sending it back whole', async () => {

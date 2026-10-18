@@ -27,6 +27,15 @@ const byOrder = (a: QuoteLineItem, b: QuoteLineItem) => (a.sortOrder ?? 0) - (b.
 export const optionLines = (q: Quote, optionId: string) =>
   q.lineItems.filter((l) => l.optionId === optionId && l.role !== 'ADD_ON').sort(byOrder);
 
+/**
+ * The option's system line: the one built from its pricebook item, else its
+ * first pricebook line. Its photo, specs and highlights describe the option.
+ */
+export const systemLine = (q: Quote, o: QuoteOption) => {
+  const lines = optionLines(q, o.id);
+  return lines.find((l) => !!l.itemId && l.itemId === o.presentationItemId) ?? lines.find((l) => !!l.itemId) ?? null;
+};
+
 /** Required lines on the whole quote: sold with every option. */
 export const sharedLines = (q: Quote) =>
   q.lineItems.filter((l) => !l.optionId && l.role !== 'ADD_ON').sort(byOrder);
