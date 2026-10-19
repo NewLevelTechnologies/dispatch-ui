@@ -19,6 +19,8 @@ import { ListToolbar, ListSearch } from '../components/ui/ListToolbar';
 import { ListFooter } from '../components/ui/ListFooter';
 import { FilterChipListbox, ChipListboxOption } from '../components/ui/FilterChipListbox';
 import { DateRangeChip } from '../components/ui/DateRangeChip';
+import { SortHeader, type SortState } from '../components/ui/SortHeader';
+import { useUrlSort } from '../hooks/useUrlSort';
 import { Dialog, DialogActions, DialogBody, DialogDescription, DialogTitle } from '../components/catalyst/dialog';
 import { Field, Label } from '../components/catalyst/fieldset';
 import { Select } from '../components/catalyst/select';
@@ -30,6 +32,10 @@ import { PAYMENT_METHOD_KEY, isPaymentMethod } from '../lib/paymentMethods';
 import { FilterChip } from '../components/ui/FilterChipRow';
 
 const PAGE_SIZE = 25;
+// BE sort whitelist (PaymentController): paymentDate, amount, paymentNumber.
+// Default paymentDate,desc (then paymentNumber,desc) = the "no sort param" state.
+const DEFAULT_SORT: SortState = { key: 'paymentDate', dir: 'desc' };
+const SORT_KEYS = ['paymentDate', 'amount', 'paymentNumber'] as const;
 
 const STATUSES: PaymentStatus[] = ['RECEIVED', 'VOID'];
 
@@ -42,6 +48,11 @@ export default function PaymentsPage() {
   // Filters and page live in the URL, so the footer's page links keep them.
   const [searchParams, setSearchParams] = useSearchParams();
   const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10));
+  const { current: currentSort, sortParam, onSort } = useUrlSort({
+    defaultSort: DEFAULT_SORT,
+    descFirst: ['paymentDate', 'amount'],
+    allowed: SORT_KEYS,
+  });
   const [searchQuery, setSearchQuery] = useState(searchParams.get('search') ?? '');
   const deferredSearch = useDeferredValue(searchQuery.trim());
   const from = searchParams.get('from') ?? '';
@@ -94,7 +105,7 @@ export default function PaymentsPage() {
   const [submitting, setSubmitting] = useState(false);
 
   const { data: paymentPage, isLoading: paymentsLoading } = useQuery({
-    queryKey: ['payments', page, deferredSearch, from, to, method, status, payer, regionId],
+    queryKey: ['payments', page, deferredSearch, from, to, method, status, payer, regionId, sortParam],
     queryFn: () =>
       paymentsApi.getAll({
         from: from || undefined,
@@ -106,6 +117,7 @@ export default function PaymentsPage() {
         q: deferredSearch || undefined,
         page: page - 1,
         size: PAGE_SIZE,
+        sort: sortParam,
       }),
   });
   const payments = paymentPage?.content ?? [];
@@ -342,11 +354,11 @@ export default function PaymentsPage() {
               <DenseTable className="dense-stack">
                 <DenseTHead>
                   <tr>
-                    <th>{t('payments.table.paymentNumber')}</th>
+                    <SortHeader sortKey="paymentNumber" label={t('payments.table.paymentNumber')} current={currentSort} onSort={onSort} />
                     <th>{t('payments.table.payer')}</th>
                     <th>{t('payments.table.appliedTo')}</th>
-                    <th>{t('payments.table.paymentDate')}</th>
-                    <th className="right">{t('payments.table.amount')}</th>
+                    <SortHeader sortKey="paymentDate" label={t('payments.table.paymentDate')} current={currentSort} onSort={onSort} />
+                    <SortHeader sortKey="amount" label={t('payments.table.amount')} align="right" current={currentSort} onSort={onSort} />
                     <th>{t('payments.table.method')}</th>
                     <th>{t('payments.table.reference')}</th>
                     <th>{t('payments.table.receivedBy')}</th>

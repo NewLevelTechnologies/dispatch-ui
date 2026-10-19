@@ -1592,8 +1592,6 @@ vi.mock('react-i18next', async () => {
     'roles.restoreAllSummary.rolesReset': '{{count}} role reset to defaults',
     'roles.restoreAllSummary.userAssignmentsPreserved': 'All user assignments have been preserved.',
     'roles.search.placeholder': 'Search roles…',
-    'roles.sort.label': 'Sort by',
-    'roles.sort.users': 'Users (desc)',
     'roles.summary.builtIn': 'Built-in',
     'roles.summary.custom': 'Custom',
     'roles.summary.roles': 'Roles',

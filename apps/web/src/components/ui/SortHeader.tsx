@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 import { useTranslation } from '@dispatch/i18n';
 
 // Sortable dense-table column header. Renders a `<th>` whose label is a button;
@@ -40,18 +40,21 @@ export function SortHeader({
   current,
   onSort,
   align = 'left',
+  style,
 }: {
   sortKey: string;
   label: ReactNode;
   current: SortState;
   onSort: (key: string) => void;
   align?: 'left' | 'right';
+  style?: CSSProperties;
 }) {
   const { t } = useTranslation();
   const active = current.key === sortKey;
   return (
     <th
       className={align === 'right' ? 'right' : undefined}
+      style={style}
       aria-sort={active ? (current.dir === 'asc' ? 'ascending' : 'descending') : 'none'}
     >
       <button

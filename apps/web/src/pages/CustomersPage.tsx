@@ -27,7 +27,8 @@ import { StatusPickerChip } from '../components/ui/StatusPickerChip';
 import {
   DenseTable, DenseTHead, DenseRow, CellStack, CellTop, CellSub,
 } from '../components/ui/DenseTable';
-import { SortHeader, type SortDir, type SortState } from '../components/ui/SortHeader';
+import { SortHeader, type SortState } from '../components/ui/SortHeader';
+import { useUrlSort } from '../hooks/useUrlSort';
 import { ListToolbar, ListSearch } from '../components/ui/ListToolbar';
 import { ListFooter } from '../components/ui/ListFooter';
 import { LoadingState } from '../components/ui/LoadingState';
@@ -64,15 +65,7 @@ function readBool(raw: string | null): boolean {
 const DEFAULT_SORT: SortState = { key: 'name', dir: 'asc' };
 // Count columns read best most-first on the first click; text columns default
 // to asc.
-const DESC_FIRST = new Set(['openJobsCount']);
-
-function parseSort(raw: string | null): SortState {
-  if (raw) {
-    const [key, dir] = raw.split(',');
-    if (key) return { key, dir: dir === 'asc' ? 'asc' : 'desc' };
-  }
-  return DEFAULT_SORT;
-}
+const DESC_FIRST = ['openJobsCount'];
 
 export default function CustomersPage() {
   const navigate = useNavigate();
@@ -95,8 +88,7 @@ export default function CustomersPage() {
   // to comma-separated `?tags=uuid1,uuid2` on the wire. getAll() returns a fresh
   // array each call, so memoize to keep the query key stable across renders.
   const tagIds = useMemo(() => searchParams.getAll('tag'), [searchParams]);
-  const sortParam = searchParams.get('sort');
-  const currentSort = parseSort(sortParam);
+  const { current: currentSort, sortParam, onSort } = useUrlSort({ defaultSort: DEFAULT_SORT, descFirst: DESC_FIRST });
 
   // Local input mirrors the URL but lets typing feel instant.
   const [searchQuery, setSearchQuery] = useState(urlSearch);
@@ -175,24 +167,6 @@ export default function CustomersPage() {
     else next.set('page', String(target));
     const qs = next.toString();
     return qs ? `?${qs}` : '?';
-  };
-
-  // Toggle dir when re-clicking the active column, else the column's default
-  // dir. Resets to page 1. Writing the default (name,asc) back is harmless — it
-  // equals the implicit default the BE applies when the param is absent.
-  const onSort = (key: string) => {
-    const dir: SortDir =
-      key === currentSort.key
-        ? currentSort.dir === 'asc'
-          ? 'desc'
-          : 'asc'
-        : DESC_FIRST.has(key)
-          ? 'desc'
-          : 'asc';
-    const next = new URLSearchParams(searchParams);
-    next.set('sort', `${key},${dir}`);
-    next.delete('page');
-    setSearchParams(next, { replace: false });
   };
 
   // Build the API status param: array of upper-case enum values, undefined

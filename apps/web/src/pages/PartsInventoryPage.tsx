@@ -15,6 +15,8 @@ import {
 import { dense } from '../components/ui/dense';
 import { Dropdown, DropdownButton, DropdownItem, DropdownLabel, DropdownMenu } from '../components/catalyst/dropdown';
 import IconButton from '../components/IconButton';
+import { SortHeader, type SortState } from '../components/ui/SortHeader';
+import { sortRows, useUrlSort } from '../hooks/useUrlSort';
 import { Dialog, DialogActions, DialogBody, DialogDescription, DialogTitle } from '../components/catalyst/dialog';
 import { Field, FieldGroup, Fieldset, Label } from '../components/catalyst/fieldset';
 import { Input, InputGroup } from '../components/catalyst/input';
@@ -28,12 +30,22 @@ import {
   type UpdatePartsInventoryRequest,
 } from '../api/setup';
 
+// The whole set is loaded, so sort is client-side. The default ('server') has
+// no accessor → rows keep the BE's order until a column is clicked.
+const DEFAULT_SORT: SortState = { key: 'server', dir: 'asc' };
+const SORT_KEYS = ['partNumber', 'partName', 'warehouse', 'quantityOnHand', 'reorderPoint', 'unitCost'] as const;
+
 export default function PartsInventoryPage() {
   const queryClient = useQueryClient();
   const { t } = useTranslation();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedPart, setSelectedPart] = useState<PartsInventory | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const { current: currentSort, onSort } = useUrlSort({
+    defaultSort: DEFAULT_SORT,
+    descFirst: ['quantityOnHand', 'reorderPoint', 'unitCost'],
+    allowed: SORT_KEYS,
+  });
   const [formData, setFormData] = useState<CreatePartsInventoryRequest>({
     warehouseId: '',
     partNumber: '',
@@ -64,18 +76,25 @@ export default function PartsInventoryPage() {
 
   // Filter parts based on search query
   const filteredParts = useMemo(() => {
-    if (safePartsInventory.length === 0) return [];
-    if (!searchQuery.trim()) return safePartsInventory;
-
-    const query = searchQuery.toLowerCase();
-    return safePartsInventory.filter(
-      (part) =>
-        part.partNumber.toLowerCase().includes(query) ||
-        part.partName.toLowerCase().includes(query) ||
-        part.warehouseId.toLowerCase().includes(query) ||
-        part.warehouseName?.toLowerCase().includes(query)
-    );
-  }, [safePartsInventory, searchQuery]);
+    const query = searchQuery.trim().toLowerCase();
+    const matched = query
+      ? safePartsInventory.filter(
+          (part) =>
+            part.partNumber.toLowerCase().includes(query) ||
+            part.partName.toLowerCase().includes(query) ||
+            part.warehouseId.toLowerCase().includes(query) ||
+            part.warehouseName?.toLowerCase().includes(query)
+        )
+      : safePartsInventory;
+    return sortRows(matched, currentSort, {
+      partNumber: (p) => p.partNumber,
+      partName: (p) => p.partName,
+      warehouse: (p) => p.warehouseName || p.warehouseId,
+      quantityOnHand: (p) => p.quantityOnHand,
+      reorderPoint: (p) => p.reorderPoint,
+      unitCost: (p) => p.unitCost,
+    });
+  }, [safePartsInventory, searchQuery, currentSort]);
 
   const createMutation = useMutation({
     mutationFn: (request: CreatePartsInventoryRequest) => partsInventoryApi.create(request),
@@ -222,12 +241,12 @@ export default function PartsInventoryPage() {
               <DenseTable>
                 <DenseTHead>
                   <tr>
-                    <th>{t('equipment.table.partNumber')}</th>
-                    <th>{t('equipment.table.partName')}</th>
-                    <th>{t('equipment.table.warehouse')}</th>
-                    <th className="right">{t('equipment.table.quantity')}</th>
-                    <th className="right">{t('equipment.table.reorderPoint')}</th>
-                    <th className="right">{t('equipment.table.unitCost')}</th>
+                    <SortHeader sortKey="partNumber" label={t('equipment.table.partNumber')} current={currentSort} onSort={onSort} />
+                    <SortHeader sortKey="partName" label={t('equipment.table.partName')} current={currentSort} onSort={onSort} />
+                    <SortHeader sortKey="warehouse" label={t('equipment.table.warehouse')} current={currentSort} onSort={onSort} />
+                    <SortHeader sortKey="quantityOnHand" label={t('equipment.table.quantity')} align="right" current={currentSort} onSort={onSort} />
+                    <SortHeader sortKey="reorderPoint" label={t('equipment.table.reorderPoint')} align="right" current={currentSort} onSort={onSort} />
+                    <SortHeader sortKey="unitCost" label={t('equipment.table.unitCost')} align="right" current={currentSort} onSort={onSort} />
                     <th></th>
                   </tr>
                 </DenseTHead>

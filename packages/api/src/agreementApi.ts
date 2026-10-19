@@ -831,7 +831,10 @@ export const agreementPlanApi = {
   // (management table); active:true for the sell-from-plan picker. Axios drops
   // undefined params, so omitting active really omits it.
   getAll: async (params?: ListAgreementPlansParams): Promise<AgreementPlanPage> => {
-    const response = await apiClient.get<AgreementPlanPage>('/work-orders/agreement-plans', { params });
+    // The BE takes Spring's native `sort=field,dir`; sortBy/sortDir alone are ignored.
+    const { sortBy, sortDir, ...rest } = params ?? {};
+    const wire = sortBy ? { ...rest, sort: `${sortBy},${sortDir ?? 'asc'}` } : rest;
+    const response = await apiClient.get<AgreementPlanPage>('/work-orders/agreement-plans', { params: wire });
     return response.data;
   },
   getById: async (id: string): Promise<AgreementPlanResponse> => {

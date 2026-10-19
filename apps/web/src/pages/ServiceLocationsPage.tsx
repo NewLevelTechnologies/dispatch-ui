@@ -32,7 +32,8 @@ import { FilterChipRow, FilterChip } from '../components/ui/FilterChipRow';
 import {
   DenseTable, DenseTHead, DenseRow, CellStack, CellTop, CellSub,
 } from '../components/ui/DenseTable';
-import { SortHeader, type SortDir, type SortState } from '../components/ui/SortHeader';
+import { SortHeader, type SortState } from '../components/ui/SortHeader';
+import { useUrlSort } from '../hooks/useUrlSort';
 import { Dropdown, DropdownButton, DropdownItem, DropdownLabel, DropdownMenu } from '../components/catalyst/dropdown';
 import IconButton from '../components/IconButton';
 import { FilterChipListbox, ChipListboxOption } from '../components/ui/FilterChipListbox';
@@ -90,15 +91,7 @@ function formatTagDisplayValue(
 const DEFAULT_SORT: SortState = { key: 'locationName', dir: 'asc' };
 // Date columns read best most-recent-first on the first click; text columns
 // default to asc.
-const DESC_FIRST = new Set(['lastServiceAt']);
-
-function parseSort(raw: string | null): SortState {
-  if (raw) {
-    const [key, dir] = raw.split(',');
-    if (key) return { key, dir: dir === 'asc' ? 'asc' : 'desc' };
-  }
-  return DEFAULT_SORT;
-}
+const DESC_FIRST = ['lastServiceAt'];
 
 export default function ServiceLocationsPage() {
   const navigate = useNavigate();
@@ -129,8 +122,7 @@ export default function ServiceLocationsPage() {
   // Tag filter ids — URL writes repeated `?tag=uuid`; API serializes to
   // comma-separated `?tags=uuid1,uuid2` on the wire.
   const tagIds = useMemo(() => searchParams.getAll('tag'), [searchParams]);
-  const sortParam = searchParams.get('sort');
-  const currentSort = parseSort(sortParam);
+  const { current: currentSort, sortParam, onSort } = useUrlSort({ defaultSort: DEFAULT_SORT, descFirst: DESC_FIRST });
 
   const [searchQuery, setSearchQuery] = useState(urlSearch);
   useEffect(() => {
@@ -230,24 +222,6 @@ export default function ServiceLocationsPage() {
     else next.set('page', String(target));
     const qs = next.toString();
     return qs ? `?${qs}` : '?';
-  };
-
-  // Toggle dir when re-clicking the active column, else the column's default
-  // dir. Resets to page 1. Writing the default (customerName,asc) back is
-  // harmless — it equals the implicit default the BE applies when absent.
-  const onSort = (key: string) => {
-    const dir: SortDir =
-      key === currentSort.key
-        ? currentSort.dir === 'asc'
-          ? 'desc'
-          : 'asc'
-        : DESC_FIRST.has(key)
-          ? 'desc'
-          : 'asc';
-    const next = new URLSearchParams(searchParams);
-    next.set('sort', `${key},${dir}`);
-    next.delete('page');
-    setSearchParams(next, { replace: false });
   };
 
   const apiStatuses = useMemo<Array<'ACTIVE' | 'INACTIVE' | 'CLOSED'> | undefined>(() => {

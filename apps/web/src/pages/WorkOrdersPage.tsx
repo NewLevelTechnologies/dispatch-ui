@@ -47,6 +47,8 @@ import {
 import { ListToolbar, ListSearch } from '../components/ui/ListToolbar';
 import { ListFooter } from '../components/ui/ListFooter';
 import { AssignedUsersCell } from '../components/ui/AssignedUsersCell';
+import { SortHeader, type SortState } from '../components/ui/SortHeader';
+import { useUrlSort } from '../hooks/useUrlSort';
 
 // ─── Filter constants ────────────────────────────────────────────────────────
 
@@ -82,6 +84,14 @@ function resolveStatusSelection(next: string[], prev: string[]): string[] {
 }
 
 const PAGE_SIZE = 50;
+
+// BE sort whitelist (WorkOrderController): scheduledDate, completedDate,
+// createdAt, workOrderNumber, priority. Only the ones with a matching column are
+// headers; priority is a string enum on the wire (sorts alphabetically, not by
+// severity) so it's not offered. Default createdAt,desc has no column — it's
+// the "no sort param" state, so no header shows active until one is clicked.
+const DEFAULT_SORT: SortState = { key: 'createdAt', dir: 'desc' };
+const SORT_KEYS = ['createdAt', 'workOrderNumber', 'scheduledDate'] as const;
 
 type PillTone = 'neutral' | 'info' | 'success' | 'warning' | 'danger' | 'accent' | 'violet';
 
@@ -231,6 +241,11 @@ export default function WorkOrdersPage() {
   const completedFrom = searchParams.get('completedFrom') ?? '';
   const completedTo = searchParams.get('completedTo') ?? '';
   const pageNumber = Math.max(1, parseInt(searchParams.get('page') ?? '1', 10) || 1);
+  const { current: currentSort, sortParam, onSort } = useUrlSort({
+    defaultSort: DEFAULT_SORT,
+    descFirst: ['scheduledDate'],
+    allowed: SORT_KEYS,
+  });
 
   // Local search input state — mirrors URL for instant feedback. Written to the
   // URL synchronously on each keystroke (with replace so we don't flood history),
@@ -352,8 +367,10 @@ export default function WorkOrdersPage() {
       includeArchived: includeArchived || undefined,
       page: pageNumber - 1, // URL is 1-based; backend Spring Page is 0-based
       size: PAGE_SIZE,
+      // Omitted → BE default createdAt,desc (newest first).
+      sort: sortParam as ListWorkOrdersParams['sort'],
     }),
-    [statusIds, cancelledView, deferredSearch, typeIds, divisionIds, regionIds, itemStatusIds, assignedId, priorityIds, unassignedOnly, onSiteOnly, unbilledOnly, completedFrom, completedTo, dateRange, includeArchived, pageNumber]
+    [statusIds, cancelledView, deferredSearch, typeIds, divisionIds, regionIds, itemStatusIds, assignedId, priorityIds, unassignedOnly, onSiteOnly, unbilledOnly, completedFrom, completedTo, dateRange, includeArchived, pageNumber, sortParam]
   );
 
   const { data: pageData, isLoading, error } = useQuery({
@@ -947,11 +964,11 @@ export default function WorkOrdersPage() {
                 </colgroup>
                 <DenseTHead>
                   <tr>
-                    <th>{getName('work_order')}</th>
+                    <SortHeader sortKey="workOrderNumber" label={getName('work_order')} current={currentSort} onSort={onSort} />
                     <th>{getName('service_location')}</th>
                     <th>{t('workOrders.table.statusHeader')}</th>
                     <th>{t('workOrders.table.assigned')}</th>
-                    <th>{t('workOrders.table.scheduled')}</th>
+                    <SortHeader sortKey="scheduledDate" label={t('workOrders.table.scheduled')} current={currentSort} onSort={onSort} />
                     <th></th>
                   </tr>
                 </DenseTHead>

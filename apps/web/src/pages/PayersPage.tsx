@@ -18,7 +18,8 @@ import { Card, CardBody } from '../components/ui/Card';
 import { TagPill } from '../components/ui/TagPill';
 import { TagList } from '../components/ui/TagList';
 import { DenseTable, DenseTHead, DenseRow, CellStack, CellTop, CellSub } from '../components/ui/DenseTable';
-import { SortHeader, type SortDir, type SortState } from '../components/ui/SortHeader';
+import { SortHeader, type SortState } from '../components/ui/SortHeader';
+import { useUrlSort } from '../hooks/useUrlSort';
 import { ListToolbar, ListSearch } from '../components/ui/ListToolbar';
 import { FilterChipRow, FilterChip } from '../components/ui/FilterChipRow';
 import { FilterChipListbox, ChipListboxOption } from '../components/ui/FilterChipListbox';
@@ -64,15 +65,7 @@ const moneyK = (n: number) =>
 const DEFAULT_SORT: SortState = { key: 'outstanding', dir: 'desc' };
 // Columns that read best most-first (amounts, counts, dates) default to desc on
 // first click; text columns (name, terms) default to asc.
-const DESC_FIRST = new Set(['outstanding', 'aged91', 'openInvoices', 'lifetimePaid', 'lastPayment', 'createdAt']);
-
-function parseSort(raw: string | null): SortState {
-  if (raw) {
-    const [key, dir] = raw.split(',');
-    if (key) return { key, dir: dir === 'asc' ? 'asc' : 'desc' };
-  }
-  return DEFAULT_SORT;
-}
+const DESC_FIRST = ['outstanding', 'aged91', 'openInvoices', 'lifetimePaid', 'lastPayment', 'createdAt'];
 
 export default function PayersPage() {
   const navigate = useNavigate();
@@ -91,8 +84,7 @@ export default function PayersPage() {
   // serializes to comma-separated `?tags=` on the wire. getAll() returns a fresh
   // array each call, so memoize to keep the query key stable across renders.
   const tagIds = useMemo(() => searchParams.getAll('tag'), [searchParams]);
-  const sortParam = searchParams.get('sort');
-  const currentSort = parseSort(sortParam);
+  const { current: currentSort, sortParam, onSort } = useUrlSort({ defaultSort: DEFAULT_SORT, descFirst: DESC_FIRST });
   const [searchQuery, setSearchQuery] = useState(urlSearch);
   useEffect(() => {
     setSearchQuery(urlSearch);
@@ -128,24 +120,6 @@ export default function PayersPage() {
     else next.set('page', String(target));
     const qs = next.toString();
     return qs ? `?${qs}` : '?';
-  };
-
-  // Toggle dir when re-clicking the active column, else the column's default
-  // dir. Writing the default (outstanding,desc) back into the URL is harmless —
-  // it equals the implicit default the BE applies when the param is absent.
-  const onSort = (key: string) => {
-    const dir: SortDir =
-      key === currentSort.key
-        ? currentSort.dir === 'asc'
-          ? 'desc'
-          : 'asc'
-        : DESC_FIRST.has(key)
-          ? 'desc'
-          : 'asc';
-    const next = new URLSearchParams(searchParams);
-    next.set('sort', `${key},${dir}`);
-    next.delete('page');
-    setSearchParams(next, { replace: false });
   };
 
   // Tag list for the "type" filter picker. Tenant-wide tag set (same source as

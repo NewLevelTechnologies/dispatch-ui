@@ -21,7 +21,8 @@ import { Pill } from '../components/ui/Pill';
 import { RoleChip } from '../components/RoleChip';
 import { Card, CardBody } from '../components/ui/Card';
 import { DenseTable, DenseTHead, DenseRow, CellStack, CellTop, CellSub } from '../components/ui/DenseTable';
-import { SortHeader, type SortDir, type SortState } from '../components/ui/SortHeader';
+import { SortHeader, type SortState } from '../components/ui/SortHeader';
+import { useUrlSort } from '../hooks/useUrlSort';
 import { ListToolbar, ListSearch } from '../components/ui/ListToolbar';
 import { ListFooter } from '../components/ui/ListFooter';
 import { FilterChipListbox, ChipListboxOption } from '../components/ui/FilterChipListbox';
@@ -94,15 +95,7 @@ function readInvitation(raw: string | null): InvitationValue {
 // "no sort param" so the BE applies its own default. Role is multi-valued and
 // not server-sortable, so its column stays a plain header.
 const DEFAULT_SORT: SortState = { key: 'lastName', dir: 'asc' };
-const DESC_FIRST = new Set<string>(['createdAt']);
-
-function parseSort(raw: string | null): SortState {
-  if (raw) {
-    const [key, dir] = raw.split(',');
-    if (key) return { key, dir: dir === 'asc' ? 'asc' : 'desc' };
-  }
-  return DEFAULT_SORT;
-}
+const DESC_FIRST = ['createdAt'];
 
 export default function UsersPage() {
   const navigate = useNavigate();
@@ -120,8 +113,7 @@ export default function UsersPage() {
   // roles — so it matches exactly who the dispatch board shows.
   const assignmentFilter = readAssignment(searchParams.get('assignment'));
   const invitationFilter = readInvitation(searchParams.get('invitation'));
-  const sortParam = searchParams.get('sort');
-  const currentSort = parseSort(sortParam);
+  const { current: currentSort, sortParam, onSort } = useUrlSort({ defaultSort: DEFAULT_SORT, descFirst: DESC_FIRST });
 
   // Local input mirrors the URL but lets typing feel instant.
   const [searchQuery, setSearchQuery] = useState(urlSearch);
@@ -287,24 +279,6 @@ export default function UsersPage() {
     else next.set('page', String(target));
     const qs = next.toString();
     return qs ? `?${qs}` : '?';
-  };
-
-  // Toggle dir when re-clicking the active column, else the column's default
-  // dir. Resets to page 1. Writing the default (lastName,asc) back is harmless —
-  // it equals the implicit default the BE applies when the param is absent.
-  const onSort = (key: string) => {
-    const dir: SortDir =
-      key === currentSort.key
-        ? currentSort.dir === 'asc'
-          ? 'desc'
-          : 'asc'
-        : DESC_FIRST.has(key)
-          ? 'desc'
-          : 'asc';
-    const next = new URLSearchParams(searchParams);
-    next.set('sort', `${key},${dir}`);
-    next.delete('page');
-    setSearchParams(next, { replace: false });
   };
 
   // Both removal routes answer 409 for two different refusals, told apart by

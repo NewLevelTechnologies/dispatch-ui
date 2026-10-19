@@ -128,6 +128,24 @@ describe('WorkOrdersPage', () => {
     expect(screen.getByText('WO-00002')).toBeInTheDocument();
   });
 
+  it('sends no sort by default, then the column key when a header is clicked', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({ data: pageOf(mockWorkOrders) });
+    renderWithProviders(<WorkOrdersPage />);
+    await screen.findByText('WO-00001');
+
+    const listCalls = () => vi.mocked(apiClient.get).mock.calls.filter(([url]) => url === '/work-orders');
+    expect(listCalls()[0][1]).toEqual(expect.objectContaining({ params: expect.not.objectContaining({ sort: expect.anything() }) }));
+
+    await userEvent.click(screen.getByRole('button', { name: /sort by scheduled/i }));
+
+    await waitFor(() =>
+      expect(apiClient.get).toHaveBeenCalledWith(
+        '/work-orders',
+        expect.objectContaining({ params: expect.objectContaining({ sort: 'scheduledDate,desc' }) }),
+      ),
+    );
+  });
+
   it('displays progress badges with correct labels', async () => {
     vi.mocked(apiClient.get).mockResolvedValue({ data: pageOf(mockWorkOrders) });
 

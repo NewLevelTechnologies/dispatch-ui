@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { agreementApi, agreementNotesApi } from './agreementApi';
+import { agreementApi, agreementNotesApi, agreementPlanApi } from './agreementApi';
 import apiClient from './client';
 
 vi.mock('./client');
@@ -284,5 +284,12 @@ describe('agreementApi', () => {
       params: { customerId: 'cust-1' },
     });
     expect(out).toEqual(rows);
+  });
+
+  it('agreementPlanApi.getAll folds sortBy/sortDir into the Spring sort param', async () => {
+    await agreementPlanApi.getAll({ active: true, sortBy: 'defaultAmount', sortDir: 'desc', page: 0, size: 25 });
+    expect(apiClient.get).toHaveBeenCalledWith('/work-orders/agreement-plans', {
+      params: { active: true, sort: 'defaultAmount,desc', page: 0, size: 25 },
+    });
   });
 });

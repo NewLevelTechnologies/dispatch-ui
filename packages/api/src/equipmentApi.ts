@@ -200,10 +200,14 @@ export interface ListEquipmentParams {
   size?: number;
 }
 
+// The BE takes Spring's native `sort=field,dir` (sortBy/sortDir are ignored on
+// the wire), so fold the typed pair into that.
 function cleanParams(params?: ListEquipmentParams): Record<string, string | number | boolean> {
   if (!params) return {};
+  const { sortBy, sortDir, ...rest } = params;
   const out: Record<string, string | number | boolean> = {};
-  for (const [key, value] of Object.entries(params)) {
+  if (sortBy) out.sort = `${sortBy},${sortDir ?? 'asc'}`;
+  for (const [key, value] of Object.entries(rest)) {
     if (value === undefined || value === null || value === '') continue;
     out[key] = value;
   }

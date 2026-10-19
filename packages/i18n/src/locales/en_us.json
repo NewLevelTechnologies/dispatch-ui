@@ -1890,10 +1890,6 @@
     "search": {
       "placeholder": "Search roles…"
     },
-    "sort": {
-      "users": "Users (desc)",
-      "label": "Sort by"
-    },
     "summary": {
       "builtIn": "Built-in",
       "custom": "Custom",
