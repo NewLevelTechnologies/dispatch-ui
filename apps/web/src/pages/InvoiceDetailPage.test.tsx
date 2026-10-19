@@ -108,6 +108,15 @@ describe('InvoiceDetailPage', () => {
     expect(screen.getByText(/Due Nov 10, 2026 · total \$1,450\.00, \$500\.00 paid/)).toBeInTheDocument();
   });
 
+  it('leads the actions with a View work order button that returns here', async () => {
+    renderPage();
+
+    expect(await screen.findByRole('link', { name: 'View work order' })).toHaveAttribute(
+      'href',
+      '/work-orders/wo-1?from=invoice&docId=inv-1&docNo=INV-3307',
+    );
+  });
+
   it('says the bill-to is tax-exempt', async () => {
     renderPage();
     expect(await screen.findByText('Tax-exempt · cert AZ-5000-114')).toBeInTheDocument();

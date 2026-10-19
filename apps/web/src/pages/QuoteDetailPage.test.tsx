@@ -120,6 +120,15 @@ describe('QuoteDetailPage', () => {
     expect(screen.getByRole('link', { name: 'WO-3892' })).toHaveAttribute('href', '/work-orders/wo-1?from=quote&docId=q-1&docNo=Q-1882');
   });
 
+  it('leads the actions with a View work order button that returns here', async () => {
+    renderPage();
+
+    expect(await screen.findByRole('link', { name: 'View work order' })).toHaveAttribute(
+      'href',
+      '/work-orders/wo-1?from=quote&docId=q-1&docNo=Q-1882',
+    );
+  });
+
   it('shows each line priced as the server returned it, in sortOrder', async () => {
     renderPage();
     await screen.findByText('Q-1882');
