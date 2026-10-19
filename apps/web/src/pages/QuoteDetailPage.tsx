@@ -256,6 +256,7 @@ export default function QuoteDetailPage() {
       error={false}
       entityLabel={entityLabel}
       back={back}
+      workOrderHref={quote.workOrderId ? withDocumentBack(`/work-orders/${quote.workOrderId}`, 'quote', quote.id, quote.quoteNumber) : null}
       title={quote.title || undefined}
       number={quote.quoteNumber}
       actions={actions}
