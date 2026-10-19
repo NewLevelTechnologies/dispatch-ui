@@ -19,6 +19,8 @@ import { ListToolbar, ListSearch } from '../components/ui/ListToolbar';
 import { ListFooter } from '../components/ui/ListFooter';
 import { ChipListboxOption, FilterChipListbox } from '../components/ui/FilterChipListbox';
 import { DateRangeChip } from '../components/ui/DateRangeChip';
+import { SortHeader, type SortState } from '../components/ui/SortHeader';
+import { useUrlSort } from '../hooks/useUrlSort';
 import { EMPTY_DATE_RANGE, rangeForPreset, type DatePreset, type DateRange } from '../lib/dateRangePresets';
 import { AssignmentChip, UNASSIGNED } from '../components/billing/AssignmentChip';
 import { StartDocumentDialog } from '../components/document/StartDocumentDialog';
@@ -56,6 +58,12 @@ const VIEW_LABEL: Record<InvoiceView, string> = {
   void: 'Void',
 };
 
+// BE sort whitelist (InvoiceController): invoiceDate, dueDate, totalAmount,
+// status, createdAt, updatedAt. Status is an enum sorted by name (meaningless
+// order) and Balance isn't whitelisted, so neither is offered.
+const DEFAULT_SORT: SortState = { key: 'invoiceDate', dir: 'desc' };
+const SORT_KEYS = ['invoiceDate', 'totalAmount'] as const;
+
 const day = (v: string | null | undefined) => formatDocDate(v, false) ?? '—';
 
 /**
@@ -76,6 +84,12 @@ export default function InvoicesPage() {
   const [searchQuery, setSearchQuery] = useState(searchParams.get('search') ?? '');
   const deferredSearch = useDeferredValue(searchQuery.trim());
   const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10));
+  const { current: currentSort, onSort } = useUrlSort({
+    defaultSort: DEFAULT_SORT,
+    descFirst: ['invoiceDate', 'totalAmount'],
+    allowed: SORT_KEYS,
+  });
+  const sort = `${currentSort.key},${currentSort.dir}` as ListInvoicesParams['sort'];
   // An exact status from an older link (the revenue report's `billed`) shows as a chip on All.
   const legacyStatusId = searchParams.get('status') ?? '';
   const legacyStatus = INVOICE_STATUS_FILTERS[legacyStatusId] ?? null;
@@ -129,7 +143,7 @@ export default function InvoicesPage() {
     queryFn: () => invoicesApi.getViews(scope),
   });
   const { data: invoicePage, isLoading } = useQuery({
-    queryKey: ['invoices', view, legacyStatusId, page, deferredSearch, dateRange.from, dateRange.to, divisionId, typeId, regionId],
+    queryKey: ['invoices', view, legacyStatusId, page, deferredSearch, dateRange.from, dateRange.to, divisionId, typeId, regionId, sort],
     queryFn: () =>
       invoicesApi.getAll({
         q: deferredSearch || undefined,
@@ -141,7 +155,7 @@ export default function InvoicesPage() {
         to: scope.to,
         page: page - 1,
         size: PAGE_SIZE,
-        sort: 'invoiceDate,desc',
+        sort,
       }),
     placeholderData: keepPreviousData,
   });
@@ -271,9 +285,9 @@ export default function InvoicesPage() {
                     <th>Bill to</th>
                     <th>{getName('service_location')}</th>
                     <th>{`${getName('customer')} PO`}</th>
-                    <th>Issued</th>
+                    <SortHeader sortKey="invoiceDate" label="Issued" current={currentSort} onSort={onSort} />
                     <th>Status</th>
-                    <th className="right">Total</th>
+                    <SortHeader sortKey="totalAmount" label="Total" align="right" current={currentSort} onSort={onSort} />
                     <th className="right">Balance</th>
                   </tr>
                 </DenseTHead>

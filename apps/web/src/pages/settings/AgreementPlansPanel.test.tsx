@@ -84,7 +84,7 @@ describe('AgreementPlansPanel', () => {
     expect(apiClient.get).toHaveBeenCalledWith(
       '/work-orders/agreement-plans',
       expect.objectContaining({
-        params: expect.objectContaining({ active: true, sortBy: 'name', sortDir: 'asc', page: 0, size: 25 }),
+        params: expect.objectContaining({ active: true, sort: 'name,asc', page: 0, size: 25 }),
       }),
     );
 

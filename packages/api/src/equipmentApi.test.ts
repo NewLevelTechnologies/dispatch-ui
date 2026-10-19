@@ -47,6 +47,16 @@ describe('equipmentApi', () => {
     });
   });
 
+  it('list folds sortBy/sortDir into the Spring sort param the BE reads', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({ data: { content: [] } });
+
+    await equipmentApi.list({ sortBy: 'name', sortDir: 'desc', page: 0 });
+
+    expect(apiClient.get).toHaveBeenCalledWith('/equipment', {
+      params: { sort: 'name,desc', page: 0 },
+    });
+  });
+
   it('list sends no params at all when called with nothing', async () => {
     vi.mocked(apiClient.get).mockResolvedValue({ data: { content: [] } });
 
