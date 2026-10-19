@@ -397,6 +397,8 @@ function OptionCard({
   const lines = optionLines(quote, o.id);
   const included = addOnLines(quote).filter((l) => modeOf(o, l.id) === 'INCLUDED');
   const photo = optionPhoto(o);
+  /** A snapshot photo can arrive without a thumbnail; fall back to the full image. */
+  const photoSrc = photo?.thumbnailUrl || photo?.url || null;
   const highlights = optionHighlights(o);
   const system = systemLine(quote, o);
   const searchLabel = lines.length ? 'Add from pricebook…' : 'Search pricebook for a system…';
@@ -527,8 +529,8 @@ function OptionCard({
             <Fragment key={l.id}>
               <div className={clsx('pb-line', isSystem && 'pb-line--system')} data-testid="proposal-option-line">
                 {isSystem &&
-                  (photo ? (
-                    <img src={photo.thumbnailUrl} alt="" className="pb-thumb" data-testid="proposal-system-thumb" />
+                  (photoSrc ? (
+                    <img src={photoSrc} alt="" className="pb-thumb" data-testid="proposal-system-thumb" />
                   ) : (
                     <span
                       className="pb-thumb pb-thumb--empty"
@@ -541,6 +543,8 @@ function OptionCard({
                     {l.description}
                   </div>
                   <div className="pb-line-sub">{lineSub(l)}</div>
+                  {/* Inside the body, so the specs and meta never become grid rows of their own. */}
+                  {isSystem && systemMeta}
                 </div>
                 <span className="pb-line-amt tabular-nums">{formatCurrency(l.lineTotal)}</span>
                 {editable && (
@@ -549,7 +553,6 @@ function OptionCard({
                   </button>
                 )}
               </div>
-              {isSystem && systemMeta}
             </Fragment>
           );
         })}
